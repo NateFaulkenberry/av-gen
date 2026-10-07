@@ -119,21 +119,23 @@ constexpr std::uint32_t kBeginMarker = 0xFFFFu;
 constexpr int kMaxSdfPackedNodes = kMaxSdfNodes * 2;
 constexpr float kTwoPi = 6.283185307179586f;
 
-constexpr std::array<const char*, 33> kKindNames = {
+constexpr std::array<const char*, 40> kKindNames = {
     "sphere",       "box",           "roundedBox",         "cylinder",         "capsule",   "torus",
     "plane",        "cone",          "union",              "intersection",     "difference", "smoothUnion",
     "smoothIntersection", "smoothDifference", "morph", "translate", "rotate",  "scale",     "twist",
     "bend",         "repeat",        "polarRepeat",        "mirror",           "fold",      "recurse",
     "displaceNoise", "displaceVoronoi", "displaceWave", "displaceField",
     "stairs",       "screw",         "warp",  "shell", // ADR-1040
+    "ellipsoid", "taperedCapsule", "octahedron", "facet", "blend", "fray", "farField", // ADR-1144
 };
 
 bool isCombination(SdfNodeKind kind) {
-    return kind >= SdfNodeKind::Union && kind <= SdfNodeKind::Morph;
+    return (kind >= SdfNodeKind::Union && kind <= SdfNodeKind::Morph) || kind == SdfNodeKind::Blend;
 }
 
 bool isUnary(SdfNodeKind kind) {
-    return kind >= SdfNodeKind::Translate && kind != SdfNodeKind::Stairs;
+    return (kind >= SdfNodeKind::Translate && kind <= SdfNodeKind::Shell && kind != SdfNodeKind::Stairs) ||
+           kind == SdfNodeKind::Fray || kind == SdfNodeKind::FarField;
 }
 
 bool isDisplacement(SdfNodeKind kind) {
@@ -177,6 +179,9 @@ struct NodeParams {
     int count = 0;
     std::uint32_t seed = 1;
     const FieldSpec* field = nullptr;
+    glm::vec3 from{0.0f};          // ADR-1144: TaperedCapsule
+    glm::vec3 to{0.0f, 1.0f, 0.0f};
+    float radius2 = 0.5f;
 };
 
 NodeParams paramsOf(const SdfNode& n, const FieldSet* fields) {
@@ -196,6 +201,9 @@ NodeParams paramsOf(const SdfNode& n, const FieldSet* fields) {
     p.speed = n.speed;
     p.count = n.count;
     p.seed = n.seed;
+    p.from = n.from;
+    p.to = n.to;
+    p.radius2 = n.radius2;
     if (n.kind == SdfNodeKind::DisplaceField && fields != nullptr) {
         p.field = fields->find(n.reference);
     }
@@ -316,6 +324,81 @@ float sdStairs(const glm::vec3& p, const glm::vec3& size, float thickness, int c
     return std::min(std::max(d2, dz), 0.0f) + glm::length(glm::max(glm::vec2(d2, dz), glm::vec2(0.0f)));
 }
 
+// ---- ADR-1144: the anatomical vocabulary (compiled trees only; shaders/sdf_program.wgsl's twins) ----
+
+// Quilez's ellipsoid bound: k0 (k0 - 1) / k1 with k0 = |p / r|, k1 = |p / r^2|.
+float sdEllipsoid(const glm::vec3& p, const glm::vec3& r) {
+    const float k0 = glm::length(p / r);
+    const float k1 = glm::length(p / (r * r));
+    return k0 * (k0 - 1.0f) / std::max(k1, 1e-6f);
+}
+
+// The prototype's tapered capsule: radius ra at a, rb at b, interpolated by the clamped segment parameter.
+float sdTaperedCapsule(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, float ra, float rb) {
+    const glm::vec3 pa = p - a;
+    const glm::vec3 ba = b - a;
+    const float h = glm::clamp(glm::dot(pa, ba) / std::max(glm::dot(ba, ba), 1e-12f), 0.0f, 1.0f);
+    return glm::length(pa - ba * h) - (ra + (rb - ra) * h);
+}
+
+// Quilez's exact octahedron.
+float sdOctahedron(const glm::vec3& p0, float s) {
+    const glm::vec3 p = glm::abs(p0);
+    const float m = p.x + p.y + p.z - s;
+    glm::vec3 q;
+    if (3.0f * p.x < m) {
+        q = p;
+    } else if (3.0f * p.y < m) {
+        q = glm::vec3(p.y, p.z, p.x);
+    } else if (3.0f * p.z < m) {
+        q = glm::vec3(p.z, p.x, p.y);
+    } else {
+        return m * 0.57735027f;
+    }
+    const float k = glm::clamp(0.5f * (q.z - q.y + s), 0.0f, s);
+    return glm::length(glm::vec3(q.x, q.y - s + k, q.z - k));
+}
+
+// The max over `count` planes (a Fibonacci sphere of normals, turning with `phase` and jittered by `jitter`)
+// of the scaled point's support, minus `level`, times the smallest radius: crisp flat faces and sharp edges.
+float sdFacet(const glm::vec3& p, const glm::vec3& r, int count, float level, float phase, float jitter) {
+    const glm::vec3 q = p / r;
+    const int planes = std::max(count, 1);
+    float m = -1e9f;
+    for (int k = 0; k < planes; ++k) {
+        const float fk = static_cast<float>(k);
+        const float z = 1.0f - (2.0f * fk + 1.0f) / static_cast<float>(planes);
+        const float rr = std::sqrt(std::max(1.0f - z * z, 0.0f));
+        const float ph = fk * 2.39996f + phase + jitter * std::sin(fk * 1.7f + phase * 2.0f);
+        m = std::max(m, glm::dot(q, glm::vec3(rr * std::cos(ph), z, rr * std::sin(ph))));
+    }
+    return (m - level) * std::min(r.x, std::min(r.y, r.z));
+}
+
+// WGSL's smoothstep, defined for equal edges (a step at the edge).
+float sstep(float lo, float hi, float x) {
+    const float t = glm::clamp((x - lo) / std::max(hi - lo, 1e-6f), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+// Blend's weight at p: amount, times the ramp across the plane dot(p, axis) = offset when axis is nonzero.
+float blendWeight(const NodeParams& n, const glm::vec3& p) {
+    const float len = glm::length(n.axis);
+    if (!(len > 1e-8f)) {
+        return n.amount;
+    }
+    const float x = glm::dot(p, n.axis / len);
+    return n.amount * sstep(n.offset - n.smooth, n.offset + n.smooth, x);
+}
+
+// Fray's scale at p: 1 + amount (noise - 0.5) m, m the radial ramp from `radius` to `offset`.
+float frayScale(const NodeParams& n, const glm::vec3& p, double time) {
+    const float t = static_cast<float>(time);
+    const float m = sstep(n.radius, n.offset, glm::length((p - n.translation) * n.size));
+    const float v = noise::valueNoise(p * n.frequency + glm::vec3(0.0f, 0.0f, n.speed * t), n.seed);
+    return 1.0f + n.amount * (v - 0.5f) * m;
+}
+
 float primitiveDistance(SdfNodeKind kind, const NodeParams& n, const glm::vec3& p) {
     switch (kind) {
     case SdfNodeKind::Sphere:
@@ -336,6 +419,12 @@ float primitiveDistance(SdfNodeKind kind, const NodeParams& n, const glm::vec3& 
         return sdCone(p, n.radius, n.height);
     case SdfNodeKind::Stairs:
         return sdStairs(p, n.size, n.height, n.count);
+    case SdfNodeKind::Ellipsoid:
+        return sdEllipsoid(p, n.size);
+    case SdfNodeKind::TaperedCapsule:
+        return sdTaperedCapsule(p, n.from, n.to, n.radius, n.radius2);
+    case SdfNodeKind::Octahedron:
+        return sdOctahedron(p, n.radius);
     default:
         return kFar;
     }
@@ -582,8 +671,41 @@ float evalEffective(const SdfNode* node, const glm::vec3& p, double time, const 
         return kFar;
     }
     const SdfNodeKind kind = node->kind;
+    if (kind == SdfNodeKind::Facet) { // ADR-1144: the one time-dependent primitive
+        const NodeParams n = paramsOf(*node, fields);
+        return sdFacet(p, n.size, n.count, n.offset, n.speed * static_cast<float>(time), n.amount);
+    }
     if (sdfNodeIsPrimitive(kind)) {
         return primitiveDistance(kind, paramsOf(*node, fields), p);
+    }
+    if (kind == SdfNodeKind::Blend) { // ADR-1144: c0 + (c1 - c0) w(p); one enabled child is itself
+        std::vector<const SdfNode*> kids;
+        for (const SdfNode& child : node->children) {
+            if (const SdfNode* e = effective(child)) {
+                kids.push_back(e);
+            }
+        }
+        if (kids.empty()) {
+            return kFar;
+        }
+        const float c0 = evalEffective(kids[0], p, time, fields, depth + 1);
+        if (kids.size() < 2) {
+            return c0;
+        }
+        const float c1 = evalEffective(kids[1], p, time, fields, depth + 1);
+        return c0 + (c1 - c0) * blendWeight(paramsOf(*node, fields), p);
+    }
+    if (kind == SdfNodeKind::FarField) { // ADR-1144: beyond `radius` the radial guide, and no child at all
+        const NodeParams n = paramsOf(*node, fields);
+        const float far = glm::length((p - n.translation) * n.size);
+        if (far > n.radius) {
+            return far - n.offset;
+        }
+        return evalEffective(effectiveChild(*node), p, time, fields, depth + 1);
+    }
+    if (kind == SdfNodeKind::Fray) { // ADR-1144: d = f child(p / f)
+        const float f = frayScale(paramsOf(*node, fields), p, time);
+        return evalEffective(effectiveChild(*node), p / f, time, fields, depth + 1) * f;
     }
     if (isCombination(kind)) {
         int enabledChildren = 0;
@@ -663,7 +785,8 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
     const char* label = kindLabel(n.kind);
     if (!finite(n.radius) || !finite(n.height) || !finite(n.size) || !finite(n.rounding) || !finite(n.axis) ||
         !finite(n.offset) || !finite(n.translation) || !finite(n.rotationDegrees) || !finite(n.scale) ||
-        !finite(n.amount) || !finite(n.smooth) || !finite(n.frequency) || !finite(n.speed)) {
+        !finite(n.amount) || !finite(n.smooth) || !finite(n.frequency) || !finite(n.speed) || !finite(n.from) ||
+        !finite(n.to) || !finite(n.radius2)) {
         return fail("sdf node '{}' has a non-finite parameter", label);
     }
     if (n.radius < 0.0f || n.height < 0.0f || n.rounding < 0.0f || !nonNegative(n.size)) {
@@ -683,6 +806,36 @@ Result<void> validateNode(const SdfNode& n, int depth, int& count) {
     }
     if (n.kind == SdfNodeKind::Stairs && (!(n.size.x > 0.0f) || !(n.size.y > 0.0f) || n.count < 1)) {
         return fail("sdf node 'stairs': size.x (run) and size.y (rise) must be > 0 and count >= 1");
+    }
+    // ADR-1144
+    if ((n.kind == SdfNodeKind::Ellipsoid || n.kind == SdfNodeKind::Facet) &&
+        (!(n.size.x > 0.0f) || !(n.size.y > 0.0f) || !(n.size.z > 0.0f))) {
+        return fail("sdf node '{}': every radius (size) must be > 0", label);
+    }
+    if (n.kind == SdfNodeKind::TaperedCapsule) {
+        if (!(n.radius2 >= 0.0f)) {
+            return fail("sdf node 'taperedCapsule': radius2 must be >= 0");
+        }
+        if (!(glm::length(n.to - n.from) > 1e-6f)) {
+            return fail("sdf node 'taperedCapsule': 'from' and 'to' must differ");
+        }
+    }
+    if (n.kind == SdfNodeKind::Facet && (n.count < 4 || n.count > 64)) {
+        return fail("sdf node 'facet': count (the number of planes) must be in 4..64 (got {})", n.count);
+    }
+    if (n.kind == SdfNodeKind::Fray) {
+        if (!(std::fabs(n.amount) < 2.0f)) {
+            return fail("sdf node 'fray': |amount| must be < 2 (the scale 1 + amount (noise - 0.5) must stay > 0)");
+        }
+        if (!(n.offset >= n.radius)) {
+            return fail("sdf node 'fray': offset (the outer radius) must be >= radius (the inner radius)");
+        }
+    }
+    if (n.kind == SdfNodeKind::FarField && !(n.radius > 0.0f)) {
+        return fail("sdf node 'farField': radius (where the guide takes over) must be > 0");
+    }
+    if (n.kind == SdfNodeKind::Blend && n.children.size() != 2) {
+        return fail("sdf node 'blend' needs exactly 2 children (got {})", n.children.size());
     }
     if ((n.kind == SdfNodeKind::Plane || n.kind == SdfNodeKind::Fold) && glm::length(n.axis) < 1e-8f) {
         return fail("sdf node '{}' has a zero axis", label);
@@ -778,6 +931,25 @@ PackedMetrics packedMetrics(const SdfNode* node) {
     return m;
 }
 
+// ADR-1144: the first enabled node (pre-order) of a kind only a compiled tree can run, or nullptr.
+const SdfNode* firstCompiledOnly(const SdfNode* node) {
+    if (node == nullptr) {
+        return nullptr;
+    }
+    if (sdfNodeIsCompiledOnly(node->kind)) {
+        return node;
+    }
+    if (isUnary(node->kind)) {
+        return firstCompiledOnly(effectiveChild(*node));
+    }
+    for (const SdfNode& child : node->children) {
+        if (const SdfNode* hit = firstCompiledOnly(effective(child))) {
+            return hit;
+        }
+    }
+    return nullptr;
+}
+
 // The deepest nesting of enabled Recurse nodes (the packed interpreter's loop frames).
 int recurseNesting(const SdfNode* node) {
     if (node == nullptr) {
@@ -859,6 +1031,12 @@ void hashNode(StructHash& h, const SdfNode& n) {
     h.u32(n.seed);
     h.str(n.reference);
     h.i32(n.material);
+    // ADR-1144: hashed only where they can matter, so every older tree keeps the hash it had.
+    if (n.kind == SdfNodeKind::TaperedCapsule) {
+        h.v3(n.from);
+        h.v3(n.to);
+        h.f32(n.radius2);
+    }
     h.u32(static_cast<std::uint32_t>(n.children.size()));
     for (const SdfNode& child : n.children) {
         hashNode(h, child);
@@ -984,6 +1162,11 @@ SdfNodeGpu packNode(const SdfNode& n, std::uint32_t childCount, const FieldSet* 
         g.p4 = glm::vec4(n.frequency, 0.0f, 0.0f, 0.0f);
     }
     g.p5 = glm::vec4(n.frequency, n.speed, static_cast<float>(n.count), 0.0f);
+    if (n.kind == SdfNodeKind::TaperedCapsule) { // ADR-1144: from, to, radius, radius2
+        g.p0.y = n.radius2;
+        g.p2 = glm::vec4(n.to, n.amount);
+        g.p3 = glm::vec4(n.from, n.smooth);
+    }
     return g;
 }
 
@@ -1069,12 +1252,20 @@ std::optional<SdfNodeKind> sdfNodeKindFromName(std::string_view name) {
 }
 
 bool sdfNodeIsPrimitive(SdfNodeKind kind) {
-    return kind <= SdfNodeKind::Cone || kind == SdfNodeKind::Stairs;
+    return kind <= SdfNodeKind::Cone || kind == SdfNodeKind::Stairs ||
+           (kind >= SdfNodeKind::Ellipsoid && kind <= SdfNodeKind::Facet);
+}
+
+bool sdfNodeIsCompiledOnly(SdfNodeKind kind) {
+    return kind >= SdfNodeKind::Ellipsoid;
 }
 
 int sdfNodeMaxChildren(SdfNodeKind kind) {
     if (sdfNodeIsPrimitive(kind)) {
         return 0;
+    }
+    if (kind == SdfNodeKind::Blend) {
+        return 2;
     }
     return isCombination(kind) ? 8 : 1;
 }
@@ -1139,6 +1330,15 @@ json SdfNode::toJson() const {
     if (reference != def.reference) {
         j["reference"] = reference;
     }
+    if (from != def.from) {
+        j["from"] = vecToJson(from); // ADR-1144
+    }
+    if (to != def.to) {
+        j["to"] = vecToJson(to);
+    }
+    if (radius2 != def.radius2) {
+        j["radius2"] = radius2;
+    }
     if (material != def.material) {
         j["material"] = material; // ADR-1044
     }
@@ -1189,6 +1389,9 @@ Result<SdfNode> SdfNode::fromJson(const json& j, int depth) {
     AVGEN_SDF_READ(n.count, "count", readInt);
     AVGEN_SDF_READ(n.seed, "seed", readU32);
     AVGEN_SDF_READ(n.reference, "reference", readString);
+    AVGEN_SDF_READ(n.from, "from", readVec3); // ADR-1144
+    AVGEN_SDF_READ(n.to, "to", readVec3);
+    AVGEN_SDF_READ(n.radius2, "radius2", readFloat);
     AVGEN_SDF_READ(n.material, "material", readInt); // ADR-1044
     if (j.contains("children")) {
         const json& arr = j.at("children");
@@ -1220,6 +1423,13 @@ Result<void> SdfTree::validate(SdfEvaluator evaluator) const {
     }
     // ADR-1005: the stacks are the interpreter's; a compiled tree has none.
     const bool stacks = evaluator == SdfEvaluator::Interpreter;
+    // ADR-1144: the anatomical kinds exist only as compiled code.
+    if (stacks) {
+        if (const SdfNode* only = firstCompiledOnly(effective(root))) {
+            return fail("sdf node '{}' runs only in a compiled tree (give the object \"compile\": true)",
+                        kindLabel(only->kind));
+        }
+    }
     if (stacks && m.distStack > kMaxSdfStack) {
         return fail("sdf tree needs a distance stack of {} (max {}); nest wide combinations less deeply",
                     m.distStack, kMaxSdfStack);
@@ -1469,7 +1679,75 @@ public:
         case SdfNodeKind::Cone: return let(indent, v, "sdfCone(" + p + ", " + r + ".p0.x, " + r + ".p0.y)");
         case SdfNodeKind::Stairs:
             return let(indent, v, "sdfStairs(" + p + ", " + r + ".p1.xyz, " + r + ".p0.y, i32(" + r + ".p5.z))");
+        // ADR-1144: the anatomical vocabulary
+        case SdfNodeKind::Ellipsoid: return let(indent, v, "sdfEllipsoid(" + p + ", " + r + ".p1.xyz)");
+        case SdfNodeKind::TaperedCapsule:
+            return let(indent, v,
+                       "sdfTaperedCapsule(" + p + ", " + r + ".p3.xyz, " + r + ".p2.xyz, " + r + ".p0.x, " + r + ".p0.y)");
+        case SdfNodeKind::Octahedron: return let(indent, v, "sdfOctahedron(" + p + ", " + r + ".p0.x)");
+        case SdfNodeKind::Facet:
+            return let(indent, v,
+                       "sdfFacet(" + p + ", " + r + ".p1.xyz, i32(" + r + ".p5.z), " + r + ".p0.w, " + r + ".p5.y * t, " + r +
+                           ".p2.w)");
         default: break;
+        }
+        if (n->kind == SdfNodeKind::Blend) {
+            std::vector<const SdfNode*> kids;
+            for (const SdfNode& child : n->children) {
+                if (const SdfNode* e = effective(child)) {
+                    kids.push_back(e);
+                }
+            }
+            if (kids.empty()) {
+                return let(indent, v, "SDF_FAR");
+            }
+            const std::string c0 = node(kids[0], p, indent);
+            if (kids.size() < 2) {
+                if (ids_) {
+                    idOf_[v] = idOf(c0);
+                }
+                return let(indent, v, c0);
+            }
+            const std::string c1 = node(kids[1], p, indent);
+            const std::string w = fresh("w");
+            line(indent, "let " + w + " = sdfBlendWeight(" + r + ", " + p + ");");
+            if (ids_) {
+                const std::string mv = fresh("m");
+                line(indent, "let " + mv + " = select(" + idOf(c0) + ", " + idOf(c1) + ", " + w + " >= 0.5);");
+                idOf_[v] = mv;
+            }
+            return let(indent, v, c0 + " + (" + c1 + " - " + c0 + ") * " + w);
+        }
+        if (n->kind == SdfNodeKind::FarField) {
+            // Beyond the radius the child is not evaluated at all: its code sits in the else branch.
+            const std::string far = fresh("far");
+            line(indent, "let " + far + " = length((" + p + " - " + r + ".p3.xyz) * " + r + ".p1.xyz);");
+            line(indent, "var " + v + " = " + far + " - " + r + ".p0.w;");
+            std::string mv;
+            if (ids_) {
+                mv = fresh("m");
+                line(indent, "var " + mv + " = 0u;");
+                idOf_[v] = mv;
+            }
+            line(indent, "if (" + far + " <= " + r + ".p0.x) {");
+            const std::string c = node(effectiveChild(*n), p, indent + 1);
+            line(indent + 1, v + " = " + c + ";");
+            if (ids_) {
+                line(indent + 1, mv + " = " + idOf(c) + ";");
+            }
+            line(indent, "}");
+            return v;
+        }
+        if (n->kind == SdfNodeKind::Fray) {
+            const std::string f = fresh("f");
+            const std::string q = fresh("q");
+            line(indent, "let " + f + " = sdfFrayScale(" + r + ", " + p + ", t);");
+            line(indent, "let " + q + " = " + p + " / " + f + ";");
+            const std::string c = node(effectiveChild(*n), q, indent);
+            if (ids_) {
+                idOf_[v] = idOf(c);
+            }
+            return let(indent, v, c + " * " + f);
         }
         if (isCombination(n->kind)) {
             std::vector<const SdfNode*> kids;
@@ -1675,6 +1953,16 @@ void sdfCompileTable(const SdfTree& tree, std::vector<SdfNodeGpu>& table, const 
     (void)e.node(effective(tree.root), "p", 1);
 }
 
+int sdfDomainChainLength(const SdfTree& tree) {
+    int n = 0;
+    for (const SdfNode* node = effective(tree.root); node != nullptr && isUnary(node->kind) &&
+                                                     node->kind != SdfNodeKind::Recurse && n < 16;
+         node = effectiveChild(*node)) {
+        ++n;
+    }
+    return n;
+}
+
 std::uint64_t sdfCompileKey(const SdfTree& tree) {
     StructHash h;
     h.str("sdf-compile-v1");
@@ -1705,6 +1993,9 @@ float evaluatePacked(std::span<const SdfNodeGpu> nodes, const glm::vec3& p, doub
     for (std::int64_t i = 0; i < total; ++i) {
         const SdfNodeGpu& g = nodes[static_cast<std::size_t>(i)];
         const auto kind = static_cast<SdfNodeKind>(g.kind);
+        if (sdfNodeIsCompiledOnly(kind)) {
+            return kFar; // ADR-1144: the interpreter has no such kind (validate refuses the tree)
+        }
         if (sdfNodeIsPrimitive(kind)) {
             if (sp >= kMaxSdfStack) {
                 return kFar;

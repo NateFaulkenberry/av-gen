@@ -47,6 +47,8 @@ struct SurfaceDetail {
     across: vec3<f32>,  // the direction across the grooves (unit, in the tangent plane)
     grating: f32,       // the grooves' diffraction strength (0 = none)
     spacing: f32,       // the grating's line spacing in nm (the first order's dispersion)
+    film: f32,          // ADR-1149: nm of temper film added here (regions near authored features, and its noise)
+    polish: f32,        // ADR-1149: 0..1, how much of the roughness the regions polish away here
 };
 
 // ---- ADR-703: per-entity effect lanes (FXL) ------------------------------------------------------
@@ -997,7 +999,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         roughness = roughness * mr.g;
         metallic = metallic * mr.b;
     }
-    roughness = clamp(roughness, 0.045, 1.0);
+    roughness = clamp(roughness * (1.0 - surfaceDetail().polish), 0.045, 1.0); // ADR-1149 (0 off the regions)
     metallic = clamp(metallic, 0.0, 1.0);
     var ao = programOcclusion; // ADR-036: the program's own occlusion channel
     if (hasOcclusion) {
@@ -1025,9 +1027,10 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // ADR-1143: thin-film interference as a tint on f0, so it reaches every light's Fresnel (punctual,
     // representative-point and the LTC area lights' f0 term) and the IBL split sum's kS below. The gate
     // is the draw's uniform: a material with no film never enters.
-    if (object.optics.x > 0.0) {
+    // ADR-1149: plus the regions' film (0 on every path but an engraved SDF, so the sum is the uniform).
+    if (object.optics.x > 0.0 || surfaceDetail().film > 0.0) {
         let substrate = dot(f0, vec3<f32>(0.2126, 0.7152, 0.0722));
-        f0 = clamp(f0 * thinFilmTint(nDotV, object.optics.x, object.optics.y, substrate, metallic),
+        f0 = clamp(f0 * thinFilmTint(nDotV, object.optics.x + surfaceDetail().film, object.optics.y, substrate, metallic),
                    vec3<f32>(0.0), vec3<f32>(1.0));
     }
     let diffuseColor = albedo * (1.0 - metallic);

@@ -14,8 +14,10 @@
 //
 // Shaders are read from ASTRAL_SHADER_DIR at run time.
 
-#include "astral_audio.hpp"
-#include "conductor.hpp"
+#include "scene/astral_conductor.hpp"
+#include "scene/astral_song.hpp"
+
+namespace astral = avgen::astral;
 
 #include "assets/image.hpp"
 #include "gpu/context.hpp"
@@ -64,7 +66,7 @@ struct FrameU {
     glm::vec4 grid0, grid1;
     glm::vec4 sim;
     glm::vec4 bands[8];
-    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox, it3;
+    glm::vec4 rig, audio0, audio1, look, flags, entity, misc, fp0, fp1, fp2, ext, it2, cbox, it3, pal0, pal1, pal2, pal3, pal4, atm0, lg0;
 };
 
 std::string readFile(const std::string& path) {
@@ -182,6 +184,21 @@ void setBands(FrameU& f, const astral::State& s) {
     put(3, {1.0f, 0.0f, 0.15f}, s.sweep * 0.85f, 0.018f, 28.0f * s.sweepStrength, 0.0f, 0.0f);
 }
 
+// v2: each god's palette, carried by broad features (light-band tints, rim, eyes, region temper zones, atmosphere).
+// Tints are normalised to unit luminance so the greyscale image is unchanged by them.
+struct GodPalette { glm::vec3 key, rim, eye, zoneA, zoneB, fog; };
+glm::vec3 unitLuma(glm::vec3 c) { return c / std::max(glm::dot(c, glm::vec3(0.2126f, 0.7152f, 0.0722f)), 1e-4f); }
+GodPalette godPalette(int arch) {
+    switch (arch) {
+    case 1: return {{0.80f, 0.97f, 1.12f}, {0.80f, 0.60f, 1.20f}, {0.35f, 0.90f, 1.15f}, {0.78f, 1.00f, 1.20f}, {0.92f, 0.76f, 1.20f}, {0.07f, 0.10f, 0.17f}}; // Seraph
+    case 2: return {{0.78f, 0.50f, 1.05f}, {1.25f, 0.22f, 0.18f}, {1.10f, 0.10f, 0.06f}, {0.74f, 0.42f, 1.12f}, {1.22f, 0.28f, 0.28f}, {0.11f, 0.02f, 0.06f}}; // Abyss
+    case 3: return {{0.55f, 1.15f, 0.78f}, {1.15f, 0.80f, 0.48f}, {0.20f, 1.05f, 0.50f}, {0.48f, 1.16f, 0.68f}, {1.22f, 0.80f, 0.42f}, {0.03f, 0.09f, 0.06f}}; // Chimera
+    case 4: return {{1.18f, 0.92f, 0.52f}, {1.10f, 0.95f, 0.68f}, {1.05f, 0.70f, 0.18f}, {1.28f, 0.94f, 0.40f}, {0.74f, 0.86f, 1.04f}, {0.11f, 0.08f, 0.04f}}; // Machine God
+    case 5: return {{1.15f, 0.80f, 0.75f}, {0.48f, 1.02f, 0.98f}, {0.28f, 1.02f, 0.92f}, {1.26f, 0.74f, 0.58f}, {0.52f, 1.06f, 1.02f}, {0.11f, 0.06f, 0.08f}}; // Choir
+    default: return {{0.85f, 0.90f, 1.05f}, {0.78f, 0.58f, 1.12f}, {0.65f, 0.42f, 1.05f}, {1.0f, 1.0f, 1.03f}, {0.86f, 0.76f, 1.10f}, {0.08f, 0.08f, 0.13f}};
+    }
+}
+
 struct Options {
     int test = 1;
     char approach = 'E';
@@ -199,6 +216,7 @@ struct Options {
     bool noCache = false;  // iteration 2: march on the analytic latent (no cached volume)
     bool noShards = false; // iteration 2: near flakes stay splats
     float shardPx = 12.0f;
+    std::string perfCsv;   // bench: per-frame GPU frame time CSV (t, ms)
     bool noHalf = false;   // iteration 3: full-resolution march (no half-resolution pre-pass)
     float cacheFrame = 0.4f;  // fine cache box half-size, as a fraction of the camera-target distance
     float minStep = 0.65f; // surface march minimum step, in density cells (iteration 1: 0.3)
@@ -214,6 +232,7 @@ astral::State conductRaw(const Options& o, float t, const astral::SongAnalysis& 
     case 4: return astral::test04(t);
     case 5: return astral::test05(t);
     case 7: return astral::test07(t);
+    case 8: return astral::test08(t, song, score);
     default: return astral::test06(t, o.songStart, song, score);
     }
 }
@@ -263,6 +282,7 @@ int main(int argc, char** argv) {
         else if (a == "--no-advect") o.noAdvect = true;
         else if (a == "--no-cache") o.noCache = true;
         else if (a == "--no-half") o.noHalf = true;
+        else if (a == "--perf-csv") o.perfCsv = next();
         else if (a == "--arch") o.archOverride = std::stoi(next());
         else if (a == "--no-shards") o.noShards = true;
         else if (a == "--min-step") o.minStep = std::stof(next());
@@ -275,7 +295,7 @@ int main(int argc, char** argv) {
     const int approach = std::clamp(o.approach - 'A', 0, 4);
     if (o.gridSize <= 0.0f) o.gridSize = o.test == 4 ? 12.5f : 20.0f;
     // The owner's test song (2026-10-05): Trench. Fireballs is the only secondary check (--song).
-    if (o.song.empty()) o.song = std::string(ASTRAL_SHADER_DIR) + "/../../../assets/audio/trench.wav"; // repo asset (gitignored)
+    if (o.song.empty()) o.song = std::string(ASTRAL_SHADER_DIR) + "/../../assets/audio/trench.wav"; // repo asset (gitignored)
     // TEST 06 default excerpt: the verse's last phrases, the break (86.25 s) and the chorus (94.61 s, a kick-opened collapse)
     if (o.songStart < 0.0) o.songStart = o.song.find("rench") != std::string::npos ? 66.54 : 41.3;
 
@@ -290,13 +310,15 @@ int main(int argc, char** argv) {
                  song.snareT.size(), song.analyseSeconds);
     if (o.debug == 8) {
         // the conductor as CSV at 60 Hz (CPU only): what the music did to the entity's state
-        const double d = o.to > 0.0 ? o.to : testDuration(o.test);
-        std::printf("t,songT,C,S,flash,arch,morph,temper,mass,breath,flow,shimmer,twist,eyeDepth,tunnel,inversion,strobe,camera\n");
+        const double d = o.to > 0.0 ? o.to : (o.test == 8 ? song.duration : testDuration(o.test));
+        std::printf("t,songT,C,S,flash,arch,morph,temper,mass,breath,flow,shimmer,twist,eyeDepth,tunnel,inversion,strobe,camera,fill,merge,legible\n");
         for (double t = o.from; t <= d + 1e-9; t += 1.0 / 60.0) {
             const astral::State s = conduct(o, static_cast<float>(t), song, score);
-            std::printf("%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%s\n", t, o.songStart + t, s.C, s.S,
+            // the face's projected screen FILL: its ~6.8-unit anatomical height over the frame height
+            const float fill = 6.8f * s.scale / (2.0f * glm::length(s.eye - s.centre) * std::tan(glm::radians(s.fovDeg) * 0.5f));
+            std::printf("%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%s,%.4f,%.3f,%.3f\n", t, (o.test == 8 ? 0.0 : o.songStart) + t, s.C, s.S,
                         s.flash, s.archA, s.morph, s.temper, s.mass, s.breath, s.flow, s.shimmer, s.fold0.x, s.fold0.y, s.fold0.z, s.fold0.w, s.strobe,
-                        s.label.c_str());
+                        s.label.c_str(), fill, s.fold1.w, s.legible);
         }
         return 0;
     }
@@ -486,7 +508,7 @@ int main(int argc, char** argv) {
     }
     auto shardGroup = makeGroup(ctx, shardLayout, {buf(shardBuf, shardBytes), tex(surfDepthView)});
 
-    auto postLayout = makeLayout(ctx, {B::Tex2D, B::Sampler, B::Uniform, B::Tex2D, B::ReadOnly}, wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex);
+    auto postLayout = makeLayout(ctx, {B::Tex2D, B::Sampler, B::Uniform, B::Tex2D, B::ReadOnly, B::Tex2DUnfilt}, wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex);
     auto postPL = makePL(ctx, {postLayout});
     auto postPipe = [&](const char* fs, wgpu::TextureFormat fmt, bool additive) {
         wgpu::BlendState blend{};
@@ -512,11 +534,11 @@ int main(int argc, char** argv) {
     auto down = postPipe("fs_down", hdrFmt, false);
     auto up = postPipe("fs_up", hdrFmt, true);
     auto composite = postPipe("fs_composite", wgpu::TextureFormat::RGBA8Unorm, false);
-    wgpu::Buffer postBuf = makeBuffer(ctx, 32, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, "post");
+    wgpu::Buffer postBuf = makeBuffer(ctx, 96, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, "post");
     wgpu::Texture dummyTex = makeTex({1, 1, 1}, hdrFmt, wgpu::TextureUsage::TextureBinding);
     wgpu::TextureView dummyView = dummyTex.CreateView();
     auto pg = [&](const wgpu::TextureView& src, const wgpu::TextureView& bl) {
-        return makeGroup(ctx, postLayout, {tex(src), smp(sampler), buf(postBuf, 32), tex(bl), buf(accumBuf, accumBytes)});
+        return makeGroup(ctx, postLayout, {tex(src), smp(sampler), buf(postBuf, 96), tex(bl), buf(accumBuf, accumBytes), tex(surfDepthView)});
     };
     auto combineGroup = pg(surfColorView, dummyView);
     std::vector<wgpu::BindGroup> downGroups, upGroups;
@@ -530,7 +552,7 @@ int main(int argc, char** argv) {
 
     // ---- per-frame state ----
     const double simRate = 60.0;
-    const double dur = testDuration(o.test);
+    const double dur = o.test == 8 ? song.duration : testDuration(o.test);
     if (o.to < 0.0) o.to = dur;
     auto fillFrame = [&](FrameU& f, const astral::State& s, const astral::State& sPrev, double tPrev, double t, std::uint64_t step) {
         const float Cprev = sPrev.C;
@@ -555,7 +577,7 @@ int main(int argc, char** argv) {
         setBands(f, s);
         f.rig = glm::vec4(s.rigPhase, s.sweep, s.sweepStrength, s.flicker);
         astral::AudioAtT a{};
-        if (o.test == 6) a = astral::sampleSong(song, o.songStart + t);
+        if (o.test == 6 || o.test == 8) a = astral::sampleSong(song, (o.test == 8 ? 0.0 : o.songStart) + t);
         f.audio0 = a.env0;
         f.audio1 = glm::vec4(a.env1.x, a.rms, a.kickEnv, a.snareEnv);
         const float flakeSize = 0.013f;
@@ -576,6 +598,18 @@ int main(int argc, char** argv) {
             const glm::vec3 lo = s.centre - glm::vec3(o.gridSize * 0.5f);
             const glm::vec3 c = glm::clamp(s.target, lo + half, lo + glm::vec3(o.gridSize) - half);
             f.cbox = glm::vec4(c - half, 2.0f * half);
+        }
+        {
+            const GodPalette a = godPalette(static_cast<int>(s.archA)), b = godPalette(static_cast<int>(s.archB));
+            const float m = s.morph;
+            auto mx = [&](glm::vec3 x, glm::vec3 y) { return unitLuma(glm::mix(x, y, m)); };
+            f.pal0 = glm::vec4(mx(a.key, b.key), s.paletteStrength);
+            f.pal1 = glm::vec4(mx(a.rim, b.rim), s.rimLight);
+            f.pal2 = glm::vec4(mx(a.eye, b.eye), s.eyeGlow);
+            f.pal3 = glm::vec4(mx(a.zoneA, b.zoneA), s.keyLight);
+            f.pal4 = glm::vec4(mx(a.zoneB, b.zoneB), s.absorb);
+            f.atm0 = glm::vec4(glm::mix(a.fog, b.fog, m), s.atmosphere);
+            f.lg0 = glm::vec4(s.legible, 0.0f, 0.0f, 0.0f);
         }
         f.it3 = glm::vec4(o.noHalf ? 0.0f : 1.0f, s.collapseAt > -1e8f ? static_cast<float>(t) - s.collapseAt : -1.0f, 0.0f, 0.0f);
         f.it2 = glm::vec4(o.noCache ? 0.0f : 1.0f, o.noShards ? 0.0f : 1.0f, o.shardPx, o.minStep);
@@ -730,7 +764,18 @@ int main(int argc, char** argv) {
                 r.Draw(3);
                 r.End();
             };
-            const float post[8] = {sLast.exposure, sLast.bloom, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f};
+            // v2 atmosphere: an off-screen source behind and above the god (god rays through the haze and through the
+            // gaps in the forming matter), and a palette-tinted ambient gradient in the void
+            const glm::vec3 lightW = sLast.centre + glm::vec3(0.0f, 10.0f, -16.0f) * sLast.scale;
+            const glm::vec4 lc = fu.viewProj * glm::vec4(lightW, 1.0f);
+            glm::vec2 luv(0.5f, -0.3f);
+            float lvis = 0.0f;
+            if (lc.w > 0.1f) { luv = glm::vec2(lc.x / lc.w * 0.5f + 0.5f, 0.5f - lc.y / lc.w * 0.5f); lvis = 1.0f; }
+            const GodPalette gp = godPalette(static_cast<int>(sLast.archA));
+            const glm::vec3 rayC = unitLuma(glm::mix(gp.key, glm::vec3(1.0f), 0.3f));
+            const float post[24] = {sLast.exposure, sLast.bloom, 0.4f, 0.018f, static_cast<float>(step), 1.0f, 1.0f, 1.6f,
+                                    luv.x, luv.y, lvis, sLast.godRays, fu.atm0.x, fu.atm0.y, fu.atm0.z, sLast.atmosphere,
+                                    rayC.x, rayC.y, rayC.z, 0.12f, 0.0f, 0.0f, 0.0f, 0.0f};
             queue.WriteBuffer(postBuf, 0, post, sizeof(post));
             fullPass(hdrView, combinePipe, combineGroup, false, "post");
             if (!o.noShards) {
@@ -809,6 +854,8 @@ int main(int argc, char** argv) {
         Stat sCpu, sGpu, sSim, sDen, sSurf, sFlk, sPost, sCache, sShard, sMarch;
         std::uint64_t lastCompleted = timeline.completedFrames();
         const std::uint32_t total = o.benchWarm + o.benchFrames;
+        std::FILE* csv = o.perfCsv.empty() ? nullptr : std::fopen(o.perfCsv.c_str(), "w");
+        if (csv) std::fprintf(csv, "t,gpu_ms,surface_ms,sim_ms\n");
         for (std::uint32_t f = 0; f < total; ++f) {
             const double t = t0 + (f + 1) / simRate;
             const auto c0 = Clock::now();
@@ -820,6 +867,7 @@ int main(int argc, char** argv) {
                 if (timeline.completedFrames() != lastCompleted) {
                     lastCompleted = timeline.completedFrames();
                     sGpu.add(timeline.frameMs());
+                    if (csv) std::fprintf(csv, "%.4f,%.3f,%.3f,%.3f\n", t, timeline.frameMs(), timeline.msFor("surface"), timeline.msFor("sim"));
                     sSim.add(timeline.msFor("sim"));
                     sDen.add(timeline.msFor("density"));
                     sSurf.add(timeline.msFor("surface"));
@@ -832,6 +880,7 @@ int main(int argc, char** argv) {
             }
         }
         ctx.waitForQueue();
+        if (csv) std::fclose(csv);
         if (!o.png.empty()) savePng(o.png);
         if (ctx.errorCount() != 0) { std::fprintf(stderr, "gpu errors: %s\n", ctx.lastError().c_str()); return 5; }
         auto j = [](const char* name, const Stat& s) { std::printf("\"%s\":{\"p50\":%.3f,\"p90\":%.3f},", name, s.pct(0.5), s.pct(0.9)); };

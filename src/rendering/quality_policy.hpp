@@ -106,7 +106,8 @@ struct QualityPolicy {
                settings.shadowCasterMinPixels == 0.0f && settings.postEffectQuality == 1.0f &&
                settings.particleCullDistance == 0.0f && settings.particleSpawnScale == 1.0f &&
                !settings.materialProgramsOff &&
-               settings.sdfShadowScale == 1; // ADR-1165: every shadow texel of a raymarched caster marched
+               settings.sdfShadowScale == 1 && // ADR-1165: every shadow texel of a raymarched caster marched
+               settings.astralTier == 0;       // ADR-1222: every particle, the full march, the exact seek
     }
 };
 

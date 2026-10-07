@@ -90,14 +90,19 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     var v = v4.xyz;
     let theta = p4.w;
     var heat = v4.w;
-    let role = roleOf(i);
+    // v2: about half the drifter dust is ABSORBED into a formed face (pal4.w = absorption, from coherence): it binds
+    // as plate matter, so the face thickens and the background thins; a collapse throws it back out
+    // (lg0.y: production turns the absorption on without the palette, ADR-1221)
+    let absorbed = (F.pal0.w > 0.0 || F.lg0.y > 0.5) && roleOf(i) == 5 && u01(hashu(i * 0x51ed27u + 3u)) < 0.8;
+    let role = select(roleOf(i), 3, absorbed);
     let hi = hashu(i * 0x27d4eb2fu + 0x165667b1u);
 
     let C = F.ent0.x;
     let Cprev = F.ent0.y;
     let flash = select(0.0, F.ent2.y, role == 1 || role == 2);
     var b = bindOf(theta, C + flash);
-    let bPrev = bindOf(theta, Cprev + flash);
+    var bPrev = bindOf(theta, Cprev + flash);
+    if (absorbed) { b = smoothstep(0.7, 0.95, C); bPrev = smoothstep(0.7, 0.95, Cprev); }
     let release = max(bPrev - b, 0.0);
     var acc = vec3f(0.0);
     var nrm = A[i].xyz;
@@ -267,9 +272,15 @@ fn cs_step(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups) n
     }
     // weak containment: the meta field stays around the entity
     let rel = p - F.entity.xyz;
-    let rmax = select(11.0, F.ext.z * 1.1, role == 5) * F.entity.w;
-    acc -= rel * 0.6 * smoothstep(rmax * 0.8, rmax * 1.3, length(rel));
+    // iteration 4: released body matter used to pile up on an 11-unit containment sphere and read as a glowing shell;
+    // with a wide meta field (the song tests) the body matter's bound scales with it
+    let rmax = select(max(11.0, F.ext.z * 0.5), F.ext.z * 1.1, role == 5) * F.entity.w;
+    // iteration 4: a soft, noisy containment (no crisp shell edge)
+    let rn = rmax * (0.85 + 0.3 * vnoise3(normalize(rel + vec3f(1e-3)) * 2.0 + vec3f(t * 0.02), 97u));
+    acc -= rel * 0.35 * smoothstep(rn * 0.5, rn * 1.6, length(rel));
 
+    // absorbed dust travels from far away: cap its pull so it streams in rather than teleporting
+    if (absorbed) { let am = length(acc); if (am > 45.0) { acc *= 45.0 / am; } }
     let drag = 0.35 + 1.4 * b;
     v = (v + acc * dt) * exp(-drag * dt);
     p += v * dt;

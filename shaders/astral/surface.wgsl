@@ -73,6 +73,14 @@ fn fieldAtM(p: vec3f, mode: i32) -> f32 {
     return dRho;
 }
 fn fieldAt(p: vec3f) -> f32 { return fieldAtMode(p, true); }
+// v2 legibility: the latent anatomy from the cache (a bound, fine for occlusion), exact outside it
+fn latentCached(p: vec3f) -> f32 {
+    let uvw = (p - F.cbox.xyz) / F.cbox.w;
+    if (F.it2.x > 0.5 && all(uvw >= vec3f(0.0)) && all(uvw <= vec3f(1.0))) {
+        return textureSampleLevel(latentCache, densSamp, uvw, 0.0).r;
+    }
+    return latent(p);
+}
 
 fn normalAt(p: vec3f, e: f32) -> vec3f {
     let k0 = vec3f(1.0, -1.0, -1.0); let k1 = vec3f(-1.0, -1.0, 1.0);
@@ -106,8 +114,9 @@ fn env(dir: vec3f, alpha: f32) -> vec3f {
             let soft = 0.04 + alpha;
             g *= smoothstep(0.0, soft, s) * smoothstep(0.0, soft, 0.72 - s);
         }
-        sum += A1.y * g * bandColor(A1.w);
+        sum += A1.y * g * bandColor(A1.w) * palTint(k);
     }
+    sum += keyRim(dir);
     // the faintest omni term so cavities are not absolute zero, plus the collapse strobe
     // a broad, dim soft-box sweep (orbiting with the rig): it describes the body's curvature between the
     // crisp strips, the way a gradient sweep does in product photography of black chrome
@@ -201,9 +210,10 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
     wj.jx = (warp(p + vec3f(ew, 0.0, 0.0)) - q) / ew;
     wj.jy = (warp(p + vec3f(0.0, ew, 0.0)) - q) / ew;
     wj.jz = (warp(p + vec3f(0.0, 0.0, ew)) - q) / ew;
-    grooveFamily(wj, n0, 0, 12.0, 0.35, footprint, &gr, select(0.0, eyeW * (1.0 - eyeBall), isFace));
-    grooveFamily(wj, n0, 1, 7.0, 0.28, footprint, &gr, (1.0 - 0.8 * eyeW) * panel);
-    grooveFamily(wj, n0, 2, 9.0, 0.16, footprint, &gr, 0.25 * (1.0 - eyeW) * (1.0 - panel));
+    let lgd = 1.0 - 0.7 * F.lg0.x; // quieter engraving on a formed face
+    grooveFamily(wj, n0, 0, 12.0, 0.35 * lgd, footprint, &gr, select(0.0, eyeW * (1.0 - eyeBall), isFace));
+    grooveFamily(wj, n0, 1, 7.0, 0.28 * lgd, footprint, &gr, (1.0 - 0.8 * eyeW) * panel);
+    grooveFamily(wj, n0, 2, 9.0, 0.16 * lgd, footprint, &gr, 0.25 * (1.0 - eyeW) * (1.0 - panel));
     let n = gr.n;
     let cosV = clamp(dot(n, V), 0.0, 1.0);
 
@@ -217,7 +227,10 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
     var film = thinFilm(cosV, thick);
     // temper is a tint on metal, not paint: keep 55% of its chroma, and let it gather at the features
     film = mix(vec3f(dot(film, vec3f(0.2126, 0.7152, 0.0722))), film, 0.35 + 0.4 * fw);
-    let F0f = clamp(F0 * film, vec3f(0.0), vec3f(1.0));
+    // v2: per-region temper ZONES (broad, so colour survives distance): zone A on the features, zone B elsewhere
+    let zoneW = smoothstep(0.15, 0.6, fw);
+    let zone = mix(vec3f(1.0), mix(F.pal4.rgb, F.pal3.rgb, zoneW), F.pal0.w);
+    let F0f = clamp(F0 * film * zone, vec3f(0.0), vec3f(1.0));
     let edge = vec3f(0.80, 0.81, 0.83);
     let Fr = F0f + (edge - F0f) * pow(1.0 - cosV, 5.0);
 
@@ -274,6 +287,35 @@ fn shadeSurface(p: vec3f, n0: vec3f, rd: vec3f, tHit: f32) -> vec3f {
 
     // forge heat: molten light in the grooves of hot matter
     col += heatColor(heat * 0.8) * (0.1 + 0.9 * gr.mask) * 0.3;
+    // v2: a restrained glow in the eyes (rises with coherence)
+    if (F.pal2.w > 0.0) {
+        let eL = q - eyeCentreL(); let eR = q - eyeCentreR();
+        let ed = min(length(eL * vec3f(1.0, 1.6, 1.0)), length(eR * vec3f(1.0, 1.6, 1.0)));
+        // legibility: dark sockets around a small, restrained bright pupil
+        col *= 1.0 - 0.92 * F.lg0.x * exp(-ed * ed * 2.2);
+        col += F.pal2.rgb * F.pal2.w * 0.5 * exp(-ed * ed * 28.0) * smoothstep(0.4, 0.9, F.ent0.x);
+        // and the mouth slit dark
+        let mq = (q - mouthCentre()) * vec3f(0.9, 3.0, 1.0);
+        col *= 1.0 - 0.8 * F.lg0.x * exp(-dot(mq, mq) * 2.0);
+    }
+    // v2 legibility: at a formed peak the face reads by FORM, not by reflections: a broad frontal-high key on the
+    // macro normal (cheekbones, brow and nose bridge lit) and cavity occlusion from the anatomy (sockets, under
+    // the nose, the mouth and the jaw line dark)
+    if (F.lg0.x > 0.0) {
+        let h = 0.16 * F.entity.w;
+        var cav = 0.0;
+        for (var k = 1; k <= 4; k++) {
+            let d = f32(k) * h;
+            cav += clamp((d - latentCached(p + n0 * d)) / d, 0.0, 1.0) / f32(k);
+        }
+        let open = exp(-cav * 2.4);
+        let up = vec3f(0.0, 1.0, 0.0);
+        let keyF = normalize(V * 0.7 + up * 0.55 + cross(up, V) * 0.25);
+        let kd = smoothstep(-0.1, 1.0, dot(n0, keyF));
+        let tint = mix(vec3f(1.0), F.pal0.rgb, F.pal0.w);
+        let form = F0f * zone * tint * kd * kd * 0.75; // the zone twice: broad colour that survives distance
+        col = mix(col, (col * 0.3 + form) * open, F.lg0.x);
+    }
     return col;
 }
 
@@ -400,7 +442,7 @@ fn jitterAt(px: vec2u) -> f32 { return u01(hashu(px.x * 1973u + px.y * 9277u + u
 @fragment fn fs_surface(i: VOut) -> FOut {
     var o: FOut;
     o.color = vec4f(0.0, 0.0, 0.0, 1.0);
-    o.depth = vec4f(1e9, 0.0, 0.0, 0.0);
+    o.depth = vec4f(1e9, 1.0, 0.0, 0.0);
     let r = rayAt(i.uv);
     let cell = F.grid0.w;
     let px = vec2u(i.clip.xy);
@@ -446,7 +488,9 @@ fn jitterAt(px: vec2u) -> f32 { return u01(hashu(px.x * 1973u + px.y * 9277u + u
     if (hit) {
         let sh = shadeHit(r.ro, r.rd, tP, tH, interior);
         col = sh.rgb;
-        o.depth = vec4f(sh.w, 0.0, 0.0, 0.0);
+        // ADR-1221: .g is the hit's clip-space depth, so production composites into the scene's depth buffer
+        let ph = F.viewProj * vec4f(r.ro + r.rd * sh.w, 1.0);
+        o.depth = vec4f(sh.w, clamp(ph.z / ph.w, 0.0, 1.0), 0.0, 0.0);
     }
     o.color = vec4f(hazeOver(col, haze, hazeHeat), 1.0);
     return o;

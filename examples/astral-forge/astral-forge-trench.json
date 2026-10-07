@@ -1,0 +1,15 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": { "name": "THE ASTRAL FORGE (Trench)" },
+  "assets": {
+    "scene": { "kind": "composition", "path": "astral-forge.scene.json" },
+    "audio": { "path": "../../assets/audio/trench.wav" }
+  },
+  "live": { "targetFps": 60 },
+  "sources": [],
+  "routes": [],
+  "presets": [],
+  "parameters": {},
+  "render": { "width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/astral-forge-trench.mp4" }
+}

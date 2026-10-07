@@ -58,7 +58,28 @@ enum class SdfNodeKind : std::uint8_t {
     Stairs, Screw, Warp,
     // ADR-1040: a hollow shell of `offset` thickness centred on the child's surface (onion): a room from one box.
     Shell,
+    // ADR-1144 (appended; COMPILED trees only -- validate(Interpreter) refuses them, so the packed
+    // interpreter and every object it draws are untouched): the anatomical vocabulary of THE ASTRAL FORGE.
+    //   Ellipsoid(size = radii): Quilez's bound k0 (k0 - 1) / k1, k0 = |p / r|, k1 = |p / r^2|.
+    //   TaperedCapsule(from, to, radius at `from`, radius2 at `to`): the segment's clamped parameter h,
+    //     d = |p - from - (to - from) h| - mix(radius, radius2, h) (the prototype's sdCone; a bound).
+    //   Octahedron(radius): Quilez's exact octahedron.
+    //   Facet(size = radii, count planes, offset = support level, speed = turn rate, amount = jitter):
+    //     max over `count` Fibonacci-sphere normals n_k of dot(p / size, n_k) - offset, times min(size);
+    //     the plane set turns with time: crisp faces that are never still.
+    //   Blend (a combination of exactly two children): c0 + (c1 - c0) w, w = amount (times
+    //     smoothstep(offset - smooth, offset + smooth, dot(p, normalize(axis))) when axis is nonzero):
+    //     half a face organic, half faceted.
+    //   Fray (unary): a ragged rim. f = 1 + amount (valueNoise(p frequency + (0, 0, speed t), seed) - 0.5)
+    //     m, m = smoothstep(radius, offset, |(p - translation) size|); d = f child(p / f) (a uniform scale
+    //     that varies in space: an ellipsoid's radii scaled by f exactly).
+    //   FarField (unary): a radial guide far from a thin feature. far = |(p - translation) size|; beyond
+    //     `radius` d = far - offset and the child is not evaluated, inside it d = child(p). The bound of a
+    //     flat feature is nearly a plane far away, and matter attracted from afar collapses onto it.
+    Ellipsoid, TaperedCapsule, Octahedron, Facet, Blend, Fray, FarField,
 };
+// ADR-1144: kinds the packed interpreter does not run (a tree using one must be compiled).
+[[nodiscard]] bool sdfNodeIsCompiledOnly(SdfNodeKind kind);
 [[nodiscard]] const char* sdfNodeKindName(SdfNodeKind kind);
 [[nodiscard]] std::optional<SdfNodeKind> sdfNodeKindFromName(std::string_view name);
 [[nodiscard]] bool sdfNodeIsPrimitive(SdfNodeKind kind);
@@ -91,6 +112,10 @@ struct SdfNode {
     // ADR-1044: the surface (0..kMaxSdfSurfaces-1) this subtree is shaded with, or -1 to inherit. Read
     // only by a compiled tree (sdfSurface); structural (compiled in as a constant).
     int material = -1;
+    // ADR-1144: TaperedCapsule's end points and its second radius (JSON "from", "to", "radius2").
+    glm::vec3 from{0.0f};
+    glm::vec3 to{0.0f, 1.0f, 0.0f};
+    float radius2 = 0.5f;
     std::string reference;               // DisplaceField: field name
     std::vector<SdfNode> children;
     [[nodiscard]] nlohmann::json toJson() const;
@@ -161,6 +186,10 @@ static_assert(sizeof(SdfNodeGpu) == 112);
 [[nodiscard]] std::string sdfCompileWgsl(const SdfTree& tree, std::vector<SdfNodeGpu>& table,
                                          const FieldSet* fields = nullptr);
 [[nodiscard]] std::uint64_t sdfCompileKey(const SdfTree& tree);
+// ADR-1154: the tree's domain chain -- how many enabled unary nodes (Recurse excluded) lead from the root to its
+// first primitive or combination. They are the first records of both the packed program and the compiled table
+// (both are pre-order), so a shader carries a point into the tree's domain by their sdfWarp in turn.
+[[nodiscard]] int sdfDomainChainLength(const SdfTree& tree);
 // Fills `table` exactly as sdfCompileWgsl does (per frame; no source generated).
 void sdfCompileTable(const SdfTree& tree, std::vector<SdfNodeGpu>& table, const FieldSet* fields = nullptr);
 

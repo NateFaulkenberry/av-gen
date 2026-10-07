@@ -47,11 +47,13 @@ float latentGradientEpsilon(const glm::vec3& boundsMin, const glm::vec3& boundsM
     return std::max(1e-3f * glm::length(boundsMax - boundsMin), 1e-4f);
 }
 
-LatentSample latentProject(std::span<const spatial::SdfNodeGpu> program, const glm::vec3& pLocal, double time,
-                           float epsilon, const spatial::FieldSet* fields) {
+namespace {
+
+template <typename Distance>
+LatentSample projectWith(const Distance& distance, const glm::vec3& pLocal, float epsilon) {
     std::array<float, 4> d{};
     for (std::size_t i = 0; i < 4; ++i) {
-        d[i] = spatial::evaluatePacked(program, pLocal + kTetra[i] * epsilon, time, fields);
+        d[i] = distance(pLocal + kTetra[i] * epsilon);
     }
     const glm::vec3 g = kTetra[0] * d[0] + kTetra[1] * d[1] + kTetra[2] * d[2] + kTetra[3] * d[3];
     LatentSample s;
@@ -61,9 +63,9 @@ LatentSample latentProject(std::span<const spatial::SdfNodeGpu> program, const g
     return s;
 }
 
-glm::vec3 latentVelocityStep(const LatentStep& step, std::span<const spatial::SdfNodeGpu> program,
-                             const glm::vec3& position, const glm::vec3& velocity, float seed,
-                             const spatial::FieldSet* fields) {
+template <typename Distance>
+glm::vec3 velocityStepWith(const LatentStep& step, const Distance& distance, const glm::vec3& position,
+                           const glm::vec3& velocity, float seed) {
     const float theta = latentTheta(seed, step.width);
     const float b = latentBinding(theta, step.coherence, step.width);
     const float release = std::max(latentBinding(theta, step.prevCoherence, step.width) - b, 0.0f);
@@ -71,7 +73,7 @@ glm::vec3 latentVelocityStep(const LatentStep& step, std::span<const spatial::Sd
         return velocity;
     }
     const glm::vec3 pl = glm::vec3(step.inverse * glm::vec4(position, 1.0f));
-    const LatentSample s = latentProject(program, pl, step.time, step.epsilon, fields);
+    const LatentSample s = projectWith(distance, pl, step.epsilon);
     const glm::vec3 target = glm::vec3(step.model * glm::vec4(s.projection, 1.0f));
     const glm::vec3 nW = safeNormalize(glm::vec3(step.normal * glm::vec4(s.normal, 0.0f)));
     const float k = latentStiffness(step.strength, step.coherence, step.dt);
@@ -84,6 +86,33 @@ glm::vec3 latentVelocityStep(const LatentStep& step, std::span<const spatial::Sd
         v += release * step.release * nW * (sgn * (0.6f + 0.8f * h));
     }
     return v;
+}
+
+} // namespace
+
+LatentSample latentProject(std::span<const spatial::SdfNodeGpu> program, const glm::vec3& pLocal, double time,
+                           float epsilon, const spatial::FieldSet* fields) {
+    return projectWith([&](const glm::vec3& p) { return spatial::evaluatePacked(program, p, time, fields); }, pLocal,
+                       epsilon);
+}
+
+LatentSample latentProject(const spatial::SdfTree& tree, const glm::vec3& pLocal, double time, float epsilon,
+                           const spatial::FieldSet* fields) {
+    return projectWith([&](const glm::vec3& p) { return tree.evaluate(p, time, fields); }, pLocal, epsilon);
+}
+
+glm::vec3 latentVelocityStep(const LatentStep& step, std::span<const spatial::SdfNodeGpu> program,
+                             const glm::vec3& position, const glm::vec3& velocity, float seed,
+                             const spatial::FieldSet* fields) {
+    return velocityStepWith(
+        step, [&](const glm::vec3& p) { return spatial::evaluatePacked(program, p, step.time, fields); }, position,
+        velocity, seed);
+}
+
+glm::vec3 latentVelocityStep(const LatentStep& step, const spatial::SdfTree& tree, const glm::vec3& position,
+                             const glm::vec3& velocity, float seed, const spatial::FieldSet* fields) {
+    return velocityStepWith(
+        step, [&](const glm::vec3& p) { return tree.evaluate(p, step.time, fields); }, position, velocity, seed);
 }
 
 void splatDensity(std::span<const glm::vec3> positions, const glm::vec3& lo, const glm::vec3& hi, int res,

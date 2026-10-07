@@ -72,6 +72,11 @@ struct SdfDensitySource {
     std::string particles;  // the particle system (with a `density` block) whose volume is drawn
     float iso = 1.0f;       // the density level the surface sits at (> 0)
     float sharpness = 0.0f; // 0..1: how far the surface is pulled onto the tree's zero set
+    // ADR-1149: how much of the sharpening is local (0 = uniform): S *= mix(1, clamp(1.3 - 0.55 |p.xy / r.xy|
+    // - |p.z| / r.z, 0.15, 1), spread) at the local point p, r = spreadRadii. The anatomy's centre is precise,
+    // its periphery stays matter (the prototype's sharpSpread, 0.6 on its faces).
+    float spread = 0.0f;
+    glm::vec3 spreadRadii{2.0f, 2.8f, 5.0f};
     [[nodiscard]] bool active() const { return !particles.empty(); }
 };
 
@@ -140,6 +145,7 @@ struct SdfParameters {
     ToonParameters toon; // ADR-1071: toon/* (the material's cel lighting)
     MaterialOpticsParameters optics; // ADR-1143: material/thinFilm/*, material/anisotropy/*
     EngravingParameters engraving;   // ADR-1152: material/engraving/* (only when the block is present)
+    SurfaceRegionParameters regions; // ADR-1149: material/regions/* (only when the block is present)
     params::Parameter<bool>* visible = nullptr;
     params::Parameter<glm::vec3>* position = nullptr;
     params::Parameter<glm::vec3>* rotation = nullptr;

@@ -19,6 +19,7 @@
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
 #include "graph/graph.hpp"
+#include "scene/astral_forge.hpp"
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
 #include "scene/grid_params.hpp"
@@ -72,6 +73,10 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+namespace avgen::analysis {
+class AnalysisTrack;
+}
 
 namespace avgen::params {
 class Timeline;
@@ -880,6 +885,12 @@ public:
     // ADR-1116: the audio history Spectrum and Onset fields read, handed to the scene's FieldSet on
     // every flatten. The engine's; null leaves every audio field silent.
     void setAudioHistory(std::shared_ptr<const spatial::AudioHistory> audio) { audioHistory_ = std::move(audio); }
+    // ADR-1221: the engine's analysed track (null with live input) and the audio's length, for the Astral Forge's
+    // song conductor, which reads the whole song (sections, phrases, kicks) to look ahead.
+    void setAnalysisTrack(std::shared_ptr<const analysis::AnalysisTrack> track, double durationSeconds) {
+        analysisTrack_ = std::move(track);
+        analysisDuration_ = durationSeconds;
+    }
     // ADR-1119: the simulation input key the engine computed this frame (FieldSet::inputKey).
     void setSimulationInputKey(std::uint64_t key) { simulationInputKey_ = key; }
     // The node's world transform as the flatten DRAWS it: `nodeWorldTransform` with every offset on
@@ -1417,6 +1428,13 @@ public:
     // and for CPU consumers of records (the path tracer, navigation, ecology lights).
     Result<std::string> bakeGeneratorToPoints(const std::string& nodeName, glm::vec2 centreGen, float radius);
     [[nodiscard]] const std::vector<spatial::GridField>& grids() const { return grids_; }
+
+    // ---- the Astral Forge (ADR-1221): the second Environment, scene-level (`"astral"`) ----
+    // Replaces any previous block; its parameters (`astral/...`) are registered when attached.
+    void setAstral(AstralForge astral);
+    [[nodiscard]] const AstralForge& astral() const { return astral_; }
+    // The song the conductor is reading (null in live mode or before the first frame with a track).
+    [[nodiscard]] std::shared_ptr<const AstralSong> astralSong() const { return astralSong_; }
     [[nodiscard]] std::vector<spatial::GridField>& grids() { return grids_; }
 
     // ---- the ecosystem (ADR-1200): the first Environment, scene-level (`"ecosystem"`) ----
@@ -2307,6 +2325,17 @@ private:
     std::vector<GridParameters> gridParams_; // ADR-1122: one per grid in `grids_`, while attached
     Ecosystem ecosystem_;                     // ADR-1200: the authored block (rest values)
     EcosystemParameters ecosystemParams_;     // its live knobs, while attached
+    AstralForge astral_;                      // ADR-1221: the authored block (rest values)
+    std::optional<AstralParameters> astralParams_; // its live knobs, while attached
+    AstralLiveConductor astralLive_;          // live mode: the song as heard so far
+    std::shared_ptr<const AstralSong> astralSong_; // song mode: built once per track
+    const analysis::AnalysisTrack* astralSongTrack_ = nullptr; // the track `astralSong_` was built from
+    float astralCollapseLevel_ = 0.0f;        // `astral/collapse` last frame (it fires on the rising edge)
+    int astralShot_ = -1;                     // the conductor's shot last frame (a change is a cut)
+    std::shared_ptr<const analysis::AnalysisTrack> analysisTrack_; // ADR-1221: see `setAnalysisTrack`
+    double analysisDuration_ = 0.0;
+    void updateAstral(); // the conductor, for this frame (applyParameters)
+    void applyAstralCamera(float& fovDegrees); // the conductor's camera, when it drives
     std::vector<MaterialProgram> materialPrograms_;
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms

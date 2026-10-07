@@ -384,6 +384,11 @@ const std::vector<GpuCategoryRule>& gpuCategoryTable() {
         {"tonemap", "composite/tonemap"},
         {"composition", "composite/tonemap"},
         {"shaderlayer", "composite/tonemap"},
+        {"astral.sim", "particles/simulation"},     // ADR-1221: the Astral Forge's particles
+        {"astral.density", "particles/simulation"},
+        {"astral.flakes", "particles/simulation"},
+        {"astral.shards", "particles/simulation"},
+        {"astral.*", "SDF"},                        // its latent cache, march, surface and combine
         {"volume.*", "volumetrics"},
         {"distort.*", "post: other"},
         {"post/*", "post: other"},

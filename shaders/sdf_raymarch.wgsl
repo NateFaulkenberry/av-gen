@@ -33,7 +33,7 @@ fn surfaceDetail() -> SurfaceDetail {
     if (kSdfEngraved) {
         return sdfDetail;
     }
-    return SurfaceDetail(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0);
+    return SurfaceDetail(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0, 0.0, 0.0);
 }
 #include "pbr_shade.wgsl"
 #include "sdf.wgsl"
@@ -67,6 +67,9 @@ struct SdfObjectUniforms {
     density0: vec4<f32>,    // iso, sharpness, one density cell in local units, 1 = density mode
     density1: vec4<f32>,    // the volume's world-space min corner, 0
     density2: vec4<f32>,    // 1 / the volume's world-space extent, 0
+    // ADR-1149: the sharpness's spread -- x = how much of it is local (0 = uniform), yzw = the radii of the
+    // falloff (local units): S *= mix(1, clamp(1.3 - 0.55 |p.xy / r.xy| - |p.z| / r.z, 0.15, 1), x).
+    density3: vec4<f32>,
 };
 
 // ADR-1055: the world wave at a world point -- the band's colour, how much of the band is here, and how
@@ -208,12 +211,19 @@ fn sdfDensityFieldOf(offset: u32, count: u32, p: vec3<f32>, t: f32, world: mat4x
     let iso = sdf.density0.x;
     let cell = sdf.density0.z;
     let dRho = (iso - rho) * cell * 1.6;
-    if (!(sdf.density0.y > 0.0 && rho > 0.12 * iso)) {
+    var sharp = sdf.density0.y;
+    if (sdf.density3.x > 0.0) {
+        // ADR-1149: the anatomy's centre (eyes, mouth) becomes precise, its periphery stays matter
+        let r = sdf.density3.yzw;
+        let localS = clamp(1.3 - 0.55 * length(p.xy / r.xy) - abs(p.z) / r.z, 0.15, 1.0);
+        sharp = sharp * mix(1.0, localS, sdf.density3.x);
+    }
+    if (!(sharp > 0.0 && rho > 0.12 * iso)) {
         return dRho;
     }
     let tree = sdfField(offset, count, p, t, world);
     let dilated = (0.38 * iso - rho) * cell * 3.0;
-    return mix(dRho, max(tree, dilated), sdf.density0.y);
+    return mix(dRho, max(tree, dilated), sharp);
 }
 
 // The field every march, normal, occlusion and shadow of this pass reads: ONE function for the depth
@@ -584,17 +594,19 @@ struct SdfGroove {
     cover: f32,        // 0..1: the strongest visibility of any octave cut here (0 = nothing engraved)
 };
 
-fn sdfGrooveLayer(rec: SdfNodeGpu, q: vec3<f32>, n0: vec3<f32>, crawl: f32, footprint: f32, weight: f32,
-                  groove: ptr<function, SdfGroove>) {
+// ADR-1154: `jac` maps a step along the object's local axes into the engraving's domain (the identity when the
+// tree has no domain chain), so the gradients are local and the line field follows the tree's warps.
+fn sdfGrooveLayer(rec: SdfNodeGpu, q: vec3<f32>, jac: mat3x3<f32>, n0: vec3<f32>, crawl: f32, footprint: f32,
+                  weight: f32, groove: ptr<function, SdfGroove>) {
     if (weight < 0.02) {
         return;
     }
     // the gradients of u and v by forward differences (an angular u unwrapped across its branch cut)
     let e = 2e-3;
     let e0 = sdfEngraveUv(rec, q, crawl);
-    let ex = sdfEngraveUv(rec, q + vec3<f32>(e, 0.0, 0.0), crawl);
-    let ey = sdfEngraveUv(rec, q + vec3<f32>(0.0, e, 0.0), crawl);
-    let ez = sdfEngraveUv(rec, q + vec3<f32>(0.0, 0.0, e), crawl);
+    let ex = sdfEngraveUv(rec, q + jac[0] * e, crawl);
+    let ey = sdfEngraveUv(rec, q + jac[1] * e, crawl);
+    let ez = sdfEngraveUv(rec, q + jac[2] * e, crawl);
     var du = vec3<f32>(ex.uv.x - e0.uv.x, ey.uv.x - e0.uv.x, ez.uv.x - e0.uv.x);
     if (e0.angular) {
         du = vec3<f32>(sdfWrapPi(du.x), sdfWrapPi(du.y), sdfWrapPi(du.z));
@@ -648,10 +660,44 @@ fn sdfPanelNoise(p: vec3<f32>) -> f32 {
     return mix(a, b, u.z);
 }
 
-// The engraving at local point q with local normal n0 and a pixel `footprint` (local units). Rosettes are
-// cut in their annulus and polish their centre; contour layers are cut in the panels (everywhere without
-// panels), engine-turned layers between them, both kept off the rosettes. Fills `sdfDetail` for the shading.
-fn sdfEngrave(q: vec3<f32>, n0: vec3<f32>, footprint: f32, time: f32) -> vec3<f32> {
+// ADR-1154: the engraving's domain -- the local point carried through the tree's domain chain, the leading
+// unary records of its program or table (head.p1.z of them; the chain stops at the first primitive or
+// combination). Each is the op's own sdfWarp, so a fold, a twist or a turn of the whole anatomy bends its
+// lines with it. A uniform Scale also scales the footprint.
+struct SdfDetailDomain {
+    q: vec3<f32>,
+    footprint: f32,
+};
+
+fn sdfDomainAt(p: vec3<f32>, chain: u32) -> vec3<f32> {
+    var q = p;
+    for (var i = 0u; i < chain; i = i + 1u) {
+        q = sdfWarp(sdfNodes[sdf.info.x + i], q);
+    }
+    return q;
+}
+
+fn sdfDetailDomainOf(p: vec3<f32>, footprint: f32) -> SdfDetailDomain {
+    let head = sdfNodes[sdf.info.x + sdf.surfaces.z];
+    let chain = min(u32(head.p1.z + 0.5), 16u);
+    var o: SdfDetailDomain;
+    o.q = sdfDomainAt(p, chain);
+    o.footprint = footprint;
+    for (var i = 0u; i < chain; i = i + 1u) {
+        let rec = sdfNodes[sdf.info.x + i];
+        if (rec.kind == SDF_SCALE) { // a BEGIN record (program) or the node's record (compiled table)
+            o.footprint = o.footprint / max(rec.p1.w, 1e-6);
+        }
+    }
+    return o;
+}
+
+// The engraving at local point p (engraving domain point q, local-to-domain Jacobian jac) with local normal n0
+// and a pixel `footprint` (domain units). Rosettes are cut in their annulus and polish their centre; contour
+// layers are cut in the panels (everywhere without panels), engine-turned layers between them, both kept off
+// the rosettes. ADR-1149: the regions' weight near the authored feature points thickens the temper film and
+// polishes the surface. Fills `sdfDetail` for the shading.
+fn sdfEngrave(q: vec3<f32>, jac: mat3x3<f32>, n0: vec3<f32>, footprint: f32, time: f32) -> vec3<f32> {
     let base = sdf.info.x + sdf.surfaces.z;
     let head = sdfNodes[base];
     let layers = min(u32(head.p1.y + 0.5), 6u);
@@ -687,8 +733,21 @@ fn sdfEngrave(q: vec3<f32>, n0: vec3<f32>, footprint: f32, time: f32) -> vec3<f3
         } else {
             weight = weight * (1.0 - cover) * select(1.0, 1.0 - panel, head.p1.x > 0.0);
         }
-        sdfGrooveLayer(rec, q, n0, crawl, footprint, weight, &g);
+        sdfGrooveLayer(rec, q, jac, n0, crawl, footprint, weight, &g);
     }
+    // ADR-1149: the regions: fw = max_k weight_k exp(-sharpness_k |(q - centre_k) scale_k|^2)
+    let regions = min(u32(head.p1.w + 0.5), 4u);
+    var fw = 0.0;
+    for (var k = 0u; k < regions; k = k + 1u) {
+        let rec = sdfNodes[base + 1u + layers + k];
+        let d = (q - rec.p0.xyz) * rec.p1.xyz;
+        fw = max(fw, rec.p1.w * exp(-rec.p0.w * dot(d, d)));
+    }
+    var film = head.p2.x * fw;
+    if (head.p2.y > 0.0) {
+        film = film + head.p2.y * sdfPanelNoise(q * head.p2.z + vec3<f32>(0.0, 7.3, 0.0));
+    }
+    let polish = clamp(head.p2.w * fw, 0.0, 1.0);
     // to world space for the shading: the line direction is a tangent (the model matrix carries it), the
     // across direction is rebuilt from it and the world normal
     let nW = normalize((object.normalMatrix * vec4<f32>(g.n, 0.0)).xyz);
@@ -699,7 +758,7 @@ fn sdfEngrave(q: vec3<f32>, n0: vec3<f32>, footprint: f32, time: f32) -> vec3<f3
     tW = select(vec3<f32>(0.0), tW / tl, tl > 1e-6 && g.cover > 0.0);
     let aW = select(vec3<f32>(0.0), normalize(cross(tW, nW)), tl > 1e-6 && g.cover > 0.0);
     // no grating on the rosettes: their groove direction turns too fast per pixel and aliases to confetti
-    sdfDetail = SurfaceDetail(tW, g.mask, aW, head.p0.z * g.mask * (1.0 - cover), head.p0.w);
+    sdfDetail = SurfaceDetail(tW, g.mask, aW, head.p0.z * g.mask * (1.0 - cover), head.p0.w, film, polish);
     return g.n;
 }
 
@@ -784,7 +843,17 @@ fn fs_sdf(in: SdfVertexOut) -> SdfFragmentOut {
         // subtends, times the local t).
         let farUp = frame.invViewProj * vec4<f32>(in.ndc + vec2<f32>(0.0, 2.0 * frame.targetSize.w), 1.0, 1.0);
         let pixelAngle = length(normalize(farUp.xyz / farUp.w - eye) - rdW);
-        nShade = sdfEngrave(pL, nL, pixelAngle * t, time);
+        // ADR-1154: in the tree's domain (with no domain chain: pL itself and the identity)
+        let dom = sdfDetailDomainOf(pL, pixelAngle * t);
+        var jac = mat3x3<f32>(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
+        let chain = min(u32(sdfNodes[sdf.info.x + sdf.surfaces.z].p1.z + 0.5), 16u);
+        if (chain > 0u) {
+            let ej = 2e-3;
+            jac = mat3x3<f32>((sdfDomainAt(pL + vec3<f32>(ej, 0.0, 0.0), chain) - dom.q) / ej,
+                              (sdfDomainAt(pL + vec3<f32>(0.0, ej, 0.0), chain) - dom.q) / ej,
+                              (sdfDomainAt(pL + vec3<f32>(0.0, 0.0, ej), chain) - dom.q) / ej);
+        }
+        nShade = sdfEngrave(dom.q, jac, nL, dom.footprint, time);
     }
     var normal = normalize((object.normalMatrix * vec4<f32>(nShade, 0.0)).xyz);
     // Face the eye: an interior start (camera inside the surface) yields a back-facing gradient.

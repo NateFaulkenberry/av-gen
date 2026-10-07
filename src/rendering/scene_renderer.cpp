@@ -202,6 +202,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
       ecosystem_(std::make_unique<EcosystemRenderer>()),
+      astral_(std::make_unique<AstralRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
       shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
@@ -538,7 +539,11 @@ Result<void> SceneRenderer::init() {
     if (auto r = ecosystem_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
         return r;
     }
-    environments_ = {ecosystem_.get()};
+    // ADR-1221: the Astral Forge runs its own passes after the lit pass, on the shared targets.
+    if (auto r = astral_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
+        return r;
+    }
+    environments_ = {ecosystem_.get(), astral_.get()}; // ADR-1200: the seam, in run order
     // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
     // IBL group (a shield's sheen).
     if (auto r = shells_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, iblLayout_); !r) {
@@ -1817,6 +1822,11 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"shadowatlas1k", [](QualitySettings& q) { q.shadowResolution = 1024; },
          "shadowResolution=1024 (the control arm: it must move the masked and unmasked frames alike)"},
         // ADR-1165: the raymarched casters' shadow march at the map's own resolution, at half, at a quarter.
+        {"astral0", [](QualitySettings& q) { q.astralTier = 0; }, "astralTier=0 (ADR-1222: the offline god: every particle, full march, exact seek)"},
+        {"astral1", [](QualitySettings& q) { q.astralTier = 1; }, "astralTier=1 (ADR-1222: the live reference)"},
+        {"astral2", [](QualitySettings& q) { q.astralTier = 2; }, "astralTier=2 (ADR-1222: 70% of the particles, 12 god-ray taps)"},
+        {"astral3", [](QualitySettings& q) { q.astralTier = 3; }, "astralTier=3 (ADR-1222: 50%, 8 taps, no shards)"},
+        {"astral4", [](QualitySettings& q) { q.astralTier = 4; }, "astralTier=4 (ADR-1222: 33%, no god rays, no shards)"},
         {"sdfshadowfull", [](QualitySettings& q) { q.sdfShadowScale = 1; },
          "sdfShadowScale=1 (raymarched SDF casters marched at the shadow map's own resolution)"},
         {"sdfshadowhalf", [](QualitySettings& q) { q.sdfShadowScale = 2; },
@@ -2020,6 +2030,9 @@ void SceneRenderer::resetTemporalHistory() {
     // ADR-1114: the simulated grids are world state too, and this call never reached them. A seek
     // forwards left a grid lagging by the whole gap and paying it back at `maxSubSteps` a frame; a
     // seek backwards reset it and granted 240 steps. Now the next frame runs the whole backlog.
+    if (astral_ != nullptr) {
+        astral_->markDiscontinuity(); // ADR-1221: its particles are world state too
+    }
     if (simulation_ != nullptr) {
         simulation_->markDiscontinuity();
     }
@@ -3923,8 +3936,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // reads the linear depth the prepass resolves -- so the question is whether a pass was
     // ENCODED, not whether the lit pass will read it. `active()` here would have produced a shadow
     // AOV computed against a depth target nobody filled.
+    // ADR-1147: a shard rests on the opaque surface, which it finds in the linear depth.
+    const bool shardsWantDepth = std::any_of(scene.particles.begin(), scene.particles.end(), [](const scene::ParticleSystem& p) {
+        return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
+    });
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
-                                   shadowMask_->encoded() || !scene.waters.empty() ||
+                                   shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth ||
                                    std::any_of(environments_.begin(), environments_.end(), // ADR-1200: the seam
                                                [&](const EnvironmentRenderer* e) { return e->wants(scene); });
     // ---- water surfaces (ADR-099) ----
@@ -3987,6 +4004,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
         }
         particleFrame.linearDepth = needsDepthPrepass ? linearDepth_.view : nullptr;
+        // ADR-1147: the angle one pixel subtends (vertical), for a shard's footprint.
+        particleFrame.pixelAngle = 2.0f / (std::max(std::abs(proj[1][1]), 1e-6f) * std::max(static_cast<float>(hdr_.height()), 1.0f));
         // ADR-520: the key light, for the scattering phase function. `resolveSky` again, for the
         // reason the sky block above gives: it is pure and cheap, and one rule about which light
         // the sun is beats a second rule that can disagree with the first. A dust mote and the disc

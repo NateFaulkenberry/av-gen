@@ -201,9 +201,11 @@ TEST_CASE("a latent naming no sdf node is refused at load", "[composition][laten
     CHECK(wrongKind.error().message.find("names no sdf node") != std::string::npos);
 }
 
-TEST_CASE("a latent the particle interpreter cannot evaluate is refused at load", "[composition][latent]") {
-    // Ten nested translations need a point stack of ten; the interpreter has eight (kMaxSdfStack). A
-    // compiled object may draw it (ADR-1005), but the particle simulation has only the interpreter.
+TEST_CASE("a latent the particle interpreter cannot evaluate is refused at load unless its object compiles",
+          "[composition][latent]") {
+    // Ten nested translations need a point stack of ten; the interpreter has eight (kMaxSdfStack). ADR-1145: a
+    // compiled object's latent runs a compiled variant of the force, so the same tree, interpreted, is refused
+    // and, compiled, loads.
     json root = json{{"kind", "sphere"}, {"radius", 0.5}};
     for (int i = 0; i < 10; ++i) {
         root = json{{"kind", "translate"}, {"translation", {0.02, 0.0, 0.0}}, {"children", json::array({root})}};
@@ -214,10 +216,14 @@ TEST_CASE("a latent the particle interpreter cannot evaluate is refused at load"
                      {"compile", true},
                      {"visible", false}};
     REQUIRE(scene::SdfObject::fromJson(deep)); // loadable as a compiled object
+    auto compiled = load(sceneWith(json::array({sdfNode("deep", deep), particlesNode("matter", latentParticles("deep"))})));
+    INFO((compiled ? std::string() : compiled.error().message));
+    CHECK(compiled);
+    deep["compile"] = false;
     auto refused = load(sceneWith(json::array({sdfNode("deep", deep), particlesNode("matter", latentParticles("deep"))})));
     REQUIRE_FALSE(refused);
     INFO(refused.error().message);
-    CHECK(refused.error().message.find("interpreter") != std::string::npos);
+    CHECK(refused.error().message.find("deep") != std::string::npos);
 }
 
 TEST_CASE("a density source naming nothing, or a system without a volume, is refused at load", "[composition][density]") {
