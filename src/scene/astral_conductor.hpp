@@ -1,8 +1,8 @@
-// THE ASTRAL FORGE -- the CONDUCTOR: the entity state as a pure function of t (and, for TEST 06, of the
+// THE ASTRAL FORGE (ADR-1221) -- the CONDUCTOR: the entity state as a pure function of t (and, for TEST 06, of the
 // whole-song analysis). docs/prototypes/astral-forge/03-parameter-state-model.md is its specification.
 #pragma once
 
-#include "astral_audio.hpp"
+#include "scene/astral_song.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace astral {
+namespace avgen::astral {
 
 enum Arch { kMask = 0, kSeraph = 1, kAbyss = 2, kChimera = 3, kMachine = 4, kChoir = 5, kHorns = 6 };
 
@@ -545,4 +545,4 @@ inline State test08(float t, const SongAnalysis& song, const Score& sc) {
     return s;
 }
 
-} // namespace astral
+} // namespace avgen::astral

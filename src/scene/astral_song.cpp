@@ -1,5 +1,5 @@
-// THE ASTRAL FORGE -- disposable prototype. See astral_audio.hpp.
-#include "astral_audio.hpp"
+// THE ASTRAL FORGE (ADR-1221). See astral_song.hpp.
+#include "scene/astral_song.hpp"
 
 #include "analysis/analysis_track.hpp"
 #include "analysis/structure.hpp"
@@ -12,7 +12,7 @@
 #include <cstring>
 #include <fstream>
 
-namespace astral {
+namespace avgen::astral {
 namespace {
 
 constexpr std::uint32_t kCacheMagic = 0x41535446u; // "ASTF"
@@ -84,23 +84,14 @@ float percentile(std::vector<float> v, float q) {
 
 } // namespace
 
-SongAnalysis loadSong(const std::string& path, const std::string& cachePath) {
+SongAnalysis buildSong(const avgen::analysis::AnalysisTrack& track, double durationSeconds) {
     SongAnalysis s;
-    if (!cachePath.empty() && readCache(cachePath, s)) return s;
-    const auto t0 = std::chrono::steady_clock::now();
-    auto file = avgen::audio::AudioFile::load(path);
-    if (!file) {
-        std::fprintf(stderr, "audio: %s\n", file.error().message.c_str());
-        std::exit(6);
-    }
-    avgen::analysis::AnalyzerConfig cfg;
-    cfg.sampleRate = file->sampleRate();
-    const auto track = avgen::analysis::AnalysisTrack::analyze(*file, cfg);
+    const auto& cfg = track.config();
     const auto& frames = track.frames();
     s.hops = static_cast<int>(frames.size());
     s.hopRate = static_cast<float>(cfg.sampleRate) / static_cast<float>(cfg.hopSize);
     s.t0 = frames.empty() ? 0.0f : static_cast<float>(frames.front().timeSeconds);
-    s.duration = file->durationSeconds();
+    s.duration = durationSeconds;
     s.tempoBpm = track.beats().tempoBpm;
     s.beats = track.beats().beatTimes;
     const float binHz = static_cast<float>(cfg.sampleRate) / static_cast<float>(cfg.windowSize);
@@ -191,6 +182,22 @@ SongAnalysis loadSong(const std::string& path, const std::string& cachePath) {
     } else {
         std::fprintf(stderr, "structure: %s\n", st.error().message.c_str());
     }
+    return s;
+}
+
+SongAnalysis loadSong(const std::string& path, const std::string& cachePath) {
+    SongAnalysis s;
+    if (!cachePath.empty() && readCache(cachePath, s)) return s;
+    const auto t0 = std::chrono::steady_clock::now();
+    auto file = avgen::audio::AudioFile::load(path);
+    if (!file) {
+        std::fprintf(stderr, "audio: %s\n", file.error().message.c_str());
+        std::exit(6);
+    }
+    avgen::analysis::AnalyzerConfig cfg;
+    cfg.sampleRate = file->sampleRate();
+    const auto track = avgen::analysis::AnalysisTrack::analyze(*file, cfg);
+    s = buildSong(track, file->durationSeconds());
     s.analyseSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     if (!cachePath.empty()) writeCache(cachePath, s);
     return s;
@@ -224,4 +231,4 @@ AudioAtT sampleSong(const SongAnalysis& s, double t) {
     return a;
 }
 
-} // namespace astral
+} // namespace avgen::astral

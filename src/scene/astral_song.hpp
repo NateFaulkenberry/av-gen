@@ -1,4 +1,4 @@
-// THE ASTRAL FORGE -- disposable prototype. Real audio, analysed once with production's offline analysis
+// THE ASTRAL FORGE (ADR-1221) -- the song as the conductor reads it. Real audio, analysed once with production's offline analysis
 // (analysis::AnalysisTrack: the same analyzer, beat tracker and band-onset pass a render uses, plus
 // analysis::detectStructure for sections and repetition groups). Reduced to what the conductor and the
 // GPU read. Everything is indexed by timeline seconds, so the conductor is a pure function of t.
@@ -10,7 +10,11 @@
 #include <string>
 #include <vector>
 
-namespace astral {
+namespace avgen::analysis {
+class AnalysisTrack;
+}
+
+namespace avgen::astral {
 
 struct Section {
     double start = 0.0, end = 0.0;
@@ -38,6 +42,10 @@ struct SongAnalysis {
     double analyseSeconds = 0.0;
 };
 
+// From a track production already analysed (an offline render's or the editor's track): no second analysis.
+// `durationSeconds` is the audio's length (the track's frames may stop short of it).
+SongAnalysis buildSong(const analysis::AnalysisTrack& track, double durationSeconds);
+// The prototype's path: analyse a file (cached at `cachePath` when non-empty). Exits on an unreadable file.
 SongAnalysis loadSong(const std::string& path, const std::string& cachePath);
 
 struct AudioAtT {
@@ -50,4 +58,4 @@ struct AudioAtT {
 
 AudioAtT sampleSong(const SongAnalysis& song, double t);
 
-} // namespace astral
+} // namespace avgen::astral

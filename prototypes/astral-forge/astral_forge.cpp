@@ -14,8 +14,10 @@
 //
 // Shaders are read from ASTRAL_SHADER_DIR at run time.
 
-#include "astral_audio.hpp"
-#include "conductor.hpp"
+#include "scene/astral_conductor.hpp"
+#include "scene/astral_song.hpp"
+
+namespace astral = avgen::astral;
 
 #include "assets/image.hpp"
 #include "gpu/context.hpp"
@@ -293,7 +295,7 @@ int main(int argc, char** argv) {
     const int approach = std::clamp(o.approach - 'A', 0, 4);
     if (o.gridSize <= 0.0f) o.gridSize = o.test == 4 ? 12.5f : 20.0f;
     // The owner's test song (2026-10-05): Trench. Fireballs is the only secondary check (--song).
-    if (o.song.empty()) o.song = std::string(ASTRAL_SHADER_DIR) + "/../../../assets/audio/trench.wav"; // repo asset (gitignored)
+    if (o.song.empty()) o.song = std::string(ASTRAL_SHADER_DIR) + "/../../assets/audio/trench.wav"; // repo asset (gitignored)
     // TEST 06 default excerpt: the verse's last phrases, the break (86.25 s) and the chorus (94.61 s, a kick-opened collapse)
     if (o.songStart < 0.0) o.songStart = o.song.find("rench") != std::string::npos ? 66.54 : 41.3;
 
