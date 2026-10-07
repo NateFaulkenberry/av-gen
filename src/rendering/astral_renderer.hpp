@@ -22,6 +22,7 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <string>
 
@@ -142,7 +143,11 @@ private:
     // time
     bool initialised_ = false;
     bool discontinuity_ = true;
-    double simT_ = 0.0;
+    // The step grid is integral: step n is at n / 60 s exactly. An accumulated `t += 1/60` drifts against the frame
+    // clock and takes 0 steps one frame and 2 the next (measured: the live profile's P95 doubled).
+    std::int64_t simStep_ = 0;
+    [[nodiscard]] double simT() const { return static_cast<double>(simStep_) / kSimRate; }
+    [[nodiscard]] static std::int64_t stepAt(double t) { return static_cast<std::int64_t>(std::floor(t * kSimRate + 1e-4)); }
     std::uint64_t step_ = 0;
     double lastFrameTime_ = -1e9;
     std::uint32_t lastEpoch_ = 0;

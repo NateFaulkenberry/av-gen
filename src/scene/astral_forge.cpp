@@ -298,6 +298,17 @@ void AstralLiveConductor::ingest(const spatial::AudioHistory& audio, double now)
 
 void AstralLiveConductor::advancePhrases(double now, bool collapse) {
     using astral::Phrase;
+    // A pulse that never stops: when the beat tracker hears nothing (silence, a beatless passage, a dropout) the
+    // conductor keeps time on its own at the last tempo it heard (100 bpm before any), so the god still forms,
+    // holds and turns over. A real beat that arrives later continues the count.
+    {
+        const double period = score_.beatSeconds > 0.2 ? score_.beatSeconds : 0.6;
+        if (song_.beats.empty()) {
+            if (now - song_.t0 > 2.0 * period) song_.beats.push_back(now);
+        } else {
+            while (now - song_.beats.back() > 1.5 * period) song_.beats.push_back(song_.beats.back() + period);
+        }
+    }
     const auto& beats = song_.beats;
     // the beat period: the median of the last eight intervals (0.5 s until there are some)
     double beatSec = 0.5;

@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <vector>
 
@@ -544,7 +545,7 @@ void AstralRenderer::initParticles(const scene::AstralForge& a, double t, const 
     }
     wgpu::CommandBuffer cb = enc.Finish();
     context_->queue().Submit(1, &cb);
-    simT_ = t;
+    simStep_ = stepAt(t);
     step_ = 0;
     lastStepState_ = s;
 }
@@ -557,14 +558,15 @@ int AstralRenderer::simulateTo(wgpu::CommandEncoder& frameEnc, const scene::Astr
     std::uint32_t chunks = 0;
     for (;;) {
         std::vector<double> stepTimes;
-        while (simT_ + 1.0 / kSimRate <= t + 1e-9 && stepTimes.size() < static_cast<std::size_t>(kSlots)) {
-            simT_ += 1.0 / kSimRate;
-            stepTimes.push_back(simT_);
+        const std::int64_t target = stepAt(t);
+        while (simStep_ < target && stepTimes.size() < static_cast<std::size_t>(kSlots)) {
+            ++simStep_;
+            stepTimes.push_back(simT());
         }
         if (stepTimes.empty()) {
             break;
         }
-        const bool more = simT_ + 1.0 / kSimRate <= t + 1e-9;
+        const bool more = simStep_ < target;
         // a backlog beyond the slots is simulated in submits of its own, before the frame's
         wgpu::CommandEncoder own;
         if (more) {
@@ -657,7 +659,7 @@ void AstralRenderer::encode(const EnvironmentFrame& frame) {
     cam.fovY = sc.effectiveFovY();
 
     const double t = frame.time.renderTime;
-    const bool jumped = !initialised_ || discontinuity_ || a.epoch != lastEpoch_ || t < simT_ - 1e-6 || t - simT_ > 1.0;
+    const bool jumped = !initialised_ || discontinuity_ || a.epoch != lastEpoch_ || stepAt(t) < simStep_ || t - simT() > 1.0;
     if (jumped) {
         stats_.reset = true;
         // exact at the offline tier in song mode: re-simulate from the song's start, as play did; otherwise ADR-360's
@@ -666,7 +668,7 @@ void AstralRenderer::encode(const EnvironmentFrame& frame) {
         liveFrom_ = a.state;
         liveFromT_ = t;
         initParticles(a, from, cam);
-        if (simT_ < t - 1.0 / kSimRate) {
+        if (simStep_ < stepAt(t) - 1) {
             wgpu::CommandEncoder pre = context_->device().CreateCommandEncoder();
             const double upTo = t - 1.0 / kSimRate; // the frame's own steps go in the frame's encoder
             (void)simulateTo(pre, a, upTo, cam);
@@ -815,6 +817,9 @@ void AstralRenderer::encode(const EnvironmentFrame& frame) {
         r.End();
     }
     lastFrameTime_ = t;
+    if (std::getenv("AVGEN_ASTRAL_TRACE") != nullptr) { // diagnostics: the steps each frame took
+        log::info("astral t={:.4f} steps={} reset={} tier={} N={}", t, stats_.steps, stats_.reset, stats_.tier, stats_.particlesActive);
+    }
 }
 
 } // namespace avgen::rendering

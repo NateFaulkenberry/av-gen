@@ -376,7 +376,9 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     s.archA = s.archB = static_cast<float>(arch);
     // iteration 4: the song's shots are mostly wide, and at 22 units the drifters' containment shell read as a
     // glowing sphere around the god (the banned 'particle sphere'). The meta field is wider for the song.
-    s.metaRadius = camera == 1 ? 60.0f : 22.0f; // iteration 4 widened the dust field for its wide shots
+    // iteration 4 widened the dust field for its wide shots; at iteration 2's distances 22 left the drifters'
+    // containment visible as a sphere around the god (the banned 'particle sphere'), so production takes 40
+    s.metaRadius = camera == 1 ? 60.0f : 40.0f;
     // v2 look: palette, raking key, rim, eye glow, dust absorbed into a formed face, atmosphere and god rays
     s.paletteStrength = 0.9f; s.keyLight = 1.0f; s.rimLight = 1.0f; s.eyeGlow = 1.0f; s.atmosphere = 1.0f; s.godRays = 1.0f;
 
