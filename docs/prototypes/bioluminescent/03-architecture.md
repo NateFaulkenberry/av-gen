@@ -55,8 +55,77 @@ The mode is then a property of the scene's content, not a switch: with no enviro
 with an environment block and nothing else it is ENVIRONMENT, and with both it is HYBRID. A switch would need a
 compatibility path for every existing scene, and this needs none.
 
-**Naming note.** `"environment"` cannot be the JSON key (it is sky/fog). Candidates: `"habitat"`, `"biome"` (taken
-by the world system), `"ecosystem"`, `"envRenderer"`. Decided when the block is built (ADR-1200).
+**Naming.** `"environment"` cannot be the JSON key, because it already means sky and fog. Each Environment names its
+own block after what it is: the first is `"ecosystem"` (ADR-1200).
+
+### 2.1 The seam contract (for every Environment; the second user is production Astral Forge)
+
+Three pieces, each small. **If the shape of any of them changes, this section says so.**
+
+**1. A scene block.**
+- It is a top-level JSON key, parsed by the Composition (`Composition::fromJsonImpl`), and must be added to
+  `kSceneKeys`.
+- It is stored on the Composition as authored ("rest") values and copied onto `scene::Scene` every frame with its
+  parameter finals applied (`Composition::update`, beside the grids).
+- The ecosystem's block: `"ecosystem"` → `scene::Ecosystem` (`src/scene/ecosystem.hpp`).
+- Unknown keys are refused, not ignored.
+
+**2. Parameters.**
+- `registerXParameters(params, rest, prefix)` / `applyXParameters(p, rest, live)`, called from
+  `Composition::attach` and from the block's setter if attached later. This is the same pattern as grids
+  (ADR-1122).
+- Routes, MIDI, presets, scene states, the timeline and the editor's generic parameter panel then reach every leaf
+  by path, with no more wiring. The ecosystem's leaves are `ecosystem/<layer>/<leaf>`.
+
+**3. A renderer.**
+- `rendering::EnvironmentRenderer` (`src/rendering/environment_renderer.hpp`) has four members: `name()`,
+  `wants(scene)`, `encode(EnvironmentFrame)` and `reload(shaders)`.
+- `SceneRenderer` owns the implementations and lists them in `environments_` (one line in `init`).
+- Every frame, after the lit pass and before the volumetric medium, each environment that `wants` the scene gets
+  `encode` with an `EnvironmentFrame`:
+  - the command encoder, the scene and the frame time;
+  - the FrameUniforms buffer (`shaders/common.wgsl` `frame`);
+  - the field block and the simulated-grid table (`FieldUniforms`, `fields.wgsl`);
+  - the prepass's linear depth (R32Float view distance);
+  - the HDR and emission targets and the depth buffer (Depth24Plus);
+  - the HDR size (render scale applied);
+  - the live quality settings;
+  - the GPU timeline (mark each pass `"<name>.<pass>"`).
+- An environment may run any compute, write HDR and emission, and test against or write depth.
+- A `wants` that is true makes the depth prepass run.
+- With none wanting the scene, nothing is recorded, and the frame is byte-identical.
+
+**What the seam gives an environment for free:**
+- audio, analysis, the signal bus and routes;
+- MIDI, scene states and the timeline;
+- the camera (any mode);
+- post, bloom (through the emission target), temporal and tonemap;
+- `--render` to PNG, EXR or video, and AOVs;
+- the live quality ladder (render scale);
+- conventional content in the same frame (HYBRID: shared depth both ways).
+
+**What an environment brings itself:**
+- **Its own GPU state.**
+- **Determinism.** Either make it a pure function of time (the ecosystem is: per-point hashes and time) or keep its
+  stateful part in a `Simulation` grid (exact seek through ADR-1119 checkpoints; the Rift's medium is ADR-1201). A
+  particle state outside `Simulation` gets ADR-360's contract (play exact, a scrub visually equivalent after a
+  pre-roll), as Astral Forge's prototype does.
+- **Quality tiers.** Read `EnvironmentFrame::quality` (`QualitySettings`: render scale, tier, the live ladder's
+  levers). Add a lever there only if the environment needs one the ladder does not already have.
+
+**Not built, on purpose:**
+- no registry or plugin loading;
+- no shared environment base state;
+- no pass scheduling beyond "after the lit pass".
+
+Astral Forge's surface march fits this point: it writes HDR and depth after the lit pass, and the medium and post
+follow. An environment that must be lit by the scene's shadows, or must cast into them, would need a second hook in
+the shadow pass. Add it when a user needs it (`SdfRenderer`'s `drawShadow` is the model).
+
+Commits to cherry-pick for the seam alone:
+- `src/rendering/environment_renderer.hpp`;
+- the `environments_` list and the `EnvironmentFrame` call in `scene_renderer.{hpp,cpp}`;
+- (optionally) `src/scene/ecosystem.*` and `src/rendering/ecosystem_renderer.*` as the worked example.
 
 ## 3. CP1: the general renderer at the Rift's first density (measured)
 

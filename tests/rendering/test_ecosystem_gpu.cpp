@@ -197,15 +197,20 @@ TEST_CASE("an ecosystem emitter is hidden by a wall in front of it", "[gpu][ecos
     wall.transform.scale = glm::vec3(4.0f, 4.0f, 0.2f);
     wall.material.baseColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
+    scene::Scene wallOnly = walled;
+    wallOnly.ecosystem = scene::Ecosystem{};
     const gpu::Image8 seen = render(renderer, open, 1.0);
     const gpu::Image8 hidden = render(renderer, walled, 1.0);
+    const gpu::Image8 wallAlone = render(renderer, wallOnly, 1.0);
     dump(seen, "ecosystem-occlusion-open");
     dump(hidden, "ecosystem-occlusion-walled");
     const int open_ = luma(seen, kWidth / 2, kHeight / 2);
+    // The wall has its own (ambient) shading: compare with the same wall and no ecosystem at all.
     const int behind = luma(hidden, kWidth / 2, kHeight / 2);
-    INFO("centre with the wall " << behind << ", without " << open_);
+    const int wallLuma = luma(wallAlone, kWidth / 2, kHeight / 2);
+    INFO("centre with the wall " << behind << " (the wall alone " << wallLuma << "), without the wall " << open_);
     CHECK(open_ > 120);
-    CHECK(behind < 12);
+    CHECK(std::abs(behind - wallLuma) <= 3);
 }
 
 TEST_CASE("a near emitter is a sprite and a far one a splat, and both are light", "[gpu][ecosystem]") {

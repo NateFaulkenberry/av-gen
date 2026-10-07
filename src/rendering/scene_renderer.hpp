@@ -582,6 +582,9 @@ public:
     // ADR-703: the camera-facing strips (Trail), and what they drew last frame.
     [[nodiscard]] const RibbonRenderer& ribbons() const { return *ribbons_; }
     [[nodiscard]] const EcosystemRenderer& ecosystem() const { return *ecosystem_; } // ADR-1200
+    // ADR-1200: the Environment seam. Every specialised environment renderer, in the order they run (after the lit
+    // pass, before the medium). The ecosystem is the first; it is also reachable by type above.
+    [[nodiscard]] const std::vector<EnvironmentRenderer*>& environments() const { return environments_; }
     [[nodiscard]] const ShellRenderer& shells() const { return *shells_; }
     // ADR-360's bounded, opt-in particle warm-up, in frames (capped at
     // ParticleRenderer::kMaxWarmUpFrames). 0 -- the default -- keeps the seek behaviour this
@@ -985,6 +988,7 @@ private:
     std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
     std::unique_ptr<WaterRenderer> water_;           // ADR-099
     std::unique_ptr<EcosystemRenderer> ecosystem_;   // ADR-1200: the first Environment, after pass 1
+    std::vector<EnvironmentRenderer*> environments_; // ADR-1200: the seam, in run order (owned above)
     std::unique_ptr<RibbonRenderer> ribbons_;        // ADR-703 (Wave 1): RIBBON, pass 1's blended section
     std::unique_ptr<ShellRenderer> shells_;          // Wave 3: SHELL, pass 1's blended section
     std::unique_ptr<PostProcessor> postProcessor_;

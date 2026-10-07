@@ -538,6 +538,7 @@ Result<void> SceneRenderer::init() {
     if (auto r = ecosystem_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
         return r;
     }
+    environments_ = {ecosystem_.get()};
     // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
     // IBL group (a shield's sheen).
     if (auto r = shells_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, iblLayout_); !r) {
@@ -2194,8 +2195,10 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = ribbons_->reload(shaders_); !r) {
         keep("ribbon.wgsl", r);
     }
-    if (auto r = ecosystem_->reload(shaders_); !r) {
-        keep("ecosystem.wgsl", r);
+    for (EnvironmentRenderer* env : environments_) {
+        if (auto r = env->reload(shaders_); !r) {
+            keep(std::string(env->name()).c_str(), r);
+        }
     }
     if (auto r = shells_->reload(shaders_); !r) {
         keep("shell.wgsl", r);
@@ -3922,7 +3925,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // AOV computed against a depth target nobody filled.
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
                                    shadowMask_->encoded() || !scene.waters.empty() ||
-                                   EcosystemRenderer::wants(scene); // ADR-1200 reads the linear depth
+                                   std::any_of(environments_.begin(), environments_.end(), // ADR-1200: the seam
+                                               [&](const EnvironmentRenderer* e) { return e->wants(scene); });
     // ---- water surfaces (ADR-099) ----
     // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
     // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in
@@ -4518,11 +4522,27 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     stage(cpu.sceneEncodeMs);
 
-    // ---- ADR-1200: the ecosystem's emitters, over the lit scene and under the medium ----
-    if (EcosystemRenderer::wants(scene) && needsDepthPrepass) {
-        ecosystem_->encode(encoder, scene, time.renderTime, frameUniforms_, *fields_, linearDepth_.view,
-                           hdr_.colorView(), emission_.view, hdr_.depthView(), hdr_.width(), hdr_.height(),
-                           timeline_.get());
+    // ---- ADR-1200: the Environment seam -- specialised renderers, over the lit scene and under the medium ----
+    if (needsDepthPrepass) {
+        EnvironmentFrame envFrame;
+        envFrame.encoder = &encoder;
+        envFrame.scene = &scene;
+        envFrame.time = time;
+        envFrame.frameUniforms = &frameUniforms_;
+        envFrame.fields = fields_.get();
+        envFrame.linearDepth = linearDepth_.view;
+        envFrame.hdr = hdr_.colorView();
+        envFrame.emission = emission_.view;
+        envFrame.depth = hdr_.depthView();
+        envFrame.width = hdr_.width();
+        envFrame.height = hdr_.height();
+        envFrame.quality = &qualitySettings_;
+        envFrame.timeline = timeline_.get();
+        for (EnvironmentRenderer* env : environments_) {
+            if (env->wants(scene)) {
+                env->encode(envFrame);
+            }
+        }
     }
 
     // ---- volumetric atmosphere (ADR-032): raymarch + depth-aware composite ----

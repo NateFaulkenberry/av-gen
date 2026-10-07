@@ -16,6 +16,7 @@
 // Nothing at all -- no buffer, no pass -- when the scene has no active ecosystem (the gate).
 
 #include "core/error.hpp"
+#include "rendering/environment_renderer.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "scene/ecosystem.hpp"
 
@@ -44,7 +45,7 @@ struct EcosystemStats {
     std::uint32_t dispatches = 0;
 };
 
-class EcosystemRenderer {
+class EcosystemRenderer final : public EnvironmentRenderer {
 public:
     EcosystemRenderer() = default;
     EcosystemRenderer(const EcosystemRenderer&) = delete;
@@ -52,17 +53,13 @@ public:
 
     [[nodiscard]] Result<void> init(gpu::Context& context, gpu::ShaderLibrary& shaders, wgpu::TextureFormat hdrFormat,
                                     wgpu::TextureFormat depthFormat);
-    [[nodiscard]] Result<void> reload(gpu::ShaderLibrary& shaders);
+    [[nodiscard]] Result<void> reload(gpu::ShaderLibrary& shaders) override;
 
-    // True when the scene has something to draw (the renderer then needs the depth prepass).
-    [[nodiscard]] static bool wants(const scene::Scene& scene);
-
-    // Records the whole ecosystem for this frame into `encoder`: compute, resolve and sprites. `frameUniforms`
-    // is the scene renderer's frame uniform buffer (FrameUniforms), `linearDepth` the prepass's R32Float view.
-    void encode(wgpu::CommandEncoder& encoder, const scene::Scene& scene, double time,
-                const wgpu::Buffer& frameUniforms, const FieldUniforms& fields, const wgpu::TextureView& linearDepth,
-                const wgpu::TextureView& hdr, const wgpu::TextureView& emission, const wgpu::TextureView& depth,
-                std::uint32_t width, std::uint32_t height, gpu::FrameTimeline* timeline);
+    // EnvironmentRenderer: "ecosystem"; wants a scene whose ecosystem block is active; encodes compute, resolve and
+    // sprites for the frame.
+    [[nodiscard]] std::string_view name() const override { return "ecosystem"; }
+    [[nodiscard]] bool wants(const scene::Scene& scene) const override;
+    void encode(const EnvironmentFrame& frame) override;
 
     [[nodiscard]] const EcosystemStats& stats() const { return stats_; }
     [[nodiscard]] bool ready() const { return static_cast<bool>(emit_); }

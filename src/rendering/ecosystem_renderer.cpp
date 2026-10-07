@@ -57,7 +57,7 @@ std::uint64_t mix(std::uint64_t h, std::uint64_t v) {
 
 } // namespace
 
-bool EcosystemRenderer::wants(const scene::Scene& scene) {
+bool EcosystemRenderer::wants(const scene::Scene& scene) const {
     return scene.ecosystem.active();
 }
 
@@ -367,12 +367,23 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
     }
 }
 
-void EcosystemRenderer::encode(wgpu::CommandEncoder& encoder, const scene::Scene& scene, double time,
-                               const wgpu::Buffer& frameUniforms, const FieldUniforms& fields,
-                               const wgpu::TextureView& linearDepth, const wgpu::TextureView& hdr,
-                               const wgpu::TextureView& emission, const wgpu::TextureView& depth, std::uint32_t width,
-                               std::uint32_t height, gpu::FrameTimeline* timeline) {
+void EcosystemRenderer::encode(const EnvironmentFrame& f) {
     stats_ = EcosystemStats{};
+    if (f.encoder == nullptr || f.scene == nullptr || f.frameUniforms == nullptr || f.fields == nullptr) {
+        return;
+    }
+    wgpu::CommandEncoder& encoder = *f.encoder;
+    const scene::Scene& scene = *f.scene;
+    const double time = f.time.renderTime;
+    const wgpu::Buffer& frameUniforms = *f.frameUniforms;
+    const FieldUniforms& fields = *f.fields;
+    const wgpu::TextureView& linearDepth = f.linearDepth;
+    const wgpu::TextureView& hdr = f.hdr;
+    const wgpu::TextureView& emission = f.emission;
+    const wgpu::TextureView& depth = f.depth;
+    const std::uint32_t width = f.width;
+    const std::uint32_t height = f.height;
+    gpu::FrameTimeline* timeline = f.timeline;
     if (!ready() || !wants(scene) || width == 0 || height == 0) {
         return;
     }
