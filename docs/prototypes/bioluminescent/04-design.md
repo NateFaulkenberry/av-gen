@@ -24,15 +24,17 @@ cells), stepped at 30 Hz.
 
 | Input | Field | Meaning |
 |---|---|---|
-| ignition | `ignite` = `kick` × `seeds` × `wakeFront` (one compound) | where a kick lands. `kick` is the low-band onset, everywhere at once for 0.18 s. `seeds` is a noise mask, so a kick ignites scattered patches, not everything. `wakeFront` is a plane that is 1 behind it and fades out over 90 m ahead: **how far down the canyon the music has reached** |
+| ignition | `ignite` = `kickFront` × `seeds` (one compound) | where a kick lands. `kickFront` is the low-band onset as a **planar front** launched from just behind the camera (its origin rides with the flight: routed, integrated), racing down the canyon at 38 m/s and fading over a few seconds. `seeds` (noise) breaks the front into arcs. **The music radiates out from the listener into the world** |
 | conductivity | `conduct` (noise) | the medium is patchy, so fronts branch round barren ground and stall in it |
-| gain | `grid/prop/injectRate` | the stage's sensitivity (0 asleep, 1.1 stirring, 3.2 at the drop), plus the bass level routed on top. Bass is large-scale energy (§8) |
-| speed | `grid/prop/waveSpeed` 14 m/s | how fast light travels through the ecosystem (MIDI CC 2 live) |
+| gain | `grid/prop/injectRate` | the stage's sensitivity (0 asleep, 1.0 stirring, 3.0 at the drop), plus the bass level routed on top. Bass is large-scale energy (§8) |
+| speed | `grid/prop/waveSpeed` | how fast light travels through the ecosystem, per stage: 10-16 m/s before the drop, 34 at the drop, 24-26 in the body (MIDI CC 2 live) |
 
-The wake front's position integrates the same pace as the camera's path (`macro.flight` and `macro.energy`, both
-routed with `integrate`). So the region the music has woken keeps a stage-set lead over the camera: 40 m in the Dark,
-260-300 m once awake, 1.8 km at the drop. **The next phrase awakens the next reach** (§2) because the camera and the
-music arrive there together, and at the drop the whole canyon ahead goes at once.
+**Revision after the first continuous run (v1).** v1 woke the whole canyon ahead at the drop: a wake front jumped
+1.8 km, and every kick ignited all of it. The medium was lit everywhere at once, and the rock's response painted
+every wall a flat pale cyan, so the canyon read as snow in daylight. That is the "washing out" the owner rejects,
+and it has no travelling wave. v2 replaces the wake front with the camera-borne planar kick front:
+- the drop is the biggest of those fronts, not a flood;
+- the walls answer only `u` (the passing front), in a saturated deep blue, in patches.
 
 Its four channels are read as fields:
 
@@ -54,10 +56,11 @@ rate, and the snare throws bursts of the swarm, scaled by the music's energy.
 - **At rest the organisms light nothing around them**, which is true to life (`01-research.md`). There are no point
   lights except a dim moon.
 - **At the drop the collective light reaches the world.** The rock's material program emits
-  `GLOW × (u + 0.6 e) × emissionIntensity`, so walls and floor light up where and when the wave passes. The haze
-  self-emits with `propGlow` as its colour field. Both are 0 until the arc raises them:
-  - `material/rock/emissionIntensity`: 0 → 5 at the drop → 1.6-2.2 in the body;
-  - `scene/volumeEmission`: 0 → 0.10 → 0.04-0.06.
+  `WALL_GLOW × u × patch × mottle × emissionIntensity`, so walls and floor light up in pools where the front is
+  passing, in saturated deep blue. The haze self-emits with `propGlow` (energy, a lagging glow) as its colour field.
+  Both are 0 until the arc raises them:
+  - `material/rock/emissionIntensity`: 0 → 1.4 at the drop → 0.6-0.8 in the body;
+  - `scene/volumeEmission`: 0 → 0.05 → 0.02-0.03.
 
   This is the "regime change" the drop needs: from darkness that only glows, to an ecosystem that floods its canyon.
   It is a field the existing material and volume systems already read, so it costs no lights.

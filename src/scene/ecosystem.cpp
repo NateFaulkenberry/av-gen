@@ -33,7 +33,7 @@ constexpr std::string_view kLayerKeys[] = {
     "name",       "enabled",      "hosts",       "template",    "color",       "excitedColor",
     "intensity",  "excitedIntensity", "size",    "responseField", "responseGain", "responseThreshold",
     "lagField",   "travel",       "wakeField",   "wakeGain",    "breath",      "breathRate",  "flicker",     "flickerRate",
-    "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance"};
+    "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance", "nearFade"};
 constexpr std::string_view kBlockKeys[] = {"enabled", "spriteRadius", "maxSprites", "layers"};
 
 template <std::size_t N>
@@ -117,7 +117,7 @@ Result<void> EmitterLayer::validate() const {
         return fail("ecosystem layer '{}': needs a template", name);
     }
     const float scalars[] = {intensity, excitedIntensity, size, responseGain, responseThreshold, travel, wakeGain, breath,
-                             breathRate, flicker, flickerRate, pulseRate, pulseDecay, sparsity, maxDistance};
+                             breathRate, flicker, flickerRate, pulseRate, pulseDecay, sparsity, maxDistance, nearFade};
     for (float s : scalars) {
         if (!finite(s)) {
             return fail("ecosystem layer '{}': a value is not finite", name);
@@ -126,7 +126,8 @@ Result<void> EmitterLayer::validate() const {
     if (!finite3(color) || !finite3(excitedColor)) {
         return fail("ecosystem layer '{}': colours must be finite", name);
     }
-    if (intensity < 0.0f || excitedIntensity < 0.0f || size <= 0.0f || maxDistance <= 0.0f || breathRate < 0.0f ||
+    if (intensity < 0.0f || excitedIntensity < 0.0f || size <= 0.0f || maxDistance <= 0.0f || nearFade < 0.0f ||
+        breathRate < 0.0f ||
         flickerRate < 0.0f || pulseRate < 0.0f || pulseDecay <= 0.0f) {
         return fail("ecosystem layer '{}': intensities and rates must be >= 0; size, maxDistance and pulseDecay > 0",
                     name);
@@ -200,6 +201,7 @@ json Ecosystem::toJson() const {
         e["pulseDecay"] = l.pulseDecay;
         e["sparsity"] = l.sparsity;
         e["maxDistance"] = l.maxDistance;
+        e["nearFade"] = l.nearFade;
         arr.push_back(std::move(e));
     }
     j["layers"] = std::move(arr);
@@ -278,6 +280,7 @@ Result<Ecosystem> Ecosystem::fromJson(const json& j) {
                 l.pulseDecay = e.value("pulseDecay", l.pulseDecay);
                 l.sparsity = e.value("sparsity", l.sparsity);
                 l.maxDistance = e.value("maxDistance", l.maxDistance);
+                l.nearFade = e.value("nearFade", l.nearFade);
                 eco.layers.push_back(std::move(l));
             }
         }
@@ -396,6 +399,7 @@ EcosystemParameters registerEcosystemParameters(params::ParameterSet& params, co
         r.f("pulseDecay", "spontaneous flash fade (s)", l.pulseDecay, 0.01f, 60.0f, 0.05f, 5.0f);
         r.f("sparsity", "dark at rest", l.sparsity, 0.0f, 1.0f, 0.0f, 1.0f);
         r.f("maxDistance", "visible to (m)", l.maxDistance, 1.0f, 100000.0f, 10.0f, 2000.0f);
+        r.f("nearFade", "fades out nearer than (m)", l.nearFade, 0.0f, 1000.0f, 0.0f, 20.0f);
         p.layers.push_back(std::move(layer));
     }
     return p;
@@ -423,6 +427,7 @@ void applyEcosystemParameters(const EcosystemParameters& p, const Ecosystem& res
         copy(lp, "pulseDecay", l.pulseDecay);
         copy(lp, "sparsity", l.sparsity);
         copy(lp, "maxDistance", l.maxDistance);
+        copy(lp, "nearFade", l.nearFade);
     }
 }
 

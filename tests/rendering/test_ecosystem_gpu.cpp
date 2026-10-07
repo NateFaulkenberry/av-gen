@@ -285,6 +285,23 @@ TEST_CASE("an awakened region keeps glowing: the wake field raises the rest ligh
     CHECK(luma(b, kWidth / 2, kHeight / 2) > luma(a, kWidth / 2, kHeight / 2) + 60);
 }
 
+TEST_CASE("a point nearer than nearFade fades out, so nothing becomes an orb on the lens", "[gpu][ecosystem]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s = darkStage();
+    addEcosystem(s, glm::vec3(0.0f, -1.0f, -2.0f), {point(glm::vec3(0.0f, 1.0f, 0.0f), 0.05f)}, 8.0f);
+    const gpu::Image8 near_ = render(renderer, s, 1.0);
+    s.ecosystem.layers[0].nearFade = 5.0f; // the point is 2 m away: fully faded
+    const gpu::Image8 faded = render(renderer, s, 1.0);
+    INFO("centre without the fade " << luma(near_, kWidth / 2, kHeight / 2) << ", with "
+                                    << luma(faded, kWidth / 2, kHeight / 2));
+    CHECK(luma(near_, kWidth / 2, kHeight / 2) > 200);
+    CHECK(luma(faded, kWidth / 2, kHeight / 2) < 12);
+}
+
 TEST_CASE("a disabled ecosystem renders the same bytes as a scene with none", "[gpu][ecosystem]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});

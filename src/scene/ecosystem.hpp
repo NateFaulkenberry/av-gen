@@ -97,6 +97,7 @@ struct EmitterLayer {
     float pulseDecay = 1.0f;         // seconds a spontaneous flash takes to fade
     float sparsity = 0.0f;           // fraction of points dark at rest (they still answer the field)
     float maxDistance = 300.0f;      // metres; fades out over the last quarter
+    float nearFade = 0.0f;           // metres; a point closer to the lens fades out (no orbs on the lens); 0 = off
 
     [[nodiscard]] Result<void> validate() const;
 };

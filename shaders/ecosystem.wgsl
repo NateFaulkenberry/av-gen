@@ -24,7 +24,7 @@ struct Layer {
     pulse: vec4<f32>,       // x = pulses per minute, y = pulse decay (s), z = sparsity, w = max distance
     slots: vec4<i32>,       // x = response field slot (-1 none), y = lag field slot, z = point count, w = host count
     bound: vec4<f32>,       // x = host bounding radius (template extent, before host scale), y = wake field slot
-                            // (-1 none), z = wake gain
+                            // (-1 none), z = wake gain, w = near fade (m, 0 = off)
 };
 
 struct Host {
@@ -169,7 +169,10 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
         response = layer.response.x * max(f - layer.response.y, 0.0);
     }
     let colour = mix(layer.color.rgb, layer.excited.rgb, saturate(response));
-    let fade = 1.0 - smoothstep(0.75 * maxDistance, maxDistance, dist);
+    var fade = 1.0 - smoothstep(0.75 * maxDistance, maxDistance, dist);
+    if (layer.bound.w > 0.0) {
+        fade = fade * smoothstep(0.4 * layer.bound.w, layer.bound.w, dist);
+    }
     let radiance = colour * (rest + layer.excited.w * response) * fade;
     if (max(radiance.r, max(radiance.g, radiance.b)) <= 1.0e-5) {
         return;

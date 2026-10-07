@@ -43,7 +43,8 @@ nlohmann::json layerJson(const std::string& templatePath) {
                           {"breath", 0.3},
                           {"pulseRate", 2.0},
                           {"sparsity", 0.25},
-                          {"maxDistance", 250.0}};
+                          {"maxDistance", 250.0},
+                          {"nearFade", 3.0}};
 }
 
 fs::path writeTemplate(const std::string& name, const nlohmann::json& points) {
@@ -68,6 +69,7 @@ TEST_CASE("an ecosystem block round-trips through JSON, and refuses what it does
     CHECK(l.travel == 0.5f);
     CHECK(l.wakeField == "wake");
     CHECK(l.wakeGain == 2.0f);
+    CHECK(l.nearFade == 3.0f);
     CHECK(eco->spriteRadius == 2.0f);
 
     auto again = scene::Ecosystem::fromJson(eco->toJson());

@@ -328,7 +328,7 @@ def fan(seed, height=2.6):
                     blob(polyps, pts[k] + rng.normal(0, 0.012, 3), [0.016, 0.016, 0.016],
                          v=v + (v1 - v) * k / nseg, u=rng.random())
         end = p + d * length
-        if depth < 5 and radius > 0.006:
+        if depth < 4 and radius > 0.006:
             spread = rng.uniform(0.25, 0.5)
             for sgn in (-1, 1):
                 branch(end, ang + sgn * spread + rng.normal(0, 0.08), length * rng.uniform(0.62, 0.8),
