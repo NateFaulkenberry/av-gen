@@ -1,20 +1,20 @@
 {
  "format": "avgen-scene",
  "version": 1,
- "name": "Chorus Field p3 roll",
+ "name": "Chorus Field p3 e7-storm-hair",
  "camera": {
   "mode": 1,
   "position": [
-   4,
-   -2,
+   0,
+   -3,
    46
   ],
   "target": [
-   3,
-   1,
+   0,
+   -3,
    0
   ],
-  "fov": 50,
+  "fov": 40,
   "orbitSpeed": 0
  },
  "lights": [
@@ -61,16 +61,16 @@
    "type": "directional",
    "role": "fill",
    "direction": [
-    -0.2,
-    0.75,
-    -0.6
+    0.1,
+    0.9,
+    0.3
    ],
    "color": [
-    0.75,
-    0.82,
-    1.0
+    0.9,
+    0.55,
+    0.35
    ],
-   "intensity": 3.0,
+   "intensity": 0.35,
    "castsShadow": false,
    "shadowStrength": 0.0,
    "softness": 3.0
@@ -133,7 +133,7 @@
  },
  "nodes": [
   {
-   "name": "wind",
+   "name": "fall",
    "kind": "field",
    "position": [
     0,
@@ -146,79 +146,29 @@
      "kind": "none"
     },
     "axis": [
-     1,
      0,
+     -1,
      0
     ],
-    "strength": 0.45
+    "strength": 1.0
    }
   },
   {
-   "name": "roll",
-   "kind": "field",
-   "position": [
-    2,
-    2,
-    0
-   ],
-   "field": {
-    "kind": "spiral",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 9,
-     "outer": 22
-    },
-    "axis": [
-     0.15,
-     0,
-     -1
-    ],
-    "spiralBias": -0.35,
-    "strength": 3.0
-   }
-  },
-  {
-   "name": "roll2",
-   "kind": "field",
-   "position": [
-    20,
-    4,
-    0
-   ],
-   "field": {
-    "kind": "vortex",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 2,
-     "outer": 8
-    },
-    "axis": [
-     0,
-     0.3,
-     -1
-    ],
-    "strength": 2.0
-   }
-  },
-  {
-   "name": "flow",
+   "name": "chin",
    "kind": "field",
    "position": [
     0,
-    0,
+    -18.0,
     0
    ],
    "field": {
-    "kind": "compound",
+    "kind": "attractor",
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 6,
+     "outer": 26
     },
-    "children": [
-     "wind",
-     "roll",
-     "roll2"
-    ],
-    "combine": "add"
+    "strength": 0.8
    }
   },
   {
@@ -234,34 +184,246 @@
     "falloff": {
      "kind": "none"
     },
-    "frequency": 0.06,
+    "frequency": 0.11,
     "strength": 1.0,
-    "seed": 8
+    "seed": 21
    }
   },
   {
-   "name": "band",
+   "name": "eyeL",
    "kind": "field",
    "position": [
-    -24,
-    6,
+    -4.6,
+    2.5,
     0
    ],
    "field": {
-    "kind": "box",
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 1.2,
+     "outer": 6.0
+    },
+    "axis": [
+     0,
+     0,
+     -1.0
+    ],
+    "strength": 2.6
+   }
+  },
+  {
+   "name": "eyeR",
+   "kind": "field",
+   "position": [
+    4.6,
+    2.5,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 1.2,
+     "outer": 6.0
+    },
+    "axis": [
+     0,
+     0,
+     1.0
+    ],
+    "strength": 2.6
+   }
+  },
+  {
+   "name": "eyes",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "eyeL",
+     "eyeR"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "hornL",
+   "kind": "field",
+   "position": [
+    -9.0,
+    11.0,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 9
+    },
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "hornR",
+   "kind": "field",
+   "position": [
+    9.0,
+    11.0,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 9
+    },
+    "axis": [
+     0,
+     0,
+     -1
+    ],
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "horns",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "hornL",
+     "hornR"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "mouthL",
+   "kind": "field",
+   "position": [
+    -2.2,
+    -6.5,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 0.8,
+     "outer": 3.2
+    },
+    "axis": [
+     0,
+     0,
+     -1
+    ],
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "mouthR",
+   "kind": "field",
+   "position": [
+    2.2,
+    -6.5,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 0.8,
+     "outer": 3.2
+    },
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "mouth",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "mouthL",
+     "mouthR"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "brow",
+   "kind": "field",
+   "position": [
+    0,
+    7.0,
+    2.5
+   ],
+   "field": {
+    "kind": "attractor",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 8
+    },
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "crown",
+   "kind": "field",
+   "position": [
+    0,
+    19.0,
+    0
+   ],
+   "field": {
+    "kind": "sphere",
     "falloff": {
      "kind": "noiseModulated",
-     "inner": 2,
-     "outer": 40,
-     "noiseAmount": 2.0,
-     "noiseScale": 0.15
+     "inner": 6,
+     "outer": 18,
+     "noiseAmount": 2.5,
+     "noiseScale": 0.25
     },
-    "size": [
-     1,
-     3,
-     20
-    ],
-    "softness": 2.5
+    "radius": 12.0,
+    "softness": 6.0
    }
   },
   {
@@ -275,49 +437,49 @@
    "procedural": {
     "source": {
      "kind": "fiber",
-     "fiberLength": 70.0,
+     "fiberLength": 36.0,
      "fiberWidth": 0.008,
      "fiberTaper": 0.3,
      "fiberSegments": 32,
-     "fiberMinPixels": 0.8
+     "fiberMinPixels": 0.7
     },
     "variation": {
      "seed": 11,
      "position": [
-      0.4,
-      0.08,
-      0.1
+      0.06818181818181818,
+      0.6,
+      0.12
      ],
      "rotation": [
       0.05,
-      0.05,
+      3.14,
       0.05
      ],
-     "uniformScale": 0.3
+     "uniformScale": 0.2
     },
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      3,
-      50,
-      220
+      220,
+      1,
+      24
      ],
      "gridSpacing": [
-      0.5,
-      0.16,
-      0.2
+      0.13636363636363635,
+      1,
+      0.25
      ]
     },
     "distributionTransform": {
      "position": [
-      -24,
-      6,
+      0,
+      19.0,
       0
      ],
      "rotation": [
       0,
       0,
-      -90
+      180
      ],
      "scale": [
       1,
@@ -329,21 +491,56 @@
      {
       "kind": "streamline",
       "space": "world",
-      "field": "flow",
-      "amount": 5.0,
+      "field": "fall",
+      "amount": 6.0,
+      "falloff": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "chin",
+      "amount": 6.0,
       "falloff": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "curl",
-      "amount": 0.5,
+      "amount": 2.16,
+      "falloff": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "eyes",
+      "amount": 6.0,
+      "falloff": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "horns",
+      "amount": 4.800000000000001,
+      "falloff": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "mouth",
+      "amount": 4.199999999999999,
+      "falloff": 0.0
+     },
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "brow",
+      "amount": 2.4000000000000004,
       "falloff": 0.0
      }
     ],
     "effectors": [
      {
-      "field": "band",
+      "field": "crown",
       "op": "scale",
       "blend": "multiply",
       "strength": 1.0,

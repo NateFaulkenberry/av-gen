@@ -292,9 +292,10 @@ def p3_roll():
     """Vortex as a personality: a released sheet is rolled into a breaking curl by one great horizontal
     vortex tube; the camera looks down the tube from inside its mouth."""
     nodes = [
-        field("wind", "direction", axis=[1, 0, 0], strength=0.7),
-        field("roll", "vortex", position=[2, 0, 0], axis=[0, 0, 1], strength=1.6, falloff=smooth(4, 16)),
-        field("roll2", "vortex", position=[16, 5, 0], axis=[0, 0.2, 1], strength=1.2, falloff=smooth(2, 9)),
+        field("wind", "direction", axis=[1, 0, 0], strength=0.45),
+        field("roll", "spiral", position=[2, 2, 0], axis=[0.15, 0, -1], spiralBias=-0.35, strength=3.0,
+              falloff=smooth(9, 22)),
+        field("roll2", "vortex", position=[20, 4, 0], axis=[0, 0.3, -1], strength=2.0, falloff=smooth(2, 8)),
         field("flow", "compound", children=["wind", "roll", "roll2"], combine="add"),
         field("curl", "curlNoise", frequency=0.06, strength=1.0, seed=8),
         field("band", "box", position=[-24, 6, 0], size=[1, 3, 20], softness=2.5,
@@ -304,7 +305,9 @@ def p3_roll():
                orient=(0.05, 0.05, 0.05), size_random=0.3, effectors=[thin("band", "band")],
                pulls=[("curl", 0.5)]),
     ]
-    return scene("Chorus Field p3 roll", nodes, cam_pos=[4, -2, 46], cam_target=[3, 1, 0], fov=50)
+    lights = default_lights()
+    lights[2].update({"direction": [-0.2, 0.75, -0.6], "intensity": 3.0, "color": [0.75, 0.82, 1.0]})
+    return scene("Chorus Field p3 roll", nodes, cam_pos=[4, -2, 46], cam_target=[3, 1, 0], fov=50, lights=lights)
 
 
 @look
@@ -336,6 +339,99 @@ def p4_tendons():
                effectors=[thin("c", "clouds")], pulls=[("curl", 0.8)]),
     ]
     return scene("Chorus Field p4 tendons", nodes, cam_pos=[6, 4, 58], cam_target=[0, 0, 0], fov=45)
+
+
+# ---- Phase 3: entity emergence ---------------------------------------------------------------------
+
+def entity_scene(title, *, eyes=True, eye_x=4.6, eye_y=2.5, eye_spin=1.0, eye_r=(1.2, 6.0), eye_strength=2.6,
+                 chin=0.8, chin_y=-18.0, horns=0.0, horn_y=11.0, horn_x=9.0, mouth=0.0, mouth_y=-6.5,
+                 brow=0.0, curl=0.06, cam=(0, -3, 46), target=(0, -3, 0), fov=40, material=None,
+                 count_x=220, depth=24, length=36.0, width=0.008, top=19.0, lights=None, env=None, post=None,
+                 spread=30.0):
+    """The curtain entity, with every feature optional. Each feature is a pull (its own streamline
+    deformer), so audio can later weight one feature of the face without touching the others."""
+    nodes = [
+        field("fall", "direction", axis=[0, -1, 0], strength=1.0),
+        field("chin", "attractor", position=[0, chin_y, 0], strength=chin, falloff=smooth(6, 26)),
+        field("curl", "curlNoise", frequency=0.11, strength=1.0, seed=21),
+    ]
+    pulls = [("chin", 1.0), ("curl", curl)]
+    if eyes:
+        nodes += [
+            field("eyeL", "vortex", position=[-eye_x, eye_y, 0], axis=[0, 0, -eye_spin], strength=eye_strength,
+                  falloff=smooth(*eye_r)),
+            field("eyeR", "vortex", position=[eye_x, eye_y, 0], axis=[0, 0, eye_spin], strength=eye_strength,
+                  falloff=smooth(*eye_r)),
+            field("eyes", "compound", children=["eyeL", "eyeR"], combine="add"),
+        ]
+        pulls.append(("eyes", 1.0))
+    if horns:
+        # Temples: counter-rotating eddies that throw the outer streams up and out before they fall.
+        nodes += [
+            field("hornL", "vortex", position=[-horn_x, horn_y, 0], axis=[0, 0, 1], strength=2.0,
+                  falloff=smooth(2, 9)),
+            field("hornR", "vortex", position=[horn_x, horn_y, 0], axis=[0, 0, -1], strength=2.0,
+                  falloff=smooth(2, 9)),
+            field("horns", "compound", children=["hornL", "hornR"], combine="add"),
+        ]
+        pulls.append(("horns", horns))
+    if mouth:
+        # A slot: two eddies side by side whose shared wake is a horizontal void.
+        nodes += [
+            field("mouthL", "vortex", position=[-2.2, mouth_y, 0], axis=[0, 0, -1], strength=2.0,
+                  falloff=smooth(0.8, 3.2)),
+            field("mouthR", "vortex", position=[2.2, mouth_y, 0], axis=[0, 0, 1], strength=2.0,
+                  falloff=smooth(0.8, 3.2)),
+            field("mouth", "compound", children=["mouthL", "mouthR"], combine="add"),
+        ]
+        pulls.append(("mouth", mouth))
+    if brow:
+        nodes.append(field("brow", "attractor", position=[0, eye_y + 4.5, 2.5], strength=1.0,
+                           falloff=smooth(2, 8)))
+        pulls.append(("brow", brow))
+    nodes += [
+        field("crown", "sphere", position=[0, top, 0], radius=spread * 0.4, softness=6.0,
+              falloff={"kind": "noiseModulated", "inner": 6, "outer": 18, "noiseAmount": 2.5, "noiseScale": 0.25}),
+        fibers("fibers", grid=(count_x, 1, depth), spacing=(spread / count_x, 1, 0.25), centre=(0, top, 0),
+               rotate=(0, 0, 180), jitter=(spread / count_x / 2, 0.6, 0.12), length=length, width=width,
+               segments=32, flow="fall", steer=6.0, orient=(0.05, 3.14, 0.05), size_random=0.2, min_px=0.7,
+               effectors=[thin("crown", "crown")], material=material, pulls=[(f, 6.0 * a) for f, a in pulls]),
+    ]
+    return scene(title, nodes, cam_pos=list(cam), cam_target=list(target), fov=fov, lights=lights, env=env,
+                 post=post)
+
+
+ENTITY_VARIANTS = {
+    "e1-base": {},
+    "e2-horned": {"horns": 0.8},
+    "e3-mouth": {"mouth": 0.7},
+    "e4-horned-mouth": {"horns": 0.8, "mouth": 0.7, "brow": 0.4},
+    "e5-wide-eyes": {"eye_x": 6.0, "eye_r": (2.0, 8.0), "eye_strength": 3.2, "chin": 1.2},
+    "e6-low": {"horns": 0.8, "mouth": 0.7, "cam": (0, -24, 34), "target": (0, 0, 0), "fov": 50},
+    "e7-storm-hair": {"horns": 0.8, "mouth": 0.7, "brow": 0.4, "curl": 0.36},
+    "e8-wild": {"horns": 0.8, "mouth": 0.7, "brow": 0.4, "curl": 0.2, "eye_strength": 3.6, "chin": 1.4},
+}
+
+for _name, _kw in ENTITY_VARIANTS.items():
+    def _make(_kw=_kw, _name=_name):
+        return entity_scene("Chorus Field p3 " + _name, **_kw)
+    _make.__name__ = "p3_" + _name.replace("-", "_")
+    LOOKS[_make.__name__] = _make
+
+
+@look
+def dbg_roll():
+    sc = p3_roll()
+    for n in sc["nodes"]:
+        if n["kind"] == "procedural":
+            pr = n["procedural"]
+            pr["distribution"]["gridCount"] = [1, 6, 5]
+            pr["distribution"]["gridSpacing"] = [1, 1.5, 8]
+            pr["effectors"] = []
+            pr["source"]["fiberWidth"] = 0.15
+            pr["material"] = metal(emissive=(1, 0.6, 0.3), ei=3.0)
+    sc["camera"].update({"position": [0, 0, 80], "target": [0, 0, 0], "fov": 60})
+    return sc
 
 
 def main(argv):
