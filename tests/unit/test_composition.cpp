@@ -3691,6 +3691,74 @@ TEST_CASE("A simulated grid's behaviour is parameters and only its layout re-see
     CHECK(finer.layoutHash() != layout);
 }
 
+// ADR-1201: an excitable grid loads from a scene's `grids`, its behaviour is `grid/<name>/<leaf>`, and a grid
+// field reads any of its channels.
+TEST_CASE("An excitable grid loads from a scene and its behaviour is parameters",
+          "[scene][composition][grid][grid-params][excitable]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "rift",
+      "nodes": [
+        { "name": "kick", "kind": "field", "field": { "kind": "sphere", "radius": 1.0 } },
+        { "name": "wake", "kind": "field", "field": { "kind": "grid", "reference": "prop", "channel": 3 } }
+      ],
+      "grids": [
+        { "name": "prop", "mode": "excitable", "resolution": [256, 1, 256], "boundsMin": [-32, -1, -32],
+          "boundsMax": [32, 1, 32], "injectField": "kick", "injectRate": 2.0, "threshold": 0.4, "coupling": 1.2,
+          "waveSpeed": 5.0, "riseRate": 10.0, "excitationDecay": 0.7, "refractoryTime": 2.0,
+          "refractoryStrength": 3.0, "energyTime": 4.0, "wakeTime": 40.0, "noise": 0.2, "ceiling": 0.95 },
+        { "name": "smoke", "mode": "scalar", "resolution": 8, "boundsMin": [-4, 0, -4], "boundsMax": [4, 8, 4] }
+      ]
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+
+    const std::pair<const char*, float> leaves[] = {
+        {"injectRate", 2.0f},      {"threshold", 0.4f},       {"coupling", 1.2f},          {"waveSpeed", 5.0f},
+        {"riseRate", 10.0f},       {"excitationDecay", 0.7f}, {"refractoryTime", 2.0f},   {"refractoryStrength", 3.0f},
+        {"energyTime", 4.0f},      {"wakeTime", 40.0f},       {"noise", 0.2f},             {"ceiling", 0.95f}};
+    for (const auto& [leaf, value] : leaves) {
+        INFO(leaf);
+        auto* p = dynamic_cast<params::Parameter<float>*>(params.find(std::string("grid/prop/") + leaf));
+        REQUIRE(p != nullptr);
+        CHECK(p->value() == value); // registered at the authored value: attaching changes nothing
+    }
+    CHECK(params.find("grid/prop/feed") == nullptr);
+    CHECK(params.find("grid/prop/turnAngle") == nullptr);
+    CHECK(params.find("grid/smoke/waveSpeed") == nullptr);
+    CHECK(params.find("grid/smoke/threshold") == nullptr);
+
+    (*comp)->update(FrameTime{});
+    REQUIRE((*comp)->scene().fields.grids.size() == 2);
+    CHECK((*comp)->scene().fields.grids[0].mode == spatial::GridMode::Excitable);
+    const spatial::FieldSpec* wake = (*comp)->scene().fields.find("wake");
+    REQUIRE(wake != nullptr);
+    CHECK(wake->channel == 3);
+    const std::uint64_t layoutBefore = (*comp)->scene().fields.grids[0].layoutHash();
+
+    auto* speed = dynamic_cast<params::Parameter<float>*>(params.find("grid/prop/waveSpeed"));
+    auto* noise = dynamic_cast<params::Parameter<float>*>(params.find("grid/prop/noise"));
+    speed->setBase(9.0f);
+    noise->setBase(0.5f);
+    params.resetFinals();
+    (*comp)->update(FrameTime{0.1, 0.1, 1});
+    const spatial::GridField& live = (*comp)->scene().fields.grids[0];
+    CHECK(live.waveSpeed == 9.0f);
+    CHECK(live.noise == 0.5f);
+    CHECK(live.layoutHash() == layoutBefore);
+    CHECK((*comp)->grids()[0].waveSpeed == 5.0f);
+
+    // The scene saves what it loaded.
+    const nlohmann::json saved = (*comp)->toJson();
+    const nlohmann::json& grid = saved.at("grids").at(0);
+    CHECK(grid.at("mode") == "excitable");
+    CHECK(grid.at("waveSpeed") == 5.0f);
+    CHECK(grid.at("wakeTime") == 40.0f);
+}
+
 // ADR-1123: an orbit circles and looks at its pivot when given one; weight 0 is the bounds centre, unchanged.
 TEST_CASE("An orbit camera circles its pivot, and weight 0 is the old orbit", "[scene][composition][camera][orbit-pivot]") {
     Fixture fx;

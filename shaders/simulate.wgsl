@@ -34,12 +34,18 @@ struct SimUniforms {
     agents: vec4<u32>,    // ADR-1120: count, species, offset (agents), seed
     agentSense: vec4<f32>,   // sensorAngle, sensorDistance (cells), turnAngle, stepSize (cells)
     agentDeposit: vec4<f32>, // depositAmount, repel, fixed-point scale, w = a scalar grid's ceiling (ADR-1163; 0 = none)
+    // ADR-1201, excitable grids:
+    excite0: vec4<f32>,      // threshold, coupling, waveSpeed, riseRate
+    excite1: vec4<f32>,      // excitationDecay, refractoryTime, refractoryStrength, energyTime
+    excite2: vec4<f32>,      // wakeTime, noise, ceiling (0 = none), pad
+    exciteSlots: vec4<u32>,  // conductivity field slot (i32 bits, -1 none), noise epoch (steps), seed, pad
 };
 
 const SIM_MODE_SCALAR: i32 = 0;
 const SIM_MODE_VECTOR: i32 = 1;
 const SIM_MODE_REACTION: i32 = 2;
 const SIM_MODE_AGENTS: i32 = 3;
+const SIM_MODE_EXCITABLE: i32 = 4;
 const SIM_TWO_PI: f32 = 6.283185307179586;
 
 @group(0) @binding(0) var<uniform> sim: SimUniforms;
@@ -425,4 +431,110 @@ fn cs_agents_resolve(@builtin(global_invocation_id) gid: vec3<u32>) {
         total = total + v;
     }
     dst[base + 3u] = total;
+}
+
+// ---- excitable medium (ADR-1201) ------------------------------------------------------------------
+// The GPU twin of stepExcitable() in src/spatial/grid_field.cpp: one gather kernel is the whole step. A cell
+// is (u excitation, r refractory, e energy, w wake) on an XZ plane. r is 1 when a cell fires and
+// exp(-age / refractoryTime) after, so it is also the clock a neighbour reads: neighbour j's front reaches
+// this cell d / waveSpeed seconds after j fired. A front that arrived within the last two steps (j's firing
+// is only seen a step late) fires this cell if the drive beats the refractory threshold, and the cell's own
+// r is set from the exact arrival, so no step quantises the front and its speed is waveSpeed in m/s.
+
+const EXCITE_FLUSH: f32 = 1e-20;      // below this a channel is 0 (Metal flushes denormals; the CPU matches)
+const EXCITE_SAME_FRONT: f32 = 1e-5;  // seconds: one front never fires a cell twice through the window
+
+fn exciteFlush(v: f32) -> f32 {
+    return select(v, 0.0, v < EXCITE_FLUSH);
+}
+
+@compute @workgroup_size(64)
+fn cs_excite(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let cellIndex = gid.x;
+    if (cellIndex >= simCells()) {
+        return;
+    }
+    let c = simCoords(cellIndex);
+    let base = simBase(c);
+    let u = src[base];
+    let r = src[base + 1u];
+    let e = src[base + 2u];
+    let w = src[base + 3u];
+    let dt = sim.bounds0.w;
+    let threshold = sim.excite0.x;
+    let coupling = sim.excite0.y;
+    let invSpeed = 1.0 / sim.excite0.z;
+    let riseRate = sim.excite0.w;
+    let tau = sim.excite1.y;
+    let p = simCellCenter(c);
+    var stimulus = 0.0;
+    if (sim.slots.x >= 0) {
+        stimulus = sim.params0.x * max(0.0, fieldScalar(sim.slots.x, p));
+    }
+    var conduct = 1.0;
+    let conductivitySlot = bitcast<i32>(sim.exciteSlots.x);
+    if (conductivitySlot >= 0) {
+        conduct = max(0.0, fieldScalar(conductivitySlot, p));
+    }
+    let epoch = fieldBlock.pad0 / max(sim.exciteSlots.y, 1u);
+    let cell = u32(c.z) * sim.res.x + u32(c.x);
+    let jitter = 1.0 + sim.excite2.y * (simUnit(simHash(cell, epoch, sim.exciteSlots.z)) * 2.0 - 1.0);
+    let h = simCellSize();
+    let nx = i32(sim.res.x);
+    let nz = i32(sim.res.z);
+    let wraps = sim.layout0.z == 1u;
+    var best = -1.0;
+    for (var dz = -2; dz <= 2; dz = dz + 1) {
+        for (var dx = -2; dx <= 2; dx = dx + 1) {
+            let d2 = dx * dx + dz * dz;
+            if (d2 == 0 || d2 > 5) {
+                continue;
+            }
+            var ii = c.x + dx;
+            var kk = c.z + dz;
+            if (wraps) {
+                ii = simWrapAxis(ii, nx);
+                kk = simWrapAxis(kk, nz);
+            } else if (ii < 0 || ii >= nx || kk < 0 || kk >= nz) {
+                continue;
+            }
+            let rj = src[simBase(vec3<i32>(ii, 0, kk)) + 1u];
+            if (rj <= 0.0) {
+                continue;
+            }
+            let ageJ = -tau * log(rj);
+            let distance = sqrt(f32(dx * dx) * h.x * h.x + f32(dz * dz) * h.z * h.z);
+            let arrived = ageJ + dt - distance * invSpeed * jitter;
+            if (arrived >= 0.0 && arrived < 2.0 * dt) {
+                best = max(best, arrived);
+            }
+        }
+    }
+    var age = 1e30;
+    if (r > 0.0) {
+        age = -tau * log(r);
+    }
+    let ageNext = age + dt;
+    let front = best >= 0.0 && ageNext > best + EXCITE_SAME_FRONT;
+    let drive = stimulus + select(0.0, coupling * conduct, front);
+    let fire = drive > threshold * (1.0 + sim.excite1.z * r);
+    var rNew = r * exp(-dt / tau);
+    var ageNow = ageNext;
+    if (fire) {
+        ageNow = select(0.0, best, front);
+        rNew = exp(-ageNow / tau);
+    }
+    var uNew = u * exp(-dt / sim.excite1.x);
+    if (ageNow - dt < 1.0 / riseRate) {
+        uNew = max(u, min(1.0, riseRate * ageNow));
+    }
+    if (sim.excite2.z > 0.0) {
+        uNew = min(uNew, sim.excite2.z);
+    }
+    let eNew = e + (uNew - e) * (1.0 - exp(-dt / sim.excite1.w));
+    let wNew = w + (uNew - w) * (1.0 - exp(-dt / sim.excite2.x));
+    dst[base] = exciteFlush(uNew);
+    dst[base + 1u] = exciteFlush(rNew);
+    dst[base + 2u] = exciteFlush(eNew);
+    dst[base + 3u] = exciteFlush(wNew);
 }

@@ -114,6 +114,7 @@ struct Simulation::Impl {
     wgpu::ComputePipeline agentsInitPipeline;
     wgpu::ComputePipeline agentsMovePipeline;
     wgpu::ComputePipeline agentsResolvePipeline;
+    wgpu::ComputePipeline excitePipeline; // ADR-1201
     wgpu::BindGroup groupToA;      // dst = A, src = B, initial = C
     wgpu::BindGroup groupToB;      // dst = B, src = A, initial = C
     wgpu::BindGroup groupToCFromA; // dst = C, src = A (the diffusion snapshot)
@@ -247,7 +248,7 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         }
         return pipeline;
     };
-    const std::array<std::pair<const char*, wgpu::ComputePipeline*>, 9> all{{
+    const std::array<std::pair<const char*, wgpu::ComputePipeline*>, 10> all{{
         {"cs_inject", &injectPipeline},
         {"cs_advect", &advectPipeline},
         {"cs_diffuse", &diffusePipeline},
@@ -257,8 +258,9 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         {"cs_agents_init", &agentsInitPipeline},
         {"cs_agents_move", &agentsMovePipeline},
         {"cs_agents_resolve", &agentsResolvePipeline},
+        {"cs_excite", &excitePipeline},
     }};
-    std::array<wgpu::ComputePipeline, 9> built{};
+    std::array<wgpu::ComputePipeline, 10> built{};
     for (std::size_t i = 0; i < all.size(); ++i) {
         auto p = make(all[i].first);
         if (!p) {
@@ -535,6 +537,19 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
             u.agentDeposit = glm::vec4(grid.depositAmount, grid.repel, kDepositScale, 0.0f);
             stats_.agents += static_cast<std::uint64_t>(std::max(grid.agentCount, 0));
         }
+        if (grid.excitable()) { // ADR-1201
+            u.excite0 = glm::vec4(grid.threshold, grid.coupling, grid.waveSpeed, grid.riseRate);
+            u.excite1 = glm::vec4(grid.excitationDecay, grid.refractoryTime, grid.refractoryStrength, grid.energyTime);
+            u.excite2 = glm::vec4(grid.wakeTime, grid.noise, grid.ceiling, 0.0f);
+            const int conductivitySlot =
+                grid.conductivityField.empty() ? -1 : scene.fields.indexOf(grid.conductivityField);
+            const auto epochSteps = static_cast<std::uint32_t>(std::max(1L, std::lround(0.25f * grid.simRate)));
+            u.exciteSlots = glm::uvec4(static_cast<std::uint32_t>(conductivitySlot), epochSteps, grid.seed, 0u);
+            // The stimulus reads the inject slot only when it would inject (as cs_inject is dispatched).
+            if (grid.injectRate == 0.0f) {
+                u.slots.x = -1;
+            }
+        }
         const std::uint32_t offset = slot * kUniformStride;
         std::memcpy(im.uniformStaging.data() + offset, &u, sizeof(u));
         work.push_back(Work{i, offset, steps});
@@ -639,7 +654,9 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         };
         for (std::uint32_t k = 0; k < count; ++k) {
             offsets[1] = static_cast<std::uint32_t>((firstBlock + k) * kStepBlockStride);
-            if (agents) {
+            if (grid.excitable()) {
+                dispatch(im.excitePipeline); // ADR-1201: one gather kernel is the whole step
+            } else if (agents) {
                 // Move and deposit (reads the current trail, writes only the deposits), then resolve.
                 if (grid.agentCount > 0) {
                     cp.SetPipeline(im.agentsMovePipeline);

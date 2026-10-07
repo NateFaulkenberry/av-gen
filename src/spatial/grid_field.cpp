@@ -43,12 +43,15 @@ const char* gridModeName(GridMode mode) {
         return "reactionDiffusion";
     case GridMode::Agents:
         return "agents";
+    case GridMode::Excitable:
+        return "excitable";
     }
     return "scalar";
 }
 
 std::optional<GridMode> gridModeFromName(std::string_view name) {
-    for (const GridMode m : {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion, GridMode::Agents}) {
+    for (const GridMode m :
+         {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion, GridMode::Agents, GridMode::Excitable}) {
         if (name == gridModeName(m)) {
             return m;
         }
@@ -79,6 +82,7 @@ int GridField::components() const {
     case GridMode::ReactionDiffusion:
         return 2;
     case GridMode::Agents:
+    case GridMode::Excitable:
         return 4;
     }
     return 1;
@@ -203,6 +207,13 @@ float GridField::sampleScalar(const glm::vec3& p) const {
     return trilinear(*this, coord, mode == GridMode::ReactionDiffusion ? 1 : 0);
 }
 
+float GridField::sampleChannel(const glm::vec3& p, int channel) const {
+    if (!allocated() || channel < 0 || channel >= components()) {
+        return 0.0f;
+    }
+    return trilinear(*this, gridCoord(*this, p), channel);
+}
+
 glm::vec3 GridField::sampleVector(const glm::vec3& p) const {
     if (!allocated()) {
         return glm::vec3(0.0f);
@@ -214,9 +225,137 @@ glm::vec3 GridField::sampleVector(const glm::vec3& p) const {
     return glm::vec3(trilinear(*this, coord, 0), trilinear(*this, coord, 1), trilinear(*this, coord, 2));
 }
 
+namespace {
+
+// ---- ADR-1201: the excitable medium. Transliterated by cs_excite in shaders/simulate.wgsl. ----
+
+// The hash of simulate.wgsl (simMix / simHash / simUnit), bit for bit.
+std::uint32_t simMix(std::uint32_t x) {
+    x ^= x >> 16u;
+    x *= 0x7feb352du;
+    x ^= x >> 15u;
+    x *= 0x846ca68bu;
+    x ^= x >> 16u;
+    return x;
+}
+
+std::uint32_t simHash(std::uint32_t a, std::uint32_t b, std::uint32_t c) {
+    return simMix((a * 0x8da6b343u) ^ simMix((b * 0xd8163841u) ^ simMix(c)));
+}
+
+float simUnit(std::uint32_t h) { return static_cast<float>(h >> 8u) * (1.0f / 16777216.0f); }
+
+// Below this a channel is 0, on both sides: Metal flushes denormals and the CPU does not.
+constexpr float kExciteFlush = 1e-20f;
+// A front may re-trigger a cell only if it arrived this much (seconds) after the cell last fired; it keeps one
+// front from firing a cell twice through the two-step acceptance window.
+constexpr float kExciteSameFront = 1e-5f;
+// Noise is re-drawn every this many seconds (a whole number of steps), so it does not depend on simRate.
+constexpr float kExciteNoisePeriod = 0.25f;
+
+float flushed(float v) { return v < kExciteFlush ? 0.0f : v; }
+
+void stepExcitable(GridField& g, float dt, double time, const FieldSet* set) {
+    const FieldSpec* inject = (set != nullptr && !g.injectField.empty()) ? set->find(g.injectField) : nullptr;
+    const FieldSpec* conductivity =
+        (set != nullptr && !g.conductivityField.empty()) ? set->find(g.conductivityField) : nullptr;
+    const bool stimulated = inject != nullptr && inject->enabled && g.injectRate != 0.0f;
+    const bool conducted = conductivity != nullptr && conductivity->enabled;
+    const auto stepIndex = static_cast<std::uint32_t>(std::llround(time * static_cast<double>(g.simRate)));
+    const auto epochSteps = static_cast<std::uint32_t>(std::max(1L, std::lround(kExciteNoisePeriod * g.simRate)));
+    const std::uint32_t epoch = stepIndex / epochSteps;
+    const float tau = g.refractoryTime;
+    const float rDecay = std::exp(-dt / tau);
+    const float uDecay = std::exp(-dt / g.excitationDecay);
+    const float eGain = 1.0f - std::exp(-dt / g.energyTime);
+    const float wGain = 1.0f - std::exp(-dt / g.wakeTime);
+    const float riseTime = 1.0f / g.riseRate;
+    const float invSpeed = 1.0f / g.waveSpeed;
+    const glm::vec3 h = g.cellSize();
+    const int nx = g.resolution.x;
+    const int nz = g.resolution.z;
+    const GridField previous = g;
+    for (int k = 0; k < nz; ++k) {
+        for (int i = 0; i < nx; ++i) {
+            const std::size_t base = g.index(i, 0, k);
+            const float u = previous.data[base];
+            const float r = previous.data[base + 1];
+            const float e = previous.data[base + 2];
+            const float w = previous.data[base + 3];
+            const glm::vec3 centre = g.cellCenter(i, 0, k);
+            const float stimulus =
+                stimulated ? g.injectRate * std::max(0.0f, spatial::sampleScalar(*inject, centre, time, set)) : 0.0f;
+            const float conduct =
+                conducted ? std::max(0.0f, spatial::sampleScalar(*conductivity, centre, time, set)) : 1.0f;
+            const std::uint32_t cell = static_cast<std::uint32_t>(k * nx + i);
+            const float jitter =
+                1.0f + g.noise * (simUnit(simHash(cell, epoch, g.seed)) * 2.0f - 1.0f);
+            // The newest front that reaches this cell in the window [0, 2 dt): how long ago it arrived.
+            float best = -1.0f;
+            for (int dz = -2; dz <= 2; ++dz) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    const int d2 = dx * dx + dz * dz;
+                    if (d2 == 0 || d2 > 5) {
+                        continue;
+                    }
+                    int ii = i + dx;
+                    int kk = k + dz;
+                    if (g.wrap == GridWrap::Wrap) {
+                        ii = wrapIndex(ii, nx, GridWrap::Wrap);
+                        kk = wrapIndex(kk, nz, GridWrap::Wrap);
+                    } else if (ii < 0 || ii >= nx || kk < 0 || kk >= nz) {
+                        continue;
+                    }
+                    const float rj = previous.data[g.index(ii, 0, kk) + 1];
+                    if (rj <= 0.0f) {
+                        continue;
+                    }
+                    const float ageJ = -tau * std::log(rj);
+                    const float distance = std::sqrt(static_cast<float>(dx * dx) * h.x * h.x +
+                                                     static_cast<float>(dz * dz) * h.z * h.z);
+                    const float arrived = ageJ + dt - distance * invSpeed * jitter;
+                    if (arrived >= 0.0f && arrived < 2.0f * dt) {
+                        best = std::max(best, arrived);
+                    }
+                }
+            }
+            const float age = r > 0.0f ? -tau * std::log(r) : 1e30f;
+            const float ageNext = age + dt;
+            const bool front = best >= 0.0f && ageNext > best + kExciteSameFront;
+            const float drive = stimulus + (front ? g.coupling * conduct : 0.0f);
+            const bool fire = drive > g.threshold * (1.0f + g.refractoryStrength * r);
+            float rNew = r * rDecay;
+            float ageNow = ageNext;
+            if (fire) {
+                ageNow = front ? best : 0.0f;
+                rNew = std::exp(-ageNow / tau);
+            }
+            float uNew = u * uDecay;
+            if (ageNow - dt < riseTime) {
+                uNew = std::max(u, std::min(1.0f, g.riseRate * ageNow));
+            }
+            if (g.ceiling > 0.0f) {
+                uNew = std::min(uNew, g.ceiling);
+            }
+            const float eNew = e + (uNew - e) * eGain;
+            const float wNew = w + (uNew - w) * wGain;
+            g.data[base] = flushed(uNew);
+            g.data[base + 1] = flushed(rNew);
+            g.data[base + 2] = flushed(eNew);
+            g.data[base + 3] = flushed(wNew);
+        }
+    }
+}
+
+} // namespace
+
 void GridField::step(float dt, double time, const FieldSet* set) {
     if (!allocated() || dt <= 0.0f || mode == GridMode::Agents) {
         return; // ADR-1120: agents run on the GPU only
+    }
+    if (mode == GridMode::Excitable) {
+        stepExcitable(*this, dt, time, set);
+        return;
     }
     const int comps = components();
     const FieldSpec* inject = (set != nullptr && !injectField.empty()) ? set->find(injectField) : nullptr;
@@ -331,7 +470,31 @@ Result<void> GridField::validate() const {
     if (resolution.x < 1 || resolution.y < 1 || resolution.z < 1) {
         return fail("grid '{}': resolution must be >= 1 on every axis", name);
     }
-    if (mode == GridMode::Agents) {
+    if (mode == GridMode::Excitable) {
+        if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': an excitable grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
+                        kMaxAgentGridResolution);
+        }
+        if (!(threshold > 0.0f) || coupling < 0.0f || refractoryStrength < 0.0f) {
+            return fail("grid '{}': threshold must be > 0, coupling and refractoryStrength >= 0", name);
+        }
+        if (!(waveSpeed > 0.0f && riseRate > 0.0f && excitationDecay > 0.0f && refractoryTime > 0.0f &&
+              energyTime > 0.0f && wakeTime > 0.0f)) {
+            return fail("grid '{}': waveSpeed, riseRate, excitationDecay, refractoryTime, energyTime and wakeTime "
+                        "must be > 0",
+                        name);
+        }
+        if (!(noise >= 0.0f && noise <= 1.0f)) {
+            return fail("grid '{}': noise must be in [0, 1]", name);
+        }
+        if (ceiling < 0.0f) {
+            return fail("grid '{}': ceiling must be >= 0", name);
+        }
+        if (seedAmount != 0.0f) {
+            // r is the medium's clock: noise in it would be fronts that fired at random moments.
+            return fail("grid '{}': an excitable grid starts at rest; seedAmount must be 0", name);
+        }
+    } else if (mode == GridMode::Agents) {
         if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
             return fail("grid '{}': an agents grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
                         kMaxAgentGridResolution);
@@ -397,6 +560,9 @@ std::uint64_t GridField::layoutHash() const {
         h.i32(species);
         h.str(depositField);
     }
+    if (mode == GridMode::Excitable) {
+        h.str(conductivityField);
+    }
     return h.value();
 }
 
@@ -439,6 +605,19 @@ std::uint64_t GridField::structuralHash() const {
         h.f32(depositAmount);
         h.f32(repel);
         h.str(depositField);
+    }
+    if (mode == GridMode::Excitable) { // ADR-1201: hashed only for excitable grids
+        h.str(conductivityField);
+        h.f32(threshold);
+        h.f32(coupling);
+        h.f32(waveSpeed);
+        h.f32(riseRate);
+        h.f32(excitationDecay);
+        h.f32(refractoryTime);
+        h.f32(refractoryStrength);
+        h.f32(energyTime);
+        h.f32(wakeTime);
+        h.f32(noise);
     }
     return h.value();
 }
@@ -483,6 +662,19 @@ json GridField::toJson() const {
         j["depositAmount"] = depositAmount;
         j["repel"] = repel;
         j["depositField"] = depositField;
+    }
+    if (mode == GridMode::Excitable) { // ADR-1201: written only for excitable grids
+        j["conductivityField"] = conductivityField;
+        j["threshold"] = threshold;
+        j["coupling"] = coupling;
+        j["waveSpeed"] = waveSpeed;
+        j["riseRate"] = riseRate;
+        j["excitationDecay"] = excitationDecay;
+        j["refractoryTime"] = refractoryTime;
+        j["refractoryStrength"] = refractoryStrength;
+        j["energyTime"] = energyTime;
+        j["wakeTime"] = wakeTime;
+        j["noise"] = noise;
     }
     return j;
 }
@@ -536,6 +728,17 @@ Result<GridField> GridField::fromJson(const json& root) {
     AVGEN_SPATIAL_READ(g.depositAmount, "depositAmount", detail::readFloat);
     AVGEN_SPATIAL_READ(g.repel, "repel", detail::readFloat);
     AVGEN_SPATIAL_READ(g.depositField, "depositField", detail::readString);
+    AVGEN_SPATIAL_READ(g.conductivityField, "conductivityField", detail::readString);
+    AVGEN_SPATIAL_READ(g.threshold, "threshold", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.coupling, "coupling", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.waveSpeed, "waveSpeed", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.riseRate, "riseRate", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.excitationDecay, "excitationDecay", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.refractoryTime, "refractoryTime", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.refractoryStrength, "refractoryStrength", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.energyTime, "energyTime", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.wakeTime, "wakeTime", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.noise, "noise", detail::readFloat);
     if (auto ok = g.validate(); !ok) {
         return std::unexpected(ok.error());
     }
