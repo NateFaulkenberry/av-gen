@@ -47,6 +47,7 @@ struct State {
     float fovDeg = 30.0f;
     float exposure = 0.85f, haze = 0.12f;
     std::string label; // camera behaviour / phase, for the log
+    int shot = 0;      // ADR-1221: the camera shot (phrase x segment); a change is a cut
 };
 
 // ---- small curve helpers ---------------------------------------------------------------------------
@@ -344,7 +345,7 @@ inline float phraseCoherence(const Score& sc, const Phrase& ph, double t, const 
     return 0.93f + 0.06f * std::sin(u * 6.28f);
 }
 
-inline State test06(float tl, double songT0, const SongAnalysis& song, const Score& sc) {
+inline State test06(float tl, double songT0, const SongAnalysis& song, const Score& sc, int godOverride = -1) {
     State s;
     const double t = songT0 + tl;
     const AudioAtT a = sampleSong(song, t);
@@ -366,6 +367,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
             if (block % 2 == 1) arch = (arch == kChimera) ? kChoir : (arch == kChoir ? kChimera : (arch == kSeraph ? kMachine : kSeraph));
         }
     }
+    if (godOverride >= 0) arch = godOverride; // ADR-1221: `astral/god` (a performer's choice beats the score's)
     s.archA = s.archB = static_cast<float>(arch);
     // iteration 4: the song's shots are mostly wide, and at 22 units the drifters' containment shell read as a
     // glowing sphere around the god (the banned 'particle sphere'). The meta field is wider for the song.
@@ -511,7 +513,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         glm::vec3 e, g;
         std::string lab;
         const int shot = camAt(tc, e, g, lab);
-        if (k == 0) { s.label = lab; shot0 = shot; }
+        if (k == 0) { s.label = lab; shot0 = shot; s.shot = shot; }
         if (shot != shot0) break; // never smooth across a cut
         const float w = 1.0f - k / 16.0f;
         eyeAcc += e * w; tgtAcc += g * w; wsum += w;
@@ -542,6 +544,67 @@ inline State test08(float t, const SongAnalysis& song, const Score& sc) {
         s.label += "+ENDING";
     }
     s.exposure *= 1.0f - sstep(dur - 2.2f, dur - 0.1f, t);   // fade with the last note
+    return s;
+}
+
+// ---- PRODUCTION (ADR-1221): the conductor under AV Gen's parameters -------------------------------------------
+// What a performer (MIDI), a route or the timeline can change. Defaults are the production look: the iteration-1/2
+// art direction (silver metal in a black void, no per-god palette, no atmosphere), with v2's held, legible peaks.
+struct Controls {
+    float summon = 0.0f;      // 0..1: coherence floor (a performer summons the god; 1 = fully formed)
+    float hold = 0.0f;        // 0..1: hold the formed face (coherence pulled to its peak)
+    float intensity = 1.0f;   // 0..2: matter energy (flow, shimmer, snare flash, collapse blast)
+    float palette = 0.0f;     // 0..1: per-god palette strength (v2)
+    float light = 0.0f;       // 0..1: raking key, rim and eye glow (v2)
+    float atmosphere = 0.0f;  // 0..1: the tinted void glow (v2)
+    float godRays = 0.0f;     // 0..1: shafts from the off-screen source (v2)
+    float legibility = 1.0f;  // 0..1: the formed face reads by form (quiet engraving, dark sockets)
+    float zoom = 1.0f;        // camera distance divisor (1.2 = 20% closer)
+    float exposure = 1.0f;    // multiplier on the conductor's exposure
+    int god = -1;             // -1: the score chooses; 0..6 an archetype (Arch)
+    bool intro = true;        // fade up from black over the first 3 s
+    bool ending = true;       // pull back and fade over the song's last seconds (song mode)
+};
+
+inline void applyControls(State& s, const Controls& c) {
+    s.paletteStrength = c.palette;
+    s.keyLight = s.rimLight = s.eyeGlow = c.light;
+    s.atmosphere = c.atmosphere;
+    s.godRays = c.godRays;
+    const float formed = std::max(s.C, std::clamp(c.summon, 0.0f, 1.0f));
+    const float C = glm::mix(formed, std::max(formed, 0.97f), std::clamp(c.hold, 0.0f, 1.0f));
+    if (C != s.C) {
+        s.C = C;
+        defaults(s);
+        s.flash = s.C < 0.85f ? s.flash : 0.0f;
+    }
+    s.legible = sstep(0.82f, 0.95f, s.C) * std::clamp(c.legibility, 0.0f, 1.0f);
+    s.absorb = sstep(0.7f, 0.95f, s.C) * (c.palette > 0.0f ? 1.0f : 0.0f);
+    const float k = std::clamp(c.intensity, 0.0f, 2.0f);
+    s.flow *= k;
+    s.tendonFlow *= k;
+    s.shimmer *= k;
+    s.flash *= k;
+    s.blast *= 0.5f + 0.5f * k;
+    if (c.zoom > 0.0f && c.zoom != 1.0f) s.eye = s.target + (s.eye - s.target) / c.zoom;
+    s.exposure *= std::max(c.exposure, 0.0f);
+}
+
+// The song conductor: TEST 08's arc over a whole analysed track, as a pure function of the song second.
+inline State conductSong(double t, const SongAnalysis& song, const Score& sc, const Controls& c) {
+    State s = test06(static_cast<float>(t), 0.0, song, sc, c.god);
+    const float tf = static_cast<float>(t);
+    const float dur = static_cast<float>(song.duration);
+    if (c.intro) s.exposure *= sstep(0.0f, 3.0f, tf);
+    if (c.ending && dur > 10.0f) {
+        const float pull = sstep(dur - 7.0f, dur - 0.5f, tf);
+        if (pull > 0.0f) {
+            s.eye = s.target + (s.eye - s.target) * (1.0f + 0.9f * pull);
+            s.label += "+ENDING";
+        }
+        s.exposure *= 1.0f - sstep(dur - 2.2f, dur - 0.1f, tf);
+    }
+    applyControls(s, c);
     return s;
 }
 

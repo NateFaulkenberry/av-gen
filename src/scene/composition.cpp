@@ -64,7 +64,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents"};
+    "worldEvents", "astral"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1062,6 +1062,96 @@ Result<std::string> Composition::bakeGeneratorToPoints(const std::string& nodeNa
     }
     dirty_ = true;
     return name;
+}
+
+void Composition::setAstral(AstralForge astral) {
+    astral_ = std::move(astral);
+    astralSong_.reset();
+    astralSongTrack_ = nullptr;
+    astralLive_.reset();
+    if (params_ != nullptr) { // attached already: register its knobs now
+        if (astralParams_) {
+            for (const params::IParameter* q : astralParams_->all) {
+                params_->remove(q->path());
+            }
+            astralParams_.reset();
+        }
+        if (astral_.enabled) {
+            astralParams_ = registerAstralParameters(*params_, astral_, "astral/" + sanitise(prefix_));
+            for (const params::IParameter* q : astralParams_->all) {
+                registeredPaths_.push_back(q->path());
+            }
+        }
+    }
+    dirty_ = true;
+}
+
+void Composition::updateAstral() {
+    AstralForge& live = scene_.astral;
+    if (!astral_.enabled) {
+        live = AstralForge{};
+        return;
+    }
+    // the authored block, with this frame's parameter finals
+    const std::uint32_t epoch = live.epoch;
+    live = astral_;
+    live.epoch = epoch;
+    float collapse = 0.0f;
+    if (astralParams_) {
+        collapse = applyAstralParameters(*astralParams_, astral_, live);
+    }
+    const bool collapseEdge = collapse >= 0.5f && astralCollapseLevel_ < 0.5f;
+    astralCollapseLevel_ = collapse;
+    live.time = currentTime_;
+    const bool haveTrack = analysisTrack_ != nullptr && analysisDuration_ > 0.0;
+    const bool historyLive = audioHistory_ != nullptr && audioHistory_->live();
+    const bool songMode = astral_.conductor == AstralConductorMode::Song ||
+                          (astral_.conductor == AstralConductorMode::Auto && haveTrack && !historyLive);
+    if (songMode && haveTrack) {
+        if (astralSongTrack_ != analysisTrack_.get() || !astralSong_) {
+            auto song = std::make_shared<AstralSong>();
+            song->song = astral::buildSong(*analysisTrack_, analysisDuration_);
+            song->score = astral::buildScore(song->song);
+            log::info("astral: song {:.1f} s, {:.1f} bpm, {} sections, {} phrases, {} kicks", song->song.duration,
+                      song->song.tempoBpm, song->song.sections.size(), song->score.phrases.size(),
+                      song->song.kickT.size());
+            astralSong_ = std::move(song);
+            astralSongTrack_ = analysisTrack_.get();
+        }
+        live.song = astralSong_;
+        live.state = astral::conductSong(currentTime_, astralSong_->song, astralSong_->score, live.live);
+    } else if (audioHistory_ != nullptr) {
+        live.song.reset();
+        live.state = astralLive_.update(*audioHistory_, audioHistory_->now(currentTime_), live.live, collapseEdge);
+    } else {
+        live.song.reset();
+        astral::State s; // no audio at all: the god forms on its own and holds
+        s.archA = s.archB = static_cast<float>(live.live.god >= 0 ? live.live.god : astral::kSeraph);
+        s.C = 0.9f;
+        astral::defaults(s);
+        s.eye = {0.0f, 0.4f, 25.0f};
+        s.target = {0.0f, 0.2f, 0.0f};
+        astral::applyControls(s, live.live);
+        live.state = s;
+    }
+}
+
+void Composition::applyAstralCamera(float& fovDegrees) {
+    const AstralForge& a = scene_.astral;
+    if (!a.enabled || a.cameraDrive < 0.5f) {
+        astralShot_ = -1;
+        return;
+    }
+    scene_.camera.position = a.state.eye;
+    scene_.camera.target = a.state.target;
+    fovDegrees = a.state.fovDeg;
+    if (a.state.shot != astralShot_) {
+        if (astralShot_ >= 0) { // ADR-912: a new shot is a cut (temporal history resets)
+            cameraCutThisFrame_ = true;
+            ++cameraCutSerial_;
+        }
+        astralShot_ = a.state.shot;
+    }
 }
 
 Result<void> Composition::addGrid(spatial::GridField grid) {
@@ -4892,6 +4982,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     for (const spatial::GridField& g : grids_) {
         gridParams_.push_back(registerGridParameters(params, g, "grid/" + sanitise(prefix_) + g.name + "/"));
     }
+    // ADR-1221: the Astral Forge's controls.
+    astralParams_.reset();
+    if (astral_.enabled) {
+        astralParams_ = registerAstralParameters(params, astral_, "astral/" + sanitise(prefix_));
+    }
     if (root) {
         addDefaultRoutes(modulator);
     } else {
@@ -5889,6 +5984,7 @@ void Composition::detach() {
         }
     }
     gridParams_.clear(); // ADR-1122 (the parameters themselves go with `registeredPaths_`)
+    astralParams_.reset(); // ADR-1221, likewise
     cameraDistance_ = nullptr;
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
@@ -8708,6 +8804,7 @@ void Composition::applyParameters() {
     for (std::size_t i = 0; i < gridParams_.size() && i < grids_.size() && i < scene_.fields.grids.size(); ++i) {
         applyGridParameters(gridParams_[i], grids_[i], scene_.fields.grids[i]);
     }
+    updateAstral(); // ADR-1221: before the camera, which it may place
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -8921,6 +9018,7 @@ void Composition::applyParameters() {
         // pick up (ADR-037 owns the lens; this only says which focal length the picture is on).
         activeCamera_.focalLength = pose.focalLength;
     }
+    applyAstralCamera(fov); // ADR-1221: the conductor places the camera, and shake and breath still compose with it
     // Shake last, and in every mode: it is an offset applied to whatever placed the camera, which
     // is what makes it compose with an orbit, a spline ride and a baked cinematic move alike
     // instead of being a fourth way to position a camera (ADR-098, brief section 14).
@@ -10803,6 +10901,9 @@ nlohmann::json Composition::toJson() const {
     if (graph_) {
         j["graph"] = graph_->toJson();
     }
+    if (astral_.enabled) {
+        j["astral"] = astralToJson(astral_); // ADR-1221
+    }
     if (!grids_.empty()) {
         json gridsJson = json::array();
         for (const spatial::GridField& g : grids_) {
@@ -11672,6 +11773,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (auto ok = comp->setGraph(std::move(*g)); !ok) {
             return fail("scene file '{}': graph: {}", scenePath.string(), ok.error().message);
         }
+    }
+    if (j.contains("astral")) { // ADR-1221
+        auto a = astralFromJson(j.at("astral"));
+        if (!a) {
+            return fail("scene file '{}': {}", scenePath.string(), a.error().message);
+        }
+        comp->setAstral(std::move(*a));
     }
     if (j.contains("grids")) {
         const json& gridsJson = j.at("grids");

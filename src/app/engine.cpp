@@ -6347,6 +6347,7 @@ void Engine::update(const FrameTime& time) {
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
         comp->setAudioHistory(audioHistory_); // ADR-1116
+        comp->setAnalysisTrack(track_, track_ ? durationSeconds() : 0.0); // ADR-1221
         // ADR-1119: every parameter base and the audio revision -- what a simulation checkpoint must
         // match. The bases, not the finals: modulation moves finals every frame and replays exactly; an
         // edit moves a base and must drop the checkpoints (ADR-700's rule, for the GPU).

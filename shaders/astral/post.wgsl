@@ -28,8 +28,7 @@ fn hashp(x0: u32) -> u32 {
 
 // surface + flakes: the flakes' dark bodies occlude the surface behind them (average colour, Beer
 // coverage), and their glints add.
-@fragment fn fs_combine(i: FOut) -> @location(0) vec4f {
-    let px = vec2i(i.clip.xy);
+fn combineAt(px: vec2i) -> vec4f {
     let dim = vec2i(textureDimensions(src));
     let surf = textureLoad(src, px, 0).rgb;
     let idx = u32(px.x + px.y * dim.x) * 7u;
@@ -53,8 +52,10 @@ fn hashp(x0: u32) -> u32 {
         let occHere = select(0.0, 1.0, textureLoad(surfDepth, px, 0).r < 1e8);
         let glow = exp(-dot(dl, dl) * 1.6) * 0.55 + 0.06 * smoothstep(1.2, -0.2, uv.y);
         c += P.d.rgb * glow * P.d.w * 0.11 * (1.0 - 0.85 * occHere); // the void stays near-black: a faint tint
-        if (P.c.w > 0.0 && P.c.z > 0.5) {
-            let n = 20; // v2 perf: 20 jittered taps (was 48; the same Riemann sum, decay per tap rescaled)
+        // ADR-1222: f.x = the tier's tap count (0 = 20, the prototype's)
+        let n = select(20, i32(P.f.x), P.f.x > 0.5);
+        if (P.c.w > 0.0 && P.c.z > 0.5 && n > 0) {
+            // v2 perf: 20 jittered taps (was 48; the same Riemann sum, decay per tap rescaled)
             let stepv = (lv - uv) / f32(n);
             var q = uv;
             var acc = 0.0;
@@ -72,13 +73,27 @@ fn hashp(x0: u32) -> u32 {
                 let src = exp(-dot(ds, ds) / (P.e.w * P.e.w));
                 acc += w * src * (1.0 - occ);
                 wsum += w;
-                w *= 0.9410;   // 0.975^(48/20)
+                w *= pow(0.975, 48.0 / f32(n)); // 0.975^(48/20) at 20 taps
             }
             let rays = acc / max(wsum, 1e-3);
             c += P.e.rgb * rays * P.c.w * 0.13 * (1.0 - 0.7 * occHere);
         }
     }
     return vec4f(c, 1.0);
+}
+@fragment fn fs_combine(i: FOut) -> @location(0) vec4f { return combineAt(vec2i(i.clip.xy)); }
+
+// ADR-1221: production composites straight into the scene's HDR target (already exposed: AV Gen's own bloom and
+// tonemap follow) and depth buffer: the surface writes its own depth, the void writes the far plane (so it shows
+// only where nothing of the scene stands in front).
+struct SceneOut { @location(0) color: vec4f, @builtin(frag_depth) depth: f32, };
+@fragment fn fs_combine_scene(i: FOut) -> SceneOut {
+    let px = vec2i(i.clip.xy);
+    var o: SceneOut;
+    o.color = vec4f(combineAt(px).rgb * P.a.x, 1.0);
+    let d = textureLoad(surfDepth, px, 0);
+    o.depth = select(1.0, d.g, d.r < 1e8);
+    return o;
 }
 
 fn tap(uv: vec2f) -> vec3f { return textureSampleLevel(src, samp, uv, 0.0).rgb; }

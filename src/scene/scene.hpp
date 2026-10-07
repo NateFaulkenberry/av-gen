@@ -8,6 +8,7 @@
 #include "scene/particles.hpp"
 #include "scene/post_settings.hpp"
 #include "scene/temporal_settings.hpp"
+#include "scene/astral_forge.hpp"
 #include "scene/composition_data.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/procedural.hpp"
@@ -89,6 +90,7 @@ struct Scene {
     CompositionData composition;                 // ADR-038; what the frame is about
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
+    AstralForge astral;                          // ADR-1221; rendering::AstralRenderer (the second Environment)
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     // ADR-099: the water surfaces of this scene, one per distinct look. An entity drawn with
     // MeshStyle::Water finds its settings by the material-program name it carries, which is how a

@@ -201,6 +201,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       ao_(std::make_unique<AoRenderer>(context, shaders)),
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
+      astral_(std::make_unique<AstralRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
       shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
@@ -533,6 +534,11 @@ Result<void> SceneRenderer::init() {
     if (auto r = ribbons_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
+    // ADR-1221: the Astral Forge runs its own passes after the lit pass, on the shared targets.
+    if (auto r = astral_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
+        return r;
+    }
+    environments_ = {astral_.get()};
     // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
     // IBL group (a shield's sheen).
     if (auto r = shells_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, iblLayout_); !r) {
@@ -2014,6 +2020,9 @@ void SceneRenderer::resetTemporalHistory() {
     // ADR-1114: the simulated grids are world state too, and this call never reached them. A seek
     // forwards left a grid lagging by the whole gap and paying it back at `maxSubSteps` a frame; a
     // seek backwards reset it and granted 240 steps. Now the next frame runs the whole backlog.
+    if (astral_ != nullptr) {
+        astral_->markDiscontinuity(); // ADR-1221: its particles are world state too
+    }
     if (simulation_ != nullptr) {
         simulation_->markDiscontinuity();
     }

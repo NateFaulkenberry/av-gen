@@ -442,7 +442,7 @@ fn jitterAt(px: vec2u) -> f32 { return u01(hashu(px.x * 1973u + px.y * 9277u + u
 @fragment fn fs_surface(i: VOut) -> FOut {
     var o: FOut;
     o.color = vec4f(0.0, 0.0, 0.0, 1.0);
-    o.depth = vec4f(1e9, 0.0, 0.0, 0.0);
+    o.depth = vec4f(1e9, 1.0, 0.0, 0.0);
     let r = rayAt(i.uv);
     let cell = F.grid0.w;
     let px = vec2u(i.clip.xy);
@@ -488,7 +488,9 @@ fn jitterAt(px: vec2u) -> f32 { return u01(hashu(px.x * 1973u + px.y * 9277u + u
     if (hit) {
         let sh = shadeHit(r.ro, r.rd, tP, tH, interior);
         col = sh.rgb;
-        o.depth = vec4f(sh.w, 0.0, 0.0, 0.0);
+        // ADR-1221: .g is the hit's clip-space depth, so production composites into the scene's depth buffer
+        let ph = F.viewProj * vec4f(r.ro + r.rd * sh.w, 1.0);
+        o.depth = vec4f(sh.w, clamp(ph.z / ph.w, 0.0, 1.0), 0.0, 0.0);
     }
     o.color = vec4f(hazeOver(col, haze, hazeHeat), 1.0);
     return o;
