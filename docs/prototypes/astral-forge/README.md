@@ -13,6 +13,7 @@ violently dissolves. This is research plus a prototype plus art, not a finished 
 | [04-architecture.md](04-architecture.md) | §15-16, §20.2 | approaches A-E implemented and benchmarked; E (hybrid) chosen; the production path |
 | [05-tests-and-assessment.md](05-tests-and-assessment.md) | §18-20 | the six tests with verdicts, performance, what worked, what looked generic, the next iteration |
 | [07-iteration-3.md](07-iteration-3.md) | iteration 3 | the production look (ADR-1150..1153) vs the prototype, off-centre framing, the peeling Machine God, release-front heat, the half-resolution march, the stride benchmark |
+| [08-iteration-4.md](08-iteration-4.md) | iteration 4 (SHELVED 2026-10-06: start here to resume) | the camera, the full Trench piece (TEST 08), v2 (shot sizes, legible faces, per-god palettes, silhouettes, atmosphere) with four measurements, the production face and port (ADR-1144..1149, 1154..1156), the conductor gap list, the retire verdict |
 | [06-iteration-2.md](06-iteration-2.md) | the approved next iteration | warp advection, tendons, shards, the latent cache (and its lesson), conductor vocabulary, the Machine God and Chimera (TEST 07), and the production path: ADR-1140..1143 in the engine |
 
 **In one paragraph.**
