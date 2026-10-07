@@ -1,0 +1,1037 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "THE RIFT / Trench"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "rift.scene.json"
+  },
+  "audio": {
+   "path": "../../assets/audio/trench.wav"
+  }
+ },
+ "live": {
+  "qualityStrategy": "effects_first",
+  "targetFps": 60
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/intensity": 0.32,
+  "post/bloom/emissionWeight": 0.75,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.28,
+  "post/grade/contrast": 1.08,
+  "post/grade/saturation": 1.05,
+  "camera/exposure/mode": 0,
+  "camera/mode": 2,
+  "sources/driftA/rate": 0.031,
+  "sources/driftC/rate": 0.047
+ },
+ "sources": [
+  {
+   "kind": "lfo",
+   "name": "driftA",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "driftC",
+   "settings": {
+    "shape": "sine"
+   }
+  }
+ ],
+ "sonic": {},
+ "routes": [
+  {
+   "source": "audio.bass",
+   "target": "root/scale",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.mid",
+   "target": "root/rotationSpeed",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.rms",
+   "target": "scene/brightness",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.onset",
+   "target": "root/impulse",
+   "op": "add",
+   "amount": 0.0
+  },
+  {
+   "source": "audio.energy",
+   "target": "macros/energy",
+   "op": "add",
+   "amount": 1.0,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 3000
+   },
+   "depthSource": "macro.sensitivity",
+   "depthMin": 0.0,
+   "depthMax": 4.0
+  },
+  {
+   "source": "audio.bass",
+   "target": "macros/bassSlow",
+   "op": "add",
+   "amount": 1.0,
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 500
+   },
+   "depthSource": "macro.sensitivity",
+   "depthMin": 0.0,
+   "depthMax": 4.0
+  },
+  {
+   "source": "macro.flight",
+   "target": "camera/splineT",
+   "op": "add",
+   "amount": 0.0074342237153085435,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "macro.energy",
+   "target": "camera/splineT",
+   "op": "add",
+   "amount": 0.0011151335572962815,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "macro.flight",
+   "target": "field/wakeFront/position",
+   "op": "add",
+   "amount": 20.0,
+   "chain": {
+    "integrate": true
+   },
+   "component": 2
+  },
+  {
+   "source": "macro.energy",
+   "target": "field/wakeFront/position",
+   "op": "add",
+   "amount": 3.0,
+   "chain": {
+    "integrate": true
+   },
+   "component": 2
+  },
+  {
+   "source": "audio.bassLevel",
+   "target": "grid/prop/injectRate",
+   "op": "add",
+   "amount": 0.8,
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "audio.trebleLevel",
+   "target": "particles/spores/spawnRate",
+   "op": "add",
+   "amount": 1600.0,
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.onsetMid",
+   "target": "particles/swarm/spawnRate",
+   "op": "add",
+   "amount": 6000.0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 40,
+    "envelopeFallPerSecond": 4.0
+   },
+   "depthSource": "macro.energy",
+   "depthMin": 0.0,
+   "depthMax": 1.0
+  },
+  {
+   "source": "audio.mid",
+   "target": "ecosystem/crinoidChains/intensity",
+   "op": "add",
+   "amount": 1.2,
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "lfo.driftA.bipolar",
+   "target": "camera/splineOffset",
+   "op": "add",
+   "amount": 2.0,
+   "component": 0,
+   "depthSource": "macro.energy",
+   "depthMin": 0.4,
+   "depthMax": 1.0
+  },
+  {
+   "source": "lfo.driftC.bipolar",
+   "target": "camera/splineOffset",
+   "op": "add",
+   "amount": 1.0,
+   "component": 1,
+   "depthSource": "macro.energy",
+   "depthMin": 0.4,
+   "depthMax": 1.0
+  }
+ ],
+ "worldMacros": [
+  {
+   "name": "energy",
+   "label": "ENERGY",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "bassSlow",
+   "label": "BASSSLOW",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "flight",
+   "label": "FLIGHT",
+   "default": 0.0,
+   "targets": []
+  },
+  {
+   "name": "sensitivity",
+   "label": "SENSITIVITY",
+   "default": 0.25,
+   "targets": []
+  }
+ ],
+ "presets": [
+  {
+   "name": "dark",
+   "values": {
+    "macros/flight": [
+     0.15
+    ],
+    "camera/splineOffset": [
+     -3.0,
+     4.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     40.0
+    ],
+    "camera/fov": [
+     36.0
+    ],
+    "camera/splineBank": [
+     3.0
+    ],
+    "grid/prop/injectRate": [
+     0.0
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     -1260.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.0
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     250.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "stirring",
+   "values": {
+    "macros/flight": [
+     0.25
+    ],
+    "camera/splineOffset": [
+     0.0,
+     2.6,
+     0.0
+    ],
+    "camera/lookAhead": [
+     30.0
+    ],
+    "camera/fov": [
+     42.0
+    ],
+    "camera/splineBank": [
+     6.0
+    ],
+    "grid/prop/injectRate": [
+     1.1
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     -1210.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.0
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     400.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "breath",
+   "values": {
+    "macros/flight": [
+     0.075
+    ],
+    "camera/splineOffset": [
+     0.0,
+     2.6,
+     0.0
+    ],
+    "camera/lookAhead": [
+     30.0
+    ],
+    "camera/fov": [
+     42.0
+    ],
+    "camera/splineBank": [
+     6.0
+    ],
+    "grid/prop/injectRate": [
+     0.0
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     -1210.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.0
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     300.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "awake",
+   "values": {
+    "macros/flight": [
+     0.4
+    ],
+    "camera/splineOffset": [
+     2.0,
+     27.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     45.0
+    ],
+    "camera/fov": [
+     56.0
+    ],
+    "camera/splineBank": [
+     10.0
+    ],
+    "grid/prop/injectRate": [
+     1.4
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     -1040.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.3
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     600.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "awake 2",
+   "values": {
+    "macros/flight": [
+     0.4
+    ],
+    "camera/splineOffset": [
+     24.0,
+     14.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     35.0
+    ],
+    "camera/fov": [
+     50.0
+    ],
+    "camera/splineBank": [
+     8.0
+    ],
+    "grid/prop/injectRate": [
+     1.5
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     -1000.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.4
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     600.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "build",
+   "values": {
+    "macros/flight": [
+     0.2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     34.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     60.0
+    ],
+    "camera/fov": [
+     48.0
+    ],
+    "camera/splineBank": [
+     4.0
+    ],
+    "grid/prop/injectRate": [
+     0.6
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     -1000.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.2
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     3500.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "drop",
+   "values": {
+    "macros/flight": [
+     1.2
+    ],
+    "camera/splineOffset": [
+     0.0,
+     5.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     40.0
+    ],
+    "camera/fov": [
+     66.0
+    ],
+    "camera/splineBank": [
+     16.0
+    ],
+    "grid/prop/injectRate": [
+     3.2
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     500.0
+    ],
+    "material/rock/emissionIntensity": [
+     5.0
+    ],
+    "scene/volumeEmission": [
+     0.1
+    ],
+    "particles/spores/spawnRate": [
+     2500.0
+    ],
+    "particles/swarm/spawnRate": [
+     9000.0
+    ]
+   }
+  },
+  {
+   "name": "body",
+   "values": {
+    "macros/flight": [
+     0.85
+    ],
+    "camera/splineOffset": [
+     2.0,
+     27.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     45.0
+    ],
+    "camera/fov": [
+     56.0
+    ],
+    "camera/splineBank": [
+     10.0
+    ],
+    "grid/prop/injectRate": [
+     2.2
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     1100.0
+    ],
+    "material/rock/emissionIntensity": [
+     1.6
+    ],
+    "scene/volumeEmission": [
+     0.04
+    ],
+    "particles/spores/spawnRate": [
+     1500.0
+    ],
+    "particles/swarm/spawnRate": [
+     3000.0
+    ]
+   }
+  },
+  {
+   "name": "body 2",
+   "values": {
+    "macros/flight": [
+     1.0
+    ],
+    "camera/splineOffset": [
+     0.0,
+     2.6,
+     0.0
+    ],
+    "camera/lookAhead": [
+     30.0
+    ],
+    "camera/fov": [
+     42.0
+    ],
+    "camera/splineBank": [
+     6.0
+    ],
+    "grid/prop/injectRate": [
+     2.4
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     1100.0
+    ],
+    "material/rock/emissionIntensity": [
+     1.8
+    ],
+    "scene/volumeEmission": [
+     0.05
+    ],
+    "particles/spores/spawnRate": [
+     1500.0
+    ],
+    "particles/swarm/spawnRate": [
+     4000.0
+    ]
+   }
+  },
+  {
+   "name": "body 3",
+   "values": {
+    "macros/flight": [
+     0.75
+    ],
+    "camera/splineOffset": [
+     24.0,
+     14.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     35.0
+    ],
+    "camera/fov": [
+     50.0
+    ],
+    "camera/splineBank": [
+     8.0
+    ],
+    "grid/prop/injectRate": [
+     2.2
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     1100.0
+    ],
+    "material/rock/emissionIntensity": [
+     1.6
+    ],
+    "scene/volumeEmission": [
+     0.04
+    ],
+    "particles/spores/spawnRate": [
+     1500.0
+    ],
+    "particles/swarm/spawnRate": [
+     3000.0
+    ]
+   }
+  },
+  {
+   "name": "body 4",
+   "values": {
+    "macros/flight": [
+     0.6
+    ],
+    "camera/splineOffset": [
+     -10.0,
+     70.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     120.0
+    ],
+    "camera/fov": [
+     58.0
+    ],
+    "camera/splineBank": [
+     4.0
+    ],
+    "grid/prop/injectRate": [
+     2.6
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     1100.0
+    ],
+    "material/rock/emissionIntensity": [
+     2.2
+    ],
+    "scene/volumeEmission": [
+     0.06
+    ],
+    "particles/spores/spawnRate": [
+     1500.0
+    ],
+    "particles/swarm/spawnRate": [
+     2000.0
+    ]
+   }
+  },
+  {
+   "name": "aftermath",
+   "values": {
+    "macros/flight": [
+     0.125
+    ],
+    "camera/splineOffset": [
+     4.0,
+     9.0,
+     0.0
+    ],
+    "camera/lookAhead": [
+     50.0
+    ],
+    "camera/fov": [
+     40.0
+    ],
+    "camera/splineBank": [
+     2.0
+    ],
+    "grid/prop/injectRate": [
+     0.0
+    ],
+    "field/wakeFront/position": [
+     0.0,
+     0.0,
+     1100.0
+    ],
+    "material/rock/emissionIntensity": [
+     0.0
+    ],
+    "scene/volumeEmission": [
+     0.0
+    ],
+    "particles/spores/spawnRate": [
+     600.0
+    ],
+    "particles/swarm/spawnRate": [
+     0.0
+    ]
+   }
+  }
+ ],
+ "states": {
+  "initial": "Dark",
+  "states": [
+   {
+    "name": "Dark",
+    "preset": "dark",
+    "transition": {
+     "seconds": 4.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "control.padDark",
+      "threshold": 0.3
+     }
+    ]
+   },
+   {
+    "name": "Stirring",
+    "preset": "stirring",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 6.0,
+      "from": "Dark"
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padStirring",
+      "threshold": 0.3
+     }
+    ]
+   },
+   {
+    "name": "Breath",
+    "preset": "breath",
+    "transition": {
+     "seconds": 1.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "macro.bassSlow",
+      "threshold": 0.2,
+      "from": "Stirring",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "macro.bassSlow",
+      "threshold": 0.2,
+      "from": "Awake",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "macro.bassSlow",
+      "threshold": 0.2,
+      "from": "Awake 2",
+      "hold": true,
+      "falling": true
+     }
+    ]
+   },
+   {
+    "name": "Awake",
+    "preset": "awake",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "macro.bassSlow",
+      "threshold": 0.35,
+      "from": "Breath",
+      "hold": true,
+      "idle": true
+     },
+     {
+      "kind": "phrase",
+      "every": 2,
+      "from": "Stirring",
+      "idle": true
+     },
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Awake 2",
+      "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padAwake",
+      "threshold": 0.3
+     }
+    ]
+   },
+   {
+    "name": "Awake 2",
+    "preset": "awake 2",
+    "transition": {
+     "seconds": 10.0,
+     "easing": "smooth",
+     "quantize": "beat"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Awake",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Build",
+    "preset": "build",
+    "transition": {
+     "seconds": 4.0,
+     "easing": "easeInOut"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 2.0,
+      "from": "Breath"
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padBuild",
+      "threshold": 0.3
+     }
+    ]
+   },
+   {
+    "name": "Drop",
+    "preset": "drop",
+    "transition": {
+     "seconds": 1.2,
+     "easing": "easeOut"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "macro.bassSlow",
+      "threshold": 0.42,
+      "from": "Build",
+      "hold": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padDrop",
+      "threshold": 0.3
+     }
+    ]
+   },
+   {
+    "name": "Body",
+    "preset": "body",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth",
+     "quantize": "beat"
+    },
+    "triggers": [
+     {
+      "kind": "elapsed",
+      "threshold": 14.0,
+      "from": "Drop"
+     },
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Body 4",
+      "idle": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padBody",
+      "threshold": 0.3
+     }
+    ]
+   },
+   {
+    "name": "Body 2",
+    "preset": "body 2",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth",
+     "quantize": "beat"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Body",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Body 3",
+    "preset": "body 3",
+    "transition": {
+     "seconds": 6.0,
+     "easing": "smooth",
+     "quantize": "beat"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Body 2",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Body 4",
+    "preset": "body 4",
+    "transition": {
+     "seconds": 8.0,
+     "easing": "smooth",
+     "quantize": "beat"
+    },
+    "triggers": [
+     {
+      "kind": "phrase",
+      "every": 1,
+      "from": "Body 3",
+      "idle": true
+     }
+    ]
+   },
+   {
+    "name": "Aftermath",
+    "preset": "aftermath",
+    "transition": {
+     "seconds": 4.0,
+     "easing": "smooth"
+    },
+    "triggers": [
+     {
+      "kind": "signal",
+      "signal": "macro.energy",
+      "threshold": 0.62,
+      "from": "Body",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "macro.energy",
+      "threshold": 0.62,
+      "from": "Body 2",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "macro.energy",
+      "threshold": 0.62,
+      "from": "Body 3",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "macro.energy",
+      "threshold": 0.62,
+      "from": "Body 4",
+      "hold": true,
+      "falling": true
+     },
+     {
+      "kind": "signal",
+      "signal": "control.padAftermath",
+      "threshold": 0.3
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/rift.mp4"
+ }
+}

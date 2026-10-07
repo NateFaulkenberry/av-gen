@@ -24,7 +24,7 @@ CACHE = REPO / "build" / "biolum"
 
 SIZE = 2400.0
 FLOOR = -150.0       # the canyon floor's level
-Z_RANGE = (-1100.0, 1100.0)
+Z_RANGE = (-1700.0, 1700.0)
 
 
 def centre_x(z):
