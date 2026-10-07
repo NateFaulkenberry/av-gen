@@ -121,6 +121,10 @@ struct SdfRenderer::Impl {
         std::size_t objectIndex; // into scene.sdfs
         std::uint32_t offset;    // dynamic offset into both uniform buffers
         const Pipelines* compiled = nullptr; // null: the interpreter's pipelines
+        // ADR-1160: false for an object whose bounds are off the camera's screen. It is still marched into the
+        // shadow maps (a caster out of frame still throws its shadow into frame), but the lit pass and the
+        // depth prepass skip it.
+        bool onCamera = true;
         // ADR-1142: the density volume this object draws (null: sdfGroup, which binds the placeholder).
         // A view, not a group: the node buffer may be re-created after the items are collected, and
         // that re-creates every group, so the group is looked up when the pass is encoded.
@@ -238,6 +242,18 @@ struct SdfRenderer::Impl {
     std::size_t cacheFrames = 120;
     bool initialised = false;
     bool warnedLimit = false;
+    // ADR-1165: the low-resolution shadow side. One Depth24Plus array (a layer per shadow view), a 2D view of each
+    // layer (the attachment, and the composite's texture), and a composite bind group per layer.
+    wgpu::Texture lowShadow;
+    std::uint32_t lowShadowSize = 0;
+    std::uint32_t lowShadowLayers = 0;
+    std::vector<wgpu::TextureView> lowShadowViews;
+    std::vector<wgpu::BindGroup> lowShadowGroups;
+    wgpu::BindGroupLayout compositeLayout;
+    wgpu::RenderPipeline compositePipeline;
+    wgpu::Buffer compositeUniforms;
+    std::uint32_t compositeFullSize = 0;
+    Result<void> createCompositePipeline();
 };
 
 SdfRenderer::SdfRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -387,8 +403,153 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
     if (auto r = im.createRaymarchPipeline(*raymarch); !r) {
         return r;
     }
+    if (auto r = im.createCompositePipeline(); !r) {
+        return r;
+    }
     im.initialised = true;
     return {};
+}
+
+// ADR-1165: the low-resolution shadow composite (sdf_shadow_composite.wgsl).
+Result<void> SdfRenderer::Impl::createCompositePipeline() {
+    const auto& device = context.device();
+    auto module = shaders.load("sdf_shadow_composite.wgsl");
+    if (!module) {
+        return std::unexpected(module.error());
+    }
+    if (!compositeLayout) {
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Fragment;
+        entries[0].texture.sampleType = wgpu::TextureSampleType::Depth;
+        entries[0].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Fragment;
+        entries[1].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[1].buffer.minBindingSize = 16;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "sdf-shadow-composite-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        compositeLayout = device.CreateBindGroupLayout(&desc);
+        wgpu::BufferDescriptor ub{};
+        ub.label = "sdf-shadow-composite-uniforms";
+        ub.size = 16;
+        ub.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        compositeUniforms = device.CreateBuffer(&ub);
+    }
+    wgpu::PipelineLayoutDescriptor layoutDesc{};
+    layoutDesc.label = "sdf-shadow-composite";
+    layoutDesc.bindGroupLayoutCount = 1;
+    layoutDesc.bindGroupLayouts = &compositeLayout;
+    const wgpu::PipelineLayout layout = device.CreatePipelineLayout(&layoutDesc);
+    wgpu::FragmentState fragment{};
+    fragment.module = *module;
+    fragment.entryPoint = "fs_composite";
+    fragment.targetCount = 0;
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::Less; // the shadow passes' own test (the depth-only pipelines)
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "sdf-shadow-composite";
+    desc.layout = layout;
+    desc.vertex.module = *module;
+    desc.vertex.entryPoint = "vs_composite";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.fragment = &fragment;
+    context.device().PushErrorScope(wgpu::ErrorFilter::Validation);
+    compositePipeline = gpu::createRenderPipeline(device, &desc);
+    std::string error;
+    auto future = device.PopErrorScope(wgpu::CallbackMode::WaitAnyOnly,
+                                       [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                                           if (type != wgpu::ErrorType::NoError) {
+                                               error = gpu::Context::toString(msg);
+                                           }
+                                       });
+    context.waitFor(future);
+    if (!error.empty() || !compositePipeline) {
+        return fail("pipeline 'sdf-shadow-composite' creation failed: {}", error);
+    }
+    return {};
+}
+
+bool SdfRenderer::prepareLowResShadows(const scene::Scene& scene, std::uint32_t views, std::uint32_t atlasResolution) {
+    Impl& im = *impl_;
+    stats_.shadowMarchResolution = 0;
+    const std::uint32_t scale = std::clamp(sdfShadowScale_, 1u, 8u);
+    if (!im.initialised || !im.compositePipeline || scale <= 1 || views == 0 ||
+        atlasResolution <= kMinLowResShadow) {
+        return false;
+    }
+    bool anyCaster = false;
+    for (const auto& item : im.raymarchItems) {
+        anyCaster = anyCaster || (item.objectIndex < scene.sdfs.size() && scene.sdfs[item.objectIndex].castShadows);
+    }
+    if (!anyCaster) {
+        return false;
+    }
+    const std::uint32_t size = std::max(kMinLowResShadow, atlasResolution / scale);
+    if (size >= atlasResolution) {
+        return false;
+    }
+    const auto& device = im.context.device();
+    if (!im.lowShadow || im.lowShadowSize != size || im.lowShadowLayers < views) {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "sdf-shadow-low";
+        desc.size = {size, size, views};
+        desc.format = im.depthFormat; // the shadow atlas's format (ShadowRenderer::kFormat): the shadow pipelines serve both
+        desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        im.lowShadow = device.CreateTexture(&desc);
+        im.lowShadowSize = size;
+        im.lowShadowLayers = views;
+        im.lowShadowViews.clear();
+        im.lowShadowGroups.clear();
+        for (std::uint32_t v = 0; v < views; ++v) {
+            wgpu::TextureViewDescriptor vd{};
+            vd.dimension = wgpu::TextureViewDimension::e2D;
+            vd.baseArrayLayer = v;
+            vd.arrayLayerCount = 1;
+            vd.aspect = wgpu::TextureAspect::DepthOnly;
+            im.lowShadowViews.push_back(im.lowShadow.CreateView(&vd));
+            std::array<wgpu::BindGroupEntry, 2> entries{};
+            entries[0].binding = 0;
+            entries[0].textureView = im.lowShadowViews.back();
+            entries[1].binding = 1;
+            entries[1].buffer = im.compositeUniforms;
+            entries[1].size = 16;
+            wgpu::BindGroupDescriptor gd{};
+            gd.label = "sdf-shadow-composite";
+            gd.layout = im.compositeLayout;
+            gd.entryCount = entries.size();
+            gd.entries = entries.data();
+            im.lowShadowGroups.push_back(device.CreateBindGroup(&gd));
+        }
+    }
+    if (im.compositeFullSize != atlasResolution) {
+        const std::array<float, 4> full{static_cast<float>(atlasResolution), static_cast<float>(atlasResolution), 0.0f,
+                                        0.0f};
+        im.context.queue().WriteBuffer(im.compositeUniforms, 0, full.data(), sizeof(full));
+        im.compositeFullSize = atlasResolution;
+    }
+    stats_.shadowMarchResolution = size;
+    return true;
+}
+
+const wgpu::TextureView& SdfRenderer::lowResShadowLayer(std::uint32_t view) const {
+    return impl_->lowShadowViews.at(view);
+}
+
+void SdfRenderer::drawShadowComposite(wgpu::RenderPassEncoder& pass, std::uint32_t view) {
+    Impl& im = *impl_;
+    if (view >= im.lowShadowGroups.size()) {
+        return;
+    }
+    pass.SetPipeline(im.compositePipeline);
+    pass.SetBindGroup(0, im.lowShadowGroups[view]);
+    pass.Draw(3);
 }
 
 void SdfRenderer::setMeshPipelines(const wgpu::RenderPipeline& cull, const wgpu::RenderPipeline& noCull) {
@@ -402,7 +563,10 @@ Result<void> SdfRenderer::reload() {
     if (!raymarch) {
         return std::unexpected(raymarch.error());
     }
-    return im.createRaymarchPipeline(*raymarch);
+    if (auto r = im.createRaymarchPipeline(*raymarch); !r) {
+        return r;
+    }
+    return im.createCompositePipeline();
 }
 
 Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelineDescriptor& desc, const char* label) {
@@ -470,6 +634,7 @@ Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgp
     }
     depthFragment.entryPoint = "fs_sdf_shadow";
     depthDesc.label = "sdf-raymarch-shadow";
+    depthDesc.vertex.entryPoint = "vs_sdf_shadow"; // ADR-1160: the view's own rect, not the camera's
     auto shadowPipeline = finish(depthDesc, "sdf-raymarch-shadow");
     if (!shadowPipeline) {
         return std::unexpected(shadowPipeline.error());
@@ -518,6 +683,7 @@ void SdfRenderer::Impl::buildPipelinesAsync(const wgpu::ShaderModule& module, co
     wgpu::RenderPipelineDescriptor shadowDesc = depthDesc;
     shadowDesc.label = "sdf-raymarch-shadow";
     shadowDesc.fragment = &shadowFragment;
+    shadowDesc.vertex.entryPoint = "vs_sdf_shadow"; // ADR-1160
     slot->pending = 3;
     const auto& device = context.device();
     const auto make = [&](const wgpu::RenderPipelineDescriptor& d, wgpu::RenderPipeline Pipelines::* member) {
@@ -858,6 +1024,11 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
         return;
     }
     ++im.frame;
+    // ADR-1160: whether any light draws a shadow map this frame. Only then is an off-screen caster worth marching.
+    bool anyCaster = false;
+    for (const scene::PunctualLight& light : scene.lights) {
+        anyCaster = anyCaster || (light.enabled && light.castsShadow && light.shadowStrength > 0.0f);
+    }
     im.pieceSeconds = time.renderTime;
     collectTimings();
     // ADR-1102: the pre-warm. Every object that asks for compilation is compiled as soon as the scene has it --
@@ -891,10 +1062,14 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
         const ObjectUniforms obj = objectUniformsFor(object, i);
         const std::uint32_t offset = slot * kObjectStride;
 
+        bool drawnOnCamera = true; // ADR-1160: false for a shadow-only raymarch item
         if (object.renderMode == scene::SdfRenderMode::Raymarch) {
             glm::vec4 rect{};
-            if (!projectedRect(viewProj * obj.model, object.boundsMin, object.boundsMax, rect)) {
-                continue; // off screen
+            // ADR-1160: off the camera's screen is not out of the world -- the object can still cast into it. Its
+            // camera passes are skipped (`onCamera`); the shadow pass projects its own rect per view.
+            const bool onCamera = projectedRect(viewProj * obj.model, object.boundsMin, object.boundsMax, rect);
+            if (!onCamera && (!object.castShadows || !anyCaster)) {
+                continue; // off screen, and nothing to cast into
             }
             // ADR-1003: a compiled object uploads its per-node parameter table; the interpreter its program.
             const Impl::Pipelines* compiled = im.compiledPipelines(object, &scene.fields);
@@ -1064,8 +1239,13 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             im.nodeStaging.insert(im.nodeStaging.end(), im.packScratch.begin(), im.packScratch.end());
             std::memcpy(im.sdfStaging.data() + offset, &u, sizeof(u));
             std::memcpy(im.objectStaging.data() + offset, &obj, sizeof(obj));
-            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, variant, densityView, coarseView});
-            ++stats_.raymarchObjects;
+            im.raymarchItems.push_back(Impl::RaymarchItem{i, offset, variant, onCamera, densityView, coarseView});
+            drawnOnCamera = onCamera;
+            if (onCamera) {
+                ++stats_.raymarchObjects;
+            } else {
+                ++stats_.shadowOnlyObjects;
+            }
             stats_.packedNodes += static_cast<std::uint32_t>(count);
         } else {
             if (!object.mesh.valid() || object.mesh.indices.empty()) {
@@ -1101,7 +1281,9 @@ void SdfRenderer::update(const scene::Scene& scene, const FrameTime& time, const
             ++stats_.meshObjects;
             stats_.meshTriangles += state.indexCount / 3;
         }
-        ++stats_.objects;
+        if (drawnOnCamera) {
+            ++stats_.objects;
+        }
         ++slot;
     }
     if (slot > 0) {
@@ -1189,8 +1371,8 @@ void SdfRenderer::encodeRaymarchPass(wgpu::CommandEncoder& encoder, const wgpu::
     pass.SetBindGroup(0, frameBindGroup);
     pass.SetBindGroup(3, iblBindGroup);
     for (const auto& item : im.raymarchItems) {
-        if (item.objectIndex >= scene.sdfs.size()) {
-            continue;
+        if (item.objectIndex >= scene.sdfs.size() || !item.onCamera) {
+            continue; // ADR-1160: a shadow-only item has no pixels on the camera's screen
         }
         pass.SetPipeline(item.compiled != nullptr ? item.compiled->lit : im.raymarchPipeline);
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
@@ -1226,6 +1408,9 @@ void SdfRenderer::drawRaymarchDepth(wgpu::RenderPassEncoder& pass, const scene::
         const scene::SdfObject& object = scene.sdfs[item.objectIndex];
         if (reducedSteps ? !object.castShadows : !object.depthPrepass) {
             continue; // ADR-1002: opted out of this depth-only march
+        }
+        if (!reducedSteps && !item.onCamera) {
+            continue; // ADR-1160: the prepass is the camera's; a shadow-only item is marched for the lights alone
         }
         const std::array<std::uint32_t, 2> offsets = {item.offset, item.offset};
         pass.SetBindGroup(1, item.densityView ? im.densityGroup(item.densityView, item.coarseView) : im.sdfGroup, offsets.size(),

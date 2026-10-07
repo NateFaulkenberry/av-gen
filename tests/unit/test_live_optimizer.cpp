@@ -260,3 +260,38 @@ TEST_CASE("at the bottom of the ladder the unsustainable verdict is judged once 
     }
     CHECK(flips <= 80 / s.dwellFrames + 1);
 }
+
+// ADR-1165: the raymarched casters' shadow resolution. Offline marches every texel; the live tiers march half; Low and
+// Emergency a quarter, as a floor the ladder raises and never lowers; and it is an Optimize lever and a ceiling key.
+TEST_CASE("the SDF shadow scale: full offline, half live, a quarter at the bottom of every ladder", "[unit][live-optimizer]") {
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Offline).sdfShadowScale == 1);
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Realtime).sdfShadowScale == 2);
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Preview).sdfShadowScale == 2);
+    rendering::QualityPolicy policy = rendering::QualityPolicy::forTier(rendering::QualityTier::Offline);
+    CHECK(policy.assertOfflineIsUncompromised());
+    policy.settings.sdfShadowScale = 2;
+    CHECK_FALSE(policy.assertOfflineIsUncompromised());
+    for (const auto strategy : {app::LiveQualityStrategy::Balanced, app::LiveQualityStrategy::ResolutionFirst,
+                                app::LiveQualityStrategy::EffectsFirst}) {
+        const auto& ladder = app::liveQualityLadder(strategy);
+        for (std::size_t k = 0; k < 3; ++k) {
+            CHECK(ladder[k].sdfShadowScale == 1); // the tier's own
+        }
+        CHECK(ladder[3].sdfShadowScale == 4);
+        CHECK(ladder[4].sdfShadowScale == 4);
+    }
+    const rendering::QualitySettings offline = rendering::QualitySettings::forTier(rendering::QualityTier::Offline);
+    const auto& ladder = app::liveQualityLadder(app::LiveQualityStrategy::Balanced);
+    CHECK(app::applyLiveRung(offline, offline, ladder[0], 0.5f).sdfShadowScale == 1);
+    CHECK(app::applyLiveRung(offline, offline, ladder[4], 0.5f).sdfShadowScale == 4);
+    app::LiveQualityRung c{};
+    CHECK(app::applyLeverToCeiling(c, "sdfshadowhalf"));
+    CHECK(c.sdfShadowScale == 2);
+    CHECK(app::applyLeverToCeiling(c, "sdfshadowquarter"));
+    CHECK(c.sdfShadowScale == 4);
+    std::string error;
+    const auto back = app::ceilingFromJsonText(app::ceilingJsonText(c), error);
+    REQUIRE(back);
+    CHECK(back->sdfShadowScale == 4);
+    CHECK(app::applyCeiling(offline, c).sdfShadowScale == 4);
+}

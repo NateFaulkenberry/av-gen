@@ -79,6 +79,9 @@ struct GridField {
     float diffusion = 0.0f;   // Jacobi diffusion coefficient (cell units per second)
     int diffuseIterations = 4;
     float dissipation = 0.0f; // fraction lost per second
+    // ADR-1163: a scalar grid's concentration saturates here (injection cannot push a cell past it; advection and
+    // diffusion only average, so the grid stays at or below it). 0 = unbounded, as before.
+    float ceiling = 0.0f;
     // Gray-Scott (ReactionDiffusion mode)
     float feed = 0.037f;
     float kill = 0.06f;

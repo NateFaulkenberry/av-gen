@@ -52,6 +52,9 @@ GridParameters registerGridParameters(params::ParameterSet& params, const spatia
     r.f("advect", "advection (x the velocity field)", rest.advect, -100.0f, 100.0f, -4.0f, 4.0f);
     r.f("diffusion", "diffusion", rest.diffusion, 0.0f, 100.0f, 0.0f, 2.0f);
     r.f("dissipation", "fades (fraction per second)", rest.dissipation, 0.0f, 100.0f, 0.0f, 10.0f);
+    if (rest.mode == spatial::GridMode::Scalar) {
+        r.f("ceiling", "saturates at (0 = unbounded; ADR-1163)", rest.ceiling, 0.0f, 1000.0f, 0.0f, 4.0f);
+    }
     if (rest.mode == spatial::GridMode::ReactionDiffusion) {
         r.f("feed", "Gray-Scott feed", rest.feed, 0.0f, 0.2f, 0.0f, 0.1f);
         r.f("kill", "Gray-Scott kill", rest.kill, 0.0f, 0.2f, 0.0f, 0.1f);
@@ -74,6 +77,7 @@ void applyGridParameters(const GridParameters& p, const spatial::GridField& rest
     live.advect = rest.advect;
     live.diffusion = rest.diffusion;
     live.dissipation = rest.dissipation;
+    live.ceiling = rest.ceiling;
     live.feed = rest.feed;
     live.kill = rest.kill;
     live.diffusionA = rest.diffusionA;
@@ -88,6 +92,7 @@ void applyGridParameters(const GridParameters& p, const spatial::GridField& rest
     copy(p, "advect", live.advect);
     copy(p, "diffusion", live.diffusion);
     copy(p, "dissipation", live.dissipation);
+    copy(p, "ceiling", live.ceiling);
     copy(p, "feed", live.feed);
     copy(p, "kill", live.kill);
     copy(p, "diffusionA", live.diffusionA);

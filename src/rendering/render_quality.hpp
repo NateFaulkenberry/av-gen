@@ -252,6 +252,12 @@ struct QualitySettings {
     // Raymarched SDFs in the shadow-map pass. Was also unread until the same audit: the shader
     // derived its own budget as `maxSteps / 4` and these four numbers evaluated to nothing.
     std::uint32_t sdfShadowSteps = 24;
+    // ADR-1165: the raymarched casters' shadow resolution, as a divisor of the shadow map's (1 = full, 2 = half,
+    // 4 = quarter, never below 512 texels). Each SDF caster costs (texels it covers) x (steps) x (its nodes) per view,
+    // and ADR-1160 made that the light's true view: on DIGITAL MOSH it was 27 ms of an 83 ms Ultra frame. The march
+    // goes to a low layer and is composited (nearest) into the map; the filtering hides the coarser silhouette.
+    // Offline keeps the full-resolution march.
+    std::uint32_t sdfShadowScale = 2;
 
     // ---- material tiers (ADR-133) --------------------------------------------------------------
     //
@@ -432,6 +438,7 @@ struct QualitySettings {
             q.shadowMaskScale = 1.0f;
             q.aoHistoryFrames = 16;
             q.sdfShadowSteps = 48;
+            q.sdfShadowScale = 1; // ADR-1165: the offline picture marches every texel
             q.cosmicOctaveScale = 1.5f;  // 4 nebula octaves -> 6
             q.cosmicSampleScale = 1.67f; // 3x3 planet and dust cells -> 5x5
             // §5.9: offline takes no representation or shading shortcut, and says so as data.

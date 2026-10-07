@@ -85,6 +85,12 @@ constexpr LiveQualityRung plainShadows(LiveQualityRung r) {
 // ADR-1094..1098: the background levers -- small casters stop casting, far emitters stop, LOD comes sooner. The brief's
 // "first" group (background shadows, background particles); heroes are exempt in the renderer. Only on the two lowest
 // levels, where the picture is already being traded, so the levels a 60 target settles on are unchanged.
+// ADR-1165: a raymarched caster's shadow at a fraction of the map (never under 512 texels). Low and Emergency only:
+// Medium and above keep the base tier's own (half on the live tiers, full offline).
+constexpr LiveQualityRung sdfShadows(LiveQualityRung r, std::uint32_t scale) {
+    r.sdfShadowScale = scale;
+    return r;
+}
 constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, float particleMetres, float lod) {
     r.shadowCasterMinPixels = casterPixels;
     r.particleCullDistance = particleMetres;
@@ -96,28 +102,28 @@ constexpr LiveQualityLadder kResolutionFirst{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
     volumes(rung(L::Medium, 0.71f), 0.25f),
-    background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f),
-    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f),
+    sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4),
+    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4),
 };
 
 constexpr LiveQualityLadder kBalanced{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
     noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)),
-    background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f),
-    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f),
+    sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4),
+    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4),
 };
 
 constexpr LiveQualityLadder kEffectsFirst{
     rung(L::Ultra, 1.0f),
     cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2),
     plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)),
-    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
-               80.0f, 1.5f),
-    background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f),
+    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
+               80.0f, 1.5f), 4),
+    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4),
 };
 
 // ADR-1099: the profiles, rows of the same family. QUALITY is the tier. BALANCED spends nothing on what is small or far
@@ -175,6 +181,7 @@ void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::Quali
                                                                  : std::min(base.particleCullDistance,
                                                                             rung.particleCullDistance);
     q.particleSpawnScale = std::min(base.particleSpawnScale, rung.particleSpawnScale);
+    q.sdfShadowScale = std::max(base.sdfShadowScale, rung.sdfShadowScale); // ADR-1165
 }
 } // namespace
 
@@ -627,6 +634,8 @@ bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
     else if (lever == "nodof") c.depthOfField = false;
     else if (lever == "castercull") c.shadowCasterMinPixels = std::max(c.shadowCasterMinPixels, 24.0f);
     else if (lever == "shadowatlas1k") c.shadowResolution = std::min<std::uint32_t>(c.shadowResolution, 1024u);
+    else if (lever == "sdfshadowhalf") c.sdfShadowScale = std::max(c.sdfShadowScale, 2u);    // ADR-1165
+    else if (lever == "sdfshadowquarter") c.sdfShadowScale = std::max(c.sdfShadowScale, 4u); // ADR-1165
     else if (lever == "lodbias2") c.lodBias = std::max(c.lodBias, 2.0f);
     else if (lever == "drawdist75") c.drawDistanceScale = std::min(c.drawDistanceScale, 0.75f);
     else if (lever == "particlelod") {
@@ -656,6 +665,7 @@ std::string ceilingJsonText(const LiveQualityRung& c) {
     if (c.postEffectQuality != n.postEffectQuality) j["postEffectQuality"] = c.postEffectQuality;
     if (c.particleCullDistance != n.particleCullDistance) j["particleCullDistance"] = c.particleCullDistance;
     if (c.particleSpawnScale != n.particleSpawnScale) j["particleSpawnScale"] = c.particleSpawnScale;
+    if (c.sdfShadowScale != n.sdfShadowScale) j["sdfShadowScale"] = c.sdfShadowScale;
     return j.dump();
 }
 
@@ -684,6 +694,7 @@ std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std:
         else if (key == "postEffectQuality" && num) c.postEffectQuality = std::clamp(v.get<float>(), 0.125f, 1.0f);
         else if (key == "particleCullDistance" && num) c.particleCullDistance = std::max(v.get<float>(), 0.0f);
         else if (key == "particleSpawnScale" && num) c.particleSpawnScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
+        else if (key == "sdfShadowScale" && num) c.sdfShadowScale = std::clamp(v.get<std::uint32_t>(), 1u, 8u);
         else {
             error = "'" + key + "' is not a quality ceiling (or has the wrong type)";
             return std::nullopt;

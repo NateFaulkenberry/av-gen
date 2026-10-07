@@ -9,6 +9,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/sdf_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "spatial/sdf.hpp"
@@ -1506,29 +1507,15 @@ TEST_CASE("SDF raymarch throughput", "[.perf][sdf]") {
     }
 }
 
-// A probe, not an assertion, because what it found is a defect that is not fixed here.
+// The tier's SDF shadow budget reaches the shadow march, and the march reaches the shadow map.
 //
-// The §15/§16 parity audit went looking for a reader of `QualitySettings::sdfShadowSteps`, found
-// none (the march derived its own budget as `maxSteps / 4`), and wired it. This was meant to be the
-// test that the wiring reaches the picture. It does not -- and the reason is one layer down.
-//
-// `SdfRenderer::update` computes each raymarched object's screen-space quad, `sdf.rect`, from the
-// *camera's* view-projection, and `drawRaymarchDepth(..., reducedSteps = true)` reuses that same
-// rect when the shadow pass draws the object into a shadow map whose projection is the *light's*.
-// The ray the shader reconstructs is the light's (the frame block is), but the quad it reconstructs
-// it over is the camera's, so the march happens over the wrong region of the shadow map. Measured
-// here: switching the key light's shadow off with the SDF in place changes the frame by **zero**
-// bytes, so this object casts no shadow at all.
-//
-// ADR-034 says raymarched SDFs "appear in the depth prepass and in the shadow maps". The prepass
-// half is true -- that pass shares the camera's projection, which is exactly why the defect hides.
-//
-// The fix is a per-view rect (or the full-screen fallback the shader already has) in the shadow
-// pass, and it has a cost nobody has measured: a full shadow-map quad per SDF per cascade. That is
-// a decision with a number attached, so it is recorded rather than guessed at here.
-//
-// This probe passes when the defect is gone. Run it with `avgen_render_tests "[.probe][sdf]"`.
-TEST_CASE("A raymarched SDF does not reach the shadow map", "[.probe][gpu][sdf][quality]") {
+// This was a `[.probe]` that recorded a defect: `SdfRenderer::update` computed each raymarched object's screen quad
+// from the CAMERA's view-projection, and the shadow pass reused it inside the light's projection, so the march ran
+// over an unrelated region of the shadow map -- and from the camera's eye, because the shadow views keep the camera's
+// `frame.cameraPos`. Switching the light's shadow off changed the frame by zero bytes. ADR-1160 fixed both: the shadow
+// pipelines project the bounds with the view's own matrix (`vs_sdf_shadow`) and march from the view's near plane.
+// The parallel-ray and off-screen-caster cases are the test after this one.
+TEST_CASE("A raymarched SDF reaches the shadow map at the tier's shadow budget", "[gpu][sdf][quality]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
     rendering::SceneRenderer renderer(*ctx, shaders);
@@ -1619,4 +1606,183 @@ TEST_CASE("A raymarched SDF does not reach the shadow map", "[.probe][gpu][sdf][
     }
     INFO("pixels differing between an 8-step and a 1024-step SDF shadow march: " << differing);
     CHECK(differing > 0);
+}
+
+// ADR-1160: a raymarched SDF throws the same shadow a mesh does, from wherever the camera stands, including when the
+// caster itself is out of frame (a shadow whose caster is off screen is the oldest trick in the de Chirico book, and
+// before this it simply vanished: an off-screen SDF was dropped from every pass).
+TEST_CASE("A raymarched SDF casts the shadow a mesh casts, from any camera, caster on or off screen", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const glm::vec3 casterAt(-4.0f, 3.0f, -2.0f);
+    constexpr float kRadius = 1.2f;
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, -0.45f, 0.3f));
+    // Where the ray from the caster's centre along the light meets the ground (y = 0).
+    const glm::vec3 shadowAt = casterAt + lightDir * (casterAt.y / -lightDir.y);
+
+    const auto sceneWith = [&](int caster, const glm::vec3& eye) { // 0 none, 1 SDF, 2 mesh
+        scene::Scene s = baseScene();
+        s.lights.clear();
+        const scene::MeshId ground = s.addMesh(scene::makePlane(30.0f, 8));
+        auto& g = s.addEntity("ground", ground);
+        g.material.baseColor = glm::vec3(0.8f);
+        g.material.roughness = 0.9f;
+        scene::PunctualLight key;
+        key.name = "key";
+        key.type = scene::PunctualLight::Type::Directional;
+        key.direction = lightDir;
+        key.intensity = 4.0f;
+        key.castsShadow = true;
+        key.contactShadow = false;
+        s.addLight(key);
+        s.camera.position = eye;
+        s.camera.target = shadowAt;
+        if (caster == 1) {
+            scene::SdfObject o;
+            o.name = "caster";
+            o.tree = treeOf(sphere(kRadius));
+            o.transform.position = casterAt;
+            o.boundsMin = glm::vec3(-kRadius - 0.1f);
+            o.boundsMax = glm::vec3(kRadius + 0.1f);
+            s.sdfs.push_back(o);
+        } else if (caster == 2) {
+            const scene::MeshId ball = s.addMesh(scene::makeIcosphere(kRadius, 4));
+            auto& e = s.addEntity("caster", ball);
+            e.transform.position = casterAt;
+        }
+        return s;
+    };
+
+    // Three vantages: from above (the caster at the frame's corner), off to the side (caster and shadow both in
+    // frame), and close over the shadow from the far side, where the caster is in front of the eye plane but 60+
+    // degrees off the view axis (a caster BEHIND the eye plane is drawn full screen, conservatively, by design).
+    const std::array<glm::vec3, 3> eyes = {shadowAt + glm::vec3(0.0f, 9.0f, 0.5f), glm::vec3(6.0f, 5.0f, 7.0f),
+                                           shadowAt + glm::vec3(1.0f, 3.0f, 1.0f)};
+    for (std::size_t v = 0; v < eyes.size(); ++v) {
+        const auto none = renderWith(renderer, sceneWith(0, eyes[v]), 0.0, 160, 160);
+        const auto sdfShadow = renderWith(renderer, sceneWith(1, eyes[v]), 0.0, 160, 160);
+        if (v == 2) {
+            // Established, not assumed: the caster is off the camera's screen and was marched for the light alone.
+            CHECK(renderer.stats().sdf.raymarchObjects == 0);
+            CHECK(renderer.stats().sdf.shadowOnlyObjects == 1);
+        }
+        const auto meshShadow = renderWith(renderer, sceneWith(2, eyes[v]), 0.0, 160, 160);
+        CHECK(ctx->errorCount() == 0);
+        if (const char* dumpDir = std::getenv("AVGEN_DUMP_DIR")) {
+            const std::filesystem::path dir(dumpDir);
+            REQUIRE(gpu::writePpm(sdfShadow, dir / ("sdf_shadow_sdf_" + std::to_string(v) + ".ppm")).has_value());
+            REQUIRE(gpu::writePpm(meshShadow, dir / ("sdf_shadow_mesh_" + std::to_string(v) + ".ppm")).has_value());
+        }
+        // Pixels the caster darkens (by more than a few levels), and their centroid, for each caster.
+        const auto darkened = [&](const gpu::Image8& img, glm::vec2& centroid) {
+            long n = 0;
+            glm::dvec2 sum(0.0);
+            for (std::uint32_t y = 0; y < img.height; ++y) {
+                for (std::uint32_t x = 0; x < img.width; ++x) {
+                    if (int(none.pixel(x, y)[1]) - int(img.pixel(x, y)[1]) > 12) {
+                        ++n;
+                        sum += glm::dvec2(x, y);
+                    }
+                }
+            }
+            centroid = n > 0 ? glm::vec2(sum / double(n)) : glm::vec2(-1.0f);
+            return n;
+        };
+        glm::vec2 cs{}, cm{};
+        const long ns = darkened(sdfShadow, cs);
+        const long nm = darkened(meshShadow, cm);
+        INFO("vantage " << v << ": SDF darkens " << ns << " px around (" << cs.x << ", " << cs.y << "), the mesh " << nm
+                        << " px around (" << cm.x << ", " << cm.y << ")");
+        REQUIRE(nm > 200); // the mesh caster's shadow is in frame, so the comparison means something
+        CHECK(ns > nm * 3 / 4);
+        CHECK(ns < nm * 5 / 4);
+        CHECK(glm::length(cs - cm) < 4.0f);
+    }
+}
+
+// ADR-1165: a raymarched caster marched at half or a quarter of the shadow map's resolution and composited in throws the
+// shadow the full-resolution march throws -- the same area, in the same place -- and the low-resolution side is really
+// what drew it (the stats name the low layer's size; at scale 1 there is none).
+TEST_CASE("A raymarched SDF's shadow marched at a fraction of the map is the full-resolution shadow", "[gpu][sdf]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const glm::vec3 casterAt(-4.0f, 3.0f, -2.0f);
+    constexpr float kRadius = 1.2f;
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, -0.45f, 0.3f));
+    const glm::vec3 shadowAt = casterAt + lightDir * (casterAt.y / -lightDir.y);
+    const auto sceneWith = [&](bool caster) {
+        scene::Scene s = baseScene();
+        s.lights.clear();
+        const scene::MeshId ground = s.addMesh(scene::makePlane(30.0f, 8));
+        auto& g = s.addEntity("ground", ground);
+        g.material.baseColor = glm::vec3(0.8f);
+        g.material.roughness = 0.9f;
+        scene::PunctualLight key;
+        key.name = "key";
+        key.type = scene::PunctualLight::Type::Directional;
+        key.direction = lightDir;
+        key.intensity = 4.0f;
+        key.castsShadow = true;
+        key.contactShadow = false;
+        s.addLight(key);
+        s.camera.position = glm::vec3(6.0f, 5.0f, 7.0f);
+        s.camera.target = shadowAt;
+        if (caster) {
+            scene::SdfObject o;
+            o.name = "caster";
+            o.tree = treeOf(sphere(kRadius));
+            o.transform.position = casterAt;
+            o.boundsMin = glm::vec3(-kRadius - 0.1f);
+            o.boundsMax = glm::vec3(kRadius + 0.1f);
+            s.sdfs.push_back(o);
+        }
+        return s;
+    };
+    const auto renderAt = [&](std::uint32_t scale, bool caster, std::uint32_t& marched) {
+        rendering::QualitySettings held = rendering::QualitySettings::forTier(rendering::QualityTier::High);
+        held.sdfShadowScale = scale;
+        renderer.setQualitySettings(held);
+        auto img = renderWith(renderer, sceneWith(caster), 0.0, 192, 192);
+        marched = renderer.stats().sdf.shadowMarchResolution;
+        return img;
+    };
+    std::uint32_t marched = 0;
+    const auto none = renderAt(1, false, marched);
+    const auto darkened = [&](const gpu::Image8& img, glm::vec2& centroid) {
+        long n = 0;
+        glm::dvec2 sum(0.0);
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                if (int(none.pixel(x, y)[1]) - int(img.pixel(x, y)[1]) > 12) {
+                    ++n;
+                    sum += glm::dvec2(x, y);
+                }
+            }
+        }
+        centroid = n > 0 ? glm::vec2(sum / double(n)) : glm::vec2(-1.0f);
+        return n;
+    };
+    const auto full = renderAt(1, true, marched);
+    CHECK(marched == 0); // scale 1: the march goes straight into the map, as before
+    glm::vec2 cf{};
+    const long nf = darkened(full, cf);
+    REQUIRE(nf > 200);
+    for (const std::uint32_t scale : {2u, 4u}) {
+        const auto low = renderAt(scale, true, marched);
+        CHECK(ctx->errorCount() == 0);
+        CHECK(marched >= rendering::SdfRenderer::kMinLowResShadow); // the low side drew it
+        glm::vec2 cl{};
+        const long nl = darkened(low, cl);
+        INFO("scale " << scale << " (low layer " << marched << " texels): darkens " << nl << " px around (" << cl.x << ", "
+                      << cl.y << "); full resolution " << nf << " px around (" << cf.x << ", " << cf.y << ")");
+        CHECK(nl > nf * 9 / 10);
+        CHECK(nl < nf * 11 / 10);
+        CHECK(glm::length(cl - cf) < 1.5f);
+    }
 }

@@ -1810,6 +1810,13 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         // cannot disagree is not agreement.
         {"shadowatlas1k", [](QualitySettings& q) { q.shadowResolution = 1024; },
          "shadowResolution=1024 (the control arm: it must move the masked and unmasked frames alike)"},
+        // ADR-1165: the raymarched casters' shadow march at the map's own resolution, at half, at a quarter.
+        {"sdfshadowfull", [](QualitySettings& q) { q.sdfShadowScale = 1; },
+         "sdfShadowScale=1 (raymarched SDF casters marched at the shadow map's own resolution)"},
+        {"sdfshadowhalf", [](QualitySettings& q) { q.sdfShadowScale = 2; },
+         "sdfShadowScale=2 (raymarched SDF casters marched at half the shadow map's resolution)"},
+        {"sdfshadowquarter", [](QualitySettings& q) { q.sdfShadowScale = 4; },
+         "sdfShadowScale=4 (raymarched SDF casters marched at a quarter, never under 512 texels)"},
         // ADR-133: the two material tiers, forced on every draw. These are *ceilings on the
         // saving*, not shippable configurations -- a shipping frame assigns the tier per draw from
         // importance, so only the small and distant reach it. Forcing the whole frame is how the
@@ -4028,9 +4035,37 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // §16 / ADR-034: the shadow march's step budget, which the tier table has always set and
     // nothing has ever read. Per frame, for the same reason the cull ladder's hysteresis is.
     sdfs_->setSdfShadowSteps(qualitySettings_.sdfShadowSteps);
+    sdfs_->setSdfShadowScale(qualitySettings_.sdfShadowScale); // ADR-1165
     sdfs_->update(scene, time, frame.viewProj, fields_.get(), particles_.get()); // ADR-1142: density sources
     stats_.sdf = sdfs_->stats();
     stage(cpu.sdfMs);
+
+    // ---- ADR-1165: the raymarched casters, marched at a fraction of the shadow map's resolution ----
+    // One depth-only pass per view into a low-resolution layer, with that view's own frame block: the same pipelines
+    // and the same view-projection as the full-resolution march, so each low texel holds the depth a full texel at its
+    // centre would. The view's pass below then composites it in instead of marching. Off (the march at full
+    // resolution, as before) when the tier's `sdfShadowScale` is 1 or there is no raymarched caster.
+    const bool sdfShadowLow = shadowViews > 0 && sdfs_->prepareLowResShadows(scene, shadowViews, shadows_->resolution());
+    if (sdfShadowLow) {
+        for (std::uint32_t v = 0; v < shadowViews; ++v) {
+            wgpu::RenderPassDepthStencilAttachment depth{};
+            depth.view = sdfs_->lowResShadowLayer(v);
+            depth.depthLoadOp = wgpu::LoadOp::Clear;
+            depth.depthStoreOp = wgpu::StoreOp::Store;
+            depth.depthClearValue = 1.0f;
+            wgpu::RenderPassDescriptor pass{};
+            pass.label = "sdf-shadow-low";
+            pass.colorAttachmentCount = 0;
+            pass.depthStencilAttachment = &depth;
+            pass.timestampWrites = timeline_->mark("shadow", gpu::FrameTimeline::PassKind::Render);
+            wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+            rp.SetBindGroup(0, shadowFrameGroups_[v]);
+            rp.SetBindGroup(3, iblBindGroup_);
+            sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
+                                     true);
+            rp.End();
+        }
+    }
 
     // ---- shadow depth passes (ADR-034): one per cascade / spot map, depth only ----
     // Every caster is drawn with its ordinary vertex shader against a frame block whose
@@ -4097,8 +4132,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
                           &depthOnlyPipeline_);
         procedurals_->drawShadow(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
-        sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
-                                 true);
+        if (sdfShadowLow) {
+            sdfs_->drawShadowComposite(rp, v); // ADR-1165
+        } else {
+            sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
+                                     true);
+        }
         rp.End();
     }
     stage(cpu.shadowEncodeMs);

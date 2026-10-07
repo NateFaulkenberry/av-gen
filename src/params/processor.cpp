@@ -300,6 +300,8 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
     // reset has dt = 0 (ADR-521) and adds nothing.
     if (integrate) {
         state.integral += static_cast<double>(y) * dt;
+        // ADR-1161: a bounded integral saturates in its state, not only in its output.
+        state.integral = std::clamp(state.integral, static_cast<double>(integrateMin), static_cast<double>(integrateMax));
         y = static_cast<float>(state.integral);
     }
     return y;

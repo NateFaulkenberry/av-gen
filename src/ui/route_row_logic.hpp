@@ -81,12 +81,14 @@ struct RouteBadge {
     for (const float f : {r.amount, r.depthMin, r.depthMax, r.chain.delayMs, r.chain.gain, r.chain.offset,
                           r.chain.curveAmount, r.chain.clampMin, r.chain.clampMax, r.chain.thresholdLevel,
                           r.chain.attackMs, r.chain.decayMs, r.chain.envelopeHoldMs, r.chain.envelopeFallPerSecond,
-                          r.chain.remapInMin, r.chain.remapInMax, r.chain.remapOutMin, r.chain.remapOutMax}) {
+                          r.chain.remapInMin, r.chain.remapInMax, r.chain.remapOutMin, r.chain.remapOutMax,
+                          r.chain.springHz, r.chain.springDamping, r.chain.integrateMin, r.chain.integrateMax}) {
         mixFloat(f);
     }
     const std::uint8_t kinds[] = {static_cast<std::uint8_t>(r.chain.curve), static_cast<std::uint8_t>(r.chain.threshold),
                                   static_cast<std::uint8_t>(r.chain.envelope),
-                                  static_cast<std::uint8_t>((r.chain.clampEnabled ? 1 : 0) | (r.chain.remapEnabled ? 2 : 0))};
+                                  static_cast<std::uint8_t>((r.chain.clampEnabled ? 1 : 0) | (r.chain.remapEnabled ? 2 : 0) |
+                                                            (r.chain.integrate ? 4 : 0))};
     mixBytes(kinds, sizeof kinds);
     return h;
 }

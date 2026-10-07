@@ -131,6 +131,7 @@ enum class TempoSource { Analysis, MidiClock };
 struct EngineStats {
     double analysisHopMicros = 0.0;
     std::uint64_t analysisFrames = 0;
+    std::uint64_t controlReplays = 0; // ADR-1168: seeks that replayed the control layer
     double modulationMicros = 0.0;
     // Where the per-frame update's heap allocations come from, counted with the interposed
     // counters in core/phase_profiler.hpp. An idle editor that allocates hundreds of times a frame
@@ -864,6 +865,8 @@ public:
     void togglePlay();
     void stop();
     void seekSeconds(double seconds);
+    // ADR-1168: replay the sources, the scene states and the routes from zero to `target` (seekSeconds calls it).
+    void replayControl(double target);
 
     // ---- the interactive seek (ADR-084's policy, applied to the playhead) ---------------------
     //

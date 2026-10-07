@@ -768,6 +768,14 @@ TEST_CASE("ADR-036 ops match the CPU interpreter", "[material][gpu]") {
         o.constant = {0.4f, -0.2f, 0.7f, 0.0f};
         batch.push_back(probe("voronoiEdge", {inputOp(MaterialInput::WorldPosition, 0), o}));
     }
+    {
+        // ADR-1162: the cell centre and the per-cell random, against the CPU twin.
+        MaterialOp o = op(MaterialOpKind::Quantize, 7, 0);
+        o.value = 3.0f;
+        o.seed = 17;
+        o.constant = {0.25f, 0.0f, -0.5f, 0.0f};
+        batch.push_back(probe("quantize", {inputOp(MaterialInput::WorldPosition, 0), o}));
+    }
     checkParity(harness, batch, noFields, 0.0, 1e-3f);
     CHECK(ctx->errorCount() == 0);
 }

@@ -4512,6 +4512,9 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     cameraSplineT_ = &params.add(floatDesc(prefix_ + "camera/splineT", 0.0f, -10.0f, 10.0f, 0.0f, 1.0f));
     cameraLookAhead_ = &params.add(floatDesc(prefix_ + "camera/lookAhead", 2.0f, -100.0f, 100.0f, 0.0f, 10.0f));
     cameraSplineOffset_ = &params.add(vec3Desc(prefix_ + "camera/splineOffset", glm::vec3(0.0f), -1e3f, 1e3f, -5.0f, 5.0f));
+    // ADR-1166: a spline camera banks into its turns: degrees of roll per radian the path's heading turns over the
+    // look-ahead. 0 (the default) keeps the world's up, as before.
+    cameraSplineBank_ = &params.add(floatDesc(prefix_ + "camera/splineBank", 0.0f, -90.0f, 90.0f, 0.0f, 40.0f));
     // Camera shake (ADR-098). Ordinary parameters, so a beat drives the amplitude through an
     // ordinary modulation route and a sequence keys it like anything else; `start` carries the
     // second the impulse began so the decay is `now - start` rather than an accumulated timer.
@@ -5893,6 +5896,7 @@ void Composition::detach() {
     cameraOrbitPivotWeight_ = nullptr;
     cameraSplineT_ = nullptr;
     cameraLookAhead_ = nullptr;
+    cameraSplineBank_ = nullptr;
     cameraSplineOffset_ = nullptr;
     materialParams_.clear();
     cameraFov_ = nullptr;
@@ -7930,6 +7934,38 @@ JourneyPose Composition::guardJourneyPose(JourneyPose pose, std::size_t chapter)
     return pose;
 }
 
+float Composition::splineBankDegrees() const {
+    // ADR-1166: how far the spline's heading turns between the camera and the point it looks at, seen from above
+    // (positive = turning left, counter-clockwise), times the bank. The camera leans into the turn: a left turn rolls
+    // the up vector left. Clamped to 45 degrees, so a hairpin cannot roll the horizon over.
+    const float bank = cameraSplineBank_ != nullptr ? cameraSplineBank_->value() : 0.0f;
+    const int cameraMode = cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_;
+    if (bank == 0.0f || cameraMode != 2 || cameraSplineSetting_.empty()) {
+        return 0.0f;
+    }
+    const spatial::Spline* spline = scene_.splines.find(prefixed(sanitise(prefix_), cameraSplineSetting_));
+    if (spline == nullptr) {
+        return 0.0f;
+    }
+    const float length = spline->length();
+    const float tRaw = cameraSplineT_ != nullptr ? cameraSplineT_->value() : 0.0f;
+    const float t = spline->closed ? tRaw - std::floor(tRaw) : std::clamp(tRaw, 0.0f, 1.0f);
+    const float lookAhead = cameraLookAhead_ != nullptr ? cameraLookAhead_->value() : 2.0f;
+    const glm::vec3 a = spline->sampleByDistance(t * length).tangent;
+    const glm::vec3 b = spline->sampleByDistance(t * length + lookAhead).tangent;
+    const glm::vec2 ha(a.x, a.z);
+    const glm::vec2 hb(b.x, b.z);
+    if (glm::dot(ha, ha) < 1e-8f || glm::dot(hb, hb) < 1e-8f) {
+        return 0.0f;
+    }
+    // atan2 of the cross and dot of the two headings; with +X right and +Z toward the viewer, a turn from -Z toward
+    // -X (left) has a positive (z-x) cross, so negate to read left as positive about +Y.
+    const float turn = -std::atan2(ha.x * hb.y - ha.y * hb.x, glm::dot(ha, hb));
+    // camera/roll turns the up vector about the line of sight, positive toward the right of frame for a camera looking
+    // down -Z; leaning INTO a left turn tilts the up vector left, so a left turn is a negative roll.
+    return std::clamp(-bank * turn, -45.0f, 45.0f);
+}
+
 CameraPose Composition::evaluateMainCamera() const {
     // Byte for byte the placement this file has always done, moved into a function so the camera
     // director can ask for it like it asks for any other camera's. Orbit lives only here: it
@@ -8913,7 +8949,8 @@ void Composition::applyParameters() {
     scene_.camera.fovYRadians = glm::radians(fov);
     // ADR-1075: camera/roll turns the up vector about the line of sight; 0 is the world's up exactly.
     {
-        const float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
+        float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
+        roll += splineBankDegrees(); // ADR-1166
         glm::vec3 up(0.0f, 1.0f, 0.0f);
         const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
         if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {

@@ -105,7 +105,8 @@ struct QualityPolicy {
                settings.lodBias == 1.0f && settings.drawDistanceScale == 1.0f &&
                settings.shadowCasterMinPixels == 0.0f && settings.postEffectQuality == 1.0f &&
                settings.particleCullDistance == 0.0f && settings.particleSpawnScale == 1.0f &&
-               !settings.materialProgramsOff;
+               !settings.materialProgramsOff &&
+               settings.sdfShadowScale == 1; // ADR-1165: every shadow texel of a raymarched caster marched
     }
 };
 

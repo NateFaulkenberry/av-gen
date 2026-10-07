@@ -38,6 +38,7 @@
 #include <optional>
 #include <string_view>
 #include <cmath>
+#include <limits>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -1769,6 +1770,31 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(140);
             ImGui::SliderFloat("decay ms", &route.chain.decayMs, 0.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            // ADR-1041 / ADR-1161: the integrate stage and its bounds (a rate becomes a position; a bounded one
+            // saturates and recovers at once -- a charge, a dose).
+            ImGui::Checkbox("integrate", &route.chain.integrate);
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted("The route outputs the running integral of the chain's value over time: a rate "
+                                   "becomes a position. Bounded, it saturates at a bound and turns back as soon as "
+                                   "the rate changes sign.");
+            }
+            if (route.chain.integrate) {
+                bool bounded = std::isfinite(route.chain.integrateMin) || std::isfinite(route.chain.integrateMax);
+                ImGui::SameLine();
+                if (ImGui::Checkbox("bounded", &bounded)) {
+                    route.chain.integrateMin = bounded ? 0.0f : -std::numeric_limits<float>::infinity();
+                    route.chain.integrateMax = bounded ? 1.0f : std::numeric_limits<float>::infinity();
+                }
+                if (bounded) {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(160);
+                    float bounds[2] = {route.chain.integrateMin, route.chain.integrateMax};
+                    if (ImGui::DragFloat2("min/max", bounds, 0.01f)) {
+                        route.chain.integrateMin = std::min(bounds[0], bounds[1]);
+                        route.chain.integrateMax = std::max(bounds[0], bounds[1]);
+                    }
+                }
+            }
             // ADR-900: the delay stage and the depth source.
             ImGui::SetNextItemWidth(140);
             ImGui::SliderFloat("delay ms", &route.chain.delayMs, 0.0f, ProcessorChain::kMaxDelayMs, "%.0f",

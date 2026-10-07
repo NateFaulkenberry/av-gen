@@ -55,12 +55,14 @@ const char* triggerKindName(TriggerKind k) {
     case TriggerKind::Phrase: return "phrase";
     case TriggerKind::Section: return "section";
     case TriggerKind::Cue: return "cue";
+    case TriggerKind::Elapsed: return "elapsed";
     }
     return "manual";
 }
 std::optional<TriggerKind> triggerKindFromName(std::string_view n) {
     for (auto k : {TriggerKind::Manual, TriggerKind::Beat, TriggerKind::Bar, TriggerKind::Onset, TriggerKind::Signal,
-                   TriggerKind::Macro, TriggerKind::Phrase, TriggerKind::Section, TriggerKind::Cue}) {
+                   TriggerKind::Macro, TriggerKind::Phrase, TriggerKind::Section, TriggerKind::Cue,
+                   TriggerKind::Elapsed}) {
         if (n == triggerKindName(k)) return k;
     }
     return std::nullopt;
@@ -114,12 +116,14 @@ void StateMachine::beginTransition(const SceneState& state, params::ParameterSet
     if (instant || state.transition.seconds <= 0.0) {
         params::applyPreset(params, *preset);
         current_ = state.name;
+        enteredSeconds_ = seconds;
         pending_.clear();
         progress_ = 1.0f;
         waitUntil_ = -1.0;
         return;
     }
     from_ = params::capturePreset(params, "state-from");
+    blendFor_.clear(); // ADR-1168: a new transition resolves its blend afresh
     pending_ = state.name;
     progress_ = 0.0f;
     startSeconds_ = seconds;
@@ -234,13 +238,25 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
                 if (auto id = bus.find(name)) {
                     value = bus.value(*id);
                     const float last = lastSignal_[mySlot];
-                    fired = t.falling ? (last >= t.threshold && value < t.threshold)
-                                      : (last < t.threshold && value >= t.threshold);
+                    if (t.hold) { // ADR-1164: while the condition holds
+                        fired = t.falling ? value < t.threshold : value >= t.threshold;
+                    } else {
+                        fired = t.falling ? (last >= t.threshold && value < t.threshold)
+                                          : (last < t.threshold && value >= t.threshold);
+                    }
                 }
                 break;
             }
+            case TriggerKind::Elapsed:
+                // ADR-1164: the committed state has lasted `threshold` seconds (never mid-transition).
+                fired = pending_.empty() && pendingQuantized_.empty() && !current_.empty() &&
+                        seconds - enteredSeconds_ >= static_cast<double>(t.threshold);
+                break;
             }
             lastSignal_[mySlot] = value;
+            if (t.idle && (!pending_.empty() || !pendingQuantized_.empty())) {
+                fired = false; // ADR-1164: an idle trigger waits for the running transition to land
+            }
             if (fired && fromOk && fire.empty() && target != current_ && target != pending_) {
                 fire = target;
             }
@@ -263,13 +279,44 @@ void StateMachine::update(double seconds, double dt, const signals::SignalBus& b
         if (t >= 1.0f) {
             params::applyPreset(params, *preset);
             current_ = pending_;
+            enteredSeconds_ = seconds;
             pending_.clear();
             progress_ = 1.0f;
         } else {
             progress_ = std::max(0.0f, t);
             const float eased = easeTransition(state->transition.easing, progress_, state->transition.bezierC0,
                                                state->transition.bezierC1);
-            params::applyPresetBlend(params, from_, *preset, eased);
+            // ADR-1168: only what the target preset names is blended, from the values captured when the transition
+            // began. The general blend also re-applied every captured parameter the target does not name (its
+            // value at the start, every frame) and rebuilt the union of both presets' paths per frame: ~3,900
+            // parameters a frame on DIGITAL MOSH, 0.7 ms, which a seek's control replay pays thousands of times.
+            if (blendFor_ != pending_ || blendSet_ != &params || blendParams_ != params.size()) {
+                blend_.clear();
+                for (const auto& [path, target] : preset->values) {
+                    params::IParameter* param = params.find(path);
+                    if (param == nullptr) {
+                        continue;
+                    }
+                    const auto start = from_.values.find(path);
+                    BlendItem item;
+                    item.param = param;
+                    const std::size_t count = std::min(param->componentCount(), target.size());
+                    for (std::size_t i = 0; i < count; ++i) {
+                        item.from.push_back(start != from_.values.end() && i < start->second.size() ? start->second[i]
+                                                                                                    : target[i]);
+                        item.to.push_back(target[i]);
+                    }
+                    blend_.push_back(std::move(item));
+                }
+                blendFor_ = pending_;
+                blendSet_ = &params;
+                blendParams_ = params.size();
+            }
+            for (const BlendItem& item : blend_) {
+                for (std::size_t i = 0; i < item.to.size(); ++i) {
+                    item.param->setBaseComponent(i, item.from[i] + (item.to[i] - item.from[i]) * eased);
+                }
+            }
         }
     }
 }
@@ -293,6 +340,8 @@ nlohmann::json StateMachine::toJson() const {
             if (!t.signal.empty()) tj["signal"] = t.signal;
             tj["threshold"] = t.threshold;
             if (t.falling) tj["falling"] = true;
+            if (t.hold) tj["hold"] = true; // ADR-1164
+            if (t.idle) tj["idle"] = true;
             tj["every"] = t.every;
             if (!t.fromState.empty()) tj["from"] = t.fromState;
             if (!t.target.empty()) tj["target"] = t.target;
@@ -358,6 +407,8 @@ Result<void> StateMachine::fromJson(const nlohmann::json& j) {
                     if (tj.contains("signal") && tj["signal"].is_string()) t.signal = tj["signal"].get<std::string>();
                     if (tj.contains("threshold") && tj["threshold"].is_number()) t.threshold = tj["threshold"].get<float>();
                     if (tj.contains("falling") && tj["falling"].is_boolean()) t.falling = tj["falling"].get<bool>();
+                    if (tj.contains("hold") && tj["hold"].is_boolean()) t.hold = tj["hold"].get<bool>(); // ADR-1164
+                    if (tj.contains("idle") && tj["idle"].is_boolean()) t.idle = tj["idle"].get<bool>();
                     if (tj.contains("every") && tj["every"].is_number_integer()) t.every = std::max(1, tj["every"].get<int>());
                     if (tj.contains("from") && tj["from"].is_string()) t.fromState = tj["from"].get<std::string>();
                     if (tj.contains("target") && tj["target"].is_string()) t.target = tj["target"].get<std::string>();

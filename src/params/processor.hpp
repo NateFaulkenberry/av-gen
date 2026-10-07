@@ -76,6 +76,11 @@ struct ProcessorChain {
     // travelled, a flow speed becomes a phase. The output never jumps whatever the input does, and a
     // zero rate holds it still. Seeks replay it like every other chain state (ADR-901).
     bool integrate = false;
+    // ADR-1161: the integral's bounds. The running total itself is clamped to [integrateMin, integrateMax] every
+    // frame, so it saturates and recovers at once: a rate that has pushed it to a bound for a minute moves it away
+    // the moment the rate changes sign (a dose that charges and heals). The default is unbounded (ADR-1041).
+    float integrateMin = -std::numeric_limits<float>::infinity();
+    float integrateMax = std::numeric_limits<float>::infinity();
 
     // One sample of the delay stage's history: the chain's input at `time` on the chain's own clock.
     struct DelaySample {

@@ -237,7 +237,11 @@ void GridField::step(float dt, double time, const FieldSet* set) {
                         }
                     } else {
                         const float s = std::max(0.0f, spatial::sampleScalar(*inject, centre, time, set));
-                        data[base + static_cast<std::size_t>(channel)] += injectRate * dt * s;
+                        float& cell = data[base + static_cast<std::size_t>(channel)];
+                        cell += injectRate * dt * s;
+                        if (mode == GridMode::Scalar && ceiling > 0.0f) {
+                            cell = std::min(cell, ceiling); // ADR-1163
+                        }
                     }
                 }
             }
@@ -422,6 +426,9 @@ std::uint64_t GridField::structuralHash() const {
     h.i32(maxSubSteps);
     h.u32(seed);
     h.f32(seedAmount);
+    if (ceiling != 0.0f) { // ADR-1163: hashed only when set, so every other grid keeps its hash
+        h.f32(ceiling);
+    }
     if (mode == GridMode::Agents) { // ADR-1120: hashed only for agents, so every other grid keeps its hash
         h.i32(agentCount);
         h.i32(species);
@@ -452,6 +459,9 @@ json GridField::toJson() const {
     j["diffusion"] = diffusion;
     j["diffuseIterations"] = diffuseIterations;
     j["dissipation"] = dissipation;
+    if (ceiling != 0.0f) {
+        j["ceiling"] = ceiling; // ADR-1163: written only when set
+    }
     j["feed"] = feed;
     j["kill"] = kill;
     j["diffusionA"] = diffusionA;
@@ -507,6 +517,7 @@ Result<GridField> GridField::fromJson(const json& root) {
     AVGEN_SPATIAL_READ(g.diffusion, "diffusion", detail::readFloat);
     AVGEN_SPATIAL_READ(g.diffuseIterations, "diffuseIterations", detail::readInt);
     AVGEN_SPATIAL_READ(g.dissipation, "dissipation", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.ceiling, "ceiling", detail::readFloat); // ADR-1163; absent = 0, unbounded
     AVGEN_SPATIAL_READ(g.feed, "feed", detail::readFloat);
     AVGEN_SPATIAL_READ(g.kill, "kill", detail::readFloat);
     AVGEN_SPATIAL_READ(g.diffusionA, "diffusionA", detail::readFloat);

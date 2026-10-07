@@ -13,6 +13,7 @@
 // here as `grid/<name>/<leaf>`:
 //
 //   every grid   injectRate, advect, diffusion, dissipation
+//   scalar       ceiling (ADR-1163)
 //   rd           feed, kill, diffusionA, diffusionB
 //   agents       sensorAngle, sensorDistance, turnAngle, stepSize, depositAmount, repel
 //

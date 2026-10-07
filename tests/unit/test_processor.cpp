@@ -1,4 +1,7 @@
 #include "params/processor.hpp"
+#include "params/serialization.hpp"
+
+#include <nlohmann/json.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -270,4 +273,56 @@ TEST_CASE("Stages run in the fixed order", "[processor]") {
     CHECK(chain.process(0.4f, false, 0.01, state) == 0.0f);  // 0.3 < 0.5
     CHECK(chain.process(0.5f, false, 0.01, state) == 10.0f); // 0.5 -> 1 -> 10
     CHECK(chain.process(5.0f, false, 0.01, state) == 10.0f); // clamped before threshold
+}
+
+// ADR-1161: a bounded integral saturates in its state, so it turns back the moment the rate changes sign -- a dose
+// that a minute of loud music fills and a breakdown starts to drain at once.
+TEST_CASE("Integrate with bounds saturates in its state and recovers at once", "[processor][adr1161]") {
+    ProcessorChain chain;
+    chain.integrate = true;
+    chain.integrateMin = 0.0f;
+    chain.integrateMax = 1.0f;
+    ProcessorChain::State s;
+    (void)chain.process(0.0f, false, 0.0, s);
+    // 60 s at +0.5/s would be 30 unbounded; bounded it sits at 1.
+    CHECK(d(run(chain, s, 0.5f, 1.0 / 60.0, 3600)) == 1.0);
+    // One second at -0.25/s takes it straight down from the bound: no minute of "debt" to pay back first.
+    CHECK_THAT(d(run(chain, s, -0.25f, 1.0 / 60.0, 60)), WithinAbs(0.75, 1e-4));
+    // And it floors at 0, then rises at once.
+    CHECK(d(run(chain, s, -1.0f, 1.0 / 60.0, 600)) == 0.0);
+    CHECK_THAT(d(run(chain, s, 0.5f, 1.0 / 60.0, 60)), WithinAbs(0.5, 1e-4));
+
+    // Unbounded (the default) is ADR-1041's integral, unchanged.
+    ProcessorChain open;
+    open.integrate = true;
+    ProcessorChain::State o;
+    (void)open.process(0.0f, false, 0.0, o);
+    CHECK_THAT(d(run(open, o, 0.5f, 1.0 / 60.0, 3600)), WithinAbs(30.0, 1e-3));
+}
+
+TEST_CASE("Integrate bounds round-trip through JSON, absent means unbounded, and a crossed pair is refused",
+          "[processor][adr1161]") {
+    ProcessorChain chain;
+    chain.integrate = true;
+    chain.integrateMin = -0.5f;
+    chain.integrateMax = 2.0f;
+    const nlohmann::json j = chainToJson(chain);
+    CHECK(j.at("integrateMin").get<double>() == -0.5);
+    CHECK(j.at("integrateMax").get<double>() == 2.0);
+    const auto back = chainFromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->integrateMin == -0.5f);
+    CHECK(back->integrateMax == 2.0f);
+
+    const nlohmann::json plain = chainToJson(ProcessorChain{});
+    CHECK_FALSE(plain.contains("integrateMin"));
+    CHECK_FALSE(plain.contains("integrateMax"));
+    const auto unbounded = chainFromJson(plain);
+    REQUIRE(unbounded.has_value());
+    CHECK(std::isinf(unbounded->integrateMin));
+    CHECK(std::isinf(unbounded->integrateMax));
+
+    nlohmann::json crossed = j;
+    crossed["integrateMin"] = 3.0;
+    CHECK_FALSE(chainFromJson(crossed).has_value());
 }
