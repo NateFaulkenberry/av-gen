@@ -103,6 +103,32 @@ failures against §16 are listed in the CP1 status: the haze washes the darkness
 surroundings (except through the expensive light pools), the mats read as pebbles, river artifacts, and no
 propagation yet.
 
+### 3.1 What the cost is (A/B, same camera, 1080p realtime, GPU p50 ms, under the lock)
+
+Scene variants of `06-flight` (`cp1/ab-*.json`, built from the still's scene by deleting or changing one thing):
+
+| Variant | Frame | Scene pass | Volume march | Depth |
+|---|---|---|---|---|
+| base (run twice) | 76.2 / 73.0 | 44.3 / 41.9 | 24.7 / 24.3 | 5.05 |
+| emitter parts removed (beads, polyps, chains, tips, pods) | 53.2 | 25.0 | 24.5 | 1.90 |
+| emitter parts `unlit` | 74.5 | 42.4 | 24.5 | 5.05 |
+| the 139 point lights removed (moon only) | 53.4 | 35.4 | 11.3 | 5.05 |
+| `volumeLocalLights` 0 | 68.0 | 41.9 | 19.3 | 5.05 |
+| no medium (`volumeDensity` 0) | 48.3 | 41.8 | — | 5.05 |
+| emitter parts only (no bodies) | 61.2 | 32.2 | 24.2 | 3.41 |
+
+**Findings:**
+1. **The micro-emitters cost about 22 ms** (19 in the lit pass, 3 in the depth prepass), and making them unlit saves
+   nothing (42.4 against 44.3). Their cost is the **rasterisation of sub-pixel geometry**, not their shading: a
+   20-triangle icosphere per polyp, quad overdraw. No material or light setting can fix it. That is a
+   representation problem, so it needs a different representation: points accumulated in compute.
+2. **The light pools cost about 22 ms:** 9 in the lit pass (clustered shading with 139 lights) and 13 in the medium.
+   They are also capped at 224 lights per scene. "Thousands of small sources collectively lighting the canyon"
+   (§3) cannot be lights. It has to be a field the surfaces and the haze read.
+3. **The medium alone is 11 ms** at the realtime tier (32 steps to 900 m).
+4. **Bodies cost about 12 ms** of the lit pass at this density. They are ordinary instanced meshes, and they can
+   stay conventional if they stop paying for 139 lights.
+
 ## 4. The next measurements (to decide what is specialised, not to assume it)
 
 | Question | Experiment |
