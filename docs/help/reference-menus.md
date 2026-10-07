@@ -28,7 +28,8 @@ Three menus. Everything else in AV Gen is a panel control.
 | Save Scene As... | | write the current scene |
 | New Project | | |
 | Open Project... | | |
-| Examples ▸ | | the shipped projects, grouped by category; disabled when none are found |
+| Live Projects ▸ | | the shipped projects made to be played with live audio and MIDI, grouped by family; opening one turns live input on |
+| Examples ▸ | | the other shipped projects, grouped by category; disabled when none are found |
 | Open Recent ▸ | | up to ten; disabled when empty |
 | Save Project | *(shows `Cmd+S`, which is not bound)* | save to the current path; disabled until the project has one |
 | Save Project As... | | |

@@ -722,6 +722,61 @@ TEST_CASE("Every example in the index exists and loads", "[integration][project]
 #endif
 }
 
+// File > Live Projects lists the index entries marked `"live": true`. What makes a project one to play is its own
+// `sonic.live` (ADR-1025: opening it turns live input on), so the flag and the project must agree both ways: a live
+// entry whose project would open with live input off is a dead item in a performer's menu, and a `sonic.live` project
+// anywhere under examples/ that the index does not list as live is one the owner made and the menu forgot.
+TEST_CASE("Live Projects lists exactly the sonic.live projects", "[integration][project][examples][live]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path examples = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples";
+    const auto listed = app::loadExampleIndex(examples / "index.json");
+    INFO((listed ? std::string() : listed.error().message));
+    REQUIRE(listed.has_value());
+
+    const auto sonicLive = [](const std::filesystem::path& file) {
+        std::ifstream in(file);
+        const auto doc = nlohmann::json::parse(in, nullptr, false);
+        if (!doc.is_object() || doc.value("format", std::string()) != "avgen-project") {
+            return false;
+        }
+        const auto s = doc.find("sonic");
+        return s != doc.end() && s->is_object() && s->value("live", false);
+    };
+
+    std::set<std::filesystem::path> liveEntries;
+    for (const app::ExampleInfo& info : *listed) {
+        INFO("example: " << info.name);
+        REQUIRE(std::filesystem::exists(info.file));
+        CHECK(info.live == sonicLive(info.file));
+        if (info.live) {
+            liveEntries.insert(info.file);
+        }
+    }
+    // The owner's request (2026-10-07) named these; they are the floor, not the list.
+    CHECK(liveEntries.size() >= 28);
+    for (const char* must : {"astral-forge/astral-forge-live.json", "digital-mosh/digital-mosh-live.json",
+                             "sonic-garden/sonic-live.json", "sonic-abstract/glitch-signal.json"}) {
+        INFO(must);
+        CHECK(liveEntries.contains((examples / must).lexically_normal()));
+    }
+
+    std::size_t scanned = 0;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(examples)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".json") {
+            continue;
+        }
+        if (sonicLive(entry.path())) {
+            ++scanned;
+            INFO("a sonic.live project the index does not list as live: " << entry.path().string());
+            CHECK(liveEntries.contains(entry.path().lexically_normal()));
+        }
+    }
+    CHECK(scanned == liveEntries.size());
+#endif
+}
+
 // Opening a project used to be a *merge*: `params::loadProject` applied the values the document
 // listed and left every other parameter alone, so anything the engine owns rather than the scene
 // -- all of `post/*`, the camera's lens, exposure and focus, the input gain -- carried over from

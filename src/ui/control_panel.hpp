@@ -154,7 +154,7 @@ public:
     std::function<void()> onExportBundle;
     std::function<void(const std::filesystem::path&)> onOpenRecent;
     std::vector<std::filesystem::path> recentProjects; // shown in File > Open Recent
-    std::vector<app::ExampleInfo> examples;             // File > Examples
+    std::vector<app::ExampleInfo> examples;             // File > Live Projects and File > Examples
     std::function<void(const app::ExampleInfo&)> onOpenExample;
     // File > Engineering Labs (ADR-261). The host opens the lab's fixture and applies its overlay
     // profile; the menu itself holds no lab knowledge beyond the registry it prints.

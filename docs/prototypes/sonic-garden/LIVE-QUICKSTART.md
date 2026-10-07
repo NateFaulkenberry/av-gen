@@ -28,7 +28,7 @@ first time. After that, AV Gen remembers your devices.
    build/release/src/avgen --example "Sonic Live"
    ```
 
-   Or launch AV Gen normally and choose **File > Examples > Sonic Live** (under "Lab"). Opening the Sonic Live project
+   Or launch AV Gen normally and choose **File > Live Projects > Sonic Live** (under "Sonic Garden"). Opening the Sonic Live project
    turns live input on, starts the transport, and opens the **Live** panel. If you close the Live panel, reopen it
    from **View > Live**.
 

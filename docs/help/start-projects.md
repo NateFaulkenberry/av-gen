@@ -89,6 +89,11 @@ development, Performance, Lab and Benchmark. Hovering an entry shows its descrip
 heavy one, with their measured frame times in the descriptions; they are the quickest way to see
 what your machine does with a known workload.
 
+**File ▸ Live Projects** lists the projects made to be played rather than rendered: Astral Forge Live, Digital
+Mosh Live, the Sonic Abstract and Sonic VFX scenes, and Sonic Live. Opening one turns live input on; pick the
+audio input and MIDI device in **View ▸ Live**. Each entry's description says what to play into it and which MIDI
+controls it maps. Inside a Sonic Abstract or Sonic VFX scene, PageUp and PageDown step to the next scene in its set.
+
 ## Where the editor keeps its own files
 
 In SDL's preferences directory for AV Gen:
