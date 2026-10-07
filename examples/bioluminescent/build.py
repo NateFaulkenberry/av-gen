@@ -451,27 +451,30 @@ CAM = {
 }
 
 # Per state: camera behaviour, pace (m/s), ignition gain, wave speed (m/s), rock glow, haze glow,
-# spores (per s), swarm (per s), transition (s, easing).
+# spores (per s), swarm (per s), transition (s, easing), medium threshold, kick-front decay (1/s), kick-front speed.
+# The medium's CHARACTER is per stage: before the drop a high threshold (fronts survive only in rich patches) and a
+# fast-dying ignition (a kick lights local pockets that ripple and stop); at the drop a low threshold (the whole canyon
+# conducts) and a slow, fast front that runs kilometres. Without that contrast the drop has nothing to break (v2).
 STAGES = {
-    "Dark":      ("drift",  3.0, 0.0, 10.0, 0.0, 0.0, 250.0, 0.0, (4.0, "smooth")),
-    "Stirring":  ("river",  5.0, 1.0, 12.0, 0.0, 0.0, 400.0, 0.0, (6.0, "smooth")),
-    "Breath":    ("river",  1.5, 0.0, 12.0, 0.0, 0.0, 300.0, 0.0, (1.0, "smooth")),
-    "Awake":     ("canopy", 8.0, 1.3, 16.0, 0.12, 0.0, 600.0, 0.0, (6.0, "smooth")),
-    "Awake 2":   ("wall",   8.0, 1.4, 16.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth")),
-    "Build":     ("climb",  4.0, 0.5, 16.0, 0.05, 0.0, 3500.0, 0.0, (4.0, "easeInOut")),
-    "Drop":      ("dive",  24.0, 3.0, 34.0, 1.4, 0.05, 2500.0, 9000.0, (1.2, "easeOut")),
-    "Body":      ("canopy", 17.0, 2.0, 24.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth")),
-    "Body 2":    ("river",  20.0, 2.2, 26.0, 0.7, 0.025, 1500.0, 4000.0, (6.0, "smooth")),
-    "Body 3":    ("wall",   15.0, 2.0, 24.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth")),
-    "Body 4":    ("reveal", 12.0, 2.4, 26.0, 0.8, 0.03, 1500.0, 2000.0, (8.0, "smooth")),
-    "Aftermath": ("after",  2.5, 0.0, 12.0, 0.0, 0.0, 600.0, 0.0, (4.0, "smooth")),
+    "Dark":      ("drift",  3.0, 0.0, 10.0, 0.0, 0.0, 250.0, 0.0, (4.0, "smooth"), 0.95, 4.0, 30.0),
+    "Stirring":  ("river",  5.0, 1.0, 10.0, 0.0, 0.0, 400.0, 0.0, (6.0, "smooth"), 0.9, 4.0, 30.0),
+    "Breath":    ("river",  1.5, 0.0, 10.0, 0.0, 0.0, 300.0, 0.0, (1.0, "smooth"), 0.95, 4.0, 30.0),
+    "Awake":     ("canopy", 8.0, 1.3, 14.0, 0.12, 0.0, 600.0, 0.0, (6.0, "smooth"), 0.75, 3.0, 34.0),
+    "Awake 2":   ("wall",   8.0, 1.4, 14.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth"), 0.75, 3.0, 34.0),
+    "Build":     ("climb",  4.0, 0.5, 16.0, 0.05, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
+    "Drop":      ("dive",  24.0, 3.0, 36.0, 1.4, 0.05, 2500.0, 9000.0, (1.2, "easeOut"), 0.3, 0.35, 70.0),
+    "Body":      ("canopy", 17.0, 2.0, 24.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.5, 1.5, 45.0),
+    "Body 2":    ("river",  20.0, 2.2, 26.0, 0.7, 0.025, 1500.0, 4000.0, (6.0, "smooth"), 0.5, 1.5, 45.0),
+    "Body 3":    ("wall",   15.0, 2.0, 24.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.5, 1.5, 45.0),
+    "Body 4":    ("reveal", 12.0, 2.4, 26.0, 0.8, 0.03, 1500.0, 2000.0, (8.0, "smooth"), 0.45, 1.2, 50.0),
+    "Aftermath": ("after",  2.5, 0.0, 12.0, 0.0, 0.0, 600.0, 0.0, (4.0, "smooth"), 0.95, 4.0, 30.0),
 }
 BODY_CYCLE = ["Body", "Body 2", "Body 3", "Body 4"]
 PADS = {"Dark": 36, "Stirring": 37, "Awake": 38, "Build": 39, "Drop": 40, "Body": 41, "Aftermath": 42}
 
 
 def preset(name, length):
-    cam, pace, ignite, speed, rock, haze, spores, swarm, _t = STAGES[name]
+    cam, pace, ignite, speed, rock, haze, spores, swarm, _t, threshold, decay, front = STAGES[name]
     up, lat, look, fov, bank = CAM[cam]
     return {"name": name.lower(), "values": {
         "macros/flight": [pace / 20.0],
@@ -479,6 +482,9 @@ def preset(name, length):
         "camera/splineBank": [bank],
         "grid/prop/injectRate": [ignite],
         "grid/prop/waveSpeed": [speed],
+        "grid/prop/threshold": [threshold],
+        "field/kickFront/onsetDecay": [decay],
+        "field/kickFront/audioSpeed": [front],
         "material/rock/emissionIntensity": [rock],
         "scene/volumeEmission": [haze],
         "particles/spores/spawnRate": [spores],
@@ -559,7 +565,8 @@ def routes(length):
                 route["component"] = comp
             r.append(route)
     # bass is large-scale energy: it sharpens the ignition (how much of the disturbed ground fires)
-    r.append({"source": "audio.bassLevel", "target": "grid/prop/injectRate", "op": "add", "amount": 0.8,
+    # (audio.bass, not bassLevel: the adaptive level sits near 0.8 and would add a constant to the stage's gain)
+    r.append({"source": "audio.bass", "target": "grid/prop/injectRate", "op": "add", "amount": 0.6,
               "chain": {"attackMs": 60, "decayMs": 400}})
     # highs are small life: spores rise with the treble
     r.append({"source": "audio.trebleLevel", "target": "particles/spores/spawnRate", "op": "add", "amount": 1600.0,

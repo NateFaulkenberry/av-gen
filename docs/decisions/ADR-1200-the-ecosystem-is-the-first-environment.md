@@ -30,6 +30,20 @@ its own renderer in `SceneRenderer`, writing the shared HDR, emission and depth 
 Audio, analysis, the signal bus, routes, MIDI, scene states, the timeline, camera, post, bloom, tonemap, every output
 path (PNG, EXR, video, AOVs) and the live quality ladder are shared unchanged. None of them knows the block exists.
 
+**The seam is an interface.** `rendering::EnvironmentRenderer` (`src/rendering/environment_renderer.hpp`) has
+`name()`, `wants(scene)`, `encode(EnvironmentFrame)` and `reload(shaders)`. `SceneRenderer` keeps them in
+`environments_` and calls each one that wants the scene after the lit pass, before the volumetric medium. A true
+`wants` turns on the depth prepass. `EnvironmentFrame` carries:
+- the encoder, the scene and the time;
+- the FrameUniforms buffer;
+- the field block and the grid table;
+- the prepass's linear depth;
+- the HDR and emission targets and the depth buffer;
+- the size, the live QualitySettings and the GPU timeline.
+
+The contract, including what an environment must bring itself (determinism, quality tiers), is in
+`docs/prototypes/bioluminescent/03-architecture.md` §2.1. Production Astral Forge is the second user.
+
 The first such block is `"ecosystem"` (`scene::Ecosystem`, `rendering::EcosystemRenderer`, `shaders/ecosystem.wgsl`):
 - **Emitter layers.** A layer attaches a template of emitter points (`[x, y, z, v, u, radius]` in the host's source
   space) to every instance of one or more ordinary procedural nodes, its **hosts**. The bodies stay conventional:
@@ -50,10 +64,15 @@ The first such block is `"ecosystem"` (`scene::Ecosystem`, `rendering::Ecosystem
     along its organism (v → 1) hears `lagField` instead, so light climbs a stalk behind a front;
   - **colour** = mix(`color`, `excitedColor`, saturate(response)). This is the fluorescence the art direction
     needs (a fan is violet at rest and magenta only under the passing wave);
-  - **radiance** = colour × (rest + `excitedIntensity` × response), faded over the last quarter of `maxDistance`.
+  - **radiance** = colour × (rest + `excitedIntensity` × response), faded over the last quarter of `maxDistance`
+    and, with `nearFade`, out within that many metres of the lens (no orbs);
+  - **wake:** rest × (1 + `wakeGain` × `wakeField`(p)), so an awakened region keeps glowing;
+  - **iridescence:** the colour mixes toward a spectral hue travelling along the organism (a comb jelly's plates);
+  - **bob:** each host instance drifts on its own phase (floating organisms).
 - **Live parameters.** Every behaviour leaf is a parameter at `ecosystem/<layer>/<leaf>`: `enabled`, `color`,
-  `excitedColor`, `intensity`, `excitedIntensity`, `size`, `responseGain`, `responseThreshold`, `travel`, `breath`,
-  `breathRate`, `flicker`, `flickerRate`, `pulseRate`, `pulseDecay`, `sparsity`, `maxDistance`. Routes, MIDI,
+  `excitedColor`, `intensity`, `excitedIntensity`, `size`, `responseGain`, `responseThreshold`, `travel`,
+  `wakeGain`, `breath`, `breathRate`, `flicker`, `flickerRate`, `pulseRate`, `pulseDecay`, `sparsity`, `maxDistance`,
+  `nearFade`, `iridescence`, `iridescenceScale`, `iridescenceSpeed`, `bob`, `bobRate`. Routes, MIDI,
   presets, the timeline and the editor's generic parameter panel reach them with no further wiring.
 - **The gate.** With no active block the renderer records nothing, and the frame is byte-identical
   (`a disabled ecosystem renders the same bytes as a scene with none`).
