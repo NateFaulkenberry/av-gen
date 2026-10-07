@@ -1817,6 +1817,11 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"shadowatlas1k", [](QualitySettings& q) { q.shadowResolution = 1024; },
          "shadowResolution=1024 (the control arm: it must move the masked and unmasked frames alike)"},
         // ADR-1165: the raymarched casters' shadow march at the map's own resolution, at half, at a quarter.
+        {"astral0", [](QualitySettings& q) { q.astralTier = 0; }, "astralTier=0 (ADR-1222: the offline god: every particle, full march, exact seek)"},
+        {"astral1", [](QualitySettings& q) { q.astralTier = 1; }, "astralTier=1 (ADR-1222: the live reference)"},
+        {"astral2", [](QualitySettings& q) { q.astralTier = 2; }, "astralTier=2 (ADR-1222: 70% of the particles, 12 god-ray taps)"},
+        {"astral3", [](QualitySettings& q) { q.astralTier = 3; }, "astralTier=3 (ADR-1222: 50%, 8 taps, no shards)"},
+        {"astral4", [](QualitySettings& q) { q.astralTier = 4; }, "astralTier=4 (ADR-1222: 33%, no god rays, no shards)"},
         {"sdfshadowfull", [](QualitySettings& q) { q.sdfShadowScale = 1; },
          "sdfShadowScale=1 (raymarched SDF casters marched at the shadow map's own resolution)"},
         {"sdfshadowhalf", [](QualitySettings& q) { q.sdfShadowScale = 2; },
