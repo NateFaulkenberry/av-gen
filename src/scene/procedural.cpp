@@ -643,6 +643,10 @@ glm::vec3 sourceHalfExtent(const SourceSpec& s) {
         return glm::vec3(s.radius);
     case PrimitiveKind::Point:
         return glm::vec3(s.pointSize * 0.5f);
+    case PrimitiveKind::Fiber:
+        // ADR-1180: a Streamline deformer may bend the fiber any way from its root, so the only bound
+        // that holds is the sphere of its length about the root.
+        return glm::vec3(s.fiberLength);
     case PrimitiveKind::Procedural:
         return glm::vec3(0.0f); // resolved through the referenced object (detail::sourceHalfExtent)
     case PrimitiveKind::Mesh: {
@@ -789,6 +793,8 @@ const char* primitiveKindName(PrimitiveKind kind) {
         return "generated";
     case PrimitiveKind::Text:
         return "text";
+    case PrimitiveKind::Fiber:
+        return "fiber";
     }
     return "cylinder";
 }
@@ -796,7 +802,8 @@ const char* primitiveKindName(PrimitiveKind kind) {
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
     for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
                             PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube,
-                            PrimitiveKind::Mesh, PrimitiveKind::Generated, PrimitiveKind::Text}) {
+                            PrimitiveKind::Mesh, PrimitiveKind::Generated, PrimitiveKind::Text,
+                            PrimitiveKind::Fiber}) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -902,13 +909,16 @@ const char* deformerKindName(DeformerKind kind) {
         return "field";
     case DeformerKind::Path:
         return "path";
+    case DeformerKind::Streamline:
+        return "streamline";
     }
     return "twist";
 }
 
 std::optional<DeformerKind> deformerKindFromName(std::string_view name) {
     for (const auto kind : {DeformerKind::Bend, DeformerKind::Twist, DeformerKind::Sine, DeformerKind::Noise,
-                            DeformerKind::Displacement, DeformerKind::Field, DeformerKind::Path}) {
+                            DeformerKind::Displacement, DeformerKind::Field, DeformerKind::Path,
+                            DeformerKind::Streamline}) {
         if (name == deformerKindName(kind)) {
             return kind;
         }
@@ -1031,6 +1041,20 @@ Result<void> SourceSpec::validate() const {
             return fail("point size must be positive");
         }
         break;
+    case PrimitiveKind::Fiber:
+        if (!(fiberLength > 0.0f) || !(fiberWidth > 0.0f)) {
+            return fail("fiber length and width must be positive (got {}, {})", fiberLength, fiberWidth);
+        }
+        if (!(fiberTaper >= 0.0f && fiberTaper <= 1.0f)) {
+            return fail("fiber taper must be in 0..1 (got {})", fiberTaper);
+        }
+        if (!inRange(fiberSegments, 1, kMaxFiberSegments)) {
+            return fail("fiber segments must be in 1..{} (got {})", kMaxFiberSegments, fiberSegments);
+        }
+        if (!(fiberMinPixels >= 0.0f && fiberMinPixels <= 8.0f)) {
+            return fail("fiber minPixels must be in 0..8 (got {})", fiberMinPixels);
+        }
+        break;
     case PrimitiveKind::Procedural:
         if (reference.empty()) {
             return fail("a procedural source needs a reference (the name of another procedural object)");
@@ -1106,6 +1130,13 @@ std::uint64_t SourceSpec::structuralHash() const {
         break;
     case PrimitiveKind::Point:
         h.f32(pointSize);
+        break;
+    case PrimitiveKind::Fiber:
+        h.f32(fiberLength);
+        h.f32(fiberWidth);
+        h.f32(fiberTaper);
+        h.i32(fiberSegments);
+        h.f32(fiberMinPixels);
         break;
     case PrimitiveKind::Procedural:
         h.u64(reference.size());
@@ -1643,6 +1674,30 @@ MeshData makePointQuad(float size) {
     return mesh;
 }
 
+// ADR-1180. See the declaration: the normal lane carries (segment length, min pixels, root half-width).
+MeshData makeFiberStrip(float length, float width, float taper, int segments, float minPixels) {
+    MeshData mesh;
+    mesh.name = "fiber";
+    const int n = std::clamp(segments, 1, kMaxFiberSegments);
+    const float ds = length / static_cast<float>(n);
+    const float rootHalf = 0.5f * width;
+    const glm::vec3 lane(ds, minPixels, rootHalf);
+    mesh.vertices.reserve(static_cast<std::size_t>(2 * (n + 1)));
+    for (int k = 0; k <= n; ++k) {
+        const float u = static_cast<float>(k) / static_cast<float>(n);
+        const float half = rootHalf * (1.0f + (taper - 1.0f) * u);
+        const float y = ds * static_cast<float>(k);
+        mesh.vertices.push_back(Vertex{{-half, y, 0.0f}, lane, {0.0f, u}});
+        mesh.vertices.push_back(Vertex{{half, y, 0.0f}, lane, {1.0f, u}});
+    }
+    mesh.indices.reserve(static_cast<std::size_t>(6 * n));
+    for (int k = 0; k < n; ++k) {
+        const auto a = static_cast<std::uint32_t>(2 * k);
+        mesh.indices.insert(mesh.indices.end(), {a, a + 1, a + 3, a, a + 3, a + 2});
+    }
+    return mesh;
+}
+
 Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
     if (auto ok = spec.validate(); !ok) {
         return std::unexpected(ok.error());
@@ -1685,6 +1740,9 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         return assets::sourceLodMesh(*spec.assetMesh, spec.meshBudget, assets::lod0Settings());
     case PrimitiveKind::Point:
         return makePointQuad(spec.pointSize);
+    case PrimitiveKind::Fiber:
+        return makeFiberStrip(spec.fiberLength, spec.fiberWidth, spec.fiberTaper, spec.fiberSegments,
+                              spec.fiberMinPixels);
     case PrimitiveKind::Procedural:
         return fail("procedural source '{}' resolves through ProceduralGeometry::resolveSourceMesh", spec.reference);
     case PrimitiveKind::Text: {
@@ -1794,7 +1852,7 @@ bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
     }
     // A mesh source's levels 1-3 are simplifications of the asset, in the asset's own space. Text
     // (ADR-1046) is never an impostor: a word at a distance is still that word.
-    if (spec.kind == PrimitiveKind::Text) {
+    if (spec.kind == PrimitiveKind::Text || spec.kind == PrimitiveKind::Fiber) { // ADR-1180: a fiber stays a fiber
         return false;
     }
     return !(spec.kind == PrimitiveKind::Mesh && spec.assetMesh);
@@ -1848,6 +1906,15 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
     }
     if (level <= 0 || spec.kind == PrimitiveKind::Text) {
         return makeSourceMesh(spec);
+    }
+    if (spec.kind == PrimitiveKind::Fiber) {
+        // ADR-1180: every level is the same fiber with fewer segments (1/2, 1/4, 1/8, at least 1).
+        if (level > 3) {
+            return fail("lod level must be in 0..3 (got {})", level);
+        }
+        SourceSpec reduced = spec;
+        reduced.fiberSegments = std::max(spec.fiberSegments >> level, 1);
+        return makeSourceMesh(reduced);
     }
     if (level == 1) {
         // Half the segment counts of every generator; the floors keep the spec valid (3 for the
@@ -2294,6 +2361,8 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return p; // needs the field set: see applyFieldDeformer
     case DeformerKind::Path:
         return p; // needs the spline: see applyPathDeformer
+    case DeformerKind::Streamline:
+        return p; // a Fiber's centre line, not a point map: see fiberCentreLine
     }
     return p;
 }
@@ -2362,6 +2431,40 @@ glm::vec3 applyPathDeformer(const Deformer& d, glm::vec3 p, const spatial::Splin
     const float rv = cu * sr + cv * cr;
     const glm::vec3 bent = s.position + (s.binormal * ru + s.normal * rv) * s.scale;
     return glm::mix(p, bent, d.amount);
+}
+
+std::vector<glm::vec3> fiberCentreLine(const Deformer* streamline, glm::vec3 root, glm::vec3 axis, float length,
+                                       int segments, double time, const spatial::FieldSet* fields, float element) {
+    const int n = std::clamp(segments, 1, kMaxFiberSegments);
+    const float ds = length / static_cast<float>(n);
+    const spatial::FieldSpec* field = nullptr;
+    if (streamline != nullptr && streamline->enabled && streamline->kind == DeformerKind::Streamline &&
+        fields != nullptr) {
+        field = fields->find(streamline->field);
+        if (field != nullptr && !field->enabled) {
+            field = nullptr;
+        }
+    }
+    std::vector<glm::vec3> points;
+    points.reserve(static_cast<std::size_t>(n + 1));
+    glm::vec3 r = root;
+    glm::vec3 d = unitOr(axis, glm::vec3(0.0f, 1.0f, 0.0f));
+    points.push_back(r);
+    for (int k = 0; k < n; ++k) {
+        if (field != nullptr) {
+            const float arc = ds * static_cast<float>(k);
+            const float ramp = streamline->falloff > 0.0f ? std::clamp(arc / streamline->falloff, 0.0f, 1.0f) : 1.0f;
+            const glm::vec3 v = spatial::sampleVector(*field, r, time, fields, element);
+            const glm::vec3 turned = d + v * (streamline->amount * ramp * ds);
+            const float len = glm::length(turned);
+            if (len > 1e-6f) {
+                d = turned / len;
+            }
+        }
+        r = r + d * ds;
+        points.push_back(r);
+    }
+    return points;
 }
 
 glm::vec3 deformPointWith(const std::vector<Deformer>& stack, glm::vec3 objectPoint, const glm::mat4& instanceWorld,
@@ -2454,6 +2557,15 @@ Result<void> ProceduralGeometry::validate() const {
         }
         if (d.kind == DeformerKind::Path && d.spline.empty()) {
             return fail("procedural '{}': deformer {} (path) needs a spline name", name, i + 1);
+        }
+        if (d.kind == DeformerKind::Streamline) {
+            if (d.field.empty()) {
+                return fail("procedural '{}': deformer {} (streamline) needs a field name", name, i + 1);
+            }
+            if (source.kind != PrimitiveKind::Fiber) {
+                return fail("procedural '{}': deformer {} (streamline) bends a fiber source; this source is a {}",
+                            name, i + 1, primitiveKindName(source.kind));
+            }
         }
     }
     if (effectors.size() > static_cast<std::size_t>(kMaxEffectors)) {
@@ -2825,6 +2937,13 @@ json ProceduralGeometry::toJson() const {
         s["minorSegments"] = source.minorSegments;
         s["pointSize"] = source.pointSize;
         s["reference"] = source.reference;
+        if (source.kind == PrimitiveKind::Fiber) { // ADR-1180; only for the kind that uses it
+            s["fiberLength"] = source.fiberLength;
+            s["fiberWidth"] = source.fiberWidth;
+            s["fiberTaper"] = source.fiberTaper;
+            s["fiberSegments"] = source.fiberSegments;
+            s["fiberMinPixels"] = source.fiberMinPixels;
+        }
         if (source.kind == PrimitiveKind::Text) { // ADR-1046; only for the kind that uses it
             s["text"] = source.text;
             s["font"] = source.font.toJson();
@@ -3120,6 +3239,12 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(s.minorSegments, "minorSegments", readInt);
         AVGEN_PROC_READ(s.pointSize, "pointSize", readFloat);
         AVGEN_PROC_READ(s.reference, "reference", readString);
+        // ADR-1180: fiber.
+        AVGEN_PROC_READ(s.fiberLength, "fiberLength", readFloat);
+        AVGEN_PROC_READ(s.fiberWidth, "fiberWidth", readFloat);
+        AVGEN_PROC_READ(s.fiberTaper, "fiberTaper", readFloat);
+        AVGEN_PROC_READ(s.fiberSegments, "fiberSegments", readInt);
+        AVGEN_PROC_READ(s.fiberMinPixels, "fiberMinPixels", readFloat);
         // ADR-1046: text.
         AVGEN_PROC_READ(s.text, "text", readString);
         AVGEN_PROC_READ(s.textSize, "textSize", readFloat);
@@ -3588,7 +3713,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
 
     // Source
     const SourceSpec& s = rest.source;
-    r.i("source/kind", static_cast<int>(s.kind), 0, 9, 0, 9); // 9 = text (ADR-1046)
+    r.i("source/kind", static_cast<int>(s.kind), 0, 10, 0, 10); // 9 = text (ADR-1046), 10 = fiber (ADR-1180)
     p.sourceSize = r.v3("source/size", s.size, 0.001f, 1000.0f, 0.01f, 10.0f);
     r.i("source/subdivisions", s.subdivisions, 1, 64, 1, 16);
     r.f("source/bevel", s.bevel, 0.0f, 1e3f, 0.0f, 1.0f);
@@ -3605,6 +3730,13 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     r.i("source/majorSegments", s.majorSegments, 3, 256, 3, 96);
     r.i("source/minorSegments", s.minorSegments, 3, 128, 3, 32);
     r.f("source/pointSize", s.pointSize, 0.0001f, 100.0f, 0.001f, 1.0f);
+    if (s.kind == PrimitiveKind::Fiber) { // ADR-1180; structural (the strip is rebuilt), so not for a fast knob
+        r.f("source/fiberLength", s.fiberLength, 0.001f, 1000.0f, 0.05f, 20.0f);
+        r.f("source/fiberWidth", s.fiberWidth, 0.00001f, 10.0f, 0.0005f, 0.1f);
+        r.f("source/fiberTaper", s.fiberTaper, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.i("source/fiberSegments", s.fiberSegments, 1, kMaxFiberSegments, 1, kMaxFiberSegments);
+        r.f("source/fiberMinPixels", s.fiberMinPixels, 0.0f, 8.0f, 0.0f, 3.0f);
+    }
     r.v3("source/position", rest.sourceTransform.position, -1e4f, 1e4f, -10.0f, 10.0f);
     r.v3("source/rotation", eulerDegrees(rest.sourceTransform.rotation), -360.0f, 360.0f, -360.0f, 360.0f);
     p.sourceScale = r.v3("source/scale", rest.sourceTransform.scale, 0.001f, 100.0f, 0.01f, 5.0f);
@@ -3858,7 +3990,12 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     }
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 9);
+    copyEnum(p, "source/kind", s.kind, 10);
+    copyValue(p, "source/fiberLength", s.fiberLength);
+    copyValue(p, "source/fiberWidth", s.fiberWidth);
+    copyValue(p, "source/fiberTaper", s.fiberTaper);
+    copyValue(p, "source/fiberSegments", s.fiberSegments);
+    copyValue(p, "source/fiberMinPixels", s.fiberMinPixels);
     copyValue(p, "source/size", s.size);
     copyValue(p, "source/subdivisions", s.subdivisions);
     copyValue(p, "source/bevel", s.bevel);

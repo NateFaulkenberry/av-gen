@@ -128,6 +128,7 @@ const DEFORM_NOISE: i32 = 3;
 const DEFORM_DISPLACEMENT: i32 = 4;
 const DEFORM_FIELD: i32 = 5;
 const DEFORM_PATH: i32 = 6;
+const DEFORM_STREAMLINE: i32 = 7; // ADR-1181: only the fiber path reads it; the chain passes it through
 const DEFORM_WORLD: i32 = 8;
 
 // ---- transforms ------------------------------------------------------------------------------
@@ -361,6 +362,124 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
     return deformWorld(p, nWorld, t);
 }
 
+// ---- ADR-1180/1181: fibers ---------------------------------------------------------------------
+// A Fiber source is a strip whose vertex pair k sits at arc length in.position.y; the normal lane
+// carries (segment length ds, min pixels at 1080 lines, root half-width). The centre line is
+// r_0 = the instance root, d_0 = the instance rotation of +Y, and per segment
+//   d_{k+1} = normalize(d_k + v(r_k) * amount * ramp(k ds) * ds),  r_{k+1} = r_k + d_{k+1} * ds
+// with v the Streamline deformer's vector field (none: straight). Vertex k integrates k steps and
+// one more for its tangent, so every vertex of a fiber agrees on the shared points exactly, with no
+// buffer between the passes. Mirrors scene::fiberCentreLine.
+
+// The first enabled Streamline deformer, or -1.
+fn fiberStreamline() -> i32 {
+    let count = u32(proc.timeInfo.y + 0.5);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let code = deformerCode(proc.deformers[i]);
+        if (code == DEFORM_STREAMLINE || code == DEFORM_STREAMLINE + DEFORM_WORLD) {
+            return i32(i);
+        }
+    }
+    return -1;
+}
+
+fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32, deformer: i32) -> vec3<f32> {
+    if (deformer < 0) {
+        return d;
+    }
+    let def = proc.deformers[u32(deformer)];
+    let slot = i32(floor(def.params.x + 0.5));
+    var ramp = 1.0;
+    if (def.params.w > 0.0) {
+        ramp = clamp(arc / def.params.w, 0.0, 1.0);
+    }
+    let turned = d + fieldVector(slot, r) * (def.centerAmount.w * ramp * ds);
+    let len = length(turned);
+    if (len > 1e-6) {
+        return turned / len;
+    }
+    return d;
+}
+
+struct FiberPoint {
+    centre: vec3<f32>,
+    tangent: vec3<f32>,
+};
+
+fn fiberPoint(root: vec3<f32>, axis: vec3<f32>, k: u32, ds: f32) -> FiberPoint {
+    let deformer = fiberStreamline();
+    var r = root;
+    var d = axis;
+    for (var i = 0u; i < 32u; i = i + 1u) {
+        if (i >= k) { break; }
+        d = fiberTurn(d, r, ds * f32(i), ds, deformer);
+        r = r + d * ds;
+    }
+    var out: FiberPoint;
+    out.centre = r;
+    out.tangent = fiberTurn(d, r, ds * f32(k), ds, deformer);
+    return out;
+}
+
+fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut) -> ProcVertexOut {
+    var out = outIn;
+    let s = inst.scale.xyz;
+    let lengthScale = s.y;
+    let widthScale = s.x;
+    let ds = in.normal.x * lengthScale;
+    let k = u32(floor(in.position.y / max(in.normal.x, 1e-9) + 0.5));
+    let rootHalf = max(in.normal.z, 1e-9);
+    let side = select(-1.0, 1.0, in.position.x > 0.0);
+    var half = abs(in.position.x) * widthScale;
+    let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+    let axis = normalize((object.model * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0)), 0.0)).xyz);
+    let fp = fiberPoint(root, axis, k, ds);
+    let now = proc.timeInfo.x;
+    let c = deformWorld(fp.centre, fp.tangent, now);
+    let t = fp.tangent;
+    let toCamera = frame.cameraPos.xyz - c;
+    let dist = max(length(toCamera), 1e-6);
+    let view = toCamera / dist;
+    var across = cross(t, view);
+    let acrossLength = length(across);
+    if (acrossLength < 1e-5) {
+        across = frame.cameraRight.xyz;
+    } else {
+        across = across / acrossLength;
+    }
+    // The floor on the on-screen width, held at the cost of coverage (darkening: the fiber field is
+    // drawn on black, so a fiber that covers a third of its pixel gives a third of its light).
+    var coverage = 1.0;
+    let minPixels = in.normal.y * frame.targetSize.y / 1080.0;
+    if (minPixels > 0.0) {
+        let probe = max(half, 1e-4);
+        let c0 = frame.viewProj * vec4<f32>(c, 1.0);
+        let c1 = frame.viewProj * vec4<f32>(c + across * probe, 1.0);
+        if (c0.w > 1e-4 && c1.w > 1e-4) {
+            let pixelsPerMetre = length((c1.xy / c1.w - c0.xy / c0.w) * 0.5 * frame.targetSize.xy) / probe;
+            let halfPixels = half * pixelsPerMetre;
+            let minHalf = 0.5 * minPixels;
+            if (pixelsPerMetre > 0.0 && halfPixels < minHalf) {
+                coverage = halfPixels / minHalf;
+                half = minHalf / pixelsPerMetre;
+            }
+        }
+    }
+    let p = c + across * (half * side);
+    // A round thread: the normal turns across the strip from the side to the viewer (the two edges at
+    // +-45 degrees, so the interpolated middle faces the camera and the rims catch grazing light).
+    let facing = normalize(view - t * dot(view, t) + vec3<f32>(0.0, 0.0, 1e-7));
+    out.normal = normalize(facing + across * side);
+    out.clip = frame.viewProj * vec4<f32>(p, 1.0);
+    out.worldPos = p;
+    out.prevClip = frame.prevViewProj * vec4<f32>(p, 1.0);
+    out.instColor = vec4<f32>(out.instColor.rgb * coverage, out.instColor.a);
+    out.instEmissive = vec4<f32>(out.instEmissive.rgb * coverage, out.instEmissive.w);
+    out.localPos = vec3<f32>(side, f32(k) * in.normal.x, 0.0);
+    return out;
+}
+
 // ---- vertex / fragment -------------------------------------------------------------------------
 
 struct ProcVertexOut {
@@ -413,6 +532,9 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
 
+    if (proc.fieldInfo.z > 1.5) {
+        return fiberVertex(in, inst, out); // ADR-1180
+    }
     if (proc.fieldInfo.z > 0.5) {
         // Point source: a camera-facing quad around the instance centre. The centre goes through
         // the object matrix and the world deformers; the quad offsets skip the deformer stack.

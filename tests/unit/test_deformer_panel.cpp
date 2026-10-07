@@ -126,6 +126,7 @@ TEST_CASE("no row names a leaf the kind's arithmetic does not read", "[ui][defor
         {scene::DeformerKind::Field, {"amount", "axis"}},
         {scene::DeformerKind::Path,
          {"amount", "axis", "center", "pathOffset", "pathScale", "pathRoll"}},
+        {scene::DeformerKind::Streamline, {"amount", "falloff"}}, // ADR-1181: steer and stiffness
     };
     REQUIRE(expected.size() == std::size(ui::kDeformerKinds));
 
@@ -278,7 +279,10 @@ TEST_CASE("a deformer the panel adds does something", "[ui][deformers][procedura
     for (const scene::DeformerKind kind : ui::kDeformerKinds) {
         // Field and Path deform through a named field or spline that a freshly added deformer does
         // not have yet, so they legitimately do nothing until one is chosen. The panel says so.
-        if (kind == scene::DeformerKind::Field || kind == scene::DeformerKind::Path) {
+        // Streamline (ADR-1181) also needs its field, and bends a fiber's centre line rather than
+        // mapping a point (test_fiber_field.cpp holds it).
+        if (kind == scene::DeformerKind::Field || kind == scene::DeformerKind::Path ||
+            kind == scene::DeformerKind::Streamline) {
             continue;
         }
         INFO("kind: " << scene::deformerKindName(kind));

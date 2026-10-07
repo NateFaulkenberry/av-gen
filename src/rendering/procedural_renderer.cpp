@@ -113,7 +113,7 @@ const scene::MaterialProgram* programNamed(const scene::Scene& scene, const std:
 // and final scale of a Path deformer (unbound or world-space Path deformers are disabled).
 DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int splineSlot, float pathScale) {
     DeformerUniform u{};
-    if (!d.enabled || (d.kind == scene::DeformerKind::Field && fieldSlot < 0) ||
+    if (!d.enabled || ((d.kind == scene::DeformerKind::Field || d.kind == scene::DeformerKind::Streamline) && fieldSlot < 0) ||
         (d.kind == scene::DeformerKind::Path && (splineSlot < 0 || d.space == scene::DeformSpace::World))) {
         u.axisKind = glm::vec4(0.0f, 1.0f, 0.0f, -1.0f);
         return u;
@@ -137,6 +137,10 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
         break;
     case scene::DeformerKind::Path:
         u.params = glm::vec4(static_cast<float>(splineSlot), pathScale, d.pathOffset, d.pathRoll);
+        break;
+    case scene::DeformerKind::Streamline:
+        // ADR-1181: x = field slot, w = stiffness (the arc length over which the steering ramps in).
+        u.params = glm::vec4(static_cast<float>(fieldSlot), 0.0f, 0.0f, std::max(d.falloff, 0.0f));
         break;
     case scene::DeformerKind::Twist:
     case scene::DeformerKind::Displacement:
@@ -2076,7 +2080,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             if (d < deformerCount) {
                 const auto& deformer = object.deformers[d];
                 int fieldSlot = -1;
-                if (deformer.kind == scene::DeformerKind::Field && fields != nullptr) {
+                if ((deformer.kind == scene::DeformerKind::Field || deformer.kind == scene::DeformerKind::Streamline) &&
+                    fields != nullptr) {
                     fieldSlot = fields->slotOf(deformer.field);
                     if (deformer.enabled && fieldSlot >= 0) {
                         ++stats_.fieldDeformers;
@@ -2179,8 +2184,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         for (std::uint32_t level = 0; level < lodCount; ++level) {
             const bool billboard =
                 isPoint || (lodMeshes[level] != nullptr && lodMeshes[level]->impostor);
-            u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount,
-                                    billboard ? 1.0f : 0.0f, cullActive ? 1.0f : 0.0f);
+            // ADR-1180: 2 = the fiber path (a camera-facing strip along the fiber's centre line).
+            const float facing = object.source.kind == scene::PrimitiveKind::Fiber ? 2.0f : (billboard ? 1.0f : 0.0f);
+            u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount, facing,
+                                    cullActive ? 1.0f : 0.0f);
             // ADR-155: this rung's tier. Rung tracks projected size, so demoting from rung N
             // down leaves everything nearer the camera at Full. No hero check is needed and none
             // is possible here -- heroes live on the Composition, not the Scene the renderer sees
@@ -2598,7 +2605,8 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         const auto& material = object.material;
         // Point billboards face the camera by construction: never cull them.
         const bool twoSided =
-            material.doubleSided || object.source.kind == scene::PrimitiveKind::Point || item.fxTwoSided;
+            material.doubleSided || object.source.kind == scene::PrimitiveKind::Point ||
+            object.source.kind == scene::PrimitiveKind::Fiber || item.fxTwoSided;
         // Which of the two compacted lists this pass draws: the camera's, or the shadow caster
         // list's own slices of the same `visible` buffer.
         const auto& groups = shadowPass
