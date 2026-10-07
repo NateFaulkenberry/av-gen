@@ -11,6 +11,6 @@ T2=$(python3 -c "print($T + 1.0/60)")
 code=$?
 f=$(ls "$TMP"/*.png 2>/dev/null | head -1)
 if [ -n "$f" ]; then mv "$f" "$OUT"; fi
-grep -iE "error|refus|fail" "$TMP/log.txt" | grep -v "GPU errors: 0" | head -5
+grep -iE "error|refus|fail" "$TMP/log.txt" | grep -v "minBindingSize" | grep -v "GPU errors: 0" | head -5
 echo "exit=$code out=$OUT"
 rm -rf "$TMP"

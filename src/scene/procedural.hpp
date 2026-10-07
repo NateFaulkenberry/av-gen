@@ -415,7 +415,8 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          `alongNormal`, else p += axis * s * a.
 //   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
 //          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of
-//          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds),
+//          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds)
+//          (several Streamline deformers sum their pulls, each with its own a and stiffness),
 //          r_{k+1} = r_k + d_{k+1} * ds, with v sampled at r_k in world space. `a` (amount) is the
 //          steering in 1/m per unit of field: 0 is a straight fiber, large values follow the field's
 //          streamline exactly. `falloff` > 0 is a stiffness: the steering grows from 0 at the root to
@@ -467,10 +468,11 @@ struct DeformContext {
 [[nodiscard]] glm::vec3 deformPointWith(const std::vector<Deformer>& stack, glm::vec3 objectPoint,
                                         const glm::mat4& instanceWorld, double time, const DeformContext& ctx,
                                         glm::vec3 normal = {0.0f, 1.0f, 0.0f});
-// ADR-1181: the CPU reference of a Fiber's centre line under a Streamline deformer (null = straight):
-// the segments + 1 points r_0..r_N from `root` along `axis`, exactly as the vertex stage builds them.
-// `element` is the record's random.w (what an Element-band audio field hears).
-[[nodiscard]] std::vector<glm::vec3> fiberCentreLine(const Deformer* streamline, glm::vec3 root, glm::vec3 axis,
+// ADR-1181: the CPU reference of a Fiber's centre line under the Streamline deformers of `stack` (every
+// enabled one adds its own field's pull, d_{k+1} = normalize(d_k + sum_i v_i(r_k) a_i ramp_i ds); none
+// = straight): the segments + 1 points r_0..r_N from `root` along `axis`, exactly as the vertex stage
+// builds them. `element` is the record's random.w (what an Element-band audio field hears).
+[[nodiscard]] std::vector<glm::vec3> fiberCentreLine(const std::vector<Deformer>& stack, glm::vec3 root, glm::vec3 axis,
                                                      float length, int segments, double time,
                                                      const spatial::FieldSet* fields, float element = 0.5f);
 // The GPU-side noise, evaluated on the CPU (for tests): 3-octave value fBM in [0, 1].

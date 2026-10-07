@@ -1,20 +1,20 @@
 {
  "format": "avgen-scene",
  "version": 1,
- "name": "Chorus Field p2 mask",
+ "name": "Chorus Field p2 void",
  "camera": {
   "mode": 1,
   "position": [
-   0,
-   0,
-   44
+   30,
+   10,
+   80
   ],
   "target": [
    0,
-   -1,
+   -2,
    0
   ],
-  "fov": 45,
+  "fov": 40,
   "orbitSpeed": 0
  },
  "lights": [
@@ -133,7 +133,7 @@
  },
  "nodes": [
   {
-   "name": "fall",
+   "name": "wind",
    "kind": "field",
    "position": [
     0,
@@ -148,91 +148,78 @@
     "axis": [
      0,
      -1,
-     0
+     0.15
     ],
-    "strength": 1.0
-   }
-  },
-  {
-   "name": "eyeL",
-   "kind": "field",
-   "position": [
-    -4.6,
-    2.5,
-    0
-   ],
-   "field": {
-    "kind": "vortex",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 1.2,
-     "outer": 6.0
-    },
-    "axis": [
-     0,
-     0,
-     -1.0
-    ],
-    "strength": 2.6
-   }
-  },
-  {
-   "name": "eyeR",
-   "kind": "field",
-   "position": [
-    4.6,
-    2.5,
-    0
-   ],
-   "field": {
-    "kind": "vortex",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 1.2,
-     "outer": 6.0
-    },
-    "axis": [
-     0,
-     0,
-     1.0
-    ],
-    "strength": 2.6
-   }
-  },
-  {
-   "name": "chin",
-   "kind": "field",
-   "position": [
-    0,
-    -18,
-    0
-   ],
-   "field": {
-    "kind": "attractor",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 6,
-     "outer": 26
-    },
     "strength": 0.8
    }
   },
   {
-   "name": "curl",
+   "name": "voidA",
    "kind": "field",
    "position": [
-    0,
-    0,
+    -7,
+    4,
     0
    ],
    "field": {
-    "kind": "curlNoise",
+    "kind": "vortex",
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 5,
+     "outer": 11
     },
-    "frequency": 0.11,
-    "strength": 0.25,
-    "seed": 21
+    "axis": [
+     0.3,
+     0.2,
+     1
+    ],
+    "strength": 2.4
+   }
+  },
+  {
+   "name": "voidB",
+   "kind": "field",
+   "position": [
+    8,
+    -3,
+    -3
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 4,
+     "outer": 10
+    },
+    "axis": [
+     -0.2,
+     0.4,
+     -1
+    ],
+    "strength": 2.2
+   }
+  },
+  {
+   "name": "voidC",
+   "kind": "field",
+   "position": [
+    -1,
+    -13,
+    2
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 3,
+     "outer": 8
+    },
+    "axis": [
+     1,
+     0.1,
+     0.3
+    ],
+    "strength": 2.0
    }
   },
   {
@@ -249,38 +236,104 @@
      "kind": "none"
     },
     "children": [
-     "fall",
-     "eyeL",
-     "eyeR",
-     "chin"
+     "wind",
+     "voidA",
+     "voidB",
+     "voidC"
     ],
     "combine": "add"
    }
   },
   {
-   "name": "crown",
+   "name": "pushA",
+   "kind": "field",
+   "position": [
+    -7,
+    4,
+    0
+   ],
+   "field": {
+    "kind": "repulsor",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 5,
+     "outer": 6.5
+    },
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "pushB",
+   "kind": "field",
+   "position": [
+    8,
+    -3,
+    -3
+   ],
+   "field": {
+    "kind": "repulsor",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 4,
+     "outer": 5.5
+    },
+    "strength": 2.0
+   }
+  },
+  {
+   "name": "push",
    "kind": "field",
    "position": [
     0,
-    17,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "pushA",
+     "pushB"
+    ],
+    "combine": "add"
+   }
+  },
+  {
+   "name": "holeA",
+   "kind": "field",
+   "position": [
+    -7,
+    4,
     0
    ],
    "field": {
     "kind": "sphere",
     "falloff": {
-     "kind": "noiseModulated",
-     "inner": 6,
-     "outer": 18,
-     "noiseAmount": 2.5,
-     "noiseScale": 0.25
+     "kind": "none"
     },
-    "radius": 12.0,
-    "softness": 6.0,
-    "scale": [
-     1.0,
-     1.0,
-     1.0
-    ]
+    "radius": 5.5,
+    "softness": 0.6,
+    "invert": true
+   }
+  },
+  {
+   "name": "holeB",
+   "kind": "field",
+   "position": [
+    8,
+    -3,
+    -3
+   ],
+   "field": {
+    "kind": "sphere",
+    "falloff": {
+     "kind": "none"
+    },
+    "radius": 4.5,
+    "softness": 0.6,
+    "invert": true
    }
   },
   {
@@ -294,49 +347,49 @@
    "procedural": {
     "source": {
      "kind": "fiber",
-     "fiberLength": 36.0,
+     "fiberLength": 14.0,
      "fiberWidth": 0.008,
      "fiberTaper": 0.3,
-     "fiberSegments": 32,
-     "fiberMinPixels": 0.7
+     "fiberSegments": 24,
+     "fiberMinPixels": 0.8
     },
     "variation": {
      "seed": 11,
      "position": [
-      0.06818181818181818,
-      0.6,
-      0.12
+      0.18,
+      0.8,
+      0.18
      ],
      "rotation": [
-      0.05,
+      0.3,
       3.14,
-      0.05
+      0.3
      ],
-     "uniformScale": 0.2
+     "uniformScale": 0.3
     },
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      220,
-      1,
-      24
+      110,
+      22,
+      110
      ],
      "gridSpacing": [
-      0.13636363636363635,
-      1,
-      0.25
+      0.36,
+      1.6,
+      0.36
      ]
     },
     "distributionTransform": {
      "position": [
       0,
-      17,
+      0,
       0
      ],
      "rotation": [
       0,
       0,
-      180
+      0
      ],
      "scale": [
       1,
@@ -349,20 +402,31 @@
       "kind": "streamline",
       "space": "world",
       "field": "flow",
-      "amount": 6.0,
+      "amount": 5.0,
       "falloff": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
-      "field": "curl",
-      "amount": 6.0,
+      "field": "push",
+      "amount": 4.0,
       "falloff": 0.0
      }
     ],
     "effectors": [
      {
-      "field": "crown",
+      "field": "holeA",
+      "op": "scale",
+      "blend": "multiply",
+      "strength": 1.0,
+      "scaleAxis": [
+       1,
+       1,
+       1
+      ]
+     },
+     {
+      "field": "holeB",
       "op": "scale",
       "blend": "multiply",
       "strength": 1.0,

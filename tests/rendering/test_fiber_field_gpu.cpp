@@ -135,7 +135,7 @@ TEST_CASE("a fiber's centre line on the GPU is the CPU reference's", "[gpu][fibe
         const scene::Scene s = fiberScene(steer, 0.05f, 0.0f);
         const auto img = render(*ctx, s);
         const auto& g = s.procedurals[0];
-        const auto pts = scene::fiberCentreLine(&g.deformers[0], {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+        const auto pts = scene::fiberCentreLine(g.deformers, {-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
                                                 g.source.fiberLength, g.source.fiberSegments, 0.0, &s.fields);
         // Every point of the reference is lit, the tip included.
         for (std::size_t k = 0; k < pts.size(); ++k) {

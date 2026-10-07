@@ -1,20 +1,20 @@
 {
  "format": "avgen-scene",
  "version": 1,
- "name": "Chorus Field p2 mask",
+ "name": "Chorus Field p2 mask deep",
  "camera": {
   "mode": 1,
   "position": [
-   0,
-   0,
-   44
+   -26,
+   -3,
+   38
   ],
   "target": [
    0,
    -1,
    0
   ],
-  "fov": 45,
+  "fov": 42,
   "orbitSpeed": 0
  },
  "lights": [
@@ -231,7 +231,7 @@
      "kind": "none"
     },
     "frequency": 0.11,
-    "strength": 0.25,
+    "strength": 0.06,
     "seed": 21
    }
   },
@@ -262,7 +262,7 @@
    "kind": "field",
    "position": [
     0,
-    17,
+    19,
     0
    ],
    "field": {
@@ -319,7 +319,7 @@
      "gridCount": [
       220,
       1,
-      24
+      48
      ],
      "gridSpacing": [
       0.13636363636363635,
@@ -330,7 +330,7 @@
     "distributionTransform": {
      "position": [
       0,
-      17,
+      19,
       0
      ],
      "rotation": [

@@ -2433,16 +2433,27 @@ glm::vec3 applyPathDeformer(const Deformer& d, glm::vec3 p, const spatial::Splin
     return glm::mix(p, bent, d.amount);
 }
 
-std::vector<glm::vec3> fiberCentreLine(const Deformer* streamline, glm::vec3 root, glm::vec3 axis, float length,
-                                       int segments, double time, const spatial::FieldSet* fields, float element) {
+std::vector<glm::vec3> fiberCentreLine(const std::vector<Deformer>& stack, glm::vec3 root, glm::vec3 axis,
+                                       float length, int segments, double time, const spatial::FieldSet* fields,
+                                       float element) {
     const int n = std::clamp(segments, 1, kMaxFiberSegments);
     const float ds = length / static_cast<float>(n);
-    const spatial::FieldSpec* field = nullptr;
-    if (streamline != nullptr && streamline->enabled && streamline->kind == DeformerKind::Streamline &&
-        fields != nullptr) {
-        field = fields->find(streamline->field);
-        if (field != nullptr && !field->enabled) {
-            field = nullptr;
+    struct Pull {
+        const spatial::FieldSpec* field;
+        float amount;
+        float stiffness;
+    };
+    std::vector<Pull> pulls;
+    if (fields != nullptr) {
+        for (std::size_t i = 0; i < stack.size() && i < static_cast<std::size_t>(kMaxDeformers); ++i) {
+            const Deformer& d = stack[i];
+            if (!d.enabled || d.kind != DeformerKind::Streamline) {
+                continue;
+            }
+            const spatial::FieldSpec* f = fields->find(d.field);
+            if (f != nullptr && f->enabled) {
+                pulls.push_back({f, d.amount, std::max(d.falloff, 0.0f)});
+            }
         }
     }
     std::vector<glm::vec3> points;
@@ -2451,11 +2462,14 @@ std::vector<glm::vec3> fiberCentreLine(const Deformer* streamline, glm::vec3 roo
     glm::vec3 d = unitOr(axis, glm::vec3(0.0f, 1.0f, 0.0f));
     points.push_back(r);
     for (int k = 0; k < n; ++k) {
-        if (field != nullptr) {
+        if (!pulls.empty()) {
             const float arc = ds * static_cast<float>(k);
-            const float ramp = streamline->falloff > 0.0f ? std::clamp(arc / streamline->falloff, 0.0f, 1.0f) : 1.0f;
-            const glm::vec3 v = spatial::sampleVector(*field, r, time, fields, element);
-            const glm::vec3 turned = d + v * (streamline->amount * ramp * ds);
+            glm::vec3 pull(0.0f);
+            for (const Pull& p : pulls) {
+                const float ramp = p.stiffness > 0.0f ? std::clamp(arc / p.stiffness, 0.0f, 1.0f) : 1.0f;
+                pull += spatial::sampleVector(*p.field, r, time, fields, element) * (p.amount * ramp);
+            }
+            const glm::vec3 turned = d + pull * ds;
             const float len = glm::length(turned);
             if (len > 1e-6f) {
                 d = turned / len;

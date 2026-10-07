@@ -1,20 +1,20 @@
 {
  "format": "avgen-scene",
  "version": 1,
- "name": "Chorus Field p2 mask",
+ "name": "Chorus Field p2 flow",
  "camera": {
   "mode": 1,
   "position": [
-   0,
-   0,
-   44
+   -34,
+   -6,
+   26
   ],
   "target": [
-   0,
-   -1,
-   0
+   6,
+   1,
+   -2
   ],
-  "fov": 45,
+  "fov": 50,
   "orbitSpeed": 0
  },
  "lights": [
@@ -133,7 +133,7 @@
  },
  "nodes": [
   {
-   "name": "fall",
+   "name": "wind",
    "kind": "field",
    "position": [
     0,
@@ -146,93 +146,65 @@
      "kind": "none"
     },
     "axis": [
-     0,
-     -1,
+     1,
+     0.05,
      0
     ],
     "strength": 1.0
    }
   },
   {
-   "name": "eyeL",
+   "name": "bodyA",
    "kind": "field",
    "position": [
-    -4.6,
-    2.5,
-    0
+    -6,
+    3,
+    -2
    ],
    "field": {
-    "kind": "vortex",
+    "kind": "repulsor",
     "falloff": {
      "kind": "smoothstep",
-     "inner": 1.2,
-     "outer": 6.0
+     "inner": 3,
+     "outer": 9
     },
-    "axis": [
-     0,
-     0,
-     -1.0
-    ],
-    "strength": 2.6
+    "strength": 1.6
    }
   },
   {
-   "name": "eyeR",
+   "name": "bodyB",
    "kind": "field",
    "position": [
-    4.6,
-    2.5,
-    0
+    10,
+    -4,
+    3
    ],
    "field": {
-    "kind": "vortex",
+    "kind": "repulsor",
     "falloff": {
      "kind": "smoothstep",
-     "inner": 1.2,
-     "outer": 6.0
+     "inner": 2,
+     "outer": 8
     },
-    "axis": [
-     0,
-     0,
-     1.0
-    ],
-    "strength": 2.6
+    "strength": 1.4
    }
   },
   {
-   "name": "chin",
+   "name": "bodyC",
    "kind": "field",
    "position": [
-    0,
-    -18,
-    0
+    22,
+    6,
+    -4
    ],
    "field": {
-    "kind": "attractor",
+    "kind": "repulsor",
     "falloff": {
      "kind": "smoothstep",
-     "inner": 6,
-     "outer": 26
+     "inner": 4,
+     "outer": 11
     },
-    "strength": 0.8
-   }
-  },
-  {
-   "name": "curl",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "curlNoise",
-    "falloff": {
-     "kind": "none"
-    },
-    "frequency": 0.11,
-    "strength": 0.25,
-    "seed": 21
+    "strength": 1.8
    }
   },
   {
@@ -249,38 +221,55 @@
      "kind": "none"
     },
     "children": [
-     "fall",
-     "eyeL",
-     "eyeR",
-     "chin"
+     "wind",
+     "bodyA",
+     "bodyB",
+     "bodyC"
     ],
     "combine": "add"
    }
   },
   {
-   "name": "crown",
+   "name": "curl",
    "kind": "field",
    "position": [
     0,
-    17,
+    0,
     0
    ],
    "field": {
-    "kind": "sphere",
+    "kind": "curlNoise",
+    "falloff": {
+     "kind": "none"
+    },
+    "frequency": 0.05,
+    "strength": 1.0,
+    "seed": 4
+   }
+  },
+  {
+   "name": "band",
+   "kind": "field",
+   "position": [
+    -26,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "box",
     "falloff": {
      "kind": "noiseModulated",
-     "inner": 6,
-     "outer": 18,
-     "noiseAmount": 2.5,
-     "noiseScale": 0.25
+     "inner": 2,
+     "outer": 30,
+     "noiseAmount": 2.0,
+     "noiseScale": 0.2
     },
-    "radius": 12.0,
-    "softness": 6.0,
-    "scale": [
-     1.0,
-     1.0,
-     1.0
-    ]
+    "size": [
+     1,
+     9,
+     9
+    ],
+    "softness": 4.0
    }
   },
   {
@@ -294,49 +283,49 @@
    "procedural": {
     "source": {
      "kind": "fiber",
-     "fiberLength": 36.0,
+     "fiberLength": 60.0,
      "fiberWidth": 0.008,
      "fiberTaper": 0.3,
      "fiberSegments": 32,
-     "fiberMinPixels": 0.7
+     "fiberMinPixels": 0.8
     },
     "variation": {
      "seed": 11,
      "position": [
-      0.06818181818181818,
-      0.6,
-      0.12
+      0.4,
+      0.11,
+      0.11
      ],
      "rotation": [
       0.05,
-      3.14,
+      0.05,
       0.05
      ],
-     "uniformScale": 0.2
+     "uniformScale": 0.25
     },
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      220,
-      1,
-      24
+      4,
+      110,
+      110
      ],
      "gridSpacing": [
-      0.13636363636363635,
-      1,
-      0.25
+      0.5,
+      0.22,
+      0.22
      ]
     },
     "distributionTransform": {
      "position": [
+      -26,
       0,
-      17,
       0
      ],
      "rotation": [
       0,
       0,
-      180
+      -90
      ],
      "scale": [
       1,
@@ -349,20 +338,20 @@
       "kind": "streamline",
       "space": "world",
       "field": "flow",
-      "amount": 6.0,
+      "amount": 5.0,
       "falloff": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "curl",
-      "amount": 6.0,
+      "amount": 0.6,
       "falloff": 0.0
      }
     ],
     "effectors": [
      {
-      "field": "crown",
+      "field": "band",
       "op": "scale",
       "blend": "multiply",
       "strength": 1.0,

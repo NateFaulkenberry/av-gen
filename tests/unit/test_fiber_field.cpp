@@ -118,7 +118,7 @@ TEST_CASE("a fiber object round-trips through JSON", "[fiber][procedural]") {
 }
 
 TEST_CASE("without a field a fiber is straight along its axis", "[fiber][procedural]") {
-    const auto pts = fiberCentreLine(nullptr, {1, 2, 3}, {0, 0, 2}, 4.0f, 8, 0.0, nullptr);
+    const auto pts = fiberCentreLine({}, {1, 2, 3}, {0, 0, 2}, 4.0f, 8, 0.0, nullptr);
     REQUIRE(pts.size() == 9);
     for (int k = 0; k <= 8; ++k) {
         CHECK_THAT(pts[static_cast<std::size_t>(k)].z, WithinAbs(3.0f + 0.5f * static_cast<float>(k), 1e-5));
@@ -137,7 +137,7 @@ TEST_CASE("a streamline follows its field and keeps its length", "[fiber][proced
     d.kind = DeformerKind::Streamline;
     d.field = "flow";
     d.amount = 1000.0f; // follows the field exactly
-    const auto pts = fiberCentreLine(&d, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
+    const auto pts = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
     REQUIRE(pts.size() == 9);
     float arc = 0.0f;
     for (std::size_t i = 1; i < pts.size(); ++i) {
@@ -149,14 +149,14 @@ TEST_CASE("a streamline follows its field and keeps its length", "[fiber][proced
 
     // Amount 0 is straight; the control that must fail the "follows" check above.
     d.amount = 0.0f;
-    const auto straight = fiberCentreLine(&d, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
+    const auto straight = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
     CHECK_THAT(straight.back().y, WithinAbs(2.0f, 1e-5));
     CHECK_THAT(straight.back().x, WithinAbs(0.0f, 1e-6));
 
     // Stiffness: no steering at the root, so the first segment leaves along the fiber's own axis.
     d.amount = 1000.0f;
     d.falloff = 1.0f;
-    const auto stiff = fiberCentreLine(&d, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
+    const auto stiff = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
     CHECK_THAT(stiff[1].x, WithinAbs(0.0f, 1e-6));
     CHECK_THAT(stiff[1].y, WithinAbs(0.25f, 1e-6));
     CHECK(stiff.back().x > 1.0f);

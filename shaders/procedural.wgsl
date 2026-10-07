@@ -367,34 +367,41 @@ fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: Insta
 // carries (segment length ds, min pixels at 1080 lines, root half-width). The centre line is
 // r_0 = the instance root, d_0 = the instance rotation of +Y, and per segment
 //   d_{k+1} = normalize(d_k + v(r_k) * amount * ramp(k ds) * ds),  r_{k+1} = r_k + d_{k+1} * ds
-// with v the Streamline deformer's vector field (none: straight). Vertex k integrates k steps and
+// summed over every Streamline deformer of the stack (none: straight). Vertex k integrates k steps and
 // one more for its tangent, so every vertex of a fiber agrees on the shared points exactly, with no
 // buffer between the passes. Mirrors scene::fiberCentreLine.
 
-// The first enabled Streamline deformer, or -1.
-fn fiberStreamline() -> i32 {
+// Whether this draw has any Streamline deformer (uniform per draw).
+fn fiberHasStreamline() -> bool {
     let count = u32(proc.timeInfo.y + 0.5);
     for (var i = 0u; i < 8u; i = i + 1u) {
         if (i >= count) { break; }
         let code = deformerCode(proc.deformers[i]);
         if (code == DEFORM_STREAMLINE || code == DEFORM_STREAMLINE + DEFORM_WORLD) {
-            return i32(i);
+            return true;
         }
     }
-    return -1;
+    return false;
 }
 
-fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32, deformer: i32) -> vec3<f32> {
-    if (deformer < 0) {
-        return d;
+// One step's turn. Every Streamline deformer of the stack adds its own field's pull, each with its own
+// steering and stiffness, so a layer is steered by up to eight separately routable forces.
+fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32) -> vec3<f32> {
+    let count = u32(proc.timeInfo.y + 0.5);
+    var pull = vec3<f32>(0.0);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let def = proc.deformers[i];
+        let code = deformerCode(def);
+        if (code != DEFORM_STREAMLINE && code != DEFORM_STREAMLINE + DEFORM_WORLD) { continue; }
+        let slot = i32(floor(def.params.x + 0.5));
+        var ramp = 1.0;
+        if (def.params.w > 0.0) {
+            ramp = clamp(arc / def.params.w, 0.0, 1.0);
+        }
+        pull = pull + fieldVector(slot, r) * (def.centerAmount.w * ramp);
     }
-    let def = proc.deformers[u32(deformer)];
-    let slot = i32(floor(def.params.x + 0.5));
-    var ramp = 1.0;
-    if (def.params.w > 0.0) {
-        ramp = clamp(arc / def.params.w, 0.0, 1.0);
-    }
-    let turned = d + fieldVector(slot, r) * (def.centerAmount.w * ramp * ds);
+    let turned = d + pull * ds;
     let len = length(turned);
     if (len > 1e-6) {
         return turned / len;
@@ -408,18 +415,33 @@ struct FiberPoint {
 };
 
 fn fiberPoint(root: vec3<f32>, axis: vec3<f32>, k: u32, ds: f32) -> FiberPoint {
-    let deformer = fiberStreamline();
     var r = root;
     var d = axis;
+    var out: FiberPoint;
+    if (!fiberHasStreamline()) {
+        out.centre = r + d * (ds * f32(k));
+        out.tangent = d;
+        return out;
+    }
     for (var i = 0u; i < 32u; i = i + 1u) {
         if (i >= k) { break; }
-        d = fiberTurn(d, r, ds * f32(i), ds, deformer);
+        d = fiberTurn(d, r, ds * f32(i), ds);
         r = r + d * ds;
     }
-    var out: FiberPoint;
     out.centre = r;
-    out.tangent = fiberTurn(d, r, ds * f32(k), ds, deformer);
+    out.tangent = fiberTurn(d, r, ds * f32(k), ds);
     return out;
+}
+
+// Screen pixels per metre across the fiber at c (0 behind the camera).
+fn pixelsPerMetreAt(c: vec3<f32>, across: vec3<f32>, half: f32) -> f32 {
+    let probe = max(half, 1e-4);
+    let c0 = frame.viewProj * vec4<f32>(c, 1.0);
+    let c1 = frame.viewProj * vec4<f32>(c + across * probe, 1.0);
+    if (c0.w <= 1e-4 || c1.w <= 1e-4) {
+        return 0.0;
+    }
+    return length((c1.xy / c1.w - c0.xy / c0.w) * 0.5 * frame.targetSize.xy) / probe;
 }
 
 fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut) -> ProcVertexOut {
@@ -452,25 +474,39 @@ fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut) -> Proc
     // drawn on black, so a fiber that covers a third of its pixel gives a third of its light).
     var coverage = 1.0;
     let minPixels = in.normal.y * frame.targetSize.y / 1080.0;
-    if (minPixels > 0.0) {
-        let probe = max(half, 1e-4);
-        let c0 = frame.viewProj * vec4<f32>(c, 1.0);
-        let c1 = frame.viewProj * vec4<f32>(c + across * probe, 1.0);
-        if (c0.w > 1e-4 && c1.w > 1e-4) {
-            let pixelsPerMetre = length((c1.xy / c1.w - c0.xy / c0.w) * 0.5 * frame.targetSize.xy) / probe;
-            let halfPixels = half * pixelsPerMetre;
-            let minHalf = 0.5 * minPixels;
-            if (pixelsPerMetre > 0.0 && halfPixels < minHalf) {
-                coverage = halfPixels / minHalf;
-                half = minHalf / pixelsPerMetre;
-            }
+    let pixelsPerMetre = pixelsPerMetreAt(c, across, half);
+    let trueHalf = half;
+    if (minPixels > 0.0 && pixelsPerMetre > 0.0) {
+        let halfPixels = half * pixelsPerMetre;
+        let minHalf = 0.5 * minPixels;
+        if (halfPixels < minHalf) {
+            coverage = halfPixels / minHalf;
+            half = minHalf / pixelsPerMetre;
         }
     }
     let p = c + across * (half * side);
     // A round thread: the normal turns across the strip from the side to the viewer (the two edges at
-    // +-45 degrees, so the interpolated middle faces the camera and the rims catch grazing light).
+    // +-70 degrees, so the interpolated middle faces the camera and the rims catch grazing light --
+    // nearly the whole half-cylinder, so a highlight exists for almost any light, as on real wire).
     let facing = normalize(view - t * dot(view, t) + vec3<f32>(0.0, 0.0, 1e-7));
-    out.normal = normalize(facing + across * side);
+    var normal = normalize(facing * 0.342 + across * (0.94 * side));
+    // A thread narrower than a few pixels cannot show its own cross-section, and sampling one point of
+    // it per pixel turns its highlight into glitter. There it is shaded as the whole thread would be
+    // (Kajiya-Kay): with the normal of the cylinder that best reflects the key light (light 0) to the
+    // viewer -- the half vector with its component along the tangent removed -- so a highlight runs
+    // continuously along every fiber whose tangent is near perpendicular to it, and bundles of
+    // aligned fibers light up together as one band.
+    let pixelsAcross = 2.0 * trueHalf * pixelsPerMetre;
+    let thin = clamp(1.0 - pixelsAcross / 4.0, 0.0, 1.0);
+    if (thin > 0.0 && frame.lightCounts.y > 0.5) {
+        let toLight = -frame.lights[0].directionRange.xyz;
+        let h = normalize(toLight + view);
+        let hPerp = h - t * dot(h, t);
+        if (dot(hPerp, hPerp) > 1e-8) {
+            normal = normalize(mix(normal, normalize(hPerp), thin));
+        }
+    }
+    out.normal = normal;
     out.clip = frame.viewProj * vec4<f32>(p, 1.0);
     out.worldPos = p;
     out.prevClip = frame.prevViewProj * vec4<f32>(p, 1.0);
