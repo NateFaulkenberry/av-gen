@@ -110,7 +110,11 @@ public:
     // Evaluates triggers against the bus, then advances the running transition (writes bases).
     void update(double seconds, double dt, const signals::SignalBus& bus, const BeatInfo& beat,
                 params::ParameterSet& params, const params::PresetBank& presets);
-    void reset(params::ParameterSet& params, const params::PresetBank& presets);
+    // Back to the initial state, with the machine's own clock restarted at `seconds` (0 = the start of the piece).
+    // The clock matters: the initial state is entered at `seconds`, and every `elapsed` trigger measures from there.
+    // Leaving it at the last second updated (it once was) meant a second ADR-1168 replay re-entered the initial state
+    // "at" the previous target and then replayed from zero, so no elapsed trigger could fire before that target.
+    void reset(params::ParameterSet& params, const params::PresetBank& presets, double seconds = 0.0);
 
     [[nodiscard]] const std::string& current() const { return current_; }
     [[nodiscard]] const std::string& pending() const { return pending_; }
