@@ -94,3 +94,45 @@ TEST_CASE("a spline camera banks into its turns", "[camera][roll][adr1166]") {
     frame();
     CHECK((*comp)->scene().camera.up.y == Approx(1.0f).margin(1e-4));
 }
+
+// A spline camera parked at the end of an open spline kept its target on the end point too: the two coincided, and
+// the aim was float rounding (single frames pointing anywhere, THE RIFT at 201-207 s). The look-ahead now continues
+// along the end tangent, so the camera keeps looking the way it was flying.
+TEST_CASE("a spline camera at the end of an open spline keeps looking along it", "[camera][spline]") {
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "end",
+        "camera": { "mode": 2, "spline": "flight", "fov": 45.0 },
+        "nodes": [
+          { "name": "flight", "kind": "spline", "spline": { "name": "flight", "kind": "catmullRom", "closed": false,
+            "points": [ { "position": [0, 2, 0] }, { "position": [0, 2, -100] }, { "position": [0, 2, -200] },
+                        { "position": [0, 2, -300] } ] } },
+          { "name": "box", "kind": "procedural", "procedural": {
+            "source": { "kind": "box", "size": [1, 1, 1] }, "distribution": { "kind": "single" } } } ] })"),
+                                             registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    auto* t = params.findAs<float>("camera/splineT");
+    auto* look = params.findAs<float>("camera/lookAhead");
+    auto* offset = params.findAs<glm::vec3>("camera/splineOffset");
+    REQUIRE(t != nullptr);
+    REQUIRE(look != nullptr);
+    REQUIRE(offset != nullptr);
+    look->setBase(20.0f);
+    // At, and past, the end (the clamp), with an offset that drifts a little each frame (as an LFO does).
+    for (int k = 0; k < 40; ++k) {
+        t->setBase(k < 20 ? 1.0f : 1.05f);
+        offset->setBase(glm::vec3(3.0f + 0.013f * static_cast<float>(k), 1.5f - 0.007f * static_cast<float>(k), 0.0f));
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = 1.0 + k / 30.0;
+        (*comp)->update(ft);
+        const scene::Camera& cam = (*comp)->scene().camera;
+        const glm::vec3 forward = glm::normalize(cam.target - cam.position);
+        INFO("frame " << k << ": forward " << forward.x << ", " << forward.y << ", " << forward.z);
+        REQUIRE(forward.z < -0.99f); // still looking down the path's direction (-Z)
+        CHECK(glm::length(cam.target - cam.position) == Approx(20.0f).margin(0.1f));
+    }
+}

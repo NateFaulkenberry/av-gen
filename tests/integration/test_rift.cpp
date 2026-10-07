@@ -136,3 +136,27 @@ TEST_CASE("THE RIFT: the render job's sequence (warm-up, camera reset, seek, fix
                                << engine.states().current() << "'");
     CHECK(engine.states().current() == "Drop");
 }
+
+// The full Trench run's camera parked at the end of its open spline at about 200 s (the flight ran out of path) and
+// lost its aim: single frames pointed anywhere (the Critic's "camera shake" at 201-207 s, 14% of the frame per frame).
+// The flight must fit the track: the integrated splineT stays inside the path for the whole song.
+TEST_CASE("THE RIFT: the flight does not run out of path before the track ends", "[rift]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    const auto* t = dynamic_cast<const params::Parameter<float>*>(engine.params().find("camera/splineT"));
+    REQUIRE(t != nullptr);
+    const double fps = 15.0;
+    const double end = 207.6;
+    float last = 0.0f;
+    for (int k = 0; k <= static_cast<int>(end * fps); ++k) {
+        FrameTime ft{};
+        ft.renderTime = k / fps;
+        ft.deltaTime = k == 0 ? 0.0 : 1.0 / fps;
+        ft.frameIndex = static_cast<std::uint64_t>(k);
+        engine.update(ft);
+        last = t->value();
+    }
+    INFO("camera/splineT at " << end << " s: " << last);
+    CHECK(last < 0.97f);
+}

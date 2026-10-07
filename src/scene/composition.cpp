@@ -8109,10 +8109,19 @@ CameraPose Composition::evaluateMainCamera() const {
         const float lookAhead = cameraLookAhead_ != nullptr ? cameraLookAhead_->value() : 2.0f;
         const glm::vec3 offset = cameraSplineOffset_ != nullptr ? cameraSplineOffset_->value() : glm::vec3(0.0f);
         const spatial::SplineSample at = cameraSpline->sampleByDistance(t * length);
-        const spatial::SplineSample ahead = cameraSpline->sampleByDistance(t * length + lookAhead);
+        const float aheadDistance = t * length + lookAhead;
+        const spatial::SplineSample ahead = cameraSpline->sampleByDistance(aheadDistance);
+        // An open spline clamps its samples, so near an end the look-ahead point would stop on the end point and,
+        // parked there, coincide with the camera: its aim was then float rounding, a random direction each frame
+        // (THE RIFT's flight ran off its path). Past either end the look-ahead continues straight along the tangent.
+        glm::vec3 aheadPosition = ahead.position;
+        if (!cameraSpline->closed) {
+            const float beyond = aheadDistance > length ? aheadDistance - length : std::min(aheadDistance, 0.0f);
+            aheadPosition += ahead.tangent * beyond;
+        }
         const glm::vec3 frameOffset = at.binormal * offset.x + at.normal * offset.y + at.tangent * offset.z;
         pose.position = at.position + frameOffset;
-        pose.target = ahead.position + at.binormal * offset.x + at.normal * offset.y;
+        pose.target = aheadPosition + at.binormal * offset.x + at.normal * offset.y;
         ensureDistinctAim(pose, at.tangent);
     } else if (cameraMode == 3 && journey_) {
         // ADR-1042: the journey. Parameters when attached, the defaults otherwise.

@@ -462,6 +462,8 @@ CAM = {
 
 # Per state: camera behaviour, pace (m/s), ignition gain, wave speed (m/s), rock glow, haze glow,
 # spores (per s), swarm (per s), transition (s, easing), medium threshold, kick-front decay (1/s), kick-front speed.
+# The paces must fit the flight into the path: on Trench the body at 17-20 m/s ran off the end of the open spline at
+# 197 s, and the parked camera lost its aim (test_rift.cpp, "the flight does not run out of path").
 # The medium's CHARACTER is per stage: before the drop a high threshold (fronts survive only in rich patches) and a
 # fast-dying ignition (a kick lights local pockets that ripple and stop); at the drop a low threshold (the whole canyon
 # conducts) and a slow, fast front that runs kilometres. Without that contrast the drop has nothing to break (v2).
@@ -473,10 +475,10 @@ STAGES = {
     "Awake 2":   ("wall",   8.0, 1.4, 14.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth"), 0.75, 3.0, 34.0),
     "Build":     ("climb",  4.0, 0.5, 16.0, 0.0, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
     "Drop":      ("surge", 26.0, 3.0, 28.0, 0.35, 0.025, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
-    "Body":      ("canopy", 17.0, 2.0, 22.0, 0.25, 0.06, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
-    "Body 2":    ("dive",   20.0, 2.2, 24.0, 0.3, 0.06, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
-    "Body 3":    ("wall",   15.0, 2.0, 22.0, 0.25, 0.05, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
-    "Body 4":    ("reveal", 12.0, 2.4, 24.0, 0.3, 0.07, 1500.0, 2000.0, (8.0, "smooth"), 0.55, 1.2, 45.0),
+    "Body":      ("canopy", 14.0, 2.0, 22.0, 0.25, 0.06, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
+    "Body 2":    ("dive",   17.0, 2.2, 24.0, 0.3, 0.06, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
+    "Body 3":    ("wall",   12.0, 2.0, 22.0, 0.25, 0.05, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
+    "Body 4":    ("reveal",  9.5, 2.4, 24.0, 0.3, 0.07, 1500.0, 2000.0, (8.0, "smooth"), 0.55, 1.2, 45.0),
     "Aftermath": ("after",  2.5, 0.0, 12.0, 0.0, 0.0, 600.0, 0.0, (4.0, "smooth"), 0.95, 4.0, 30.0),
 }
 # How brightly the whole ecosystem burns, per stage: (rest x, excited x, crown light cd). The drop surges every layer at
