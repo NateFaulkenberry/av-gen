@@ -49,7 +49,7 @@ struct FiberStrandUniforms {
     glm::mat4 model;
     glm::uvec4 info;           // x = record count, y = points per fiber, z = pulls
     glm::vec4 shape;           // x = segment length at scale 1
-    glm::vec4 pulls[scene::kMaxDeformers]; // x = field slot, y = steering, z = stiffness
+    glm::vec4 pulls[scene::kMaxDeformers]; // x = field slot, y = steering, z = stiffness, w = tension
 };
 static_assert(sizeof(FiberStrandUniforms) == 64 + 32 + 16 * scene::kMaxDeformers);
 constexpr std::uint32_t kEffectorWorkgroup = 64;     // points.wgsl cs_effectors
@@ -150,6 +150,7 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
     case scene::DeformerKind::Streamline:
         // ADR-1181: x = field slot, w = stiffness (the arc length over which the steering ramps in).
         u.params = glm::vec4(static_cast<float>(fieldSlot), 0.0f, 0.0f, std::max(d.falloff, 0.0f));
+        extra = glm::vec3(std::max(d.tension, 0.0f), 0.0f, 0.0f); // x = tension
         break;
     case scene::DeformerKind::Twist:
     case scene::DeformerKind::Displacement:
@@ -2043,8 +2044,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 if (slotOf < 0) {
                     continue;
                 }
-                strandUniforms.pulls[strandPulls++] =
-                    glm::vec4(static_cast<float>(slotOf), d.amount, std::max(d.falloff, 0.0f), 0.0f);
+                strandUniforms.pulls[strandPulls++] = glm::vec4(static_cast<float>(slotOf), d.amount,
+                                                                std::max(d.falloff, 0.0f), std::max(d.tension, 0.0f));
             }
         }
         const std::uint32_t strandSegments =

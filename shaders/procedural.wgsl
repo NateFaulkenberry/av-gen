@@ -384,9 +384,9 @@ fn fiberHasStreamline() -> bool {
     return false;
 }
 
-// One step's turn. Every Streamline deformer of the stack adds its own field's pull, each with its own
-// steering and stiffness, so a layer is steered by up to eight separately routable forces.
-fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32) -> vec3<f32> {
+// The summed pull of every Streamline deformer of the stack at r for arc length a (each with its own field,
+// steering, stiffness ramp and tension -- extra.x). The fallback twin of fiber_strands.wgsl `strandPull`.
+fn fiberPull(r: vec3<f32>, arc: f32) -> vec3<f32> {
     let count = u32(proc.timeInfo.y + 0.5);
     var pull = vec3<f32>(0.0);
     for (var i = 0u; i < 8u; i = i + 1u) {
@@ -399,14 +399,30 @@ fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32) -> vec3<f32> {
         if (def.params.w > 0.0) {
             ramp = clamp(arc / def.params.w, 0.0, 1.0);
         }
-        pull = pull + fieldVector(slot, r) * (def.centerAmount.w * ramp);
+        var v = fieldVector(slot, r) * (def.centerAmount.w * ramp);
+        if (def.extra.x > 0.0) {
+            let m = length(v);
+            v = select(vec3<f32>(0.0), v * (max(m - def.extra.x, 0.0) / m), m > 1e-8);
+        }
+        pull = pull + v;
     }
-    let turned = d + pull * ds;
+    return pull;
+}
+
+fn fiberTurnBy(d: vec3<f32>, pull: vec3<f32>, h: f32) -> vec3<f32> {
+    let turned = d + pull * h;
     let len = length(turned);
     if (len > 1e-6) {
         return turned / len;
     }
     return d;
+}
+
+// One midpoint (RK2) step's new direction from (d, r) at arc length `arc`.
+fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32) -> vec3<f32> {
+    let half = fiberTurnBy(d, fiberPull(r, arc), 0.5 * ds);
+    let mid = r + half * (0.5 * ds);
+    return fiberTurnBy(d, fiberPull(mid, arc + 0.5 * ds), ds);
 }
 
 struct FiberPoint {
@@ -423,7 +439,7 @@ fn fiberPoint(root: vec3<f32>, axis: vec3<f32>, k: u32, ds: f32) -> FiberPoint {
         out.tangent = d;
         return out;
     }
-    for (var i = 0u; i < 32u; i = i + 1u) {
+    for (var i = 0u; i < 64u; i = i + 1u) {
         if (i >= k) { break; }
         d = fiberTurn(d, r, ds * f32(i), ds);
         r = r + d * ds;

@@ -347,7 +347,8 @@ def entity_scene(title, *, eyes=True, eye_x=4.6, eye_y=2.5, eye_spin=1.0, eye_r=
                  chin=0.8, chin_y=-18.0, horns=0.0, horn_y=11.0, horn_x=9.0, mouth=0.0, mouth_y=-6.5,
                  brow=0.0, curl=0.06, cam=(0, -3, 46), target=(0, -3, 0), fov=40, material=None,
                  count_x=220, depth=24, length=36.0, width=0.008, top=19.0, lights=None, env=None, post=None,
-                 spread=30.0):
+                 spread=30.0, jitter=1.0, taper=0.3, size_random=0.2, extra_nodes=(), extra_effectors=(),
+                 mvar=None, segments=32, tube=1.0):
     """The curtain entity, with every feature optional. Each feature is a pull (its own streamline
     deformer), so audio can later weight one feature of the face without touching the others."""
     nodes = [
@@ -359,9 +360,9 @@ def entity_scene(title, *, eyes=True, eye_x=4.6, eye_y=2.5, eye_spin=1.0, eye_r=
     if eyes:
         nodes += [
             field("eyeL", "vortex", position=[-eye_x, eye_y, 0], axis=[0, 0, -eye_spin], strength=eye_strength,
-                  falloff=smooth(*eye_r)),
+                  falloff=smooth(*eye_r), scale=[1, 1, tube]),
             field("eyeR", "vortex", position=[eye_x, eye_y, 0], axis=[0, 0, eye_spin], strength=eye_strength,
-                  falloff=smooth(*eye_r)),
+                  falloff=smooth(*eye_r), scale=[1, 1, tube]),
             field("eyes", "compound", children=["eyeL", "eyeR"], combine="add"),
         ]
         pulls.append(("eyes", 1.0))
@@ -369,9 +370,9 @@ def entity_scene(title, *, eyes=True, eye_x=4.6, eye_y=2.5, eye_spin=1.0, eye_r=
         # Temples: counter-rotating eddies that throw the outer streams up and out before they fall.
         nodes += [
             field("hornL", "vortex", position=[-horn_x, horn_y, 0], axis=[0, 0, 1], strength=2.0,
-                  falloff=smooth(2, 9)),
+                  falloff=smooth(2, 9), scale=[1, 1, tube]),
             field("hornR", "vortex", position=[horn_x, horn_y, 0], axis=[0, 0, -1], strength=2.0,
-                  falloff=smooth(2, 9)),
+                  falloff=smooth(2, 9), scale=[1, 1, tube]),
             field("horns", "compound", children=["hornL", "hornR"], combine="add"),
         ]
         pulls.append(("horns", horns))
@@ -393,10 +394,13 @@ def entity_scene(title, *, eyes=True, eye_x=4.6, eye_y=2.5, eye_spin=1.0, eye_r=
         field("crown", "sphere", position=[0, top, 0], radius=spread * 0.4, softness=6.0,
               falloff={"kind": "noiseModulated", "inner": 6, "outer": 18, "noiseAmount": 2.5, "noiseScale": 0.25}),
         fibers("fibers", grid=(count_x, 1, depth), spacing=(spread / count_x, 1, 0.25), centre=(0, top, 0),
-               rotate=(0, 0, 180), jitter=(spread / count_x / 2, 0.6, 0.12), length=length, width=width,
-               segments=32, flow="fall", steer=6.0, orient=(0.05, 3.14, 0.05), size_random=0.2, min_px=0.7,
-               effectors=[thin("crown", "crown")], material=material, pulls=[(f, 6.0 * a) for f, a in pulls]),
+               rotate=(0, 0, 180), jitter=(jitter * spread / count_x / 2, 0.6 * jitter, 0.12 * jitter),
+               length=length, width=width, taper=taper, segments=segments, flow="fall", steer=6.0,
+               orient=(0.05 * jitter, 3.14 * jitter, 0.05 * jitter), size_random=size_random, min_px=0.7,
+               effectors=[thin("crown", "crown")] + list(extra_effectors), material=material,
+               material_variation=mvar, pulls=[(f, 6.0 * a) for f, a in pulls]),
     ]
+    nodes[-1:-1] = list(extra_nodes)
     return scene(title, nodes, cam_pos=list(cam), cam_target=list(target), fov=fov, lights=lights, env=env,
                  post=post)
 
@@ -434,15 +438,223 @@ def dbg_roll():
     return sc
 
 
+# ---- Phase 4: material ----------------------------------------------------------------------------
+
+FACE = {"horns": 0.8, "mouth": 0.7, "brow": 0.4}
+
+
+def film(base, rough, thickness, ior=1.6, emissive=(0, 0, 0), ei=0.0):
+    m = metal(base=base, rough=rough, emissive=emissive, ei=ei)
+    m["thinFilm"] = {"thickness": thickness, "ior": ior}
+    return m
+
+
+def oxide_regions():
+    """Field-driven material regions: a slow noise of colour, silver against oxidised bronze-verdigris."""
+    return [field("oxide", "noiseColor", frequency=0.09, seed=17, colorA=[0.30, 0.34, 0.40, 1],
+                  colorB=[0.42, 0.26, 0.13, 1])], [
+        {"field": "oxide", "op": "color", "blend": "add", "strength": 1.0}]
+
+
+MATERIALS = {
+    "m1-oilslick": dict(material=film((0.30, 0.30, 0.32), 0.22, 420.0, 1.7)),
+    "m2-blackchrome": dict(material=metal(base=(0.10, 0.10, 0.11), rough=0.12)),
+    "m3-engraved": dict(material=film((0.55, 0.52, 0.48), 0.25, 280.0, 1.45), jitter=0.0, taper=1.0,
+                        size_random=0.0, width=0.006),
+    "m4-veins": dict(material=metal(base=(0.20, 0.20, 0.22), rough=0.2, emissive=(1.0, 0.42, 0.16), ei=6.0),
+                     mvar={"emissiveSparsity": 0.965, "emissiveRandom": 0.6}),
+    "m5-oxide": dict(material=film((1, 1, 1), 0.3, 340.0, 1.5)),
+    "m6-gunmetal-oxide": dict(material=metal(base=(1, 1, 1), rough=0.22)),
+    "m7-chrome-split": dict(material=metal(base=(0.14, 0.14, 0.15), rough=0.14, emissive=(1.0, 0.36, 0.12), ei=5.0),
+                            mvar={"emissiveSparsity": 0.98, "emissiveRandom": 0.5}, lights="split"),
+    "m8-chrome-split-film": dict(material=film((0.16, 0.16, 0.17), 0.14, 190.0, 1.5, emissive=(1.0, 0.36, 0.12),
+                                               ei=5.0),
+                                 mvar={"emissiveSparsity": 0.98, "emissiveRandom": 0.5}, lights="split",
+                                 oxide=True),
+    "m9-studio-sky": dict(material=metal(base=(0.5, 0.5, 0.52), rough=0.16, emissive=(1.0, 0.36, 0.12), ei=5.0),
+                          mvar={"emissiveSparsity": 0.985, "emissiveRandom": 0.5}, lights="split", env="spectral"),
+    "m10-studio-film": dict(material=film((0.45, 0.45, 0.47), 0.16, 230.0, 1.45), lights="split", env="spectral"),
+}
+
+
+def spectral_env():
+    """Colour from reflection: a sky the fibers mirror, deep blue overhead, ember at the horizon,
+    violet below. The background stays black; only the metal sees it."""
+    return default_env(zenith=(0.03, 0.08, 0.30), horizon=(0.75, 0.38, 0.12), ground=(0.16, 0.04, 0.22),
+                       intensity=1.4)
+
+
+def split_lights():
+    """Colour from light, not from the fibers: a warm key and a cold, strong rim from behind."""
+    return [
+        {"name": "key", "type": "directional", "role": "key", "direction": [-0.5, -0.45, -0.75],
+         "color": [1.0, 0.82, 0.62], "intensity": 6.0, "castsShadow": True, "shadowStrength": 0.92,
+         "softness": 1.2},
+        {"name": "rim", "type": "directional", "role": "rim", "direction": [0.45, -0.25, 0.85],
+         "color": [0.45, 0.68, 1.0], "intensity": 7.0, "castsShadow": False, "shadowStrength": 0.0,
+         "softness": 2.0},
+        {"name": "under", "type": "directional", "role": "fill", "direction": [0.1, 0.9, 0.3],
+         "color": [0.55, 0.3, 0.75], "intensity": 0.8, "castsShadow": False, "shadowStrength": 0.0,
+         "softness": 3.0},
+    ]
+
+for _name, _kw in MATERIALS.items():
+    def _make(_kw=_kw, _name=_name):
+        kw = dict(FACE)
+        kw.update(_kw)
+        if kw.pop("lights", None) == "split":
+            kw["lights"] = split_lights()
+        if kw.pop("env", None) == "spectral":
+            kw["env"] = spectral_env()
+        if kw.pop("oxide", False) or _name in ("m5-oxide", "m6-gunmetal-oxide"):
+            nodes, effs = oxide_regions()
+            kw["extra_nodes"], kw["extra_effectors"] = nodes, effs
+        return entity_scene("Chorus Field p4 " + _name, **kw)
+    _make.__name__ = "p4_" + _name.replace("-", "_")
+    LOOKS[_make.__name__] = _make
+
+
+# ---- Phase 4: depth -------------------------------------------------------------------------------
+
+def depth_layers(curl_field="curl"):
+    """A deep storm far behind (an enormous distant structure) and a few strands crossing the lens."""
+    back = fibers("deep", grid=(160, 1, 4), spacing=(1.6, 1, 6.0), centre=(-10, 70, -150), rotate=(0, 0, 180),
+                  jitter=(0.8, 3.0, 3.0), length=180.0, width=0.05, segments=24, flow="fall", steer=4.0,
+                  orient=(0.1, 3.14, 0.1), size_random=0.3, min_px=0.6, seed=77,
+                  material=metal(base=(0.07, 0.075, 0.09), rough=0.35), pulls=[("deepswirl", 2.5)])
+    front = fibers("near", grid=(14, 1, 3), spacing=(3.0, 1, 2.5), centre=(6, 30, 26), rotate=(0, 0, 180),
+                   jitter=(1.5, 2.0, 1.2), length=70.0, width=0.03, segments=32, flow="fall", steer=4.0,
+                   orient=(0.1, 3.14, 0.1), size_random=0.2, min_px=0.8, seed=78,
+                   material=metal(base=(0.5, 0.5, 0.52), rough=0.16), pulls=[(curl_field, 0.9)])
+    return [front]  # the deep storm read as rain behind the entity, killing its negative space; kept out
+
+
+@look
+def p4_depth():
+    """The entity in a world: m9's material, the curtain 12 m deep (the eddies are tubes through it), a
+    storm far behind and strands across the lens; seen three-quarters."""
+    kw = dict(FACE)
+    kw.update(MATERIALS["m9-studio-sky"])
+    kw.pop("lights"), kw.pop("env")
+    deep = field("deepswirl", "spiral", position=[30, -10, -150], axis=[0.2, 0.1, 1], spiralBias=-0.2,
+                 strength=1.0, falloff=smooth(30, 120))
+    return entity_scene("Chorus Field p4 depth", **kw, lights=split_lights(), env=spectral_env(), depth=48,
+                        tube=2.5, extra_nodes=[deep] + depth_layers(), cam=(-16, -4, 44), target=(0, -3, 0),
+                        fov=44)
+
+
+@look
+def p4_depth_front():
+    sc = p4_depth()
+    sc["camera"].update({"position": [0, -3, 50], "target": [0, -3, 0], "fov": 42})
+    return sc
+
+
+# ---- Phase 5: audio -- topology first ---------------------------------------------------------------
+
+def route(source, target, amount, op="add", **chain):
+    r = {"source": source, "target": target, "op": op, "amount": amount}
+    if chain:
+        r["chain"] = chain
+    return r
+
+
+@look
+def p5_chorus():
+    """The entity on the music. Topology first:
+      bass      -> the face itself: the eye and temple eddies and the chin's pull. With no bass (the
+                   breakdowns) there is no face, only a curtain; the drop pulls it out of the curtain.
+      kick      -> a shockwave: a radial push riding the low onset fronts outward from the face (8 m/s).
+      snare     -> tearing: the curl pull bursts and decays.
+      mid       -> coherence: it calms the curl, so a full mid range holds the structure together.
+      treble    -> microstructure: a fine, fast curl shimmers every filament.
+    Appearance second: the threads that glow each hear their own band (spectrum, element), and the film's
+    thickness drifts with the treble."""
+    kw = {"horns": 0.8}  # the mouth and brow are left out: 16 GPU field slots and 8 deformers are the budget
+    kw.update(MATERIALS["m9-studio-sky"])
+    kw.pop("lights"), kw.pop("env")
+    sc = entity_scene("Chorus Field p5 chorus", **kw, lights=split_lights(), env=spectral_env())
+    nodes = sc["nodes"]
+    nodes[-1:-1] = [
+        field("kickPush", "radialVector", position=[0, 1, 0], strength=1.0),
+        field("kickFront", "onset", position=[0, 1, 0], onsetSource="low", audioSpeed=9.0, onsetWidth=3.0,
+              onsetDecay=1.6, waveGeometry="spherical", axis=[1, 1, 1], strength=1.0),
+        field("kick", "compound", children=["kickPush", "kickFront"], combine="multiply"),
+        field("shimmer", "curlNoise", frequency=0.6, speed=2.0, strength=1.0, seed=5),
+        field("bands", "spectrum", audioBand="element", bandLow=0.05, bandHigh=0.95, audioSpeed=12.0,
+              position=[0, 1, 0], waveGeometry="spherical", strength=1.0),
+    ]
+    fib = nodes[-1]["procedural"]
+    # Deformer order: fall, chin, curl, eyes, horns (entity_scene), then kick, shimmer.
+    fib["deformers"] += [
+        {"kind": "streamline", "space": "world", "field": "kick", "amount": 0.0},
+        {"kind": "streamline", "space": "world", "field": "shimmer", "amount": 0.0},
+    ]
+    fib["effectors"].append({"field": "bands", "op": "emission", "blend": "add", "strength": 3.0})
+    d = "procedural/fibers/deform/"
+    sc["_routes"] = [
+        # bass -> topology: the face exists in proportion to the low end (smoothed, so it breathes).
+        route("audio.bass", d + "4/amount", 1.0, op="multiply", attackMs=60, decayMs=900, gain=2.2,
+              clampEnabled=True, clampMin=0.0, clampMax=1.3),
+        route("audio.bass", d + "5/amount", 1.0, op="multiply", attackMs=60, decayMs=1200, gain=2.2,
+              clampEnabled=True, clampMin=0.0, clampMax=1.3),
+        route("audio.bass", d + "2/amount", 1.0, op="multiply", attackMs=200, decayMs=1500, gain=2.0,
+              clampEnabled=True, clampMin=0.2, clampMax=1.4),
+        # kick -> a travelling shockwave through the field.
+        route("audio.onsetLow", d + "6/amount", 14.0, op="add", envelope="peakhold", envelopeHoldMs=60,
+              envelopeFallPerSecond=3.0),
+        # snare -> tearing: a short burst of curl.
+        route("audio.onsetMid", d + "3/amount", 1.4, op="add", envelope="peakhold", envelopeHoldMs=40,
+              envelopeFallPerSecond=6.0),
+        # mid -> coherence (calms the curl).
+        route("audio.mid", d + "3/amount", -0.12, op="add", attackMs=100, decayMs=600),
+        # treble -> microstructure: a fine curl that only ever shivers the filaments.
+        route("audio.treble", d + "7/amount", 0.5, op="add", attackMs=20, decayMs=200),
+        # appearance second: the glowing threads brighten with the highs.
+        route("audio.treble", "procedural/fibers/material/emissive", 6.0, op="add", attackMs=30, decayMs=300),
+    ]
+    return sc
+
+
+# ---- Phase 6: the cost of a fiber -------------------------------------------------------------------
+
+BENCH = {
+    # name: (count_x, depth rows, segments, width)
+    "b005k-s32": (220, 24, 32, 0.008),
+    "b016k-s32": (660, 24, 32, 0.004),
+    "b048k-s32": (2000, 24, 32, 0.002),
+    "b048k-s16": (2000, 24, 16, 0.002),
+    "b048k-s08": (2000, 24, 8, 0.002),
+    "b144k-s16": (6000, 24, 16, 0.0012),
+    "b288k-s16": (6000, 48, 16, 0.0012),
+    "b576k-s16": (6000, 96, 16, 0.0012),
+    "b576k-s08": (6000, 96, 8, 0.0012),
+    "b1m-s08": (8000, 128, 8, 0.0010),
+}
+
+for _name, (_cx, _d, _seg, _w) in BENCH.items():
+    def _make(_cx=_cx, _d=_d, _seg=_seg, _w=_w, _name=_name):
+        kw = dict(FACE)
+        kw.update(MATERIALS["m9-studio-sky"])
+        kw.pop("lights"), kw.pop("env")
+        return entity_scene("Chorus Field p6 " + _name, **kw, lights=split_lights(), env=spectral_env(),
+                            count_x=_cx, depth=_d, segments=_seg, width=_w, tube=_d * 0.25 / 6.0)
+    _make.__name__ = "p6_" + _name.replace("-", "_")
+    LOOKS[_make.__name__] = _make
+
+
 def main(argv):
     names = argv[1:] or list(LOOKS)
     for name in names:
         sc = LOOKS[name]()
+        routes = sc.pop("_routes", [])
         base = name.replace("_", "-")
         with open(os.path.join(HERE, base + ".scene.json"), "w") as f:
             json.dump(sc, f, indent=1)
         with open(os.path.join(HERE, base + ".json"), "w") as f:
-            json.dump(project("Chorus Field " + base, base + ".scene.json"), f, indent=1)
+            pr = project("Chorus Field " + base, base + ".scene.json")
+            pr["routes"] += routes
+            json.dump(pr, f, indent=1)
         print("wrote", base)
 
 

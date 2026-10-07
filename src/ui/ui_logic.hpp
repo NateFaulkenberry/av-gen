@@ -1529,6 +1529,8 @@ struct DeformerRow {
         {"amount", "steer", "%.2f /m", "How hard the field turns the fiber, per metre per unit of field. 0 is straight;\n"
                                        "large values follow the field's streamline exactly (ADR-1181)."},
         {"falloff", "stiffness", "%.2f m", "Arc length over which the steering ramps in from the root. 0 = none."},
+        {"tension", "tension", "%.2f /m", "A pull weaker than this does not bend the fiber at all: straight runs and\n"
+                                          "sharp bends, like wire under load. 0 = none."},
     };
     static constexpr DeformerRow kPath[] = {
         {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},

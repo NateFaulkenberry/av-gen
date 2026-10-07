@@ -420,7 +420,10 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          r_{k+1} = r_k + d_{k+1} * ds, with v sampled at r_k in world space. `a` (amount) is the
 //          steering in 1/m per unit of field: 0 is a straight fiber, large values follow the field's
 //          streamline exactly. `falloff` > 0 is a stiffness: the steering grows from 0 at the root to
-//          full at that arc length, so a fiber leaves its root along its own axis. Only a Fiber source
+//          full at that arc length, so a fiber leaves its root along its own axis. `tension` is a dead
+//          zone: a pull p becomes p * max(|p| - tension, 0) / |p|, so weak field leaves the fiber straight
+//          and only strong field bends it. Steps are midpoint (RK2): the pull is sampled at r_k and at the
+//          half step, which removes Euler's kinks and outward drift on tight turns. Only a Fiber source
 //          uses it (the deformer is refused on any other source); `space` is ignored.
 struct Deformer {
     DeformerKind kind = DeformerKind::Twist;
@@ -444,6 +447,8 @@ struct Deformer {
     float pathOffset = 0.0f;            // Path: arc-length offset
     float pathScale = 0.0f;             // Path: units of arc length per object unit (0 = fit)
     float pathRoll = 0.0f;              // Path: extra roll (radians)
+    float tension = 0.0f;               // Streamline (ADR-1181): the pull (1/m) this deformer must exceed to bend
+                                        // the fiber at all; 0 = none. Straight runs, sharp bends: wire, not hair
 };
 // CPU reference of the whole stack, identical in meaning to the GPU shader: applies the enabled
 // deformers in order; `instanceWorld` is the instance's world matrix (local deformers apply to
@@ -478,7 +483,7 @@ struct DeformContext {
 // The GPU-side noise, evaluated on the CPU (for tests): 3-octave value fBM in [0, 1].
 [[nodiscard]] float fbm3(glm::vec3 p, std::uint32_t seed);
 constexpr int kMaxDeformers = 8;
-constexpr int kMaxFiberSegments = 32; // ADR-1180
+constexpr int kMaxFiberSegments = 64; // ADR-1180
 constexpr std::size_t kKeepCloudMax = 262144;
 constexpr std::size_t kMaxBakedPoints = 65536; // ADR-1118: a Points list, and so a bake, holds at most this
 

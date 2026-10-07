@@ -6,8 +6,9 @@
 //
 // The rule is scene::fiberCentreLine's, operation for operation:
 //   r_0 = model * position, d_0 = normalize(model * rotate(q, +Y)), ds = shape.x * scale.y
-//   d_{k+1} = normalize(d_k + sum_j v_j(r_k) * amount_j * ramp_j(k ds) * ds), r_{k+1} = r_k + d_{k+1} ds
-// with ramp_j(a) = clamp(a / stiffness_j, 0, 1) (1 when stiffness is 0). A zero-scale record (an
+//   P(r, a) = sum_j tension_j(v_j(r) * amount_j * ramp_j(a)), ramp_j(a) = clamp(a / stiffness_j, 0, 1)
+//   h = turn(d_k, P(r_k, k ds), ds / 2), m = r_k + h ds / 2, d_{k+1} = turn(d_k, P(m, (k + 1/2) ds), ds)
+//   r_{k+1} = r_k + d_{k+1} ds, with turn(d, p, h) = normalize(d + p h) and tension_j(p) = p max(|p| - T_j, 0) / |p|. A zero-scale record (an
 // empty generator cell, or one an effector thinned away) is never drawn and is skipped.
 //
 // Bindings (group 0): 0 StrandParams, 1 records (read), 2 strands (read_write), 3 FieldBlock,
@@ -28,7 +29,7 @@ struct StrandParams {
     model: mat4x4<f32>,
     info: vec4<u32>,            // x = record count, y = points per fiber (segments + 1), z = pulls
     shape: vec4<f32>,           // x = segment length at scale 1
-    pulls: array<vec4<f32>, 8>, // x = field slot, y = steering, z = stiffness
+    pulls: array<vec4<f32>, 8>, // x = field slot, y = steering, z = stiffness, w = tension
 };
 
 @group(0) @binding(0) var<uniform> strandParams: StrandParams;
@@ -39,6 +40,36 @@ struct StrandParams {
 fn strandQuatRotate(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
     let t = 2.0 * cross(q.xyz, v);
     return v + q.w * t + cross(q.xyz, t);
+}
+
+// The summed pull at r for arc length a: every pull's field, steering, stiffness ramp and tension.
+fn strandPull(r: vec3<f32>, a: f32) -> vec3<f32> {
+    let pullCount = min(strandParams.info.z, 8u);
+    var total = vec3<f32>(0.0);
+    for (var j = 0u; j < 8u; j = j + 1u) {
+        if (j >= pullCount) { break; }
+        let p = strandParams.pulls[j];
+        var ramp = 1.0;
+        if (p.z > 0.0) {
+            ramp = clamp(a / p.z, 0.0, 1.0);
+        }
+        var v = fieldVector(i32(floor(p.x + 0.5)), r) * (p.y * ramp);
+        if (p.w > 0.0) {
+            let m = length(v);
+            v = select(vec3<f32>(0.0), v * (max(m - p.w, 0.0) / m), m > 1e-8);
+        }
+        total = total + v;
+    }
+    return total;
+}
+
+fn strandTurn(d: vec3<f32>, pull: vec3<f32>, h: f32) -> vec3<f32> {
+    let t = d + pull * h;
+    let len = length(t);
+    if (len > 1e-6) {
+        return t / len;
+    }
+    return d;
 }
 
 @compute @workgroup_size(64)
@@ -59,24 +90,12 @@ fn cs_fiber_strands(@builtin(global_invocation_id) gid: vec3<u32>) {
     var r = (strandParams.model * vec4<f32>(rec.position.xyz, 1.0)).xyz;
     var d = normalize((strandParams.model * vec4<f32>(strandQuatRotate(rec.rotation, vec3<f32>(0.0, 1.0, 0.0)), 0.0)).xyz);
     strands[base] = vec4<f32>(r, 1.0);
-    let pullCount = min(strandParams.info.z, 8u);
     for (var k = 0u; k + 1u < points; k = k + 1u) {
         let arc = ds * f32(k);
-        var pull = vec3<f32>(0.0);
-        for (var j = 0u; j < 8u; j = j + 1u) {
-            if (j >= pullCount) { break; }
-            let p = strandParams.pulls[j];
-            var ramp = 1.0;
-            if (p.z > 0.0) {
-                ramp = clamp(arc / p.z, 0.0, 1.0);
-            }
-            pull = pull + fieldVector(i32(floor(p.x + 0.5)), r) * (p.y * ramp);
-        }
-        let turned = d + pull * ds;
-        let len = length(turned);
-        if (len > 1e-6) {
-            d = turned / len;
-        }
+        // Midpoint (RK2): the pull at r and at the half step (scene::fiberCentreLine).
+        let half = strandTurn(d, strandPull(r, arc), 0.5 * ds);
+        let mid = r + half * (0.5 * ds);
+        d = strandTurn(d, strandPull(mid, arc + 0.5 * ds), ds);
         r = r + d * ds;
         strands[base + k + 1u] = vec4<f32>(r, 1.0);
     }

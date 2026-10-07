@@ -76,7 +76,7 @@ TEST_CASE("a fiber is refused when it cannot be drawn", "[fiber][procedural]") {
     CHECK(s.validate().has_value());
     s.fiberSegments = 0;
     CHECK_FALSE(s.validate().has_value());
-    s.fiberSegments = 33;
+    s.fiberSegments = 65;
     CHECK_FALSE(s.validate().has_value());
     s = fiberObject().source;
     s.fiberWidth = 0.0f;
@@ -153,11 +153,22 @@ TEST_CASE("a streamline follows its field and keeps its length", "[fiber][proced
     CHECK_THAT(straight.back().y, WithinAbs(2.0f, 1e-5));
     CHECK_THAT(straight.back().x, WithinAbs(0.0f, 1e-6));
 
-    // Stiffness: no steering at the root, so the first segment leaves along the fiber's own axis.
-    d.amount = 1000.0f;
+    // Stiffness: the steering ramps in from the root, so the first segment turns less than without it.
+    d.amount = 2.0f;
+    d.falloff = 0.0f;
+    const auto loose = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
     d.falloff = 1.0f;
     const auto stiff = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
-    CHECK_THAT(stiff[1].x, WithinAbs(0.0f, 1e-6));
-    CHECK_THAT(stiff[1].y, WithinAbs(0.25f, 1e-6));
-    CHECK(stiff.back().x > 1.0f);
+    CHECK(stiff[1].x < 0.5f * loose[1].x);
+    CHECK(stiff[1].y > loose[1].y);
+
+    // Tension: a pull weaker than it leaves the fiber straight; a stronger one still bends it.
+    d.falloff = 0.0f;
+    d.amount = 2.0f;
+    d.tension = 3.0f; // |pull| = 2 < 3
+    const auto taut = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
+    CHECK_THAT(taut.back().x, WithinAbs(0.0f, 1e-6));
+    d.amount = 6.0f; // |pull| = 6 > 3
+    const auto bent = fiberCentreLine({d}, {0, 0, 0}, {0, 1, 0}, 2.0f, 8, 0.0, &fields);
+    CHECK(bent.back().x > 0.5f);
 }

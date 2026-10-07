@@ -2442,6 +2442,7 @@ std::vector<glm::vec3> fiberCentreLine(const std::vector<Deformer>& stack, glm::
         const spatial::FieldSpec* field;
         float amount;
         float stiffness;
+        float tension;
     };
     std::vector<Pull> pulls;
     if (fields != nullptr) {
@@ -2452,10 +2453,29 @@ std::vector<glm::vec3> fiberCentreLine(const std::vector<Deformer>& stack, glm::
             }
             const spatial::FieldSpec* f = fields->find(d.field);
             if (f != nullptr && f->enabled) {
-                pulls.push_back({f, d.amount, std::max(d.falloff, 0.0f)});
+                pulls.push_back({f, d.amount, std::max(d.falloff, 0.0f), std::max(d.tension, 0.0f)});
             }
         }
     }
+    // The summed pull at r for arc length a: every deformer's field, steering, stiffness ramp and tension.
+    const auto pullAt = [&](const glm::vec3& r, float a) {
+        glm::vec3 total(0.0f);
+        for (const Pull& p : pulls) {
+            const float ramp = p.stiffness > 0.0f ? std::clamp(a / p.stiffness, 0.0f, 1.0f) : 1.0f;
+            glm::vec3 v = spatial::sampleVector(*p.field, r, time, fields, element) * (p.amount * ramp);
+            if (p.tension > 0.0f) {
+                const float m = glm::length(v);
+                v = m > 1e-8f ? v * (std::max(m - p.tension, 0.0f) / m) : glm::vec3(0.0f);
+            }
+            total += v;
+        }
+        return total;
+    };
+    const auto turn = [](const glm::vec3& d, const glm::vec3& pull, float h) {
+        const glm::vec3 t = d + pull * h;
+        const float len = glm::length(t);
+        return len > 1e-6f ? t / len : d;
+    };
     std::vector<glm::vec3> points;
     points.reserve(static_cast<std::size_t>(n + 1));
     glm::vec3 r = root;
@@ -2464,16 +2484,9 @@ std::vector<glm::vec3> fiberCentreLine(const std::vector<Deformer>& stack, glm::
     for (int k = 0; k < n; ++k) {
         if (!pulls.empty()) {
             const float arc = ds * static_cast<float>(k);
-            glm::vec3 pull(0.0f);
-            for (const Pull& p : pulls) {
-                const float ramp = p.stiffness > 0.0f ? std::clamp(arc / p.stiffness, 0.0f, 1.0f) : 1.0f;
-                pull += spatial::sampleVector(*p.field, r, time, fields, element) * (p.amount * ramp);
-            }
-            const glm::vec3 turned = d + pull * ds;
-            const float len = glm::length(turned);
-            if (len > 1e-6f) {
-                d = turned / len;
-            }
+            const glm::vec3 half = turn(d, pullAt(r, arc), 0.5f * ds);
+            const glm::vec3 mid = r + half * (0.5f * ds);
+            d = turn(d, pullAt(mid, arc + 0.5f * ds), ds);
         }
         r = r + d * ds;
         points.push_back(r);
@@ -3068,6 +3081,9 @@ json ProceduralGeometry::toJson() const {
             s["pathOffset"] = d.pathOffset;
             s["pathScale"] = d.pathScale;
             s["pathRoll"] = d.pathRoll;
+            if (d.kind == DeformerKind::Streamline) { // ADR-1181; only for the kind that reads it
+                s["tension"] = d.tension;
+            }
             arr.push_back(std::move(s));
         }
         j["deformers"] = std::move(arr);
@@ -3424,6 +3440,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             AVGEN_PROC_READ(d.pathOffset, "pathOffset", readFloat);
             AVGEN_PROC_READ(d.pathScale, "pathScale", readFloat);
             AVGEN_PROC_READ(d.pathRoll, "pathRoll", readFloat);
+            AVGEN_PROC_READ(d.tension, "tension", readFloat);
             g.deformers.push_back(d);
         }
     }
@@ -3867,6 +3884,9 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         addF("falloff", def.falloff, 0.0f, 1000.0f, 0.0f, 10.0f);
         addV3("center", def.center, -1e4f, 1e4f, -10.0f, 10.0f);
         addV3("axis", def.axis, -1.0f, 1.0f, -1.0f, 1.0f);
+        if (def.kind == DeformerKind::Streamline) { // ADR-1181
+            addF("tension", def.tension, 0.0f, 1000.0f, 0.0f, 20.0f);
+        }
         if (def.kind == DeformerKind::Path) {
             addF("pathOffset", def.pathOffset, -1e4f, 1e4f, -20.0f, 20.0f);
             addF("pathScale", def.pathScale, -1000.0f, 1000.0f, 0.0f, 5.0f);
@@ -4119,6 +4139,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
         copyValue(p, base + "pathOffset", def.pathOffset);
         copyValue(p, base + "pathScale", def.pathScale);
         copyValue(p, base + "pathRoll", def.pathRoll);
+        copyValue(p, base + "tension", def.tension);
     }
 
     // Point ops and effectors: the list shapes come from rest; amount/enabled/strength/weight from
