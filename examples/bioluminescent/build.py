@@ -426,7 +426,7 @@ def scene(P):
             "background": [0.003, 0.004, 0.010], "intensity": 0.06,
             "fogColor": [0.004, 0.007, 0.018], "volumeDensity": 0.006, "volumeScattering": 0.9,
             "volumeAbsorption": 0.3, "volumeAnisotropy": 0.35, "volumeSteps": 32, "volumeMaxDistance": 900.0,
-            "volumeLocalLights": 1.0, "volumeNoise": 0.6, "volumeNoiseScale": 0.03,
+            "volumeLocalLights": 1.0, "volumeNoise": 0.0, "volumeNoiseScale": 0.03,
             "volumeEmission": 0.0, "volumeColorField": "propGlow",
             "fogHeight": land.FLOOR + 30.0, "fogHeightFalloff": 0.02, "fogUpperDensity": 0.12,
             "fogSky": 1.0, "fogSkyDistance": 1400.0,
@@ -638,7 +638,11 @@ POST = {
 }
 
 
-LIVE_PARAMETERS = {"scene/volumeSteps": 16, "scene/volumeNoise": 0.0}
+# The scene asks for clear (noise-free) air, which is what live runs; the offline project asks for the noise. A project
+# may raise its scene's noise but never zero it (test_volumetric_noise_authoring.cpp: a zero override is how a saved
+# session's accident looks), so the zero lives in the scene.
+LIVE_PARAMETERS = {"scene/volumeSteps": 16}
+OFFLINE_PARAMETERS = {"scene/volumeNoise": 0.6}
 
 
 def project(name, audio, length, live=False):
@@ -658,6 +662,8 @@ def project(name, audio, length, live=False):
     }
     if audio:
         p["assets"]["audio"] = {"path": audio}
+    if not live:
+        p["parameters"].update(OFFLINE_PARAMETERS)
     if live:
         # Live: the same world, cheaper medium. The march costs ~1 ms per step at 1080p (03-architecture.md §6);
         # 16 steps halve it. LIVE AUTO's render scale takes the pixel-bound rest. Offline keeps 32.
@@ -714,6 +720,7 @@ def main():
     # the live project's settings on the Trench file, for profiling live cost without a live input
     lp = project("THE RIFT LIVE (Trench file)", "../../assets/audio/trench.wav", length)
     lp["parameters"].update(LIVE_PARAMETERS)
+    lp["parameters"].pop("scene/volumeNoise")  # live's clear air: the scene's own zero
     (HERE / "diag-live-trench.json").write_text(json.dumps(lp, indent=1))
     print(f"wrote rift.scene.json ({(HERE / 'rift.scene.json').stat().st_size / 1e6:.1f} MB), {', '.join(projects)};"
           f" flight {length:.0f} m")

@@ -81,3 +81,6 @@ Branch `proto/bioluminescent`, worktree `../av-gen-biolum`, from main f56eaab0.
     the end point too, so the target coincided with the camera and the aim was float rounding: single frames
     pointing anywhere. The look-ahead now continues along the end tangent (b72866dd). Size a flight's paces to its
     path: `test_rift.cpp` plays the whole track and checks it.
+11. A project may raise its scene's volumetric noise but never zero it
+    (`test_volumetric_noise_authoring.cpp`: a zero override is how a saved session's accident looks). So the scene
+    asks for clear air, which is what live runs, and `rift.json` raises it to 0.6 offline.

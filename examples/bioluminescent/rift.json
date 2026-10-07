@@ -29,7 +29,8 @@
   "camera/exposure/mode": 0,
   "camera/mode": 2,
   "sources/driftA/rate": 0.031,
-  "sources/driftC/rate": 0.047
+  "sources/driftC/rate": 0.047,
+  "scene/volumeNoise": 0.6
  },
  "sources": [
   {

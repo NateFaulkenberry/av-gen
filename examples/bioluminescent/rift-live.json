@@ -27,8 +27,7 @@
   "camera/mode": 2,
   "sources/driftA/rate": 0.031,
   "sources/driftC/rate": 0.047,
-  "scene/volumeSteps": 16,
-  "scene/volumeNoise": 0.0
+  "scene/volumeSteps": 16
  },
  "sources": [
   {
