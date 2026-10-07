@@ -72,7 +72,7 @@ Result<AstralForge> astralFromJson(const json& j) {
             return fail("astral.controls must be an object");
         }
         if (auto ok = refuseUnknown(c, {"summon", "hold", "intensity", "palette", "light", "atmosphere", "godRays",
-                                        "legibility", "zoom", "exposure", "god", "intro", "ending"},
+                                        "legibility", "zoom", "exposure", "god", "intro", "ending", "cameraStyle"},
                                     "astral.controls");
             !ok) {
             return std::unexpected(ok.error());
@@ -89,6 +89,7 @@ Result<AstralForge> astralFromJson(const json& j) {
         k.zoom = c.value("zoom", k.zoom);
         k.exposure = c.value("exposure", k.exposure);
         k.god = c.value("god", k.god);
+        k.camera = c.value("cameraStyle", k.camera);
         k.intro = c.value("intro", k.intro);
         k.ending = c.value("ending", k.ending);
         if (k.god < -1 || k.god > 6) {
@@ -113,7 +114,7 @@ json astralToJson(const AstralForge& a) {
                  {{"summon", k.summon}, {"hold", k.hold}, {"intensity", k.intensity}, {"palette", k.palette},
                   {"light", k.light}, {"atmosphere", k.atmosphere}, {"godRays", k.godRays},
                   {"legibility", k.legibility}, {"zoom", k.zoom}, {"exposure", k.exposure}, {"god", k.god},
-                  {"intro", k.intro}, {"ending", k.ending}}}};
+                  {"intro", k.intro}, {"ending", k.ending}, {"cameraStyle", k.camera}}}};
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------
@@ -192,6 +193,7 @@ AstralParameters registerAstralParameters(params::ParameterSet& params, const As
     r.f("godRays", "god rays", k.godRays, 0.0f, 1.0f);
     r.f("legibility", "face legibility at a formed peak", k.legibility, 0.0f, 1.0f);
     r.f("zoom", "camera zoom (distance divisor)", k.zoom, 0.25f, 4.0f);
+    r.i("cameraStyle", "camera style (0 iteration 2's vocabulary, 1 v2's shot sizes)", k.camera, 0, 1);
     r.f("exposure", "exposure (multiplier)", k.exposure, 0.0f, 4.0f);
     r.f("camera", "conductor drives the camera (0 = the scene's camera)", rest.driveCamera ? 1.0f : 0.0f, 0.0f, 1.0f);
     r.f("density", "particles simulated (fraction)", 1.0f, 0.05f, 1.0f);
@@ -210,6 +212,7 @@ float applyAstralParameters(const AstralParameters& p, const AstralForge& rest, 
     k.godRays = fval(p, "godRays", k.godRays);
     k.legibility = fval(p, "legibility", k.legibility);
     k.zoom = fval(p, "zoom", k.zoom);
+    k.camera = ival(p, "cameraStyle", k.camera);
     k.exposure = fval(p, "exposure", k.exposure);
     live.live = k;
     live.cameraDrive = fval(p, "camera", rest.driveCamera ? 1.0f : 0.0f);
@@ -361,7 +364,7 @@ astral::State AstralLiveConductor::update(const spatial::AudioHistory& audio, do
     advancePhrases(now, collapse);
     astral::Controls c = controls;
     c.intro = c.ending = false;
-    astral::State s = astral::test06(static_cast<float>(now), 0.0, song_, score_, c.god);
+    astral::State s = astral::test06(static_cast<float>(now), 0.0, song_, score_, c.god, c.camera, c.zoom);
     astral::applyControls(s, c);
     return s;
 }

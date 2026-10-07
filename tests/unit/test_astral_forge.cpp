@@ -102,7 +102,7 @@ TEST_CASE("the astral block parses, round-trips and refuses what it does not kno
 
 TEST_CASE("the astral parameters are real parameters: their finals reach the frame's block", "[astral][adr1221]") {
     Comp c(sceneWithAstral({{"controls", {{"zoom", 1.25}}}}));
-    for (const char* leaf : {"summon", "hold", "collapse", "god", "intensity", "palette", "light", "atmosphere",
+    for (const char* leaf : {"summon", "hold", "collapse", "god", "intensity", "palette", "light", "atmosphere", "cameraStyle",
                              "godRays", "legibility", "zoom", "exposure", "camera", "density"}) {
         INFO(leaf);
         CHECK(c.params.find(std::string("astral/") + leaf) != nullptr);
@@ -173,7 +173,7 @@ TEST_CASE("the song conductor is a pure function of the song second", "[astral][
     k1.god = astral::kChoir;
     k1.hold = 1.0f;
     const astral::State far = astral::conductSong(8.2, song, score, k1);
-    CHECK(glm::length(s.eye - s.target) == Approx(0.5f * glm::length(far.eye - far.target)).epsilon(1e-3));
+    CHECK(glm::length(s.eye - s.target) == Approx(0.5f * glm::length(far.eye - far.target)).epsilon(0.05));
     CHECK(astral::conductSong(0.5, song, score, astral::Controls{}).exposure < 0.2f); // fading up from black
 }
 

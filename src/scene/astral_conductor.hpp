@@ -345,7 +345,11 @@ inline float phraseCoherence(const Score& sc, const Phrase& ph, double t, const 
     return 0.93f + 0.06f * std::sin(u * 6.28f);
 }
 
-inline State test06(float tl, double songT0, const SongAnalysis& song, const Score& sc, int godOverride = -1) {
+// `camera`: 1 = v2's fill-based shot sizes (the prototype's default); 0 = iteration 2's vocabulary, centred, which the
+// owner chose for production (ADR-1221), with a shorter reveal. `zoom` divides every camera distance (before the
+// framing offsets, so the subject stays where the shot puts it).
+inline State test06(float tl, double songT0, const SongAnalysis& song, const Score& sc, int godOverride = -1, int camera = 1,
+                    float zoom = 1.0f) {
     State s;
     const double t = songT0 + tl;
     const AudioAtT a = sampleSong(song, t);
@@ -371,7 +375,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     s.archA = s.archB = static_cast<float>(arch);
     // iteration 4: the song's shots are mostly wide, and at 22 units the drifters' containment shell read as a
     // glowing sphere around the god (the banned 'particle sphere'). The meta field is wider for the song.
-    s.metaRadius = 60.0f;
+    s.metaRadius = camera == 1 ? 60.0f : 22.0f; // iteration 4 widened the dust field for its wide shots
     // v2 look: palette, raking key, rim, eye glow, dust absorbed into a formed face, atmosphere and god rays
     s.paletteStrength = 0.9f; s.keyLight = 1.0f; s.rimLight = 1.0f; s.eyeGlow = 1.0f; s.atmosphere = 1.0f; s.godRays = 1.0f;
 
@@ -495,6 +499,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
             d = glm::mix(d, fillD(0.12f), r); el += 8.0f * r; lab = "REVEAL";
         }
         if (p.kickOpens && since < 1.4f) { d -= 4.0f * (1.0f - since / 1.4f); lab = "COLLISION"; thirdX = 0.0f; thirdY = 0.0f; }
+        d /= std::max(zoom, 0.1f);
         eye = orbit(d, az, el, focus);
         const glm::vec3 fwd = glm::normalize(tgt - eye);
         const glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)));
@@ -505,6 +510,49 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         tgt += right * (thirdX * tx * dist) - upv * (thirdY * 0.07f * dist);
         return p.index * 4 + seg;
     };
+    // ITERATION 2's vocabulary (production, ADR-1221): a behaviour per phrase from its family, the side alternating,
+    // the god centred. Build phrases: OBSERVER, PROFILE, LOW. Held phrases: DESCENT, ORBIT, PORTRAIT (the face held,
+    // close: the owner's 'longer face poses'), and every fourth held phrase MICRO on one eye. Withheld sections:
+    // HOVER on the eyes. A new section REVEALs (shorter and nearer than iteration 2's); a kick-opened phrase begins
+    // in COLLISION.
+    auto camAt2 = [&](double tc, glm::vec3& eye, glm::vec3& tgt, std::string& lab) -> int {
+        std::size_t k = 0;
+        while (k + 1 < sc.phrases.size() && tc >= sc.phrases[k + 1].start) ++k;
+        const Phrase& p = sc.phrases.empty() ? Phrase{0, 1e9, 0, 0, false} : sc.phrases[k];
+        const float v = static_cast<float>((tc - p.start) / std::max(p.end - p.start, 1e-3));
+        const bool first = p.index == 0 || sc.phrases[static_cast<std::size_t>(p.index - 1)].section != p.section;
+        const bool wh = withholdAt(sc, p);
+        const bool build = p.index == 0 || first || p.kickOpens || p.index % 2 == 0;
+        const float side = (p.index % 2 == 0) ? 1.0f : -1.0f;
+        const int choice = (p.index * 7 + std::max(p.section, 0) * 5) % 3;
+        glm::vec3 focus{0.0f, 0.2f, 0.0f};
+        float d = 20.0f, el = 6.0f, az = 0.0f;
+        tgt = {0.0f, -0.1f, 0.0f};
+        if (wh) {
+            const glm::vec3 eyes{0.0f, 0.72f, 0.6f};
+            d = 8.5f - 2.0f * v; el = 3.0f; az = side * (12.0f - 10.0f * v); focus = eyes; tgt = eyes; lab = "HOVER";
+        } else if (build) {
+            // the build pushes in as the face forms and arrives at a portrait for the hold (v2: peak by 60%)
+            const float push = sstep(0.0f, 0.65f, v);
+            if (choice == 0) { d = 26.0f - 12.0f * push; el = 6.0f; az = side * (20.0f - 8.0f * v); lab = "OBSERVER"; }
+            else if (choice == 1) { d = 19.0f - 5.0f * push; el = 0.0f; az = side * (70.0f - 30.0f * push); lab = "PROFILE"; }
+            else { d = 22.0f - 8.0f * push; el = -24.0f + 18.0f * push; az = side * (25.0f - 10.0f * v); lab = "LOW"; }
+        } else {
+            const bool micro = choice == 2 && (p.index % 8) == 7;
+            if (choice == 0) { d = 15.0f - 3.0f * v; el = 28.0f - 22.0f * v; az = side * 18.0f; lab = "DESCENT"; }
+            else if (choice == 1) { d = 13.5f; el = 10.0f; az = side * (-50.0f + 100.0f * v); lab = "ORBIT"; }
+            else if (micro) {
+                const glm::vec3 eyeP{side * 0.76f, 0.72f, 0.6f};
+                d = 7.5f - 1.8f * v; el = 4.0f; az = side * 14.0f; focus = eyeP; tgt = eyeP; lab = "MICRO";
+            } else { d = 12.5f - 1.5f * v; el = 4.0f; az = side * (16.0f - 10.0f * v); focus = tgt = glm::vec3(0.0f, 0.1f, 0.2f); lab = "PORTRAIT"; }
+        }
+        const float since = static_cast<float>(tc - p.start);
+        if (first && since < 4.5f && !wh) { d += 12.0f * std::sin(glm::pi<float>() * since / 4.5f); el += 6.0f; lab = "REVEAL"; }
+        if (p.kickOpens && since < 1.4f) { d -= 5.0f * (1.0f - since / 1.4f); lab = "COLLISION"; }
+        d /= std::max(zoom, 0.1f);
+        eye = orbit(d, az, el, focus);
+        return p.index;
+    };
     glm::vec3 eyeAcc{0.0f}, tgtAcc{0.0f};
     float wsum = 0.0f;
     int shot0 = -1;
@@ -512,7 +560,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const double tc = t - 0.9 * k / 15.0;
         glm::vec3 e, g;
         std::string lab;
-        const int shot = camAt(tc, e, g, lab);
+        const int shot = camera == 1 ? camAt(tc, e, g, lab) : camAt2(tc, e, g, lab);
         if (k == 0) { s.label = lab; shot0 = shot; s.shot = shot; }
         if (shot != shot0) break; // never smooth across a cut
         const float w = 1.0f - k / 16.0f;
@@ -562,6 +610,7 @@ struct Controls {
     float zoom = 1.0f;        // camera distance divisor (1.2 = 20% closer)
     float exposure = 1.0f;    // multiplier on the conductor's exposure
     int god = -1;             // -1: the score chooses; 0..6 an archetype (Arch)
+    int camera = 0;           // 0: iteration 2's vocabulary (production); 1: v2's fill-based shot sizes
     bool intro = true;        // fade up from black over the first 3 s
     bool ending = true;       // pull back and fade over the song's last seconds (song mode)
 };
@@ -586,13 +635,12 @@ inline void applyControls(State& s, const Controls& c) {
     s.shimmer *= k;
     s.flash *= k;
     s.blast *= 0.5f + 0.5f * k;
-    if (c.zoom > 0.0f && c.zoom != 1.0f) s.eye = s.target + (s.eye - s.target) / c.zoom;
     s.exposure *= std::max(c.exposure, 0.0f);
 }
 
 // The song conductor: TEST 08's arc over a whole analysed track, as a pure function of the song second.
 inline State conductSong(double t, const SongAnalysis& song, const Score& sc, const Controls& c) {
-    State s = test06(static_cast<float>(t), 0.0, song, sc, c.god);
+    State s = test06(static_cast<float>(t), 0.0, song, sc, c.god, c.camera, c.zoom);
     const float tf = static_cast<float>(t);
     const float dur = static_cast<float>(song.duration);
     if (c.intro) s.exposure *= sstep(0.0f, 3.0f, tf);
