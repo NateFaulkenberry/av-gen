@@ -3,6 +3,10 @@
 // engine does not have simply does nothing. This is the scene's own guard -- every preset path, route target and
 // macro target of both projects is a parameter of the loaded engine, the ecosystem's layers and the excitable medium
 // reached the scene, and the arc has its stages. Rerun build.py after changing it, then this.
+//
+// rift.scene.json (14 MB) is generated and gitignored, so a clean checkout does not have it. riftScene() generates it
+// in place with `build.py --scene-only` (which writes nothing that is committed) when python3, numpy and the
+// world-preview tool are present, and the tests SKIP with the command to run when they are not.
 
 #include "app/engine.hpp"
 #include "params/modulation.hpp"
@@ -11,15 +15,84 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
 using namespace avgen;
 namespace fs = std::filesystem;
 
+namespace {
+
+struct RiftScene {
+    std::optional<std::string> skip;  // why the scene cannot be made here (a clean checkout without the tools)
+    std::optional<std::string> error; // the tools were there and build.py failed: a real defect
+};
+
+// The generated world, made once per process, under a lock shared with any concurrently running test process.
+const RiftScene& riftScene() {
+    static const RiftScene result = [] {
+        RiftScene r;
+        const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent";
+        const fs::path scene = dir / "rift.scene.json";
+        const std::string remedy = "run `python3 examples/bioluminescent/build.py` (after building avgen_world_preview "
+                                   "in build/release) to generate the gitignored rift.scene.json";
+        const fs::path lockPath = fs::temp_directory_path() / "avgen-rift-scene.lock";
+        const int lock = ::open(lockPath.c_str(), O_CREAT | O_RDWR, 0644);
+        if (lock >= 0) {
+            ::flock(lock, LOCK_EX);
+        }
+        if (!fs::exists(scene)) {
+            const fs::path tool = fs::path(AVGEN_SOURCE_DIR) / "build/release/tools/avgen_world_preview";
+            if (std::system("python3 -c 'import numpy' >/dev/null 2>&1") != 0) {
+                r.skip = "rift.scene.json is missing and python3 with numpy is not available: " + remedy;
+            } else if (!fs::exists(tool)) {
+                r.skip = "rift.scene.json is missing and " + tool.string() + " is not built: " + remedy;
+            } else {
+                const fs::path log = fs::temp_directory_path() / "avgen-rift-build.log";
+                const std::string cmd = "python3 \"" + (dir / "build.py").string() + "\" --scene-only >\"" +
+                                        log.string() + "\" 2>&1";
+                if (std::system(cmd.c_str()) != 0 || !fs::exists(scene)) {
+                    std::ifstream in(log);
+                    std::stringstream text;
+                    text << in.rdbuf();
+                    r.error = "build.py --scene-only failed:\n" + text.str();
+                }
+            }
+        }
+        if (lock >= 0) {
+            ::flock(lock, LOCK_UN);
+            ::close(lock);
+        }
+        return r;
+    }();
+    return result;
+}
+
+// Every case starts here: SKIP on a checkout that cannot make the world, FAIL if making it broke.
+#define REQUIRE_RIFT_SCENE()                                                                                            \
+    do {                                                                                                                \
+        const RiftScene& rift = riftScene();                                                                            \
+        if (rift.skip) {                                                                                                \
+            SKIP(*rift.skip);                                                                                           \
+        }                                                                                                               \
+        INFO(rift.error.value_or(""));                                                                                  \
+        REQUIRE_FALSE(rift.error.has_value());                                                                          \
+    } while (false)
+
+} // namespace
+
 TEST_CASE("THE RIFT: every preset path, route target and macro target is a parameter", "[rift]") {
+    REQUIRE_RIFT_SCENE();
     for (const char* name : {"rift.json", "rift-live.json"}) {
         const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent" / name;
         app::Engine engine(app::EngineMode::Offline);
@@ -82,6 +155,7 @@ TEST_CASE("THE RIFT: every preset path, route target and macro target is a param
 // ADR-1168 on THE RIFT: an offline seek must land the arc where a play from zero has it. Found by a `--range 84:112`
 // render that sat in the initial state (Dark) through the drop.
 TEST_CASE("THE RIFT: a seek lands the arc where play does", "[rift][adr1168]") {
+    REQUIRE_RIFT_SCENE();
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());
@@ -96,6 +170,7 @@ TEST_CASE("THE RIFT: a seek lands the arc where play does", "[rift][adr1168]") {
 }
 
 TEST_CASE("THE RIFT: a seek to 84 s then playing on lands in the drop", "[rift][adr1168]") {
+    REQUIRE_RIFT_SCENE();
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());
@@ -117,6 +192,7 @@ TEST_CASE("THE RIFT: a seek to 84 s then playing on lands in the drop", "[rift][
 
 TEST_CASE("THE RIFT: the render job's sequence (warm-up, camera reset, seek, fixed clock) lands in the drop",
           "[rift][adr1168]") {
+    REQUIRE_RIFT_SCENE();
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());
@@ -141,6 +217,7 @@ TEST_CASE("THE RIFT: the render job's sequence (warm-up, camera reset, seek, fix
 // lost its aim: single frames pointed anywhere (the Critic's "camera shake" at 201-207 s, 14% of the frame per frame).
 // The flight must fit the track: the integrated splineT stays inside the path for the whole song.
 TEST_CASE("THE RIFT: the flight does not run out of path before the track ends", "[rift]") {
+    REQUIRE_RIFT_SCENE();
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());

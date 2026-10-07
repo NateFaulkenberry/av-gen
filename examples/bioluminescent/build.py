@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -700,14 +701,24 @@ def probe_project(p):
 
 
 def main():
-    organisms.build_all()
+    # --scene-only: write just the generated world (rift.scene.json, gitignored) from the committed meshes and leave
+    # every committed file alone. tests/integration/test_rift.cpp runs it on a clean checkout.
+    scene_only = "--scene-only" in sys.argv[1:]
+    if not scene_only:
+        organisms.build_all()
     print("ground...")
     g = land.Ground(land.world(), *REGION, step=2.0)
     P = place(g)
     for k, v in P.items():
         print(f"  {k}: {len(v)}")
     sc, length = scene(P)
-    (HERE / "rift.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
+    # written beside and renamed into place, so a reader never sees a half-written world
+    tmp = HERE / f"rift.scene.json.{os.getpid()}.tmp"
+    tmp.write_text(json.dumps(sc, separators=(",", ":")))
+    os.replace(tmp, HERE / "rift.scene.json")
+    if scene_only:
+        print(f"wrote rift.scene.json ({(HERE / 'rift.scene.json').stat().st_size / 1e6:.1f} MB)")
+        return
     projects = {
         "rift.json": project("THE RIFT / Trench", "../../assets/audio/trench.wav", length),
         "rift-live.json": project("THE RIFT LIVE", None, length, live=True),
