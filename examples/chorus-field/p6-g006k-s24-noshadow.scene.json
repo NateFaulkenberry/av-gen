@@ -1,7 +1,7 @@
 {
  "format": "avgen-scene",
  "version": 1,
- "name": "Chorus Field p6 g400k-s12",
+ "name": "Chorus Field p6 no shadow",
  "camera": {
   "mode": 1,
   "position": [
@@ -33,7 +33,7 @@
     0.86
    ],
    "intensity": 6.0,
-   "castsShadow": true,
+   "castsShadow": false,
    "shadowStrength": 0.92,
    "softness": 1.2
   },
@@ -527,15 +527,15 @@
     "source": {
      "kind": "fiber",
      "fiberLength": 33.0,
-     "fiberWidth": 0.0012,
+     "fiberWidth": 0.006,
      "fiberTaper": 1.0,
-     "fiberSegments": 12,
+     "fiberSegments": 24,
      "fiberMinPixels": 0.7
     },
     "variation": {
      "seed": 11,
      "position": [
-      0.003605769230769231,
+      0.057692307692307696,
       6.0,
       0.12
      ],
@@ -549,12 +549,12 @@
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      4160,
+      260,
       1,
-      96
+      24
      ],
      "gridSpacing": [
-      0.007211538461538462,
+      0.11538461538461539,
       1,
       0.25
      ]

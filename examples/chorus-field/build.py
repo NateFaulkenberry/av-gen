@@ -837,6 +837,24 @@ for _name, (_cx, _d, _seg, _w) in BENCH.items():
     LOOKS[_make.__name__] = _make
 
 
+@look
+def p6_g006k_s24_noprog():
+    """The cost of the material program: the same scene shaded by the plain material."""
+    sc = god_scene("Chorus Field p6 no program", count_x=260, depth=24, segments=24, width=0.006)
+    for n in sc["nodes"]:
+        if n["name"] == "fibers":
+            n["procedural"]["material"].pop("program")
+    return sc
+
+
+@look
+def p6_g006k_s24_noshadow():
+    """The cost of the shadows: the key light casts none."""
+    sc = god_scene("Chorus Field p6 no shadow", count_x=260, depth=24, segments=24, width=0.006)
+    sc["lights"][0]["castsShadow"] = False
+    return sc
+
+
 def main(argv):
     names = argv[1:] or list(LOOKS)
     for name in names:
