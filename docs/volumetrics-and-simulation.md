@@ -176,6 +176,12 @@ Scene::fields.fields ─── FieldSpec { kind: "grid", reference: "smoke" }
 | `scalar` | 1 | the value | value × the field's axis |
 | `vector` | 4 (xyz + pad) | the length | the vector, rotated by the field's frame |
 | `reactionDiffusion` | 2 (A, B) | **B**, the pattern channel | B × the field's axis |
+| `excitable` (ADR-1201) | 4 (u, r, e, w), a plane `[x, 1, z]` | **u**, the excitation | u × the field's axis |
+
+A Grid field's `"channel": 0..3` reads that component of the cells as a scalar instead, for any mode
+(ADR-1201; e.g. the wake `w` of an excitable grid). An `excitable` grid is a propagating medium with a
+calibrated front speed in m/s, refractoriness and energy / wake accumulators; its model, parameters and
+cost are in [ADR-1201](decisions/ADR-1201-excitable-propagation-grid.md).
 
 Sampling is trilinear over the cell centres (cell *i* is centred at
 `boundsMin + (i + 0.5) * cellSize`). Outside the bounds, `wrap` decides: `clamp` repeats the edge
