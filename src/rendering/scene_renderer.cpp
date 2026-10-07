@@ -2189,6 +2189,11 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = ribbons_->reload(shaders_); !r) {
         keep("ribbon.wgsl", r);
     }
+    for (EnvironmentRenderer* env : environments_) {
+        if (auto r = env->reload(shaders_); !r) {
+            keep(std::string(env->name()).c_str(), r);
+        }
+    }
     if (auto r = shells_->reload(shaders_); !r) {
         keep("shell.wgsl", r);
     }
@@ -3917,7 +3922,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
     });
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
-                                   shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth;
+                                   shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth ||
+                                   std::any_of(environments_.begin(), environments_.end(), // ADR-1200: the seam
+                                               [&](const EnvironmentRenderer* e) { return e->wants(scene); });
     // ---- water surfaces (ADR-099) ----
     // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
     // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in
@@ -4514,6 +4521,29 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.End();
     }
     stage(cpu.sceneEncodeMs);
+
+    // ---- ADR-1200: the Environment seam -- specialised renderers, over the lit scene and under the medium ----
+    if (needsDepthPrepass) {
+        EnvironmentFrame envFrame;
+        envFrame.encoder = &encoder;
+        envFrame.scene = &scene;
+        envFrame.time = time;
+        envFrame.frameUniforms = &frameUniforms_;
+        envFrame.fields = fields_.get();
+        envFrame.linearDepth = linearDepth_.view;
+        envFrame.hdr = hdr_.colorView();
+        envFrame.emission = emission_.view;
+        envFrame.depth = hdr_.depthView();
+        envFrame.width = hdr_.width();
+        envFrame.height = hdr_.height();
+        envFrame.quality = &qualitySettings_;
+        envFrame.timeline = timeline_.get();
+        for (EnvironmentRenderer* env : environments_) {
+            if (env->wants(scene)) {
+                env->encode(envFrame);
+            }
+        }
+    }
 
     // ---- volumetric atmosphere (ADR-032): raymarch + depth-aware composite ----
     // ADR-139: at `QualitySettings::volumeResolutionScale` of the scene's resolution, not a
