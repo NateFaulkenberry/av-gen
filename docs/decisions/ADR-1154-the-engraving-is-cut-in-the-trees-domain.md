@@ -38,4 +38,4 @@ contour centres, the region points (ADR-1149) and the frequencies are authored i
   either.
 - Cost: a tree with a chain of N ops walks it four times per engraved pixel (the point and the three Jacobian
   columns), N sdfWarp calls each; the T01 face has no chain (its root is a smooth union) and pays nothing. Not
-  measured separately: `latent-entity` (a chain of one `scale`) renders in the same budget as before.
+  measured separately.
