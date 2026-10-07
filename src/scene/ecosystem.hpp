@@ -15,6 +15,7 @@
 //
 // What an emitter does (per point, per frame, on the GPU):
 //   rest      = intensity x (1 + breath x slow per-point cycle) x (1 - sparsity gate) x (1 + flicker x twinkle)
+//               x (1 + wakeGain x wakeField(p))       an awakened region keeps glowing between events
 //               + spontaneous pulses (pulseRate per minute, decaying over pulseDecay seconds)
 //   response  = responseGain x max(0, field(p) - responseThreshold)            field: responseField at the point
 //               with `travel` > 0, a point far along its organism (v -> 1) hears `lagField` instead, so light climbs
@@ -86,6 +87,8 @@ struct EmitterLayer {
     float responseThreshold = 0.0f;
     std::string lagField;            // what a point far along its organism hears (empty: none)
     float travel = 0.0f;             // 0..1: how far along v the lag field takes over
+    std::string wakeField;           // scalar field that raises the rest glow (an awakened region stays alive)
+    float wakeGain = 0.0f;           // rest x (1 + wakeGain x wakeField(p))
     float breath = 0.0f;             // slow autonomous cycle depth, 0..1
     float breathRate = 0.08f;        // Hz
     float flicker = 0.0f;            // fast per-point twinkle depth, 0..1

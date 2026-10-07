@@ -23,7 +23,8 @@ struct Layer {
     rest: vec4<f32>,        // x = breath, y = breath rate, z = flicker, w = flicker rate
     pulse: vec4<f32>,       // x = pulses per minute, y = pulse decay (s), z = sparsity, w = max distance
     slots: vec4<i32>,       // x = response field slot (-1 none), y = lag field slot, z = point count, w = host count
-    bound: vec4<f32>,       // x = host bounding radius (template extent, before host scale), yzw unused
+    bound: vec4<f32>,       // x = host bounding radius (template extent, before host scale), y = wake field slot
+                            // (-1 none), z = wake gain
 };
 
 struct Host {
@@ -141,6 +142,11 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
     let breath = 1.0 + layer.rest.x * sin(tau * (layer.rest.y * t * (0.75 + 0.5 * hHost) + hHost + 0.15 * pt.v));
     let flicker = 1.0 + layer.rest.z * sin(tau * (layer.rest.w * t * (0.6 + 0.8 * hPoint2) + hPoint));
     rest = rest * max(breath, 0.0) * max(flicker, 0.0);
+    fieldElement = hPoint;
+    let wakeSlot = i32(layer.bound.y);
+    if (wakeSlot >= 0) {
+        rest = rest * (1.0 + layer.bound.z * max(fieldScalar(wakeSlot, p), 0.0));
+    }
     // Spontaneous flashes: one chance per period, at the point's own phase; a hash decides whether it fires.
     if (layer.pulse.x > 0.0) {
         let period = 60.0 / layer.pulse.x;

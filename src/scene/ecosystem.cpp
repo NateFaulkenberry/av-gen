@@ -32,7 +32,7 @@ std::uint64_t hashPoints(const std::vector<EmitterPoint>& pts) {
 constexpr std::string_view kLayerKeys[] = {
     "name",       "enabled",      "hosts",       "template",    "color",       "excitedColor",
     "intensity",  "excitedIntensity", "size",    "responseField", "responseGain", "responseThreshold",
-    "lagField",   "travel",       "breath",      "breathRate",  "flicker",     "flickerRate",
+    "lagField",   "travel",       "wakeField",   "wakeGain",    "breath",      "breathRate",  "flicker",     "flickerRate",
     "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance"};
 constexpr std::string_view kBlockKeys[] = {"enabled", "spriteRadius", "maxSprites", "layers"};
 
@@ -116,7 +116,7 @@ Result<void> EmitterLayer::validate() const {
     if (templatePath.empty()) {
         return fail("ecosystem layer '{}': needs a template", name);
     }
-    const float scalars[] = {intensity, excitedIntensity, size, responseGain, responseThreshold, travel, breath,
+    const float scalars[] = {intensity, excitedIntensity, size, responseGain, responseThreshold, travel, wakeGain, breath,
                              breathRate, flicker, flickerRate, pulseRate, pulseDecay, sparsity, maxDistance};
     for (float s : scalars) {
         if (!finite(s)) {
@@ -190,6 +190,8 @@ json Ecosystem::toJson() const {
         e["responseThreshold"] = l.responseThreshold;
         e["lagField"] = l.lagField;
         e["travel"] = l.travel;
+        e["wakeField"] = l.wakeField;
+        e["wakeGain"] = l.wakeGain;
         e["breath"] = l.breath;
         e["breathRate"] = l.breathRate;
         e["flicker"] = l.flicker;
@@ -266,6 +268,8 @@ Result<Ecosystem> Ecosystem::fromJson(const json& j) {
                 l.responseThreshold = e.value("responseThreshold", l.responseThreshold);
                 l.lagField = e.value("lagField", l.lagField);
                 l.travel = e.value("travel", l.travel);
+                l.wakeField = e.value("wakeField", l.wakeField);
+                l.wakeGain = e.value("wakeGain", l.wakeGain);
                 l.breath = e.value("breath", l.breath);
                 l.breathRate = e.value("breathRate", l.breathRate);
                 l.flicker = e.value("flicker", l.flicker);
@@ -383,6 +387,7 @@ EcosystemParameters registerEcosystemParameters(params::ParameterSet& params, co
         r.f("responseGain", "response gain", l.responseGain, 0.0f, 1000.0f, 0.0f, 8.0f);
         r.f("responseThreshold", "species threshold", l.responseThreshold, -10.0f, 10.0f, 0.0f, 1.0f);
         r.f("travel", "light travels along the organism", l.travel, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("wakeGain", "an awakened region glows (x wake)", l.wakeGain, 0.0f, 1000.0f, 0.0f, 10.0f);
         r.f("breath", "autonomous breathing depth", l.breath, 0.0f, 1.0f, 0.0f, 1.0f);
         r.f("breathRate", "breathing rate (Hz)", l.breathRate, 0.0f, 20.0f, 0.0f, 1.0f);
         r.f("flicker", "twinkle depth", l.flicker, 0.0f, 1.0f, 0.0f, 1.0f);
@@ -409,6 +414,7 @@ void applyEcosystemParameters(const EcosystemParameters& p, const Ecosystem& res
         copy(lp, "responseGain", l.responseGain);
         copy(lp, "responseThreshold", l.responseThreshold);
         copy(lp, "travel", l.travel);
+        copy(lp, "wakeGain", l.wakeGain);
         copy(lp, "breath", l.breath);
         copy(lp, "breathRate", l.breathRate);
         copy(lp, "flicker", l.flicker);

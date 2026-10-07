@@ -457,7 +457,8 @@ void EcosystemRenderer::encode(wgpu::CommandEncoder& encoder, const scene::Scene
         u.slots = glm::ivec4(layer.responseField.empty() ? -1 : fields.slotOf(layer.responseField),
                              layer.lagField.empty() ? -1 : fields.slotOf(layer.lagField),
                              static_cast<int>(g.pointCount), static_cast<int>(g.hostCount));
-        u.bound = glm::vec4(g.boundRadius, 0.0f, 0.0f, 0.0f);
+        const int wakeSlot = layer.wakeField.empty() ? -1 : fields.slotOf(layer.wakeField);
+        u.bound = glm::vec4(g.boundRadius, static_cast<float>(wakeSlot), layer.wakeGain, 0.0f);
         context_->queue().WriteBuffer(g.uniforms, 0, &u, sizeof(u));
         cp.SetBindGroup(2, g.group);
         const std::uint32_t wx = (g.pointCount + 63u) / 64u;
