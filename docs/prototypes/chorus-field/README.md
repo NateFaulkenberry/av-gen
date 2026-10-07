@@ -75,6 +75,82 @@ The question was: "what is the cheapest technically sound way to produce the phe
 - curve control-point fits (they smooth away the tight turns that make wakes read);
 - a separate renderer (the brief's §20).
 
+## What was found (Phases 1-5)
+
+**Representation.** A fiber is a camera-facing strip whose centre line is a streamline of the scene's vector
+fields (ADR-1180, ADR-1181). Segmented tubes were rejected as sub-pixel triangle soup, the CPU ribbons as
+unscalable, and a separate renderer by the brief. Three things decided the look, each measured on a
+checkpoint:
+1. **The Kajiya-Kay normal for sub-pixel fibers.** CP1's glitter became CP2's coherent anisotropic bands, with
+   nothing else changed.
+2. **Long, sparse streamlines instead of short fibers filling a volume.** Volumes read as fur, a box of hair
+   or toy clouds (CP1, CP4).
+3. **Forms made where streams are steered, not where seeds are put.** Every block of seeds showed its block
+   silhouette.
+
+**Personalities found** (`examples/chorus-field/*.json`; stills in `~/Desktop/av-gen-review/39-chorus-field/`):
+
+| Personality | Look | How |
+|---|---|---|
+| Flow | `p2-flow` | one released stream bent round three invisible repulsors: liquid silver |
+| Vortex | `p3-roll`, `p3-roll-inside` | an inward **spiral** (a plain vortex only lifts a sheet over itself) rolls a sheet into a coil you look down |
+| Choir | `p2-choir` | ground roots risen into columns by attractors at height. Striking close up, a box of hair from afar |
+| Emergence | `p3-e*`, `p7-god-*`, `p8-god-trench` | a curtain parted by eddy pairs; see below |
+| Void | `p2-mask*` | the sockets *are* the voids: wakes behind eddies. The standalone void (`p2-void`) failed |
+| Collapse / dissolve | `p7-god-dissolved` | the same field with its features at 5-15%: pure falling metal |
+| Tendons | `p4-tendons` | two clouds drawn through a throat. It read as a candy wrapper: a failure |
+
+**Entity emergence worked.** Nothing in the scene is a face. A curtain of 5k wires falls from a ragged ceiling,
+and the face is made of fields:
+- two counter-rotating eddies leave dark orbits in their wakes;
+- temple eddies curl the brow and the orbit rims;
+- twin eddies below make the nostrils and the mouth;
+- an attractor gathers the jaw, and another pulls the brow.
+
+Switch the eddies off and it is a curtain again. The strongest stills are `cp6-material/p7-god-front.png` and
+`cp5-entity/p3-e4-horned-mouth.png`. In the breakdown, a small second pair of eyes stayed low in the curtain
+by accident: a different creature, kept.
+
+**Materials.**
+- **The material program `chorusWire`** reads the eddy fields per fragment:
+  - bright silver where the streams shear (brow, cheekbones, temple curls);
+  - gunmetal where they only fall, with an oxide shadow tone;
+  - a pale-gold lit inner rim on the wires that skirt each socket, read from the face compound's weight just
+    short of full;
+  - a fade to dark below the mouth.
+- **What it fixed:** wire (no taper, light tension) and this program killed most of the hair read. The lower
+  third still reads as long silver hair when the camera lingers there.
+- **Thin film (ADR-1143)** tints the whole object one hue under a Kajiya-Kay normal (nDotV is near-constant),
+  so it is off in the final look. The ember colour is multiplied by the material's `emissiveColor`, which must
+  be white.
+- **Gotcha:** a program `field` op on a vector field returns the *vector*. Only compounds read as weights.
+
+**Audio (`p8-god-trench`, Trench; topology first).** Every route audits live.
+- **Bass** (ADR-1182 normalised, cubed, smoothed) is the strength of the eye, temple and chin fields: the god
+  exists with the low end and lets go in the breakdowns.
+- **Slow treble** opens the mouth (the maw spiral and the twin eddies).
+- **Slow mids** move the eyes, so the face that re-forms is not the one that left.
+- **The kick** sends onset fronts out of the face at 9 m/s as a travelling lift.
+- **The snare** bursts the curl.
+- **The camera** rides the same normalised bass. Fast and slow copies routed with opposite signs make
+  transients: a pull-back reveal at a drop, a push-in as the god gathers, and a drift into the falling
+  curtain at a breakdown. A bounded integral (ADR-1161) swings the camera to three-quarter at a held drop,
+  though its threshold is too strict on Trench.
+- **Appearance follows topology:** the rim glow reads the same fields, so it goes out with the eyes.
+
+**Honest weaknesses:**
+- **Hair.** The lower third reads as hair, and silver strands always risk "shampoo commercial" (`p3-roll`).
+- **Depth.** It is a relief more than a volume. The eddies are tubes through a 6 m curtain; a deeper
+  curtain fills the sockets.
+- **Scale.** No convincing "face as part of a far larger field". Pulled far back, the field's extent shows,
+  so the reveal is capped.
+- **The maw.** It rolls the lip rather than opening a tunnel. Pushed harder it reads as a cartoon lip.
+- **Slots.** 16/16 GPU field slots and 5/8 deformers in the final scene. Features share compounds (base =
+  fall + chin + brow, face = eyes + temples, mouth = twin eddies + maw).
+- **Relative drive.** Normalisation forms the god in the intro if the intro's bass is steady (the floor is
+  the guard).
+- **The orbit** to three-quarter rarely fires on Trench.
+
 ## Phase 7: what is engine, and what is scene
 
 The test applied to every piece: would a second scene (Storm Field, Void Field, Neural Field) need it unchanged?

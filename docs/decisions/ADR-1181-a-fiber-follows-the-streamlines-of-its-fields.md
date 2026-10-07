@@ -37,20 +37,26 @@ follow a flow.
    ```json
    {"kind": "streamline", "space": "world", "field": "flow", "amount": 6.0, "falloff": 0.0}
    ```
-   From the instance's root `r_0` and axis `d_0` (its rotation of +Y, through the object matrix):
+   From the instance's root `r_0` and axis `d_0` (its rotation of +Y, through the object matrix), with
+   `P(r, a) = Σ_i T_i(v_i(r) · amount_i · ramp_i(a))`:
    ```
-   d_{k+1} = normalize(d_k + Σ_i v_i(r_k) · amount_i · ramp_i(k·ds) · ds),   r_{k+1} = r_k + d_{k+1} · ds
+   h = turn(d_k, P(r_k, k·ds), ds/2),   m = r_k + h · ds/2
+   d_{k+1} = turn(d_k, P(m, (k+½)·ds), ds),   r_{k+1} = r_k + d_{k+1} · ds,   turn(d, p, h) = normalize(d + p·h)
    ```
-   - `ds` is the segment length times the instance's length scale.
-   - `ramp_i(a) = clamp(a / falloff_i, 0, 1)`, or 1 when falloff is 0. `falloff` is a stiffness: the fiber
+   - Each step is a **midpoint (RK2) step.** Explicit Euler, the first cut, left visible kinks and drifted
+     outward on tight turns at 1-2 m segments.
+   - `ds` is the segment length times the instance's length scale. Fibers have up to 64 segments.
+   - `ramp_i(a) = clamp(a / falloff_i, 0, 1)`, or 1 when falloff is 0. `falloff` is a **stiffness**: the fiber
      leaves its root along its own axis.
+   - `T_i(p) = p · max(|p| − tension_i, 0) / |p|`. `tension` is a **dead zone**: a weak field leaves the wire
+     straight and only a strong one bends it. That gives straight runs and sharp bends, like wire under load,
+     not hair.
    - **Amount** is steering, in 1/m per unit of field. 0 is a straight fiber; large values follow the
      streamline exactly.
    - **Arc length is preserved** whatever the field does.
    - **Every Streamline deformer of a stack adds its own pull.** A layer is steered by up to eight separately
-     weighted forces, each with a routable `procedural/<n>/deform/<k>/amount`. This also lifts the GPU's limit of
-     four children in one compound field. In the Chorus Field this is how audio weights one feature of the face
-     (the eyes, the temples, the kick's push) without touching the others.
+     weighted forces, each with routable `procedural/<n>/deform/<k>/{amount,falloff,tension}`. This also lifts
+     the GPU's limit of four children in one compound field.
    - `space` is ignored; the field is always sampled in world space. A Streamline on any non-fiber source is
      refused at load.
 2. **The strand pass.** After the effector pass, one compute thread per record integrates the centre line once
@@ -70,7 +76,7 @@ follow a flow.
 
 ## Consequences
 
-**Measured** (M2 Max, 1080p Ultra, the mask, 5.3k fibers × 32 segments, 4 pulls): the strand pass costs 0.98 ms.
+**Measured** (M2 Max, 1080p Ultra): the strand pass costs 0.98 ms for the mask (5.3k fibers × 32 segments, 4 pulls, Euler), and 2.5 ms for the god (5k × 24 segments, 5 pulls, RK2).
 Without it, a 192k × 32 scene queued enough vertex work that Dawn returned an all-black frame with "GPU errors:
 0". That is the known long-backlog defect, `docs/research/gpu-world-productionization.md`, Risks item 1. With
 it, the same scene renders. The strand buffer costs records × (segments + 1) × 16 B: 101 MB for 192k fibers
@@ -82,9 +88,9 @@ kinds:
 - the onset × radial-vector compound used for the kick shockwave;
 - scalar fields that thin the fibers through Scale effectors.
 
-**Explicit Euler drifts outward on rotation.** A circle integrated at 1-2 m steps spirals out. Most of the time
-this is welcome: it is why a vortex makes a coil rather than a ring. RK2 would cost one more field sample a step
-and is the revisit trigger if exact orbits are ever wanted.
+**The midpoint step costs two field samples a step.** That is 2.5 ms for 5k fibers × 24 segments with five
+pulls (Phase 6 in `docs/prototypes/chorus-field/README.md`). Dispatching over culled-visible records only is
+the next saving. An inward *spiral* field, not integration drift, is what makes a coil.
 
 ## Rejected alternatives
 
