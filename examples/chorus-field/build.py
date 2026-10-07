@@ -32,7 +32,7 @@ def smooth(inner, outer):
 
 # ---- the fiber layer ------------------------------------------------------------------------------
 
-def fibers(name, *, grid=(64, 64, 64), spacing=(0.5, 0.5, 0.5), centre=(0, 0, 0), rotate=(0, 0, 0), jitter=None,
+def fibers(name, *, grid=(64, 64, 64), tensions=None, tension=0.0, spacing=(0.5, 0.5, 0.5), centre=(0, 0, 0), rotate=(0, 0, 0), jitter=None,
            length=2.5, width=0.012, taper=0.3, segments=12, min_px=0.8, flow="flow", steer=4.0,
            stiffness=0.0, seed=11, material=None, effectors=(), material_variation=None, pulls=(),
            orient=(math.pi, math.pi, math.pi), size_random=0.4, cast_shadows=True):
@@ -46,8 +46,9 @@ def fibers(name, *, grid=(64, 64, 64), spacing=(0.5, 0.5, 0.5), centre=(0, 0, 0)
         "distribution": {"kind": "grid", "gridCount": list(grid), "gridSpacing": list(spacing)},
         "distributionTransform": {"position": list(centre), "rotation": list(rotate), "scale": [1, 1, 1]},
         "deformers": [{"kind": "streamline", "space": "world", "field": flow, "amount": steer,
-                       "falloff": stiffness}] + [{"kind": "streamline", "space": "world", "field": f, "amount": a,
-                                                  "falloff": stiffness} for (f, a) in pulls],
+                       "falloff": stiffness, "tension": tension}] + [
+            {"kind": "streamline", "space": "world", "field": f, "amount": a, "falloff": stiffness,
+             "tension": (tensions or {}).get(f, 0.0)} for (f, a) in pulls],
         "effectors": list(effectors),
         "lod": {"cull": True, "maxDistance": 0.0, "count": 1},
         "material": material or metal(),
@@ -65,8 +66,8 @@ def metal(base=(0.62, 0.63, 0.66), rough=0.28, emissive=(0, 0, 0), ei=0.0):
 
 # ---- a look ---------------------------------------------------------------------------------------
 
-def scene(name, nodes, *, cam_pos, cam_target, fov=40, lights=None, env=None, post=None):
-    return {
+def scene(name, nodes, *, cam_pos, cam_target, fov=40, lights=None, env=None, post=None, programs=None):
+    sc = {
         "format": "avgen-scene", "version": 1, "name": name,
         "camera": {"mode": 1, "position": cam_pos, "target": cam_target, "fov": fov, "orbitSpeed": 0},
         "lights": lights if lights is not None else default_lights(),
@@ -74,6 +75,9 @@ def scene(name, nodes, *, cam_pos, cam_target, fov=40, lights=None, env=None, po
         "post": post if post is not None else default_post(),
         "nodes": nodes,
     }
+    if programs:
+        sc["materialPrograms"] = programs
+    return sc
 
 
 def default_lights():
@@ -552,8 +556,10 @@ def p4_depth_front():
 
 # ---- Phase 5: audio -- topology first ---------------------------------------------------------------
 
-def route(source, target, amount, op="add", **chain):
+def route(source, target, amount, op="add", component=None, **chain):
     r = {"source": source, "target": target, "op": op, "amount": amount}
+    if component is not None:
+        r["component"] = component
     if chain:
         r["chain"] = chain
     return r
@@ -641,6 +647,170 @@ for _name, (_cx, _d, _seg, _w) in BENCH.items():
                             count_x=_cx, depth=_d, segments=_seg, width=_w, tube=_d * 0.25 / 6.0)
     _make.__name__ = "p6_" + _name.replace("-", "_")
     LOOKS[_make.__name__] = _make
+
+
+# ---- Phase 4 (directed): the god in the field -----------------------------------------------------------
+#
+# The owner's direction after CP5: the entity is the heart; kill "hair"; make it a volume; give it scale;
+# transformation is the show. The curtain no longer starts at a cut: it is gathered out of a wide ceiling
+# of flow by a funnel, so above the face there are converging streams, not an edge.
+
+def wire_program():
+    """Field-driven metal, per fragment. The eddies' weight is the shear: bright silver ridges where they
+    turn the streams (brow, cheekbones, temple curls), gunmetal where the streams only fall, an oxide
+    undertone where nothing shears them -- the shadow tone, not the overall tone. A thin ember line on the
+    fibers that skirt a socket: the eddy weight just short of full. The eye fields' STRENGTH is what audio
+    routes, so when an eye weakens its rim band falls below the line and the glow goes with the face."""
+    return {
+        "name": "chorusWire",
+        "ops": [
+            # The rim (emission, r7): the eyes' weight just short of full.
+            # (A vector field reads as its vector; a compound reads as the sum of its children's weights,
+            # which is the scalar wanted here -- hence the program-only "eyes" compound.)
+            {"kind": "field", "dst": 0, "field": "eyes"},
+            {"kind": "smoothstep", "dst": 6, "srcA": 0, "constant": [1.9, 2.4, 0, 0]},
+            {"kind": "remap", "dst": 7, "srcA": 0, "constant": [2.52, 2.58, 1.0, 0.0], "value": 1.0},
+            {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+            {"kind": "constant", "dst": 7, "constant": [1.0, 0.78, 0.5, 1.0]},
+            {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 6},
+            # The metal (r4) and its roughness (r5): the shear of the whole face.
+            {"kind": "field", "dst": 2, "field": "face"},
+            {"kind": "smoothstep", "dst": 3, "srcA": 2, "constant": [0.08, 1.5, 0, 0]},
+            {"kind": "ramp", "dst": 4, "srcA": 3, "constant": [0.40, 0.35, 0.30, 1.0],
+             "constant2": [0.64, 0.65, 0.68, 1.0], "constant3": [0.95, 0.95, 0.97, 1.0]},
+            {"kind": "remap", "dst": 5, "srcA": 3, "constant": [0.0, 1.0, 0.34, 0.13], "value": 1.0},
+            # The god emerges from the dark: below the mouth the falling streams fade towards a quarter.
+            {"kind": "input", "dst": 0, "input": "worldPosition"},
+            {"kind": "gradient", "dst": 1, "srcA": 0, "value": 0.1, "constant": [0.0, 1.0, 0.0, 1.4]},
+            {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 0.22, 1.0], "value": 1.0},
+            {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 1},
+            {"kind": "constant", "dst": 1, "constant": [1.0, 1.0, 1.0, 1.0]},
+        ],
+        "baseColor": 4, "metallic": 1, "roughness": 5, "emission": 7, "emissionIntensity": 0.45,
+    }
+
+
+def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, chin=1.0, curl=0.06, kick=0.0,
+              cam=(0, -3, 46), target=(0, -3, 0), fov=40, debris=True, tension=0.3, segments=48,
+              length=40.0, count_x=260, depth=24, width=0.006, top=21.0, ragged=6.0, film=0.0,
+              lights=None, env=None):
+    """CP5's e4 geometry -- the proven skull -- made of wire: the curtain's top is ragged (roots scattered
+    over 2 x `ragged` metres of height and thinned by noise), the eddies are tubes through its depth, and the
+    mouth is a maw that can roll open into a tunnel. Feature strengths are FIELD strengths, so the glow,
+    the pull and the material all follow one routable number per feature."""
+    # Sixteen GPU field slots and eight deformers are the budget, so features share pulls through
+    # compounds and are weighted by their FIELD strengths (each routable): base = fall + chin + brow,
+    # face = both eyes + both temples, mouth = the twin eddies whose shared wake is the slot.
+    nodes = [
+        field("fall", "direction", axis=[0, -1, 0], strength=1.0),
+        field("chin", "attractor", position=[0, -18, 0], strength=0.8 * chin, falloff=smooth(6, 26)),
+        field("brow", "attractor", position=[0, 7.0, 2.5], strength=0.4, falloff=smooth(2, 8)),
+        field("base", "compound", children=["fall", "chin", "brow"], combine="add"),
+        field("curl", "curlNoise", frequency=0.11, strength=1.0, seed=21),
+        field("eyeL", "vortex", position=[-4.6, 2.5, 0], axis=[0, 0, -1], strength=eyes, falloff=smooth(1.2, 6.0),
+              scale=[1, 1, 3]),
+        field("eyeR", "vortex", position=[4.6, 2.5, 0], axis=[0, 0, 1], strength=eyes, falloff=smooth(1.2, 6.0),
+              scale=[1, 1, 3]),
+        field("hornL", "vortex", position=[-9, 11, 0], axis=[0, 0, 1], strength=horns, falloff=smooth(2, 9),
+              scale=[1, 1, 3]),
+        field("hornR", "vortex", position=[9, 11, 0], axis=[0, 0, -1], strength=horns, falloff=smooth(2, 9),
+              scale=[1, 1, 3]),
+        field("face", "compound", children=["eyeL", "eyeR", "hornL", "hornR"], combine="add"),
+        field("eyes", "compound", children=["eyeL", "eyeR"], combine="add"),  # read by chorusWire only
+        field("mouthL", "vortex", position=[-2.2, -6.5, 0], axis=[0, 0, -1], strength=mouth, falloff=smooth(0.8, 3.2),
+              scale=[1, 1, 3]),
+        field("mouthR", "vortex", position=[2.2, -6.5, 0], axis=[0, 0, 1], strength=mouth, falloff=smooth(0.8, 3.2),
+              scale=[1, 1, 3]),
+        field("mouth", "compound", children=["mouthL", "mouthR"], combine="add"),
+        # The kick: onset fronts leaving the face at 9 m/s, read as a vector along +Y (a lift that travels).
+        field("kick", "onset", position=[0, 1, 0], onsetSource="low", audioSpeed=9.0, onsetWidth=3.0,
+              onsetDecay=1.6, waveGeometry="spherical", axis=[0, 1, 0], strength=1.0),
+        field("crown", "sphere", position=[0, top, 0], radius=12.0, softness=6.0,
+              falloff={"kind": "noiseModulated", "inner": 6, "outer": 18, "noiseAmount": 2.5, "noiseScale": 0.25}),
+    ]
+    pulls = [("curl", 6.0 * curl), ("face", 6.0), ("mouth", 6.0), ("kick", kick)]
+    mat = metal(base=(1, 1, 1), rough=0.2)
+    mat["program"] = "chorusWire"
+    if film > 0:
+        mat["thinFilm"] = {"thickness": film, "ior": 1.45}
+    mat["emissiveColor"] = [1.0, 1.0, 1.0]  # the program writes the ember colour; this multiplies it
+    mat["emissiveIntensity"] = 1.0
+    spread = 30.0
+    face = fibers("fibers", grid=(count_x, 1, depth), spacing=(spread / count_x, 1, 0.25), centre=(0, top, 0),
+                  rotate=(0, 0, 180), jitter=(spread / count_x / 2, ragged, 0.12), length=length, width=width,
+                  taper=1.0, segments=segments, steer=6.0, orient=(0.03, 3.14, 0.03), size_random=0.0,
+                  min_px=0.7, effectors=[thin("crown", "crown")], material=mat, pulls=pulls, flow="base",
+                  tensions={"face": tension, "mouth": tension})
+    nodes.append(face)
+    if debris:
+        # Scale: a few short, bright sparks of wire near the lens, off the face's axis.
+        sm = metal(base=(0.9, 0.9, 0.92), rough=0.1, emissive=(1.0, 0.6, 0.3), ei=2.0)
+        nodes.append(fibers("debris", grid=(3, 3, 2), spacing=(8.0, 6.0, 4.0),
+                            centre=(cam[0] * 0.7, cam[1] * 0.7 + 1, cam[2] - 14), jitter=(4.0, 3.0, 2.0),
+                            length=0.7, width=0.01, taper=1.0, segments=4, flow="curl", steer=0.5,
+                            size_random=0.5, min_px=1.0, seed=99, material=sm))
+    return scene(title, nodes, cam_pos=list(cam), cam_target=list(target), fov=fov,
+                 lights=lights or default_lights(), env=env or default_env(), programs=[wire_program()])
+
+
+GOD_SHOTS = {
+    "front": {},
+    "low": {"cam": (0, -26, 36), "target": (0, 2, 0), "fov": 52},
+    "three-quarter": {"cam": (-26, -5, 40), "target": (0, -2, 0), "fov": 42},
+    "maw": {"mouth": 3.2},
+    "dissolved": {"eyes": 0.3, "horns": 0.25, "mouth": 0.2, "chin": 0.4, "curl": 0.12},
+    "split-light": {"lights": "split", "env": "spectral"},
+    "taut": {"tension": 1.0},
+    "slack": {"tension": 0.0},
+}
+
+for _name, _kw in GOD_SHOTS.items():
+    def _make(_kw=_kw, _name=_name):
+        kw = dict(_kw)
+        if kw.get("lights") == "split":
+            kw["lights"], kw["env"] = split_lights(), spectral_env()
+        return god_scene("Chorus Field p7 god " + _name, **kw)
+    _make.__name__ = "p7_god_" + _name.replace("-", "_")
+    LOOKS[_make.__name__] = _make
+
+
+@look
+def p8_god_trench():
+    """The show on Trench. Topology first; each feature of the god is its own pull, weighted by the music:
+      bass (smoothed)   -> the eyes, the temples and the chin: the god exists in proportion to the low end.
+                           In the bass-less breakdowns (86-94 s, 134-144 s) it lets go into falling flow.
+      highs (slow)      -> the maw: when the treble climbs (the second drop and the climax) the mouth rolls
+                           open into a tunnel, p3-roll's coil turned to face us.
+      mids (slow)       -> where the eyes are: the spacing drifts with the mid range, so the face that reforms
+                           after each breakdown is not the face that left.
+      kick              -> a shockwave: a radial push riding the low onset fronts out from the face at 9 m/s.
+      snare             -> tearing: a short burst of curl.
+    Appearance follows the topology for free: the ember rim exists only while an eye is strong (the material
+    program reads the eye fields' weight), so the glow comes and goes with the face."""
+    sc = god_scene("Chorus Field p8 god on Trench")
+    d = "procedural/fibers/deform/"
+    # Deformer order (god_scene): 1 base (fall + chin + brow), 2 curl, 3 face, 4 mouth, 5 kick.
+    bass = dict(attackMs=80, decayMs=1500, gain=2.4, clampEnabled=True, clampMin=0.05, clampMax=1.15)
+    sc["_routes"] = [
+        route("audio.bass", "field/eyeL/strength", 1.0, op="multiply", **bass),
+        route("audio.bass", "field/eyeR/strength", 1.0, op="multiply", **bass),
+        route("audio.bass", "field/hornL/strength", 1.0, op="multiply", **bass),
+        route("audio.bass", "field/hornR/strength", 1.0, op="multiply", **bass),
+        route("audio.bass", "field/chin/strength", 1.0, op="multiply", attackMs=300, decayMs=2000, gain=2.0,
+              clampEnabled=True, clampMin=0.3, clampMax=1.2),
+        # highs (slow) open the mouth into a tunnel: the twin eddies grow until their wake is a gape.
+        route("audio.treble", "field/mouthL/strength", 2.2, op="add", attackMs=2500, decayMs=4000, gain=3.0,
+              clampEnabled=True, clampMin=0.0, clampMax=1.0, curve="power", curveAmount=2.0),
+        route("audio.treble", "field/mouthR/strength", 2.2, op="add", attackMs=2500, decayMs=4000, gain=3.0,
+              clampEnabled=True, clampMin=0.0, clampMax=1.0, curve="power", curveAmount=2.0),
+        route("audio.mid", "field/eyeL/position", -3.0, op="add", component=0, attackMs=1500, decayMs=3000),
+        route("audio.mid", "field/eyeR/position", 3.0, op="add", component=0, attackMs=1500, decayMs=3000),
+        route("audio.onsetLow", d + "5/amount", 10.0, op="add", envelope="peakhold", envelopeHoldMs=60,
+              envelopeFallPerSecond=3.0),
+        route("audio.onsetMid", d + "2/amount", 1.2, op="add", envelope="peakhold", envelopeHoldMs=40,
+              envelopeFallPerSecond=6.0),
+    ]
+    return sc
 
 
 def main(argv):

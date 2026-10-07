@@ -32,7 +32,7 @@
     0.94,
     0.86
    ],
-   "intensity": 3.2,
+   "intensity": 6.0,
    "castsShadow": true,
    "shadowStrength": 0.92,
    "softness": 1.2
@@ -51,7 +51,7 @@
     0.7,
     1.0
    ],
-   "intensity": 2.2,
+   "intensity": 4.0,
    "castsShadow": false,
    "shadowStrength": 0.0,
    "softness": 2.0
@@ -233,11 +233,23 @@
       0.5,
       0.5,
       0.5
-     ],
-     "center": [
+     ]
+    },
+    "distributionTransform": {
+     "position": [
       0,
       0,
       0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
      ]
     },
     "deformers": [
@@ -246,7 +258,8 @@
       "space": "world",
       "field": "flow",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      }
     ],
     "effectors": [],

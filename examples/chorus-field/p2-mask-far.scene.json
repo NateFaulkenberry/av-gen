@@ -350,14 +350,16 @@
       "space": "world",
       "field": "flow",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "curl",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      }
     ],
     "effectors": [

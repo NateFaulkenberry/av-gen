@@ -403,14 +403,16 @@
       "space": "world",
       "field": "flow",
       "amount": 5.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "push",
       "amount": 4.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      }
     ],
     "effectors": [

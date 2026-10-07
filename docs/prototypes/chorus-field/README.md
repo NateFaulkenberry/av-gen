@@ -74,3 +74,44 @@ The question was: "what is the cheapest technically sound way to produce the phe
 - simulated advection with trails (state and seeking, for a picture that is a pure function of the field);
 - curve control-point fits (they smooth away the tight turns that make wakes read);
 - a separate renderer (the brief's §20).
+
+## Phase 7: what is engine, and what is scene
+
+The test applied to every piece: would a second scene (Storm Field, Void Field, Neural Field) need it unchanged?
+
+**Engine (reusable, ADR-1180 and ADR-1181; reachable from scene JSON, parameters, the CLI and the editor):**
+
+| Piece | Where | Why it is engine |
+|---|---|---|
+| Fiber source: a camera-facing strip, a pixel floor paid in coverage, a round-thread normal, a Kajiya-Kay normal when sub-pixel, LOD as fewer segments | `PrimitiveKind::Fiber`, `fiberVertex` | Every fiber scene needs thin metal that does not alias and does not glitter |
+| Streamline deformer: steering, stiffness, tension, several summed pulls, midpoint integration | `DeformerKind::Streamline`, `fiberCentreLine` | It is the whole mechanism by which a field becomes visible structure |
+| Strand pass: a centre line integrated once a record a frame, read by every pass | `fiber_strands.wgsl`, `procedural_renderer.cpp` | It turns O(segments²) per pass into O(segments) once; it is needed at any count |
+| Per-pull routability: `procedural/<n>/deform/<k>/{amount,falloff,tension}` | the parameter registrar | Audio and MIDI weight one force without touching the others. This is how "the music changes topology" is authored |
+
+**Already engine, and used as-is:**
+- field kinds: vortex, spiral, attractor, direction, curl, radial vector, onset, spectrum and noise colour;
+- compound fields (the kick shockwave is `radialVector × onset`);
+- field transforms (a vortex scaled in depth is a tube);
+- Scale effectors (a scalar field thins the fibers to zero);
+- material programs with the `field` op (oxide against silver, and the socket-rim glow, per fragment);
+- thin film (ADR-1143);
+- routes with processor chains;
+- Grid and generator distributions;
+- GPU cull and indirect draws.
+
+**Scene configuration (`examples/chorus-field/build.py`), and why it stays there:**
+- **The entity:** the eye, temple, maw and chin fields and their positions. It is the art, and it is *one*
+  configuration of the vocabulary.
+- **The ceiling funnel, the curtain seeding and the debris layer:** composition.
+- **`chorusWire`:** a material program. It is authored data.
+- **The audio mapping:** routes in the project.
+- **Lights, environment and cameras.**
+
+**Not built, deliberately:**
+- a "personality preset" system;
+- a `ChorusField` node kind;
+- a field mirror/symmetry flag (the eddy pairs are authored as pairs);
+- a GPU 3D generator kernel (a Grid distribution was enough below 1M; a volumetric generator is the next step
+  if an unbounded fiber world is wanted).
+
+Each is a candidate once a second scene needs it, which is ADR-1117's "two use cases before a shared abstraction".

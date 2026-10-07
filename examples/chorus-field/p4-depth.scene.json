@@ -537,14 +537,16 @@
       "space": "world",
       "field": "fall",
       "amount": 4.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "curl",
       "amount": 0.9,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      }
     ],
     "effectors": [],
@@ -637,49 +639,56 @@
       "space": "world",
       "field": "fall",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "chin",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "curl",
       "amount": 0.36,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "eyes",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "horns",
       "amount": 4.800000000000001,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "mouth",
       "amount": 4.199999999999999,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "brow",
       "amount": 2.4000000000000004,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      }
     ],
     "effectors": [

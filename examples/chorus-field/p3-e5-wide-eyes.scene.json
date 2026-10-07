@@ -209,7 +209,12 @@
      0,
      -1.0
     ],
-    "strength": 3.2
+    "strength": 3.2,
+    "scale": [
+     1,
+     1,
+     1.0
+    ]
    }
   },
   {
@@ -232,7 +237,12 @@
      0,
      1.0
     ],
-    "strength": 3.2
+    "strength": 3.2,
+    "scale": [
+     1,
+     1,
+     1.0
+    ]
    }
   },
   {
@@ -343,28 +353,32 @@
       "space": "world",
       "field": "fall",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "chin",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "curl",
       "amount": 0.36,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "eyes",
       "amount": 6.0,
-      "falloff": 0.0
+      "falloff": 0.0,
+      "tension": 0.0
      }
     ],
     "effectors": [
