@@ -7,7 +7,7 @@
   "position": [
    0,
    -3,
-   100
+   78
   ],
   "target": [
    0,
@@ -172,6 +172,24 @@
    }
   },
   {
+   "name": "brow",
+   "kind": "field",
+   "position": [
+    0,
+    7.0,
+    2.5
+   ],
+   "field": {
+    "kind": "attractor",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 8
+    },
+    "strength": 0.4
+   }
+  },
+  {
    "name": "base",
    "kind": "field",
    "position": [
@@ -186,7 +204,8 @@
     },
     "children": [
      "fall",
-     "chin"
+     "chin",
+     "brow"
     ],
     "combine": "add"
    }
@@ -339,26 +358,6 @@
      "eyeR",
      "hornL",
      "hornR"
-    ],
-    "combine": "add"
-   }
-  },
-  {
-   "name": "eyes",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "compound",
-    "falloff": {
-     "kind": "none"
-    },
-    "children": [
-     "eyeL",
-     "eyeR"
     ],
     "combine": "add"
    }
@@ -703,7 +702,7 @@
      "position": [
       0.0,
       -1.0999999999999996,
-      86
+      64
      ],
      "rotation": [
       0,
@@ -757,7 +756,7 @@
     {
      "kind": "field",
      "dst": 0,
-     "field": "eyes"
+     "field": "face"
     },
     {
      "kind": "smoothstep",

@@ -168,7 +168,7 @@
    "source": "audio.treble",
    "target": "field/maw/strength",
    "op": "add",
-   "amount": 3.0,
+   "amount": 1.4,
    "chain": {
     "normalizeSeconds": 20.0,
     "normalizeFloor": 0.08,
@@ -231,7 +231,7 @@
    "source": "audio.bass",
    "target": "camera/position",
    "op": "add",
-   "amount": 45.0,
+   "amount": 26.0,
    "component": 2,
    "chain": {
     "normalizeSeconds": 20.0,
@@ -251,7 +251,7 @@
    "source": "audio.bass",
    "target": "camera/position",
    "op": "add",
-   "amount": -99.0,
+   "amount": -58.0,
    "component": 2,
    "chain": {
     "normalizeSeconds": 20.0,

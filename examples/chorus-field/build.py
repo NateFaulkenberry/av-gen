@@ -638,9 +638,9 @@ def wire_program():
         "name": "chorusWire",
         "ops": [
             # The rim (emission, r7): the eyes' weight just short of full.
-            # (A vector field reads as its vector; a compound reads as the sum of its children's weights,
-            # which is the scalar wanted here -- hence the program-only "eyes" compound.)
-            {"kind": "field", "dst": 0, "field": "eyes"},
+            # (A vector field reads as its vector; a compound reads as the sum of its children's weights, the
+            # scalar wanted here. Near a socket the face compound IS the eye: the temples' weight is 0 there.)
+            {"kind": "field", "dst": 0, "field": "face"},
             {"kind": "smoothstep", "dst": 6, "srcA": 0, "constant": [1.9, 2.4, 0, 0]},
             {"kind": "remap", "dst": 7, "srcA": 0, "constant": [2.52, 2.58, 1.0, 0.0], "value": 1.0},
             {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
@@ -677,7 +677,8 @@ def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, maw=0.0, chin=1.0, curl=
     nodes = [
         field("fall", "direction", axis=[0, -1, 0], strength=1.0),
         field("chin", "attractor", position=[0, -18, 0], strength=0.8 * chin, falloff=smooth(6, 26)),
-        field("base", "compound", children=["fall", "chin"], combine="add"),
+        field("brow", "attractor", position=[0, 7.0, 2.5], strength=0.4, falloff=smooth(2, 8)),
+        field("base", "compound", children=["fall", "chin", "brow"], combine="add"),
         field("curl", "curlNoise", frequency=0.11, strength=1.0, seed=21),
         field("eyeL", "vortex", position=[-4.6, 2.5, 0], axis=[0, 0, -1], strength=eyes, falloff=smooth(1.2, 6.0),
               scale=[1, 1, 3]),
@@ -688,7 +689,6 @@ def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, maw=0.0, chin=1.0, curl=
         field("hornR", "vortex", position=[9, 11, 0], axis=[0, 0, -1], strength=horns, falloff=smooth(2, 9),
               scale=[1, 1, 3]),
         field("face", "compound", children=["eyeL", "eyeR", "hornL", "hornR"], combine="add"),
-        field("eyes", "compound", children=["eyeL", "eyeR"], combine="add"),  # read by chorusWire only
         field("mouthL", "vortex", position=[-2.2, -6.5, 0], axis=[0, 0, -1], strength=mouth, falloff=smooth(0.8, 3.2),
               scale=[1, 1, 3]),
         field("mouthR", "vortex", position=[2.2, -6.5, 0], axis=[0, 0, 1], strength=mouth, falloff=smooth(0.8, 3.2),
@@ -762,7 +762,7 @@ def p8_god_trench():
       snare             -> tearing: a short burst of curl.
     Appearance follows the topology for free: the ember rim exists only while an eye is strong (the material
     program reads the eye fields' weight), so the glow comes and goes with the face."""
-    sc = god_scene("Chorus Field p8 god on Trench", cam=(0, -3, 100), mouth=1.4)
+    sc = god_scene("Chorus Field p8 god on Trench", cam=(0, -3, 78), mouth=1.4)
     d = "procedural/fibers/deform/"
     # Deformer order (god_scene): 1 base (fall + chin + brow), 2 curl, 3 face, 4 mouth, 5 kick.
     # The bass is normalised to its own running peak (ADR-1182, 20 s fall-back) and then cubed: the intro
@@ -784,7 +784,7 @@ def p8_god_trench():
         route("audio.treble", "field/mouthR/strength", 2.2, op="add", attackMs=2500, decayMs=4000, gain=3.0,
               clampEnabled=True, clampMin=0.0, clampMax=1.0, curve="power", curveAmount=2.0),
         # ... and past a threshold the maw rolls the mouth into a tunnel (an inward spiral in the mouth compound).
-        route("audio.treble", "field/maw/strength", 3.0, op="add", **norm, attackMs=3000, decayMs=4000, gain=1.0,
+        route("audio.treble", "field/maw/strength", 1.4, op="add", **norm, attackMs=3000, decayMs=4000, gain=1.0,
               curve="power", curveAmount=4.0, clampEnabled=True, clampMin=0.0, clampMax=1.0),
         route("audio.mid", "field/eyeL/position", -3.0, op="add", component=0, attackMs=1500, decayMs=3000),
         route("audio.mid", "field/eyeR/position", 3.0, op="add", component=0, attackMs=1500, decayMs=3000),
@@ -797,10 +797,10 @@ def p8_god_trench():
         # and a slow one (6 s) are routed with opposite signs; their difference is a transient that only exists
         # while the god is changing state -- a drop throws the eye back (the reveal) and then the slow copy
         # pushes it in as the god gathers; a breakdown carries it forward through the falling curtain before
-        # it eases back out. Base: z 100; at a held drop 100 + 45 - 99 = 46.
-        route("audio.bass", "camera/position", 45.0, op="add", component=2, **gate, attackMs=300, decayMs=300,
+        # it eases back out. Base: z 78; at a held drop 78 + 26 - 58 = 46.
+        route("audio.bass", "camera/position", 26.0, op="add", component=2, **gate, attackMs=300, decayMs=300,
               springHz=0.35),
-        route("audio.bass", "camera/position", -99.0, op="add", component=2, **gate, attackMs=6000, decayMs=6000,
+        route("audio.bass", "camera/position", -58.0, op="add", component=2, **gate, attackMs=6000, decayMs=6000,
               springHz=0.2),
         # The breakdown's drift is also a drift sideways and down, into the curtain's flank.
         route("audio.bass", "camera/position", 5.0, op="add", component=0, **gate, attackMs=300, decayMs=300,
