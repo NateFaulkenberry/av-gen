@@ -54,7 +54,7 @@ fn hashp(x0: u32) -> u32 {
         let glow = exp(-dot(dl, dl) * 1.6) * 0.55 + 0.06 * smoothstep(1.2, -0.2, uv.y);
         c += P.d.rgb * glow * P.d.w * 0.11 * (1.0 - 0.85 * occHere); // the void stays near-black: a faint tint
         if (P.c.w > 0.0 && P.c.z > 0.5) {
-            let n = 48;
+            let n = 20; // v2 perf: 20 jittered taps (was 48; the same Riemann sum, decay per tap rescaled)
             let stepv = (lv - uv) / f32(n);
             var q = uv;
             var acc = 0.0;
@@ -72,10 +72,10 @@ fn hashp(x0: u32) -> u32 {
                 let src = exp(-dot(ds, ds) / (P.e.w * P.e.w));
                 acc += w * src * (1.0 - occ);
                 wsum += w;
-                w *= 0.975;
+                w *= 0.9410;   // 0.975^(48/20)
             }
             let rays = acc / max(wsum, 1e-3);
-            c += P.e.rgb * rays * P.c.w * 0.16 * (1.0 - 0.7 * occHere);
+            c += P.e.rgb * rays * P.c.w * 0.13 * (1.0 - 0.7 * occHere);
         }
     }
     return vec4f(c, 1.0);
