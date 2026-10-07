@@ -293,8 +293,8 @@ def ecosystem(P, sc_nodes):
               maxDistance=260, responseThreshold=0.2),
         layer("combGlow", ["combHost"], "comb_glow", [0.35, 0.3, 1.0], 0.6, 0.0, "", bob=1.2, bobRate=0.05,
               sparsity=0.2, nearFade=1.5, maxDistance=200),
-        layer("plankton", ["planktonHost"], "plankton", BLUE, 0.8, 14.0, "propU", sparsity=0.7, pulseRate=4.0,
-              pulseDecay=0.6, flicker=0.3, flickerRate=3.0, wakeGain=2.0, maxDistance=320),
+        layer("plankton", ["planktonHost"], "plankton", BLUE, 0.8, 7.0, "propU", sparsity=0.7, pulseRate=4.0,
+              pulseDecay=0.6, flicker=0.3, flickerRate=3.0, wakeGain=2.0, maxDistance=320, nearFade=3.0),
     ]}
     for l in eco["layers"]:
         LAYER_BASE[l["name"]] = (l["intensity"], l["excitedIntensity"])
@@ -521,6 +521,12 @@ def glow_values(name):
     for lid in CROWN_IDS:
         v[f"lights/{lid}/intensity"] = [crown]
     dense = name in ("Drop", "Body", "Body 2", "Body 3", "Body 4")
+    # The drop is also a synchronised ignition ("thousands of organisms illuminate"): every organism that answers the
+    # medium answers as if a front were on it, landing with the drop's ease-out and easing back over the body's
+    # transition while the real fronts keep travelling. Negative thresholds = a standing response.
+    flash = {"Drop": -0.32, "Body": -0.06, "Body 2": -0.06, "Body 3": -0.06, "Body 4": -0.08}.get(name, 0.0)
+    for layer in ("matPolyps", "seapenPolyps", "crust", "crustViolet", "fanPolyps", "plankton"):
+        v[f"ecosystem/{layer}/responseThreshold"] = [flash]
     v["ecosystem/crust/sparsity"] = [0.4 if name == "Drop" else (0.5 if dense else 0.65)]
     v["ecosystem/crustViolet/sparsity"] = [0.45 if name == "Drop" else (0.6 if dense else 0.75)]
     return v
