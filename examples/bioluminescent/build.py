@@ -279,11 +279,11 @@ def ecosystem(P, sc_nodes):
               nearFade=1.5),
         layer("seapenPolyps", pens, "seapen", PEN, 2.5, 9.0, "propU", sparsity=0.3, pulseRate=0.8, pulseDecay=1.0,
               wakeGain=2.0, maxDistance=300),
-        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 1.2, 6.0, "propU", sparsity=0.5, pulseRate=2.0,
-              pulseDecay=1.5, breath=0.4, breathRate=0.03, size=0.8, wakeGain=3.0, maxDistance=700),
+        layer("crust", ["crustHost"], "crust", DEEP_BLUE, 0.6, 6.0, "propU", sparsity=0.65, pulseRate=2.0,
+              pulseDecay=1.5, breath=0.4, breathRate=0.03, size=0.8, wakeGain=1.5, maxDistance=700),
         layer("embers", ["emberHost"], "crust", EMBER, 0.6, 0.0, "", sparsity=0.85, breath=0.6, breathRate=0.02,
               size=0.7, maxDistance=400, wakeField=""),
-        layer("combRows", ["combHost"], "comb_rows", PALE, 2.5, 3.0, "highs", iridescence=0.9, iridescenceScale=1.5,
+        layer("combRows", ["combHost"], "comb_rows", PALE, 1.2, 3.0, "highs", iridescence=0.55, size=0.8, iridescenceScale=1.5,
               iridescenceSpeed=0.8, bob=1.2, bobRate=0.05, flicker=0.2, flickerRate=4.0, nearFade=1.5,
               maxDistance=260, responseThreshold=0.2),
         layer("combGlow", ["combHost"], "comb_glow", [0.35, 0.3, 1.0], 0.6, 0.0, "", bob=1.2, bobRate=0.05,
@@ -359,6 +359,24 @@ def flight_length(pts):
     return float(np.sum(np.linalg.norm(np.diff(a, axis=0), axis=1)))
 
 
+CROWN = [0.10, 0.55, 1.0]
+
+
+def crown_lights(P):
+    """The hero scale lights the haze: the larger bank crinoids each pool their photophores' light in the air under
+    their crowns (the owner liked CP1's radiant canopy). Micro emitters never do (01-research.md); only the giants."""
+    out = []
+    for k, c in enumerate(P["crinoid"]):
+        s = c[7]
+        if s < 1.0 or len(out) >= 120:
+            continue
+        x, y, z = c[:3]
+        out.append({"name": f"crown{k}", "id": f"crown{k}", "type": "point", "position": [x, y + 21.0 * s, z],
+                    "color": CROWN, "intensity": 220.0, "range": 26.0 * s, "radius": 2.0, "castsShadow": False,
+                    "volumetric": 0.4})
+    return out
+
+
 def scene(P):
     nodes = list(fields())
     nodes.append({"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
@@ -399,7 +417,7 @@ def scene(P):
             "background": [0.003, 0.004, 0.010], "intensity": 0.06,
             "fogColor": [0.004, 0.007, 0.018], "volumeDensity": 0.006, "volumeScattering": 0.9,
             "volumeAbsorption": 0.3, "volumeAnisotropy": 0.35, "volumeSteps": 32, "volumeMaxDistance": 900.0,
-            "volumeLocalLights": 0.0, "volumeNoise": 0.6, "volumeNoiseScale": 0.03,
+            "volumeLocalLights": 1.0, "volumeNoise": 0.6, "volumeNoiseScale": 0.03,
             "volumeEmission": 0.0, "volumeColorField": "propGlow",
             "fogHeight": land.FLOOR + 30.0, "fogHeightFalloff": 0.02, "fogUpperDensity": 0.12,
             "fogSky": 1.0, "fogSkyDistance": 1400.0,
@@ -410,7 +428,7 @@ def scene(P):
         },
         "lights": [{"name": "moon", "id": "moon", "type": "directional", "role": "key",
                     "direction": [0.25, -0.92, 0.3], "color": [0.55, 0.65, 1.0], "intensity": 0.05,
-                    "castsShadow": False}],
+                    "castsShadow": False}] + crown_lights(P),
         "grids": [PROP],
         "materialPrograms": [rock_program()],
         "ecosystem": ecosystem(P, body),

@@ -4,3 +4,4 @@ cp1/
 __pycache__/
 cp2/
 rift.scene.json
+diag-*
