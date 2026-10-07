@@ -240,6 +240,7 @@ struct LiveQualityRung {
     float particleCullDistance = 0.0f;  // QualitySettings::particleCullDistance (0 = none; the nearer limit wins)
     float particleSpawnScale = 1.0f;    // ceiling on QualitySettings::particleSpawnScale
     std::uint32_t sdfShadowScale = 1;   // ADR-1165: floor on QualitySettings::sdfShadowScale (higher = coarser)
+    std::uint32_t astralTier = 0;       // ADR-1222: floor on QualitySettings::astralTier (higher = fewer particles)
     [[nodiscard]] bool operator==(const LiveQualityRung&) const = default;
 };
 

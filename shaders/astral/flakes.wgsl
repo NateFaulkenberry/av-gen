@@ -130,7 +130,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
     let F0 = vec3f(0.5, 0.51, 0.54) * film;
     let Fr = F0 + (vec3f(0.95) - F0) * pow(1.0 - cosV, 5.0);
     // the flake's reflected radiance: dark unless its normal finds a band (a glint)
-    let base = envF(r, 0.012) * Fr * select(0.2 + 0.65 * b, 0.15 + 0.6 * F.ext.w, role == 5);
+    let base = envF(r, 0.012) * Fr * select(0.2 + 0.65 * b, (0.15 + 0.6 * F.ext.w) * (1.0 - 0.8 * F.pal4.w), role == 5 && b < 0.3);
     // heat shows as sparks: only a third of the matter carries it visibly, so a collapse is a spray, not a fireball
     var glint = heatColor(heat) * select(0.0, 1.4, hz < 0.045);
     // a few hot cores: the field's nervous system
@@ -147,7 +147,7 @@ fn cs_flakes(@builtin(global_invocation_id) gid: vec3u, @builtin(num_workgroups)
         n = clamp(i32(ceil(min(L, 60.0) / 2.0)), 1, 8); // iteration 2: 2 px spacing, 8 samples (was 1.2 px, 14)
     }
     // as the form sharpens, bound matter FUSES into the surface: its flakes thin out to a residual sparkle
-    let fuse = 1.0 - 0.97 * F.ent0.z * smoothstep(0.6, 1.0, b);
+    let fuse = (1.0 - 0.97 * F.ent0.z * smoothstep(0.6, 1.0, b)) * (1.0 - 0.8 * F.lg0.x * step(0.3, b));
     // near enough to resolve as an object: hand it to the shard pass (it fades in over 1 px of footprint)
     // fused matter still leaves 30% of its plates resting on the surface: engraved debris, the micro scale's
     // proof that the surface is made of matter

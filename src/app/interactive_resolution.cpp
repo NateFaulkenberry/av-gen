@@ -91,6 +91,12 @@ constexpr LiveQualityRung sdfShadows(LiveQualityRung r, std::uint32_t scale) {
     r.sdfShadowScale = scale;
     return r;
 }
+// ADR-1222: the Astral Forge simulates fewer particles (70% at Medium, 50% at Low, 33% at Emergency), with fewer god-ray
+// taps and, from Low, no shards. Medium and above keep the full god on the live reference tier.
+constexpr LiveQualityRung astral(LiveQualityRung r, std::uint32_t tier) {
+    r.astralTier = tier;
+    return r;
+}
 constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, float particleMetres, float lod) {
     r.shadowCasterMinPixels = casterPixels;
     r.particleCullDistance = particleMetres;
@@ -101,29 +107,29 @@ constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, floa
 constexpr LiveQualityLadder kResolutionFirst{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
-    volumes(rung(L::Medium, 0.71f), 0.25f),
-    sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4),
-    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4),
+    astral(volumes(rung(L::Medium, 0.71f), 0.25f), 2),
+    astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3),
+    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4),
 };
 
 constexpr LiveQualityLadder kBalanced{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
-    noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)),
-    sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4),
-    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4),
+    astral(noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)), 2),
+    astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3),
+    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4),
 };
 
 constexpr LiveQualityLadder kEffectsFirst{
     rung(L::Ultra, 1.0f),
     cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2),
-    plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)),
-    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
-               80.0f, 1.5f), 4),
-    sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4),
+    astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)), 2),
+    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
+               80.0f, 1.5f), 4), 3),
+    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4),
 };
 
 // ADR-1099: the profiles, rows of the same family. QUALITY is the tier. BALANCED spends nothing on what is small or far
@@ -151,7 +157,7 @@ int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
            (a.shadowCasterMinPixels != b.shadowCasterMinPixels ? 1 : 0) +
            (a.postEffectQuality != b.postEffectQuality ? 1 : 0) +
            (a.particleCullDistance != b.particleCullDistance ? 1 : 0) +
-           (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0);
+           (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0) + (a.astralTier != b.astralTier ? 1 : 0);
 }
 } // namespace
 
@@ -182,6 +188,7 @@ void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::Quali
                                                                             rung.particleCullDistance);
     q.particleSpawnScale = std::min(base.particleSpawnScale, rung.particleSpawnScale);
     q.sdfShadowScale = std::max(base.sdfShadowScale, rung.sdfShadowScale); // ADR-1165
+    q.astralTier = std::max(base.astralTier, rung.astralTier);             // ADR-1222
 }
 } // namespace
 
@@ -549,6 +556,7 @@ void giveUp(LiveQualityRung& r, std::string_view group, int depth) {
     if (group == "particles") {
         r.particleCullDistance = full ? 50.0f : 80.0f;
         r.particleSpawnScale = full ? 0.6f : 0.85f;
+        r.astralTier = full ? 3u : 2u; // ADR-1222
     } else if (group == "shadows") {
         r.shadowCasterMinPixels = full ? 24.0f : 12.0f;
         r.cascadeCount = 2;
@@ -636,6 +644,8 @@ bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
     else if (lever == "shadowatlas1k") c.shadowResolution = std::min<std::uint32_t>(c.shadowResolution, 1024u);
     else if (lever == "sdfshadowhalf") c.sdfShadowScale = std::max(c.sdfShadowScale, 2u);    // ADR-1165
     else if (lever == "sdfshadowquarter") c.sdfShadowScale = std::max(c.sdfShadowScale, 4u); // ADR-1165
+    else if (lever == "astralfewer") c.astralTier = std::max(c.astralTier, 2u); // ADR-1222: 70% of the particles
+    else if (lever == "astralhalf") c.astralTier = std::max(c.astralTier, 3u);  // ADR-1222: 50%, no shards
     else if (lever == "lodbias2") c.lodBias = std::max(c.lodBias, 2.0f);
     else if (lever == "drawdist75") c.drawDistanceScale = std::min(c.drawDistanceScale, 0.75f);
     else if (lever == "particlelod") {
@@ -666,6 +676,7 @@ std::string ceilingJsonText(const LiveQualityRung& c) {
     if (c.particleCullDistance != n.particleCullDistance) j["particleCullDistance"] = c.particleCullDistance;
     if (c.particleSpawnScale != n.particleSpawnScale) j["particleSpawnScale"] = c.particleSpawnScale;
     if (c.sdfShadowScale != n.sdfShadowScale) j["sdfShadowScale"] = c.sdfShadowScale;
+    if (c.astralTier != n.astralTier) j["astralTier"] = c.astralTier; // ADR-1222
     return j.dump();
 }
 
@@ -695,6 +706,7 @@ std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std:
         else if (key == "particleCullDistance" && num) c.particleCullDistance = std::max(v.get<float>(), 0.0f);
         else if (key == "particleSpawnScale" && num) c.particleSpawnScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
         else if (key == "sdfShadowScale" && num) c.sdfShadowScale = std::clamp(v.get<std::uint32_t>(), 1u, 8u);
+        else if (key == "astralTier" && num) c.astralTier = std::clamp(v.get<std::uint32_t>(), 0u, 4u); // ADR-1222
         else {
             error = "'" + key + "' is not a quality ceiling (or has the wrong type)";
             return std::nullopt;

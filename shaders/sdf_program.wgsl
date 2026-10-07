@@ -50,6 +50,7 @@ const SDF_STAIRS: u32 = 29u;         // ADR-1040 (a primitive, appended)
 const SDF_SCREW: u32 = 30u;          // ADR-1040
 const SDF_WARP: u32 = 31u;           // ADR-1040
 const SDF_SHELL: u32 = 32u;          // ADR-1040
+// ADR-1144: 33 ellipsoid .. 39 farField exist only in compiled trees (sdfCompileWgsl calls their helpers).
 
 const SDF_FAR: f32 = 1e9;
 const SDF_BEGIN: u32 = 0xFFFFu;
@@ -172,6 +173,74 @@ fn sdfPrimitive(n: SdfNodeGpu, p: vec3<f32>) -> f32 {
         return sdfStairs(p, n.p1.xyz, n.p0.y, i32(n.p5.z));
     }
     return SDF_FAR;
+}
+
+// ---- ADR-1144: the anatomical vocabulary (compiled trees only: spatial::sdfCompileWgsl calls these by
+// name, and the interpreter below never reaches them, so no interpreted object's code changes). The CPU
+// twins are in spatial/sdf.cpp, the same expressions in the same order.
+
+fn sdfEllipsoid(p: vec3<f32>, r: vec3<f32>) -> f32 {
+    let k0 = length(p / r);
+    let k1 = length(p / (r * r));
+    return k0 * (k0 - 1.0) / max(k1, 1e-6);
+}
+
+fn sdfTaperedCapsule(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, ra: f32, rb: f32) -> f32 {
+    let pa = p - a;
+    let ba = b - a;
+    let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-12), 0.0, 1.0);
+    return length(pa - ba * h) - (ra + (rb - ra) * h);
+}
+
+fn sdfOctahedron(p0: vec3<f32>, s: f32) -> f32 {
+    let p = abs(p0);
+    let m = p.x + p.y + p.z - s;
+    var q: vec3<f32>;
+    if (3.0 * p.x < m) {
+        q = p;
+    } else if (3.0 * p.y < m) {
+        q = p.yzx;
+    } else if (3.0 * p.z < m) {
+        q = p.zxy;
+    } else {
+        return m * 0.57735027;
+    }
+    let k = clamp(0.5 * (q.z - q.y + s), 0.0, s);
+    return length(vec3<f32>(q.x, q.y - s + k, q.z - k));
+}
+
+fn sdfFacet(p: vec3<f32>, r: vec3<f32>, count: i32, level: f32, phase: f32, jitter: f32) -> f32 {
+    let q = p / r;
+    let planes = max(count, 1);
+    var m = -1e9;
+    for (var k = 0; k < planes; k = k + 1) {
+        let fk = f32(k);
+        let z = 1.0 - (2.0 * fk + 1.0) / f32(planes);
+        let rr = sqrt(max(1.0 - z * z, 0.0));
+        let ph = fk * 2.39996 + phase + jitter * sin(fk * 1.7 + phase * 2.0);
+        m = max(m, dot(q, vec3<f32>(rr * cos(ph), z, rr * sin(ph))));
+    }
+    return (m - level) * min(r.x, min(r.y, r.z));
+}
+
+// smoothstep defined for equal edges (spatial::sstep).
+fn sdfSstep(lo: f32, hi: f32, x: f32) -> f32 {
+    let t = clamp((x - lo) / max(hi - lo, 1e-6), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fn sdfBlendWeight(n: SdfNodeGpu, p: vec3<f32>) -> f32 {
+    let len = length(n.p2.xyz);
+    if (!(len > 1e-8)) {
+        return n.p2.w;
+    }
+    return n.p2.w * sdfSstep(n.p0.w - n.p3.w, n.p0.w + n.p3.w, dot(p, n.p2.xyz / len));
+}
+
+fn sdfFrayScale(n: SdfNodeGpu, p: vec3<f32>, t: f32) -> f32 {
+    let m = sdfSstep(n.p0.x, n.p0.w, length((p - n.p3.xyz) * n.p1.xyz));
+    let v = valueNoise(p * n.p5.x + vec3<f32>(0.0, 0.0, n.p5.y * t), n.seed);
+    return 1.0 + n.p2.w * (v - 0.5) * m;
 }
 
 // ---- combinations --------------------------------------------------------------------------------

@@ -31,6 +31,13 @@ struct Frame {
     it2: vec4f,      // iteration 2: latent cache on, shards on, shard threshold (px), -
     cbox: vec4f,     // iteration 2: the latent cache's box (origin xyz, edge length), framed on the shot
     it3: vec4f,      // iteration 3: half-resolution march on, seconds since the last collapse (-1 none), -, -
+    pal0: vec4f,     // v2: key-light tint (unit luminance), palette strength
+    pal1: vec4f,     // rim tint, rim strength
+    pal2: vec4f,     // eye tint, eye glow
+    pal3: vec4f,     // zone A (features) tint, raking key strength
+    pal4: vec4f,     // zone B (periphery) tint, dust absorption (0..1)
+    atm0: vec4f,     // atmosphere colour, strength
+    lg0: vec4f,      // v2 legibility at a formed peak (0..1), -, -, -
 };
 
 @group(0) @binding(0) var<uniform> F: Frame;
@@ -134,4 +141,29 @@ fn thinFilm(cosI: f32, thicknessNm: f32) -> vec3f {
 fn heatColor(h: f32) -> vec3f {
     let x = clamp(h, 0.0, 1.5);
     return vec3f(1.0, 0.32 + 0.45 * smoothstep(0.2, 1.2, x), 0.06 + 0.25 * smoothstep(0.7, 1.5, x)) * (x * x) * 3.0;
+}
+
+// v2: a band's colour pulled toward the god's palette (band 0 key, 1 zone A, 2 rim, 3 eye), luminance preserved
+fn palTint(k: i32) -> vec3f {
+    var c = F.pal0.rgb;
+    if (k == 1) { c = F.pal3.rgb; }
+    if (k == 2) { c = F.pal1.rgb; }
+    if (k == 3) { c = F.pal2.rgb; }
+    return mix(vec3f(1.0), c, F.pal0.w);
+}
+// v2: the raking key (low, from the side the camera does not face) and the rim (from behind), in reflection space
+fn keyRim(dir: vec3f) -> vec3f {
+    if (F.pal3.w <= 0.0 && F.pal1.w <= 0.0) { return vec3f(0.0); }
+    let fwd = normalize(F.camFwd.xyz);
+    let right = normalize(cross(fwd, vec3f(0.0, 1.0, 0.0)) + vec3f(1e-4, 0.0, 0.0));
+    let up = cross(right, fwd);
+    let keyD = normalize(right * 0.9 - up * 0.25 - fwd * 0.35);
+    let rimD = normalize(fwd * 0.9 + up * 0.35);
+    var k = exp((dot(dir, keyD) - 1.0) * 5.0) * 1.6 * F.pal3.w;
+    // v2 legibility: a broad frontal-high key at a formed peak (bright brow, cheekbones and nose bridge; sockets and the
+    // mouth turned away from it stay dark) -- the T-configuration a viewer and a face detector read
+    let keyF = normalize(-fwd * 0.75 + up * 0.65);
+    k += exp((dot(dir, keyF) - 1.0) * 1.8) * 1.1 * F.lg0.x;
+    let r = exp((dot(dir, rimD) - 1.0) * 3.5) * 1.8 * F.pal1.w;
+    return k * mix(vec3f(1.0), F.pal0.rgb, F.pal0.w) + r * mix(vec3f(1.0), F.pal1.rgb, F.pal0.w);
 }

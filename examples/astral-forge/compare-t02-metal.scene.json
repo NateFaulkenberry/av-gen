@@ -119,9 +119,12 @@
             "smooth": 0.35,
             "children": [
              {
-              "kind": "capsule",
-              "radius": 1.375,
-              "height": 1.5
+              "kind": "ellipsoid",
+              "size": [
+               1.5,
+               2.9,
+               1.25
+              ]
              },
              {
               "kind": "translate",
@@ -132,9 +135,12 @@
               ],
               "children": [
                {
-                "kind": "capsule",
-                "radius": 0.75,
-                "height": 0.75
+                "kind": "ellipsoid",
+                "size": [
+                 0.75,
+                 1.5,
+                 0.75
+                ]
                }
               ]
              }
@@ -182,9 +188,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.6,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.6,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 5.2
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -233,9 +249,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -3.178134911250316,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       3.178134911250316,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 6.356269822500632
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -284,9 +310,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.9093008230928787,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.9093008230928787,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 5.8186016461857575
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -335,9 +371,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.1873403044896156,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.1873403044896156,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 4.374680608979231
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -386,9 +432,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.0699272065679084,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.0699272065679084,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 4.139854413135817
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -421,20 +477,27 @@
             "amount": 0.25,
             "children": [
              {
-              "kind": "intersection",
+              "kind": "farField",
+              "translation": [
+               0.0,
+               0.0,
+               0.0
+              ],
+              "size": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "radius": 2.88,
+              "offset": 2.04,
               "children": [
                {
-                "kind": "box",
+                "kind": "ellipsoid",
                 "size": [
-                 0.6,
-                 2.7,
+                 0.55,
+                 2.4,
                  0.035
                 ]
-               },
-               {
-                "kind": "capsule",
-                "radius": 0.55,
-                "height": 2.05
                }
               ]
              }
@@ -464,9 +527,12 @@
               "offset": 0.1,
               "children": [
                {
-                "kind": "capsule",
-                "radius": 0.85,
-                "height": 0.75
+                "kind": "ellipsoid",
+                "size": [
+                 0.85,
+                 1.6,
+                 0.85
+                ]
                }
               ]
              },
@@ -514,7 +580,8 @@
       0.5
      ],
      "metallic": 1.0
-    }
+    },
+    "compile": true
    }
   },
   {
@@ -701,9 +768,12 @@
             "smooth": 0.35,
             "children": [
              {
-              "kind": "capsule",
-              "radius": 1.375,
-              "height": 1.5
+              "kind": "ellipsoid",
+              "size": [
+               1.5,
+               2.9,
+               1.25
+              ]
              },
              {
               "kind": "translate",
@@ -714,9 +784,12 @@
               ],
               "children": [
                {
-                "kind": "capsule",
-                "radius": 0.75,
-                "height": 0.75
+                "kind": "ellipsoid",
+                "size": [
+                 0.75,
+                 1.5,
+                 0.75
+                ]
                }
               ]
              }
@@ -764,9 +837,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.6,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.6,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 5.2
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -815,9 +898,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -3.178134911250316,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       3.178134911250316,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 6.356269822500632
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -866,9 +959,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.9093008230928787,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.9093008230928787,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 5.8186016461857575
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -917,9 +1020,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.1873403044896156,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.1873403044896156,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 4.374680608979231
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -968,9 +1081,19 @@
                     ],
                     "children": [
                      {
-                      "kind": "cone",
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       -2.0699272065679084,
+                       0.0
+                      ],
+                      "to": [
+                       0.0,
+                       2.0699272065679084,
+                       0.0
+                      ],
                       "radius": 0.42,
-                      "height": 4.139854413135817
+                      "radius2": 0.01
                      }
                     ]
                    }
@@ -1003,20 +1126,27 @@
             "amount": 0.25,
             "children": [
              {
-              "kind": "intersection",
+              "kind": "farField",
+              "translation": [
+               0.0,
+               0.0,
+               0.0
+              ],
+              "size": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "radius": 2.88,
+              "offset": 2.04,
               "children": [
                {
-                "kind": "box",
+                "kind": "ellipsoid",
                 "size": [
-                 0.6,
-                 2.7,
+                 0.55,
+                 2.4,
                  0.035
                 ]
-               },
-               {
-                "kind": "capsule",
-                "radius": 0.55,
-                "height": 2.05
                }
               ]
              }
@@ -1046,9 +1176,12 @@
               "offset": 0.1,
               "children": [
                {
-                "kind": "capsule",
-                "radius": 0.85,
-                "height": 0.75
+                "kind": "ellipsoid",
+                "size": [
+                 0.85,
+                 1.6,
+                 0.85
+                ]
                }
               ]
              },
@@ -1161,7 +1294,8 @@
      "particles": "matter",
      "iso": 1.0,
      "sharpness": 1.0
-    }
+    },
+    "compile": true
    }
   }
  ]

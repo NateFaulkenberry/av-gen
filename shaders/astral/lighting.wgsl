@@ -20,13 +20,14 @@ fn envF(dir: vec3f, alpha: f32) -> vec3f {
             let s = fract(ph * A1.z / TAU + F.rig.x * (0.07 + 0.05 * f32(k)));
             g *= smoothstep(0.0, 0.04 + alpha, s) * smoothstep(0.0, 0.04 + alpha, 0.72 - s);
         }
-        sum += A1.y * g * mix(vec3f(0.80, 0.90, 1.08), vec3f(1.08, 0.93, 0.78), A1.w);
+        sum += A1.y * g * mix(vec3f(0.80, 0.90, 1.08), vec3f(1.08, 0.93, 0.78), A1.w) * palTint(k);
     }
     // a broad, dim soft-box sweep (orbiting with the rig): it describes the body's curvature between the
     // crisp strips, the way a gradient sweep does in product photography of black chrome
     let key = normalize(vec3f(cos(F.rig.x * 0.23 + 0.8), 0.55, sin(F.rig.x * 0.23 + 0.8)));
     let soft = exp((dot(dir, key) - 1.0) * 2.6) * 0.55 + 0.08 * smoothstep(-0.3, 1.0, dir.y);
     sum += soft * vec3f(0.92, 0.95, 1.0);
+    sum += keyRim(dir);
     return sum * (1.0 + F.rig.w) + vec3f(F.misc.z * 1.5);
 }
 
@@ -47,7 +48,7 @@ fn envBands(dir: vec3f, alpha: f32) -> vec3f {
             let s = fract(ph * A1.z / TAU + F.rig.x * (0.07 + 0.05 * f32(k)));
             g *= smoothstep(0.0, 0.04 + alpha, s) * smoothstep(0.0, 0.04 + alpha, 0.72 - s);
         }
-        sum += A1.y * g * mix(vec3f(0.80, 0.90, 1.08), vec3f(1.08, 0.93, 0.78), A1.w);
+        sum += A1.y * g * mix(vec3f(0.80, 0.90, 1.08), vec3f(1.08, 0.93, 0.78), A1.w) * palTint(k);
     }
     return sum * (1.0 + F.rig.w) + vec3f(F.misc.z * 1.5);
 }

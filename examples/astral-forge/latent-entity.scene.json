@@ -1,470 +1,2194 @@
 {
-  "format": "avgen-scene",
-  "version": 1,
-  "name": "latent-entity",
-  "camera": {
-    "mode": 1,
-    "position": [
-      0.0,
-      0.25,
-      7.2
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "latent-entity",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.25,
+   7.2
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 34.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0,
+   0,
+   0
+  ],
+  "intensity": 0.0,
+  "bands": {
+   "phase": 1.2,
+   "rotation": 0.0,
+   "gain": 1.0,
+   "softbox": {
+    "intensity": 0.55,
+    "azimuth": 1.076,
+    "elevation": 0.5028,
+    "falloff": 2.6,
+    "skyFill": 0.08
+   },
+   "strips": [
+    {
+     "axis": [
+      0.779,
+      0.33035,
+      0.53294
+     ],
+     "offset": 0.0,
+     "width": 0.014,
+     "intensity": 17.0,
+     "segments": 5,
+     "warmth": 0.05,
+     "rate": 0.07
+    },
+    {
+     "axis": [
+      0.08406,
+      0.95444,
+      0.28633
+     ],
+     "offset": 0.62,
+     "width": 0.02,
+     "intensity": 9.0,
+     "segments": 0,
+     "warmth": 0.42,
+     "rate": 0.12
+    },
+    {
+     "axis": [
+      0.1761,
+      -0.8805,
+      0.44013
+     ],
+     "offset": 0.5,
+     "width": 0.012,
+     "intensity": 11.0,
+     "segments": 9,
+     "warmth": 0.33,
+     "rate": 0.17
+    }
+   ]
+  }
+ },
+ "post": {
+  "bloomIntensity": 0.05
+ },
+ "lights": [],
+ "nodes": [
+  {
+   "name": "mask",
+   "kind": "sdf",
+   "sdf": {
+    "visible": false,
+    "tree": {
+     "root": {
+      "kind": "scale",
+      "scale": 0.6,
+      "children": [
+       {
+        "kind": "smoothUnion",
+        "smooth": 0.075,
+        "children": [
+         {
+          "kind": "smoothUnion",
+          "smooth": 0.075,
+          "children": [
+           {
+            "kind": "smoothUnion",
+            "smooth": 0.2,
+            "children": [
+             {
+              "kind": "smoothUnion",
+              "smooth": 0.25,
+              "children": [
+               {
+                "kind": "smoothDifference",
+                "smooth": 0.06,
+                "children": [
+                 {
+                  "kind": "smoothDifference",
+                  "smooth": 0.1,
+                  "children": [
+                   {
+                    "kind": "smoothIntersection",
+                    "smooth": 0.25,
+                    "children": [
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0.0,
+                       0.15,
+                       -1.25
+                      ],
+                      "children": [
+                       {
+                        "kind": "fray",
+                        "amount": 0.22,
+                        "frequency": 1.7,
+                        "speed": 0.1,
+                        "seed": 61,
+                        "radius": 1.4,
+                        "offset": 2.4,
+                        "size": [
+                         1.0,
+                         0.75,
+                         0.0
+                        ],
+                        "translation": [
+                         0.0,
+                         -0.15,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "blend",
+                          "amount": 0.85,
+                          "axis": [
+                           1.0,
+                           0.0,
+                           0.0
+                          ],
+                          "offset": 0.05,
+                          "smooth": 0.3,
+                          "children": [
+                           {
+                            "kind": "shell",
+                            "offset": 0.425,
+                            "children": [
+                             {
+                              "kind": "ellipsoid",
+                              "size": [
+                               1.95,
+                               3.35,
+                               2.0
+                              ]
+                             }
+                            ]
+                           },
+                           {
+                            "kind": "shell",
+                            "offset": 0.425,
+                            "children": [
+                             {
+                              "kind": "facet",
+                              "size": [
+                               1.8915,
+                               3.2495,
+                               2.0
+                              ],
+                              "count": 24,
+                              "offset": 0.93,
+                              "speed": 0.05,
+                              "amount": 0.3
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "plane",
+                      "axis": [
+                       0.0,
+                       0.0,
+                       -1.0
+                      ],
+                      "offset": 0.55
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     -0.76,
+                     0.72,
+                     0.6
+                    ],
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       0.0,
+                       -12.60507
+                      ],
+                      "children": [
+                       {
+                        "kind": "ellipsoid",
+                        "size": [
+                         0.56,
+                         0.3,
+                         0.49
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0.76,
+                     0.72,
+                     0.6
+                    ],
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       0.0,
+                       12.60507
+                      ],
+                      "children": [
+                       {
+                        "kind": "ellipsoid",
+                        "size": [
+                         0.56,
+                         0.3,
+                         0.49
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -1.45,
+                   0.62
+                  ],
+                  "children": [
+                   {
+                    "kind": "ellipsoid",
+                    "size": [
+                     0.89,
+                     0.066,
+                     0.79
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "taperedCapsule",
+                  "from": [
+                   0.0,
+                   1.38,
+                   0.78
+                  ],
+                  "to": [
+                   -1.75,
+                   1.02,
+                   0.28
+                  ],
+                  "radius": 0.17,
+                  "radius2": 0.07
+                 },
+                 {
+                  "kind": "taperedCapsule",
+                  "from": [
+                   0.0,
+                   1.38,
+                   0.78
+                  ],
+                  "to": [
+                   1.75,
+                   1.02,
+                   0.28
+                  ],
+                  "radius": 0.17,
+                  "radius2": 0.07
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "taperedCapsule",
+              "from": [
+               0.0,
+               1.05,
+               0.86
+              ],
+              "to": [
+               0.0,
+               -0.55,
+               1.08
+              ],
+              "radius": 0.07,
+              "radius2": 0.12
+             }
+            ]
+           },
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "farField",
+              "translation": [
+               -0.76,
+               0.72,
+               0.6
+              ],
+              "size": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "radius": 1.3,
+              "offset": 0.45,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.76,
+                 0.72,
+                 0.4
+                ],
+                "children": [
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -12.60507
+                    ],
+                    "children": [
+                     {
+                      "kind": "ellipsoid",
+                      "size": [
+                       0.5,
+                       0.288,
+                       0.4
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     90.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "union",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.314,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.08,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.284,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.16,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.254,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.24,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "farField",
+              "translation": [
+               0.76,
+               0.72,
+               0.6
+              ],
+              "size": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "radius": 1.3,
+              "offset": 0.45,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.76,
+                 0.72,
+                 0.4
+                ],
+                "children": [
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "morph",
+                    "amount": 0.85,
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       0.0,
+                       12.60507
+                      ],
+                      "children": [
+                       {
+                        "kind": "ellipsoid",
+                        "size": [
+                         0.5,
+                         0.288,
+                         0.4
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "octahedron",
+                      "radius": 0.5
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     90.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "union",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.314,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.088,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.284,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.176,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.254,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.264,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "farField",
+          "translation": [
+           0.0,
+           -1.45,
+           0.62
+          ],
+          "size": [
+           1.0,
+           1.6,
+           1.0
+          ],
+          "radius": 1.7,
+          "offset": 1.0,
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             -1.45,
+             0.62
+            ],
+            "children": [
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "smoothIntersection",
+                "smooth": 0.03,
+                "children": [
+                 {
+                  "kind": "shell",
+                  "offset": 0.04,
+                  "children": [
+                   {
+                    "kind": "ellipsoid",
+                    "size": [
+                     0.97,
+                     0.156,
+                     0.85
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "box",
+                  "size": [
+                   50.0,
+                   50.0,
+                   0.22
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.85,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.85,
+                       0.09552,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.68,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.68,
+                       0.0314,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.51,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.51,
+                       -0.0114,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.34,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.34,
+                       -0.08945,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.17,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.17,
+                       -0.16185,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.0,
+                       -0.18489,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.17,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.17,
+                       -0.04359,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.34,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.34,
+                       -0.02862,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.51,
+                     0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.51,
+                     -0.03485,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.68,
+                     0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.68,
+                     0.0784,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.85,
+                     0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.85,
+                     0.07935,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.77,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.77,
+                       -0.07366,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.6,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.6,
+                       0.01415,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.43,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.43,
+                       -0.01236,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.26,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.26,
+                       0.03884,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.09,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.09,
+                       0.07886,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.08,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.08,
+                       0.07562,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.25,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.25,
+                       0.02342,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.42,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.42,
+                       0.10272,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.59,
+                     -0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.59,
+                     -0.0322,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.76,
+                     -0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.76,
+                     -0.0872,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.93,
+                     -0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.93,
+                     -0.11545,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "boundsMin": [
+     -2.4,
+     -2.4,
+     -2.4
     ],
-    "target": [
-      0.0,
-      0.0,
-      0.0
+    "boundsMax": [
+     2.4,
+     2.4,
+     2.4
     ],
-    "fov": 34.0,
-    "orbitSpeed": 0.0
-  },
-  "environment": {
-    "background": [
+    "material": {
+     "baseColor": [
+      0.56,
+      0.56,
+      0.58
+     ],
+     "emissiveColor": [
       0,
       0,
       0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.24,
+     "metallic": 1.0
+    },
+    "compile": true
+   }
+  },
+  {
+   "name": "matter",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 400000,
+    "seed": 11,
+    "shape": "sphere",
+    "position": [
+     0.0,
+     0.0,
+     0.0
     ],
-    "intensity": 0.0,
-    "bands": {
-      "phase": 1.2,
-      "rotation": 0.0,
-      "gain": 1.0,
-      "softbox": {
-        "intensity": 0.55,
-        "azimuth": 1.076,
-        "elevation": 0.5028,
-        "falloff": 2.6,
-        "skyFill": 0.08
-      },
-      "strips": [
-        {
-          "axis": [
-            0.779,
-            0.33035,
-            0.53294
+    "extent": [
+     2.6,
+     2.6,
+     2.6
+    ],
+    "spawnRate": 0.0,
+    "burst": 400000.0,
+    "lifetimeMin": 1000.0,
+    "lifetimeMax": 1000.0,
+    "spread": 1.0,
+    "speedMin": 0.0,
+    "speedMax": 0.3,
+    "gravity": [
+     0,
+     0,
+     0
+    ],
+    "drag": 0.4,
+    "turbulence": 0.5,
+    "turbulenceScale": 0.6,
+    "turbulenceSpeed": 0.2,
+    "sizeStart": 0.008,
+    "sizeEnd": 0.008,
+    "colorStart": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "colorEnd": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "emissive": 1.0,
+    "blend": "additive",
+    "latent": {
+     "sdf": "mask",
+     "coherence": 1.0,
+     "width": 0.08,
+     "strength": 1.0,
+     "flow": 0.4,
+     "release": 12.0
+    },
+    "density": {
+     "boundsMin": [
+      -2.4,
+      -2.4,
+      -2.4
+     ],
+     "boundsMax": [
+      2.4,
+      2.4,
+      2.4
+     ],
+     "resolution": 192,
+     "weight": 1.0
+    },
+    "shape2d": "flake",
+    "flake": {
+     "metal": [
+      0.5,
+      0.51,
+      0.54
+     ],
+     "temper": 30.0,
+     "filmIor": 2.4,
+     "glint": 0.012,
+     "tumble": 0.4,
+     "free": 0.2,
+     "bound": 0.65,
+     "latentNormal": 1.0,
+     "sparkle": 0.008,
+     "sparkleGain": 0.6,
+     "fuse": 0.9
+    }
+   }
+  },
+  {
+   "name": "entity",
+   "kind": "sdf",
+   "sdf": {
+    "tree": {
+     "root": {
+      "kind": "scale",
+      "scale": 0.6,
+      "children": [
+       {
+        "kind": "smoothUnion",
+        "smooth": 0.075,
+        "children": [
+         {
+          "kind": "smoothUnion",
+          "smooth": 0.075,
+          "children": [
+           {
+            "kind": "smoothUnion",
+            "smooth": 0.2,
+            "children": [
+             {
+              "kind": "smoothUnion",
+              "smooth": 0.25,
+              "children": [
+               {
+                "kind": "smoothDifference",
+                "smooth": 0.06,
+                "children": [
+                 {
+                  "kind": "smoothDifference",
+                  "smooth": 0.1,
+                  "children": [
+                   {
+                    "kind": "smoothIntersection",
+                    "smooth": 0.25,
+                    "children": [
+                     {
+                      "kind": "translate",
+                      "translation": [
+                       0.0,
+                       0.15,
+                       -1.25
+                      ],
+                      "children": [
+                       {
+                        "kind": "fray",
+                        "amount": 0.22,
+                        "frequency": 1.7,
+                        "speed": 0.1,
+                        "seed": 61,
+                        "radius": 1.4,
+                        "offset": 2.4,
+                        "size": [
+                         1.0,
+                         0.75,
+                         0.0
+                        ],
+                        "translation": [
+                         0.0,
+                         -0.15,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "blend",
+                          "amount": 0.85,
+                          "axis": [
+                           1.0,
+                           0.0,
+                           0.0
+                          ],
+                          "offset": 0.05,
+                          "smooth": 0.3,
+                          "children": [
+                           {
+                            "kind": "shell",
+                            "offset": 0.425,
+                            "children": [
+                             {
+                              "kind": "ellipsoid",
+                              "size": [
+                               1.95,
+                               3.35,
+                               2.0
+                              ]
+                             }
+                            ]
+                           },
+                           {
+                            "kind": "shell",
+                            "offset": 0.425,
+                            "children": [
+                             {
+                              "kind": "facet",
+                              "size": [
+                               1.8915,
+                               3.2495,
+                               2.0
+                              ],
+                              "count": 24,
+                              "offset": 0.93,
+                              "speed": 0.05,
+                              "amount": 0.3
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "plane",
+                      "axis": [
+                       0.0,
+                       0.0,
+                       -1.0
+                      ],
+                      "offset": 0.55
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     -0.76,
+                     0.72,
+                     0.6
+                    ],
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       0.0,
+                       -12.60507
+                      ],
+                      "children": [
+                       {
+                        "kind": "ellipsoid",
+                        "size": [
+                         0.56,
+                         0.3,
+                         0.49
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "translate",
+                    "translation": [
+                     0.76,
+                     0.72,
+                     0.6
+                    ],
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       0.0,
+                       12.60507
+                      ],
+                      "children": [
+                       {
+                        "kind": "ellipsoid",
+                        "size": [
+                         0.56,
+                         0.3,
+                         0.49
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "translate",
+                  "translation": [
+                   0.0,
+                   -1.45,
+                   0.62
+                  ],
+                  "children": [
+                   {
+                    "kind": "ellipsoid",
+                    "size": [
+                     0.89,
+                     0.066,
+                     0.79
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "taperedCapsule",
+                  "from": [
+                   0.0,
+                   1.38,
+                   0.78
+                  ],
+                  "to": [
+                   -1.75,
+                   1.02,
+                   0.28
+                  ],
+                  "radius": 0.17,
+                  "radius2": 0.07
+                 },
+                 {
+                  "kind": "taperedCapsule",
+                  "from": [
+                   0.0,
+                   1.38,
+                   0.78
+                  ],
+                  "to": [
+                   1.75,
+                   1.02,
+                   0.28
+                  ],
+                  "radius": 0.17,
+                  "radius2": 0.07
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "taperedCapsule",
+              "from": [
+               0.0,
+               1.05,
+               0.86
+              ],
+              "to": [
+               0.0,
+               -0.55,
+               1.08
+              ],
+              "radius": 0.07,
+              "radius2": 0.12
+             }
+            ]
+           },
+           {
+            "kind": "union",
+            "children": [
+             {
+              "kind": "farField",
+              "translation": [
+               -0.76,
+               0.72,
+               0.6
+              ],
+              "size": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "radius": 1.3,
+              "offset": 0.45,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 -0.76,
+                 0.72,
+                 0.4
+                ],
+                "children": [
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     0.0,
+                     0.0,
+                     -12.60507
+                    ],
+                    "children": [
+                     {
+                      "kind": "ellipsoid",
+                      "size": [
+                       0.5,
+                       0.288,
+                       0.4
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     90.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "union",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.314,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.08,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.284,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.16,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.254,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.24,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "kind": "farField",
+              "translation": [
+               0.76,
+               0.72,
+               0.6
+              ],
+              "size": [
+               1.0,
+               1.0,
+               1.0
+              ],
+              "radius": 1.3,
+              "offset": 0.45,
+              "children": [
+               {
+                "kind": "translate",
+                "translation": [
+                 0.76,
+                 0.72,
+                 0.4
+                ],
+                "children": [
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "morph",
+                    "amount": 0.85,
+                    "children": [
+                     {
+                      "kind": "rotate",
+                      "rotation": [
+                       0.0,
+                       0.0,
+                       12.60507
+                      ],
+                      "children": [
+                       {
+                        "kind": "ellipsoid",
+                        "size": [
+                         0.5,
+                         0.288,
+                         0.4
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "kind": "octahedron",
+                      "radius": 0.5
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "rotate",
+                    "rotation": [
+                     90.0,
+                     0.0,
+                     0.0
+                    ],
+                    "children": [
+                     {
+                      "kind": "union",
+                      "children": [
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.314,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.088,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.284,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.176,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       },
+                       {
+                        "kind": "translate",
+                        "translation": [
+                         0.0,
+                         0.254,
+                         0.0
+                        ],
+                        "children": [
+                         {
+                          "kind": "torus",
+                          "radius": 0.264,
+                          "rounding": 0.02667
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "kind": "farField",
+          "translation": [
+           0.0,
+           -1.45,
+           0.62
           ],
-          "offset": 0.0,
-          "width": 0.014,
-          "intensity": 17.0,
-          "segments": 5,
-          "warmth": 0.05,
-          "rate": 0.07
-        },
-        {
-          "axis": [
-            0.08406,
-            0.95444,
-            0.28633
+          "size": [
+           1.0,
+           1.6,
+           1.0
           ],
-          "offset": 0.62,
-          "width": 0.02,
-          "intensity": 9.0,
-          "segments": 0,
-          "warmth": 0.42,
-          "rate": 0.12
-        },
-        {
-          "axis": [
-            0.1761,
-            -0.8805,
-            0.44013
-          ],
-          "offset": 0.5,
-          "width": 0.012,
-          "intensity": 11.0,
-          "segments": 9,
-          "warmth": 0.33,
-          "rate": 0.17
-        }
+          "radius": 1.7,
+          "offset": 1.0,
+          "children": [
+           {
+            "kind": "translate",
+            "translation": [
+             0.0,
+             -1.45,
+             0.62
+            ],
+            "children": [
+             {
+              "kind": "union",
+              "children": [
+               {
+                "kind": "smoothIntersection",
+                "smooth": 0.03,
+                "children": [
+                 {
+                  "kind": "shell",
+                  "offset": 0.04,
+                  "children": [
+                   {
+                    "kind": "ellipsoid",
+                    "size": [
+                     0.97,
+                     0.156,
+                     0.85
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "box",
+                  "size": [
+                   50.0,
+                   50.0,
+                   0.22
+                  ]
+                 }
+                ]
+               },
+               {
+                "kind": "union",
+                "children": [
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.85,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.85,
+                       0.09552,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.68,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.68,
+                       0.0314,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.51,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.51,
+                       -0.0114,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.34,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.34,
+                       -0.08945,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.17,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.17,
+                       -0.16185,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.0,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.0,
+                       -0.18489,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.17,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.17,
+                       -0.04359,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.34,
+                       0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.34,
+                       -0.02862,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.51,
+                     0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.51,
+                     -0.03485,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.68,
+                     0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.68,
+                     0.0784,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.85,
+                     0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.85,
+                     0.07935,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   }
+                  ]
+                 },
+                 {
+                  "kind": "union",
+                  "children": [
+                   {
+                    "kind": "union",
+                    "children": [
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.77,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.77,
+                       -0.07366,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.6,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.6,
+                       0.01415,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.43,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.43,
+                       -0.01236,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.26,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.26,
+                       0.03884,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       -0.09,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       -0.09,
+                       0.07886,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.08,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.08,
+                       0.07562,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.25,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.25,
+                       0.02342,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     },
+                     {
+                      "kind": "taperedCapsule",
+                      "from": [
+                       0.42,
+                       -0.186,
+                       0.05
+                      ],
+                      "to": [
+                       0.42,
+                       0.10272,
+                       0.12
+                      ],
+                      "radius": 0.05,
+                      "radius2": 0.004
+                     }
+                    ]
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.59,
+                     -0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.59,
+                     -0.0322,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.76,
+                     -0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.76,
+                     -0.0872,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   },
+                   {
+                    "kind": "taperedCapsule",
+                    "from": [
+                     0.93,
+                     -0.186,
+                     0.05
+                    ],
+                    "to": [
+                     0.93,
+                     -0.11545,
+                     0.12
+                    ],
+                    "radius": 0.05,
+                    "radius2": 0.004
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
       ]
-    }
-  },
-  "post": {
-    "bloomIntensity": 0.05
-  },
-  "lights": [],
-  "nodes": [
-    {
-      "name": "mask",
-      "kind": "sdf",
-      "sdf": {
-        "visible": false,
-        "tree": {
-          "root": {
-            "kind": "smoothUnion",
-            "smooth": 0.18,
-            "children": [
-              {
-                "kind": "roundedBox",
-                "size": [
-                  1.05,
-                  1.45,
-                  0.22
-                ],
-                "rounding": 0.2,
-                "name": "plate"
-              },
-              {
-                "kind": "translate",
-                "translation": [
-                  -0.5,
-                  0.38,
-                  0.2
-                ],
-                "children": [
-                  {
-                    "kind": "sphere",
-                    "radius": 0.36
-                  }
-                ]
-              },
-              {
-                "kind": "translate",
-                "translation": [
-                  0.5,
-                  0.38,
-                  0.2
-                ],
-                "children": [
-                  {
-                    "kind": "sphere",
-                    "radius": 0.36
-                  }
-                ]
-              },
-              {
-                "kind": "translate",
-                "translation": [
-                  0.0,
-                  -0.62,
-                  0.18
-                ],
-                "children": [
-                  {
-                    "kind": "rotate",
-                    "rotation": [
-                      0.0,
-                      0.0,
-                      90.0
-                    ],
-                    "children": [
-                      {
-                        "kind": "capsule",
-                        "radius": 0.12,
-                        "height": 0.38
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "boundsMin": [
-          -2.4,
-          -2.4,
-          -2.4
-        ],
-        "boundsMax": [
-          2.4,
-          2.4,
-          2.4
-        ],
-        "material": {
-          "baseColor": [
-            0.56,
-            0.56,
-            0.58
-          ],
-          "emissiveColor": [
-            0,
-            0,
-            0
-          ],
-          "emissiveIntensity": 0.0,
-          "roughness": 0.24,
-          "metallic": 1.0
-        }
-      }
+     }
     },
-    {
-      "name": "matter",
-      "kind": "particles",
-      "particles": {
-        "enabled": true,
-        "capacity": 400000,
-        "seed": 11,
-        "shape": "sphere",
-        "position": [
-          0.0,
-          0.0,
-          0.0
+    "boundsMin": [
+     -2.4,
+     -2.4,
+     -2.4
+    ],
+    "boundsMax": [
+     2.4,
+     2.4,
+     2.4
+    ],
+    "material": {
+     "baseColor": [
+      0.36,
+      0.37,
+      0.4
+     ],
+     "emissiveColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.2,
+     "metallic": 1.0,
+     "thinFilm": {
+      "thickness": 30.0,
+      "ior": 2.4
+     },
+     "anisotropy": {
+      "strength": -0.4,
+      "rotation": 0.0
+     },
+     "engraving": {
+      "depth": 0.3,
+      "crawl": 0.07,
+      "grating": 1.0,
+      "spacing": 1600.0,
+      "panels": 1.1,
+      "layers": [
+       {
+        "family": "rosette",
+        "center": [
+         -0.76,
+         0.72,
+         0.6
         ],
-        "extent": [
-          2.6,
-          2.6,
-          2.6
+        "petals": 12,
+        "frequency": 14.4,
+        "weight": 1.0,
+        "depth": 0.35,
+        "inner": 0.2,
+        "outer": 0.7
+       },
+       {
+        "family": "rosette",
+        "center": [
+         0.76,
+         0.72,
+         0.6
         ],
-        "spawnRate": 0.0,
-        "burst": 400000.0,
-        "lifetimeMin": 1000.0,
-        "lifetimeMax": 1000.0,
-        "spread": 1.0,
-        "speedMin": 0.0,
-        "speedMax": 0.3,
-        "gravity": [
-          0,
-          0,
-          0
+        "petals": 18,
+        "frequency": 14.4,
+        "weight": 1.0,
+        "depth": 0.35,
+        "inner": 0.2,
+        "outer": 0.7
+       },
+       {
+        "family": "contour",
+        "center": [
+         0.0,
+         0.2,
+         -3.0
         ],
-        "drag": 0.4,
-        "turbulence": 0.5,
-        "turbulenceScale": 0.6,
-        "turbulenceSpeed": 0.2,
-        "sizeStart": 0.008,
-        "sizeEnd": 0.008,
-        "colorStart": [
-          1,
-          1,
-          1,
-          1
+        "petals": 7,
+        "frequency": 8.4,
+        "weight": 1.0,
+        "depth": 0.28,
+        "inner": 0.15,
+        "outer": 0.8
+       },
+       {
+        "family": "engine",
+        "axis": [
+         0.94,
+         0.3,
+         0.17
         ],
-        "colorEnd": [
-          1,
-          1,
-          1,
-          1
+        "frequency": 10.8,
+        "weight": 0.25,
+        "depth": 0.16,
+        "inner": 0.15,
+        "outer": 0.8
+       }
+      ]
+     },
+     "regions": {
+      "film": 35.0,
+      "filmNoise": 8.0,
+      "noiseScale": 0.9,
+      "polish": 0.69,
+      "points": [
+       {
+        "center": [
+         -0.76,
+         0.72,
+         0.6
         ],
-        "emissive": 1.0,
-        "blend": "additive",
-        "latent": {
-          "sdf": "mask",
-          "coherence": 1.0,
-          "width": 0.08,
-          "strength": 1.0,
-          "flow": 0.4,
-          "release": 12.0
-        },
-        "density": {
-          "boundsMin": [
-            -2.4,
-            -2.4,
-            -2.4
-          ],
-          "boundsMax": [
-            2.4,
-            2.4,
-            2.4
-          ],
-          "resolution": 192,
-          "weight": 1.0
-        },
-        "shape2d": "flake",
-        "flake": {
-          "metal": [
-            0.5,
-            0.51,
-            0.54
-          ],
-          "temper": 30.0,
-          "filmIor": 2.4,
-          "glint": 0.012,
-          "tumble": 0.4,
-          "free": 0.2,
-          "bound": 0.65,
-          "latentNormal": 1.0,
-          "sparkle": 0.008,
-          "sparkleGain": 0.6,
-          "fuse": 0.9
-        }
-      }
+        "sharpness": 4.0,
+        "weight": 1.0
+       },
+       {
+        "center": [
+         0.76,
+         0.72,
+         0.6
+        ],
+        "sharpness": 4.0,
+        "weight": 1.0
+       },
+       {
+        "center": [
+         0.0,
+         -1.45,
+         0.62
+        ],
+        "scale": [
+         0.8,
+         2.0,
+         1.0
+        ],
+        "sharpness": 3.0,
+        "weight": 0.6
+       }
+      ]
+     }
     },
-    {
-      "name": "entity",
-      "kind": "sdf",
-      "sdf": {
-        "tree": {
-          "root": {
-            "kind": "smoothUnion",
-            "smooth": 0.18,
-            "children": [
-              {
-                "kind": "roundedBox",
-                "size": [
-                  1.05,
-                  1.45,
-                  0.22
-                ],
-                "rounding": 0.2,
-                "name": "plate"
-              },
-              {
-                "kind": "translate",
-                "translation": [
-                  -0.5,
-                  0.38,
-                  0.2
-                ],
-                "children": [
-                  {
-                    "kind": "sphere",
-                    "radius": 0.36
-                  }
-                ]
-              },
-              {
-                "kind": "translate",
-                "translation": [
-                  0.5,
-                  0.38,
-                  0.2
-                ],
-                "children": [
-                  {
-                    "kind": "sphere",
-                    "radius": 0.36
-                  }
-                ]
-              },
-              {
-                "kind": "translate",
-                "translation": [
-                  0.0,
-                  -0.62,
-                  0.18
-                ],
-                "children": [
-                  {
-                    "kind": "rotate",
-                    "rotation": [
-                      0.0,
-                      0.0,
-                      90.0
-                    ],
-                    "children": [
-                      {
-                        "kind": "capsule",
-                        "radius": 0.12,
-                        "height": 0.38
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        "boundsMin": [
-          -2.4,
-          -2.4,
-          -2.4
-        ],
-        "boundsMax": [
-          2.4,
-          2.4,
-          2.4
-        ],
-        "material": {
-          "baseColor": [
-            0.36,
-            0.37,
-            0.4
-          ],
-          "emissiveColor": [
-            0,
-            0,
-            0
-          ],
-          "emissiveIntensity": 0.0,
-          "roughness": 0.2,
-          "metallic": 1.0,
-          "thinFilm": {
-            "thickness": 30.0,
-            "ior": 2.4
-          },
-          "anisotropy": {
-            "strength": -0.4,
-            "rotation": 0.0
-          },
-          "engraving": {
-            "depth": 0.3,
-            "crawl": 0.07,
-            "grating": 1.0,
-            "spacing": 1600.0,
-            "panels": 1.1,
-            "layers": [
-              {
-                "family": "rosette",
-                "center": [
-                  -0.5,
-                  0.38,
-                  0.5
-                ],
-                "petals": 12,
-                "frequency": 24.0,
-                "weight": 1.0,
-                "depth": 0.35,
-                "inner": 0.12,
-                "outer": 0.42
-              },
-              {
-                "family": "rosette",
-                "center": [
-                  0.5,
-                  0.38,
-                  0.5
-                ],
-                "petals": 18,
-                "frequency": 24.0,
-                "weight": 1.0,
-                "depth": 0.35,
-                "inner": 0.12,
-                "outer": 0.42
-              },
-              {
-                "family": "contour",
-                "center": [
-                  0.0,
-                  0.1,
-                  -1.5
-                ],
-                "petals": 7,
-                "frequency": 14.0,
-                "weight": 1.0,
-                "depth": 0.28,
-                "inner": 0.15,
-                "outer": 0.8
-              },
-              {
-                "family": "engine",
-                "axis": [
-                  0.94,
-                  0.3,
-                  0.17
-                ],
-                "frequency": 18.0,
-                "weight": 0.25,
-                "depth": 0.16,
-                "inner": 0.15,
-                "outer": 0.8
-              }
-            ]
-          }
-        },
-        "maxSteps": 448,
-        "stepScale": 0.6,
-        "epsilon": 0.0008,
-        "normalEpsilon": 0.004,
-        "castShadows": false,
-        "look": {
-          "aoStrength": 0.6,
-          "aoDistance": 0.25
-        },
-        "density": {
-          "particles": "matter",
-          "iso": 1.5,
-          "sharpness": 1.0
-        }
-      }
-    }
-  ]
+    "maxSteps": 448,
+    "stepScale": 0.6,
+    "epsilon": 0.0008,
+    "normalEpsilon": 0.004,
+    "castShadows": false,
+    "look": {
+     "aoStrength": 0.6,
+     "aoDistance": 0.25
+    },
+    "density": {
+     "particles": "matter",
+     "iso": 1.5,
+     "sharpness": 1.0,
+     "spread": 0.6,
+     "spreadRadii": [
+      1.2,
+      1.68,
+      3.0
+     ]
+    },
+    "compile": true
+   }
+  }
+ ]
 }

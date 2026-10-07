@@ -1,0 +1,260 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "THE ASTRAL FORGE LIVE"
+  },
+  "_note": "Live input + MIDI (ADR-1222). The live conductor builds phrases from the beats it hears; a strong kick on a phrase downbeat (or pad 36) collapses the god. MIDI map: docs/prototypes/astral-forge/09-production.md.",
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "astral-forge.scene.json"
+    }
+  },
+  "live": {
+    "qualityStrategy": "resolution_first",
+    "targetFps": 60
+  },
+  "sonic": {
+    "live": true
+  },
+  "sources": [],
+  "routes": [],
+  "presets": [],
+  "parameters": {},
+  "control": {
+    "midi": {
+      "enabled": true,
+      "filter": "*",
+      "bindings": [
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 1,
+          "parameter": "astral/summon",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 2,
+          "parameter": "astral/hold",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 3,
+          "parameter": "astral/intensity",
+          "component": 0,
+          "min": 0,
+          "max": 2
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 4,
+          "parameter": "astral/zoom",
+          "component": 0,
+          "min": 0.6,
+          "max": 1.8
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 5,
+          "parameter": "astral/palette",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 6,
+          "parameter": "astral/light",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 7,
+          "parameter": "astral/atmosphere",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 8,
+          "parameter": "astral/godRays",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 9,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": -1,
+          "max": 6
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 10,
+          "parameter": "astral/exposure",
+          "component": 0,
+          "min": 0.3,
+          "max": 1.6
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 11,
+          "parameter": "astral/camera",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 12,
+          "parameter": "astral/density",
+          "component": 0,
+          "min": 0.1,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "cc",
+          "number": 13,
+          "parameter": "astral/legibility",
+          "component": 0,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 36,
+          "parameter": "astral/collapse",
+          "component": 0,
+          "min": 0,
+          "max": 2.0
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 37,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 0,
+          "max": 0
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 38,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 39,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 2,
+          "max": 2
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 40,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 3,
+          "max": 3
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 41,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 4,
+          "max": 4
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 42,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 5,
+          "max": 5
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 43,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": 6,
+          "max": 6
+        },
+        {
+          "source": "*",
+          "channel": -1,
+          "kind": "note",
+          "number": 44,
+          "parameter": "astral/god",
+          "component": 0,
+          "min": -1,
+          "max": -1
+        }
+      ]
+    }
+  },
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "output": "video",
+    "path": "renders/astral-forge-live.mp4"
+  }
+}

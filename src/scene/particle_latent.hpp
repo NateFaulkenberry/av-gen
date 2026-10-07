@@ -38,6 +38,9 @@ struct LatentSample {
 // Four evaluations of the packed program around `pLocal` (sdf.wgsl's interpreter, evaluatePacked here).
 [[nodiscard]] LatentSample latentProject(std::span<const spatial::SdfNodeGpu> program, const glm::vec3& pLocal,
                                          double time, float epsilon, const spatial::FieldSet* fields = nullptr);
+// ADR-1145: the same over the tree itself -- the reference for the compiled force (sdfCompileWgsl's field).
+[[nodiscard]] LatentSample latentProject(const spatial::SdfTree& tree, const glm::vec3& pLocal, double time,
+                                         float epsilon, const spatial::FieldSet* fields = nullptr);
 
 // Everything one cs_latent step reads that is not the particle.
 struct LatentStep {
@@ -56,6 +59,10 @@ struct LatentStep {
 // The velocity after one cs_latent step, WITHOUT the flow term (which reads the curl noise, a
 // function this mirror does not carry). `flow` must be 0 for a parity comparison.
 [[nodiscard]] glm::vec3 latentVelocityStep(const LatentStep& step, std::span<const spatial::SdfNodeGpu> program,
+                                           const glm::vec3& position, const glm::vec3& velocity, float seed,
+                                           const spatial::FieldSet* fields = nullptr);
+// ADR-1145: the compiled force's reference (the tree evaluated directly).
+[[nodiscard]] glm::vec3 latentVelocityStep(const LatentStep& step, const spatial::SdfTree& tree,
                                            const glm::vec3& position, const glm::vec3& velocity, float seed,
                                            const spatial::FieldSet* fields = nullptr);
 

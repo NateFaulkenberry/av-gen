@@ -157,6 +157,17 @@ struct Params {
     bandsSoft2: vec4<f32>,
     bandsRate: vec4<f32>,
     bands: array<vec4<f32>, 8>,
+    // ADR-1146: tendons (cs_tendon only). The curves ride after the latent program in `sdfNodes`, each resampled
+    // to tendonInfo.z points by arc length (p0.xyz = the point, latent-local).
+    tendon0: vec4<f32>,         // rate (curve passes per second), stiffness, spray (m/s), ramp
+    tendonInfo: vec4<u32>,      // first curve record, curve count, points per curve, 0
+    // ADR-1148: the release front's heat (cs_heat, vs_flake). Heat lives in the record's trailWrites lane.
+    heat0: vec4<f32>,           // front origin (world), seconds since the front set out (< 0: no front)
+    heat1: vec4<f32>,           // front speed (world units / s), front width (world), inject, decay (1/s)
+    heat2: vec4<f32>,           // spark fraction, spark gain, 1 = heat on, 0
+    // ADR-1147: shards (vs_shard / fs_shard, and vs_flake hands them its plates).
+    shard0: vec4<f32>,          // footprint threshold (px), fraction, size (x particle size), 1 = on
+    shard1: vec4<f32>,          // grooves per radius, bevel, radians per pixel (vertical), 0
 };
 
 // ADR-1151: the band accessors reflection_bands.wgsl reads (the particle path has no frame block).
@@ -210,7 +221,7 @@ struct Counters {
 @group(0) @binding(4) var<storage, read> aliveRead: array<u32>;
 @group(0) @binding(5) var<storage, read> historyRead: array<vec4<f32>>;
 // The R32F view distance of the opaque scene (ADR-035); 1e7 where nothing was drawn.
-@group(0) @binding(13) var linearDepthTex: texture_2d<f32>;
+@group(0) @binding(13) var linearDepthTex: texture_2d<f32>; // ADR-1147: read by vs_flake and vs_shard as well
 // ADR-715: the terrain's baked height, for a fog layer that follows the ground. A placeholder that
 // is never read when `params.terrain1.w` is 0.
 @group(0) @binding(12) var terrainHeightTex: texture_2d<f32>;
@@ -637,6 +648,212 @@ fn cs_latent(@builtin(global_invocation_id) gid: vec3<u32>) {
         // the attractor reads as "no home" (only anchored systems set it, and they never store this).
         p.home = vec4<f32>(nW, 0.0);
     }
+    particles[slot] = p;
+}
+
+// ---- ADR-1155: the staggered projection -----------------------------------------------------------
+// cs_latent with the prototype's stagger: a particle refreshes its projection (the four SDF taps) on one step in
+// `stride` (latentInfo.z; by 64-slot block); in between it springs toward the stored surface point. The point rides the record's
+// `home` lane (xyz, world), and the latent normal octahedral-packed into 2 x 11 bits in `home.w` as
+// -(1 + bits): always < 0.5, so the attractor (which reads home.w > 0.5 as an anchored home) never sees it, and
+// > -0.5 marks "nothing stored yet". A separate entry, so cs_latent -- every unstaggered latent -- is untouched.
+
+fn latentOctEncode(n: vec3<f32>) -> f32 {
+    let a = n / max(abs(n.x) + abs(n.y) + abs(n.z), 1e-9);
+    var e = a.xy;
+    if (a.z < 0.0) {
+        e = (vec2<f32>(1.0) - abs(a.yx)) * select(vec2<f32>(-1.0), vec2<f32>(1.0), a.xy >= vec2<f32>(0.0));
+    }
+    let q = vec2<u32>(round(clamp(e * 0.5 + 0.5, vec2<f32>(0.0), vec2<f32>(1.0)) * 2047.0));
+    return -1.0 - f32(q.x | (q.y << 11u));
+}
+
+fn latentOctDecode(w: f32) -> vec3<f32> {
+    let bits = u32(max(-w - 1.0, 0.0) + 0.5);
+    let e = vec2<f32>(f32(bits & 2047u), f32((bits >> 11u) & 2047u)) / 2047.0 * 2.0 - 1.0;
+    var n = vec3<f32>(e, 1.0 - abs(e.x) - abs(e.y));
+    if (n.z < 0.0) {
+        let xy = (vec2<f32>(1.0) - abs(n.yx)) * select(vec2<f32>(-1.0), vec2<f32>(1.0), n.xy >= vec2<f32>(0.0));
+        n = vec3<f32>(xy, n.z);
+    }
+    return normalize(n);
+}
+
+// Two entries, so the heavy one runs on a third of the matter: `cs_latent_project` (the SDF taps, the only code
+// that inlines the tree) runs over just the 64-slot blocks whose turn it is this step and stores their surface
+// points; `cs_latent_spring` (no SDF code at all, so a tree's register pressure never throttles it) springs every
+// bound particle toward its stored point. A particle with nothing stored yet waits for its block's turn (at most
+// stride - 1 steps); a released one is thrown along its stored normal.
+@compute @workgroup_size(64)
+fn cs_latent_project(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let stride = max(params.latentInfo.z, 1u);
+    let phase = (stride - (u32(params.sim.z) % stride)) % stride; // (block + frame) % stride == 0
+    let slot = ((gid.x >> 6u) * stride + phase) * 64u + (gid.x & 63u);
+    if (slot >= params.counts.y) { return; }
+    var p = particles[slot];
+    if (p.life <= 0.0 || p.stage > 0.5) { return; }
+    let width = params.latent0.z;
+    let theta = latentTheta(p.seed, width);
+    let b = latentBinding(theta, params.latent0.x, width);
+    let release = max(latentBinding(theta, params.latent0.y, width) - b, 0.0);
+    if (b <= 0.0 && release <= 0.0) { return; }
+    let t = params.sim.y;
+    let count = params.latentInfo.x;
+    let pl = (params.latentInverse * vec4<f32>(p.position, 1.0)).xyz;
+    let e = params.latent1.z;
+    let k0 = vec3<f32>(1.0, -1.0, -1.0);
+    let k1 = vec3<f32>(-1.0, -1.0, 1.0);
+    let k2 = vec3<f32>(-1.0, 1.0, -1.0);
+    let k3 = vec3<f32>(1.0, 1.0, 1.0);
+    let d0 = sdfEvaluate(0u, count, pl + k0 * e, t, params.latentModel);
+    let d1 = sdfEvaluate(0u, count, pl + k1 * e, t, params.latentModel);
+    let d2 = sdfEvaluate(0u, count, pl + k2 * e, t, params.latentModel);
+    let d3 = sdfEvaluate(0u, count, pl + k3 * e, t, params.latentModel);
+    let nL = sdfSafeNormalize(k0 * d0 + k1 * d1 + k2 * d2 + k3 * d3);
+    let d = 0.25 * (d0 + d1 + d2 + d3);
+    let goal = (params.latentModel * vec4<f32>(pl - nL * d, 1.0)).xyz;
+    let nW = sdfSafeNormalize((params.latentNormal * vec4<f32>(nL, 0.0)).xyz);
+    p.home = vec4<f32>(goal, latentOctEncode(nW));
+    particles[slot] = p;
+}
+
+@compute @workgroup_size(64)
+fn cs_latent_spring(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= params.counts.y) { return; }
+    var p = particles[slot];
+    if (p.life <= 0.0 || p.stage > 0.5 || p.home.w > -0.5) { return; } // dead, a ring, or nothing stored yet
+    let width = params.latent0.z;
+    let theta = latentTheta(p.seed, width);
+    let b = latentBinding(theta, params.latent0.x, width);
+    let release = max(latentBinding(theta, params.latent0.y, width) - b, 0.0);
+    if (b <= 0.0 && release <= 0.0) { return; }
+    let dt = params.sim.x;
+    let t = params.sim.y;
+    let goal = p.home.xyz;
+    let nW = latentOctDecode(p.home.w);
+    let C = params.latent0.x;
+    var K = params.latent0.w * (18.0 + 70.0 * C * C);
+    if (dt > 0.0) {
+        K = min(K, 0.8 / (dt * dt));
+    }
+    let c = 2.0 * 0.55 * sqrt(K);
+    var acc = b * (K * (goal - p.position) - c * p.velocity);
+    if (params.latent1.x > 0.0) {
+        var cf = turbCurl(p.position * params.turb.x + vec3<f32>(0.0, 0.0, t * params.turb.y));
+        cf = cf - nW * dot(cf, nW);
+        acc = acc + b * params.latent1.x * cf;
+    }
+    p.velocity = p.velocity + acc * dt;
+    if (release > 0.0) {
+        let h = fract(p.seed * 173.0);
+        let sgn = select(1.0, -1.0, fract(p.seed * 29.0) < 0.2);
+        p.velocity = p.velocity + release * params.latent1.y * nW * (sgn * (0.6 + 0.8 * h));
+    }
+    particles[slot] = p;
+}
+
+// The latent normal a flake plate stored: ADR-1153's home.xyz, or (ADR-1155, staggered) the packed one. Zero when
+// none is stored.
+fn storedLatentNormal(p: Particle) -> vec3<f32> {
+    if (params.latentInfo.z > 1u) {
+        return select(vec3<f32>(0.0), latentOctDecode(p.home.w), p.home.w <= -0.5);
+    }
+    if (p.home.w < 0.5) {
+        return p.home.xyz;
+    }
+    return vec3<f32>(0.0);
+}
+
+// ---- ADR-1146: tendons ----------------------------------------------------------------------------
+// Dispatched INSTEAD of cs_latent for a latent with tendons. Each particle rides one authored curve at a time:
+// u = fract(phase + rate t) streams it along, the curve is a hash of (particle, generation); the spring pulls it
+// to the moving point on the curve and damps its velocity toward that point's own, so a bound particle travels
+// with the curve; a fresh generation's binding ramps in over `ramp` of u, and crossing u = 0.97 throws it off the
+// end. The release impulse of a coherence drop flings it away from its curve.
+
+fn tendonPoint(curve: u32, u: f32) -> vec3<f32> {
+    let n = max(params.tendonInfo.z, 2u);
+    let x = clamp(u, 0.0, 1.0) * f32(n - 1u);
+    let i = min(u32(floor(x)), n - 2u);
+    let f = x - f32(i);
+    let base = params.tendonInfo.x + curve * n;
+    return mix(sdfNodes[base + i].p0.xyz, sdfNodes[base + i + 1u].p0.xyz, f);
+}
+
+fn tendonJitter(seed: f32, salt: u32) -> vec3<f32> {
+    let h = flakeHash(bitcast<u32>(seed) * 0x2c1b3c6du + salt);
+    return vec3<f32>(flakeU01(h), flakeU01(h >> 5u), flakeU01(h >> 11u)) - 0.5;
+}
+
+@compute @workgroup_size(64)
+fn cs_tendon(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= params.counts.y) { return; }
+    var p = particles[slot];
+    if (p.life <= 0.0 || p.stage > 0.5) { return; }
+    let width = params.latent0.z;
+    let theta = latentTheta(p.seed, width);
+    let b = latentBinding(theta, params.latent0.x, width);
+    let release = max(latentBinding(theta, params.latent0.y, width) - b, 0.0);
+    if (b <= 0.0 && release <= 0.0) { return; }
+    let dt = params.sim.x;
+    let t = params.sim.y;
+    let rate = params.tendon0.x;
+    let s = fract(p.seed * 7.31 + 0.137) + rate * max(t, 0.0);
+    let gen = floor(s);
+    let u = s - gen;
+    let curve = flakeHash(bitcast<u32>(p.seed) ^ (u32(gen) * 0x9e3779b9u + 0x632be5abu)) % max(params.tendonInfo.y, 1u);
+    let du = 0.02;
+    let goal = (params.latentModel * vec4<f32>(tendonPoint(curve, u), 1.0)).xyz;
+    let span = (params.latentModel * vec4<f32>(tendonPoint(curve, u + du) - tendonPoint(curve, u - du), 0.0)).xyz;
+    let along = span * (rate / (2.0 * du)); // the moving point's velocity (world)
+    let w = b * smoothstep(0.0, max(params.tendon0.w, 1e-4), u) * (1.0 - smoothstep(0.97, 1.0, u));
+    var K = params.latent0.w * params.tendon0.y;
+    if (dt > 0.0) {
+        K = min(K, 0.8 / (dt * dt));
+    }
+    let c = 2.0 * 0.55 * sqrt(K);
+    p.velocity = p.velocity + w * (K * (goal - p.position) - c * (p.velocity - along)) * dt;
+    // the end of the curve: crossing u = 0.97 this step sprays the matter off into the field
+    if (b > 0.0 && u >= 0.97 && u - rate * dt < 0.97) {
+        let dir = sdfSafeNormalize(span);
+        p.velocity = p.velocity + (dir * 1.2 + tendonJitter(p.seed, u32(gen) * 7919u + 17u) * 2.4) * params.tendon0.z * b;
+    }
+    if (release > 0.0) {
+        let away = sdfSafeNormalize(p.position - goal + tendonJitter(p.seed, 31u) * 0.3);
+        p.velocity = p.velocity + release * params.latent1.y * (away * (0.4 + 0.8 * fract(p.seed * 173.0)));
+    }
+    particles[slot] = p;
+}
+
+// ---- ADR-1148: the collapse heat front -----------------------------------------------------------
+// Dispatched after cs_latent / cs_tendon for a heated latent: heat rides the record's trailWrites lane (a heated
+// system has no trails). Released matter is heated only where the front -- a shell expanding from the origin
+// since the coherence began to fall -- passes it; everything decays.
+
+// Incandescence (0 .. 1.5: dull red, orange, gold), the prototype's heatColor.
+fn heatColor(h: f32) -> vec3<f32> {
+    let x = clamp(h, 0.0, 1.5);
+    return vec3<f32>(1.0, 0.32 + 0.45 * smoothstep(0.2, 1.2, x), 0.06 + 0.25 * smoothstep(0.7, 1.5, x)) * (x * x) * 3.0;
+}
+
+@compute @workgroup_size(64)
+fn cs_heat(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= params.counts.y) { return; }
+    var p = particles[slot];
+    if (p.life <= 0.0 || p.stage > 0.5) { return; }
+    var heat = p.trailWrites;
+    let width = params.latent0.z;
+    let theta = latentTheta(p.seed, width);
+    let release = max(latentBinding(theta, params.latent0.y, width) - latentBinding(theta, params.latent0.x, width), 0.0);
+    if (release > 0.0 && params.heat0.w >= 0.0) {
+        let r = params.heat1.x * params.heat0.w;
+        let x = (length(p.position - params.heat0.xyz) - r) / max(params.heat1.y, 1e-4);
+        heat = heat + release * params.heat1.z * (0.5 + fract(p.seed * 911.0)) * exp(-x * x);
+    }
+    p.trailWrites = heat * exp(-params.heat1.w * params.sim.x);
     particles[slot] = p;
 }
 
@@ -1156,8 +1373,13 @@ fn vs_flake(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) ->
     let freeN = normalize(vec3<f32>(sin(ang + jit.x * 9.0), cos(ang * 0.7 + jit.y * 7.0), sin(ang * 1.3 + jit.z * 5.0))
                           + jit);
     var nf = freeN;
-    let stored = p.home.xyz;
-    if (params.latentInfo.y == 1u && p.home.w < 0.5 && dot(stored, stored) > 0.25) {
+    var stored = p.home.xyz;
+    var hasStored = p.home.w < 0.5;
+    if (params.latentInfo.z > 1u) { // ADR-1155: the staggered projection packs the normal in home.w
+        stored = storedLatentNormal(p);
+        hasStored = true;
+    }
+    if (params.latentInfo.y == 1u && hasStored && dot(stored, stored) > 0.25) {
         nf = normalize(mix(freeN, normalize(stored + jit * 0.25), smoothstep(0.2, 0.8, b) * params.flake2.z));
     }
     let toEye = normalize(params.cameraPos.xyz - p.position);
@@ -1173,9 +1395,21 @@ fn vs_flake(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) ->
     let fr = f0 + (vec3<f32>(0.95) - f0) * pow(1.0 - cosV, 5.0);
     // as the form sharpens, bound matter fuses into the surface: its plates thin out to a residual sparkle
     let fuse = 1.0 - params.flake3.y * smoothstep(0.6, 1.0, b);
-    var radiance = reflectionBands(r, params.flake1.z, true) * fr * (params.flake2.x + params.flake2.y * b) * fuse;
+    let reflected = reflectionBands(r, params.flake1.z, true) * fr * (params.flake2.x + params.flake2.y * b);
+    var radiance = reflected * fuse;
+    var emitted = vec3<f32>(0.0); // ADR-1156: what the plate emits rather than reflects (an alpha system's own colour)
     if (hz > 1.0 - params.flake2.w) {
         radiance = radiance + vec3<f32>(0.85, 0.92, 1.0) * params.flake3.x * (0.3 + 0.7 * b);
+        emitted = vec3<f32>(0.85, 0.92, 1.0) * params.flake3.x * (0.3 + 0.7 * b);
+    }
+    if (params.heat2.z > 0.5 && hz < params.heat2.x) {
+        radiance = radiance + heatColor(p.trailWrites) * params.heat2.y; // ADR-1148: a spark
+        emitted = emitted + heatColor(p.trailWrites) * params.heat2.y;
+    }
+    var shardTaken = 0.0;
+    if (params.shard0.w > 0.5) {
+        shardTaken = shardWeight(slot, p, b, size0); // ADR-1147: a plate drawn as a shard fades out as a flake
+        radiance = radiance * (1.0 - shardTaken);
     }
     var out: VsOut;
     out.clip = params.viewProj * vec4<f32>(world, 1.0);
@@ -1185,8 +1419,186 @@ fn vs_flake(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) ->
     out.uv = c;
     out.world = world;
     out.color = vec4<f32>(radiance * nearFade, particleAlpha(t));
+    if (params.counts.z == 1u) {
+        // ADR-1156: an ALPHA flake system covers, as the prototype's coverage-averaged splat does: the plate's own
+        // colour (its reflection, its sparkle and its heat), with what fusing, the near fade and a shard take away
+        // removed from its COVERAGE rather than from its colour -- so a dark plate occludes what is behind it and a
+        // fused one lets the surface it formed show through.
+        out.color = vec4<f32>(reflected + emitted, particleAlpha(t) * fuse * nearFade * (1.0 - shardTaken));
+    }
     out.ringMask = 0.0;
-    if (p.life <= 0.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); } // cull dead (never drawn)
+    if (p.life <= 0.0 || shardTaken >= 1.0) { out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); } // cull dead (never drawn)
+    return out;
+}
+
+// ---- ADR-1147: shards ----------------------------------------------------------------------------------
+// After THE ASTRAL FORGE prototype's shards.wgsl: a near bound plate resolves as an irregular four-cornered
+// sliver (a fan of four triangles about its centre) in the plate's plane -- the stored latent normal --, with
+// micro-grooves across it and a bevelled rim that turns outward and catches the bands. Every 4th slot is a
+// candidate (the draw is capacity / 4 instances of 12 vertices); vs_flake fades the same plate out as it fades in.
+
+// How much of the plate at `slot` is a shard (0 = none): bound, larger than the footprint threshold, resting on
+// the opaque surface, and under the kept fraction (fewer as they grow).
+fn shardWeight(slot: u32, p: Particle, b: f32, size: f32) -> f32 {
+    if ((slot & 3u) != 0u || b <= 0.3) {
+        return 0.0;
+    }
+    let toEye = params.cameraPos.xyz - p.position;
+    let dist = max(length(toEye), 1e-4);
+    let rpx = size * params.shard0.z / max(dist * params.shard1.z, 1e-9);
+    let px = params.shard0.x;
+    if (rpx <= px) {
+        return 0.0;
+    }
+    let keep = params.shard0.y * min(1.0, (px * 2.0 / rpx) * (px * 2.0 / rpx));
+    if (flakeU01(flakeHash(bitcast<u32>(p.seed) * 0x2c1b3c6du + 0x297a2d39u)) >= keep) {
+        return 0.0;
+    }
+    let clip = params.viewProj * vec4<f32>(p.position, 1.0);
+    if (clip.w <= 1e-4) {
+        return 0.0;
+    }
+    let ndc = clip.xy / clip.w;
+    let dims = vec2<f32>(textureDimensions(linearDepthTex));
+    let pixel = vec2<i32>(clamp(vec2<f32>((ndc.x * 0.5 + 0.5) * dims.x, (0.5 - ndc.y * 0.5) * dims.y), vec2<f32>(0.0),
+                                dims - 1.0));
+    let sceneZ = textureLoad(linearDepthTex, pixel, 0).x;
+    let axis = normalize(cross(params.cameraRight.xyz, params.cameraUp.xyz));
+    let z = abs(dot(p.position - params.cameraPos.xyz, axis));
+    if (sceneZ > 1e6 || abs(z - sceneZ) > 0.15 * z + 0.1) {
+        return 0.0;
+    }
+    return smoothstep(px, px + 1.0, rpx) * (1.0 - smoothstep(60.0, 80.0, rpx));
+}
+
+fn shardCorner(h: u32, k: u32) -> vec2<f32> {
+    // irregular slivers: uneven corner radii, then stretched along one axis (never a square)
+    let a = (f32(k) + 0.5) * 1.5707963 + (flakeU01(flakeHash(h + k * 97u)) - 0.5) * 1.1;
+    let r = 0.3 + 0.7 * flakeU01(flakeHash(h * 3u + k * 131u));
+    let st = 1.3 + 1.2 * flakeU01(h >> 9u);
+    return vec2<f32>(cos(a) * st, sin(a) / st) * r;
+}
+
+struct ShardOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) local: vec2<f32>,                     // in the plate's plane, in shard radii
+    @location(1) edge: f32,                            // 0 at the centre, 1 at the rim
+    @location(2) @interpolate(flat) normal: vec3<f32>,
+    @location(3) @interpolate(flat) tangent: vec3<f32>,
+    @location(4) @interpolate(flat) data: vec4<f32>,   // heat, binding, hash, weight
+    @location(5) world: vec3<f32>,
+    @location(6) nowClip: vec4<f32>,
+    @location(7) prevClip: vec4<f32>,
+};
+
+@vertex
+fn vs_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> ShardOut {
+    var out: ShardOut;
+    out.clip = vec4<f32>(0.0, 0.0, 2.0, 1.0); // culled unless a shard
+    let slot = ii * 4u;
+    if (slot >= params.counts.y) {
+        return out;
+    }
+    let p = particlesRead[slot];
+    if (p.life <= 0.0) {
+        return out;
+    }
+    let t = clamp(p.age / max(p.life, 1e-4), 0.0, 1.0);
+    var b = 0.0;
+    if (params.latentInfo.x > 0u) {
+        let width = params.latent0.z;
+        b = latentBinding(latentTheta(p.seed, width), params.latent0.x, width);
+    }
+    let size = particleSize(t) * p.size;
+    let weight = shardWeight(slot, p, b, size);
+    if (weight <= 0.0) {
+        return out;
+    }
+    let h = flakeHash(bitcast<u32>(p.seed) + 911u);
+    let tri = vi / 3u;
+    let corner = vi % 3u;
+    var lp = vec2<f32>(0.0);
+    var edge = 0.0;
+    if (corner == 1u) {
+        lp = shardCorner(h, tri);
+        edge = 1.0;
+    }
+    if (corner == 2u) {
+        lp = shardCorner(h, (tri + 1u) % 4u);
+        edge = 1.0;
+    }
+    // the plate's plane: the latent normal a bound flake stored, or facing the eye
+    var n = normalize(params.cameraPos.xyz - p.position);
+    let stored = storedLatentNormal(p);
+    if (params.latentInfo.y == 1u && dot(stored, stored) > 0.25) {
+        n = normalize(stored);
+    }
+    let up = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.y) > 0.9);
+    let rot = flakeU01(h >> 5u) * 6.2831853;
+    let e1 = normalize(cross(up, n));
+    let e2 = cross(n, e1);
+    let t1 = e1 * cos(rot) + e2 * sin(rot);
+    let t2 = cross(n, t1);
+    let world = p.position + (t1 * lp.x + t2 * lp.y) * (size * params.shard0.z);
+    out.clip = params.viewProj * vec4<f32>(world, 1.0);
+    out.nowClip = out.clip;
+    out.prevClip = params.prevViewProj * vec4<f32>(world - p.velocity * params.sim.x, 1.0);
+    out.local = lp;
+    out.edge = edge;
+    out.normal = n;
+    out.tangent = t1;
+    out.data = vec4<f32>(select(0.0, p.trailWrites, params.heat2.z > 0.5), b, flakeU01(h), weight);
+    out.world = world;
+    return out;
+}
+
+@fragment
+fn fs_shard(in: ShardOut) -> ParticleOut {
+    // the weight keeps or drops a WHOLE shard (by its own hash): a per-pixel dither reads as sand
+    if (in.data.w < flakeU01(flakeHash(bitcast<u32>(in.data.z) + 4242u))) {
+        discard;
+    }
+    let toEye = normalize(params.cameraPos.xyz - in.world);
+    var n = in.normal;
+    if (dot(n, toEye) < 0.0) {
+        n = -n;
+    }
+    let t1 = normalize(in.tangent - n * dot(in.tangent, n));
+    let t2 = cross(n, t1);
+    // micro-grooves across the shard (engraved debris), wavy, with their own phase per shard
+    let g = in.local.x * params.shard1.x + 0.8 * sin(in.local.y * 9.0 + in.data.z * 40.0);
+    let x = fract(g) - 0.5;
+    let slope = select(0.0, -sign(x) / 0.32, abs(x) < 0.32);
+    var nn = normalize(n - t1 * slope * 0.06);
+    // the bevelled rim: the outer `bevel` of the plate turns outward and catches the bands
+    let rimW = smoothstep(1.0 - params.shard1.y, 1.0, in.edge);
+    let radial = normalize(t1 * in.local.x + t2 * in.local.y + n * 1e-4);
+    nn = normalize(mix(nn, normalize(n * 0.35 + radial), rimW));
+    let r = reflect(-toEye, nn);
+    let cosV = clamp(dot(nn, toEye), 0.0, 1.0);
+    let heat = in.data.x;
+    let b = in.data.y;
+    var film = flakeFilm(cosV, params.flake1.x * b * (0.8 + 0.4 * in.data.z) + 160.0 * min(heat, 1.0), params.flake1.y);
+    film = mix(vec3<f32>(dot(film, vec3<f32>(0.2126, 0.7152, 0.0722))), film, 0.6);
+    let f0 = params.flake0.xyz * film;
+    let fr = f0 + (vec3<f32>(0.95) - f0) * pow(1.0 - cosV, 5.0);
+    // the strips only: the soft box would light every small plate a uniform grey; anisotropic across the grooves
+    var spec = vec3<f32>(0.0);
+    for (var j = -1; j <= 1; j = j + 1) {
+        spec = spec + reflectionBands(normalize(r + t1 * (f32(j) * 0.06)), 0.02, false);
+    }
+    var col = spec / 3.0 * fr * (0.45 + 0.55 * b) + vec3<f32>(0.002);
+    if (params.heat2.z > 0.5 && in.data.z < params.heat2.x) {
+        col = col + heatColor(heat) * params.heat2.y;
+    }
+    var out: ParticleOut;
+    out.color = vec4<f32>(col * params.turb.w, 1.0);
+    out.normalRoughness = vec4<f32>(nn, 0.1);
+    let now = in.nowClip.xy / max(abs(in.nowClip.w), 1e-6) * sign(max(in.nowClip.w, 1e-6));
+    let before = in.prevClip.xy / max(abs(in.prevClip.w), 1e-6) * sign(max(in.prevClip.w, 1e-6));
+    out.velocity = vec2<f32>((now.x - before.x) * 0.5, (before.y - now.y) * 0.5);
+    out.emission = vec4<f32>(out.color.rgb, 1.0);
+    out.ids = 0u;
     return out;
 }
 

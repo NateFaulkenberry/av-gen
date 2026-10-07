@@ -1,0 +1,49 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "the-astral-forge",
+  "_note": "THE ASTRAL FORGE (ADR-1221): a god of two million particles of engraved, tempered metal, conducted by the music, in a black void. The `astral` block is the whole scene (an ENVIRONMENT, ADR-1200); its conductor places the camera. docs/prototypes/astral-forge/09-production.md.",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0.0,
+      0.4,
+      25.0
+    ],
+    "target": [
+      0.0,
+      0.2,
+      0.0
+    ],
+    "fov": 30.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "background": [
+      0,
+      0,
+      0
+    ],
+    "intensity": 0.0
+  },
+  "post": {
+    "bloomIntensity": 0.05
+  },
+  "lights": [],
+  "astral": {
+    "particles": 2097152,
+    "grid": 192,
+    "gridSize": 20.0,
+    "conductor": "auto",
+    "camera": true,
+    "preroll": 6.0,
+    "controls": {
+      "zoom": 1.1,
+      "legibility": 0.55,
+      "light": 0.25,
+      "dust": 1.0,
+      "folds": 0.35,
+      "cameraStyle": 0
+    }
+  }
+}

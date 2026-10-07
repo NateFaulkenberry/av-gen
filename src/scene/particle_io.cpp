@@ -247,6 +247,31 @@ json particlesToJson(const ParticleSystem& s) {
         j["latent"] = json{{"sdf", s.latent.sdf},           {"coherence", s.latent.coherence},
                            {"width", s.latent.width},       {"strength", s.latent.strength},
                            {"flow", s.latent.flow},         {"release", s.latent.release}};
+        if (s.latent.stagger != 1) { // ADR-1155
+            j["latent"]["stagger"] = s.latent.stagger;
+        }
+        if (const ParticleTendons& t = s.latent.tendons; t.active()) { // ADR-1146
+            json curves = json::array();
+            for (const auto& c : t.curves) {
+                json pts = json::array();
+                for (const glm::vec3& p : c) {
+                    pts.push_back(vecToJson(p));
+                }
+                curves.push_back(std::move(pts));
+            }
+            j["latent"]["tendons"] = json{{"curves", std::move(curves)}, {"speed", t.speed}, {"stiffness", t.stiffness},
+                                          {"spray", t.spray},           {"ramp", t.ramp}};
+        }
+        if (const ParticleHeat& h = s.latent.heat; h.enabled) { // ADR-1148
+            j["latent"]["heat"] = json{{"origin", vecToJson(h.origin)}, {"speed", h.speed},   {"width", h.width},
+                                       {"inject", h.inject},           {"decay", h.decay},   {"fraction", h.fraction},
+                                       {"gain", h.gain}};
+        }
+    }
+    if (s.shards.enabled) { // ADR-1147
+        const ParticleShards& sh = s.shards;
+        j["shards"] = json{{"pixels", sh.pixels}, {"fraction", sh.fraction}, {"size", sh.size},
+                           {"grooves", sh.grooves}, {"bevel", sh.bevel}};
     }
     if (s.density.enabled) { // ADR-1141
         j["density"] = json{{"boundsMin", vecToJson(s.density.boundsMin)},
@@ -571,10 +596,13 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
             return fail("'latent' must be an object {sdf, coherence, width, strength, flow, release}");
         }
         for (const auto& [key, value] : l.items()) {
-            static constexpr const char* kKeys[] = {"sdf", "coherence", "width", "strength", "flow", "release"};
+            static constexpr const char* kKeys[] = {"sdf", "coherence", "width", "strength", "flow", "release",
+                                                    "tendons", "heat", "stagger"};
             if (std::find_if(std::begin(kKeys), std::end(kKeys), [&](const char* k) { return key == k; }) ==
                 std::end(kKeys)) {
-                return fail("'latent': unknown key '{}' (expected sdf, coherence, width, strength, flow, release)", key);
+                return fail("'latent': unknown key '{}' (expected sdf, coherence, width, strength, flow, release, "
+                            "tendons, heat, stagger)",
+                            key);
             }
         }
         auto sdf = readString(l, "sdf", "");
@@ -593,6 +621,109 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
             auto v = readFloat(l, key, *target);
             if (!v) {
                 return fail("'latent.{}': {}", key, v.error().message);
+            }
+            *target = *v;
+        }
+        if (l.contains("stagger")) { // ADR-1155
+            const json& v = l.at("stagger");
+            if (!v.is_number_integer()) {
+                return fail("'latent.stagger' must be an integer (1..4)");
+            }
+            s.latent.stagger = v.get<int>();
+        }
+        if (l.contains("tendons")) { // ADR-1146
+            const json& tj = l.at("tendons");
+            if (!tj.is_object()) {
+                return fail("'latent.tendons' must be an object {curves, speed, stiffness, spray, ramp}");
+            }
+            for (const auto& [key, value] : tj.items()) {
+                if (key != "curves" && key != "speed" && key != "stiffness" && key != "spray" && key != "ramp") {
+                    return fail("'latent.tendons': unknown key '{}' (expected curves, speed, stiffness, spray, ramp)", key);
+                }
+            }
+            if (!tj.contains("curves") || !tj.at("curves").is_array() || tj.at("curves").empty()) {
+                return fail("'latent.tendons' needs 'curves', a non-empty array of point lists");
+            }
+            ParticleTendons t;
+            for (const json& c : tj.at("curves")) {
+                if (!c.is_array()) {
+                    return fail("'latent.tendons.curves': each curve must be an array of [x, y, z] points");
+                }
+                std::vector<glm::vec3> pts;
+                for (const json& p : c) {
+                    if (!p.is_array() || p.size() != 3 || !p[0].is_number() || !p[1].is_number() || !p[2].is_number()) {
+                        return fail("'latent.tendons.curves': each point must be [x, y, z]");
+                    }
+                    pts.emplace_back(p[0].get<float>(), p[1].get<float>(), p[2].get<float>());
+                }
+                t.curves.push_back(std::move(pts));
+            }
+            for (const auto& [key, target] : {std::pair<const char*, float*>{"speed", &t.speed},
+                                              std::pair<const char*, float*>{"stiffness", &t.stiffness},
+                                              std::pair<const char*, float*>{"spray", &t.spray},
+                                              std::pair<const char*, float*>{"ramp", &t.ramp}}) {
+                auto v = readFloat(tj, key, *target);
+                if (!v) {
+                    return fail("'latent.tendons.{}': {}", key, v.error().message);
+                }
+                *target = *v;
+            }
+            s.latent.tendons = std::move(t);
+        }
+        if (l.contains("heat")) { // ADR-1148
+            const json& hj = l.at("heat");
+            if (!hj.is_object()) {
+                return fail("'latent.heat' must be an object {origin, speed, width, inject, decay, fraction, gain}");
+            }
+            for (const auto& [key, value] : hj.items()) {
+                if (key != "origin" && key != "speed" && key != "width" && key != "inject" && key != "decay" &&
+                    key != "fraction" && key != "gain") {
+                    return fail("'latent.heat': unknown key '{}' (expected origin, speed, width, inject, decay, fraction, "
+                                "gain)",
+                                key);
+                }
+            }
+            ParticleHeat h;
+            h.enabled = true;
+            auto origin = readVec<3>(hj, "origin", h.origin);
+            if (!origin) {
+                return fail("'latent.heat.origin': {}", origin.error().message);
+            }
+            h.origin = *origin;
+            for (const auto& [key, target] : {std::pair<const char*, float*>{"speed", &h.speed},
+                                              std::pair<const char*, float*>{"width", &h.width},
+                                              std::pair<const char*, float*>{"inject", &h.inject},
+                                              std::pair<const char*, float*>{"decay", &h.decay},
+                                              std::pair<const char*, float*>{"fraction", &h.fraction},
+                                              std::pair<const char*, float*>{"gain", &h.gain}}) {
+                auto v = readFloat(hj, key, *target);
+                if (!v) {
+                    return fail("'latent.heat.{}': {}", key, v.error().message);
+                }
+                *target = *v;
+            }
+            s.latent.heat = h;
+        }
+    }
+    if (j.contains("shards")) { // ADR-1147
+        const json& sj = j.at("shards");
+        if (!sj.is_object()) {
+            return fail("'shards' must be an object {pixels, fraction, size, grooves, bevel}");
+        }
+        for (const auto& [key, value] : sj.items()) {
+            if (key != "pixels" && key != "fraction" && key != "size" && key != "grooves" && key != "bevel") {
+                return fail("'shards': unknown key '{}' (expected pixels, fraction, size, grooves, bevel)", key);
+            }
+        }
+        s.shards.enabled = true;
+        for (const auto& [key, target] : {std::pair<const char*, float*>{"pixels", &s.shards.pixels},
+                                          std::pair<const char*, float*>{"fraction", &s.shards.fraction},
+                                          std::pair<const char*, float*>{"size", &s.shards.size},
+                                          std::pair<const char*, float*>{"grooves", &s.shards.grooves},
+                                          std::pair<const char*, float*>{"bevel", &s.shards.bevel}}) {
+            auto v = readFloat(sj, key, *target);
+            if (!v) {
+                return fail("'shards.{}': {}", key, v.error().message);
             }
             *target = *v;
         }
