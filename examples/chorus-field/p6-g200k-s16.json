@@ -2,12 +2,12 @@
  "format": "avgen-project",
  "version": 4,
  "app": {
-  "name": "Chorus Field p6-b016k-s32"
+  "name": "Chorus Field p6-g200k-s16"
  },
  "assets": {
   "scene": {
    "kind": "composition",
-   "path": "p6-b016k-s32.scene.json"
+   "path": "p6-g200k-s16.scene.json"
   },
   "audio": {
    "path": "../../assets/audio/trench.wav"

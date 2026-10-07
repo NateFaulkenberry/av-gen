@@ -1,7 +1,7 @@
 {
  "format": "avgen-scene",
  "version": 1,
- "name": "Chorus Field p6 b576k-s08",
+ "name": "Chorus Field p6 g050k-s24",
  "camera": {
   "mode": 1,
   "position": [
@@ -23,14 +23,14 @@
    "type": "directional",
    "role": "key",
    "direction": [
-    -0.5,
     -0.45,
-    -0.75
+    -0.55,
+    -0.7
    ],
    "color": [
     1.0,
-    0.82,
-    0.62
+    0.94,
+    0.86
    ],
    "intensity": 6.0,
    "castsShadow": true,
@@ -42,16 +42,16 @@
    "type": "directional",
    "role": "rim",
    "direction": [
-    0.45,
-    -0.25,
-    0.85
+    0.55,
+    -0.2,
+    0.8
    ],
    "color": [
-    0.45,
-    0.68,
+    0.55,
+    0.7,
     1.0
    ],
-   "intensity": 7.0,
+   "intensity": 4.0,
    "castsShadow": false,
    "shadowStrength": 0.0,
    "softness": 2.0
@@ -66,11 +66,11 @@
     0.3
    ],
    "color": [
+    0.9,
     0.55,
-    0.3,
-    0.75
+    0.35
    ],
-   "intensity": 0.8,
+   "intensity": 0.35,
    "castsShadow": false,
    "shadowStrength": 0.0,
    "softness": 3.0
@@ -82,7 +82,7 @@
    0.0045,
    0.006
   ],
-  "intensity": 1.4,
+  "intensity": 0.6,
   "sky": {
    "enabled": true,
    "background": false,
@@ -93,19 +93,19 @@
     -0.5
    ],
    "zenithColor": [
-    0.03,
-    0.08,
-    0.3
+    0.05,
+    0.055,
+    0.07
    ],
    "horizonColor": [
-    0.75,
-    0.38,
-    0.12
+    0.16,
+    0.16,
+    0.17
    ],
    "groundColor": [
-    0.16,
-    0.04,
-    0.22
+    0.012,
+    0.011,
+    0.012
    ],
    "haze": 0.3,
    "sunColor": [
@@ -158,7 +158,7 @@
    "kind": "field",
    "position": [
     0,
-    -18.0,
+    -18,
     0
    ],
    "field": {
@@ -169,6 +169,26 @@
      "outer": 26
     },
     "strength": 0.8
+   }
+  },
+  {
+   "name": "base",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "fall",
+     "chin"
+    ],
+    "combine": "add"
    }
   },
   {
@@ -207,13 +227,13 @@
     "axis": [
      0,
      0,
-     -1.0
+     -1
     ],
     "strength": 2.6,
     "scale": [
      1,
      1,
-     4.0
+     3
     ]
    }
   },
@@ -235,14 +255,92 @@
     "axis": [
      0,
      0,
-     1.0
+     1
     ],
     "strength": 2.6,
     "scale": [
      1,
      1,
-     4.0
+     3
     ]
+   }
+  },
+  {
+   "name": "hornL",
+   "kind": "field",
+   "position": [
+    -9,
+    11,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 9
+    },
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "strength": 1.6,
+    "scale": [
+     1,
+     1,
+     3
+    ]
+   }
+  },
+  {
+   "name": "hornR",
+   "kind": "field",
+   "position": [
+    9,
+    11,
+    0
+   ],
+   "field": {
+    "kind": "vortex",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 2,
+     "outer": 9
+    },
+    "axis": [
+     0,
+     0,
+     -1
+    ],
+    "strength": 1.6,
+    "scale": [
+     1,
+     1,
+     3
+    ]
+   }
+  },
+  {
+   "name": "face",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "falloff": {
+     "kind": "none"
+    },
+    "children": [
+     "eyeL",
+     "eyeR",
+     "hornL",
+     "hornR"
+    ],
+    "combine": "add"
    }
   },
   {
@@ -261,82 +359,6 @@
     "children": [
      "eyeL",
      "eyeR"
-    ],
-    "combine": "add"
-   }
-  },
-  {
-   "name": "hornL",
-   "kind": "field",
-   "position": [
-    -9.0,
-    11.0,
-    0
-   ],
-   "field": {
-    "kind": "vortex",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 2,
-     "outer": 9
-    },
-    "axis": [
-     0,
-     0,
-     1
-    ],
-    "strength": 2.0,
-    "scale": [
-     1,
-     1,
-     4.0
-    ]
-   }
-  },
-  {
-   "name": "hornR",
-   "kind": "field",
-   "position": [
-    9.0,
-    11.0,
-    0
-   ],
-   "field": {
-    "kind": "vortex",
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 2,
-     "outer": 9
-    },
-    "axis": [
-     0,
-     0,
-     -1
-    ],
-    "strength": 2.0,
-    "scale": [
-     1,
-     1,
-     4.0
-    ]
-   }
-  },
-  {
-   "name": "horns",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "compound",
-    "falloff": {
-     "kind": "none"
-    },
-    "children": [
-     "hornL",
-     "hornR"
     ],
     "combine": "add"
    }
@@ -361,7 +383,12 @@
      0,
      -1
     ],
-    "strength": 2.0
+    "strength": 1.4,
+    "scale": [
+     1,
+     1,
+     3
+    ]
    }
   },
   {
@@ -384,7 +411,41 @@
      0,
      1
     ],
-    "strength": 2.0
+    "strength": 1.4,
+    "scale": [
+     1,
+     1,
+     3
+    ]
+   }
+  },
+  {
+   "name": "maw",
+   "kind": "field",
+   "position": [
+    0,
+    -6.5,
+    0
+   ],
+   "field": {
+    "kind": "spiral",
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 1.5,
+     "outer": 6
+    },
+    "axis": [
+     1,
+     0,
+     0
+    ],
+    "spiralBias": -0.3,
+    "strength": 0.0,
+    "scale": [
+     1.6,
+     1,
+     3
+    ]
    }
   },
   {
@@ -402,26 +463,35 @@
     },
     "children": [
      "mouthL",
-     "mouthR"
+     "mouthR",
+     "maw"
     ],
     "combine": "add"
    }
   },
   {
-   "name": "brow",
+   "name": "kick",
    "kind": "field",
    "position": [
     0,
-    7.0,
-    2.5
+    1,
+    0
    ],
    "field": {
-    "kind": "attractor",
+    "kind": "onset",
     "falloff": {
-     "kind": "smoothstep",
-     "inner": 2,
-     "outer": 8
+     "kind": "none"
     },
+    "onsetSource": "low",
+    "audioSpeed": 9.0,
+    "onsetWidth": 3.0,
+    "onsetDecay": 1.6,
+    "waveGeometry": "spherical",
+    "axis": [
+     0,
+     1,
+     0
+    ],
     "strength": 1.0
    }
   },
@@ -430,7 +500,7 @@
    "kind": "field",
    "position": [
     0,
-    19.0,
+    21.0,
     0
    ],
    "field": {
@@ -457,35 +527,35 @@
    "procedural": {
     "source": {
      "kind": "fiber",
-     "fiberLength": 36.0,
-     "fiberWidth": 0.0012,
-     "fiberTaper": 0.3,
-     "fiberSegments": 8,
+     "fiberLength": 33.0,
+     "fiberWidth": 0.003,
+     "fiberTaper": 1.0,
+     "fiberSegments": 24,
      "fiberMinPixels": 0.7
     },
     "variation": {
      "seed": 11,
      "position": [
-      0.0025,
-      0.6,
+      0.014423076923076924,
+      6.0,
       0.12
      ],
      "rotation": [
-      0.05,
+      0.03,
       3.14,
-      0.05
+      0.03
      ],
-     "uniformScale": 0.2
+     "uniformScale": 0.0
     },
     "distribution": {
      "kind": "grid",
      "gridCount": [
-      6000,
+      1040,
       1,
-      96
+      48
      ],
      "gridSpacing": [
-      0.005,
+      0.028846153846153848,
       1,
       0.25
      ]
@@ -493,7 +563,7 @@
     "distributionTransform": {
      "position": [
       0,
-      19.0,
+      21.0,
       0
      ],
      "rotation": [
@@ -511,15 +581,7 @@
      {
       "kind": "streamline",
       "space": "world",
-      "field": "fall",
-      "amount": 6.0,
-      "falloff": 0.0,
-      "tension": 0.0
-     },
-     {
-      "kind": "streamline",
-      "space": "world",
-      "field": "chin",
+      "field": "base",
       "amount": 6.0,
       "falloff": 0.0,
       "tension": 0.0
@@ -535,32 +597,24 @@
      {
       "kind": "streamline",
       "space": "world",
-      "field": "eyes",
+      "field": "face",
       "amount": 6.0,
       "falloff": 0.0,
-      "tension": 0.0
-     },
-     {
-      "kind": "streamline",
-      "space": "world",
-      "field": "horns",
-      "amount": 4.800000000000001,
-      "falloff": 0.0,
-      "tension": 0.0
+      "tension": 0.3
      },
      {
       "kind": "streamline",
       "space": "world",
       "field": "mouth",
-      "amount": 4.199999999999999,
+      "amount": 6.0,
       "falloff": 0.0,
-      "tension": 0.0
+      "tension": 0.3
      },
      {
       "kind": "streamline",
       "space": "world",
-      "field": "brow",
-      "amount": 2.4000000000000004,
+      "field": "kick",
+      "amount": 0.0,
       "falloff": 0.0,
       "tension": 0.0
      }
@@ -585,24 +639,273 @@
     },
     "material": {
      "baseColor": [
-      0.5,
-      0.5,
-      0.52
+      1,
+      1,
+      1
      ],
-     "roughness": 0.16,
+     "roughness": 0.2,
      "metallic": 1.0,
      "emissiveColor": [
       1.0,
-      0.36,
-      0.12
+      1.0,
+      1.0
      ],
-     "emissiveIntensity": 5.0
-    },
-    "materialVariation": {
-     "emissiveSparsity": 0.985,
-     "emissiveRandom": 0.5
+     "emissiveIntensity": 1.0,
+     "program": "chorusWire"
     }
    }
+  },
+  {
+   "name": "debris",
+   "kind": "procedural",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "fiber",
+     "fiberLength": 0.7,
+     "fiberWidth": 0.01,
+     "fiberTaper": 1.0,
+     "fiberSegments": 4,
+     "fiberMinPixels": 1.0
+    },
+    "variation": {
+     "seed": 99,
+     "position": [
+      4.0,
+      3.0,
+      2.0
+     ],
+     "rotation": [
+      3.141592653589793,
+      3.141592653589793,
+      3.141592653589793
+     ],
+     "uniformScale": 0.5
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      3,
+      3,
+      2
+     ],
+     "gridSpacing": [
+      8.0,
+      6.0,
+      4.0
+     ]
+    },
+    "distributionTransform": {
+     "position": [
+      0.0,
+      -1.0999999999999996,
+      32
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1,
+      1,
+      1
+     ]
+    },
+    "deformers": [
+     {
+      "kind": "streamline",
+      "space": "world",
+      "field": "curl",
+      "amount": 0.5,
+      "falloff": 0.0,
+      "tension": 0.0
+     }
+    ],
+    "effectors": [],
+    "lod": {
+     "cull": true,
+     "maxDistance": 0.0,
+     "count": 1
+    },
+    "material": {
+     "baseColor": [
+      0.9,
+      0.9,
+      0.92
+     ],
+     "roughness": 0.1,
+     "metallic": 1.0,
+     "emissiveColor": [
+      1.0,
+      0.6,
+      0.3
+     ],
+     "emissiveIntensity": 2.0
+    }
+   }
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "chorusWire",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "eyes"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 0,
+     "constant": [
+      1.9,
+      2.4,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 0,
+     "constant": [
+      2.52,
+      2.58,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      1.0,
+      0.78,
+      0.5,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 6
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "face"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 2,
+     "constant": [
+      0.08,
+      1.5,
+      0,
+      0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.4,
+      0.35,
+      0.3,
+      1.0
+     ],
+     "constant2": [
+      0.64,
+      0.65,
+      0.68,
+      1.0
+     ],
+     "constant3": [
+      0.95,
+      0.95,
+      0.97,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      0.34,
+      0.13
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 0,
+     "value": 0.1,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.22,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 1
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": 1,
+   "roughness": 5,
+   "emission": 7,
+   "emissionIntensity": 0.45
   }
  ]
 }

@@ -45,12 +45,17 @@
    "op": "multiply",
    "amount": 1.0,
    "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
     "attackMs": 80,
     "decayMs": 1500,
-    "gain": 2.4,
+    "gain": 1.1,
+    "curve": "power",
+    "curveAmount": 3.0,
     "clampEnabled": true,
     "clampMin": 0.05,
-    "clampMax": 1.15
+    "clampMax": 1.05
    }
   },
   {
@@ -59,12 +64,17 @@
    "op": "multiply",
    "amount": 1.0,
    "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
     "attackMs": 80,
     "decayMs": 1500,
-    "gain": 2.4,
+    "gain": 1.1,
+    "curve": "power",
+    "curveAmount": 3.0,
     "clampEnabled": true,
     "clampMin": 0.05,
-    "clampMax": 1.15
+    "clampMax": 1.05
    }
   },
   {
@@ -73,12 +83,17 @@
    "op": "multiply",
    "amount": 1.0,
    "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
     "attackMs": 80,
     "decayMs": 1500,
-    "gain": 2.4,
+    "gain": 1.1,
+    "curve": "power",
+    "curveAmount": 3.0,
     "clampEnabled": true,
     "clampMin": 0.05,
-    "clampMax": 1.15
+    "clampMax": 1.05
    }
   },
   {
@@ -87,12 +102,17 @@
    "op": "multiply",
    "amount": 1.0,
    "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
     "attackMs": 80,
     "decayMs": 1500,
-    "gain": 2.4,
+    "gain": 1.1,
+    "curve": "power",
+    "curveAmount": 3.0,
     "clampEnabled": true,
     "clampMin": 0.05,
-    "clampMax": 1.15
+    "clampMax": 1.05
    }
   },
   {
@@ -101,9 +121,12 @@
    "op": "multiply",
    "amount": 1.0,
    "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
     "attackMs": 300,
     "decayMs": 2000,
-    "gain": 2.0,
+    "gain": 1.2,
     "clampEnabled": true,
     "clampMin": 0.3,
     "clampMax": 1.2
@@ -139,6 +162,25 @@
     "clampMax": 1.0,
     "curve": "power",
     "curveAmount": 2.0
+   }
+  },
+  {
+   "source": "audio.treble",
+   "target": "field/maw/strength",
+   "op": "add",
+   "amount": 3.0,
+   "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
+    "attackMs": 3000,
+    "decayMs": 4000,
+    "gain": 1.0,
+    "curve": "power",
+    "curveAmount": 4.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
    }
   },
   {
@@ -183,6 +225,104 @@
     "envelope": "peakhold",
     "envelopeHoldMs": 40,
     "envelopeFallPerSecond": 6.0
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "camera/position",
+   "op": "add",
+   "amount": 45.0,
+   "component": 2,
+   "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
+    "gain": 2.5,
+    "offset": -1.5,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 300,
+    "decayMs": 300,
+    "springHz": 0.35
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "camera/position",
+   "op": "add",
+   "amount": -99.0,
+   "component": 2,
+   "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
+    "gain": 2.5,
+    "offset": -1.5,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 6000,
+    "decayMs": 6000,
+    "springHz": 0.2
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "camera/position",
+   "op": "add",
+   "amount": 5.0,
+   "component": 0,
+   "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
+    "gain": 2.5,
+    "offset": -1.5,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 300,
+    "decayMs": 300,
+    "springHz": 0.25
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "camera/position",
+   "op": "add",
+   "amount": -5.0,
+   "component": 0,
+   "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
+    "gain": 2.5,
+    "offset": -1.5,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 6000,
+    "decayMs": 6000,
+    "springHz": 0.25
+   }
+  },
+  {
+   "source": "audio.bass",
+   "target": "camera/position",
+   "op": "add",
+   "amount": -26.0,
+   "component": 0,
+   "chain": {
+    "normalizeSeconds": 20.0,
+    "normalizeFloor": 0.08,
+    "normalizeSmoothMs": 800.0,
+    "gain": 1.0,
+    "offset": -0.95,
+    "integrate": true,
+    "integrateMin": 0.0,
+    "integrateMax": 1.0,
+    "springHz": 0.15
    }
   }
  ]

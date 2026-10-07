@@ -237,6 +237,11 @@ json chainToJson(const ProcessorChain& chain) {
     j["remapOutMax"] = static_cast<double>(chain.remapOutMax);
     // ADR-1041: written only when used, like a route's depth (a key every route always carried would be
     // noise in every project).
+    if (chain.normalizeSeconds > 0.0f) { // ADR-1182; written only when used
+        j["normalizeSeconds"] = static_cast<double>(chain.normalizeSeconds);
+        j["normalizeFloor"] = static_cast<double>(chain.normalizeFloor);
+        j["normalizeSmoothMs"] = static_cast<double>(chain.normalizeSmoothMs);
+    }
     if (chain.springHz > 0.0f) {
         j["springHz"] = static_cast<double>(chain.springHz);
         j["springDamping"] = static_cast<double>(chain.springDamping);
@@ -259,7 +264,7 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         return fail("processor chain must be a JSON object");
     }
     ProcessorChain chain;
-    std::array<Result<void>, 25> results{
+    std::array<Result<void>, 28> results{
         readFloat(j, "delayMs", chain.delayMs), // ADR-900; absent = no delay
         readFloat(j, "gain", chain.gain),
         readFloat(j, "offset", chain.offset),
@@ -281,6 +286,9 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         readFloat(j, "remapOutMin", chain.remapOutMin),
         readFloat(j, "remapOutMax", chain.remapOutMax),
         readFloat(j, "springHz", chain.springHz),           // ADR-1041; absent = off
+        readFloat(j, "normalizeSeconds", chain.normalizeSeconds), // ADR-1182; absent = off
+        readFloat(j, "normalizeFloor", chain.normalizeFloor),
+        readFloat(j, "normalizeSmoothMs", chain.normalizeSmoothMs),
         readFloat(j, "springDamping", chain.springDamping), // ADR-1041; absent = critical
         readBool(j, "integrate", chain.integrate),          // ADR-1041; absent = off
         readFloat(j, "integrateMin", chain.integrateMin),   // ADR-1161; absent = unbounded
@@ -297,6 +305,10 @@ Result<ProcessorChain> chainFromJson(const json& j) {
     }
     if (chain.delayMs < 0.0f) {
         return fail("processor chain: 'delayMs' must be >= 0, got {:g}", chain.delayMs);
+    }
+    if (!(chain.normalizeSeconds >= 0.0f) || chain.normalizeSeconds > 3600.0f || !(chain.normalizeFloor > 0.0f)) {
+        return fail("processor chain: 'normalizeSeconds' must be in [0, 3600] and 'normalizeFloor' > 0 (got {:g}, {:g})",
+                    chain.normalizeSeconds, chain.normalizeFloor);
     }
     if (chain.springHz < 0.0f || chain.springHz > ProcessorChain::kMaxSpringHz || chain.springDamping < 0.0f) {
         return fail("processor chain: 'springHz' must be in [0, {:g}] and 'springDamping' >= 0 (got {:g}, {:g})",

@@ -3384,6 +3384,9 @@ std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource*
             mix((c.clampEnabled ? 1u : 0u) | (c.remapEnabled ? 2u : 0u) | (c.integrate ? 4u : 0u));
             mix(bits(c.springHz)); // ADR-1041
             mix(bits(c.springDamping));
+            mix(bits(c.normalizeSeconds)); // ADR-1182
+            mix(bits(c.normalizeFloor));
+            mix(bits(c.normalizeSmoothMs));
         }
     }
     return key ^ (h + 0x7f4a7c159e3779b9ull + (key << 6) + (key >> 2));

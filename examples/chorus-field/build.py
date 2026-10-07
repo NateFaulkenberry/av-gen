@@ -622,33 +622,6 @@ def p5_chorus():
     return sc
 
 
-# ---- Phase 6: the cost of a fiber -------------------------------------------------------------------
-
-BENCH = {
-    # name: (count_x, depth rows, segments, width)
-    "b005k-s32": (220, 24, 32, 0.008),
-    "b016k-s32": (660, 24, 32, 0.004),
-    "b048k-s32": (2000, 24, 32, 0.002),
-    "b048k-s16": (2000, 24, 16, 0.002),
-    "b048k-s08": (2000, 24, 8, 0.002),
-    "b144k-s16": (6000, 24, 16, 0.0012),
-    "b288k-s16": (6000, 48, 16, 0.0012),
-    "b576k-s16": (6000, 96, 16, 0.0012),
-    "b576k-s08": (6000, 96, 8, 0.0012),
-    "b1m-s08": (8000, 128, 8, 0.0010),
-}
-
-for _name, (_cx, _d, _seg, _w) in BENCH.items():
-    def _make(_cx=_cx, _d=_d, _seg=_seg, _w=_w, _name=_name):
-        kw = dict(FACE)
-        kw.update(MATERIALS["m9-studio-sky"])
-        kw.pop("lights"), kw.pop("env")
-        return entity_scene("Chorus Field p6 " + _name, **kw, lights=split_lights(), env=spectral_env(),
-                            count_x=_cx, depth=_d, segments=_seg, width=_w, tube=_d * 0.25 / 6.0)
-    _make.__name__ = "p6_" + _name.replace("-", "_")
-    LOOKS[_make.__name__] = _make
-
-
 # ---- Phase 4 (directed): the god in the field -----------------------------------------------------------
 #
 # The owner's direction after CP5: the entity is the heart; kill "hair"; make it a volume; give it scale;
@@ -681,7 +654,7 @@ def wire_program():
             {"kind": "remap", "dst": 5, "srcA": 3, "constant": [0.0, 1.0, 0.34, 0.13], "value": 1.0},
             # The god emerges from the dark: below the mouth the falling streams fade towards a quarter.
             {"kind": "input", "dst": 0, "input": "worldPosition"},
-            {"kind": "gradient", "dst": 1, "srcA": 0, "value": 0.1, "constant": [0.0, 1.0, 0.0, 1.4]},
+            {"kind": "gradient", "dst": 1, "srcA": 0, "value": 0.1, "constant": [0.0, 1.0, 0.0, 1.0]},
             {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 0.22, 1.0], "value": 1.0},
             {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 1},
             {"kind": "constant", "dst": 1, "constant": [1.0, 1.0, 1.0, 1.0]},
@@ -690,9 +663,9 @@ def wire_program():
     }
 
 
-def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, chin=1.0, curl=0.06, kick=0.0,
+def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, maw=0.0, chin=1.0, curl=0.06, kick=0.0,
               cam=(0, -3, 46), target=(0, -3, 0), fov=40, debris=True, tension=0.3, segments=48,
-              length=40.0, count_x=260, depth=24, width=0.006, top=21.0, ragged=6.0, film=0.0,
+              length=33.0, count_x=260, depth=24, width=0.006, top=21.0, ragged=6.0, film=0.0,
               lights=None, env=None):
     """CP5's e4 geometry -- the proven skull -- made of wire: the curtain's top is ragged (roots scattered
     over 2 x `ragged` metres of height and thinned by noise), the eddies are tubes through its depth, and the
@@ -704,8 +677,7 @@ def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, chin=1.0, curl=0.06, kic
     nodes = [
         field("fall", "direction", axis=[0, -1, 0], strength=1.0),
         field("chin", "attractor", position=[0, -18, 0], strength=0.8 * chin, falloff=smooth(6, 26)),
-        field("brow", "attractor", position=[0, 7.0, 2.5], strength=0.4, falloff=smooth(2, 8)),
-        field("base", "compound", children=["fall", "chin", "brow"], combine="add"),
+        field("base", "compound", children=["fall", "chin"], combine="add"),
         field("curl", "curlNoise", frequency=0.11, strength=1.0, seed=21),
         field("eyeL", "vortex", position=[-4.6, 2.5, 0], axis=[0, 0, -1], strength=eyes, falloff=smooth(1.2, 6.0),
               scale=[1, 1, 3]),
@@ -721,7 +693,10 @@ def god_scene(title, *, eyes=2.6, horns=1.6, mouth=1.4, chin=1.0, curl=0.06, kic
               scale=[1, 1, 3]),
         field("mouthR", "vortex", position=[2.2, -6.5, 0], axis=[0, 0, 1], strength=mouth, falloff=smooth(0.8, 3.2),
               scale=[1, 1, 3]),
-        field("mouth", "compound", children=["mouthL", "mouthR"], combine="add"),
+        # The maw: an inward spiral in the mouth (p3-roll's coil, turned to face us); 0 until the music opens it.
+        field("maw", "spiral", position=[0, -6.5, 0], axis=[1, 0, 0], spiralBias=-0.3, strength=maw,
+              falloff=smooth(1.5, 6), scale=[1.6, 1, 3]),
+        field("mouth", "compound", children=["mouthL", "mouthR", "maw"], combine="add"),
         # The kick: onset fronts leaving the face at 9 m/s, read as a vector along +Y (a lift that travels).
         field("kick", "onset", position=[0, 1, 0], onsetSource="low", audioSpeed=9.0, onsetWidth=3.0,
               onsetDecay=1.6, waveGeometry="spherical", axis=[0, 1, 0], strength=1.0),
@@ -757,7 +732,7 @@ GOD_SHOTS = {
     "front": {},
     "low": {"cam": (0, -26, 36), "target": (0, 2, 0), "fov": 52},
     "three-quarter": {"cam": (-26, -5, 40), "target": (0, -2, 0), "fov": 42},
-    "maw": {"mouth": 3.2},
+    "maw": {"mouth": 1.4, "maw": 3.0},
     "dissolved": {"eyes": 0.3, "horns": 0.25, "mouth": 0.2, "chin": 0.4, "curl": 0.12},
     "split-light": {"lights": "split", "env": "spectral"},
     "taut": {"tension": 1.0},
@@ -787,30 +762,79 @@ def p8_god_trench():
       snare             -> tearing: a short burst of curl.
     Appearance follows the topology for free: the ember rim exists only while an eye is strong (the material
     program reads the eye fields' weight), so the glow comes and goes with the face."""
-    sc = god_scene("Chorus Field p8 god on Trench")
+    sc = god_scene("Chorus Field p8 god on Trench", cam=(0, -3, 100), mouth=1.4)
     d = "procedural/fibers/deform/"
     # Deformer order (god_scene): 1 base (fall + chin + brow), 2 curl, 3 face, 4 mouth, 5 kick.
-    bass = dict(attackMs=80, decayMs=1500, gain=2.4, clampEnabled=True, clampMin=0.05, clampMax=1.15)
+    # The bass is normalised to its own running peak (ADR-1182, 20 s fall-back) and then cubed: the intro
+    # is a hint, the build gathers, every drop -- the quieter second one too -- re-forms fully, on any song.
+    norm = dict(normalizeSeconds=20.0, normalizeFloor=0.08, normalizeSmoothMs=800.0)
+    gate = dict(**norm, gain=2.5, offset=-1.5, clampEnabled=True, clampMin=0.0, clampMax=1.0)
+    bass = dict(**norm, attackMs=80, decayMs=1500, gain=1.1, curve="power", curveAmount=3.0, clampEnabled=True,
+                clampMin=0.05, clampMax=1.05)
     sc["_routes"] = [
         route("audio.bass", "field/eyeL/strength", 1.0, op="multiply", **bass),
         route("audio.bass", "field/eyeR/strength", 1.0, op="multiply", **bass),
         route("audio.bass", "field/hornL/strength", 1.0, op="multiply", **bass),
         route("audio.bass", "field/hornR/strength", 1.0, op="multiply", **bass),
-        route("audio.bass", "field/chin/strength", 1.0, op="multiply", attackMs=300, decayMs=2000, gain=2.0,
+        route("audio.bass", "field/chin/strength", 1.0, op="multiply", **norm, attackMs=300, decayMs=2000, gain=1.2,
               clampEnabled=True, clampMin=0.3, clampMax=1.2),
         # highs (slow) open the mouth into a tunnel: the twin eddies grow until their wake is a gape.
         route("audio.treble", "field/mouthL/strength", 2.2, op="add", attackMs=2500, decayMs=4000, gain=3.0,
               clampEnabled=True, clampMin=0.0, clampMax=1.0, curve="power", curveAmount=2.0),
         route("audio.treble", "field/mouthR/strength", 2.2, op="add", attackMs=2500, decayMs=4000, gain=3.0,
               clampEnabled=True, clampMin=0.0, clampMax=1.0, curve="power", curveAmount=2.0),
+        # ... and past a threshold the maw rolls the mouth into a tunnel (an inward spiral in the mouth compound).
+        route("audio.treble", "field/maw/strength", 3.0, op="add", **norm, attackMs=3000, decayMs=4000, gain=1.0,
+              curve="power", curveAmount=4.0, clampEnabled=True, clampMin=0.0, clampMax=1.0),
         route("audio.mid", "field/eyeL/position", -3.0, op="add", component=0, attackMs=1500, decayMs=3000),
         route("audio.mid", "field/eyeR/position", 3.0, op="add", component=0, attackMs=1500, decayMs=3000),
         route("audio.onsetLow", d + "5/amount", 10.0, op="add", envelope="peakhold", envelopeHoldMs=60,
               envelopeFallPerSecond=3.0),
         route("audio.onsetMid", d + "2/amount", 1.2, op="add", envelope="peakhold", envelopeHoldMs=40,
               envelopeFallPerSecond=6.0),
+        # ---- the camera: phrase-scale, sprung, no shake, driven by the same normalised bass ----
+        # G = the normalised bass mapped so it is 0 below 60% of its running peak and 1 at it. A fast copy of G
+        # and a slow one (6 s) are routed with opposite signs; their difference is a transient that only exists
+        # while the god is changing state -- a drop throws the eye back (the reveal) and then the slow copy
+        # pushes it in as the god gathers; a breakdown carries it forward through the falling curtain before
+        # it eases back out. Base: z 100; at a held drop 100 + 45 - 99 = 46.
+        route("audio.bass", "camera/position", 45.0, op="add", component=2, **gate, attackMs=300, decayMs=300,
+              springHz=0.35),
+        route("audio.bass", "camera/position", -99.0, op="add", component=2, **gate, attackMs=6000, decayMs=6000,
+              springHz=0.2),
+        # The breakdown's drift is also a drift sideways and down, into the curtain's flank.
+        route("audio.bass", "camera/position", 5.0, op="add", component=0, **gate, attackMs=300, decayMs=300,
+              springHz=0.25),
+        route("audio.bass", "camera/position", -5.0, op="add", component=0, **gate, attackMs=6000, decayMs=6000,
+              springHz=0.25),
+        # An orbit to three-quarter at a hold: the bass held at its peak charges a bounded integral (ADR-1161)
+        # that swings the eye 30 m to the side over ~7 s; when the bass goes, it swings back.
+        route("audio.bass", "camera/position", -26.0, op="add", component=0, **norm, gain=1.0, offset=-0.95,
+              integrate=True, integrateMin=0.0, integrateMax=1.0, springHz=0.15),
     ]
     return sc
+
+
+# ---- Phase 6: the cost of a fiber (the directed god, p7-god-front, at other counts) ----------------------
+
+BENCH = {
+    # name: (count_x, depth rows, segments, width)
+    "g006k-s48": (260, 24, 48, 0.006),
+    "g006k-s24": (260, 24, 24, 0.006),
+    "g006k-s12": (260, 24, 12, 0.006),
+    "g025k-s24": (520, 48, 24, 0.004),
+    "g050k-s24": (1040, 48, 24, 0.003),
+    "g100k-s16": (2080, 48, 16, 0.002),
+    "g200k-s16": (4160, 48, 16, 0.0015),
+    "g400k-s12": (4160, 96, 12, 0.0012),
+    "g800k-s08": (8320, 96, 8, 0.001),
+}
+
+for _name, (_cx, _d, _seg, _w) in BENCH.items():
+    def _make(_cx=_cx, _d=_d, _seg=_seg, _w=_w, _name=_name):
+        return god_scene("Chorus Field p6 " + _name, count_x=_cx, depth=_d, segments=_seg, width=_w)
+    _make.__name__ = "p6_" + _name.replace("-", "_")
+    LOOKS[_make.__name__] = _make
 
 
 def main(argv):
