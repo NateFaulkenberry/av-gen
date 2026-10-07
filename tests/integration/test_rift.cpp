@@ -78,3 +78,61 @@ TEST_CASE("THE RIFT: every preset path, route target and macro target is a param
         CHECK(engine.params().find("grid/prop/waveSpeed") != nullptr);
     }
 }
+
+// ADR-1168 on THE RIFT: an offline seek must land the arc where a play from zero has it. Found by a `--range 84:112`
+// render that sat in the initial state (Dark) through the drop.
+TEST_CASE("THE RIFT: a seek lands the arc where play does", "[rift][adr1168]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    engine.seekSeconds(100.0);
+    FrameTime t{};
+    t.renderTime = 100.0;
+    t.deltaTime = 0.0;
+    engine.update(t);
+    INFO("state after a seek to 100 s: '" << engine.states().current() << "' (index " << engine.states().currentIndex()
+                                          << ")");
+    CHECK(engine.states().current() == "Drop");
+}
+
+TEST_CASE("THE RIFT: a seek to 84 s then playing on lands in the drop", "[rift][adr1168]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    engine.seekSeconds(84.0);
+    const double fps = 15.0;
+    std::string at90, at100;
+    for (int k = 0; k <= static_cast<int>(16.0 * fps); ++k) {
+        FrameTime t{};
+        t.renderTime = 84.0 + k / fps;
+        t.deltaTime = k == 0 ? 0.0 : 1.0 / fps;
+        t.frameIndex = static_cast<std::uint64_t>(k);
+        engine.update(t);
+        if (k == static_cast<int>(6.0 * fps)) at90 = engine.states().current();
+        if (k == static_cast<int>(16.0 * fps)) at100 = engine.states().current();
+    }
+    INFO("at 90 s '" << at90 << "', at 100 s '" << at100 << "'");
+    CHECK(at100 == "Drop");
+}
+
+TEST_CASE("THE RIFT: the render job's sequence (warm-up, camera reset, seek, fixed clock) lands in the drop",
+          "[rift][adr1168]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    // as RenderJob::begin does
+    FixedStepClock warm(15.0);
+    warm.restartAt(100.0);
+    engine.seekSeconds(100.0);
+    engine.update(engine.tick(warm));
+    const std::string afterWarm = engine.states().current();
+    engine.resetCameraState();
+    FixedStepClock clock(15.0);
+    clock.restartAt(100.0);
+    engine.seekSeconds(100.0);
+    const std::string afterSeek = engine.states().current();
+    engine.update(engine.tick(clock));
+    INFO("after the warm-up '" << afterWarm << "', after the second seek '" << afterSeek << "', after the first frame '"
+                               << engine.states().current() << "'");
+    CHECK(engine.states().current() == "Drop");
+}
