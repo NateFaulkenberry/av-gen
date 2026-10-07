@@ -225,3 +225,17 @@ offline tier).
 - **Live capture** (`--live-capture`) re-renders the frame, so the capture runs at about 10 fps. The live profile is
   the measurement.
 
+## 6. Suites and merge readiness
+
+**The suites at `1ee0a24a`:**
+
+| Suite | Lock | Exit | Cases | Assertions |
+|---|---|---|---|---|
+| `avgen_tests` | none (CPU only) | **0** | 4193: 4173 passed, 19 skipped, exactly **1 failed as expected** (the one `[!shouldfail]`, character-lab slopes) | 10,341,734 |
+| `avgen_render_tests` | under `tools/gpu-lock.sh` | **0** | 635: 634 passed, 1 skipped | 644,126 |
+
+Only this section was added after that commit.
+
+**Large-file check against `origin/main` (`ea72eda5`, the branch's base):** nothing under `assets/`, no media, and no
+file over 1 MB. The render, captures and sheets live in the review folder only.
+
