@@ -256,9 +256,9 @@ def crinoid(seed, height=26.0):
                 plen = 0.75 * (1 - 0.6 * frac)
                 for sgn in (1, -1):
                     pd = bs_[k] * sgn * 0.8 + t[k] * 0.45 + np.array([0, -0.25, 0])
-                    pc = curve(c2[k], pd, plen, 4, bend=np.array([0, -0.6, 0]))
+                    pc = curve(c2[k], pd, plen, 3, bend=np.array([0, -0.6, 0]))
                     v = 0.4 + 0.6 * frac
-                    tube(arms, pc, np.linspace(0.025, 0.008, 4), 3, v, v, u=rng.random())
+                    ribbon(arms, pc, np.linspace(0.05, 0.015, 3), t[k], v, v, u=rng.random())
                     if k % 2 == 0:
                         blob(beads, pc[-1], [0.05, 0.05, 0.05], v=v, u=rng.random())
                 if k % 3 == 0:
@@ -328,7 +328,7 @@ def fan(seed, height=2.6):
                     blob(polyps, pts[k] + rng.normal(0, 0.012, 3), [0.016, 0.016, 0.016],
                          v=v + (v1 - v) * k / nseg, u=rng.random())
         end = p + d * length
-        if depth < 4 and radius > 0.006:
+        if depth < 3 and radius > 0.006:
             spread = rng.uniform(0.25, 0.5)
             for sgn in (-1, 1):
                 branch(end, ang + sgn * spread + rng.normal(0, 0.08), length * rng.uniform(0.62, 0.8),
@@ -370,15 +370,13 @@ def mat(seed):
     for lump in range(3):
         c = rng.normal(0, 0.18, 3) * [1, 0, 1]
         blob(cushion, c, [rng.uniform(0.35, 0.55), rng.uniform(0.07, 0.14), rng.uniform(0.35, 0.55)], v=0.0,
-             rings=5)
+             rings=3)
     for q in range(90):
         r = 0.55 * math.sqrt(rng.random())
         a = rng.uniform(0, 2 * math.pi)
         x, z = r * math.cos(a), r * math.sin(a)
         h = 0.12 * (1 - (r / 0.6) ** 2) + rng.uniform(0.0, 0.07)
         stalk_top = np.array([x, h, z])
-        tube(cushion, [[x, max(h - 0.08, 0), z], [x * 1.02, h - 0.03, z * 1.02], stalk_top], [0.007, 0.006, 0.005], 3,
-             0.0, 0.5)
         rr = rng.uniform(0.008, 0.022)
         blob(polyps, stalk_top, [rr, rr * 1.2, rr], v=r / 0.55, u=rng.random())
     return {"mat_cushion": cushion, "mat_polyps": polyps}

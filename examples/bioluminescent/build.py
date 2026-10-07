@@ -298,8 +298,8 @@ PROP = {
     "name": "prop", "mode": "excitable", "wrap": "clamp",
     "resolution": [256, 1, 1024], "boundsMin": [-200.0, -400.0, Z0], "boundsMax": [200.0, 400.0, Z1],
     "injectField": "ignite", "injectRate": 1.0, "conductivityField": "conduct",
-    "threshold": 0.5, "coupling": 1.0, "waveSpeed": 14.0, "riseRate": 10.0, "excitationDecay": 0.7,
-    "refractoryTime": 2.0, "refractoryStrength": 4.0, "energyTime": 3.0, "wakeTime": 30.0, "noise": 0.35,
+    "threshold": 0.5, "coupling": 1.0, "waveSpeed": 14.0, "riseRate": 10.0, "excitationDecay": 0.4,
+    "refractoryTime": 2.5, "refractoryStrength": 8.0, "energyTime": 3.0, "wakeTime": 30.0, "noise": 0.35,
     "ceiling": 0.0, "simRate": 30, "maxSubSteps": 4, "seed": 11, "checkpointInterval": 5,
 }
 
@@ -462,11 +462,11 @@ STAGES = {
     "Awake":     ("canopy", 8.0, 1.3, 14.0, 0.12, 0.0, 600.0, 0.0, (6.0, "smooth"), 0.75, 3.0, 34.0),
     "Awake 2":   ("wall",   8.0, 1.4, 14.0, 0.15, 0.0, 600.0, 0.0, (10.0, "smooth"), 0.75, 3.0, 34.0),
     "Build":     ("climb",  4.0, 0.5, 16.0, 0.05, 0.0, 3500.0, 0.0, (4.0, "easeInOut"), 0.95, 4.0, 30.0),
-    "Drop":      ("dive",  24.0, 3.0, 36.0, 1.4, 0.05, 2500.0, 9000.0, (1.2, "easeOut"), 0.3, 0.35, 70.0),
-    "Body":      ("canopy", 17.0, 2.0, 24.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.5, 1.5, 45.0),
-    "Body 2":    ("river",  20.0, 2.2, 26.0, 0.7, 0.025, 1500.0, 4000.0, (6.0, "smooth"), 0.5, 1.5, 45.0),
-    "Body 3":    ("wall",   15.0, 2.0, 24.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.5, 1.5, 45.0),
-    "Body 4":    ("reveal", 12.0, 2.4, 26.0, 0.8, 0.03, 1500.0, 2000.0, (8.0, "smooth"), 0.45, 1.2, 50.0),
+    "Drop":      ("dive",  24.0, 3.0, 28.0, 1.4, 0.05, 2500.0, 9000.0, (1.2, "easeOut"), 0.35, 0.25, 28.0),
+    "Body":      ("canopy", 17.0, 2.0, 22.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
+    "Body 2":    ("river",  20.0, 2.2, 24.0, 0.7, 0.025, 1500.0, 4000.0, (6.0, "smooth"), 0.6, 1.5, 40.0),
+    "Body 3":    ("wall",   15.0, 2.0, 22.0, 0.6, 0.02, 1500.0, 3000.0, (6.0, "smooth"), 0.62, 1.5, 40.0),
+    "Body 4":    ("reveal", 12.0, 2.4, 24.0, 0.8, 0.03, 1500.0, 2000.0, (8.0, "smooth"), 0.55, 1.2, 45.0),
     "Aftermath": ("after",  2.5, 0.0, 12.0, 0.0, 0.0, 600.0, 0.0, (4.0, "smooth"), 0.95, 4.0, 30.0),
 }
 BODY_CYCLE = ["Body", "Body 2", "Body 3", "Body 4"]
