@@ -444,7 +444,37 @@ fn pixelsPerMetreAt(c: vec3<f32>, across: vec3<f32>, half: f32) -> f32 {
     return length((c1.xy / c1.w - c0.xy / c0.w) * 0.5 * frame.targetSize.xy) / probe;
 }
 
-fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut) -> ProcVertexOut {
+// ADR-1181: the strand pass's centre line, when it is bound: the first Streamline deformer carries
+// (params.y = segments per fiber in the buffer, params.z = 1 when bound). Binding 7 holds the strands
+// for a fiber draw (it is ADR-056's bend array on a simulated plant layer, which a fiber never is).
+// Returns w = 0 when unbound, and the vertex stage integrates the line itself.
+fn fiberStrandInfo() -> vec2<f32> {
+    let count = u32(proc.timeInfo.y + 0.5);
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        if (i >= count) { break; }
+        let def = proc.deformers[i];
+        let code = deformerCode(def);
+        if (code == DEFORM_STREAMLINE || code == DEFORM_STREAMLINE + DEFORM_WORLD) {
+            return vec2<f32>(def.params.y, def.params.z);
+        }
+    }
+    return vec2<f32>(0.0);
+}
+
+fn fiberStrandPoint(recordIndex: u32, segments: u32, k: u32) -> FiberPoint {
+    let base = recordIndex * (segments + 1u);
+    let kk = min(k, segments);
+    let p = plantBend[base + kk].xyz;
+    let a = plantBend[base + select(kk - 1u, 0u, kk == 0u)].xyz;
+    let b = plantBend[base + min(kk + 1u, segments)].xyz;
+    var out: FiberPoint;
+    out.centre = p;
+    let dt = b - a;
+    out.tangent = select(vec3<f32>(0.0, 1.0, 0.0), normalize(dt), dot(dt, dt) > 1e-14);
+    return out;
+}
+
+fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut, recordIndex: u32) -> ProcVertexOut {
     var out = outIn;
     let s = inst.scale.xyz;
     let lengthScale = s.y;
@@ -456,7 +486,15 @@ fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut) -> Proc
     var half = abs(in.position.x) * widthScale;
     let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
     let axis = normalize((object.model * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0)), 0.0)).xyz);
-    let fp = fiberPoint(root, axis, k, ds);
+    let strand = fiberStrandInfo();
+    var fp: FiberPoint;
+    if (strand.y > 0.5) {
+        let segments = u32(strand.x + 0.5);
+        // This mesh may be a coarser LOD level: its vertex at arc fraction uv.y is the buffer's nearest point.
+        fp = fiberStrandPoint(recordIndex, segments, u32(floor(in.uv.y * f32(segments) + 0.5)));
+    } else {
+        fp = fiberPoint(root, axis, k, ds);
+    }
     let now = proc.timeInfo.x;
     let c = deformWorld(fp.centre, fp.tangent, now);
     let t = fp.tangent;
@@ -569,7 +607,7 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.instIndex = inst.scale.w;
 
     if (proc.fieldInfo.z > 1.5) {
-        return fiberVertex(in, inst, out); // ADR-1180
+        return fiberVertex(in, inst, out, recordIndex); // ADR-1180
     }
     if (proc.fieldInfo.z > 0.5) {
         // Point source: a camera-facing quad around the instance centre. The centre goes through

@@ -143,6 +143,8 @@ struct ProceduralStats {
     std::uint64_t generatorCells = 0;
     std::uint64_t generatorBytes = 0;
     std::uint32_t generatorDispatches = 0;
+    std::uint32_t fiberStrandObjects = 0; // ADR-1181: Fiber objects whose centre lines the strand pass wrote
+    std::uint64_t fiberStrands = 0;       // records it integrated
     double generatorMs = -1.0;            // GPU time of the last measured generator pass
 };
 

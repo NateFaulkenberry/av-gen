@@ -287,6 +287,57 @@ def p2_mask_far():
     return mask_scene("Chorus Field p2 mask far", curl=0.06, depth=48, cam=(0, -2, 62), target=(0, -2, 0), fov=40)
 
 
+@look
+def p3_roll():
+    """Vortex as a personality: a released sheet is rolled into a breaking curl by one great horizontal
+    vortex tube; the camera looks down the tube from inside its mouth."""
+    nodes = [
+        field("wind", "direction", axis=[1, 0, 0], strength=0.7),
+        field("roll", "vortex", position=[2, 0, 0], axis=[0, 0, 1], strength=1.6, falloff=smooth(4, 16)),
+        field("roll2", "vortex", position=[16, 5, 0], axis=[0, 0.2, 1], strength=1.2, falloff=smooth(2, 9)),
+        field("flow", "compound", children=["wind", "roll", "roll2"], combine="add"),
+        field("curl", "curlNoise", frequency=0.06, strength=1.0, seed=8),
+        field("band", "box", position=[-24, 6, 0], size=[1, 3, 20], softness=2.5,
+              falloff={"kind": "noiseModulated", "inner": 2, "outer": 40, "noiseAmount": 2.0, "noiseScale": 0.15}),
+        fibers("fibers", grid=(3, 50, 220), spacing=(0.5, 0.16, 0.2), centre=(-24, 6, 0), rotate=(0, 0, -90),
+               jitter=(0.4, 0.08, 0.1), length=70.0, width=0.008, segments=32, steer=5.0,
+               orient=(0.05, 0.05, 0.05), size_random=0.3, effectors=[thin("band", "band")],
+               pulls=[("curl", 0.5)]),
+    ]
+    return scene("Chorus Field p3 roll", nodes, cam_pos=[4, -2, 46], cam_target=[3, 1, 0], fov=50)
+
+
+@look
+def p3_roll_inside():
+    """The same roll from inside the tube, looking along its axis."""
+    sc = p3_roll()
+    sc["camera"].update({"position": [1, -1, 26], "target": [3, 1, -10], "fov": 70})
+    sc["name"] = "Chorus Field p3 roll inside"
+    return sc
+
+
+@look
+def p4_tendons():
+    """Macrostructure: two diffuse clouds of roots drawn to a throat between them, so their streams
+    gather into tendons -- thick at the clouds, cabled where they meet."""
+    nodes = [
+        field("throatA", "attractor", position=[0, 2, 0], strength=1.0, falloff=smooth(4, 40)),
+        field("throatB", "attractor", position=[0, -6, 0], strength=0.6, falloff=smooth(3, 30)),
+        field("twist", "vortex", position=[0, 0, 0], axis=[1, 0.1, 0], strength=0.5, falloff=smooth(2, 18)),
+        field("flow", "compound", children=["throatA", "throatB", "twist"], combine="add"),
+        field("curl", "curlNoise", frequency=0.05, strength=1.0, seed=31),
+        field("cloudL", "sphere", position=[-20, 4, 0], radius=7.0, softness=5.0,
+              falloff={"kind": "noiseModulated", "inner": 4, "outer": 14, "noiseAmount": 2.5, "noiseScale": 0.2}),
+        field("cloudR", "sphere", position=[20, 2, 0], radius=7.0, softness=5.0,
+              falloff={"kind": "noiseModulated", "inner": 4, "outer": 14, "noiseAmount": 2.5, "noiseScale": 0.2}),
+        field("clouds", "compound", children=["cloudL", "cloudR"], combine="max"),
+        fibers("fibers", grid=(120, 40, 40), spacing=(0.42, 0.42, 0.42), jitter=(0.21, 0.21, 0.21),
+               length=24.0, width=0.008, segments=32, steer=4.0, size_random=0.3,
+               effectors=[thin("c", "clouds")], pulls=[("curl", 0.8)]),
+    ]
+    return scene("Chorus Field p4 tendons", nodes, cam_pos=[6, 4, 58], cam_target=[0, 0, 0], fov=45)
+
+
 def main(argv):
     names = argv[1:] or list(LOOKS)
     for name in names:

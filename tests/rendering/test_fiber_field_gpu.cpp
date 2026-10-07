@@ -76,7 +76,7 @@ scene::Scene fiberScene(float steer, float width, float minPixels, bool withFiel
     g.meshHash = g.source.structuralHash() | 1u;
     g.material.baseColor = {0.0f, 0.0f, 0.0f};
     g.material.emissiveColor = {1.0f, 1.0f, 1.0f};
-    g.material.emissiveIntensity = 2.0f;
+    g.material.emissiveIntensity = 8.0f;
     g.material.roughness = 1.0f;
     s.procedurals.push_back(g);
     return s;
@@ -151,15 +151,16 @@ TEST_CASE("a fiber's centre line on the GPU is the CPU reference's", "[gpu][fibe
 
 TEST_CASE("a hair-thin fiber stays on screen, paid for in brightness", "[gpu][fiber]") {
     auto ctx = makeContext();
-    // 0.2 mm at 8 m is a few hundredths of a pixel: without the floor it rasterises to (almost) nothing.
-    const auto bare = render(*ctx, fiberScene(0.0f, 0.0002f, 0.0f));
-    const auto held = render(*ctx, fiberScene(0.0f, 0.0002f, 1.0f));
+    // 6 mm at 8 m is a fifth of a pixel here: without the floor it rasterises into broken dashes.
+    const auto bare = render(*ctx, fiberScene(0.0f, 0.006f, 0.0f));
+    // The floor is in pixels at 1080 lines; this target is 256, so 4.5 is about one pixel here.
+    const auto held = render(*ctx, fiberScene(0.0f, 0.006f, 4.5f));
     const int bareLit = litPixels(bare);
     const int heldLit = litPixels(held);
-    CHECK(heldLit > 40);           // a continuous thread of ~1 pixel down the fiber's length
-    CHECK(heldLit > 4 * bareLit);  // the floor is what keeps it
+    CHECK(heldLit > 60);           // a continuous thread of ~1 pixel down the fiber's ~100 px length
+    CHECK(heldLit > 2 * bareLit);  // the floor is what keeps it
     // Coverage: the held fiber is dimmer than a fiber that really is a pixel wide.
-    const auto wide = render(*ctx, fiberScene(0.0f, 0.02f, 1.0f));
+    const auto wide = render(*ctx, fiberScene(0.0f, 0.06f, 4.5f));
     int heldPeak = 0;
     int widePeak = 0;
     for (std::uint32_t y = 0; y < kSize; ++y) {
