@@ -197,10 +197,31 @@ evaluated in the surface's bisection and normal.
 **Live capture:** `live/astral-forge-live-capture.mp4`, 55 s with music, from the live conductor. It was re-rendered
 by `--live-capture`, so it runs at about 10 fps.
 
-**OFFLINE:** see section 4.
+**OFFLINE** (the final render, 1080p30, the offline tier: every particle, the full-resolution march): 6,228 frames in
+235 s, which is 26.5 fps or about 38 ms a frame for two simulation steps and the frame. 0 GPU errors.
 
 ## 4. The final render
 
 The full *Trench* (207.6 s, 1080p30, with sound) through the production path:
 `avgen --project examples/astral-forge/astral-forge-trench.json --render astral-forge-production-trench.mp4` (the
 offline tier).
+
+**Output:** `astral-forge-production-trench.mp4`, 207.6 s, h264 + AAC, 350 MB. It renders in 3 min 55 s.
+
+**Contact sheets:** `contact-sheet-every-5s.jpg` and its greyscale twin.
+- Faces read through every section: the Seraph with wings, the Machine God, the break where only the eyes form, the
+  Chimera, and the Choir merging into one face.
+- Collapses are dust sprays.
+- The ending pulls back and fades.
+
+## 5. What is left
+
+- **The Machine God** costs about twice what the other gods do at the face, because of its three peeling shells
+  (section 3). A live performance with long Machine sections runs at Low or Emergency.
+- **No shadow casting.** The god casts nothing into the scene's shadow maps (ADR-1200 has no shadow hook). A HYBRID
+  scene that needs it would add one, on the model of `SdfRenderer::drawShadow`.
+- **The live conductor** knows no song structure: virtual sections of eight phrases stand in for sections, and the
+  god's choice cycles. A performer's god pads and `astral/god` override it.
+- **Live capture** (`--live-capture`) re-renders the frame, so the capture runs at about 10 fps. The live profile is
+  the measurement.
+
