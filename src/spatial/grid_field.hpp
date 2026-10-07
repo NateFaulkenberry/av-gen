@@ -47,7 +47,19 @@ struct FieldSet;
 // so bit-exact); then the trail blurs by `diffusion` and fades by `dissipation`. GPU only: the CPU
 // `step()` does nothing for it (a chaotic population cannot be mirrored to the last bit), and it is
 // sampled as a vector (the three trails), so a scalar read is the trails' length.
-enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents };
+// Excitable (ADR-1201): 4 floats, an excitable medium on the XZ plane (resolution.y must be 1):
+//   u  excitation (0..1), the visible activation of a front
+//   r  refractory (0..1), 1 at the moment a cell fires, then exp(-age / refractoryTime); it is also the
+//      medium's clock: a neighbour's age since it fired is -refractoryTime * ln(r)
+//   e  energy, u low-passed with energyTime
+//   w  wake, u low-passed with wakeTime (tens of seconds)
+// A cell fires when stimulus + coupling * conductivity * front > threshold * (1 + refractoryStrength * r),
+// where `front` is 1 when a neighbour's front reaches it this step: neighbour j (within a 5 x 5 disk) fired
+// `age_j` ago, its front arrives at distance d after d / waveSpeed seconds. The fire time is kept to the
+// sub-step (r is set from the exact arrival), so the wave speed is waveSpeed in metres per second whatever
+// the cell size or simRate (stepStencil in grid_field.cpp; docs/decisions/ADR-1201). Sampled as a scalar
+// it reads u; a Grid field's `channel` reads any of the four.
+enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents, Excitable };
 [[nodiscard]] const char* gridModeName(GridMode mode);
 [[nodiscard]] std::optional<GridMode> gridModeFromName(std::string_view name);
 
@@ -56,7 +68,7 @@ enum class GridWrap : std::uint8_t { Clamp, Wrap };
 [[nodiscard]] std::optional<GridWrap> gridWrapFromName(std::string_view name);
 
 constexpr int kMaxGridResolution = 128;
-// ADR-1120: an Agents grid is a plane, and may be finer on x and z.
+// ADR-1120: an Agents grid is a plane, and may be finer on x and z. So is an Excitable grid (ADR-1201).
 constexpr int kMaxAgentGridResolution = 1024;
 constexpr int kMaxAgents = 4 * 1024 * 1024;
 // Total floats every grid of a scene may occupy together (16 MB: one 1024 x 1 x 1024 agents trail,
@@ -102,6 +114,18 @@ struct GridField {
     float depositAmount = 1.0f;   // trail added per agent per step (x the deposit field, when set)
     float repel = 0.6f;           // how much the other species' trails count against a direction
     std::string depositField;     // a scalar field the deposit is multiplied by (audio, typically); empty = 1
+    // Excitable (ADR-1201). The stimulus is injectRate * max(0, injectField) (a level, not a rate).
+    std::string conductivityField;  // a scalar field the front's drive is multiplied by per cell; empty = 1
+    float threshold = 0.5f;         // the drive a rested cell needs to fire
+    float coupling = 1.0f;          // the drive a passing front gives (x conductivity)
+    float waveSpeed = 4.0f;         // metres per second a front travels
+    float riseRate = 8.0f;          // 1/s: u climbs to 1 in 1 / riseRate seconds after firing
+    float excitationDecay = 0.6f;   // seconds, u's decay time constant once risen
+    float refractoryTime = 1.5f;    // seconds, r's decay time constant (and the clock's)
+    float refractoryStrength = 4.0f; // the threshold is threshold * (1 + refractoryStrength * r)
+    float energyTime = 3.0f;        // seconds, e's time constant
+    float wakeTime = 30.0f;         // seconds, w's time constant
+    float noise = 0.0f;             // 0..1: each cell's front delay jitters by +-noise, re-drawn every 0.25 s
     // Checkpoints for an exact seek (ADR-1119): one every this many seconds of steps; 0 = none.
     float checkpointInterval = 5.0f;
 
@@ -124,14 +148,20 @@ struct GridField {
     // Trilinear sample of the grid at a point in the grid's own space (the field's local frame).
     [[nodiscard]] float sampleScalar(const glm::vec3& p) const;   // Rd: the B channel
     [[nodiscard]] glm::vec3 sampleVector(const glm::vec3& p) const;
+    // ADR-1201: trilinear sample of one component (0 outside [0, components())).
+    [[nodiscard]] float sampleChannel(const glm::vec3& p, int channel) const;
     // Raw component c of the cell, with the wrap rule applied to the indices.
     [[nodiscard]] float at(int i, int j, int k, int c) const;
 
     // One sub-step of dt = 1 / simRate seconds at `time` (seconds, for the input fields).
-    // `set` resolves injectField / velocityField (null = no inputs).
+    // `set` resolves injectField / velocityField (null = no inputs). An Excitable grid's step index (its
+    // noise) is round(time * simRate), which is the GPU's when `time` is the step's own second (ADR-1119).
     void step(float dt, double time, const FieldSet* set = nullptr);
 
     [[nodiscard]] bool agents() const { return mode == GridMode::Agents; }
+    [[nodiscard]] bool excitable() const { return mode == GridMode::Excitable; }
+    // ADR-1201: a plane grid (agents, excitable): resolution [x, 1, z] up to kMaxAgentGridResolution.
+    [[nodiscard]] bool plane() const { return agents() || excitable(); }
     [[nodiscard]] Result<void> validate() const;
     // ADR-1122: what the state's shape and seed depend on -- mode, wrap, resolution, bounds, the sim rate, the
     // seed, the agents' count and species, and the names of the fields it reads. A change here re-seeds the grid

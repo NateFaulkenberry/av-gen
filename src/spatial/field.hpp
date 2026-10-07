@@ -182,6 +182,10 @@ struct FieldSpec {
     float mix = 0.5f;
     // Grid: the name of the simulated grid it samples.
     std::string reference;
+    // Grid (ADR-1201): which component of the grid's cells to read, as a scalar; -1 = the grid's own reading
+    // (scalar: the value, reaction-diffusion: B, excitable: u, vector and agents: the vector). For an excitable
+    // grid 0..3 are u, r, e, w. Serialised and hashed only when set.
+    int channel = -1;
     // Audio kinds (ADR-1116). Serialised, hashed and registered as parameters only for those kinds.
     AudioBand audioBand = AudioBand::Range;
     float bandLow = 0.0f;                  // [0, 1] of the log-frequency axis (kAudioMinHz..kAudioMaxHz)
@@ -278,7 +282,7 @@ struct alignas(16) FieldGpu {
     // audioSpeed), gridBounds1 = (audioBand, bandRepeat, onsetDecay, onsetWidth), gridRes.x = onsetSource.
     glm::vec4 gridBounds0;             // grid boundsMin.xyz, offset into the grid table (floats)
     glm::vec4 gridBounds1;             // grid boundsMax.xyz, components per cell
-    glm::vec4 gridRes;                 // resolution.xyz, w = 1 bound + 2 when wrapping (0 = unbound)
+    glm::vec4 gridRes;                 // resolution.xyz, w = 1 bound + 2 when wrapping + 4 * (channel + 1) (0 = unbound)
 };
 static_assert(sizeof(FieldGpu) == 368);
 // Packs a field for slot use; child names resolve to slots through `set` (order of `set.fields`).

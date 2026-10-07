@@ -14,6 +14,8 @@
 //
 //   every grid   injectRate, advect, diffusion, dissipation
 //   scalar       ceiling (ADR-1163)
+//   excitable    ceiling, threshold, coupling, waveSpeed, riseRate, excitationDecay, refractoryTime,
+//                refractoryStrength, energyTime, wakeTime, noise (ADR-1201)
 //   rd           feed, kill, diffusionA, diffusionB
 //   agents       sensorAngle, sensorDistance, turnAngle, stepSize, depositAmount, repel
 //

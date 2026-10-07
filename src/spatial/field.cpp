@@ -399,11 +399,11 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet
     const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
-        if (g != nullptr && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {
+        if (g != nullptr && f.channel < 0 && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {
             return glm::length(vectorAt(f, p, td, set, depth, element)); // vector as scalar
         }
         const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
-        float v = g != nullptr ? g->sampleScalar(q) : 0.0f;
+        float v = g == nullptr ? 0.0f : f.channel >= 0 ? g->sampleChannel(q, f.channel) : g->sampleScalar(q);
         if (f.invert) {
             v = 1.0f - v;
         }
@@ -455,7 +455,7 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, double td, const Fiel
     const glm::vec3 q = glm::vec3(frame.worldToLocal * glm::vec4(p, 1.0f));
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
-        if (g == nullptr || (g->mode != GridMode::Vector && g->mode != GridMode::Agents)) {
+        if (g == nullptr || f.channel >= 0 || (g->mode != GridMode::Vector && g->mode != GridMode::Agents)) {
             return scalarAt(f, p, td, set, depth, element) * (frame.rotation * fieldAxis(f)); // scalar as vector
         }
         glm::vec3 dir = g->sampleVector(q);
@@ -505,7 +505,7 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, double td, const Field
     const float w = fieldWeight(f, q);
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
-        if (g != nullptr && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {
+        if (g != nullptr && f.channel < 0 && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {
             return glm::vec4(vectorAt(f, p, td, set, depth, element) * 0.5f + 0.5f, w);
         }
         const float s = scalarAt(f, p, td, set, depth, element);
@@ -936,6 +936,9 @@ Result<void> FieldSpec::validate() const {
     if (kind == FieldKind::Grid && reference.empty()) {
         return fail("field '{}': grid needs a 'reference' (the grid's name)", name);
     }
+    if (channel < -1 || channel > 3 || (channel >= 0 && kind != FieldKind::Grid)) {
+        return fail("field '{}': channel must be -1 (the grid's reading) or 0..3, and only on a grid field", name);
+    }
     if (isAudio()) {
         if (!(bandLow >= 0.0f && bandLow <= 1.0f && bandHigh >= 0.0f && bandHigh <= 1.0f)) {
             return fail("field '{}': bandLow and bandHigh must be in [0, 1]", name);
@@ -995,6 +998,9 @@ std::uint64_t FieldSpec::structuralHash() const {
     h.u8(static_cast<std::uint8_t>(combine));
     h.f32(mix);
     h.str(reference);
+    if (channel >= 0) { // ADR-1201: hashed only when set, so every other field keeps its hash
+        h.i32(channel);
+    }
     // ADR-1116: hashed only for the audio kinds, so every other field keeps the hash it always had.
     if (isAudio()) {
         h.u8(static_cast<std::uint8_t>(audioBand));
@@ -1068,6 +1074,9 @@ json FieldSpec::toJson() const {
     j["combine"] = fieldCombineName(combine);
     j["mix"] = mix;
     j["reference"] = reference;
+    if (channel >= 0) {
+        j["channel"] = channel; // ADR-1201: written only when set
+    }
     // ADR-1116: written only for the audio kinds.
     if (isAudio()) {
         j["audioBand"] = audioBandName(audioBand);
@@ -1126,6 +1135,7 @@ Result<FieldSpec> FieldSpec::fromJson(const json& root) {
         AVGEN_SPATIAL_READ_ENUM(f.combine, "combine", &fieldCombineFromName, "field combine");
         AVGEN_SPATIAL_READ(f.mix, "mix", detail::readFloat);
         AVGEN_SPATIAL_READ(f.reference, "reference", detail::readString);
+        AVGEN_SPATIAL_READ(f.channel, "channel", detail::readInt);
         AVGEN_SPATIAL_READ_ENUM(f.audioBand, "audioBand", &audioBandFromName, "audio band");
         AVGEN_SPATIAL_READ(f.bandLow, "bandLow", detail::readFloat);
         AVGEN_SPATIAL_READ(f.bandHigh, "bandHigh", detail::readFloat);
@@ -1273,12 +1283,15 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
                 const auto offset = static_cast<float>(gridTableOffset(set->grids, static_cast<std::size_t>(gi)));
                 g.gridBounds0 = glm::vec4(grid.boundsMin, offset);
                 g.gridBounds1 = glm::vec4(grid.boundsMax, static_cast<float>(grid.components()));
+                // w = 1 bound + 2 wrapping + 4 * (channel + 1): ADR-1201's channel rides in the same lane, and
+                // the default (-1) leaves it what it always was.
+                const int channel = std::clamp(field.channel, -1, 3);
                 g.gridRes = glm::vec4(static_cast<float>(grid.resolution.x), static_cast<float>(grid.resolution.y),
                                       static_cast<float>(grid.resolution.z),
-                                      grid.wrap == GridWrap::Wrap ? 3.0f : 1.0f);
-                // The bound grid's mode decides how the record reads across types.
-                g.type = static_cast<std::uint32_t>((grid.mode == GridMode::Vector || grid.mode == GridMode::Agents) ? FieldType::Vector
-                                                                                 : FieldType::Scalar);
+                                      (grid.wrap == GridWrap::Wrap ? 3.0f : 1.0f) + 4.0f * static_cast<float>(channel + 1));
+                // The bound grid's mode decides how the record reads across types; a channel is a scalar.
+                const bool vector = channel < 0 && (grid.mode == GridMode::Vector || grid.mode == GridMode::Agents);
+                g.type = static_cast<std::uint32_t>(vector ? FieldType::Vector : FieldType::Scalar);
             }
         }
     }

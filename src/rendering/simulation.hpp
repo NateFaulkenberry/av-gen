@@ -66,7 +66,7 @@ struct SimulationStats {
     std::uint64_t restoredFromStep = 0; // the step the last restore landed on
 };
 
-// Group 0 binding 0 of every kernel (160 bytes in a 256-byte dynamic-offset slot). Mirrors
+// Group 0 binding 0 of every kernel (224 bytes in a 256-byte dynamic-offset slot). Mirrors
 // `SimUniforms` in shaders/simulate.wgsl.
 struct SimUniforms {
     glm::uvec4 res;      // resolution.xyz, components per cell
@@ -79,8 +79,13 @@ struct SimUniforms {
     glm::uvec4 agents;   // ADR-1120: count, species, offset (in agents), seed
     glm::vec4 agentSense; // sensorAngle, sensorDistance (cells), turnAngle, stepSize (cells)
     glm::vec4 agentDeposit; // depositAmount, repel, 0, 0
+    // ADR-1201, excitable grids (zero for every other mode):
+    glm::vec4 excite0;     // threshold, coupling, waveSpeed, riseRate
+    glm::vec4 excite1;     // excitationDecay, refractoryTime, refractoryStrength, energyTime
+    glm::vec4 excite2;     // wakeTime, noise, ceiling (0 = none), 0
+    glm::uvec4 exciteSlots; // conductivity field slot (as i32 bits; -1 = none), noise epoch (steps), seed, 0
 };
-static_assert(sizeof(SimUniforms) == 160);
+static_assert(sizeof(SimUniforms) == 224);
 
 class Simulation {
 public:

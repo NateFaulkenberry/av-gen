@@ -51,7 +51,7 @@ struct FieldGpu {
     children: vec4<i32>,             // compound child slots, -1 = none
     gridBounds0: vec4<f32>,          // Grid kind: boundsMin.xyz, offset into gridTable (floats)
     gridBounds1: vec4<f32>,          // boundsMax.xyz, components per cell (1 scalar, 2 Rd, 4 vector)
-    gridRes: vec4<f32>,              // resolution.xyz, w = 0 unbound, 1 bound (clamp), 3 bound (wrap)
+    gridRes: vec4<f32>,              // resolution.xyz, w = 0 unbound, else 1 + 2 (wrap) + 4 * (channel + 1) (ADR-1201)
 };
 
 // ADR-1116: the audio history the Spectrum and Onset kinds read (rendering::FieldUniforms packs it
@@ -168,7 +168,7 @@ fn gridFetch(fi: u32, i: i32, j: i32, k: i32, c: i32) -> f32 {
     if (c < 0 || c >= comps) {
         return 0.0;
     }
-    let wraps = fieldBlock.fields[fi].gridRes.w > 2.0;
+    let wraps = (u32(fieldBlock.fields[fi].gridRes.w + 0.5) & 2u) != 0u;
     let ii = gridAxisIndex(i, nx, wraps);
     let jj = gridAxisIndex(j, ny, wraps);
     let kk = gridAxisIndex(k, nz, wraps);
@@ -210,7 +210,9 @@ fn gridScalarAt(fi: u32, q: vec3<f32>) -> f32 {
         return 0.0;
     }
     let comps = i32(fieldBlock.fields[fi].gridBounds1.w + 0.5);
-    let channel = select(0, 1, comps == 2);
+    // ADR-1201: a chosen channel (gridRes.w's bits 2+ hold channel + 1), else B for reaction-diffusion, else 0.
+    let chosen = i32(u32(fieldBlock.fields[fi].gridRes.w + 0.5) >> 2u) - 1;
+    let channel = select(select(0, 1, comps == 2), chosen, chosen >= 0);
     return gridTrilinear(fi, gridCoord(fi, q), channel);
 }
 
