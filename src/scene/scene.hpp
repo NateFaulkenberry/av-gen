@@ -11,6 +11,7 @@
 #include "scene/composition_data.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/procedural.hpp"
+#include "scene/ecosystem.hpp"
 #include "scene/material_program.hpp"
 #include "scene/sdf_object.hpp"
 #include "scene/water_surface.hpp"
@@ -89,6 +90,7 @@ struct Scene {
     CompositionData composition;                 // ADR-038; what the frame is about
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
+    Ecosystem ecosystem;                         // ADR-1200; rendering::EcosystemRenderer (the first Environment)
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     // ADR-099: the water surfaces of this scene, one per distinct look. An entity drawn with
     // MeshStyle::Water finds its settings by the material-program name it carries, which is how a

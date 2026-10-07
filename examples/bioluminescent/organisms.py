@@ -17,6 +17,7 @@ The species are abyssal fauna re-imagined as a land ecosystem in a drained trenc
 """
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
@@ -31,6 +32,7 @@ class Mesh:
     def __init__(self):
         self.p, self.n, self.uv, self.i = [], [], [], []
         self.count = 0
+        self.emit = []  # emitter template points: [x, y, z, v, u, radius]
 
     def add(self, p, n, uv, i):
         self.p.append(np.asarray(p, np.float32))
@@ -39,8 +41,17 @@ class Mesh:
         self.i.append(np.asarray(i, np.uint32) + self.count)
         self.count += len(p)
 
+    def write_emit(self, name):
+        OUT.mkdir(parents=True, exist_ok=True)
+        pts = [[round(float(c), 4) for c in e] for e in self.emit]
+        (OUT / f"{name}.emit.json").write_text(json.dumps({"points": pts}, separators=(",", ":")))
+        print(f"  {name}: {len(pts)} emitters")
+        return len(pts)
+
     def write(self, name):
         OUT.mkdir(parents=True, exist_ok=True)
+        if self.emit:
+            self.write_emit(name)
         if not self.p:
             raise ValueError(f"{name}: empty")
         tris = write_glb(OUT / f"{name}.glb", np.concatenate(self.p), np.concatenate(self.n),
@@ -151,6 +162,8 @@ def blob(mesh, centre, radii, v=0.0, u=0.0, axis=None, rings=0):
         P, N = P @ R.T, N @ R.T
     UV = np.tile([u, v], (len(P), 1))
     mesh.add(P + np.asarray(centre, float), N, UV, idx)
+    c = np.asarray(centre, float)
+    mesh.emit.append([c[0], c[1], c[2], v, u, float(np.mean(r))])
 
 
 def ribbon(mesh, pts, widths, side, v0, v1, u=0.0):
@@ -288,6 +301,9 @@ def seapen(seed, height=1.7):
             c = curve(p, out + [0, 0.9, 0], L, 5, bend=np.array([0, 0.6, 0]))
             side = np.cross(out, [0, 1, 0])
             ribbon(body, c, np.linspace(0.02, 0.07, 5), side + [0, 0.3, 0], f, f + 0.02, u=rng.random())
+            for q in range(1, 5):  # the polyps along the leaf's edge
+                body.emit.append([*c[q], f, rng.random(), 0.011])
+    body.emit = [e for e in body.emit if e[5] < 0.05]  # not the peduncle
     return {"seapen": body}
 
 
@@ -396,12 +412,45 @@ def comb(seed):
     return {"comb_body": body, "comb_rows": rows}
 
 
+def crust(seed):
+    """Wall crust: ~600 micro-organisms over a 3 m patch (points only; no body). v = distance from the patch centre."""
+    rng = np.random.default_rng(seed)
+    m = Mesh()
+    for q in range(600):
+        r = 1.5 * math.sqrt(rng.random())
+        a = rng.uniform(0, 2 * math.pi)
+        x, z = r * math.cos(a), r * math.sin(a)
+        # clumped: most points near a few nuclei
+        if rng.random() < 0.6:
+            k = rng.integers(0, 5)
+            ka = k * 1.3 + seed
+            x, z = 0.8 * math.cos(ka) + rng.normal(0, 0.18), 0.8 * math.sin(ka) + rng.normal(0, 0.18)
+        m.emit.append([x, rng.uniform(0.0, 0.05), z, min(1.0, math.hypot(x, z) / 1.5), rng.random(),
+                       rng.uniform(0.004, 0.014)])
+    return {"crust": m}
+
+
+def plankton(seed):
+    """River plankton: ~900 points within 0.4 m of the surface over an 8 m patch (points only)."""
+    rng = np.random.default_rng(seed)
+    m = Mesh()
+    for q in range(900):
+        r = 4.0 * math.sqrt(rng.random())
+        a = rng.uniform(0, 2 * math.pi)
+        m.emit.append([r * math.cos(a), -rng.uniform(0.0, 0.4) ** 2, r * math.sin(a), rng.random(), rng.random(),
+                       rng.uniform(0.004, 0.01)])
+    return {"plankton": m}
+
+
 def build_all():
     print("organisms:")
     total = {}
     for fn, seed in ((crinoid, 3), (seapen, 5), (fan, 7), (whips, 11), (mat, 13), (lanterns, 17), (comb, 19)):
         for name, mesh in fn(seed).items():
             total[name] = mesh.write(name)
+    for fn, seed in ((crust, 23), (plankton, 29)):
+        for name, mesh in fn(seed).items():
+            mesh.write_emit(name)
     return total
 
 

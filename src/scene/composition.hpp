@@ -22,6 +22,7 @@
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
 #include "scene/grid_params.hpp"
+#include "scene/ecosystem.hpp"
 #include "scene/ground_query.hpp"
 #include "entity/clip_motion_provider.hpp"
 #include "entity/match_motion_provider.hpp"
@@ -1418,6 +1419,12 @@ public:
     [[nodiscard]] const std::vector<spatial::GridField>& grids() const { return grids_; }
     [[nodiscard]] std::vector<spatial::GridField>& grids() { return grids_; }
 
+    // ---- the ecosystem (ADR-1200): the first Environment, scene-level (`"ecosystem"`) ----
+    // Templates must already be loaded (Ecosystem::loadTemplates). Replaces any previous block; its
+    // parameters (`ecosystem/<layer>/...`) are registered when attached.
+    Result<void> setEcosystem(Ecosystem ecosystem);
+    [[nodiscard]] const Ecosystem& ecosystem() const { return ecosystem_; }
+
     // ---- material programs (scene-level, ADR-030) ----
     Result<void> addMaterialProgram(MaterialProgram program); // registers parameters when attached
     [[nodiscard]] const std::vector<MaterialProgram>& materialPrograms() const { return materialPrograms_; }
@@ -2298,6 +2305,8 @@ private:
     params::Modulator* graphModulator_ = nullptr;
     std::vector<spatial::GridField> grids_;
     std::vector<GridParameters> gridParams_; // ADR-1122: one per grid in `grids_`, while attached
+    Ecosystem ecosystem_;                     // ADR-1200: the authored block (rest values)
+    EcosystemParameters ecosystemParams_;     // its live knobs, while attached
     std::vector<MaterialProgram> materialPrograms_;
     std::vector<MaterialProgramParameters> materialParams_;
     std::size_t ownMaterialCount_ = 0; // this composition's programs come first in scene_.materialPrograms

@@ -64,7 +64,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents"};
+    "worldEvents", "ecosystem"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1062,6 +1062,23 @@ Result<std::string> Composition::bakeGeneratorToPoints(const std::string& nodeNa
     }
     dirty_ = true;
     return name;
+}
+
+Result<void> Composition::setEcosystem(Ecosystem ecosystem) {
+    if (auto ok = ecosystem.validate(); !ok) {
+        return ok;
+    }
+    ecosystem_ = std::move(ecosystem);
+    if (params_ != nullptr) {
+        ecosystemParams_ = registerEcosystemParameters(*params_, ecosystem_, "ecosystem/" + sanitise(prefix_));
+        for (const auto& layer : ecosystemParams_.layers) {
+            for (const params::IParameter* q : layer.all) {
+                registeredPaths_.push_back(q->path());
+            }
+        }
+    }
+    dirty_ = true;
+    return {};
 }
 
 Result<void> Composition::addGrid(spatial::GridField grid) {
@@ -4892,6 +4909,8 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     for (const spatial::GridField& g : grids_) {
         gridParams_.push_back(registerGridParameters(params, g, "grid/" + sanitise(prefix_) + g.name + "/"));
     }
+    // ADR-1200: the ecosystem's layers.
+    ecosystemParams_ = registerEcosystemParameters(params, ecosystem_, "ecosystem/" + sanitise(prefix_));
     if (root) {
         addDefaultRoutes(modulator);
     } else {
@@ -8708,6 +8727,9 @@ void Composition::applyParameters() {
     for (std::size_t i = 0; i < gridParams_.size() && i < grids_.size() && i < scene_.fields.grids.size(); ++i) {
         applyGridParameters(gridParams_[i], grids_[i], scene_.fields.grids[i]);
     }
+    // ADR-1200: the ecosystem, with its finals. Layers share their templates by pointer, so this is cheap.
+    scene_.ecosystem = ecosystem_;
+    applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -10810,6 +10832,9 @@ nlohmann::json Composition::toJson() const {
         }
         j["grids"] = std::move(gridsJson);
     }
+    if (!ecosystem_.layers.empty()) {
+        j["ecosystem"] = ecosystem_.toJson(); // ADR-1200
+    }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
         for (const MaterialProgram& mp : materialPrograms_) {
@@ -11686,6 +11711,19 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             if (auto added = comp->addGrid(std::move(*g)); !added) {
                 return fail("scene file '{}': {}", scenePath.string(), added.error().message);
             }
+        }
+    }
+    if (j.contains("ecosystem")) { // ADR-1200
+        auto eco = Ecosystem::fromJson(j.at("ecosystem"));
+        if (!eco) {
+            return fail("scene file '{}': {}", scenePath.string(), eco.error().message);
+        }
+        const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");
+        if (auto loaded = eco->loadTemplates(base); !loaded) {
+            return fail("scene file '{}': {}", scenePath.string(), loaded.error().message);
+        }
+        if (auto set = comp->setEcosystem(std::move(*eco)); !set) {
+            return fail("scene file '{}': {}", scenePath.string(), set.error().message);
         }
     }
     if (j.contains("materialPrograms")) {

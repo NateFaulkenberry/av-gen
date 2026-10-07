@@ -201,6 +201,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       ao_(std::make_unique<AoRenderer>(context, shaders)),
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
+      ecosystem_(std::make_unique<EcosystemRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
       shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
@@ -531,6 +532,10 @@ Result<void> SceneRenderer::init() {
     }
     // ADR-703: RIBBON draws inside the scene pass with the scene's own frame group and nothing else.
     if (auto r = ribbons_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_); !r) {
+        return r;
+    }
+    // ADR-1200: the ecosystem runs its own passes after the lit pass, on the shared targets.
+    if (auto r = ecosystem_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
         return r;
     }
     // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
@@ -2188,6 +2193,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = ribbons_->reload(shaders_); !r) {
         keep("ribbon.wgsl", r);
+    }
+    if (auto r = ecosystem_->reload(shaders_); !r) {
+        keep("ecosystem.wgsl", r);
     }
     if (auto r = shells_->reload(shaders_); !r) {
         keep("shell.wgsl", r);
@@ -3913,7 +3921,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ENCODED, not whether the lit pass will read it. `active()` here would have produced a shadow
     // AOV computed against a depth target nobody filled.
     const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
-                                   shadowMask_->encoded() || !scene.waters.empty();
+                                   shadowMask_->encoded() || !scene.waters.empty() ||
+                                   EcosystemRenderer::wants(scene); // ADR-1200 reads the linear depth
     // ---- water surfaces (ADR-099) ----
     // One uniform slot per authored surface, uploaded once a frame. `flowTime` is the timeline
     // second, never a wall clock and never an accumulated delta: a river at t = 12.0 has to be in
@@ -4508,6 +4517,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.End();
     }
     stage(cpu.sceneEncodeMs);
+
+    // ---- ADR-1200: the ecosystem's emitters, over the lit scene and under the medium ----
+    if (EcosystemRenderer::wants(scene) && needsDepthPrepass) {
+        ecosystem_->encode(encoder, scene, time.renderTime, frameUniforms_, *fields_, linearDepth_.view,
+                           hdr_.colorView(), emission_.view, hdr_.depthView(), hdr_.width(), hdr_.height(),
+                           timeline_.get());
+    }
 
     // ---- volumetric atmosphere (ADR-032): raymarch + depth-aware composite ----
     // ADR-139: at `QualitySettings::volumeResolutionScale` of the scene's resolution, not a
