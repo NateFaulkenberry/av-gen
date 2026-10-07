@@ -1525,6 +1525,13 @@ struct DeformerRow {
         {"amount", "amount", "%.3f", "How much of the field's answer is taken."},
         {"axis", "along", "%.2f", "The direction a SCALAR field pushes, when it is not along the normal."},
     };
+    static constexpr DeformerRow kStreamline[] = {
+        {"amount", "steer", "%.2f /m", "How hard the field turns the fiber, per metre per unit of field. 0 is straight;\n"
+                                       "large values follow the field's streamline exactly (ADR-1181)."},
+        {"falloff", "stiffness", "%.2f m", "Arc length over which the steering ramps in from the root. 0 = none."},
+        {"tension", "tension", "%.2f /m", "A pull weaker than this does not bend the fiber at all: straight runs and\n"
+                                          "sharp bends, like wire under load. 0 = none."},
+    };
     static constexpr DeformerRow kPath[] = {
         {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},
         {"axis", "along", "%.2f", "The object axis that maps to arc length."},
@@ -1544,6 +1551,7 @@ struct DeformerRow {
     case scene::DeformerKind::Displacement: return kDisplacement;
     case scene::DeformerKind::Field: return kField;
     case scene::DeformerKind::Path: return kPath;
+    case scene::DeformerKind::Streamline: return kStreamline;
     }
     return kAxisCenter; // unreachable for a declared enumerator
 }
@@ -1553,7 +1561,7 @@ struct DeformerRow {
 inline constexpr scene::DeformerKind kDeformerKinds[] = {
     scene::DeformerKind::Bend,  scene::DeformerKind::Twist,        scene::DeformerKind::Sine,
     scene::DeformerKind::Noise, scene::DeformerKind::Displacement, scene::DeformerKind::Field,
-    scene::DeformerKind::Path,
+    scene::DeformerKind::Path,  scene::DeformerKind::Streamline,
 };
 
 // The parameter path one row names, for the object `prefix` (`procedural/<name>/`) and a 0-based

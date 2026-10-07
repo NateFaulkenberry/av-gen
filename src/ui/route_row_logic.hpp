@@ -82,7 +82,8 @@ struct RouteBadge {
                           r.chain.curveAmount, r.chain.clampMin, r.chain.clampMax, r.chain.thresholdLevel,
                           r.chain.attackMs, r.chain.decayMs, r.chain.envelopeHoldMs, r.chain.envelopeFallPerSecond,
                           r.chain.remapInMin, r.chain.remapInMax, r.chain.remapOutMin, r.chain.remapOutMax,
-                          r.chain.springHz, r.chain.springDamping, r.chain.integrateMin, r.chain.integrateMax}) {
+                          r.chain.springHz, r.chain.springDamping, r.chain.integrateMin, r.chain.integrateMax,
+                          r.chain.normalizeSeconds, r.chain.normalizeFloor, r.chain.normalizeSmoothMs}) {
         mixFloat(f);
     }
     const std::uint8_t kinds[] = {static_cast<std::uint8_t>(r.chain.curve), static_cast<std::uint8_t>(r.chain.threshold),

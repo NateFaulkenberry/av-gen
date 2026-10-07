@@ -43,6 +43,15 @@ constexpr std::uint32_t kShadowSlotBase = kMaxProceduralObjects;
 constexpr std::uint32_t kCullSlots = kMaxProceduralObjects * 2;
 constexpr std::uint32_t kObjectStride = SceneRenderer::kObjectStride; // dynamic-offset alignment
 constexpr std::uint32_t kInstanceStride = sizeof(scene::InstanceRecord); // 96
+constexpr std::uint32_t kStrandWorkgroup = 64;      // fiber_strands.wgsl cs_fiber_strands (ADR-1181)
+// ADR-1181: the strand pass parameters (shaders/fiber_strands.wgsl `StrandParams`, 224 bytes).
+struct FiberStrandUniforms {
+    glm::mat4 model;
+    glm::uvec4 info;           // x = record count, y = points per fiber, z = pulls
+    glm::vec4 shape;           // x = segment length at scale 1
+    glm::vec4 pulls[scene::kMaxDeformers]; // x = field slot, y = steering, z = stiffness, w = tension
+};
+static_assert(sizeof(FiberStrandUniforms) == 64 + 32 + 16 * scene::kMaxDeformers);
 constexpr std::uint32_t kEffectorWorkgroup = 64;     // points.wgsl cs_effectors
 constexpr std::uint32_t kCullWorkgroup = 64;        // cull.wgsl cs_cull_classify
 constexpr std::uint32_t kCullScanBlock = 1024;      // cull.wgsl kScanBlock (256 threads x 4 elements)
@@ -113,7 +122,7 @@ const scene::MaterialProgram* programNamed(const scene::Scene& scene, const std:
 // and final scale of a Path deformer (unbound or world-space Path deformers are disabled).
 DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int splineSlot, float pathScale) {
     DeformerUniform u{};
-    if (!d.enabled || (d.kind == scene::DeformerKind::Field && fieldSlot < 0) ||
+    if (!d.enabled || ((d.kind == scene::DeformerKind::Field || d.kind == scene::DeformerKind::Streamline) && fieldSlot < 0) ||
         (d.kind == scene::DeformerKind::Path && (splineSlot < 0 || d.space == scene::DeformSpace::World))) {
         u.axisKind = glm::vec4(0.0f, 1.0f, 0.0f, -1.0f);
         return u;
@@ -137,6 +146,11 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
         break;
     case scene::DeformerKind::Path:
         u.params = glm::vec4(static_cast<float>(splineSlot), pathScale, d.pathOffset, d.pathRoll);
+        break;
+    case scene::DeformerKind::Streamline:
+        // ADR-1181: x = field slot, w = stiffness (the arc length over which the steering ramps in).
+        u.params = glm::vec4(static_cast<float>(fieldSlot), 0.0f, 0.0f, std::max(d.falloff, 0.0f));
+        extra = glm::vec3(std::max(d.tension, 0.0f), 0.0f, 0.0f); // x = tension
         break;
     case scene::DeformerKind::Twist:
     case scene::DeformerKind::Displacement:
@@ -263,6 +277,15 @@ struct ProceduralRenderer::Impl {
         wgpu::Buffer generatorGroupTarget;
         scene::GeneratorWindow generatorWindow;
         std::uint64_t generatorFrame = 0;
+        // ADR-1181: a Fiber object's centre lines, (segments + 1) points a record, written by the
+        // strand pass and read by the vertex stage at group 1 binding 7 (the binding ADR-056's bend
+        // array uses; a fiber layer is never a Tier 1 simulated plant layer, so the two never meet).
+        wgpu::Buffer strands;
+        std::uint64_t strandBytes = 0;
+        wgpu::Buffer strandUniforms;
+        wgpu::BindGroup strandGroup;
+        wgpu::Buffer strandGroupRecords;    // the record buffer the strand group reads
+        wgpu::Buffer strandGroupStrands;    // the strand buffer it writes
     };
     struct DrawItem {
         std::size_t objectIndex;        // into scene.procedurals
@@ -295,6 +318,10 @@ struct ProceduralRenderer::Impl {
         const WireMesh* wire = nullptr;
     };
     struct ComputeItem {
+        const ObjectState* state;
+        std::uint32_t count;
+    };
+    struct StrandItem { // ADR-1181
         const ObjectState* state;
         std::uint32_t count;
     };
@@ -348,6 +375,8 @@ struct ProceduralRenderer::Impl {
     Result<void> createCullPipelines(const wgpu::ShaderModule& module);
     Result<void> createGeneratorPipeline(const wgpu::ShaderModule& module); // ADR-1117
     void ensureGeneratorState(ObjectState& state);
+    Result<void> createStrandPipeline(const wgpu::ShaderModule& module); // ADR-1181
+    void ensureStrandGroup(ObjectState& state, const wgpu::Buffer& records, std::uint64_t recordBytes);
     Result<wgpu::ComputePipeline> makeCompute(const wgpu::PipelineLayout& layout, const wgpu::ShaderModule& module,
                                               const char* entry, const char* label);
     CachedMesh uploadMesh(const Result<scene::MeshData>& mesh, const std::string& name);
@@ -363,7 +392,8 @@ struct ProceduralRenderer::Impl {
     void ensureObjectBuffers(ObjectState& state, std::uint64_t instanceBytes, bool needsLive, std::uint32_t lodCount,
                              bool cullActive, std::uint32_t count, std::uint32_t simRecords,
                              std::uint32_t simSlots, const wgpu::Buffer& sharedVisible = nullptr,
-                             std::uint32_t sharedStride = 0, std::uint32_t sharedLevels = 0);
+                             std::uint32_t sharedStride = 0, std::uint32_t sharedLevels = 0,
+                             std::uint64_t strandBytes = 0);
     // Allocates (grow-only) the cull buffers; returns true when a buffer was replaced.
     bool ensureCullBuffers(ObjectState& state, std::uint32_t count, std::uint32_t lodCount);
     void pumpStats();
@@ -387,6 +417,9 @@ struct ProceduralRenderer::Impl {
     wgpu::BindGroupLayout generatorLayout;          // ADR-1117
     wgpu::PipelineLayout generatorPipelineLayout;
     wgpu::ComputePipeline generatorPipeline;
+    wgpu::BindGroupLayout strandLayout;             // ADR-1181
+    wgpu::PipelineLayout strandPipelineLayout;
+    wgpu::ComputePipeline strandPipeline;
     wgpu::BindGroupLayout cullLayout;
     wgpu::PipelineLayout cullPipelineLayout;
     wgpu::ComputePipeline cullClassifyPipeline;
@@ -425,6 +458,7 @@ struct ProceduralRenderer::Impl {
     std::vector<DrawItem> items;
     std::vector<ComputeItem> computeItems;
     std::vector<GeneratorItem> generatorItems;
+    std::vector<StrandItem> strandItems; // ADR-1181
     std::vector<CullItem> cullItems;
     // Parallel to cullItems. The uniforms are staged rather than written as they are built because
     // a material part reached later in the object loop appends itself to its lead's fanout list
@@ -739,6 +773,47 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     if (auto r = im.createGeneratorPipeline(*generator); !r) {
         return r;
     }
+    {
+        // ADR-1181: the strand pass. 0 = params, 1 = records (read), 2 = strands (written),
+        // 3 = field block, 15 = the simulated-grid table (declared by fields.wgsl).
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Compute;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.minBindingSize = sizeof(FiberStrandUniforms);
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Compute;
+        entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[1].buffer.minBindingSize = kInstanceStride;
+        entries[2].binding = 2;
+        entries[2].visibility = wgpu::ShaderStage::Compute;
+        entries[2].buffer.type = wgpu::BufferBindingType::Storage;
+        entries[2].buffer.minBindingSize = 16;
+        entries[3].binding = 3;
+        entries[3].visibility = wgpu::ShaderStage::Compute;
+        entries[3].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[3].buffer.minBindingSize = FieldUniforms::kBufferSize;
+        entries[4].binding = 15;
+        entries[4].visibility = wgpu::ShaderStage::Compute;
+        entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "procedural-strand-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        im.strandLayout = im.context.device().CreateBindGroupLayout(&desc);
+        wgpu::PipelineLayoutDescriptor pdesc{};
+        pdesc.label = "procedural-strand-pipeline-layout";
+        pdesc.bindGroupLayoutCount = 1;
+        pdesc.bindGroupLayouts = &im.strandLayout;
+        im.strandPipelineLayout = im.context.device().CreatePipelineLayout(&pdesc);
+    }
+    auto strandModule = im.shaders.load("fiber_strands.wgsl");
+    if (!strandModule) {
+        return std::unexpected(strandModule.error());
+    }
+    if (auto r = im.createStrandPipeline(*strandModule); !r) {
+        return r;
+    }
     im.initialised = true;
     return {};
 }
@@ -769,7 +844,64 @@ Result<void> ProceduralRenderer::reload() {
     if (!generator) {
         return std::unexpected(generator.error());
     }
-    return impl_->createGeneratorPipeline(*generator);
+    if (auto r = impl_->createGeneratorPipeline(*generator); !r) {
+        return r;
+    }
+    auto strandModule = impl_->shaders.load("fiber_strands.wgsl");
+    if (!strandModule) {
+        return std::unexpected(strandModule.error());
+    }
+    return impl_->createStrandPipeline(*strandModule);
+}
+
+Result<void> ProceduralRenderer::Impl::createStrandPipeline(const wgpu::ShaderModule& module) {
+    auto pipeline = makeCompute(strandPipelineLayout, module, "cs_fiber_strands", "procedural-fiber-strands");
+    if (!pipeline) {
+        return std::unexpected(pipeline.error());
+    }
+    strandPipeline = *pipeline;
+    return {};
+}
+
+void ProceduralRenderer::Impl::ensureStrandGroup(ObjectState& state, const wgpu::Buffer& records,
+                                                 std::uint64_t recordBytes) {
+    const auto& device = context.device();
+    if (!state.strandUniforms) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "procedural-fiber-strand-params";
+        desc.size = sizeof(FiberStrandUniforms);
+        desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        state.strandUniforms = device.CreateBuffer(&desc);
+        state.strandGroup = nullptr;
+    }
+    if (state.strandGroup && state.strandGroupRecords.Get() == records.Get() &&
+        state.strandGroupStrands.Get() == state.strands.Get()) {
+        return;
+    }
+    std::array<wgpu::BindGroupEntry, 5> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = state.strandUniforms;
+    entries[0].size = sizeof(FiberStrandUniforms);
+    entries[1].binding = 1;
+    entries[1].buffer = records;
+    entries[1].size = recordBytes;
+    entries[2].binding = 2;
+    entries[2].buffer = state.strands;
+    entries[2].size = state.strandBytes;
+    entries[3].binding = 3;
+    entries[3].buffer = fieldBlock;
+    entries[3].size = FieldUniforms::kBufferSize;
+    entries[4].binding = 15;
+    entries[4].buffer = gridTable;
+    entries[4].size = FieldUniforms::kGridBufferSize;
+    wgpu::BindGroupDescriptor desc{};
+    desc.label = "procedural-fiber-strand-group";
+    desc.layout = strandLayout;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    state.strandGroup = device.CreateBindGroup(&desc);
+    state.strandGroupRecords = records;
+    state.strandGroupStrands = state.strands;
 }
 
 Result<void> ProceduralRenderer::Impl::createGeneratorPipeline(const wgpu::ShaderModule& module) {
@@ -1191,7 +1323,7 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
                                                   std::uint32_t lodCount, bool cullActive, std::uint32_t count,
                                                   std::uint32_t simRecords, std::uint32_t simSlots,
                                                   const wgpu::Buffer& sharedVisible, std::uint32_t sharedStride,
-                                                  std::uint32_t sharedLevels) {
+                                                  std::uint32_t sharedLevels, std::uint64_t strandBytes) {
     const auto& device = context.device();
     const std::uint32_t levels = std::clamp(lodCount, 1u, static_cast<std::uint32_t>(scene::kMaxLodLevels));
     // Missing group for the top level this frame needs (a fresh object, or lodCount grew).
@@ -1214,6 +1346,16 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
         state.live = device.CreateBuffer(&desc);
         state.liveBytes = instanceBytes;
+        rebuildGroup = true;
+    }
+    // ADR-1181: grow-only, like the records; the draw groups bind it, so a new one rebuilds them.
+    if (strandBytes > 0 && (!state.strands || state.strandBytes < strandBytes)) {
+        wgpu::BufferDescriptor desc{};
+        desc.label = "procedural-fiber-strands";
+        desc.size = strandBytes;
+        desc.usage = wgpu::BufferUsage::Storage;
+        state.strands = device.CreateBuffer(&desc);
+        state.strandBytes = strandBytes;
         rebuildGroup = true;
     }
     if (!state.deformers) {
@@ -1304,7 +1446,13 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
             }
             entries[6].binding = 6;
             entries[7].binding = 7;
-            if (state.dynamics) {
+            if (state.strands) {
+                // ADR-1181: a fiber's centre lines at binding 7; binding 6 stays inert.
+                entries[6].buffer = emptyVisible;
+                entries[6].size = 256;
+                entries[7].buffer = state.strands;
+                entries[7].size = state.strandBytes;
+            } else if (state.dynamics) {
                 entries[6].buffer = state.dynamics;
                 entries[6].size = state.bendOffset;
                 entries[7].buffer = state.dynamics;
@@ -1576,6 +1724,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     im.items.clear();
     im.computeItems.clear();
     im.generatorItems.clear();
+    im.strandItems.clear();
     im.cullItems.clear();
     im.cullUniformStaging.clear();
     im.passThisFrame = false;
@@ -1883,6 +2032,26 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         const bool usesLive = effectorCount > 0;
 
+        // ---- ADR-1181: a Fiber object's streamlines are integrated once a record by the strand pass ----
+        FiberStrandUniforms strandUniforms{};
+        std::uint32_t strandPulls = 0;
+        if (object.source.kind == scene::PrimitiveKind::Fiber && fields != nullptr) {
+            for (const scene::Deformer& d : object.deformers) {
+                if (!d.enabled || d.kind != scene::DeformerKind::Streamline || strandPulls >= scene::kMaxDeformers) {
+                    continue;
+                }
+                const int slotOf = fields->slotOf(d.field);
+                if (slotOf < 0) {
+                    continue;
+                }
+                strandUniforms.pulls[strandPulls++] = glm::vec4(static_cast<float>(slotOf), d.amount,
+                                                                std::max(d.falloff, 0.0f), std::max(d.tension, 0.0f));
+            }
+        }
+        const std::uint32_t strandSegments =
+            static_cast<std::uint32_t>(std::clamp(object.source.fiberSegments, 1, scene::kMaxFiberSegments));
+        const bool strandsActive = strandPulls > 0;
+
         // Per-object state keyed by name; a duplicate name in the same frame gets its index appended.
         std::string key = object.name;
         if (auto existing = im.objects.find(key); existing != im.objects.end() && existing->second.lastUsed == im.frame) {
@@ -1905,7 +2074,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                simWanted ? static_cast<std::uint32_t>(simShare) : 0u,
                                leadState != nullptr ? leadState->visible : wgpu::Buffer(nullptr),
                                leadState != nullptr ? leadState->visibleStride : 0u,
-                               leadState != nullptr ? leadState->cullLodCount : 0u);
+                               leadState != nullptr ? leadState->cullLodCount : 0u,
+                               strandsActive ? (instanceBytes / kInstanceStride) * (strandSegments + 1u) * 16u : 0u);
         state.usesLive = usesLive;
         state.statsSlot = slot;
         if (!generated &&
@@ -2054,6 +2224,18 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             stats_.effectorInstances += instanceCount;
             stats_.effectors += effectorCount;
         }
+        if (strandsActive && state.strands) {
+            im.ensureStrandGroup(state, usesLive ? state.live : state.instances,
+                                 usesLive ? state.liveBytes : state.instanceBytes);
+            strandUniforms.model = model;
+            strandUniforms.info = glm::uvec4(instanceCount, strandSegments + 1u, strandPulls, 0u);
+            strandUniforms.shape = glm::vec4(object.source.fiberLength / static_cast<float>(strandSegments), 0.0f,
+                                             0.0f, 0.0f);
+            queue.WriteBuffer(state.strandUniforms, 0, &strandUniforms, sizeof(strandUniforms));
+            im.strandItems.push_back(Impl::StrandItem{&state, instanceCount});
+            ++stats_.fiberStrandObjects;
+            stats_.fiberStrands += instanceCount;
+        }
         // ---- ADR-1117: the generator kernel writes this frame's window into the record buffer ----
         if (generated) {
             const GeneratorUniforms gu = packGenerator(object, genWindow);
@@ -2076,7 +2258,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             if (d < deformerCount) {
                 const auto& deformer = object.deformers[d];
                 int fieldSlot = -1;
-                if (deformer.kind == scene::DeformerKind::Field && fields != nullptr) {
+                if ((deformer.kind == scene::DeformerKind::Field || deformer.kind == scene::DeformerKind::Streamline) &&
+                    fields != nullptr) {
                     fieldSlot = fields->slotOf(deformer.field);
                     if (deformer.enabled && fieldSlot >= 0) {
                         ++stats_.fieldDeformers;
@@ -2102,6 +2285,12 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                     }
                 }
                 u.deformers[d] = packDeformer(deformer, fieldSlot, splineSlot, pathScale);
+                if (deformer.kind == scene::DeformerKind::Streamline) {
+                    // ADR-1181: y = the strand buffer's segments per fiber, z = 1 when it is bound (the
+                    // vertex stage reads the centre line instead of integrating it).
+                    u.deformers[d].params.y = static_cast<float>(strandSegments);
+                    u.deformers[d].params.z = strandsActive && state.strands ? 1.0f : 0.0f;
+                }
                 enabled += deformer.enabled ? 1u : 0u;
             } else {
                 u.deformers[d].axisKind = glm::vec4(0.0f, 1.0f, 0.0f, -1.0f);
@@ -2179,8 +2368,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         for (std::uint32_t level = 0; level < lodCount; ++level) {
             const bool billboard =
                 isPoint || (lodMeshes[level] != nullptr && lodMeshes[level]->impostor);
-            u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount,
-                                    billboard ? 1.0f : 0.0f, cullActive ? 1.0f : 0.0f);
+            // ADR-1180: 2 = the fiber path (a camera-facing strip along the fiber's centre line).
+            const float facing = object.source.kind == scene::PrimitiveKind::Fiber ? 2.0f : (billboard ? 1.0f : 0.0f);
+            u.fieldInfo = glm::vec4(static_cast<float>(emissiveSlot), object.emissiveFieldAmount, facing,
+                                    cullActive ? 1.0f : 0.0f);
             // ADR-155: this rung's tier. Rung tracks projected size, so demoting from rung N
             // down leaves everything nearer the camera at Full. No hero check is needed and none
             // is possible here -- heroes live on the Composition, not the Scene the renderer sees
@@ -2395,6 +2586,21 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         stats_.effectorPassMs = im.lastEffectorMs;
     }
 
+    // ---- ADR-1181: the strand pass, after the effectors (it reads the records they moved) ----
+    if (!im.strandItems.empty()) {
+        wgpu::ComputePassDescriptor desc{};
+        desc.label = "procedural-fiber-strands";
+        desc.timestampWrites =
+            im.timeline != nullptr ? im.timeline->mark("fiberStrands", gpu::FrameTimeline::PassKind::Compute) : nullptr;
+        wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
+        cp.SetPipeline(im.strandPipeline);
+        for (const auto& item : im.strandItems) {
+            cp.SetBindGroup(0, item.state->strandGroup);
+            cp.DispatchWorkgroups((item.count + kStrandWorkgroup - 1) / kStrandWorkgroup);
+        }
+        cp.End();
+    }
+
     // ---- the cull pass: classify, then a stable per-level compaction (cull.wgsl) ----
     // Encoded after the effector pass so it sees the live records; dispatches inside one pass are
     // ordered, so reduce feeds top feeds scatter, and the y dimension of a dispatch is the LOD level.
@@ -2598,7 +2804,8 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         const auto& material = object.material;
         // Point billboards face the camera by construction: never cull them.
         const bool twoSided =
-            material.doubleSided || object.source.kind == scene::PrimitiveKind::Point || item.fxTwoSided;
+            material.doubleSided || object.source.kind == scene::PrimitiveKind::Point ||
+            object.source.kind == scene::PrimitiveKind::Fiber || item.fxTwoSided;
         // Which of the two compacted lists this pass draws: the camera's, or the shadow caster
         // list's own slices of the same `visible` buffer.
         const auto& groups = shadowPass

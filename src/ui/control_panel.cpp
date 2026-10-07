@@ -1770,6 +1770,13 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(140);
             ImGui::SliderFloat("decay ms", &route.chain.decayMs, 0.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            // ADR-1182: the normalise stage.
+            ImGui::SetNextItemWidth(140);
+            ImGui::SliderFloat("normalise s", &route.chain.normalizeSeconds, 0.0f, 120.0f, "%.1f");
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted("Divide the signal by its own running peak, which falls back over this many "
+                                   "seconds: a quieter section is heard relative to the loud one before it. 0 = off.");
+            }
             // ADR-1041 / ADR-1161: the integrate stage and its bounds (a rate becomes a position; a bounded one
             // saturates and recovers at once -- a charge, a dose).
             ImGui::Checkbox("integrate", &route.chain.integrate);

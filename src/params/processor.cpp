@@ -163,6 +163,16 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
         event = delayed.event;
     }
 
+    // normalise (ADR-1182): x over its own running peak, which rises at once and falls back with a time
+    // constant of normalizeSeconds, never below normalizeFloor.
+    if (normalizeSeconds > 0.0f) {
+        const float k = smoothingCoefficient(normalizeSmoothMs, dt);
+        state.level = k >= 1.0f ? x : state.level + (x - state.level) * k;
+        const float fall = static_cast<float>(std::exp(-std::max(dt, 0.0) / static_cast<double>(normalizeSeconds)));
+        state.peak = std::max(state.level, state.peak * fall);
+        x = state.level / std::max(state.peak, std::max(normalizeFloor, 1e-6f));
+    }
+
     // gain -> offset -> curve
     float y = applyCurve(x * gain + offset, curve, curveAmount);
 

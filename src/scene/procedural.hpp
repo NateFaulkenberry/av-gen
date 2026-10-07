@@ -60,9 +60,16 @@ namespace avgen::scene {
 // source mesh is used and its cloud is composed under each of this object's placements
 // (hierarchical instancing, ADR-029). The referenced object may itself reference another
 // (depth <= kMaxHierarchyDepth; cycles are rejected by validate through the scene).
+// Fiber (ADR-1180): a hair-thin strip of `fiberSegments` segments, `fiberLength` long from its root at
+// the origin along +Y, `fiberWidth` wide at the root and `fiberTaper` of that at the tip. The vertex
+// stage turns it to face the camera, holds it at no less than `fiberMinPixels` across (darkening it by
+// the coverage it had to add, so a far filament fades instead of aliasing into dashes), and shades it
+// as a round thread. With a Streamline deformer (ADR-1181) its centre line is the integral curve of a
+// vector field from the instance's root. The mesh carries the fiber's arc length per vertex, so a
+// coarser LOD level is the same fiber with fewer segments.
 // Appended only, never reordered: the enum's integer value is written into `structuralHash` and its
 // name into every scene file.
-enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh, Generated, Text };
+enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh, Generated, Text, Fiber };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
 
@@ -188,6 +195,12 @@ struct SourceSpec {
     float textTracking = 0.0f;
     int textAlign = 1;  // 0 left, 1 centre, 2 right (about x = 0)
     int textVAlign = 0; // 0 middle (the block centred on y = 0), 1 baseline (first baseline at y = 0)
+    // Fiber (ADR-1180).
+    float fiberLength = 1.0f;     // metres, root to tip
+    float fiberWidth = 0.004f;    // metres across at the root
+    float fiberTaper = 0.3f;      // tip width as a fraction of the root's (0..1)
+    int fiberSegments = 8;        // 1..32
+    float fiberMinPixels = 0.8f;  // the narrowest it is drawn, in pixels at 1080 lines; 0 = no floor
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // changes whenever the mesh would change
@@ -207,6 +220,11 @@ struct SourceSpec {
 [[nodiscard]] MeshData makeUvSphere(float radius, int segments, int rings);
 [[nodiscard]] MeshData makeTorus(float majorRadius, float minorRadius, int majorSegments, int minorSegments);
 [[nodiscard]] MeshData makePointQuad(float size); // 4 vertices, 2 triangles, XY plane, normal +Z, uv 0..1
+// ADR-1180: the fiber strip. Vertex pair k (k = 0..segments) sits at arc length s_k = length * k /
+// segments: position (side * halfWidth_k, s_k, 0) with side -1 / +1, uv (side01, k / segments), and the
+// normal lane carrying what the vertex stage needs rather than a normal: (segment length, min pixels,
+// root half-width, 0). Two triangles per segment.
+[[nodiscard]] MeshData makeFiberStrip(float length, float width, float taper, int segments, float minPixels);
 // A tapering, twisting tube swept along a curve (ADR-043). Normals come from the swept surface
 // itself, so a taper shades as a cone rather than as a cylinder. Zero-length or degenerate curves
 // return an empty mesh rather than a fold.
@@ -362,7 +380,7 @@ struct Variation {
 
 // ---- deformers ----------------------------------------------------------------------------------
 
-enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path };
+enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path, Streamline };
 [[nodiscard]] const char* deformerKindName(DeformerKind kind);
 [[nodiscard]] std::optional<DeformerKind> deformerKindFromName(std::string_view name);
 enum class DeformSpace : std::uint8_t { Local, World };
@@ -395,6 +413,18 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          deformer space is World, else at the instance's world position + local offset):
 //          vector fields: p += v * a; scalar fields: p += n * s * a (along the normal) when
 //          `alongNormal`, else p += axis * s * a.
+//   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
+//          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of
+//          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds)
+//          (several Streamline deformers sum their pulls, each with its own a and stiffness),
+//          r_{k+1} = r_k + d_{k+1} * ds, with v sampled at r_k in world space. `a` (amount) is the
+//          steering in 1/m per unit of field: 0 is a straight fiber, large values follow the field's
+//          streamline exactly. `falloff` > 0 is a stiffness: the steering grows from 0 at the root to
+//          full at that arc length, so a fiber leaves its root along its own axis. `tension` is a dead
+//          zone: a pull p becomes p * max(|p| - tension, 0) / |p|, so weak field leaves the fiber straight
+//          and only strong field bends it. Steps are midpoint (RK2): the pull is sampled at r_k and at the
+//          half step, which removes Euler's kinks and outward drift on tight turns. Only a Fiber source
+//          uses it (the deformer is refused on any other source); `space` is ignored.
 struct Deformer {
     DeformerKind kind = DeformerKind::Twist;
     bool enabled = true;
@@ -417,6 +447,8 @@ struct Deformer {
     float pathOffset = 0.0f;            // Path: arc-length offset
     float pathScale = 0.0f;             // Path: units of arc length per object unit (0 = fit)
     float pathRoll = 0.0f;              // Path: extra roll (radians)
+    float tension = 0.0f;               // Streamline (ADR-1181): the pull (1/m) this deformer must exceed to bend
+                                        // the fiber at all; 0 = none. Straight runs, sharp bends: wire, not hair
 };
 // CPU reference of the whole stack, identical in meaning to the GPU shader: applies the enabled
 // deformers in order; `instanceWorld` is the instance's world matrix (local deformers apply to
@@ -441,9 +473,17 @@ struct DeformContext {
 [[nodiscard]] glm::vec3 deformPointWith(const std::vector<Deformer>& stack, glm::vec3 objectPoint,
                                         const glm::mat4& instanceWorld, double time, const DeformContext& ctx,
                                         glm::vec3 normal = {0.0f, 1.0f, 0.0f});
+// ADR-1181: the CPU reference of a Fiber's centre line under the Streamline deformers of `stack` (every
+// enabled one adds its own field's pull, d_{k+1} = normalize(d_k + sum_i v_i(r_k) a_i ramp_i ds); none
+// = straight): the segments + 1 points r_0..r_N from `root` along `axis`, exactly as the vertex stage
+// builds them. `element` is the record's random.w (what an Element-band audio field hears).
+[[nodiscard]] std::vector<glm::vec3> fiberCentreLine(const std::vector<Deformer>& stack, glm::vec3 root, glm::vec3 axis,
+                                                     float length, int segments, double time,
+                                                     const spatial::FieldSet* fields, float element = 0.5f);
 // The GPU-side noise, evaluated on the CPU (for tests): 3-octave value fBM in [0, 1].
 [[nodiscard]] float fbm3(glm::vec3 p, std::uint32_t seed);
 constexpr int kMaxDeformers = 8;
+constexpr int kMaxFiberSegments = 64; // ADR-1180
 constexpr std::size_t kKeepCloudMax = 262144;
 constexpr std::size_t kMaxBakedPoints = 65536; // ADR-1118: a Points list, and so a bake, holds at most this
 

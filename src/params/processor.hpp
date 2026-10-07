@@ -33,6 +33,17 @@ struct ProcessorChain {
     // ADR-900: the first stage. 0 = no delay, and no history is kept. Clamped to [0, kMaxDelayMs].
     float delayMs = 0.0f;
 
+    // ADR-1182: the second stage, an automatic gain. > 0: the chain reads the signal's LEVEL (a one-pole of
+    // it over `normalizeSmoothMs`) as a fraction of that level's running peak, which rises at once and
+    // falls back exponentially with a time constant of `normalizeSeconds`, never below `normalizeFloor`.
+    // A loud section sets the peak; a quieter one later is heard relative to what the peak has fallen back
+    // to, so a feature driven by "the bass" comes back fully after a breakdown in a second drop that is
+    // quieter than the first -- on any song and on live input. The level, not the raw signal, is what a
+    // kick-heavy band needs: its instants are all transient. 0 = off.
+    float normalizeSeconds = 0.0f;
+    float normalizeFloor = 0.05f;
+    float normalizeSmoothMs = 250.0f;
+
     float gain = 1.0f;
     float offset = 0.0f;
 
@@ -120,6 +131,9 @@ struct ProcessorChain {
         float springVelocity = 0.0f;
         bool springInitialised = false;
         double integral = 0.0;
+        // ADR-1182: the normalise stage's level and its running peak.
+        float level = 0.0f;
+        float peak = 0.0f;
     };
 
     // x: raw signal value; event: true when the source fired this frame; dt: seconds.

@@ -329,6 +329,9 @@ private:
             mix(bits(c.springDamping));
             mix(bits(c.integrateMin)); // ADR-1161
             mix(bits(c.integrateMax));
+            mix(bits(c.normalizeSeconds)); // ADR-1182
+            mix(bits(c.normalizeFloor));
+            mix(bits(c.normalizeSmoothMs));
         }
         routesKey_ = h;
         if (replaysRoutes_) {
