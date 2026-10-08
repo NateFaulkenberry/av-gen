@@ -4600,6 +4600,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // whose camera walks through rooms). The SDF march starts at the near plane, so a near plane larger
     // than the camera's clearance cuts the nearest wall open.
     cameraNear_ = &params.add(floatDesc(prefix_ + "camera/near", cameraNearSetting_, 0.0f, 10.0f, 0.0f, 0.5f));
+    // ADR-1280: the far plane. 0 = automatic (50 x the world's radius). A world with a moon 9 km out has a radius
+    // near 30 km, so the automatic far plane is 1,400 km, and with a macro shot's few-centimetre near plane the depth
+    // range is too deep for the depth buffer: the sky and everything far draw black. A shot sets what it can see.
+    cameraFar_ = &params.add(floatDesc(prefix_ + "camera/far", cameraFarSetting_, 0.0f, 1.0e6f, 0.0f, 50000.0f));
     // ADR-1075: a roll about the line of sight, in degrees (positive rolls the camera clockwise, so the horizon
     // tilts anticlockwise in the picture). The world
     // and its lights stay put; only the camera's up turns.
@@ -6019,6 +6023,7 @@ void Composition::detach() {
     materialParams_.clear();
     cameraFov_ = nullptr;
     cameraNear_ = nullptr;
+    cameraFar_ = nullptr;
     cameraRoll_ = nullptr;
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
@@ -9100,6 +9105,9 @@ void Composition::applyParameters() {
         scene_.camera.nearPlane = authored > 0.0f ? std::max(authored, 0.001f) : autoNear;
     }
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
+    if (const float authoredFar = cameraFar_ != nullptr ? cameraFar_->value() : cameraFarSetting_; authoredFar > 0.0f) {
+        scene_.camera.farPlane = std::max(authoredFar, scene_.camera.nearPlane * 2.0f); // ADR-1280
+    }
     applyFraming();
     // ADR-391, and the position in this function is the whole of its correctness. The film's camera
     // is now final -- resolved, evaluated, shaken, framed -- and `activeCamera_` has published what
@@ -10085,6 +10093,9 @@ nlohmann::json Composition::toJson() const {
     camera["fov"] = cameraFov_ != nullptr ? cameraFov_->base() : cameraFovSetting_;
     if (const float nearPlane = cameraNear_ != nullptr ? cameraNear_->base() : cameraNearSetting_; nearPlane > 0.0f) {
         camera["near"] = nearPlane; // ADR-1058
+    }
+    if (const float farPlane = cameraFar_ != nullptr ? cameraFar_->base() : cameraFarSetting_; farPlane > 0.0f) {
+        camera["far"] = farPlane; // ADR-1280
     }
     camera["mode"] = cameraMode_ != nullptr ? cameraMode_->base() : cameraModeSetting_;
     if (!cameraSplineSetting_.empty()) {
@@ -11085,6 +11096,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(nearPlane.error());
         }
         comp->cameraNearSetting_ = std::max(0.0f, *nearPlane);
+        auto farPlane = readFloat(c, "far", 0.0f); // ADR-1280
+        if (!farPlane) {
+            return std::unexpected(farPlane.error());
+        }
+        comp->cameraFarSetting_ = std::max(0.0f, *farPlane);
     }
     if (j.contains("cameraDirection")) {
         auto direction = CameraDirection::fromJson(j.at("cameraDirection"));
