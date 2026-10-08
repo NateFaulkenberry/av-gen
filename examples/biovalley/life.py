@@ -150,8 +150,8 @@ def programs():
         op("noise", 1, srcA=0, value=3.0, seed=11),
         op("remap", 1, srcA=1, value=1, constant=[0.2, 0.8, 0.5, 1.5]),
         op("input", 2, input="instanceRandom"),
-        op("constant", 3, constant=[0.012, 0.045, 0.03, 1.0]),
-        op("constant", 4, constant=[0.03, 0.06, 0.02, 1.0]),
+        op("constant", 3, constant=[0.008, 0.02, 0.035, 1.0]),                     # moss: blue-black
+        op("constant", 4, constant=[0.012, 0.035, 0.03, 1.0]),                     # to deep teal
         op("mixBy", 3, srcA=3, srcB=4, srcC=2),
         op("multiply", 3, srcA=3, srcB=1),
         # a soft luminous gradient in patches over the cushion's top, its colour the material's (per species)
