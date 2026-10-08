@@ -265,12 +265,21 @@ fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
     if (abs(seen - qDepth) > 0.003 * qDepth + 0.3) {
         return; // something other than the water is in front there
     }
+    // Ripples break the reflection into an irregular streak: each point's own length (0.3..1 x stretch), its own
+    // horizontal wander, and gaps where its ripple phase hides a sample. Never a regular comb (a barcode).
     let k = 10;
     let tt = eco.misc.x;
+    let len = stretch * (0.3 + 0.7 * fract(h * 7.31));
+    let side = cross(frame.cameraUp.xyz, frame.cameraForward.xyz);
     for (var i = 0; i < k; i = i + 1) {
-        let f = (f32(i) + 0.5) / f32(k) * 2.0 - 1.0;
-        let wob = 0.35 * sin(6.2831853 * (0.7 * tt + h * 5.0 + f32(i) * 0.37));
-        let pi = pm + vec3<f32>(0.0, (f + 0.25 * wob) * stretch, 0.0);
+        let hi = fract(h * 13.7 + f32(i) * 0.6180339);
+        let f = hi * 2.0 - 1.0;
+        let wave = sin(6.2831853 * (0.45 * tt + h * 3.0 + f * 1.7));
+        if (wave < -0.35) {
+            continue; // a trough: this part of the streak is dark this moment
+        }
+        let wob = 0.12 * len * sin(6.2831853 * (0.9 * tt + h * 5.0 + f32(i) * 0.37));
+        let pi = pm + vec3<f32>(0.0, f * len, 0.0) + side * wob;
         let c = frame.viewProj * vec4<f32>(pi, 1.0);
         if (c.w <= 0.0) {
             continue;
@@ -280,8 +289,8 @@ fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
         let fy = (0.5 - n.y * 0.5) * eco.size.y;
         let up = frame.viewProj * vec4<f32>(pi + frame.cameraUp.xyz * radius, 1.0);
         let rPx = abs((0.5 - (up.y / up.w) * 0.5) * eco.size.y - fy);
-        // the falloff along the streak: brightest at the mirror image, fading toward its ends
-        let w = strength * (1.0 - 0.6 * abs(f)) / f32(k);
+        // brightest near the mirror image, fading toward the streak's ends; shimmering with the ripple
+        let w = strength * (1.0 - 0.7 * abs(f)) * (0.55 + 0.45 * wave) / f32(k) * 1.6;
         let energy = radiance * max(3.14159265 * rPx * rPx, 0.6) * w;
         let ix = i32(floor(fx - 0.5));
         let iy = i32(floor(fy - 0.5));

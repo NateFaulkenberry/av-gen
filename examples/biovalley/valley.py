@@ -331,7 +331,7 @@ def _quat(m):
 
 def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=None):
     water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
-             "reflection": 0.5, "reflectionTint": [0.45, 0.55, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
+             "reflection": 1.3, "reflectionTint": [0.5, 0.5, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
              "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
     nodes = [
         {"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
@@ -359,7 +359,7 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
             "map": "../sky/night.hdr", "intensity": 0.9, "skyIntensity": 1.0, "rotation": 0.0,
             "lightFromEnvironment": False,
             "background": [0.004, 0.006, 0.02],
-            "fogColor": [0.008, 0.016, 0.07],
+            "fogColor": [0.010, 0.012, 0.075],
             "volumeDensity": 0.0014, "volumeAbsorption": 1.0, "volumeScattering": 0.0,
             "volumeSteps": (air or {}).get("steps", 16), "volumeMaxDistance": (air or {}).get("reach", 200.0),
             "volumeEmission": (air or {}).get("emission", 0.0), "volumeColorField": (air or {}).get("mist", ""),

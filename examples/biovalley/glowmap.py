@@ -52,7 +52,7 @@ def field(name, grid, color, strength=1.0):
 
 def maps(carpet, groves_glow, eyes):
     """The three glow maps and their fields, and a compound of all three (the mist's colour, the programs' pool)."""
-    teal = [0.18, 0.8, 1.0]      # the mist's light: cyan-blue, as the reference's lit haze
+    teal = [0.18, 0.55, 1.0]     # the mist's light: blue, as the reference's lit haze
 
     def flat(d):
         return [r for v in d.values() for r in v]

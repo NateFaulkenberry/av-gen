@@ -74,7 +74,7 @@ def programs():
         op("constant", 5, constant=[0.012, 0.03, 0.026, 1.0]),                      # moss: dark green-black
         op("mixBy", 3, srcA=3, srcB=5, srcC=4),
         op("constant", 6, constant=[0.92, 0.92, 0.92, 1.0]),
-        *_pool(7, 5, [0.25, 1.0, 0.65], 0.008),                                      # the light pooled on the rock
+        *_pool(7, 5, [0.15, 0.45, 1.0], 0.008),                                      # the light pooled on the rock
     ], "baseColor": 3, "metallic": -1, "roughness": 6, "emission": 7, "emissionIntensity": 1.0, "opacity": -1}
 
     crown = {"name": "crown", "ops": [
@@ -87,12 +87,12 @@ def programs():
         op("remap", 3, srcA=3, value=1, constant=[0.0, 1.0, 0.7, 1.25]),
         op("swizzle", 3, srcA=3, constant=[0, 0, 0, 0]),
         op("multiply", 2, srcA=2, srcB=3),
-        op("constant", 4, constant=[0.012, 0.032, 0.026, 1.0]),
+        op("constant", 4, constant=[0.010, 0.024, 0.030, 1.0]),
         op("multiply", 4, srcA=4, srcB=2),
         op("field", 5, field=GLOW_FIELDS[0]),
         op("remap", 1, srcA=1, value=1, constant=[0.0, 1.0, 1.0, 0.15]),           # underside most
         op("multiply", 5, srcA=5, srcB=1),
-        op("constant", 6, constant=[0.006, 0.027, 0.034, 1.0]),
+        op("constant", 6, constant=[0.006, 0.02, 0.045, 1.0]),
         op("multiply", 6, srcA=6, srcB=5),
     ], "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
 
@@ -154,8 +154,63 @@ def programs():
         op("constant", 4, constant=[0.03, 0.06, 0.02, 1.0]),
         op("mixBy", 3, srcA=3, srcB=4, srcC=2),
         op("multiply", 3, srcA=3, srcB=1),
-        *_pool(6, 5, [0.25, 1.0, 0.65], 0.006),
+        # a soft luminous gradient in patches over the cushion's top, its colour the material's (per species)
+        op("noise", 5, srcA=0, value=1.4, seed=17),
+        op("smoothstep", 5, srcA=5, constant=[0.45, 0.8, 0, 0]),
+        op("input", 7, input="uv"),
+        op("swizzle", 7, srcA=7, constant=[1, 1, 1, 1]),
+        op("multiply", 5, srcA=5, srcB=7),
+        op("input", 6, input="materialEmission"),
+        op("multiply", 6, srcA=6, srcB=5),
     ], "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
+
+    bulb = {"name": "bulb", "ops": [
+        # a translucent bulb lit from inside: brightest face-on (the core), falling toward the limb; each its own
+        # brightness. Its colour is the material's.
+        op("fresnel", 1, value=1.0),
+        op("remap", 1, srcA=1, value=1, constant=[0.0, 1.0, 1.6, 0.25]),
+        op("input", 2, input="instanceRandom"),
+        op("swizzle", 2, srcA=2, constant=[1, 1, 1, 1]),
+        op("remap", 2, srcA=2, value=1, constant=[0.0, 1.0, 0.25, 1.6]),
+        op("multiply", 1, srcA=1, srcB=2),
+        op("input", 3, input="materialEmission"),
+        op("multiply", 6, srcA=3, srcB=1),
+        op("constant", 0, constant=[0.02, 0.03, 0.04, 1.0]),
+    ], "baseColor": 0, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
+
+    frond = {"name": "frond", "ops": [
+        # leaflets cut into the edge (opacity), a glowing midrib and a brighter curl at the tip
+        op("input", 0, input="uv"),
+        op("swizzle", 1, srcA=0, constant=[0, 0, 0, 0]),                            # u across
+        op("constant", 2, constant=[-0.5, -0.5, -0.5, 0]),
+        op("add", 1, srcA=1, srcB=2),
+        op("multiply", 1, srcA=1, srcB=1),                                          # (u - .5)^2
+        op("swizzle", 3, srcA=0, constant=[1, 1, 1, 1]),                            # v along
+        op("constant", 4, constant=[22.0, 22.0, 22.0, 0]),
+        op("multiply", 4, srcA=3, srcB=4),
+        op("quantize", 4, srcA=4, value=1.0),
+        op("constant", 5, constant=[-1, -1, -1, 0]),
+        op("multiply", 4, srcA=4, srcB=5),
+        op("swizzle", 5, srcA=0, constant=[1, 1, 1, 1]),
+        op("constant", 7, constant=[22.0, 22.0, 22.0, 0]),
+        op("multiply", 5, srcA=5, srcB=7),
+        op("add", 4, srcA=4, srcB=5),                                               # fract(22 v): leaflet phase
+        op("remap", 4, srcA=4, value=1, constant=[0.0, 1.0, 0.25, 0.04]),           # leaflet notch depth
+        op("constant", 5, constant=[0.25, 0.25, 0.25, 0]),
+        op("add", 5, srcA=4, srcB=5),
+        op("multiply", 5, srcA=5, srcB=5),
+        op("remap", 7, srcA=1, value=0, constant=[0.0, 1.0, 1.0, 0.0]),
+        op("smoothstep", 7, srcA=1, constant=[0.0, 0.004, 0, 0]),
+        op("remap", 7, srcA=7, value=1, constant=[0.0, 1.0, 1.0, 0.08]),           # the midrib glows
+        op("remap", 2, srcA=3, value=1, constant=[0.6, 1.0, 0.0, 1.5]),            # the curl glows
+        op("add", 7, srcA=7, srcB=2),
+        op("input", 2, input="materialEmission"),
+        op("multiply", 6, srcA=2, srcB=7),
+        op("constant", 2, constant=[0.25, 0.25, 0.25, 0]),
+        op("multiply", 2, srcA=2, srcB=1),
+        op("threshold", 2, srcA=4, value=0.12),
+        op("constant", 0, constant=[0.012, 0.03, 0.03, 1.0]),
+    ], "baseColor": 0, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": 2}
 
     ground = {"name": "ground", "ops": [
         # the valley's ground: dark soil and moss in patches, wetter (darker) low down, catching the pooled light
@@ -164,25 +219,26 @@ def programs():
         op("triplanar", 2, srcA=0, value=0.6, seed=23),
         op("multiply", 1, srcA=1, srcB=2),
         op("remap", 1, srcA=1, value=1, constant=[0.05, 0.5, 0.5, 1.4]),
-        op("constant", 3, constant=[0.022, 0.026, 0.032, 1.0]),                     # soil
-        op("constant", 4, constant=[0.012, 0.032, 0.024, 1.0]),                     # moss
+        op("constant", 3, constant=[0.016, 0.018, 0.034, 1.0]),                     # soil: indigo-black
+        op("constant", 4, constant=[0.010, 0.024, 0.030, 1.0]),                     # moss
         op("noise", 5, srcA=0, value=0.11, seed=29),
         op("smoothstep", 5, srcA=5, constant=[0.4, 0.65, 0, 0]),
         op("mixBy", 3, srcA=3, srcB=4, srcC=5),
         op("multiply", 3, srcA=3, srcB=1),
-        *_pool(6, 7, [0.25, 1.0, 0.65], 0.006),
+        *_pool(6, 7, [0.15, 0.5, 1.0], 0.006),
     ], "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
-    return [rock, crown, cap, falls, moss, ground]
+    return [rock, crown, cap, falls, moss, ground, bulb, frond]
 
 
 # ---- organisms ------------------------------------------------------------------------------------------------------
 
 
-def tuft(seed, n=(7, 14), height=(0.25, 0.75)):
-    """A tuft of thin stalks with luminous tips (the meadow's carpet). Emitters: one at each tip (v = 1), a faint
-    one partway up some stalks."""
+def tuft(seed, n=(5, 11), height=(0.2, 0.8)):
+    """A tuft of thin stalks, each ending in a translucent bulb (the reference's tip-stalks). Two meshes with the same
+    placements: the stalks (dark) and the bulbs (self-lit, shaded by the `bulb` program: a bright core, a dimmer rim).
+    Emitters: one per bulb, as its soft halo; a faint one partway up some stalks."""
     r = np.random.default_rng(seed)
-    m = Mesh()
+    stalks, bulbs = Mesh(), Mesh()
     emit = []
     k = int(r.integers(*n))
     for i in range(k):
@@ -190,15 +246,51 @@ def tuft(seed, n=(7, 14), height=(0.25, 0.75)):
         base = np.array([r.normal(0, 0.05), 0.0, r.normal(0, 0.05)])
         lean = np.array([r.normal(0, 0.25), 1.0, r.normal(0, 0.25)])
         lean /= np.linalg.norm(lean)
-        bend = np.array([r.normal(0, 0.12), 0, r.normal(0, 0.12)])
-        ts = np.linspace(0, 1, 6)
-        pts = base + np.outer(ts * h, lean) + np.outer(ts ** 2 * h, bend)
+        bend = np.array([r.normal(0, 0.14), 0, r.normal(0, 0.14)])
+        ts = np.linspace(0, 1, 7)
+        pts = base + np.outer(ts * h, lean) + np.outer(ts ** 2 * h, bend) - np.outer(ts ** 3 * h * 0.15, [0, 1, 0])
         u = (i * 0.618 + seed * 0.13) % 1.0
-        flora.tube(m, pts, np.linspace(0.006, 0.0025, 6), 3, 0.0, 1.0, u=u)
-        flora.clump(m, pts[-1], 0.012, seed * 50 + i, level=1, squash=1.0, lump=0.1, u=u)
-        emit.append([*pts[-1], 1.0, u, 0.016])
-        if r.random() < 0.3:
-            emit.append([*pts[3], 0.6, (u + 0.5) % 1, 0.006])
+        flora.tube(stalks, pts, np.linspace(0.005, 0.002, 7), 3, 0.0, 1.0, u=u)
+        rad = r.uniform(0.008, 0.02) * (0.6 + h)
+        tip = pts[-1] + (pts[-1] - pts[-2]) / np.linalg.norm(pts[-1] - pts[-2]) * rad * 0.8
+        flora.clump(bulbs, tip, rad, seed * 50 + i, level=2, squash=1.15, lump=0.05, u=u)
+        emit.append([*tip, 1.0, u, rad * 1.6])
+        if r.random() < 0.25:
+            emit.append([*pts[4], 0.6, (u + 0.5) % 1, 0.004])
+    return stalks, bulbs, emit
+
+
+def frond(seed, length=(0.5, 1.2), n=(3, 6)):
+    """A clump of curled fronds (fern-like): a ribbon whose width follows a leaf profile, curling at the tip, with
+    leaflets cut into its edge by the program (u across, v along). The `frond` program glows along the midrib and
+    the tip of the curl: glowing fronds, not dots."""
+    r = np.random.default_rng(seed)
+    m = Mesh()
+    emit = []
+    for i in range(int(r.integers(*n))):
+        L = r.uniform(*length)
+        a = r.uniform(0, 2 * math.pi)
+        d = np.array([math.cos(a), 0, math.sin(a)])
+        side = np.array([-d[2], 0, d[0]])
+        s = np.linspace(0, 1, 24)
+        rise = 0.55 + 0.25 * r.random()
+        # an arching spine: up and out, then the tip curls back (a fiddlehead unrolling)
+        ang = rise * math.pi / 2 * (1 - s) - s ** 3 * 1.6
+        dx = np.cumsum(np.cos(ang)) / len(s) * L
+        dy = np.cumsum(np.sin(ang)) / len(s) * L
+        spine = np.outer(dx, d) + np.outer(dy, [0, 1, 0])
+        w = L * 0.16 * np.sin(np.clip(s, 0, 1) * math.pi) ** 0.7 * (1 - 0.6 * s)
+        twist = 0.35 * s
+        nrm = np.outer(np.cos(twist), side) + np.outer(np.sin(twist), [0, 1, 0])
+        V = np.concatenate([spine - nrm * w[:, None], spine + nrm * w[:, None]])
+        F = []
+        N = len(s)
+        for j in range(N - 1):
+            F += [[j, j + 1, N + j], [j + 1, N + j + 1, N + j]]
+        UV = np.concatenate([np.stack([np.zeros(N), s], -1), np.stack([np.ones(N), s], -1)])
+        m.add(V, np.array(F), UV)
+        for j in range(4, N, 4):
+            emit.append([*spine[j], s[j], (i * 0.618 + j * 0.07) % 1, 0.012])
     return m, emit
 
 

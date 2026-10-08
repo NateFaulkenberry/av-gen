@@ -209,10 +209,14 @@ def framing(gc, gfine, vista_eye, vista_yaw):
     hx, hz = polar(33.0, 46.0)
     hy = float(gc.height(np.array([hx]), np.array([hz]))[0])
     hero.append(rec(hx, hy - 1.0, hz, math.radians(200.0), 1.3))
+    # a second, nearer, larger: its trunk and limbs cut the frame's left edge and corner (panel 2's big dark tree)
+    hx, hz = polar(50.0, 26.0)
+    hy = float(gc.height(np.array([hx]), np.array([hz]))[0])
+    hero.append(rec(hx, hy - 4.0, hz, math.radians(120.0), 1.35))
     # dark FG masses on the promontory's lip: shrubs (scaled to small trees) across the bottom of frame
-    for k in range(40):
-        b = r.uniform(-34, 34)
-        d = r.uniform(30, 120)
+    for k in range(90):
+        b = r.uniform(-36, 36)
+        d = r.uniform(18, 110) if r.random() < 0.6 else r.uniform(18, 45)
         x, z = polar(b, d)
         y = float(gc.height(np.array([x]), np.array([z]))[0])
         shrubs[int(r.integers(0, N_SHRUBS))].append(rec(x, y - 0.3, z, r.uniform(0, 6.28), r.uniform(2.5, 5.5)))

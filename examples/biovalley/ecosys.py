@@ -24,7 +24,8 @@ from geom import fbm2, quat_y
 
 rec = populate.rec
 
-N_TUFT = 3
+N_TUFT = 5          # colour per variant: lime, emerald, cyan, blue, violet (TUFT_COLORS)
+N_FROND = 3
 N_GRASS = 3
 N_MOSS = 4
 N_LATTICE = 2
@@ -36,13 +37,17 @@ WATER_BANK = None   # set by place(): the riverbank's calm water surface
 def build(out):
     tris = 0
     for k in range(N_TUFT):
-        m, e = life.tuft(1100 + k)
-        tris += m.write(out / f"tuft{k}.glb", f"tuft{k}")
+        s, b, e = life.tuft(1100 + k)
+        tris += s.write(out / f"tuft{k}_stalk.glb", f"tuft{k}_stalk") + b.write(out / f"tuft{k}_bulb.glb", "bulb")
         life.write_emit(out / f"tuft{k}.emit.json", e)
+    for k in range(N_FROND):
+        m, e = life.frond(1900 + k)
+        tris += m.write(out / f"frond{k}.glb", f"frond{k}")
+        life.write_emit(out / f"frond{k}.emit.json", e)
     for k in range(N_GRASS):
         tris += life.grass(1200 + k).write(out / f"grass{k}.glb", f"grass{k}")
     for k in range(N_MOSS):
-        m, e = life.moss(1300 + k, 1.0, dots=700)
+        m, e = life.moss(1300 + k, 1.0, dots=160)
         tris += m.write(out / f"moss{k}.glb", f"moss{k}")
         life.write_emit(out / f"moss{k}.emit.json", e)
     for k in range(N_LATTICE):
@@ -94,6 +99,23 @@ def build(out):
 # ---- placement ----------------------------------------------------------------------------------------------------
 
 
+TUFT_COLORS = (life.LIME, life.EMERALD, life.CYAN, life.BLUE, life.VIOLET)
+
+
+def zone(x, z, scale=1.0):
+    """The colour zone of a place: blue zones, violet patches, emerald clusters, cyan and lime between. Returns a
+    tuft variant (0 lime, 1 emerald, 2 cyan, 3 blue, 4 violet), by two low-frequency noises (spatially coherent)."""
+    a = float(fbm2(np.array([x / (70.0 * scale)]), np.array([z / (70.0 * scale)]), 81, 3)[0])
+    b = float(fbm2(np.array([x / (35.0 * scale)]), np.array([z / (35.0 * scale)]), 82, 2)[0])
+    if a < 0.38:
+        return 3                     # blue zone
+    if b > 0.64:
+        return 4                     # violet patch
+    if a > 0.62:
+        return 1                     # emerald cluster
+    return 2 if b < 0.45 else 0      # cyan, lime
+
+
 def _scatter(r, cx, cz, radius, spacing_near, spacing_far, cone=None):
     """Points around (cx, cz) out to `radius`, denser near the centre (spacing grows linearly), optionally inside a
     heading cone (deg, half-angle, heading_rad)."""
@@ -119,7 +141,7 @@ def place(gc, gfine, gfloor, eyes, headings):
     """Return {node prefix: {variant: records}} for every carpet organism."""
     r = np.random.default_rng(21)
     out = {k: {} for k in ("tuft", "grass", "moss", "lattice", "bulbs", "reeds", "f3d_hero", "f3d_bank",
-                           "f3d_small", "glade", "mtuft", "mmoss")}
+                           "f3d_small", "glade", "mtuft", "mmoss", "frond")}
 
     def put(kind, v, rc):
         out[kind].setdefault(v, []).append(rc)
@@ -129,17 +151,26 @@ def place(gc, gfine, gfloor, eyes, headings):
     mx, mz = eyes["meadow"]
     P = _scatter(r, mx, mz, 190.0, 0.32, 2.6, cone=(math.radians(75), headings["meadow"]))
     P = P[P[:, 2] > 1.8]                                          # nothing on the lens
+    edge = 190.0 * (0.45 + 0.6 * fbm2(P[:, 0] / 50.0, P[:, 1] / 50.0, 33, 3))
+    P = P[P[:, 2] < edge]                                         # a ragged outer edge, not a ring
     X, Z, D = P[:, 0], P[:, 1], P[:, 2]
     H = g.height(X, Z)
     wet = g.wet(X, Z) | g.wet(X + 0.6, Z) | g.wet(X - 0.6, Z)
     drift = fbm2(X / 9.0, Z / 9.0, 31, 3) * 0.45 + fbm2(X / 45.0, Z / 45.0, 32, 2) * 0.55
     keep = (~wet) & (drift > 0.47)
     for x, z, y, d, dv in zip(X[keep], Z[keep], H[keep], D[keep], drift[keep]):
-        put("tuft", int(r.integers(0, N_TUFT)), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.5, 1.2) *
-                                                   (0.4 + 1.6 * (dv - 0.47))))
+        put("tuft", zone(x, z), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.5, 1.2) *
+                                    (0.4 + 1.6 * (dv - 0.47))))
         if d < 45 and r.random() < 0.7:
             put("grass", int(r.integers(0, N_GRASS)), rec(x + r.normal(0, 0.2), y - 0.02, z + r.normal(0, 0.2),
                                                           r.uniform(0, 6.28), r.uniform(0.8, 1.6)))
+    # fronds along the meadow stream's banks
+    for x, z, y, d in zip(X, Z, H, D):
+        if d < 70 and r.random() < 0.08:
+            nw = any(g.wet(np.array([x + dx]), np.array([z + dz]))[0] for dx, dz in ((1.5, 0), (-1.5, 0), (0, 1.5),
+                                                                                      (0, -1.5)))
+            if nw:
+                put("frond", int(r.integers(0, N_FROND)), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.8, 1.6)))
     # dark moss between the drifts near the lens
     for x, z, y, d, dv in zip(X, Z, H, D, drift):
         if d < 40 and dv <= 0.47 and r.random() < 0.25 and not g.wet(np.array([x]), np.array([z]))[0]:
@@ -160,16 +191,21 @@ def place(gc, gfine, gfloor, eyes, headings):
     for x, z, y, d, nw, w_, pv in zip(X, Z, H, D, near_water, wet, patch):
         if w_:
             continue
-        if nw and r.random() < 0.6:
+        if nw and r.random() < 0.45:
             put("reeds", int(r.integers(0, N_REEDS)), rec(x, y - 0.05, z, r.uniform(0, 6.28), r.uniform(0.7, 1.3)))
-        elif pv > 0.5:
+        elif nw and r.random() < 0.5:
+            # fronds lean out over the water: turned so they arch toward it
+            to_w = math.atan2(0.0, 1.0)
+            put("frond", int(r.integers(0, N_FROND)), rec(x, y - 0.03, z, r.uniform(0, 6.28), r.uniform(1.0, 2.2)))
+        elif pv > 0.62:
             put("moss", int(r.integers(0, N_MOSS)), rec(x, y - 0.12, z, r.uniform(0, 6.28), r.uniform(0.4, 1.4)))
-        elif pv > 0.38:
-            put("tuft", int(r.integers(0, N_TUFT)), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.8, 1.6)))
+        elif pv > 0.4:
+            put("tuft", zone(x, z, 0.4), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.8, 1.8)))
         if d < 40 and r.random() < 0.35:
             put("grass", int(r.integers(0, N_GRASS)), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(1.0, 2.0)))
-        if d < 70 and r.random() < 0.04:
-            put("f3d_small", 0, rec(x, y - 0.01, z, r.uniform(0, 6.28), r.uniform(0.8, 2.5)))
+        if d < 70 and r.random() < 0.05:
+            put("f3d_small", [3, 4, 2][int(r.integers(0, 3))], rec(x, y - 0.01, z, r.uniform(0, 6.28),
+                                                                r.uniform(0.8, 2.5)))
     # the bank's bigger fungi along the near left bank
     for k in range(22):
         x = bx - r.uniform(5, 60)
@@ -182,45 +218,48 @@ def place(gc, gfine, gfloor, eyes, headings):
         put("f3d_bank", 0, rec(x, float(g.height(np.array([x]), np.array([z]))[0]) - 0.02, z, r.uniform(0, 6.28),
                                r.uniform(0.7, 1.6)))
 
-    # ---- MACRO: within a few metres of the lens, at organism scale
+    # ---- MACRO: within a few metres of the lens, at organism scale: dense and layered (panel 3)
     ex, ez = eyes["macro"]
     head = headings["macro"]
-    P = _scatter(r, ex, ez, 7.0, 0.07, 0.5, cone=(math.radians(60), head))
-    P = P[P[:, 2] > 0.35]
+
+    def ahead(d, off):
+        a_ = head + off
+        x_, z_ = ex + d * math.sin(a_), ez + d * math.cos(a_)
+        return x_, float(g.height(np.array([x_]), np.array([z_]))[0]), z_
+
+    P = _scatter(r, ex, ez, 6.0, 0.05, 0.35, cone=(math.radians(55), head))
+    P = P[P[:, 2] > 0.3]
     X, Z, D = P[:, 0], P[:, 1], P[:, 2]
     H = g.height(X, Z)
     wet = g.wet(X, Z)
-    patch = fbm2(X / 0.9, Z / 0.9, 35, 3)
+    patch = fbm2(X / 0.7, Z / 0.7, 35, 3)
     for x, z, y, d, w_, pv in zip(X, Z, H, D, wet, patch):
-        if w_ or d < 0.25:
+        if w_:
             continue
-        if pv > 0.47:
-            put("mmoss", int(r.integers(0, N_MOSS)), rec(x, y - 0.03, z, r.uniform(0, 6.28),
-                                                         r.uniform(0.1, 0.28) * (0.6 + d * 0.3)))
-        elif pv > 0.4 and r.random() < 0.5:
-            put("mtuft", 1, rec(x, y - 0.01, z, r.uniform(0, 6.28), r.uniform(0.25, 0.5)))
-        elif d > 1.5 and r.random() < 0.12:
-            put("f3d_small", 0, rec(x, y, z, r.uniform(0, 6.28), r.uniform(0.6, 1.4)))
-
-    def ahead(d, off):
-        a = head + off
-        x, z = ex + d * math.sin(a), ez + d * math.cos(a)
-        return x, float(g.height(np.array([x]), np.array([z]))[0]), z
-
-    # the hero pair, left of centre (panel 3's emerald caps)
-    for d, off, s in ((0.85, 0.2, 1.0), (1.0, 0.3, 0.8)):
+        # a continuous floor of moss mounds of all sizes, with stalks and small fungi growing from it
+        if r.random() < 0.55:
+            put("mmoss", int(r.integers(0, N_MOSS)), rec(x, y - 0.04, z, r.uniform(0, 6.28),
+                                                         r.uniform(0.08, 0.3) * (0.6 + d * 0.25)))
+        if pv > 0.45 and r.random() < 0.6:
+            put("mtuft", zone(x, z, 0.03), rec(x, y - 0.01, z, r.uniform(0, 6.28), r.uniform(0.2, 0.45)))
+        elif pv < 0.4 and r.random() < 0.18:
+            put("f3d_small", [3, 4, 2, 3][int(r.integers(0, 4))], rec(x, y, z, r.uniform(0, 6.28),
+                                                                   r.uniform(0.5, 1.5)))
+        elif r.random() < 0.05:
+            put("frond", int(r.integers(0, N_FROND)), rec(x, y - 0.01, z, r.uniform(0, 6.28), r.uniform(0.08, 0.22)))
+    # the hero pair, left of centre (panel 3's emerald caps), and a second group deeper right
+    for d, off, s in ((0.85, 0.2, 1.0), (1.0, 0.3, 0.8), (2.6, -0.3, 1.3), (2.9, -0.24, 1.0)):
         x, y, z = ahead(d, off)
         put("f3d_hero", 0, rec(x, y - 0.01, z, r.uniform(0, 6.28), s))
-    for d, off in ((1.1, 0.5), (1.6, -0.15), (2.4, 0.2)):
+    for d, off in ((1.1, 0.5), (1.6, -0.15), (2.4, 0.2), (1.3, 0.62), (3.2, 0.4), (2.0, -0.45)):
         x, y, z = ahead(d, off)
-        put("lattice", int(r.integers(0, N_LATTICE)), rec(x, y, z, r.uniform(0, 6.28), r.uniform(0.8, 1.4)))
-    # foreground bulbs on the lens: out of focus, they become the reference's bokeh orbs
-    # a few, mostly low in frame and to the right (panel 3's bottom right), of different sizes; variant 2 is faint
+        put("lattice", int(r.integers(0, N_LATTICE)), rec(x, y, z, r.uniform(0, 6.28), r.uniform(0.8, 1.6)))
+    # foreground orbs, mostly low in frame (panel 3's bottom), of different sizes; variant 2 is faint
     for k, (d, off) in enumerate(((0.3, -0.55), (0.34, -0.42), (0.4, -0.65), (0.33, 0.6), (0.45, -0.25),
                                   (0.5, 0.45), (0.38, -0.7), (0.6, -0.5), (0.55, 0.3))):
         x, y, z = ahead(d, off)
         put("bulbs", k % N_BULBS, rec(x, y - 0.06, z, r.uniform(0, 6.28), r.uniform(0.35, 1.0)))
-    # big dark moss mounds in the lower foreground, both sides (panel 3's dark mounds with sparse dots)
+    # big moss mounds in the lower foreground, both sides (panel 3's dark mounds)
     for d, off, s in ((0.38, -0.6, 0.3), (0.42, 0.62, 0.26), (0.75, -0.4, 0.3), (0.65, 0.5, 0.22)):
         x, y, z = ahead(d, off)
         put("mmoss", int(r.integers(0, N_MOSS)), rec(x, y - 0.06, z, r.uniform(0, 6.28), s))
@@ -240,7 +279,7 @@ def place(gc, gfine, gfloor, eyes, headings):
     for exx, ezz in eyes.values():                                # the shots' own carpets are near; glades are far
         keep &= np.hypot(X - exx, Z - ezz) > 160.0
     for x, z, y in zip(X[keep], Z[keep], H[keep]):
-        put("glade", int(r.integers(0, N_TUFT)), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.9, 1.8)))
+        put("glade", zone(x, z, 3.0), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.9, 1.8)))
     for k, v in out.items():
         print(f"  {k}: {sum(len(x) for x in v.values())}")
     return out
@@ -281,22 +320,35 @@ def nodes(out, mat):
             names.append(nm)
         return names
 
-    stalk = mat([0.03, 0.06, 0.04], 0.6, life.EMERALD, 0.08)
+    stalk = mat([0.015, 0.03, 0.03], 0.6)
     hosts = {}
+
+    def bulb(v):
+        return mat([0.02, 0.03, 0.04], 0.4, TUFT_COLORS[v], 1.6, program="bulb")
     for v, pts in out["tuft"].items():
-        hosts.setdefault("tuft", []).extend(add(f"tuft{v}", f"tuft{v}", pts, stalk, 80.0))
+        add(f"tuft{v}s", f"tuft{v}_stalk", pts, stalk, 80.0)
+        hosts.setdefault(f"tuft{v}", []).extend(add(f"tuft{v}b", f"tuft{v}_bulb", pts, bulb(v), 80.0))
     for v, pts in out["mtuft"].items():
-        hosts.setdefault("mtuft", []).extend(add(f"mtuft{v}", f"tuft{v}", pts, stalk, 30.0))
+        add(f"mtuft{v}s", f"tuft{v}_stalk", pts, stalk, 30.0)
+        hosts.setdefault(f"mtuft{v}", []).extend(add(f"mtuft{v}b", f"tuft{v}_bulb", pts, bulb(v), 30.0))
+    for v, pts in out["frond"].items():
+        col = [life.CYAN, life.EMERALD, life.BLUE][v % 3]
+        hosts.setdefault("frond", []).extend(add(f"frond{v}", f"frond{v}", pts,
+                                                 mat([0.01, 0.03, 0.03], 0.6, col, 0.35, program="frond",
+                                                     doubleSided=True, alphaCutoff=0.5), 120.0))
     for v, pts in out["mmoss"].items():
+        col = [life.BLUE, life.TEAL, life.BLUE, life.EMERALD][v % 4]
         hosts.setdefault("mmoss", []).extend(add(f"mmoss{v}", f"moss{v}", pts,
-                                                 mat([0.01, 0.03, 0.022], 0.95, program="moss"), 30.0))
+                                                 mat([0.008, 0.016, 0.03], 0.95, col, 0.12, program="moss"), 30.0))
     for v, pts in out["glade"].items():
-        hosts.setdefault("glade", []).extend(add(f"glade{v}", f"tuft{v}", pts, stalk, 60.0))
+        hosts.setdefault(f"glade{v}", []).extend(add(f"glade{v}s", f"tuft{v}_stalk", pts, stalk, 60.0))
     for v, pts in out["grass"].items():
         add(f"grass{v}", f"grass{v}", pts, mat([0.012, 0.03, 0.02], 0.8, doubleSided=True), 45.0)
     for v, pts in out["moss"].items():
+        col = [life.BLUE, life.TEAL][v % 2]
         hosts.setdefault(f"moss{v % 2}", []).extend(add(f"moss{v}", f"moss{v}", pts,
-                                                        mat([0.015, 0.04, 0.03], 0.95, program="moss"), 120.0))
+                                                        mat([0.008, 0.018, 0.03], 0.95, col, 0.07, program="moss"),
+                                                        120.0))
     for v, pts in out["reeds"].items():
         hosts.setdefault(f"reeds{v}", []).extend(add(f"reeds{v}", f"reeds{v}", pts,
                                                  mat([0.02, 0.04, 0.035], 0.7, doubleSided=True), 120.0))
@@ -307,17 +359,22 @@ def nodes(out, mat):
     for v, pts in out["bulbs"].items():
         hosts.setdefault(f"bulbs{v}", []).extend(add(f"bulbs{v}_stalk", f"bulbs{v}_stalk", pts,
                                                      mat([0.03, 0.05, 0.04], 0.6), 0.05))   # orbs float: the stalks never draw
-    for name in ("hero", "bank", "small"):
+    small = out["f3d_small"]
+    for v, nm in ((2, "small"), (3, "smallb"), (4, "smallv")):
+        out[f"f3d_{nm}"] = {0: small.get(v, []) + (small.get(0, []) if v == 2 else [])}
+    for name in ("hero", "bank", "small", "smallb", "smallv"):
         pts = out[f"f3d_{name}"].get(0, [])
+        mesh = "small" if name.startswith("small") else name
         if not pts:
             continue
-        add(f"f3d_{name}_stalk", f"f3d_{name}_stalk", pts, mat([0.02, 0.05, 0.045], 0.5, life.EMERALD, 0.03,
+        add(f"f3d_{name}_stalk", f"f3d_{mesh}_stalk", pts, mat([0.02, 0.04, 0.05], 0.5, life.EMERALD, 0.03,
                                                                opacity=0.85), 200.0)
-        col = life.EMERALD if name == "hero" else life.TEAL
-        hosts.setdefault("f3d", []).extend(add(f"f3d_{name}_cap", f"f3d_{name}_cap", pts,
+        col = {"hero": life.EMERALD, "bank": life.CYAN, "small": life.TEAL, "smallb": life.BLUE,
+               "smallv": life.VIOLET}[name]
+        hosts.setdefault("f3d", []).extend(add(f"f3d_{name}_cap", f"f3d_{mesh}_cap", pts,
                                                mat([0.02, 0.06, 0.06], 0.4, col, 0.32, program="cap",
                                                    doubleSided=True), 200.0))
-        hosts.setdefault(f"f3d_{name}_emit", []).append(f"f3d_{name}_cap_0")
+        hosts.setdefault(f"f3d_{mesh}_emit", []).append(f"f3d_{name}_cap_0")
     return N, hosts
 
 
@@ -333,31 +390,32 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
     """The emitter layers. Tier 1 subtle, tier 2 active, tier 3 hero (see the module docstring). Brightness clumps
     by a low-frequency field (`clumps`, as each layer's wake): drifts of brighter organisms among dimmer ones, never a
     uniform stipple. Bank layers mirror in the calm reach; floor layers in the descending river (ADR-1281)."""
-    bank = {"mirror": 1.6, "mirrorLevel": round(water_level, 3), "mirrorStretch": 1.1}
-    river = {"mirror": 1.2, "mirrorLevel": round(land.river_level(0.0) + 1.8, 3), "mirrorStretch": 6.0,
+    bank = {"mirror": 1.6, "mirrorLevel": round(water_level, 3), "mirrorStretch": 0.9}
+    river = {"mirror": 0.35, "mirrorLevel": round(land.river_level(0.0) + 1.8, 3), "mirrorStretch": 3.0,
              "mirrorSlope": [0.0, 0.0012]}
     clump = {"wakeField": "clumps", "wakeGain": 3.0}
     L = []
-    cols = (life.LIME, life.EMERALD, life.CYAN)
+    cols = TUFT_COLORS
     for v in range(N_TUFT):
-        hs = [h for h in hosts.get("tuft", []) if h.startswith(f"tuft{v}_")]
-        gs = [h for h in hosts.get("glade", []) if h.startswith(f"glade{v}_")]
+        # the bulbs themselves are lit meshes; the emitter is each bulb's halo near, and its whole light far
+        hs = hosts.get(f"tuft{v}", []) + hosts.get(f"mtuft{v}", [])
+        gs = hosts.get(f"glade{v}", [])
         if hs:
-            L.append(layer(f"tips{v}", hs, f"tuft{v}.emit.json", cols[v], 0.9, maxDistance=900.0, sparsity=0.2,
-                           pulseRate=1.5, pulseDecay=0.8, **clump, **bank))
+            L.append(layer(f"tips{v}", hs, f"tuft{v}.emit.json", cols[v], 0.6, maxDistance=900.0, sparsity=0.15,
+                           pulseRate=1.5, pulseDecay=0.8, nearFade=0.5, **clump, **bank))
         if gs:
             L.append(layer(f"glade{v}", gs, f"tuft{v}.emit.json", cols[v], 0.9, size=3.5, maxDistance=5200.0,
                            sparsity=0.3, pulseRate=1.0, pulseDecay=0.8, **clump, **river))
-    if hosts.get("mtuft"):
-        L.append(layer("macroTips", hosts["mtuft"], "tuft1.emit.json", life.EMERALD, 1.0, maxDistance=40.0,
-                       sparsity=0.35, **clump))
+    if hosts.get("frond"):
+        L.append(layer("frondGlow", hosts["frond"], "frond0.emit.json", life.CYAN, 0.8, maxDistance=200.0,
+                       sparsity=0.4, **bank))
     for k, col in ((0, life.BLUE), (1, life.TEAL)):
         hs = hosts.get(f"moss{k}", [])
         if hs:
             L.append(layer(f"mossDots{k}", hs, f"moss{k}.emit.json", col, 0.35, sparsity=0.5, maxDistance=180.0,
                            flicker=0.3, flickerRate=1.3, **clump, **bank))
     if hosts.get("mmoss"):
-        L.append(layer("macroMoss", hosts["mmoss"], "moss0.emit.json", life.TEAL, 0.9, sparsity=0.45,
+        L.append(layer("macroMoss", hosts["mmoss"], "moss0.emit.json", life.BLUE, 0.7, sparsity=0.7,
                        maxDistance=40.0, flicker=0.3, flickerRate=1.0, wakeField="clumps", wakeGain=2.0))
     for v, col in ((0, life.EMERALD), (1, life.CYAN), (2, life.VIOLET)):
         hs = hosts.get(f"reeds{v}", [])
@@ -365,7 +423,7 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
             L.append(layer(f"reedTips{v}", hs, f"reeds{v}.emit.json", col, 2.4, maxDistance=600.0, **bank))
     if hosts.get("lattice"):
         L.append(layer("latticeGlow", hosts["lattice"], "lattice0.emit.json", life.VIOLET, 1.2, maxDistance=60.0))
-    for name, col, inten in (("hero", life.LIME, 4.0), ("bank", life.CYAN, 3.0), ("small", life.TEAL, 1.6)):
+    for name, col, inten in (("hero", life.LIME, 4.0), ("bank", life.CYAN, 3.0), ("small", life.PALE, 1.2)):
         hs = hosts.get(f"f3d_{name}_emit", [])
         if hs:
             L.append(layer(f"gills_{name}", hs, f"f3d_{name}.emit.json", col, inten, maxDistance=400.0, **bank))
@@ -377,10 +435,12 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
     if veil_hosts:
         L.append(layer("veilBeads", veil_hosts, "veil.emit.json", life.PALE, 5.0, maxDistance=900.0, flicker=0.25,
                        flickerRate=0.7, **bank))
-    for v in range(len(forest_hosts["all"])):
-        if forest_hosts["all"][v]:
-            L.append(layer(f"crown{v}", forest_hosts["all"][v], f"grove{v}_crown.emit.json", life.CYAN, 0.6,
-                           sparsity=0.6, maxDistance=5200.0, **clump))
+    allc = forest_hosts["all"]
+    for k, col in ((0, life.CYAN), (1, life.BLUE)):
+        hs = [h for v in range(len(allc)) if v % 2 == k for h in allc[v]]
+        if hs:
+            L.append(layer(f"crown{k}", hs, f"grove{k}_crown.emit.json", col, 0.6, sparsity=0.6, maxDistance=5200.0,
+                           **clump))
     glow = [h for v in range(len(forest_hosts["glow"])) for h in forest_hosts["glow"][v]]
     if glow:
         half = len(glow) // 2
