@@ -17,11 +17,13 @@ appear in the stream beside it.
 An emitter layer can draw each point's reflection in still water at a level:
 - `mirror`: the strength (0 = off, the default; not written when off);
 - `mirrorLevel`: the water's height in metres;
-- `mirrorStretch`: the half length of the ripple streak, in metres.
+- `mirrorStretch`: the half length of the ripple streak, in metres;
+- `mirrorSlope`: `[dlevel/dx, dlevel/dz]`, for a river that descends along its course (added at CP4: the valley's
+  main river drops 1.2 m per km). The level at a point is `mirrorLevel + slope · (x, z)`.
 
 In `cs_emit`, a point above the level is mirrored through the plane. The ray to the mirrored point crosses the
 water at q. The reflection is drawn only if the surface the camera sees at q's pixel is that plane: the prepass's
-linear depth must match q's view depth, within 4% + 0.25 m. A reflection therefore never lands on a bank, a rock or
+linear depth must match q's view depth, within 0.3% of the distance + 0.3 m (tightened from 4% at CP4, when 4% let reflections land on the banks at range). A reflection therefore never lands on a bank, a rock or
 the sky.
 
 Ripples smear it into six splats spread over ±`mirrorStretch` vertically, with a small time-dependent wobble, so
@@ -41,7 +43,7 @@ layout.
 
 ## Consequences
 
-- One plane per layer. A scene with water at several levels splits its layers, or accepts the depth test's tolerance
+- One plane (possibly sloped) per layer. A scene with water at several levels splits its layers, or accepts the depth test's tolerance
   (a reflection is rejected where the visible surface is far from the plane).
 - Cost: six extra splats per mirrored point above the plane. In the valley this is only the bank layers (a few
   hundred thousand points), well under a millisecond.

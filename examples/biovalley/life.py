@@ -48,6 +48,17 @@ def op(kind, dst, **kw):
     return d
 
 
+GLOW_FIELDS = ("glowFloorF", "glowBankF", "glowMeadowF")
+
+
+def _pool(dst, tmp, color, gain):
+    """Ops leaving in `dst` the living light pooled at this point: the three glow maps summed, tinted."""
+    return [op("field", dst, field=GLOW_FIELDS[0]), op("field", tmp, field=GLOW_FIELDS[1]),
+            op("add", dst, srcA=dst, srcB=tmp), op("field", tmp, field=GLOW_FIELDS[2]),
+            op("add", dst, srcA=dst, srcB=tmp),
+            op("constant", tmp, constant=[c * gain for c in color] + [1.0]), op("multiply", dst, srcA=dst, srcB=tmp)]
+
+
 def programs():
     rock = {"name": "rock", "ops": [
         # macro value variation in world space, bedding streaks down the faces, moss on the ledges (uv.x = flatness)
@@ -63,22 +74,27 @@ def programs():
         op("constant", 5, constant=[0.012, 0.03, 0.026, 1.0]),                      # moss: dark green-black
         op("mixBy", 3, srcA=3, srcB=5, srcC=4),
         op("constant", 6, constant=[0.92, 0.92, 0.92, 1.0]),
-    ], "baseColor": 3, "metallic": -1, "roughness": 6, "emission": -1, "emissionIntensity": 1.0, "opacity": -1}
+        *_pool(7, 5, [0.25, 1.0, 0.65], 0.008),                                      # the light pooled on the rock
+    ], "baseColor": 3, "metallic": -1, "roughness": 6, "emission": 7, "emissionIntensity": 1.0, "opacity": -1}
 
     crown = {"name": "crown", "ops": [
-        # a crown reads as a dome: dark underneath, catching the sky on top; every tree its own green
+        # a crown reads as a dome: dark underneath, catching the sky on top; lit from below where the undergrowth
+        # glows (the floor's glow map). Kept short: it runs on most of the valley's pixels.
         op("input", 0, input="uv"),
         op("swizzle", 1, srcA=0, constant=[1, 1, 1, 1]),                            # v: height in the clump
-        op("remap", 1, srcA=1, value=1, constant=[0.0, 1.0, 0.25, 1.35]),
-        op("input", 2, input="instanceRandom"),
-        op("constant", 3, constant=[0.010, 0.030, 0.028, 1.0]),                     # deep teal-green
-        op("constant", 4, constant=[0.022, 0.040, 0.020, 1.0]),                     # olive
-        op("mixBy", 3, srcA=3, srcB=4, srcC=2),
-        op("remap", 5, srcA=2, value=1, constant=[0.0, 1.0, 0.7, 1.25]),
-        op("swizzle", 5, srcA=5, constant=[1, 1, 1, 1]),
-        op("multiply", 3, srcA=3, srcB=5),
-        op("multiply", 3, srcA=3, srcB=1),
-    ], "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1, "emissionIntensity": 1.0, "opacity": -1}
+        op("remap", 2, srcA=1, value=1, constant=[0.0, 1.0, 0.25, 1.35]),
+        op("input", 3, input="instanceRandom"),
+        op("remap", 3, srcA=3, value=1, constant=[0.0, 1.0, 0.7, 1.25]),
+        op("swizzle", 3, srcA=3, constant=[0, 0, 0, 0]),
+        op("multiply", 2, srcA=2, srcB=3),
+        op("constant", 4, constant=[0.012, 0.032, 0.026, 1.0]),
+        op("multiply", 4, srcA=4, srcB=2),
+        op("field", 5, field=GLOW_FIELDS[0]),
+        op("remap", 1, srcA=1, value=1, constant=[0.0, 1.0, 1.0, 0.15]),           # underside most
+        op("multiply", 5, srcA=5, srcB=1),
+        op("constant", 6, constant=[0.006, 0.027, 0.034, 1.0]),
+        op("multiply", 6, srcA=6, srcB=5),
+    ], "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
 
     cap = {"name": "cap", "ops": [
         # translucent cap: light gathers in the core and the gills, the body is a dimmer glow, the rim catches it
@@ -138,8 +154,25 @@ def programs():
         op("constant", 4, constant=[0.03, 0.06, 0.02, 1.0]),
         op("mixBy", 3, srcA=3, srcB=4, srcC=2),
         op("multiply", 3, srcA=3, srcB=1),
-    ], "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1, "emissionIntensity": 1.0, "opacity": -1}
-    return [rock, crown, cap, falls, moss]
+        *_pool(6, 5, [0.25, 1.0, 0.65], 0.006),
+    ], "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
+
+    ground = {"name": "ground", "ops": [
+        # the valley's ground: dark soil and moss in patches, wetter (darker) low down, catching the pooled light
+        op("input", 0, input="worldPosition"),
+        op("noise", 1, srcA=0, value=0.05, seed=21),
+        op("triplanar", 2, srcA=0, value=0.6, seed=23),
+        op("multiply", 1, srcA=1, srcB=2),
+        op("remap", 1, srcA=1, value=1, constant=[0.05, 0.5, 0.5, 1.4]),
+        op("constant", 3, constant=[0.022, 0.026, 0.032, 1.0]),                     # soil
+        op("constant", 4, constant=[0.012, 0.032, 0.024, 1.0]),                     # moss
+        op("noise", 5, srcA=0, value=0.11, seed=29),
+        op("smoothstep", 5, srcA=5, constant=[0.4, 0.65, 0, 0]),
+        op("mixBy", 3, srcA=3, srcB=4, srcC=5),
+        op("multiply", 3, srcA=3, srcB=1),
+        *_pool(6, 7, [0.25, 1.0, 0.65], 0.006),
+    ], "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6, "emissionIntensity": 1.0, "opacity": -1}
+    return [rock, crown, cap, falls, moss, ground]
 
 
 # ---- organisms ------------------------------------------------------------------------------------------------------

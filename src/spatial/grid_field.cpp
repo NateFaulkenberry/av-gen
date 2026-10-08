@@ -121,6 +121,10 @@ void GridField::reset() {
     if (floats == 0) {
         return;
     }
+    if (initial.size() == floats) { // ADR-1282: authored values
+        data = initial;
+        return;
+    }
     const int comps = components();
     for (int k = 0; k < resolution.z; ++k) {
         for (int j = 0; j < resolution.y; ++j) {
@@ -470,6 +474,19 @@ Result<void> GridField::validate() const {
     if (resolution.x < 1 || resolution.y < 1 || resolution.z < 1) {
         return fail("grid '{}': resolution must be >= 1 on every axis", name);
     }
+    if (!initial.empty()) { // ADR-1282
+        if (mode != GridMode::Scalar && mode != GridMode::Vector) {
+            return fail("grid '{}': only a scalar or vector grid can start from authored values", name);
+        }
+        if (initial.size() != floatCount()) {
+            return fail("grid '{}': 'initial' has {} values; the grid holds {}", name, initial.size(), floatCount());
+        }
+        for (const float v : initial) {
+            if (!std::isfinite(v)) {
+                return fail("grid '{}': 'initial' values must be finite", name);
+            }
+        }
+    }
     if (mode == GridMode::Excitable) {
         if (resolution.y != 1 || resolution.x < 2 || resolution.z < 2 || resolution.x > kMaxAgentGridResolution ||
             resolution.z > kMaxAgentGridResolution) {
@@ -556,6 +573,12 @@ std::uint64_t GridField::layoutHash() const {
     h.i32(maxSubSteps);
     h.u32(seed);
     h.f32(seedAmount);
+    if (!initial.empty()) { // ADR-1282: hashed only when authored, so every other grid keeps its hash
+        h.u64(initial.size());
+        for (const float v : initial) {
+            h.f32(v);
+        }
+    }
     if (mode == GridMode::Agents) {
         h.i32(agentCount);
         h.i32(species);
@@ -595,6 +618,12 @@ std::uint64_t GridField::structuralHash() const {
     h.f32(seedAmount);
     if (ceiling != 0.0f) { // ADR-1163: hashed only when set, so every other grid keeps its hash
         h.f32(ceiling);
+    }
+    if (!initial.empty()) { // ADR-1282: hashed only when authored, so every other grid keeps its hash
+        h.u64(initial.size());
+        for (const float v : initial) {
+            h.f32(v);
+        }
     }
     if (mode == GridMode::Agents) { // ADR-1120: hashed only for agents, so every other grid keeps its hash
         h.i32(agentCount);
@@ -652,6 +681,9 @@ json GridField::toJson() const {
     j["seedAmount"] = seedAmount;
     if (checkpointInterval != 5.0f) {
         j["checkpointInterval"] = checkpointInterval;
+    }
+    if (!initial.empty()) {
+        j["initial"] = initial; // ADR-1282: written only when authored
     }
     if (mode == GridMode::Agents) {
         j["agentCount"] = agentCount;
@@ -740,6 +772,19 @@ Result<GridField> GridField::fromJson(const json& root) {
     AVGEN_SPATIAL_READ(g.energyTime, "energyTime", detail::readFloat);
     AVGEN_SPATIAL_READ(g.wakeTime, "wakeTime", detail::readFloat);
     AVGEN_SPATIAL_READ(g.noise, "noise", detail::readFloat);
+    if (root.contains("initial")) { // ADR-1282
+        const json& a = root.at("initial");
+        if (!a.is_array()) {
+            return fail("grid '{}': 'initial' must be an array of numbers", g.name);
+        }
+        g.initial.reserve(a.size());
+        for (const json& v : a) {
+            if (!v.is_number()) {
+                return fail("grid '{}': 'initial' must be an array of numbers", g.name);
+            }
+            g.initial.push_back(v.get<float>());
+        }
+    }
     if (auto ok = g.validate(); !ok) {
         return std::unexpected(ok.error());
     }

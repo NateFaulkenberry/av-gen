@@ -239,8 +239,12 @@ STYLES = {
 }
 
 
-def tree(style, seed, height):
-    S = STYLES[style]
+def tree(style, seed, height, leaf_level=None, sides=None):
+    S = dict(STYLES[style])
+    if leaf_level is not None:
+        S["leaf_level"] = leaf_level
+    if sides is not None:
+        S["sides"] = sides
     t = Tree(seed, S)
     r = t.r
     if style == "hero":
@@ -260,7 +264,7 @@ def tree(style, seed, height):
 # ---- species meshes ---------------------------------------------------------------------------------------------------
 
 
-def grove(seed, size=26.0, count=(5, 9), height=(13.0, 22.0)):
+def grove(seed, size=26.0, count=(5, 9), height=(13.0, 22.0), leaf_level=2, sides=None):
     """Several canopy trees merged into one mesh pair: a patch of forest, so the floor needs fewer instances and each
     instance already has variety inside it."""
     r = np.random.default_rng(seed)
@@ -273,7 +277,7 @@ def grove(seed, size=26.0, count=(5, 9), height=(13.0, 22.0)):
             if all(math.hypot(x - a, z - b) > 4.5 for a, b in placed):
                 break
         placed.append((x, z))
-        t = tree("canopy", seed * 100 + k, r.uniform(*height))
+        t = tree("canopy", seed * 100 + k, r.uniform(*height), leaf_level=leaf_level, sides=sides)
         for src, dst in ((t.wood, wood), (t.leaf, leaf)):
             P, F, UV = src.arrays()
             dst.add(P + np.array([x, 0, z]), F, UV)
@@ -351,16 +355,17 @@ def fungus(seed, height, cap_r, style="parasol"):
                                                                    [a / 6.283, 1]]))
     else:
         # hanging threads from the rim, each a thin ribbon with a bead at its end
-        for k in range(90):
+        for k in range(56):
             a = r.uniform(0, 2 * math.pi)
             f = 1.0 + 0.07 * math.sin(7 * a)
             start = top + np.array([math.cos(a) * cap_r * 0.98 * f, -cap_r * 0.1, math.sin(a) * cap_r * 0.98 * f])
-            length = height * r.uniform(0.25, 0.7)
+            length = height * (0.12 + 0.6 * r.random() ** 1.8)
             m = 10
             s = np.linspace(0, 1, m)
-            line = start[None, :] + np.stack([0.05 * length * np.sin(s * 3 + k) * np.ones(m), -length * s,
-                                              0.05 * length * np.cos(s * 2 + k)], -1)
-            w = 0.0035 * height
+            inward = -np.array([math.cos(a), 0, math.sin(a)]) * 0.12 * length
+            line = start[None, :] + np.stack([0.06 * length * np.sin(s * 3 + k) * np.ones(m), -length * s,
+                                              0.06 * length * np.cos(s * 2 + k)], -1) + np.outer(s ** 2, inward)
+            w = 0.0025 * height * r.uniform(0.6, 1.4)
             side = np.array([-math.sin(a), 0, math.cos(a)]) * w
             V = np.concatenate([line - side, line + side])
             F = []

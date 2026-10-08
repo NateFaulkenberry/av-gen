@@ -322,3 +322,38 @@ TEST_CASE("A grid table lays every grid out back to back", "[grid]") {
     CHECK(spatial::gridTableOffset(grids, 2) == 64 + 256);
     CHECK(spatial::gridTableFloats(grids) == 64 + 256 + 128);
 }
+
+TEST_CASE("a grid can start from authored values, keep them, and round-trip them (ADR-1282)", "[grid][adr1282]") {
+    spatial::GridField g;
+    g.name = "glow";
+    g.mode = spatial::GridMode::Scalar;
+    g.resolution = glm::ivec3(4, 1, 2);
+    g.boundsMin = glm::vec3(0.0f, -1.0f, 0.0f);
+    g.boundsMax = glm::vec3(4.0f, 1.0f, 2.0f);
+    g.diffusion = 0.0f;
+    g.dissipation = 0.0f;
+    g.initial = {0, 1, 2, 3, 4, 5, 6, 7};
+    REQUIRE(g.validate());
+    g.reset();
+    REQUIRE(g.data.size() == 8);
+    // cell (i, 0, k) holds initial[k * 4 + i]; cell centres are at (i + 0.5, 0, k + 0.5)
+    CHECK(g.sampleScalar(glm::vec3(2.5f, 0.0f, 1.5f)) == 6.0f);
+    CHECK(g.sampleScalar(glm::vec3(0.5f, 0.0f, 0.5f)) == 0.0f);
+    // a static grid keeps them through its steps
+    for (int i = 0; i < 10; ++i) {
+        g.step(1.0f / g.simRate, i * 0.1);
+    }
+    CHECK(g.sampleScalar(glm::vec3(3.5f, 0.0f, 0.5f)) == 3.0f);
+
+    auto again = spatial::GridField::fromJson(g.toJson());
+    REQUIRE(again);
+    CHECK(again->initial == g.initial);
+    CHECK(again->structuralHash() == g.structuralHash());
+    spatial::GridField plain = g;
+    plain.initial.clear();
+    CHECK(plain.structuralHash() != g.structuralHash());
+
+    auto j = g.toJson();
+    j["initial"] = nlohmann::json::array({1.0, 2.0});
+    CHECK_FALSE(spatial::GridField::fromJson(j)); // the wrong count is refused
+}

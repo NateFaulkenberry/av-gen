@@ -34,7 +34,7 @@ constexpr std::string_view kLayerKeys[] = {
     "intensity",  "excitedIntensity", "size",    "responseField", "responseGain", "responseThreshold",
     "lagField",   "travel",       "wakeField",   "wakeGain",    "breath",      "breathRate",  "flicker",     "flickerRate",
     "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance", "nearFade",
-    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate", "mirror", "mirrorLevel", "mirrorStretch"};
+    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate", "mirror", "mirrorLevel", "mirrorStretch", "mirrorSlope"};
 constexpr std::string_view kBlockKeys[] = {"enabled", "spriteRadius", "maxSprites", "layers"};
 
 template <std::size_t N>
@@ -216,6 +216,9 @@ json Ecosystem::toJson() const {
             e["mirror"] = l.mirror;
             e["mirrorLevel"] = l.mirrorLevel;
             e["mirrorStretch"] = l.mirrorStretch;
+            if (l.mirrorSlope != glm::vec2(0.0f)) {
+                e["mirrorSlope"] = {l.mirrorSlope.x, l.mirrorSlope.y};
+            }
         }
         arr.push_back(std::move(e));
     }
@@ -304,6 +307,13 @@ Result<Ecosystem> Ecosystem::fromJson(const json& j) {
                 l.mirror = e.value("mirror", l.mirror);
                 l.mirrorLevel = e.value("mirrorLevel", l.mirrorLevel);
                 l.mirrorStretch = e.value("mirrorStretch", l.mirrorStretch);
+                if (e.contains("mirrorSlope")) {
+                    const auto& ms = e.at("mirrorSlope");
+                    if (!ms.is_array() || ms.size() != 2 || !ms[0].is_number() || !ms[1].is_number()) {
+                        return fail("ecosystem layer '{}': mirrorSlope must be [dlevel/dx, dlevel/dz]", l.name);
+                    }
+                    l.mirrorSlope = glm::vec2(ms[0].get<float>(), ms[1].get<float>());
+                }
                 eco.layers.push_back(std::move(l));
             }
         }

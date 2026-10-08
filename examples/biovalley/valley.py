@@ -29,6 +29,7 @@ import populate  # noqa: E402
 import falls  # noqa: E402
 import ecosys  # noqa: E402
 import life  # noqa: E402
+import glowmap  # noqa: E402
 from geom import Mesh, quat_y  # noqa: E402
 
 MESHES = HERE / "meshes"
@@ -328,16 +329,16 @@ def _quat(m):
     return [round(v, 6) for v in q]
 
 
-def scene(tw, eye, target, fov, near, far, extra=(), eco=None):
+def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=None):
     water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
              "reflection": 0.5, "reflectionTint": [0.45, 0.55, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
              "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
     nodes = [
         {"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
          "terrain": {"chunkSize": 200.0, "resolution": 80, "lodLevels": 4, "lodDistance": 300.0,
-                     "viewDistance": 4500.0, "shadowDistance": 200.0, "skirtDepth": 30.0, "groundMottle": True,
+                     "viewDistance": 4500.0, "shadowDistance": 60.0, "skirtDepth": 30.0, "groundMottle": True,
                      "water": water},
-         "material": mat(GROUND, 0.92)},
+         "material": mat(GROUND, 0.92, program="ground")},
         {"name": "ranges", "kind": "procedural", "procedural": {
             "source": {"kind": "mesh", "asset": "../meshes/ranges.glb"},
             "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]},
@@ -359,9 +360,11 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None):
             "lightFromEnvironment": False,
             "background": [0.004, 0.006, 0.02],
             "fogColor": [0.008, 0.016, 0.07],
-            "volumeDensity": 0.0011, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 8,
-            "volumeMaxDistance": 200.0,
-            "fogHeight": 30.0, "fogHeightFalloff": 0.007, "fogUpperDensity": 0.1, "fogHeightAmount": 1.0,
+            "volumeDensity": 0.0014, "volumeAbsorption": 1.0, "volumeScattering": 0.0,
+            "volumeSteps": (air or {}).get("steps", 16), "volumeMaxDistance": (air or {}).get("reach", 200.0),
+            "volumeEmission": (air or {}).get("emission", 0.0), "volumeColorField": (air or {}).get("mist", ""),
+            "volumeNoise": 0.35, "volumeNoiseScale": 0.02,
+            "fogHeight": 18.0, "fogHeightFalloff": 0.012, "fogUpperDensity": 0.1, "fogHeightAmount": 1.0,
             "fogSky": 0.6, "fogSkyDistance": 5500.0,
         },
         "lights": [{"name": "moon", "id": "moon", "type": "directional", "role": "key",
@@ -374,9 +377,16 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None):
                                     "bandTilt": 32.0, "daylight": 0.0}}],
         "nodes": nodes,
         "materialPrograms": life.programs(),
+        **({"grids": list(grids)} if grids else {}),
         **({"ecosystem": eco} if eco else {}),
     }
 
+
+# The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
+AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 0.7, "mist": "mistFloor"},
+       "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
+       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.15, "mist": "mistBank"},
+       "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}
 
 # Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
 POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/intensity": 0.45,
@@ -426,27 +436,43 @@ def main():
         shrubs[k] += v
     groves = populate.forest(gfloor, vista_eye, VISTA_YAW, eyes)
     glow, dark = ecosys.split_groves(groves)
-    groups = {"groveglow": glow, "grovedark": dark, "shrub": shrubs, "arch": arch, "hero": {0: hero},
-              "boulder": boulders}
+
+    def near_split(d):
+        # groves within 260 m of a close shot (riverbank, macro, meadow) use the full build
+        close = [(S[k][0][0], S[k][0][2]) for k in ("riverbank", "macro", "meadow")]
+        hq, lo = {}, {}
+        for v, pts in d.items():
+            for rc in pts:
+                near = any(math.hypot(rc[0] - a, rc[2] - b) < 260.0 for a, b in close)
+                (hq if near else lo).setdefault(v, []).append(rc)
+        return hq, lo
+    glow_hq, glow_lo = near_split(glow)
+    dark_hq, dark_lo = near_split(dark)
+    groups = {"groveglow": glow_lo, "grovedark": dark_lo, "grovehqglow": glow_hq, "grovehqdark": dark_hq,
+              "shrub": shrubs, "arch": arch, "hero": {0: hero}, "boulder": boulders}
     eyes_by = {k: (s[0][0], s[0][2]) for k, s in S.items()}
     heads = {k: math.atan2(s[1][0] - s[0][0], s[1][2] - s[0][2]) for k, s in S.items()}
     ecosys.WATER_BANK = float(gfine["bank"].water_level(np.array([eyes_by["riverbank"][0] - 20.0]),
                                                         np.array([land.BANK_Z]))[0])
     print(f"  bank water level {ecosys.WATER_BANK:.2f}")
     veg = populate.nodes(groups, mat)
-    carpet, hosts = ecosys.nodes(ecosys.place(gc, gfine, gfloor, eyes_by, heads), mat)
-    extra = (veg + waterfalls(tw, eyes_by) + populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat) + carpet)
+    placed = ecosys.place(gc, gfine, gfloor, eyes_by, heads)
+    carpet, hosts = ecosys.nodes(placed, mat)
+    grids, gfields = glowmap.maps(placed, glow, eyes_by)
+    extra = (gfields + veg + waterfalls(tw, eyes_by) + populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat) +
+             carpet + ecosys.particles(eyes_by))
 
     def names(prefix):
         return [n["name"] for n in veg if n["name"].startswith(prefix) and "_leaf" in n["name"]]
-    forest_hosts = {"all": [names(f"groveglow{v}_leaf") + names(f"grovedark{v}_leaf")
-                            for v in range(populate.N_GROVES)],
-                    "glow": [names(f"groveglow{v}_leaf") for v in range(populate.N_GROVES)]}
+    forest_hosts = {"all": [names(f"groveglow{v}_leaf") + names(f"grovedark{v}_leaf") + names(f"grovehqglow{v}_leaf") +
+                            names(f"grovehqdark{v}_leaf") for v in range(populate.N_GROVES)],
+                    "glow": [names(f"groveglow{v}_leaf") + names(f"grovehqglow{v}_leaf")
+                             for v in range(populate.N_GROVES)]}
     shrub_hosts = [n["name"] for n in veg if n["name"].startswith("shrub") and "_leaf" in n["name"]]
     eco = ecosys.ecosystem(hosts, forest_hosts, shrub_hosts, ["fungus_veil_threads"], ecosys.WATER_BANK)
     print(f"  ecosystem layers: {len(eco['layers'])}")
     for name, (eye, tgt, fov, near, far) in S.items():
-        sc = scene(tw, eye, tgt, fov, near, far, extra, eco)
+        sc = scene(tw, eye, tgt, fov, near, far, extra, eco, grids, AIR[name])
         (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
         (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
         print(f"  shot {name}: eye {eye} target {tgt}")

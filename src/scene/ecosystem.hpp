@@ -111,6 +111,7 @@ struct EmitterLayer {
     float mirror = 0.0f;             // reflection strength, 0..4
     float mirrorLevel = 0.0f;        // the water's level (m)
     float mirrorStretch = 0.3f;      // the ripple streak's half length (m)
+    glm::vec2 mirrorSlope{0.0f};     // the water's slope (dlevel/dx, dlevel/dz): a river descends along its course
 
     [[nodiscard]] Result<void> validate() const;
 };

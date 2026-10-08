@@ -28,6 +28,7 @@ struct Layer {
     optics: vec4<f32>,      // x = iridescence, y = spectral cycles along v, z = cycles per second, w = bob (m)
     motion: vec4<f32>,      // x = bob rate (Hz), y = mirror strength (0 = off), z = mirror level (m), w = mirror
                             // stretch (m): ADR-1281, the point's reflection in still water at that level
+    mirror2: vec4<f32>,     // x, y = the water's slope (dlevel/dx, dlevel/dz): a river descends; zw unused
 };
 
 struct Host {
@@ -133,7 +134,7 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
     let texel = vec2<i32>(clamp(i32(fx), 0, i32(eco.size.x) - 1), clamp(i32(fy), 0, i32(eco.size.y) - 1));
     let sceneDepth = textureLoad(linearDepth, texel, 0).r;
     let occluded = viewDepth - radius > sceneDepth * 1.002 + 0.02;
-    let mirrored = layer.motion.y > 0.0 && p.y > layer.motion.z;
+    let mirrored = layer.motion.y > 0.0 && p.y > layer.motion.z + layer.mirror2.x * p.x + layer.mirror2.y * p.z;
     if (occluded && !mirrored) {
         return;
     }
@@ -234,7 +235,7 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
 // the plane's along that ray), so it never lands on a bank or a rock. Ripples smear it into a short vertical streak
 // (several splats spread over +-stretch metres, shimmering with time): light on rippled water becomes a pillar.
 fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
-    let level = layer.motion.z;
+    let level = layer.motion.z + layer.mirror2.x * p.x + layer.mirror2.y * p.z;
     let strength = layer.motion.y;
     let stretch = layer.motion.w;
     let cam = frame.cameraPos.xyz;
@@ -261,10 +262,10 @@ fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
     let qy = (0.5 - nq.y * 0.5) * eco.size.y;
     let qt = vec2<i32>(clamp(i32(qx), 0, i32(eco.size.x) - 1), clamp(i32(qy), 0, i32(eco.size.y) - 1));
     let seen = textureLoad(linearDepth, qt, 0).r;
-    if (abs(seen - qDepth) > 0.04 * qDepth + 0.25) {
+    if (abs(seen - qDepth) > 0.003 * qDepth + 0.3) {
         return; // something other than the water is in front there
     }
-    let k = 6;
+    let k = 10;
     let tt = eco.misc.x;
     for (var i = 0; i < k; i = i + 1) {
         let f = (f32(i) + 0.5) / f32(k) * 2.0 - 1.0;

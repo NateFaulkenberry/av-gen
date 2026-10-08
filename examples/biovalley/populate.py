@@ -34,9 +34,14 @@ STONE = [0.03, 0.033, 0.042]
 def build(out):
     tris = 0
     for k in range(N_GROVES):
-        w, l = flora.grove(700 + k)
+        # the far forest: a light build (clumps of 80 triangles, five-sided limbs) -- it is most of the valley's
+        # triangles, and from the vista one grove is a few pixels; the near forest (grovehq) keeps the full build
+        w, l = flora.grove(700 + k, leaf_level=1, sides=5)
         tris += w.write(out / f"grove{k}_wood.glb", f"grove{k}_wood")
         tris += l.write(out / f"grove{k}_leaf.glb", f"grove{k}_leaf")
+        w, l = flora.grove(700 + k)
+        tris += w.write(out / f"grovehq{k}_wood.glb", f"grovehq{k}_wood")
+        tris += l.write(out / f"grovehq{k}_leaf.glb", f"grovehq{k}_leaf")
     for k in range(N_SHRUBS):
         t = flora.tree("shrub", 800 + k, 4.0)
         tris += t.wood.write(out / f"shrub{k}_wood.glb", f"shrub{k}_wood")
@@ -93,11 +98,11 @@ def fungus_nodes(groups, mat):
         if not pts:
             continue
         lod = {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 400.0}
-        parts = [("stalk", mat([0.03, 0.08, 0.06], 0.5, [0.15, 0.85, 0.5], 0.25, opacity=0.85)),
-                 ("cap", mat([0.02, 0.06, 0.07], 0.4, [0.2, 1.0, 0.8], 0.55, doubleSided=True, opacity=0.75))]
+        parts = [("stalk", mat([0.03, 0.08, 0.06], 0.5, [0.15, 0.85, 0.5], 0.12, opacity=0.85)),
+                 ("cap", mat([0.02, 0.06, 0.07], 0.4, [0.2, 1.0, 0.8], 0.35, doubleSided=True, program="cap"))]
         if name == "veil":
-            parts.append(("threads", mat([0.02, 0.04, 0.06], 0.4, [0.3, 0.75, 1.0], 1.2, doubleSided=True,
-                                         opacity=0.8)))
+            parts.append(("threads", mat([0.02, 0.04, 0.06], 0.4, [0.3, 0.75, 1.0], 0.35, doubleSided=True,
+                                         opacity=0.55)))
         for part, m in parts:
             out.append({"name": f"fungus_{name}_{part}", "kind": "procedural", "procedural": {
                 "source": {"kind": "mesh", "asset": f"../meshes/fungus_{name}_{part}.glb"},
@@ -245,7 +250,7 @@ def nodes(groups, mat):
     """Scene nodes for the placed vegetation. `groups` = {species prefix: {variant: records}}."""
     out = []
     lod_grove = {"cull": True, "count": 4, "byScreenSize": False, "maxDistance": 5200.0,
-                 "distance1": 90.0, "distance2": 300.0, "distance3": 900.0}
+                 "distance1": 70.0, "distance2": 200.0, "distance3": 480.0}
     lod_small = {"cull": True, "count": 3, "byScreenSize": False, "maxDistance": 4800.0,
                  "distance1": 120.0, "distance2": 500.0}
 
@@ -260,14 +265,15 @@ def nodes(groups, mat):
                 "material": material}})
 
     for prefix, variants in groups.items():
-        mesh = {"groveglow": "grove", "grovedark": "grove"}.get(prefix, prefix)
+        mesh = {"groveglow": "grove", "grovedark": "grove", "grovehqglow": "grovehq",
+                "grovehqdark": "grovehq"}.get(prefix, prefix)
         for v, pts in variants.items():
             if not pts:
                 continue
             if prefix == "boulder":
                 add(f"boulder{v}", f"boulder{v}", pts, mat(STONE, 0.75, program="rock"), lod_small)
                 continue
-            lod = lod_grove if mesh == "grove" else lod_small
+            lod = lod_grove if mesh in ("grove", "grovehq") else lod_small
             if prefix == "hero":
                 lod = {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 0.0}
             add(f"{prefix}{v}_wood", f"{mesh}{v}_wood" if prefix != "hero" else "hero_wood", pts, mat(BARK, 0.85), lod)

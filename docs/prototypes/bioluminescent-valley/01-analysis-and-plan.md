@@ -358,3 +358,70 @@ Media: `~/Desktop/av-gen-review/45-bioluminescent-valley/cp3/`: `sbs-all.png`, `
 **Cost (1080p, realtime tier, under the lock):**
 - **GPU:** vista 70 ms, meadow 68 ms. The scene pass is 46-58 ms; the ecosystem is not among the top six passes.
 - The forest's far geometry still dominates. A cheaper far forest after the look is approved, as agreed.
+
+## 9. CP4: the full environment without audio (2026-10-08)
+
+The owner approved CP3. CP4 media: `~/Desktop/av-gen-review/45-bioluminescent-valley/cp4/`.
+
+**The owner's CP3 notes, as done:**
+1. **The vista's floor.** The glades now cover the whole floor wherever the cluster noise allows (about 77,000,
+   kept off the river's banks so the river stays water). The understorey glow is clustered across the floor, not
+   along the river.
+   - **The mist glows where the light pools.** `glowmap.py` splats every glowing organism into three static glow
+     maps (the valley floor, the riverbank, the meadow), blurred into pools. The maps are authored grids (ADR-1282).
+     The volumetric medium's emission reads the map times a height mask, so only the low air glows.
+   - **The river reflects.** The floor's layers mirror in the main river with a sloped level (`mirrorSlope`,
+     ADR-1281's addition: the river descends 1.2 m per km), in 6 m ripple pillars.
+2. **The macro is calmer.** Mean luma 0.175 against the reference's 0.155 (it was 0.30).
+   - Its own moss mounds are dark with teal dots in clumps.
+   - There are fewer, smaller orbs of varied strength, one variant only faint.
+   - Fewer tips. The hero cap is the focal point.
+3. **Shaped glow, not stipple.**
+   - Every carpet layer's rest brightness is modulated by a low-frequency `clumps` field (as its wake), so drifts
+     are brighter and gaps dimmer.
+   - The meadow's drifts mix two scales.
+   - Glow pools onto surfaces: the `ground`, `rock` and `crown` programs add a faint tint from the glow maps.
+     Crowns are lit from beneath.
+4. **The boxy shape at the left of the riverbank** was the veil fungus's threads. There are now fewer threads, they
+   are thinner, varied in length, drawn inward under the cap, dimmer and translucent.
+5. **Riverbank reflections.** The bank layers mirror with 1.1 m pillars, at strength 1.6. The reeds come in three
+   colours, including violet, for the reference's coloured columns.
+
+**Also in CP4:**
+- **Particles** (spec §16), each population with its own scale, motion and light:
+  - near-camera motes at the riverbank, meadow and macro;
+  - ambient spores rising over the meadow;
+  - spray drifting downstream over the bank stream.
+- **Mist:** 16-24 march steps, noise 0.35, a 18 m layer.
+
+**Performance** (1080p, realtime tier, GPU p50, under the lock):
+
+| | before | after |
+|---|---|---|
+| vista | 114.8 ms (scene 80.8, march 23.3) | **83.1 ms** (scene 52.3, march 23.1; 8.8 M triangles) |
+| meadow | 100.9 ms | **84.3 ms** |
+| riverbank | — | 92.4 ms (shadow 17.2) |
+
+- **What changed:**
+  - The far forest uses a light build (80-triangle clumps, five-sided limbs).
+  - The full build (`grovehq`) is used only within 260 m of the close shots.
+  - Forest LOD distances are tighter.
+  - The crown program is short (14 ops, one glow map).
+- **A/B attribution (vista):**
+  - The crown program cost 25 ms (now short).
+  - The groves are ~50 ms of the scene pass.
+  - The march costs ~1 ms per step (24 steps = 23 ms; 8 steps = 8 ms).
+- **Next for live:**
+  - fewer march steps in the live tier;
+  - terrain shadows only near the camera (done: 60 m);
+  - the live ladder's render scale.
+
+  30 fps is not yet reached; this is the performance pass after CP6.
+
+**Verdict:**
+- **Riverbank:** the closest. It has the bank's reflections as pillars, the falls, the glowing banks and a lit,
+  misty midground.
+- **Meadow:** carpets in drifts, the stream reflecting, the rose horizon. The far carpet is still a band.
+- **Macro:** calmer and darker, with the hero cap as the focus. It is greener overall than the reference's blue.
+- **Vista:** the floor now glows across its width with lit low mist and a reflecting river. It is still less dense
+  and less blue than the reference, and the foreground framing is darker and less leafy than the reference's.
