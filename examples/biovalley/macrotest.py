@@ -68,6 +68,7 @@ def layer(name, hosts, template, color, intensity, **kw):
 
 
 CARDS = False
+LIBRARY = False
 HERO_SCALE = 1.0
 HX, HZ = -0.3, 0.5          # the hero: up the bank, left of centre
 EYE = (0.25, 0.0, -0.3)      # the lens: low on the near slope, looking up into the bank
@@ -136,16 +137,54 @@ def build(variant, hero):
         if roll < 0.55:      # a continuous skin of moss mounds of all sizes
             sup["moss"][int(r.integers(0, ecosys.N_MOSS))].append(rec(x, y - 0.02, z, r.uniform(0, 6.28),
                                                                        r.uniform(0.04, 0.16)))
-        elif roll < 0.8 and de > 0.45:
+        elif roll < (0.62 if LIBRARY else 0.8) and de > 0.45:
             sup["tuft"][ecosys.zone(x, z, 0.015)].append(rec(x, y - 0.01, z, r.uniform(0, 6.28),
                                                               r.uniform(0.15, 0.45)))
-        elif roll < 0.9:
+        elif roll < (0.7 if LIBRARY else 0.9):
             sup["f3d_small"].append(rec(x, y - 0.01, z, r.uniform(0, 6.28), r.uniform(0.4, 1.2)))
-        elif roll < 0.95:
+        elif roll < (0.72 if LIBRARY else 0.95):
             sup["frond"][int(r.integers(0, ecosys.N_FROND))].append(rec(x, y - 0.01, z, r.uniform(0, 6.28),
                                                                          r.uniform(0.08, 0.2)))
+    if LIBRARY:
+        # the approved hero library around the hero: each species in its own niche and scale (macro LOD 0)
+        lib = {k: [] for k in ("lattice", "lanternberry", "filigree", "veilfern", "bellspire", "glowmound",
+                               "glowmat", "reliquary", "chalice")}
+
+        def at(dx, dz, s, yaw=None, name=None):
+            x, z = HX + dx, HZ + dz
+            lib[name].append(rec(x, height(x, z) - 0.01, z, r.uniform(0, 6.28) if yaw is None else yaw, s))
+        # glowing mounds under and around the hero, and the big out-of-focus one bottom right
+        for dx, dz, s in ((0.1, -0.05, 0.45), (-0.25, 0.1, 0.55), (0.35, 0.3, 0.5), (-0.5, 0.45, 0.6),
+                          (0.55, -0.1, 0.4), (0.0, 0.55, 0.5), (-0.6, -0.2, 0.45)):
+            at(dx, dz, s, name="glowmound")
+        x, z = EYE[0] + 0.1, EYE[2] + 0.36
+        lib["glowmound"].append(rec(x, height(x, z) - 0.06, z, 1.2, 0.42))
+        for k in range(14):
+            at(r.uniform(-0.9, 0.9), r.uniform(-0.4, 1.2), r.uniform(0.4, 0.9), name="glowmat")
+        for dx, dz, s in ((-0.32, 0.08, 1.2), (0.42, 0.22, 1.0), (-0.75, 0.5, 1.4)):
+            at(dx, dz, s, name="lattice")
+        for k in range(9):
+            at(r.uniform(-0.6, 0.7), r.uniform(-0.25, 0.7), r.uniform(0.8, 1.4), name="lanternberry")
+        for k in range(10):
+            at(r.uniform(-0.9, 0.9), r.uniform(-0.2, 1.0), r.uniform(0.8, 1.5), name="filigree")
+        for dx, dz, s in ((-0.55, -0.05, 1.3), (0.6, 0.45, 1.1), (0.25, 0.75, 1.4)):
+            at(dx, dz, s, name="veilfern")
+        for dx, dz, s in ((0.3, 0.6, 1.3), (-0.45, 0.9, 1.6), (0.75, 1.0, 1.2)):
+            at(dx, dz, s, name="bellspire")
+        at(-0.9, 0.95, 1.3, name="reliquary")
+        for name, pts in lib.items():
+            if not pts:
+                continue
+            nodes.append({"name": f"lib_{name}", "kind": "procedural", "procedural": {
+                "source": {"kind": "mesh", "asset": f"../meshes/hero/hero_{name}_lod0.glb"},
+                "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
+                "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 60.0}}})
+            if (M / f"hero/hero_{name}.emit.json").exists():
+                layers.append(layer(f"lib_{name}", [f"lib_{name}"], f"hero/hero_{name}.emit.json", life.PALE, 1.0,
+                                    maxDistance=60.0, sparsity=0.4, flicker=0.2, flickerRate=0.5))
+
     # the hero's company: a cluster of emerald bank fungi beside and behind it
-    for dx, dz, s in ((0.1, 0.12, 0.55), (0.16, 0.05, 0.4), (-0.08, 0.2, 0.45), (0.22, 0.25, 0.6)):
+    for dx, dz, s in (() if LIBRARY else ((0.1, 0.12, 0.55), (0.16, 0.05, 0.4), (-0.08, 0.2, 0.45), (0.22, 0.25, 0.6))):
         sup["f3d_bank"].append(rec(HX + dx, height(HX + dx, HZ + dz) - 0.01, HZ + dz, r.uniform(0, 6.28), s))
     # the big out-of-focus foreground mound, bottom right, and a smaller one bottom left
     for x, z, s in ((EYE[0] + 0.12, EYE[2] + 0.28, 0.2), (EYE[0] - 0.22, EYE[2] + 0.3, 0.12)):
@@ -189,11 +228,13 @@ def build(variant, hero):
     if CARDS:
         # Approach C (hybrid 2.5D): three depths of painted silhouette cards behind the bank, facing the lens
         import cards
-        for k in range(3):
-            cards.card_texture(M / f"card{k}.png", 500 + k, trunks=2 + k, strands=20 + 10 * k)
+        for k in range(4):
+            cards.card_texture(M / f"card{k}.png", 500 + k, trunks=2 + k, strands=20 + 10 * k, canopy=0.6 + 0.2 * k,
+                               glints=60 + 40 * k)
         cards.card_mesh(M / "card.glb")
         yaw = math.atan2(EYE[0] - HX, EYE[2] - HZ)
-        for k, (dist, w, h, dx) in enumerate(((1.3, 2.4, 1.8, -0.5), (2.2, 3.6, 2.8, 0.6), (3.3, 5.5, 4.0, 0.0))):
+        for k, (dist, w, h, dx) in enumerate(((1.3, 3.0, 2.6, -0.5), (2.2, 4.6, 3.8, 0.6), (3.3, 6.5, 5.5, 0.0),
+                                              (5.0, 11.0, 8.0, 0.3))):
             cx = HX + dx - dist * math.sin(yaw)
             cz = HZ - dist * math.cos(yaw)
             y0 = height(max(min(cx, 3.9), -3.9), max(min(cz, 3.9), -3.9)) - 0.1
@@ -222,10 +263,12 @@ def build(variant, hero):
     sc["environment"]["fogHeightFalloff"] = 1.5
     # the back light: low behind the hero, cyan, rimming the cap and the veil; a faint violet fill from the left
     sc["lights"] += [
+        {"name": "blueFill", "type": "point", "position": [EYE[0] - 0.5, height(EYE[0], EYE[2]) + 0.8, EYE[2] - 0.6],
+         "color": [0.12, 0.25, 1.0], "intensity": 0.6, "range": 5.0, "radius": 0.3, "castsShadow": False},
         {"name": "rim", "type": "point", "position": [HX + 0.2, height(HX, HZ) + 0.5, HZ + 0.5], "color": [0.35, 0.75, 1.0],
          "intensity": 2.0, "range": 3.0, "radius": 0.05, "castsShadow": False}
     ]
-    name = variant + ("-cards" if CARDS else "")
+    name = variant + ("-cards" if CARDS else "") + ("-library" if LIBRARY else "")
     proj = valley.project(f"macrotest-{name}", f"macrotest-{name}.scene.json")
     proj["parameters"].update({"post/dof/enabled": True, "post/dof/focusDistance": 1.0,
                                "post/dof/focusRange": 0.2, "post/dof/maxRadius": 18.0})
@@ -242,6 +285,7 @@ if __name__ == "__main__":
     if "--hero" in sys.argv:
         hero = sys.argv[sys.argv.index("--hero") + 1]
     CARDS = "--cards" in sys.argv
+    LIBRARY = "--library" in sys.argv
     if "--scale" in sys.argv:
         HERO_SCALE = float(sys.argv[sys.argv.index("--scale") + 1])
     build(variant, hero)

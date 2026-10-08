@@ -67,10 +67,21 @@ def _ferns(d, rnd, W, H, n):
             d.line(pts, fill=255, width=3)
 
 
-def card_texture(path, seed, W=1024, H=1024, trunks=3, strands=30, ferns=6):
+def _canopy(d, rnd, W, H, cover):
+    """Masses of foliage hanging from the top of the card: lumpy blobs overlapping into a ragged lower edge."""
+    for _ in range(int(60 * cover)):
+        x = rnd.uniform(-0.05, 1.05) * W
+        y = rnd.uniform(-0.1, 0.35 * cover) * H
+        r = rnd.uniform(0.04, 0.12) * W
+        d.ellipse([x - r, y - r * 0.8, x + r, y + r * 0.8], fill=255)
+
+
+def card_texture(path, seed, W=1024, H=1024, trunks=3, strands=30, ferns=6, canopy=0.0, glints=0):
     rnd = __import__("random").Random(seed)
     a = Image.new("L", (W, H), 0)
     d = ImageDraw.Draw(a)
+    if canopy > 0:
+        _canopy(d, rnd, W, H, canopy)
     for k in range(trunks):
         _trunk(d, rnd, W, H, rnd.uniform(0.1, 0.9) * W, rnd.uniform(0.04, 0.09) * W)
     _strands(d, rnd, W, H, strands)
@@ -81,6 +92,19 @@ def card_texture(path, seed, W=1024, H=1024, trunks=3, strands=30, ferns=6):
     rgb = np.zeros((H, W, 3))
     rgb[...] = [6, 9, 18]
     rgb += edge[..., None] * np.array([30, 60, 110]) * 0.6
+    # a few soft luminous specks inside the silhouettes (distant organisms; out of focus they read as bokeh)
+    if glints:
+        gl = Image.new("L", (W, H), 0)
+        gd = ImageDraw.Draw(gl)
+        A = np.asarray(a)
+        for _ in range(glints):
+            x, y = rnd.randrange(W), rnd.randrange(H)
+            if A[y, x] > 128:
+                r = rnd.uniform(2, 6)
+                gd.ellipse([x - r, y - r, x + r, y + r], fill=255)
+        g = np.asarray(gl.filter(ImageFilter.GaussianBlur(2.5)), float)[..., None] / 255.0
+        hue = np.array([[40, 200, 255], [60, 255, 150], [90, 120, 255]])[seed % 3]
+        rgb = rgb * (1 - g) + hue * g
     img = np.dstack([np.clip(rgb, 0, 255), np.asarray(a)]).astype(np.uint8)
     Image.fromarray(img, "RGBA").save(path)
 

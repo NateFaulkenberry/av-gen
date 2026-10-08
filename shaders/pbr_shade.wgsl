@@ -839,11 +839,15 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         }
         fxAdded = fxAdded + fxEdge;
     }
-    let emissiveBase = matEmissive.rgb * ownEmissiveMul;
-    var emissive = emissiveBase * matEmissive.w;
+    // ADR-1284: the emissive texture localises the emission, so it localises the grazing rim below too: a
+    // glTF-correct asset (factor 1, colour and placement in the texture) used to get a neutral rim over its
+    // whole surface, glowing even where the texture emits nothing. Without a texture this is 1, bit for bit.
+    var emissiveTexel = vec3<f32>(1.0);
     if (hasEmissive) {
-        emissive = emissive * textureSample(emissiveTex, materialSampler, uv).rgb;
+        emissiveTexel = textureSample(emissiveTex, materialSampler, uv).rgb;
     }
+    let emissiveBase = matEmissive.rgb * ownEmissiveMul * emissiveTexel;
+    var emissive = emissiveBase * matEmissive.w;
     // ADR-903/904: the instance's variation on the surface's own emission, then the object's lane on
     // the finished emission -- after the program, the texture and every FXL lane (whose gain it
     // multiplies and whose hue it adds to) -- and before the waves, which amplify what the surface
