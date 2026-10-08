@@ -494,6 +494,10 @@ def patch_glb(path, slots):
         else:
             m.pop("alphaCutoff", None)
         m["doubleSided"] = bool(s.double_sided)
+        # the ORM image's R channel is the painted ambient occlusion: reference it as the occlusion texture
+        mr = m.get("pbrMetallicRoughness", {}).get("metallicRoughnessTexture")
+        if mr is not None:
+            m["occlusionTexture"] = {"index": mr["index"], "strength": 1.0}
     jb = json.dumps(js, separators=(",", ":")).encode()
     jb += b" " * ((4 - len(jb) % 4) % 4)
     out = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(jb) + len(rest)) + struct.pack("<II", len(jb), 0x4E4F534A)
@@ -543,9 +547,9 @@ def grow_veins(rng, n_primary, r0=0.1, r1=1.0, step=0.025, wander=0.12, branch_p
             a2 += 0.25 * math.atan2(math.sin(rad - a2), math.cos(rad - a2))
             st = step * (0.6 + 0.8 * r)
             x2, y2 = x + st * math.cos(a2), y + st * math.sin(a2)
-            w2 = w * (0.985 - 0.02 * r)
+            w2 = w * (0.975 - 0.03 * r)
             segs.append([x, y, x2, y2, w])
-            if rng.random() < branch_p * (0.5 + r):
+            if rng.random() < branch_p * (0.3 + 2.0 * r * r):
                 side = rng.choice([-1, 1])
                 nxt.append([x2, y2, a2 + side * spread * rng.uniform(0.6, 1.3), w2 * decay * 0.8])
                 a2 -= side * spread * 0.3
@@ -579,7 +583,7 @@ def raster_segments(segs, res, width, extent=1.0, soft=1.5):
         L2 = dx * dx + dy * dy + 1e-18
         t = np.clip(((XX - x0) * dx + (YY - y0) * dy) / L2, 0, 1)
         d = np.hypot(XX - (x0 + t * dx), YY - (y0 + t * dy))
-        c = 1 - smoothstep(ww * 0.5, ww * 0.5 + soft * px, d)
+        c = (1 - smoothstep(ww * 0.5, ww * 0.5 + soft * px, d)) * (0.45 + 0.55 * min(w, 1.0))
         g = np.exp(-d / (ww * 2.5 + px))
         sl = (slice(j0, j1), slice(i0, i1))
         core[sl] = np.maximum(core[sl], c)
@@ -601,3 +605,131 @@ def sample_canvas(canvas, X, Y, extent=1.0):
     c01 = canvas[j + 1, i]
     c11 = canvas[j + 1, i + 1]
     return (c00 * (1 - ax) + c10 * ax) * (1 - ay) + (c01 * (1 - ax) + c11 * ax) * ay
+
+
+# ---- shared organism kit ------------------------------------------------------------------------------------------
+
+# the family palette (linear): emerald and cyan luminous anatomy, blue and violet lace, near-black teal tissue
+EMERALD = np.array([0.06, 1.0, 0.30])
+CYAN = np.array([0.02, 0.75, 1.0])
+BLUE = np.array([0.10, 0.30, 1.0])
+VIOLET = np.array([0.40, 0.18, 1.0])
+MINT = np.array([0.5, 1.0, 0.7])
+TISSUE_DARK = np.array([0.010, 0.016, 0.022])
+TEAL_DARK = np.array([0.012, 0.035, 0.045])
+TEAL_THIN = np.array([0.030, 0.095, 0.105])
+
+
+def rodrigues(v, axis, ang):
+    axis = axis / max(np.linalg.norm(axis), 1e-12)
+    return (v * math.cos(ang) + np.cross(axis, v) * math.sin(ang) + axis * np.dot(axis, v) * (1 - math.cos(ang)))
+
+
+def perp(d, rng):
+    a = rng.normal(size=3)
+    a -= d * np.dot(a, d)
+    return a / max(np.linalg.norm(a), 1e-12)
+
+
+class Branch:
+    __slots__ = ("pts", "radii", "d0", "d1", "gen", "tip")
+
+    def __init__(self, pts, radii, d0, d1, gen, tip):
+        self.pts, self.radii, self.d0, self.d1, self.gen, self.tip = pts, radii, d0, d1, gen, tip
+
+
+def grow_branches(rng, p0, d0, length, radius, max_gen, children=(2, 3), spread=(0.35, 0.8), shrink=0.7,
+                  rshrink=0.6, curl=0.6, up=0.15, segs=14, crozier=0.3, crozier_turns=1.4, min_r=0.0004,
+                  child_t=(0.35, 1.0)):
+    """A recursive branching body of curved, tapering tubes. Returns [Branch]; each branch records its path distance
+    from the root (d0 -> d1) so a v = distance / max-distance runs root (0) to tips (1) over the whole organism."""
+    out = []
+
+    def rec(p, d, L, r, gen, dist):
+        d = d / np.linalg.norm(d)
+        axis = perp(d, rng)
+        tot = curl * rng.uniform(0.5, 1.2) * (1 + 0.5 * gen)
+        terminal = gen >= max_gen
+        if terminal and rng.random() < crozier:
+            tot = crozier_turns * 2 * math.pi * rng.uniform(0.6, 1.0)
+        n = segs
+        pts = [p.copy()]
+        dirs = [d.copy()]
+        cur = d.copy()
+        step = L / n
+        for i in range(n):
+            f = i / n
+            a = tot / n * (0.3 + 1.4 * f) if terminal else tot / n
+            cur = rodrigues(cur, axis, a)
+            cur = cur + np.array([0, 0, up]) * (1 - gen / (max_gen + 1)) * step * 8
+            cur /= np.linalg.norm(cur)
+            # coiling tips get shorter steps so the crozier tightens
+            s = step * (1 - 0.6 * f) if (terminal and tot > 3) else step
+            pts.append(pts[-1] + cur * s)
+            dirs.append(cur)
+        pts = np.array(pts)
+        seglen = np.r_[0, np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))]
+        t = seglen / seglen[-1]
+        r_end = max(r * rshrink, min_r) if not terminal else min_r
+        radii = r + (r_end - r) * t ** 0.8
+        out.append(Branch(pts, radii, dist, dist + seglen[-1], gen, terminal))
+        if terminal:
+            return
+        k = rng.integers(children[0], children[1] + 1)
+        for j in range(k):
+            tt = rng.uniform(*child_t) if j < k - 1 else 1.0
+            i = min(int(tt * n), n)
+            nd = rodrigues(dirs[i], perp(dirs[i], rng), rng.uniform(*spread))
+            rec(pts[i], nd, L * shrink * rng.uniform(0.8, 1.15), radii[i] * (0.85 if tt < 1 else 1.0), gen + 1,
+                dist + seglen[i])
+
+    rec(np.asarray(p0, dtype=np.float64), np.asarray(d0, dtype=np.float64), length, radius, 0, 0.0)
+    return out
+
+
+def add_branches(slot, region, branches, sides_fn, shape=None, s_width=0.25, seed=0):
+    """Tubes for every branch; v = path distance / the organism's longest path."""
+    rng = np.random.default_rng(seed)
+    dmax = max(b.d1 for b in branches)
+    for b in branches:
+        sides = sides_fn(b)
+        P = tube_grid(b.pts, b.radii, sides, shape)
+        s0 = rng.uniform(0, 1 - s_width)
+        slot.add_grid(P, region, wrap_u=True, s_range=(s0, s0 + s_width), t_range=(b.d0 / dmax, b.d1 / dmax))
+    return dmax
+
+
+def lace(S, T, cells_u, cells_v, seed, wall=(0.045, 0.10), px=True, warp=0.6):
+    """A cellular net in (S, T): returns wall (strand) mask, knot mask and the cell hash. cells_v may be an array."""
+    x = S * cells_u
+    y = T * cells_v
+    wx = x + warp * (fbm(S * 8, T * 4, 2, seed, px=8 if px else None) - 0.5)
+    wy = y + warp * (fbm(S * 8 + 3, T * 4, 2, seed + 1, px=8 if px else None) - 0.5)
+    F1, F2, F3, h = worley(wx, wy, seed + 2, px=cells_u if px else None, jitter=0.9)
+    w = 1 - smoothstep(wall[0], wall[1], F2 - F1)
+    k = 1 - smoothstep(0.05, 0.2, F3 - F1)
+    return w, k, h, F1
+
+
+def revolve(profile_r, profile_z, nth, radial=None, phase=0.0, clockwise=True):
+    """A surface of revolution: rows follow the profile (v), columns go around (u). `radial(th, v) -> (nv, nth)`
+    multiplies the radius (folds, lobes). Clockwise keeps cross(Pu, Pv) outward for an outward-going profile."""
+    th = np.linspace(0, 2 * math.pi, nth, endpoint=False) + phase
+    if clockwise:
+        th = -th
+    v = np.linspace(0, 1, len(profile_r))
+    R = np.asarray(profile_r)[:, None] * (radial(th, v) if radial else 1.0)
+    Z = np.asarray(profile_z)[:, None] * np.ones_like(th)[None, :]
+    return np.stack([R * np.cos(th)[None, :], R * np.sin(th)[None, :], Z], -1), th
+
+
+def frame_to(a):
+    """A rotation taking +Z to the unit vector a."""
+    a = a / np.linalg.norm(a)
+    z = np.array([0, 0, 1.0])
+    v = np.cross(z, a)
+    c = float(np.dot(z, a))
+    if np.linalg.norm(v) < 1e-9:
+        return np.eye(3) if c > 0 else np.diag([1.0, -1.0, -1.0])
+    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + vx + vx @ vx * (1 / (1 + c))

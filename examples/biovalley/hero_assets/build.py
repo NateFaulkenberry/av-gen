@@ -26,6 +26,14 @@ import lib  # noqa: E402
 
 ASSETS = {
     "veilcap": "veilcap",
+    "lattice": "lattice",
+    "filigree": "filigree",
+    "chalice": "chalice",
+    "lanternberry": "lanternberry",
+    "veilfern": "frond",
+    "bellspire": "spire",
+    "glowmat": "mat",
+    "reliquary": "reliquary",
 }
 
 
@@ -81,7 +89,7 @@ def setup_lookdev(res=900):
     except AttributeError:
         pass
     sc.view_settings.view_transform = "AgX"
-    sc.view_settings.look = "None"
+    sc.view_settings.look = "AgX - Punchy"
     sc.view_settings.exposure = 0.0
     world = bpy.data.worlds.get("lookdev") or bpy.data.worlds.new("lookdev")
     world.use_nodes = True
@@ -100,7 +108,7 @@ def setup_lookdev(res=900):
     m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (0.008, 0.012, 0.016, 1)
-    b.inputs["Roughness"].default_value = 0.55
+    b.inputs["Roughness"].default_value = 0.8
     me.materials.append(m)
 
     def light(name, kind, loc, rot, energy, color, size):
@@ -118,7 +126,7 @@ def setup_lookdev(res=900):
     # cool back/rim light high behind, a dim violet fill, a faint moon-blue top
     light("back", "AREA", (-0.55, 0.65, 0.65), (math.radians(-55), math.radians(-35), math.radians(0)), 6.0,
           (0.55, 0.68, 1.0), 0.35)
-    light("fill", "AREA", (0.7, -0.5, 0.25), (math.radians(75), 0, math.radians(55)), 1.2, (0.45, 0.4, 1.0), 0.6)
+    light("fill", "AREA", (0.7, -0.5, 0.25), (math.radians(75), 0, math.radians(55)), 0.5, (0.45, 0.4, 1.0), 0.6)
     light("top", "AREA", (0.0, 0.0, 1.2), (0, 0, 0), 0.4, (0.5, 0.6, 1.0), 1.0)
 
 

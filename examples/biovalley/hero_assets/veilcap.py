@@ -24,11 +24,11 @@ from lib import (Asset, bezier, col, fbm, grow_veins, lerp, raster_segments, rid
 TAU = 2 * math.pi
 
 # palette (linear)
-EMERALD = np.array([0.18, 1.0, 0.42])
-CYAN = np.array([0.25, 0.85, 1.0])
-BLUE = np.array([0.22, 0.42, 1.0])
+EMERALD = np.array([0.06, 1.0, 0.30])
+CYAN = np.array([0.02, 0.75, 1.0])
+BLUE = np.array([0.10, 0.30, 1.0])
 TEAL_DARK = np.array([0.012, 0.035, 0.045])
-TEAL_THIN = np.array([0.030, 0.095, 0.105])
+TEAL_THIN = np.array([0.014, 0.045, 0.055])
 STALK_DARK = np.array([0.010, 0.016, 0.022])
 
 
@@ -50,11 +50,11 @@ class Veilcap:
         # the cap's vein trees, drawn once on a planar canvas of the unit disc and sampled by the painters
         cres = 1536 if lod == 0 else 768
         vr = np.random.default_rng(seed + 50)
-        prim = grow_veins(vr, 15, r0=0.06, step=0.02, wander=0.10, branch_p=0.10, spread=0.40, w0=1.0)
+        prim = grow_veins(vr, 11, r0=0.07, step=0.018, wander=0.12, branch_p=0.16, spread=0.45, w0=1.0, decay=0.8)
         sec = grow_veins(vr, 44, r0=0.42, step=0.015, wander=0.22, branch_p=0.16, spread=0.55, w0=0.55,
                          phase=0.3)
-        self.v1_core, self.v1_glow = raster_segments(prim, cres, 0.010)
-        self.v2_core, self.v2_glow = raster_segments(sec, cres, 0.0045)
+        self.v1_core, self.v1_glow = raster_segments(prim, cres, 0.020)
+        self.v2_core, self.v2_glow = raster_segments(sec, cres, 0.008)
 
     # -- the outer cap surface, in cap space (origin = top of stalk, z up)
     def cap_radius(self, th):
@@ -68,7 +68,7 @@ class Veilcap:
         ruffle_ph = 3.0 * fbm(th / TAU * 9, 1.7, 2, self.seed + 3, px=9)
         amp = 0.35 + 1.1 * fbm(th / TAU * 7, 4.1, 2, self.seed + 4, px=7)  # the frill comes and goes
         rr = rho * R + 0.0045 * rho ** 5 * amp * np.cos(29 * th + ruffle_ph)
-        z = (0.030 - 0.020 * rho ** 1.4 - 0.050 * rho ** 4.2
+        z = (0.030 - 0.026 * rho ** 1.6 - 0.030 * rho ** 3.5
              + 0.007 * rho ** 2 * np.sin(5 * th + p[0] + 0.6)
              + rho ** 5 * amp * (0.0065 * np.sin(29 * th + ruffle_ph) + 0.0025 * np.sin(13 * th + 2 * ruffle_ph)))
         return np.stack([rr * np.cos(th), rr * np.sin(th), z], -1)
@@ -88,17 +88,17 @@ class Veilcap:
         q = self.q
         A = Asset("veilcap")
         res = 1.0 if self.lod == 0 else 0.5
-        mem = A.slot("membrane", res=(int(2048 * res), int(1024 * res)), mode="MASK", emissive_strength=3.0)
-        lace = A.slot("veil", res=(int(2048 * res), int(1024 * res)), mode="MASK", emissive_strength=3.0)
+        mem = A.slot("membrane", res=(int(2048 * res), int(1024 * res)), mode="MASK", emissive_strength=4.0)
+        lace = A.slot("veil", res=(int(2048 * res), int(1024 * res)), mode="MASK", emissive_strength=4.0)
         stalk = A.slot("stalk", res=(int(1024 * res), int(1024 * res)), mode="OPAQUE", double_sided=False,
-                       emissive_strength=3.0)
+                       emissive_strength=4.0)
         self.A = A
 
         # ---- membrane: outer cap, crown, gills
-        r_cap = mem.region(0.0, 0.36, self.paint_cap, bump=6.0)
-        r_under = mem.region(0.36, 0.58, self.paint_under, bump=4.0)
-        r_crown = mem.region(0.58, 0.82, self.paint_crown, bump=8.0)
-        r_gill = mem.region(0.82, 1.0, self.paint_gill, bump=4.0)
+        r_cap = mem.region(0.0, 0.50, self.paint_cap, bump=6.0)
+        r_under = mem.region(0.50, 0.66, self.paint_under, bump=4.0)
+        r_crown = mem.region(0.66, 0.86, self.paint_crown, bump=8.0)
+        r_gill = mem.region(0.86, 1.0, self.paint_gill, bump=4.0)
 
         nth = int(256 * q)
         nr = int(56 * q)
@@ -276,13 +276,14 @@ class Veilcap:
         base = lerp(TEAL_DARK, TEAL_THIN, thin * (0.6 + 0.4 * mott))
         base = base + col([0.015, 0.05, 0.035], c1) + col([0.01, 0.03, 0.03], c2)
         vis = 0.5 + 0.7 * blotch  # glow pools in patches, not uniformly
-        e = (col(EMERALD, c1 * (0.10 + 0.40 * T ** 1.5) * vis)
-             + col(EMERALD, g1 * 0.05 * T)
-             + col(lerp(EMERALD, CYAN, T), c2 * 0.22 * T ** 1.5 * vis)
-             + col(CYAN, rim ** 2 * 0.20 * (0.4 + 0.6 * mott))
-             + col(EMERALD, 0.012 * rings * thin))
+        e = (col(EMERALD, c1 * (0.25 + 0.65 * T ** 1.2) * vis)
+             + col(EMERALD, g1 ** 2 * 0.06 * (0.3 + T))
+             + col(lerp(EMERALD, CYAN, T), c2 * 0.45 * T ** 1.2 * vis)
+             + col(CYAN, rim ** 3 * 0.40 * (0.4 + 0.6 * mott))
+             # the translucent body: a dim inner light, stronger where the membrane thins
+             + col(lerp(EMERALD, CYAN, 0.4 + 0.5 * T), 0.0015 + 0.006 * thin * (0.3 + mott)))
         height = 0.7 * c1 + 0.35 * c2 + 0.02 * rings + 0.25 * mott
-        rough = 0.42 + 0.16 * mott - 0.08 * c1
+        rough = 0.62 + 0.12 * mott - 0.08 * c1
         return dict(base=base, emis=e, alpha=self._rim_alpha(S, T), height=height, rough=rough, ao=0.8 + 0.2 * T)
 
     def paint_under(self, S, T):
@@ -319,7 +320,7 @@ class Veilcap:
         patch = smoothstep(0.4, 0.8, fbm(X * 3 + 1, Y * 3 + 4, 3, sd + 4))
         base = lerp(TEAL_DARK, TEAL_THIN * 0.8, 0.2 + 0.5 * T) * (0.6 + 0.4 * dome)[..., None]
         base = base + col([0.02, 0.05, 0.04], wall)
-        glow_w = wall * (0.03 + 0.30 * smoothstep(0.45, 1.0, T)) * (0.4 + 0.8 * patch)
+        glow_w = wall * (0.08 + 0.50 * smoothstep(0.4, 1.0, T)) * (0.4 + 0.8 * patch)
         e = col(lerp(EMERALD, CYAN, 0.35 + 0.4 * T), glow_w) + col(CYAN, knot * wall * 0.28 * smoothstep(0.5, 0.95, T))
         e = e * (0.7 + 0.4 * mott)[..., None]
         height = 0.7 * wall + 0.45 * dome * (1 - wall) + 0.1 * mott
@@ -335,7 +336,7 @@ class Veilcap:
         mott = fbm(S * 30, T * 8, 3, sd + 2)
         along = smoothstep(0.0, 0.5, S)
         base = lerp(np.array([0.006, 0.014, 0.016]), np.array([0.05, 0.12, 0.11]), smoothstep(0.5, 1.0, T))
-        e = (col(lerp(EMERALD, CYAN, S), edge * (0.22 + 0.22 * mott) * (0.4 + 0.6 * along))
+        e = (col(lerp(EMERALD, CYAN, S), edge * (0.40 + 0.35 * mott) * (0.4 + 0.6 * along)) + col(EMERALD, 0.008 * T)
              + col(np.array([0.5, 1.0, 0.7]), beads * 0.55))
         height = 0.25 * stri + 0.5 * beads + 0.2 * mott
         alpha = (T < 0.975 + 0.025 * fbm(S * 140, 1.0, 2, sd + 3)).astype(float)
@@ -362,7 +363,7 @@ class Veilcap:
         collar = T < 0.05 + 0.02 * fbm(S * 30, 1.0, 2, sd + 4, px=30)
         alpha = np.maximum(alpha, collar.astype(float))
         base = lerp(np.array([0.01, 0.02, 0.05]), np.array([0.03, 0.06, 0.14]), wall)
-        e = col(lerp(BLUE, CYAN, 0.2 + 0.4 * h), wall * (0.07 + 0.12 * (1 - T))) + col(CYAN, knot * wall * 0.35)
+        e = col(lerp(BLUE, CYAN, 0.2 + 0.4 * h), wall * (0.14 + 0.2 * (1 - T))) + col(CYAN, knot * wall * 0.5)
         e = e * (0.6 + 0.6 * fbm(S * 20, T * 6, 2, sd + 5, px=20))[..., None]
         height = wall + 0.5 * knot
         return dict(base=base, emis=e, alpha=alpha, height=height, rough=0.35, ao=1.0)
@@ -376,12 +377,17 @@ class Veilcap:
         net = (1 - smoothstep(0.05, 0.14, F2 - F1)) * smoothstep(0.45, 0.8, T)
         mott = fbm(S * 30, T * 40, 3, sd + 2, px=30)
         velvet = 1 - smoothstep(0.0, 0.35, T)
-        base = lerp(STALK_DARK, np.array([0.03, 0.06, 0.07]), 0.25 + 0.45 * T + 0.3 * net)
+        fuzz = fbm(S * 160, T * 220, 2, sd + 3, px=160)  # velvet nap
+        up = smoothstep(0.08, 1.0, T)
+        base = lerp(STALK_DARK, np.array([0.025, 0.06, 0.06]), 0.15 + 0.55 * up + 0.3 * net)
         base = base * (0.75 + 0.5 * mott)[..., None]
-        e = (col(BLUE, vein * 0.25 * smoothstep(0.15, 1.0, T)) + col(CYAN, net * 0.10 * T)
-             + col(EMERALD, 0.25 * smoothstep(0.96, 1.0, T)))
-        height = 0.5 * net + 0.35 * vein + 0.4 * mott * (0.4 + velvet)
-        rough = 0.45 + 0.35 * velvet + 0.1 * mott
+        # translucent pale green-cyan rising up the stalk, sap veins and the net catching it
+        glow = lerp(np.array([0.05, 0.9, 0.45]), np.array([0.15, 0.9, 1.0]), up)
+        e = (col(glow, (0.0015 + 0.018 * up ** 2) * (0.5 + 0.7 * mott))
+             + col(lerp(BLUE, CYAN, up), vein * 0.5 * up) + col(CYAN, net * 0.16 * up)
+             + col(EMERALD, 0.35 * smoothstep(0.95, 1.0, T)))
+        height = 0.5 * net + 0.35 * vein + 0.4 * mott * (0.4 + velvet) + 0.15 * fuzz
+        rough = 0.78 + 0.15 * velvet + 0.07 * fuzz
         return dict(base=base, emis=e, height=height, rough=rough, ao=0.55 + 0.45 * smoothstep(0, 0.3, T))
 
     def paint_root(self, S, T):
@@ -392,7 +398,7 @@ class Veilcap:
 
     def paint_filament(self, S, T):
         tip = smoothstep(0.84, 0.95, T)
-        e = col(lerp(CYAN, np.array([0.45, 1.0, 0.6]), tip), 0.05 + 0.75 * tip) + col(EMERALD, 0.04 * T)
+        e = col(lerp(CYAN, np.array([0.45, 1.0, 0.6]), tip), 0.05 + 0.75 * tip) + col(EMERALD, 0.008 * T)
         base = lerp(np.array([0.02, 0.05, 0.06]), np.array([0.1, 0.3, 0.2]), tip)
         return dict(base=base, emis=e, height=np.zeros_like(S), rough=0.25, ao=1.0)
 
