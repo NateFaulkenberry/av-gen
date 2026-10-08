@@ -79,29 +79,11 @@ def fungi(gfine, eyes):
 
     bx, bz = eyes["riverbank"]
     # the veil: 13 m ahead, left of the stream (north bank), leaning over the water
-    x = bx - 14.0
+    x = bx - 19.0
     zs = np.arange(land.BANK_Z, land.BANK_Z + 25, 0.5)
     hs = np.array([at(x, zz) for zz in zs])
     z = float(zs[np.argmax(hs > 3.6)]) + 1.5                 # the first dry ground north of the stream
     out["veil"].append(rec(x, at(x, z) - 0.1, z, 0.3, 1.0))
-    for k in range(26):
-        x = bx - r.uniform(6, 60)
-        side = 1 if k % 3 else -1
-        z = land.BANK_Z + side * r.uniform(5.5, 10.0)
-        nm = f"parasol{int(r.integers(0, 3))}"
-        out[nm].append(rec(x, at(x, z) - 0.02, z, r.uniform(0, 6.28), r.uniform(1.5, 4.5)))
-    mx, mz = eyes["macro"]
-    look = math.atan2(-6.0, 3.0)                               # the macro camera's heading (x, z)
-    for k, (d, off, s, nm) in enumerate(((0.85, 0.22, 1.0, "parasol1"), (0.95, 0.30, 0.8, "parasol1"))):
-        a = look + off                                         # the hero pair, left of centre
-        x, z = mx + d * math.sin(a), mz + d * math.cos(a)
-        out[nm].append(rec(x, at(x, z) - 0.01, z, r.uniform(0, 6.28), s))
-    for k in range(40):
-        d = r.uniform(0.6, 4.0)
-        a = look + r.normal(0, 0.5)
-        x, z = mx + d * math.sin(a), mz + d * math.cos(a)
-        nm = f"parasol{int(r.integers(0, 3))}"
-        out[nm].append(rec(x, at(x, z) - 0.01, z, r.uniform(0, 6.28), r.uniform(0.2, 0.6)))
     return out
 
 
@@ -155,7 +137,7 @@ def forest(gfloor, vista_eye, vista_yaw, shot_eyes):
     groves = fbm2(X / 260.0, Z / 260.0, 21, 3)                 # clearings and groves at two scales
     patches = fbm2(X / 70.0, Z / 70.0, 22, 2)
     p = habitat * (0.35 + 1.1 * (groves - 0.42)) + 0.25 * (patches - 0.5)
-    keep = (~wet) & (p > 0.18) & (r.random(len(X)) < 0.92)
+    keep = (~wet) & (p > 0.22) & (r.random(len(X)) < 0.94)
     # sight lines and clearings
     mx, mz = land.MEADOW_X, land.MEADOW_Z + 60
     keep &= np.hypot(X - mx, Z - mz) > 200
@@ -172,7 +154,8 @@ def forest(gfloor, vista_eye, vista_yaw, shot_eyes):
     out = {k: [] for k in range(N_GROVES)}
     for k in range(len(X)):
         v = int(r.integers(0, N_GROVES))
-        out[v].append(rec(X[k], H[k] - 0.4, Z[k], r.uniform(0, 6.283), r.uniform(0.8, 1.25), r.uniform(0.85, 1.3)))
+        thick = float(patches[keep][k]) if False else 1.0
+        out[v].append(rec(X[k], H[k] - 0.4, Z[k], r.uniform(0, 6.283), r.uniform(0.85, 1.35), r.uniform(0.85, 1.35)))
     print(f"  forest: {len(X)} groves")
     return out
 
@@ -277,16 +260,17 @@ def nodes(groups, mat):
                 "material": material}})
 
     for prefix, variants in groups.items():
+        mesh = {"groveglow": "grove", "grovedark": "grove"}.get(prefix, prefix)
         for v, pts in variants.items():
             if not pts:
                 continue
             if prefix == "boulder":
-                add(f"boulder{v}", f"boulder{v}", pts, mat(STONE, 0.75), lod_small)
+                add(f"boulder{v}", f"boulder{v}", pts, mat(STONE, 0.75, program="rock"), lod_small)
                 continue
-            lod = lod_grove if prefix == "grove" else lod_small
+            lod = lod_grove if mesh == "grove" else lod_small
             if prefix == "hero":
                 lod = {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 0.0}
-            add(f"{prefix}{v}_wood", f"{prefix}{v}_wood" if prefix != "hero" else "hero_wood", pts, mat(BARK, 0.85), lod)
-            add(f"{prefix}{v}_leaf", f"{prefix}{v}_leaf" if prefix != "hero" else "hero_leaf", pts,
-                mat(LEAF, 0.7), lod)
+            add(f"{prefix}{v}_wood", f"{mesh}{v}_wood" if prefix != "hero" else "hero_wood", pts, mat(BARK, 0.85), lod)
+            add(f"{prefix}{v}_leaf", f"{mesh}{v}_leaf" if prefix != "hero" else "hero_leaf", pts,
+                mat(LEAF, 0.7, program="crown"), lod)
     return out

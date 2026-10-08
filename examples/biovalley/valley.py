@@ -27,6 +27,8 @@ import towers  # noqa: E402
 import massifs  # noqa: E402
 import populate  # noqa: E402
 import falls  # noqa: E402
+import ecosys  # noqa: E402
+import life  # noqa: E402
 from geom import Mesh, quat_y  # noqa: E402
 
 MESHES = HERE / "meshes"
@@ -87,9 +89,9 @@ def shots(gc, gfine):
     S["riverbank"] = (e, tgt, 48.0, 0.2, 26000.0)
     # MACRO: on the mossy bank of the tributary, 30 cm up, looking along it
     bx, bz = land.BANK_X0 + 150, land.BANK_Z + 9
-    e = at(gfine["bank"], bx, bz, 0.32)
-    tgt = at(gfine["bank"], bx - 6, bz + 3, 0.5)
-    S["macro"] = (e, tgt, 42.0, 0.05, 26000.0)
+    e = at(gfine["bank"], bx, bz, 0.2)
+    tgt = at(gfine["bank"], bx - 6, bz + 3, 0.45)
+    S["macro"] = (e, tgt, 42.0, 0.03, 26000.0)
     return S
 
 
@@ -103,6 +105,7 @@ def build_meshes():
     crescent_mesh(MESHES / "moon.glb")
     print(f"massifs: {len(massifs.CATALOGUE)} variants, {tris} tris; ranges {tris_r} tris")
     print(f"flora: {populate.build(MESHES)} tris; fungi {populate.build_fungi(MESHES)} tris")
+    print(f"life: {ecosys.build(MESHES)} tris")
 
 
 def local_to_world(rec, P):
@@ -232,7 +235,7 @@ def waterfalls(tw, eyes):
         nodes.append({"name": f"fall{k}", "kind": "procedural", "procedural": {
             "source": {"kind": "mesh", "asset": f"../meshes/fall{k}.glb"},
             "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]}, "castsShadow": False,
-            "material": mat([0.0, 0.0, 0.0], 0.4, [0.55, 0.68, 1.0], 0.55, unlit=True, doubleSided=True)}})
+            "material": mat([0.1, 0.14, 0.2], 0.3, [0.45, 0.62, 1.0], 0.35, doubleSided=True, program="falls")}})
         big = width > 10
         nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0, 0]), width * (1.2 if big else 1.5),
                                 60.0 if big else 90.0, 610 + k, size=(6.0, 22.0) if big else (3.0, 9.0),
@@ -325,7 +328,7 @@ def _quat(m):
     return [round(v, 6) for v in q]
 
 
-def scene(tw, eye, target, fov, near, far, extra=()):
+def scene(tw, eye, target, fov, near, far, extra=(), eco=None):
     water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
              "reflection": 0.5, "reflectionTint": [0.45, 0.55, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
              "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
@@ -342,7 +345,7 @@ def scene(tw, eye, target, fov, near, far, extra=()):
     ]
     for k, pts in tw.items():
         if pts:
-            nodes.append(mesh_node(f"massif_{k}", f"massif_{k}", pts, mat(ROCK, 0.85), shadow=False))
+            nodes.append(mesh_node(f"massif_{k}", f"massif_{k}", pts, mat(ROCK, 0.85, program="rock"), shadow=False))
     nodes += list(extra)
     nodes += moon_nodes(eye)
 
@@ -355,11 +358,11 @@ def scene(tw, eye, target, fov, near, far, extra=()):
             "map": "../sky/night.hdr", "intensity": 0.9, "skyIntensity": 1.0, "rotation": 0.0,
             "lightFromEnvironment": False,
             "background": [0.004, 0.006, 0.02],
-            "fogColor": [0.012, 0.022, 0.085],
+            "fogColor": [0.008, 0.016, 0.07],
             "volumeDensity": 0.0011, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 8,
             "volumeMaxDistance": 200.0,
             "fogHeight": 30.0, "fogHeightFalloff": 0.007, "fogUpperDensity": 0.1, "fogHeightAmount": 1.0,
-            "fogSky": 1.0, "fogSkyDistance": 5500.0,
+            "fogSky": 0.6, "fogSkyDistance": 5500.0,
         },
         "lights": [{"name": "moon", "id": "moon", "type": "directional", "role": "key",
                     "direction": [round(float(v), 4) for v in moon_light], "color": [0.62, 0.70, 1.0],
@@ -370,17 +373,31 @@ def scene(tw, eye, target, fov, near, far, extra=()):
                                     "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.7, "band": 0.3,
                                     "bandTilt": 32.0, "daylight": 0.0}}],
         "nodes": nodes,
+        "materialPrograms": life.programs(),
+        **({"ecosystem": eco} if eco else {}),
     }
 
 
-POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.9, "post/bloom/intensity": 0.25,
-        "post/tonemap/chroma-retention": 0.8, "post/output/vignette": 0.25}
+# Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
+POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/intensity": 0.45,
+        "post/bloom/knee": 0.7, "post/bloom/radius": 1.25, "post/bloom/emissionWeight": 0.9,
+        "post/tonemap/chroma-retention": 0.85, "post/output/vignette": 0.25}
+
+# Depth of field per shot: the macro's foreground goes soft into bokeh, the riverbank's near bank slightly
+SHOT_POST = {
+    "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 0.9, "post/dof/focusRange": 0.3,
+              "post/dof/maxRadius": 26.0},
+    "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 18.0, "post/dof/focusRange": 30.0,
+                  "post/dof/maxRadius": 6.0},
+}
 
 
 def project(name, scene_path):
+    params = dict(POST)
+    params.update(SHOT_POST.get(name, {}))
     return {"format": "avgen-project", "version": 4, "app": {"name": f"Bioluminescent Valley ({name})"},
             "assets": {"scene": {"kind": "composition", "path": scene_path}, "audio": {"path": AUDIO}},
-            "parameters": dict(POST)}
+            "parameters": params}
 
 
 def main():
@@ -407,13 +424,29 @@ def main():
     shrubs = populate.ledges(tw, MESHES)
     for k, v in shrubs_f.items():
         shrubs[k] += v
-    groups = {"grove": populate.forest(gfloor, vista_eye, VISTA_YAW, eyes), "shrub": shrubs, "arch": arch,
-              "hero": {0: hero}, "boulder": boulders}
+    groves = populate.forest(gfloor, vista_eye, VISTA_YAW, eyes)
+    glow, dark = ecosys.split_groves(groves)
+    groups = {"groveglow": glow, "grovedark": dark, "shrub": shrubs, "arch": arch, "hero": {0: hero},
+              "boulder": boulders}
     eyes_by = {k: (s[0][0], s[0][2]) for k, s in S.items()}
-    extra = (populate.nodes(groups, mat) + waterfalls(tw, eyes_by) +
-             populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat))
+    heads = {k: math.atan2(s[1][0] - s[0][0], s[1][2] - s[0][2]) for k, s in S.items()}
+    ecosys.WATER_BANK = float(gfine["bank"].water_level(np.array([eyes_by["riverbank"][0] - 20.0]),
+                                                        np.array([land.BANK_Z]))[0])
+    print(f"  bank water level {ecosys.WATER_BANK:.2f}")
+    veg = populate.nodes(groups, mat)
+    carpet, hosts = ecosys.nodes(ecosys.place(gc, gfine, gfloor, eyes_by, heads), mat)
+    extra = (veg + waterfalls(tw, eyes_by) + populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat) + carpet)
+
+    def names(prefix):
+        return [n["name"] for n in veg if n["name"].startswith(prefix) and "_leaf" in n["name"]]
+    forest_hosts = {"all": [names(f"groveglow{v}_leaf") + names(f"grovedark{v}_leaf")
+                            for v in range(populate.N_GROVES)],
+                    "glow": [names(f"groveglow{v}_leaf") for v in range(populate.N_GROVES)]}
+    shrub_hosts = [n["name"] for n in veg if n["name"].startswith("shrub") and "_leaf" in n["name"]]
+    eco = ecosys.ecosystem(hosts, forest_hosts, shrub_hosts, ["fungus_veil_threads"], ecosys.WATER_BANK)
+    print(f"  ecosystem layers: {len(eco['layers'])}")
     for name, (eye, tgt, fov, near, far) in S.items():
-        sc = scene(tw, eye, tgt, fov, near, far, extra)
+        sc = scene(tw, eye, tgt, fov, near, far, extra, eco)
         (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
         (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
         print(f"  shot {name}: eye {eye} target {tgt}")

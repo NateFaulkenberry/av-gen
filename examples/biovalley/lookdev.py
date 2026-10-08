@@ -19,7 +19,9 @@ COLORS = {"rock": valley.mat(valley.ROCK, 0.85), "bark": valley.mat([0.03, 0.028
           "leaf": valley.mat([0.02, 0.05, 0.04], 0.7), "cap": valley.mat([0.05, 0.1, 0.1], 0.4),
           "glowcap": valley.mat([0.02, 0.06, 0.06], 0.4, [0.25, 1.0, 0.8], 0.8, doubleSided=True),
           "glowthread": valley.mat([0.02, 0.04, 0.06], 0.4, [0.3, 0.8, 1.0], 1.5, doubleSided=True),
-          "glowstalk": valley.mat([0.03, 0.08, 0.06], 0.5, [0.2, 0.9, 0.5], 0.3)}
+          "glowstalk": valley.mat([0.03, 0.08, 0.06], 0.5, [0.2, 0.9, 0.5], 0.3),
+          "capprog": valley.mat([0.02, 0.06, 0.06], 0.4, [0.12, 1.0, 0.38], 0.32, program="cap", doubleSided=True),
+          "stalk2": valley.mat([0.02, 0.05, 0.045], 0.5, [0.12, 1.0, 0.38], 0.06, opacity=0.85)}
 
 
 def main():
@@ -44,6 +46,8 @@ def main():
     eye = [0.0, height, -dist]
     sc = valley.scene({}, eye, [0.0, height * 0.6, 0.0], fov, 0.05, 26000.0)
     sc["nodes"] = [nd for nd in sc["nodes"] if nd["name"] in ("moon",)] + nodes
+    import life
+    sc["materialPrograms"] = life.programs()
     (valley.SHOTS / f"lookdev-{name}.scene.json").write_text(json.dumps(sc))
     (valley.SHOTS / f"lookdev-{name}.json").write_text(json.dumps(valley.project(name, f"lookdev-{name}.scene.json")))
 

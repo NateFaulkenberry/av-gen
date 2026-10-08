@@ -34,7 +34,7 @@ constexpr std::string_view kLayerKeys[] = {
     "intensity",  "excitedIntensity", "size",    "responseField", "responseGain", "responseThreshold",
     "lagField",   "travel",       "wakeField",   "wakeGain",    "breath",      "breathRate",  "flicker",     "flickerRate",
     "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance", "nearFade",
-    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate"};
+    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate", "mirror", "mirrorLevel", "mirrorStretch"};
 constexpr std::string_view kBlockKeys[] = {"enabled", "spriteRadius", "maxSprites", "layers"};
 
 template <std::size_t N>
@@ -119,7 +119,8 @@ Result<void> EmitterLayer::validate() const {
     }
     const float scalars[] = {intensity, excitedIntensity, size, responseGain, responseThreshold, travel, wakeGain, breath,
                              breathRate, flicker, flickerRate, pulseRate, pulseDecay, sparsity, maxDistance, nearFade,
-                             iridescence, iridescenceScale, iridescenceSpeed, bob, bobRate};
+                             iridescence, iridescenceScale, iridescenceSpeed, bob, bobRate, mirror, mirrorLevel,
+                             mirrorStretch};
     for (float s : scalars) {
         if (!finite(s)) {
             return fail("ecosystem layer '{}': a value is not finite", name);
@@ -136,9 +137,9 @@ Result<void> EmitterLayer::validate() const {
     }
     if (travel < 0.0f || travel > 1.0f || breath < 0.0f || breath > 1.0f || flicker < 0.0f || flicker > 1.0f ||
         sparsity < 0.0f || sparsity > 1.0f || iridescence < 0.0f || iridescence > 1.0f || bob < 0.0f ||
-        bobRate < 0.0f) {
-        return fail("ecosystem layer '{}': travel, breath, flicker, sparsity and iridescence are 0..1; bob and bobRate"
-                    " >= 0", name);
+        bobRate < 0.0f || mirror < 0.0f || mirrorStretch < 0.0f) {
+        return fail("ecosystem layer '{}': travel, breath, flicker, sparsity and iridescence are 0..1; bob, bobRate,"
+                    " mirror and mirrorStretch >= 0", name);
     }
     return {};
 }
@@ -211,6 +212,11 @@ json Ecosystem::toJson() const {
         e["iridescenceSpeed"] = l.iridescenceSpeed;
         e["bob"] = l.bob;
         e["bobRate"] = l.bobRate;
+        if (l.mirror > 0.0f) {
+            e["mirror"] = l.mirror;
+            e["mirrorLevel"] = l.mirrorLevel;
+            e["mirrorStretch"] = l.mirrorStretch;
+        }
         arr.push_back(std::move(e));
     }
     j["layers"] = std::move(arr);
@@ -295,6 +301,9 @@ Result<Ecosystem> Ecosystem::fromJson(const json& j) {
                 l.iridescenceSpeed = e.value("iridescenceSpeed", l.iridescenceSpeed);
                 l.bob = e.value("bob", l.bob);
                 l.bobRate = e.value("bobRate", l.bobRate);
+                l.mirror = e.value("mirror", l.mirror);
+                l.mirrorLevel = e.value("mirrorLevel", l.mirrorLevel);
+                l.mirrorStretch = e.value("mirrorStretch", l.mirrorStretch);
                 eco.layers.push_back(std::move(l));
             }
         }
@@ -419,6 +428,8 @@ EcosystemParameters registerEcosystemParameters(params::ParameterSet& params, co
         r.f("iridescenceSpeed", "spectrum travel (cycles/s)", l.iridescenceSpeed, -100.0f, 100.0f, -4.0f, 4.0f);
         r.f("bob", "drift (m)", l.bob, 0.0f, 100.0f, 0.0f, 4.0f);
         r.f("bobRate", "drift rate (Hz)", l.bobRate, 0.0f, 10.0f, 0.0f, 1.0f);
+        r.f("mirror", "reflection in still water (ADR-1281)", l.mirror, 0.0f, 4.0f, 0.0f, 2.0f);
+        r.f("mirrorStretch", "reflection streak (m)", l.mirrorStretch, 0.0f, 50.0f, 0.0f, 5.0f);
         p.layers.push_back(std::move(layer));
     }
     return p;
@@ -452,6 +463,8 @@ void applyEcosystemParameters(const EcosystemParameters& p, const Ecosystem& res
         copy(lp, "iridescenceSpeed", l.iridescenceSpeed);
         copy(lp, "bob", l.bob);
         copy(lp, "bobRate", l.bobRate);
+        copy(lp, "mirror", l.mirror);
+        copy(lp, "mirrorStretch", l.mirrorStretch);
     }
 }
 

@@ -323,3 +323,53 @@ TEST_CASE("a disabled ecosystem renders the same bytes as a scene with none", "[
     CHECK(renderer.ecosystem().stats().layers == 0);
     CHECK(a.rgba == b.rgba);
 }
+
+TEST_CASE("an emitter is reflected in still water only where the camera sees that water (ADR-1281)",
+          "[gpu][ecosystem][adr1281]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // An emitter 2 m above a dark floor at y = -2, 20 m out. Its mirror image (y = -4) is seen where the ray to it
+    // crosses the floor: (0, -2, -10), which projects 0.2 / tan(30 deg) of the half height below the centre.
+    scene::Scene base = darkStage();
+    addEcosystem(base, glm::vec3(0.0f, 0.0f, -20.0f), {point(glm::vec3(0.0f), 0.04f)}, 40.0f);
+    const scene::MeshId cube = base.addMesh(scene::makeCube(1.0f));
+    scene::Entity& floor = base.addEntity("water", cube);
+    floor.transform.position = glm::vec3(0.0f, -3.0f, -30.0f);
+    floor.transform.scale = glm::vec3(60.0f, 1.0f, 60.0f); // a cube of half-extent 1: its top face at y = -2
+    floor.material.baseColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+    scene::Scene mirrored = base;
+    mirrored.ecosystem.layers[0].mirror = 1.0f;
+    mirrored.ecosystem.layers[0].mirrorLevel = -2.0f;
+    mirrored.ecosystem.layers[0].mirrorStretch = 0.2f;
+    scene::Scene noFloor = mirrored;
+    noFloor.entities.clear();
+
+    const gpu::Image8 plain = render(renderer, base, 1.0);
+    const gpu::Image8 refl = render(renderer, mirrored, 1.0);
+    const gpu::Image8 air = render(renderer, noFloor, 1.0);
+    dump(plain, "ecosystem-mirror-off");
+    dump(refl, "ecosystem-mirror-on");
+    dump(air, "ecosystem-mirror-no-water");
+
+    const float halfPx = 0.5f * static_cast<float>(kHeight);
+    const auto ry = static_cast<std::uint32_t>(halfPx + 0.2f / std::tan(glm::radians(30.0f)) * halfPx);
+    auto around = [&](const gpu::Image8& img) {
+        int best = 0;
+        for (std::uint32_t y = ry - 4; y <= ry + 4; ++y) {
+            for (std::uint32_t x = kWidth / 2 - 3; x <= kWidth / 2 + 3; ++x) {
+                best = std::max(best, luma(img, x, y));
+            }
+        }
+        return best;
+    };
+    INFO("at the reflection: off " << around(plain) << ", on " << around(refl) << ", no water " << around(air));
+    CHECK(around(refl) > around(plain) + 40);
+    // the direct image is unchanged by the reflection
+    CHECK(std::abs(luma(refl, kWidth / 2, kHeight / 2) - luma(plain, kWidth / 2, kHeight / 2)) <= 3);
+    // with nothing at the water's level in front, there is nothing to reflect in
+    CHECK(around(air) < around(refl) / 3);
+}

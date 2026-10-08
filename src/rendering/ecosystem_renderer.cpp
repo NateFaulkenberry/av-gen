@@ -32,7 +32,7 @@ struct LayerUniformGpu {
     glm::ivec4 slots;
     glm::vec4 bound;
     glm::vec4 optics; // iridescence, scale, speed, bob
-    glm::vec4 motion; // bob rate, unused x3
+    glm::vec4 motion; // bob rate, mirror strength, mirror level, mirror stretch (ADR-1281)
 };
 static_assert(sizeof(LayerUniformGpu) == 144);
 
@@ -473,7 +473,7 @@ void EcosystemRenderer::encode(const EnvironmentFrame& f) {
         const int wakeSlot = layer.wakeField.empty() ? -1 : fields.slotOf(layer.wakeField);
         u.bound = glm::vec4(g.boundRadius + layer.bob, static_cast<float>(wakeSlot), layer.wakeGain, layer.nearFade);
         u.optics = glm::vec4(layer.iridescence, layer.iridescenceScale, layer.iridescenceSpeed, layer.bob);
-        u.motion = glm::vec4(layer.bobRate, 0.0f, 0.0f, 0.0f);
+        u.motion = glm::vec4(layer.bobRate, layer.mirror, layer.mirrorLevel, layer.mirrorStretch);
         context_->queue().WriteBuffer(g.uniforms, 0, &u, sizeof(u));
         cp.SetBindGroup(2, g.group);
         const std::uint32_t wx = (g.pointCount + 63u) / 64u;

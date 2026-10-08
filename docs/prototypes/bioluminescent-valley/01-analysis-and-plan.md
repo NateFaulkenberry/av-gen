@@ -286,3 +286,75 @@ Media: `~/Desktop/av-gen-review/45-bioluminescent-valley/cp2/`.
 0.3 m speckles distant surfaces with single dark pixels. The fog reads a mismatched depth there; a 0.05 → 0.5 m near
 plane cut the specks 7x. The shots use the largest near plane each can afford (vista 1 m, meadow 0.3 m, riverbank
 0.2 m). Reversed-Z is the real fix: renderer-wide, logged, not done.
+
+## 8. CP3: density and bioluminescence (2026-10-08): the owner's review stop
+
+Media: `~/Desktop/av-gen-review/45-bioluminescent-valley/cp3/`: `sbs-all.png`, `contact-sheet.png`, `stats.md`.
+
+**What was built (`life.py`, `ecosys.py`):**
+- **Ground carpets**, placed by ecological rules around each shot:
+  - the meadow: tip-stalk tufts in drifts at two noise scales, grass between, dark dotted moss in the gaps, nothing
+    within 1.8 m of the lens;
+  - the riverbank: moss cushions, tufts and grass on both banks, reeds at the water's edge, small 3D fungi;
+  - the macro: moss mounds, tufts, lattice fungi and fungi at organism scale.
+- **Glades on the valley floor:** about 47,000 tufts in clusters, more of them near water. At the vista's range
+  only their light is drawn.
+- **Fungi with real form (`life.fungus3d`):**
+  - a domed cap with thickness (top shell and underside);
+  - a ruffled rim and 64 hanging gills;
+  - a stalk with a ring and a swollen foot.
+
+  Three sizes: the macro's hero pair, the bank's, and small ones. The old flat parasols are gone.
+- **Five material programs:**
+  - `rock`: macro and grain variation, dark moss on the ledges;
+  - `crown`: crowns dark beneath, lighter on top, every tree its own green;
+  - `cap`: translucent CORE → BODY → RIM, radial striations, more see-through at the rim;
+  - `falls`: streaks that travel down the veil, broken into gaps, catching light rather than lit white;
+  - `moss`.
+- **The ecosystem: 30 emitter layers** (ADR-1202's cap of 32, brought from `proto/rift-jungle`):
+  - **Tier 1, subtle:** crown specks on every grove, moss dots (blue on half the cushions, teal on the other),
+    ledge specks.
+  - **Tier 2, active:**
+    - stalk tips (lime, emerald, cyan per variant);
+    - floor glades;
+    - the forest understorey glow on a clustered third of the groves near the river (green and cyan halves);
+    - gills and rims;
+    - reed tips;
+    - the violet lattice.
+  - **Tier 3, hero:** the veil fungus's beads, the macro hero caps, and the macro's foreground orbs. The orbs are
+    near emitters drawn as soft discs, which the depth of field turns into bokeh.
+- **ADR-1281: an emitter is reflected in still water.** The riverbank's layers mirror through the calm reach's
+  level (2.90 m) wherever the camera sees that water, smeared into ripple pillars.
+- **Colour:** the fog is navy, `fogSky` 0.6. The rose band is narrower and sits only at the horizon.
+- **Depth of field:** the macro's is focused at 0.9 m, the riverbank's at 18 m.
+
+**Verdict against the §36 questions:**
+- **Riverbank:** the closest to its panel. It has:
+  - glowing banks thick with dotted moss and tips;
+  - the veil fungus top left;
+  - the falls with mist;
+  - reflections of the bank's light on the black water.
+
+  Weaker: the water's reflections are a band along the right bank rather than the reference's coloured bokeh
+  columns, and the near left bank is dark.
+- **Macro:** now living tissue rather than paper. A domed, ruffled hero cap with dotted gills, violet lattice
+  fungi, tip stalks, and blue and green bokeh orbs in the foreground. It is too busy and too bright (mean luma 0.30
+  against 0.155): the orbs dominate the left half, and the reference's dark mossy mounds with dotted skins read
+  less well than its caps.
+- **Meadow:** wall-to-wall glowing stalks with drifts, dotted moss, rocks, the stream reflecting the tips, the rose
+  horizon, arched trees. The far carpet still reads as one bright band; the FG is a little dark.
+- **Vista: the weakest against its panel.**
+  - The structure is right.
+  - The floor glow is sparse clusters along the river, where the reference has a dense luminous carpet and lit mist
+    over the whole floor.
+  - The falls barely read at this distance; the foreground lacks the reference's dense dark foliage; the river is
+    dark (one mirror level cannot follow a descending river).
+
+  The lit mist is CP4's ground mist and illuminated pockets. Glow density and river reflections are the next
+  fixes.
+- **Darkness:** near-black share is 24-46% against 20-33%. Colour is blue and green, not grey. Violet now appears
+  only in the lattice fungi and at the horizon.
+
+**Cost (1080p, realtime tier, under the lock):**
+- **GPU:** vista 70 ms, meadow 68 ms. The scene pass is 46-58 ms; the ecosystem is not among the top six passes.
+- The forest's far geometry still dominates. A cheaper far forest after the look is approved, as agreed.

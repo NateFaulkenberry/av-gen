@@ -212,10 +212,10 @@ STYLES = {
     # the floor's forest: a straight-ish trunk, a rounded crown of many clumps
     "canopy": {"depth": 3, "r0": 0.45, "sides": 8, "taper": 0.55, "gnarl": 0.25, "kid_r": 0.62,
                "up": {3: 0.10, 2: 0.06, 1: 0.03, 0: 0.0}, "wobble": {3: 0.05, 2: 0.10, 1: 0.14, 0: 0.15},
-               "kids": {3: (3, 6), 2: (2, 4), 1: (2, 4)}, "at": {3: (0.45, 0.95), 2: (0.3, 0.9), 1: (0.3, 0.9)},
+               "kids": {3: (3, 5), 2: (2, 3), 1: (2, 3)}, "at": {3: (0.45, 0.95), 2: (0.3, 0.9), 1: (0.3, 0.9)},
                "spread": {3: (30, 60), 2: (25, 50), 1: (20, 45)}, "ratio": {3: (0.45, 0.65), 2: (0.5, 0.75),
                                                                            1: (0.5, 0.75)},
-               "clump": 2.4, "leaf_level": 2},
+               "clump": 3.1, "leaf_level": 2, "squash": 0.8, "lump": 0.35},
     # the hero framing tree: a gnarled leaning trunk, long near-horizontal limbs, clumps along them
     "hero": {"depth": 4, "r0": 1.3, "sides": 14, "taper": 0.45, "gnarl": 0.5, "kid_r": 0.58,
              "up": {4: 0.02, 3: -0.035, 2: 0.0, 1: 0.04, 0: 0.0}, "wobble": {4: 0.08, 3: 0.14, 2: 0.18, 1: 0.22, 0: 0.2},
@@ -311,6 +311,7 @@ def fungus(seed, height, cap_r, style="parasol"):
     brighter than the body (spec §10: core, body, halo)."""
     r = np.random.default_rng(seed)
     stalk, cap, threads = Mesh(), Mesh(), Mesh()
+    threads.emit = []
     # stalk: a soft S-curve
     n = 14
     lean = r.normal(0, 0.12, 2)
@@ -368,4 +369,6 @@ def fungus(seed, height, cap_r, style="parasol"):
             threads.add(V, np.array(F), np.stack([np.full(2 * m, (k * 0.618) % 1), np.tile(s, 2)], -1))
             clump(threads, line[-1], 0.009 * height, seed * 7 + k, level=1, squash=1.0, lump=0.1, u=(k * 0.618) % 1,
                   top=None)
+            threads.emit.append([*line[-1], 1.0, (k * 0.618) % 1, 0.012 * height])
+            threads.emit.append([*line[m // 2], 0.5, (k * 0.31) % 1, 0.004 * height])
     return stalk, cap, threads
