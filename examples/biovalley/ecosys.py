@@ -335,7 +335,7 @@ def nodes(out, mat):
         col = [life.CYAN, life.EMERALD, life.BLUE][v % 3]
         hosts.setdefault("frond", []).extend(add(f"frond{v}", f"frond{v}", pts,
                                                  mat([0.01, 0.03, 0.03], 0.6, col, 0.35, program="frond",
-                                                     doubleSided=True, alphaCutoff=0.5), 120.0))
+                                                     doubleSided=True, alphaCutoff=0.5, alphaMode="mask"), 120.0))
     for v, pts in out["mmoss"].items():
         col = [life.BLUE, life.TEAL, life.BLUE, life.EMERALD][v % 4]
         hosts.setdefault("mmoss", []).extend(add(f"mmoss{v}", f"moss{v}", pts,

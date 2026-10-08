@@ -112,7 +112,7 @@ def programs():
         op("swizzle", 5, srcA=5, constant=[2, 2, 2, 2]),
         op("remap", 5, srcA=5, value=1, constant=[0.0, 1.0, 0.45, 1.5]),            # each one its own brightness
         op("multiply", 2, srcA=2, srcB=5),
-        op("constant", 3, constant=[140.0, 6.0, 0.0, 0.0]),                         # radial striations (gill lines
+        op("constant", 3, constant=[140.0, 1.5, 0.0, 0.0]),                         # radial striations (gill lines
         op("multiply", 3, srcA=0, srcB=3),                                          # seen through the flesh)
         op("noise", 3, srcA=3, value=1.0, seed=13),
         op("remap", 3, srcA=3, value=1, constant=[0.25, 0.75, 0.45, 1.5]),

@@ -7392,6 +7392,19 @@ void Composition::rebuild() {
                         resolved.emissiveIntensity = authored.emissiveIntensity;
                         resolved.roughness = authored.roughness;
                         resolved.metallic = authored.metallic;
+                        // ADR-1283: the author's switches too, where the author turned them on. Before this
+                        // a mesh whose GLB carried any material silently dropped an authored cutout
+                        // (alphaMode/alphaCutoff), its base-colour texture, doubleSided and unlit: a leaf card
+                        // drew as an opaque rectangle and a frond as a one-sided sheet.
+                        resolved.doubleSided = resolved.doubleSided || authored.doubleSided;
+                        resolved.unlit = resolved.unlit || authored.unlit;
+                        if (authored.alphaMode != AlphaMode::Opaque) {
+                            resolved.alphaMode = authored.alphaMode;
+                            resolved.alphaCutoff = authored.alphaCutoff;
+                        }
+                        if (authored.baseColorTexture.valid()) {
+                            resolved.baseColorTexture = authored.baseColorTexture;
+                        }
                     }
                     return resolved;
                 };

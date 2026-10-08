@@ -3811,3 +3811,58 @@ TEST_CASE("An orbit camera circles its pivot, and weight 0 is the old orbit", "[
     REQUIRE(again.has_value());
     CHECK((*again)->toJson()["camera"] == j["camera"]);
 }
+
+TEST_CASE("an authored material's cutout, double-sidedness and unlit reach a mesh whose asset has a material (ADR-1283)",
+          "[composition][procedural][adr1283]") {
+    const std::filesystem::path asset =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "assets/quaternius/glTF/Mushroom_Common.gltf";
+    if (!std::filesystem::exists(asset)) {
+        SKIP("the Quaternius library is not present in this checkout");
+    }
+    std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "cards",
+      "camera": { "mode": 1, "position": [0, 2, 6], "target": [0, 0, 0], "fov": 50.0 },
+      "nodes": [
+        { "name": "card", "kind": "procedural", "procedural": {
+            "source": { "kind": "mesh", "asset": "@ASSET@" },
+            "distribution": { "kind": "single" },
+            "material": { "baseColor": [0.2, 0.3, 0.4], "alphaMode": "mask", "alphaCutoff": 0.35,
+                          "doubleSided": true, "unlit": true } } },
+        { "name": "plain", "kind": "procedural", "procedural": {
+            "source": { "kind": "mesh", "asset": "@ASSET@" },
+            "distribution": { "kind": "single" },
+            "material": { "baseColor": [0.2, 0.3, 0.4] } } }
+      ]
+    })";
+    Fixture fx;
+    text.replace(text.find("@ASSET@"), 7, asset.string());
+    text.replace(text.find("@ASSET@"), 7, asset.string());
+    const auto path = writeJson("adr1283_cards", text);
+    fx.files.push_back(path);
+    auto comp = scene::Composition::loadFile(path.filename(), fx.registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator, "");
+    (*comp)->update(FrameTime{});
+    const scene::Scene& s = (*comp)->scene();
+    auto find = [&](std::string_view name) {
+        return std::ranges::find_if(s.procedurals, [&](const scene::ProceduralGeometry& p) {
+            return p.name == name || p.name.ends_with(std::string("_") + std::string(name));
+        });
+    };
+    const auto card = find("card");
+    const auto plain = find("plain");
+    REQUIRE(card != s.procedurals.end());
+    REQUIRE(plain != s.procedurals.end());
+    CHECK(card->material.alphaMode == scene::AlphaMode::Mask);
+    CHECK(std::abs(card->material.alphaCutoff - 0.35f) < 1e-6f);
+    CHECK(card->material.doubleSided);
+    CHECK(card->material.unlit);
+    CHECK(std::abs(card->material.baseColor.r - 0.2f) < 1e-6f);
+    // an author who sets none of them keeps the asset's own
+    CHECK(plain->material.alphaMode == scene::AlphaMode::Opaque);
+    CHECK_FALSE(plain->material.unlit);
+}
