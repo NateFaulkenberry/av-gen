@@ -189,3 +189,35 @@ All three are fast enough.
 - The frame lacks the reference's bottom-right out-of-focus mound and its deep blue shadows.
 
 Those are the roll-out's first tasks, after the owner's decision.
+
+## The owner approved the method (2026-10-08); ADR-1284 and the macro rework (Gate A)
+
+**ADR-1284** (found by the asset artist):
+- The lit path's grazing emissive rim ignored the emissive texture, so every glTF-correct asset (factor 1, emission
+  in the texture) wore a white rim over its whole surface. That was the veilcap's "plaster".
+- The texel now multiplies the rim. Untextured materials are unchanged bit for bit.
+- GPU test `[adr1284]`.
+- Full `avgen_render_tests`: exit 0, 649 passed, 1 skipped.
+- Before and after: `artpass/03-rim-fix-before-after.png`.
+
+**The macro with the approved library** (`macrotest.py --variant asset --hero hero/hero_veilcap_lod0 --cards
+--library --scale 2.2`; `artpass/03-macro-library-sbs.png`, `03-macro-library.png`, and the full-resolution crop):
+- The veilcap is the hero.
+- Glowmounds under and around it, with a big out-of-focus one at bottom right.
+- Glowmats, lattices, lanternberries, filigrees, veilferns, bellspires and a reliquary.
+- Five depths of silhouette cards with canopy and soft glints behind.
+- A deep blue fill.
+- Fewer native stalks (none within 0.8 m of the lens).
+
+**Read against panel 3:**
+- It is now dense and layered, with deep blue shadows, a textured translucent hero, and real organisms at several
+  depths.
+- What remains:
+  - the sky still shows at top left;
+  - a pale shape glows behind the left veilfern (to identify);
+  - the native moss mounds' dots are still stipple next to the library's mounds;
+  - the native small caps read pale blue.
+
+**An engine trap found on the way:** a procedural node whose `points` list is empty draws ONE instance at the
+origin. It is not "no instances". The macro test had an empty fungus node, which put a giant fungus in front of
+the lens. The scene generators now skip empty nodes. This is logged here, not yet fixed in the engine.

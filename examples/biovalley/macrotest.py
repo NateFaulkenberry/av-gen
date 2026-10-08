@@ -57,6 +57,7 @@ def floor_mesh(path, size=8.0, n=160, seed=5):
 
 
 def node(name, glb, pts, material, maxd=60.0):
+    # (an empty points list is NOT "no instances": the engine draws one at the origin -- callers skip empties)
     return {"name": name, "kind": "procedural", "procedural": {
         "source": {"kind": "mesh", "asset": f"../meshes/{glb}.glb"},
         "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
@@ -137,12 +138,12 @@ def build(variant, hero):
         if roll < 0.55:      # a continuous skin of moss mounds of all sizes
             sup["moss"][int(r.integers(0, ecosys.N_MOSS))].append(rec(x, y - 0.02, z, r.uniform(0, 6.28),
                                                                        r.uniform(0.04, 0.16)))
-        elif roll < (0.62 if LIBRARY else 0.8) and de > 0.45:
+        elif roll < (0.62 if LIBRARY else 0.8) and de > (0.8 if LIBRARY else 0.45):
             sup["tuft"][ecosys.zone(x, z, 0.015)].append(rec(x, y - 0.01, z, r.uniform(0, 6.28),
                                                               r.uniform(0.15, 0.45)))
-        elif roll < (0.7 if LIBRARY else 0.9):
+        elif roll < (0.66 if LIBRARY else 0.9) and de > 0.6:
             sup["f3d_small"].append(rec(x, y - 0.01, z, r.uniform(0, 6.28), r.uniform(0.4, 1.2)))
-        elif roll < (0.72 if LIBRARY else 0.95):
+        elif roll < (0.68 if LIBRARY else 0.95) and de > 0.4:
             sup["frond"][int(r.integers(0, ecosys.N_FROND))].append(rec(x, y - 0.01, z, r.uniform(0, 6.28),
                                                                          r.uniform(0.08, 0.2)))
     if LIBRARY:
@@ -180,7 +181,8 @@ def build(variant, hero):
                 "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
                 "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 60.0}}})
             if (M / f"hero/hero_{name}.emit.json").exists():
-                layers.append(layer(f"lib_{name}", [f"lib_{name}"], f"hero/hero_{name}.emit.json", life.PALE, 1.0,
+                layers.append(layer(f"lib_{name}", [f"lib_{name}"], f"hero/hero_{name}.emit.json", life.PALE,
+                                    0.5 if name in ("glowmound", "glowmat") else 1.0,
                                     maxDistance=60.0, sparsity=0.4, flicker=0.2, flickerRate=0.5))
 
     # the hero's company: a cluster of emerald bank fungi beside and behind it
@@ -228,13 +230,13 @@ def build(variant, hero):
     if CARDS:
         # Approach C (hybrid 2.5D): three depths of painted silhouette cards behind the bank, facing the lens
         import cards
-        for k in range(4):
+        for k in range(5):
             cards.card_texture(M / f"card{k}.png", 500 + k, trunks=2 + k, strands=20 + 10 * k, canopy=0.6 + 0.2 * k,
                                glints=60 + 40 * k)
         cards.card_mesh(M / "card.glb")
         yaw = math.atan2(EYE[0] - HX, EYE[2] - HZ)
         for k, (dist, w, h, dx) in enumerate(((1.3, 3.0, 2.6, -0.5), (2.2, 4.6, 3.8, 0.6), (3.3, 6.5, 5.5, 0.0),
-                                              (5.0, 11.0, 8.0, 0.3))):
+                                              (5.0, 11.0, 8.0, 0.3), (1.0, 2.6, 2.6, -1.6))):
             cx = HX + dx - dist * math.sin(yaw)
             cz = HZ - dist * math.cos(yaw)
             y0 = height(max(min(cx, 3.9), -3.9), max(min(cz, 3.9), -3.9)) - 0.1
@@ -249,9 +251,12 @@ def build(variant, hero):
 
 
     eye = [EYE[0], height(EYE[0], EYE[2]) + 0.14, EYE[2]]
-    tgt = [HX + 0.2, height(HX, HZ) + 0.12, HZ]
+    tgt = [HX + 0.2, height(HX, HZ) + 0.04, HZ]
     sc = valley.scene({}, eye, tgt, 50.0, 0.02, 26000.0, nodes, None, (), {"reach": 30.0, "steps": 12,
                                                                             "emission": 0.0})
+    nodes = [n for n in nodes if n["kind"] != "procedural" or n["procedural"]["distribution"].get("points", [1])]
+    live = {n["name"] for n in nodes}
+    layers = [l for l in layers if all(h in live for h in l["hosts"])]
     sc["nodes"] = [n for n in sc["nodes"] if n["name"] in ("moon",)] + nodes
     sc["nodes"].append({"name": "clumps", "kind": "field", "position": [0, 0, 0],
                         "field": {"kind": "noise", "frequency": 2.5, "seed": 61, "strength": 1.0,
