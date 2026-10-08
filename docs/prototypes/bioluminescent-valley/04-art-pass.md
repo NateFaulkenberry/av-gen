@@ -125,3 +125,67 @@ It has a silhouette nothing else in the scene has. **Verdict:**
 - tune the lantern's materials (gill light only along the gill edges; the cap membrane dark with a lit rim);
 - fill the composition's midground;
 - wait for archetype 1 from the artist, then build the three-method comparison on this scene.
+
+## Coordinator notes on the first macro test, as done (09291a3c)
+
+The macro test is rebuilt to panel 3's layout:
+- a mossy bank climbs to the back-left, and the low camera looks up into it;
+- the hero stands up the bank, left of centre;
+- a dense skin of moss mounds (emerald, blue, cyan, with clumped glowing dots), bulb-tip stalks, small blue fungi,
+  emerald bank fungi and fronds covers the bank;
+- there is no lattice (the asset artist owns it now);
+- the lantern's stalk is translucent green (the `bulb` program).
+
+## Engine fix found here: ADR-1283
+
+An authored `alphaMode`/`alphaCutoff`, `baseColorTexture`, `doubleSided` and `unlit` were silently dropped for
+every mesh source whose GLB carries a material (all of ours). The cards drew as rectangles, and the valley's fronds
+were one-sided and uncut. They are carried over now (CPU test).
+
+## Phase 3: the method comparison (2026-10-08)
+
+The same panel-3 composition and camera, with only the hero and background method changed. Renders:
+`artpass/02-method-comparison.png` (each beside panel 3), `02-*.png` at 1080p, and full-resolution `02-*-crop.png`.
+GPU at 1920x1080, realtime tier, p50 (60 frames, under the lock):
+
+| | Method | Hero | GPU p50 | Triangles | Image |
+|---|---|---|---|---|---|
+| A | Native AV Gen | `life.fungus3d` (numpy shells) at hero scale | 44.0 ms | 4.29 M | A ruffled sheet on a stick. No secondary structure; it reads as CG at macro range |
+| B1 | Blender-assisted (the lead's test) | the veiled lantern: modifiers (subdivision, solidify, wireframe lace) | 45.4 ms | 4.39 M | A distinctive silhouette (tiered frilled bell, lace veil), but flat untextured materials: the cap reads as one lit mass |
+| B2 | Blender-assisted (the asset artist) | **the veilcap**: parametric surfaces plus UV-space anatomy painting, with base, emissive, normal and ORM textures, three tissue materials (membrane, veil, stalk), 121 k triangles | 45.7 ms | 4.40 M | **Clearly the best.** It has gills and veins in the membrane, a translucent rim with dripping beads, a fibrous stalk with a texture, and lace filaments. It stays structurally interesting at restrained emission (Gate A's test) |
+| C | Hybrid 2.5D | the veilcap plus three depths of painted silhouette cards (trunks, roots, strands, ferns; alpha cutout) behind the bank | 46.9 ms | 4.40 M | The best overall image: the empty navy sky becomes a dark, out-of-focus forest. Parallax is kept; the cost is +1.2 ms |
+
+**Cost.** The hero method is not the cost driver: B2 against A is +1.7 ms. The textured hero is 16 MB of GLB at
+LOD 0, and the asset ships a 14 k-triangle LOD 1 for scene range. The frame is dominated by the scene pass
+(26-28 ms: the supporting carpet) and the moss mounds' shadow pass (8 ms), which is the same in every variant.
+
+**Iteration speed:**
+- A: about 1 s per change (numpy).
+- B2: about 15 s to regenerate an asset headless (`Blender -b -P examples/biovalley/hero_assets/build.py`), plus a
+  ~10 s render.
+- C's cards: about 1 s.
+
+All three are fast enough.
+
+**Robustness:**
+- A and B are full 3D, robust to any camera.
+- C's cards are robust only as background, at 1.3 m or more and out of focus. Seen near edge-on, a card betrays
+  itself, so they must never be the subject or be crossed by a camera move.
+
+**Decision (proposed, for the owner):**
+1. **Hero and focal organisms: Blender-assisted (B2)**, authored by the asset artist, imported as multi-material
+   GLBs with their own textures (no material block), with `.emit.json` glints for the ecosystem.
+2. **Background depth: hybrid cards (C)**, only for out-of-focus layers behind the subject in the close shots
+   (macro, riverbank, meadow foreground).
+3. **Supporting carpets and the far ecosystem: native AV Gen**: instanced numpy species, emitter layers and glow
+   maps. They are good at density and cheap. As the asset library grows, the artist's LOD 1 meshes replace the numpy
+   species where they read better.
+
+**What is still wrong in the best (C) frame:**
+- The veilcap's top surface is pale grey, lit like plaster by the moon. That is the base texture's value; it is
+  feedback for the artist.
+- The supporting fungi still use the striated numpy caps (concentric rings).
+- The foreground bulbs are too uniform and too many.
+- The frame lacks the reference's bottom-right out-of-focus mound and its deep blue shadows.
+
+Those are the roll-out's first tasks, after the owner's decision.

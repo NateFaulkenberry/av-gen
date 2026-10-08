@@ -68,6 +68,7 @@ def layer(name, hosts, template, color, intensity, **kw):
 
 
 CARDS = False
+HERO_SCALE = 1.0
 HX, HZ = -0.3, 0.5          # the hero: up the bank, left of centre
 EYE = (0.25, 0.0, -0.3)      # the lens: low on the near slope, looking up into the bank
 
@@ -81,7 +82,18 @@ def build(variant, hero):
     layers = []
 
     # ---- the hero, at (0, 0, 0), 1.1 m from the lens
-    if variant == "blender":
+    if variant == "asset":
+        # an asset artist's GLB: its own materials and textures (no material block, so nothing overrides them)
+        place = [rec(HX, height(HX, HZ) - 0.005, HZ, 0.4, HERO_SCALE)]
+        nodes.append({"name": "hero", "kind": "procedural", "procedural": {
+            "source": {"kind": "mesh", "asset": f"../meshes/{hero}.glb"},
+            "distribution": {"kind": "points", "points": place}, "castsShadow": False,
+            "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 60.0}}})
+        emit = hero.rsplit("_lod", 1)[0] + ".emit.json"
+        if (M / emit).exists():
+            layers.append(layer("hero_glints", ["hero"], emit, life.PALE, 1.2, maxDistance=60.0, sparsity=0.5,
+                                flicker=0.2, flickerRate=0.6))
+    elif variant == "blender":
         parts = {  # part: (material, emitter colour, emitter intensity)
             "stalk": (mat([0.02, 0.06, 0.04], 0.5, life.EMERALD, 0.3, program="bulb"), None, 0),
             "under": (mat([0.015, 0.03, 0.045], 0.5, life.CYAN, 0.04, doubleSided=True), None, 0),
@@ -230,4 +242,6 @@ if __name__ == "__main__":
     if "--hero" in sys.argv:
         hero = sys.argv[sys.argv.index("--hero") + 1]
     CARDS = "--cards" in sys.argv
+    if "--scale" in sys.argv:
+        HERO_SCALE = float(sys.argv[sys.argv.index("--scale") + 1])
     build(variant, hero)
