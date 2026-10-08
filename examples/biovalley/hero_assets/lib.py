@@ -640,7 +640,7 @@ class Branch:
 
 def grow_branches(rng, p0, d0, length, radius, max_gen, children=(2, 3), spread=(0.35, 0.8), shrink=0.7,
                   rshrink=0.6, curl=0.6, up=0.15, segs=14, crozier=0.3, crozier_turns=1.4, min_r=0.0004,
-                  child_t=(0.35, 1.0)):
+                  child_t=(0.35, 1.0), min_dz=-1.0, sink=0.0):
     """A recursive branching body of curved, tapering tubes. Returns [Branch]; each branch records its path distance
     from the root (d0 -> d1) so a v = distance / max-distance runs root (0) to tips (1) over the whole organism."""
     out = []
@@ -679,20 +679,50 @@ def grow_branches(rng, p0, d0, length, radius, max_gen, children=(2, 3), spread=
         for j in range(k):
             tt = rng.uniform(*child_t) if j < k - 1 else 1.0
             i = min(int(tt * n), n)
-            nd = rodrigues(dirs[i], perp(dirs[i], rng), rng.uniform(*spread))
-            rec(pts[i], nd, L * shrink * rng.uniform(0.8, 1.15), radii[i] * (0.85 if tt < 1 else 1.0), gen + 1,
+            axis = perp(dirs[i], rng)  # drawn before the angle: the approved organisms depend on this order
+            ang = rng.uniform(*spread) * (1.0 if tt < 1 else (0.35 if sink > 0 else 1.0))  # the leader turns gently
+            nd = rodrigues(dirs[i], axis, ang)
+            if nd[2] < min_dz:  # keep limbs from diving into the ground
+                nd = nd.copy()
+                nd[2] = min_dz
+                nd /= np.linalg.norm(nd)
+            # `sink` starts a side branch inside its parent so the joint has no visible seam
+            start = pts[i] - nd * radii[i] * (sink if tt < 1 else 0.5 * sink)
+            rec(start, nd, L * shrink * rng.uniform(0.8, 1.15), radii[i] * (0.85 if tt < 1 else 1.0), gen + 1,
                 dist + seglen[i])
 
     rec(np.asarray(p0, dtype=np.float64), np.asarray(d0, dtype=np.float64), length, radius, 0, 0.0)
     return out
 
 
-def add_branches(slot, region, branches, sides_fn, shape=None, s_width=0.25, seed=0):
-    """Tubes for every branch; v = path distance / the organism's longest path."""
+def tube_up(curve, radii, sides, shape=None, up=(0.0, 0.0, 1.0)):
+    """A tube whose u = 0 faces up (world +Z projected off the axis): painters can put moss on top."""
+    curve = np.asarray(curve, dtype=np.float64)
+    T = normalize(np.gradient(curve, axis=0))
+    U = np.asarray(up, dtype=np.float64)[None, :] * np.ones_like(T)
+    N = U - T * np.sum(U * T, axis=1, keepdims=True)
+    bad = np.linalg.norm(N, axis=1) < 1e-4
+    N[bad] = np.cross(T[bad], [1.0, 0, 0])
+    N = normalize(N)
+    B = np.cross(T, N)
+    th = np.linspace(0, 2 * math.pi, sides, endpoint=False)
+    t = np.linspace(0.0, 1.0, len(curve))
+    R = np.asarray(radii, dtype=np.float64)[:, None] * (shape(th, t) if shape else 1.0)
+    ring = np.cos(th)[None, :, None] * N[:, None, :] + np.sin(th)[None, :, None] * B[:, None, :]
+    return curve[:, None, :] + R[..., None] * ring
+
+
+def add_branches(slot, region, branches, sides_fn, shape=None, s_width=0.25, seed=0, up_frame=False):
+    """Tubes for every branch; v = path distance / the organism's longest path. With `up_frame`, u = 0 faces up on
+    every branch and u spans the region's full width (s_width is ignored), so a painter can tell top from bottom."""
     rng = np.random.default_rng(seed)
     dmax = max(b.d1 for b in branches)
     for b in branches:
         sides = sides_fn(b)
+        if up_frame:
+            P = tube_up(b.pts, b.radii, sides, shape)
+            slot.add_grid(P, region, wrap_u=True, t_range=(b.d0 / dmax, b.d1 / dmax))
+            continue
         P = tube_grid(b.pts, b.radii, sides, shape)
         s0 = rng.uniform(0, 1 - s_width)
         slot.add_grid(P, region, wrap_u=True, s_range=(s0, s0 + s_width), t_range=(b.d0 / dmax, b.d1 / dmax))
@@ -733,3 +763,37 @@ def frame_to(a):
         return np.eye(3) if c > 0 else np.diag([1.0, -1.0, -1.0])
     vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
     return np.eye(3) + vx + vx @ vx * (1 / (1 + c))
+
+
+def _hash3(ix, iy, iz, seed):
+    return _hash(ix * 7919 + iz * 104729, iy, seed)
+
+
+def worley3(x, y, z, seed=0, jitter=0.9, chunk=1 << 18):
+    """3D jittered-grid cellular noise: F1 and the nearest cell's hash. For painting detail on a surface by its own
+    3D positions, so it keeps its shape however the UVs stretch."""
+    shape = np.shape(x)
+    x = np.ravel(x).astype(np.float64)
+    y = np.ravel(y).astype(np.float64)
+    z = np.ravel(z).astype(np.float64)
+    F1 = np.empty_like(x)
+    H1 = np.empty_like(x)
+    for a in range(0, len(x), chunk):
+        xs, ys, zs = x[a:a + chunk], y[a:a + chunk], z[a:a + chunk]
+        cx, cy, cz = np.floor(xs).astype(np.int64), np.floor(ys).astype(np.int64), np.floor(zs).astype(np.int64)
+        best = np.full(len(xs), 1e9)
+        hb = np.zeros(len(xs))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    ix, iy, iz = cx + dx, cy + dy, cz + dz
+                    px = ix + 0.5 + jitter * (_hash3(ix, iy, iz, seed) - 0.5)
+                    py = iy + 0.5 + jitter * (_hash3(ix, iy, iz, seed + 7) - 0.5)
+                    pz = iz + 0.5 + jitter * (_hash3(ix, iy, iz, seed + 13) - 0.5)
+                    d = np.sqrt((px - xs) ** 2 + (py - ys) ** 2 + (pz - zs) ** 2)
+                    m = d < best
+                    best = np.where(m, d, best)
+                    hb = np.where(m, _hash3(ix, iy, iz, seed + 19), hb)
+        F1[a:a + chunk] = best
+        H1[a:a + chunk] = hb
+    return F1.reshape(shape), H1.reshape(shape)

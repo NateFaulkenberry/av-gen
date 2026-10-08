@@ -73,7 +73,48 @@ Nine archetypes (spec Phase 2, items 1-8, plus the coordinator's lattice). All a
 - **Luminous anatomy:** veins, edges, beads, knots and throats, in saturated emerald (0.06, 1, 0.3) and cyan (0.02, 0.75, 1). Lace is blue and violet (lattice, veils, the reliquary's outer shell); the berries are cyan, emerald or a rare blue.
 - **Body glow:** below 1% of peak, so a dark body stays dark.
 
-## Engine note: the emissive Fresnel rim
+## Round 2 (after the owner's approval)
+
+**Reworked:**
+- **chalice:** now five open trumpet cups with glowing throats and thin, crimped, translucent lips. Two slots, `chalice_bell` (outside) and `chalice_throat` (lining). 97,920 / 14,688 tris.
+- **glowmat:** a denser thread network and a speckle of emerald and blue dots. The dots vary in size (a few large, many small) and brightness, and gather in drifts. They are painted from the surface's 3D position with `worley3`, so they stay round on slopes.
+
+**New:** organisms and scene support.
+
+| Asset | Use | Size | LOD0 tris | LOD1 tris |
+|---|---|---|---|---|
+| `glowmound` | the macro's big foreground mound, glowmat tissue | 1.0 x 0.49 m | 61,600 | 11,472 |
+| `shadowbough` | dark framing tree (vista left, riverbank) | 29 m tall, overhangs **+X** by ~25 m | 43,396 | 1,700 |
+| `riverrock_a` .. `_d` | craggy mossy boulders | 2.0 / 1.1 / 0.7 / 0.3 m | 47,960 | 1,848 |
+| `glowsedge` | bank sedge with luminous seed-heads | 0.6-1.4 m | 3,980 | 198 |
+| `bulbstalk` | meadow bulb-tip stalks (5 per clump) | 0.12-0.3 m | 1,040 | 144 |
+| `canopy` | valley-floor tree, 300 m to 2 km | 16 m | 1,128 | 1,128 |
+| `canopygrove` | 7 canopy trees as one instance, ~30 m across | 18 m | 7,266 | 7,266 |
+| `darkfern` | low dark understorey fern | 0.25 m | 396 | 36 |
+
+**Notes:**
+- **shadowbough:**
+  - Trunk plus buttress roots, with moss on the upper side of every limb: limbs are built with `tube_up`, so u = 0 faces up.
+  - Foliage: ragged horizontal leaf pads plus curtains of crossed drooping strand cards (MASK).
+  - Emission: a few pods, moss speckle and rare leaf-tip glints only.
+  - Rotate the instance to aim the overhang.
+- **riverrocks:**
+  - Moss on top and in the crevices. **Only the moss emits** (a faint spore speckle); the lichen rings are unlit.
+  - The waterline band is darker and glossy.
+- **canopy:**
+  - One level of detail only.
+  - Self-shadowing is painted: every lobe darkens toward its underside, and lower lobes take the darker half of the texture.
+  - Sparse emerald glints on the upper crown.
+- **Instanced in thousands:** glowsedge, bulbstalk and darkfern LOD1s are 36-198 tris.
+
+**Verified in AV Gen** with the lead's ADR-1284 rim fix, 0 loader warnings each:
+- `meshes/hero/round2-near.json`
+- `meshes/hero/round2-far.json`
+- `meshes/hero/lineup-lod0.json`
+
+**Look-dev:** framing assets render against a lit sky (`SILHOUETTE` in build.py), and rocks under brighter light. The light rig scales with asset size.
+
+## Engine note: the emissive Fresnel rim (FIXED, ADR-1284)
 
 `shaders/pbr_shade.wgsl` adds `pow(1 - N.V, 3) * emissiveBase * 0.3 * intensity` to every emissive material. `emissiveBase` is the emissive factor and **not** the texture. These assets carry their colour and localisation in the emissive texture, with a factor of (1,1,1) and strength 4. As a result every surface gets a neutral grazing sheath of up to 1.2, which reads as silver in the bright look-dev sky.
 
@@ -82,7 +123,7 @@ Measured on the glowmat in the lineup:
 - with emissiveFactor x0.05: 18;
 - albedo, roughness and the normal map have no effect on it.
 
-Suggested fix (the lead's call): drive the rim from the textured emission when a material has an emissive texture.
+Fixed on the lead's branch (ADR-1284): the rim now follows the emissive texture. After the fix, the same moss pixel reads (3, 17, 11), dark green.
 
 ### 1. Veilcap
 
