@@ -30,7 +30,7 @@ python3 sheet.py <render dir> <out.png> <name> ...            # turntable-style 
 | Emitters | `hero_<name>.emit.json`: `{"points": [[x, y, z, v, u, radius], ...]}` in GLB space (Y up). It marks luminous knots, bead tips and gill-edge beads, for the lead's compute-point glints |
 | Attributes | POSITION, NORMAL (authored smooth normals) and TEXCOORD_0. No vertex colours, no tangents (AV Gen doesn't read them) |
 | Materials | one per anatomical tissue, named `<name>_<tissue>`; AV Gen makes one instanced draw per slot |
-| Textures | embedded PNGs (copies are in `textures/` for inspection), 1k-2k. **base** = sRGB baseColor plus alpha; **emissive** = sRGB luminous anatomy; **orm** = R ambient occlusion (not referenced by the GLB, so the engine ignores it), G roughness, B metal = 0; **normal** = tangent-space, OpenGL (+Y = +v) |
+| Textures | embedded PNGs (copies are in `textures/` for inspection), 1k-2k. **base** = sRGB baseColor plus alpha; **emissive** = sRGB luminous anatomy; **orm** = R ambient occlusion (also referenced as `occlusionTexture`), G roughness, B metal = 0; **normal** = tangent-space, OpenGL (+Y = +v) |
 | Emission | emissiveFactor (1,1,1), with the brightness in the texture; `KHR_materials_emissive_strength` = 3.0 is the overall dial. The texture carries the gradient: bright core, then dim body, then dark tissue |
 | Alpha | `MASK` with cutoff 0.5 for lace, frayed rims, pores and holes. Never BLEND: the procedural path draws blend as opaque |
 | Sidedness | membranes, veils and gills are `doubleSided`; stalk tissue is single-sided |
@@ -49,9 +49,40 @@ python3 sheet.py <render dir> <out.png> <name> ...            # turntable-style 
 
 ## The library
 
-| # | Asset | Archetype | LOD0 tris | LOD1 tris | Slots (texture) |
-|---|---|---|---|---|---|
-| 1 | `veilcap` | translucent fungus: layered cap, gills, lace veil | 121,004 | 13,936 | membrane MASK 2048x1024; veil MASK 2048x1024; stalk OPAQUE 1024 |
+Nine archetypes (spec Phase 2, items 1-8, plus the coordinator's lattice). All are verified loading in AV Gen: `meshes/hero/lineup-lod0.json` and `lineup-lod1.json` give 0 loader warnings and 0 GPU errors.
+
+| # | Asset (`hero_<name>_lod*.glb`) | Archetype | Height | LOD0 tris | LOD1 tris | Slots (texture) |
+|---|---|---|---|---|---|---|
+| 1 | `veilcap` | translucent fungus: layered cap, gills, lace veil | 0.32 m | 121,004 | 13,936 | membrane MASK 2048x1024; veil MASK 2048x1024; stalk 1024 |
+| 2 | `filigree` | branching organism, curved tapering filaments, croziers | 0.22 m | 68,304 | 3,040 | filament 1024 |
+| 3 | `chalice` | three folded, asymmetric trumpets with glowing throats | 0.22 m | 84,864 | 12,948 | bell MASK 2048x1024 |
+| 4 | `lanternberry` | lace-husked luminous berries on a gnarled body | 0.14 m | 52,746 | 10,330 | body 1024; husk MASK 1024; berry 256 |
+| 5 | `veilfern` | rosette of broad translucent fronds, one unfurling | 0.28 m | 53,088 | 8,190 | blade MASK 2048x1024; stalk 512 |
+| 6 | `bellspire` | tall stalk, umbel of pendant bells, secondary branches | 0.78 m | 32,852 | 2,944 | stalk 1024; bell MASK 1024x512 |
+| 7 | `glowmat` | moss and fungal cushion, mycelium, spore colonies, sporophytes | 0.08 m | 44,472 | 3,852 | moss 2048x1024; sporophyte 512 |
+| 8 | `reliquary` | focal hero: rib cage cupping a lace-shelled glowing heart | 0.55 m | 40,358 | 4,484 | rib 1024; shell MASK 2048x1024; core 512 |
+| + | `lattice` | curling perforated honeycomb sheets, blue-violet | 0.28 m | 39,864 | 4,608 | net MASK 2048x1024; foot 512 |
+
+**Lighter LODs:**
+- LOD1 is the same organism, pruned and coarsened from the same seeds (the filigree drops generations 4-5), with half-resolution textures.
+- Use LOD1 beyond ~2 m. AV Gen's own ladder can simplify it further.
+
+**Palette:** one shared material language across the family.
+- **Tissue:** near-black teal stalks and bodies, velvety (roughness 0.75-0.9).
+- **Membranes:** gelatinous (0.3-0.6).
+- **Luminous anatomy:** veins, edges, beads, knots and throats, in saturated emerald (0.06, 1, 0.3) and cyan (0.02, 0.75, 1). Lace is blue and violet (lattice, veils, the reliquary's outer shell); the berries are cyan, emerald or a rare blue.
+- **Body glow:** below 1% of peak, so a dark body stays dark.
+
+## Engine note: the emissive Fresnel rim
+
+`shaders/pbr_shade.wgsl` adds `pow(1 - N.V, 3) * emissiveBase * 0.3 * intensity` to every emissive material. `emissiveBase` is the emissive factor and **not** the texture. These assets carry their colour and localisation in the emissive texture, with a factor of (1,1,1) and strength 4. As a result every surface gets a neutral grazing sheath of up to 1.2, which reads as silver in the bright look-dev sky.
+
+Measured on the glowmat in the lineup:
+- moss pixel as exported: 92, against 5 for the ground beside it;
+- with emissiveFactor x0.05: 18;
+- albedo, roughness and the normal map have no effect on it.
+
+Suggested fix (the lead's call): drive the rim from the textured emission when a material has an emissive texture.
 
 ### 1. Veilcap
 
@@ -72,4 +103,11 @@ Slots:
 - **`veilcap_veil`**: the lace veil.
 - **`veilcap_stalk`**, u strips: stalk 0 to 0.62, roots 0.62 to 0.80, filaments 0.80 to 1.
 
-**Verified in AV Gen** (`avgen --render`, scene `meshes/hero/check.json`): 3 materials, 12 textures, 0 loader warnings. The MASK lace and the textures read correctly.
+
+### 2-8 and the lattice
+
+Each module's docstring describes its anatomy: `filigree.py`, `chalice.py`, `lanternberry.py`, `frond.py` (veilfern), `spire.py` (bellspire), `mat.py` (glowmat), `reliquary.py`, `lattice.py`.
+
+Every slot uses `v` from root or centre (0) to tip or rim (1):
+- **filigree:** v is the path distance from the root over the longest path, so the tips sit at v ≈ 1.
+- **lanternberry husks** and **bellspire bells:** v runs from the attachment to the mouth or tip.
