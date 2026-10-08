@@ -63,11 +63,11 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     # the glow low over the far valley: violet that warms to rose at the horizon, wide in azimuth
     gaz = np.einsum("ijk,k->ij", d * np.array([1, 0, 1]), glow_dir * np.array([1, 0, 1]))
     gaz = gaz / np.maximum(np.linalg.norm(d[..., [0, 2]], axis=-1), 1e-6) / np.linalg.norm(glow_dir[[0, 2]])
-    lobe = np.exp(-((1.0 - gaz) / 0.35) ** 1.2)
-    low = np.exp(-np.maximum(elev, 0) / 0.075)
-    band = np.exp(-np.maximum(elev, 0) / 0.022)
-    violet = np.array([0.060, 0.040, 0.150])
-    rose = np.array([0.150, 0.058, 0.095])
+    lobe = np.exp(-((1.0 - gaz) / 0.30) ** 1.2)
+    low = np.exp(-np.maximum(elev, 0) / 0.16)
+    band = np.exp(-((np.maximum(elev, 0) - 0.07) / 0.07) ** 2)      # a raised band, clear of the far hills
+    violet = np.array([0.045, 0.035, 0.150])
+    rose = np.array([0.62, 0.20, 0.20])
     sky += lobe[..., None] * (low[..., None] * violet + band[..., None] * rose)
 
     # the moon's halo

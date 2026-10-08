@@ -69,7 +69,7 @@ def _path(fn, level_fn, step=40.0, z0=Z_RANGE[0], z1=Z_RANGE[1]):
 
 VISTA_Z = -1150.0
 VISTA_X = cx(VISTA_Z) + 250.0
-VISTA_HEIGHT = 300.0      # the promontory's rise above the floor
+VISTA_HEIGHT = 560.0      # the promontory's rise above the floor
 
 MEADOW_Z = 140.0
 MEADOW_X = cx(MEADOW_Z) - 170.0

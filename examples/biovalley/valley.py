@@ -24,6 +24,9 @@ sys.path.insert(0, str(HERE))
 import land  # noqa: E402
 import sky  # noqa: E402
 import towers  # noqa: E402
+import massifs  # noqa: E402
+import populate  # noqa: E402
+import falls  # noqa: E402
 from geom import Mesh, quat_y  # noqa: E402
 
 MESHES = HERE / "meshes"
@@ -37,8 +40,6 @@ ROCK_FAR = [0.07, 0.075, 0.10]
 GROUND = [0.045, 0.05, 0.06]
 MOON = [0.80, 0.86, 1.0]
 
-N_TOWER_VARIANTS = 8
-TOWER_H = 300.0          # nominal height of a variant; instances scale it
 
 
 def rng(seed):
@@ -53,8 +54,9 @@ def _dir(yaw_deg, pitch_deg):
 
 
 VISTA_YAW = 4.0         # degrees from +z toward +x: looking across the valley, not straight down it
-MOON_DIR = _dir(VISTA_YAW - 16.0, 9.0)   # +yaw is screen-left (RH, +z ahead)
-GLOW_DIR = _dir(VISTA_YAW - 4.0, 0.0)
+MOON_DIR = _dir(VISTA_YAW - 16.0, 9.5)   # +yaw is screen-left (RH, +z ahead)
+GLOW_DIR = _dir(VISTA_YAW - 10.0, 0.0)
+VISTA_EYE_XZ = (land.VISTA_X - 40, land.VISTA_Z + 60)
 
 
 def shots(gc, gfine):
@@ -66,23 +68,23 @@ def shots(gc, gfine):
 
     S = {}
     # VISTA: on the lookout, over the tree line, across the valley toward the moon
-    e = at(gc, land.VISTA_X - 40, land.VISTA_Z + 60, 80.0)
-    d = _dir(VISTA_YAW, -7.0)
+    e = at(gc, *VISTA_EYE_XZ, 14.0)
+    d = _dir(VISTA_YAW, -8.5)
     S["vista"] = (e, [round(e[0] + d[0] * 1000, 2), round(e[1] + d[1] * 1000, 2), round(e[2] + d[2] * 1000, 2)],
-                  44.0, 0.2, 26000.0)
+                  44.0, 1.0, 26000.0)
     # MEADOW: knee height on the terrace, looking north up the valley at the far towers
     mx, mz = land.MEADOW_X + 4, land.MEADOW_Z - 30
     e = at(gfine["meadow"], mx, mz, 1.15)
     d = _dir(12.0, -4.0)
     S["meadow"] = (e, [round(e[0] + d[0] * 500, 2), round(e[1] + d[1] * 500, 2), round(e[2] + d[2] * 500, 2)],
-                   46.0, 0.05, 26000.0)
+                   46.0, 0.3, 26000.0)
     # RIVERBANK: just above the tributary's water, looking upstream (west) toward the cliff and its falls
     bx, bz = land.BANK_X0 + 185, land.BANK_Z - 14
     e = at(gfine["bank"], bx, bz, 0.6)
     yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 7.0   # the falls right of centre
     d = _dir(yaw, 2.0)
     tgt = [round(e[0] + d[0] * 100, 2), round(e[1] + d[1] * 100, 2), round(e[2] + d[2] * 100, 2)]
-    S["riverbank"] = (e, tgt, 48.0, 0.05, 26000.0)
+    S["riverbank"] = (e, tgt, 48.0, 0.2, 26000.0)
     # MACRO: on the mossy bank of the tributary, 30 cm up, looking along it
     bx, bz = land.BANK_X0 + 150, land.BANK_Z + 9
     e = at(gfine["bank"], bx, bz, 0.32)
@@ -93,100 +95,150 @@ def shots(gc, gfine):
 
 # ---- towers ---------------------------------------------------------------------------------------------------------
 
-def build_towers():
+def build_meshes():
     MESHES.mkdir(parents=True, exist_ok=True)
-    tris = 0
-    for k in range(N_TOWER_VARIANTS):
-        m = towers.tower(1000 + k * 7, TOWER_H)
-        tris += m.write(MESHES / f"tower{k}.glb", f"tower{k}", outward_from=towers.tower_outward)
+    tris = massifs.build(MESHES)
     r = towers.ranges()
     tris_r = r.write(MESHES / "ranges.glb", "ranges", outward_from=lambda P: np.tile([0, 1.0, 0], (len(P), 1)))
     crescent_mesh(MESHES / "moon.glb")
-    print(f"towers: {N_TOWER_VARIANTS} variants, {tris} tris; ranges {tris_r} tris")
+    print(f"massifs: {len(massifs.CATALOGUE)} variants, {tris} tris; ranges {tris_r} tris")
+    print(f"flora: {populate.build(MESHES)} tris; fungi {populate.build_fungi(MESHES)} tris")
 
 
-def place_towers(gc):
-    """Where the towers stand: rows on both walls and the plateau behind, a few on the floor, a forest of them at
-    the far end. Heights follow distance from the floor's edge (taller further back) with bounded randomness, and a
-    minimum spacing scaled to size so they never interpenetrate."""
+def local_to_world(rec, P):
+    """Catalogue-local points (n, 3) of an instance record [x, y, z, qx, qy, qz, qw, s, s, s] (a turn about y)."""
+    x, y, z, qx, qy, qz, qw, s = rec[:8]
+    yaw = 2.0 * math.atan2(qy, qw)
+    c, sn = math.cos(yaw), math.sin(yaw)
+    P = np.asarray(P, float) * s
+    return np.stack([x + c * P[:, 0] + sn * P[:, 2], y + P[:, 1], z - sn * P[:, 0] + c * P[:, 2]], -1)
+
+
+def place_massifs(gc):
+    """Mountain masses in depth layers along both walls, a far end of ranges, and authored hero masses that frame
+    the vista. Scale varies a lot (heavy-tailed); each mass is oriented roughly along the valley."""
     r = rng(77)
-    cand = []
+    cand = []                      # (name, x, z, scale, yaw, forced)
+    names = {k: [n for n, c in massifs.CATALOGUE.items() if c[0] == k] for k in massifs.KINDS}
 
-    def add(x, z, h, variant=None):
-        cand.append((x, z, h, variant))
+    def add(kind, x, z, scale, yaw=None, forced=False, name=None):
+        nm = name or str(r.choice(names[kind]))
+        if yaw is None:
+            yaw = math.radians(-90.0 + r.normal(0, 22.0))
+        cand.append((nm, x, z, scale, yaw, forced))
 
-    # walls and plateau, both sides: CLUSTERS, not rows. Each cluster is a dominant tower with satellites;
-    # between clusters the walls stay bare (negative space). Heights are heavy-tailed: most towers are modest, a
-    # few are giants, so the skyline has a hierarchy.
+    # layers: (offset range from the centre line, mean spacing along z, kinds, scale range)
+    layers = (((420, 760), 330.0, ("peak", "cliff", "spire", "range"), (0.45, 1.0)),
+              ((780, 1400), 420.0, ("range", "peak", "range", "cliff"), (0.7, 1.35)),
+              ((1500, 2600), 560.0, ("range", "range", "peak"), (1.0, 1.75)))
     for side in (-1, 1):
-        z = -1500.0 + r.uniform(0, 120)
-        while z < 4300:
-            off = r.uniform(340, 1300) if r.random() < 0.8 else r.uniform(1300, 1900)
-            cxz, czz = land.cx(z) + side * off, z
-            hd = min(160 + 260 * r.pareto(2.6) + off * 0.12, 820)
-            add(cxz, czz, hd)
-            for _ in range(int(r.integers(1, 6))):
-                a_ = r.uniform(0, 6.283)
-                d_ = r.uniform(0.25, 0.7) * hd
-                add(cxz + d_ * math.cos(a_), czz + d_ * math.sin(a_), hd * r.uniform(0.3, 0.75))
-            z += r.uniform(160, 420)
-    # isolated towers on the floor (rare, they stand in the river's braids)
-    for z, off, h in ((1300, -150, 210), (1720, 210, 260), (2050, -60, 300), (2250, 230, 240), (2500, -260, 330),
-                      (780, 290, 150)):
-        add(land.cx(z) + off, z, h)
-    # the far end: towers across the whole valley, receding
-    for z in np.arange(2700, 4400, 90.0):
-        x = land.cx(z) + r.uniform(-1400, 1400)
-        hd = min(220 + 240 * r.pareto(2.6), 760)
-        add(x, z, hd)
-        for _ in range(int(r.integers(0, 4))):
-            a_ = r.uniform(0, 6.283)
-            add(x + 0.5 * hd * math.cos(a_), z + 0.5 * hd * math.sin(a_), hd * r.uniform(0.35, 0.8))
-    # giants: a few far taller than the rest, so the skyline has a hierarchy, not a comb
-    for z, off, h in ((1450, -560, 760), (2200, 620, 820), (3100, -300, 900), (900, 640, 640), (2700, 150, 700)):
-        add(land.cx(z) + off, z, h)
-    # the vista's hero masses (panel 2): a broad group of peaks left of centre, a cliff-massif framing the right.
-    # Bearings are from the vista eye, degrees, + = screen left.
-    ex, ez = land.VISTA_X - 40, land.VISTA_Z + 60
-    for bearing, dist, h, var in ((17.0, 1450.0, 560.0, 3), (26.0, 1600.0, 480.0, 6), (12.0, 1800.0, 430.0, 2),
-                                  (34.0, 1050.0, 380.0, 5), (-30.0, 1350.0, 500.0, 5), (-36.0, 1700.0, 470.0, 3),
-                                  (-17.0, 1900.0, 420.0, 6)):
+        for (o0, o1), gap, kinds, (s0, s1) in layers:
+            z = -1700.0 + r.uniform(0, gap)
+            while z < 4600:
+                off = r.uniform(o0, o1)
+                sc = s0 + (s1 - s0) * min(r.pareto(3.0), 1.0)
+                add(str(r.choice(kinds)), land.cx(z) + side * off, z, sc)
+                z += gap * r.uniform(0.6, 1.4)
+    # the far end, across the valley, receding
+    for z in np.arange(2900, 6200, 380.0):
+        for _ in range(2):
+            add(str(r.choice(("range", "peak", "range", "spire"))), land.cx(z) + r.uniform(-1700, 1700),
+                z + r.uniform(-120, 120), r.uniform(0.9, 1.8))
+    # a few masses standing on the floor (the reference's isolated towers in the valley)
+    for z, off, kind, sc in ((1650, 230, "spire", 0.55), (2150, -200, "peak", 0.5), (2550, 120, "spire", 0.7)):
+        add(kind, land.cx(z) + off, z, sc)
+    # the vista's framing masses. Bearings from the vista eye, degrees, + = screen left.
+    ex, ez = VISTA_EYE_XZ
+    for bearing, dist, name, sc, yaw in ((24.0, 1900.0, "peak2", 1.25, -60.0), (33.0, 1500.0, "peak0", 0.95, -100.0),
+                                         (17.0, 2600.0, "range1", 1.2, -80.0), (-26.0, 1500.0, "cliff0", 1.0, -90.0),
+                                         (-34.0, 2000.0, "peak1", 1.1, -90.0), (-20.0, 2900.0, "range3", 1.3, -95.0)):
         b = math.radians(VISTA_YAW + bearing)
-        add(ex + dist * math.sin(b), ez + dist * math.cos(b), h, var)
-    # the falls tower: the riverbank's stream comes down its face
-    add(land.BANK_X0 - 150, land.BANK_Z + 10, 190, 0)
+        add(None, ex + dist * math.sin(b), ez + dist * math.cos(b), sc, math.radians(yaw), True, name)
+    # the riverbank's cliff: its long axis runs north-south, its face east toward the camera
+    add(None, land.BANK_X0 - 25, land.BANK_Z + 10, 1.0, math.radians(-90.0), True, "bankcliff")
 
-    # keep-outs: the vista's own sight line over the near floor, the meadow and the bank
+    eyes = [(ex, ez), (land.MEADOW_X, land.MEADOW_Z), (land.BANK_X0 + 150, land.BANK_Z)]
     keep = []
-    ex, ez = land.VISTA_X - 40, land.VISTA_Z + 60
-    for (x, z, h, var) in cand:
-        dv = math.hypot(x - ex, z - ez)
-        bearing = math.degrees(math.atan2(x - ex, z - ez)) - VISTA_YAW
-        if var is None and (dv < 300 or (abs(bearing) < 9.0 and dv < 2600)):
+    for (nm, x, z, sc, yaw, forced) in cand:
+        _, L_, W_, _, _ = massifs.CATALOGUE[nm]
+        c_, s_ = math.cos(yaw), math.sin(yaw)
+
+        def covers(a, b):
+            dx, dz = a - x, b - z
+            lx, lz = c_ * dx - s_ * dz, s_ * dx + c_ * dz
+            return abs(lx) < 0.62 * L_ * sc + 80 and abs(lz) < 0.62 * W_ * sc + 80
+        if nm != "bankcliff" and any(covers(a, b) for a, b in eyes):
             continue
-        if math.hypot(x - land.MEADOW_X, z - land.MEADOW_Z) < 280:
-            continue
-        if 20 < math.hypot(x - (land.BANK_X0 + 90), z - land.BANK_Z) < 175:
-            continue
-        keep.append((x, z, h, var))
-    # spacing: a tower of height h claims ~0.17 h of radius
-    keep.sort(key=lambda c: -c[2])
+        if not forced:
+            dv = math.hypot(x - ex, z - ez)
+            bearing = math.degrees(math.atan2(x - ex, z - ez)) - VISTA_YAW
+            if dv < 900 or (abs(bearing) < 14.0 and dv < 3600):
+                continue
+            if math.hypot(x - land.MEADOW_X, z - land.MEADOW_Z) < 420:
+                continue
+            if math.hypot(x - (land.BANK_X0 + 100), z - land.BANK_Z) < 330:
+                continue
+        keep.append((nm, x, z, sc, yaw, forced))
+    keep.sort(key=lambda c: (not c[5], -c[3] * massifs.CATALOGUE[c[0]][1]))
     placed = []
-    for (x, z, h, var) in keep:
-        rad = 0.12 * h
-        if var is not None or all(math.hypot(x - px, z - pz) > 0.75 * (rad + 0.12 * ph) for (px, pz, ph, _) in placed):
-            placed.append((x, z, h, var))
-    by_variant = {k: [] for k in range(N_TOWER_VARIANTS)}
-    X = np.array([p[0] for p in placed])
-    Z = np.array([p[1] for p in placed])
-    Y = gc.height(X, Z)
-    for k, (x, z, h, var) in enumerate(placed):
-        s = h / TOWER_H
-        v = int(r.integers(0, N_TOWER_VARIANTS)) if var is None else var
-        by_variant[v].append([round(x, 2), round(float(Y[k]), 2), round(z, 2), *quat_y(r.uniform(0, 6.283)),
-                              round(s, 4), round(s * r.uniform(0.9, 1.1), 4), round(s, 4)])
-    print(f"towers placed: {len(placed)}")
-    return by_variant
+    for c in keep:
+        nm, x, z, sc = c[:4]
+        rad = 0.32 * sc * massifs.CATALOGUE[nm][1]
+        if c[5] or all(math.hypot(x - p[1], z - p[2]) > 0.8 * (rad + 0.32 * p[3] * massifs.CATALOGUE[p[0]][1])
+                       for p in placed):
+            placed.append(c)
+    # each mass stands on the lowest ground under its footprint, so none hangs over a slope
+    out = {n: [] for n in massifs.CATALOGUE}
+    ang = np.linspace(0, 2 * math.pi, 24, endpoint=False)
+    for k, (nm, x, z, sc, yaw, forced) in enumerate(placed):
+        _, L, W, _, _ = massifs.CATALOGUE[nm]
+        ring = []
+        for f in (0.0, 0.25, 0.5):
+            ring += [(x + f * L * sc * math.cos(a), z + f * L * sc * math.sin(a)) for a in ang]
+        R = np.array(ring)
+        y0 = float(gc.height(R[:, 0], R[:, 1]).min())
+        out[nm].append([round(x, 2), round(y0 - 6.0, 2), round(z, 2), *quat_y(yaw),
+                        round(sc, 4), round(sc, 4), round(sc, 4)])
+    print(f"massifs placed: {len(placed)}")
+    return out
+
+
+def find_instance(tw, name, x, z):
+    """The placed record of catalogue `name` nearest (x, z)."""
+    best = min(tw[name], key=lambda rc: math.hypot(rc[0] - x, rc[2] - z))
+    return best
+
+
+def waterfalls(tw, eyes):
+    """The falls (one mesh per fall, in world space) and their mist: three off the vista's framing masses, one at
+    the riverbank's stream head."""
+    nodes = []
+    ex, ez = VISTA_EYE_XZ
+    specs = []
+    for bearing, dist, name, width, lipfrac in ((-26.0, 1500.0, "cliff0", 22.0, 0.5), (33.0, 1500.0, "peak0", 14.0, 0.45),
+                                               (24.0, 1900.0, "peak2", 18.0, 0.4)):
+        b = math.radians(VISTA_YAW + bearing)
+        rc = find_instance(tw, name, ex + dist * math.sin(b), ez + dist * math.cos(b))
+        specs.append((name, rc, (ex, ez), width, lipfrac, 60, 2.5))
+    bx, bz = eyes["riverbank"]
+    rc = find_instance(tw, "bankcliff", land.BANK_X0 - 25, land.BANK_Z + 10)
+    specs.append(("bankcliff", rc, (bx, bz), 6.0, 0.22, 50, 1.2))
+    for k, (name, rc, toward, width, frac, strands, speed) in enumerate(specs):
+        F = massifs.Field(MESHES, name)
+        lip, foot = falls.find_lip(F, rc, toward, frac)
+        facing = (toward[0] - lip[0], toward[1] - lip[2])
+        m = falls.fall(lip, foot[1], facing, width, 600 + k, strands=strands, speed=speed)
+        m.write(MESHES / f"fall{k}.glb", f"fall{k}")
+        nodes.append({"name": f"fall{k}", "kind": "procedural", "procedural": {
+            "source": {"kind": "mesh", "asset": f"../meshes/fall{k}.glb"},
+            "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]}, "castsShadow": False,
+            "material": mat([0.0, 0.0, 0.0], 0.4, [0.55, 0.68, 1.0], 0.55, unlit=True, doubleSided=True)}})
+        big = width > 10
+        nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0, 0]), width * (1.2 if big else 1.5),
+                                60.0 if big else 90.0, 610 + k, size=(6.0, 22.0) if big else (3.0, 9.0),
+                                emissive=1.2 if big else 1.4))
+        print(f"  fall{k} ({name}): lip {np.round(lip, 1).tolist()} drop {lip[1] - foot[1]:.0f} m")
+    return nodes
 
 
 # ---- scene ----------------------------------------------------------------------------------------------------------
@@ -243,7 +295,7 @@ def crescent_mesh(path, phase=0.24, tilt=0.75, n=256):
 
 def moon_nodes(eye):
     """The crescent, 20 km out, turned to face the vista camera (it is far enough not to parallax between shots)."""
-    D, ang = 20000.0, math.radians(3.1)
+    D, ang = 20000.0, math.radians(2.8)
     rad = D * math.tan(ang)
     c = np.asarray(eye) + MOON_DIR * D
     z = -MOON_DIR                                   # the mesh's +z faces the camera
@@ -273,14 +325,14 @@ def _quat(m):
     return [round(v, 6) for v in q]
 
 
-def scene(tw, eye, target, fov, near, far):
+def scene(tw, eye, target, fov, near, far, extra=()):
     water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
-             "reflection": 1.1, "reflectionTint": [0.55, 0.62, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
+             "reflection": 0.5, "reflectionTint": [0.45, 0.55, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
              "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
     nodes = [
         {"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
          "terrain": {"chunkSize": 200.0, "resolution": 80, "lodLevels": 4, "lodDistance": 300.0,
-                     "viewDistance": 4500.0, "shadowDistance": 200.0, "skirtDepth": 4.0, "groundMottle": True,
+                     "viewDistance": 4500.0, "shadowDistance": 200.0, "skirtDepth": 30.0, "groundMottle": True,
                      "water": water},
          "material": mat(GROUND, 0.92)},
         {"name": "ranges", "kind": "procedural", "procedural": {
@@ -290,7 +342,8 @@ def scene(tw, eye, target, fov, near, far):
     ]
     for k, pts in tw.items():
         if pts:
-            nodes.append(mesh_node(f"towers{k}", f"tower{k}", pts, mat(ROCK, 0.85), shadow=False))
+            nodes.append(mesh_node(f"massif_{k}", f"massif_{k}", pts, mat(ROCK, 0.85), shadow=False))
+    nodes += list(extra)
     nodes += moon_nodes(eye)
 
     moon_light = -MOON_DIR
@@ -334,7 +387,7 @@ def main():
     SHOTS.mkdir(parents=True, exist_ok=True)
     SKY.mkdir(parents=True, exist_ok=True)
     if "--no-meshes" not in sys.argv:
-        build_towers()
+        build_meshes()
     if "--no-sky" not in sys.argv and not (SKY / "night.hdr").exists() or "--sky" in sys.argv:
         print("sky...")
         sky.build(SKY / "night.hdr", MOON_DIR, GLOW_DIR)
@@ -344,9 +397,23 @@ def main():
         "meadow": land.ground((land.MEADOW_X - 200, land.MEADOW_X + 200, land.MEADOW_Z - 200, land.MEADOW_Z + 300), 2.0),
         "bank": land.ground((land.BANK_X0 - 120, land.BANK_X0 + 300, land.BANK_Z - 150, land.BANK_Z + 120), 1.0),
     }
-    tw = place_towers(gc)
-    for name, (eye, tgt, fov, near, far) in shots(gc, gfine).items():
-        sc = scene(tw, eye, tgt, fov, near, far)
+    tw = place_massifs(gc)
+    print("ground (floor)...")
+    gfloor = land.ground((-1500.0, 1500.0, -1700.0, 4400.0), 6.0)
+    S = shots(gc, gfine)
+    vista_eye = S["vista"][0]
+    eyes = [(s[0][0], s[0][2]) for s in S.values()]
+    hero, shrubs_f, arch, boulders = populate.framing(gc, gfine, vista_eye, VISTA_YAW)
+    shrubs = populate.ledges(tw, MESHES)
+    for k, v in shrubs_f.items():
+        shrubs[k] += v
+    groups = {"grove": populate.forest(gfloor, vista_eye, VISTA_YAW, eyes), "shrub": shrubs, "arch": arch,
+              "hero": {0: hero}, "boulder": boulders}
+    eyes_by = {k: (s[0][0], s[0][2]) for k, s in S.items()}
+    extra = (populate.nodes(groups, mat) + waterfalls(tw, eyes_by) +
+             populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat))
+    for name, (eye, tgt, fov, near, far) in S.items():
+        sc = scene(tw, eye, tgt, fov, near, far, extra)
         (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
         (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
         print(f"  shot {name}: eye {eye} target {tgt}")

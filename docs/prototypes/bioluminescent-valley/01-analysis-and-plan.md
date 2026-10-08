@@ -221,3 +221,68 @@ Known engine-side notes from CP1:
 - With the fog off, distant terrain and range tips alias into single dark pixels (no TAA in the offline still).
   Forest cover and fog hide most of it; supersampled offline renders would remove it.
 - Terrain chunks: 200 m, view distance 4.5 km. Not yet profiled.
+
+## 7. CP2: hero vegetation, and the owner's CP1 notes (2026-10-08)
+
+Media: `~/Desktop/av-gen-review/45-bioluminescent-valley/cp2/`.
+
+**The owner's CP1 notes, as done:**
+1. **Vista camera.** It now stands on the lip of a 300 m promontory (`land.VISTA_HEIGHT` 560), 14 m above the
+   ground, pitched -8.5°. The forest floor and the river fill the lower two-thirds. No mass stands within 900 m of
+   the eye or in a ±14° corridor out to 3.6 km, except the authored framing masses.
+2. **Mountains, not obelisks.** `massifs.py` replaces the pillar towers. Each massif is a heightfield over a
+   warped footprint, with:
+   - cliff bands at the edge;
+   - several summits joined by ridged noise;
+   - terraced ledges;
+   - crags;
+   - cliff faces jittered sideways.
+
+   There are 13 catalogue masses: ranges, peaks, cliffs, spires, and the riverbank's cliff. They are placed in
+   three depth layers per wall, plus a far end, with heavy-tailed scales. Each stands on the lowest ground under its
+   footprint, so none overhangs a slope. Ledge points come out of the generator, and shrubs and small trees are
+   placed on them.
+3. **Riverbank.** A craggy cliff (`bankcliff`) stands at the stream head. Its falls is a streaked veil of 50
+   gravity-arc ribbons, with a mist pool of particles at the foot.
+4. **Meadow.** The sky has a raised rose band in the direction both north-looking shots face. The forest is thinned
+   in a corridor right of the meadow's centre, so the glow shows behind the far spires and in the stream.
+
+**CP2 content (`flora.py`, `populate.py`, `falls.py`):**
+- **Forest.** About 14,400 grove instances, each 5-9 canopy trees merged into one mesh pair. They are placed by
+  habitat: low ground, gentle slope, wetter and denser near water. Clearings and groves come from two noise scales.
+  The river and stream corridors, the meadow clearing and the shot eyes are kept out.
+- **Ledge vegetation:** about 3,300 shrubs and small trees on the massifs' ledges.
+- **Framing:**
+  - the vista's hero tree (a gnarled, pad-foliaged tree) and dark FG masses on the promontory lip;
+  - arched trees on the meadow's left horizon;
+  - boulders on the meadow's FG and along both banks of the riverbank stream.
+- **Waterfalls:** three off the vista's framing masses (105-230 m drops), one at the riverbank. Each has mist.
+- **Hero fungi** (the first glowing organisms):
+  - the riverbank's tall veil fungus on the near left bank (a cap trailing luminous threads with beads);
+  - parasol fungi along both banks;
+  - a colony with a hero pair in front of the macro lens.
+
+**Verdict:**
+- **The vista** now reads as the reference's structure: a glowing-to-be forest floor seen from above, a river
+  winding to the lower right, craggy masses in layers separated by haze, a crescent moon, falls on the framing
+  masses, and a dark tree framing the left. It is too violet overall; the reference is bluer, with the pink
+  confined to the horizon. Retune at CP3/CP4.
+- **The riverbank** has the reference's layout: woods on both banks, the veil fungus top left, and the falls with
+  mist right of centre.
+- **The meadow** has its horizon line, the arched trees on the left, the rose glow right of centre, the stream and
+  FG rocks. The ground carpet is CP3.
+- **The macro** is the weakest: flat mint emissive discs on sticks read as toys. It is all organisms, and it is
+  CP3's first job: translucent caps with a bright core and a dimmer body, glowing gills, moss mounds, bulbs and
+  bokeh.
+
+**Cost (first measurement, vista, 1920x1080, realtime tier, under the lock):**
+- GPU p50 is 97.7 ms: the scene pass 79.4 ms and the depth prepass 12.7 ms.
+- Submitted triangles: 28.4 M; visible instances: 21,653.
+- The dominant cost is the forest's far-LOD geometry (17,437 instances at LOD 3).
+- The fix is a far representation of the forest (leaner far rungs or a canopy surface), at the performance pass.
+  It is not a reason to thin the forest.
+
+**Engine limit met:** depth precision. Depth24 with standard Z, a 26 km far plane and a near plane under about
+0.3 m speckles distant surfaces with single dark pixels. The fog reads a mismatched depth there; a 0.05 → 0.5 m near
+plane cut the specks 7x. The shots use the largest near plane each can afford (vista 1 m, meadow 0.3 m, riverbank
+0.2 m). Reversed-Z is the real fix: renderer-wide, logged, not done.
