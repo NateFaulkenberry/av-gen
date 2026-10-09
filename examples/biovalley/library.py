@@ -42,13 +42,37 @@ BASE = {"glowmat": [0.3, 0.38, 0.45], "glowmound": [0.45, 0.55, 0.6], "lattice":
         "filigree": [0.5, 0.55, 0.6]}
 
 
-def node(name, species, pts, lod, maxd):
+# Colourways by tinting the emission (the material's emissive factor multiplies the asset's emission texture, whose
+# light is cyan-teal): one mesh, the reference palette's hues. Factors above 1 pull the weak channels up.
+TINTS = {"cyan": [1.0, 1.0, 1.0], "emerald": [0.35, 1.0, 0.4], "chartreuse": [2.6, 1.05, 0.12],
+         "gold": [4.5, 0.8, 0.06], "blue": [0.35, 0.55, 1.7], "violet": [2.6, 0.3, 1.7]}
+# the glint colour of each colourway (the light the eye reads as the organism's dots)
+TINT_GLOW = {"cyan": [0.1, 0.85, 1.0], "emerald": [0.15, 1.0, 0.35], "chartreuse": [0.65, 1.0, 0.1],
+             "gold": [1.0, 0.7, 0.15], "blue": [0.15, 0.35, 1.0], "violet": [0.55, 0.2, 1.0]}
+# per shot, per species: the hue mix (weights), chosen per region (coherent drifts of one colour)
+PALETTES = {
+    "meadow": {"bulbstalk": [("chartreuse", 3), ("emerald", 3), ("cyan", 2), ("gold", 1), ("blue", 1)],
+               "glowmat": [("emerald", 3), ("blue", 2), ("cyan", 1)],
+               "filigree": [("cyan", 2), ("emerald", 1), ("violet", 1)],
+               "lanternberry": [("gold", 2), ("blue", 1), ("violet", 1)],
+               "glowmound": [("emerald", 2), ("blue", 1)],
+               "glowsedge": [("blue", 2), ("cyan", 1)], "veilfern": [("emerald", 1), ("cyan", 1)],
+               "bellspire": [("blue", 1), ("violet", 1)]},
+    "riverbank": {"glowsedge": [("chartreuse", 2), ("emerald", 2), ("cyan", 1)],
+                  "glowmound": [("emerald", 2), ("blue", 2), ("cyan", 1)],
+                  "glowmat": [("emerald", 1), ("blue", 1)], "veilfern": [("emerald", 1), ("cyan", 1)],
+                  "lanternberry": [("blue", 2), ("violet", 1), ("gold", 1)], "bellspire": [("blue", 1), ("violet", 1)],
+                  "filigree": [("cyan", 1), ("blue", 1)], "veilcap": [("cyan", 1)]},
+}
+
+
+def node(name, species, pts, lod, maxd, tint=None):
     proc = {"source": {"kind": "mesh", "asset": f"../{HERO}/hero_{species}_lod{lod}.glb"},
             "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
             "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": maxd}}
     if species in DIAL:
         proc["material"] = {"baseColor": BASE.get(species, [1.0, 1.0, 1.0]), "roughness": 1.0, "metallic": 0.0,
-                            "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": DIAL[species]}
+                            "emissiveColor": TINTS.get(tint, [1.0, 1.0, 1.0]), "emissiveIntensity": DIAL[species]}
     return {"name": name, "kind": "procedural", "procedural": proc}
 
 
@@ -62,19 +86,31 @@ def emit_layer(name, hosts, species, color, intensity, mirror=None, **kw):
     return d
 
 
-def assemble(groups, eye, near=10.0, far=400.0):
-    """groups: {species: [records]} -> (nodes, {species: [host names]}). LOD 0 within `near` m of the eye."""
+def assemble(groups, eye, near=10.0, far=400.0, palette=None, scale=12.0):
+    """groups: {species: [records]} -> (nodes, {species: [host names]}). LOD 0 within `near` m of the eye. With a
+    palette, each record takes a colourway chosen by a low-frequency noise at its position (drifts of one hue)."""
     nodes, hosts = [], {}
+    palette = palette or {}
     for sp, recs in groups.items():
         if not recs:
             continue
-        near_r = [r for r in recs if math.hypot(r[0] - eye[0], r[2] - eye[2]) < near]
-        far_r = [r for r in recs if math.hypot(r[0] - eye[0], r[2] - eye[2]) >= near]
-        for tag, rs, lod, md in (("n", near_r, 0, near * 1.5), ("f", far_r, 1, far)):
-            if rs:
-                nm = f"lib_{sp}_{tag}"
-                nodes.append(node(nm, sp, rs, lod, md))
-                hosts.setdefault(sp, []).append(nm)
+        mix = palette.get(sp, [(None, 1)])
+        names = [m[0] for m in mix]
+        cum = np.cumsum([m[1] for m in mix], dtype=float)
+        cum /= cum[-1]
+        P = np.array([[r[0], r[2]] for r in recs])
+        n = fbm2(P[:, 0] / scale, P[:, 1] / scale, 71 + len(sp), 2)
+        n = np.clip((n - 0.25) / 0.5, 0, 0.999)                  # stretch the noise to fill 0..1
+        pick = np.searchsorted(cum, n)
+        for ti, tint in enumerate(names):
+            sel = [recs[i] for i in range(len(recs)) if pick[i] == ti]
+            near_r = [r for r in sel if math.hypot(r[0] - eye[0], r[2] - eye[2]) < near]
+            far_r = [r for r in sel if math.hypot(r[0] - eye[0], r[2] - eye[2]) >= near]
+            for tag, rs, lod, md in (("n", near_r, 0, near * 1.5), ("f", far_r, 1, far)):
+                if rs:
+                    nm = f"lib_{sp}_{tint or 'base'}_{tag}"
+                    nodes.append(node(nm, sp, rs, lod, md, tint))
+                    hosts.setdefault((sp, tint), []).append(nm)
     return nodes, hosts
 
 

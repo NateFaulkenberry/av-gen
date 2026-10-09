@@ -55,19 +55,19 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     glow_dir = np.asarray(glow_dir, float) / np.linalg.norm(glow_dir)
 
     # the gradient: indigo zenith, blue-violet toward the horizon
-    zen = np.array([0.003, 0.008, 0.06])
-    hor = np.array([0.014, 0.026, 0.115])
+    zen = np.array([0.006, 0.014, 0.13])        # deep royal blue (panel 2 sky ~ sRGB 34,49,110)
+    hor = np.array([0.022, 0.04, 0.22])
     t = np.clip(1.0 - np.maximum(elev, 0) / (math.pi / 2), 0, 1) ** 2.4
     sky = zen + (hor - zen) * t[..., None]
 
     # the glow low over the far valley: violet that warms to rose at the horizon, wide in azimuth
     gaz = np.einsum("ijk,k->ij", d * np.array([1, 0, 1]), glow_dir * np.array([1, 0, 1]))
     gaz = gaz / np.maximum(np.linalg.norm(d[..., [0, 2]], axis=-1), 1e-6) / np.linalg.norm(glow_dir[[0, 2]])
-    lobe = np.exp(-((1.0 - gaz) / 0.22) ** 1.2)
+    lobe = np.exp(-((1.0 - gaz) / 0.4) ** 1.2)
     low = np.exp(-np.maximum(elev, 0) / 0.16)
-    band = np.exp(-((np.maximum(elev, 0) - 0.07) / 0.07) ** 2)      # a raised band, clear of the far hills
-    violet = np.array([0.03, 0.03, 0.13])
-    rose = np.array([0.48, 0.16, 0.18])
+    band = np.exp(-((np.maximum(elev, 0) - 0.07) / 0.06) ** 2)     # a raised band, clear of the far hills
+    violet = np.array([0.06, 0.03, 0.14])
+    rose = np.array([0.7, 0.3, 0.38])
     sky += lobe[..., None] * (low[..., None] * violet + band[..., None] * rose)
 
     # the moon's halo
@@ -98,8 +98,8 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     # shading: dark bodies, lit edges toward the moon and over the glow
     edge = np.clip(1.0 - np.abs(dens - 0.45) / 0.45, 0, 1) ** 2
     near_moon = np.exp(-ang / 0.38)
-    body = np.array([0.006, 0.011, 0.046]) + 0.6 * lobe[..., None] * low[..., None] * np.array([0.06, 0.03, 0.08])
-    lit = (near_moon[..., None] * np.array([0.09, 0.13, 0.30]) * (0.35 + edge[..., None]) +
+    body = np.array([0.012, 0.02, 0.09]) + 0.6 * lobe[..., None] * low[..., None] * np.array([0.06, 0.03, 0.08])
+    lit = (near_moon[..., None] * np.array([0.1, 0.18, 0.5]) * (0.35 + edge[..., None]) +
            (lobe * low)[..., None] * np.array([0.12, 0.05, 0.12]) * (0.4 + edge[..., None]))
     cloud = body + lit
     sky = sky * (1 - dens[..., None] * 0.9) + cloud * dens[..., None]

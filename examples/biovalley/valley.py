@@ -251,7 +251,7 @@ def waterfalls(tw, eyes):
         big = width > 10
         if not big:
             # the riverbank's falls: violet-white, catching light (panel 1)
-            nodes[-1]["procedural"]["material"] = mat([0.12, 0.12, 0.2], 0.3, [0.62, 0.5, 1.0], 0.6,
+            nodes[-1]["procedural"]["material"] = mat([0.12, 0.14, 0.25], 0.3, [0.45, 0.55, 1.0], 0.45,
                                                       doubleSided=True, program="falls")
             FALL_FEET["riverbank"] = foot
         nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0, 0]), width * (1.2 if big else 2.2),
@@ -376,7 +376,7 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
             "map": "../sky/night.hdr", "intensity": 0.9, "skyIntensity": 1.0, "rotation": 0.0,
             "lightFromEnvironment": False,
             "background": [0.004, 0.006, 0.02],
-            "fogColor": [0.010, 0.012, 0.075],
+            "fogColor": [0.02, 0.032, 0.16],
             "volumeDensity": 0.0014, "volumeAbsorption": 1.0, "volumeScattering": 0.0,
             "volumeSteps": (air or {}).get("steps", 16), "volumeMaxDistance": (air or {}).get("reach", 200.0),
             "volumeEmission": (air or {}).get("emission", 0.0), "volumeColorField": (air or {}).get("mist", ""),
@@ -385,13 +385,13 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
             "fogSky": 0.6, "fogSkyDistance": 5500.0,
         },
         "lights": [{"name": "moon", "id": "moon", "type": "directional", "role": "key",
-                    "direction": [round(float(v), 4) for v in moon_light], "color": [0.62, 0.70, 1.0],
-                    "intensity": 0.9, "castsShadow": True},
+                    "direction": [round(float(v), 4) for v in moon_light], "color": [0.55, 0.65, 1.0],
+                    "intensity": 1.4, "castsShadow": True},
                    # the sky's own light from behind the camera: moonlit faces stay readable when the shot looks
                    # toward the moon (the vista), never a second shadow
                    {"name": "skyfill", "type": "directional", "direction": [round(float(v), 4) for v in
                                                                           (MOON_DIR[0], -0.35, MOON_DIR[2])],
-                    "color": [0.42, 0.48, 1.0], "intensity": 0.28, "castsShadow": False}],
+                    "color": [0.35, 0.45, 1.0], "intensity": 0.7, "castsShadow": False}],
         "effects": [{"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True,
                      "order": 0, "activation": "always",
                      "parameters": {"brightness": 2.2, "density": 0.7, "magnitudeSlope": 6.5, "colorSpread": 0.35,
@@ -420,8 +420,8 @@ LIB_GAIN = {"glowmound": 0.5, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, 
             "riverrock_d": 0.1, "darkfern": 0.1, "bellspire": 1.5, "lattice": 0.3, "reliquary": 0.8,
             "shadowbough": 0.4}
 # Per-shot water: the riverbank's stream is dark (it carries reflections, not the sky's colour)
-WATER = {"riverbank": {"reflection": 0.1, "reflectionTint": [0.3, 0.25, 0.75], "fresnel": 0.06, "specular": 0.8,
-                       "ripple": 0.3, "sparkle": 0.3, "sparkleColor": [0.45, 0.8, 1.0]}}
+WATER = {"riverbank": {"reflection": 0.5, "reflectionTint": [0.25, 0.35, 1.0], "fresnel": 0.08, "specular": 0.8,
+                       "ripple": 0.35, "sparkle": 0.12, "sparkleColor": [0.3, 0.6, 1.0]}}
 
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2},
@@ -437,7 +437,7 @@ POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/int
 # Depth of field per shot: the macro's foreground goes soft into bokeh, the riverbank's near bank slightly
 SHOT_POST = {
     "vista": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
-    "meadow": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
+    "meadow": {"camera/exposure/compensation": 0.0, "post/grade/saturation": 1.2},
     "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 0.9, "post/dof/focusRange": 0.3,
               "post/dof/maxRadius": 26.0},
     "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 9.0, "post/dof/focusRange": 25.0,
@@ -522,23 +522,27 @@ def main():
     bank_mirror = {"mirror": 2.2, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 3.0,
                    "mirrorSoftness": 9.0}
     groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK, FALL_FEET.get("riverbank"))
-    nodes_b, hosts_b = library.assemble(groups, rb_eye, near=4.0)
+    nodes_b, hosts_b = library.assemble(groups, rb_eye, near=4.0, palette=library.PALETTES["riverbank"], scale=6.0)
     lib_nodes["riverbank"] = nodes_b
     # only a few saturated species are reflected: a mix of every species' glints reflects as grey
     MIRRORED = ("glowsedge", "veilcap", "veilfern", "glowmound", "riverrock_a", "riverrock_b", "bellspire")
-    lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
-                                                  bank_mirror if sp in MIRRORED else None, sparsity=0.3)
-                               for sp, hs in hosts_b.items()]
+    lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
+                                                  LIB_GAIN.get(sp, 0.3), bank_mirror if sp in MIRRORED else None,
+                                                  sparsity=0.3)
+                               for (sp, t), hs in hosts_b.items()]
     md_eye = S["meadow"][0]
     groups_m = library.meadow(gfine["meadow"], md_eye, heads["meadow"])
-    nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=4.0)
+    nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=4.0, palette=library.PALETTES["meadow"], scale=10.0)
     lib_nodes["meadow"] = nodes_m
     md_mirror = {"mirror": 1.0, "mirrorLevel": round(float(gfine["meadow"].water_level(
         np.array([md_eye[0] + 20 * math.sin(heads["meadow"])]), np.array([md_eye[2] + 20 * math.cos(heads["meadow"])]))[0]),
         3), "mirrorStretch": 1.5, "mirrorSoftness": 5.0}
-    lib_layers["meadow"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
-                                               md_mirror if sp in MIRRORED + ("bulbstalk",) else None, sparsity=0.3)
-                            for sp, hs in hosts_m.items()]
+    MEADOW_GAIN = {"bulbstalk": 3.0, "glowmat": 0.8, "filigree": 0.3, "lanternberry": 2.5, "glowmound": 1.0}
+    lib_layers["meadow"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
+                                               MEADOW_GAIN.get(sp, LIB_GAIN.get(sp, 0.3)),
+                                               md_mirror if sp in MIRRORED + ("bulbstalk",) else None, sparsity=0.15,
+                                               size=2.0)
+                            for (sp, t), hs in hosts_m.items()]
     if populate.VISTA_FERNS:
         lib_nodes["vista"] = [library.node("lib_darkfern_vista", "darkfern", populate.VISTA_FERNS, 1, 3000.0)]
     # layers a shot cannot see are dropped (the ecosystem holds 32)
