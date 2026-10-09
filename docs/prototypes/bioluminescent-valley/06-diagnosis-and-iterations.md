@@ -169,3 +169,30 @@ Regions are luma / saturation, ours against the reference.
       - a pale blue haze of far lacefans and filigree sits behind the reliquary;
       - there is little violet or gold.
     - **Decision:** KEEP.
+12. **Meadow: carpet to the lens** (`c18`..`c34`).
+    - **Problem:** the bottom half was bare moonlit ground with big rocks.
+    - **Change:**
+      - `library.meadow()` lays a carpet from 1 m to 9 m: glowmat, bulbstalk drifts, low darkfern, a few lanternberries and filigree.
+      - Only 14 small, half-sunk rocks and mounds remain.
+      - The nearest 4.5 m keep only sparse drifts (`c19`).
+    - **The frost:** the carpet then read as pale blue frost.
+      - Darkening the bodies (BASE, DIAL) and removing the native tufts changed nothing.
+      - Ablation by layer (`md2/`, measured as the bright, low-saturation share of the bottom of frame) found the cause: the library's *glint layers* for filigree (0.3) and glowmat, plus lanternberry. The share went 0.179 with all layers, 0.082 without filigree, 0.037 with none.
+      - At meadow range the glints are sub-pixel, and the splat floor turns them into frost whatever their gain. A layer's gain does not fix it; dropping the layer does.
+    - **Result** (`c34`):
+      - carpet 0.243/0.61 vs ref 0.250/0.53;
+      - foreground 0.118/0.78 vs 0.085/0.65.
+      - The colour now reads as chartreuse, emerald and cyan bulbs on a dark bed.
+    - **Decision:** KEEP.
+    - **Also:**
+      - The meadow glowmat palette drops the blue mat; panel 4 is greener than the collage as a whole.
+      - The glowmat dial is 0.8, with a dark BASE.
+13. **Colourway GLBs replace emission tints** (riverbank and meadow).
+    - **Finding:** the render log showed "emissiveColor.x is 2.6 and runs at 1". Material factors are clamped to [0,1], so the tints above 1 (gold, chartreuse, violet) never pulled channels up; they only darkened the others.
+    - **Change:** `library.node()` now uses `hero_<species>_<colour>` where the artist exported it (neutral emissive). Otherwise it falls back to the clamped tint.
+    - **Palettes:** re-weighted toward blue on the riverbank, per the artist's measurement of the collage (70% blue).
+14. **Riverbank: forest instead of mountain** (`c20`, `c21`).
+    - **Change:** 70 canopy trees on both banks, 22-110 m out, keeping the sightline to the falls open, with riverbank mist emission 0.12.
+    - **Result:** the stream now runs through a dark forest corridor to the fall, like panel 1's enclosure. Sky/canopy is 0.027 against the reference's 0.068: it is darker than the reference, with too little blue mist in the back.
+    - **Decision:** KEEP.
+    - **Note:** a library layer whose emit template is missing (hero_canopy has none) made the engine drop the whole scene and render its default sphere and grid with exit 0. Layers are now emitted only when their template exists.

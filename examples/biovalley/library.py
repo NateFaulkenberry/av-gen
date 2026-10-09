@@ -19,6 +19,7 @@ Species and niches (scale is relative to the authored size, which is macro-scale
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -31,15 +32,15 @@ HERO = "meshes/hero"
 
 # Per-scene emission dials (the artist's strengths are all 4.0). A material block with neutral factors keeps the
 # asset's textures and only retunes the emissive strength (ADR-1283 keeps its cutouts and two-sidedness).
-DIAL = {"glowmat": 1.4, "filigree": 1.6, "glowmound": 2.4, "veilfern": 2.6, "lattice": 2.6, "bellspire": 3.0,
+DIAL = {"glowmat": 0.8, "filigree": 1.6, "glowmound": 2.4, "veilfern": 2.6, "lattice": 2.6, "bellspire": 3.0,
         "lanternberry": 3.0, "veilcap": 4.0, "reliquary": 3.0, "glowsedge": 3.0, "riverrock_a": 2.0,
-        "riverrock_b": 2.0, "riverrock_c": 2.0, "riverrock_d": 2.0, "shadowbough": 2.0, "darkfern": 1.0,
-        "canopy": 2.0, "canopygrove": 2.0, "bulbstalk": 3.0}
+        "riverrock_b": 2.0, "riverrock_c": 2.0, "riverrock_d": 2.0, "shadowbough": 2.0, "darkfern": 0.15,
+        "canopy": 1.5, "canopygrove": 2.0, "bulbstalk": 3.0}
 
 
 # Base-colour factors (multiplying the textures): the pale aprons and lace read as snow under the moon at range
-BASE = {"glowmat": [0.3, 0.38, 0.45], "glowmound": [0.45, 0.55, 0.6], "lattice": [0.4, 0.4, 0.55],
-        "filigree": [0.5, 0.55, 0.6]}
+BASE = {"glowmat": [0.07, 0.09, 0.13], "glowmound": [0.45, 0.55, 0.6], "lattice": [0.4, 0.4, 0.55],
+        "filigree": [0.15, 0.17, 0.22], "darkfern": [0.35, 0.4, 0.5]}
 
 
 # Colourways by tinting the emission (the material's emissive factor multiplies the asset's emission texture, whose
@@ -51,28 +52,35 @@ TINT_GLOW = {"cyan": [0.1, 0.85, 1.0], "emerald": [0.15, 1.0, 0.35], "chartreuse
              "gold": [1.0, 0.7, 0.15], "blue": [0.15, 0.35, 1.0], "violet": [0.55, 0.2, 1.0]}
 # per shot, per species: the hue mix (weights), chosen per region (coherent drifts of one colour)
 PALETTES = {
-    "meadow": {"bulbstalk": [("chartreuse", 3), ("emerald", 3), ("cyan", 2), ("gold", 1), ("blue", 1)],
-               "glowmat": [("emerald", 3), ("blue", 2), ("cyan", 1)],
-               "filigree": [("cyan", 2), ("emerald", 1), ("violet", 1)],
-               "lanternberry": [("gold", 2), ("blue", 1), ("violet", 1)],
-               "glowmound": [("emerald", 2), ("blue", 1)],
-               "glowsedge": [("blue", 2), ("cyan", 1)], "veilfern": [("emerald", 1), ("cyan", 1)],
-               "bellspire": [("blue", 1), ("violet", 1)]},
-    "riverbank": {"glowsedge": [("chartreuse", 2), ("emerald", 2), ("cyan", 1)],
-                  "glowmound": [("emerald", 2), ("blue", 2), ("cyan", 1)],
-                  "glowmat": [("emerald", 1), ("blue", 1)], "veilfern": [("emerald", 1), ("cyan", 1)],
-                  "lanternberry": [("blue", 2), ("violet", 1), ("gold", 1)], "bellspire": [("blue", 1), ("violet", 1)],
-                  "filigree": [("cyan", 1), ("blue", 1)], "veilcap": [("cyan", 1)]},
+    # panel 4 is greener than the collage as a whole: its carpet is emerald and yellow-green over blue
+    "meadow": {"bulbstalk": [("chartreuse", 3), ("blue", 2), ("cyan", 2), ("gold", 1)],
+               "glowmat": [("emerald", 3), ("chartreuse", 1), (None, 1)],   # the blue mat reads as frost here
+               "filigree": [("blue", 2), ("cyan", 1), ("violet", 1)],
+               "lanternberry": [("blue", 2), ("gold", 1), ("violet", 1)],
+               "glowmound": [("blue", 2), ("emerald", 1)],
+               "glowsedge": [("blue", 2), ("cyan", 1)], "veilfern": [("blue", 1), ("cyan", 1)],
+               "bellspire": [("blue", 2), ("violet", 1)]},
+    "riverbank": {"glowsedge": [("blue", 2), ("cyan", 2), ("chartreuse", 1)],
+                  "glowmound": [("blue", 3), ("emerald", 2), ("cyan", 1)],
+                  "glowmat": [("blue", 2), ("emerald", 1)], "veilfern": [("cyan", 2), ("blue", 1)],
+                  "lanternberry": [("blue", 2), ("violet", 1), ("gold", 1)], "bellspire": [("blue", 2), ("violet", 1)],
+                  "filigree": [("cyan", 1), ("blue", 2)], "veilcap": [("cyan", 1)]},
 }
 
 
 def node(name, species, pts, lod, maxd, tint=None):
-    proc = {"source": {"kind": "mesh", "asset": f"../{HERO}/hero_{species}_lod{lod}.glb"},
+    # the artist's recoloured GLB when there is one (a material factor above 1 is clamped, so the emission tint can
+    # only darken channels; the colourways recolour the texture band by band instead)
+    variant = (Path(__file__).parent / HERO / f"hero_{species}_{tint}_lod{lod}.glb").exists() if tint else False
+    glb = f"hero_{species}_{tint}" if variant else f"hero_{species}"
+    proc = {"source": {"kind": "mesh", "asset": f"../{HERO}/{glb}_lod{lod}.glb"},
             "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
             "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": maxd}}
     if species in DIAL:
         proc["material"] = {"baseColor": BASE.get(species, [1.0, 1.0, 1.0]), "roughness": 1.0, "metallic": 0.0,
-                            "emissiveColor": TINTS.get(tint, [1.0, 1.0, 1.0]), "emissiveIntensity": DIAL[species]}
+                            "emissiveColor": [1.0, 1.0, 1.0] if variant or not tint else
+                            [min(c, 1.0) for c in TINTS.get(tint, [1.0, 1.0, 1.0])],
+                            "emissiveIntensity": DIAL[species]}
     return {"name": name, "kind": "procedural", "procedural": proc}
 
 
@@ -119,13 +127,29 @@ def bank(g, eye, head, water_level, fall_foot=None, rng_seed=31):
     r = np.random.default_rng(rng_seed)
     groups = {k: [] for k in ("veilcap", "glowmound", "glowmat", "lanternberry", "filigree", "veilfern", "bellspire",
                               "lattice", "reliquary", "glowsedge", "darkfern", "riverrock_a", "riverrock_b",
-                              "riverrock_c", "riverrock_d", "shadowbough")}
+                              "riverrock_c", "riverrock_d", "shadowbough", "canopy")}
 
     def put(sp, x, z, s, sink=0.01):
         y = float(g.height(np.array([x]), np.array([z]))[0])
         groups[sp].append(rec(x, y - sink * s, z, r.uniform(0, 6.28), s))
 
     ex, ez = eye[0], eye[2]
+    # the forest over the stream (panel 1's back is canopy and hanging growth, not bare mountain): crowns on both
+    # banks from 25 m out, tall enough to close the top of frame
+    fx0, fz0 = math.sin(head), math.cos(head)
+    for k in range(70):
+        d = r.uniform(22.0, 110.0)
+        side = r.choice([-1.0, 1.0]) * r.uniform(9.0, 40.0)
+        x, z = ex + fx0 * d + fz0 * side, ez + fz0 * d - fx0 * side
+        if g.wet(np.array([x]), np.array([z]))[0]:
+            continue
+        if fall_foot is not None:                     # keep the line of sight to the falls open
+            ax, az = fall_foot[0] - ex, fall_foot[2] - ez
+            L = math.hypot(ax, az)
+            t = ((x - ex) * ax + (z - ez) * az) / L
+            if 0 < t < L + 30 and abs((x - ex) * az - (z - ez) * ax) / L < 14.0:
+                continue
+        put("canopy", x, z, r.uniform(1.1, 1.9), sink=0.02)
     fx, fz = math.sin(head), math.cos(head)          # forward (x, z)
     lx, lz = fz, -fx                                  # left (checked against the projection: right-dot < 0)
 
@@ -270,18 +294,36 @@ def meadow(g, eye, head, rng_seed=37):
     for d, side, s in ((16.0, 4.5, 4.0), (18.0, 6.0, 2.5)):
         put("veilcap", ex + fx * d + lx * side, ez + fz * d + lz * side, s)
     put("reliquary", ex + fx * 24.0 - lx * 6.0, ez + fz * 24.0 - lz * 6.0, 4.0)
-    # foreground: mossy rocks and glowmounds, low, leading toward the stream
-    for k in range(40):
-        d = r.uniform(1.5, 9.0)
-        side = r.uniform(-6.0, 6.0)
+    # foreground: the carpet runs to the lens (panel 4's bottom is growth, not ground): mats edge to edge, stalk
+    # drifts rising out of them, a few low mossy rocks and mounds half-sunk in it
+    for k in range(5000):
+        d = 1.0 + 8.0 * r.random() ** 0.8
+        side = r.uniform(-1.0, 1.0) * (1.0 + d * 0.75)
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         if g.wet(np.array([x]), np.array([z]))[0]:
             continue
-        if r.random() < 0.45:
-            put(["riverrock_a", "riverrock_b", "riverrock_c", "riverrock_d"][int(r.integers(0, 4))], x, z,
-                r.uniform(0.4, 0.9), sink=0.15)
+        drift = float(fbm2(np.array([x / 3.0]), np.array([z / 3.0]), 53, 2)[0])
+        u = r.random()
+        near = d < 4.5                                    # the nearest metres stay mostly dark (panel 4's bottom)
+        if u < 0.45:
+            put("glowmat", x, z, r.uniform(1.2, 2.4))
+        elif drift > (0.66 if near else 0.56) and u < 0.55:
+            put("bulbstalk", x, z, r.uniform(1.0, 2.2))
+        elif u < 0.8:
+            put("darkfern", x, z, r.uniform(0.6, 1.3))       # low, so the mats' light shows between
+        elif u < 0.92:
+            put(["filigree", "lanternberry"][int(r.integers(0, 2))], x, z, r.uniform(1.0, 1.8))
+    for k in range(14):
+        d = r.uniform(2.0, 9.0)
+        side = r.uniform(-5.0, 5.0)
+        x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
+        if g.wet(np.array([x]), np.array([z]))[0]:
+            continue
+        if r.random() < 0.5:
+            put(["riverrock_a", "riverrock_b", "riverrock_c"][int(r.integers(0, 3))], x, z, r.uniform(0.3, 0.6),
+                sink=0.3)
         else:
-            put("glowmound", x, z, r.uniform(0.6, 1.4), sink=0.05)
+            put("glowmound", x, z, r.uniform(0.5, 0.9), sink=0.25)
     return groups
 
 

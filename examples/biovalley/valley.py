@@ -433,7 +433,7 @@ LIT = {"riverbank": 0.35}
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
-       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.03, "mist": "mistBank"},
+       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.12, "mist": "mistBank"},
        "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}
 
 # Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
@@ -537,7 +537,7 @@ def main():
     lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
                                                   LIB_GAIN.get(sp, 0.3), bank_mirror if sp in MIRRORED else None,
                                                   sparsity=0.3)
-                               for (sp, t), hs in hosts_b.items()]
+                               for (sp, t), hs in hosts_b.items() if (MESHES / "hero" / f"hero_{sp}.emit.json").exists()]
     md_eye = S["meadow"][0]
     groups_m = library.meadow(gfine["meadow"], md_eye, heads["meadow"])
     nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=4.0, palette=library.PALETTES["meadow"], scale=10.0)
@@ -545,12 +545,13 @@ def main():
     md_mirror = {"mirror": 1.0, "mirrorLevel": round(float(gfine["meadow"].water_level(
         np.array([md_eye[0] + 20 * math.sin(heads["meadow"])]), np.array([md_eye[2] + 20 * math.cos(heads["meadow"])]))[0]),
         3), "mirrorStretch": 1.5, "mirrorSoftness": 5.0}
-    MEADOW_GAIN = {"bulbstalk": 3.0, "glowmat": 0.8, "filigree": 0.3, "lanternberry": 2.5, "glowmound": 1.0}
+    MEADOW_GAIN = {"darkfern": 0.0, "bulbstalk": 3.0, "glowmat": 0.2, "filigree": 0.0, "lanternberry": 0.0, "glowmound": 1.0}
     lib_layers["meadow"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
                                                MEADOW_GAIN.get(sp, LIB_GAIN.get(sp, 0.3)),
                                                md_mirror if sp in MIRRORED + ("bulbstalk",) else None, sparsity=0.15,
                                                size=2.0)
-                            for (sp, t), hs in hosts_m.items()]
+                            for (sp, t), hs in hosts_m.items() if MEADOW_GAIN.get(sp, LIB_GAIN.get(sp, 0.3)) > 0]
+    # (the lanternberries' glints are sub-pixel at meadow range: the splat floor turns them into a pale frost)
     # the macro (panel 3): the library at LOD 0 in front of the lens, the riverbank's library beyond it
     mc_eye, mc_tgt = S["macro"][0], S["macro"][1]
     mgroups = library.macro(gfine["bank"], mc_eye, mc_tgt)
@@ -588,6 +589,16 @@ def main():
         eco_s["layers"] = [l for l in eco["layers"] if not l["name"].startswith(DROP[name])] + lib_layers.get(name, [])
         assert len(eco_s["layers"]) <= 32, (name, len(eco_s["layers"]))
         ex_s = extra
+        if name == "meadow":
+            # the library's near carpet replaces the native tufts in front of the lens (they read as frost)
+            ex_s = []
+            for nd in extra:
+                pr = nd.get("procedural")
+                if pr and nd["name"].startswith(("tuft", "mtuft")):
+                    nd = json.loads(json.dumps(nd))
+                    nd["procedural"]["distribution"]["points"] = [
+                        p for p in pr["distribution"].get("points", []) if math.hypot(p[0] - eye[0], p[2] - eye[2]) > 12.0]
+                ex_s.append(nd)
         if name == "macro":
             # the library replaces the native macro set in front of the lens (the native moss stays as the ground)
             ex_s = []
