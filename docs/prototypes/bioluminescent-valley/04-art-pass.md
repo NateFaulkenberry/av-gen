@@ -221,3 +221,81 @@ Those are the roll-out's first tasks, after the owner's decision.
 **An engine trap found on the way:** a procedural node whose `points` list is empty draws ONE instance at the
 origin. It is not "no instances". The macro test had an empty fungus node, which put a giant fungus in front of
 the lens. The scene generators now skip empty nodes. This is logged here, not yet fixed in the engine.
+
+## The roll-out and the finishing pass (Phases 4-8), 2026-10-08: the four-shot stop
+
+Media: `~/Desktop/av-gen-review/45-bioluminescent-valley/artpass/final/`:
+- `sbs-all.png` (each shot beside its panel), `sbs-*.png`, the four 1080p stills, `contact-sheet.png`, `stats.md`;
+- the steps: `04-` and `05-riverbank*`, `06-vista*`, `07-meadow.png`.
+
+**Engine changes in this stretch (all with tests):**
+
+| ADR | Change | Test |
+|---|---|---|
+| 1284 | the grazing emissive rim follows the emissive texture | GPU `[adr1284]`; render suite exit 0 |
+| 1285 | an empty `points` list places nothing (not one instance at the origin) | CPU `[adr1285]` |
+| 1281 addendum | `mirrorSoftness`: reflections as soft ripple dashes of the light's own colour, every sample re-tested on the water | CPU round-trip; GPU ecosystem suite |
+| 1283 | authored cutout, texture, double-sided and unlit reach mesh sources | CPU `[adr1283]` |
+
+**The shots:**
+- **Riverbank (Gate B):** recomposed around open water receding to a violet-white falls with glowing plants at its
+  foot.
+  - The left third is a big dark bank: the veilcap hero, glowing sedges, glowmounds, lit rocks at the waterline.
+  - The far bank is low.
+  - The water is dark (reflection 0.1), with fine sparkle and ripple-dash reflections in each source's colour
+    (cyan, emerald, a little violet).
+  - Only saturated species are mirrored, because a mix of everything reflects as grey.
+- **Vista (Gate C):**
+  - the library's canopy groves cover the floor and slopes;
+  - shadowboughs frame the left;
+  - dark quiet regions sit between blue-cyan pooled glades, with lit low mist over them;
+  - the river is dark and winding;
+  - the masses are moonlit: a rim term in the rock program plus a sky fill light from behind the camera, with
+    stronger aerial perspective;
+  - the falls are brighter and wider;
+  - there are stars.
+- **Meadow (Gate D):** layered drifts from the library:
+  - bulbstalk clusters, glowmat ground growth, filigree and lanternberry at the drift edges;
+  - darkfern between drifts, rare bellspires;
+  - a veilcap pair and a reliquary as focal specimens;
+  - mossy glowing mounds and rocks in the foreground leading to the stream.
+
+  The far glade band and the native carpet are removed.
+- **Macro (Gate A):** the veilcap with the full library, silhouette cards behind, deep blue fill
+  (`shots/macrotest-asset-cards-library.json`). The valley's own `macro` shot still uses the native set: the library
+  macro lives in the macro test scene, and replacing it is a one-line change at the roll-out to the arc.
+
+**Measured against the reference** (`final/stats.md`):
+- Mean luma: riverbank 0.100 against 0.133, vista 0.155 against 0.182, macro 0.153 against 0.155, meadow 0.136
+  against 0.162.
+- Ours are still darker, with more near-black (34-53% against 20-33%), and fewer glowing pixels in the riverbank and
+  meadow.
+
+**Performance** (1920x1080, realtime tier, GPU p50, 90 frames, under the lock):
+
+| shot | GPU ms | CPU ms (excl. wait) | top passes | triangles | draws |
+|---|---|---|---|---|---|
+| vista | 90.2 | 10.7 | scene 57.3, volume march 23.4, depth 5.6 | 9.6 M | 837 |
+| riverbank | 202.0 | 11.8 | scene 113.5, shadow 45.5, volume march 23.5 | 34.0 M | 757 |
+| meadow | 238.0 | 11.3 | scene 150.9, shadow 43.3, volume march 23.6 | 33.7 M | 774 |
+| macro (test scene) | 59.7 | 1.5 | scene 39.9, shadow 8.2, volume march 5.6 | 5.2 M | 49 |
+
+The close shots are now too heavy for live. The dominant cost is the library's scene-range build in large numbers:
+thousands of instances at 2-11 k triangles each (glowmound LOD 1 is 11 k, lanternberry 10 k, veilfern 8 k), plus a
+shadow pass of about 45 ms.
+
+**The next highest-value fixes:**
+1. Per-species distance culls and a third LOD (a ~300-triangle far build for the artist to export).
+2. Find what still draws into the shadow maps in the close shots: the library nodes ask for no shadows.
+3. 16 march steps in live (the march costs 1 ms per step).
+4. The live ladder's render scale.
+
+Live 30 fps is not reached on any valley shot yet. Offline is fine.
+
+**Suites at the stop:**
+- `avgen_render_tests`: exit 0 (649 passed, 1 skipped).
+- `avgen_tests`: exit 42, 4,210 passed, 2 failed, 1 failed as expected. The two failures are the known baseline:
+  - `test_character_lab_slopes.cpp:187`;
+  - `test_rift.cpp`, which needs the generated `rift.scene.json` that a clean checkout lacks.
+
+  Nothing else fails. The `character_lab_slopes` baseline on main is still to be confirmed before any merge.

@@ -436,6 +436,8 @@ POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/int
 
 # Depth of field per shot: the macro's foreground goes soft into bokeh, the riverbank's near bank slightly
 SHOT_POST = {
+    "vista": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
+    "meadow": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
     "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 0.9, "post/dof/focusRange": 0.3,
               "post/dof/maxRadius": 26.0},
     "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 9.0, "post/dof/focusRange": 25.0,
@@ -520,7 +522,7 @@ def main():
     bank_mirror = {"mirror": 2.2, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 3.0,
                    "mirrorSoftness": 9.0}
     groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK, FALL_FEET.get("riverbank"))
-    nodes_b, hosts_b = library.assemble(groups, rb_eye)
+    nodes_b, hosts_b = library.assemble(groups, rb_eye, near=4.0)
     lib_nodes["riverbank"] = nodes_b
     # only a few saturated species are reflected: a mix of every species' glints reflects as grey
     MIRRORED = ("glowsedge", "veilcap", "veilfern", "glowmound", "riverrock_a", "riverrock_b", "bellspire")
@@ -529,7 +531,7 @@ def main():
                                for sp, hs in hosts_b.items()]
     md_eye = S["meadow"][0]
     groups_m = library.meadow(gfine["meadow"], md_eye, heads["meadow"])
-    nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=12.0)
+    nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=4.0)
     lib_nodes["meadow"] = nodes_m
     md_mirror = {"mirror": 1.0, "mirrorLevel": round(float(gfine["meadow"].water_level(
         np.array([md_eye[0] + 20 * math.sin(heads["meadow"])]), np.array([md_eye[2] + 20 * math.cos(heads["meadow"])]))[0]),
