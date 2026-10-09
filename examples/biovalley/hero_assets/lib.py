@@ -271,6 +271,14 @@ class Slot:
         self.F.append(F + self.nverts)
         self.nverts += nv * nu
 
+    def add_mesh(self, V, F, UV, N):
+        """Adds an arbitrary triangle mesh with its own UVs (already in [0, 1] region space) and normals."""
+        self.V.append(np.asarray(V, dtype=np.float64))
+        self.N.append(np.asarray(N, dtype=np.float64))
+        self.UV.append(np.asarray(UV, dtype=np.float64))
+        self.F.append(np.asarray(F, dtype=np.int64) + self.nverts)
+        self.nverts += len(V)
+
     def triangles(self):
         return sum(len(f) for f in self.F)
 

@@ -222,23 +222,29 @@ def build_fall_rock(lod=0):
     return A
 
 
-def stream_sheet(c, w, rng, nv, nu, layer=0.0):
-    """One stream: rolls over the lip and falls on a ballistic curve, widening as it goes. (nv, nu, 3)."""
+def stream_sheet(c, w, rng, nv, nu, layer=0.0, split=0.0):
+    """One stream: runs along its channel, bulges and curls over the lip, then falls on a ballistic curve, widening
+    and swaying. `split` (metres) peels this ribbon away from the stream's centre line partway down, so two ribbons
+    sharing a centre braid apart and back. (nv, nu, 3)."""
     v = np.linspace(0, 1, nv)
-    # the first 12% rolls over the rounded lip, the rest is free fall
-    roll = smoothstep(0.0, 0.12, v)
-    t = np.clip((v - 0.12) / 0.88, 0, 1)
-    v0 = 1.4 + rng.uniform(-0.2, 0.3)
+    roll = smoothstep(0.0, 0.14, v)
+    t = np.clip((v - 0.14) / 0.86, 0, 1)
+    v0 = 1.5 + rng.uniform(-0.3, 0.4)
     tf = math.sqrt(2 * (H - 1.0) / 9.81)
-    floor = H - float(notch(np.array(c))) + 0.12  # the water surface in its channel
-    x = LIP_X - 0.4 - 5.0 * (1 - roll) + v0 * t * tf + layer * 0.35
-    z = floor + 0.25 * (1 - roll) - (floor + 0.1) * t ** 2  # along the channel, over the lip, then ballistic
+    floor = H - float(notch(np.array(c))) + 0.12
+    # the curl: over the lip the water bulges up and out on a quarter circle before it drops
+    a = (np.pi / 2) * roll
+    curl_x = 1.1 * np.sin(a)
+    curl_z = 0.45 * (1 - np.cos(a)) * -1 + 0.35 * np.sin(2 * a)
+    x = LIP_X - 0.4 - 5.0 * (1 - roll) + curl_x + v0 * t * tf + layer * 0.35
+    z = floor + 0.25 * (1 - roll) + curl_z - (floor + 0.1) * t ** 2
     z = np.maximum(z, -0.2)
-    width = w * (1 + 0.9 * t ** 1.3) * (0.85 + 0.1 * np.sin(5 * t + c))
-    sway = 0.4 * np.sin(3.1 * t + c) * t
+    ph = rng.uniform(0, TAU)
+    width = w * (1 + 1.1 * t ** 1.2) * (0.75 + 0.25 * np.sin(4.3 * t + ph)) * (1 - 0.35 * t ** 3)
+    sway = (0.7 * np.sin(2.3 * t + ph) + 0.3 * np.sin(5.7 * t + 2 * ph)) * t + split * np.sin(np.pi * t) ** 0.8
     u = np.linspace(-0.5, 0.5, nu)
     V, U = np.meshgrid(v, u, indexing="ij")
-    X = np.broadcast_to(x[:, None], V.shape) + 0.25 * np.sin(U * 9 + V * 6 + c) * t[:, None]
+    X = np.broadcast_to(x[:, None], V.shape) + 0.35 * np.sin(U * 9 + V * 6 + c) * t[:, None]
     Y = c + sway[:, None] + U * width[:, None]
     Z = np.broadcast_to(z[:, None], V.shape) + 0.15 * np.sin(U * 13 + c) * (1 - t[:, None])
     return np.stack([X, Y, Z], -1)
@@ -252,34 +258,44 @@ def build_fall_water(lod=0):
                 emissive_strength=2.0)
     r_main = sl.region(0.0, 0.7, paint_water(0), bump=2.0)
     r_thread = sl.region(0.7, 1.0, paint_water(1), bump=1.0)
-    nv = 60 if lod == 0 else 20
+    nv = 72 if lod == 0 else 22
     for k, (c, w, layered) in enumerate(STREAMS):
         nu = 14 if lod == 0 else 5
-        sl.add_grid(stream_sheet(c, w, rng, nv, nu), r_main, s_range=(k / 3, (k + 1) / 3))
-        if layered and lod == 0:  # a narrower, offset back layer gives the water depth
-            sl.add_grid(stream_sheet(c + 0.3, w * 0.75, rng, nv, nu - 4, layer=-1.0), r_main,
+        # each stream is two ribbons that braid apart and rejoin, of unequal width
+        f = rng.uniform(0.35, 0.65)
+        for j, (cc, ww, sp) in enumerate(((c - w * (1 - f) / 2, w * f, -w * 0.18), (c + w * f / 2, w * (1 - f), w * 0.22))):
+            sl.add_grid(stream_sheet(cc, ww, rng, nv, nu, split=sp), r_main, s_range=(k / 3, (k + 1) / 3))
+        if layered and lod == 0:  # an offset back layer gives the water depth
+            sl.add_grid(stream_sheet(c + 0.3, w * 0.7, rng, nv, nu - 4, layer=-1.0), r_main,
                         s_range=(k / 3, (k + 1) / 3))
     for k, c in enumerate(THREADS[: (5 if lod == 0 else 2)]):
-        sl.add_grid(stream_sheet(c, rng.uniform(0.35, 0.8), rng, nv, 3), r_thread, s_range=(k / 5, (k + 1) / 5))
+        sl.add_grid(stream_sheet(c, rng.uniform(0.25, 0.9), rng, nv, 3), r_thread, s_range=(k / 5, (k + 1) / 5))
     return A
 
 
 def paint_water(kind):
     def paint(S, T):
         sd = 410 + kind
-        # streaks run down the flow; they break up as the water falls
-        st = fbm(S * (90 if kind == 0 else 20), T * 1.2, 3, sd)
-        streak = smoothstep(0.35, 0.7, st)
-        brk = fbm(S * 24, T * 70, 3, sd + 1)  # round holes, about half a metre, not slits
-        edge = np.minimum(S * 3 % 1.0, 1 - (S * 3 % 1.0)) * 2 if kind == 0 else np.minimum(S * 5 % 1.0, 1 - (S * 5 % 1.0)) * 2
-        fray = smoothstep(0.0, 0.25 + 0.25 * fbm(S * 40, T * 6, 2, sd + 2), edge)
-        # fine vertical gaps open between the streaks as the water falls; round holes only near the foot
-        gap = smoothstep(0.30 - 0.18 * T, 0.22 - 0.18 * T, st)
-        hole = smoothstep(0.86, 0.9, brk) * smoothstep(0.7, 0.95, T)
-        alpha = ((fray * (1 - gap) * (1 - hole)) > 0.4).astype(float)
+        # streaks run down the flow, warped so they are not even columns; they widen and break as the water falls
+        warp = 0.08 * (fbm(S * 6, T * 3, 2, sd + 5) - 0.5)
+        st = fbm((S + warp) * (60 if kind == 0 else 20), T * (1.0 + 2.0 * T), 4, sd)
+        streak = smoothstep(0.3, 0.75, st)
+        brk = fbm(S * 30, T * 50, 3, sd + 1)
+        k = 3 if kind == 0 else 5
+        local = (S * k) % 1.0
+        edge = np.minimum(local, 1 - local) * 2
+        # edges fray into threads, more toward the foot
+        fray = smoothstep(0.0, 0.18 + 0.5 * T + 0.25 * fbm(S * 60, T * 8, 2, sd + 2), edge)
+        threads = smoothstep(0.55, 0.7, fbm(S * 160, T * 3, 2, sd + 3))
+        fray = np.maximum(fray, threads * smoothstep(0.0, 0.4, edge) * (T > 0.2))
+        # vertical gaps open between the streaks as it falls; the lower third breaks into spray and dissolves
+        gap = smoothstep(0.30 - 0.22 * T, 0.2 - 0.22 * T, st)
+        spray = smoothstep(0.62, 1.0, T)
+        dissolve = smoothstep(0.92 - 0.55 * spray, 0.96 - 0.55 * spray, brk)
+        alpha = ((fray * (1 - gap) * (1 - dissolve)) > 0.4).astype(float)
         alpha = alpha * (T > 0.004)
         base = lerp(np.array([0.05, 0.06, 0.12]), np.array([0.2, 0.22, 0.38]), streak)
-        e = col(VIOLET_WHITE, (0.03 + 0.18 * streak) * (0.6 + 0.4 * T)) + col(CYAN, 0.02 * T)
+        e = col(VIOLET_WHITE, (0.03 + 0.18 * streak) * (0.6 + 0.4 * T) * (1 + 0.6 * spray)) + col(CYAN, 0.02 * T)
         return dict(base=base, emis=e, alpha=alpha, height=streak, rough=0.08, ao=1.0)
     return paint
 

@@ -293,3 +293,76 @@ Origin at the waterline, Z up, water at 0.
 | `env_karst_stack` | A squat, leaning stack with a flat, overhanging table top (supporting) | 220 m |
 
 All three are about 153k tris at LOD0 and 9k at LOD1.
+
+
+### Revisions after review (E2, E4)
+
+- **env_fall_water:**
+  - The water bulges and curls over the lip on a quarter-circle before it drops.
+  - Each stream is two braided ribbons of unequal width that split and rejoin, with irregular widths and sway.
+  - The streak texture is warped, not even columns.
+  - Edges fray into threads, more toward the foot.
+  - The lower third breaks into spray and dissolves (MASK dissolve). UV v still runs down the flow.
+- **env_karst_tower:**
+  - Taller and narrower: 640 m on a ~210 m base.
+  - Crisper, sharper-edged fins and deeper undercuts at each tier.
+  - Dark vegetation tufts on the ledges (a `veg` slot).
+- **env_karst_fin and env_karst_stack:** broken, notched top edges, stronger vertical fluting, and ledge tufts.
+
+### Moon (`sky.py`): `env_moon`
+
+- A unit sphere (scale it in the scene), with equirectangular UVs.
+- **Surface:** soft irregular maria, faint highland relief, three soft craters and one faint ray crater. Relief is only in the normal map; the silhouette stays round.
+- **The designed face looks along GLB +Z.**
+- **No emission and no cut shape:** the crescent comes from lighting.
+- In AV Gen the moon is lit by the scene's lights, so it needs its own light placed sun-side, or a phase-aware shader. With the vista's key light behind it, it reads as a dark sphere (F5).
+
+### Hero clouds (`sky.py`)
+
+**`env_vista_clouds.lobes.json` (the deliverable for the lead's blob renderer):**
+- In the vista world frame (metres, Y up), with eye and `moon_dir` recorded.
+- Per lobe: `c` (centre), `r` (radius), `scale` (x, y, z), `density` (0..1), `soft` (edge softness as a fraction of r).
+- **Four masses**, placed by screen position for the vista camera (the moon projects to (1358, 96) on a 1920x1080 frame):
+
+| Mass | Lobes | Placement |
+|---|---|---|
+| `bank_left` | 316 | a layered bank below-left of the moon, behind the far peaks, ~7 km |
+| `tower_right` | 325 | a towering mass rising just right of the moon, leaving a window, ~8 km |
+| `veil_upper` | ~300 | a thin broken band across the top, ~9.5 km, density 0.5 |
+| `horizon_band` | 376 | small masses low at the horizon glow, ~11 km |
+
+- Each mass: big lobes, then billows (2-3 levels), then a fringe of small soft lobes for edge breakup.
+
+**`env_vista_clouds_lod*.glb`:** the same lobes as a metaball mesh, in world space (node at the origin, no rotation). Silhouette fallback and framing check only; procedural nodes draw it as a hard cut-out.
+
+**`env_cloud_a`, `env_cloud_b`, `env_cloud_c`:** standalone sculptural cloud meshes (bank, band, broken cluster) in their own frames, each with a `.lobes.json`.
+
+### Near canopy (`bough.py` habits): designed crowns with explicit limb layouts
+
+| File | Habit | Size | Tris (LOD0 / LOD1) |
+|---|---|---|---|
+| `env_canopy_a` | broad umbrella: short trunk, seven radiating limbs, stacked flat foliage tiers | 55 m wide, 30 m tall | 64k / 1.9k |
+| `env_canopy_b` | tall, with layered whorls of horizontal branches (pagoda-like) | 37 m tall | 64k / 3.9k |
+| `env_canopy_c` | leaning and weeping, with long drooping curtains | 34 m tall | 70k / 2.4k |
+
+- `shadowbough` is unchanged.
+- All are dark matte: moss on the limb tops and rare glints.
+
+### Macro substrate (`substrate.py`)
+
+| File | Content |
+|---|---|
+| `env_mosscarpet_a`, `env_mosscarpet_b` | broad low cushion carpets, 2.0 and 1.4 m, glowmat tissue at 1/8 glow |
+| `env_roots` | surface roots, half-sunk, forking, with moss on top |
+| `env_litter` | humus disc ~1.2 m, embedded stones, curled decayed leaves, twigs |
+
+### AV Gen verification
+
+All load with 0 loader warnings and 0 GPU errors, at metre scale with outward normals. Check scenes in `meshes/env/`:
+- `envcheck-fall.json`
+- `envcheck-karst.json`
+- `envcheck-sky.json`
+- `envcheck-moon.json`
+- `envcheck-canopy.json`
+- `envcheck-substrate.json`
+- `envcheck-vistaclouds.json`: the lead's vista with the cloud fallback added, paths rewritten.

@@ -21,9 +21,11 @@ TAU = 2 * math.pi
 
 class Mat:
     def __init__(self, seed=71, lod=0, name="glowmat", R0=0.22, dome=0.0, dot_cell=0.0045, cups=True,
-                 sporo_scale=1.0, lobe_amp=1.0):
+                 sporo_scale=1.0, lobe_amp=1.0, glow=1.0, extras=True):
         self.seed = seed
         self.lod = lod
+        self.glow = glow
+        self.extras = extras
         self.lod0 = lod == 0
         self.name = name
         self.R0 = R0
@@ -96,7 +98,7 @@ class Mat:
         r_st = sp.region(0, 0.7, self.paint_sporo, bump=1.0)
         r_cup = sp.region(0.7, 1.0, self.paint_cup, bump=2.0)
         nper = (70 if lod0 else 18)
-        for (cx, cy) in self.colonies:
+        for (cx, cy) in (self.colonies if self.extras else []):
             for j in range(nper):
                 ang = rng.uniform(0, TAU)
                 d = abs(rng.normal(0, 0.13))
@@ -134,8 +136,9 @@ class Mat:
             Q = np.stack([r * np.cos(TT), r * np.sin(TT), z], -1) + p
             sp.add_grid(Q[:, ::-1], r_cup, wrap_u=True)
             A.emitters.append(list(p + [0, 0, H * 0.85]) + [0.9, 0.5, R * 0.6])
-        self.add_nodules(A, rng)
-        self.add_fronds(A, rng)
+        if self.extras:
+            self.add_nodules(A, rng)
+            self.add_fronds(A, rng)
         return A
 
     def add_nodules(self, A, rng):
@@ -255,7 +258,7 @@ class Mat:
              + col(CYAN, mycg ** 3 * 0.06 * patch)
              + dot_col * (dots * bright * 1.0)[..., None]
              + col(EMERALD, heads * 0.015 * (0.3 + patch)))
-        e = e * (1 - edge)[..., None]
+        e = e * (1 - edge)[..., None] * self.glow
         height = 0.6 * dome + 0.5 * heads + 0.25 * fuzz + 0.2 * myc + 0.3 * dots
         rough = 0.92 - 0.3 * dots
         return dict(base=base, emis=e, height=height, rough=rough, ao=0.35 + 0.65 * dome * (0.5 + 0.5 * heads))

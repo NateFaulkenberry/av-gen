@@ -58,11 +58,23 @@ ASSETS = {
     "env_karst_tower": "karst:make_tower",
     "env_karst_fin": "karst:make_fin",
     "env_karst_stack": "karst:make_stack",
+    "env_moon": "sky:make_moon",
+    "env_cloud_a": "sky:make_cloud_a",
+    "env_cloud_b": "sky:make_cloud_b",
+    "env_cloud_c": "sky:make_cloud_c",
+    "env_vista_clouds": "sky:make_vista_clouds",
+    "env_canopy_a": "bough:make_canopy_a",
+    "env_canopy_b": "bough:make_canopy_b",
+    "env_canopy_c": "bough:make_canopy_c",
+    "env_mosscarpet_a": "substrate:make_mosscarpet_a",
+    "env_mosscarpet_b": "substrate:make_mosscarpet_b",
+    "env_roots": "substrate:make_roots",
+    "env_litter": "substrate:make_litter",
     "reliquary": "reliquary",
 }
 
 
-SILHOUETTE = {"shadowbough", "canopy", "canopygrove", "env"}
+SILHOUETTE = {"shadowbough", "canopy", "canopygrove", "env", "env_cloud_a", "env_cloud_b", "env_cloud_c", "env_canopy_a", "env_canopy_b", "env_canopy_c"}
 
 
 def clear_scene():
@@ -91,6 +103,12 @@ def build_one(name, out, lod, tex_dir):
                       for s in A.slots},
             "bounds_zup_m": [[round(float(x), 4) for x in lo], [round(float(x), 4) for x in hi]],
             "bytes": os.path.getsize(path)}
+    for fn, data in getattr(A, "extra_files", {}).items():
+        if lod == 0 and fn == "env_vista_clouds.lobes.json":
+            importlib.import_module("sky").write_vista_clouds(os.path.join(out, fn))
+        elif lod == 0:
+            with open(os.path.join(out, fn), "w") as f:
+                json.dump(data, f)
     if lod == 0 and A.emitters:
         lib.write_emitters(os.path.join(out, f"{stem}.emit.json"), A.emitters)
         info["emitters"] = len(A.emitters)
