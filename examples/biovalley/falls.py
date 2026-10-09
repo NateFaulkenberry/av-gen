@@ -71,6 +71,7 @@ def fall(lip, foot_y, facing, width, seed, strands=40, speed=1.6, segs=40):
 
 
 def mist(name, pos, extent, rate, seed, color=(0.55, 0.68, 1.0), size=(1.5, 4.0), emissive=0.25):
+    color = tuple(color)
     """A pool of rising, drifting spray at a fall's foot."""
     return {"name": name, "kind": "particles", "particles": {
         "capacity": int(rate * 10), "seed": seed, "shape": "disc", "position": [round(float(v), 2) for v in pos],

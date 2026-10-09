@@ -28,7 +28,8 @@ struct Layer {
     optics: vec4<f32>,      // x = iridescence, y = spectral cycles along v, z = cycles per second, w = bob (m)
     motion: vec4<f32>,      // x = bob rate (Hz), y = mirror strength (0 = off), z = mirror level (m), w = mirror
                             // stretch (m): ADR-1281, the point's reflection in still water at that level
-    mirror2: vec4<f32>,     // x, y = the water's slope (dlevel/dx, dlevel/dz): a river descends; zw unused
+    mirror2: vec4<f32>,     // x, y = the water's slope (dlevel/dx, dlevel/dz): a river descends; z = the streak's
+                            // softness in pixels (ADR-1281: soft bokeh columns instead of sub-pixel dots); w unused
 };
 
 struct Host {
@@ -267,7 +268,7 @@ fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
     }
     // Ripples break the reflection into an irregular streak: each point's own length (0.3..1 x stretch), its own
     // horizontal wander, and gaps where its ripple phase hides a sample. Never a regular comb (a barcode).
-    let k = 10;
+    let k = select(10, 24, layer.mirror2.z > 0.5);
     let tt = eco.misc.x;
     let len = stretch * (0.3 + 0.7 * fract(h * 7.31));
     let side = cross(frame.cameraUp.xyz, frame.cameraForward.xyz);
@@ -292,6 +293,42 @@ fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
         // brightest near the mirror image, fading toward the streak's ends; shimmering with the ripple
         let w = strength * (1.0 - 0.7 * abs(f)) * (0.55 + 0.45 * wave) / f32(k) * 1.6;
         let energy = radiance * max(3.14159265 * rPx * rPx, 0.6) * w;
+        // every sample of the streak must itself land on the water: the ray through its pixel meets the plane at
+        // the depth the prepass saw there (else it is on a bank or a stem in front of the water)
+        {
+            let far4 = frame.invViewProj * vec4<f32>(n.xy, 1.0, 1.0);
+            let dir = normalize(far4.xyz / far4.w - cam);
+            if (dir.y >= -1.0e-4) {
+                continue;
+            }
+            let tp = (level - cam.y) / dir.y;
+            let planeDepth = dot(dir * tp, frame.cameraForward.xyz);
+            let st = vec2<i32>(clamp(i32(fx), 0, i32(eco.size.x) - 1), clamp(i32(fy), 0, i32(eco.size.y) - 1));
+            let seenS = textureLoad(linearDepth, st, 0).r;
+            if (seenS < planeDepth * 0.9 - 0.5) {
+                continue; // something stands in front of the water at this pixel
+            }
+        }
+        let soft = layer.mirror2.z;
+        if (soft > 0.5) {
+            // An out-of-focus reflection: the sample is a soft disc `soft` pixels in radius whose radiance is the
+            // point's own (it is the blurred image of the light, not of its sub-pixel footprint), Gaussian falloff,
+            // one-pixel taps so no lattice shows.
+            let R = i32(min(ceil(soft * 1.5), 12.0));
+            let inv = 1.0 / (soft * soft);
+            let wdisc = strength * (1.0 - 0.7 * abs(f)) * (0.55 + 0.45 * wave) / f32(k);
+            for (var dy = -R; dy <= R; dy = dy + 1) {
+                for (var dx = -R; dx <= R; dx = dx + 1) {
+                    let q2 = f32(dx * dx + dy * dy);
+                    let g = exp(-q2 * inv);
+                    if (g < 0.02) {
+                        continue;
+                    }
+                    splatAdd(i32(round(fx - 0.5)) + dx, i32(round(fy - 0.5)) + dy, radiance * (wdisc * g));
+                }
+            }
+            continue;
+        }
         let ix = i32(floor(fx - 0.5));
         let iy = i32(floor(fy - 0.5));
         let ax = fx - 0.5 - f32(ix);

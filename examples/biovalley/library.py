@@ -78,7 +78,7 @@ def assemble(groups, eye, near=10.0, far=400.0):
     return nodes, hosts
 
 
-def bank(g, eye, head, water_level, rng_seed=31):
+def bank(g, eye, head, water_level, fall_foot=None, rng_seed=31):
     """The riverbank: the stream's two banks out to ~80 m upstream, a focal veilcap on the near (left) bank."""
     r = np.random.default_rng(rng_seed)
     groups = {k: [] for k in ("veilcap", "glowmound", "glowmat", "lanternberry", "filigree", "veilfern", "bellspire",
@@ -91,7 +91,15 @@ def bank(g, eye, head, water_level, rng_seed=31):
 
     ex, ez = eye[0], eye[2]
     fx, fz = math.sin(head), math.cos(head)          # forward (x, z)
-    lx, lz = fz, -fx                                  # left... (rotate +90 about y): (z, -x) points to the left
+    lx, lz = fz, -fx                                  # left (checked against the projection: right-dot < 0)
+
+    def shore(d, extra):
+        """The point `extra` metres beyond the left (near) bank's waterline, `d` metres ahead."""
+        for s in np.arange(0.0, 40.0, 0.25):
+            x, z = ex + fx * d + lx * s, ez + fz * d + lz * s
+            if not g.wet(np.array([x]), np.array([z]))[0]:
+                return s + extra
+        return 40.0 + extra
     # candidates over both banks ahead of the lens
     for k in range(16000):
         d = r.uniform(5.0, 90.0)
@@ -101,6 +109,7 @@ def bank(g, eye, head, water_level, rng_seed=31):
         z = ez + fz * d + lz * side
         if g.wet(np.array([x]), np.array([z]))[0]:
             continue
+        right = side < 0
         nw = any(g.wet(np.array([x + dx]), np.array([z + dz]))[0] for dx, dz in ((1.5, 0), (-1.5, 0), (0, 1.5),
                                                                                   (0, -1.5)))
         patch = float(fbm2(np.array([x / 7.0]), np.array([z / 7.0]), 41, 3)[0])
@@ -108,7 +117,7 @@ def bank(g, eye, head, water_level, rng_seed=31):
         if nw and u < 0.18:
             put("veilfern", x, z, grow * r.uniform(1.6, 3.2))                 # the waterline: broad fronds leaning out
         elif nw and u < 0.55:
-            put("glowsedge", x, z, r.uniform(1.0, 2.0))                       # sedge clumps at the water's edge
+            put("glowsedge", x, z, r.uniform(0.6, 1.0) if right else r.uniform(1.0, 2.0))   # sedge at the edge
         elif nw and u < 0.65:
             put("lanternberry", x, z, r.uniform(2.0, 3.5))
         elif nw and u < 0.8:
@@ -121,19 +130,21 @@ def bank(g, eye, head, water_level, rng_seed=31):
         elif patch > 0.58:
             put(["glowmound", "glowmat", "glowmat"][int(r.integers(0, 3))], x, z, grow * r.uniform(0.8, 2.2), sink=0.04)
         elif patch > 0.45:
-            put(["filigree", "lanternberry", "filigree"][int(r.integers(0, 3))], x, z, grow * r.uniform(1.4, 3.2))
+            put(["filigree", "lanternberry", "filigree"][int(r.integers(0, 3))], x, z,
+                grow * r.uniform(1.0, 1.8) if right else grow * r.uniform(1.4, 3.2))
         elif patch < 0.3 and u < 0.06:
             put("lattice", x, z, grow * r.uniform(1.8, 3.5))
-        elif u < 0.012:
+        elif u < 0.012 and not right:
             put("bellspire", x, z, grow * r.uniform(2.0, 3.5))
     # the focal veilcap: on the near (left) bank, 10-12 m ahead, very large (about 2.5 m tall), and a smaller pair
-    for d, side, s in ((7.5, 3.2, 7.0), (10.5, 5.5, 4.0), (6.5, 5.5, 2.6)):
+    for d, side, s in ((9.0, 1.5, 7.0), (12.0, 3.0, 4.0), (7.0, 3.0, 2.6)):
+        side = shore(d, side)
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         put("veilcap", x, z, s)
     # the near-left foreground (panel 1's dark rocks, moss and glowing stalks at the lens)
     for k in range(26):
         d = r.uniform(1.6, 6.0)
-        side = r.uniform(1.0, 5.5)
+        side = shore(d, r.uniform(0.3, 4.0))
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         if g.wet(np.array([x]), np.array([z]))[0]:
             continue
@@ -150,15 +161,23 @@ def bank(g, eye, head, water_level, rng_seed=31):
         else:
             put("bellspire", x, z, r.uniform(1.2, 2.0))
     # stones standing in the stream to the right of the lens, with sedge on them: the water is framed, not empty
-    for d, side, s in ((4.5, -2.5, 0.9), (7.0, -4.5, 1.3), (11.0, -3.0, 1.1), (15.0, -6.5, 1.5), (6.0, -7.5, 0.8),
-                       (19.0, -2.0, 1.2)):
+    for d, side, s in ((9.0, -5.5, 0.6), (17.0, 3.0, 0.5)):
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         y = float(g.water_level(np.array([x]), np.array([z]))[0])
         if y < -1e8:
             y = float(g.height(np.array([x]), np.array([z]))[0])
         sp = ["riverrock_a", "riverrock_b"][int(r.integers(0, 2))]
         groups[sp].append(rec(x, y - 0.25 * s, z, r.uniform(0, 6.28), s))
-        groups["glowsedge"].append(rec(x + 0.2, y + 0.2 * s, z + 0.1, r.uniform(0, 6.28), r.uniform(1.0, 1.6)))
+
+    # glowing plants at the falls' foot
+    if fall_foot is not None:
+        for k in range(14):
+            a = r.uniform(0, 6.28)
+            rr = r.uniform(3.0, 10.0)
+            x, z = fall_foot[0] + rr * math.cos(a), fall_foot[2] + rr * math.sin(a)
+            if g.wet(np.array([x]), np.array([z]))[0]:
+                continue
+            put(["glowsedge", "bellspire", "lanternberry", "glowmound"][k % 4], x, z, r.uniform(1.5, 3.0))
     # the framing bough: rooted behind-left of the lens, its +X limb aimed over the stream to the right
     bx, bz = ex - fx * 2.0 + lx * 14.0, ez - fz * 2.0 + lz * 14.0
     aim = (fx * 0.85 - lx * 0.5, fz * 0.85 - lz * 0.5)

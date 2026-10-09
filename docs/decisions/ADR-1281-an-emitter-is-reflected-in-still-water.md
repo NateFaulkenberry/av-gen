@@ -48,3 +48,13 @@ layout.
 - Cost: six extra splats per mirrored point above the plane. In the valley this is only the bank layers (a few
   hundred thousand points), well under a millisecond.
 - A layer with `mirror` 0 runs the same code as before, bit for bit (the branch is not taken).
+
+## Addendum (the art pass, 2026-10-08): soft columns, and every sample on the water
+
+- `mirrorSoftness` (pixels, 0 = off): each reflected sample is a soft disc with the point's own radiance, as the
+  blurred image of the light, not its sub-pixel footprint. A streak of them reads as the reference's bokeh column.
+  With softness on, the streak takes 24 samples.
+- Each sample of a streak is tested again at its own pixel: the ray through it meets the plane at a depth, and if
+  the prepass saw something clearly in front (`seen < 0.9 x plane depth - 0.5 m`), that sample is dropped. Streaks no
+  longer paint onto the banks or stems in front of the water.
+- Only a few saturated species should be mirrored. A mix of every species' glints reflects as grey.

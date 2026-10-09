@@ -87,10 +87,13 @@ def shots(gc, gfine):
     g = gfine["bank"]
     zs = np.arange(land.BANK_Z - 40, land.BANK_Z + 40, 0.25)
     wet = g.wet(np.full(len(zs), bx), zs)
-    bz = float(zs[np.where(wet)[0].max()]) + 1.2 if wet.any() else land.BANK_Z - 14   # just up the north bank
-    e = at(g, bx, bz, 0.85)
-    yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 4.0   # the falls right of centre
-    d = _dir(yaw, 3.0)
+    # over the water, a little right of the stream's centre, so the near (north) bank fills only the left third and
+    # the stream runs from the bottom of the frame up to the falls (panel 1)
+    wz = zs[np.where(wet)[0]]
+    bz = float(wz.max() - 0.22 * (wz.max() - wz.min())) if wet.any() else land.BANK_Z - 14
+    e = at(g, bx, bz, 0.7)
+    yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 7.0
+    d = _dir(yaw, 2.5)
     tgt = [round(e[0] + d[0] * 100, 2), round(e[1] + d[1] * 100, 2), round(e[2] + d[2] * 100, 2)]
     S["riverbank"] = (e, tgt, 48.0, 0.2, 26000.0)
     # MACRO: on the mossy bank of the tributary, 30 cm up, looking along it
@@ -218,6 +221,9 @@ def find_instance(tw, name, x, z):
     return best
 
 
+FALL_FEET = {}
+
+
 def waterfalls(tw, eyes):
     """The falls (one mesh per fall, in world space) and their mist: three off the vista's framing masses, one at
     the riverbank's stream head."""
@@ -243,9 +249,15 @@ def waterfalls(tw, eyes):
             "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]}, "castsShadow": False,
             "material": mat([0.1, 0.14, 0.2], 0.3, [0.45, 0.62, 1.0], 0.35, doubleSided=True, program="falls")}})
         big = width > 10
-        nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0, 0]), width * (1.2 if big else 1.5),
-                                60.0 if big else 90.0, 610 + k, size=(6.0, 22.0) if big else (3.0, 9.0),
-                                emissive=1.2 if big else 1.4))
+        if not big:
+            # the riverbank's falls: violet-white, catching light (panel 1)
+            nodes[-1]["procedural"]["material"] = mat([0.12, 0.12, 0.2], 0.3, [0.62, 0.5, 1.0], 0.6,
+                                                      doubleSided=True, program="falls")
+            FALL_FEET["riverbank"] = foot
+        nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0, 0]), width * (1.2 if big else 2.2),
+                                60.0 if big else 160.0, 610 + k, size=(6.0, 22.0) if big else (3.0, 11.0),
+                                emissive=1.2 if big else 2.2,
+                                color=(0.55, 0.68, 1.0) if big else (0.72, 0.6, 1.0)))
         print(f"  fall{k} ({name}): lip {np.round(lip, 1).tolist()} drop {lip[1] - foot[1]:.0f} m")
     return nodes
 
@@ -391,23 +403,24 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
 LIB_COLORS = {"veilcap": [0.55, 0.95, 1.0], "glowmound": [0.2, 1.0, 0.6], "glowmat": [0.3, 0.8, 1.0],
               "lanternberry": [0.6, 1.0, 0.4], "filigree": [0.5, 0.9, 1.0], "veilfern": [0.3, 0.9, 1.0],
               "bellspire": [0.5, 0.6, 1.0], "lattice": [0.45, 0.4, 1.0], "reliquary": [0.7, 0.9, 1.0]}
-LIB_COLORS.update({"glowsedge": [0.4, 1.0, 0.85], "riverrock_a": [0.2, 0.9, 0.6], "riverrock_b": [0.2, 0.9, 0.6],
+LIB_COLORS.update({"glowsedge": [0.05, 0.75, 1.0], "lanternberry": [0.65, 0.2, 1.0], "bellspire": [0.5, 0.3, 1.0],
+                   "veilfern": [0.2, 1.0, 0.55], "riverrock_a": [0.2, 0.9, 0.6], "riverrock_b": [0.2, 0.9, 0.6],
                    "riverrock_c": [0.2, 0.9, 0.6], "riverrock_d": [0.2, 0.9, 0.6], "shadowbough": [0.4, 0.8, 1.0],
                    "darkfern": [0.3, 0.6, 1.0], "canopy": [0.3, 0.9, 0.9], "canopygrove": [0.3, 0.9, 0.9],
                    "bulbstalk": [0.5, 1.0, 0.6]})
 # glint gains: the bodies carry their light in their own textures; the glints are sparse accents (the splat's
 # sub-pixel floor makes a few hundred points per instance x thousands of instances read as a white field)
-LIB_GAIN = {"glowmound": 0.12, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, "lanternberry": 1.5,
-            "veilfern": 0.5, "glowsedge": 2.5, "riverrock_a": 0.1, "riverrock_b": 0.1, "riverrock_c": 0.1,
+LIB_GAIN = {"glowmound": 0.5, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, "lanternberry": 0.5,
+            "veilfern": 1.2, "glowsedge": 6.0, "riverrock_a": 0.1, "riverrock_b": 0.1, "riverrock_c": 0.1,
             "riverrock_d": 0.1, "darkfern": 0.1, "bellspire": 1.5, "lattice": 0.3, "reliquary": 0.8,
             "shadowbough": 0.4}
 # Per-shot water: the riverbank's stream is dark (it carries reflections, not the sky's colour)
-WATER = {"riverbank": {"reflection": 0.35, "reflectionTint": [0.2, 0.26, 0.55], "specular": 0.8, "ripple": 0.25}}
+WATER = {"riverbank": {"reflection": 0.1, "reflectionTint": [0.3, 0.25, 0.75], "fresnel": 0.06, "specular": 0.8, "ripple": 0.3}}
 
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 0.7, "mist": "mistFloor"},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
-       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.15, "mist": "mistBank"},
+       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.03, "mist": "mistBank"},
        "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}
 
 # Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
@@ -420,7 +433,8 @@ SHOT_POST = {
     "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 0.9, "post/dof/focusRange": 0.3,
               "post/dof/maxRadius": 26.0},
     "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 9.0, "post/dof/focusRange": 25.0,
-                  "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6},
+                  "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6,
+                  "post/grade/saturation": 1.25},
 }
 
 
@@ -497,12 +511,16 @@ def main():
     lib_nodes, lib_layers = {}, {}
     rb_eye = S["riverbank"][0]
     rb_head = heads["riverbank"]
-    bank_mirror = {"mirror": 4.0, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 2.4}
-    groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK)
+    bank_mirror = {"mirror": 1.4, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 3.0,
+                   "mirrorSoftness": 9.0}
+    groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK, FALL_FEET.get("riverbank"))
     nodes_b, hosts_b = library.assemble(groups, rb_eye)
     lib_nodes["riverbank"] = nodes_b
+    # only a few saturated species are reflected: a mix of every species' glints reflects as grey
+    MIRRORED = ("glowsedge", "lanternberry", "bellspire", "veilcap", "veilfern")
     lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
-                                                  bank_mirror, sparsity=0.5) for sp, hs in hosts_b.items()]
+                                                  bank_mirror if sp in MIRRORED else None, sparsity=0.3)
+                               for sp, hs in hosts_b.items()]
     # layers a shot cannot see are dropped (the ecosystem holds 32)
     DROP = {"riverbank": ("glade", "crown", "ledge", "understory", "orbs", "macroMoss", "gills", "veilBeads",
                           "latticeGlow", "tips", "frondGlow"), "macro": ("glade", "crown", "ledge"),

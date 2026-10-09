@@ -34,7 +34,7 @@ constexpr std::string_view kLayerKeys[] = {
     "intensity",  "excitedIntensity", "size",    "responseField", "responseGain", "responseThreshold",
     "lagField",   "travel",       "wakeField",   "wakeGain",    "breath",      "breathRate",  "flicker",     "flickerRate",
     "pulseRate",  "pulseDecay",   "sparsity",    "maxDistance", "nearFade",
-    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate", "mirror", "mirrorLevel", "mirrorStretch", "mirrorSlope"};
+    "iridescence", "iridescenceScale", "iridescenceSpeed", "bob", "bobRate", "mirror", "mirrorLevel", "mirrorStretch", "mirrorSlope", "mirrorSoftness"};
 constexpr std::string_view kBlockKeys[] = {"enabled", "spriteRadius", "maxSprites", "layers"};
 
 template <std::size_t N>
@@ -137,7 +137,7 @@ Result<void> EmitterLayer::validate() const {
     }
     if (travel < 0.0f || travel > 1.0f || breath < 0.0f || breath > 1.0f || flicker < 0.0f || flicker > 1.0f ||
         sparsity < 0.0f || sparsity > 1.0f || iridescence < 0.0f || iridescence > 1.0f || bob < 0.0f ||
-        bobRate < 0.0f || mirror < 0.0f || mirrorStretch < 0.0f) {
+        bobRate < 0.0f || mirror < 0.0f || mirrorStretch < 0.0f || mirrorSoftness < 0.0f) {
         return fail("ecosystem layer '{}': travel, breath, flicker, sparsity and iridescence are 0..1; bob, bobRate,"
                     " mirror and mirrorStretch >= 0", name);
     }
@@ -216,6 +216,9 @@ json Ecosystem::toJson() const {
             e["mirror"] = l.mirror;
             e["mirrorLevel"] = l.mirrorLevel;
             e["mirrorStretch"] = l.mirrorStretch;
+            if (l.mirrorSoftness > 0.0f) {
+                e["mirrorSoftness"] = l.mirrorSoftness;
+            }
             if (l.mirrorSlope != glm::vec2(0.0f)) {
                 e["mirrorSlope"] = {l.mirrorSlope.x, l.mirrorSlope.y};
             }
@@ -307,6 +310,7 @@ Result<Ecosystem> Ecosystem::fromJson(const json& j) {
                 l.mirror = e.value("mirror", l.mirror);
                 l.mirrorLevel = e.value("mirrorLevel", l.mirrorLevel);
                 l.mirrorStretch = e.value("mirrorStretch", l.mirrorStretch);
+                l.mirrorSoftness = e.value("mirrorSoftness", l.mirrorSoftness);
                 if (e.contains("mirrorSlope")) {
                     const auto& ms = e.at("mirrorSlope");
                     if (!ms.is_array() || ms.size() != 2 || !ms[0].is_number() || !ms[1].is_number()) {
@@ -440,6 +444,7 @@ EcosystemParameters registerEcosystemParameters(params::ParameterSet& params, co
         r.f("bobRate", "drift rate (Hz)", l.bobRate, 0.0f, 10.0f, 0.0f, 1.0f);
         r.f("mirror", "reflection in still water (ADR-1281)", l.mirror, 0.0f, 4.0f, 0.0f, 2.0f);
         r.f("mirrorStretch", "reflection streak (m)", l.mirrorStretch, 0.0f, 50.0f, 0.0f, 5.0f);
+        r.f("mirrorSoftness", "reflection softness (px)", l.mirrorSoftness, 0.0f, 64.0f, 0.0f, 16.0f);
         p.layers.push_back(std::move(layer));
     }
     return p;
@@ -475,6 +480,7 @@ void applyEcosystemParameters(const EcosystemParameters& p, const Ecosystem& res
         copy(lp, "bobRate", l.bobRate);
         copy(lp, "mirror", l.mirror);
         copy(lp, "mirrorStretch", l.mirrorStretch);
+        copy(lp, "mirrorSoftness", l.mirrorSoftness);
     }
 }
 

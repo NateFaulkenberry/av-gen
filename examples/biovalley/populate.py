@@ -21,6 +21,7 @@ import massifs
 from geom import fbm2, quat_y
 
 N_GROVES = 6
+CANOPY_ASSET = True   # the floor forest and the vista's framing tree come from the hero library
 N_SHRUBS = 4
 N_BOULDERS = 6
 N_ARCH = 3
@@ -282,6 +283,27 @@ def nodes(groups, mat):
             lod = lod_grove if mesh in ("grove", "grovehq") else lod_small
             if prefix == "hero":
                 lod = {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 0.0}
+            if CANOPY_ASSET and mesh in ("grove", "grovehq"):
+                # the asset artist's canopy grove (painted self-shadowing crowns), its own materials, dialled
+                for i, part in enumerate(chunks(pts)):
+                    out.append({"name": f"{prefix}{v}_leaf{i}" if i else f"{prefix}{v}_leaf", "kind": "procedural",
+                                "procedural": {"source": {"kind": "mesh",
+                                                          "asset": "../meshes/hero/hero_canopygrove_lod1.glb"},
+                                               "distribution": {"kind": "points", "points": part},
+                                               "castsShadow": False, "lod": lod,
+                                               "material": {"baseColor": [0.8, 0.85, 0.9], "roughness": 1.0,
+                                                            "metallic": 0.0, "emissiveColor": [1.0, 1.0, 1.0],
+                                                            "emissiveIntensity": 1.6}}})
+                continue
+            if CANOPY_ASSET and prefix == "hero":
+                # the framing tree is the artist's shadowbough
+                for i, part in enumerate(chunks(pts)):
+                    out.append({"name": "hero0_leaf", "kind": "procedural", "procedural": {
+                        "source": {"kind": "mesh", "asset": "../meshes/hero/hero_shadowbough_lod0.glb"},
+                        "distribution": {"kind": "points", "points": part}, "castsShadow": False, "lod": lod,
+                        "material": {"baseColor": [1.0, 1.0, 1.0], "roughness": 1.0, "metallic": 0.0,
+                                     "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 2.0}}})
+                continue
             add(f"{prefix}{v}_wood", f"{mesh}{v}_wood" if prefix != "hero" else "hero_wood", pts, mat(BARK, 0.85), lod)
             add(f"{prefix}{v}_leaf", f"{mesh}{v}_leaf" if prefix != "hero" else "hero_leaf", pts,
                 mat(LEAF, 0.7, program="crown"), lod)

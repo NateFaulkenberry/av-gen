@@ -227,6 +227,12 @@ TEST_CASE("a layer's reflection in still water round-trips, is off by default, a
     auto again = scene::Ecosystem::fromJson(eco->toJson());
     REQUIRE(again);
     CHECK_THAT(again->layers[0].mirrorStretch, WithinAbs(0.5, 1e-6));
+    l["mirrorSoftness"] = 6.0;
+    auto soft = scene::Ecosystem::fromJson(nlohmann::json{{"layers", {l}}});
+    REQUIRE(soft);
+    auto softAgain = scene::Ecosystem::fromJson(soft->toJson());
+    REQUIRE(softAgain);
+    CHECK_THAT(softAgain->layers[0].mirrorSoftness, WithinAbs(6.0, 1e-6));
     l["mirror"] = -1.0;
     CHECK_FALSE(scene::Ecosystem::fromJson(nlohmann::json{{"layers", {l}}}));
 }
