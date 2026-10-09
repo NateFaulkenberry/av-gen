@@ -451,6 +451,8 @@ MACRO_FAR = 0.18
 MACRO_NO_BANK = True
 MACRO_LENS = 1.5
 MACRO_LENS_GAIN = 0.2
+PUDDLE_LIFT = 0.02
+PUDDLE_LEVEL = 4.668   # metres: just over the band's hollow on the engine's ground (swept 4.62/4.68/4.74)
 
 # Deliverable C: the shots that draw the lobe clouds (ADR-1289), and the vista's karst landmarks
 # (asset, bearing deg + = screen left, distance m, scale, yaw deg)
@@ -499,6 +501,131 @@ def project(name, scene_path):
     return {"format": "avgen-project", "version": 4, "app": {"name": f"Bioluminescent Valley ({name})"},
             "assets": {"scene": {"kind": "composition", "path": scene_path}, "audio": {"path": AUDIO}},
             "parameters": params}
+
+
+def macro_finish(sc, g, eye, tgt):
+    """(showcase P4) the macro's own world:
+      - a puddle in the dark band of ground at the lower right, drawn with the riverbank's cinematic water
+        (ADR-1286) so it mirrors the organisms above it. The valley's terrain is far too coarse near the lens to carve
+        one (its LOD 0 is 2.5 m cells), so the puddle is its own small terrain node: a 3 m sheet of water whose own
+        ground lies 5 m down, at a level just above the valley ground's local hollow -- the water shows only where the
+        real ground dips below it, so the shoreline is the ground's own and not a drawn shape
+      - the scene wind (gentle, with gusts) that the organisms' motion answers (ADR-1292)
+      - a soft violet light pocket in the background depth"""
+    to_world = library.macro_frame(eye, tgt)
+    cx, cz = to_world(0.35, 1.18)
+    xs = np.linspace(cx - 0.5, cx + 0.5, 9)
+    zs = np.linspace(cz - 0.5, cz + 0.5, 9)
+    X, Z = np.meshgrid(xs, zs)
+    hs = g.height(X.ravel(), Z.ravel())
+    level = float(np.percentile(hs, 45)) + PUDDLE_LIFT
+    puddle_water = dict(WATER["riverbank"], ripple=0.05, rippleScale=3.0, undulation=0.0, roughnessVariation=0.3,
+                        ssrDistance=6.0, reflectionRays=4.0, streak=0.05, tintPatches=0.0, glow=0.0, ssrGain=3.0,
+                        fresnel=0.7, reflection=1.4, edgeFade=0.01, clarity=0.15, foam=0.0, shallow=0.2,
+                        refraction=0.05)
+    # A flat, uncarved water feature on the valley's own terrain: its level sits just above the ground's natural
+    # hollow in the band, so the water fills that hollow and its shoreline is the ground's own. (A carve was
+    # invisible -- the terrain's LOD 0 is 2.5 m cells -- and a second terrain node's water did not draw.)
+    for n in sc["nodes"]:
+        if n["name"] == "land":
+            n["world"]["features"].append(
+                {"name": "macroPuddle", "kind": "river",
+                 "path": [[round(cx + dx, 3), round(PUDDLE_LEVEL - 0.02, 4), round(cz + dz, 3)]
+                          for dx, dz in ((-0.6, 0.15), (0.0, 0.0), (0.6, -0.15))],
+                 "width": 1.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0,
+                 "water": True, "waterDepth": 0.02, "smoothing": 1})
+            n["terrain"]["water"].update(puddle_water)
+            # nothing stands in the water: records whose base the water covers (on the engine's own ground) go
+            import land as _land
+            G = _land.rift_land.Ground(n["world"], cx - 3, cx + 3, cz - 3, cz + 3, step=0.05)
+            for m in sc["nodes"]:
+                pr = m.get("procedural")
+                if pr and m["name"].startswith(("mac_glowmat", "mac_env", "mmoss", "mac_filigree", "mac_bulbstalk")):
+                    ps = pr["distribution"].get("points")
+                    if ps:
+                        keep = []
+                        for q in ps:
+                            if math.hypot(q[0] - cx, q[2] - cz) < 0.7 and \
+                                    G.wet(np.array([q[0]]), np.array([q[2]]))[0]:
+                                continue
+                            keep.append(q)
+                        pr["distribution"]["points"] = keep
+            # the "dark smudge" itself: the seam curtain of a terrain chunk edge that runs across the bank 1-2 m from
+            # the lens, hanging 30 m (the valley's setting, sized for cliffs) -- a vertical dark wall in this shot
+            n["terrain"]["skirtDepth"] = 0.3
+    sc["wind"] = {"enabled": True, "speed": 0.35, "direction": 0.6, "gustAmount": 1.1, "gustScale": 3.5,
+                  "gustSpeed": 1.6, "gustSharpness": 3.5, "turbulence": 0.35, "turbulenceScale": 1.2,
+                  "turbulenceSpeed": 0.4, "regionScale": 6.0, "flutterScale": 0.3}
+    x, z = to_world(0.35, 5.0)
+    y = float(g.height(np.array([x]), np.array([z]))[0])
+    sc["lights"].append({"name": "violetPocket", "type": "point", "position": [round(x, 3), round(y + 0.6, 3), round(z, 3)],
+                         "color": [0.65, 0.3, 1.0], "intensity": 1.2, "range": 3.5, "radius": 0.3,
+                         "castsShadow": False})
+
+
+def _route(source, target, amount, attack, decay, norm=0.0, component=-1, gain=1.0, delay=0.0):
+    chain = {"gain": gain, "attackMs": attack, "decayMs": decay, "delayMs": delay}
+    if norm > 0:
+        chain.update({"normalizeSeconds": norm, "normalizeFloor": 0.02, "normalizeSmoothMs": 200.0})
+    return {"source": source, "target": target, "component": component, "amount": amount, "op": "add",
+            "polarity": "unipolar", "enabled": True, "chain": chain}
+
+
+def _track(target, keys, component=-1):
+    return {"target": target, "component": component, "timeBase": "seconds", "mode": "add", "loopLength": 0.0,
+            "enabled": True, "keys": [{"time": t, "value": v, "interp": "easeInOut"} for t, v in keys]}
+
+
+def macro_audio(sc):
+    """(showcase P4) the macro's audio response, on Trench, in four layers that never share one envelope:
+      fast   localised transients: bead colonies flash on onsets, the veilcap's gills on the bass, the blue
+             stalk tips on the hats, a sparkle through the carpet on the high mids
+      medium supporting organisms breathe with the mids: the violet background pocket and the gold accents
+      slow   the environment follows the song's loudness over seconds: exposure, bloom, and the wind
+      phrase coordinated events at the song's structure (the 45 s breakdown, the 47 s re-entry, the 61 s lift):
+             the reliquary, the violet light pocket and the exposure move together
+    Silence leaves the still exactly as composed: every route adds, from zero."""
+    names = {n["name"] for n in sc["nodes"]}
+    layers = {l["name"] for l in sc.get("ecosystem", {}).get("layers", [])}
+    def P(node, leaf):
+        assert node in names, node
+        return f"procedural/{node}/{leaf}"
+    def E(layer, leaf):
+        assert layer in layers, layer
+        return f"ecosystem/{layer}/{leaf}"
+    routes = [
+        # fast
+        _route("audio.onset", E("mac_beadcluster", "intensity"), 2.5, 5, 220),
+        _route("audio.bass", P("mac_veilcap_emeraldcyan", "material/emissive"), 2.4, 20, 380, norm=6.0),
+        _route("audio.treble", E("mac_bulbstalk_blue", "intensity"), 1.6, 10, 170, norm=6.0),
+        _route("audio.highMid", E("mac_glowmat_blue", "intensity"), 0.9, 40, 450, norm=6.0),
+        # medium
+        _route("audio.mid", P("mac_bellspire_violet_bg_far", "material/emissive"), 2.0, 400, 1400, norm=8.0),
+        _route("audio.mid", P("mac_filigree_violet_bg_far", "material/emissive"), 1.6, 600, 1600, norm=8.0,
+               delay=250.0),
+        _route("audio.lowMid", P("mac_filigree_goldtip", "material/emissive"), 2.4, 300, 1000, norm=8.0),
+        _route("audio.lowMid", P("mac_beadcluster_gold", "material/emissive"), 2.0, 450, 1200, norm=8.0,
+               delay=180.0),
+        # slow
+        _route("audio.rms", "camera/exposure/compensation", 0.16, 1800, 3500, norm=12.0),
+        _route("audio.rms", "post/bloom/intensity", 0.22, 1500, 3000, norm=12.0),
+        _route("audio.spectralFlux", "scene/windSpeed", 0.35, 900, 3000, norm=10.0),
+    ]
+    tracks = [
+        _track(P("mac_reliquary", "material/emissive"),
+               [(44.3, 0.0), (45.3, -3.5), (46.9, -3.5), (47.25, 6.0), (49.8, 0.0), (60.5, 0.0), (61.1, 4.5),
+                (63.5, 0.0)]),
+        _track("lights/violetPocket/intensity", [(46.8, 0.0), (47.3, 3.0), (50.5, 0.0), (60.8, 0.0), (61.3, 2.5),
+                                                  (64.0, 0.0)]),
+        _track("camera/exposure/compensation", [(44.5, 0.0), (45.4, -0.35), (46.9, -0.35), (47.3, 0.08),
+                                                 (49.5, 0.0)]),
+    ]
+    pj = project("macro", "macro.scene.json")
+    pj["app"]["name"] = "Bioluminescent Valley (macro, audio-reactive)"
+    pj["parameters"]["camera/exposure/compensation"] = pj["parameters"].get("camera/exposure/compensation", 0) - 0.08
+    pj["routes"] = routes
+    pj["timeline"] = {"enabled": True, "cues": [], "tracks": tracks}
+    return pj
 
 
 def macro_move(eye, tgt, seconds=12.0):
@@ -759,6 +886,13 @@ def main():
             for nd in extra:
                 if nd["name"].startswith(("rs_fall", "fallMist3", "fall3")):
                     continue
+                # (P4) the native moss mounds within 2.6 m of the lens are smooth dark domes: the "smudgy dark area" in
+                # the lower right (found by projecting every instance into it); the artist's substrate replaces them
+                if nd["name"].startswith("mmoss"):
+                    nd = json.loads(json.dumps(nd))
+                    pr_ = nd["procedural"]
+                    pr_["distribution"]["points"] = [q for q in pr_["distribution"]["points"]
+                                                     if math.hypot(q[0] - eye[0], q[2] - eye[2]) > 2.6]
                 pr = nd.get("procedural")
                 if pr and nd["name"].startswith(("mtuft", "frond", "lattice", "bulbs", "f3d_")):
                     pts = [p for p in pr["distribution"].get("points", [])
@@ -776,10 +910,13 @@ def main():
             for n in sc["nodes"]:
                 if n["name"] == "land":
                     n["terrain"]["water"].update(WATER[name])
+        if name == "macro":
+            macro_finish(sc, gfine["bank"], eye, tgt)
         (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
         (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
         if name == "macro":
-            (SHOTS / "macro_move.json").write_text(json.dumps(macro_move(eye, tgt), indent=1))
+            (SHOTS / "macro_move.json").unlink(missing_ok=True)   # owner: the macro is static
+            (SHOTS / "macro_audio.json").write_text(json.dumps(macro_audio(sc), indent=1))
         print(f"  shot {name}: eye {eye} target {tgt}")
     print("wrote", SHOTS)
 

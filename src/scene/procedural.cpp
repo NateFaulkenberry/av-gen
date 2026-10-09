@@ -3125,6 +3125,9 @@ json ProceduralGeometry::toJson() const {
         s2["impostorSize"] = lod.impostorSize;
         j["lod"] = std::move(s2);
     }
+    if (motion.windSensitivity > 0.0f) { // ADR-1292: written only when the object answers the wind
+        j["motion"] = wind::motionToJson(motion);
+    }
     {
         json s = json::object();
         s["baseColor"] = vecToJson(material.baseColor);
@@ -3476,6 +3479,20 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                 return fail("effector {}: {}", g.effectors.size() + 1, e.error().message);
             }
             g.effectors.push_back(std::move(*e));
+        }
+    }
+    // ADR-1292: how this object answers the scene wind (core/wind.hpp VegetationMotion). Until now only an ecology
+    // scatter layer could carry it, so a hand-placed organism -- every node of a curated library -- stood still in
+    // any wind. Absent means windSensitivity 0: nothing moves that did not ask to.
+    if (root.contains("motion")) {
+        if (!root.at("motion").is_object()) {
+            return fail("'motion' must be an object");
+        }
+        g.motion = wind::motionFromJson(root.at("motion"), g.motion);
+        if (!(g.motion.stiffness > 0.0f) || !(g.motion.mass > 0.0f) || g.motion.damping < 0.0f ||
+            g.motion.windSensitivity < 0.0f || g.motion.tipAmplitude < 0.0f || !(g.motion.bendLimit >= 0.0f)) {
+            return fail("motion: stiffness and mass must be positive; damping, windSensitivity, tipAmplitude and "
+                        "bendLimit must not be negative");
         }
     }
     if (root.contains("lod")) {

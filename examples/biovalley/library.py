@@ -338,6 +338,7 @@ MACRO_DIAL = {"veilcap": 1.9, "reliquary": 2.1, "lacefan": 0.15, "beadcluster": 
 # the lit albedo of the supporting forms: the pale lacefan lattice and the tall stalks catch the moon as brightly as
 # the heroes glow, so their reflectance is cut (they read as dark lace against the dark, lit at the rims)
 MACRO_FG_DIAL = 2.2
+MACRO_BG_DIAL = 0.8
 MACRO_BASE = {"lacefan": 0.18, "bellspire": 0.45, "bulbstalk": 0.6}
 
 
@@ -346,12 +347,47 @@ def macro_node(name, glb, pts, dial):
         glb = glb.replace("@fg", "")
         name = name.replace("@fg", "_fg")
         dial = MACRO_FG_DIAL
+    if "@bg" in glb:                                   # the background colour pocket: its own glow, past the falloff
+        glb = glb.replace("@bg", "")
+        name = name.replace("@bg", "_bg")
+        dial = MACRO_BG_DIAL
     if glb.startswith("env:"):
         # the artist's substrate pieces: their own materials (low glow), no override
         return {"name": name.replace(":", "_"), "kind": "procedural", "procedural": {
             "source": {"kind": "mesh", "asset": f"../meshes/env/{glb[4:]}_lod0.glb"},
             "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
             "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 40.0}}}
+    node_ = _macro_node(name, glb, pts, dial)
+    mo = MACRO_MOTION.get(glb.split("_")[0])
+    if mo:
+        node_["procedural"]["motion"] = dict(mo)
+    return node_
+
+
+# (showcase P4, wind) how each organism answers the scene wind (ADR-1292): stiff, heavy forms barely lean; thin
+# stalks, bells and filaments sway near their resonance and take the gusts; different stiffness and mass give each
+# species its own rate and phase lag, so a gust travels through them rather than moving them in step
+MACRO_MOTION = {
+    "bulbstalk": {"stiffness": 0.6, "mass": 0.012, "damping": 0.25, "windSensitivity": 1.0, "tipAmplitude": 0.18,
+                  "bendLimit": 0.3, "gustResponse": 1.2, "bendCurve": 2.0, "amplitudeVariance": 0.4},
+    "bellspire": {"stiffness": 0.9, "mass": 0.03, "damping": 0.3, "windSensitivity": 0.9, "tipAmplitude": 0.12,
+                  "bendLimit": 0.25, "gustResponse": 1.0, "bendCurve": 2.4, "amplitudeVariance": 0.35},
+    "filigree": {"stiffness": 0.5, "mass": 0.008, "damping": 0.2, "windSensitivity": 1.0, "tipAmplitude": 0.14,
+                 "bendLimit": 0.3, "gustResponse": 1.3, "bendCurve": 1.6, "amplitudeVariance": 0.45},
+    "veilfern": {"stiffness": 0.7, "mass": 0.02, "damping": 0.3, "windSensitivity": 0.9, "tipAmplitude": 0.12,
+                 "bendLimit": 0.25, "gustResponse": 1.1, "bendCurve": 2.2, "amplitudeVariance": 0.35},
+    "lacefan": {"stiffness": 1.6, "mass": 0.05, "damping": 0.45, "windSensitivity": 0.6, "tipAmplitude": 0.06,
+                "bendLimit": 0.15, "gustResponse": 0.9, "bendCurve": 2.8, "amplitudeVariance": 0.3},
+    "veilcap": {"stiffness": 4.0, "mass": 0.2, "damping": 0.6, "windSensitivity": 0.4, "tipAmplitude": 0.025,
+                "bendLimit": 0.06, "gustResponse": 0.6, "bendCurve": 3.0, "amplitudeVariance": 0.2},
+    "chalice": {"stiffness": 1.2, "mass": 0.03, "damping": 0.35, "windSensitivity": 0.7, "tipAmplitude": 0.08,
+                "bendLimit": 0.2, "gustResponse": 1.0, "bendCurve": 2.4, "amplitudeVariance": 0.35},
+    "lanternberry": {"stiffness": 0.8, "mass": 0.02, "damping": 0.3, "windSensitivity": 0.8, "tipAmplitude": 0.12,
+                     "bendLimit": 0.25, "gustResponse": 1.1, "bendCurve": 2.0, "amplitudeVariance": 0.4},
+}
+
+
+def _macro_node(name, glb, pts, dial):
     return {"name": name, "kind": "procedural", "procedural": {
         "source": {"kind": "mesh", "asset": f"../{HERO}/hero_{glb}_lod0.glb"},
         "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
@@ -443,12 +479,37 @@ def macro(g, eye, tgt, rng_seed=43):
         else:
             r.uniform(0, 6.28)                            # keep the stream: the skipped put's yaw draw
     for k in range(10):
-        put("env:env_roots", r.uniform(-1.2, 1.2), r.uniform(0.6, 3.0), r.uniform(0.8, 1.5), sink=0.05)
+        # (P4) a root within 1.6 m of the lens was the smooth dark slab across the lower right (found by ablation)
+        right_, fwd_, sc_ = r.uniform(-1.2, 1.2), r.uniform(0.6, 3.0), r.uniform(0.8, 1.5)
+        if near_ok(right_, fwd_):
+            put("env:env_roots", right_, fwd_, sc_, sink=0.05)
+        else:
+            r.uniform(0, 6.28)
     # (showcase P2-3) the moss carpets are smooth cushions: seen within ~1.6 m of the lens they read as a flat dark
     # slab across the lower right (found by rendering the library alone without DOF), so near ones are not placed
     near_ok = lambda right, fwd: math.hypot(right, fwd) > 1.6
     for k in range(14):
         put("env:env_litter", r.uniform(-1.4, 1.4), r.uniform(0.3, 3.5), r.uniform(0.9, 1.6), sink=0.0)
+    # (showcase P4) the background's depth and colour, on its own random stream so nothing above moves:
+    #  - a violet/magenta pocket behind and between the heroes (the colour the owner liked, now deliberate):
+    #    violet bells, filigree, mounds and a lacefan 3.5-6.5 m back, glowing at their own (@bg) dial
+    #  - warm accents through the mid-ground: gold beads, gold bells, gold-tipped filigree, chartreuse chalices
+    r3 = np.random.default_rng(rng_seed + 2)
+
+    def put3(glb, right, fwd, s, sink=0.01):
+        x, z = ex + rx * right + fx * fwd, ez + rz * right + fz * fwd
+        y = float(g.height(np.array([x]), np.array([z]))[0])
+        out.setdefault(glb, []).append(rec(x, y - sink * s, z, r3.uniform(0, 6.28), s))
+    for k in range(14):
+        sp = ["bellspire_violet@bg", "filigree_violet@bg", "glowmound_violet@bg", "veilfern_violet@bg",
+              "chalice_violet@bg"][k % 5]
+        put3(sp, r3.uniform(-0.6, 1.3), r3.uniform(3.4, 6.5), r3.uniform(1.4, 2.6) if "glowmound" not in sp
+             else r3.uniform(0.6, 1.0), sink=0.05 if "glowmound" in sp else 0.01)
+    put3("lacefan_violet@bg", 0.55, 4.6, 2.4)
+    for k in range(6):                                    # warm accents in the mid-ground
+        sp = ["beadcluster_gold", "bellspire_gold", "filigree_goldtip", "chalice_chartreuse", "beadcluster_gold",
+              "lanternberry_gold"][k]
+        put3(sp, r3.uniform(-0.9, 1.2), r3.uniform(1.4, 3.0), r3.uniform(0.9, 1.5))
     # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)
     for k in range(9):
         put("canopy", r.uniform(-14, 14), r.uniform(12, 30), r.uniform(0.8, 1.3), sink=0.02)
