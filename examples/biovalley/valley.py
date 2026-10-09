@@ -90,7 +90,7 @@ def shots(gc, gfine):
     # over the water, a little right of the stream's centre, so the near (north) bank fills only the left third and
     # the stream runs from the bottom of the frame up to the falls (panel 1)
     wz = zs[np.where(wet)[0]]
-    bz = float(wz.max() - 0.22 * (wz.max() - wz.min())) if wet.any() else land.BANK_Z - 14
+    bz = float(wz.max() - 0.12 * (wz.max() - wz.min())) if wet.any() else land.BANK_Z - 14
     e = at(g, bx, bz, 0.7)
     yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 7.0
     d = _dir(yaw, 2.5)
@@ -416,11 +416,12 @@ LIB_COLORS.update({"glowsedge": [0.05, 0.75, 1.0], "lanternberry": [0.65, 0.2, 1
 # glint gains: the bodies carry their light in their own textures; the glints are sparse accents (the splat's
 # sub-pixel floor makes a few hundred points per instance x thousands of instances read as a white field)
 LIB_GAIN = {"glowmound": 0.5, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, "lanternberry": 0.5,
-            "veilfern": 1.2, "glowsedge": 6.0, "riverrock_a": 0.1, "riverrock_b": 0.1, "riverrock_c": 0.1,
+            "veilfern": 1.2, "glowsedge": 6.0, "riverrock_a": 1.0, "riverrock_b": 1.0, "riverrock_c": 0.1,
             "riverrock_d": 0.1, "darkfern": 0.1, "bellspire": 1.5, "lattice": 0.3, "reliquary": 0.8,
             "shadowbough": 0.4}
 # Per-shot water: the riverbank's stream is dark (it carries reflections, not the sky's colour)
-WATER = {"riverbank": {"reflection": 0.1, "reflectionTint": [0.3, 0.25, 0.75], "fresnel": 0.06, "specular": 0.8, "ripple": 0.3}}
+WATER = {"riverbank": {"reflection": 0.1, "reflectionTint": [0.3, 0.25, 0.75], "fresnel": 0.06, "specular": 0.8,
+                       "ripple": 0.3, "sparkle": 0.3, "sparkleColor": [0.45, 0.8, 1.0]}}
 
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2},
@@ -516,13 +517,13 @@ def main():
     lib_nodes, lib_layers = {}, {}
     rb_eye = S["riverbank"][0]
     rb_head = heads["riverbank"]
-    bank_mirror = {"mirror": 1.4, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 3.0,
+    bank_mirror = {"mirror": 2.2, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 3.0,
                    "mirrorSoftness": 9.0}
     groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK, FALL_FEET.get("riverbank"))
     nodes_b, hosts_b = library.assemble(groups, rb_eye)
     lib_nodes["riverbank"] = nodes_b
     # only a few saturated species are reflected: a mix of every species' glints reflects as grey
-    MIRRORED = ("glowsedge", "lanternberry", "bellspire", "veilcap", "veilfern")
+    MIRRORED = ("glowsedge", "veilcap", "veilfern", "glowmound", "riverrock_a", "riverrock_b", "bellspire")
     lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
                                                   bank_mirror if sp in MIRRORED else None, sparsity=0.3)
                                for sp, hs in hosts_b.items()]

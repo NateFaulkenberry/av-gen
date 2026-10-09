@@ -314,13 +314,14 @@ fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
             // An out-of-focus reflection: the sample is a soft disc `soft` pixels in radius whose radiance is the
             // point's own (it is the blurred image of the light, not of its sub-pixel footprint), Gaussian falloff,
             // one-pixel taps so no lattice shows.
+            // ripple-scale dashes: wide across, thin vertically (light broken by the wavelets)
             let R = i32(min(ceil(soft * 1.5), 12.0));
             let inv = 1.0 / (soft * soft);
+            let invY = 1.0 / max(soft * soft * 0.06, 0.25);
             let wdisc = strength * (1.0 - 0.7 * abs(f)) * (0.55 + 0.45 * wave) / f32(k);
             for (var dy = -R; dy <= R; dy = dy + 1) {
                 for (var dx = -R; dx <= R; dx = dx + 1) {
-                    let q2 = f32(dx * dx + dy * dy);
-                    let g = exp(-q2 * inv);
+                    let g = exp(-f32(dx * dx) * inv - f32(dy * dy) * invY);
                     if (g < 0.02) {
                         continue;
                     }

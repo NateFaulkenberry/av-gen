@@ -142,20 +142,20 @@ def bank(g, eye, head, water_level, fall_foot=None, rng_seed=31):
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         put("veilcap", x, z, s)
     # the near-left foreground (panel 1's dark rocks, moss and glowing stalks at the lens)
-    for k in range(26):
-        d = r.uniform(1.6, 6.0)
+    for k in range(60):
+        d = r.uniform(1.6, 14.0)
         side = shore(d, r.uniform(0.3, 4.0))
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         if g.wet(np.array([x]), np.array([z]))[0]:
             continue
         u = r.random()
         if u < 0.3:
-            put(["riverrock_a", "riverrock_b", "riverrock_c"][int(r.integers(0, 3))], x, z, r.uniform(0.5, 1.0),
+            put(["riverrock_a", "riverrock_b", "riverrock_c"][int(r.integers(0, 3))], x, z, r.uniform(0.7, 1.6),
                 sink=0.15)
         elif u < 0.55:
             put("darkfern", x, z, r.uniform(2.0, 4.0))
         elif u < 0.75:
-            put("glowmound", x, z, r.uniform(0.5, 1.1), sink=0.05)
+            put("glowmound", x, z, r.uniform(0.9, 1.8), sink=0.05)
         elif u < 0.9:
             put("lanternberry", x, z, r.uniform(1.0, 2.0))
         else:
