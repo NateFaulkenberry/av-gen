@@ -88,7 +88,9 @@ def fungi(gfine, eyes):
     zs = np.arange(land.BANK_Z, land.BANK_Z + 25, 0.5)
     hs = np.array([at(x, zz) for zz in zs])
     z = float(zs[np.argmax(hs > 3.6)]) + 1.5                 # the first dry ground north of the stream
-    out["veil"].append(rec(x, at(x, z) - 0.1, z, 0.3, 1.0))
+    import ecosys
+    if not ecosys.LIBRARY:                                   # the library's veilcap is the bank's hero now
+        out["veil"].append(rec(x, at(x, z) - 0.1, z, 0.3, 1.0))
     return out
 
 

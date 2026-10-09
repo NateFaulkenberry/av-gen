@@ -30,6 +30,7 @@ import falls  # noqa: E402
 import ecosys  # noqa: E402
 import life  # noqa: E402
 import glowmap  # noqa: E402
+import library  # noqa: E402
 from geom import Mesh, quat_y  # noqa: E402
 
 MESHES = HERE / "meshes"
@@ -82,10 +83,14 @@ def shots(gc, gfine):
     S["meadow"] = (e, [round(e[0] + d[0] * 500, 2), round(e[1] + d[1] * 500, 2), round(e[2] + d[2] * 500, 2)],
                    46.0, 0.3, 26000.0)
     # RIVERBANK: just above the tributary's water, looking upstream (west) toward the cliff and its falls
-    bx, bz = land.BANK_X0 + 185, land.BANK_Z - 14
-    e = at(gfine["bank"], bx, bz, 0.6)
-    yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 7.0   # the falls right of centre
-    d = _dir(yaw, 2.0)
+    bx = land.BANK_X0 + 185
+    g = gfine["bank"]
+    zs = np.arange(land.BANK_Z - 40, land.BANK_Z + 40, 0.25)
+    wet = g.wet(np.full(len(zs), bx), zs)
+    bz = float(zs[np.where(wet)[0].max()]) + 1.2 if wet.any() else land.BANK_Z - 14   # just up the north bank
+    e = at(g, bx, bz, 0.85)
+    yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 4.0   # the falls right of centre
+    d = _dir(yaw, 3.0)
     tgt = [round(e[0] + d[0] * 100, 2), round(e[1] + d[1] * 100, 2), round(e[2] + d[2] * 100, 2)]
     S["riverbank"] = (e, tgt, 48.0, 0.2, 26000.0)
     # MACRO: on the mossy bank of the tributary, 30 cm up, looking along it
@@ -382,6 +387,23 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
     }
 
 
+# The library's glint colours and gains (its own textures carry the bodies' light; the glints are accents)
+LIB_COLORS = {"veilcap": [0.55, 0.95, 1.0], "glowmound": [0.2, 1.0, 0.6], "glowmat": [0.3, 0.8, 1.0],
+              "lanternberry": [0.6, 1.0, 0.4], "filigree": [0.5, 0.9, 1.0], "veilfern": [0.3, 0.9, 1.0],
+              "bellspire": [0.5, 0.6, 1.0], "lattice": [0.45, 0.4, 1.0], "reliquary": [0.7, 0.9, 1.0]}
+LIB_COLORS.update({"glowsedge": [0.4, 1.0, 0.85], "riverrock_a": [0.2, 0.9, 0.6], "riverrock_b": [0.2, 0.9, 0.6],
+                   "riverrock_c": [0.2, 0.9, 0.6], "riverrock_d": [0.2, 0.9, 0.6], "shadowbough": [0.4, 0.8, 1.0],
+                   "darkfern": [0.3, 0.6, 1.0], "canopy": [0.3, 0.9, 0.9], "canopygrove": [0.3, 0.9, 0.9],
+                   "bulbstalk": [0.5, 1.0, 0.6]})
+# glint gains: the bodies carry their light in their own textures; the glints are sparse accents (the splat's
+# sub-pixel floor makes a few hundred points per instance x thousands of instances read as a white field)
+LIB_GAIN = {"glowmound": 0.12, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, "lanternberry": 1.5,
+            "veilfern": 0.5, "glowsedge": 2.5, "riverrock_a": 0.1, "riverrock_b": 0.1, "riverrock_c": 0.1,
+            "riverrock_d": 0.1, "darkfern": 0.1, "bellspire": 1.5, "lattice": 0.3, "reliquary": 0.8,
+            "shadowbough": 0.4}
+# Per-shot water: the riverbank's stream is dark (it carries reflections, not the sky's colour)
+WATER = {"riverbank": {"reflection": 0.35, "reflectionTint": [0.2, 0.26, 0.55], "specular": 0.8, "ripple": 0.25}}
+
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 0.7, "mist": "mistFloor"},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
@@ -397,8 +419,8 @@ POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/int
 SHOT_POST = {
     "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 0.9, "post/dof/focusRange": 0.3,
               "post/dof/maxRadius": 26.0},
-    "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 18.0, "post/dof/focusRange": 30.0,
-                  "post/dof/maxRadius": 6.0},
+    "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 9.0, "post/dof/focusRange": 25.0,
+                  "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6},
 }
 
 
@@ -471,8 +493,29 @@ def main():
     shrub_hosts = [n["name"] for n in veg if n["name"].startswith("shrub") and "_leaf" in n["name"]]
     eco = ecosys.ecosystem(hosts, forest_hosts, shrub_hosts, ["fungus_veil_threads"], ecosys.WATER_BANK)
     print(f"  ecosystem layers: {len(eco['layers'])}")
+    # the hero library, per shot
+    lib_nodes, lib_layers = {}, {}
+    rb_eye = S["riverbank"][0]
+    rb_head = heads["riverbank"]
+    bank_mirror = {"mirror": 4.0, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 2.4}
+    groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK)
+    nodes_b, hosts_b = library.assemble(groups, rb_eye)
+    lib_nodes["riverbank"] = nodes_b
+    lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
+                                                  bank_mirror, sparsity=0.5) for sp, hs in hosts_b.items()]
+    # layers a shot cannot see are dropped (the ecosystem holds 32)
+    DROP = {"riverbank": ("glade", "crown", "ledge", "understory", "orbs", "macroMoss", "gills", "veilBeads",
+                          "latticeGlow", "tips", "frondGlow"), "macro": ("glade", "crown", "ledge"),
+            "meadow": ("ledge",), "vista": ()}
     for name, (eye, tgt, fov, near, far) in S.items():
-        sc = scene(tw, eye, tgt, fov, near, far, extra, eco, grids, AIR[name])
+        eco_s = dict(eco)
+        eco_s["layers"] = [l for l in eco["layers"] if not l["name"].startswith(DROP[name])] + lib_layers.get(name, [])
+        assert len(eco_s["layers"]) <= 32, (name, len(eco_s["layers"]))
+        sc = scene(tw, eye, tgt, fov, near, far, extra + lib_nodes.get(name, []), eco_s, grids, AIR[name])
+        if name in WATER:
+            for n in sc["nodes"]:
+                if n["name"] == "land":
+                    n["terrain"]["water"].update(WATER[name])
         (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
         (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
         print(f"  shot {name}: eye {eye} target {tgt}")

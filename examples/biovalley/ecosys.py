@@ -32,6 +32,7 @@ N_LATTICE = 2
 N_BULBS = 3
 N_REEDS = 3
 WATER_BANK = None   # set by place(): the riverbank's calm water surface
+LIBRARY = True      # the approved hero library replaces the native organisms at the riverbank (library.bank)
 
 
 def build(out):
@@ -191,6 +192,14 @@ def place(gc, gfine, gfloor, eyes, headings):
     for x, z, y, d, nw, w_, pv in zip(X, Z, H, D, near_water, wet, patch):
         if w_:
             continue
+        if LIBRARY:
+            # the library carries the banks: native reeds at the water's edge and sparse dark moss remain
+            if False:
+                put("reeds", int(r.integers(0, N_REEDS)), rec(x, y - 0.05, z, r.uniform(0, 6.28),
+                                                              r.uniform(0.7, 1.3)))
+            elif pv > 0.72 and r.random() < 0.4:
+                put("moss", int(r.integers(0, N_MOSS)), rec(x, y - 0.12, z, r.uniform(0, 6.28), r.uniform(0.4, 1.2)))
+            continue
         if nw and r.random() < 0.45:
             put("reeds", int(r.integers(0, N_REEDS)), rec(x, y - 0.05, z, r.uniform(0, 6.28), r.uniform(0.7, 1.3)))
         elif nw and r.random() < 0.5:
@@ -206,8 +215,8 @@ def place(gc, gfine, gfloor, eyes, headings):
         if d < 70 and r.random() < 0.05:
             put("f3d_small", [3, 4, 2][int(r.integers(0, 3))], rec(x, y - 0.01, z, r.uniform(0, 6.28),
                                                                 r.uniform(0.8, 2.5)))
-    # the bank's bigger fungi along the near left bank
-    for k in range(22):
+    # the bank's bigger fungi along the near left bank (native; the library's veilcaps replace them)
+    for k in range(0 if LIBRARY else 22):
         x = bx - r.uniform(5, 60)
         zs = np.arange(land.BANK_Z, land.BANK_Z + 20, 0.4)
         hs = g.height(np.full(len(zs), x), zs)
