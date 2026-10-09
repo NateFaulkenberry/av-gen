@@ -142,3 +142,30 @@ Regions are luma / saturation, ours against the reference.
     - **Change:** a domed crown over near-vertical walls, `(1-d^pw)^(0.35 ex)`, with pw 2.6-4 for peaks, 3-5 for spires and 1.4-2 for ranges.
     - **Result:** sheer towers with lit faces, like panel 2. Mountain luma is 0.172 → 0.162, because the walls now face away from the moon more often.
     - **Decision:** KEEP.
+11. **Checkpoint C: the macro production shot** (`m1`..`m7`, review `artpass/C-macro/`).
+    - **Problem:** the valley's own macro camera showed a tilted slope with sparse native fungi and orbs, an empty navy sky, and nothing of the library.
+    - **Change:**
+      - The camera moves to a flat stretch of the near bank, found by search (ground within 2 mm of a gentle rise over 4 m), 22 cm up, looking upstream.
+      - `library.macro()` places the library at LOD 0 in the camera's frame. It uses the artist's colourway GLBs, weighted to the measured palette (mostly blue and cyan):
+        - an emerald-cyan veilcap hero upper left;
+        - the reliquary behind;
+        - blue lacefans at the left edge;
+        - blue bead colonies in the bottom-left corner and emerald ones on a glowmound bottom right;
+        - a glowmat carpet;
+        - bulbstalks, filigree, bellspires, chalices and lanternberries in the mid-ground;
+        - a silhouette canopy 12-30 m back that closes the top of frame.
+      - The riverbank's library continues beyond 9 m.
+      - The native macro set is removed within 8 m; the native moss stays as the ground.
+      - DOF focus 1.3 m, range 0.45; exposure -0.6; saturation 1.25.
+    - **Result** (luma/sat, ours against the reference):
+      - top 0.090/0.82 vs 0.120/0.72;
+      - hero 0.296/0.77 vs 0.207/0.75;
+      - middle 0.224/0.78 vs 0.196/0.71;
+      - foreground 0.233/0.76 vs 0.178/0.80.
+      - The hue histogram now spreads emerald → cyan → blue like the reference's.
+    - **Open:**
+      - the mid-ground is busier and brighter than the reference;
+      - the ground between the organisms is bare dark lumps, where the reference has a mossy carpet;
+      - a pale blue haze of far lacefans and filigree sits behind the reliquary;
+      - there is little violet or gold.
+    - **Decision:** KEEP.

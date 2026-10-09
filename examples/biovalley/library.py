@@ -283,3 +283,90 @@ def meadow(g, eye, head, rng_seed=37):
         else:
             put("glowmound", x, z, r.uniform(0.6, 1.4), sink=0.05)
     return groups
+
+
+# ---- the macro (panel 3): the library at LOD 0 in the valley's own macro camera ------------------------------------
+# Colourways are the artist's recoloured GLBs (hero_<species>_<colour>), weighted to the reference's glow palette:
+# mostly electric blue and cyan, emerald second, violet and gold as rare accents.
+MACRO_DIAL = {"veilcap": 1.4, "reliquary": 1.2, "lacefan": 0.7, "beadcluster": 1.2, "glowmound": 0.9,
+              "glowmat": 1.4, "bulbstalk": 1.3, "filigree": 0.8, "bellspire": 1.1, "lanternberry": 1.2,
+              "veilfern": 0.9, "chalice": 1.0, "glowsedge": 1.0, "darkfern": 0.4, "canopy": 0.0}
+
+
+def macro_node(name, glb, pts, dial):
+    return {"name": name, "kind": "procedural", "procedural": {
+        "source": {"kind": "mesh", "asset": f"../{HERO}/hero_{glb}_lod0.glb"},
+        "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
+        "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 40.0},
+        "material": {"baseColor": [1.0, 1.0, 1.0], "roughness": 1.0, "metallic": 0.0,
+                     "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 4.0 * dial}}}
+
+
+def macro(g, eye, tgt, rng_seed=43):
+    """-> {glb: [records]} placed in the macro camera's frame: (right, forward) metres from the lens."""
+    r = np.random.default_rng(rng_seed)
+    ex, ez = eye[0], eye[2]
+    fx, fz = tgt[0] - ex, tgt[2] - ez
+    n = math.hypot(fx, fz)
+    fx, fz = fx / n, fz / n
+    rx, rz = -fz, fx                                   # screen right (checked by render)
+    out = {}
+
+    def put(glb, right, fwd, s, sink=0.01, yaw=None):
+        x, z = ex + rx * right + fx * fwd, ez + rz * right + fz * fwd
+        y = float(g.height(np.array([x]), np.array([z]))[0])
+        out.setdefault(glb, []).append(rec(x, y - sink * s, z, r.uniform(0, 6.28) if yaw is None else yaw, s))
+
+    # the heroes: a tall emerald-cyan veilcap upper left (panel 3's mushroom), the reliquary behind right of centre,
+    # blue lace fans at the left edge and behind
+    put("veilcap_emeraldcyan", -0.32, 1.05, 1.7)
+    put("veilcap", -0.55, 1.6, 1.3)
+    put("reliquary", 0.28, 1.7, 1.25)
+    put("lacefan", -0.7, 1.15, 1.6)
+    put("lacefan", -0.95, 1.9, 2.0)
+    put("lacefan_violet", 1.0, 2.6, 1.2)
+    # out-of-focus foreground: blue bead colonies bottom left, an emerald bead mound bottom right
+    for k in range(5):                                # blue bead colonies in the bottom-left corner, soft in the blur
+        put("beadcluster", r.uniform(-0.36, -0.2), r.uniform(0.26, 0.42), r.uniform(0.9, 1.4))
+    put("glowmound_emerald", 0.24, 0.42, 0.5, sink=0.2)
+    for k in range(3):                                # emerald beads over the mound, bottom-right corner
+        put("beadcluster_emerald", r.uniform(0.2, 0.34), r.uniform(0.3, 0.45), r.uniform(0.9, 1.3))
+    # the carpet under everything: glow mats edge to edge from the lens to 2 m, blue first, emerald second
+    for k in range(90):
+        right, fwd = r.uniform(-0.9, 0.9), r.uniform(0.25, 2.2)
+        put(["glowmat_blue", "glowmat_blue", "glowmat_blue", "glowmat_emerald", "glowmat_emerald"][int(r.integers(0, 5))],
+            right * (0.4 + fwd * 0.5), fwd, r.uniform(1.0, 2.0))
+    # the mid-ground bank: a carpet of mats and mounds, stalks rising out of it, filigree and bells between
+    for k in range(70):
+        right, fwd = r.uniform(-1.4, 1.4), r.uniform(0.6, 3.5)
+        if abs(right) < 0.12 and fwd < 0.9:
+            continue
+        u = r.random()
+        if u < 0.3:
+            put(["glowmat_blue", "glowmat_blue", "glowmat_emerald", "glowmat"][int(r.integers(0, 4))], right, fwd,
+                r.uniform(0.7, 1.4))
+        elif u < 0.45:
+            put(["glowmound_blue", "glowmound", "glowmound_emerald"][int(r.integers(0, 3))], right, fwd,
+                r.uniform(0.35, 0.7), sink=0.1)
+        elif u < 0.7:
+            put(["bulbstalk", "bulbstalk_blue", "bulbstalk_blue", "bulbstalk_chartreuse"][int(r.integers(0, 4))],
+                right, fwd, r.uniform(1.0, 2.2))
+        elif u < 0.82:
+            put(["filigree_blue", "filigree", "filigree_violet"][int(r.integers(0, 3))], right, fwd, r.uniform(1.0, 1.8))
+        elif u < 0.9:
+            put(["bellspire_blue", "bellspire"][int(r.integers(0, 2))], right, fwd, r.uniform(0.8, 1.4))
+        elif u < 0.95:
+            put(["lanternberry_blue", "lanternberry_gold"][int(r.integers(0, 2))], right, fwd, r.uniform(1.0, 1.6))
+        else:
+            put(["chalice_blue", "chalice"][int(r.integers(0, 2))], right, fwd, r.uniform(1.0, 1.6))
+    # beyond: more mounds and stalks to 8 m so the bank continues into the haze
+    for k in range(120):
+        right, fwd = r.uniform(-3.5, 3.5), r.uniform(3.5, 9.0)
+        u = r.random()
+        glb = (["bulbstalk_blue", "bulbstalk", "glowmound_blue", "glowmat_blue", "bulbstalk_blue", "veilcap_blue",
+                "chalice_blue", "lacefan"][int(r.integers(0, 8))])
+        put(glb, right, fwd, r.uniform(1.2, 2.2))
+    # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)
+    for k in range(9):
+        put("canopy", r.uniform(-14, 14), r.uniform(12, 30), r.uniform(0.8, 1.3), sink=0.02)
+    return out

@@ -97,9 +97,12 @@ def shots(gc, gfine):
     tgt = [round(e[0] + d[0] * 100, 2), round(e[1] + d[1] * 100, 2), round(e[2] + d[2] * 100, 2)]
     S["riverbank"] = (e, tgt, 48.0, 0.2, 26000.0)
     # MACRO: on the mossy bank of the tributary, 30 cm up, looking along it
-    bx, bz = land.BANK_X0 + 150, land.BANK_Z + 9
-    e = at(gfine["bank"], bx, bz, 0.2)
-    tgt = at(gfine["bank"], bx - 6, bz + 3, 0.45)
+    # a flat stretch of the near bank (searched: ground within 2 mm of a gentle rise over 4 m ahead), looking
+    # upstream along it, the lens 22 cm up and tipped slightly down onto the bank (panel 3)
+    bx, bz = land.BANK_X0 + 171.7, land.BANK_Z + 25.0
+    e = at(gfine["bank"], bx, bz, 0.22)
+    d = _dir(255.0, 0.0)
+    tgt = at(gfine["bank"], bx + d[0] * 5.0, bz + d[2] * 5.0, 0.12)
     S["macro"] = (e, tgt, 42.0, 0.03, 26000.0)
     return S
 
@@ -442,7 +445,8 @@ POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/int
 SHOT_POST = {
     "vista": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
     "meadow": {"camera/exposure/compensation": 0.0, "post/grade/saturation": 1.2},
-    "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 0.9, "post/dof/focusRange": 0.3,
+    "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 1.3, "post/dof/focusRange": 0.45,
+              "camera/exposure/compensation": -0.6, "post/grade/saturation": 1.25,
               "post/dof/maxRadius": 26.0},
     "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 9.0, "post/dof/focusRange": 25.0,
                   "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6,
@@ -547,19 +551,55 @@ def main():
                                                md_mirror if sp in MIRRORED + ("bulbstalk",) else None, sparsity=0.15,
                                                size=2.0)
                             for (sp, t), hs in hosts_m.items()]
+    # the macro (panel 3): the library at LOD 0 in front of the lens, the riverbank's library beyond it
+    mc_eye, mc_tgt = S["macro"][0], S["macro"][1]
+    mgroups = library.macro(gfine["bank"], mc_eye, mc_tgt)
+    lib_nodes["macro"] = [library.macro_node(f"mac_{glb}", glb, pts, library.MACRO_DIAL.get(glb.split("_")[0], 1.0))
+                          for glb, pts in mgroups.items()]
+    for nd in lib_nodes["macro"]:
+        if nd["name"] == "mac_canopy":                 # the forest behind is silhouette
+            nd["procedural"]["material"]["baseColor"] = [0.25, 0.27, 0.4]
+    for nd in nodes_b:                                 # the bank beyond, clear of the lens (no superseded lattice)
+        if "_lattice_" in nd["name"] or "_veilfern_" in nd["name"]:
+            continue
+        pts = [p for p in nd["procedural"]["distribution"]["points"]
+               if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > 9.0]
+        if pts:
+            lib_nodes["macro"].append(json.loads(json.dumps(nd)))
+            lib_nodes["macro"][-1]["procedural"]["distribution"]["points"] = pts
+    GLINT = {"veilcap_emeraldcyan": library.TINT_GLOW["emerald"], "reliquary": [0.5, 0.8, 1.0],
+             "beadcluster": library.TINT_GLOW["blue"], "beadcluster_emerald": library.TINT_GLOW["emerald"],
+             "bulbstalk_blue": library.TINT_GLOW["blue"], "bulbstalk": library.TINT_GLOW["chartreuse"],
+             "glowmat_blue": library.TINT_GLOW["blue"], "lacefan": library.TINT_GLOW["blue"]}
+    lib_layers["macro"] = [library.emit_layer(f"mac_{glb}", [f"mac_{glb}"], glb, col, 0.6, sparsity=0.4,
+                                              maxDistance=40.0, size=1.2)
+                           for glb, col in GLINT.items() if glb in mgroups]
     if populate.VISTA_FERNS:
         lib_nodes["vista"] = [library.node("lib_darkfern_vista", "darkfern", populate.VISTA_FERNS, 1, 3000.0)]
     # layers a shot cannot see are dropped (the ecosystem holds 32)
     DROP = {"riverbank": ("glade", "crown", "ledge", "understory", "orbs", "macroMoss", "gills", "veilBeads",
                           "latticeGlow", "tips", "frondGlow"),
             "meadow": ("ledge", "glade", "understory", "tips", "mossDots", "orbs", "macroMoss", "gills", "veilBeads", "latticeGlow", "frondGlow",
-                       "reedTips"), "macro": ("glade", "crown", "ledge"),
+                       "reedTips"), "macro": ("glade", "crown", "ledge", "orbs", "understory", "tips", "veilBeads", "gills",
+                                    "latticeGlow"),
             "vista": ()}
     for name, (eye, tgt, fov, near, far) in S.items():
         eco_s = dict(eco)
         eco_s["layers"] = [l for l in eco["layers"] if not l["name"].startswith(DROP[name])] + lib_layers.get(name, [])
         assert len(eco_s["layers"]) <= 32, (name, len(eco_s["layers"]))
-        sc = scene(tw, eye, tgt, fov, near, far, extra + lib_nodes.get(name, []), eco_s, grids, AIR[name],
+        ex_s = extra
+        if name == "macro":
+            # the library replaces the native macro set in front of the lens (the native moss stays as the ground)
+            ex_s = []
+            for nd in extra:
+                pr = nd.get("procedural")
+                if pr and nd["name"].startswith(("mtuft", "frond", "lattice", "bulbs", "f3d_")):
+                    pts = [p for p in pr["distribution"].get("points", [])
+                           if math.hypot(p[0] - eye[0], p[2] - eye[2]) > 8.0]
+                    nd = json.loads(json.dumps(nd))
+                    nd["procedural"]["distribution"]["points"] = pts
+                ex_s.append(nd)
+        sc = scene(tw, eye, tgt, fov, near, far, ex_s + lib_nodes.get(name, []), eco_s, grids, AIR[name],
                    LIT.get(name, 1.0))
         if name in WATER:
             for n in sc["nodes"]:
