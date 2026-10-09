@@ -46,11 +46,35 @@ ASSETS = {
     "darkfern": "grasses:make_darkfern",
     "lacefan": "newspecies:make_lacefan",
     "beadcluster": "newspecies:make_beadcluster",
+    "env_fall_rock": "riverset:make_rock",
+    "env_fall_water": "riverset:make_water",
+    "env_fall_foam": "riverset:make_foam",
+    "env_fall_pool": "riverset:make_pool",
+    "env_shelf_a": "riverset:make_shelf_a",
+    "env_shelf_b": "riverset:make_shelf_b",
+    "env_waterrock_a": "riverset:make_waterrock_a",
+    "env_waterrock_b": "riverset:make_waterrock_b",
+    "env_waterrock_c": "riverset:make_waterrock_c",
+    "env_karst_tower": "karst:make_tower",
+    "env_karst_fin": "karst:make_fin",
+    "env_karst_stack": "karst:make_stack",
+    "env_moon": "sky:make_moon",
+    "env_cloud_a": "sky:make_cloud_a",
+    "env_cloud_b": "sky:make_cloud_b",
+    "env_cloud_c": "sky:make_cloud_c",
+    "env_vista_clouds": "sky:make_vista_clouds",
+    "env_canopy_a": "bough:make_canopy_a",
+    "env_canopy_b": "bough:make_canopy_b",
+    "env_canopy_c": "bough:make_canopy_c",
+    "env_mosscarpet_a": "substrate:make_mosscarpet_a",
+    "env_mosscarpet_b": "substrate:make_mosscarpet_b",
+    "env_roots": "substrate:make_roots",
+    "env_litter": "substrate:make_litter",
     "reliquary": "reliquary",
 }
 
 
-SILHOUETTE = {"shadowbough", "canopy", "canopygrove"}
+SILHOUETTE = {"shadowbough", "canopy", "canopygrove", "env", "env_cloud_a", "env_cloud_b", "env_cloud_c", "env_canopy_a", "env_canopy_b", "env_canopy_c"}
 
 
 def clear_scene():
@@ -68,8 +92,9 @@ def build_one(name, out, lod, tex_dir):
     for s in A.slots:
         imgs = lib.build_textures(bpy, s, tex_dir)
         mats.append(lib.build_material(bpy, s, imgs))
-    ob = lib.build_object(bpy, A, mats, name=f"hero_{name}_lod{lod}")
-    path = os.path.join(out, f"hero_{name}_lod{lod}.glb")
+    stem = name if name.startswith("env_") else f"hero_{name}"  # environment pieces go to meshes/env as env_*
+    ob = lib.build_object(bpy, A, mats, name=f"{stem}_lod{lod}")
+    path = os.path.join(out, f"{stem}_lod{lod}.glb")
     lib.export_glb(bpy, ob, path, A.slots)
     lo, hi = A.bounds()
     info = {"glb": os.path.basename(path), "triangles": int(A.triangles()),
@@ -78,8 +103,14 @@ def build_one(name, out, lod, tex_dir):
                       for s in A.slots},
             "bounds_zup_m": [[round(float(x), 4) for x in lo], [round(float(x), 4) for x in hi]],
             "bytes": os.path.getsize(path)}
+    for fn, data in getattr(A, "extra_files", {}).items():
+        if lod == 0 and fn == "env_vista_clouds.lobes.json":
+            importlib.import_module("sky").write_vista_clouds(os.path.join(out, fn))
+        elif lod == 0:
+            with open(os.path.join(out, fn), "w") as f:
+                json.dump(data, f)
     if lod == 0 and A.emitters:
-        lib.write_emitters(os.path.join(out, f"hero_{name}.emit.json"), A.emitters)
+        lib.write_emitters(os.path.join(out, f"{stem}.emit.json"), A.emitters)
         info["emitters"] = len(A.emitters)
     return ob, A, info
 
@@ -160,6 +191,7 @@ def render_views(name, ob, out_dir, A, only=None, stem=None, post_rig=None):
     cd = bpy.data.cameras.new("cam")
     cd.lens = 50
     cd.clip_start = 0.01
+    cd.clip_end = 1.0e5
     cam = bpy.data.objects.new("cam", cd)
     sc.collection.objects.link(cam)
     sc.camera = cam

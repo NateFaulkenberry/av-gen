@@ -271,6 +271,14 @@ class Slot:
         self.F.append(F + self.nverts)
         self.nverts += nv * nu
 
+    def add_mesh(self, V, F, UV, N):
+        """Adds an arbitrary triangle mesh with its own UVs (already in [0, 1] region space) and normals."""
+        self.V.append(np.asarray(V, dtype=np.float64))
+        self.N.append(np.asarray(N, dtype=np.float64))
+        self.UV.append(np.asarray(UV, dtype=np.float64))
+        self.F.append(np.asarray(F, dtype=np.int64) + self.nverts)
+        self.nverts += len(V)
+
     def triangles(self):
         return sum(len(f) for f in self.F)
 
@@ -817,3 +825,16 @@ def cup_leaf(base, d0, side, L, W, cup=0.35, curl=0.3, nv=8, nu=5, open_=0.0, rn
     V_, U_ = np.meshgrid(v, u, indexing="ij")
     return (C[:, None, :] + side[None, None, :] * (U_ * w[:, None])[..., None]
             + nrm[:, None, :] * ((cup * U_ ** 2) * w[:, None])[..., None])
+
+
+def grid_sample(P, S, T):
+    """Bilinear lookup of an (nv, nu, k) grid at parameter (S across u, T along v) in [0, 1]: lets a painter know
+    the 3D position (or normal) of every texel of a grid surface that has no closed form."""
+    nv, nu = P.shape[:2]
+    fu = np.clip(S, 0, 1) * (nu - 1)
+    fv = np.clip(T, 0, 1) * (nv - 1)
+    i = np.minimum(np.floor(fu).astype(int), nu - 2)
+    j = np.minimum(np.floor(fv).astype(int), nv - 2)
+    a = (fu - i)[..., None]
+    b = (fv - j)[..., None]
+    return ((P[j, i] * (1 - a) + P[j, i + 1] * a) * (1 - b) + (P[j + 1, i] * (1 - a) + P[j + 1, i + 1] * a) * b)

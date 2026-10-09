@@ -81,7 +81,30 @@ def paint_clump(N, rng, n_leaf):
 
 
 class Bough:
-    def __init__(self, seed=91, lod=0):
+    # habits for the near-canopy variants (07 section 6.2); the default is the shadowbough as approved
+    HABITS = {
+        "shadowbough": dict(d0=[0.45, 0.05, 1.0], L=2.4, R=0.24, gens=4, spread=(0.5, 1.0), up=0.0, sag=0.06,
+                            pads=(2, 3), strands=(1, 2), pad_size=(2.8, 4.6), clump_tiers=0),
+        # a broad umbrella: short trunk, wide flat-topped crown in two or three stacked foliage tiers
+        "env_canopy_a": dict(d0=[0.1, 0.05, 1.0], L=1.8, R=0.22, gens=3, spread=(0.4, 0.8), up=-0.004, sag=0.03,
+                             pads=(3, 4), strands=(0, 0), pad_size=(3.5, 5.5), clump_tiers=2,
+                             trunk=(14.0, 0.08), limbs=[(a, 0.8 + 0.2 * (k % 2), math.radians(22 + 8 * (k % 3)), 13.0)
+                                                        for k, a in enumerate(np.linspace(0, TAU, 7, endpoint=False))]),
+        # tall and narrow, its foliage in horizontal layers up the stem (a layered conifer-like silhouette)
+        "env_canopy_b": dict(d0=[0.05, 0.0, 1.0], L=3.6, R=0.18, gens=2, spread=(0.3, 0.6), up=0.0, sag=0.05,
+                             pads=(2, 3), strands=(0, 1), pad_size=(2.6, 4.0), clump_tiers=0, layered=True,
+                             trunk=(38.0, 0.03), limbs=[(k * 2.4, 0.25 + 0.7 * k / 17, math.radians(-4 + 14 * k / 17),
+                                                         12.0 * (1 - 0.75 * k / 17) + 2.0) for k in range(18)]),
+        # leaning, with long drooping curtains: a dense weeping mass
+        "env_canopy_c": dict(d0=[0.6, -0.2, 1.0], L=2.2, R=0.2, gens=3, spread=(0.4, 0.8), up=-0.006, sag=0.09,
+                             pads=(2, 2), strands=(2, 3), pad_size=(2.6, 3.8), clump_tiers=0,
+                             trunk=(22.0, 0.35), limbs=[(a, 0.62 + 0.38 * ((k * 0.37) % 1.0), math.radians(30 + 15 * (k % 2)),
+                                                         12.0 + 3 * (k % 3)) for k, a in enumerate(np.linspace(-1.2, 4.5, 8))]),
+    }
+
+    def __init__(self, seed=91, lod=0, habit="shadowbough"):
+        self.habit = habit
+        self.h = self.HABITS[habit]
         self.seed = seed
         self.lod = lod
         self.lod0 = lod == 0
@@ -94,7 +117,8 @@ class Bough:
     def build(self):
         rng = np.random.default_rng(self.seed)
         lod0 = self.lod0
-        A = Asset("shadowbough")
+        A = Asset(self.habit)
+        h = self.h
         self.A = A
         res = 1.0 if lod0 else 0.5
         bark = A.slot("bark", res=(int(1024 * res), int(2048 * res)), mode="OPAQUE", double_sided=False,
@@ -102,13 +126,16 @@ class Bough:
         leaf = A.slot("foliage", res=(int(2048 * res), int(2048 * res)), mode="MASK", emissive_strength=4.0)
         pod = A.slot("pod", res=(int(128 * res), int(128 * res)), mode="OPAQUE", double_sided=False,
                      emissive_strength=4.0)
-        br = grow_branches(rng, [0, 0, -0.15 * K], [0.45, 0.05, 1.0], 2.4 * K, 0.24 * K, max_gen=4,
-                           children=(2, 3), spread=(0.5, 1.0), shrink=0.72, rshrink=0.6, curl=0.35, up=0.0,
-                           segs=18 if lod0 else 8, crozier=0.0, min_r=0.03, child_t=(0.4, 1.0), min_dz=0.08,
-                           sink=0.9)
+        if "limbs" in h:
+            br = self.designed_crown(rng, h, lod0)
+        else:
+            br = grow_branches(rng, [0, 0, -0.15 * K], h["d0"], h["L"] * K, h["R"] * K, max_gen=h["gens"],
+                               children=(2, 3), spread=h["spread"], shrink=0.72, rshrink=0.6, curl=0.35, up=h["up"],
+                               segs=18 if lod0 else 8, crozier=0.0, min_r=0.03, child_t=(0.4, 1.0), min_dz=0.08,
+                               sink=0.9)
         for b in br:  # heavy limbs sag with their reach
             reach = np.hypot(b.pts[:, 0], b.pts[:, 1])
-            b.pts[:, 2] -= 0.06 * K * np.maximum(reach / K - 1.0, 0) ** 1.5 * (b.gen > 0)
+            b.pts[:, 2] -= h["sag"] * K * np.maximum(reach / K - 1.0, 0) ** 1.5 * (b.gen > 0)
 
         def gnarl(th, t):
             return (1 + 0.14 * (fbm(th[None, :] * 0.8, t[:, None] * 8, 3, self.seed + 4) - 0.5) * 2
@@ -136,12 +163,16 @@ class Bough:
         regs = [leaf.region(k / 4, (k + 1) / 4, self._paint_foliage(k), bump=2.0) for k in range(4)]
         rp = pod.region(0, 1, self.paint_pod, bump=1.0)
         for b in [b for b in br if b.gen >= 2]:
-            npad = (3 if b.gen >= 3 else 2) if lod0 else (1 if (b.gen == 2 or rng.random() < 0.45) else 0)
+            npad = (h["pads"][1] if b.gen >= 3 else h["pads"][0]) if lod0 else (1 if (b.gen == 2 or rng.random() < 0.45) else 0)
             for _ in range(npad):
                 t = rng.uniform(0.35, 1.0)
                 i = min(int(t * (len(b.pts) - 1)), len(b.pts) - 1)
-                self.pad(leaf, regs[2 + rng.integers(0, 2)], b.pts[i], rng, big=not lod0)
-            nstr = (2 if b.gen >= 3 else 1) if lod0 else (1 if rng.random() < 0.3 else 0)
+                p = b.pts[i]
+                if h.get("layered"):  # snap the foliage to horizontal layers up the stem
+                    p = p.copy()
+                    p[2] = round(p[2] / (0.55 * K)) * 0.55 * K
+                self.pad(leaf, regs[2 + rng.integers(0, 2)], p, rng, big=not lod0)
+            nstr = (h["strands"][1] if b.gen >= 3 else h["strands"][0]) if lod0 else (1 if rng.random() < 0.3 * (h["strands"][1] > 0) else 0)
             for _ in range(nstr):
                 t = rng.uniform(0.3, 1.0)
                 i = min(int(t * (len(b.pts) - 1)), len(b.pts) - 1)
@@ -152,11 +183,44 @@ class Bough:
                 self.strand_cards(leaf, regs[rng.integers(0, 2)], p0, L, rng.uniform(0, math.pi), rng)
                 if rng.random() < 0.05:
                     self.pod(pod, rp, p0 + np.array([0, 0, -rng.uniform(0.3, 0.8)]), rng)
+        if h["clump_tiers"]:
+            tips = np.array([b.pts[-1] for b in br if b.tip])
+            top = np.percentile(tips[:, 2], 80)
+            for k in range(h["clump_tiers"] * (6 if lod0 else 2)):
+                c = tips[rng.integers(len(tips))].copy()
+                c[2] = top - 0.35 * K * (k % h["clump_tiers"]) + rng.uniform(-0.3, 0.3)
+                self.pad(leaf, regs[2 + rng.integers(0, 2)], c, rng, big=True)
         return A
+
+    def designed_crown(self, rng, h, lod0):
+        """A trunk of the habit's height and lean, and limbs placed by design (azimuth, height on the trunk,
+        elevation, length), each grown out into twigs."""
+        from lib import Branch
+        H, lean = h["trunk"]
+        n = 24 if lod0 else 8
+        t = np.linspace(0, 1, n)
+        trunk = np.stack([lean * H * t ** 1.5, 0.15 * lean * H * np.sin(t * 2), H * t - 1.0], -1)
+        R0 = h["R"] * K
+        rad = R0 * (1 - 0.7 * t) + 0.04
+        seglen = np.r_[0, np.cumsum(np.linalg.norm(np.diff(trunk, axis=0), axis=1))]
+        out = [Branch(trunk, rad, 0.0, seglen[-1], 0, False)]
+        for az, hf, el, L in h["limbs"]:
+            i = min(int(hf * (n - 1)), n - 1)
+            d = np.array([math.cos(az) * math.cos(el), math.sin(az) * math.cos(el), math.sin(el)])
+            sub = grow_branches(rng, trunk[i] - d * rad[i] * 0.8, d, L * rng.uniform(0.85, 1.1), rad[i] * 0.55,
+                                max_gen=h["gens"], children=(2, 3), spread=h["spread"], shrink=0.62, rshrink=0.6,
+                                curl=0.3, up=h["up"], segs=12 if lod0 else 5, crozier=0.0, min_r=0.03,
+                                child_t=(0.35, 1.0), min_dz=-0.2, sink=0.9)
+            for b in sub:
+                b.gen += 1
+                b.d0 += seglen[i]
+                b.d1 += seglen[i]
+            out += sub
+        return out
 
     def pad(self, slot, reg, c, rng, big=False):
         """A ragged leaf mass: stacked, turned, roughly horizontal cards whose rims sag."""
-        size = rng.uniform(2.8, 4.6) * (1.5 if big else 1.0)
+        size = rng.uniform(*self.h["pad_size"]) * (1.5 if big else 1.0)
         for j in range(2 if big else 3):
             yaw = rng.uniform(0, TAU)
             tilt = rng.normal(0, 0.25, 2)
@@ -227,3 +291,15 @@ class Bough:
 
 def make(lod=0, seed=91):
     return Bough(seed, lod).build()
+
+
+def make_canopy_a(lod=0):
+    return Bough(911, lod, "env_canopy_a").build()
+
+
+def make_canopy_b(lod=0):
+    return Bough(921, lod, "env_canopy_b").build()
+
+
+def make_canopy_c(lod=0):
+    return Bough(931, lod, "env_canopy_c").build()
