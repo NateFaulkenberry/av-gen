@@ -283,8 +283,9 @@ def place(gc, gfine, gfloor, eyes, headings):
     for dx, dz in ((15, 0), (-15, 0), (0, 15), (0, -15)):
         nearw |= gfloor.wet(X + dx, Z + dz)
     cl = fbm2(X / 120.0, Z / 120.0, 41, 3) * 0.65 + fbm2(X / 25.0, Z / 25.0, 42, 2) * 0.35
-    p = (cl - 0.5) * 3.0 - rel / 120.0
-    keep = (~wet) & (~nearw) & (p > 0.02) & (gfloor.slope(X, Z) < 0.8)   # the river itself stays water
+    quiet = fbm2(X / 420.0, Z / 420.0, 43, 2)                       # large dark, quiet regions
+    p = (cl - 0.5) * 3.0 - rel / 120.0 - 2.2 * np.clip(0.55 - quiet, 0, 1) / 0.2
+    keep = (~wet) & (~nearw) & (p > 0.18) & (gfloor.slope(X, Z) < 0.8)   # the river itself stays water
     for exx, ezz in eyes.values():                                # the shots' own carpets are near; glades are far
         keep &= np.hypot(X - exx, Z - ezz) > 160.0
     for x, z, y in zip(X[keep], Z[keep], H[keep]):
@@ -303,7 +304,7 @@ def split_groves(groves):
             c = fbm2(np.array([x / 150.0]), np.array([z / 150.0]), 51, 3)[0]
             dr = abs(x - land.rx(z))
             p = c + 0.08 * math.exp(-dr / 120.0)
-            (glow if p > 0.47 else dark).setdefault(v, []).append(rc)
+            (glow if p > 0.6 else dark).setdefault(v, []).append(rc)
     return glow, dark
 
 
@@ -448,7 +449,7 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
     for k, col in ((0, life.CYAN), (1, life.BLUE)):
         hs = [h for v in range(len(allc)) if v % 2 == k for h in allc[v]]
         if hs:
-            L.append(layer(f"crown{k}", hs, f"grove{k}_crown.emit.json", col, 0.6, sparsity=0.6, maxDistance=5200.0,
+            L.append(layer(f"crown{k}", hs, f"grove{k}_crown.emit.json", col, 0.2, sparsity=0.85, maxDistance=5200.0,
                            **clump))
     glow = [h for v in range(len(forest_hosts["glow"])) for h in forest_hosts["glow"][v]]
     if glow:

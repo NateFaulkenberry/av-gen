@@ -140,7 +140,7 @@ def place_massifs(gc):
         cand.append((nm, x, z, scale, yaw, forced))
 
     # layers: (offset range from the centre line, mean spacing along z, kinds, scale range)
-    layers = (((420, 760), 330.0, ("peak", "cliff", "spire", "range"), (0.45, 1.0)),
+    layers = (((420, 760), 330.0, ("range", "cliff", "range", "peak"), (0.45, 1.0)),
               ((780, 1400), 420.0, ("range", "peak", "range", "cliff"), (0.7, 1.35)),
               ((1500, 2600), 560.0, ("range", "range", "peak"), (1.0, 1.75)))
     for side in (-1, 1):
@@ -163,7 +163,7 @@ def place_massifs(gc):
     ex, ez = VISTA_EYE_XZ
     for bearing, dist, name, sc, yaw in ((24.0, 1900.0, "peak2", 1.25, -60.0), (33.0, 1500.0, "peak0", 0.95, -100.0),
                                          (17.0, 2600.0, "range1", 1.2, -80.0), (-26.0, 1500.0, "cliff0", 1.0, -90.0),
-                                         (-34.0, 2000.0, "peak1", 1.1, -90.0), (-20.0, 2900.0, "range3", 1.3, -95.0)):
+                                         (-36.0, 2000.0, "cliff1", 1.5, -70.0), (-20.0, 2900.0, "range3", 1.3, -95.0)):
         b = math.radians(VISTA_YAW + bearing)
         add(None, ex + dist * math.sin(b), ez + dist * math.cos(b), sc, math.radians(yaw), True, name)
     # the riverbank's cliff: its long axis runs north-south, its face east toward the camera
@@ -521,6 +521,8 @@ def main():
     lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
                                                   bank_mirror if sp in MIRRORED else None, sparsity=0.3)
                                for sp, hs in hosts_b.items()]
+    if populate.VISTA_FERNS:
+        lib_nodes["vista"] = [library.node("lib_darkfern_vista", "darkfern", populate.VISTA_FERNS, 1, 3000.0)]
     # layers a shot cannot see are dropped (the ecosystem holds 32)
     DROP = {"riverbank": ("glade", "crown", "ledge", "understory", "orbs", "macroMoss", "gills", "veilBeads",
                           "latticeGlow", "tips", "frondGlow"), "macro": ("glade", "crown", "ledge"),

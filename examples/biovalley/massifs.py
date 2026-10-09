@@ -85,7 +85,7 @@ def massif(seed, kind, L, W, H, res=150):
         hk = H * (1.0 if k == 0 else r.uniform(0.4, 0.85))
         rk = {"range": r.uniform(0.35, 0.6), "peak": r.uniform(0.7, 1.0), "cliff": r.uniform(0.8, 1.1),
               "spire": r.uniform(0.6, 0.9)}[kind]
-        ex = {"range": r.uniform(0.7, 1.1), "peak": r.uniform(0.8, 1.2), "cliff": 0.35,
+        ex = {"range": r.uniform(0.55, 0.9), "peak": r.uniform(0.7, 1.1), "cliff": 0.35,
               "spire": r.uniform(1.2, 1.6)}[kind]
         d = np.sqrt((u - pu) ** 2 + (v - pv) ** 2) / rk
         summit = np.maximum(summit, hk * np.clip(1.0 - d, 0, 1) ** ex)

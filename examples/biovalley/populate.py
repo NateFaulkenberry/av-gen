@@ -21,6 +21,7 @@ import massifs
 from geom import fbm2, quat_y
 
 N_GROVES = 6
+VISTA_FERNS = []
 CANOPY_ASSET = True   # the floor forest and the vista's framing tree come from the hero library
 N_SHRUBS = 4
 N_BOULDERS = 6
@@ -141,7 +142,7 @@ def forest(gfloor, vista_eye, vista_yaw, shot_eyes):
     for dx, dz in ((9, 0), (-9, 0), (0, 9), (0, -9)):
         wet |= gfloor.wet(X + dx, Z + dz)
     # habitat: low ground, gentle slopes; wetter (near the river: lower and flatter) is denser
-    habitat = np.clip(1.0 - rel / 260.0, 0.15, 1) * np.clip(1.0 - sl / 1.4, 0, 1)
+    habitat = np.clip(1.0 - rel / 400.0, 0.3, 1) * np.clip(1.0 - sl / 3.0, 0, 1)
     groves = fbm2(X / 260.0, Z / 260.0, 21, 3)                 # clearings and groves at two scales
     patches = fbm2(X / 70.0, Z / 70.0, 22, 2)
     p = habitat * (0.35 + 1.1 * (groves - 0.42)) + 0.25 * (patches - 0.5)
@@ -209,20 +210,31 @@ def framing(gc, gfine, vista_eye, vista_yaw):
         return ex + dist * math.sin(b), ez + dist * math.cos(b)
 
     # VISTA: the hero tree left of frame, below the eye so its crown frames the left edge and the upper left
-    hx, hz = polar(33.0, 46.0)
-    hy = float(gc.height(np.array([hx]), np.array([hz]))[0])
-    hero.append(rec(hx, hy - 1.0, hz, math.radians(200.0), 1.3))
-    # a second, nearer, larger: its trunk and limbs cut the frame's left edge and corner (panel 2's big dark tree)
-    hx, hz = polar(50.0, 26.0)
-    hy = float(gc.height(np.array([hx]), np.array([hz]))[0])
-    hero.append(rec(hx, hy - 4.0, hz, math.radians(120.0), 1.35))
+    # the framing boughs (the library's shadowbough): rooted left of frame, the long limb (+X) reaching in over the
+    # valley from the left edge (panel 2's big dark tree)
+    fwd = (math.sin(math.radians(vista_yaw)), math.cos(math.radians(vista_yaw)))
+    rgt = (-fwd[1], fwd[0])       # screen right
+    aim = (fwd[0] * 0.55 + rgt[0] * 0.85, fwd[1] * 0.55 + rgt[1] * 0.85)
+    yaw_aim = math.atan2(-aim[1], aim[0])
+    for b_deg, dist, s in ((40.0, 38.0, 1.0), (52.0, 26.0, 0.8)):
+        hx, hz = polar(b_deg, dist)
+        hy = float(gc.height(np.array([hx]), np.array([hz]))[0])
+        hero.append(rec(hx, hy - 2.0, hz, yaw_aim + math.radians(r.uniform(-12, 12)), s))
     # dark FG masses on the promontory's lip: shrubs (scaled to small trees) across the bottom of frame
-    for k in range(90):
+    for k in range(0 if CANOPY_ASSET else 90):     # (the library's ferns take this role: see darkfern below)
         b = r.uniform(-36, 36)
         d = r.uniform(18, 110) if r.random() < 0.6 else r.uniform(18, 45)
         x, z = polar(b, d)
         y = float(gc.height(np.array([x]), np.array([z]))[0])
         shrubs[int(r.integers(0, N_SHRUBS))].append(rec(x, y - 0.3, z, r.uniform(0, 6.28), r.uniform(2.5, 5.5)))
+    global VISTA_FERNS
+    VISTA_FERNS = []
+    for k in range(900 if CANOPY_ASSET else 0):     # dark fern masses down the promontory, bottom and left of frame
+        b = r.uniform(-30, 45)
+        d = r.uniform(14, 70) if k < 300 else r.uniform(70, 420)
+        x, z = polar(b, d)
+        y = float(gc.height(np.array([x]), np.array([z]))[0])
+        VISTA_FERNS.append(rec(x, y - 0.1, z, r.uniform(0, 6.28), r.uniform(10.0, 22.0) * (1.0 + d / 150.0)))
 
     # MEADOW: arched trees on the left of its horizon, a pair of them overlapping (panel 4)
     g = gfine["meadow"]
