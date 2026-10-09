@@ -196,3 +196,26 @@ Regions are luma / saturation, ours against the reference.
     - **Result:** the stream now runs through a dark forest corridor to the fall, like panel 1's enclosure. Sky/canopy is 0.027 against the reference's 0.068: it is darker than the reference, with too little blue mist in the back.
     - **Decision:** KEEP.
     - **Note:** a library layer whose emit template is missing (hero_canopy has none) made the engine drop the whole scene and render its default sphere and grid with exit 0. Layers are now emitted only when their template exists.
+15. **Riverbank back light** (`c35`).
+    - **Change:** LIT 0.35 → 0.55; mist emission 0.12 → 0.35.
+    - **Result:** sky/canopy 0.027 → 0.039 (ref 0.068); falls 0.154 (ref 0.125). The forest reads blue, not black.
+    - **Decision:** KEEP.
+
+## Checkpoint D (2026-10-09): STOP for the owner
+
+- **Files:** `artpass/D/D-contact-sheet.png` (reference | baseline c727a200 | D), the four stills, and `palette-*.png` and `palette.md`.
+- **Riverbank:**
+  - a forest corridor to the fall;
+  - dark water carrying the bank's light;
+  - a violet glow at the falls' foot;
+  - no snow-flecks.
+- **Vista:**
+  - a royal-blue sky;
+  - karst towers with moonlit faces.
+  - The floor glow is unchanged in form. Its near slopes stay brighter than the reference's dark foreground canopy.
+- **Macro:**
+  - the library in the valley's camera: a veilcap hero, the reliquary, lacefans, bead bokeh in the corners, an enclosed top.
+- **Meadow:**
+  - a carpet to the lens: chartreuse and emerald glints on a dark bed;
+  - rocks reduced.
+  - The horizon is still cool; the reference's warm sunset is not there.
