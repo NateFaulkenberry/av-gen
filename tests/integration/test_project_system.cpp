@@ -162,6 +162,34 @@ TEST_CASE("A project whose scene fails to load says so apart from its warnings",
     CHECK(engine.projectSceneError().empty());
 }
 
+// ADR-1288: what a broken scene means to anything that writes frames. The render used to proceed over the
+// default scene and exit 0; requireProjectScene is the refusal every offline path (render, queue job, headless
+// run) now checks, and it names the cause.
+TEST_CASE("A project whose scene fails to load is refused by the paths that write frames",
+          "[integration][project][adr1288]") {
+    Fixture f;
+    std::ofstream(f.dir / "media" / "broken.scene.json")
+        << R"({"format":"avgen-scene","version":1,"name":"b","nodes":[{"name":"x","kind":"nonsense"}]})";
+    const auto broken = f.dir / "broken.json";
+    std::ofstream(broken) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/broken.scene.json"}}})";
+    app::Engine engine(app::EngineMode::Offline);
+    // the document itself is valid, so the editor can still open it and show the error...
+    REQUIRE(engine.loadProject(broken).has_value());
+    // ...but nothing that renders may proceed, and the refusal says why
+    const auto refused = engine.requireProjectScene();
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().message.find("nonsense") != std::string::npos);
+    CHECK(refused.error().message.find("did not load") != std::string::npos);
+
+    // the control: a project whose scene loads is not refused
+    const auto good = f.dir / "good.json";
+    std::ofstream(good) << R"({"format":"avgen-project","version":4,
+      "assets":{"scene":{"kind":"composition","path":"media/stage.json"}}})";
+    REQUIRE(engine.loadProject(good).has_value());
+    CHECK(engine.requireProjectScene().has_value());
+}
+
 TEST_CASE("A cue preset that overrides a scene value says so", "[integration][project][cues]") {
     // Cues recall presets into the base values (ADR-018), so from a cue onward the preset's value
     // is what the scene has -- whatever the scene file said. That precedence is right and it was

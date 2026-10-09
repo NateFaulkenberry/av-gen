@@ -3620,6 +3620,8 @@ namespace {
 // the maximum itself: an object whose scene authors more than this gets a range that holds what it
 // authored, and every object that does not keeps exactly the range it had.
 constexpr float kAuthoredEmissiveCeiling = 50.0f;
+// ADR-1287: the most an authored emission tint channel may be (an entity part's `emissiveColor` ceiling).
+constexpr float kEmissiveColorCeiling = 64.0f;
 
 struct Registrar {
     params::ParameterSet& params;
@@ -3975,7 +3977,15 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     // Material
     const Material& m = rest.material;
     p.baseColor = r.v3("material/baseColor", m.baseColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
-    p.emissiveColor = r.v3("material/emissiveColor", m.emissiveColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
+    // ADR-1287: `emissiveColor` is a *factor on light*, not a reflectance. It multiplies the emission texture
+    // (ADR-1284) before the HDR pipeline, and nothing downstream bounds it -- the shaders multiply, AgX maps.
+    // A [0, 1] hard range made every tint that lifts a channel (a gold or violet colourway of a cyan texture)
+    // run at 1 and only darken. So the range holds what the file authored, up to the same ceiling as an
+    // entity part's emissive colour (64), and the *soft* range -- what the panel draws -- stays 0..1.
+    // `baseColor` keeps [0, 1]: an albedo above 1 is a surface that reflects more light than it receives.
+    const float authoredTint = std::max({m.emissiveColor.x, m.emissiveColor.y, m.emissiveColor.z});
+    p.emissiveColor = r.v3("material/emissiveColor", m.emissiveColor, 0.0f,
+                           std::clamp(authoredTint, 1.0f, kEmissiveColorCeiling), 0.0f, 1.0f, true);
     // ADR-331. The ceiling here was a flat 50, and it clamped an authored 256 in silence.
     //
     // A hard range is an affordance -- it keeps a slider and a modulation route inside something

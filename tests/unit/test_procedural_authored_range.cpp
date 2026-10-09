@@ -119,3 +119,46 @@ TEST_CASE("an object whose every authored value is in range reports nothing", "[
     }
     CHECK(p.clamped.empty());
 }
+
+TEST_CASE("an emission tint above 1 runs as authored and reaches the live material (ADR-1287)",
+          "[procedural][range][adr1287]") {
+    // The colourway that found it: a gold tint of a cyan emission texture asks red to rise to 4.5. With a
+    // [0, 1] range it ran at 1 and the tint could only darken.
+    scene::Material m;
+    m.emissiveColor = glm::vec3(4.5f, 0.8f, 0.06f);
+    m.emissiveIntensity = 2.0f;
+    Registered gold(m);
+    REQUIRE(gold.p.emissiveColor != nullptr);
+    const glm::vec3 v = gold.p.emissiveColor->value();
+    CHECK_THAT(v.x, Catch::Matchers::WithinAbs(4.5, 1e-4));
+    CHECK_THAT(v.y, Catch::Matchers::WithinAbs(0.8, 1e-4));
+    CHECK_THAT(v.z, Catch::Matchers::WithinAbs(0.06, 1e-4));
+    CHECK_FALSE(gold.reported("material/emissiveColor.x"));
+    // the slider is unchanged: the soft range is still a colour's
+    CHECK_THAT(gold.p.emissiveColor->softMax(0), Catch::Matchers::WithinAbs(1.0, 1e-4));
+
+    // and the value the renderer reads (the live material, after the parameters are applied) is the authored one
+    scene::ProceduralGeometry live = gold.rest;
+    live.material.emissiveColor = glm::vec3(0.0f);
+    scene::applyProceduralParameters(gold.p, gold.rest, live);
+    CHECK_THAT(live.material.emissiveColor.x, Catch::Matchers::WithinAbs(4.5, 1e-4));
+
+    // the ceiling still exists: a typo far above it is moved, and says so
+    scene::Material wild;
+    wild.emissiveColor = glm::vec3(500.0f, 1.0f, 1.0f);
+    Registered w(wild);
+    CHECK(w.reported("material/emissiveColor.x"));
+    CHECK_THAT(w.p.emissiveColor->value().x, Catch::Matchers::WithinAbs(64.0, 1e-4));
+
+    // the control: an ordinary tint keeps exactly the [0, 1] range it had
+    scene::Material plain;
+    plain.emissiveColor = glm::vec3(0.3f, 0.9f, 1.0f);
+    Registered p(plain);
+    CHECK_THAT(p.p.emissiveColor->hardMax(0), Catch::Matchers::WithinAbs(1.0, 1e-4));
+    CHECK(p.p.clamped.empty());
+    // and an albedo is still a reflectance: baseColor above 1 is still moved (and reported)
+    scene::Material bright;
+    bright.baseColor = glm::vec3(2.0f, 0.5f, 0.5f);
+    Registered b(bright);
+    CHECK(b.reported("material/baseColor.x"));
+}
