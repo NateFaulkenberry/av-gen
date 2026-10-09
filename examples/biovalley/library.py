@@ -330,17 +330,22 @@ def meadow(g, eye, head, rng_seed=37):
 # ---- the macro (panel 3): the library at LOD 0 in the valley's own macro camera ------------------------------------
 # Colourways are the artist's recoloured GLBs (hero_<species>_<colour>), weighted to the reference's glow palette:
 # mostly electric blue and cyan, emerald second, violet and gold as rare accents.
-MACRO_DIAL = {"veilcap": 1.9, "reliquary": 2.1, "lacefan": 0.3, "beadcluster": 1.2, "glowmound": 0.7,
+MACRO_DIAL = {"veilcap": 1.9, "reliquary": 2.1, "lacefan": 0.15, "beadcluster": 1.2, "glowmound": 0.7,
               "glowmat": 1.2, "bulbstalk": 0.6, "filigree": 0.55, "bellspire": 0.45, "lanternberry": 0.9,
               "veilfern": 0.9, "chalice": 1.0, "glowsedge": 1.0, "darkfern": 0.4, "canopy": 0.0}
 
 
 # the lit albedo of the supporting forms: the pale lacefan lattice and the tall stalks catch the moon as brightly as
 # the heroes glow, so their reflectance is cut (they read as dark lace against the dark, lit at the rims)
+MACRO_FG_DIAL = 2.2
 MACRO_BASE = {"lacefan": 0.18, "bellspire": 0.45, "bulbstalk": 0.6}
 
 
 def macro_node(name, glb, pts, dial):
+    if "@fg" in glb:                                   # a foreground variant: same mesh, its own glow
+        glb = glb.replace("@fg", "")
+        name = name.replace("@fg", "_fg")
+        dial = MACRO_FG_DIAL
     if glb.startswith("env:"):
         # the artist's substrate pieces: their own materials (low glow), no override
         return {"name": name.replace(":", "_"), "kind": "procedural", "procedural": {
@@ -365,6 +370,11 @@ def macro(g, eye, tgt, rng_seed=43):
     rx, rz = -fz, fx                                   # screen right (checked by render)
     out = {}
 
+    def _xz_y(right, fwd, sink):
+        x, z = ex + rx * right + fx * fwd, ez + rz * right + fz * fwd
+        y = float(g.height(np.array([x]), np.array([z]))[0])
+        return x, y - sink, z
+
     def put(glb, right, fwd, s, sink=0.01, yaw=None):
         x, z = ex + rx * right + fx * fwd, ez + rz * right + fz * fwd
         y = float(g.height(np.array([x]), np.array([z]))[0])
@@ -381,7 +391,9 @@ def macro(g, eye, tgt, rng_seed=43):
     # out-of-focus foreground: blue bead colonies bottom left, an emerald bead mound bottom right
     for k in range(5):                                # blue bead colonies in the bottom-left corner, soft in the blur
         put("beadcluster", r.uniform(-0.36, -0.2), r.uniform(0.26, 0.42), r.uniform(0.9, 1.4))
-    put("glowmound_emerald", 0.24, 0.42, 0.5, sink=0.2)
+    # the near-right mound (0.5 m from the lens) is the foreground's soft out-of-focus glow, in emerald (panel 3's
+    # bottom right); at the mounds' common dial it was a dark smooth slab across the lower right third
+    put("glowmound_emerald@fg", 0.24, 0.42, 0.5, sink=0.2)
     for k in range(3):                                # emerald beads over the mound, bottom-right corner
         put("beadcluster_emerald", r.uniform(0.2, 0.34), r.uniform(0.3, 0.45), r.uniform(0.9, 1.3))
     # the carpet under everything: glow mats edge to edge from the lens to 2 m, blue first, emerald second
@@ -419,14 +431,22 @@ def macro(g, eye, tgt, rng_seed=43):
         glb = (["bulbstalk_blue", "bulbstalk", "glowmound_blue", "glowmat_blue", "bulbstalk_blue", "veilcap_blue",
                 "chalice_blue", "lacefan"][int(r.integers(0, 8))])
         put(glb, right, fwd, r.uniform(1.2, 2.2))
+    near_ok = lambda right, fwd: math.hypot(right, fwd) > 1.6   # (showcase P2-3; see below)
     # the substrate (spec 07 §8): moss carpets, surface roots and litter under and between everything, so the
     # organisms stand in a forest floor rather than on bare lumps; sunk a little so they hug the ground
     for k in range(26):
         right, fwd = r.uniform(-1.3, 1.3) * (0.5 + 0.3 * k / 26), r.uniform(0.35, 3.2)
-        put("env:" + ["env_mosscarpet_a", "env_mosscarpet_b", "env_mosscarpet_a"][k % 3], right, fwd,
-            r.uniform(0.8, 1.4), sink=0.03)
+        sc_ = r.uniform(0.8, 1.4)
+        if near_ok(right, fwd):
+            put("env:" + ["env_mosscarpet_a", "env_mosscarpet_b", "env_mosscarpet_a"][k % 3], right, fwd, sc_,
+                sink=0.03)
+        else:
+            r.uniform(0, 6.28)                            # keep the stream: the skipped put's yaw draw
     for k in range(10):
         put("env:env_roots", r.uniform(-1.2, 1.2), r.uniform(0.6, 3.0), r.uniform(0.8, 1.5), sink=0.05)
+    # (showcase P2-3) the moss carpets are smooth cushions: seen within ~1.6 m of the lens they read as a flat dark
+    # slab across the lower right (found by rendering the library alone without DOF), so near ones are not placed
+    near_ok = lambda right, fwd: math.hypot(right, fwd) > 1.6
     for k in range(14):
         put("env:env_litter", r.uniform(-1.4, 1.4), r.uniform(0.3, 3.5), r.uniform(0.9, 1.6), sink=0.0)
     # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)

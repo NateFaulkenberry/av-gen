@@ -448,6 +448,9 @@ WATER = {"riverbank": {
 # Macro showcase (spec 09): the near zone keeps full glow; beyond it the far bank glows at MACRO_FAR
 MACRO_NEAR = 3.0
 MACRO_FAR = 0.18
+MACRO_NO_BANK = True
+MACRO_LENS = 1.5
+MACRO_LENS_GAIN = 0.2
 
 # Deliverable C: the shots that draw the lobe clouds (ADR-1289), and the vista's karst landmarks
 # (asset, bearing deg + = screen left, distance m, scale, yaw deg)
@@ -650,6 +653,13 @@ def main():
     lib_nodes["macro"] = []
     for glb, pts in mgroups.items():
         dial = library.MACRO_DIAL.get(glb.split("_")[0], 1.0)
+        # (showcase P2-4) the carpet nearest the lens dissolves into large bokeh discs that outshine the subjects:
+        # within MACRO_LENS m the glow mats glow at MACRO_LENS_GAIN, so the foreground frames rather than competes
+        if glb.startswith("glowmat"):
+            lens_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) <= MACRO_LENS]
+            pts = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > MACRO_LENS]
+            if lens_p:
+                lib_nodes["macro"].append(library.macro_node(f"mac_{glb}_lens", glb, lens_p, dial * MACRO_LENS_GAIN))
         near_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) <= MACRO_NEAR]
         far_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > MACRO_NEAR]
         if near_p:
@@ -660,7 +670,10 @@ def main():
     for nd in lib_nodes["macro"]:
         if nd["name"] == "mac_canopy":                 # the forest behind is silhouette
             nd["procedural"]["material"]["baseColor"] = [0.25, 0.27, 0.4]
-    for nd in nodes_b:                                 # the bank beyond, clear of the lens (no superseded lattice)
+    # (showcase P2) the riverbank's library beyond 9 m is no longer copied into the macro: at the far bank's glow it
+    # added almost nothing, and its nodes pushed the frame past the procedural renderer's 256 visible objects, so
+    # arbitrary objects were skipped (the log said so; the picture changed with every edit)
+    for nd in ([] if MACRO_NO_BANK else nodes_b):      # the bank beyond, clear of the lens (no superseded lattice)
         if "_lattice_" in nd["name"] or "_veilfern_" in nd["name"]:
             continue
         pts = [p for p in nd["procedural"]["distribution"]["points"]
