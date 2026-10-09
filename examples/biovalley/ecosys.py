@@ -158,7 +158,7 @@ def place(gc, gfine, gfloor, eyes, headings):
     H = g.height(X, Z)
     wet = g.wet(X, Z) | g.wet(X + 0.6, Z) | g.wet(X - 0.6, Z)
     drift = fbm2(X / 9.0, Z / 9.0, 31, 3) * 0.45 + fbm2(X / 45.0, Z / 45.0, 32, 2) * 0.55
-    keep = (~wet) & (drift > 0.47)
+    keep = (~wet) & (drift > 0.47) & (not LIBRARY)
     for x, z, y, d, dv in zip(X[keep], Z[keep], H[keep], D[keep], drift[keep]):
         put("tuft", zone(x, z), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.5, 1.2) *
                                     (0.4 + 1.6 * (dv - 0.47))))
@@ -167,14 +167,14 @@ def place(gc, gfine, gfloor, eyes, headings):
                                                           r.uniform(0, 6.28), r.uniform(0.8, 1.6)))
     # fronds along the meadow stream's banks
     for x, z, y, d in zip(X, Z, H, D):
-        if d < 70 and r.random() < 0.08:
+        if (not LIBRARY) and d < 70 and r.random() < 0.08:
             nw = any(g.wet(np.array([x + dx]), np.array([z + dz]))[0] for dx, dz in ((1.5, 0), (-1.5, 0), (0, 1.5),
                                                                                       (0, -1.5)))
             if nw:
                 put("frond", int(r.integers(0, N_FROND)), rec(x, y - 0.02, z, r.uniform(0, 6.28), r.uniform(0.8, 1.6)))
     # dark moss between the drifts near the lens
     for x, z, y, d, dv in zip(X, Z, H, D, drift):
-        if d < 40 and dv <= 0.47 and r.random() < 0.25 and not g.wet(np.array([x]), np.array([z]))[0]:
+        if (not LIBRARY) and d < 40 and dv <= 0.47 and r.random() < 0.25 and not g.wet(np.array([x]), np.array([z]))[0]:
             put("moss", int(r.integers(0, N_MOSS)), rec(x, y - 0.1, z, r.uniform(0, 6.28), r.uniform(0.3, 0.9)))
 
     # ---- RIVERBANK: both banks of the calm reach, out to 110 m upstream of the lens

@@ -245,7 +245,7 @@ def framing(gc, gfine, vista_eye, vista_yaw):
         arch[k % N_ARCH].append(rec(x, y - 0.3, z, r.uniform(0, 6.28), s))
     # meadow FG rocks, low and dark (panel 4's bottom)
     mx, mz = land.MEADOW_X + 4, land.MEADOW_Z - 30
-    for k in range(18):
+    for k in range(0 if CANOPY_ASSET else 18):
         a = r.uniform(-1.2, 1.2) + math.radians(12.0)
         d = r.uniform(3, 18)
         x, z = mx + d * math.sin(a), mz + d * math.cos(a)

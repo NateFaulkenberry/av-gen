@@ -521,12 +521,24 @@ def main():
     lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
                                                   bank_mirror if sp in MIRRORED else None, sparsity=0.3)
                                for sp, hs in hosts_b.items()]
+    md_eye = S["meadow"][0]
+    groups_m = library.meadow(gfine["meadow"], md_eye, heads["meadow"])
+    nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=12.0)
+    lib_nodes["meadow"] = nodes_m
+    md_mirror = {"mirror": 1.0, "mirrorLevel": round(float(gfine["meadow"].water_level(
+        np.array([md_eye[0] + 20 * math.sin(heads["meadow"])]), np.array([md_eye[2] + 20 * math.cos(heads["meadow"])]))[0]),
+        3), "mirrorStretch": 1.5, "mirrorSoftness": 5.0}
+    lib_layers["meadow"] = [library.emit_layer(f"lib_{sp}", hs, sp, LIB_COLORS[sp], LIB_GAIN.get(sp, 0.3),
+                                               md_mirror if sp in MIRRORED + ("bulbstalk",) else None, sparsity=0.3)
+                            for sp, hs in hosts_m.items()]
     if populate.VISTA_FERNS:
         lib_nodes["vista"] = [library.node("lib_darkfern_vista", "darkfern", populate.VISTA_FERNS, 1, 3000.0)]
     # layers a shot cannot see are dropped (the ecosystem holds 32)
     DROP = {"riverbank": ("glade", "crown", "ledge", "understory", "orbs", "macroMoss", "gills", "veilBeads",
-                          "latticeGlow", "tips", "frondGlow"), "macro": ("glade", "crown", "ledge"),
-            "meadow": ("ledge",), "vista": ()}
+                          "latticeGlow", "tips", "frondGlow"),
+            "meadow": ("ledge", "glade", "understory", "tips", "mossDots", "orbs", "macroMoss", "gills", "veilBeads", "latticeGlow", "frondGlow",
+                       "reedTips"), "macro": ("glade", "crown", "ledge"),
+            "vista": ()}
     for name, (eye, tgt, fov, near, far) in S.items():
         eco_s = dict(eco)
         eco_s["layers"] = [l for l in eco["layers"] if not l["name"].startswith(DROP[name])] + lib_layers.get(name, [])

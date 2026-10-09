@@ -187,3 +187,63 @@ def bank(g, eye, head, water_level, fall_foot=None, rng_seed=31):
         x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
         put("reliquary", x, z, s)
     return groups
+
+
+def meadow(g, eye, head, rng_seed=37):
+    """The meadow (panel 4): layered vegetation in drifts, not a carpet. Fine ground growth (glowmat), small
+    luminous clusters (bulbstalk), medium forms (filigree, lanternberry), occasional tall heroes (bellspire), dark
+    contrast (darkfern), rare bright focal specimens (veilcap, reliquary); mossy rocks in the foreground guiding the
+    eye to the stream."""
+    r = np.random.default_rng(rng_seed)
+    groups = {k: [] for k in ("glowmat", "bulbstalk", "filigree", "lanternberry", "bellspire", "darkfern", "veilcap",
+                              "reliquary", "glowmound", "riverrock_a", "riverrock_b", "riverrock_c", "riverrock_d",
+                              "glowsedge", "veilfern")}
+    ex, ez = eye[0], eye[2]
+    fx, fz = math.sin(head), math.cos(head)
+    lx, lz = fz, -fx
+
+    def put(sp, x, z, s, sink=0.01):
+        y = float(g.height(np.array([x]), np.array([z]))[0])
+        groups[sp].append(rec(x, y - sink * s, z, r.uniform(0, 6.28), s))
+
+    for k in range(30000):
+        d = 6.0 + 160.0 * r.random() ** 1.7          # denser near, thinning out; the lens's first metres open
+        side = r.uniform(-1.1, 1.1) * (4.0 + d * 0.9)
+        x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
+        if g.wet(np.array([x]), np.array([z]))[0]:
+            continue
+        nw = any(g.wet(np.array([x + dx]), np.array([z + dz]))[0] for dx, dz in ((1.0, 0), (-1.0, 0), (0, 1.0),
+                                                                                  (0, -1.0)))
+        drift = float(fbm2(np.array([x / 18.0]), np.array([z / 18.0]), 51, 3)[0]) * 0.6 + \
+            float(fbm2(np.array([x / 6.0]), np.array([z / 6.0]), 52, 2)[0]) * 0.4
+        grow = 0.6 + 0.7 * min(d / 60.0, 1.0)
+        u = r.random()
+        if nw and u < 0.5:
+            put(["glowsedge", "veilfern"][int(r.integers(0, 2))], x, z, r.uniform(0.6, 1.1))
+        elif drift > 0.58:                                    # a drift: dense luminous clusters
+            put(["bulbstalk", "bulbstalk", "bulbstalk", "glowmat", "filigree"][int(r.integers(0, 5))], x, z,
+                grow * r.uniform(1.6, 3.0))
+        elif drift > 0.48:                                    # the drift's edge: medium forms
+            if u < 0.5:
+                put(["filigree", "lanternberry", "glowmat"][int(r.integers(0, 3))], x, z, grow * r.uniform(1.6, 3.0))
+        elif u < 0.35:                                        # between drifts: dark growth
+            put("darkfern", x, z, grow * r.uniform(1.2, 2.6))
+        if u < 0.004 and d > 25.0:
+            put("bellspire", x, z, r.uniform(1.8, 2.8))
+    # rare focal specimens: a veilcap pair left of the stream, a reliquary right
+    for d, side, s in ((16.0, 4.5, 4.0), (18.0, 6.0, 2.5)):
+        put("veilcap", ex + fx * d + lx * side, ez + fz * d + lz * side, s)
+    put("reliquary", ex + fx * 24.0 - lx * 6.0, ez + fz * 24.0 - lz * 6.0, 4.0)
+    # foreground: mossy rocks and glowmounds, low, leading toward the stream
+    for k in range(40):
+        d = r.uniform(1.5, 9.0)
+        side = r.uniform(-6.0, 6.0)
+        x, z = ex + fx * d + lx * side, ez + fz * d + lz * side
+        if g.wet(np.array([x]), np.array([z]))[0]:
+            continue
+        if r.random() < 0.45:
+            put(["riverrock_a", "riverrock_b", "riverrock_c", "riverrock_d"][int(r.integers(0, 4))], x, z,
+                r.uniform(0.4, 0.9), sink=0.15)
+        else:
+            put("glowmound", x, z, r.uniform(0.6, 1.4), sink=0.05)
+    return groups
