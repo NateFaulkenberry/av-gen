@@ -33,8 +33,22 @@ ASSETS = {
     "veilfern": "frond",
     "bellspire": "spire",
     "glowmat": "mat",
+    "glowmound": "mat:make_mound",
+    "shadowbough": "bough",
+    "riverrock_a": "rocks:make_a",
+    "riverrock_b": "rocks:make_b",
+    "riverrock_c": "rocks:make_c",
+    "riverrock_d": "rocks:make_d",
+    "glowsedge": "grasses:make_sedge",
+    "bulbstalk": "grasses:make_bulbstalk",
+    "canopy": "canopy:make_tree",
+    "canopygrove": "canopy:make_grove",
+    "darkfern": "grasses:make_darkfern",
     "reliquary": "reliquary",
 }
+
+
+SILHOUETTE = {"shadowbough", "canopy", "canopygrove"}
 
 
 def clear_scene():
@@ -46,8 +60,8 @@ def clear_scene():
 
 
 def build_one(name, out, lod, tex_dir):
-    mod = importlib.import_module(ASSETS[name])
-    A = mod.make(lod=lod)
+    modname, _, fn = ASSETS[name].partition(":")
+    A = getattr(importlib.import_module(modname), fn or "make")(lod=lod)
     mats = []
     for s in A.slots:
         imgs = lib.build_textures(bpy, s, tex_dir)
@@ -148,6 +162,21 @@ def render_views(name, ob, out_dir, A):
     sc.collection.objects.link(cam)
     sc.camera = cam
     R = max(h, float(hi[0] - lo[0]), float(hi[1] - lo[1]))
+    # the rig was laid out for a ~0.4 m organism: scale it with the asset so a tree is lit like a fungus
+    k = max(R / 0.4, 1.0)
+    for o in sc.objects:
+        if o.type == "LIGHT":
+            o.location = o.location * k
+            o.data.energy *= k * k
+            if o.data.type == "AREA":
+                o.data.size *= k
+    if name in SILHOUETTE:  # framing assets are judged against a lit night sky
+        sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 14.0
+    if name.startswith("riverrock"):  # dark rock needs more light to read its form
+        for o in sc.objects:
+            if o.type == "LIGHT":
+                o.data.energy *= 6.0
+        sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 5.0
     views = {
         "hero": ((cx + 1.7 * R * math.cos(-0.5), cy + 1.7 * R * math.sin(-0.5), 0.55 * h), (cx, cy, 0.52 * h)),
         "side": ((cx, cy - 2.0 * R, 0.5 * h), (cx, cy, 0.5 * h)),
