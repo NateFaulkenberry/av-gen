@@ -230,8 +230,8 @@ def waterfalls(tw, eyes):
     nodes = []
     ex, ez = VISTA_EYE_XZ
     specs = []
-    for bearing, dist, name, width, lipfrac in ((-26.0, 1500.0, "cliff0", 22.0, 0.5), (33.0, 1500.0, "peak0", 14.0, 0.45),
-                                               (24.0, 1900.0, "peak2", 18.0, 0.4)):
+    for bearing, dist, name, width, lipfrac in ((-26.0, 1500.0, "cliff0", 34.0, 0.5), (33.0, 1500.0, "peak0", 26.0, 0.45),
+                                               (24.0, 1900.0, "peak2", 30.0, 0.4)):
         b = math.radians(VISTA_YAW + bearing)
         rc = find_instance(tw, name, ex + dist * math.sin(b), ez + dist * math.cos(b))
         specs.append((name, rc, (ex, ez), width, lipfrac, 60, 2.5))
@@ -247,7 +247,7 @@ def waterfalls(tw, eyes):
         nodes.append({"name": f"fall{k}", "kind": "procedural", "procedural": {
             "source": {"kind": "mesh", "asset": f"../meshes/fall{k}.glb"},
             "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]}, "castsShadow": False,
-            "material": mat([0.1, 0.14, 0.2], 0.3, [0.45, 0.62, 1.0], 0.35, doubleSided=True, program="falls")}})
+            "material": mat([0.1, 0.14, 0.2], 0.3, [0.55, 0.7, 1.0], 1.6, doubleSided=True, program="falls")}})
         big = width > 10
         if not big:
             # the riverbank's falls: violet-white, catching light (panel 1)
@@ -325,7 +325,7 @@ def moon_nodes(eye):
     y = np.cross(z, x)
     q = _quat(np.stack([x, y, z], 1))
     return [mesh_node("moon", "moon", [[*np.round(c, 1).tolist(), *q, rad, rad, rad]],
-                      mat([0.0, 0.0, 0.0], 1.0, MOON, 9.0, unlit=True, doubleSided=True))]
+                      mat([0.0, 0.0, 0.0], 1.0, MOON, 40.0, unlit=True, doubleSided=True))]
 
 
 def _quat(m):
@@ -381,15 +381,20 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
             "volumeSteps": (air or {}).get("steps", 16), "volumeMaxDistance": (air or {}).get("reach", 200.0),
             "volumeEmission": (air or {}).get("emission", 0.0), "volumeColorField": (air or {}).get("mist", ""),
             "volumeNoise": 0.35, "volumeNoiseScale": 0.02,
-            "fogHeight": 18.0, "fogHeightFalloff": 0.012, "fogUpperDensity": 0.1, "fogHeightAmount": 1.0,
+            "fogHeight": 18.0, "fogHeightFalloff": 0.012, "fogUpperDensity": (air or {}).get("upper", 0.1), "fogHeightAmount": 1.0,
             "fogSky": 0.6, "fogSkyDistance": 5500.0,
         },
         "lights": [{"name": "moon", "id": "moon", "type": "directional", "role": "key",
                     "direction": [round(float(v), 4) for v in moon_light], "color": [0.62, 0.70, 1.0],
-                    "intensity": 0.55, "castsShadow": True}],
+                    "intensity": 0.9, "castsShadow": True},
+                   # the sky's own light from behind the camera: moonlit faces stay readable when the shot looks
+                   # toward the moon (the vista), never a second shadow
+                   {"name": "skyfill", "type": "directional", "direction": [round(float(v), 4) for v in
+                                                                          (MOON_DIR[0], -0.35, MOON_DIR[2])],
+                    "color": [0.42, 0.48, 1.0], "intensity": 0.28, "castsShadow": False}],
         "effects": [{"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True,
                      "order": 0, "activation": "always",
-                     "parameters": {"brightness": 0.9, "density": 0.45, "magnitudeSlope": 6.5, "colorSpread": 0.35,
+                     "parameters": {"brightness": 2.2, "density": 0.7, "magnitudeSlope": 6.5, "colorSpread": 0.35,
                                     "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.7, "band": 0.3,
                                     "bandTilt": 32.0, "daylight": 0.0}}],
         "nodes": nodes,
@@ -418,7 +423,7 @@ LIB_GAIN = {"glowmound": 0.5, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, 
 WATER = {"riverbank": {"reflection": 0.1, "reflectionTint": [0.3, 0.25, 0.75], "fresnel": 0.06, "specular": 0.8, "ripple": 0.3}}
 
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
-AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 0.7, "mist": "mistFloor"},
+AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
        "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.03, "mist": "mistBank"},
        "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}

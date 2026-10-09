@@ -67,7 +67,7 @@ def programs():
         op("triplanar", 2, srcA=0, value=0.09, seed=5),                             # 10 m grain
         op("multiply", 1, srcA=1, srcB=2),
         op("remap", 1, srcA=1, value=1, constant=[0.05, 0.55, 0.45, 1.6]),
-        op("constant", 3, constant=[0.052, 0.058, 0.082, 1.0]),                     # cold blue-grey stone
+        op("constant", 3, constant=[0.075, 0.08, 0.12, 1.0]),                       # cold blue-grey stone
         op("multiply", 3, srcA=3, srcB=1),
         op("input", 4, input="uv"),
         op("smoothstep", 4, srcA=4, constant=[0.45, 0.85, 0, 0]),                   # ledge mask from flatness
@@ -75,6 +75,10 @@ def programs():
         op("mixBy", 3, srcA=3, srcB=5, srcC=4),
         op("constant", 6, constant=[0.92, 0.92, 0.92, 1.0]),
         *_pool(7, 5, [0.15, 0.45, 1.0], 0.008),                                      # the light pooled on the rock
+        op("fresnel", 4, value=4.0),                                                # a cool rim on ridges and
+        op("constant", 5, constant=[0.012, 0.016, 0.05, 1.0]),                      # silhouettes (moon-scattered
+        op("multiply", 4, srcA=4, srcB=5),                                          # sky light at grazing angles)
+        op("add", 7, srcA=7, srcB=4),
     ], "baseColor": 3, "metallic": -1, "roughness": 6, "emission": 7, "emissionIntensity": 1.0, "opacity": -1}
 
     crown = {"name": "crown", "ops": [

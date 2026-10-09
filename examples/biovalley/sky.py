@@ -55,7 +55,7 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     glow_dir = np.asarray(glow_dir, float) / np.linalg.norm(glow_dir)
 
     # the gradient: indigo zenith, blue-violet toward the horizon
-    zen = np.array([0.004, 0.009, 0.052])
+    zen = np.array([0.003, 0.008, 0.06])
     hor = np.array([0.014, 0.026, 0.115])
     t = np.clip(1.0 - np.maximum(elev, 0) / (math.pi / 2), 0, 1) ** 2.4
     sky = zen + (hor - zen) * t[..., None]

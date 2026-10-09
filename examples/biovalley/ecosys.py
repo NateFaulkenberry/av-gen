@@ -414,7 +414,8 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
             L.append(layer(f"tips{v}", hs, f"tuft{v}.emit.json", cols[v], 0.6, maxDistance=900.0, sparsity=0.15,
                            pulseRate=1.5, pulseDecay=0.8, nearFade=0.5, **clump, **bank))
         if gs:
-            L.append(layer(f"glade{v}", gs, f"tuft{v}.emit.json", cols[v], 0.9, size=3.5, maxDistance=5200.0,
+            gcol = {0: life.CYAN, 1: life.EMERALD, 2: life.CYAN, 3: life.BLUE, 4: life.VIOLET}[v]   # blue-cyan floor
+            L.append(layer(f"glade{v}", gs, f"tuft{v}.emit.json", gcol, 0.9, size=3.5, maxDistance=5200.0,
                            sparsity=0.3, pulseRate=1.0, pulseDecay=0.8, **clump, **river))
     if hosts.get("frond"):
         L.append(layer("frondGlow", hosts["frond"], "frond0.emit.json", life.CYAN, 0.8, maxDistance=200.0,
@@ -454,9 +455,9 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
     glow = [h for v in range(len(forest_hosts["glow"])) for h in forest_hosts["glow"][v]]
     if glow:
         half = len(glow) // 2
-        L.append(layer("understoryGreen", glow[:half] or glow, "grove0_under.emit.json", life.LIME, 2.5, size=2.0,
+        L.append(layer("understoryGreen", glow[:half] or glow, "grove0_under.emit.json", life.TEAL, 4.0, size=3.0,
                        maxDistance=5200.0, sparsity=0.2, pulseRate=0.8, **clump, **river))
-        L.append(layer("understoryCyan", glow[half:] or glow, "grove1_under.emit.json", life.CYAN, 2.2, size=2.0,
+        L.append(layer("understoryCyan", glow[half:] or glow, "grove1_under.emit.json", life.BLUE, 4.5, size=3.0,
                        maxDistance=5200.0, sparsity=0.2, pulseRate=0.8, **clump, **river))
     if shrub_hosts:
         L.append(layer("ledgeSpecks", shrub_hosts, "shrub0.emit.json", life.TEAL, 1.0, sparsity=0.5,
