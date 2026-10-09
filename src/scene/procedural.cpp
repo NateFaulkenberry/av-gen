@@ -2687,6 +2687,11 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
     if (distribution.kind == DistributionKind::Generator) {
         return spatial::PointCloud(0);
     }
+    // ADR-1285: an empty points list places nothing. It used to fall through to the derived path, which always
+    // makes at least one placement -- one instance at the origin, an object nobody placed.
+    if (distribution.kind == DistributionKind::Points && (!distribution.points || distribution.points->empty())) {
+        return spatial::PointCloud(0);
+    }
     // ADR-1118: a points list is read straight through, as a scatter cloud is.
     const bool fromPoints = distribution.kind == DistributionKind::Points && distribution.points &&
                             !distribution.points->empty();

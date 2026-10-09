@@ -225,6 +225,25 @@ TEST_CASE("A points distribution is serialised placements", "[unit][generator]")
     CHECK(back->instances[2].scale.x == Approx(2.0f));
 }
 
+TEST_CASE("An empty points list places nothing, not one instance at the origin (ADR-1285)", "[unit][generator][adr1285]") {
+    ProceduralGeometry pg;
+    pg.name = "none";
+    pg.source.kind = PrimitiveKind::Box;
+    pg.distribution.kind = DistributionKind::Points;
+    pg.distribution.setPoints({});
+    REQUIRE(pg.rebuild());
+    CHECK(pg.instances.empty());
+    auto back = ProceduralGeometry::fromJson(pg.toJson());
+    REQUIRE(back.has_value());
+    REQUIRE(back->rebuild());
+    CHECK(back->instances.empty());
+    // one point is still one instance
+    std::vector<Transform> one(1);
+    pg.distribution.setPoints(one);
+    REQUIRE(pg.rebuild());
+    CHECK(pg.instances.size() == 1);
+}
+
 #include "assets/asset_registry.hpp"
 #include "scene/composition.hpp"
 
