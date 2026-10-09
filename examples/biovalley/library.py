@@ -60,10 +60,10 @@ PALETTES = {
                "glowmound": [("blue", 2), ("emerald", 1)],
                "glowsedge": [("blue", 2), ("cyan", 1)], "veilfern": [("blue", 1), ("cyan", 1)],
                "bellspire": [("blue", 2), ("violet", 1)]},
-    "riverbank": {"glowsedge": [("blue", 2), ("cyan", 2), ("chartreuse", 1)],
+    "riverbank": {"glowsedge": [("blue", 2), ("cyan", 2), ("violet", 2)],
                   "glowmound": [("blue", 3), ("emerald", 2), ("cyan", 1)],
-                  "glowmat": [("blue", 2), ("emerald", 1)], "veilfern": [("cyan", 2), ("blue", 1)],
-                  "lanternberry": [("blue", 2), ("violet", 1), ("gold", 1)], "bellspire": [("blue", 2), ("violet", 1)],
+                  "glowmat": [("blue", 2), ("emerald", 1)], "veilfern": [("cyan", 2), ("violet", 1), ("blue", 1)],
+                  "lanternberry": [("violet", 2), ("blue", 2), ("gold", 1)], "bellspire": [("violet", 2), ("blue", 1)],
                   "filigree": [("cyan", 1), ("blue", 2)], "veilcap": [("cyan", 1)]},
 }
 
@@ -147,7 +147,7 @@ def bank(g, eye, head, water_level, fall_foot=None, rng_seed=31):
             ax, az = fall_foot[0] - ex, fall_foot[2] - ez
             L = math.hypot(ax, az)
             t = ((x - ex) * ax + (z - ez) * az) / L
-            if 0 < t < L + 30 and abs((x - ex) * az - (z - ez) * ax) / L < 14.0:
+            if 0 < t < L + 60 and abs((x - ex) * az - (z - ez) * ax) / L < 30.0:
                 continue
         put("canopy", x, z, r.uniform(1.1, 1.9), sink=0.02)
     fx, fz = math.sin(head), math.cos(head)          # forward (x, z)

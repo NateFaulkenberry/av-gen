@@ -64,7 +64,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral"};
+    "worldEvents", "ecosystem", "astral", "clouds"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -8855,6 +8855,7 @@ void Composition::applyParameters() {
     }
     // ADR-1200: the ecosystem, with its finals. Layers share their templates by pointer, so this is cheap.
     scene_.ecosystem = ecosystem_;
+    scene_.clouds = clouds_; // ADR-1289
     applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
     updateAstral(); // ADR-1221: before the camera, which it may place
 
@@ -10987,6 +10988,9 @@ nlohmann::json Composition::toJson() const {
     if (!ecosystem_.layers.empty()) {
         j["ecosystem"] = ecosystem_.toJson(); // ADR-1200
     }
+    if (!clouds_.lobes.empty()) {
+        j["clouds"] = clouds_.toJson(); // ADR-1289
+    }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
         for (const MaterialProgram& mp : materialPrograms_) {
@@ -11876,6 +11880,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("scene file '{}': {}", scenePath.string(), added.error().message);
             }
         }
+    }
+    if (j.contains("clouds")) { // ADR-1289
+        const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");
+        auto clouds = Clouds::fromJson(j.at("clouds"), base);
+        if (!clouds) {
+            return fail("scene file '{}': {}", scenePath.string(), clouds.error().message);
+        }
+        comp->setClouds(std::move(*clouds));
     }
     if (j.contains("ecosystem")) { // ADR-1200
         auto eco = Ecosystem::fromJson(j.at("ecosystem"));

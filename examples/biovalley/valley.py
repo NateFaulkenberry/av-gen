@@ -23,6 +23,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import land  # noqa: E402
 import sky  # noqa: E402
+import riverset  # noqa: E402
+import vistaset  # noqa: E402
 import towers  # noqa: E402
 import massifs  # noqa: E402
 import populate  # noqa: E402
@@ -260,8 +262,8 @@ def waterfalls(tw, eyes):
         # the riverbank's spray is a wide, faint veil of violet-blue (panel 1), not a lit block at the foot
         nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0, 0]), width * (1.2 if big else 3.5),
                                 60.0 if big else 50.0, 610 + k, size=(6.0, 22.0) if big else (5.0, 18.0),
-                                emissive=1.2 if big else 0.18,
-                                color=(0.55, 0.68, 1.0) if big else (0.58, 0.5, 1.0)))
+                                emissive=1.2 if big else 0.35,
+                                color=(0.55, 0.68, 1.0) if big else (0.8, 0.4, 1.0)))
         print(f"  fall{k} ({name}): lip {np.round(lip, 1).tolist()} drop {lip[1] - foot[1]:.0f} m")
     return nodes
 
@@ -350,7 +352,8 @@ def _quat(m):
     return [round(v, 6) for v in q]
 
 
-def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=None, lit=1.0):
+def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=None, lit=1.0, lights=(),
+          clouds=None):
     water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
              "reflection": 1.3, "reflectionTint": [0.5, 0.5, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
              "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
@@ -369,7 +372,9 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
         if pts:
             nodes.append(mesh_node(f"massif_{k}", f"massif_{k}", pts, mat(ROCK, 0.85, program="rock"), shadow=False))
     nodes += list(extra)
-    nodes += moon_nodes(eye)
+    # Deliverable C: the dimensional moon (the artist's sphere), lit on its sun side by its own short-range light
+    moon_node, moon_sun = vistaset.moon(eye, MOON_DIR, _quat)
+    nodes.append(moon_node)
 
     moon_light = -MOON_DIR
     return {
@@ -395,7 +400,7 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
                    # toward the moon (the vista), never a second shadow
                    {"name": "skyfill", "type": "directional", "direction": [round(float(v), 4) for v in
                                                                           (MOON_DIR[0], -0.35, MOON_DIR[2])],
-                    "color": [0.35, 0.45, 1.0], "intensity": round(0.7 * lit, 3), "castsShadow": False}],
+                    "color": [0.35, 0.45, 1.0], "intensity": round(0.7 * lit, 3), "castsShadow": False}, moon_sun] + list(lights),
         "effects": [{"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True,
                      "order": 0, "activation": "always",
                      "parameters": {"brightness": 2.2, "density": 0.7, "magnitudeSlope": 6.5, "colorSpread": 0.35,
@@ -405,6 +410,7 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
         "materialPrograms": life.programs(),
         **({"grids": list(grids)} if grids else {}),
         **({"ecosystem": eco} if eco else {}),
+        **({"clouds": clouds} if clouds else {}),
     }
 
 
@@ -424,8 +430,24 @@ LIB_GAIN = {"glowmound": 0.5, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, 
             "riverrock_d": 0.1, "darkfern": 0.1, "bellspire": 1.5, "lattice": 0.3, "reliquary": 0.8,
             "shadowbough": 0.4}
 # Per-shot water: the riverbank's stream is dark (it carries reflections, not the sky's colour)
-WATER = {"riverbank": {"reflection": 0.22, "reflectionTint": [0.2, 0.28, 0.8], "fresnel": 0.08, "specular": 0.8,
-                       "ripple": 0.35, "sparkle": 0.0}}
+WATER = {"riverbank": {
+    # ADR-1286, the cinematic path (Deliverable A's W3): a dark absorbing body, swell, calm and ruffled reaches,
+    # the lit frame reflected in view-streaked rays, violet tint patches, sparse violet glow beneath
+    "shallowColor": [0.003, 0.01, 0.03], "deepColor": [0.002, 0.006, 0.03], "roughness": 0.04,
+    "ripple": 0.25, "rippleScale": 0.9, "chop": 0.6, "undulation": 0.5, "undulationScale": 0.06,
+    "roughnessVariation": 0.7, "transmission": 1.0, "absorption": [3.0, 2.0, 1.1], "clarity": 2.0,
+    "reflectionTint": [0.07, 0.09, 0.3], "reflection": 1.0, "fresnel": 0.1, "specular": 1.5,
+    "ssr": 1.0, "ssrDistance": 120.0, "ssrSteps": 160.0, "ssrGain": 2.6, "streak": 0.14, "reflectionRays": 8.0,
+    "glints": 3.0, "tintPatches": 0.7, "reflectionTint2": [0.22, 0.1, 0.5], "tintPatchScale": 0.05,
+    "glow": 0.06, "glowColor": [0.35, 0.15, 1.0], "glowScale": 0.06, "glowCoverage": 0.16, "glowDepth": 0.3,
+    "refraction": 0.4, "sparkle": 0.0}}
+
+# Deliverable C: the shots that draw the lobe clouds (ADR-1289), and the vista's karst landmarks
+# (asset, bearing deg + = screen left, distance m, scale, yaw deg)
+CLOUDED = ("vista", "meadow")
+KARST = (("env_karst_tower", -22.0, 1750.0, 1.0, 20.0),
+         ("env_karst_fin", -38.0, 2600.0, 0.9, 70.0),
+         ("env_karst_stack", 20.0, 2300.0, 1.0, 0.0))
 
 # The moon, its fill and the sky per shot: the riverbank is under the canopy, near-black but for the life
 LIT = {"riverbank": 0.55}
@@ -448,7 +470,7 @@ SHOT_POST = {
     "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 1.3, "post/dof/focusRange": 0.45,
               "camera/exposure/compensation": -0.6, "post/grade/saturation": 1.25,
               "post/dof/maxRadius": 26.0},
-    "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 9.0, "post/dof/focusRange": 25.0,
+    "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 12.0, "post/dof/focusRange": 45.0,
                   "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6,
                   "post/grade/saturation": 1.25},
 }
@@ -515,7 +537,12 @@ def main():
     placed = ecosys.place(gc, gfine, gfloor, eyes_by, heads)
     carpet, hosts = ecosys.nodes(placed, mat)
     grids, gfields = glowmap.maps(placed, glow, eyes_by)
-    extra = (gfields + veg + waterfalls(tw, eyes_by) + populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat) +
+    falls_nodes = waterfalls(tw, eyes_by)
+    # Deliverable B: the artist's fall set replaces fall3's procedural strands (its spray stays, recoloured)
+    rb_foot = FALL_FEET["riverbank"]
+    falls_nodes = [n for n in falls_nodes if n["name"] != "fall3"]
+    falls_nodes += riverset.fall_set(rb_foot, ecosys.WATER_BANK)
+    extra = (gfields + veg + falls_nodes + populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat) +
              carpet + ecosys.particles(eyes_by))
 
     def names(prefix):
@@ -531,11 +558,27 @@ def main():
     lib_nodes, lib_layers = {}, {}
     rb_eye = S["riverbank"][0]
     rb_head = heads["riverbank"]
-    bank_mirror = {"mirror": 2.2, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 3.0,
-                   "mirrorSoftness": 9.0}
+    bank_mirror = {"mirror": 2.9, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 6.0,
+                   "mirrorSoftness": 10.0}
     groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK, FALL_FEET.get("riverbank"))
     nodes_b, hosts_b = library.assemble(groups, rb_eye, near=4.0, palette=library.PALETTES["riverbank"], scale=6.0)
-    lib_nodes["riverbank"] = nodes_b
+    # the forest over the stream: the artist's designed crowns (dark, limbed) instead of the faceted canopy blobs
+    canopy_pts = [p for nd in nodes_b if nd["name"].startswith("lib_canopy_")
+                  for p in nd["procedural"]["distribution"]["points"]]
+    nodes_b = [nd for nd in nodes_b if not nd["name"].startswith("lib_canopy_")]
+    hosts_b = {k: v for k, v in hosts_b.items() if k[0] != "canopy"}
+    forest_rb = []
+    for k, p in enumerate(canopy_pts):
+        q = list(p)
+        q[7:10] = [round(q[7] * 0.7, 3)] * 3
+        forest_rb.append(("env_canopy_b", "env_canopy_c", "env_canopy_a")[k % 3] and q)
+    forest_nodes = [vistaset.env_node(f"rb_forest_{sp}", sp, [q for k, q in enumerate(forest_rb) if k % 3 == j],
+                                      maxd=600.0, lod=0,
+                                      material={"baseColor": [0.55, 0.6, 0.75], "roughness": 1.0, "metallic": 0.0,
+                                                "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 0.8})
+                    for j, sp in enumerate(("env_canopy_b", "env_canopy_c", "env_canopy_a"))]
+    lib_nodes["riverbank"] = (nodes_b + [n for n in forest_nodes if n["procedural"]["distribution"]["points"]] +
+                              riverset.shoreline(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK))
     # only a few saturated species are reflected: a mix of every species' glints reflects as grey
     MIRRORED = ("glowsedge", "veilcap", "veilfern", "glowmound", "riverrock_a", "riverrock_b", "bellspire")
     lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
@@ -579,6 +622,8 @@ def main():
     lib_layers["macro"] = [library.emit_layer(f"mac_{glb}", [f"mac_{glb}"], glb, col, 0.6, sparsity=0.4,
                                               maxDistance=40.0, size=1.2)
                            for glb, col in GLINT.items() if glb in mgroups]
+    # Deliverable C: the karst landmark and its supports, and the dark designed canopy below the lookout
+    vista_set = vistaset.karst(gc, VISTA_EYE_XZ, VISTA_YAW, KARST) + vistaset.canopy(gc, S["vista"][0], VISTA_YAW)
     if populate.VISTA_FERNS:
         lib_nodes["vista"] = [library.node("lib_darkfern_vista", "darkfern", populate.VISTA_FERNS, 1, 3000.0)]
     # layers a shot cannot see are dropped (the ecosystem holds 32)
@@ -588,6 +633,7 @@ def main():
                        "reedTips"), "macro": ("glade", "crown", "ledge", "orbs", "understory", "tips", "veilBeads", "gills",
                                     "latticeGlow"),
             "vista": ()}
+    lib_nodes.setdefault("vista", []).extend(vista_set)
     for name, (eye, tgt, fov, near, far) in S.items():
         eco_s = dict(eco)
         eco_s["layers"] = [l for l in eco["layers"] if not l["name"].startswith(DROP[name])] + lib_layers.get(name, [])
@@ -615,7 +661,9 @@ def main():
                     nd["procedural"]["distribution"]["points"] = pts
                 ex_s.append(nd)
         sc = scene(tw, eye, tgt, fov, near, far, ex_s + lib_nodes.get(name, []), eco_s, grids, AIR[name],
-                   LIT.get(name, 1.0))
+                   LIT.get(name, 1.0),
+                   riverset.fall_lights(rb_foot, ecosys.WATER_BANK) if name in ("riverbank",) else (),
+                   vistaset.clouds_block(MOON_DIR, GLOW_DIR) if name in CLOUDED else None)
         if name in WATER:
             for n in sc["nodes"]:
                 if n["name"] == "land":

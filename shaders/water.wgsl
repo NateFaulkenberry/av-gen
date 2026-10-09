@@ -928,11 +928,16 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         // Glints: the finest facets catch the bright things the reflection found, in their colour -- a cyan
         // organism gives cyan sparks, the violet falls violet ones. Nothing bright nearby, no glint.
         if (water.cineC.w > 0.0) {
-            let gf = water.ripples.y * 9.0;
-            let gfade = rippleLayerFade(gf, lodFootprint);
-            let crest = noiseD(in.worldPos.xz * gf + vec2<f32>(t * 0.7, -t * 0.4)).x * 0.5 + 0.5;
-            let crest2 = noiseD(in.worldPos.xz * gf * 2.3 + vec2<f32>(-t * 0.5, t * 0.9) + vec2<f32>(5.1, 1.7)).x * 0.5 + 0.5;
-            let cut = smoothstep(0.72, 0.95, crest * crest2 * 1.6);
+            // Ripple-shaped: a glint is a ripple crest turned to the eye, so it is a short bar lying ACROSS the view
+            // (long sideways, thin toward the eye), on the crests of the chop layer, not a speckle of grain.
+            let side = normalize(vec3<f32>(-v.z, 0.0, v.x) + vec3<f32>(0.0, 0.0, 1e-5)).xz;
+            let toward = vec2<f32>(v.x, v.z) * inverseSqrt(max(v.x * v.x + v.z * v.z, 1e-8));
+            let gf = water.ripples.y * 2.7;
+            let q = vec2<f32>(dot(in.worldPos.xz, side) * gf * 0.35, dot(in.worldPos.xz, toward) * gf * 1.6);
+            let gfade = rippleLayerFade(gf * 1.6, lodFootprint);
+            let crest = noiseD(q + vec2<f32>(t * 0.35, -t * 0.6)).x * 0.5 + 0.5;
+            let breakup = noiseD(q * vec2<f32>(0.5, 0.25) + vec2<f32>(7.3, t * 0.2)).x * 0.5 + 0.5;
+            let cut = smoothstep(0.66, 0.86, crest) * smoothstep(0.35, 0.65, breakup);
             cineGlint = ssrColor * cover * cut * gfade * water.cineC.w * (0.3 + 3.0 * peak);
         }
     }

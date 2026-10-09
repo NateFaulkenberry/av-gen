@@ -31,6 +31,7 @@
 #include "rendering/water_renderer.hpp"
 #include "rendering/ribbon_renderer.hpp"
 #include "rendering/ecosystem_renderer.hpp"
+#include "rendering/cloud_renderer.hpp"
 #include "rendering/environment_renderer.hpp"
 #include "rendering/astral_renderer.hpp"
 #include "rendering/shell_renderer.hpp"
@@ -992,6 +993,7 @@ private:
     std::unique_ptr<WaterRenderer> water_;           // ADR-099
     std::unique_ptr<EcosystemRenderer> ecosystem_;   // ADR-1200: the first Environment, after pass 1
     std::unique_ptr<AstralRenderer> astral_;         // ADR-1221: the Astral Forge, the second Environment
+    std::unique_ptr<CloudRenderer> clouds_; // ADR-1289
     std::vector<EnvironmentRenderer*> environments_; // ADR-1200: the seam, in run order (owned by SceneRenderer)
     std::unique_ptr<RibbonRenderer> ribbons_;        // ADR-703 (Wave 1): RIBBON, pass 1's blended section
     std::unique_ptr<ShellRenderer> shells_;          // Wave 3: SHELL, pass 1's blended section
