@@ -445,6 +445,10 @@ WATER = {"riverbank": {
     "glow": 0.06, "glowColor": [0.35, 0.15, 1.0], "glowScale": 0.06, "glowCoverage": 0.16, "glowDepth": 0.3,
     "refraction": 0.4, "sparkle": 0.0}}
 
+# Macro showcase (spec 09): the near zone keeps full glow; beyond it the far bank glows at MACRO_FAR
+MACRO_NEAR = 3.0
+MACRO_FAR = 0.18
+
 # Deliverable C: the shots that draw the lobe clouds (ADR-1289), and the vista's karst landmarks
 # (asset, bearing deg + = screen left, distance m, scale, yaw deg)
 CLOUDED = ("vista", "meadow")
@@ -462,7 +466,7 @@ FILL = {"vista": 0.5}
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 2.4, "mist": "mistFloor", "upper": 0.2, "density": 0.0007},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
        "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.35, "mist": "mistBank"},
-       "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}
+       "macro": {"reach": 40.0, "steps": 12, "emission": 0.02, "mist": "mistBank"}}
 
 # Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
 POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/intensity": 0.45,
@@ -641,8 +645,18 @@ def main():
     # the macro (panel 3): the library at LOD 0 in front of the lens, the riverbank's library beyond it
     mc_eye, mc_tgt = S["macro"][0], S["macro"][1]
     mgroups = library.macro(gfine["bank"], mc_eye, mc_tgt)
-    lib_nodes["macro"] = [library.macro_node(f"mac_{glb}", glb, pts, library.MACRO_DIAL.get(glb.split("_")[0], 1.0))
-                          for glb, pts in mgroups.items()]
+    # Showcase phase 2: light falls off with depth. Everything past MACRO_NEAR m is the far bank and glows at a
+    # fraction, so the subjects stand against dark negative space instead of a cyan wall.
+    lib_nodes["macro"] = []
+    for glb, pts in mgroups.items():
+        dial = library.MACRO_DIAL.get(glb.split("_")[0], 1.0)
+        near_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) <= MACRO_NEAR]
+        far_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > MACRO_NEAR]
+        if near_p:
+            lib_nodes["macro"].append(library.macro_node(f"mac_{glb}", glb, near_p, dial))
+        if far_p:
+            lib_nodes["macro"].append(library.macro_node(f"mac_{glb}_far", glb,
+                                                         far_p, dial * (1.0 if glb.startswith("env:") else MACRO_FAR)))
     for nd in lib_nodes["macro"]:
         if nd["name"] == "mac_canopy":                 # the forest behind is silhouette
             nd["procedural"]["material"]["baseColor"] = [0.25, 0.27, 0.4]
@@ -654,6 +668,9 @@ def main():
         if pts:
             lib_nodes["macro"].append(json.loads(json.dumps(nd)))
             lib_nodes["macro"][-1]["procedural"]["distribution"]["points"] = pts
+            m_ = lib_nodes["macro"][-1]["procedural"].get("material")
+            if m_ and "emissiveIntensity" in m_:
+                m_["emissiveIntensity"] = round(m_["emissiveIntensity"] * MACRO_FAR * 0.6, 3)
     GLINT = {"veilcap_emeraldcyan": library.TINT_GLOW["emerald"], "reliquary": [0.5, 0.8, 1.0],
              "beadcluster": library.TINT_GLOW["blue"], "beadcluster_emerald": library.TINT_GLOW["emerald"],
              "bulbstalk_blue": library.TINT_GLOW["blue"], "bulbstalk": library.TINT_GLOW["chartreuse"],
@@ -689,9 +706,13 @@ def main():
                         p for p in pr["distribution"].get("points", []) if math.hypot(p[0] - eye[0], p[2] - eye[2]) > 12.0]
                 ex_s.append(nd)
         if name == "macro":
-            # the library replaces the native macro set in front of the lens (the native moss stays as the ground)
+            # the library replaces the native macro set in front of the lens (the native moss stays as the ground);
+            # the riverbank's fall set, 115 m upstream, showed through a gap as an out-of-focus violet smudge behind the
+            # subjects (found by rendering without DOF): the macro does not draw it
             ex_s = []
             for nd in extra:
+                if nd["name"].startswith(("rs_fall", "fallMist3", "fall3")):
+                    continue
                 pr = nd.get("procedural")
                 if pr and nd["name"].startswith(("mtuft", "frond", "lattice", "bulbs", "f3d_")):
                     pts = [p for p in pr["distribution"].get("points", [])

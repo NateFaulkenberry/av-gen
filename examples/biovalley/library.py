@@ -372,7 +372,7 @@ def macro(g, eye, tgt, rng_seed=43):
     put("reliquary", 0.28, 1.7, 1.25)
     put("lacefan", -0.7, 1.15, 1.6)
     put("lacefan", -0.95, 1.9, 2.0)
-    put("lacefan_violet", 1.0, 2.6, 1.2)
+    r.uniform(0, 6.28)        # (the violet lacefan here was the violet smudge mid-frame; removed, its draw kept)
     # out-of-focus foreground: blue bead colonies bottom left, an emerald bead mound bottom right
     for k in range(5):                                # blue bead colonies in the bottom-left corner, soft in the blur
         put("beadcluster", r.uniform(-0.36, -0.2), r.uniform(0.26, 0.42), r.uniform(0.9, 1.4))
