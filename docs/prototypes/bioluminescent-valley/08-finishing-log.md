@@ -85,3 +85,60 @@ Rejected on the way:
 - water-shot luma rises 0.090 → 0.113 and contrast 0.110 → 0.120 across W0-W3, with clip at 0;
 - it flags W2 and W3 as "repeating the composition" of W1, which is expected for a controlled experiment;
 - it cannot judge the water itself.
+
+## Engine fixes (spec 07 §4.5 and §9)
+
+- **ADR-1287:** procedural `material/emissiveColor` holds authored values above 1, up to 64. The HDR path never
+  clamped; the parameter's hard range did.
+- **ADR-1288:** `--render`, the render queue and headless runs refuse a project whose scene did not load, and exit
+  non-zero with the cause.
+- **Suites:**
+  - CPU: only the 2 known [rift] failures (the generated scene is missing), plus the expected shouldfail.
+  - GPU: green after the NaN guard was extended to ADR-1286's fields.
+- **Note:** the first GPU run was invalid, because it ran on a build taken while headers were being edited, so the
+  binary mixed two sources.
+
+## Deliverable B, pass 1 (owner GO, 2026-10-09)
+
+Files are in `finishing/B-riverbank/`: B-sbs.png (reference | D | B), B-water-crops.png, B-riverbank.png and the
+palette.
+
+**Changes:**
+- **Water:** W3's cinematic material, with 8 streaked reflection rays (streak 0.14) and SSR gain 2.6.
+- **Fall:** the artist's fall set at fall3's foot (rock alcove, braided water, foam, pool). The water carries a
+  violet-magenta emission (now able to exceed 1, ADR-1287), and two violet point lights sit at the plunge.
+- **Shoreline:** shelves and waterline rocks from 16 m to 75 m along both banks, half-sunk.
+- **Waterline colourways:** violet glowsedge, lanternberry, bellspire and veilfern added, so the water has violet to
+  reflect.
+- **Forest:** the faceted canopy blobs are replaced by the artist's designed crowns (env_canopy_a/b/c), with the
+  sightline to the fall kept open (30 m half-width).
+- **DOF:** focus 12 m, range 45 m, so the fall is legible.
+- **Glints:** turned off. Both the ripple-shaped mask and its swap gave vertical hairlines. The cause is that the
+  glints multiply the reflected colour, which contains crisp reflections of thin grass stalks. The SSR streaks carry
+  the highlights instead.
+
+**Measured** (ours against the reference):
+
+| Region | Ours | Reference |
+|---|---|---|
+| water luma/sat | 0.145/0.84 | 0.161/0.71 |
+| water near-black | 1% | 19% |
+| falls | 0.175 | 0.125 |
+| back | 0.042 | 0.068 |
+
+**The river questions:**
+- **Depth:** partly. There are dark and teal regions, but no clear shallows.
+- **Spatially coherent reflections:** yes for the bank organisms and the canopy. The fall's reflection is faint.
+- **Violet and cyan integrated:** cyan is, and violet now appears in the bank reflections and as magenta dashes.
+  The reference's broad violet bokeh path is still missing.
+- **More interesting than the flat plane:** yes.
+- **Shoreline and fall connected:** the fall now has rock, a lip, a pool and foam, but it is small and distant in
+  this camera. The plunge is hidden by the near-right bank.
+- **Strong without overexposure:** no clipping. The water is now slightly too uniformly teal-blue in the middle.
+
+**The three biggest remaining issues:**
+1. The middle of the river is a uniform teal sheet; it needs darker channels.
+2. The ecosystem's emitter-mirror dashes still read as blobby ovals.
+3. The fall's reflection path is too faint to lead the eye.
+
+**Next experiment:** darker body in the channel with depth-weighted reflection. Mirror dashes softer and fewer.

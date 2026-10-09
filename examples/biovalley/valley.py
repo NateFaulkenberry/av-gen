@@ -438,7 +438,7 @@ WATER = {"riverbank": {
     "roughnessVariation": 0.7, "transmission": 1.0, "absorption": [3.0, 2.0, 1.1], "clarity": 2.0,
     "reflectionTint": [0.07, 0.09, 0.3], "reflection": 1.0, "fresnel": 0.1, "specular": 1.5,
     "ssr": 1.0, "ssrDistance": 120.0, "ssrSteps": 160.0, "ssrGain": 2.6, "streak": 0.14, "reflectionRays": 8.0,
-    "glints": 3.0, "tintPatches": 0.7, "reflectionTint2": [0.22, 0.1, 0.5], "tintPatchScale": 0.05,
+    "glints": 0.0, "tintPatches": 0.7, "reflectionTint2": [0.22, 0.1, 0.5], "tintPatchScale": 0.05,
     "glow": 0.06, "glowColor": [0.35, 0.15, 1.0], "glowScale": 0.06, "glowCoverage": 0.16, "glowDepth": 0.3,
     "refraction": 0.4, "sparkle": 0.0}}
 
