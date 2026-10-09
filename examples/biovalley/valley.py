@@ -428,12 +428,12 @@ WATER = {"riverbank": {"reflection": 0.22, "reflectionTint": [0.2, 0.28, 0.8], "
                        "ripple": 0.35, "sparkle": 0.0}}
 
 # The moon, its fill and the sky per shot: the riverbank is under the canopy, near-black but for the life
-LIT = {"riverbank": 0.35}
+LIT = {"riverbank": 0.55}
 
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
 AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
-       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.12, "mist": "mistBank"},
+       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.35, "mist": "mistBank"},
        "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}
 
 # Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
