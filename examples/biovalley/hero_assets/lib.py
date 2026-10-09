@@ -797,3 +797,23 @@ def worley3(x, y, z, seed=0, jitter=0.9, chunk=1 << 18):
         F1[a:a + chunk] = best
         H1[a:a + chunk] = hb
     return F1.reshape(shape), H1.reshape(shape)
+
+
+def cup_leaf(base, d0, side, L, W, cup=0.35, curl=0.3, nv=8, nu=5, open_=0.0, rng=None):
+    """A small cupped, pointed leaf (sepal, bract, petal) rising from `base` along d0, its width along `side`.
+    It curls away from its axis by `curl` radians over its length. Rows v run base -> tip, columns u across."""
+    d0 = normalize(np.asarray(d0, dtype=np.float64))
+    side = normalize(np.asarray(side, dtype=np.float64) - d0 * np.dot(side, d0))
+    away = np.cross(side, d0)
+    v = np.linspace(0, 1, nv)
+    phi = open_ + curl * v ** 1.6
+    d = np.cos(phi)[:, None] * d0 + np.sin(phi)[:, None] * away
+    C = np.zeros((nv, 3))
+    C[1:] = np.cumsum(d[:-1] * (L / max(nv - 1, 1)), axis=0)
+    C = C + base
+    nrm = np.cross(d, side)
+    w = W * np.sin(math.pi * np.clip(v, 0, 1) ** 0.72) ** 0.75
+    u = np.linspace(-1, 1, nu)
+    V_, U_ = np.meshgrid(v, u, indexing="ij")
+    return (C[:, None, :] + side[None, None, :] * (U_ * w[:, None])[..., None]
+            + nrm[:, None, :] * ((cup * U_ ** 2) * w[:, None])[..., None])

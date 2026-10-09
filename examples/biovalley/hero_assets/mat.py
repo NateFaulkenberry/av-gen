@@ -21,7 +21,7 @@ TAU = 2 * math.pi
 
 class Mat:
     def __init__(self, seed=71, lod=0, name="glowmat", R0=0.22, dome=0.0, dot_cell=0.0045, cups=True,
-                 sporo_scale=1.0):
+                 sporo_scale=1.0, lobe_amp=1.0):
         self.seed = seed
         self.lod = lod
         self.lod0 = lod == 0
@@ -32,6 +32,7 @@ class Mat:
         self.dot_cell = dot_cell
         self.cups = cups
         self.sporo_scale = sporo_scale
+        self.lobe_amp = lobe_amp
         # the profile unrolled: arc length along the surface as a function of the planar radius, so fine detail
         # painted in (arc length, angle) keeps its shape on a steep mound instead of stretching down its flanks
         rr = np.linspace(0, 1, 513)
@@ -57,9 +58,13 @@ class Mat:
     def height(self, x, y, r):
         """Height in metres at unit-disc coords (x, y) and normalised radius r."""
         h = 0.010 * self.f * (1 - r ** 2) + self.dome * np.clip(1 - r ** 2, 0, 1) ** 0.55
-        for cx, cy, rad, amp in self.domes:
-            d = np.hypot(x - cx, y - cy) / rad
-            h = h + 0.032 * self.f * amp * np.clip(1 - d ** 2, 0, 1) ** 0.7
+        # overlapping cushion lobes: flat-topped with a rounded lip, stacked in layers so each one's rim shows
+        lobes = np.zeros_like(np.asarray(x, dtype=float))
+        for k, (cx, cy, rad, amp) in enumerate(self.domes):
+            d = np.hypot(x - cx, y - cy) / (rad * (1 + 0.12 * np.sin(5 * np.arctan2(y - cy, x - cx) + k)))
+            prof = np.clip(1 - d ** 4, 0, 1) ** 0.45 if not self.dome else np.clip(1 - d ** 2.2, 0, 1) ** 0.8
+            lobes = np.maximum(lobes, (0.026 * amp + 0.006 * (k % 3)) * self.f * self.lobe_amp * prof)
+        h = h + lobes
         F1, F2, _, _ = worley(x * 22 * self.f, y * 22 * self.f, self.seed + 5)
         clump = 0.0035 * self.f ** 0.5 * (1 - np.clip(F1, 0, 1) ** 2)
         h = h + clump
@@ -129,7 +134,75 @@ class Mat:
             Q = np.stack([r * np.cos(TT), r * np.sin(TT), z], -1) + p
             sp.add_grid(Q[:, ::-1], r_cup, wrap_u=True)
             A.emitters.append(list(p + [0, 0, H * 0.85]) + [0.9, 0.5, R * 0.6])
+        self.add_nodules(A, rng)
+        self.add_fronds(A, rng)
         return A
+
+    def add_nodules(self, A, rng):
+        """Clusters of translucent gelatinous nodules, a few large and many small, half sunk into the moss."""
+        lod0 = self.lod0
+        sl = A.slot("nodule", res=(256, 256) if lod0 else (128, 128), mode="OPAQUE", double_sided=False,
+                    emissive_strength=4.0)
+        reg = sl.region(0, 1, self.paint_nodule, bump=1.0)
+        clusters = [(0.25, -0.15), (-0.45, -0.35), (0.05, 0.5), (-0.2, 0.1)] + (
+            [(0.62, 0.2), (-0.6, 0.25), (0.15, -0.65), (-0.1, 0.72)] if self.dome else [])
+        j = 0
+        for cx, cy in clusters:
+            for _ in range(14 if lod0 else 6):
+                a = rng.uniform(0, TAU)
+                d = abs(rng.normal(0, 0.07))
+                p = self.point(cx + d * math.cos(a), cy + d * math.sin(a))
+                if p is None:
+                    continue
+                R = 0.0035 * self.f * (1 + 2.2 * rng.random() ** 4)  # a few large, many small
+                nv, nt = (8, 10) if lod0 else (4, 5)
+                V, TH = np.meshgrid(np.linspace(0, 1, nv), -np.linspace(0, TAU, nt, endpoint=False), indexing="ij")
+                ph = -math.pi / 2 + math.pi * V
+                Q = np.stack([R * np.cos(ph) * np.cos(TH), R * np.cos(ph) * np.sin(TH),
+                              R * 0.8 * np.sin(ph) + R * 0.45], -1) + p
+                sl.add_grid(Q[:, ::-1], reg, wrap_u=True, s_range=((j % 16) / 16, (j % 16 + 1) / 16))
+                j += 1
+
+    def add_fronds(self, A, rng):
+        """Tufts of miniature pinnate fronds standing out of the moss."""
+        from grasses import blade
+        lod0 = self.lod0
+        sl = A.slot("frond", res=(256, 512) if lod0 else (128, 256), mode="MASK", emissive_strength=4.0)
+        reg = sl.region(0, 1, self.paint_frond, bump=2.0)
+        for cx, cy in [(-0.5, 0.25), (0.45, 0.1), (-0.05, -0.5), (0.3, 0.55)] + (
+                [(0.7, -0.3), (-0.68, -0.2)] if self.dome else []):
+            p = self.point(cx, cy)
+            if p is None:
+                continue
+            for k in range(6 if lod0 else 3):
+                a = rng.uniform(0, TAU)
+                lean = rng.uniform(0.3, 0.8)
+                d = [math.sin(lean) * math.cos(a), math.sin(lean) * math.sin(a), math.cos(lean)]
+                L = rng.uniform(0.02, 0.04) * self.f
+                P, _ = blade(p - np.array([0, 0, 0.002]), d, L, L * 0.38, rng.uniform(0.4, 0.9), rng,
+                             8 if lod0 else 3, 3 if lod0 else 2)
+                sl.add_grid(P, reg)
+
+    def paint_nodule(self, S, T):
+        idx = np.floor(S * 16)
+        bright = 0.25 + 0.75 * ((idx * 0.618 + self.seed * 0.1) % 1.0) ** 2  # not every nodule equally lit
+        core = np.sin(math.pi * T) ** 1.5
+        hue = lerp(CYAN, EMERALD, ((idx * 0.37) % 1.0))
+        base = lerp(np.array([0.04, 0.10, 0.10]), np.array([0.10, 0.22, 0.20]), core)
+        e = col(hue, 1.0) * ((0.04 + 0.45 * core) * bright)[..., None]
+        return dict(base=base, emis=e, height=np.zeros_like(S), rough=0.12, ao=0.7 + 0.3 * T)
+
+    def paint_frond(self, S, T):
+        x = (S - 0.5) * 2
+        ax = np.abs(x)
+        env = np.sin(math.pi * np.clip(T * 0.92 + 0.04, 0, 1)) ** 0.6
+        f = np.abs(((T * 14 - ax * 2.5) % 1.0) - 0.5) * 2
+        leaf = (f < 0.55 * (1 - ax / np.maximum(env, 1e-3))) & (ax < env)
+        rach = ax < 0.05
+        base = lerp(np.array([0.006, 0.016, 0.01]), np.array([0.02, 0.045, 0.03]), 1 - f)
+        e = col(EMERALD, smoothstep(0.85, 1.0, T) * 0.15 * rach)
+        return dict(base=base, emis=e, alpha=(leaf | rach).astype(float), height=(1 - f) * leaf + rach,
+                    rough=0.6, ao=0.5 + 0.5 * T)
 
     def point(self, ux, uy):
         """The surface point over unit-disc coords (ux, uy), or None outside the cushion."""
@@ -207,4 +280,5 @@ def make(lod=0, seed=71):
 
 def make_mound(lod=0, seed=73):
     """The large variant: a 1 m moss mound, 0.42 m high, for the macro's out-of-focus foreground."""
-    return Mat(seed, lod, name="glowmound", R0=0.5, dome=0.36, dot_cell=0.011, cups=False, sporo_scale=1.6).build()
+    return Mat(seed, lod, name="glowmound", R0=0.5, dome=0.13, dot_cell=0.011, cups=False, sporo_scale=1.6,
+               lobe_amp=4.0).build()

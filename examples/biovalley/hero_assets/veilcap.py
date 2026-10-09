@@ -397,7 +397,8 @@ class Veilcap:
         return dict(base=base, emis=e, height=mott, rough=0.8, ao=0.5 + 0.5 * T)
 
     def paint_filament(self, S, T):
-        tip = smoothstep(0.84, 0.95, T)
+        lit = 0.2 + 0.8 * ((np.floor(S * 22) * 0.618) % 1.0) ** 1.5  # each filament's bead its own brightness
+        tip = smoothstep(0.84, 0.95, T) * lit
         e = col(lerp(CYAN, np.array([0.45, 1.0, 0.6]), tip), 0.05 + 0.75 * tip) + col(EMERALD, 0.008 * T)
         base = lerp(np.array([0.02, 0.05, 0.06]), np.array([0.1, 0.3, 0.2]), tip)
         return dict(base=base, emis=e, height=np.zeros_like(S), rough=0.25, ao=1.0)
