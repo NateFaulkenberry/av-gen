@@ -330,9 +330,14 @@ def meadow(g, eye, head, rng_seed=37):
 # ---- the macro (panel 3): the library at LOD 0 in the valley's own macro camera ------------------------------------
 # Colourways are the artist's recoloured GLBs (hero_<species>_<colour>), weighted to the reference's glow palette:
 # mostly electric blue and cyan, emerald second, violet and gold as rare accents.
-MACRO_DIAL = {"veilcap": 1.6, "reliquary": 1.4, "lacefan": 0.55, "beadcluster": 1.2, "glowmound": 0.7,
-              "glowmat": 1.2, "bulbstalk": 0.9, "filigree": 0.55, "bellspire": 0.8, "lanternberry": 0.9,
+MACRO_DIAL = {"veilcap": 1.9, "reliquary": 2.1, "lacefan": 0.3, "beadcluster": 1.2, "glowmound": 0.7,
+              "glowmat": 1.2, "bulbstalk": 0.6, "filigree": 0.55, "bellspire": 0.45, "lanternberry": 0.9,
               "veilfern": 0.9, "chalice": 1.0, "glowsedge": 1.0, "darkfern": 0.4, "canopy": 0.0}
+
+
+# the lit albedo of the supporting forms: the pale lacefan lattice and the tall stalks catch the moon as brightly as
+# the heroes glow, so their reflectance is cut (they read as dark lace against the dark, lit at the rims)
+MACRO_BASE = {"lacefan": 0.18, "bellspire": 0.45, "bulbstalk": 0.6}
 
 
 def macro_node(name, glb, pts, dial):
@@ -346,7 +351,7 @@ def macro_node(name, glb, pts, dial):
         "source": {"kind": "mesh", "asset": f"../{HERO}/hero_{glb}_lod0.glb"},
         "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
         "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 40.0},
-        "material": {"baseColor": [1.0, 1.0, 1.0], "roughness": 1.0, "metallic": 0.0,
+        "material": {"baseColor": [MACRO_BASE.get(glb.split("_")[0], 1.0)] * 3, "roughness": 1.0, "metallic": 0.0,
                      "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 4.0 * dial}}}
 
 
@@ -427,4 +432,34 @@ def macro(g, eye, tgt, rng_seed=43):
     # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)
     for k in range(9):
         put("canopy", r.uniform(-14, 14), r.uniform(12, 30), r.uniform(0.8, 1.3), sink=0.02)
+    return out
+
+
+def macro_frame(eye, tgt):
+    """(right, fwd) metres in the macro camera's ground frame -> world (x, z); the frame `macro()` places in."""
+    ex, ez = eye[0], eye[2]
+    fx, fz = tgt[0] - ex, tgt[2] - ez
+    n = math.hypot(fx, fz)
+    fx, fz = fx / n, fz / n
+    rx, rz = -fz, fx
+
+    def to_world(right, fwd):
+        return ex + rx * right + fx * fwd, ez + rz * right + fz * fwd
+    return to_world
+
+
+def macro_lights(g, eye, tgt):
+    """The subjects light their own ground (spec 09 §3 local coloured illumination, and the ground's depth): a small
+    emerald-cyan pool under the veilcap's cap, a blue one at the reliquary's foot, and a faint violet back light low
+    behind the pair that rims the ground's undulation."""
+    w = macro_frame(eye, tgt)
+    out = []
+    for name, (right, fwd), lift, col, inten, rng in (
+            ("veilcapPool", (-0.32, 1.05), 0.12, [0.25, 1.0, 0.75], 0.16, 0.9),
+            ("reliquaryPool", (0.28, 1.7), 0.12, [0.3, 0.55, 1.0], 0.2, 0.9),
+            ("groundRim", (0.0, 2.8), 0.1, [0.45, 0.35, 1.0], 0.35, 3.0)):
+        x, z = w(right, fwd)
+        y = float(g.height(np.array([x]), np.array([z]))[0]) + lift
+        out.append({"name": name, "type": "point", "position": [round(x, 3), round(y, 3), round(z, 3)],
+                    "color": col, "intensity": inten, "range": rng, "radius": 0.05, "castsShadow": False})
     return out

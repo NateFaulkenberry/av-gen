@@ -722,7 +722,8 @@ def main():
                 ex_s.append(nd)
         sc = scene(tw, eye, tgt, fov, near, far, ex_s + lib_nodes.get(name, []), eco_s, grids, AIR[name],
                    LIT.get(name, 1.0),
-                   riverset.fall_lights(rb_foot, ecosys.WATER_BANK) if name in ("riverbank",) else (),
+                   riverset.fall_lights(rb_foot, ecosys.WATER_BANK) if name == "riverbank" else
+                   library.macro_lights(gfine["bank"], eye, tgt) if name == "macro" else (),
                    vistaset.clouds_block(MOON_DIR, GLOW_DIR) if name in CLOUDED else None, FILL.get(name, 1.0),
                    "night_warm.hdr" if name == "meadow" else "night.hdr")
         if name in WATER:
