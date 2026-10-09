@@ -278,3 +278,42 @@ offline-only as configured.
 **Creative Critic** (job in critic-report.md):
 - 0 issues; luma 0.12-0.17, contrast 0.13-0.17, clip ≤ 0.04%.
 - On stills it remains an exposure and clipping guard, not a judge of likeness.
+
+## Macro showcase (spec 09), phases 1-3
+
+The media and the measurements are in `macro-showcase/`.
+
+**Kept:**
+1. **Depth falloff.** Organisms past 3 m glow at 18%.
+2. **The far fall removed from the macro.** The riverbank's fall set, 115 m upstream, showed through a gap as a violet
+   blur behind the subjects. A render without DOF found it.
+3. **Hierarchy.** The veilcap is at 1.9 and the reliquary at 2.1. The supporting lacefan, bellspire and bulbstalk are
+   dimmer, with darker albedo.
+4. **Small coloured light pools** under the veilcap (emerald) and the reliquary (blue), and a faint violet rim on the
+   ground.
+5. **Near moss carpets removed.** Within 1.6 m of the lens they read as a smooth dark slab; a library-only render
+   without DOF showed this.
+6. **Glow mats dimmed within 1.5 m of the lens** (×0.2), so the foreground bokeh frames the subjects instead of
+   competing with them.
+7. **The far-bank library copy dropped.** It pushed the frame past the procedural renderer's 256 visible objects, so
+   arbitrary objects were skipped: the log warned "extra objects skipped", and the picture shifted with unrelated
+   edits.
+8. **Presentation** (variant C of 3):
+   - focus 1.25 m, range 0.3, max radius 30;
+   - bloom threshold 0.9, intensity 0.6;
+   - vignette 0.45, exposure -0.45.
+9. **Camera sequence** (`shots/macro_move.json`): 12 s, a push-in with a rightward drift that opens the reliquary
+   from behind the veilcap, with focus moving from 1.7 m to 1.1 m.
+
+**Rejected:**
+- the riverbank water on the macro's stream (no visible change);
+- small foreground carpets (still a slab);
+- bright light pools (they washed the ground teal);
+- a glowing near mound.
+
+**The critic:**
+- **Still:** 0 issues; luma 0.168 → 0.163, contrast 0.169 → 0.158, no clipping. It cannot rank the hierarchy, so the
+  focal measurements above stand in for it.
+- **Sequence:** stability and flashes are clean. One low-severity finding: "the shot keeps going after it stops showing
+  anything new" (novelty 0.05). That is inherent to a slow 12 s reveal. Phase 4's audio response is what will carry the
+  later seconds.
