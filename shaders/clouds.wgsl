@@ -97,8 +97,11 @@ fn cDensity(p: vec3<f32>, hit: ptr<function, array<u32, 160>>, n: u32, detail: u
     let warp = vec3<f32>(cNoise(p * ns * 0.5 + seed), cNoise(p * ns * 0.5 + seed + 11.0),
                          cNoise(p * ns * 0.5 + seed + 23.0)) - 0.5;
     let n2 = cFbm(p * ns + warp * 2.5 + seed, detail);
-    // erode from the outside in: thin parts go first, so edges break into wisps and interiors stay solid
-    return clamp((base - cu.warmColor.w * (1.0 - n2)) / max(1.0 - cu.warmColor.w * 0.5, 1e-3), 0.0, 1.0);
+    // billows at a coarser scale shape the mass (lobes within lobes), the fine fbm erodes the edges into wisps
+    let billow = cFbm(p * ns * 0.35 + warp + seed * 0.5, 3u);
+    let a = cu.warmColor.w;
+    let shaped = base * mix(1.0, smoothstep(0.25, 0.7, billow), a);
+    return clamp((shaped - a * (1.0 - n2) * 0.9) * (1.0 + a), 0.0, 1.0);
 }
 
 fn cPhase(cosT: f32, g: f32) -> f32 {

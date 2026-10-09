@@ -50,19 +50,19 @@ struct MaterialProgramGpu {
     ops: array<MaterialOpGpu, 48>,
 };
 
-// Mirrors rendering::MaterialProgramBlock (45840 bytes; a storage buffer since ADR-036).
+// Mirrors rendering::MaterialProgramBlock (91664 bytes since ADR-1290's 16 slots; a storage buffer since ADR-036).
 struct MaterialProgramBlock {
     count: u32,
     pad0: u32,
     pad1: u32,
     pad2: u32,
-    programs: array<MaterialProgramGpu, 8>,
+    programs: array<MaterialProgramGpu, 16>,
 };
 
 const MAT_MAX_OPS: u32 = 48u;
 const MAT_MAX_LAYERS: u32 = 4u;
 const MAT_MAX_FIELDS: u32 = 4u;   // scene::kMaxMaterialFields
-const MAT_MAX_PROGRAMS: i32 = 8;
+const MAT_MAX_PROGRAMS: i32 = 16; // ADR-1290 (was 8)
 const MAT_REGISTERS: i32 = 8;
 
 const MAT_OP_INPUT: u32 = 0u;

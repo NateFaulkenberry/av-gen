@@ -142,3 +142,40 @@ palette.
 3. The fall's reflection path is too faint to lead the eye.
 
 **Next experiment:** darker body in the channel with depth-weighted reflection. Mirror dashes softer and fewer.
+
+## Deliverable C, pass 1: sky and vista
+
+Files are in `finishing/C-vista/`: C-sbs.png (reference | D | C), C-vista.png and C-sky-crop.png (full resolution).
+
+**Changes:**
+- **Clouds** (ADR-1289): the artist's lobes (bank_left, tower_right, horizon_band) are marched with billow shaping
+  and fbm edge erosion. Bodies sit darker than the sky, edges toward the moon are silver, and undersides over the
+  glow are warm. The `veil_upper` mass is dropped: as a row of small puffs it read as cotton balls.
+- **Moon:** the artist's sphere, its phase shaded by a material program (the sun-side hemisphere of its own normal,
+  a soft terminator, maria noise, faint earthshine).
+  - A local light cannot reach 20 km, and the asset's black emission map zeroed program emission (ADR-1284). So a
+    derived copy (`meshes/derived/env_moon_lit`) uses its albedo as the emission map.
+  - Adding the program needed a ninth GPU program slot: ADR-1290 raises the table from 8 slots to 16.
+- **Karst:** `env_karst_tower` at bearing -22° and 1.75 km is the right-hand landmark, with the fin and the stack
+  supporting it.
+- **Near canopy:** 150 designed crowns on the slope below the lookout. Each is scaled so its top sits at least 19°
+  below the eye, so they fill the bottom band as dark silhouettes and never block the lens. The first attempt put a
+  tree in front of the lens.
+- **Light:** thinner air (density 0.0007) and dimmer lights (LIT 0.6) with less front fill (FILL 0.5), so the
+  geology reads dark with lit rims instead of flat pale blue. Rock albedo is back to [0.075,0.095,0.22].
+
+**The vista questions:**
+- **Memorable karst tower:** yes, a tiered spire beside the moon.
+- **Near canopy dark enough to frame:** yes, the bottom third is now dark crowns.
+- **Distinct sky colour layers:** royal blue above, a violet mid-sky, a rose band low. Yes, but the rose is still a
+  little broad.
+- **Clouds with volume and coherent lighting:** they have soft volume and erosion, but they still read a little
+  puffy, and the tower_right plume is a thin pale smoke column.
+- **3D moon:** yes, a dimensional crescent with a terminator and faint earthshine.
+- **Ground glow integrated:** no. These are still dashed patches. This is the main open item.
+- **Clear focal hierarchy:** better: dark frame, lit valley, dark landmarks, sky.
+
+**Remaining issues:**
+1. The floor glow is dashed marks rather than ecology.
+2. The procedural waterfalls on the far cliffs read as white wire strands.
+3. The horizon_band and tower_right masses need more presence and less puff.

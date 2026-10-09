@@ -353,7 +353,7 @@ def _quat(m):
 
 
 def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=None, lit=1.0, lights=(),
-          clouds=None):
+          clouds=None, fill=1.0):
     water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
              "reflection": 1.3, "reflectionTint": [0.5, 0.5, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
              "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
@@ -373,7 +373,7 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
             nodes.append(mesh_node(f"massif_{k}", f"massif_{k}", pts, mat(ROCK, 0.85, program="rock"), shadow=False))
     nodes += list(extra)
     # Deliverable C: the dimensional moon (the artist's sphere), lit on its sun side by its own short-range light
-    moon_node, moon_sun = vistaset.moon(eye, MOON_DIR, _quat)
+    moon_node, moon_prog = vistaset.moon(eye, MOON_DIR, _quat)
     nodes.append(moon_node)
 
     moon_light = -MOON_DIR
@@ -386,7 +386,7 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
             "lightFromEnvironment": False,
             "background": [0.004, 0.006, 0.02],
             "fogColor": [0.02, 0.032, 0.16],
-            "volumeDensity": 0.0014, "volumeAbsorption": 1.0, "volumeScattering": 0.0,
+            "volumeDensity": (air or {}).get("density", 0.0014), "volumeAbsorption": 1.0, "volumeScattering": 0.0,
             "volumeSteps": (air or {}).get("steps", 16), "volumeMaxDistance": (air or {}).get("reach", 200.0),
             "volumeEmission": (air or {}).get("emission", 0.0), "volumeColorField": (air or {}).get("mist", ""),
             "volumeNoise": 0.35, "volumeNoiseScale": 0.02,
@@ -400,14 +400,14 @@ def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=Non
                    # toward the moon (the vista), never a second shadow
                    {"name": "skyfill", "type": "directional", "direction": [round(float(v), 4) for v in
                                                                           (MOON_DIR[0], -0.35, MOON_DIR[2])],
-                    "color": [0.35, 0.45, 1.0], "intensity": round(0.7 * lit, 3), "castsShadow": False}, moon_sun] + list(lights),
+                    "color": [0.35, 0.45, 1.0], "intensity": round(0.7 * lit * fill, 3), "castsShadow": False}] + list(lights),
         "effects": [{"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True,
                      "order": 0, "activation": "always",
                      "parameters": {"brightness": 2.2, "density": 0.7, "magnitudeSlope": 6.5, "colorSpread": 0.35,
                                     "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.7, "band": 0.3,
                                     "bandTilt": 32.0, "daylight": 0.0}}],
         "nodes": nodes,
-        "materialPrograms": life.programs(),
+        "materialPrograms": life.programs() + [moon_prog],
         **({"grids": list(grids)} if grids else {}),
         **({"ecosystem": eco} if eco else {}),
         **({"clouds": clouds} if clouds else {}),
@@ -450,10 +450,13 @@ KARST = (("env_karst_tower", -22.0, 1750.0, 1.0, 20.0),
          ("env_karst_stack", 20.0, 2300.0, 1.0, 0.0))
 
 # The moon, its fill and the sky per shot: the riverbank is under the canopy, near-black but for the life
-LIT = {"riverbank": 0.55}
+LIT = {"riverbank": 0.55, "vista": 0.6}
+# The sky fill from behind the camera, per shot: the vista's landmarks are seen against the moon, so their faces
+# toward us stay in shadow (dark geology, lit rims), not flat-lit pale blue
+FILL = {"vista": 0.5}
 
 # The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
-AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2},
+AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 1.3, "mist": "mistFloor", "upper": 0.2, "density": 0.0007},
        "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
        "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.35, "mist": "mistBank"},
        "macro": {"reach": 40.0, "steps": 12, "emission": 0.08, "mist": "mistBank"}}
@@ -491,6 +494,7 @@ def main():
         sys.exit(f"usage: valley.py [--no-meshes] [--sky | --no-sky]   (unknown: {' '.join(unknown)})")
     SHOTS.mkdir(parents=True, exist_ok=True)
     SKY.mkdir(parents=True, exist_ok=True)
+    vistaset.derive_moon(MESHES)
     if "--no-meshes" not in sys.argv:
         build_meshes()
     if "--no-sky" not in sys.argv and not (SKY / "night.hdr").exists() or "--sky" in sys.argv:
@@ -663,7 +667,7 @@ def main():
         sc = scene(tw, eye, tgt, fov, near, far, ex_s + lib_nodes.get(name, []), eco_s, grids, AIR[name],
                    LIT.get(name, 1.0),
                    riverset.fall_lights(rb_foot, ecosys.WATER_BANK) if name in ("riverbank",) else (),
-                   vistaset.clouds_block(MOON_DIR, GLOW_DIR) if name in CLOUDED else None)
+                   vistaset.clouds_block(MOON_DIR, GLOW_DIR) if name in CLOUDED else None, FILL.get(name, 1.0))
         if name in WATER:
             for n in sc["nodes"]:
                 if n["name"] == "land":
