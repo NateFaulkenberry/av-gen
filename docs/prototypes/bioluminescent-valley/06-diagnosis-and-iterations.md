@@ -125,3 +125,20 @@ Regions are luma / saturation, ours against the reference.
    - **Change:** a wide, faint violet-blue veil (50/s, 5-18 m, 0.18); sparkle 0.
    - **Result:** a soft violet glow at the foot, like the reference's lit fall, and clean dark water.
    - **Decision:** KEEP.
+7. **The vista's near floor fading to the far core** (`c13`, `c14`).
+   - **Change:** layer nearFade 320 m, then 1300 m, on the glade, understory, crown, ledge and tips layers, plus gain ×1.5; the glades shift bluer.
+   - **Result:** no visible change. The near patches are the glade bulbs' own lit meshes plus the glow-map mist, not the emitter layers.
+   - **Decision:** REVERT the fade; KEEP the bluer glade colours (glade 1 [0.25,0.65,1.0], glade 3 [0.4,0.45,1.0]).
+8. **Dark canopy below the lookout** (`c15`, `c16`).
+   - **Change:** 160 canopygrove crowns at 90-520 m below the lookout, darkened.
+   - **Result:** foreground 0.185 → 0.145 (ref 0.097), but from 300 m above they read as boulder heaps, not tree crowns.
+   - **Decision:** REVERT. The reference's foreground is seen at canopy height; this camera is not.
+9. **Asset checkpoint B merged** (1fb67bc6, merge 6c8abef1).
+   - The revised default GLBs changed the scenes.
+   - A fresh baseline with the new assets and no new change of mine is `b2/`; later entries compare against `b2`.
+10. **Karst towers, not cones** (`c17` against `b2`).
+    - **Problem:** the vista's mountains read as uniform triangles.
+    - **Cause:** the summit profile was the linear cone `(1-d)^ex`.
+    - **Change:** a domed crown over near-vertical walls, `(1-d^pw)^(0.35 ex)`, with pw 2.6-4 for peaks, 3-5 for spires and 1.4-2 for ranges.
+    - **Result:** sheer towers with lit faces, like panel 2. Mountain luma is 0.172 → 0.162, because the walls now face away from the moon more often.
+    - **Decision:** KEEP.

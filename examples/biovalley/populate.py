@@ -22,6 +22,7 @@ from geom import fbm2, quat_y
 
 N_GROVES = 6
 VISTA_FERNS = []
+VISTA_CANOPY = []
 CANOPY_ASSET = True   # the floor forest and the vista's framing tree come from the hero library
 N_SHRUBS = 4
 N_BOULDERS = 6
@@ -235,6 +236,17 @@ def framing(gc, gfine, vista_eye, vista_yaw):
         x, z = polar(b, d)
         y = float(gc.height(np.array([x]), np.array([z]))[0])
         VISTA_FERNS.append(rec(x, y - 0.1, z, r.uniform(0, 6.28), r.uniform(10.0, 22.0) * (1.0 + d / 150.0)))
+    # dark canopy down the slope below the lookout: the bottom of frame is tree crowns in silhouette, so the valley's
+    # light gathers in the far core (panel 2), not on the near floor
+    global VISTA_CANOPY
+    VISTA_CANOPY = []
+    for k in range(0):     # tried in iteration 8: reads as boulder heaps from above; off
+   
+        b = r.uniform(-34, 34)
+        d = r.uniform(90, 520)
+        x, z = polar(b, d)
+        y = float(gc.height(np.array([x]), np.array([z]))[0])
+        VISTA_CANOPY.append(rec(x, y - 1.0, z, r.uniform(0, 6.28), r.uniform(1.4, 2.4) * (1.0 + d / 600.0)))
 
     # MEADOW: arched trees on the left of its horizon, a pair of them overlapping (panel 4)
     g = gfine["meadow"]

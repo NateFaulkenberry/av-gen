@@ -88,7 +88,11 @@ def massif(seed, kind, L, W, H, res=150):
         ex = {"range": r.uniform(0.55, 0.9), "peak": r.uniform(0.7, 1.1), "cliff": 0.35,
               "spire": r.uniform(1.2, 1.6)}[kind]
         d = np.sqrt((u - pu) ** 2 + (v - pv) ** 2) / rk
-        summit = np.maximum(summit, hk * np.clip(1.0 - d, 0, 1) ** ex)
+        # karst towers, not cones: a domed crown over near-vertical walls (panel 2's sheer moonlit spires). The
+        # wall power `pw` sets how square the shoulder is; ranges keep a softer, broken shoulder
+        pw = {"range": r.uniform(1.4, 2.0), "peak": r.uniform(2.6, 4.0), "cliff": r.uniform(2.0, 3.0),
+              "spire": r.uniform(3.0, 5.0)}[kind]
+        summit = np.maximum(summit, hk * np.clip(1.0 - d ** pw, 0, 1) ** (0.35 * ex))
     ridge = _ridged(X / (0.16 * L), Z / (0.16 * L), seed + 3, 5)
     h = summit * (0.75 + 0.5 * ridge) + 0.12 * H * (ridge - 0.5)
     h = np.maximum(h, 0.08 * H)

@@ -414,7 +414,7 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
             L.append(layer(f"tips{v}", hs, f"tuft{v}.emit.json", cols[v], 0.6, maxDistance=900.0, sparsity=0.15,
                            pulseRate=1.5, pulseDecay=0.8, nearFade=0.5, **clump, **bank))
         if gs:
-            gcol = {0: [1.0, 0.75, 0.2], 1: life.CYAN, 2: life.BLUE, 3: life.BLUE, 4: life.VIOLET}[v]   # panel 2's floor
+            gcol = {0: [1.0, 0.75, 0.2], 1: [0.25, 0.65, 1.0], 2: life.BLUE, 3: [0.4, 0.45, 1.0], 4: life.VIOLET}[v]   # panel 2's floor
             L.append(layer(f"glade{v}", gs, f"tuft{v}.emit.json", gcol, 0.9, size=3.5, maxDistance=5200.0,
                            sparsity=0.3, pulseRate=1.0, pulseDecay=0.8, **clump, **river))
     if hosts.get("frond"):
