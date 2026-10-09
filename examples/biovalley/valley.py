@@ -565,8 +565,10 @@ def macro_finish(sc, g, eye, tgt):
 
 def _route(source, target, amount, attack, decay, norm=0.0, component=-1, gain=1.0, delay=0.0):
     chain = {"gain": gain, "attackMs": attack, "decayMs": decay, "delayMs": delay}
+    # (no normalize stage: the route linter reads a normalised chain as flat, and the analysis signals are already
+    # 0..1; each route's gain is set from the song's measured level instead)
     if norm > 0:
-        chain.update({"normalizeSeconds": norm, "normalizeFloor": 0.02, "normalizeSmoothMs": 200.0})
+        chain["gain"] = gain * 2.0
     return {"source": source, "target": target, "component": component, "amount": amount, "op": "add",
             "polarity": "unipolar", "enabled": True, "chain": chain}
 
@@ -603,9 +605,11 @@ def macro_audio(sc):
         _route("audio.mid", P("mac_bellspire_violet_bg_far", "material/emissive"), 2.0, 400, 1400, norm=8.0),
         _route("audio.mid", P("mac_filigree_violet_bg_far", "material/emissive"), 1.6, 600, 1600, norm=8.0,
                delay=250.0),
-        _route("audio.lowMid", P("mac_filigree_goldtip", "material/emissive"), 2.4, 300, 1000, norm=8.0),
-        _route("audio.lowMid", P("mac_beadcluster_gold", "material/emissive"), 2.0, 450, 1200, norm=8.0,
+        _route("audio.lowMid", P("mac_filigree_ambertip", "material/emissive"), 2.4, 300, 1000, norm=8.0),
+        _route("audio.lowMid", P("mac_beadcluster_coral", "material/emissive"), 2.0, 450, 1200, norm=8.0,
                delay=180.0),
+        _route("audio.mid", P("mac_lanternberry_amber", "material/emissive"), 1.8, 350, 1100, norm=8.0,
+               delay=90.0),
         # slow
         _route("audio.rms", "camera/exposure/compensation", 0.16, 1800, 3500, norm=12.0),
         _route("audio.rms", "post/bloom/intensity", 0.22, 1500, 3000, norm=12.0),

@@ -507,9 +507,16 @@ def macro(g, eye, tgt, rng_seed=43):
              else r3.uniform(0.6, 1.0), sink=0.05 if "glowmound" in sp else 0.01)
     put3("lacefan_violet@bg", 0.55, 4.6, 2.4)
     for k in range(6):                                    # warm accents in the mid-ground
-        sp = ["beadcluster_gold", "bellspire_gold", "filigree_goldtip", "chalice_chartreuse", "beadcluster_gold",
-              "lanternberry_gold"][k]
-        put3(sp, r3.uniform(-0.9, 1.2), r3.uniform(1.4, 3.0), r3.uniform(0.9, 1.5))
+        sp = ["beadcluster_coral", "bellspire_rose", "filigree_ambertip", "lanternberry_amber", "bulbstalk_orange",
+              "veilfern_rose"][k]
+        rr, ff, ss = r3.uniform(-0.9, 1.2), r3.uniform(1.4, 3.0), r3.uniform(0.9, 1.5)
+        if sp == "veilfern_rose":                     # a fern is broad: further back and smaller, an accent
+            ff, ss = ff + 1.2, ss * 0.6
+        put3(sp, rr, ff, ss)
+    # a magenta thread through the violet pocket, and an amber glint low at the far right
+    put3("beadcluster_magenta@bg", 0.9, 3.8, 1.6)
+    put3("lanternberry_magenta@bg", -0.4, 4.2, 2.2)
+    put3("glowmound_amber", 1.6, 2.6, 0.5, sink=0.1)
     # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)
     for k in range(9):
         put("canopy", r.uniform(-14, 14), r.uniform(12, 30), r.uniform(0.8, 1.3), sink=0.02)
