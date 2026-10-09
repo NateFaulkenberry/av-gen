@@ -1060,6 +1060,9 @@ private:
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;
+    // ADR-1286: the lit opaque frame as it stood before the water, for the cinematic water path.
+    wgpu::Texture waterSceneCopy_;
+    wgpu::TextureView waterSceneCopyView_;
     AuxTarget normalRough_;
     AuxTarget velocity_;
     AuxTarget emission_;

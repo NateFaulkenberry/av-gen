@@ -65,10 +65,14 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              // ADR-916. A NaN shear or cell would take every seam -- and through the
                              // shared sample point, every ripple -- with it.
                              s.tears,     s.tearShear,  s.tearCoverage, s.tearCell, s.tearSpacing,
-                             s.tearStretch, s.tearAngle, s.tearDrift,   s.tearWind};
+                             s.tearStretch, s.tearAngle, s.tearDrift,   s.tearWind,
+                             // ADR-1286
+                             s.ssr, s.ssrDistance, s.ssrSteps, s.ssrGain, s.transmission, s.undulation,
+                             s.undulationScale, s.roughnessVariation, s.streak, s.reflectionRays,
+                             s.tintPatches, s.tintPatchScale, s.glints};
     bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
               finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
-              finite3(s.emissiveColor);
+              finite3(s.emissiveColor) && finite3(s.absorption) && finite3(s.reflectionTint2);
     for (const float v : scalars) {
         ok = ok && std::isfinite(v);
     }
@@ -105,6 +109,13 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     u.tears = glm::vec4(s.tears, s.tearShear, s.tearCoverage, std::max(s.tearCell, 1e-3f));
     u.tearShape = glm::vec4(std::max(s.tearSpacing, 1e-3f), std::max(s.tearStretch, 1e-3f), s.tearDrift, s.tearWind);
     u.tearFrame = glm::vec4(std::cos(s.tearAngle), std::sin(s.tearAngle), s.tearFollowsWind ? 1.0f : 0.0f, 0.0f);
+    // ADR-1286. Packed as authored; only the cinematic pipeline reads them, and only a cinematic material
+    // (`WaterSettings::cinematic`) is drawn by it.
+    u.cineA = glm::vec4(s.ssr, s.ssrDistance, s.transmission, s.roughnessVariation);
+    u.cineB = glm::vec4(s.undulation, std::max(s.undulationScale, 1e-3f), s.ssrSteps, s.ssrGain);
+    u.cineAbsorb = glm::vec4(s.absorption, 0.0f);
+    u.cineC = glm::vec4(s.streak, s.reflectionRays, s.tintPatches, s.glints);
+    u.cineTint2 = glm::vec4(s.reflectionTint2, std::max(s.tintPatchScale, 1e-3f));
     return u;
 }
 
@@ -140,6 +151,40 @@ Result<void> WaterRenderer::init(gpu::Context& context, gpu::ShaderLibrary& shad
         desc.bindGroupLayouts = layouts.data();
         pipelineLayout_ = device.CreatePipelineLayout(&desc);
     }
+    // ADR-1286: the cinematic layout -- the same uniforms, plus the copy of the lit frame and a sampler.
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.hasDynamicOffset = true;
+        entries[0].buffer.minBindingSize = sizeof(WaterUniforms);
+        entries[1].binding = 1;
+        entries[1].visibility = wgpu::ShaderStage::Fragment;
+        entries[1].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[1].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[2].binding = 2;
+        entries[2].visibility = wgpu::ShaderStage::Fragment;
+        entries[2].sampler.type = wgpu::SamplerBindingType::Filtering;
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "water-cinematic-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        cineLayout_ = device.CreateBindGroupLayout(&desc);
+        const std::array<wgpu::BindGroupLayout, 4> layouts = {frameLayout, objectLayout, cineLayout_, iblLayout};
+        wgpu::PipelineLayoutDescriptor pdesc{};
+        pdesc.label = "water-cinematic-pipeline-layout";
+        pdesc.bindGroupLayoutCount = layouts.size();
+        pdesc.bindGroupLayouts = layouts.data();
+        cinePipelineLayout_ = device.CreatePipelineLayout(&pdesc);
+        wgpu::SamplerDescriptor sdesc{};
+        sdesc.label = "water-cinematic-sampler";
+        sdesc.magFilter = wgpu::FilterMode::Linear;
+        sdesc.minFilter = wgpu::FilterMode::Linear;
+        sdesc.addressModeU = wgpu::AddressMode::ClampToEdge;
+        sdesc.addressModeV = wgpu::AddressMode::ClampToEdge;
+        cineSampler_ = device.CreateSampler(&sdesc);
+    }
     {
         wgpu::BufferDescriptor desc{};
         desc.label = "water-uniforms";
@@ -170,8 +215,12 @@ Result<void> WaterRenderer::reload(gpu::ShaderLibrary& shaders) {
 }
 
 Result<std::string> waterSourceWithoutTears(const std::string& source) {
-    static constexpr std::string_view kBegin = "---- tears (ADR-916) begin ----";
-    static constexpr std::string_view kEnd = "---- tears (ADR-916) end ----";
+    return waterSourceWithout(source, "tears (ADR-916)");
+}
+
+Result<std::string> waterSourceWithout(const std::string& source, std::string_view tag) {
+    const std::string kBegin = "---- " + std::string(tag) + " begin ----";
+    const std::string kEnd = "---- " + std::string(tag) + " end ----";
     std::string out;
     out.reserve(source.size());
     bool inside = false;
@@ -207,11 +256,26 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     if (!source) {
         return std::unexpected(source.error());
     }
-    auto plainSource = waterSourceWithoutTears(*source);
+    // ADR-1286: the cinematic block is compiled out of both of the older pipelines, so they are the
+    // shaders they were; the full source (tears and cinematic) is the third.
+    auto tornSource = waterSourceWithout(*source, "cinematic (ADR-1286)");
+    if (!tornSource) {
+        return std::unexpected(tornSource.error());
+    }
+    auto plainSource = waterSourceWithoutTears(*tornSource);
     if (!plainSource) {
         return std::unexpected(plainSource.error());
     }
-    auto module = shaders.compile(*source, "water.wgsl");
+    auto cineModule = shaders.compile(*source, "water.wgsl (cinematic)");
+    if (!cineModule) {
+        return std::unexpected(cineModule.error());
+    }
+    auto cine = buildPipeline(*cineModule, "water-cinematic", cinePipelineLayout_);
+    if (!cine) {
+        return std::unexpected(cine.error());
+    }
+    cinePipeline_ = *cine;
+    auto module = shaders.compile(*tornSource, "water.wgsl");
     if (!module) {
         return std::unexpected(module.error());
     }
@@ -219,11 +283,11 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     if (!plainModule) {
         return std::unexpected(plainModule.error());
     }
-    auto torn = buildPipeline(*module, "water");
+    auto torn = buildPipeline(*module, "water", pipelineLayout_);
     if (!torn) {
         return std::unexpected(torn.error());
     }
-    auto plain = buildPipeline(*plainModule, "water-no-tears");
+    auto plain = buildPipeline(*plainModule, "water-no-tears", pipelineLayout_);
     if (!plain) {
         return std::unexpected(plain.error());
     }
@@ -232,7 +296,8 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     return {};
 }
 
-Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModule& module, const char* label) {
+Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModule& module, const char* label,
+                                                         const wgpu::PipelineLayout& layout) {
     VertexLayoutStorage vertex;
 
     wgpu::BlendState blend{};
@@ -278,7 +343,7 @@ Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModu
 
     wgpu::RenderPipelineDescriptor desc{};
     desc.label = label;
-    desc.layout = pipelineLayout_;
+    desc.layout = layout;
     desc.vertex.module = module;
     desc.vertex.entryPoint = "vs_water";
     desc.vertex.bufferCount = 1;
@@ -320,8 +385,32 @@ void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUnif
         std::memcpy(staging_.data() + static_cast<std::size_t>(i) * kStride, &materials[i],
                     sizeof(WaterUniforms));
         torn_[i] = materials[i].tears.x > 0.0f; // ADR-916: which pipeline draws this slot
+        // ADR-1286: the same test as WaterSettings::cinematic, on the packed record
+        cine_[i] = materials[i].cineA.x > 0.0f || materials[i].cineA.z > 0.0f || materials[i].cineA.w > 0.0f ||
+                   materials[i].cineB.x > 0.0f || materials[i].cineC.z > 0.0f;
     }
     queue.WriteBuffer(uniforms_, 0, staging_.data(), static_cast<std::size_t>(uploaded_) * kStride);
+}
+
+void WaterRenderer::setSceneColor(const wgpu::TextureView& view) {
+    if (context_ == nullptr || !view) {
+        cineBindGroup_ = nullptr;
+        return;
+    }
+    std::array<wgpu::BindGroupEntry, 3> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = uniforms_;
+    entries[0].size = sizeof(WaterUniforms);
+    entries[1].binding = 1;
+    entries[1].textureView = view;
+    entries[2].binding = 2;
+    entries[2].sampler = cineSampler_;
+    wgpu::BindGroupDescriptor bg{};
+    bg.label = "water-cinematic-bind-group";
+    bg.layout = cineLayout_;
+    bg.entryCount = entries.size();
+    bg.entries = entries.data();
+    cineBindGroup_ = context_->device().CreateBindGroup(&bg);
 }
 
 } // namespace avgen::rendering

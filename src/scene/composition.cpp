@@ -10882,7 +10882,22 @@ nlohmann::json Composition::toJson() const {
                                       {"tearDirection", ts.water.tearFollowsWind ? json("wind")
                                                                                  : json(ts.water.tearAngle)},
                                       {"tearDrift", ts.water.tearDrift},
-                                      {"tearWind", ts.water.tearWind}}}};
+                                      {"tearWind", ts.water.tearWind},
+                                      {"ssr", ts.water.ssr},
+                                      {"ssrDistance", ts.water.ssrDistance},
+                                      {"ssrSteps", ts.water.ssrSteps},
+                                      {"ssrGain", ts.water.ssrGain},
+                                      {"transmission", ts.water.transmission},
+                                      {"absorption", vecToJson(ts.water.absorption)},
+                                      {"undulation", ts.water.undulation},
+                                      {"undulationScale", ts.water.undulationScale},
+                                      {"roughnessVariation", ts.water.roughnessVariation},
+                                      {"streak", ts.water.streak},
+                                      {"reflectionRays", ts.water.reflectionRays},
+                                      {"tintPatches", ts.water.tintPatches},
+                                      {"reflectionTint2", vecToJson(ts.water.reflectionTint2)},
+                                      {"tintPatchScale", ts.water.tintPatchScale},
+                                      {"glints", ts.water.glints}}}};
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -12822,7 +12837,17 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"tearCell", &w.tearCell},
                               TerrainFloat{"tearSpacing", &w.tearSpacing},
                               TerrainFloat{"tearStretch", &w.tearStretch},
-                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind}}) {
+                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind},
+                              // ADR-1286: the cinematic path
+                              TerrainFloat{"ssr", &w.ssr}, TerrainFloat{"ssrDistance", &w.ssrDistance},
+                              TerrainFloat{"ssrSteps", &w.ssrSteps}, TerrainFloat{"ssrGain", &w.ssrGain},
+                              TerrainFloat{"transmission", &w.transmission},
+                              TerrainFloat{"undulation", &w.undulation},
+                              TerrainFloat{"undulationScale", &w.undulationScale},
+                              TerrainFloat{"roughnessVariation", &w.roughnessVariation},
+                              TerrainFloat{"streak", &w.streak}, TerrainFloat{"reflectionRays", &w.reflectionRays},
+                              TerrainFloat{"tintPatches", &w.tintPatches},
+                              TerrainFloat{"tintPatchScale", &w.tintPatchScale}, TerrainFloat{"glints", &w.glints}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
@@ -12850,7 +12875,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                                           std::pair{"reflectionTint", &w.reflectionTint},
                                                           std::pair{"foamColor", &w.foamColor},
                                                           std::pair{"glowColor", &w.glowColor},
-                                                          std::pair{"sparkleColor", &w.sparkleColor}}) {
+                                                          std::pair{"sparkleColor", &w.sparkleColor},
+                                                          std::pair{"absorption", &w.absorption},
+                                                          std::pair{"reflectionTint2", &w.reflectionTint2}}) {
                             auto v = readVec<3>(wj, key, *target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);

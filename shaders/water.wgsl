@@ -56,6 +56,13 @@ struct WaterUniforms {
     tearShape: vec4<f32>,      // x = spacing (m), y = stretch, z = drift (m/s), w = wind coupling
     tearFrame: vec4<f32>,      // xy = seam direction in XZ, z = 1 when it follows the scene wind, w = 0
     // ---- tears (ADR-916) end ----
+    // ---- cinematic (ADR-1286) begin ----
+    cineA: vec4<f32>,          // x = screen-space reflection, y = its reach (m), z = transmission, w = roughness variation
+    cineB: vec4<f32>,          // x = undulation, y = undulation scale (cycles/m), z = reflection steps, w = reflection gain
+    cineAbsorb: vec4<f32>,     // rgb = absorption per metre of the transmitted bed, w = 0
+    cineC: vec4<f32>,          // x = streak (normal spread along the view), y = reflection rays, z = tint patches, w = glints
+    cineTint2: vec4<f32>,      // rgb = the second reflection tint (the patches), w = patch scale (cycles/m)
+    // ---- cinematic (ADR-1286) end ----
 };
 
 @group(2) @binding(0) var<uniform> water: WaterUniforms;
@@ -64,6 +71,102 @@ struct WaterUniforms {
 @group(3) @binding(1) var irradianceMap: texture_cube<f32>;
 @group(3) @binding(2) var prefilteredMap: texture_cube<f32>;
 @group(3) @binding(3) var brdfLut: texture_2d<f32>;
+
+// ---- cinematic (ADR-1286) begin ----
+// The cinematic water path: a copy of the lit opaque frame, taken just before the water is drawn, which the
+// surface reflects (screen-space, against the linear depth) and sees through (refraction with absorption).
+// Bound only on the cinematic pipeline; every other water surface is drawn by a shader with this block
+// compiled out, so it is byte-identical to the surface before it existed.
+@group(2) @binding(1) var waterSceneColor: texture_2d<f32>;
+@group(2) @binding(2) var waterSceneSampler: sampler;
+
+// The frame behind the water at `uv`, softened by `radius` (uv units) with a small fixed disc.
+fn waterSceneAt(uv: vec2<f32>, radius: f32) -> vec3<f32> {
+    if (radius <= 0.0005) {
+        return textureSampleLevel(waterSceneColor, waterSceneSampler, uv, 0.0).rgb;
+    }
+    var sum = textureSampleLevel(waterSceneColor, waterSceneSampler, uv, 0.0).rgb;
+    let k = array<vec2<f32>, 6>(vec2<f32>(1.0, 0.0), vec2<f32>(0.5, 0.866), vec2<f32>(-0.5, 0.866),
+                                vec2<f32>(-1.0, 0.0), vec2<f32>(-0.5, -0.866), vec2<f32>(0.5, -0.866));
+    let aspect = vec2<f32>(frame.targetSize.y * frame.targetSize.z, 1.0);
+    for (var i = 0u; i < 6u; i = i + 1u) {
+        let o = k[i] * radius * aspect;
+        sum = sum + textureSampleLevel(waterSceneColor, waterSceneSampler, clamp(uv + o, vec2<f32>(0.0),
+                                       vec2<f32>(1.0)), 0.0).rgb;
+    }
+    return sum / 7.0;
+}
+
+fn waterLinearDepthAt(uv: vec2<f32>) -> f32 {
+    let size = vec2<f32>(textureDimensions(sceneLinearDepth, 0));
+    let texel = clamp(vec2<i32>(uv * size), vec2<i32>(0), vec2<i32>(size) - vec2<i32>(1));
+    return textureLoad(sceneLinearDepth, texel, 0).r;
+}
+
+// Screen-space reflection, marched in world space against the opaque frame's linear depth. Returns the
+// reflected radiance and, in w, how much of it to trust: 0 where the ray leaves the frame, goes behind the
+// camera, or finds nothing within its reach (the environment reflection stands there instead).
+fn waterSsr(p: vec3<f32>, r: vec3<f32>, rough: f32, jitter: f32) -> vec4<f32> {
+    if (water.params.z < 0.5) {
+        return vec4<f32>(0.0);
+    }
+    let reach = max(water.cineA.y, 1.0);
+    let steps = clamp(u32(water.cineB.z + 0.5), 8u, 160u);
+    var prevS = 0.0;
+    var hitS = -1.0;
+    for (var i = 0u; i < steps; i = i + 1u) {
+        let k = (f32(i) + jitter) / f32(steps);
+        let sDist = reach * k * k + 0.03;              // dense near the surface, where contact is
+        let q = p + r * sDist;
+        let c = frame.viewProj * vec4<f32>(q, 1.0);
+        if (c.w <= 1e-3) {
+            break;
+        }
+        let ndc = c.xy / c.w;
+        let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+            break;
+        }
+        let qd = dot(q - frame.cameraPos.xyz, frame.cameraForward.xyz);
+        let sd = waterLinearDepthAt(uv);
+        let thick = max(0.35, sDist * 0.1);
+        if (qd > sd && qd - sd < thick) {
+            // refine between the last miss and this hit
+            var lo = prevS;
+            var hi = sDist;
+            for (var j = 0u; j < 6u; j = j + 1u) {
+                let mid = 0.5 * (lo + hi);
+                let qm = p + r * mid;
+                let cm = frame.viewProj * vec4<f32>(qm, 1.0);
+                let nm = cm.xy / max(cm.w, 1e-4);
+                let um = vec2<f32>(nm.x * 0.5 + 0.5, 0.5 - nm.y * 0.5);
+                let dm = dot(qm - frame.cameraPos.xyz, frame.cameraForward.xyz);
+                if (dm > waterLinearDepthAt(um)) {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            }
+            hitS = hi;
+            break;
+        }
+        prevS = sDist;
+    }
+    if (hitS < 0.0) {
+        return vec4<f32>(0.0);
+    }
+    let qh = p + r * hitS;
+    let ch = frame.viewProj * vec4<f32>(qh, 1.0);
+    let nh = ch.xy / max(ch.w, 1e-4);
+    let uvh = vec2<f32>(nh.x * 0.5 + 0.5, 0.5 - nh.y * 0.5);
+    let edge = smoothstep(0.0, 0.06, min(uvh.x, 1.0 - uvh.x)) * smoothstep(0.0, 0.06, min(uvh.y, 1.0 - uvh.y));
+    let far = 1.0 - smoothstep(0.7 * reach, reach, hitS);
+    // the reflection blurs with the surface's roughness and with how far the ray travelled to its hit,
+    // measured in the hit's own screen size (a metre of travel is fewer pixels far away)
+    let radius = clamp(rough * hitS / max(ch.w, 0.5) * 0.9, 0.0, 0.03);
+    return vec4<f32>(waterSceneAt(uvh, radius), edge * far);
+}
+// ---- cinematic (ADR-1286) end ----
 
 struct WaterOut {
     @invariant @builtin(position) clip: vec4<f32>,
@@ -598,6 +701,31 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ---- tears (ADR-916) end ----
     let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, lodFootprint, desync) * rippleAmplitude;
     var n = normalize(vec3<f32>(-gradient.x, 1.0, -gradient.y));
+    // ---- cinematic (ADR-1286) begin ----
+    // Calm and ruffled regions, and a broad swell under the ripples: a river surface is not one texture.
+    // `cineRough` is the local roughness the cinematic reflection blurs with.
+    var cineRough = water.surface.z;
+    if (water.cineA.w > 0.0 || water.cineB.x > 0.0) {
+        let patchN = noiseD(in.worldPos.xz * 0.09 + vec2<f32>(3.1, 7.7)).x * 0.65 +
+                     noiseD(in.worldPos.xz * 0.31 + vec2<f32>(-5.3, 2.9)).x * 0.35;
+        let ruffle = smoothstep(-0.3, 0.4, patchN);
+        let rv = clamp(water.cineA.w, 0.0, 1.0);
+        cineRough = water.surface.z * mix(1.0 - 0.75 * rv, 1.0 + 1.8 * rv, ruffle);
+        let amp = mix(1.0 - 0.7 * rv, 1.0 + 0.9 * rv, ruffle);
+        // the swell: long crests lying across the flow, drifting with it under bounded advection
+        let across = vec2<f32>(-dir.y, dir.x);
+        let us = max(water.cineB.y, 1e-3);
+        let phu = flowPhases(t, kFlowPeriod * 2.0, desync + 0.29, 7u);
+        let vu = dir * (speed * 0.5);
+        let pa = in.worldPos.xz - vu * phu.travel.x;
+        let pb = in.worldPos.xz - vu * phu.travel.y;
+        let na = noiseD(vec2<f32>(dot(pa, dir) * us, dot(pa, across) * us * 0.4) + phu.jump0);
+        let nb = noiseD(vec2<f32>(dot(pb, dir) * us, dot(pb, across) * us * 0.4) + phu.jump1);
+        let nu = na.yz * phu.weight.x + nb.yz * phu.weight.y;
+        let ug = (dir * nu.x * us + across * nu.y * us * 0.4) * water.cineB.x;
+        n = normalize(vec3<f32>(-(gradient.x * amp + ug.x), 1.0, -(gradient.y * amp + ug.y)));
+    }
+    // ---- cinematic (ADR-1286) end ----
     // ---- cascade (ADR-985) begin ----
     // The ripples, built about +Y, turned onto the slope.
     if (steep > 0.0) {
@@ -763,6 +891,52 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         glint = glint + light.colorIntensity.rgb * d * vis * nDotL * shadow;
     }
     glint = glint * water.surface.y;
+    // ---- cinematic (ADR-1286) begin ----
+    // The lit world in the water: the bank, its organisms, the canopy and the falls, from the frame itself.
+    // Broad patches of a second tint over the environment reflection (violet against blue): the sky's colour
+    // is not one colour across a river, because the swell turns different reaches toward different sky.
+    if (water.cineC.z > 0.0) {
+        let ps = max(water.cineTint2.w, 1e-3);
+        let pn = noiseD(in.worldPos.xz * ps + vec2<f32>(n.x, n.z) * 2.0 + vec2<f32>(13.7, -4.1)).x * 0.7 +
+                 noiseD(in.worldPos.xz * ps * 2.7 + vec2<f32>(-8.2, 9.9)).x * 0.3;
+        let pm = smoothstep(-0.15, 0.45, pn) * clamp(water.cineC.z, 0.0, 1.0);
+        reflected = mix(reflected, reflected / max(water.reflectTint.rgb, vec3<f32>(1e-3)) * water.cineTint2.rgb, pm);
+    }
+    var cineGlint = vec3<f32>(0.0);
+    if (water.cineA.x > 0.0 && !underwater) {
+        // Several rays, their normals spread ALONG THE VIEW: a rippled surface returns a point of light as a
+        // vertical streak, because the facets that can see it are strung out toward the eye. The spread is the
+        // streak's length; across the view the reflection stays sharp.
+        let rays = clamp(u32(water.cineC.y + 0.5), 1u, 16u);
+        let along = normalize(vec3<f32>(v.x, 0.0, v.z) + vec3<f32>(1e-5, 0.0, 0.0));
+        let jitter = gradientNoise(screenUv * frame.targetSize.xy);
+        var acc = vec3<f32>(0.0);
+        var wsum = 0.0;
+        var peak = 0.0;
+        for (var k = 0u; k < rays; k = k + 1u) {
+            let u = (f32(k) + fract(jitter * 7.13 + f32(k) * 0.618)) / f32(rays) - 0.5;
+            let nk = normalize(n + along * (u * water.cineC.x));
+            let rr = reflect(-v, nk);
+            let ssr = waterSsr(in.worldPos, rr, cineRough, fract(jitter + f32(k) * 0.37));
+            acc = acc + ssr.rgb * ssr.w;
+            wsum = wsum + ssr.w;
+            peak = max(peak, dot(ssr.rgb * ssr.w, vec3<f32>(0.2126, 0.7152, 0.0722)));
+        }
+        let cover = wsum / f32(rays);
+        let ssrColor = acc / max(wsum, 1e-4);
+        reflected = mix(reflected, ssrColor * water.cineB.w, clamp(cover * water.cineA.x, 0.0, 1.0));
+        // Glints: the finest facets catch the bright things the reflection found, in their colour -- a cyan
+        // organism gives cyan sparks, the violet falls violet ones. Nothing bright nearby, no glint.
+        if (water.cineC.w > 0.0) {
+            let gf = water.ripples.y * 9.0;
+            let gfade = rippleLayerFade(gf, lodFootprint);
+            let crest = noiseD(in.worldPos.xz * gf + vec2<f32>(t * 0.7, -t * 0.4)).x * 0.5 + 0.5;
+            let crest2 = noiseD(in.worldPos.xz * gf * 2.3 + vec2<f32>(-t * 0.5, t * 0.9) + vec2<f32>(5.1, 1.7)).x * 0.5 + 0.5;
+            let cut = smoothstep(0.72, 0.95, crest * crest2 * 1.6);
+            cineGlint = ssrColor * cover * cut * gfade * water.cineC.w * (0.3 + 3.0 * peak);
+        }
+    }
+    // ---- cinematic (ADR-1286) end ----
 
     // ---- sparkle (§15 highs) -------------------------------------------------------------------
     // A glint that rides a field far finer than any ripple layer, thresholded hard so it is a few
@@ -855,7 +1029,22 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         alpha = mix(0.55, 0.9, 1.0 - nDotV);
     }
 
+    // ---- cinematic (ADR-1286) begin ----
+    // Transmission: the bed is seen through the water at the refracted point, absorbed over the path, and the
+    // surface composites it itself (opaque but for the shoreline), instead of an alpha over the bed.
+    if (water.cineA.z > 0.0 && !underwater) {
+        let behind = waterSceneAt(distorted, 0.0);
+        let trans = exp(-water.cineAbsorb.rgb * thickness);
+        let seen = behind * trans + body * (vec3<f32>(1.0) - trans);
+        let k = clamp(water.cineA.z, 0.0, 1.0);
+        body = mix(body, seen, k);
+        alpha = mix(alpha, clamp(shoreFade + foam * 0.85, 0.0, 1.0), k);
+    }
+    // ---- cinematic (ADR-1286) end ----
     var color = mix(body, reflected, fresnel) + glint + sparkle + water.foamColor.rgb * foam;
+    // ---- cinematic (ADR-1286) begin ----
+    color = color + cineGlint;
+    // ---- cinematic (ADR-1286) end ----
     // Ambient occlusion from the banks: water in a cut channel is darker than water in the open,
     // and the AO buffer already knows which is which.
     let occlusion = sampleAmbientOcclusion(screenUv, viewDepth, vec3<f32>(0.0, 1.0, 0.0));
@@ -881,6 +1070,9 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // The glint and the sparkle are what should bloom; the body colour should not, or a wide river
     // washes the whole frame. The alpha lane is the bloom weight.
     out.emission = vec4<f32>((glint + sparkle) * alpha + fx.radiance, 1.0);
+    // ---- cinematic (ADR-1286) begin ----
+    out.emission = vec4<f32>(out.emission.rgb + cineGlint * alpha, 1.0);
+    // ---- cinematic (ADR-1286) end ----
     out.ids = packIds(object.ids.x, object.ids.y);
     return out;
 }

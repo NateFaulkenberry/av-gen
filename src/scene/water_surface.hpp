@@ -113,6 +113,33 @@ struct WaterSettings {
     float tearDrift = 0.15f;     // metres per second the seam lattice drifts along its direction
     float tearWind = 0.6f;       // how much the local wind's strength and gusts tighten the seams (0..1)
 
+    // ---- cinematic (ADR-1286) -------------------------------------------------------------------
+    // An optional higher-quality path for offline shots. Any of these above 0 draws the surface with the
+    // cinematic pipeline, which takes a copy of the lit opaque frame just before the water: the surface
+    // reflects it (screen-space, marched against the linear depth, the environment where the ray leaves the
+    // frame) and sees the bed through it (refracted, absorbed per channel over the path). All 0 is the
+    // surface as it was, drawn by a shader with the cinematic code compiled out.
+    float ssr = 0.0f;            // how much of the reflection the frame itself supplies (0..1)
+    float ssrDistance = 60.0f;   // metres a reflected ray marches
+    float ssrSteps = 48.0f;      // march steps (8..160)
+    float ssrGain = 1.0f;        // the frame's reflection, multiplied (the environment keeps `reflection`)
+    float transmission = 0.0f;   // 0 = the old alpha over the bed, 1 = the bed refracted and absorbed here
+    glm::vec3 absorption{0.45f, 0.30f, 0.12f}; // per metre of path, linear: red goes first
+    float undulation = 0.0f;     // a broad swell under the ripples (normal amplitude)
+    float undulationScale = 0.07f; // its frequency, cycles per metre along the flow
+    float roughnessVariation = 0.0f; // calm (glassy) and ruffled (rough) regions (0..1)
+    float streak = 0.0f;         // normal spread along the view: lights reflect as vertical streaks (0..2)
+    float reflectionRays = 1.0f; // rays per pixel the frame reflection takes (1..16)
+    float tintPatches = 0.0f;    // broad patches of `reflectionTint2` over the environment reflection (0..1)
+    glm::vec3 reflectionTint2{0.45f, 0.3f, 1.0f};
+    float tintPatchScale = 0.05f; // their frequency, cycles per metre
+    float glints = 0.0f;         // fine sparks in the colour of what the reflection found (0..50)
+
+    [[nodiscard]] bool cinematic() const {
+        return ssr > 0.0f || transmission > 0.0f || undulation > 0.0f || roughnessVariation > 0.0f ||
+               tintPatches > 0.0f;
+    }
+
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
 };

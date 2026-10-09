@@ -463,6 +463,10 @@ def project(name, scene_path):
 
 
 def main():
+    # refuse anything unknown (a stray `--help` used to regenerate every mesh and shot)
+    unknown = [a for a in sys.argv[1:] if a not in ("--no-meshes", "--no-sky", "--sky")]
+    if unknown:
+        sys.exit(f"usage: valley.py [--no-meshes] [--sky | --no-sky]   (unknown: {' '.join(unknown)})")
     SHOTS.mkdir(parents=True, exist_ok=True)
     SKY.mkdir(parents=True, exist_ok=True)
     if "--no-meshes" not in sys.argv:
