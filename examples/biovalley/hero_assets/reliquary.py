@@ -23,15 +23,17 @@ from lib import (BLUE, CYAN, EMERALD, MINT, TISSUE_DARK, VIOLET, Asset, bezier, 
 TAU = 2 * math.pi
 
 
-def tube_ref(curve, radii, sides, ref, flat=1.0):
-    """A tube whose u = 0 faces `ref(i)` (a direction per point); `flat` < 1 squashes it across that direction."""
+def tube_ref(curve, radii, sides, ref, flat=1.0, keel=0.0):
+    """A tube whose u = 0 faces `ref(i)` (a direction per point); `flat` < 1 squashes it across that direction and
+    `keel` raises a ridge on the side facing away from it (u = 0.5)."""
     T = normalize(np.gradient(curve, axis=0))
     R = np.array([ref(i) for i in range(len(curve))])
     N = normalize(R - T * np.sum(R * T, axis=1, keepdims=True))
     B = np.cross(T, N)
     th = np.linspace(0, TAU, sides, endpoint=False)
     ring = (np.cos(th)[None, :, None] * N[:, None, :] + flat * np.sin(th)[None, :, None] * B[:, None, :])
-    return curve[:, None, :] + np.asarray(radii)[:, None, None] * ring
+    k = 1 + keel * np.clip(-np.cos(th), 0, 1) ** 6
+    return curve[:, None, :] + np.asarray(radii)[:, None, None] * k[None, :, None] * ring
 
 
 class Reliquary:
@@ -72,10 +74,28 @@ class Reliquary:
             ang = a + tw * t ** 1.5
             z = 0.025 + h * t ** 0.95 - 0.04 * smoothstep(0.85, 1.0, t)
             curve = np.stack([r * np.cos(ang), r * np.sin(ang), z], -1)
-            rad = 0.012 * (1 - t) ** 1.2 + 0.0013
-            P = tube_ref(curve, rad, 14 if lod0 else 6,
-                         lambda i: np.array([-curve[i, 0], -curve[i, 1], 0.0]), flat=0.55)
+            # articulation: swollen nodes and a slight change of direction at each
+            nodes = np.array([0.17, 0.32, 0.46, 0.59, 0.71, 0.82, 0.91])
+            node = np.exp(-((t[:, None] - nodes[None, :]) / 0.013) ** 2).sum(1)
+            kink = (1 / (1 + np.exp(-(t[:, None] - nodes[None, :]) / 0.006)) * np.where(np.arange(7) % 2, 1, -1)).sum(1)
+            ang = ang + 0.035 * kink
+            curve = np.stack([r * np.cos(ang), r * np.sin(ang), z], -1)
+            rad = (0.012 * (1 - t) ** 1.2 + 0.0013) * (1 + 0.32 * node)
+            ref = lambda i: np.array([-curve[i, 0], -curve[i, 1], 0.0])
+            P = tube_ref(curve, rad, 16 if lod0 else 6, ref, flat=0.42, keel=0.9 if lod0 else 0.5)
             rib.add_grid(P, r_rib, wrap_u=True, s_range=(k / nrib, (k + 1) / nrib))
+            # thorns along the outer keel, between the nodes, leaning up
+            if lod0:
+                for tn in (nodes[:-1] + nodes[1:]) / 2:
+                    i = int(tn * (n - 1))
+                    out = normalize(np.array([curve[i, 0], curve[i, 1], 0.0]))
+                    tang = normalize(curve[min(i + 1, n - 1)] - curve[max(i - 1, 0)])
+                    base_p = curve[i] + out * rad[i] * 1.6
+                    L = rng.uniform(0.010, 0.02) * (1.2 - t[i])
+                    tip_p = base_p + normalize(out + 0.8 * tang) * L
+                    th_c = bezier(base_p - out * rad[i] * 0.6, base_p, (base_p + tip_p) / 2 + tang * L * 0.15, tip_p, 5)
+                    rib.add_grid(tube_grid(th_c, np.linspace(rad[i] * 0.35, 0.0002, 5), 5), r_thread, wrap_u=True,
+                                 s_range=(0.0, 0.05), t_range=(0.0, 0.4))
             # tip fringe
             tip = curve[-1]
             for j in range(3 if lod0 else 1):
@@ -94,7 +114,7 @@ class Reliquary:
                 i = int(rng.uniform(0.35, 0.6) * (n - 1))
                 p0 = curve[i]
                 d = self.HEART - p0
-                p1 = self.HEART - normalize(d) * 0.075
+                p1 = self.HEART - normalize(d) * 0.07
                 mid = (p0 + p1) / 2 + np.array([0, 0, -0.02])
                 tc = bezier(p0, mid, mid, p1, 14 if lod0 else 5)
                 tt = np.linspace(0, 1, len(tc))
@@ -120,29 +140,83 @@ class Reliquary:
         rib.add_grid(tube_grid(sc, 0.006 - 0.0028 * tt, 10 if lod0 else 5), r_rib, wrap_u=True, s_range=(0.0, 0.1),
                      t_range=(0.0, 0.5))
 
-        # ---- the heart: two lace shells and a core
-        r_out = shell.region(0.0, 0.55, self._paint_shell(BLUE, VIOLET, 26, 15, 0), bump=3.0)
-        r_in = shell.region(0.55, 1.0, self._paint_shell(EMERALD, CYAN, 22, 13, 1), bump=3.0)
-        for (rad, zr, reg, nt, nv, ph) in ((0.072, 0.085, r_out, 128, 48, 0.0), (0.046, 0.055, r_in, 96, 36, 0.7)):
-            nt, nv = (nt, nv) if lod0 else (nt // 3, nv // 3)
-            phi = np.linspace(-math.pi / 2 + 0.38, math.pi / 2 - 0.3, nv)
-            th = -np.linspace(0, TAU, nt, endpoint=False) + ph
-            PH, TH = np.meshgrid(phi, th, indexing="ij")
-            lob = 1 + 0.10 * np.sin(5 * TH + ph * 3) * np.cos(PH) + 0.05 * np.sin(3 * PH + TH)
-            r = rad * np.cos(PH) * lob
-            z = zr * np.sin(PH) + 0.01 * np.sin(4 * TH) * np.cos(PH)
-            P = np.stack([r * np.cos(TH), r * np.sin(TH), z], -1) + self.HEART
-            shell.add_grid(P[:, ::-1], reg, wrap_u=True)  # rising rows + clockwise u face in: flip
+        # ---- the heart: a bud of three petal layers, closed inside, half open, reflexed outside
+        layers = [  # (count, length, width, opening, curl, base radius, hue pair)
+            (5, 0.105, 0.050, 0.06, 0.12, 0.010),
+            (6, 0.125, 0.060, 0.28, 0.32, 0.018),
+            (7, 0.140, 0.068, 0.52, 0.62, 0.026),
+        ]
+        prng = np.random.default_rng(self.seed + 500)
+        for li, (cnt, L, W, opn, curl, r0) in enumerate(layers):
+            reg = shell.region(li / 3, (li + 1) / 3, self._paint_petal(li), bump=3.0)
+            for j in range(cnt):
+                a = TAU * (j + 0.5 * li) / cnt + prng.uniform(-0.1, 0.1)
+                P = self.petal(a, r0, L * prng.uniform(0.9, 1.08), W * prng.uniform(0.9, 1.1),
+                               opn + prng.uniform(-0.08, 0.08), curl, prng, 24 if lod0 else 8, 12 if lod0 else 4)
+                shell.add_grid(P, reg, s_range=(j / cnt, (j + 1) / cnt))
         nv, nt = (20, 32) if lod0 else (8, 12)
         phi = np.linspace(-math.pi / 2, math.pi / 2, nv)
         th = -np.linspace(0, TAU, nt, endpoint=False)
         PH, TH = np.meshgrid(phi, th, indexing="ij")
-        r = 0.022 * np.cos(PH) * (1 + 0.08 * np.sin(6 * TH) * np.cos(PH))
-        z = 0.03 * np.sin(PH)
+        r = 0.016 * np.cos(PH) * (1 + 0.08 * np.sin(6 * TH) * np.cos(PH))
+        z = 0.024 * np.sin(PH) + 0.008
         core.add_grid((np.stack([r * np.cos(TH), r * np.sin(TH), z], -1) + self.HEART)[:, ::-1],
                       core.region(0, 1, self.paint_core, bump=2.0), wrap_u=True)
         A.emitters.append(list(self.HEART) + [0.5, 0.5, 0.02])
         return A
+
+    def petal(self, a, r0, L, W, opn, curl, rng, nv, nu):
+        """A cupped, pointed petal rising from the heart's base ring at azimuth a; v base -> tip, u across."""
+        z = np.array([0, 0, 1.0])
+        radial = np.array([math.cos(a), math.sin(a), 0.0])
+        side = np.array([-math.sin(a), math.cos(a), 0.0])
+        v = np.linspace(0, 1, nv)
+        phi = opn + curl * v ** 1.6
+        d = np.cos(phi)[:, None] * z + np.sin(phi)[:, None] * radial
+        C = np.zeros((nv, 3))
+        C[1:] = np.cumsum(d[:-1] * (L / (nv - 1)), axis=0)
+        C = C + self.HEART - np.array([0, 0, 0.045]) + radial * r0
+        nrm = np.cross(d, side)  # points toward the axis: the cup's hollow faces the core
+        w = W * np.sin(math.pi * np.clip(v, 0, 1) ** 0.72) ** 0.75 * (1 - 0.15 * v)
+        u = np.linspace(-1, 1, nu)
+        V_, U_ = np.meshgrid(v, u, indexing="ij")
+        ph = rng.uniform(0, TAU)
+        ruff = 0.10 * np.abs(U_) ** 3 * np.sin(22 * V_ + 3 * U_ + ph) * V_
+        cup = 0.35 * U_ ** 2 + ruff
+        P = (C[:, None, :] + side[None, None, :] * (U_ * w[:, None])[..., None]
+             + nrm[:, None, :] * (cup * w[:, None])[..., None])
+        return P
+
+    def _paint_petal(self, li):
+        inner_hue, outer_hue = [(MINT, CYAN), (CYAN, BLUE), (BLUE, VIOLET)][li]
+
+        def paint(S, T):
+            sd = self.seed + 600 + 37 * li
+            # S across all petals of the layer; each petal spans its own strip, so the local across is frac
+            cnt = [5, 6, 7][li]
+            x = ((S * cnt) % 1.0) * 2 - 1
+            ax = np.abs(x)
+            # veins converge at the base by geometry: constant-x lines; a midrib and branching secondaries
+            veins = smoothstep(0.82, 0.98, 0.5 + 0.5 * np.cos(x * math.pi * 6 + 0.6 * fbm(x * 3 + li, T * 4, 2, sd)))
+            mid = 1 - smoothstep(0.03, 0.07, ax)
+            sec = smoothstep(0.9, 0.98, 1 - np.abs(2 * fbm(x * 9, T * 14, 2, sd + 1) - 1))
+            edge = smoothstep(0.86, 0.99, ax) + smoothstep(0.9, 1.0, T)
+            thin = smoothstep(0.3, 1.0, np.maximum(ax, T))
+            # the outer layer is perforated toward its tip
+            alpha = (ax < 0.985).astype(float)
+            if li == 2:
+                F1, F2, _, h = __import__("lib").worley(x * 6 + 20, T * 14, sd + 2)
+                hole = (F1 < 0.32) & (h < smoothstep(0.45, 0.95, T) * 0.8) & (veins < 0.3) & (mid < 0.3)
+                alpha = alpha * (~hole)
+            near = (1 - T) ** 1.5  # lit from the core: brighter toward the base
+            hue = lerp(inner_hue, outer_hue, T)
+            base = lerp(np.array([0.02, 0.03, 0.08]), np.array([0.07, 0.10, 0.20]), thin)
+            e = (col(hue, (veins * 0.35 + mid * 0.45 + sec * 0.15) * (0.25 + 0.75 * near))
+                 + col(outer_hue, np.clip(edge, 0, 1) * 0.30)
+                 + col(inner_hue, 0.03 + 0.10 * near * (1 - thin)))
+            height = veins * 0.5 + mid * 0.8 + sec * 0.3
+            return dict(base=base, emis=e, alpha=alpha, height=height, rough=0.3 + 0.2 * thin, ao=0.5 + 0.5 * T)
+        return paint
 
     # ---- painters
     def paint_rib(self, S, T):

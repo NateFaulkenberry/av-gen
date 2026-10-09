@@ -28,7 +28,20 @@ def label(im, text):
     return im
 
 
+def grid(out, cols, paths, tile=420):
+    """Any renders in a grid, labelled by file name (colourway sheets)."""
+    rows = (len(paths) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * tile, rows * tile))
+    for i, p in enumerate(paths):
+        im = bloom(Image.open(p).convert("RGB")).resize((tile, tile))
+        lab = os.path.basename(p).replace("hero_", "").replace("_lod0_hero.png", "").replace("_lod0", "")
+        sheet.paste(label(im, lab), ((i % cols) * tile, (i // cols) * tile))
+    sheet.save(out)
+
+
 def main(argv):
+    if argv[0] == "--grid":
+        return grid(argv[1], int(argv[2]), argv[3:])
     family = argv[0] == "--family"
     if family:
         argv = argv[1:]

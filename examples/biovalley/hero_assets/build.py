@@ -44,6 +44,8 @@ ASSETS = {
     "canopy": "canopy:make_tree",
     "canopygrove": "canopy:make_grove",
     "darkfern": "grasses:make_darkfern",
+    "lacefan": "newspecies:make_lacefan",
+    "beadcluster": "newspecies:make_beadcluster",
     "reliquary": "reliquary",
 }
 
@@ -150,7 +152,7 @@ def look_at(cam, target):
     cam.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
 
 
-def render_views(name, ob, out_dir, A):
+def render_views(name, ob, out_dir, A, only=None, stem=None, post_rig=None):
     sc = bpy.context.scene
     lo, hi = A.bounds()
     h = float(hi[2])
@@ -172,6 +174,8 @@ def render_views(name, ob, out_dir, A):
                 o.data.size *= k
     if name in SILHOUETTE:  # framing assets are judged against a lit night sky
         sc.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 14.0
+    if post_rig:
+        post_rig()
     if name.startswith("riverrock"):  # dark rock needs more light to read its form
         for o in sc.objects:
             if o.type == "LIGHT":
@@ -186,10 +190,12 @@ def render_views(name, ob, out_dir, A):
     os.makedirs(out_dir, exist_ok=True)
     paths = {}
     for v, (loc, tgt) in views.items():
+        if only and v != only:
+            continue
         cam.location = loc
         look_at(cam, tgt)
         cd.lens = 50 if v != "under" else 28
-        p = os.path.join(out_dir, f"{name}_{v}.png")
+        p = os.path.join(out_dir, f"{stem or name}_{v}.png")
         sc.render.filepath = p
         bpy.ops.render.render(write_still=True)
         paths[v] = p
@@ -233,4 +239,5 @@ def main():
                 shutil.copy2(src, dst)
 
 
-main()
+if __name__ == "__main__":
+    main()
