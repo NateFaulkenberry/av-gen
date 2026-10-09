@@ -330,12 +330,18 @@ def meadow(g, eye, head, rng_seed=37):
 # ---- the macro (panel 3): the library at LOD 0 in the valley's own macro camera ------------------------------------
 # Colourways are the artist's recoloured GLBs (hero_<species>_<colour>), weighted to the reference's glow palette:
 # mostly electric blue and cyan, emerald second, violet and gold as rare accents.
-MACRO_DIAL = {"veilcap": 1.4, "reliquary": 1.2, "lacefan": 0.7, "beadcluster": 1.2, "glowmound": 0.9,
-              "glowmat": 1.4, "bulbstalk": 1.3, "filigree": 0.8, "bellspire": 1.1, "lanternberry": 1.2,
+MACRO_DIAL = {"veilcap": 1.6, "reliquary": 1.4, "lacefan": 0.55, "beadcluster": 1.2, "glowmound": 0.7,
+              "glowmat": 1.2, "bulbstalk": 0.9, "filigree": 0.55, "bellspire": 0.8, "lanternberry": 0.9,
               "veilfern": 0.9, "chalice": 1.0, "glowsedge": 1.0, "darkfern": 0.4, "canopy": 0.0}
 
 
 def macro_node(name, glb, pts, dial):
+    if glb.startswith("env:"):
+        # the artist's substrate pieces: their own materials (low glow), no override
+        return {"name": name.replace(":", "_"), "kind": "procedural", "procedural": {
+            "source": {"kind": "mesh", "asset": f"../meshes/env/{glb[4:]}_lod0.glb"},
+            "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
+            "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": 40.0}}}
     return {"name": name, "kind": "procedural", "procedural": {
         "source": {"kind": "mesh", "asset": f"../{HERO}/hero_{glb}_lod0.glb"},
         "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
@@ -408,6 +414,16 @@ def macro(g, eye, tgt, rng_seed=43):
         glb = (["bulbstalk_blue", "bulbstalk", "glowmound_blue", "glowmat_blue", "bulbstalk_blue", "veilcap_blue",
                 "chalice_blue", "lacefan"][int(r.integers(0, 8))])
         put(glb, right, fwd, r.uniform(1.2, 2.2))
+    # the substrate (spec 07 §8): moss carpets, surface roots and litter under and between everything, so the
+    # organisms stand in a forest floor rather than on bare lumps; sunk a little so they hug the ground
+    for k in range(26):
+        right, fwd = r.uniform(-1.3, 1.3) * (0.5 + 0.3 * k / 26), r.uniform(0.35, 3.2)
+        put("env:" + ["env_mosscarpet_a", "env_mosscarpet_b", "env_mosscarpet_a"][k % 3], right, fwd,
+            r.uniform(0.8, 1.4), sink=0.03)
+    for k in range(10):
+        put("env:env_roots", r.uniform(-1.2, 1.2), r.uniform(0.6, 3.0), r.uniform(0.8, 1.5), sink=0.05)
+    for k in range(14):
+        put("env:env_litter", r.uniform(-1.4, 1.4), r.uniform(0.3, 3.5), r.uniform(0.9, 1.6), sink=0.0)
     # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)
     for k in range(9):
         put("canopy", r.uniform(-14, 14), r.uniform(12, 30), r.uniform(0.8, 1.3), sink=0.02)

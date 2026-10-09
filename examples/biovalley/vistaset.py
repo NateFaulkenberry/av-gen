@@ -90,7 +90,7 @@ def clouds_block(moon_dir, glow_dir, lobes="../meshes/env/env_vista_clouds.lobes
     # veil_upper (a row of small puffs across the top) read as cotton balls in a line: the three big masses only
     return {"lobes": lobes, "masses": ["bank_left", "tower_right", "horizon_band"], "extinction": 0.009, "steps": 128, "lightSteps": 6, "lightDistance": 500.0,
             "lightDirection": [round(float(v), 5) for v in moon_dir], "lightColor": [0.6, 0.7, 1.0],
-            "lightIntensity": 0.22, "anisotropy": 0.6,
+            "lightIntensity": 0.1, "anisotropy": 0.6,
             "ambientTop": [0.008, 0.012, 0.06], "ambientBottom": [0.003, 0.004, 0.02],
             "warmColor": [0.3, 0.1, 0.12], "warmDirection": [round(float(v), 5) for v in glow_dir],
             "warmHeight": 1600.0, "noiseScale": 0.011, "noiseAmount": 0.82,

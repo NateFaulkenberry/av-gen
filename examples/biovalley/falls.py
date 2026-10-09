@@ -56,7 +56,7 @@ def fall(lip, foot_y, facing, width, seed, strands=40, speed=1.6, segs=40):
         spread = (r.normal(0, 0.12) * drop * (ts / tmax) ** 1.5)[:, None] * across[None, :]
         P = (lip + o)[None, :] + facing[None, :] * (v0 * ts)[:, None] - np.array([0, 1.0, 0])[None, :] * \
             (0.5 * 9.81 * ts * ts)[:, None] + spread
-        w = width / strands * r.uniform(0.6, 2.2) * (1.0 + 1.5 * ts / tmax)
+        w = width / strands * r.uniform(1.2, 3.2) * (1.0 + 1.5 * ts / tmax)
         L = P - across[None, :] * w[:, None] * 0.5
         R = P + across[None, :] * w[:, None] * 0.5
         V = np.stack([L, R], 1).reshape(-1, 3)

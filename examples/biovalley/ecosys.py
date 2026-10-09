@@ -415,8 +415,8 @@ def ecosystem(hosts, forest_hosts, shrub_hosts, veil_hosts, water_level):
                            pulseRate=1.5, pulseDecay=0.8, nearFade=0.5, **clump, **bank))
         if gs:
             gcol = {0: [1.0, 0.75, 0.2], 1: [0.25, 0.65, 1.0], 2: life.BLUE, 3: [0.4, 0.45, 1.0], 4: life.VIOLET}[v]   # panel 2's floor
-            L.append(layer(f"glade{v}", gs, f"tuft{v}.emit.json", gcol, 0.9, size=3.5, maxDistance=5200.0,
-                           sparsity=0.3, pulseRate=1.0, pulseDecay=0.8, **clump, **river))
+            L.append(layer(f"glade{v}", gs, f"tuft{v}.emit.json", gcol, 0.5, size=2.2, maxDistance=5200.0,
+                           sparsity=0.55, pulseRate=1.0, pulseDecay=0.8, **clump, **river))
     if hosts.get("frond"):
         L.append(layer("frondGlow", hosts["frond"], "frond0.emit.json", life.CYAN, 0.8, maxDistance=200.0,
                        sparsity=0.4, **bank))
@@ -494,7 +494,8 @@ def particles(eyes):
     # B. near-camera motes: sparse, larger, slow; some drift through the depth of field
     system("motesBank", (bx - 25, gy + 1.5, bz), (40, 30), 40, (8, 14), (0.05, 0.25), (0.03, 0.02), life.CYAN, 2.5,
            (0, 0.02, 0), (0.5, 0.25, 0.15), 71)
-    system("motesMeadow", (mx, gy + 1.5, mz + 30), (60, 60), 60, (8, 14), (0.05, 0.25), (0.04, 0.02), life.LIME, 2.0,
+    # kept 25 m clear of the lens: a mote drifting a metre from it was the meadow's unexplained "green sphere"
+    system("motesMeadow", (mx, gy + 1.5, mz + 75), (55, 45), 60, (8, 14), (0.05, 0.25), (0.04, 0.02), life.LIME, 2.0,
            (0, 0.02, 0), (0.5, 0.2, 0.15), 72)
     system("motesMacro", (cx - 1.5, gy + 0.4, cz + 1.0), (3, 3), 12, (6, 10), (0.01, 0.05), (0.004, 0.002), life.PALE,
            2.5, (0, 0.005, 0), (0.3, 1.5, 0.2), 73)

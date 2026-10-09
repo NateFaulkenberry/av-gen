@@ -15,8 +15,8 @@ from populate import rec
 ENV = "meshes/env"
 
 # the falls' own light: violet-magenta (spec 07 §4.3: violet reflection #7350D8, magenta accent #D34BDB)
-FALL_GLOW = [1.0, 0.42, 1.35]
-FALL_GLOW_INTENSITY = 1.6
+FALL_GLOW = [0.85, 0.72, 1.25]   # violet-WHITE: bright streaky water catching light, not hot pink
+FALL_GLOW_INTENSITY = 1.3
 
 
 def env_node(name, asset, pts, maxd=600.0, material=None, lod=0):

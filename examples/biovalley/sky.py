@@ -41,7 +41,7 @@ def fbm(x, z, seed, octaves, lac=2.0, gain=0.5):
     return s / norm
 
 
-def build(path, moon_dir, glow_dir, width=4096, seed=11):
+def build(path, moon_dir, glow_dir, width=4096, seed=11, warmth=1.0):
     h = width // 2
     v = (np.arange(h) + 0.5) / h
     u = (np.arange(width) + 0.5) / width
@@ -67,8 +67,11 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     low = np.exp(-np.maximum(elev, 0) / 0.16)
     band = np.exp(-((np.maximum(elev, 0) - 0.06) / 0.045) ** 2)     # a raised band, clear of the far hills
     violet = np.array([0.035, 0.025, 0.14])
-    rose = np.array([0.8, 0.33, 0.3])
+    rose = np.array([0.8, 0.33, 0.3]) * warmth
+    peach = np.array([0.95, 0.55, 0.32]) * max(warmth - 1.0, 0.0)   # only a warmer sky has the peach floor
     sky += lobe[..., None] * (low[..., None] * violet + band[..., None] * rose)
+    floor = np.exp(-((np.maximum(elev, 0) - 0.015) / 0.025) ** 2)       # the last degrees above the horizon
+    sky += (lobe ** 0.6)[..., None] * floor[..., None] * peach
 
     # the moon's halo
     cm = np.einsum("ijk,k->ij", d, moon_dir)
