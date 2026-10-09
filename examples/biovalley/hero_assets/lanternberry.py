@@ -107,7 +107,8 @@ class Lanternberry:
         Q = np.stack([br * np.cos(BT), br * np.sin(BT), bz], -1) + top
         Q[..., 0] += lean[0] * (Q[..., 2] - top[2])
         Q[..., 1] += lean[1] * (Q[..., 2] - top[2])
-        berry.add_grid(Q[::-1], rbe, wrap_u=True)
+        self.nb = getattr(self, 'nb', 0) + 1
+        berry.add_grid(Q[::-1], rbe, wrap_u=True, s_range=((self.nb % 10) / 10, (self.nb % 10 + 1) / 10))
 
     def paint_body(self, S, T):
         sd = self.seed + 70
@@ -141,7 +142,7 @@ class Lanternberry:
 
     def _paint_berry(self, hue):
         def paint(S, T):
-            core = np.sin(math.pi * T) ** 0.7
+            core = np.sin(math.pi * T) ** 0.7 * (0.3 + 0.7 * ((np.floor(S * 10) * 0.618) % 1.0) ** 1.2)
             spots = smoothstep(0.7, 0.9, fbm(S * 12, T * 8, 2, self.seed + 90, px=12))
             base = col(hue, 0.08)
             e = col(lerp(hue, MINT, 0.15 * core), 0.12 + 0.30 * core) + col(MINT, spots * 0.1)

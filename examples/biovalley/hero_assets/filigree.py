@@ -13,7 +13,8 @@ import math
 
 import numpy as np
 
-from lib import (CYAN, EMERALD, MINT, TISSUE_DARK, Asset, add_branches, col, fbm, grow_branches, lerp, smoothstep)
+from lib import (CYAN, EMERALD, MINT, TISSUE_DARK, Asset, add_branches, col, fbm, grow_branches, lerp, smoothstep,
+                 vnoise)
 
 
 class Filigree:
@@ -65,6 +66,7 @@ class Filigree:
         sd = self.seed + 50
         up = smoothstep(0.15, 1.0, T)
         tip = smoothstep(0.80, 0.99, T)
+        lit = 0.15 + 0.85 * smoothstep(0.35, 0.75, vnoise(S * 16, 0.5, sd + 9))  # some tips dark, a few bright
         mott = fbm(S * 24, T * 60, 3, sd)
         # one sap channel per tube (each tube spans a quarter of u)
         chan = smoothstep(0.82, 1.0, 0.5 + 0.5 * np.sin(S * 2 * math.pi * 4 + 1.0))
@@ -74,7 +76,7 @@ class Filigree:
         base = base + col([0.05, 0.12, 0.10], tip)
         hue = lerp(EMERALD, CYAN, smoothstep(0.4, 1.0, T))
         e = (col(hue, chan * (0.005 + 0.35 * up ** 3) * (0.6 + 0.6 * mott))
-             + col(lerp(CYAN, MINT, tip), tip ** 2 * 0.75)
+             + col(lerp(CYAN, MINT, tip), tip ** 2 * 0.75 * lit)
              + col(hue, 0.001 + 0.012 * up ** 4))
         height = 0.4 * chan + 0.5 * scar + 0.4 * mott * (1 - up)
         rough = 0.75 - 0.4 * up

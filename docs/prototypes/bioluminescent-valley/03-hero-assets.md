@@ -152,3 +152,97 @@ Each module's docstring describes its anatomy: `filigree.py`, `chalice.py`, `lan
 Every slot uses `v` from root or centre (0) to tip or rim (1):
 - **filigree:** v is the path distance from the root over the longest path, so the tips sit at v ≈ 1.
 - **lanternberry husks** and **bellspire bells:** v runs from the attachment to the mouth or tip.
+
+
+## Breakthrough pass (05-hero-asset-breakthrough.md): clay, material family, colour
+
+### Neutral-material diagnostic
+
+Every organism is rendered as grey clay with no emission (cut-outs kept) next to its final look, with the same framing:
+`render_glbs.py -- <out> hero:clay <glbs>`. The composed views come from `macro_scene.py`.
+
+**Revised because they failed in clay:**
+
+| Asset | Before | After |
+|---|---|---|
+| glowmat / glowmound | dots on a smooth blob | layered cushion lobes with defined rims, clusters of graded translucent nodules (new `nodule` slot), tufts of miniature pinnate fronds (new `frond` slot), threads and dots kept; the mound is built from big overlapping cushions |
+| beadcluster | identical beads on pins | a colony: a gelatinous pad; a translucent coral-like body forking 2-3 times; small sacs at the tips and large ones at the forks; strands sag between neighbours. Slots `body`, `sac` |
+| bulbstalk | sticks and balls | articulated stalks (two nodes, a bract), heads that nod over into hanging buds cupped by three dark sepals |
+| lattice | a crumpled bag in scene | superseded by `lacefan` (flat perforated fans, radial ribs, blue cell edges); still exported, but not recommended |
+
+**Signature organism: the reliquary (v2).** It combines a layered membrane bud (A), filament fringes (B) and a gelatinous organ (D):
+- **Ribs:** seven articulated, keeled blade-ribs with swollen nodes, a slight kink at each node, and thorns along the outer keel.
+- **Bud:** in the cage, a three-layer petal bud (closed inner, half-open middle, outer reflexed at the tips). The petals are veined translucent membrane, cyan at the core grading to violet outside; the outer petals are perforated.
+- **Core:** a small gelatinous core.
+
+### Material family (section 4): every slot is one of six tissues
+
+| Tissue | Base | Roughness | Emission | Slots |
+|---|---|---|---|---|
+| translucent membrane | dark, lighter where thin | 0.3-0.6 | rims and veins; light gathers near its source | veilcap membrane/veil, reliquary petals (`shell`), veilfern blade, chalice bell/throat, lacefan fan |
+| gelatinous tissue | mid, translucent-looking | 0.1-0.25 | core gradient, dark skin at the ends | lanternberry berry, beadcluster sac, glowmat/mound nodule, reliquary core |
+| filaments | dark to pale at tips | 0.25-0.5 | tips only, brightness varied per filament | filigree, veilcap/reliquary fringes, strands, sporophytes |
+| veined tissue | dark | 0.3-0.6 | vein trees and channels; never the whole surface | veilcap cap, chalice, veilfern, reliquary rib channel |
+| matte organic support | near-black | 0.75-0.9 | none, or faint speckle | stalks, ribs, roots, bark, moss, rocks |
+| luminous organs and tips | bright | 0.1-0.3 | a bright core, **brightness varied per organ** | bulbstalk buds, beadcluster sacs, sedge heads, lanternberry berries, nodules |
+
+"Not every tip equally bright": each organ or filament gets its own u-strip, and its brightness is a per-strip hash (0.2-1.0).
+
+### Reference palette (sampled from 00-reference.png)
+
+**Glow:** brightest quarter of the saturated, bright pixels per hue band, as display RGB 0-255.
+
+| Role | Swatch | Share of glow |
+|---|---|---|
+| electric / sky blue | (64, 134, 220) | 35% |
+| blue | (84, 99, 209) | 35% |
+| cyan | (49, 206, 237) | 13% |
+| emerald | (107, 230, 117) | 6% |
+| teal-green | (52, 232, 190) | 5% |
+| violet | (145, 104, 231) | 3% |
+| lime / yellow-green | (147, 235, 112) | 2% |
+| gold / amber | (234, 172, 86) | 0.4% |
+| chartreuse | (213, 220, 105) | 0.3% |
+| magenta-pink | (202, 100, 221) | <0.1% |
+
+**Shadow and tissue:** median of the dark pixels.
+
+| Role | Swatch |
+|---|---|
+| deep blue | (8, 18, 35) |
+| teal dark | (8, 31, 30) |
+| green dark | (11, 31, 13) |
+| indigo | (9, 8, 21) |
+
+The reference is overwhelmingly blue and cyan. Green, violet and gold are accents: use them by region and sparingly.
+
+### Colourways (`colorways.py`)
+
+**Files:**
+- `hero_<species>_<colour>_lod{0,1}.glb` plus `hero_<species>_<colour>.emit.json`, alongside the default `hero_<species>_lod{0,1}.glb`.
+- Same mesh. The emissive image is recoloured (and the tissue tinted for the cool variants) band by band, so a green body with cyan tips becomes, for example, a violet body with blue tips.
+
+**Processing:**
+- Saturation is boosted toward the reference.
+- A thickness-modulated body glow (lit from within, kept low) is added to every colourway, including the default.
+
+**Pipeline:** `build.py` writes the raw GLBs, then `colorways.py <raw> <out>` writes the final defaults and the variants.
+
+| Species | Colourways |
+|---|---|
+| bulbstalk | chartreuse, gold, blue, violet |
+| glowmat, glowmound | emerald, blue, violet, chartreuse |
+| filigree | violet, goldtip (gold tips on a cyan body), blue |
+| lanternberry | gold, blue, violet |
+| veilcap | emeraldcyan (emerald, cyan rim), chartreuse, violet, blue |
+| glowsedge | blue, violet, chartreuse |
+| chalice, veilfern | violet, blue, chartreuse |
+| bellspire | violet, gold, blue |
+| reliquary | violet, gold |
+| lacefan | violet, cyan, emerald (default: electric blue) |
+| beadcluster | emerald, violet, gold (default: emerald and blue sac by sac) |
+| lattice (superseded) | violet, cyan |
+
+Every emissive strength is still 4.0: dial per scene.
+
+**Verified in AV Gen** (`meshes/hero/breakthrough.json`): the revised species plus a mix of colourways, 0 loader warnings, 0 GPU errors.

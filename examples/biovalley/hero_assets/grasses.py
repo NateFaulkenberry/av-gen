@@ -93,7 +93,7 @@ class Sedge:
             head = top[None, :] + dvec[None, :] * np.linspace(0, L, hn)[:, None]
             ht = np.linspace(0, 1, hn)
             hr = 0.0045 * np.sin(math.pi * ht) ** 0.7 * (1 + 0.18 * np.sin(ht * 9 * math.pi) * lod0) + 0.0012
-            st.add_grid(tube_grid(head, hr, 8 if lod0 else 4), rh, wrap_u=True)
+            st.add_grid(tube_grid(head, hr, 8 if lod0 else 4), rh, wrap_u=True, s_range=(j / 6, (j + 1) / 6))
             A.emitters.append(list(head[hn // 2]) + [0.5, 0.5, 0.004])
         self.A = A
         return A
@@ -116,7 +116,7 @@ class Sedge:
 
     def paint_head(self, S, T):
         beads = 0.5 + 0.5 * np.cos(T * TAU * 9)
-        mid = np.sin(math.pi * T)
+        mid = np.sin(math.pi * T) * (0.3 + 0.7 * ((np.floor(S * 6) * 0.618 + 0.1) % 1.0))  # heads differ
         base = lerp(np.array([0.05, 0.1, 0.08]), np.array([0.2, 0.35, 0.3]), mid)
         e = col(lerp(CYAN, MINT, mid), (0.2 + 0.6 * mid) * (0.6 + 0.4 * beads))
         return dict(base=base, emis=e, height=beads, rough=0.3, ao=1.0)
@@ -138,29 +138,50 @@ class Bulbstalk:
         rs = sl.region(0, 0.4, self.paint_stalk, bump=1.0)
         rb = sl.region(0.4, 0.8, self.paint_bulb, bump=1.0)
         rl = sl.region(0.8, 1.0, self.paint_leaf, bump=1.0)
+        from lib import cup_leaf
         n = 5
         for j in range(n):
             a = TAU * j / n + rng.uniform(-0.5, 0.5)
             h = rng.uniform(0.12, 0.32)
             lean = rng.uniform(0.05, 0.4)
             base = np.array([0.006 * math.cos(a), 0.006 * math.sin(a), -0.005])
+            out = np.array([math.cos(a), math.sin(a), 0.0])
             top = base + np.array([math.sin(lean) * math.cos(a) * h, math.sin(lean) * math.sin(a) * h,
                                    h * math.cos(lean)])
+            # the head nods: the stalk runs up, then hooks over
+            hook = top + out * 0.018 + np.array([0, 0, -0.012])
             if not lod0 and j >= 3:
                 continue
-            m = 10 if lod0 else 4
-            stalk = bezier(base, base + [0, 0, h * 0.5], top - [0, 0, h * 0.2] + 0.3 * (top - base) * [1, 1, 0],
-                           top, m)
+            m = 14 if lod0 else 5
+            stalk = bezier(base, base + [0, 0, h * 0.55], top + [0, 0, 0.01], hook, m)
             t = np.linspace(0, 1, m)
-            sl.add_grid(tube_grid(stalk, 0.0011 - 0.0005 * t, 5 if lod0 else 3), rs, wrap_u=True)
-            # the bulb: a small, slightly pointed ovoid along the stalk's end direction
-            dvec = normalize(top - stalk[-2])
-            R = rng.uniform(0.0035, 0.006)
-            bn = 8 if lod0 else 4
+            # articulated: two swollen nodes
+            node = np.exp(-((t[:, None] - np.array([0.35, 0.62])[None, :]) / 0.03) ** 2).sum(1)
+            sl.add_grid(tube_grid(stalk, (0.0011 - 0.0005 * t) * (1 + 0.6 * node), 5 if lod0 else 3), rs, wrap_u=True)
+            # a small bract at the lower node
+            if lod0:
+                i = int(0.35 * (m - 1))
+                d = normalize(stalk[i + 1] - stalk[i])
+                side = np.cross(d, out)
+                P = cup_leaf(stalk[i], normalize(d + out * 0.8), side, 0.016, 0.004, cup=0.4, curl=0.5, nv=6, nu=3)
+                sl.add_grid(P, rl)
+            # the bud hangs from the hook, cupped by three dark sepals
+            dvec = normalize(hook - stalk[-2])
+            R = rng.uniform(0.0042, 0.0072) * (0.6 if j == 4 else 1.0)  # one bud still small
+            bn = 9 if lod0 else 4
             bt = np.linspace(0, 1, bn)
-            axis = top[None, :] + dvec[None, :] * (bt * 2.6 * R)[:, None]
-            br = R * np.sin(math.pi * bt) ** 0.75 * (1 - 0.25 * bt) + 0.0004
-            sl.add_grid(tube_grid(axis, br, 8 if lod0 else 5), rb, wrap_u=True)
+            axis = hook[None, :] + dvec[None, :] * (bt * 2.8 * R)[:, None]
+            br = R * np.sin(math.pi * bt) ** 0.7 * (0.75 + 0.35 * bt) + 0.0004
+            sl.add_grid(tube_grid(axis, br, 8 if lod0 else 5), rb, wrap_u=True, s_range=(j / n, (j + 1) / n))
+            if lod0:
+                ref = normalize(np.cross(dvec, [0, 0, 1.0]) + 1e-6)
+                for k in range(3):
+                    ang = TAU * k / 3
+                    side = ref * math.cos(ang) + np.cross(dvec, ref) * math.sin(ang)
+                    sd = normalize(dvec + np.cross(side, dvec) * 0.6)
+                    P = cup_leaf(hook + dvec * R * 0.2, sd, side, R * 1.6, R * 0.9, cup=0.5, curl=-0.25, nv=5, nu=3,
+                                 open_=0.5)
+                    sl.add_grid(P, rl)
             A.emitters.append(list(axis[bn // 2]) + [0.5, 0.5, R])
         # a tiny rosette of basal leaves (LOD0 only)
         if lod0:
@@ -178,11 +199,13 @@ class Bulbstalk:
         return dict(base=base, emis=e, height=np.zeros_like(S), rough=0.5, ao=0.5 + 0.5 * T)
 
     def paint_bulb(self, S, T):
-        core = np.sin(math.pi * T) ** 1.2
+        idx = np.floor(S * 5)
+        bright = 0.3 + 0.7 * ((idx * 0.618 + 0.2) % 1.0) ** 1.5  # not every bud equally lit
+        core = np.sin(math.pi * T) ** 1.2 * bright
         base = lerp(np.array([0.04, 0.10, 0.07]), np.array([0.08, 0.2, 0.15]), core)
-        hue = lerp(EMERALD, CYAN, 0.5 + 0.5 * np.cos(TAU * S))  # a cyan cheek on an emerald bulb
+        hue = lerp(EMERALD, CYAN, 0.5 + 0.5 * np.cos(TAU * S * 5))  # a cyan cheek on an emerald bulb
         k = (0.25 * core ** 4)[..., None]
-        e = (hue * (1 - k) + MINT * k) * (0.2 + 0.5 * core)[..., None]
+        e = (hue * (1 - k) + MINT * k) * (0.06 + 0.65 * core)[..., None]
         return dict(base=base, emis=e, height=np.zeros_like(S), rough=0.25, ao=1.0)
 
     def paint_leaf(self, S, T):

@@ -100,59 +100,107 @@ class Lacefan:
 
 
 class Beadcluster:
+    """A colony of translucent sacs on a branching, coral-like body (archetype D): a gelatinous pad, three or four
+    stems that fork twice or three times, small sacs at the tips and larger ones swelling at the forks, a few
+    sagging strands that link neighbouring sacs. Every sac is lit from inside to its own degree."""
+
     def __init__(self, seed=161, lod=0):
         self.seed = seed
         self.lod0 = lod == 0
 
     def build(self):
+        from lib import add_branches, grow_branches, normalize
         rng = np.random.default_rng(self.seed)
+        lod0 = self.lod0
         A = Asset("beadcluster")
-        res = 1.0 if self.lod0 else 0.5
-        sl = A.slot("bead", res=(int(512 * res), int(512 * res)), mode="OPAQUE", double_sided=False,
-                    emissive_strength=4.0)
-        r_stem = sl.region(0.0, 0.4, self.paint_stem, bump=1.0)
-        r_green = sl.region(0.4, 0.7, self._paint_bead(EMERALD), bump=1.0)
-        r_blue = sl.region(0.7, 1.0, self._paint_bead(BLUE), bump=1.0)
-        n = 64 if self.lod0 else 24
-        ga = math.pi * (3 - math.sqrt(5))
-        for j in range(n):
-            az = j * ga + rng.uniform(-0.2, 0.2)
-            el = math.radians(8 + 70 * math.sqrt((j + 0.5) / n)) + rng.uniform(-0.08, 0.08)
-            d = np.array([math.sin(el) * math.cos(az), math.sin(el) * math.sin(az), math.cos(el)])
-            L = rng.uniform(0.02, 0.06) * (1.1 - 0.35 * math.sin(el))
-            p0 = np.array([0, 0, 0.008])
-            end = p0 + d * L + np.array([0, 0, -0.15 * L * math.sin(el) ** 2])
-            m = 6 if self.lod0 else 3
-            stem = bezier(p0, p0 + d * L * 0.4, end - d * L * 0.2 + [0, 0, 0.1 * L], end, m)
-            sl.add_grid(tube_grid(stem, np.linspace(0.0005, 0.0003, m), 4 if self.lod0 else 3), r_stem, wrap_u=True)
-            R = rng.uniform(0.001, 0.0025)
-            nv, nt = (7, 10) if self.lod0 else (4, 5)
+        res = 1.0 if lod0 else 0.5
+        body = A.slot("body", res=(int(512 * res), int(512 * res)), mode="OPAQUE", double_sided=False,
+                      emissive_strength=4.0)
+        sacs = A.slot("sac", res=(int(512 * res), int(256 * res)), mode="OPAQUE", double_sided=False,
+                      emissive_strength=4.0)
+        r_body = body.region(0.0, 0.7, self.paint_body, bump=2.0)
+        r_strand = body.region(0.7, 1.0, self.paint_strand, bump=1.0)
+        r_green = sacs.region(0.0, 0.5, self._paint_sac(EMERALD, 0), bump=1.0)
+        r_blue = sacs.region(0.5, 1.0, self._paint_sac(BLUE, 1), bump=1.0)
+        br = []
+        for k in range(4):
+            a = TAU * k / 4 + rng.uniform(-0.3, 0.3)
+            tilt = rng.uniform(0.15, 0.55)
+            d = [math.sin(tilt) * math.cos(a), math.sin(tilt) * math.sin(a), math.cos(tilt)]
+            br += grow_branches(rng, [0.006 * math.cos(a), 0.006 * math.sin(a), 0.004], d, rng.uniform(0.035, 0.05),
+                                0.0028, max_gen=3, children=(2, 3), spread=(0.35, 0.75), shrink=0.72, rshrink=0.7,
+                                curl=0.35, up=0.25, segs=8 if lod0 else 4, crozier=0.0, min_r=0.0008,
+                                child_t=(0.55, 1.0), sink=0.8)
+        add_branches(body, r_body, br, lambda b: 7 if lod0 else 4, seed=self.seed)
+        # the pad
+        V, TH = np.meshgrid(np.linspace(0, 1, 8 if lod0 else 4), -np.linspace(0, TAU, 20 if lod0 else 8, endpoint=False),
+                            indexing="ij")
+        pr = 0.024 * np.sin(math.pi * (0.5 + 0.5 * V)) * (1 + 0.15 * np.cos(5 * TH)) + 0.001
+        pz = 0.012 * V - 0.003
+        body.add_grid(np.stack([pr * np.cos(TH), pr * np.sin(TH), pz], -1)[::-1, ::-1], r_body, wrap_u=True,
+                      t_range=(0.0, 0.1))
+        centres = []
+        j = 0
+
+        def sac(c, d, R, elong):
+            nonlocal j
+            nv, nt = (8, 10) if lod0 else (4, 5)
             V, TH = np.meshgrid(np.linspace(0, 1, nv), -np.linspace(0, TAU, nt, endpoint=False), indexing="ij")
             ph = -math.pi / 2 + math.pi * V
-            B = np.stack([R * np.cos(ph) * np.cos(TH), R * np.cos(ph) * np.sin(TH), R * np.sin(ph)], -1)
-            B = B @ frame_to(d).T + end + d * R * 0.8
-            sl.add_grid(B[:, ::-1], r_green if rng.random() < 0.5 else r_blue, wrap_u=True)
-            A.emitters.append(list(end + d * R * 0.8) + [1.0, 0.5, R])
-        # the knob
-        V, TH = np.meshgrid(np.linspace(0, 1, 6 if self.lod0 else 3), -np.linspace(0, TAU, 12 if self.lod0 else 6,
-                                                                                   endpoint=False), indexing="ij")
-        ph = -math.pi / 2 + math.pi * V
-        K = np.stack([0.009 * np.cos(ph) * np.cos(TH), 0.009 * np.cos(ph) * np.sin(TH), 0.006 * np.sin(ph) + 0.004], -1)
-        sl.add_grid(K[:, ::-1], r_stem, wrap_u=True)
+            # a teardrop: wider toward its free end
+            rr = R * np.cos(ph) * (0.85 + 0.25 * V)
+            B = np.stack([rr * np.cos(TH), rr * np.sin(TH), R * elong * np.sin(ph)], -1)
+            B = B @ frame_to(d).T + c
+            reg = r_green if rng.random() < 0.5 else r_blue
+            sacs.add_grid(B[:, ::-1], reg, wrap_u=True, s_range=((j % 12) / 12, (j % 12 + 1) / 12))
+            centres.append(c)
+            A.emitters.append(list(c) + [0.5, 0.5, R])
+            j += 1
+        for b in br:
+            d = normalize(b.pts[-1] - b.pts[-2])
+            if b.tip:  # small sacs crown the tips
+                R = rng.uniform(0.0022, 0.0042)
+                sac(b.pts[-1] + d * R * 1.1, d, R, 1.35)
+            elif rng.random() < 0.6:  # larger ones swell at the forks
+                R = rng.uniform(0.0045, 0.0075)
+                i = len(b.pts) - 1
+                sac(b.pts[i] + d * R * 0.3, d, R, 1.2)
+        # strands between neighbouring sacs
+        if lod0:
+            C = np.array(centres)
+            for _ in range(10):
+                i = rng.integers(len(C))
+                dist = np.linalg.norm(C - C[i], axis=1)
+                dist[i] = 1e9
+                k = int(np.argmin(dist + rng.uniform(0, 0.01, len(C))))
+                p0, p1 = C[i], C[k]
+                mid = (p0 + p1) / 2 - np.array([0, 0, 0.25 * np.linalg.norm(p1 - p0)])
+                st = bezier(p0, mid, mid, p1, 8)
+                body.add_grid(tube_grid(st, np.full(8, 0.00025), 3), r_strand, wrap_u=True)
         self.A = A
         return A
 
-    def paint_stem(self, S, T):
-        base = lerp(TISSUE_DARK, np.array([0.03, 0.06, 0.07]), T)
-        return dict(base=base, emis=col(CYAN, 0.01 + 0.08 * T ** 3), height=np.zeros_like(S), rough=0.5,
-                    ao=0.5 + 0.5 * T)
+    def paint_body(self, S, T):
+        sd = self.seed + 7
+        mott = fbm(S * 12, T * 30, 2, sd)
+        up = smoothstep(0.2, 1.0, T)
+        base = lerp(np.array([0.02, 0.04, 0.06]), np.array([0.06, 0.12, 0.16]), up * (0.6 + 0.4 * mott))
+        e = col(lerp(BLUE, CYAN, up), (0.01 + 0.10 * up ** 2) * (0.5 + 0.6 * mott))
+        return dict(base=base, emis=e, height=mott, rough=0.25, ao=0.5 + 0.5 * T)
 
-    def _paint_bead(self, hue):
+    def paint_strand(self, S, T):
+        return dict(base=col(CYAN, 0.08), emis=col(CYAN, 0.12 + 0.0 * T), height=np.zeros_like(S), rough=0.3,
+                    ao=1.0)
+
+    def _paint_sac(self, hue, k):
         def paint(S, T):
-            core = np.sin(math.pi * T) ** 1.5
-            base = col(hue, 0.15)
-            e = col(hue, 0.18 + 0.4 * core) + col(MINT, 0.05 * core ** 6)
-            return dict(base=base, emis=e, height=np.zeros_like(S), rough=0.15, ao=1.0)
+            idx = np.floor(S * 12)
+            bright = 0.2 + 0.8 * (((idx + 3 * k) * 0.618) % 1.0) ** 1.5  # each sac lit to its own degree
+            core = np.sin(math.pi * T) ** 1.4
+            skin = smoothstep(0.75, 1.0, np.abs(2 * T - 1))  # the membrane shows at the ends
+            base = lerp(np.array([0.05, 0.08, 0.12]), np.array([0.12, 0.2, 0.26]), core)
+            e = col(hue, 1.0) * ((0.05 + 0.55 * core) * bright)[..., None] + col(MINT, 0.05 * core ** 8 * bright)
+            return dict(base=base, emis=e, height=skin, rough=0.1, ao=1.0)
         return paint
 
 

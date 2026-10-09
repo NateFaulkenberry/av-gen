@@ -33,7 +33,7 @@ LAYOUTS = {
                ("bellspire", 1.55, 0.2, 0, 0.75), ("lanternberry", -2.15, 0.1, 40, 1.0),
                ("beadcluster", 2.0, 0.0, 0, 2.0), ("glowmound", -2.75, 0.25, 0, 0.45),
                ("bulbstalk", 2.4, 0.0, 0, 1.4), ("glowsedge", 2.9, 0.3, 0, 0.45), ("glowmat", -3.4, 0.1, 0, 0.9)],
-        cam=((-0.2, -5.2, 0.55), (-0.2, 0.0, 0.25), 50, 5.2)),
+        cam=((-0.25, -4.4, 0.42), (-0.25, 0.0, 0.32), 26, 4.4)),
 }
 
 
@@ -54,7 +54,8 @@ def main():
                 o.scale = (s, s, s)
     build.setup_lookdev(1200)
     sc = bpy.context.scene
-    sc.render.resolution_x = 1600
+    wide = argv[3:] == ["family"]
+    sc.render.resolution_x = 3600 if wide else 1600
     sc.render.resolution_y = 900
     # replace the turntable rig: a cool key from the upper left, a strong rim from behind, nothing else
     for o in list(sc.objects):
