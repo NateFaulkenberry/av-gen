@@ -179,3 +179,102 @@ Files are in `finishing/C-vista/`: C-sbs.png (reference | D | C), C-vista.png an
 1. The floor glow is dashed marks rather than ecology.
 2. The procedural waterfalls on the far cliffs read as white wire strands.
 3. The horizon_band and tower_right masses need more presence and less puff.
+
+## Deliverable D: meadow and macro
+
+- **Meadow:**
+  - It now has its own sky map (`night_warm.hdr`, warmth 2.4). That adds a peach floor in the last degrees above the
+    horizon, only in the glow's azimuth, so the warm twilight shows low between the peaks and the vista keeps its
+    blue.
+  - The "green sphere" was a lime firefly mote drifting about a metre from the lens. Found by ablation: it vanishes
+    with the particles off and stays with the ecosystem off. The meadow motes now spawn 30-120 m ahead.
+- **Macro:**
+  - The artist's moss carpets, roots and litter are laid under and between the organisms.
+  - The supporting species are dimmed (lacefan, filigree, bellspire, bulbstalk), so the veilcap and the reliquary
+    lead.
+  - Middle luma is 0.166 (reference 0.196); the hero is 0.294.
+
+## Riverbank finishing (owner notes on B)
+
+- **Composition:** the camera hugs the left bank, 0.95 m up, yawed so the stream runs from bottom centre to the
+  falls at upper right (panel 1's composition).
+- **Near left bank:** a 7 m forward cone is cleared of library growth, and the near left bank is populated from
+  1.6 m out (rocks, mounds, fronds, sedge, lanternberries).
+- **Falls:** violet-white ([0.85,0.72,1.25] × 1.3) instead of hot pink, with a wider and fainter violet-white mist
+  veil around the plunge.
+- **Reflections:** emitter mirror stretch 8, softness 14. The bank's violet and cyan now lay long broken reflection
+  paths down the water.
+
+## Deliverable E: final sheet
+
+Files are in `finishing/E-final/`:
+- E-contact-sheet.png (reference | Checkpoint D | finishing);
+- the four stills, plus riverbank-4k.png and vista-4k.png;
+- the palette strips and palette.md;
+- critic-report.md.
+
+## Deliverable F: critique
+
+**What materially improved:**
+- **Riverbank:**
+  - The water reflects the lit world (ADR-1286), not just the sky.
+  - The composition now matches panel 1.
+  - The falls are an authored rock set with violet-white water.
+  - Long violet and cyan reflection paths run down the stream.
+  - The forest is designed crowns.
+- **Vista:**
+  - A dimensional crescent moon (shaded by phase).
+  - A karst landmark tower.
+  - Volumetric lobe clouds.
+  - A dark designed canopy band framing the bottom.
+  - Dark geology with lit rims instead of flat pale-blue masses.
+- **Meadow:** a warm low twilight; the green-sphere artifact is gone.
+- **Macro:** substrate under the organisms and a clearer brightness hierarchy.
+
+**What was preserved:**
+- the organism library and colourways;
+- the meadow composition and carpet;
+- every camera except the riverbank's (moved on the owner's note);
+- the world layout.
+
+**What was removed or rebuilt:**
+- fall3's procedural strands, replaced by the artist's set;
+- the faceted riverbank canopy blobs;
+- the vista's flat-lit pale massifs (now relit);
+- the cloud row (`veil_upper`);
+- the water glints (they amplified reflected stalks into hairlines);
+- the flat moon disc.
+
+**Rendering techniques added or extended:**
+
+| ADR | What |
+|---|---|
+| 1286 | Cinematic water: frame-copy SSR with view-streaked rays, absorbed transmission, swell, calm/ruffled regions, tint patches |
+| 1287 | Emission tints above 1 |
+| 1288 | A broken scene fails the render |
+| 1289 | Lobe clouds as an Environment |
+| 1290 | Sixteen material program slots |
+
+- The moon's phase is a material program over a derived GLB.
+- There are per-shot light, fill, air and sky-map controls in the generator.
+
+**Issues that remain:**
+1. The vista's floor glow still reads as dashed patches. It is not yet ecology following the terrain; it needs a
+   different placement law (river corridors and sheltered pockets) and broader, dimmer pools.
+2. **Water:**
+   - the middle of the riverbank water is navy where nothing on screen is reflected (an SSR limit; planar reflection
+     is the next step);
+   - the emitter mirror dashes are still visibly rectangular up close.
+3. The vista clouds are soft but still a little puffy. The tower_right mass is a thin plume.
+4. **Falls:**
+   - the far vista falls are pale ribbons;
+   - the riverbank fall's plunge is half hidden behind the right bank.
+5. The meadow horizon stays darker than the reference's (0.130 against 0.297): the hills cover most of the warm band.
+
+**Strongest candidate for real time:** the macro. It is a bounded 3 m world with no water, sky or clouds. Its cost is
+the library's LOD 0 meshes, the substrate and the DOF. The riverbank's water path (8 rays × 160 steps) is
+offline-only as configured.
+
+**Creative Critic** (job in critic-report.md):
+- 0 issues; luma 0.12-0.17, contrast 0.13-0.17, clip ≤ 0.04%.
+- On stills it remains an exposure and clipping guard, not a judge of likeness.
