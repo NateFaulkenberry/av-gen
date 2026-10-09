@@ -67,7 +67,7 @@ def programs():
         op("triplanar", 2, srcA=0, value=0.09, seed=5),                             # 10 m grain
         op("multiply", 1, srcA=1, srcB=2),
         op("remap", 1, srcA=1, value=1, constant=[0.05, 0.55, 0.45, 1.6]),
-        op("constant", 3, constant=[0.07, 0.085, 0.17, 1.0]),                       # blue-violet moonlit stone
+        op("constant", 3, constant=[0.12, 0.15, 0.33, 1.0]),                       # blue-violet moonlit stone
         op("multiply", 3, srcA=3, srcB=1),
         op("input", 4, input="uv"),
         op("smoothstep", 4, srcA=4, constant=[0.45, 0.85, 0, 0]),                   # ledge mask from flatness

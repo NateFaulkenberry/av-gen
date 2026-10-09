@@ -63,18 +63,18 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     # the glow low over the far valley: violet that warms to rose at the horizon, wide in azimuth
     gaz = np.einsum("ijk,k->ij", d * np.array([1, 0, 1]), glow_dir * np.array([1, 0, 1]))
     gaz = gaz / np.maximum(np.linalg.norm(d[..., [0, 2]], axis=-1), 1e-6) / np.linalg.norm(glow_dir[[0, 2]])
-    lobe = np.exp(-((1.0 - gaz) / 0.4) ** 1.2)
+    lobe = np.exp(-((1.0 - gaz) / 0.22) ** 1.2)
     low = np.exp(-np.maximum(elev, 0) / 0.16)
-    band = np.exp(-((np.maximum(elev, 0) - 0.07) / 0.06) ** 2)     # a raised band, clear of the far hills
-    violet = np.array([0.06, 0.03, 0.14])
-    rose = np.array([0.7, 0.3, 0.38])
+    band = np.exp(-((np.maximum(elev, 0) - 0.06) / 0.045) ** 2)     # a raised band, clear of the far hills
+    violet = np.array([0.035, 0.025, 0.14])
+    rose = np.array([0.8, 0.33, 0.3])
     sky += lobe[..., None] * (low[..., None] * violet + band[..., None] * rose)
 
     # the moon's halo
     cm = np.einsum("ijk,k->ij", d, moon_dir)
     ang = np.arccos(np.clip(cm, -1, 1))
     halo = 0.05 * np.exp(-ang / 0.10) + 0.012 * np.exp(-ang / 0.45)
-    sky += halo[..., None] * np.array([0.45, 0.60, 1.0])
+    sky += halo[..., None] * np.array([0.3, 0.5, 1.0])
 
     # a faint galactic band and dust (tilted great circle)
     gal_n = np.array([0.35, 0.55, -0.76])
@@ -100,7 +100,7 @@ def build(path, moon_dir, glow_dir, width=4096, seed=11):
     near_moon = np.exp(-ang / 0.38)
     body = np.array([0.012, 0.02, 0.09]) + 0.6 * lobe[..., None] * low[..., None] * np.array([0.06, 0.03, 0.08])
     lit = (near_moon[..., None] * np.array([0.1, 0.18, 0.5]) * (0.35 + edge[..., None]) +
-           (lobe * low)[..., None] * np.array([0.12, 0.05, 0.12]) * (0.4 + edge[..., None]))
+           (lobe * low)[..., None] * np.array([0.12, 0.05, 0.08]) * (0.4 + edge[..., None]))
     cloud = body + lit
     sky = sky * (1 - dens[..., None] * 0.9) + cloud * dens[..., None]
 
