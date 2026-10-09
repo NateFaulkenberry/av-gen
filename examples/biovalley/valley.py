@@ -480,9 +480,13 @@ POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/int
 SHOT_POST = {
     "vista": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
     "meadow": {"camera/exposure/compensation": 0.0, "post/grade/saturation": 1.2},
-    "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 1.3, "post/dof/focusRange": 0.45,
-              "camera/exposure/compensation": -0.6, "post/grade/saturation": 1.25,
-              "post/dof/maxRadius": 26.0},
+    # (showcase P3, variant C) tighter focus on the two subjects, a deeper defocus, bloom only on what truly glows,
+    # a stronger vignette to hold the eye in the middle
+    "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 1.25, "post/dof/focusRange": 0.3,
+              "post/bloom/threshold": 0.9, "post/bloom/intensity": 0.6, "post/bloom/radius": 0.9,
+              "post/output/vignette": 0.45,
+              "camera/exposure/compensation": -0.45, "post/grade/saturation": 1.25,
+              "post/dof/maxRadius": 30.0},
     "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 12.0, "post/dof/focusRange": 45.0,
                   "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6,
                   "post/grade/saturation": 1.25},
@@ -495,6 +499,35 @@ def project(name, scene_path):
     return {"format": "avgen-project", "version": 4, "app": {"name": f"Bioluminescent Valley ({name})"},
             "assets": {"scene": {"kind": "composition", "path": scene_path}, "audio": {"path": AUDIO}},
             "parameters": params}
+
+
+def macro_move(eye, tgt, seconds=12.0):
+    """(showcase P3) the macro's camera sequence: a slow push-in low over the floor toward the veilcap, drifting a
+    little right so the reliquary opens from behind it, the focus riding the subject. Same scene as the still."""
+    e, t = np.asarray(eye, float), np.asarray(tgt, float)
+    f = t - e
+    f[1] = 0.0
+    f /= np.linalg.norm(f)
+    r = np.array([-f[2], 0.0, f[0]])
+    start = e - f * 0.45 - r * 0.12 + np.array([0, 0.02, 0])
+    end = e + f * 0.15 + r * 0.08
+    t0 = t - r * 0.25
+    t1 = t + r * 0.1
+    rnd = lambda v: [round(float(x), 4) for x in v]
+    pj = project("macro", "macro.scene.json")
+    pj["app"]["name"] = "Bioluminescent Valley (macro, camera sequence)"
+    pj["timeline"] = {"enabled": True, "cues": [], "tracks": [
+        {"target": "camera/position", "component": -1, "timeBase": "seconds", "mode": "replace", "loopLength": 0.0,
+         "enabled": True, "keys": [{"time": 0.0, "value": rnd(start), "interp": "easeInOut"},
+                                   {"time": seconds, "value": rnd(end), "interp": "easeInOut"}]},
+        {"target": "camera/target", "component": -1, "timeBase": "seconds", "mode": "replace", "loopLength": 0.0,
+         "enabled": True, "keys": [{"time": 0.0, "value": rnd(t0), "interp": "easeInOut"},
+                                   {"time": seconds, "value": rnd(t1), "interp": "easeInOut"}]},
+        {"target": "post/dof/focusDistance", "component": -1, "timeBase": "seconds", "mode": "replace",
+         "loopLength": 0.0, "enabled": True,
+         "keys": [{"time": 0.0, "value": 1.7, "interp": "easeInOut"},
+                  {"time": seconds, "value": 1.1, "interp": "easeInOut"}]}]}
+    return pj
 
 
 def main():
@@ -745,6 +778,8 @@ def main():
                     n["terrain"]["water"].update(WATER[name])
         (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
         (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
+        if name == "macro":
+            (SHOTS / "macro_move.json").write_text(json.dumps(macro_move(eye, tgt), indent=1))
         print(f"  shot {name}: eye {eye} target {tgt}")
     print("wrote", SHOTS)
 
