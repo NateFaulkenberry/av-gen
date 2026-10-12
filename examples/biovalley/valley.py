@@ -553,9 +553,9 @@ def macro_finish(sc, g, eye, tgt):
             # the "dark smudge" itself: the seam curtain of a terrain chunk edge that runs across the bank 1-2 m from
             # the lens, hanging 30 m (the valley's setting, sized for cliffs) -- a vertical dark wall in this shot
             n["terrain"]["skirtDepth"] = 0.3
-    sc["wind"] = {"enabled": True, "speed": 0.35, "direction": 0.6, "gustAmount": 1.1, "gustScale": 3.5,
-                  "gustSpeed": 1.6, "gustSharpness": 3.5, "turbulence": 0.35, "turbulenceScale": 1.2,
-                  "turbulenceSpeed": 0.4, "regionScale": 6.0, "flutterScale": 0.3}
+    sc["wind"] = {"enabled": True, "speed": 0.22, "direction": 0.6, "gustAmount": 0.6, "gustScale": 9.0,
+                  "gustSpeed": 0.7, "gustSharpness": 1.0, "turbulence": 0.12, "turbulenceScale": 2.5,
+                  "turbulenceSpeed": 0.15, "regionScale": 12.0, "regionDrift": 0.02, "flutterScale": 0.6}
     x, z = to_world(0.35, 5.0)
     y = float(g.height(np.array([x]), np.array([z]))[0])
     sc["lights"].append({"name": "violetPocket", "type": "point", "position": [round(x, 3), round(y + 0.6, 3), round(z, 3)],
@@ -605,15 +605,20 @@ def macro_audio(sc):
         _route("audio.mid", P("mac_bellspire_violet_bg_far", "material/emissive"), 2.0, 400, 1400, norm=8.0),
         _route("audio.mid", P("mac_filigree_violet_bg_far", "material/emissive"), 1.6, 600, 1600, norm=8.0,
                delay=250.0),
-        _route("audio.lowMid", P("mac_filigree_ambertip", "material/emissive"), 2.4, 300, 1000, norm=8.0),
-        _route("audio.lowMid", P("mac_beadcluster_coral", "material/emissive"), 2.0, 450, 1200, norm=8.0,
+        _route("audio.lowMid", P("mac_filigree_ambertip_acc", "material/emissive"), 2.4, 300, 1000, norm=8.0),
+        _route("audio.lowMid", P("mac_beadcluster_coral_acc", "material/emissive"), 2.0, 450, 1200, norm=8.0,
                delay=180.0),
-        _route("audio.mid", P("mac_lanternberry_amber", "material/emissive"), 1.8, 350, 1100, norm=8.0,
+        _route("audio.mid", P("mac_lanternberry_amber_acc", "material/emissive"), 1.8, 350, 1100, norm=8.0,
                delay=90.0),
+        _route("audio.mid", P("mac_bellspire_rose_acc", "material/emissive"), 1.6, 500, 1400, norm=8.0,
+               delay=300.0),
         # slow
         _route("audio.rms", "camera/exposure/compensation", 0.16, 1800, 3500, norm=12.0),
         _route("audio.rms", "post/bloom/intensity", 0.22, 1500, 3000, norm=12.0),
-        _route("audio.spectralFlux", "scene/windSpeed", 0.35, 900, 3000, norm=10.0),
+        # capped: a slow lift of the breeze on busy passages, never enough to set anything rocking
+        dict(_route("audio.spectralFlux", "scene/windSpeed", 0.06, 2500, 5000),
+             chain={"gain": 1.0, "attackMs": 2500, "decayMs": 5000, "delayMs": 0.0, "clampEnabled": True,
+                    "clampMin": 0.0, "clampMax": 1.0}),
     ]
     tracks = [
         _track(P("mac_reliquary", "material/emissive"),

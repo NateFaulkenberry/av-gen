@@ -339,6 +339,7 @@ MACRO_DIAL = {"veilcap": 1.9, "reliquary": 2.1, "lacefan": 0.15, "beadcluster": 
 # the heroes glow, so their reflectance is cut (they read as dark lace against the dark, lit at the rims)
 MACRO_FG_DIAL = 2.2
 MACRO_BG_DIAL = 0.8
+MACRO_ACC_DIAL = 1.6
 MACRO_BASE = {"lacefan": 0.18, "bellspire": 0.45, "bulbstalk": 0.6}
 
 
@@ -347,6 +348,10 @@ def macro_node(name, glb, pts, dial):
         glb = glb.replace("@fg", "")
         name = name.replace("@fg", "_fg")
         dial = MACRO_FG_DIAL
+    if "@acc" in glb:                                  # the colour accents: their own (brighter) glow
+        glb = glb.replace("@acc", "")
+        name = name.replace("@acc", "_acc")
+        dial = MACRO_ACC_DIAL
     if "@bg" in glb:                                   # the background colour pocket: its own glow, past the falloff
         glb = glb.replace("@bg", "")
         name = name.replace("@bg", "_bg")
@@ -368,22 +373,25 @@ def macro_node(name, glb, pts, dial):
 # stalks, bells and filaments sway near their resonance and take the gusts; different stiffness and mass give each
 # species its own rate and phase lag, so a gust travels through them rather than moving them in step
 MACRO_MOTION = {
-    "bulbstalk": {"stiffness": 0.6, "mass": 0.012, "damping": 0.25, "windSensitivity": 1.0, "tipAmplitude": 0.18,
-                  "bendLimit": 0.3, "gustResponse": 1.2, "bendCurve": 2.0, "amplitudeVariance": 0.4},
-    "bellspire": {"stiffness": 0.9, "mass": 0.03, "damping": 0.3, "windSensitivity": 0.9, "tipAmplitude": 0.12,
-                  "bendLimit": 0.25, "gustResponse": 1.0, "bendCurve": 2.4, "amplitudeVariance": 0.35},
-    "filigree": {"stiffness": 0.5, "mass": 0.008, "damping": 0.2, "windSensitivity": 1.0, "tipAmplitude": 0.14,
-                 "bendLimit": 0.3, "gustResponse": 1.3, "bendCurve": 1.6, "amplitudeVariance": 0.45},
-    "veilfern": {"stiffness": 0.7, "mass": 0.02, "damping": 0.3, "windSensitivity": 0.9, "tipAmplitude": 0.12,
-                 "bendLimit": 0.25, "gustResponse": 1.1, "bendCurve": 2.2, "amplitudeVariance": 0.35},
-    "lacefan": {"stiffness": 1.6, "mass": 0.05, "damping": 0.45, "windSensitivity": 0.6, "tipAmplitude": 0.06,
-                "bendLimit": 0.15, "gustResponse": 0.9, "bendCurve": 2.8, "amplitudeVariance": 0.3},
-    "veilcap": {"stiffness": 4.0, "mass": 0.2, "damping": 0.6, "windSensitivity": 0.4, "tipAmplitude": 0.025,
-                "bendLimit": 0.06, "gustResponse": 0.6, "bendCurve": 3.0, "amplitudeVariance": 0.2},
-    "chalice": {"stiffness": 1.2, "mass": 0.03, "damping": 0.35, "windSensitivity": 0.7, "tipAmplitude": 0.08,
-                "bendLimit": 0.2, "gustResponse": 1.0, "bendCurve": 2.4, "amplitudeVariance": 0.35},
-    "lanternberry": {"stiffness": 0.8, "mass": 0.02, "damping": 0.3, "windSensitivity": 0.8, "tipAmplitude": 0.12,
-                     "bendLimit": 0.25, "gustResponse": 1.1, "bendCurve": 2.0, "amplitudeVariance": 0.4},
+    # (P4b, owner: "aggressive rocking, smooth that out") heavily damped (zeta 0.85-0.95, no ringing), low resonance
+    # (heavier tips), small travel, bending concentrated toward the tip (high bendCurve: the base stays put and the tip
+    # trails), and a gentle share of the gusts: the plants lean and settle with the air rather than swing
+    "bulbstalk": {"stiffness": 0.5, "mass": 0.09, "damping": 0.9, "windSensitivity": 0.6, "tipAmplitude": 0.06,
+                  "bendLimit": 0.12, "gustResponse": 0.6, "bendCurve": 2.8, "amplitudeVariance": 0.4},
+    "bellspire": {"stiffness": 0.8, "mass": 0.16, "damping": 0.9, "windSensitivity": 0.5, "tipAmplitude": 0.045,
+                  "bendLimit": 0.1, "gustResponse": 0.55, "bendCurve": 3.0, "amplitudeVariance": 0.35},
+    "filigree": {"stiffness": 0.4, "mass": 0.06, "damping": 0.85, "windSensitivity": 0.6, "tipAmplitude": 0.05,
+                 "bendLimit": 0.12, "gustResponse": 0.65, "bendCurve": 2.6, "amplitudeVariance": 0.45},
+    "veilfern": {"stiffness": 0.6, "mass": 0.12, "damping": 0.9, "windSensitivity": 0.5, "tipAmplitude": 0.045,
+                 "bendLimit": 0.1, "gustResponse": 0.55, "bendCurve": 3.0, "amplitudeVariance": 0.35},
+    "lacefan": {"stiffness": 1.4, "mass": 0.3, "damping": 0.95, "windSensitivity": 0.35, "tipAmplitude": 0.02,
+                "bendLimit": 0.05, "gustResponse": 0.45, "bendCurve": 3.2, "amplitudeVariance": 0.3},
+    "veilcap": {"stiffness": 4.0, "mass": 0.8, "damping": 0.95, "windSensitivity": 0.25, "tipAmplitude": 0.008,
+                "bendLimit": 0.02, "gustResponse": 0.4, "bendCurve": 3.5, "amplitudeVariance": 0.2},
+    "chalice": {"stiffness": 1.0, "mass": 0.18, "damping": 0.9, "windSensitivity": 0.45, "tipAmplitude": 0.03,
+                "bendLimit": 0.08, "gustResponse": 0.55, "bendCurve": 3.0, "amplitudeVariance": 0.35},
+    "lanternberry": {"stiffness": 0.7, "mass": 0.12, "damping": 0.9, "windSensitivity": 0.5, "tipAmplitude": 0.045,
+                     "bendLimit": 0.1, "gustResponse": 0.6, "bendCurve": 2.8, "amplitudeVariance": 0.4},
 }
 
 
@@ -506,17 +514,22 @@ def macro(g, eye, tgt, rng_seed=43):
         put3(sp, r3.uniform(-0.6, 1.3), r3.uniform(3.4, 6.5), r3.uniform(1.4, 2.6) if "glowmound" not in sp
              else r3.uniform(0.6, 1.0), sink=0.05 if "glowmound" in sp else 0.01)
     put3("lacefan_violet@bg", 0.55, 4.6, 2.4)
-    for k in range(6):                                    # warm accents in the mid-ground
-        sp = ["beadcluster_coral", "bellspire_rose", "filigree_ambertip", "lanternberry_amber", "bulbstalk_orange",
-              "veilfern_rose"][k]
-        rr, ff, ss = r3.uniform(-0.9, 1.2), r3.uniform(1.4, 3.0), r3.uniform(0.9, 1.5)
-        if sp == "veilfern_rose":                     # a fern is broad: further back and smaller, an accent
-            ff, ss = ff + 1.2, ss * 0.6
-        put3(sp, rr, ff, ss)
-    # a magenta thread through the violet pocket, and an amber glint low at the far right
+    # (P4b colour pass) the warm families as deliberate drifts where the eye lands, balanced against the cool heroes
+    # and the violet pocket: an amber/orange/coral drift low-left in front of the veilcap, rose and red-coral at the
+    # right edge, a small yellow-gold drift at the reliquary's foot, magenta threaded into the violet pocket.
+    def drift(species, centre, spread, n, scale, sink=0.01):
+        for k in range(n):
+            put3(species[k % len(species)] + "@acc", centre[0] + r3.normal(0, spread[0]),
+                 centre[1] + abs(r3.normal(0, spread[1])), scale * r3.uniform(0.75, 1.25), sink=sink)
+    drift(["lanternberry_amber", "bulbstalk_orange", "beadcluster_coral", "bulbstalk_amber"], (-0.78, 0.85),
+          (0.14, 0.18), 9, 1.15)
+    drift(["bellspire_rose", "beadcluster_coral", "chalice_rose", "lanternberry_rose", "bulbstalk_coral"],
+          (1.15, 1.7), (0.16, 0.3), 8, 1.0)
+    drift(["lanternberry_gold", "beadcluster_gold", "filigree_ambertip"], (0.55, 1.45), (0.1, 0.12), 5, 0.95)
+    drift(["veilfern_rose"], (1.45, 2.6), (0.2, 0.2), 2, 1.0)
     put3("beadcluster_magenta@bg", 0.9, 3.8, 1.6)
     put3("lanternberry_magenta@bg", -0.4, 4.2, 2.2)
-    put3("glowmound_amber", 1.6, 2.6, 0.5, sink=0.1)
+    put3("chalice_magenta@bg", 0.2, 3.6, 1.8)
     # the forest behind: dark trunks and crowns 12-30 m back close the top of frame (panel 3 has no sky)
     for k in range(9):
         put("canopy", r.uniform(-14, 14), r.uniform(12, 30), r.uniform(0.8, 1.3), sink=0.02)
