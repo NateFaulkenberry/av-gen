@@ -1433,6 +1433,9 @@ public:
     // Replaces any previous block; its parameters (`astral/...`) are registered when attached.
     void setAstral(AstralForge astral);
     [[nodiscard]] const AstralForge& astral() const { return astral_; }
+    // ADR-1289: the authored cloud block (static: copied to the scene as is).
+    void setClouds(Clouds clouds) { clouds_ = std::move(clouds); }
+    [[nodiscard]] const Clouds& clouds() const { return clouds_; }
     // The song the conductor is reading (null in live mode or before the first frame with a track).
     [[nodiscard]] std::shared_ptr<const AstralSong> astralSong() const { return astralSong_; }
     [[nodiscard]] std::vector<spatial::GridField>& grids() { return grids_; }
@@ -1655,6 +1658,7 @@ private:
     float cameraOrbitSpeedSetting_ = 0.12f;
     float cameraFovSetting_ = 50.0f;
     float cameraNearSetting_ = 0.0f; // ADR-1058: the near plane (m); 0 = automatic
+    float cameraFarSetting_ = 0.0f;  // ADR-1280: the far plane (m); 0 = automatic (50 x the world's radius)
     float envIntensitySetting_ = 1.0f;
     // HDRI sky (ADR-049): the scene-file values behind env/rotation and the background controls.
     // `envRotationSetting_` in particular used to have nowhere to come from -- the parameter
@@ -2326,6 +2330,7 @@ private:
     Ecosystem ecosystem_;                     // ADR-1200: the authored block (rest values)
     EcosystemParameters ecosystemParams_;     // its live knobs, while attached
     AstralForge astral_;                      // ADR-1221: the authored block (rest values)
+    Clouds clouds_;                          // ADR-1289
     std::optional<AstralParameters> astralParams_; // its live knobs, while attached
     AstralLiveConductor astralLive_;          // live mode: the song as heard so far
     std::shared_ptr<const AstralSong> astralSong_; // song mode: built once per track
@@ -2459,6 +2464,7 @@ private:
     float cameraOrbitPivotWeightSetting_ = 0.0f;
     params::Parameter<float>* cameraFov_ = nullptr;
     params::Parameter<float>* cameraNear_ = nullptr; // ADR-1058
+    params::Parameter<float>* cameraFar_ = nullptr;  // ADR-1280
     params::Parameter<float>* cameraRoll_ = nullptr; // ADR-1075
     params::Parameter<float>* envIntensity_ = nullptr;
     params::Parameter<float>* envRotation_ = nullptr;

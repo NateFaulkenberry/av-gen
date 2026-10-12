@@ -1,0 +1,934 @@
+"""THE BIOLUMINESCENT VALLEY: the scene generator.
+
+    python3 examples/biovalley/valley.py            -> meshes/, sky/, valley.scene.json, shots/<shot>.{scene,}.json
+
+One world, four shot types matching the reference's four panels (docs/prototypes/bioluminescent-valley/
+01-analysis-and-plan.md): VISTA (panel 2), RIVERBANK (panel 1), MACRO (panel 3), MEADOW (panel 4).
+
+Built large-to-small, in the spec's order (§35). Phase 1 (this file's first version): terrain, river, karst
+towers, far ranges, sky, moon, cameras. Later phases add to `scene()`.
+
+Everything generated (meshes, the sky map, scenes) is gitignored and reproducible from these scripts.
+"""
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+import numpy as np
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import land  # noqa: E402
+import sky  # noqa: E402
+import riverset  # noqa: E402
+import vistaset  # noqa: E402
+import towers  # noqa: E402
+import massifs  # noqa: E402
+import populate  # noqa: E402
+import falls  # noqa: E402
+import ecosys  # noqa: E402
+import life  # noqa: E402
+import glowmap  # noqa: E402
+import library  # noqa: E402
+from geom import Mesh, quat_y  # noqa: E402
+
+MESHES = HERE / "meshes"
+SHOTS = HERE / "shots"
+SKY = HERE / "sky"
+AUDIO = "../../../assets/audio/trench.wav"   # relative to shots/
+
+# ---- palette (linear) -----------------------------------------------------------------------------------------------
+ROCK = [0.075, 0.08, 0.10]
+ROCK_FAR = [0.07, 0.075, 0.10]
+GROUND = [0.045, 0.05, 0.06]
+MOON = [0.80, 0.86, 1.0]
+
+
+
+def rng(seed):
+    return np.random.default_rng(seed)
+
+
+# ---- the shots -----------------------------------------------------------------------------------------------------
+
+def _dir(yaw_deg, pitch_deg):
+    y, p = math.radians(yaw_deg), math.radians(pitch_deg)
+    return np.array([math.sin(y) * math.cos(p), math.sin(p), math.cos(y) * math.cos(p)])
+
+
+VISTA_YAW = 4.0         # degrees from +z toward +x: looking across the valley, not straight down it
+MOON_DIR = _dir(VISTA_YAW - 16.0, 9.5)   # +yaw is screen-left (RH, +z ahead)
+GLOW_DIR = _dir(VISTA_YAW - 10.0, 0.0)
+VISTA_EYE_XZ = (land.VISTA_X - 40, land.VISTA_Z + 60)
+
+
+def shots(gc, gfine):
+    """name -> (eye, target, fov, near). Eyes stand on the engine's ground."""
+    def at(g, x, z, h):
+        y = float(g.height(np.array([x]), np.array([z]))[0])
+        wl = float(g.water_level(np.array([x]), np.array([z]))[0])
+        return [round(x, 2), round(max(y, wl) + h, 2), round(z, 2)]
+
+    S = {}
+    # VISTA: on the lookout, over the tree line, across the valley toward the moon
+    e = at(gc, *VISTA_EYE_XZ, 14.0)
+    d = _dir(VISTA_YAW, -8.5)
+    S["vista"] = (e, [round(e[0] + d[0] * 1000, 2), round(e[1] + d[1] * 1000, 2), round(e[2] + d[2] * 1000, 2)],
+                  44.0, 1.0, 26000.0)
+    # MEADOW: knee height on the terrace, looking north up the valley at the far towers
+    mx, mz = land.MEADOW_X + 4, land.MEADOW_Z - 30
+    e = at(gfine["meadow"], mx, mz, 1.15)
+    d = _dir(12.0, -4.0)
+    S["meadow"] = (e, [round(e[0] + d[0] * 500, 2), round(e[1] + d[1] * 500, 2), round(e[2] + d[2] * 500, 2)],
+                   46.0, 0.3, 26000.0)
+    # RIVERBANK: just above the tributary's water, looking upstream (west) toward the cliff and its falls
+    bx = land.BANK_X0 + 185
+    g = gfine["bank"]
+    zs = np.arange(land.BANK_Z - 40, land.BANK_Z + 40, 0.25)
+    wet = g.wet(np.full(len(zs), bx), zs)
+    # over the water, a little right of the stream's centre, so the near (north) bank fills only the left third and
+    # the stream runs from the bottom of the frame up to the falls (panel 1)
+    wz = zs[np.where(wet)[0]]
+    # finishing pass (owner note): hug the LEFT bank, low, so the bank's rocks and plants fill the left third from the
+    # lens outward and the stream runs from bottom centre to the falls at upper right
+    bz = float(wz.max() + 0.6) if wet.any() else land.BANK_Z - 14
+    e = at(g, bx, bz, 0.95)
+    yaw = math.degrees(math.atan2(land.BANK_X0 + 45 - bx, (land.BANK_Z + 8) - bz)) + 13.0
+    d = _dir(yaw, 2.5)
+    tgt = [round(e[0] + d[0] * 100, 2), round(e[1] + d[1] * 100, 2), round(e[2] + d[2] * 100, 2)]
+    S["riverbank"] = (e, tgt, 48.0, 0.2, 26000.0)
+    # MACRO: on the mossy bank of the tributary, 30 cm up, looking along it
+    # a flat stretch of the near bank (searched: ground within 2 mm of a gentle rise over 4 m ahead), looking
+    # upstream along it, the lens 22 cm up and tipped slightly down onto the bank (panel 3)
+    bx, bz = land.BANK_X0 + 171.7, land.BANK_Z + 25.0
+    e = at(gfine["bank"], bx, bz, 0.22)
+    d = _dir(255.0, 0.0)
+    tgt = at(gfine["bank"], bx + d[0] * 5.0, bz + d[2] * 5.0, 0.12)
+    S["macro"] = (e, tgt, 42.0, 0.03, 26000.0)
+    return S
+
+
+# ---- towers ---------------------------------------------------------------------------------------------------------
+
+def build_meshes():
+    MESHES.mkdir(parents=True, exist_ok=True)
+    tris = massifs.build(MESHES)
+    r = towers.ranges()
+    tris_r = r.write(MESHES / "ranges.glb", "ranges", outward_from=lambda P: np.tile([0, 1.0, 0], (len(P), 1)))
+    crescent_mesh(MESHES / "moon.glb")
+    print(f"massifs: {len(massifs.CATALOGUE)} variants, {tris} tris; ranges {tris_r} tris")
+    print(f"flora: {populate.build(MESHES)} tris; fungi {populate.build_fungi(MESHES)} tris")
+    print(f"life: {ecosys.build(MESHES)} tris")
+
+
+def local_to_world(rec, P):
+    """Catalogue-local points (n, 3) of an instance record [x, y, z, qx, qy, qz, qw, s, s, s] (a turn about y)."""
+    x, y, z, qx, qy, qz, qw, s = rec[:8]
+    yaw = 2.0 * math.atan2(qy, qw)
+    c, sn = math.cos(yaw), math.sin(yaw)
+    P = np.asarray(P, float) * s
+    return np.stack([x + c * P[:, 0] + sn * P[:, 2], y + P[:, 1], z - sn * P[:, 0] + c * P[:, 2]], -1)
+
+
+def place_massifs(gc):
+    """Mountain masses in depth layers along both walls, a far end of ranges, and authored hero masses that frame
+    the vista. Scale varies a lot (heavy-tailed); each mass is oriented roughly along the valley."""
+    r = rng(77)
+    cand = []                      # (name, x, z, scale, yaw, forced)
+    names = {k: [n for n, c in massifs.CATALOGUE.items() if c[0] == k] for k in massifs.KINDS}
+
+    def add(kind, x, z, scale, yaw=None, forced=False, name=None):
+        nm = name or str(r.choice(names[kind]))
+        if yaw is None:
+            yaw = math.radians(-90.0 + r.normal(0, 22.0))
+        cand.append((nm, x, z, scale, yaw, forced))
+
+    # layers: (offset range from the centre line, mean spacing along z, kinds, scale range)
+    layers = (((420, 760), 330.0, ("range", "cliff", "range", "peak"), (0.45, 1.0)),
+              ((780, 1400), 420.0, ("range", "peak", "range", "cliff"), (0.7, 1.35)),
+              ((1500, 2600), 560.0, ("range", "range", "peak"), (1.0, 1.75)))
+    for side in (-1, 1):
+        for (o0, o1), gap, kinds, (s0, s1) in layers:
+            z = -1700.0 + r.uniform(0, gap)
+            while z < 4600:
+                off = r.uniform(o0, o1)
+                sc = s0 + (s1 - s0) * min(r.pareto(3.0), 1.0)
+                add(str(r.choice(kinds)), land.cx(z) + side * off, z, sc)
+                z += gap * r.uniform(0.6, 1.4)
+    # the far end, across the valley, receding
+    for z in np.arange(2900, 6200, 380.0):
+        for _ in range(2):
+            add(str(r.choice(("range", "peak", "range", "spire"))), land.cx(z) + r.uniform(-1700, 1700),
+                z + r.uniform(-120, 120), r.uniform(0.9, 1.8))
+    # a few masses standing on the floor (the reference's isolated towers in the valley)
+    for z, off, kind, sc in ((1650, 230, "spire", 0.55), (2150, -200, "peak", 0.5), (2550, 120, "spire", 0.7)):
+        add(kind, land.cx(z) + off, z, sc)
+    # the vista's framing masses. Bearings from the vista eye, degrees, + = screen left.
+    ex, ez = VISTA_EYE_XZ
+    for bearing, dist, name, sc, yaw in ((24.0, 1900.0, "peak2", 1.25, -60.0), (33.0, 1500.0, "peak0", 0.95, -100.0),
+                                         (17.0, 2600.0, "range1", 1.2, -80.0), (-26.0, 1500.0, "cliff0", 1.0, -90.0),
+                                         (-36.0, 2000.0, "cliff1", 1.5, -70.0), (-20.0, 2900.0, "range3", 1.3, -95.0)):
+        b = math.radians(VISTA_YAW + bearing)
+        add(None, ex + dist * math.sin(b), ez + dist * math.cos(b), sc, math.radians(yaw), True, name)
+    # the riverbank's cliff: its long axis runs north-south, its face east toward the camera
+    add(None, land.BANK_X0 - 25, land.BANK_Z + 10, 1.0, math.radians(-90.0), True, "bankcliff")
+
+    eyes = [(ex, ez), (land.MEADOW_X, land.MEADOW_Z), (land.BANK_X0 + 150, land.BANK_Z)]
+    keep = []
+    for (nm, x, z, sc, yaw, forced) in cand:
+        _, L_, W_, _, _ = massifs.CATALOGUE[nm]
+        c_, s_ = math.cos(yaw), math.sin(yaw)
+
+        def covers(a, b):
+            dx, dz = a - x, b - z
+            lx, lz = c_ * dx - s_ * dz, s_ * dx + c_ * dz
+            return abs(lx) < 0.62 * L_ * sc + 80 and abs(lz) < 0.62 * W_ * sc + 80
+        if nm != "bankcliff" and any(covers(a, b) for a, b in eyes):
+            continue
+        if not forced:
+            dv = math.hypot(x - ex, z - ez)
+            bearing = math.degrees(math.atan2(x - ex, z - ez)) - VISTA_YAW
+            if dv < 900 or (abs(bearing) < 14.0 and dv < 3600):
+                continue
+            if math.hypot(x - land.MEADOW_X, z - land.MEADOW_Z) < 420:
+                continue
+            if math.hypot(x - (land.BANK_X0 + 100), z - land.BANK_Z) < 330:
+                continue
+        keep.append((nm, x, z, sc, yaw, forced))
+    keep.sort(key=lambda c: (not c[5], -c[3] * massifs.CATALOGUE[c[0]][1]))
+    placed = []
+    for c in keep:
+        nm, x, z, sc = c[:4]
+        rad = 0.32 * sc * massifs.CATALOGUE[nm][1]
+        if c[5] or all(math.hypot(x - p[1], z - p[2]) > 0.8 * (rad + 0.32 * p[3] * massifs.CATALOGUE[p[0]][1])
+                       for p in placed):
+            placed.append(c)
+    # each mass stands on the lowest ground under its footprint, so none hangs over a slope
+    out = {n: [] for n in massifs.CATALOGUE}
+    ang = np.linspace(0, 2 * math.pi, 24, endpoint=False)
+    for k, (nm, x, z, sc, yaw, forced) in enumerate(placed):
+        _, L, W, _, _ = massifs.CATALOGUE[nm]
+        ring = []
+        for f in (0.0, 0.25, 0.5):
+            ring += [(x + f * L * sc * math.cos(a), z + f * L * sc * math.sin(a)) for a in ang]
+        R = np.array(ring)
+        y0 = float(gc.height(R[:, 0], R[:, 1]).min())
+        out[nm].append([round(x, 2), round(y0 - 6.0, 2), round(z, 2), *quat_y(yaw),
+                        round(sc, 4), round(sc, 4), round(sc, 4)])
+    print(f"massifs placed: {len(placed)}")
+    return out
+
+
+def find_instance(tw, name, x, z):
+    """The placed record of catalogue `name` nearest (x, z)."""
+    best = min(tw[name], key=lambda rc: math.hypot(rc[0] - x, rc[2] - z))
+    return best
+
+
+FALL_FEET = {}
+
+
+def waterfalls(tw, eyes):
+    """The falls (one mesh per fall, in world space) and their mist: three off the vista's framing masses, one at
+    the riverbank's stream head."""
+    nodes = []
+    ex, ez = VISTA_EYE_XZ
+    specs = []
+    for bearing, dist, name, width, lipfrac in ((-26.0, 1500.0, "cliff0", 34.0, 0.5), (33.0, 1500.0, "peak0", 26.0, 0.45),
+                                               (24.0, 1900.0, "peak2", 30.0, 0.4)):
+        b = math.radians(VISTA_YAW + bearing)
+        rc = find_instance(tw, name, ex + dist * math.sin(b), ez + dist * math.cos(b))
+        specs.append((name, rc, (ex, ez), width, lipfrac, 16, 2.5))   # few broad ribbons: wire at 1.5 km otherwise
+    bx, bz = eyes["riverbank"]
+    rc = find_instance(tw, "bankcliff", land.BANK_X0 - 25, land.BANK_Z + 10)
+    specs.append(("bankcliff", rc, (bx, bz), 6.0, 0.22, 50, 1.2))
+    for k, (name, rc, toward, width, frac, strands, speed) in enumerate(specs):
+        F = massifs.Field(MESHES, name)
+        lip, foot = falls.find_lip(F, rc, toward, frac)
+        facing = (toward[0] - lip[0], toward[1] - lip[2])
+        m = falls.fall(lip, foot[1], facing, width, 600 + k, strands=strands, speed=speed)
+        m.write(MESHES / f"fall{k}.glb", f"fall{k}")
+        nodes.append({"name": f"fall{k}", "kind": "procedural", "procedural": {
+            "source": {"kind": "mesh", "asset": f"../meshes/fall{k}.glb"},
+            "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]}, "castsShadow": False,
+            "material": mat([0.1, 0.14, 0.2], 0.3, [0.62, 0.6, 1.0], 0.7, doubleSided=True, program="falls")}})
+        big = width > 10
+        if not big:
+            # the riverbank's falls: violet-white, catching light (panel 1)
+            nodes[-1]["procedural"]["material"] = mat([0.12, 0.14, 0.25], 0.3, [0.45, 0.55, 1.0], 0.45,
+                                                      doubleSided=True, program="falls")
+            FALL_FEET["riverbank"] = foot
+        # the riverbank's spray is a wide, faint veil of violet-blue (panel 1), not a lit block at the foot
+        nodes.append(falls.mist(f"fallMist{k}", foot + np.array([0, 1.0 if big else 3.0, 0]),
+                                width * (1.2 if big else 3.0), 60.0 if big else 90.0, 610 + k,
+                                size=(6.0, 22.0) if big else (6.0, 24.0),
+                                emissive=1.2 if big else 0.45,
+                                color=(0.55, 0.68, 1.0) if big else (0.72, 0.62, 1.0)))
+        print(f"  fall{k} ({name}): lip {np.round(lip, 1).tolist()} drop {lip[1] - foot[1]:.0f} m")
+    return nodes
+
+
+# ---- scene ----------------------------------------------------------------------------------------------------------
+
+def mat(base, rough=0.85, emit=None, intensity=0.0, **kw):
+    d = {"baseColor": base, "roughness": rough, "metallic": 0.0}
+    if emit is not None:
+        d.update({"emissiveColor": emit, "emissiveIntensity": intensity})
+    d.update(kw)
+    return d
+
+
+def mesh_node(name, glb, pts, material, max_distance=0.0, shadow=False):
+    return {"name": name, "kind": "procedural", "procedural": {
+        "source": {"kind": "mesh", "asset": f"../meshes/{glb}.glb"},
+        "distribution": {"kind": "points", "points": pts},
+        "castsShadow": shadow,
+        "lod": {"cull": True, "count": 1, "byScreenSize": False, "maxDistance": max_distance},
+        "material": material}}
+
+
+def crescent_mesh(path, phase=0.24, tilt=0.75, n=256):
+    """A crescent as a flat lens in its own xy plane, unit radius, facing +z: the points of the unit disc outside a
+    second disc of the same radius offset by `2 * phase` along a direction tilted by `tilt` radians. A mesh rather
+    than an occluding sphere, because an occluder at 9 km is fogged to the sky's colour beside a bright halo and reads
+    as a pale disc."""
+    off = 2.0 * phase * np.array([math.cos(tilt), math.sin(tilt)])
+    # outer arc: the lit limb, the half of the unit circle away from the offset; inner arc: the terminator, the
+    # part of the offset circle inside the unit disc
+    a0 = math.atan2(-off[1], -off[0])
+    # where the two circles meet
+    d = np.linalg.norm(off)
+    h = math.acos(d / 2.0)
+    base = math.atan2(off[1], off[0])
+    outer = np.linspace(base + h, base + 2 * math.pi - h, n)
+    P_out = np.stack([np.cos(outer), np.sin(outer)], -1)
+    # the terminator: the offset circle's arc between the same two meeting points, through the disc's inside
+    c_ang0 = math.atan2(math.sin(base + h) - off[1], math.cos(base + h) - off[0])
+    c_ang1 = math.atan2(math.sin(base - h) - off[1], math.cos(base - h) - off[0])
+    if c_ang1 < c_ang0:
+        c_ang1 += 2 * math.pi
+    inner = np.linspace(c_ang0, c_ang1, n)
+    P_in = off + np.stack([np.cos(inner), np.sin(inner)], -1)
+    # the terminator walks the same way round as the limb; pair them from the matching ends
+    P_in = P_in[::-1] if np.linalg.norm(P_in[0] - P_out[0]) > np.linalg.norm(P_in[-1] - P_out[0]) else P_in
+    P = np.concatenate([np.c_[P_out, np.zeros(n)], np.c_[P_in, np.zeros(n)]])
+    F = []
+    for k in range(n - 1):
+        F += [[k, k + 1, n + k], [k + 1, n + k + 1, n + k]]
+    m = Mesh()
+    m.add(P, np.array(F), np.c_[P[:, 0] * 0.5 + 0.5, P[:, 1] * 0.5 + 0.5])
+    return m.write(path, "moon", outward_from=lambda Q: np.tile([0, 0, 1.0], (len(Q), 1)))
+
+
+def moon_nodes(eye):
+    """The crescent, 20 km out, turned to face the vista camera (it is far enough not to parallax between shots)."""
+    D, ang = 20000.0, math.radians(2.8)
+    rad = D * math.tan(ang)
+    c = np.asarray(eye) + MOON_DIR * D
+    z = -MOON_DIR                                   # the mesh's +z faces the camera
+    x = np.cross([0, 1.0, 0], z)
+    x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+    q = _quat(np.stack([x, y, z], 1))
+    return [mesh_node("moon", "moon", [[*np.round(c, 1).tolist(), *q, rad, rad, rad]],
+                      mat([0.0, 0.0, 0.0], 1.0, MOON, 40.0, unlit=True, doubleSided=True))]
+
+
+def _quat(m):
+    tr = m[0, 0] + m[1, 1] + m[2, 2]
+    if tr > 0:
+        s = math.sqrt(tr + 1.0) * 2
+        return [round(v, 6) for v in ((m[2, 1] - m[1, 2]) / s, (m[0, 2] - m[2, 0]) / s, (m[1, 0] - m[0, 1]) / s, 0.25 * s)]
+    i = int(np.argmax([m[0, 0], m[1, 1], m[2, 2]]))
+    if i == 0:
+        s = math.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2]) * 2
+        q = (0.25 * s, (m[0, 1] + m[1, 0]) / s, (m[0, 2] + m[2, 0]) / s, (m[2, 1] - m[1, 2]) / s)
+    elif i == 1:
+        s = math.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2]) * 2
+        q = ((m[0, 1] + m[1, 0]) / s, 0.25 * s, (m[1, 2] + m[2, 1]) / s, (m[0, 2] - m[2, 0]) / s)
+    else:
+        s = math.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1]) * 2
+        q = ((m[0, 2] + m[2, 0]) / s, (m[1, 2] + m[2, 1]) / s, 0.25 * s, (m[1, 0] - m[0, 1]) / s)
+    return [round(v, 6) for v in q]
+
+
+def scene(tw, eye, target, fov, near, far, extra=(), eco=None, grids=(), air=None, lit=1.0, lights=(),
+          clouds=None, fill=1.0, sky_map="night.hdr"):
+    water = {"shallowColor": [0.004, 0.008, 0.016], "deepColor": [0.001, 0.003, 0.010], "clarity": 0.8,
+             "reflection": 1.3, "reflectionTint": [0.5, 0.5, 1.0], "specular": 1.2, "fresnel": 0.3, "foam": 0.0,
+             "ripple": 0.35, "rippleScale": 0.5, "edgeFade": 0.5}
+    nodes = [
+        {"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
+         "terrain": {"chunkSize": 200.0, "resolution": 80, "lodLevels": 4, "lodDistance": 300.0,
+                     "viewDistance": 4500.0, "shadowDistance": 60.0, "skirtDepth": 30.0, "groundMottle": True,
+                     "water": water},
+         "material": mat(GROUND, 0.92, program="ground")},
+        {"name": "ranges", "kind": "procedural", "procedural": {
+            "source": {"kind": "mesh", "asset": "../meshes/ranges.glb"},
+            "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]},
+            "castsShadow": False, "material": mat(ROCK_FAR, 0.9)}},
+    ]
+    for k, pts in tw.items():
+        if pts:
+            nodes.append(mesh_node(f"massif_{k}", f"massif_{k}", pts, mat(ROCK, 0.85, program="rock"), shadow=False))
+    nodes += list(extra)
+    # Deliverable C: the dimensional moon (the artist's sphere), lit on its sun side by its own short-range light
+    moon_node, moon_prog = vistaset.moon(eye, MOON_DIR, _quat)
+    nodes.append(moon_node)
+
+    moon_light = -MOON_DIR
+    return {
+        "format": "avgen-scene", "version": 1, "name": "Bioluminescent Valley",
+        "_note": "Generated by examples/biovalley/valley.py. Do not edit.",
+        "camera": {"mode": 1, "position": eye, "target": target, "fov": fov, "orbitSpeed": 0, "near": near, "far": far},
+        "environment": {
+            "map": f"../sky/{sky_map}", "intensity": round(0.9 * lit, 3), "skyIntensity": round(lit, 3), "rotation": 0.0,
+            "lightFromEnvironment": False,
+            "background": [0.004, 0.006, 0.02],
+            "fogColor": [0.02, 0.032, 0.16],
+            "volumeDensity": (air or {}).get("density", 0.0014), "volumeAbsorption": 1.0, "volumeScattering": 0.0,
+            "volumeSteps": (air or {}).get("steps", 16), "volumeMaxDistance": (air or {}).get("reach", 200.0),
+            "volumeEmission": (air or {}).get("emission", 0.0), "volumeColorField": (air or {}).get("mist", ""),
+            "volumeNoise": 0.35, "volumeNoiseScale": 0.02,
+            "fogHeight": 18.0, "fogHeightFalloff": 0.012, "fogUpperDensity": (air or {}).get("upper", 0.1), "fogHeightAmount": 1.0,
+            "fogSky": 0.6, "fogSkyDistance": 5500.0,
+        },
+        "lights": [{"name": "moon", "id": "moon", "type": "directional", "role": "key",
+                    "direction": [round(float(v), 4) for v in moon_light], "color": [0.55, 0.65, 1.0],
+                    "intensity": round(1.4 * lit, 3), "castsShadow": True},
+                   # the sky's own light from behind the camera: moonlit faces stay readable when the shot looks
+                   # toward the moon (the vista), never a second shadow
+                   {"name": "skyfill", "type": "directional", "direction": [round(float(v), 4) for v in
+                                                                          (MOON_DIR[0], -0.35, MOON_DIR[2])],
+                    "color": [0.35, 0.45, 1.0], "intensity": round(0.7 * lit * fill, 3), "castsShadow": False}] + list(lights),
+        "effects": [{"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True,
+                     "order": 0, "activation": "always",
+                     "parameters": {"brightness": 2.2, "density": 0.7, "magnitudeSlope": 6.5, "colorSpread": 0.35,
+                                    "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.7, "band": 0.3,
+                                    "bandTilt": 32.0, "daylight": 0.0}}],
+        "nodes": nodes,
+        "materialPrograms": life.programs() + [moon_prog],
+        **({"grids": list(grids)} if grids else {}),
+        **({"ecosystem": eco} if eco else {}),
+        **({"clouds": clouds} if clouds else {}),
+    }
+
+
+# The library's glint colours and gains (its own textures carry the bodies' light; the glints are accents)
+LIB_COLORS = {"veilcap": [0.55, 0.95, 1.0], "glowmound": [0.2, 1.0, 0.6], "glowmat": [0.3, 0.8, 1.0],
+              "lanternberry": [0.6, 1.0, 0.4], "filigree": [0.5, 0.9, 1.0], "veilfern": [0.3, 0.9, 1.0],
+              "bellspire": [0.5, 0.6, 1.0], "lattice": [0.45, 0.4, 1.0], "reliquary": [0.7, 0.9, 1.0]}
+LIB_COLORS.update({"glowsedge": [0.05, 0.75, 1.0], "lanternberry": [0.65, 0.2, 1.0], "bellspire": [0.5, 0.3, 1.0],
+                   "veilfern": [0.2, 1.0, 0.55], "riverrock_a": [0.2, 0.9, 0.6], "riverrock_b": [0.2, 0.9, 0.6],
+                   "riverrock_c": [0.2, 0.9, 0.6], "riverrock_d": [0.2, 0.9, 0.6], "shadowbough": [0.4, 0.8, 1.0],
+                   "darkfern": [0.3, 0.6, 1.0], "canopy": [0.3, 0.9, 0.9], "canopygrove": [0.3, 0.9, 0.9],
+                   "bulbstalk": [0.5, 1.0, 0.6]})
+# glint gains: the bodies carry their light in their own textures; the glints are sparse accents (the splat's
+# sub-pixel floor makes a few hundred points per instance x thousands of instances read as a white field)
+LIB_GAIN = {"glowmound": 0.5, "glowmat": 0.1, "veilcap": 2.5, "filigree": 0.04, "lanternberry": 0.5,
+            "veilfern": 1.2, "glowsedge": 6.0, "riverrock_a": 1.0, "riverrock_b": 1.0, "riverrock_c": 0.1,
+            "riverrock_d": 0.1, "darkfern": 0.1, "bellspire": 1.5, "lattice": 0.3, "reliquary": 0.8,
+            "shadowbough": 0.4}
+# Per-shot water: the riverbank's stream is dark (it carries reflections, not the sky's colour)
+WATER = {"riverbank": {
+    # ADR-1286, the cinematic path (Deliverable A's W3): a dark absorbing body, swell, calm and ruffled reaches,
+    # the lit frame reflected in view-streaked rays, violet tint patches, sparse violet glow beneath
+    "shallowColor": [0.003, 0.01, 0.03], "deepColor": [0.002, 0.006, 0.03], "roughness": 0.04,
+    "ripple": 0.25, "rippleScale": 0.9, "chop": 0.6, "undulation": 0.5, "undulationScale": 0.06,
+    "roughnessVariation": 0.7, "transmission": 1.0, "absorption": [3.0, 2.0, 1.1], "clarity": 2.0,
+    "reflectionTint": [0.04, 0.05, 0.2], "reflection": 1.0, "fresnel": 0.1, "specular": 1.5,
+    "ssr": 1.0, "ssrDistance": 120.0, "ssrSteps": 160.0, "ssrGain": 2.0, "streak": 0.14, "reflectionRays": 8.0,
+    "glints": 0.0, "tintPatches": 0.7, "reflectionTint2": [0.22, 0.1, 0.5], "tintPatchScale": 0.05,
+    "glow": 0.06, "glowColor": [0.35, 0.15, 1.0], "glowScale": 0.06, "glowCoverage": 0.16, "glowDepth": 0.3,
+    "refraction": 0.4, "sparkle": 0.0}}
+
+# Macro showcase (spec 09): the near zone keeps full glow; beyond it the far bank glows at MACRO_FAR
+MACRO_NEAR = 3.0
+MACRO_FAR = 0.18
+MACRO_NO_BANK = True
+MACRO_LENS = 1.5
+MACRO_LENS_GAIN = 0.2
+PUDDLE_LIFT = 0.02
+PUDDLE_LEVEL = 4.668   # metres: just over the band's hollow on the engine's ground (swept 4.62/4.68/4.74)
+
+# Deliverable C: the shots that draw the lobe clouds (ADR-1289), and the vista's karst landmarks
+# (asset, bearing deg + = screen left, distance m, scale, yaw deg)
+CLOUDED = ("vista", "meadow")
+KARST = (("env_karst_tower", -22.0, 1750.0, 1.0, 20.0),
+         ("env_karst_fin", -38.0, 2600.0, 0.9, 70.0),
+         ("env_karst_stack", 20.0, 2300.0, 1.0, 0.0))
+
+# The moon, its fill and the sky per shot: the riverbank is under the canopy, near-black but for the life
+LIT = {"riverbank": 0.55, "vista": 0.6}
+# The sky fill from behind the camera, per shot: the vista's landmarks are seen against the moon, so their faces
+# toward us stay in shadow (dark geology, lit rims), not flat-lit pale blue
+FILL = {"vista": 0.5}
+
+# The air per shot: how far the lit march reaches, its steps, and how strongly the mist glows where the light pools
+AIR = {"vista": {"reach": 4000.0, "steps": 24, "emission": 2.4, "mist": "mistFloor", "upper": 0.2, "density": 0.0007},
+       "meadow": {"reach": 1500.0, "steps": 24, "emission": 0.06, "mist": "mistMeadow"},
+       "riverbank": {"reach": 300.0, "steps": 24, "emission": 0.35, "mist": "mistBank"},
+       "macro": {"reach": 40.0, "steps": 12, "emission": 0.02, "mist": "mistBank"}}
+
+# Bloom as the Rootworks tuned it (restrained: it carries the cores, not the look)
+POST = {"post/bloom/enabled": True, "post/bloom/threshold": 0.6, "post/bloom/intensity": 0.45,
+        "post/bloom/knee": 0.7, "post/bloom/radius": 1.25, "post/bloom/emissionWeight": 0.9,
+        "post/tonemap/chroma-retention": 0.85, "post/output/vignette": 0.25}
+
+# Depth of field per shot: the macro's foreground goes soft into bokeh, the riverbank's near bank slightly
+SHOT_POST = {
+    "vista": {"camera/exposure/compensation": 0.5, "post/grade/saturation": 1.2},
+    "meadow": {"camera/exposure/compensation": 0.0, "post/grade/saturation": 1.2},
+    # (showcase P3, variant C) tighter focus on the two subjects, a deeper defocus, bloom only on what truly glows,
+    # a stronger vignette to hold the eye in the middle
+    "macro": {"post/dof/enabled": True, "post/dof/focusDistance": 1.25, "post/dof/focusRange": 0.3,
+              "post/bloom/threshold": 0.9, "post/bloom/intensity": 0.6, "post/bloom/radius": 0.9,
+              "post/output/vignette": 0.45,
+              "camera/exposure/compensation": -0.45, "post/grade/saturation": 1.25,
+              "post/dof/maxRadius": 30.0},
+    "riverbank": {"post/dof/enabled": True, "post/dof/focusDistance": 12.0, "post/dof/focusRange": 45.0,
+                  "post/dof/maxRadius": 4.0, "camera/exposure/compensation": 0.6,
+                  "post/grade/saturation": 1.25},
+}
+
+
+def project(name, scene_path):
+    params = dict(POST)
+    params.update(SHOT_POST.get(name, {}))
+    return {"format": "avgen-project", "version": 4, "app": {"name": f"Bioluminescent Valley ({name})"},
+            "assets": {"scene": {"kind": "composition", "path": scene_path}, "audio": {"path": AUDIO}},
+            "parameters": params}
+
+
+def macro_finish(sc, g, eye, tgt):
+    """(showcase P4) the macro's own world:
+      - a puddle in the dark band of ground at the lower right, drawn with the riverbank's cinematic water
+        (ADR-1286) so it mirrors the organisms above it. The valley's terrain is far too coarse near the lens to carve
+        one (its LOD 0 is 2.5 m cells), so the puddle is its own small terrain node: a 3 m sheet of water whose own
+        ground lies 5 m down, at a level just above the valley ground's local hollow -- the water shows only where the
+        real ground dips below it, so the shoreline is the ground's own and not a drawn shape
+      - the scene wind (gentle, with gusts) that the organisms' motion answers (ADR-1292)
+      - a soft violet light pocket in the background depth"""
+    to_world = library.macro_frame(eye, tgt)
+    cx, cz = to_world(0.35, 1.18)
+    xs = np.linspace(cx - 0.5, cx + 0.5, 9)
+    zs = np.linspace(cz - 0.5, cz + 0.5, 9)
+    X, Z = np.meshgrid(xs, zs)
+    hs = g.height(X.ravel(), Z.ravel())
+    level = float(np.percentile(hs, 45)) + PUDDLE_LIFT
+    puddle_water = dict(WATER["riverbank"], ripple=0.05, rippleScale=3.0, undulation=0.0, roughnessVariation=0.3,
+                        ssrDistance=6.0, reflectionRays=4.0, streak=0.05, tintPatches=0.0, glow=0.0, ssrGain=3.0,
+                        fresnel=0.7, reflection=1.4, edgeFade=0.01, clarity=0.15, foam=0.0, shallow=0.2,
+                        refraction=0.05)
+    # A flat, uncarved water feature on the valley's own terrain: its level sits just above the ground's natural
+    # hollow in the band, so the water fills that hollow and its shoreline is the ground's own. (A carve was
+    # invisible -- the terrain's LOD 0 is 2.5 m cells -- and a second terrain node's water did not draw.)
+    for n in sc["nodes"]:
+        if n["name"] == "land":
+            n["world"]["features"].append(
+                {"name": "macroPuddle", "kind": "river",
+                 "path": [[round(cx + dx, 3), round(PUDDLE_LEVEL - 0.02, 4), round(cz + dz, 3)]
+                          for dx, dz in ((-0.6, 0.15), (0.0, 0.0), (0.6, -0.15))],
+                 "width": 1.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0,
+                 "water": True, "waterDepth": 0.02, "smoothing": 1})
+            n["terrain"]["water"].update(puddle_water)
+            # nothing stands in the water: records whose base the water covers (on the engine's own ground) go
+            import land as _land
+            G = _land.rift_land.Ground(n["world"], cx - 3, cx + 3, cz - 3, cz + 3, step=0.05)
+            for m in sc["nodes"]:
+                pr = m.get("procedural")
+                if pr and m["name"].startswith(("mac_glowmat", "mac_env", "mmoss", "mac_filigree", "mac_bulbstalk")):
+                    ps = pr["distribution"].get("points")
+                    if ps:
+                        keep = []
+                        for q in ps:
+                            if math.hypot(q[0] - cx, q[2] - cz) < 0.7 and \
+                                    G.wet(np.array([q[0]]), np.array([q[2]]))[0]:
+                                continue
+                            keep.append(q)
+                        pr["distribution"]["points"] = keep
+            # the "dark smudge" itself: the seam curtain of a terrain chunk edge that runs across the bank 1-2 m from
+            # the lens, hanging 30 m (the valley's setting, sized for cliffs) -- a vertical dark wall in this shot
+            n["terrain"]["skirtDepth"] = 0.3
+    sc["wind"] = {"enabled": True, "speed": 0.22, "direction": 0.6, "gustAmount": 0.6, "gustScale": 9.0,
+                  "gustSpeed": 0.7, "gustSharpness": 1.0, "turbulence": 0.12, "turbulenceScale": 2.5,
+                  "turbulenceSpeed": 0.15, "regionScale": 12.0, "regionDrift": 0.02, "flutterScale": 0.6}
+    x, z = to_world(0.35, 5.0)
+    y = float(g.height(np.array([x]), np.array([z]))[0])
+    sc["lights"].append({"name": "violetPocket", "type": "point", "position": [round(x, 3), round(y + 0.6, 3), round(z, 3)],
+                         "color": [0.65, 0.3, 1.0], "intensity": 1.2, "range": 3.5, "radius": 0.3,
+                         "castsShadow": False})
+
+
+def _route(source, target, amount, attack, decay, norm=0.0, component=-1, gain=1.0, delay=0.0):
+    chain = {"gain": gain, "attackMs": attack, "decayMs": decay, "delayMs": delay}
+    # (no normalize stage: the route linter reads a normalised chain as flat, and the analysis signals are already
+    # 0..1; each route's gain is set from the song's measured level instead)
+    if norm > 0:
+        chain["gain"] = gain * 2.0
+    return {"source": source, "target": target, "component": component, "amount": amount, "op": "add",
+            "polarity": "unipolar", "enabled": True, "chain": chain}
+
+
+def _track(target, keys, component=-1):
+    return {"target": target, "component": component, "timeBase": "seconds", "mode": "add", "loopLength": 0.0,
+            "enabled": True, "keys": [{"time": t, "value": v, "interp": "easeInOut"} for t, v in keys]}
+
+
+def macro_audio(sc):
+    """(showcase P4) the macro's audio response, on Trench, in four layers that never share one envelope:
+      fast   localised transients: bead colonies flash on onsets, the veilcap's gills on the bass, the blue
+             stalk tips on the hats, a sparkle through the carpet on the high mids
+      medium supporting organisms breathe with the mids: the violet background pocket and the gold accents
+      slow   the environment follows the song's loudness over seconds: exposure, bloom, and the wind
+      phrase coordinated events at the song's structure (the 45 s breakdown, the 47 s re-entry, the 61 s lift):
+             the reliquary, the violet light pocket and the exposure move together
+    Silence leaves the still exactly as composed: every route adds, from zero."""
+    names = {n["name"] for n in sc["nodes"]}
+    layers = {l["name"] for l in sc.get("ecosystem", {}).get("layers", [])}
+    def P(node, leaf):
+        assert node in names, node
+        return f"procedural/{node}/{leaf}"
+    def E(layer, leaf):
+        assert layer in layers, layer
+        return f"ecosystem/{layer}/{leaf}"
+    routes = [
+        # fast
+        _route("audio.onset", E("mac_beadcluster", "intensity"), 2.5, 5, 220),
+        _route("audio.bass", P("mac_veilcap_emeraldcyan", "material/emissive"), 2.4, 20, 380, norm=6.0),
+        _route("audio.treble", E("mac_bulbstalk_blue", "intensity"), 1.6, 10, 170, norm=6.0),
+        _route("audio.highMid", E("mac_glowmat_blue", "intensity"), 0.9, 40, 450, norm=6.0),
+        # medium
+        _route("audio.mid", P("mac_bellspire_violet_bg_far", "material/emissive"), 2.0, 400, 1400, norm=8.0),
+        _route("audio.mid", P("mac_filigree_violet_bg_far", "material/emissive"), 1.6, 600, 1600, norm=8.0,
+               delay=250.0),
+        _route("audio.lowMid", P("mac_filigree_ambertip_acc", "material/emissive"), 2.4, 300, 1000, norm=8.0),
+        _route("audio.lowMid", P("mac_beadcluster_coral_acc", "material/emissive"), 2.0, 450, 1200, norm=8.0,
+               delay=180.0),
+        _route("audio.mid", P("mac_lanternberry_amber_acc", "material/emissive"), 1.8, 350, 1100, norm=8.0,
+               delay=90.0),
+        _route("audio.mid", P("mac_bellspire_rose_acc", "material/emissive"), 1.6, 500, 1400, norm=8.0,
+               delay=300.0),
+        # slow
+        _route("audio.rms", "camera/exposure/compensation", 0.16, 1800, 3500, norm=12.0),
+        _route("audio.rms", "post/bloom/intensity", 0.22, 1500, 3000, norm=12.0),
+        # capped: a slow lift of the breeze on busy passages, never enough to set anything rocking
+        dict(_route("audio.spectralFlux", "scene/windSpeed", 0.06, 2500, 5000),
+             chain={"gain": 1.0, "attackMs": 2500, "decayMs": 5000, "delayMs": 0.0, "clampEnabled": True,
+                    "clampMin": 0.0, "clampMax": 1.0}),
+    ]
+    tracks = [
+        _track(P("mac_reliquary", "material/emissive"),
+               [(44.3, 0.0), (45.3, -3.5), (46.9, -3.5), (47.25, 6.0), (49.8, 0.0), (60.5, 0.0), (61.1, 4.5),
+                (63.5, 0.0)]),
+        _track("lights/violetPocket/intensity", [(46.8, 0.0), (47.3, 3.0), (50.5, 0.0), (60.8, 0.0), (61.3, 2.5),
+                                                  (64.0, 0.0)]),
+        _track("camera/exposure/compensation", [(44.5, 0.0), (45.4, -0.35), (46.9, -0.35), (47.3, 0.08),
+                                                 (49.5, 0.0)]),
+    ]
+    pj = project("macro", "macro.scene.json")
+    pj["app"]["name"] = "Bioluminescent Valley (macro, audio-reactive)"
+    pj["parameters"]["camera/exposure/compensation"] = pj["parameters"].get("camera/exposure/compensation", 0) - 0.08
+    pj["routes"] = routes
+    pj["timeline"] = {"enabled": True, "cues": [], "tracks": tracks}
+    return pj
+
+
+def macro_move(eye, tgt, seconds=12.0):
+    """(showcase P3) the macro's camera sequence: a slow push-in low over the floor toward the veilcap, drifting a
+    little right so the reliquary opens from behind it, the focus riding the subject. Same scene as the still."""
+    e, t = np.asarray(eye, float), np.asarray(tgt, float)
+    f = t - e
+    f[1] = 0.0
+    f /= np.linalg.norm(f)
+    r = np.array([-f[2], 0.0, f[0]])
+    start = e - f * 0.45 - r * 0.12 + np.array([0, 0.02, 0])
+    end = e + f * 0.15 + r * 0.08
+    t0 = t - r * 0.25
+    t1 = t + r * 0.1
+    rnd = lambda v: [round(float(x), 4) for x in v]
+    pj = project("macro", "macro.scene.json")
+    pj["app"]["name"] = "Bioluminescent Valley (macro, camera sequence)"
+    pj["timeline"] = {"enabled": True, "cues": [], "tracks": [
+        {"target": "camera/position", "component": -1, "timeBase": "seconds", "mode": "replace", "loopLength": 0.0,
+         "enabled": True, "keys": [{"time": 0.0, "value": rnd(start), "interp": "easeInOut"},
+                                   {"time": seconds, "value": rnd(end), "interp": "easeInOut"}]},
+        {"target": "camera/target", "component": -1, "timeBase": "seconds", "mode": "replace", "loopLength": 0.0,
+         "enabled": True, "keys": [{"time": 0.0, "value": rnd(t0), "interp": "easeInOut"},
+                                   {"time": seconds, "value": rnd(t1), "interp": "easeInOut"}]},
+        {"target": "post/dof/focusDistance", "component": -1, "timeBase": "seconds", "mode": "replace",
+         "loopLength": 0.0, "enabled": True,
+         "keys": [{"time": 0.0, "value": 1.7, "interp": "easeInOut"},
+                  {"time": seconds, "value": 1.1, "interp": "easeInOut"}]}]}
+    return pj
+
+
+def main():
+    # refuse anything unknown (a stray `--help` used to regenerate every mesh and shot)
+    unknown = [a for a in sys.argv[1:] if a not in ("--no-meshes", "--no-sky", "--sky")]
+    if unknown:
+        sys.exit(f"usage: valley.py [--no-meshes] [--sky | --no-sky]   (unknown: {' '.join(unknown)})")
+    SHOTS.mkdir(parents=True, exist_ok=True)
+    SKY.mkdir(parents=True, exist_ok=True)
+    vistaset.derive_moon(MESHES)
+    if "--no-meshes" not in sys.argv:
+        build_meshes()
+    if "--no-sky" not in sys.argv and not (SKY / "night.hdr").exists() or "--sky" in sys.argv:
+        print("sky...")
+        sky.build(SKY / "night.hdr", MOON_DIR, GLOW_DIR)
+        # the meadow's sky: the same night with a warmer, lower twilight (spec 07 §7); its own map so the vista
+        # keeps its blue
+        sky.build(SKY / "night_warm.hdr", MOON_DIR, GLOW_DIR, warmth=2.4)
+    print("ground (coarse)...")
+    gc = land.ground((-4400.0, 4400.0, -2400.0, 4400.0), 25.0)
+    gfine = {
+        "meadow": land.ground((land.MEADOW_X - 200, land.MEADOW_X + 200, land.MEADOW_Z - 200, land.MEADOW_Z + 300), 2.0),
+        "bank": land.ground((land.BANK_X0 - 120, land.BANK_X0 + 300, land.BANK_Z - 150, land.BANK_Z + 120), 1.0),
+    }
+    tw = place_massifs(gc)
+    print("ground (floor)...")
+    gfloor = land.ground((-1500.0, 1500.0, -1700.0, 4400.0), 6.0)
+    S = shots(gc, gfine)
+    vista_eye = S["vista"][0]
+    eyes = [(s[0][0], s[0][2]) for s in S.values()]
+    hero, shrubs_f, arch, boulders = populate.framing(gc, gfine, vista_eye, VISTA_YAW)
+    shrubs = populate.ledges(tw, MESHES)
+    for k, v in shrubs_f.items():
+        shrubs[k] += v
+    groves = populate.forest(gfloor, vista_eye, VISTA_YAW, eyes)
+    glow, dark = ecosys.split_groves(groves)
+
+    def near_split(d):
+        # groves within 260 m of a close shot (riverbank, macro, meadow) use the full build
+        close = [(S[k][0][0], S[k][0][2]) for k in ("riverbank", "macro", "meadow")]
+        hq, lo = {}, {}
+        for v, pts in d.items():
+            for rc in pts:
+                near = any(math.hypot(rc[0] - a, rc[2] - b) < 260.0 for a, b in close)
+                (hq if near else lo).setdefault(v, []).append(rc)
+        return hq, lo
+    glow_hq, glow_lo = near_split(glow)
+    dark_hq, dark_lo = near_split(dark)
+    groups = {"groveglow": glow_lo, "grovedark": dark_lo, "grovehqglow": glow_hq, "grovehqdark": dark_hq,
+              "shrub": shrubs, "arch": arch, "hero": {0: hero}, "boulder": boulders}
+    eyes_by = {k: (s[0][0], s[0][2]) for k, s in S.items()}
+    heads = {k: math.atan2(s[1][0] - s[0][0], s[1][2] - s[0][2]) for k, s in S.items()}
+    ecosys.WATER_BANK = float(gfine["bank"].water_level(np.array([eyes_by["riverbank"][0] - 20.0]),
+                                                        np.array([land.BANK_Z]))[0])
+    print(f"  bank water level {ecosys.WATER_BANK:.2f}")
+    veg = populate.nodes(groups, mat)
+    placed = ecosys.place(gc, gfine, gfloor, eyes_by, heads)
+    carpet, hosts = ecosys.nodes(placed, mat)
+    grids, gfields = glowmap.maps(placed, glow, eyes_by)
+    falls_nodes = waterfalls(tw, eyes_by)
+    # Deliverable B: the artist's fall set replaces fall3's procedural strands (its spray stays, recoloured)
+    rb_foot = FALL_FEET["riverbank"]
+    falls_nodes = [n for n in falls_nodes if n["name"] != "fall3"]
+    falls_nodes += riverset.fall_set(rb_foot, ecosys.WATER_BANK)
+    extra = (gfields + veg + falls_nodes + populate.fungus_nodes(populate.fungi(gfine, eyes_by), mat) +
+             carpet + ecosys.particles(eyes_by))
+
+    def names(prefix):
+        return [n["name"] for n in veg if n["name"].startswith(prefix) and "_leaf" in n["name"]]
+    forest_hosts = {"all": [names(f"groveglow{v}_leaf") + names(f"grovedark{v}_leaf") + names(f"grovehqglow{v}_leaf") +
+                            names(f"grovehqdark{v}_leaf") for v in range(populate.N_GROVES)],
+                    "glow": [names(f"groveglow{v}_leaf") + names(f"grovehqglow{v}_leaf")
+                             for v in range(populate.N_GROVES)]}
+    shrub_hosts = [n["name"] for n in veg if n["name"].startswith("shrub") and "_leaf" in n["name"]]
+    eco = ecosys.ecosystem(hosts, forest_hosts, shrub_hosts, ["fungus_veil_threads"], ecosys.WATER_BANK)
+    print(f"  ecosystem layers: {len(eco['layers'])}")
+    # the hero library, per shot
+    lib_nodes, lib_layers = {}, {}
+    rb_eye = S["riverbank"][0]
+    rb_head = heads["riverbank"]
+    bank_mirror = {"mirror": 2.4, "mirrorLevel": round(ecosys.WATER_BANK, 3), "mirrorStretch": 8.0,
+                   "mirrorSoftness": 14.0}
+    groups = library.bank(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK, FALL_FEET.get("riverbank"))
+    # clear the lens: from the bank, nothing tall within 7 m in the forward cone (the stream must read from the
+    # bottom of the frame); the bank's growth stays at the left edge
+    fwd_rb = (math.sin(heads["riverbank"]), math.cos(heads["riverbank"]))
+    def _clear(r_):
+        dx, dz = r_[0] - rb_eye[0], r_[2] - rb_eye[2]
+        dd = math.hypot(dx, dz)
+        if dd > 7.0:
+            return True
+        cosang = (dx * fwd_rb[0] + dz * fwd_rb[1]) / max(dd, 1e-6)
+        return cosang < math.cos(math.radians(32.0))
+    groups = {k: [r_ for r_ in v if _clear(r_)] for k, v in groups.items()}
+    # the near left bank, from the lens outward (panel 1's left third): mossy waterline rocks, glowing mounds, fronds
+    # and stalks, larger nearer, so the bank is a mass of life and not dark ground
+    rng_l = np.random.default_rng(57)
+    lx_, lz_ = fwd_rb[1], -fwd_rb[0]
+    for k in range(70):
+        ang = math.radians(rng_l.uniform(36.0, 75.0))
+        dd = 1.6 + 9.0 * rng_l.random() ** 1.3
+        dx = fwd_rb[0] * math.cos(ang) + lx_ * math.sin(ang)
+        dz = fwd_rb[1] * math.cos(ang) + lz_ * math.sin(ang)
+        x_, z_ = rb_eye[0] + dx * dd, rb_eye[2] + dz * dd
+        y_ = float(gfine["bank"].height(np.array([x_]), np.array([z_]))[0])
+        u_ = rng_l.random()
+        sp_, sc_, sink_ = (("riverrock_a", rng_l.uniform(0.7, 1.4), 0.15) if u_ < 0.2 else
+                           ("glowmound", rng_l.uniform(0.6, 1.3), 0.08) if u_ < 0.45 else
+                           ("veilfern", rng_l.uniform(1.5, 2.6), 0.01) if u_ < 0.6 else
+                           ("glowsedge", rng_l.uniform(0.8, 1.4), 0.01) if u_ < 0.8 else
+                           ("lanternberry", rng_l.uniform(1.6, 2.6), 0.01))
+        groups.setdefault(sp_, []).append(populate.rec(x_, y_ - sink_ * sc_, z_, rng_l.uniform(0, 6.28), sc_))
+    nodes_b, hosts_b = library.assemble(groups, rb_eye, near=4.0, palette=library.PALETTES["riverbank"], scale=6.0)
+    # the forest over the stream: the artist's designed crowns (dark, limbed) instead of the faceted canopy blobs
+    canopy_pts = [p for nd in nodes_b if nd["name"].startswith("lib_canopy_")
+                  for p in nd["procedural"]["distribution"]["points"]]
+    nodes_b = [nd for nd in nodes_b if not nd["name"].startswith("lib_canopy_")]
+    hosts_b = {k: v for k, v in hosts_b.items() if k[0] != "canopy"}
+    forest_rb = []
+    for k, p in enumerate(canopy_pts):
+        q = list(p)
+        q[7:10] = [round(q[7] * 0.7, 3)] * 3
+        forest_rb.append(("env_canopy_b", "env_canopy_c", "env_canopy_a")[k % 3] and q)
+    forest_nodes = [vistaset.env_node(f"rb_forest_{sp}", sp, [q for k, q in enumerate(forest_rb) if k % 3 == j],
+                                      maxd=600.0, lod=0,
+                                      material={"baseColor": [0.55, 0.6, 0.75], "roughness": 1.0, "metallic": 0.0,
+                                                "emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 0.8})
+                    for j, sp in enumerate(("env_canopy_b", "env_canopy_c", "env_canopy_a"))]
+    lib_nodes["riverbank"] = (nodes_b + [n for n in forest_nodes if n["procedural"]["distribution"]["points"]] +
+                              riverset.shoreline(gfine["bank"], rb_eye, rb_head, ecosys.WATER_BANK))
+    # only a few saturated species are reflected: a mix of every species' glints reflects as grey
+    MIRRORED = ("glowsedge", "veilcap", "veilfern", "glowmound", "riverrock_a", "riverrock_b", "bellspire")
+    lib_layers["riverbank"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
+                                                  LIB_GAIN.get(sp, 0.3), bank_mirror if sp in MIRRORED else None,
+                                                  sparsity=0.3)
+                               for (sp, t), hs in hosts_b.items() if (MESHES / "hero" / f"hero_{sp}.emit.json").exists()]
+    md_eye = S["meadow"][0]
+    groups_m = library.meadow(gfine["meadow"], md_eye, heads["meadow"])
+    nodes_m, hosts_m = library.assemble(groups_m, md_eye, near=4.0, palette=library.PALETTES["meadow"], scale=10.0)
+    lib_nodes["meadow"] = nodes_m
+    md_mirror = {"mirror": 1.0, "mirrorLevel": round(float(gfine["meadow"].water_level(
+        np.array([md_eye[0] + 20 * math.sin(heads["meadow"])]), np.array([md_eye[2] + 20 * math.cos(heads["meadow"])]))[0]),
+        3), "mirrorStretch": 1.5, "mirrorSoftness": 5.0}
+    MEADOW_GAIN = {"darkfern": 0.0, "bulbstalk": 3.0, "glowmat": 0.2, "filigree": 0.0, "lanternberry": 0.0, "glowmound": 1.0}
+    lib_layers["meadow"] = [library.emit_layer(f"lib_{sp}_{t}", hs, sp, library.TINT_GLOW.get(t, LIB_COLORS[sp]),
+                                               MEADOW_GAIN.get(sp, LIB_GAIN.get(sp, 0.3)),
+                                               md_mirror if sp in MIRRORED + ("bulbstalk",) else None, sparsity=0.15,
+                                               size=2.0)
+                            for (sp, t), hs in hosts_m.items() if MEADOW_GAIN.get(sp, LIB_GAIN.get(sp, 0.3)) > 0]
+    # (the lanternberries' glints are sub-pixel at meadow range: the splat floor turns them into a pale frost)
+    # the macro (panel 3): the library at LOD 0 in front of the lens, the riverbank's library beyond it
+    mc_eye, mc_tgt = S["macro"][0], S["macro"][1]
+    mgroups = library.macro(gfine["bank"], mc_eye, mc_tgt)
+    # Showcase phase 2: light falls off with depth. Everything past MACRO_NEAR m is the far bank and glows at a
+    # fraction, so the subjects stand against dark negative space instead of a cyan wall.
+    lib_nodes["macro"] = []
+    for glb, pts in mgroups.items():
+        dial = library.MACRO_DIAL.get(glb.split("_")[0], 1.0)
+        # (showcase P2-4) the carpet nearest the lens dissolves into large bokeh discs that outshine the subjects:
+        # within MACRO_LENS m the glow mats glow at MACRO_LENS_GAIN, so the foreground frames rather than competes
+        if glb.startswith("glowmat"):
+            lens_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) <= MACRO_LENS]
+            pts = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > MACRO_LENS]
+            if lens_p:
+                lib_nodes["macro"].append(library.macro_node(f"mac_{glb}_lens", glb, lens_p, dial * MACRO_LENS_GAIN))
+        near_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) <= MACRO_NEAR]
+        far_p = [p for p in pts if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > MACRO_NEAR]
+        if near_p:
+            lib_nodes["macro"].append(library.macro_node(f"mac_{glb}", glb, near_p, dial))
+        if far_p:
+            lib_nodes["macro"].append(library.macro_node(f"mac_{glb}_far", glb,
+                                                         far_p, dial * (1.0 if glb.startswith("env:") else MACRO_FAR)))
+    for nd in lib_nodes["macro"]:
+        if nd["name"] == "mac_canopy":                 # the forest behind is silhouette
+            nd["procedural"]["material"]["baseColor"] = [0.25, 0.27, 0.4]
+    # (showcase P2) the riverbank's library beyond 9 m is no longer copied into the macro: at the far bank's glow it
+    # added almost nothing, and its nodes pushed the frame past the procedural renderer's 256 visible objects, so
+    # arbitrary objects were skipped (the log said so; the picture changed with every edit)
+    for nd in ([] if MACRO_NO_BANK else nodes_b):      # the bank beyond, clear of the lens (no superseded lattice)
+        if "_lattice_" in nd["name"] or "_veilfern_" in nd["name"]:
+            continue
+        pts = [p for p in nd["procedural"]["distribution"]["points"]
+               if math.hypot(p[0] - mc_eye[0], p[2] - mc_eye[2]) > 9.0]
+        if pts:
+            lib_nodes["macro"].append(json.loads(json.dumps(nd)))
+            lib_nodes["macro"][-1]["procedural"]["distribution"]["points"] = pts
+            m_ = lib_nodes["macro"][-1]["procedural"].get("material")
+            if m_ and "emissiveIntensity" in m_:
+                m_["emissiveIntensity"] = round(m_["emissiveIntensity"] * MACRO_FAR * 0.6, 3)
+    GLINT = {"veilcap_emeraldcyan": library.TINT_GLOW["emerald"], "reliquary": [0.5, 0.8, 1.0],
+             "beadcluster": library.TINT_GLOW["blue"], "beadcluster_emerald": library.TINT_GLOW["emerald"],
+             "bulbstalk_blue": library.TINT_GLOW["blue"], "bulbstalk": library.TINT_GLOW["chartreuse"],
+             "glowmat_blue": library.TINT_GLOW["blue"], "lacefan": library.TINT_GLOW["blue"]}
+    lib_layers["macro"] = [library.emit_layer(f"mac_{glb}", [f"mac_{glb}"], glb, col, 0.6, sparsity=0.4,
+                                              maxDistance=40.0, size=1.2)
+                           for glb, col in GLINT.items() if glb in mgroups]
+    # Deliverable C: the karst landmark and its supports, and the dark designed canopy below the lookout
+    vista_set = vistaset.karst(gc, VISTA_EYE_XZ, VISTA_YAW, KARST) + vistaset.canopy(gc, S["vista"][0], VISTA_YAW)
+    if populate.VISTA_FERNS:
+        lib_nodes["vista"] = [library.node("lib_darkfern_vista", "darkfern", populate.VISTA_FERNS, 1, 3000.0)]
+    # layers a shot cannot see are dropped (the ecosystem holds 32)
+    DROP = {"riverbank": ("glade", "crown", "ledge", "understory", "orbs", "macroMoss", "gills", "veilBeads",
+                          "latticeGlow", "tips", "frondGlow"),
+            "meadow": ("ledge", "glade", "understory", "tips", "mossDots", "orbs", "macroMoss", "gills", "veilBeads", "latticeGlow", "frondGlow",
+                       "reedTips"), "macro": ("glade", "crown", "ledge", "orbs", "understory", "tips", "veilBeads", "gills",
+                                    "latticeGlow"),
+            "vista": ()}
+    lib_nodes.setdefault("vista", []).extend(vista_set)
+    for name, (eye, tgt, fov, near, far) in S.items():
+        eco_s = dict(eco)
+        eco_s["layers"] = [l for l in eco["layers"] if not l["name"].startswith(DROP[name])] + lib_layers.get(name, [])
+        assert len(eco_s["layers"]) <= 32, (name, len(eco_s["layers"]))
+        ex_s = extra
+        if name == "meadow":
+            # the library's near carpet replaces the native tufts in front of the lens (they read as frost)
+            ex_s = []
+            for nd in extra:
+                pr = nd.get("procedural")
+                if pr and nd["name"].startswith(("tuft", "mtuft")):
+                    nd = json.loads(json.dumps(nd))
+                    nd["procedural"]["distribution"]["points"] = [
+                        p for p in pr["distribution"].get("points", []) if math.hypot(p[0] - eye[0], p[2] - eye[2]) > 12.0]
+                ex_s.append(nd)
+        if name == "macro":
+            # the library replaces the native macro set in front of the lens (the native moss stays as the ground);
+            # the riverbank's fall set, 115 m upstream, showed through a gap as an out-of-focus violet smudge behind the
+            # subjects (found by rendering without DOF): the macro does not draw it
+            ex_s = []
+            for nd in extra:
+                if nd["name"].startswith(("rs_fall", "fallMist3", "fall3")):
+                    continue
+                # (P4) the native moss mounds within 2.6 m of the lens are smooth dark domes: the "smudgy dark area" in
+                # the lower right (found by projecting every instance into it); the artist's substrate replaces them
+                if nd["name"].startswith("mmoss"):
+                    nd = json.loads(json.dumps(nd))
+                    pr_ = nd["procedural"]
+                    pr_["distribution"]["points"] = [q for q in pr_["distribution"]["points"]
+                                                     if math.hypot(q[0] - eye[0], q[2] - eye[2]) > 2.6]
+                pr = nd.get("procedural")
+                if pr and nd["name"].startswith(("mtuft", "frond", "lattice", "bulbs", "f3d_")):
+                    pts = [p for p in pr["distribution"].get("points", [])
+                           if math.hypot(p[0] - eye[0], p[2] - eye[2]) > 8.0]
+                    nd = json.loads(json.dumps(nd))
+                    nd["procedural"]["distribution"]["points"] = pts
+                ex_s.append(nd)
+        sc = scene(tw, eye, tgt, fov, near, far, ex_s + lib_nodes.get(name, []), eco_s, grids, AIR[name],
+                   LIT.get(name, 1.0),
+                   riverset.fall_lights(rb_foot, ecosys.WATER_BANK) if name == "riverbank" else
+                   library.macro_lights(gfine["bank"], eye, tgt) if name == "macro" else (),
+                   vistaset.clouds_block(MOON_DIR, GLOW_DIR) if name in CLOUDED else None, FILL.get(name, 1.0),
+                   "night_warm.hdr" if name == "meadow" else "night.hdr")
+        if name in WATER:
+            for n in sc["nodes"]:
+                if n["name"] == "land":
+                    n["terrain"]["water"].update(WATER[name])
+        if name == "macro":
+            macro_finish(sc, gfine["bank"], eye, tgt)
+        (SHOTS / f"{name}.scene.json").write_text(json.dumps(sc, separators=(",", ":")))
+        (SHOTS / f"{name}.json").write_text(json.dumps(project(name, f"{name}.scene.json"), indent=1))
+        if name == "macro":
+            (SHOTS / "macro_move.json").unlink(missing_ok=True)   # owner: the macro is static
+            (SHOTS / "macro_audio.json").write_text(json.dumps(macro_audio(sc), indent=1))
+        print(f"  shot {name}: eye {eye} target {tgt}")
+    print("wrote", SHOTS)
+
+
+if __name__ == "__main__":
+    main()

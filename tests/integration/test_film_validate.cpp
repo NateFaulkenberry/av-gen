@@ -192,6 +192,35 @@ TEST_CASE("camera/near sets the near plane; a journey's automatic near plane is 
     }
 }
 
+TEST_CASE("camera/far sets the far plane; 0 keeps the automatic one (ADR-1280)", "[adr1280]") {
+    {
+        const json s = sceneWith(freeCamera(0.05));
+        const auto p = writeProject("farAuto", s, json::array());
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(p).has_value());
+        FrameTime t;
+        engine.update(t);
+        CHECK(engine.scene().camera.farPlane >= 2000.0f);
+        REQUIRE(engine.params().find("camera/far") != nullptr);
+    }
+    {
+        json c = freeCamera(0.05);
+        c["far"] = 1500.0;
+        const json s = sceneWith(c);
+        const auto p = writeProject("farSet", s, json::array());
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(p).has_value());
+        FrameTime t;
+        engine.update(t);
+        CHECK_THAT(engine.scene().camera.farPlane, WithinAbs(1500.0, 1e-3));
+        CHECK_THAT(engine.scene().camera.nearPlane, WithinAbs(0.05, 1e-6));
+        // the parameter moves it live
+        engine.params().find("camera/far")->setBaseComponent(0, 900.0f);
+        engine.update(t);
+        CHECK_THAT(engine.scene().camera.farPlane, WithinAbs(900.0, 1e-3));
+    }
+}
+
 TEST_CASE("Film pass: a structural node that wobbles after it is built is a build-lock warning; built-and-locked passes",
           "[space][liminal][adr1057]") {
     // The roof drops in at 0.5 s and holds (a build event); from 1.5 s it steps +-3 cm every 0.1 s (a wobble).

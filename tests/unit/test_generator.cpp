@@ -225,6 +225,50 @@ TEST_CASE("A points distribution is serialised placements", "[unit][generator]")
     CHECK(back->instances[2].scale.x == Approx(2.0f));
 }
 
+TEST_CASE("A placed procedural node carries its wind response (ADR-1292)", "[unit][generator][adr1292]") {
+    ProceduralGeometry pg;
+    pg.name = "stalk";
+    pg.source.kind = PrimitiveKind::Box;
+    CHECK_FALSE(pg.toJson().contains("motion")); // still by default, and not written
+    nlohmann::json j = pg.toJson();
+    j["motion"] = {{"stiffness", 0.6}, {"mass", 0.012}, {"damping", 0.25}, {"windSensitivity", 1.0},
+                   {"tipAmplitude", 0.18}, {"bendLimit", 0.3}, {"gustResponse", 1.2}};
+    auto read = ProceduralGeometry::fromJson(j);
+    REQUIRE(read.has_value());
+    CHECK(read->motion.active());
+    CHECK(read->motion.stiffness == Catch::Approx(0.6f));
+    CHECK(read->motion.mass == Catch::Approx(0.012f));
+    CHECK(read->motion.gustResponse == Catch::Approx(1.2f));
+    auto back = ProceduralGeometry::fromJson(read->toJson()); // written back, read again: the same
+    REQUIRE(back.has_value());
+    CHECK(back->motion.windSensitivity == Catch::Approx(1.0f));
+    CHECK(back->motion.tipAmplitude == Catch::Approx(0.18f));
+    // nonsense is refused
+    j["motion"]["stiffness"] = 0.0;
+    CHECK_FALSE(ProceduralGeometry::fromJson(j).has_value());
+    j["motion"] = 3;
+    CHECK_FALSE(ProceduralGeometry::fromJson(j).has_value());
+}
+
+TEST_CASE("An empty points list places nothing, not one instance at the origin (ADR-1285)", "[unit][generator][adr1285]") {
+    ProceduralGeometry pg;
+    pg.name = "none";
+    pg.source.kind = PrimitiveKind::Box;
+    pg.distribution.kind = DistributionKind::Points;
+    pg.distribution.setPoints({});
+    REQUIRE(pg.rebuild());
+    CHECK(pg.instances.empty());
+    auto back = ProceduralGeometry::fromJson(pg.toJson());
+    REQUIRE(back.has_value());
+    REQUIRE(back->rebuild());
+    CHECK(back->instances.empty());
+    // one point is still one instance
+    std::vector<Transform> one(1);
+    pg.distribution.setPoints(one);
+    REQUIRE(pg.rebuild());
+    CHECK(pg.instances.size() == 1);
+}
+
 #include "assets/asset_registry.hpp"
 #include "scene/composition.hpp"
 

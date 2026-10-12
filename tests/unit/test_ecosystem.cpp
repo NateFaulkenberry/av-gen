@@ -207,3 +207,32 @@ TEST_CASE("a scene file's ecosystem reaches the scene, with its layers as live p
     (*comp)->update(t);
     CHECK_FALSE((*comp)->scene().ecosystem.active());
 }
+
+TEST_CASE("a layer's reflection in still water round-trips, is off by default, and refuses a negative strength (ADR-1281)",
+          "[ecosystem][json][adr1281]") {
+    nlohmann::json l = layerJson("t.emit.json");
+    {
+        auto eco = scene::Ecosystem::fromJson(nlohmann::json{{"layers", {l}}});
+        REQUIRE(eco);
+        CHECK(eco->layers[0].mirror == 0.0f);
+        CHECK_FALSE(eco->toJson()["layers"][0].contains("mirror")); // off is not written
+    }
+    l["mirror"] = 0.8;
+    l["mirrorLevel"] = 2.9;
+    l["mirrorStretch"] = 0.5;
+    auto eco = scene::Ecosystem::fromJson(nlohmann::json{{"layers", {l}}});
+    REQUIRE(eco);
+    CHECK_THAT(eco->layers[0].mirror, WithinAbs(0.8, 1e-6));
+    CHECK_THAT(eco->layers[0].mirrorLevel, WithinAbs(2.9, 1e-6));
+    auto again = scene::Ecosystem::fromJson(eco->toJson());
+    REQUIRE(again);
+    CHECK_THAT(again->layers[0].mirrorStretch, WithinAbs(0.5, 1e-6));
+    l["mirrorSoftness"] = 6.0;
+    auto soft = scene::Ecosystem::fromJson(nlohmann::json{{"layers", {l}}});
+    REQUIRE(soft);
+    auto softAgain = scene::Ecosystem::fromJson(soft->toJson());
+    REQUIRE(softAgain);
+    CHECK_THAT(softAgain->layers[0].mirrorSoftness, WithinAbs(6.0, 1e-6));
+    l["mirror"] = -1.0;
+    CHECK_FALSE(scene::Ecosystem::fromJson(nlohmann::json{{"layers", {l}}}));
+}

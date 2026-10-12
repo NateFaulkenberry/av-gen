@@ -64,7 +64,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral"};
+    "worldEvents", "ecosystem", "astral", "clouds"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -4600,6 +4600,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // whose camera walks through rooms). The SDF march starts at the near plane, so a near plane larger
     // than the camera's clearance cuts the nearest wall open.
     cameraNear_ = &params.add(floatDesc(prefix_ + "camera/near", cameraNearSetting_, 0.0f, 10.0f, 0.0f, 0.5f));
+    // ADR-1280: the far plane. 0 = automatic (50 x the world's radius). A world with a moon 9 km out has a radius
+    // near 30 km, so the automatic far plane is 1,400 km, and with a macro shot's few-centimetre near plane the depth
+    // range is too deep for the depth buffer: the sky and everything far draw black. A shot sets what it can see.
+    cameraFar_ = &params.add(floatDesc(prefix_ + "camera/far", cameraFarSetting_, 0.0f, 1.0e6f, 0.0f, 50000.0f));
     // ADR-1075: a roll about the line of sight, in degrees (positive rolls the camera clockwise, so the horizon
     // tilts anticlockwise in the picture). The world
     // and its lights stay put; only the camera's up turns.
@@ -6019,6 +6023,7 @@ void Composition::detach() {
     materialParams_.clear();
     cameraFov_ = nullptr;
     cameraNear_ = nullptr;
+    cameraFar_ = nullptr;
     cameraRoll_ = nullptr;
     cameraMode_ = nullptr;
     cameraPosition_ = nullptr;
@@ -7387,6 +7392,19 @@ void Composition::rebuild() {
                         resolved.emissiveIntensity = authored.emissiveIntensity;
                         resolved.roughness = authored.roughness;
                         resolved.metallic = authored.metallic;
+                        // ADR-1283: the author's switches too, where the author turned them on. Before this
+                        // a mesh whose GLB carried any material silently dropped an authored cutout
+                        // (alphaMode/alphaCutoff), its base-colour texture, doubleSided and unlit: a leaf card
+                        // drew as an opaque rectangle and a frond as a one-sided sheet.
+                        resolved.doubleSided = resolved.doubleSided || authored.doubleSided;
+                        resolved.unlit = resolved.unlit || authored.unlit;
+                        if (authored.alphaMode != AlphaMode::Opaque) {
+                            resolved.alphaMode = authored.alphaMode;
+                            resolved.alphaCutoff = authored.alphaCutoff;
+                        }
+                        if (authored.baseColorTexture.valid()) {
+                            resolved.baseColorTexture = authored.baseColorTexture;
+                        }
                     }
                     return resolved;
                 };
@@ -8837,6 +8855,7 @@ void Composition::applyParameters() {
     }
     // ADR-1200: the ecosystem, with its finals. Layers share their templates by pointer, so this is cheap.
     scene_.ecosystem = ecosystem_;
+    scene_.clouds = clouds_; // ADR-1289
     applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
     updateAstral(); // ADR-1221: before the camera, which it may place
 
@@ -9100,6 +9119,9 @@ void Composition::applyParameters() {
         scene_.camera.nearPlane = authored > 0.0f ? std::max(authored, 0.001f) : autoNear;
     }
     scene_.camera.farPlane = std::max(radius_ * 50.0f, 2000.0f); // free cameras look across whole worlds
+    if (const float authoredFar = cameraFar_ != nullptr ? cameraFar_->value() : cameraFarSetting_; authoredFar > 0.0f) {
+        scene_.camera.farPlane = std::max(authoredFar, scene_.camera.nearPlane * 2.0f); // ADR-1280
+    }
     applyFraming();
     // ADR-391, and the position in this function is the whole of its correctness. The film's camera
     // is now final -- resolved, evaluated, shaken, framed -- and `activeCamera_` has published what
@@ -10086,6 +10108,9 @@ nlohmann::json Composition::toJson() const {
     if (const float nearPlane = cameraNear_ != nullptr ? cameraNear_->base() : cameraNearSetting_; nearPlane > 0.0f) {
         camera["near"] = nearPlane; // ADR-1058
     }
+    if (const float farPlane = cameraFar_ != nullptr ? cameraFar_->base() : cameraFarSetting_; farPlane > 0.0f) {
+        camera["far"] = farPlane; // ADR-1280
+    }
     camera["mode"] = cameraMode_ != nullptr ? cameraMode_->base() : cameraModeSetting_;
     if (!cameraSplineSetting_.empty()) {
         camera["spline"] = cameraSplineSetting_;
@@ -10858,7 +10883,22 @@ nlohmann::json Composition::toJson() const {
                                       {"tearDirection", ts.water.tearFollowsWind ? json("wind")
                                                                                  : json(ts.water.tearAngle)},
                                       {"tearDrift", ts.water.tearDrift},
-                                      {"tearWind", ts.water.tearWind}}}};
+                                      {"tearWind", ts.water.tearWind},
+                                      {"ssr", ts.water.ssr},
+                                      {"ssrDistance", ts.water.ssrDistance},
+                                      {"ssrSteps", ts.water.ssrSteps},
+                                      {"ssrGain", ts.water.ssrGain},
+                                      {"transmission", ts.water.transmission},
+                                      {"absorption", vecToJson(ts.water.absorption)},
+                                      {"undulation", ts.water.undulation},
+                                      {"undulationScale", ts.water.undulationScale},
+                                      {"roughnessVariation", ts.water.roughnessVariation},
+                                      {"streak", ts.water.streak},
+                                      {"reflectionRays", ts.water.reflectionRays},
+                                      {"tintPatches", ts.water.tintPatches},
+                                      {"reflectionTint2", vecToJson(ts.water.reflectionTint2)},
+                                      {"tintPatchScale", ts.water.tintPatchScale},
+                                      {"glints", ts.water.glints}}}};
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -10947,6 +10987,9 @@ nlohmann::json Composition::toJson() const {
     }
     if (!ecosystem_.layers.empty()) {
         j["ecosystem"] = ecosystem_.toJson(); // ADR-1200
+    }
+    if (!clouds_.lobes.empty()) {
+        j["clouds"] = clouds_.toJson(); // ADR-1289
     }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
@@ -11085,6 +11128,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(nearPlane.error());
         }
         comp->cameraNearSetting_ = std::max(0.0f, *nearPlane);
+        auto farPlane = readFloat(c, "far", 0.0f); // ADR-1280
+        if (!farPlane) {
+            return std::unexpected(farPlane.error());
+        }
+        comp->cameraFarSetting_ = std::max(0.0f, *farPlane);
     }
     if (j.contains("cameraDirection")) {
         auto direction = CameraDirection::fromJson(j.at("cameraDirection"));
@@ -11832,6 +11880,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("scene file '{}': {}", scenePath.string(), added.error().message);
             }
         }
+    }
+    if (j.contains("clouds")) { // ADR-1289
+        const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");
+        auto clouds = Clouds::fromJson(j.at("clouds"), base);
+        if (!clouds) {
+            return fail("scene file '{}': {}", scenePath.string(), clouds.error().message);
+        }
+        comp->setClouds(std::move(*clouds));
     }
     if (j.contains("ecosystem")) { // ADR-1200
         auto eco = Ecosystem::fromJson(j.at("ecosystem"));
@@ -12793,7 +12849,17 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"tearCell", &w.tearCell},
                               TerrainFloat{"tearSpacing", &w.tearSpacing},
                               TerrainFloat{"tearStretch", &w.tearStretch},
-                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind}}) {
+                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind},
+                              // ADR-1286: the cinematic path
+                              TerrainFloat{"ssr", &w.ssr}, TerrainFloat{"ssrDistance", &w.ssrDistance},
+                              TerrainFloat{"ssrSteps", &w.ssrSteps}, TerrainFloat{"ssrGain", &w.ssrGain},
+                              TerrainFloat{"transmission", &w.transmission},
+                              TerrainFloat{"undulation", &w.undulation},
+                              TerrainFloat{"undulationScale", &w.undulationScale},
+                              TerrainFloat{"roughnessVariation", &w.roughnessVariation},
+                              TerrainFloat{"streak", &w.streak}, TerrainFloat{"reflectionRays", &w.reflectionRays},
+                              TerrainFloat{"tintPatches", &w.tintPatches},
+                              TerrainFloat{"tintPatchScale", &w.tintPatchScale}, TerrainFloat{"glints", &w.glints}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
@@ -12821,7 +12887,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                                           std::pair{"reflectionTint", &w.reflectionTint},
                                                           std::pair{"foamColor", &w.foamColor},
                                                           std::pair{"glowColor", &w.glowColor},
-                                                          std::pair{"sparkleColor", &w.sparkleColor}}) {
+                                                          std::pair{"sparkleColor", &w.sparkleColor},
+                                                          std::pair{"absorption", &w.absorption},
+                                                          std::pair{"reflectionTint2", &w.reflectionTint2}}) {
                             auto v = readVec<3>(wj, key, *target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);

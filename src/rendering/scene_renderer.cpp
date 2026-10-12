@@ -203,6 +203,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       water_(std::make_unique<WaterRenderer>()),
       ecosystem_(std::make_unique<EcosystemRenderer>()),
       astral_(std::make_unique<AstralRenderer>()),
+      clouds_(std::make_unique<CloudRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
       shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
@@ -543,7 +544,11 @@ Result<void> SceneRenderer::init() {
     if (auto r = astral_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
         return r;
     }
-    environments_ = {ecosystem_.get(), astral_.get()}; // ADR-1200: the seam, in run order
+    if (auto r = clouds_->init(context_, shaders_, kHdrFormat); !r) {
+        return std::unexpected(r.error());
+    }
+    // ADR-1289: the clouds first -- they are sky, behind the ecosystem's glints and the astral's particles
+    environments_ = {clouds_.get(), ecosystem_.get(), astral_.get()}; // ADR-1200: the seam, in run order
     // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
     // IBL group (a shield's sheen).
     if (auto r = shells_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, iblLayout_); !r) {
@@ -4492,6 +4497,40 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // the bank, which are opaque and already drawn, and the motes and spores above it have to
         // composite over the surface. Its own pipeline, so the branch it needs is not in the
         // shader every other entity in the world runs.
+        // ---- ADR-1286: the cinematic water path reads the lit opaque frame ----
+        // When a water material this frame is cinematic, the pass is split here (as it is around the SDF
+        // raymarch): the frame so far -- opaque world, sky, atmosphere -- is copied, and the water reflects
+        // and refracts the copy. No cinematic water, no split: the frame is the one it always was.
+        if (!water.empty() && water_->ready() && water_->anyCinematic()) {
+            rp.End();
+            const wgpu::Texture& src = hdr_.colorTexture();
+            if (!waterSceneCopy_ || waterSceneCopy_.GetWidth() != hdr_.width() ||
+                waterSceneCopy_.GetHeight() != hdr_.height()) {
+                wgpu::TextureDescriptor td{};
+                td.label = "water-scene-copy";
+                td.size = {hdr_.width(), hdr_.height(), 1};
+                td.format = kHdrFormat;
+                td.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+                waterSceneCopy_ = context_.device().CreateTexture(&td);
+                waterSceneCopyView_ = waterSceneCopy_.CreateView();
+                water_->setSceneColor(waterSceneCopyView_);
+            }
+            wgpu::TexelCopyTextureInfo from{};
+            from.texture = src;
+            wgpu::TexelCopyTextureInfo to{};
+            to.texture = waterSceneCopy_;
+            const wgpu::Extent3D extent{hdr_.width(), hdr_.height(), 1};
+            encoder.CopyTextureToTexture(&from, &to, &extent);
+            for (auto& attachment : attachments) {
+                attachment.loadOp = wgpu::LoadOp::Load;
+            }
+            depth.depthLoadOp = wgpu::LoadOp::Load;
+            pass.label = "scene-pass-after-water-copy";
+            pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
+            rp = encoder.BeginRenderPass(&pass);
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
+        }
         if (!water.empty() && water_->ready()) {
             // ADR-916: a material with tears and one without are drawn by two pipelines, so the bind
             // follows the item -- once per frame for a scene whose waters agree.
@@ -4506,7 +4545,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 const GpuMesh& mesh = *item.geometry;
                 const std::uint32_t waterOffset = water_->offset(item.water);
                 rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
-                rp.SetBindGroup(2, water_->bindGroup(), 1, &waterOffset);
+                rp.SetBindGroup(2, water_->bindGroup(item.water), 1, &waterOffset);
                 rp.SetVertexBuffer(0, mesh.vertices);
                 rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
                 rp.DrawIndexed(mesh.indexCount);

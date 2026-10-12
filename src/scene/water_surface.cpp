@@ -111,6 +111,51 @@ Result<void> WaterSettings::validate() const {
     if (!(tearWind >= 0.0f && tearWind <= 1.0f)) {
         return fail("water: tearWind must be in [0, 1]");
     }
+    // ADR-1286. Written as `!(inside)` so a NaN fails too.
+    if (!(ssr >= 0.0f && ssr <= 1.0f)) {
+        return fail("water: ssr must be in [0, 1]");
+    }
+    if (!(ssrDistance >= 1.0f && ssrDistance <= 2000.0f)) {
+        return fail("water: ssrDistance must be in [1, 2000] metres");
+    }
+    if (!(ssrSteps >= 8.0f && ssrSteps <= 160.0f)) {
+        return fail("water: ssrSteps must be in [8, 160]");
+    }
+    if (!(ssrGain >= 0.0f && ssrGain <= 20.0f)) {
+        return fail("water: ssrGain must be in [0, 20]");
+    }
+    if (!(transmission >= 0.0f && transmission <= 1.0f)) {
+        return fail("water: transmission must be in [0, 1]");
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (!(absorption[i] >= 0.0f && absorption[i] <= 100.0f)) {
+            return fail("water: absorption must be in [0, 100] per metre in each channel");
+        }
+    }
+    if (!(undulation >= 0.0f && undulation <= 20.0f)) {
+        return fail("water: undulation must be in [0, 20]");
+    }
+    if (!(undulationScale > 0.0f && undulationScale <= 10.0f)) {
+        return fail("water: undulationScale must be in (0, 10] cycles per metre");
+    }
+    if (!(roughnessVariation >= 0.0f && roughnessVariation <= 1.0f)) {
+        return fail("water: roughnessVariation must be in [0, 1]");
+    }
+    if (!(streak >= 0.0f && streak <= 2.0f)) {
+        return fail("water: streak must be in [0, 2]");
+    }
+    if (!(reflectionRays >= 1.0f && reflectionRays <= 16.0f)) {
+        return fail("water: reflectionRays must be in [1, 16]");
+    }
+    if (!(tintPatches >= 0.0f && tintPatches <= 1.0f)) {
+        return fail("water: tintPatches must be in [0, 1]");
+    }
+    if (!(tintPatchScale > 0.0f && tintPatchScale <= 10.0f)) {
+        return fail("water: tintPatchScale must be in (0, 10] cycles per metre");
+    }
+    if (!(glints >= 0.0f && glints <= 50.0f)) {
+        return fail("water: glints must be in [0, 50]");
+    }
     return {};
 }
 

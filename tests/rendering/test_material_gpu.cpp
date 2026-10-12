@@ -1432,3 +1432,60 @@ TEST_CASE("a material program's bar input is the engine's bar phase", "[material
     // ...and not the frame's own beat count: with the old derivation all three were the 0.25 image.
     CHECK(late != quarter);
 }
+
+// ---- ADR-1290: sixteen program slots ------------------------------------------------------------------------------
+
+TEST_CASE("the ninth to sixteenth material programs render; the seventeenth falls back to the material (ADR-1290)",
+          "[material][gpu][adr1290]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    if (auto init = renderer.init(); !init) {
+        FAIL(init.error().message);
+    }
+
+    // Seventeen programs, each a flat base colour: the first eight grey (the old table, filled), the ninth to
+    // sixteenth red, and the seventeenth green. A wall drawn with program i must take its colour when i < 16.
+    auto flat = [](const std::string& name, glm::vec3 c) {
+        MaterialProgram p;
+        p.name = name;
+        MaterialOp k = op(MaterialOpKind::Constant, 0);
+        k.constant = {c.x, c.y, c.z, 1.0f};
+        p.ops.push_back(k);
+        p.baseColorRegister = 0;
+        return p;
+    };
+    scene::Scene base = baseScene();
+    base.camera.position = {0.0f, 0.0f, 12.0f};
+    for (int i = 0; i < 17; ++i) {
+        const glm::vec3 c = i < 8 ? glm::vec3(0.5f) : (i < 16 ? glm::vec3(0.9f, 0.05f, 0.05f) : glm::vec3(0.05f, 0.9f, 0.05f));
+        base.materialPrograms.push_back(flat("p" + std::to_string(i), c));
+    }
+    auto wallWith = [&](const std::string& program) {
+        scene::Scene s = base;
+        scene::ProceduralGeometry wall = boxWall();
+        wall.material.program = program;
+        s.procedurals.push_back(wall);
+        return renderWith(renderer, s);
+    };
+    const auto ninth = wallWith("p8");
+    const auto twelfth = wallWith("p11");
+    const auto sixteenth = wallWith("p15");
+    const auto seventeenth = wallWith("p16");
+    CHECK(ctx->errorCount() == 0);
+    auto rgb = [](const gpu::Image8& img) {
+        const std::uint8_t* p = img.pixel(80, 80);
+        return std::array<int, 3>{p[0], p[1], p[2]};
+    };
+    for (const auto* img : {&ninth, &twelfth, &sixteenth}) {
+        const auto c = rgb(*img);
+        INFO("program slot 9..16 pixel " << c[0] << "," << c[1] << "," << c[2]);
+        CHECK(c[0] > c[1] + 30); // red: the program ran
+        CHECK(c[0] > c[2] + 30);
+    }
+    // the seventeenth is not uploaded: the wall shades with its own (grey) material, not green
+    const auto g = rgb(seventeenth);
+    INFO("seventeenth pixel " << g[0] << "," << g[1] << "," << g[2]);
+    CHECK(std::abs(g[1] - g[0]) < 12);
+    CHECK(std::abs(g[1] - g[2]) < 12);
+}

@@ -65,7 +65,7 @@ static_assert(sizeof(EmitterPoint) == 24);
 [[nodiscard]] Result<std::vector<EmitterPoint>> loadEmitterTemplate(const std::filesystem::path& file);
 [[nodiscard]] Result<std::vector<EmitterPoint>> emitterTemplateFromJson(const nlohmann::json& j);
 
-constexpr std::size_t kMaxEcosystemLayers = 16;
+constexpr std::size_t kMaxEcosystemLayers = 32; // ADR-1200 had 16; each layer is its own dispatch, so the cap is bookkeeping (see the ADR index)
 constexpr std::size_t kMaxTemplatePoints = 65536;
 
 struct EmitterLayer {
@@ -106,6 +106,13 @@ struct EmitterLayer {
     // Floating organisms drift: each host instance bobs on its own phase. 0 = still.
     float bob = 0.0f;                // metres
     float bobRate = 0.1f;            // Hz
+    // ADR-1281: the point's reflection in still water at y = mirrorLevel, drawn only where the camera sees that
+    // water, smeared vertically over +-mirrorStretch metres by ripples. 0 = off.
+    float mirror = 0.0f;             // reflection strength, 0..4
+    float mirrorLevel = 0.0f;        // the water's level (m)
+    float mirrorStretch = 0.3f;      // the ripple streak's half length (m)
+    glm::vec2 mirrorSlope{0.0f};     // the water's slope (dlevel/dx, dlevel/dz): a river descends along its course
+    float mirrorSoftness = 0.0f;     // pixels: each reflected sample a soft disc (an out-of-focus column); 0 = sharp
 
     [[nodiscard]] Result<void> validate() const;
 };

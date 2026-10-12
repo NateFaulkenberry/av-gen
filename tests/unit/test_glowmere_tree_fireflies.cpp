@@ -218,8 +218,8 @@ TEST_CASE("The firefly material lights exactly the swarm trees and leaves every 
                                         [&](const scene::MaterialProgram& p) { return p.name == lead->material.program; });
         REQUIRE(found != s.materialPrograms.end());
         // rendering::kMaxGpuMaterialPrograms, which this CPU suite cannot include (it pulls in
-        // webgpu); shaders/material.wgsl's MAT_MAX_PROGRAMS says the same 8.
-        CHECK(found - s.materialPrograms.begin() < 8);
+        // webgpu); shaders/material.wgsl's MAT_MAX_PROGRAMS says the same 16 (ADR-1290).
+        CHECK(found - s.materialPrograms.begin() < 16);
         const scene::MaterialProgram& program = *found;
         REQUIRE(program.validate().has_value());
 

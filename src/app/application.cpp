@@ -2154,6 +2154,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 return std::unexpected(r.error());
             }
             if (panel_) panel_->setStatus(r.error().message);
+        } else if (auto scene = engine_->requireProjectScene(); !scene && (options.headless || options.render)) {
+            // ADR-1288: headless and render runs refuse a project whose scene did not load
+            log::error("project: {}", scene.error().message);
+            return std::unexpected(scene.error());
         } else if (!options.headless) {
             rememberProject(*options.project);
         }
@@ -5973,6 +5977,11 @@ Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesys
     auto offline = std::make_unique<Engine>(EngineMode::Offline);
     offline->setLiveControl(false); // a render is a pure function of its file, not of the OSC port
     if (auto r = offline->loadProject(projectFile); !r) {
+        return std::unexpected(r.error());
+    }
+    // ADR-1288: a render of the default scene in place of the project's is not a render of the project. It
+    // used to write every frame and exit 0, which made a broken scene file look like a finished deliverable.
+    if (auto r = offline->requireProjectScene(); !r) {
         return std::unexpected(r.error());
     }
     for (const auto& w : offline->projectWarnings()) {

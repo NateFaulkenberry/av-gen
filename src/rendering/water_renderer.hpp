@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace avgen::gpu {
@@ -62,8 +63,16 @@ struct WaterUniforms {
     glm::vec4 tears{0.0f};        // amount, shear (m), coverage, lattice cell (m)
     glm::vec4 tearShape{0.0f};    // spacing (m), stretch, drift (m/s), wind coupling
     glm::vec4 tearFrame{0.0f};    // seam direction x, z (in XZ), 1 when it follows the wind, 0
+    // ADR-1286, appended so no offset above moved. Read only by the cinematic pipeline.
+    glm::vec4 cineA{0.0f};        // ssr, ssrDistance (m), transmission, roughnessVariation
+    glm::vec4 cineB{0.0f};        // undulation, undulationScale, ssrSteps, ssrGain
+    glm::vec4 cineAbsorb{0.0f};   // absorption rgb per metre, 0
+    glm::vec4 cineC{0.0f};        // streak, reflection rays, tint patches, glints
+    glm::vec4 cineTint2{0.0f};    // second reflection tint rgb, patch scale
 };
-static_assert(sizeof(WaterUniforms) == 240);
+static_assert(sizeof(WaterUniforms) == 320);
+// The part of the record a shader without the cinematic block reads (its binding's minimum size).
+inline constexpr std::uint64_t kWaterUniformsPlainSize = 240;
 
 // How many distinct water materials one frame may carry. Uniform slots are cheap; the number is a
 // bound on the dynamic-offset buffer and nothing else.
@@ -81,6 +90,8 @@ inline constexpr std::uint32_t kMaxWaterMaterials = 8;
 // from this, so it runs exactly the shader it ran before the tears existed. Source with no markers comes
 // back unchanged; a block that never closes is an error.
 [[nodiscard]] Result<std::string> waterSourceWithoutTears(const std::string& source);
+// ADR-1286: the same for any marked block, `---- <tag> begin ----` through `---- <tag> end ----`.
+[[nodiscard]] Result<std::string> waterSourceWithout(const std::string& source, std::string_view tag);
 
 class WaterRenderer {
 public:
@@ -103,25 +114,46 @@ public:
         return static_cast<std::uint32_t>(slot) * kStride;
     }
     [[nodiscard]] const wgpu::BindGroup& bindGroup() const { return bindGroup_; }
+    // ADR-1286. The bind group slot `slot` is drawn with: the cinematic one (uniforms plus the copy of the
+    // lit opaque frame) for a cinematic material, the plain one otherwise.
+    [[nodiscard]] const wgpu::BindGroup& bindGroup(std::size_t slot) const {
+        return slot < cine_.size() && cine_[slot] && cineBindGroup_ ? cineBindGroup_ : bindGroup_;
+    }
+    // Whether any material uploaded this frame is cinematic, i.e. whether the frame copy is needed.
+    [[nodiscard]] bool anyCinematic() const {
+        for (std::uint32_t i = 0; i < uploaded_; ++i) {
+            if (cine_[i]) return true;
+        }
+        return false;
+    }
+    // The copy of the lit opaque frame the cinematic surfaces read. Rebuilds the cinematic bind group;
+    // called whenever the copy is (re)allocated.
+    void setSceneColor(const wgpu::TextureView& view);
     // The pipeline slot `slot`'s material is drawn with (ADR-916): the one with the tear code when its
     // `tears` is above 0, and otherwise the one with it compiled out -- so a surface without tears is
     // byte-identical to the shader before them, which one shader with the code gated could not promise
     // (the compiler builds the shared ripple path differently once the tear's data flows through it).
     [[nodiscard]] const wgpu::RenderPipeline& pipeline(std::size_t slot) const {
+        if (slot < cine_.size() && cine_[slot] && cineBindGroup_) {
+            return cinePipeline_;
+        }
         return slot < torn_.size() && torn_[slot] ? pipeline_ : plainPipeline_;
     }
-    [[nodiscard]] bool ready() const { return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_); }
+    [[nodiscard]] bool ready() const {
+        return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_) && static_cast<bool>(cinePipeline_);
+    }
     [[nodiscard]] std::uint32_t materialCount() const { return uploaded_; }
 
 private:
     // Dynamic uniform offsets must be a multiple of the device's minimum alignment, which is 256
-    // on every backend this runs on. 240 bytes of record, padded.
-    static constexpr std::uint32_t kStride = 256;
+    // on every backend this runs on. 320 bytes of record (ADR-1286), padded.
+    static constexpr std::uint32_t kStride = 512;
     static_assert(kStride % 256 == 0);
     static_assert(sizeof(WaterUniforms) <= kStride);
 
     [[nodiscard]] Result<void> createPipeline(gpu::ShaderLibrary& shaders);
-    [[nodiscard]] Result<wgpu::RenderPipeline> buildPipeline(const wgpu::ShaderModule& module, const char* label);
+    [[nodiscard]] Result<wgpu::RenderPipeline> buildPipeline(const wgpu::ShaderModule& module, const char* label,
+                                                             const wgpu::PipelineLayout& layout);
 
     gpu::Context* context_ = nullptr;
     wgpu::TextureFormat hdrFormat_ = wgpu::TextureFormat::RGBA16Float;
@@ -130,6 +162,13 @@ private:
     wgpu::PipelineLayout pipelineLayout_;
     wgpu::RenderPipeline pipeline_;      // with the tears (ADR-916)
     wgpu::RenderPipeline plainPipeline_; // with them compiled out
+    // ADR-1286: the cinematic path, its own layout (uniforms, the frame copy, a sampler) and bind group.
+    wgpu::BindGroupLayout cineLayout_;
+    wgpu::PipelineLayout cinePipelineLayout_;
+    wgpu::RenderPipeline cinePipeline_;
+    wgpu::BindGroup cineBindGroup_;
+    wgpu::Sampler cineSampler_;
+    std::array<bool, kMaxWaterMaterials> cine_{};
     std::array<bool, kMaxWaterMaterials> torn_{};
     wgpu::Buffer uniforms_;
     wgpu::BindGroup bindGroup_;

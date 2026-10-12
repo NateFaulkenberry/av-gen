@@ -225,6 +225,10 @@ public:
     // it is not a warning like the others: the world is gone and the orb stands in for it, so the
     // application reports it on its own rather than as the first of a count (QA pass, 2026-09-28).
     [[nodiscard]] const std::string& projectSceneError() const { return projectSceneError_; }
+    // ADR-1288: the same fact as a failure, for every caller that must not proceed without the project's own
+    // world -- an offline render, a queue job, a headless run. The editor still opens a project whose scene
+    // failed (it says so in the status bar and lets the author fix it); nothing that writes frames does.
+    [[nodiscard]] Result<void> requireProjectScene() const;
 
     // ---- route and parameter liveness (ADR-902) ------------------------------------------------
     // What the liveness rules read about this engine's project -- its bus, parameters, sources,

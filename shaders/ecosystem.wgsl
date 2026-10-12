@@ -26,7 +26,10 @@ struct Layer {
     bound: vec4<f32>,       // x = host bounding radius (template extent, before host scale), y = wake field slot
                             // (-1 none), z = wake gain, w = near fade (m, 0 = off)
     optics: vec4<f32>,      // x = iridescence, y = spectral cycles along v, z = cycles per second, w = bob (m)
-    motion: vec4<f32>,      // x = bob rate (Hz)
+    motion: vec4<f32>,      // x = bob rate (Hz), y = mirror strength (0 = off), z = mirror level (m), w = mirror
+                            // stretch (m): ADR-1281, the point's reflection in still water at that level
+    mirror2: vec4<f32>,     // x, y = the water's slope (dlevel/dx, dlevel/dz): a river descends; z = the streak's
+                            // softness in pixels (ADR-1281: soft bokeh columns instead of sub-pixel dots); w unused
 };
 
 struct Host {
@@ -131,7 +134,9 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
     let radius = pt.radius * layer.response.w * hostScale;
     let texel = vec2<i32>(clamp(i32(fx), 0, i32(eco.size.x) - 1), clamp(i32(fy), 0, i32(eco.size.y) - 1));
     let sceneDepth = textureLoad(linearDepth, texel, 0).r;
-    if (viewDepth - radius > sceneDepth * 1.002 + 0.02) {
+    let occluded = viewDepth - radius > sceneDepth * 1.002 + 0.02;
+    let mirrored = layer.motion.y > 0.0 && p.y > layer.motion.z + layer.mirror2.x * p.x + layer.mirror2.y * p.z;
+    if (occluded && !mirrored) {
         return;
     }
 
@@ -191,6 +196,12 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
     if (max(radiance.r, max(radiance.g, radiance.b)) <= 1.0e-5) {
         return;
     }
+    if (mirrored) {
+        mirrorSplat(p, radiance, radius, hPoint);
+    }
+    if (occluded) {
+        return;
+    }
 
     // ---- footprint ----
     let clipUp = frame.viewProj * vec4<f32>(p + frame.cameraUp.xyz * radius, 1.0);
@@ -218,6 +229,116 @@ fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l
     splatAdd(ix + 1, iy, energy * ax * (1.0 - ay));
     splatAdd(ix, iy + 1, energy * (1.0 - ax) * ay);
     splatAdd(ix + 1, iy + 1, energy * ax * ay);
+}
+
+// ADR-1281: a point's reflection in still water. The point is mirrored through the plane y = level; the reflection
+// is drawn only where the surface the camera sees at the mirrored point's pixel IS that plane (its view depth matches
+// the plane's along that ray), so it never lands on a bank or a rock. Ripples smear it into a short vertical streak
+// (several splats spread over +-stretch metres, shimmering with time): light on rippled water becomes a pillar.
+fn mirrorSplat(p: vec3<f32>, radiance: vec3<f32>, radius: f32, h: f32) {
+    let level = layer.motion.z + layer.mirror2.x * p.x + layer.mirror2.y * p.z;
+    let strength = layer.motion.y;
+    let stretch = layer.motion.w;
+    let cam = frame.cameraPos.xyz;
+    let pm = vec3<f32>(p.x, 2.0 * level - p.y, p.z);
+    if (cam.y <= level) {
+        return;
+    }
+    // where the ray to the mirrored point crosses the water
+    let t = (cam.y - level) / max(cam.y - pm.y, 1.0e-4);
+    let q = cam + (pm - cam) * t;
+    let qDepth = dot(q - cam, frame.cameraForward.xyz);
+    if (qDepth < 0.05) {
+        return;
+    }
+    let clipQ = frame.viewProj * vec4<f32>(q, 1.0);
+    if (clipQ.w <= 0.0) {
+        return;
+    }
+    let nq = clipQ.xyz / clipQ.w;
+    if (abs(nq.x) > 1.05 || abs(nq.y) > 1.05) {
+        return;
+    }
+    let qx = (nq.x * 0.5 + 0.5) * eco.size.x;
+    let qy = (0.5 - nq.y * 0.5) * eco.size.y;
+    let qt = vec2<i32>(clamp(i32(qx), 0, i32(eco.size.x) - 1), clamp(i32(qy), 0, i32(eco.size.y) - 1));
+    let seen = textureLoad(linearDepth, qt, 0).r;
+    if (abs(seen - qDepth) > 0.003 * qDepth + 0.3) {
+        return; // something other than the water is in front there
+    }
+    // Ripples break the reflection into an irregular streak: each point's own length (0.3..1 x stretch), its own
+    // horizontal wander, and gaps where its ripple phase hides a sample. Never a regular comb (a barcode).
+    let k = select(10, 24, layer.mirror2.z > 0.5);
+    let tt = eco.misc.x;
+    let len = stretch * (0.3 + 0.7 * fract(h * 7.31));
+    let side = cross(frame.cameraUp.xyz, frame.cameraForward.xyz);
+    for (var i = 0; i < k; i = i + 1) {
+        let hi = fract(h * 13.7 + f32(i) * 0.6180339);
+        let f = hi * 2.0 - 1.0;
+        let wave = sin(6.2831853 * (0.45 * tt + h * 3.0 + f * 1.7));
+        if (wave < -0.35) {
+            continue; // a trough: this part of the streak is dark this moment
+        }
+        let wob = 0.12 * len * sin(6.2831853 * (0.9 * tt + h * 5.0 + f32(i) * 0.37));
+        let pi = pm + vec3<f32>(0.0, f * len, 0.0) + side * wob;
+        let c = frame.viewProj * vec4<f32>(pi, 1.0);
+        if (c.w <= 0.0) {
+            continue;
+        }
+        let n = c.xyz / c.w;
+        let fx = (n.x * 0.5 + 0.5) * eco.size.x;
+        let fy = (0.5 - n.y * 0.5) * eco.size.y;
+        let up = frame.viewProj * vec4<f32>(pi + frame.cameraUp.xyz * radius, 1.0);
+        let rPx = abs((0.5 - (up.y / up.w) * 0.5) * eco.size.y - fy);
+        // brightest near the mirror image, fading toward the streak's ends; shimmering with the ripple
+        let w = strength * (1.0 - 0.7 * abs(f)) * (0.55 + 0.45 * wave) / f32(k) * 1.6;
+        let energy = radiance * max(3.14159265 * rPx * rPx, 0.6) * w;
+        // every sample of the streak must itself land on the water: the ray through its pixel meets the plane at
+        // the depth the prepass saw there (else it is on a bank or a stem in front of the water)
+        {
+            let far4 = frame.invViewProj * vec4<f32>(n.xy, 1.0, 1.0);
+            let dir = normalize(far4.xyz / far4.w - cam);
+            if (dir.y >= -1.0e-4) {
+                continue;
+            }
+            let tp = (level - cam.y) / dir.y;
+            let planeDepth = dot(dir * tp, frame.cameraForward.xyz);
+            let st = vec2<i32>(clamp(i32(fx), 0, i32(eco.size.x) - 1), clamp(i32(fy), 0, i32(eco.size.y) - 1));
+            let seenS = textureLoad(linearDepth, st, 0).r;
+            if (seenS < planeDepth * 0.9 - 0.5) {
+                continue; // something stands in front of the water at this pixel
+            }
+        }
+        let soft = layer.mirror2.z;
+        if (soft > 0.5) {
+            // An out-of-focus reflection: the sample is a soft disc `soft` pixels in radius whose radiance is the
+            // point's own (it is the blurred image of the light, not of its sub-pixel footprint), Gaussian falloff,
+            // one-pixel taps so no lattice shows.
+            // ripple-scale dashes: wide across, thin vertically (light broken by the wavelets)
+            let R = i32(min(ceil(soft * 1.5), 12.0));
+            let inv = 1.0 / (soft * soft);
+            let invY = 1.0 / max(soft * soft * 0.06, 0.25);
+            let wdisc = strength * (1.0 - 0.7 * abs(f)) * (0.55 + 0.45 * wave) / f32(k);
+            for (var dy = -R; dy <= R; dy = dy + 1) {
+                for (var dx = -R; dx <= R; dx = dx + 1) {
+                    let g = exp(-f32(dx * dx) * inv - f32(dy * dy) * invY);
+                    if (g < 0.02) {
+                        continue;
+                    }
+                    splatAdd(i32(round(fx - 0.5)) + dx, i32(round(fy - 0.5)) + dy, radiance * (wdisc * g));
+                }
+            }
+            continue;
+        }
+        let ix = i32(floor(fx - 0.5));
+        let iy = i32(floor(fy - 0.5));
+        let ax = fx - 0.5 - f32(ix);
+        let ay = fy - 0.5 - f32(iy);
+        splatAdd(ix, iy, energy * (1.0 - ax) * (1.0 - ay));
+        splatAdd(ix + 1, iy, energy * ax * (1.0 - ay));
+        splatAdd(ix, iy + 1, energy * (1.0 - ax) * ay);
+        splatAdd(ix + 1, iy + 1, energy * ax * ay);
+    }
 }
 
 // The sprite draw's indirect arguments: six vertices per sprite, as many sprites as were appended (capped).

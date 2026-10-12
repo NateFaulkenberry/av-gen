@@ -6,13 +6,13 @@
 // field references resolve through the frame's FieldUniforms slot map.
 //
 // Slot assignment: slot i is Scene::materialPrograms[i] for i < kMaxGpuMaterialPrograms, so
-// Material::program resolves through slotOf(name). Programs beyond the eighth are not uploaded
+// Material::program resolves through slotOf(name). Programs beyond the sixteenth are not uploaded
 // (slotOf -1, warned once) and their materials shade with their own values.
 //
 // The select buffer is the second half of the story: the shader reads its program index from a
 // 16-byte uniform (`MaterialSelect`, group 2 binding 7) rather than a per-object lane, so the
 // procedural and SDF renderers need no plumbing. It holds one region per possible slot value
-// (-1 .. 7) at 256-byte (dynamic-offset-aligned) stride, written once; a material bind group binds
+// (-1 .. 15) at 256-byte (dynamic-offset-aligned) stride, written once; a material bind group binds
 // the region for its own slot.
 
 #include "scene/material_program.hpp"
@@ -33,9 +33,11 @@ namespace avgen::rendering {
 
 class FieldUniforms;
 
-constexpr int kMaxGpuMaterialPrograms = 8;
+// ADR-1290: 16 (was 8). A world of eight surface programs plus a sky object (the moon's phase) ran out of slots, and
+// the ninth program was dropped with one log line -- its surfaces shading as though they had none.
+constexpr int kMaxGpuMaterialPrograms = 16;
 
-// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (45,840 bytes since ADR-904's header
+// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (91,664 bytes since ADR-1290; 45,840 since ADR-904's header
 // flags; past the uniform limit since ADR-036, which is why it is a read-only storage buffer).
 struct MaterialProgramBlock {
     std::uint32_t count = 0;

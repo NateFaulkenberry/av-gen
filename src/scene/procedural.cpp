@@ -2687,6 +2687,11 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
     if (distribution.kind == DistributionKind::Generator) {
         return spatial::PointCloud(0);
     }
+    // ADR-1285: an empty points list places nothing. It used to fall through to the derived path, which always
+    // makes at least one placement -- one instance at the origin, an object nobody placed.
+    if (distribution.kind == DistributionKind::Points && (!distribution.points || distribution.points->empty())) {
+        return spatial::PointCloud(0);
+    }
     // ADR-1118: a points list is read straight through, as a scatter cloud is.
     const bool fromPoints = distribution.kind == DistributionKind::Points && distribution.points &&
                             !distribution.points->empty();
@@ -3120,6 +3125,9 @@ json ProceduralGeometry::toJson() const {
         s2["impostorSize"] = lod.impostorSize;
         j["lod"] = std::move(s2);
     }
+    if (motion.windSensitivity > 0.0f) { // ADR-1292: written only when the object answers the wind
+        j["motion"] = wind::motionToJson(motion);
+    }
     {
         json s = json::object();
         s["baseColor"] = vecToJson(material.baseColor);
@@ -3473,6 +3481,20 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
             g.effectors.push_back(std::move(*e));
         }
     }
+    // ADR-1292: how this object answers the scene wind (core/wind.hpp VegetationMotion). Until now only an ecology
+    // scatter layer could carry it, so a hand-placed organism -- every node of a curated library -- stood still in
+    // any wind. Absent means windSensitivity 0: nothing moves that did not ask to.
+    if (root.contains("motion")) {
+        if (!root.at("motion").is_object()) {
+            return fail("'motion' must be an object");
+        }
+        g.motion = wind::motionFromJson(root.at("motion"), g.motion);
+        if (!(g.motion.stiffness > 0.0f) || !(g.motion.mass > 0.0f) || g.motion.damping < 0.0f ||
+            g.motion.windSensitivity < 0.0f || g.motion.tipAmplitude < 0.0f || !(g.motion.bendLimit >= 0.0f)) {
+            return fail("motion: stiffness and mass must be positive; damping, windSensitivity, tipAmplitude and "
+                        "bendLimit must not be negative");
+        }
+    }
     if (root.contains("lod")) {
         const json& j = root.at("lod");
         if (!j.is_object()) {
@@ -3615,6 +3637,8 @@ namespace {
 // the maximum itself: an object whose scene authors more than this gets a range that holds what it
 // authored, and every object that does not keeps exactly the range it had.
 constexpr float kAuthoredEmissiveCeiling = 50.0f;
+// ADR-1287: the most an authored emission tint channel may be (an entity part's `emissiveColor` ceiling).
+constexpr float kEmissiveColorCeiling = 64.0f;
 
 struct Registrar {
     params::ParameterSet& params;
@@ -3970,7 +3994,15 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
     // Material
     const Material& m = rest.material;
     p.baseColor = r.v3("material/baseColor", m.baseColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
-    p.emissiveColor = r.v3("material/emissiveColor", m.emissiveColor, 0.0f, 1.0f, 0.0f, 1.0f, true);
+    // ADR-1287: `emissiveColor` is a *factor on light*, not a reflectance. It multiplies the emission texture
+    // (ADR-1284) before the HDR pipeline, and nothing downstream bounds it -- the shaders multiply, AgX maps.
+    // A [0, 1] hard range made every tint that lifts a channel (a gold or violet colourway of a cyan texture)
+    // run at 1 and only darken. So the range holds what the file authored, up to the same ceiling as an
+    // entity part's emissive colour (64), and the *soft* range -- what the panel draws -- stays 0..1.
+    // `baseColor` keeps [0, 1]: an albedo above 1 is a surface that reflects more light than it receives.
+    const float authoredTint = std::max({m.emissiveColor.x, m.emissiveColor.y, m.emissiveColor.z});
+    p.emissiveColor = r.v3("material/emissiveColor", m.emissiveColor, 0.0f,
+                           std::clamp(authoredTint, 1.0f, kEmissiveColorCeiling), 0.0f, 1.0f, true);
     // ADR-331. The ceiling here was a flat 50, and it clamped an authored 256 in silence.
     //
     // A hard range is an affordance -- it keeps a slider and a modulation route inside something

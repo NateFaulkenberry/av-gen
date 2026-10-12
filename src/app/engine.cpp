@@ -2675,6 +2675,14 @@ void Engine::markProjectSaved() {
 
 // ---- loading a project, and starting a new one ------------------------------------------------
 
+Result<void> Engine::requireProjectScene() const {
+    if (projectSceneError_.empty()) {
+        return {};
+    }
+    return fail("the project's scene did not load, so what would be drawn is not the project's world: {}",
+                projectSceneError_);
+}
+
 Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // ---- the stages, and what they cost -----------------------------------------------------
     //

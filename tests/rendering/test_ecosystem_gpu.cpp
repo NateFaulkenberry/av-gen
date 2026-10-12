@@ -323,3 +323,123 @@ TEST_CASE("a disabled ecosystem renders the same bytes as a scene with none", "[
     CHECK(renderer.ecosystem().stats().layers == 0);
     CHECK(a.rgba == b.rgba);
 }
+
+TEST_CASE("an emitter is reflected in still water only where the camera sees that water (ADR-1281)",
+          "[gpu][ecosystem][adr1281]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // An emitter 2 m above a dark floor at y = -2, 20 m out. Its mirror image (y = -4) is seen where the ray to it
+    // crosses the floor: (0, -2, -10), which projects 0.2 / tan(30 deg) of the half height below the centre.
+    scene::Scene base = darkStage();
+    addEcosystem(base, glm::vec3(0.0f, 0.0f, -20.0f), {point(glm::vec3(0.0f), 0.04f)}, 40.0f);
+    const scene::MeshId cube = base.addMesh(scene::makeCube(1.0f));
+    scene::Entity& floor = base.addEntity("water", cube);
+    floor.transform.position = glm::vec3(0.0f, -3.0f, -30.0f);
+    floor.transform.scale = glm::vec3(60.0f, 1.0f, 60.0f); // a cube of half-extent 1: its top face at y = -2
+    floor.material.baseColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+    scene::Scene mirrored = base;
+    mirrored.ecosystem.layers[0].mirror = 1.0f;
+    mirrored.ecosystem.layers[0].mirrorLevel = -2.0f;
+    mirrored.ecosystem.layers[0].mirrorStretch = 0.2f;
+    scene::Scene noFloor = mirrored;
+    noFloor.entities.clear();
+
+    const gpu::Image8 plain = render(renderer, base, 1.0);
+    const gpu::Image8 refl = render(renderer, mirrored, 1.0);
+    const gpu::Image8 air = render(renderer, noFloor, 1.0);
+    dump(plain, "ecosystem-mirror-off");
+    dump(refl, "ecosystem-mirror-on");
+    dump(air, "ecosystem-mirror-no-water");
+
+    const float halfPx = 0.5f * static_cast<float>(kHeight);
+    const auto ry = static_cast<std::uint32_t>(halfPx + 0.2f / std::tan(glm::radians(30.0f)) * halfPx);
+    auto around = [&](const gpu::Image8& img) {
+        int best = 0;
+        for (std::uint32_t y = ry - 4; y <= ry + 4; ++y) {
+            for (std::uint32_t x = kWidth / 2 - 3; x <= kWidth / 2 + 3; ++x) {
+                best = std::max(best, luma(img, x, y));
+            }
+        }
+        return best;
+    };
+    INFO("at the reflection: off " << around(plain) << ", on " << around(refl) << ", no water " << around(air));
+    CHECK(around(refl) > around(plain) + 40);
+    // the direct image is unchanged by the reflection
+    CHECK(std::abs(luma(refl, kWidth / 2, kHeight / 2) - luma(plain, kWidth / 2, kHeight / 2)) <= 3);
+    // with nothing at the water's level in front, there is nothing to reflect in
+    CHECK(around(air) < around(refl) / 3);
+}
+
+// ---- ADR-1284: the grazing emissive rim follows the emissive texture ------------------------------------------------
+
+namespace {
+
+scene::TextureData flatTexture(std::uint8_t v) {
+    scene::TextureData t;
+    t.name = v == 0 ? "black" : "white";
+    t.width = t.height = 8;
+    t.data.assign(static_cast<std::size_t>(t.width) * t.height * 4, v);
+    for (std::size_t i = 3; i < t.data.size(); i += 4) {
+        t.data[i] = 255;
+    }
+    return t;
+}
+
+// A black sphere 6 m out, emissive factor white x 4 (the glTF convention: colour and placement in the texture).
+scene::Scene rimStage(int texture /* -1 none, 0 black, 255 white */) {
+    scene::Scene s = darkStage();
+    const scene::MeshId mesh = s.addMesh(scene::makeIcosphere(1.0f, 4));
+    scene::Entity& e = s.addEntity("ball", mesh);
+    e.transform.position = glm::vec3(0.0f, 0.0f, -6.0f);
+    e.material.baseColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    e.material.emissiveColor = glm::vec3(1.0f);
+    e.material.emissiveIntensity = 4.0f;
+    if (texture >= 0) {
+        const scene::TextureId id = s.addTexture(flatTexture(static_cast<std::uint8_t>(texture)));
+        e.material.emissiveTexture.texture = id;
+    }
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("the grazing emissive rim follows the emissive texture: black emission has no rim (ADR-1284)",
+          "[gpu][material][adr1284]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const gpu::Image8 none = render(renderer, rimStage(-1), 1.0);
+    const gpu::Image8 black = render(renderer, rimStage(0), 1.0);
+    const gpu::Image8 white = render(renderer, rimStage(255), 1.0);
+    scene::Scene darkScene = rimStage(-1);
+    darkScene.entities[0].material.emissiveIntensity = 0.0f; // the same sphere emitting nothing at all
+    const gpu::Image8 dark = render(renderer, darkScene, 1.0);
+    dump(none, "rim-no-texture");
+    dump(black, "rim-black-texture");
+    dump(white, "rim-white-texture");
+
+    // the sphere's silhouette, where the rim term is strongest: its radius on screen is about
+    // 0.5 * H * (1 / 6) / tan(30 deg) = 19.5 px; sample a ring just inside it
+    const float r = 0.5f * static_cast<float>(kHeight) * (1.0f / 6.0f) / std::tan(glm::radians(30.0f)) - 1.5f;
+    int maxBlack = 0; // the largest difference between the black-textured sphere and the non-emitting one
+    int sumNone = 0;
+    int sumWhite = 0;
+    for (int k = 0; k < 16; ++k) {
+        const float a = 6.2831853f * static_cast<float>(k) / 16.0f;
+        const auto x = static_cast<std::uint32_t>(static_cast<float>(kWidth) * 0.5f + r * std::cos(a));
+        const auto y = static_cast<std::uint32_t>(static_cast<float>(kHeight) * 0.5f + r * std::sin(a));
+        maxBlack = std::max(maxBlack, std::abs(luma(black, x, y) - luma(dark, x, y)));
+        sumNone += luma(none, x, y);
+        sumWhite += luma(white, x, y);
+    }
+    INFO("rim ring: no texture " << sumNone << ", white texture " << sumWhite << ", black texture max " << maxBlack);
+    CHECK(maxBlack <= 3);                      // nothing emitted, nothing added at the rim (it is lit, not glowing)
+    CHECK(std::abs(sumWhite - sumNone) <= 16); // a white texture is the untextured material
+    CHECK(sumNone > 16 * 60);                  // and the untextured material still has its rim
+}
