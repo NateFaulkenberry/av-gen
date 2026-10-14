@@ -163,9 +163,6 @@ if(APPLE)
         "-framework Metal" "-framework Foundation")
 endif()
 
-add_executable(avgen_slope_probe _slope_probe.cpp)
-target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
-
 
 # Phase D §58/§64: simulate a scene headless and print one line per decision any character makes,
 # plus the §41 "why" report on request. A permanent tool, not a probe: it is the offline half of

@@ -173,3 +173,6 @@ __pycache__/
 # were removed in the QA pass (2026-09-28); the generator itself no longer runs against today's
 # deliverable ("no vortex object to set 'innerVoid'"), so regenerating them needs it updated first.
 /examples/treeisland/_vx2-*.json
+# Output of the hidden [.capture] cases in tests/rendering/test_temporal_gpu.cpp, which now write to
+# AVGEN_CAPTURE_DIR or build/captures; this catches a run with AVGEN_CAPTURE_DIR=. from the root.
+/temporal-*.png

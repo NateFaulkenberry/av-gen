@@ -2088,7 +2088,7 @@ proceed until it exists.
 ### Why the alien lab does not exercise body compensation, and what that says
 
 `examples/labs/footik/alien-foot-lab.scene.json` stands three aliens on terrain measured at
-**0.3499 m of relief across their own 0.9 m footprint** (found with `tools/_slope_probe.cpp`). Both
+**0.3499 m of relief across their own 0.9 m footprint** (found with `tools/_slope_probe.cpp`, since removed). Both
 feet of every alien **apply** — never clamp — and body compensation never engages.
 
 That is not a fixture that is too flat. It is the architecture:

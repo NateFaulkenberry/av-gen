@@ -511,7 +511,7 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    halves a small highlight's glow across the delivered picture. Measured, with two controls, in
    ADR-279; deliberately not changed, because the fix is an art-direction decision. **Owner: the
    owner.**
-8. **`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists, and
+8. ~~**`indtune.cpp` at the repository root is a 0-byte file**~~ **Removed, 2026-10-14.**
    `avgen_bench_flatten` is marked temporary and slated for deletion with its investigation.
 9. ~~**An authored particle `burst` is inert.**~~ **Fixed, 2026-09-20 (ADR-399).**
    `registerParticleParameters` (`src/scene/particles.cpp`) seeded `particles/<name>/burst` with a
