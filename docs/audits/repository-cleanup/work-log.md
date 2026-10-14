@@ -91,3 +91,17 @@ The owner's checkout (`av-gen`, on `main`) is not modified.
    - Deleted 7 local branches whose commits are all in `main`, a remote branch, or a retained sibling. The tips are
      recorded in `repository-inventory.md`.
    - Removed the `av-gen-furnace-eng` worktree.
+9. **Code fixes merged** from `cleanup/code-fixes` (`b7b8a0f5`): CA-001, -002, -005, -009, -010, -013/14/15.
+10. **Found by this branch's own CI runs:**
+    - the numpy wheel (Python 3.14);
+    - the non-hermetic simdjson link (fastgltf); the build job now refuses non-system dylibs;
+    - the Rift arc cases need Trench;
+    - a second copy of the index existence check.
+
+    All fixed. `38597524868` and `38601296548` are green.
+11. **Final local runs at `b7b8a0f5`:**
+    - CPU: exit 0, 4242/4242 ran, 0 failed;
+    - GPU: exit 0, 656/656 ran, 0 failed;
+    - examples review: 95/95 ok.
+12. **Moved into the owner's checkout:** the Biovalley outputs. The `av-gen-biovalley` worktree and the
+    `proto/bio-valley` branch were removed.

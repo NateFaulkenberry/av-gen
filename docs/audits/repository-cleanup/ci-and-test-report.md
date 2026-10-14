@@ -76,7 +76,9 @@ absolute.
 | Suite | Commit | Result |
 |---|---|---|
 | `avgen_tests` via `run-suite.sh cpu-assets` | `f35ad350`^ (before the code-fix merge) | **exit 0**: passed 4221, failed 0, skipped 19, expected failures 1, ran 4241/4241, 17 m 49 s |
-| `avgen_tests` + `avgen_render_tests`, final | see §6 | see §6 |
+| `avgen_tests` via `run-suite.sh cpu-assets`, **final** | `b7b8a0f5` (all fixes merged) | **exit 0**: passed 4222, failed 0, skipped 19 (the same environmental set), expected failures 1, ran 4242/4242, 18 m 59 s |
+| `avgen_render_tests` via `run-suite.sh gpu` (under `tools/gpu-lock.sh`), **final** | `b7b8a0f5` | **exit 0**: passed 655, failed 0, skipped 1 (the NDI case: `libndi` is not installed), ran 656/656, 28 m 55 s |
+| every example through the menu path (`tools/review_examples.py`) | `d5e0e65b`+ | **95 ok / 95**: exit 0, not black, not flat; contact sheets inspected |
 
 The 19 skips are all inputs this machine does not have either:
 
@@ -96,7 +98,9 @@ The one expected failure is the documented `[!shouldfail]` in `test_character_la
 | `38584566817` | `ed9926db` | success | failure (numpy step) | |
 | `38590850459` | `22a56ce7` | success | failure (dyld, simdjson) | the sonic scores generated and hash-matched for the first time |
 | `38594164369` | `9cd8f010`+ | success, including the dylib guard | failure: passed 3983, **failed 4**, skipped 227 | Rift arc ×3 and the Tree of Life check |
-| final | see §6 | | | |
+| `38597524868` | `f35ad350` | success | **success**: passed 3984, failed 0, skipped 230, needs-assets-failed 26, ran 4241/4241 | the first green CI run since 2026-10-07 |
+| `38601296548` | `b7b8a0f5` (all fixes merged) | success | **success**: passed 3971, failed 0, skipped 244, needs-assets-failed 26, ran 4242/4242 | skips +14: the CA-002 path-trace cases now SKIP without assets instead of passing |
+| on `main` after the merge | see §6 | | | |
 
 ## 5. Remaining failures and environmental limitations
 
@@ -111,4 +115,10 @@ The one expected failure is the documented `[!shouldfail]` in `test_character_la
 
 ## 6. Final verification
 
-Filled in at the end of the sprint, after the code-fix merge; see `cleanup-summary.md`.
+- **Local, at `b7b8a0f5`:**
+  - CPU suite exit 0 (4242 of 4242 ran, 0 failed);
+  - GPU suite exit 0 (656 of 656 ran, 0 failed);
+  - examples review 95 of 95 ok.
+- **Remote, on the branch:** `38601296548` green at `b7b8a0f5`.
+- **On `main`:** the push run and a dispatched full run (`gpu: true`, `assets: true`, so the private-asset tier runs
+  too). Their results are recorded in the commit that follows them.
