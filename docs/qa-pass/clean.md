@@ -17,15 +17,15 @@ Worktree `/Users/natefaulkenberry/Documents/GitHub/av-gen-qa-clean`. A successor
   only rewrites the song path to absolute.
 - Main's generator reproduces it: `python3 tools/make_glowmere_valley_3.py && python3 tools/gv3/ufo.py --no-trace`
   (needs `avgen_world_preview` and `avgen_cast_trace` built). Scene byte-identical; project identical except
-  `assets.audio.path` (`../../../../../Desktop/Rebuild.mp3`, the family convention, vs `/Users/<owner>/Desktop/...`).
+  `assets.audio.path` (`../../assets/audio/rebuild.mp3`, the family convention, vs an absolute path to the owner's copy).
   The regenerated `03-directives.md` and `04-shot-plan.md` equal r7b's snapshot. Generator log equals gen-r7b.log.
 - Semantic diff repo vs Desktop copy: project 1 difference (`/assets/audio/path`), scene 0.
 - Verification, `avgen --project examples/world/glowmere-valley-3.json --audit-routes`: rc 0, 0 errors,
   routes 105/105, tracks 130/130, effect-default routes 23/23, effects 18/18 live; 73 shots, 225.5 s. The audit
   JSON equals the Desktop bundle's (minus the path field).
 - Added to `examples/index.json` (Showcase, "Glowmere Valley 3"); the index test loads it (passes).
-- Not included, and why (also in `docs/glowmere-valley-3/README.md`): the song (copyrighted; relative Desktop
-  path, tests use `$AVGEN_REBUILD_AUDIO` or `~/Desktop/Rebuild.mp3` and SKIP); the purchased aliens
+- Not included, and why (also in `docs/glowmere-valley-3/README.md`): the song (copyrighted; gitignored at
+  assets/audio/rebuild.mp3, tests use `$AVGEN_REBUILD_AUDIO` or `assets/audio/rebuild.mp3` and SKIP); the purchased aliens
   (`assets/aliens/*.glb`) and farm animals (`assets/farm/*.glb`); the CC0 quaternius pack (gitignored bulk
   download); the Desktop `bundle/` (its `assets/` holds copies of the licensed files); the r7b cast trace
   (6.4 MB build artifact, only for `--final`, regenerable by `avgen_cast_trace` in ~17 min CPU).

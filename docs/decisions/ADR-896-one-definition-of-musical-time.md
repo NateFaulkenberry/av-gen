@@ -130,7 +130,7 @@ uses them; recorded here rather than folded in.
 
 ## Consequences
 
-- **"Rebuild"** (`avgen_music_report ~/Desktop/Rebuild.mp3 --grid 130 0.480`, re-measured
+- **"Rebuild"** (`avgen_music_report assets/audio/rebuild.mp3 --grid 130 0.480`, re-measured
   2026-09-26): estimate tracked beat 0 (confidence 1.00; phase scores 1.17, -0.25, 0.43, -0.31),
   phrases 8 bars (evidence 5.2); **all 122 bar lines within 30 ms of the true bars** (mean 8.9 ms,
   worst 18.9 ms), none off the grid. Before: every bar line a beat (461 ms) early. With the estimate

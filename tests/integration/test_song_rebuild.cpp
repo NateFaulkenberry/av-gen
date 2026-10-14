@@ -39,8 +39,7 @@ namespace {
 #define REQUIRE_REBUILD()                                                                                      \
     const analysis::AnalysisTrack* track = rebuildTrack();                                                    \
     if (track == nullptr) {                                                                                    \
-        SKIP("Rebuild.mp3 (the GV3 master, sha256 53a7c00c...) is not present: set AVGEN_REBUILD_AUDIO or put " \
-             "it at ~/Desktop/Rebuild.mp3");                                                                   \
+        SKIP(kRebuildMissing);                                                                                 \
     }
 
 constexpr double kFps = 60.0;          // Glowmere Valley 3 renders at 60 fps

@@ -165,7 +165,7 @@ the field — and valley 2 and two lab fixtures carry it.
 Two more residues in valley-2-multicam are recorded here and **not** touched, because that file
 belongs to another unit of work: its render output path is the absolute
 `/Users/natefaulkenberry/Desktop/bad.mov`, and its audio asset is
-`../../../../../Desktop/Rebuild.mp3`.
+`../../assets/audio/rebuild.mp3`.
 
 ---
 

@@ -5,7 +5,7 @@
   },
   "assets": {
     "audio": {
-               "path": "../../../../../Desktop/Rebuild.mp3",
+               "path": "../../assets/audio/rebuild.mp3",
                "sha256": "53a7c00cbdca9a078338db1f5a1cc725fa6b926623dccb7728f55e948838a030",
                "size": 5435776
              },

@@ -361,7 +361,7 @@
     },
     {
       "category": "Showcase",
-      "description": "Glowmere Valley 3, a 3:45 music video to \"Rebuild\": 73 locked shots cut to the song, five UFO set pieces and the hero pulses, generated from the multi-camera valley by tools/make_glowmere_valley_3.py. The song is not in the repository: it plays when Rebuild.mp3 is on the Desktop (docs/glowmere-valley-3/README.md).",
+      "description": "Glowmere Valley 3, a 3:45 music video to \"Rebuild\": 73 locked shots cut to the song, five UFO set pieces and the hero pulses, generated from the multi-camera valley by tools/make_glowmere_valley_3.py. The song is the owner's and is not committed: it plays when assets/audio/rebuild.mp3 is in the checkout (docs/glowmere-valley-3/README.md).",
       "name": "Glowmere Valley 3",
       "project": "world/glowmere-valley-3.json"
     },

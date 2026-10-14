@@ -157,7 +157,7 @@ t = 30 s.
   ```
 
   - Take the last PNG of a short range, not the first: the first frame has no temporal history.
-  - To use the owner's song, add `--audio ~/Desktop/Rebuild.mp3`, for owner-review captures only.
+  - To use the owner's song, add `--audio assets/audio/rebuild.mp3`, for owner-review captures only.
   - To isolate one state, copy the project, delete `states`, and set
     `"sdf/space/node/state/amount"` in `parameters`.
 - **Measure:**
@@ -256,7 +256,7 @@ t = 30 s.
 
 ## Phase 9: profiling of the final art (engineering, 2026-09-30 04:00)
 
-- **Method.** `--headless --frames 150 --fps 30 --range <song time>: --audio ~/Desktop/Rebuild.mp3
+- **Method.** `--headless --frames 150 --fps 30 --range <song time>: --audio assets/audio/rebuild.mp3
   --bench-json`, at 1920x1080, 1440x810, 960x540 and 634x356, under `/usr/bin/time -l` for the peak
   RSS. Each showcase stage (and each Folding / Explosion / melt state) was measured on its own
   copy of the project with that stage's preset baked into `parameters` and `states` removed (scene

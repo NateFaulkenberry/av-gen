@@ -117,7 +117,7 @@ logging paths under `/assets/`, `Desktop/` or with a media extension to `$OPENTR
 worktree and the primary checkout back to `assets/<rel>`.
 
 **Result.** GPU suite (549 cases, 19 min, under the lock): 5 aliens, 3 farm, 55 Quaternius (CC0) +
-glowmere-valley.wav (generated) + ~/Desktop/Rebuild.mp3. The 280 CPU cases CI skips/fails for assets
+glowmere-valley.wav (generated) + assets/audio/rebuild.mp3. The 280 CPU cases CI skips/fails for assets
 (3 niced shards): + 1 alien, 6 farm, 55 Quaternius, 55 Kenney city, 15 nature, 1 HDRI, 6 treeisle (152 MB),
 night-shift.wav (generated), ~/Desktop/MP3/bass.mp3. -> `tools/ci/test-assets.list` (202 files, 249 MB;
 ~110 MB without the island). With assets: CPU 263 pass / 17 skip / 0 fail; GPU 548 pass / 1 skip / 0 fail.

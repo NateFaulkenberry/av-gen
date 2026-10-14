@@ -403,7 +403,7 @@ undo, serialization or compilation will be built on them.
 - Approval re-compiles against authored places, not the live simulation (by design, ADR-756).
 - The AI sink's parameter diff can include engine-driven base writes during a long task. This is
   pre-existing, and more visible now that a task is one command.
-- Glowmere's audio is `~/Desktop/Rebuild.mp3`, outside the repository, so the benchmark tests are
+- Glowmere's audio is `assets/audio/rebuild.mp3`, outside the repository, so the benchmark tests are
   machine-specific.
 - Not verified in the running UI: the Cameras panel's history pushes, the AI panel's Undo /
   Approve / Reject, and the render and queue scratch-copy wiring.

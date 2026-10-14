@@ -468,7 +468,7 @@ parked, and the aurora (art pass).
 2. **GPU CI steps 4-6** (parked): the deploy key and secret, `AVGEN_TEST_ASSETS` and `AVGEN_GPU_RUNNER`, and a
    self-hosted runner registered on the private repository.
 3. **Wire `Rebuild.mp3` into the private set.** It needs the list, step 1 again, and the fetch script linking
-   it to `~/Desktop/Rebuild.mp3` or `AVGEN_REBUILD_AUDIO`. It would un-skip 41 CPU cases.
+   it to `assets/audio/rebuild.mp3` or `AVGEN_REBUILD_AUDIO`. It would un-skip 41 CPU cases.
 4. **The farm GLBs in public history** (`4bdc42ff`). Removing them needs `git filter-repo` and a force-push,
    which breaks every clone and worktree. PROGRESS.md says you chose earlier not to, and lists it "for
    completeness". The GPU CI doc still lists it as open.

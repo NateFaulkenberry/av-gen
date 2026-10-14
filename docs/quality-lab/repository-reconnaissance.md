@@ -383,7 +383,7 @@ supersample 2.0, limits unlimited**), `-multicam` (0→30 s, 1800 frames), `glow
 (0→105 s). **ADR-171: "Glowmere Valley 2 succeeds `glowmere-stylized.scene.json`"** — not
 `terrain.scene.json`, despite the index calling the latter "Glowmere Valley".
 
-⚠️ Both Glowmere Valley 2 projects reference audio at `"../../../../../Desktop/Rebuild.mp3"` — an
+⚠️ Both Glowmere Valley 2 projects reference audio at `"../../assets/audio/rebuild.mp3"` — an
 absolute-ish escape out of the repo that will not relink elsewhere.
 
 `renders/output-preview/` already contains a **two-arm quality comparison** driven by `--queue`:

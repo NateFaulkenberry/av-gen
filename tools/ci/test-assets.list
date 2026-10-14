@@ -5,7 +5,7 @@
 # with a DYLD open()/fopen() interposer while running (a) the whole GPU suite, avgen_render_tests, 549
 # cases, and (b) the 280 avgen_tests cases a hosted runner skips or fails for want of an asset. Tracked
 # files are left out (the public repository has them), and so are assets/audio/*.wav: CI regenerates
-# them (tools/ci/generate-audio.sh). Not included, deliberately: ~/Desktop/Rebuild.mp3 and
+# them (tools/ci/generate-audio.sh). Not included, deliberately: assets/audio/rebuild.mp3 and
 # ~/Desktop/MP3/bass.mp3 (copyrighted songs; the owner's decision), and the motion packs 17 cases need
 # that are not on the owner's machine either (retargeted 100STYLE, the augmented scout pack).
 #

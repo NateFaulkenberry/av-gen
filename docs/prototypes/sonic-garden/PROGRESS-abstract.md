@@ -95,7 +95,7 @@ Sonic Garden. Do NOT modify `examples/sonic-garden/*` or the "Sonic VFX" entries
   5. point `avgen.sh` at it.
 - **GPU:** every job goes through `tools/gpu-lock.sh`, one job per hold. No `timeout` command. The engineer is done
   (the GPU is ours).
-- **Real music:** 30 s excerpts of the owner's tracks (Desktop: `All You Got.wav` from 34 s, `Rebuild.mp3` from 156 s),
+- **Real music:** 30 s excerpts of the owner's tracks (`All You Got.wav` from the Desktop from 34 s, `assets/audio/rebuild.mp3` from 156 s),
   cut by `abstract.py music` into `assets/audio/sonic-abstract-{allyougot,rebuild}.wav`. Classes `allyougot` and
   `rebuild` in `review.REAL_MUSIC`. The 12-second intensity follower starts at zero in a clip that starts mid-song, so
   `response.intensity` climbs through the whole excerpt (do not trigger anything on "level above intensity").

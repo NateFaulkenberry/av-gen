@@ -119,7 +119,7 @@ the private set is rebuilt from the list (step 1), which also needs a new lock s
 
 It leaves out:
 - `assets/audio/*.wav`: CI regenerates them;
-- the songs (`~/Desktop/Rebuild.mp3`, `~/Desktop/MP3/bass.mp3`): the owner's decision;
+- the songs (`assets/audio/rebuild.mp3`, `~/Desktop/MP3/bass.mp3`): the owner's decision;
 - the motion packs 17 cases need (retargeted 100STYLE, the augmented scout pack and its database):
   they are not on the owner's machine either, so **no machine runs those 17 cases today**.
 
@@ -200,7 +200,7 @@ Decided 2026-09-28:
   cases skip on CI without `Rebuild.mp3` (the multicam project's audio). **Not done yet (future work):**
   it is not in `tools/ci/test-assets.list` and the fetch script does not link it. To include it, add it
   to the list, re-run step 1, and teach the fetch script to link it where the projects look
-  (`~/Desktop/Rebuild.mp3`, or `AVGEN_REBUILD_AUDIO`). It must never go into this public repository,
+  (`assets/audio/rebuild.mp3`, or `AVGEN_REBUILD_AUDIO`). It must never go into this public repository,
   a CI cache or an artifact.
 - **Where the runner lives: DECIDED, the private repository** (so step 5b is not needed). The runner
   itself is parked: none is registered for now.

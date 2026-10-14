@@ -8,16 +8,16 @@ inside AV Gen, and it is the production record the brief asks for ([00-brief.md]
 | project | `examples/world/glowmere-valley-3.json` (+ `.scene.json`) |
 | derived from | `examples/world/glowmere-valley-2-multicam.{json,scene.json}`, never modified |
 | generator | `tools/make_glowmere_valley_3.py`, assembling `tools/gv3/` (music, directives, shots, look, cast, world) |
-| audio | "Rebuild", `~/Desktop/Rebuild.mp3` (not in the repository) |
+| audio | "Rebuild", `assets/audio/rebuild.mp3` (not in the repository) |
 | render | `avgen --project examples/world/glowmere-valley-3.json --render <out.mov>` |
 
 ## Running it
 
 What the repository cannot carry, because it is licensed or copyrighted:
 
-- **The song**, at `~/Desktop/Rebuild.mp3`. The project refers to it by a relative path from
-  `examples/world/`, so it resolves only with the repository checked out at the owner's depth
-  (`~/Documents/GitHub/<repo>`). Anywhere else, repoint `assets.audio.path` in the project.
+- **The song**, at `assets/audio/rebuild.mp3` in the checkout: gitignored, and never committed (the repository
+  is public). The project names it relative to `examples/world/` (`../../assets/audio/rebuild.mp3`), so it
+  resolves in any checkout, and in a worktree once `tools/link-worktree-assets.sh` has linked it.
 - **The characters and animals**: `assets/aliens/alien-{scout,diver,elder,ranger,pilot}.glb` and
   `assets/farm/{horse,cow,bull}.glb`, the commercial packs Glowmere Valley 2 also needs. A worktree
   gets them from main's `tools/link-worktree-assets.sh <worktree>`, run from main.
@@ -38,8 +38,8 @@ python3 tools/make_glowmere_valley_3.py && python3 tools/gv3/ufo.py --no-trace
 ```
 
 writes a scene byte-identical to r7b's and a project whose only difference is the song's path
-(`../../../../../Desktop/Rebuild.mp3`, the Glowmere family's convention, where the review copy had
-the absolute `/Users/<owner>/Desktop/Rebuild.mp3`). It also rewrites `03-directives.md` and
+(`../../assets/audio/rebuild.mp3`, the Glowmere family's convention, where the review copy had
+an absolute path to the owner's copy). It also rewrites `03-directives.md` and
 `04-shot-plan.md`, identical to r7b's. Checked with `avgen --project ... --audit-routes`: 0 errors,
 routes 105/105, tracks 130/130, effects 18/18 live, 73 shots, 225.5 s, and an audit report identical
 to the review bundle's.

@@ -55,6 +55,10 @@ cmake-build-*/
 # down to the byte, and 16 MB. The manifest carries the command and the hash; the wav does not
 # belong in history any more than a build output does.
 /assets/audio/*.wav
+# The owner's songs: copyrighted, never committed (the repository is public), and kept in the checkout
+# beside the generated scores, e.g. assets/audio/rebuild.mp3 (Glowmere Valley 2/3) and assets/audio/trench.wav.
+# A worktree gets them from tools/link-worktree-assets.sh; CI does not have them, and their cases SKIP.
+/assets/audio/*.mp3
 
 # The city, character and concert packs (assets/city.manifest.json, ADR-none): 700+ meshes and
 # their texture atlases, imported 2026-09-11 for the music video. Gitignored for size, not for

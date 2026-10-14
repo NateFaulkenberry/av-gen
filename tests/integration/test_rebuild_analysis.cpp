@@ -5,9 +5,9 @@
 // four on the floor, out for the pull-back (bars 15-16), cut on beat 4 of bars 24, 40, 56 and 72,
 // and stopping after bar 122 beat 3.
 //
-// The song is the owner's and is never in the repository. These tests read it from
-// $AVGEN_REBUILD_AUDIO, or ~/Desktop/Rebuild.mp3, and SKIP when it is not there -- or when it is not
-// the master the ground truth was measured on (its SHA-256 differs).
+// The song is the owner's, gitignored at assets/audio/rebuild.mp3 (tests/support/rebuild_track.hpp finds and
+// analyses it). These tests SKIP when it is not there -- or when it is not the master the ground truth was
+// measured on (its SHA-256 differs).
 
 #include "analysis/analysis_track.hpp"
 #include "analysis/meter.hpp"
@@ -19,6 +19,7 @@
 #include "core/hash.hpp"
 #include "core/time.hpp"
 #include "signals/musical_events.hpp"
+#include "support/rebuild_track.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -34,7 +35,6 @@ using namespace avgen;
 
 namespace {
 
-constexpr const char* kRebuildSha256 = "53a7c00cbdca9a078338db1f5a1cc725fa6b926623dccb7728f55e948838a030";
 constexpr double kBpm = 130.0;
 constexpr double kBeat = 60.0 / kBpm;
 constexpr double kBar = 4.0 * kBeat;
@@ -64,36 +64,13 @@ std::vector<double> kicks() {
     return out;
 }
 
-// The analysed track, once per process: 226 s of audio is a second of work.
-const analysis::AnalysisTrack* rebuild() {
-    static const std::optional<analysis::AnalysisTrack> track = []() -> std::optional<analysis::AnalysisTrack> {
-        std::filesystem::path path;
-        if (const char* env = std::getenv("AVGEN_REBUILD_AUDIO"); env != nullptr && *env != '\0') {
-            path = env;
-        } else if (const char* home = std::getenv("HOME"); home != nullptr) {
-            path = std::filesystem::path(home) / "Desktop" / "Rebuild.mp3";
-        }
-        if (path.empty() || !std::filesystem::exists(path)) {
-            return std::nullopt;
-        }
-        const auto sha = sha256File(path);
-        if (!sha || *sha != kRebuildSha256) {
-            return std::nullopt;
-        }
-        auto file = audio::AudioFile::load(path);
-        if (!file) {
-            return std::nullopt;
-        }
-        return analysis::AnalysisTrack::analyze(*file, analysis::AnalyzerConfig{});
-    }();
-    return track ? &*track : nullptr;
-}
+// The analysed track, once per process (tests/support/rebuild_track.hpp): 226 s of audio is a second of work.
+const analysis::AnalysisTrack* rebuild() { return testing::rebuildTrack(); }
 
 #define REQUIRE_REBUILD()                                                                                      \
     const analysis::AnalysisTrack* track = rebuild();                                                         \
     if (track == nullptr) {                                                                                    \
-        SKIP("Rebuild.mp3 (the GV3 master, sha256 53a7c00c...) is not present: set AVGEN_REBUILD_AUDIO or put " \
-             "it at ~/Desktop/Rebuild.mp3");                                                                   \
+        SKIP(testing::kRebuildMissing);                                                                        \
     }
 
 struct Score {
@@ -170,12 +147,7 @@ TEST_CASE("Rebuild: the engine's music.downbeat lands within 30 ms of every bar"
     REQUIRE_REBUILD();
     // The same file through the engine, at 60 fps: `music.downbeat` is stamped on the analysis frame
     // of the tracked beat, `beat.bar` wraps on the first render frame after it.
-    std::filesystem::path path;
-    if (const char* env = std::getenv("AVGEN_REBUILD_AUDIO"); env != nullptr && *env != '\0') {
-        path = env;
-    } else {
-        path = std::filesystem::path(std::getenv("HOME")) / "Desktop" / "Rebuild.mp3";
-    }
+    const std::filesystem::path path = testing::rebuildAudioPath();
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadAudio(path).has_value());
     CHECK(engine.meter().downbeat == 0);

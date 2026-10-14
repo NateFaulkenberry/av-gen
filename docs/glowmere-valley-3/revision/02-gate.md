@@ -71,7 +71,7 @@ tools/gpu-lock.sh ./build/release/src/avgen --project examples/world/glowmere-va
     --session gate-check --track s16-gate --label <name> --wait --json --strict
 # exit 0 complete, 5 partial (a core check did not run), 2 failed, 4 evaluator unreachable
 
-# a frame sequence instead: --sequence <dir> --fps 60 --sequence-start 85.4 --audio ~/Desktop/Rebuild.mp3
+# a frame sequence instead: --sequence <dir> --fps 60 --sequence-start 85.4 --audio assets/audio/rebuild.mp3
 # compare any two jobs: critic compare <baseline job> <candidate job> --json
 ```
 Run `critic submit` from `~/Documents/GitHub/creative-critic`, where `work/gv3-v2/inputs.json`

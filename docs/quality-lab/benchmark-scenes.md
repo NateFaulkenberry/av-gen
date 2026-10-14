@@ -63,7 +63,7 @@ pixels**, by an explicit decision recorded in the file and in `tools/certify.py`
 | `examples/world/glowmere-atmospherics.json` | 1920×1080 / 60, 0→30 s | volumetrics and banding |
 | `examples/city/night-shift.json` | 1920×1080 / 30, 0→105 s | a different art direction entirely — the §35 cross-check |
 
-⚠️ **Both Glowmere Valley 2 projects reference audio at `"../../../../../Desktop/Rebuild.mp3"`** — an
+⚠️ **Both Glowmere Valley 2 projects reference audio at `"../../assets/audio/rebuild.mp3"`** — an
 absolute-ish escape out of the repo that will not relink on another machine. A quality run that needs
 a deterministic audio-driven parameter must fix this or use a scene without it.
 

@@ -21,7 +21,7 @@ on branch `agent/<topic>`, created from main `0b623b88`. Assets are linked with
      - Estimate the downbeat phase, with a serialized override in beats.
      - Apply it everywhere a beat count becomes a bar, phrase or downbeat: `beat.bar/phrase`, `music.downbeat/bar/phrase`, LFO beat-sync, the timeline's beats base, the shaders' bar input, and effect triggers. The Beat source counts from 0 while the bus counts from 1; make them agree.
      - Make phrase length configurable (8 bars for Rebuild).
-     - Validate on `~/Desktop/Rebuild.mp3` (130 BPM, first downbeat 0.480 s): downbeats within ±30 ms. Skip cleanly when the file is absent.
+     - Validate on `assets/audio/rebuild.mp3` (130 BPM, first downbeat 0.480 s): downbeats within ±30 ms. Skip cleanly when the file is absent.
   2. **Features that survive a flat master.**
      - Density as an onset rate.
      - A loudness-independent energy composite.
@@ -220,7 +220,7 @@ generator can read.
 - **Tests:**
   - In `test_song_director.cpp`: Rising gives monotonic durations; every cut is on a beat; the label-scramble test still passes.
   - `installSequence` drops no baked track.
-  - On `~/Desktop/Rebuild.mp3` (skip cleanly when absent):
+  - On `assets/audio/rebuild.mp3` (skip cleanly when absent):
     - cuts land on downbeats within one frame;
     - durations are not uniform (state the measure);
     - the riser (bars 89–96) accelerates;
