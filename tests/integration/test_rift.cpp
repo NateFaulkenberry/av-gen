@@ -12,6 +12,7 @@
 #include "params/modulation.hpp"
 #include "params/preset.hpp"
 #include "scene/scene.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -156,6 +157,9 @@ TEST_CASE("THE RIFT: every preset path, route target and macro target is a param
 // render that sat in the initial state (Dark) through the drop.
 TEST_CASE("THE RIFT: a seek lands the arc where play does", "[rift][adr1168]") {
     REQUIRE_RIFT_SCENE();
+    // The arc reaches the drop only on Trench (assets/audio/trench.wav, the owner's song, on no CI runner): without
+    // it the states never leave Dark, which says nothing about seeking.
+    testsupport::skipUnlessProjectAssetsPresent(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json");
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());
@@ -171,6 +175,9 @@ TEST_CASE("THE RIFT: a seek lands the arc where play does", "[rift][adr1168]") {
 
 TEST_CASE("THE RIFT: a seek to 84 s then playing on lands in the drop", "[rift][adr1168]") {
     REQUIRE_RIFT_SCENE();
+    // The arc reaches the drop only on Trench (assets/audio/trench.wav, the owner's song, on no CI runner): without
+    // it the states never leave Dark, which says nothing about seeking.
+    testsupport::skipUnlessProjectAssetsPresent(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json");
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());
@@ -193,6 +200,9 @@ TEST_CASE("THE RIFT: a seek to 84 s then playing on lands in the drop", "[rift][
 TEST_CASE("THE RIFT: the render job's sequence (warm-up, camera reset, seek, fixed clock) lands in the drop",
           "[rift][adr1168]") {
     REQUIRE_RIFT_SCENE();
+    // The arc reaches the drop only on Trench (assets/audio/trench.wav, the owner's song, on no CI runner): without
+    // it the states never leave Dark, which says nothing about seeking.
+    testsupport::skipUnlessProjectAssetsPresent(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json");
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json";
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());

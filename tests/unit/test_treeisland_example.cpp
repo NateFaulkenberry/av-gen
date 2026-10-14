@@ -82,7 +82,8 @@ TEST_CASE("The floating island showcase is in the examples menu", "[treeisland][
         // see, because it resolves paths without opening them.
         CHECK(e.name != "The Tree of Life");
         INFO("example '" << e.name << "' -> " << e.file.string());
-        CHECK(fs::exists(e.file));
+        // A generated entry may be absent from a checkout, and then it must say how to make it (ADR-1340).
+        CHECK((fs::exists(e.file) || !e.generate.empty()));
     }
     REQUIRE(entry != nullptr);
     CHECK_FALSE(entry->description.empty());
