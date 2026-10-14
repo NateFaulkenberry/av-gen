@@ -35,6 +35,12 @@ fixed.
 menus read it (ADR-1340). No doc counts its entries. A live scene needs `"live": true` and a `sonic.live` block,
 and the tests enforce that. Diagnostic arms sit beside their deliverable with a leading `_`. Run
 `python3 tools/check_project_integrity.py` before committing a change under `examples/`. It must exit 0.
+An entry whose scene is generated and gitignored (THE RIFT, the Biovalley macro) carries `"generate"`, the command
+that makes it; the menu then lists it greyed with that command on a checkout without the files, and the index test
+requires it. Every scene must stay openable from the menu: `python3 tools/review_examples.py --out <dir>` opens each
+entry through `avgen --example`, renders a frame and writes contact sheets (run it on an idle GPU before a merge
+that touches `examples/` or the renderer). The owner's songs live gitignored in `assets/audio/` and are named by
+projects relative to the project file, never by a Desktop path.
 
 ## Generated artifacts
 
@@ -49,7 +55,8 @@ tracked manifest. The common commands:
   `examples/digital-mosh/`), or the `tools/make_*.py` script that writes them.
 - Gitignored test inputs: [ci.md, "Generated inputs"](ci.md#generated-inputs).
 
-Tests and tools that write images default to a temp directory, never the working directory.
+Tests and tools that write images default to a temp or build directory (`build/captures` for the `[.capture]`
+cases, `$AVGEN_CAPTURE_DIR` to override), never the working directory.
 
 ## Ending an experiment
 
