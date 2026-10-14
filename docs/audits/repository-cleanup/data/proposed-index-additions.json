@@ -1,0 +1,124 @@
+{
+ "meta": {
+  "generated": "2026-10-14",
+  "head": "ed9926db",
+  "note": "Proposed ADDITIONS only; examples/index.json was not edited. Live projects must also have sonic.live (test-enforced); none of these is live. Categories avoid the live-only categories Astral Forge, Digital Mosh, Sonic Abstract, Sonic Garden, Sonic VFX, The Rift."
+ },
+ "additions": [
+  {
+   "name": "Astral Forge - Trench",
+   "description": "The Astral Forge rendered on Trench: a god of metal dust assembles from the music, holds a face and collapses on the drop.",
+   "category": "Showcase",
+   "live": false,
+   "project": "astral-forge/astral-forge-trench.json",
+   "note": "Category must not be \"Astral Forge\" (a live category; tests/unit/test_example_menu.cpp forbids a live category under Examples). Needs assets/audio/trench.wav (owner-supplied)."
+  },
+  {
+   "name": "Digital Mosh - Feline Footwear",
+   "description": "Datamosh flythrough rendered on Feline Footwear.",
+   "category": "Showcase",
+   "live": false,
+   "project": "digital-mosh/digital-mosh.json",
+   "note": "Not \"Digital Mosh\" category (live). Needs assets/audio/feline-footwear.wav (owner-supplied)."
+  },
+  {
+   "name": "Digital Mosh - Trench",
+   "description": "Datamosh flythrough rendered on Trench.",
+   "category": "Showcase",
+   "live": false,
+   "project": "digital-mosh/digital-mosh-trench.json",
+   "note": "Needs assets/audio/trench.wav."
+  },
+  {
+   "name": "Chorus Field - Trench God",
+   "description": "A curtain of ~5k fibers becomes a demonic silver skull through eddy fields; bass forms the god, breakdowns dissolve it.",
+   "category": "Showcase",
+   "live": false,
+   "project": "chorus-field/p8-god-trench.json",
+   "generate": {
+    "command": "python3 examples/chorus-field/build.py",
+    "produces": "chorus-field/p*.json + .scene.json (tracked; only needed after editing build.py)"
+   },
+   "note": "Needs assets/audio/trench.wav."
+  },
+  {
+   "name": "Liminal - All You Got",
+   "description": "The All You Got music video: one continuous walk through pale, impossible liminal rooms (pass 4 final).",
+   "category": "Showcase",
+   "live": false,
+   "project": "liminal/all-you-got-pass4.json",
+   "generate": {
+    "command": "python3 tools/liminal/make_all_you_got_pass4.py",
+    "produces": "liminal/all-you-got-pass4*.json (tracked)"
+   },
+   "note": "Audio path is ~/Desktop/All You Got.wav (owner machine only); loads without it with a missing-asset warning (TBD coordinator)."
+  },
+  {
+   "name": "Biovalley - Macro",
+   "description": "Static-camera, audio-reactive bioluminescent forest floor built from the Blender hero-asset library, on Trench.",
+   "category": "Showcase",
+   "live": false,
+   "project": "biovalley/shots/macro_audio.json",
+   "generate": {
+    "command": "python3 examples/biovalley/valley.py",
+    "produces": "examples/biovalley/meshes/, sky/, shots/macro.json, shots/macro_audio.json (gitignored); requires the Blender-built meshes/hero and meshes/env (examples/biovalley/hero_assets/build.py + colorways.py) and a built engine"
+   },
+   "note": "Adding it makes tests/integration/test_project_system.cpp:705 fail on any checkout that has not run valley.py (it REQUIREs the file to exist): needs a generate-or-skip guard like test_rift first."
+  },
+  {
+   "name": "The Tide",
+   "description": "An enormous translucent body moving through a warm luminous medium (early ocean prototype).",
+   "category": "Showcase",
+   "live": false,
+   "project": "tide/tide.json"
+  },
+  {
+   "name": "Glowmere Valley 2 - Song",
+   "description": "Glowmere Valley 2 cut to the song structure (auto-director over song sections).",
+   "category": "Showcase",
+   "live": false,
+   "project": "world/glowmere-valley-2-song.json",
+   "note": "Owner rule: Glowmere is protected; audio ~/Desktop/Rebuild.mp3 (owner machine only)."
+  },
+  {
+   "name": "Procedural Space - Showcase",
+   "description": "The Procedural Space POC showcase preset.",
+   "category": "Lab",
+   "live": false,
+   "project": "space/showcase.json",
+   "generate": {
+    "command": "python3 tools/make_space_presets.py showcase",
+    "produces": "space/showcase.json + .scene.json (tracked)"
+   },
+   "note": "Six more presets exist (folding-space, geometry-explosion, infinite-hall, radial-architecture, recursive-cathedral, experiment-melt-void); index only if wanted."
+  },
+  {
+   "name": "Bioluminescent Valley (recipe)",
+   "description": "A cinematic alien rainforest at night composed from a recipe.",
+   "category": "Look development",
+   "live": false,
+   "project": "recipes/bioluminescent-valley.recipe.json",
+   "note": "A recipe entry uses the key \"recipe\" rather than \"project\" in index.json."
+  },
+  {
+   "name": "Open Vista (stress)",
+   "description": "Renderer stress profile: 1.4 km of mountainous relief, thin ground cover, large negative space.",
+   "category": "Performance",
+   "live": false,
+   "project": "stress/open-vista.recipe.json",
+   "note": "A recipe entry: key \"recipe\"."
+  },
+  {
+   "name": "Sonic Garden - variants",
+   "description": "(optional) The Sonic Garden phrase through each timbre: pad, bell, bass, perc, morph, context.",
+   "category": "Lab",
+   "live": false,
+   "project": "sonic-garden/variants/pad.json",
+   "generate": {
+    "command": "python3 tools/make_sonic_material.py && python3 tools/sonic_garden_variants.py",
+    "produces": "assets/audio/sonic-*.wav (gitignored) and sonic-garden/variants/*.json"
+   },
+   "note": "Optional; probably better left unindexed."
+  }
+ ]
+}

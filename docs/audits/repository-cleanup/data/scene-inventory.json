@@ -1,0 +1,3675 @@
+{
+ "meta": {
+  "generated": "2026-10-14",
+  "worktree": "/Users/natefaulkenberry/Documents/GitHub/av-gen-cleanup",
+  "head": "ed9926db",
+  "method": "Every examples/**/*.json parsed; project scene references read from assets.scene.path (string or {path}), assets.audio/environment, sequence.scenes[].file and every string ending in a file extension (resolved relative to the file, then the repo root); scene->scene/rig/material references followed transitively. Grouping: one record per distinct scene; projects over the same scene file (lighting/camera/song variants), phase iterations and generator presets are variant_files of their parent. Status: generated-missing = a referenced scene file is gitignored and absent on a clean checkout; not-indexed = reviewable but absent from examples/index.json. Category by intended use: Live = made for real-time audio/MIDI play (index live:true / sonic.live); Offline = rendered video, showcase, look-dev, lab, benchmark."
+ },
+ "counts": {
+  "unique_scenes": 81,
+  "offline": 53,
+  "live": 28,
+  "by_status": {
+   "indexed-reviewable": 74,
+   "generated-missing": 2,
+   "not-indexed": 5
+  },
+  "by_family": {
+   "Astral Forge": 1,
+   "Digital Mosh": 1,
+   "The Rift": 1,
+   "Sonic Garden": 1,
+   "Sonic VFX": 16,
+   "Sonic Abstract": 9,
+   "Benchmark": 2,
+   "Lab": 11,
+   "Look development": 7,
+   "Performance": 2,
+   "Showcase": 19,
+   "Weather": 8,
+   "Chorus Field": 1,
+   "Liminal": 1,
+   "Biovalley": 1
+  },
+  "with_also_supports": [
+   "astral-forge",
+   "digital-mosh",
+   "the-rift"
+  ],
+  "index_entries_total": 84,
+  "index_entries_covered": 84,
+  "fixture_groups": 13,
+  "fixture_files": 171,
+  "support_files": 63,
+  "branch_only_scenes": 4,
+  "branch_only_note": "astral-furnace, astral-forge-2, rootworks, biovalley-2d (wetland-of-veils is its descendant pass); biovalley-water is a variant of biovalley-macro, proto/sonic-garden has none",
+  "unclassified_files": []
+ },
+ "scenes": [
+  {
+   "id": "astral-forge",
+   "name": "The Astral Forge",
+   "category": "Live",
+   "also_supports": "Offline",
+   "family": "Astral Forge",
+   "primary_file": "examples/astral-forge/astral-forge-live.json",
+   "variant_files": [
+    "examples/astral-forge/astral-forge-trench.json"
+   ],
+   "scene_files": [
+    "examples/astral-forge/astral-forge.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Astral Forge Live"
+   ],
+   "index_live_names": [
+    "Astral Forge Live"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "A god of metal dust assembles from the music, holds a face and collapses on the drop; MIDI-playable live instrument with an offline Trench render.",
+   "docs": [
+    "docs/prototypes/astral-forge/README.md",
+    "docs/prototypes/astral-forge/09-production.md"
+   ],
+   "assets": [
+    "assets/audio/trench.wav (owner-supplied song; not in assets/audio/manifest.json, not regenerable, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": "Live Projects: astral-forge-live.json (indexed). Offline astral-forge-trench.json is not indexed; it would go under Examples, but NOT under the category \"Astral Forge\" (test_example_menu forbids a live category in Examples).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "digital-mosh",
+   "name": "Digital Mosh",
+   "category": "Live",
+   "also_supports": "Offline",
+   "family": "Digital Mosh",
+   "primary_file": "examples/digital-mosh/digital-mosh-live.json",
+   "variant_files": [
+    "examples/digital-mosh/digital-mosh.json",
+    "examples/digital-mosh/digital-mosh-trench.json"
+   ],
+   "scene_files": [
+    "examples/digital-mosh/digital-mosh.scene.json"
+   ],
+   "generated": null,
+   "regenerable": {
+    "command": "python3 examples/digital-mosh/build.py",
+    "outputs": [
+     "digital-mosh.scene.json",
+     "digital-mosh.json",
+     "digital-mosh-trench.json",
+     "digital-mosh-live.json"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": true,
+   "index_names": [
+    "Digital Mosh Live"
+   ],
+   "index_live_names": [
+    "Digital Mosh Live"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "Datamosh/temporal-feedback flythrough of a pixel-sorted terrain; live instrument plus offline renders on Feline Footwear and Trench.",
+   "docs": [
+    "docs/prototypes/digital-mosh/PROGRESS.md",
+    "docs/prototypes/digital-mosh/02-design.md"
+   ],
+   "assets": [
+    "assets/audio/feline-footwear.wav (owner-supplied song; not in manifest)",
+    "assets/audio/trench.wav (owner-supplied song; not in assets/audio/manifest.json, not regenerable, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": "Live Projects: digital-mosh-live.json (indexed). digital-mosh.json (Feline Footwear) and digital-mosh-trench.json are offline and not indexed.",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "the-rift",
+   "name": "THE RIFT (Bioluminescent Environment)",
+   "category": "Offline",
+   "also_supports": "Live",
+   "family": "The Rift",
+   "primary_file": "examples/bioluminescent/rift.json",
+   "variant_files": [
+    "examples/bioluminescent/rift-live.json"
+   ],
+   "scene_files": [
+    "examples/bioluminescent/rift.scene.json"
+   ],
+   "generated": {
+    "command": "python3 examples/bioluminescent/build.py --scene-only (or full build.py)",
+    "outputs": [
+     "examples/bioluminescent/rift.scene.json (14 MB, gitignored)",
+     "rift.json / rift-live.json (tracked, rewritten)",
+     "meshes/ (tracked; organisms.py)"
+    ],
+    "prerequisites": [
+     "python3 + numpy (tools/ci/requirements.txt)",
+     "build/release/tools/avgen_world_preview built (tests/integration/test_rift.cpp:55)",
+     "outputs: rift.scene.json gitignored (examples/bioluminescent/.gitignore)"
+    ]
+   },
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "THE RIFT (Bioluminescent Environment)",
+    "THE RIFT LIVE"
+   ],
+   "index_live_names": [
+    "THE RIFT LIVE"
+   ],
+   "status": "generated-missing",
+   "purpose": "A canyon of bioluminescent organisms excited by the kick through a propagating medium; the first Environment (ADR-1200 seam); Trench music video plus a live instrument.",
+   "docs": [
+    "docs/prototypes/bioluminescent/PROGRESS.md",
+    "docs/prototypes/bioluminescent/04-design.md"
+   ],
+   "assets": [
+    "assets/audio/trench.wav (owner-supplied song; not in assets/audio/manifest.json, not regenerable, gitignored)",
+    "examples/bioluminescent/meshes/ (tracked organism GLBs + .emit.json)"
+   ],
+   "shared_example_deps": [],
+   "menu": "Both indexed: rift.json under Examples > Showcase, rift-live.json under Live Projects > The Rift. Both point at the gitignored rift.scene.json.",
+   "notes": "missing files: examples/bioluminescent/rift.scene.json",
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-live",
+   "name": "Sonic Live",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Garden",
+   "primary_file": "examples/sonic-garden/sonic-live.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-garden/sonic-live.scene.json"
+   ],
+   "generated": null,
+   "regenerable": {
+    "command": "python3 tools/sonic_live_project.py",
+    "outputs": [
+     "sonic-live.json",
+     "sonic-live.scene.json"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": true,
+   "index_names": [
+    "Sonic Live"
+   ],
+   "index_live_names": [
+    "Sonic Live"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "The live Sonic Garden: audio-input-driven garden that leads the Sonic VFX live scene switcher.",
+   "docs": [
+    "docs/prototypes/sonic-garden/LIVE-QUICKSTART.md",
+    "docs/prototypes/sonic-garden/01-brief-live.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/sonic-garden.rig.json"
+   ],
+   "menu": "Live Projects > Sonic Garden (indexed). Hard-coded by name in src/app/live_scenes.cpp and src/app/application.cpp.",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-salt-flat-mirage",
+   "name": "Sonic VFX - Salt Flat Mirage",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/salt-flat-mirage.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/salt-flat-mirage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Salt Flat Mirage"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Salt Flat Mirage"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-lantern-lake",
+   "name": "Sonic VFX - Lantern Lake",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/lantern-lake.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/lantern-lake.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Lantern Lake"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Lantern Lake"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-aurora-tundra",
+   "name": "Sonic VFX - Aurora Tundra",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/aurora-tundra.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/aurora-tundra.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Aurora Tundra"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Aurora Tundra"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-breathing-deep",
+   "name": "Sonic VFX - The Breathing Deep",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/breathing-deep.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/breathing-deep.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - The Breathing Deep"
+   ],
+   "index_live_names": [
+    "Sonic VFX - The Breathing Deep"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-abyssal-bloom",
+   "name": "Sonic VFX - Abyssal Bloom",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/abyssal-bloom.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/abyssal-bloom.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Abyssal Bloom"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Abyssal Bloom"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-cymatic-plate",
+   "name": "Sonic VFX - Cymatic Plate",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/cymatic-plate.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/cymatic-plate.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Cymatic Plate"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Cymatic Plate"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-silk-theatre",
+   "name": "Sonic VFX - Silk Theatre",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/silk-theatre.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/silk-theatre.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Silk Theatre"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Silk Theatre"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-ferrofluid-crown",
+   "name": "Sonic VFX - Ferrofluid Crown",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/ferrofluid-crown.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/ferrofluid-crown.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Ferrofluid Crown"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Ferrofluid Crown"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-feedback-mirror",
+   "name": "Sonic VFX - Feedback Mirror",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/feedback-mirror.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/feedback-mirror.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Feedback Mirror"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Feedback Mirror"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-tesla-choir",
+   "name": "Sonic VFX - Tesla Choir",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/tesla-choir.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/tesla-choir.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Tesla Choir"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Tesla Choir"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-datascape",
+   "name": "Sonic VFX - Datascape",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/datascape.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/datascape.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Datascape"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Datascape"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-ember-forest",
+   "name": "Sonic VFX - Ember Forest",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/ember-forest.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/ember-forest.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Ember Forest"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Ember Forest"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-corrupted-cathedral",
+   "name": "Sonic VFX - The Corrupted Cathedral",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/corrupted-cathedral.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/corrupted-cathedral.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - The Corrupted Cathedral"
+   ],
+   "index_live_names": [
+    "Sonic VFX - The Corrupted Cathedral"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-storm-cell",
+   "name": "Sonic VFX - Storm Cell",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/storm-cell.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/storm-cell.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Storm Cell"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Storm Cell"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-stellar-nursery",
+   "name": "Sonic VFX - Stellar Nursery",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/stellar-nursery.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/stellar-nursery.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Stellar Nursery"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Stellar Nursery"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-vfx-event-horizon",
+   "name": "Sonic VFX - Event Horizon",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic VFX",
+   "primary_file": "examples/sonic-vfx/event-horizon.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-vfx/event-horizon.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic VFX - Event Horizon"
+   ],
+   "index_live_names": [
+    "Sonic VFX - Event Horizon"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the sixteen live VFX scenes in the Sonic VFX switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/SCENE-CATALOG.md",
+    "docs/prototypes/sonic-garden/PROGRESS-vfx-art.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-sacred-flight",
+   "name": "Sonic Abstract - Sacred Geometry Flight",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/sacred-flight.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/sacred-flight.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Sacred Geometry Flight"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Sacred Geometry Flight"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-neon-vector",
+   "name": "Sonic Abstract - Neon Vector World",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/neon-vector.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/neon-vector.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Neon Vector World"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Neon Vector World"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-cel-dream",
+   "name": "Sonic Abstract - Cel-Shaded Dream World",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/cel-dream.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/cel-dream.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Cel-Shaded Dream World"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Cel-Shaded Dream World"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-color-geometry",
+   "name": "Sonic Abstract - Infinite Color Geometry",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/color-geometry.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/color-geometry.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Infinite Color Geometry"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Infinite Color Geometry"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-organic-garden",
+   "name": "Sonic Abstract - Organic Digital Garden",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/organic-garden.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/organic-garden.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Organic Digital Garden"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Organic Digital Garden"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-digital-alpine",
+   "name": "Sonic Abstract - Digital Alpine",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/digital-alpine.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/digital-alpine.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Digital Alpine"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Digital Alpine"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [
+    "examples/sonic-abstract/meshes/ (.glb files)"
+   ],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-chromatic-topography",
+   "name": "Sonic Abstract - Chromatic Topography",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/chromatic-topography.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/chromatic-topography.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Chromatic Topography"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Chromatic Topography"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [
+    "examples/sonic-abstract/meshes/ (.glb files)"
+   ],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-glitch-signal",
+   "name": "Sonic Abstract - Glitch Signal",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/glitch-signal.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/glitch-signal.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - Glitch Signal"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - Glitch Signal"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-abstract-bit-ocean",
+   "name": "Sonic Abstract - 8-Bit Ocean",
+   "category": "Live",
+   "also_supports": null,
+   "family": "Sonic Abstract",
+   "primary_file": "examples/sonic-abstract/bit-ocean.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/sonic-abstract/bit-ocean.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Abstract - 8-Bit Ocean"
+   ],
+   "index_live_names": [
+    "Sonic Abstract - 8-Bit Ocean"
+   ],
+   "status": "indexed-reviewable",
+   "purpose": "One of the nine stylized live scenes in the Sonic Abstract switcher set (audio/MIDI driven).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS-abstract.md",
+    "docs/prototypes/sonic-garden/04-brief-abstract-direction.md"
+   ],
+   "assets": [
+    "examples/sonic-abstract/meshes/ (.glb files)"
+   ],
+   "shared_example_deps": [],
+   "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "benchmark",
+   "name": "Procedural Benchmark",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Benchmark",
+   "primary_file": "examples/benchmark/benchmark.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/benchmark/benchmark.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Procedural Benchmark"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Procedural benchmark scene for frame-time measurement.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "stress",
+   "name": "Stress Test (1K to 1M)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Benchmark",
+   "primary_file": "examples/stress/stress.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/stress/stress.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Stress Test (1K to 1M)"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Instance-count stress ladder; also the Integration/Stress Lab fixture.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "alien",
+   "name": "Alien - Skinned Character",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/characters/alien.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/characters/alien.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Alien - Skinned Character"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Single skinned purchased alien character lab scene.",
+   "docs": [],
+   "assets": [
+    "assets/imported (partly gitignored: concert/instruments)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "alien-squad",
+   "name": "Alien Squad - Modular Characters",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/characters/alien-squad.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/characters/alien-squad.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Alien Squad - Modular Characters"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Five modular aliens standing on two river banks.",
+   "docs": [],
+   "assets": [
+    "assets/aliens (PURCHASED, gitignored, never commit)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "character-animation-lab",
+   "name": "Character Animation Lab",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/lab/character-animation-lab.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/lab/character-animation-lab.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Character Animation Lab"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Animation Lab fixture: clip sampling, blending and skinning.",
+   "docs": [
+    "docs/character-animation-lab.md"
+   ],
+   "assets": [
+    "assets/aliens (PURCHASED, gitignored, never commit)",
+    "assets/farm (PURCHASED, gitignored, never commit)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "farm-animals",
+   "name": "Farm Animals - Imported Pack",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/farm/farm-animals.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/farm/farm-animals.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Farm Animals - Imported Pack"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "The nine purchased farm animals placed with real metre sizes.",
+   "docs": [],
+   "assets": [
+    "assets/farm (PURCHASED, gitignored, never commit)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "astronaut-musicians",
+   "name": "Astronaut Musicians - Prototype",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/musicians/astronaut-musicians.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/musicians/astronaut-musicians.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Astronaut Musicians - Prototype"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Prototype stage of astronaut musicians playing instruments.",
+   "docs": [
+    "docs/prototypes/astronaut-musicians/PROGRESS.md"
+   ],
+   "assets": [
+    "assets/musicians (licence unconfirmed, gitignored)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "procedural-geometry-lab",
+   "name": "Procedural Geometry Lab",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/lab/lab.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/lab/lab.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Procedural Geometry Lab"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Procedural geometry generator/deformer test bench.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "renderer-qa",
+   "name": "Renderer QA",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/qa/renderer-qa.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/qa/renderer-qa.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Renderer QA"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Renderer QA scene; Visibility Lab fixture; baseline snapshots in qa/baselines.",
+   "docs": [],
+   "assets": [
+    "assets/imported (partly gitignored: concert/instruments)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "alien-wander",
+   "name": "Wanderer - Behaviour and Navigation",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/characters/alien-wander.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/characters/alien-wander.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Wanderer - Behaviour and Navigation"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "An autonomous alien wandering terrain: behaviour and navigation demo.",
+   "docs": [],
+   "assets": [
+    "assets/audio/glowmere-valley.wav",
+    "assets/imported (partly gitignored: concert/instruments)"
+   ],
+   "shared_example_deps": [
+    "examples/entities/craft-lights.profile.json",
+    "examples/lightrigs/bioluminescent.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "bioluminescent-world",
+   "name": "Bioluminescent World",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/world/world.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/world/world.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Bioluminescent World"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Early bioluminescent world look-dev scene.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/bioluminescent.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "fungi",
+   "name": "Fungi",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/organic/fungi.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/organic/fungi.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Fungi"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Procedural fungi look-dev.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "glowmere-stylized",
+   "name": "Glowmere Valley - Painterly / Matched PBR / Lyrics",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/world/glowmere-stylized.json",
+   "variant_files": [
+    "examples/world/glowmere-stylized-pbr.json",
+    "examples/composition/glowmere-lyrics.json"
+   ],
+   "scene_files": [
+    "examples/world/glowmere-stylized.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Glowmere Valley - Painterly",
+    "Glowmere Valley - Matched PBR",
+    "Glowmere Valley - Lyrics"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "The stylized Glowmere valley: painterly look, a matched-PBR grade over the same scene, and a lyric-overlay composition.",
+   "docs": [
+    "docs/art-direction.md"
+   ],
+   "assets": [
+    "assets/audio/glowmere-valley.wav",
+    "assets/imported (partly gitignored: concert/instruments)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [
+    "examples/entities/craft-lights.profile.json",
+    "examples/lightrigs/glowmere-valley.rig.json",
+    "examples/materials/bush-glow.material.json",
+    "examples/materials/glowmere-painted-crown.material.json",
+    "examples/materials/glowmere-painted-frond.material.json",
+    "examples/materials/glowmere-painted-ground.material.json",
+    "examples/materials/glowmere-tissue.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "hero-metal",
+   "name": "Hero Metal",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/hero/hero.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/hero/hero.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Hero Metal"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Bevelled hero-object metal look-dev.",
+   "docs": [
+    "docs/bevels-and-hero-objects.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json",
+    "examples/materials/brushed-metal.material.json",
+    "examples/materials/dark-steel.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "organic-curves",
+   "name": "Organic Curves",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/organic/organic.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/organic/organic.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Organic Curves"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Tube/curve organic forms look-dev.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "plant-grammar",
+   "name": "Plant Grammar",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/organic/plants.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/organic/plants.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Plant Grammar"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "L-system style plant grammar look-dev.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/studio-softbox.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "glowmere-density",
+   "name": "Glowmere Density ladder (Low/Medium/Dense/Extreme)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Performance",
+   "primary_file": "examples/recipes/glowmere-medium.recipe.json",
+   "variant_files": [
+    "examples/recipes/glowmere-low.recipe.json",
+    "examples/recipes/glowmere-dense.recipe.json",
+    "examples/recipes/glowmere-extreme.recipe.json",
+    "examples/recipes/glowmere.recipe.json"
+   ],
+   "scene_files": [],
+   "generated": null,
+   "regenerable": {
+    "command": "opened directly: a recipe is composed (generated in-engine) on open",
+    "outputs": [
+     "in-memory world"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": true,
+   "index_names": [
+    "Glowmere Density - Medium",
+    "Glowmere Density - Low",
+    "Glowmere Density - Dense",
+    "Glowmere Density - Extreme"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Four recipe-generated Glowmere worlds at increasing density: the renderer performance ladder.",
+   "docs": [],
+   "assets": [
+    "assets/glowmere.manifest.json"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "grove",
+   "name": "Bioluminescent Grove",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/world/grove.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/world/grove.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Bioluminescent Grove"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Small bioluminescent grove showcase.",
+   "docs": [],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/nocturne-forest.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "glowmere-valley",
+   "name": "Glowmere Valley",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/world/terrain.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/world/terrain.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Glowmere Valley"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "The original Glowmere valley terrain showcase.",
+   "docs": [],
+   "assets": [
+    "assets/hdri/kloppenheim_02_puresky_4k.hdr",
+    "assets/nature (gitignored)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/glowmere.rig.json",
+    "examples/materials/bush-glow.material.json",
+    "examples/materials/canopy-fireflies.material.json",
+    "examples/materials/frond-glow.material.json",
+    "examples/materials/glowmere-crown.material.json",
+    "examples/materials/glowmere-ground.material.json",
+    "examples/materials/glowmere-tissue.material.json",
+    "examples/materials/pine-fireflies.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "glowmere-valley-2",
+   "name": "Glowmere Valley 2 (+ Multi-Camera, Song)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/world/glowmere-valley-2.json",
+   "variant_files": [
+    "examples/world/glowmere-valley-2-multicam.json",
+    "examples/world/glowmere-valley-2-song.json"
+   ],
+   "scene_files": [
+    "examples/world/glowmere-valley-2.scene.json",
+    "examples/world/glowmere-valley-2-multicam.scene.json",
+    "examples/world/glowmere-valley-2-song.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Glowmere Valley 2",
+    "Glowmere Valley 2 - Multi-Camera"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Glowmere Valley 2 music video: aliens, farm animals, UFO abduction set piece; a multi-camera cut and a song-structured cut.",
+   "docs": [
+    "docs/glowmere-valley-2"
+   ],
+   "assets": [
+    "EXTERNAL owner-machine file: ~/Desktop/Rebuild.mp3 (present on owner machine)",
+    "assets/aliens (PURCHASED, gitignored, never commit)",
+    "assets/farm (PURCHASED, gitignored, never commit)",
+    "assets/imported (partly gitignored: concert/instruments)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [
+    "examples/entities/craft-lights.profile.json",
+    "examples/lightrigs/glowmere-valley.rig.json",
+    "examples/materials/glowmere-fireflies-crown.material.json",
+    "examples/materials/glowmere-fireflies-scaled.material.json",
+    "examples/materials/glowmere-painted-frond.material.json",
+    "examples/materials/glowmere-tissue.material.json",
+    "examples/materials/glowmere2-cap.material.json",
+    "examples/materials/glowmere2-painted-ground.material.json",
+    "examples/materials/glowmere2-tissue-cool.material.json",
+    "examples/materials/glowmere2-tissue.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "glowmere-valley-3",
+   "name": "Glowmere Valley 3",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/world/glowmere-valley-3.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/world/glowmere-valley-3.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Glowmere Valley 3"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "GV3 music video (art pass r1/r2).",
+   "docs": [
+    "docs/glowmere-valley-3"
+   ],
+   "assets": [
+    "EXTERNAL owner-machine file: ~/Desktop/Rebuild.mp3 (present on owner machine)",
+    "assets/aliens (PURCHASED, gitignored, never commit)",
+    "assets/farm (PURCHASED, gitignored, never commit)",
+    "assets/imported (partly gitignored: concert/instruments)",
+    "assets/musicians (licence unconfirmed, gitignored)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [
+    "examples/entities/craft-lights.profile.json",
+    "examples/lightrigs/glowmere-valley.rig.json",
+    "examples/materials/glowmere-fireflies-crown.material.json",
+    "examples/materials/glowmere-fireflies-scaled.material.json",
+    "examples/materials/glowmere-painted-frond.material.json",
+    "examples/materials/glowmere-tissue.material.json",
+    "examples/materials/glowmere2-cap.material.json",
+    "examples/materials/glowmere2-painted-ground.material.json",
+    "examples/materials/glowmere2-tissue-cool.material.json",
+    "examples/materials/glowmere2-tissue.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "glowmere-atmospherics",
+   "name": "Glowmere Atmospherics",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/world/glowmere-atmospherics.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/world/glowmere-atmospherics.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Glowmere Atmospherics"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Glowmere with the atmospheric effects stack (fog, aurora, fireflies).",
+   "docs": [],
+   "assets": [
+    "EXTERNAL owner-machine file: ~/Desktop/MP3/bass.mp3 (present on owner machine)",
+    "assets/aliens (PURCHASED, gitignored, never commit)",
+    "assets/farm (PURCHASED, gitignored, never commit)",
+    "assets/imported (partly gitignored: concert/instruments)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [
+    "examples/entities/craft-lights.profile.json",
+    "examples/lightrigs/glowmere-valley.rig.json",
+    "examples/materials/glowmere-painted-frond.material.json",
+    "examples/materials/glowmere-tissue.material.json",
+    "examples/materials/glowmere2-cap.material.json",
+    "examples/materials/glowmere2-painted-ground.material.json",
+    "examples/materials/glowmere2-tissue-cool.material.json",
+    "examples/materials/glowmere2-tissue.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "hyperspace",
+   "name": "Hyperspace",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/hyperspace/hyperspace.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/hyperspace/hyperspace.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Hyperspace"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Hyperspace tunnel showcase.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/void-core.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "chamber",
+   "name": "Impossible Chamber",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/chamber/chamber.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/chamber/chamber.scene.json",
+    "examples/chamber/wall.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Impossible Chamber"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Impossible-geometry chamber built from nested wall scenes.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "reassembly",
+   "name": "Metallic Reassembly",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/reassembly/reassembly.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/reassembly/reassembly.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Metallic Reassembly"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Metal pieces reassembling on onsets.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/industrial-cold.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "night-shift",
+   "name": "Night Shift",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/city/night-shift.json",
+   "variant_files": [
+    "examples/city/night-shift.lrc"
+   ],
+   "scene_files": [
+    "examples/city/night-shift.scene.json",
+    "examples/city/plaza.scene.json",
+    "examples/city/downtown.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Night Shift"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "City music video (Night Shift) with a cinematic sequence across plaza and downtown sub-scenes and lyrics.",
+   "docs": [
+    "docs/group-d-city-brief.md",
+    "docs/sequencer.md"
+   ],
+   "assets": [
+    "assets/audio/night-shift.wav",
+    "assets/imported (partly gitignored: concert/instruments)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/night-shift.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "cathedral",
+   "name": "The Cathedral",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/cathedral/cathedral.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/cathedral/cathedral.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "The Cathedral"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Procedural cathedral showcase.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "helix",
+   "name": "The Helix",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/helix/helix.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/helix/helix.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "The Helix"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Procedural helix showcase.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "infinite-temple",
+   "name": "The Infinite Temple",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/infinite/infinite.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/infinite/infinite.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "The Infinite Temple"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Endless procedural temple corridor showcase.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/colonnade.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "constellation",
+   "name": "The Living Constellation",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/constellation/constellation.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/constellation/constellation.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "The Living Constellation"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Living constellation showcase on the Glowmere score.",
+   "docs": [
+    "docs/constellation.md"
+   ],
+   "assets": [
+    "assets/audio/glowmere-valley.wav"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/constellation.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "machine",
+   "name": "The Living Machine",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/machine/machine.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/machine/machine.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "The Living Machine"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Mechanical procedural machine showcase.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/industrial-cold.rig.json",
+    "examples/materials/brushed-metal.material.json",
+    "examples/materials/dark-steel.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "temple",
+   "name": "The Temple",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/temple/temple.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/temple/temple.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "The Temple"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Procedural temple showcase (the first example).",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/sacred-warm.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "tree-of-life-island",
+   "name": "Tree of Life - Floating Island / Celestial Night",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/treeisland/tree-of-life-floating-island.json",
+   "variant_files": [
+    "examples/treeisland/tree-of-life-floating-island-night.json"
+   ],
+   "scene_files": [
+    "examples/treeisland/tree-of-life-floating-island.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Tree of Life - Floating Island",
+    "Tree of Life - Celestial Night"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Hero Tree of Life on a floating island; Celestial Night is a second lighting project over the same scene.",
+   "docs": [],
+   "assets": [
+    "EXTERNAL owner-machine file: ~/Desktop/MP3/Hellopines 2.mp3 (present on owner machine)",
+    "assets/treeisle (gitignored, owner-only copy)",
+    "shaders/glowmere-cosmos.wgsl"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "tree-of-life-ocean",
+   "name": "Tree of Life - Ocean World",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/treeisland/tree-of-life-ocean-world.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/treeisland/tree-of-life-ocean-world.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Tree of Life - Ocean World"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "The Tree of Life island set in an ocean world.",
+   "docs": [],
+   "assets": [
+    "assets/environments/tree_of_life_day.exr",
+    "assets/environments/tree_of_life_night.exr",
+    "assets/treeisle (gitignored, owner-only copy)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "worlds",
+   "name": "Worlds (preset morph)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/worlds/worlds.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/worlds/worlds.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Worlds (preset morph)"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Morphs between world presets.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "quality-aliasing",
+   "name": "Quality Lab: aliasing (+ dolly)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/quality/aliasing.json",
+   "variant_files": [
+    "examples/quality/aliasing-dolly.json"
+   ],
+   "scene_files": [
+    "examples/quality/aliasing.scene.json",
+    "examples/quality/aliasing-dolly.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Quality Lab: aliasing",
+    "Quality Lab: aliasing dolly"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Aliasing measurement scene for the Quality/Rendering Lab; the dolly is a moving-camera variant (Temporal Lab).",
+   "docs": [
+    "docs/quality-lab/README.md"
+   ],
+   "assets": [],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-rain",
+   "name": "Rain",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/rain.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/rain.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Rain"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (rain) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-snow",
+   "name": "Snow",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/snow.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/snow.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Snow"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (snow) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-ashfall",
+   "name": "Ashfall",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/ashfall.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/ashfall.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Ashfall"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (ashfall) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-weather-front",
+   "name": "Weather front",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/weather-front.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/weather-front.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Weather front"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (weather front) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-dust-motes",
+   "name": "Dust motes",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/dust-motes.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/dust-motes.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Dust motes"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (dust motes) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-fireflies",
+   "name": "Fireflies",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/fireflies.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/fireflies.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Fireflies"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (fireflies) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-pollen",
+   "name": "Pollen, spores and seeds",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/pollen.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/pollen.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Pollen, spores and seeds"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (pollen, spores and seeds) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "weather-season",
+   "name": "Season shift",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Weather",
+   "primary_file": "examples/weather/season.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/weather/season.scene.json",
+    "examples/weather/_stage.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Season shift"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Weather-system demo (season shift) on the shared weather stage.",
+   "docs": [
+    "examples/weather/README.md"
+   ],
+   "assets": [
+    "assets/kenney (CC0, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "procedural-space",
+   "name": "Procedural Space (POC)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/space/space.json",
+   "variant_files": [
+    "examples/space/showcase.json",
+    "examples/space/folding-space.json",
+    "examples/space/geometry-explosion.json",
+    "examples/space/infinite-hall.json",
+    "examples/space/radial-architecture.json",
+    "examples/space/recursive-cathedral.json",
+    "examples/space/experiment-melt-void.json"
+   ],
+   "scene_files": [
+    "examples/space/space.scene.json",
+    "examples/space/showcase.scene.json",
+    "examples/space/folding-space.scene.json",
+    "examples/space/geometry-explosion.scene.json",
+    "examples/space/infinite-hall.scene.json",
+    "examples/space/radial-architecture.scene.json",
+    "examples/space/recursive-cathedral.scene.json",
+    "examples/space/experiment-melt-void.scene.json"
+   ],
+   "generated": null,
+   "regenerable": {
+    "command": "python3 tools/make_space_presets.py",
+    "outputs": [
+     "space/*.json + *.scene.json"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": true,
+   "index_names": [
+    "Procedural Space (POC)"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "SDF procedural space POC; seven preset/showcase projects over separate scenes.",
+   "docs": [
+    "docs/prototypes/procedural-space/REPORT.md",
+    "docs/prototypes/procedural-space/PROGRESS.md"
+   ],
+   "assets": [
+    "assets/audio/night-shift.wav"
+   ],
+   "shared_example_deps": [
+    "examples/space/space-art.rig.json",
+    "examples/space/space.rig.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "sonic-garden",
+   "name": "Sonic Garden",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Lab",
+   "primary_file": "examples/sonic-garden/sonic-garden.json",
+   "variant_files": [
+    "examples/sonic-garden/variants/bass.json",
+    "examples/sonic-garden/variants/bell.json",
+    "examples/sonic-garden/variants/context-bell.json",
+    "examples/sonic-garden/variants/context-pad.json",
+    "examples/sonic-garden/variants/morph.json",
+    "examples/sonic-garden/variants/pad.json",
+    "examples/sonic-garden/variants/perc.json"
+   ],
+   "scene_files": [
+    "examples/sonic-garden/sonic-garden.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": true,
+   "index_names": [
+    "Sonic Garden"
+   ],
+   "index_live_names": [],
+   "status": "indexed-reviewable",
+   "purpose": "Offline Sonic Garden: the visual interpreter on prepared timbre clips (pad, bass, bell, perc, morph, context).",
+   "docs": [
+    "docs/prototypes/sonic-garden/PROGRESS.md",
+    "docs/prototypes/sonic-garden/00-brief.md"
+   ],
+   "assets": [
+    "assets/audio/sonic-bass.wav (MISSING)",
+    "assets/audio/sonic-bell.wav (MISSING)",
+    "assets/audio/sonic-context-bell.wav (MISSING)",
+    "assets/audio/sonic-context-pad.wav (MISSING)",
+    "assets/audio/sonic-morph.wav (MISSING)",
+    "assets/audio/sonic-pad.wav (MISSING)",
+    "assets/audio/sonic-perc.wav (MISSING)"
+   ],
+   "shared_example_deps": [
+    "examples/lightrigs/sonic-garden.rig.json",
+    "examples/sonic-garden/notes/ (.mid files)"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "chorus-field",
+   "name": "Chorus Field (Trench god)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Chorus Field",
+   "primary_file": "examples/chorus-field/p8-god-trench.json",
+   "variant_files": [
+    "examples/chorus-field/dbg-roll.json",
+    "examples/chorus-field/p1-curl.json",
+    "examples/chorus-field/p1-sheet.json",
+    "examples/chorus-field/p1-shell.json",
+    "examples/chorus-field/p1-vortex-curl.json",
+    "examples/chorus-field/p2-choir.json",
+    "examples/chorus-field/p2-flow.json",
+    "examples/chorus-field/p2-mask-calm.json",
+    "examples/chorus-field/p2-mask-deep.json",
+    "examples/chorus-field/p2-mask-far.json",
+    "examples/chorus-field/p2-mask.json",
+    "examples/chorus-field/p2-void.json",
+    "examples/chorus-field/p3-e1-base.json",
+    "examples/chorus-field/p3-e2-horned.json",
+    "examples/chorus-field/p3-e3-mouth.json",
+    "examples/chorus-field/p3-e4-horned-mouth.json",
+    "examples/chorus-field/p3-e5-wide-eyes.json",
+    "examples/chorus-field/p3-e6-low.json",
+    "examples/chorus-field/p3-e7-storm-hair.json",
+    "examples/chorus-field/p3-e8-wild.json",
+    "examples/chorus-field/p3-roll-inside.json",
+    "examples/chorus-field/p3-roll.json",
+    "examples/chorus-field/p4-depth-front.json",
+    "examples/chorus-field/p4-depth.json",
+    "examples/chorus-field/p4-m1-oilslick.json",
+    "examples/chorus-field/p4-m10-studio-film.json",
+    "examples/chorus-field/p4-m2-blackchrome.json",
+    "examples/chorus-field/p4-m3-engraved.json",
+    "examples/chorus-field/p4-m4-veins.json",
+    "examples/chorus-field/p4-m5-oxide.json",
+    "examples/chorus-field/p4-m6-gunmetal-oxide.json",
+    "examples/chorus-field/p4-m7-chrome-split.json",
+    "examples/chorus-field/p4-m8-chrome-split-film.json",
+    "examples/chorus-field/p4-m9-studio-sky.json",
+    "examples/chorus-field/p4-tendons.json",
+    "examples/chorus-field/p5-chorus.json",
+    "examples/chorus-field/p6-g006k-s12.json",
+    "examples/chorus-field/p6-g006k-s24-noprog.json",
+    "examples/chorus-field/p6-g006k-s24-noshadow.json",
+    "examples/chorus-field/p6-g006k-s24.json",
+    "examples/chorus-field/p6-g006k-s48.json",
+    "examples/chorus-field/p6-g025k-s24.json",
+    "examples/chorus-field/p6-g050k-s24.json",
+    "examples/chorus-field/p6-g100k-s16.json",
+    "examples/chorus-field/p6-g200k-s16.json",
+    "examples/chorus-field/p6-g400k-s12.json",
+    "examples/chorus-field/p6-g800k-s08.json",
+    "examples/chorus-field/p7-god-dissolved.json",
+    "examples/chorus-field/p7-god-far.json",
+    "examples/chorus-field/p7-god-front.json",
+    "examples/chorus-field/p7-god-low.json",
+    "examples/chorus-field/p7-god-maw.json",
+    "examples/chorus-field/p7-god-slack.json",
+    "examples/chorus-field/p7-god-split-light.json",
+    "examples/chorus-field/p7-god-taut.json",
+    "examples/chorus-field/p7-god-three-quarter.json"
+   ],
+   "scene_files": [
+    "examples/chorus-field/dbg-roll.scene.json",
+    "examples/chorus-field/p1-curl.scene.json",
+    "examples/chorus-field/p1-sheet.scene.json",
+    "examples/chorus-field/p1-shell.scene.json",
+    "examples/chorus-field/p1-vortex-curl.scene.json",
+    "examples/chorus-field/p2-choir.scene.json",
+    "examples/chorus-field/p2-flow.scene.json",
+    "examples/chorus-field/p2-mask-calm.scene.json",
+    "examples/chorus-field/p2-mask-deep.scene.json",
+    "examples/chorus-field/p2-mask-far.scene.json",
+    "examples/chorus-field/p2-mask.scene.json",
+    "examples/chorus-field/p2-void.scene.json",
+    "examples/chorus-field/p3-e1-base.scene.json",
+    "examples/chorus-field/p3-e2-horned.scene.json",
+    "examples/chorus-field/p3-e3-mouth.scene.json",
+    "examples/chorus-field/p3-e4-horned-mouth.scene.json",
+    "examples/chorus-field/p3-e5-wide-eyes.scene.json",
+    "examples/chorus-field/p3-e6-low.scene.json",
+    "examples/chorus-field/p3-e7-storm-hair.scene.json",
+    "examples/chorus-field/p3-e8-wild.scene.json",
+    "examples/chorus-field/p3-roll-inside.scene.json",
+    "examples/chorus-field/p3-roll.scene.json",
+    "examples/chorus-field/p4-depth-front.scene.json",
+    "examples/chorus-field/p4-depth.scene.json",
+    "examples/chorus-field/p4-m1-oilslick.scene.json",
+    "examples/chorus-field/p4-m10-studio-film.scene.json",
+    "examples/chorus-field/p4-m2-blackchrome.scene.json",
+    "examples/chorus-field/p4-m3-engraved.scene.json",
+    "examples/chorus-field/p4-m4-veins.scene.json",
+    "examples/chorus-field/p4-m5-oxide.scene.json",
+    "examples/chorus-field/p4-m6-gunmetal-oxide.scene.json",
+    "examples/chorus-field/p4-m7-chrome-split.scene.json",
+    "examples/chorus-field/p4-m8-chrome-split-film.scene.json",
+    "examples/chorus-field/p4-m9-studio-sky.scene.json",
+    "examples/chorus-field/p4-tendons.scene.json",
+    "examples/chorus-field/p5-chorus.scene.json",
+    "examples/chorus-field/p6-g006k-s12.scene.json",
+    "examples/chorus-field/p6-g006k-s24-noprog.scene.json",
+    "examples/chorus-field/p6-g006k-s24-noshadow.scene.json",
+    "examples/chorus-field/p6-g006k-s24.scene.json",
+    "examples/chorus-field/p6-g006k-s48.scene.json",
+    "examples/chorus-field/p6-g025k-s24.scene.json",
+    "examples/chorus-field/p6-g050k-s24.scene.json",
+    "examples/chorus-field/p6-g100k-s16.scene.json",
+    "examples/chorus-field/p6-g200k-s16.scene.json",
+    "examples/chorus-field/p6-g400k-s12.scene.json",
+    "examples/chorus-field/p6-g800k-s08.scene.json",
+    "examples/chorus-field/p7-god-dissolved.scene.json",
+    "examples/chorus-field/p7-god-far.scene.json",
+    "examples/chorus-field/p7-god-front.scene.json",
+    "examples/chorus-field/p7-god-low.scene.json",
+    "examples/chorus-field/p7-god-maw.scene.json",
+    "examples/chorus-field/p7-god-slack.scene.json",
+    "examples/chorus-field/p7-god-split-light.scene.json",
+    "examples/chorus-field/p7-god-taut.scene.json",
+    "examples/chorus-field/p7-god-three-quarter.scene.json",
+    "examples/chorus-field/p8-god-trench.scene.json"
+   ],
+   "generated": null,
+   "regenerable": {
+    "command": "python3 examples/chorus-field/build.py",
+    "outputs": [
+     "chorus-field/p*.json + .scene.json"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": false,
+   "index_names": [],
+   "index_live_names": [],
+   "status": "not-indexed",
+   "purpose": "Procedural fiber field: ~5k wires form a demonic silver skull via eddy fields; Trench show with phrase-driven camera.",
+   "docs": [
+    "docs/prototypes/chorus-field/README.md"
+   ],
+   "assets": [
+    "assets/audio/trench.wav (owner-supplied song; not in assets/audio/manifest.json, not regenerable, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "liminal",
+   "name": "Liminal Euclidean World: All You Got",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Liminal",
+   "primary_file": "examples/liminal/all-you-got-pass4.json",
+   "variant_files": [
+    "examples/liminal/all-you-got-pass2-kit.json",
+    "examples/liminal/all-you-got-pass2-kit.rig.json",
+    "examples/liminal/all-you-got-pass2-kit.shots.json",
+    "examples/liminal/all-you-got-pass2.json",
+    "examples/liminal/all-you-got-pass2.rig.json",
+    "examples/liminal/all-you-got-pass2.shots.json",
+    "examples/liminal/all-you-got-pass3-rooms.json",
+    "examples/liminal/all-you-got-pass3-rooms.rig.json",
+    "examples/liminal/all-you-got-pass3-rooms.shots.json",
+    "examples/liminal/all-you-got-pass3-tableaux.json",
+    "examples/liminal/all-you-got-pass3-tableaux.rig.json",
+    "examples/liminal/all-you-got-pass3-tableaux.shots.json",
+    "examples/liminal/all-you-got-pass3.json",
+    "examples/liminal/all-you-got-pass3.rig.json",
+    "examples/liminal/all-you-got-pass3.shots.json",
+    "examples/liminal/all-you-got-pass4-city.json",
+    "examples/liminal/all-you-got-pass4-city.rig.json",
+    "examples/liminal/all-you-got-pass4-city.shots.json",
+    "examples/liminal/all-you-got-pass4-rooms.json",
+    "examples/liminal/all-you-got-pass4-rooms.rig.json",
+    "examples/liminal/all-you-got-pass4-rooms.shots.json",
+    "examples/liminal/all-you-got-pass4-tableaux.json",
+    "examples/liminal/all-you-got-pass4-tableaux.rig.json",
+    "examples/liminal/all-you-got-pass4-tableaux.shots.json",
+    "examples/liminal/all-you-got-pass4.rig.json",
+    "examples/liminal/all-you-got-pass4.shots.json",
+    "examples/liminal/all-you-got.json",
+    "examples/liminal/all-you-got.rig.json",
+    "examples/liminal/liminal.json",
+    "examples/liminal/liminal.rig.json"
+   ],
+   "scene_files": [
+    "examples/liminal/all-you-got-pass2-kit.scene.json",
+    "examples/liminal/all-you-got-pass2.scene.json",
+    "examples/liminal/all-you-got-pass3-rooms.scene.json",
+    "examples/liminal/all-you-got-pass3-tableaux.scene.json",
+    "examples/liminal/all-you-got-pass3.scene.json",
+    "examples/liminal/all-you-got-pass4-city.scene.json",
+    "examples/liminal/all-you-got-pass4-rooms.scene.json",
+    "examples/liminal/all-you-got-pass4-tableaux.scene.json",
+    "examples/liminal/all-you-got-pass4.scene.json",
+    "examples/liminal/all-you-got.scene.json",
+    "examples/liminal/liminal.scene.json"
+   ],
+   "generated": null,
+   "regenerable": {
+    "command": "python3 tools/liminal/make_all_you_got_pass4.py (and make_all_you_got*.py / tools/make_liminal_example.py for the earlier passes)",
+    "outputs": [
+     "liminal/all-you-got-pass4*.json/.scene.json/.rig.json/.shots.json/.validation.txt"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": false,
+   "index_names": [],
+   "index_live_names": [],
+   "status": "not-indexed",
+   "purpose": "All You Got music video in a liminal/Escherian SDF world; pass 4 is the final, earlier passes and the base example world are kept.",
+   "docs": [
+    "docs/prototypes/liminal-space/PROGRESS-art.md",
+    "docs/prototypes/liminal-space/REPORT.md"
+   ],
+   "assets": [
+    "EXTERNAL owner-machine file: ~/Desktop/All You Got.wav (present on owner machine)",
+    "assets/quaternius (CC0; mostly gitignored, 3 meshes tracked)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "biovalley-macro",
+   "name": "Biovalley Macro Showcase",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Biovalley",
+   "primary_file": "examples/biovalley/shots/macro_audio.json",
+   "variant_files": [
+    "examples/biovalley/shots/macro.json"
+   ],
+   "scene_files": [
+    "examples/biovalley/shots/ (scene files generated beside macro.json / macro_audio.json; names not verifiable without running valley.py)"
+   ],
+   "generated": {
+    "command": "python3 examples/biovalley/valley.py (after an engine build)",
+    "outputs": [
+     "examples/biovalley/meshes/",
+     "examples/biovalley/sky/",
+     "examples/biovalley/shots/macro.json",
+     "examples/biovalley/shots/macro_audio.json",
+     "valley.scene.json and the other shots"
+    ],
+    "prerequisites": [
+     "Blender hero-asset library: meshes/hero and meshes/env built by examples/biovalley/hero_assets/build.py + colorways.py (Blender)",
+     "python3 + numpy",
+     "engine built",
+     "assets/audio/trench.wav"
+    ]
+   },
+   "regenerable": null,
+   "indexed": false,
+   "index_names": [],
+   "index_live_names": [],
+   "status": "generated-missing",
+   "purpose": "Static-camera audio-reactive bioluminescent forest floor built from the Blender hero-asset library (Trench).",
+   "docs": [
+    "docs/prototypes/bioluminescent-valley/PAUSED.md",
+    "docs/prototypes/bioluminescent-valley/09-macro-showcase.md"
+   ],
+   "assets": [
+    "assets/audio/trench.wav (owner-supplied)",
+    "examples/biovalley/meshes/hero, meshes/env (Blender-built hero-asset library, gitignored)"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": "missing files: examples/biovalley/shots/macro_audio.json, examples/biovalley/shots/macro.json",
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "tide",
+   "name": "The Tide (leviathan)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Showcase",
+   "primary_file": "examples/tide/tide.json",
+   "variant_files": [],
+   "scene_files": [
+    "examples/tide/tide.scene.json"
+   ],
+   "generated": null,
+   "regenerable": null,
+   "indexed": false,
+   "index_names": [],
+   "index_live_names": [],
+   "status": "not-indexed",
+   "purpose": "Early (2026-09-10) ocean prototype that became a translucent leviathan body moving through a luminous medium.",
+   "docs": [],
+   "assets": [],
+   "shared_example_deps": [
+    "examples/lightrigs/tide.rig.json",
+    "examples/materials/tide-water.material.json"
+   ],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "bioluminescent-valley-recipe",
+   "name": "Bioluminescent Valley (recipe)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Look development",
+   "primary_file": "examples/recipes/bioluminescent-valley.recipe.json",
+   "variant_files": [],
+   "scene_files": [],
+   "generated": null,
+   "regenerable": {
+    "command": "opened directly: recipe composed in-engine",
+    "outputs": [
+     "in-memory world"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": false,
+   "index_names": [],
+   "index_live_names": [],
+   "status": "not-indexed",
+   "purpose": "Recipe-generated alien rainforest at night (world-editor recipe example); not the Biovalley macro.",
+   "docs": [
+    "docs/world-editor.md"
+   ],
+   "assets": [
+    "assets/manifest.json"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  },
+  {
+   "id": "open-vista",
+   "name": "Open Vista (stress recipe)",
+   "category": "Offline",
+   "also_supports": null,
+   "family": "Performance",
+   "primary_file": "examples/stress/open-vista.recipe.json",
+   "variant_files": [],
+   "scene_files": [],
+   "generated": null,
+   "regenerable": {
+    "command": "opened directly: recipe composed in-engine",
+    "outputs": [
+     "in-memory world"
+    ],
+    "note": "outputs are tracked; generator only needed after edits"
+   },
+   "indexed": false,
+   "index_names": [],
+   "index_live_names": [],
+   "status": "not-indexed",
+   "purpose": "Second renderer stress profile: 1.4 km mountainous relief, thin cover, large negative space.",
+   "docs": [
+    "docs/renderer-upgrade/05-scope-contract.md"
+   ],
+   "assets": [
+    "assets/glowmere.manifest.json"
+   ],
+   "shared_example_deps": [],
+   "menu": null,
+   "notes": null,
+   "verification_level": "TBD (coordinator)"
+  }
+ ],
+ "fixtures": [
+  {
+   "id": "assetlod-arms",
+   "parent_scene": "tree-of-life-island",
+   "description": "ADR-348/355 asset-LOD measurement arms (control + before/after pairs); more are gitignored and regenerated by tools/make_assetlod_arms.py",
+   "files": [
+    "examples/assetlod/_arm-bare.json",
+    "examples/assetlod/_arm-bare.scene.json",
+    "examples/assetlod/_arm-full.json",
+    "examples/assetlod/_arm-full.scene.json",
+    "examples/assetlod/_arm-nofoliage.json",
+    "examples/assetlod/_arm-nofoliage.scene.json",
+    "examples/assetlod/_arm-notree.json",
+    "examples/assetlod/_arm-notree.scene.json",
+    "examples/assetlod/_arm-static-notree.json",
+    "examples/assetlod/_arm-static-notree.scene.json",
+    "examples/assetlod/_arm-static.json",
+    "examples/assetlod/_arm-static.scene.json",
+    "examples/assetlod/tree-closeup-auto.json",
+    "examples/assetlod/tree-closeup-auto.scene.json",
+    "examples/assetlod/tree-closeup-off.json",
+    "examples/assetlod/tree-closeup-off.scene.json",
+    "examples/assetlod/tree-hero-auto.json",
+    "examples/assetlod/tree-hero-auto.scene.json",
+    "examples/assetlod/tree-hero-off.json",
+    "examples/assetlod/tree-hero-off.scene.json",
+    "examples/assetlod/tree-medium-auto.json",
+    "examples/assetlod/tree-medium-auto.scene.json",
+    "examples/assetlod/tree-medium-off.json",
+    "examples/assetlod/tree-medium-off.scene.json",
+    "examples/assetlod/tree-small-auto.json",
+    "examples/assetlod/tree-small-auto.scene.json",
+    "examples/assetlod/tree-small-off.json",
+    "examples/assetlod/tree-small-off.scene.json",
+    "examples/assetlod/tree-wide-auto.json",
+    "examples/assetlod/tree-wide-auto.scene.json",
+    "examples/assetlod/tree-wide-off.json",
+    "examples/assetlod/tree-wide-off.scene.json"
+   ],
+   "file_count": 32,
+   "used_by": "tools/make_assetlod_arms.py; hidden [.analysis] instruments tests/unit/test_asset_lod_frames.cpp (AVGEN_LOD_FRAMES, skips without) and test_asset_lod_analysis.cpp; ADR-348/355",
+   "code_references": [],
+   "code_reference_count": 0
+  },
+  {
+   "id": "treeisland-arms",
+   "parent_scene": "tree-of-life-island",
+   "description": "Tree of Life A/B arms (_ck-*, _ctl-*, _glow-*, _view-*, _ca-vg-*, _compare-original); more gitignored (_fog*, _vx2-*)",
+   "files": [
+    "examples/treeisland/_ca-vg-g1.json",
+    "examples/treeisland/_ca-vg-g1.scene.json",
+    "examples/treeisland/_ca-vg-g2.json",
+    "examples/treeisland/_ca-vg-g2.scene.json",
+    "examples/treeisland/_ck-before-hero.json",
+    "examples/treeisland/_ck-before-hero.scene.json",
+    "examples/treeisland/_ck-ctl-nofill.json",
+    "examples/treeisland/_ck-ctl-nofill.scene.json",
+    "examples/treeisland/_ck-ctl-noglow.json",
+    "examples/treeisland/_ck-ctl-noglow.scene.json",
+    "examples/treeisland/_ck-ctl-nokey.json",
+    "examples/treeisland/_ck-ctl-nokey.scene.json",
+    "examples/treeisland/_ck-ctl-noshadow.json",
+    "examples/treeisland/_ck-ctl-noshadow.scene.json",
+    "examples/treeisland/_ck-eval-volume.json",
+    "examples/treeisland/_ck-eval-volume.scene.json",
+    "examples/treeisland/_ck-perf-noshadowrange.json",
+    "examples/treeisland/_ck-perf-noshadowrange.scene.json",
+    "examples/treeisland/_ck-view-hero.json",
+    "examples/treeisland/_ck-view-hero.scene.json",
+    "examples/treeisland/_ck-view-orbit.json",
+    "examples/treeisland/_ck-view-orbit.scene.json",
+    "examples/treeisland/_ck-view-shadow.json",
+    "examples/treeisland/_ck-view-shadow.scene.json",
+    "examples/treeisland/_ck-view-under.json",
+    "examples/treeisland/_ck-view-under.scene.json",
+    "examples/treeisland/_ck-view-wide.json",
+    "examples/treeisland/_ck-view-wide.scene.json",
+    "examples/treeisland/_compare-original.json",
+    "examples/treeisland/_compare-original.scene.json",
+    "examples/treeisland/_ctl-no-cosmos-shader.json",
+    "examples/treeisland/_ctl-no-cosmos-shader.scene.json",
+    "examples/treeisland/_ctl-no-stars.json",
+    "examples/treeisland/_ctl-no-stars.scene.json",
+    "examples/treeisland/_glow-high.json",
+    "examples/treeisland/_glow-low.json",
+    "examples/treeisland/_glow-off.json",
+    "examples/treeisland/_view-contact.json",
+    "examples/treeisland/_view-contact.scene.json",
+    "examples/treeisland/_view-low-angle.json",
+    "examples/treeisland/_view-low-angle.scene.json"
+   ],
+   "file_count": 41,
+   "used_by": "tools/make_treeisland_arms.py, make_cosmickey_arms.py, make_fog_arms.py, make_review_arms.py",
+   "code_references": [
+    "tools/make_treeisland_arms.py:153"
+   ],
+   "code_reference_count": 1
+  },
+  {
+   "id": "astral-prototype-arms",
+   "parent_scene": "astral-forge",
+   "description": "Astral Forge prototype comparison arms",
+   "files": [
+    "examples/astral-forge/compare-t01-face.json",
+    "examples/astral-forge/compare-t01-face.scene.json",
+    "examples/astral-forge/compare-t02-metal.json",
+    "examples/astral-forge/compare-t02-metal.scene.json",
+    "examples/astral-forge/latent-entity.json",
+    "examples/astral-forge/latent-entity.scene.json",
+    "examples/astral-forge/tempered-metal.scene.json"
+   ],
+   "file_count": 7,
+   "used_by": "tests/rendering/test_astral_port_gpu.cpp:572,585; tests/rendering/test_sdf_anatomy_gpu.cpp:215; tests/unit/test_sdf_anatomy.cpp:355 (compare-t01-face.scene.json); test_particle_latent_gpu.cpp:492 (comment, latent-entity); tempered-metal: docs only",
+   "code_references": [
+    "tests/rendering/test_astral_port_gpu.cpp:572",
+    "tests/rendering/test_astral_port_gpu.cpp:585",
+    "tests/rendering/test_particle_latent_gpu.cpp:492",
+    "tests/rendering/test_sdf_anatomy_gpu.cpp:215",
+    "tests/unit/test_sdf_anatomy.cpp:355"
+   ],
+   "code_reference_count": 5
+  },
+  {
+   "id": "imagelook-captures",
+   "parent_scene": "-",
+   "description": "Image-look capture fixtures (bloom, defocus, exposure, grey ramp, hue wheel, look, wide tier, disabled)",
+   "files": [
+    "examples/imagelook/il-bloom.json",
+    "examples/imagelook/il-bloom.scene.json",
+    "examples/imagelook/il-defocus.json",
+    "examples/imagelook/il-defocus.scene.json",
+    "examples/imagelook/il-disabled.json",
+    "examples/imagelook/il-disabled.scene.json",
+    "examples/imagelook/il-exposure.json",
+    "examples/imagelook/il-exposure.scene.json",
+    "examples/imagelook/il-grey-ramp.json",
+    "examples/imagelook/il-grey-ramp.scene.json",
+    "examples/imagelook/il-hue-wheel.json",
+    "examples/imagelook/il-hue-wheel.scene.json",
+    "examples/imagelook/il-look.json",
+    "examples/imagelook/il-look.scene.json",
+    "examples/imagelook/il-wide-tier.json",
+    "examples/imagelook/il-wide-tier.scene.json"
+   ],
+   "file_count": 16,
+   "used_by": "tools/make_imagelook_captures.py (writes/uses them); docs/image-look-*.md",
+   "code_references": [
+    "tools/make_imagelook_captures.py:32"
+   ],
+   "code_reference_count": 1
+  },
+  {
+   "id": "gpu-regression",
+   "parent_scene": "-",
+   "description": "GPU regression scenes (echo-field, endless-meadow, mycelium)",
+   "files": [
+    "examples/gpu-regression/echo-field.json",
+    "examples/gpu-regression/echo-field.scene.json",
+    "examples/gpu-regression/endless-meadow.json",
+    "examples/gpu-regression/endless-meadow.scene.json",
+    "examples/gpu-regression/mycelium.json",
+    "examples/gpu-regression/mycelium.scene.json"
+   ],
+   "file_count": 6,
+   "used_by": "tests/rendering/test_gpu_regression_scenes_gpu.cpp:145-375",
+   "code_references": [
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:145",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:168",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:212",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:223",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:260",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:281",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:282",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:283",
+    "tests/rendering/test_gpu_regression_scenes_gpu.cpp:375"
+   ],
+   "code_reference_count": 9
+  },
+  {
+   "id": "renderer-qa-variants",
+   "parent_scene": "renderer-qa",
+   "description": "Renderer QA isolation variants (character, minimal, transparency, water) and frame-snapshot baselines",
+   "files": [
+    "examples/qa/renderer-qa-character.scene.json",
+    "examples/qa/renderer-qa-minimal.scene.json",
+    "examples/qa/renderer-qa-transparency.scene.json",
+    "examples/qa/renderer-qa-water.scene.json",
+    "examples/qa/baselines/renderer-qa-minimal.snapshot.json",
+    "examples/qa/baselines/renderer-qa-transparency.snapshot.json",
+    "examples/qa/baselines/renderer-qa.snapshot.json"
+   ],
+   "file_count": 7,
+   "used_by": "tests/rendering/test_composition_gpu.cpp, test_resource_lifetime_gpu.cpp, test_character_forensics_gpu.cpp, test_post_artifact_forensics_gpu.cpp, test_water_depth_forensics_gpu.cpp; tests/support/water_bench.hpp:56",
+   "code_references": [
+    "tests/rendering/test_character_forensics_gpu.cpp:3",
+    "tests/rendering/test_character_forensics_gpu.cpp:84",
+    "tests/rendering/test_composition_gpu.cpp:2254",
+    "tests/rendering/test_composition_gpu.cpp:2268",
+    "tests/rendering/test_composition_gpu.cpp:2475",
+    "tests/rendering/test_composition_gpu.cpp:2484",
+    "tests/rendering/test_composition_gpu.cpp:2492",
+    "tests/rendering/test_composition_gpu.cpp:2499",
+    "tests/rendering/test_composition_gpu.cpp:2704",
+    "tests/rendering/test_composition_gpu.cpp:4343",
+    "tests/rendering/test_composition_gpu.cpp:4470",
+    "tests/rendering/test_composition_gpu.cpp:4472",
+    "tests/rendering/test_post_artifact_forensics_gpu.cpp:654",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:1071",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:402",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:602",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:778",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:779",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:783",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:785",
+    "tests/rendering/test_resource_lifetime_gpu.cpp:891",
+    "tests/rendering/test_water_depth_forensics_gpu.cpp:180",
+    "tests/support/water_bench.hpp:5",
+    "tests/support/water_bench.hpp:56"
+   ],
+   "code_reference_count": 24
+  },
+  {
+   "id": "engineering-labs",
+   "parent_scene": "-",
+   "description": "Engineering Labs fixtures: lab scenes + cases.json per lab (src/labs/case.cpp:52 builds examples/labs/<key>/cases.json); character, footik, motion, motionmatch, tornado, grid-catchup, visibility-culling scenes",
+   "files": [
+    "examples/labs/_tc-1-dust-devil.scene.json",
+    "examples/labs/_tc-2-classic-cone.scene.json",
+    "examples/labs/_tc-3-wedge.scene.json",
+    "examples/labs/_tc-4-tall-column.scene.json",
+    "examples/labs/_tc-5-thick-cloud.scene.json",
+    "examples/labs/_tc-6-thin-rope.scene.json",
+    "examples/labs/_tc-7-cosmic-storm.scene.json",
+    "examples/labs/camera/cases.json",
+    "examples/labs/character/autonomy-demo.scene.json",
+    "examples/labs/character/cases.json",
+    "examples/labs/character/character-intelligence-lab.scene.json",
+    "examples/labs/character/guard-post.scene.json",
+    "examples/labs/character/pasture.scene.json",
+    "examples/labs/character/perception-crowd.scene.json",
+    "examples/labs/character/river-crossing.scene.json",
+    "examples/labs/footik/alien-foot-lab.scene.json",
+    "examples/labs/footik/foot-ik-lab-off.scene.json",
+    "examples/labs/footik/foot-ik-lab.scene.json",
+    "examples/labs/grid-catchup-lab.scene.json",
+    "examples/labs/hdr-lab.scene.json",
+    "examples/labs/hdr/cases.json",
+    "examples/labs/interaction/cases.json",
+    "examples/labs/lighting-lab.scene.json",
+    "examples/labs/lighting/cases.json",
+    "examples/labs/lod-geometry-lab.scene.json",
+    "examples/labs/lod/cases.json",
+    "examples/labs/motion/clip-playback-jump.json",
+    "examples/labs/motion/clip-playback-lab.scene.json",
+    "examples/labs/motion/clip-playback-loop.json",
+    "examples/labs/motion/clip-playback-once.json",
+    "examples/labs/motionmatch/alien-match-100style-lab.scene.json",
+    "examples/labs/motionmatch/alien-match-lab.scene.json",
+    "examples/labs/motionmatch/glowmere-match-crowd-10.scene.json",
+    "examples/labs/motionmatch/glowmere-match-crowd-100.scene.json",
+    "examples/labs/motionmatch/glowmere-match-crowd-50.scene.json",
+    "examples/labs/motionmatch/glowmere-motion-matching-demo.scene.json",
+    "examples/labs/particle-vfx-lab.scene.json",
+    "examples/labs/particle/cases.json",
+    "examples/labs/rendering/cases.json",
+    "examples/labs/shadow-lab.scene.json",
+    "examples/labs/shadow/cases.json",
+    "examples/labs/tornado-lab.scene.json",
+    "examples/labs/tornado-modes-a-structure.scene.json",
+    "examples/labs/tornado-modes-b-macro.scene.json",
+    "examples/labs/tornado-modes-c-meso.scene.json",
+    "examples/labs/tornado-modes-d-full.scene.json",
+    "examples/labs/tornado-showcase.scene.json",
+    "examples/labs/visibility-culling-lab.scene.json",
+    "examples/labs/volumetric-atmosphere-lab.scene.json",
+    "examples/labs/volumetric/cases.json"
+   ],
+   "file_count": 50,
+   "used_by": "src/labs/lab.cpp:39-166 registry; src/labs/case.cpp:52; tests/unit (character lab, foot IK, motion matching), tests/rendering (tornado, grid catch-up, particle, volumetric, hdr)",
+   "code_references": [
+    "src/app/render_settings.hpp:93",
+    "src/core/json_keys.hpp:40",
+    "src/labs/case.cpp:52",
+    "src/labs/case.hpp:104",
+    "src/labs/lab.cpp:107",
+    "src/labs/lab.cpp:115",
+    "src/labs/lab.cpp:123",
+    "src/labs/lab.cpp:147",
+    "src/labs/lab.cpp:165",
+    "src/labs/lab.cpp:55",
+    "src/labs/lab.cpp:56",
+    "src/labs/lab.cpp:72",
+    "src/labs/lab.cpp:80",
+    "src/labs/lab.cpp:90",
+    "src/labs/lab.cpp:99",
+    "src/rendering/debug_visualizer.cpp:775",
+    "tests/data/explore-position-trace.txt:1",
+    "tests/rendering/test_gpu_sim_seek_gpu.cpp:221",
+    "tests/rendering/test_gpu_sim_seek_gpu.cpp:226",
+    "tests/rendering/test_gpu_sim_seek_gpu.cpp:301",
+    "tests/rendering/test_hdr_lab_gpu.cpp:313",
+    "tests/rendering/test_hdr_lab_gpu.cpp:325",
+    "tests/rendering/test_march_grain_gpu.cpp:183",
+    "tests/rendering/test_march_grain_gpu.cpp:184",
+    "tests/rendering/test_particle_lab_gpu.cpp:10",
+    "tests/rendering/test_particle_lab_gpu.cpp:59",
+    "tests/rendering/test_tornado_structure_gpu.cpp:158",
+    "tests/rendering/test_tornado_structure_gpu.cpp:209",
+    "tests/rendering/test_tornado_structure_gpu.cpp:255",
+    "tests/rendering/test_volumetric_lab_gpu.cpp:5",
+    "tests/rendering/test_volumetric_lab_gpu.cpp:64",
+    "tests/unit/test_alien_foot_lab.cpp:43",
+    "tests/unit/test_alien_foot_lab.cpp:7",
+    "tests/unit/test_alien_locomotion.cpp:1575",
+    "tests/unit/test_character_goal.cpp:32",
+    "tests/unit/test_character_intelligence_lab.cpp:61",
+    "tests/unit/test_character_intelligence_lab.cpp:9",
+    "tests/unit/test_character_lab_layers.cpp:67",
+    "tests/unit/test_character_lab_sockets.cpp:58",
+    "tests/unit/test_decision_extraction.cpp:151",
+    "tests/unit/test_decision_extraction.cpp:61",
+    "tests/unit/test_deterministic_seeds.cpp:43",
+    "tests/unit/test_entity_decision.cpp:62",
+    "tests/unit/test_entity_perception.cpp:544",
+    "tests/unit/test_entity_perception.cpp:57",
+    "tests/unit/test_entity_perception.cpp:60",
+    "tests/unit/test_foot_ik.cpp:1066",
+    "tests/unit/test_layer_blend.cpp:33",
+    "tests/unit/test_lighting_lab.cpp:447",
+    "tests/unit/test_lighting_lab.cpp:451",
+    "tests/unit/test_motion_db_loading.cpp:35",
+    "tests/unit/test_motion_debug_seam.cpp:35",
+    "tests/unit/test_motion_glowmere_demo.cpp:47",
+    "tests/unit/test_motion_matching_wired.cpp:265",
+    "tests/unit/test_motion_matrix.cpp:102",
+    "tests/unit/test_motion_slice.cpp:31",
+    "tests/unit/test_phase_d_autonomy.cpp:1136",
+    "tests/unit/test_phase_d_autonomy.cpp:3",
+    "tests/unit/test_phase_d_autonomy.cpp:50",
+    "tests/unit/test_root_motion.cpp:112",
+    "tests/unit/test_route_pricing.cpp:200",
+    "tests/unit/test_route_pricing.cpp:398",
+    "tests/unit/test_route_pricing.cpp:63",
+    "tests/unit/test_route_pricing.cpp:66",
+    "tests/unit/test_route_pricing.cpp:69",
+    "tests/unit/test_scene_authored_lights.cpp:165",
+    "tests/unit/test_scene_authored_lights.cpp:166",
+    "tests/unit/test_scene_authored_lights.cpp:251",
+    "tests/unit/test_scene_authored_lights.cpp:6",
+    "tests/unit/test_scheduled_direction.cpp:185",
+    "tools/gen_match_crowd.py:4",
+    "tools/gen_match_crowd.py:68",
+    "tools/make_foot_ik_lab.py:163",
+    "tools/make_tornado_showcase.py:104",
+    "tools/make_tornado_showcase.py:56",
+    "tools/make_tornado_showcase.py:6",
+    "tools/phase_d/make_autonomy_demo.py:1",
+    "tools/phase_d/make_autonomy_demo.py:5",
+    "tools/phase_d/make_autonomy_demo.py:8",
+    "tools/phase_d/make_autonomy_demo.py:93"
+   ],
+   "code_reference_count": 83
+  },
+  {
+   "id": "camera-lab",
+   "parent_scene": "-",
+   "description": "Camera/Framing Lab visual fixture: six shots, one per camera behaviour",
+   "files": [
+    "examples/camera/behaviors.json",
+    "examples/camera/behaviors.scene.json"
+   ],
+   "file_count": 2,
+   "used_by": "src/labs/lab.cpp:80 (Camera Lab fixture); tests/unit/test_camera_behaviors.cpp:444; src/app/ui_script.cpp:646,659,787 (comments)",
+   "code_references": [
+    "src/app/ui_script.cpp:646",
+    "src/app/ui_script.cpp:659",
+    "src/app/ui_script.cpp:787",
+    "src/labs/lab.cpp:80",
+    "tests/unit/test_camera_behaviors.cpp:444"
+   ],
+   "code_reference_count": 5
+  },
+  {
+   "id": "tractor-beam-lab",
+   "parent_scene": "glowmere-valley-2",
+   "description": "Abduction/tractor-beam lab and its pre-ADR-262 legacy arm",
+   "files": [
+    "examples/world/tractor-beam-lab-legacy.scene.json",
+    "examples/world/tractor-beam-lab.scene.json"
+   ],
+   "file_count": 2,
+   "used_by": "tests/unit/test_beam_lab.cpp:97,572; tests/unit/test_abduction_sequence.cpp:45; tests/unit/test_farm_locomotion.cpp:922-928; tools/make_tractor_beam_lab.py:56",
+   "code_references": [
+    "tests/unit/test_abduction_sequence.cpp:45",
+    "tests/unit/test_beam_lab.cpp:556",
+    "tests/unit/test_beam_lab.cpp:572",
+    "tests/unit/test_beam_lab.cpp:97",
+    "tests/unit/test_farm_locomotion.cpp:922",
+    "tests/unit/test_farm_locomotion.cpp:928",
+    "tools/make_tractor_beam_lab.py:56"
+   ],
+   "code_reference_count": 7
+  },
+  {
+   "id": "world-doc-arms",
+   "parent_scene": "glowmere-*",
+   "description": "Glowmere measurement/assembly arms referenced only from docs",
+   "files": [
+    "examples/world/_skyonly.scene.json",
+    "examples/world/_tier1.scene.json",
+    "examples/world/_tier1big.scene.json",
+    "examples/world/moonrise.scene.json",
+    "examples/world/assemblies/elder.scene.json"
+   ],
+   "file_count": 5,
+   "used_by": "docs only (no test/tool loads them) -- removal candidates",
+   "code_references": [],
+   "code_reference_count": 0
+  },
+  {
+   "id": "city-first-block",
+   "parent_scene": "night-shift",
+   "description": "First city block (city node kind fixture)",
+   "files": [
+    "examples/city/first-block.scene.json"
+   ],
+   "file_count": 1,
+   "used_by": "tests/unit/test_city.cpp:645,700",
+   "code_references": [
+    "tests/unit/test_city.cpp:645",
+    "tests/unit/test_city.cpp:700"
+   ],
+   "code_reference_count": 2
+  },
+  {
+   "id": "ufo-stack",
+   "parent_scene": "glowmere-valley-2",
+   "description": "UFO effect-stack demo over the GV2 multicam scene (generated by a [.generate] test)",
+   "files": [
+    "examples/effects/ufo-stack.json"
+   ],
+   "file_count": 1,
+   "used_by": "tests/integration/test_ufo_stack_demo.cpp:37; tests/rendering/test_shell_gpu.cpp:608; tests/rendering/test_shell2_gpu.cpp:625",
+   "code_references": [
+    "tests/integration/test_ufo_stack_demo.cpp:37",
+    "tests/integration/test_ufo_stack_demo.cpp:6",
+    "tests/rendering/test_shell2_gpu.cpp:625",
+    "tests/rendering/test_shell_gpu.cpp:608"
+   ],
+   "code_reference_count": 4
+  },
+  {
+   "id": "infinite-temple-director",
+   "parent_scene": "infinite-temple",
+   "description": "World-director knob file",
+   "files": [
+    "examples/directors/infinite-temple.json"
+   ],
+   "file_count": 1,
+   "used_by": "tests/unit/test_world_director.cpp:195",
+   "code_references": [
+    "tests/unit/test_world_director.cpp:195"
+   ],
+   "code_reference_count": 1
+  }
+ ],
+ "support_data": [
+  {
+   "id": "lightrigs",
+   "description": "Shared light rigs (21); swept by test_scene_authored_lights.cpp:527",
+   "files": [
+    "examples/lightrigs/_noshadow.rig.json",
+    "examples/lightrigs/bioluminescent.rig.json",
+    "examples/lightrigs/city-dawn.rig.json",
+    "examples/lightrigs/colonnade.rig.json",
+    "examples/lightrigs/constellation.rig.json",
+    "examples/lightrigs/cosmic-blue.rig.json",
+    "examples/lightrigs/glowmere-valley.rig.json",
+    "examples/lightrigs/glowmere.rig.json",
+    "examples/lightrigs/industrial-cold.rig.json",
+    "examples/lightrigs/lighting-lab.rig.json",
+    "examples/lightrigs/monumental.rig.json",
+    "examples/lightrigs/night-cinematic.rig.json",
+    "examples/lightrigs/night-shift.rig.json",
+    "examples/lightrigs/nocturne-forest.rig.json",
+    "examples/lightrigs/sacred-warm.rig.json",
+    "examples/lightrigs/shadow-lab.rig.json",
+    "examples/lightrigs/sonic-garden.rig.json",
+    "examples/lightrigs/studio-softbox.rig.json",
+    "examples/lightrigs/tide.rig.json",
+    "examples/lightrigs/valley-moon.rig.json",
+    "examples/lightrigs/void-core.rig.json"
+   ],
+   "file_count": 21
+  },
+  {
+   "id": "materials",
+   "description": "Shared material programs (24); tests/unit/test_material_program.cpp tables",
+   "files": [
+    "examples/materials/alien-metal.material.json",
+    "examples/materials/bioluminescent.material.json",
+    "examples/materials/brushed-metal.material.json",
+    "examples/materials/bush-glow.material.json",
+    "examples/materials/canopy-fireflies.material.json",
+    "examples/materials/dark-steel.material.json",
+    "examples/materials/emissive-glass.material.json",
+    "examples/materials/frond-glow.material.json",
+    "examples/materials/glowmere-crown.material.json",
+    "examples/materials/glowmere-fireflies-crown.material.json",
+    "examples/materials/glowmere-fireflies-scaled.material.json",
+    "examples/materials/glowmere-ground.material.json",
+    "examples/materials/glowmere-painted-crown.material.json",
+    "examples/materials/glowmere-painted-frond.material.json",
+    "examples/materials/glowmere-painted-ground.material.json",
+    "examples/materials/glowmere-tissue.material.json",
+    "examples/materials/glowmere2-cap.material.json",
+    "examples/materials/glowmere2-painted-ground.material.json",
+    "examples/materials/glowmere2-tissue-cool.material.json",
+    "examples/materials/glowmere2-tissue.material.json",
+    "examples/materials/oxidised-metal.material.json",
+    "examples/materials/pine-fireflies.material.json",
+    "examples/materials/tide-water.material.json",
+    "examples/materials/weathered-stone.material.json"
+   ],
+   "file_count": 24
+  },
+  {
+   "id": "looks",
+   "description": "Image looks (8)",
+   "files": [
+    "examples/looks/alien.json",
+    "examples/looks/bioluminescent.json",
+    "examples/looks/cosmic.json",
+    "examples/looks/dreamlike.json",
+    "examples/looks/hyperreal.json",
+    "examples/looks/industrial.json",
+    "examples/looks/monumental.json",
+    "examples/looks/sacred.json"
+   ],
+   "file_count": 8
+  },
+  {
+   "id": "entities",
+   "description": "Entity profile libraries; tests/unit (craft-lights, crowd profiles)",
+   "files": [
+    "examples/entities/craft-lights.profile.json",
+    "examples/entities/crowd.profiles.json"
+   ],
+   "file_count": 2
+  },
+  {
+   "id": "graphs",
+   "description": "Procedural graphs (3); tests/unit/test_graph*",
+   "files": [
+    "examples/graphs/radial-columns.graph.json",
+    "examples/graphs/ring-stack.graph.json",
+    "examples/graphs/spiral-tower.graph.json"
+   ],
+   "file_count": 3
+  },
+  {
+   "id": "library",
+   "description": "Building-block library; tests/unit/test_library.cpp:21",
+   "files": [
+    "examples/library/library.json"
+   ],
+   "file_count": 1
+  },
+  {
+   "id": "organisms",
+   "description": "GV2/GV3 hero mushroom record; tests/rendering/test_mushroom_search.cpp:321; tools/gv3/heroes.py:46; tools/make_glowmere_valley_2.py:473",
+   "files": [
+    "examples/organisms/glowmere2-heroes.json"
+   ],
+   "file_count": 1
+  },
+  {
+   "id": "ai-scripts",
+   "description": "AI control-plane scripts (atmosphere, live-optimize); docs only",
+   "files": [
+    "examples/ai/atmosphere.ai.json",
+    "examples/ai/live-optimize.ai.json"
+   ],
+   "file_count": 2
+  },
+  {
+   "id": "weather-readme",
+   "description": "Weather family readme",
+   "files": [
+    "examples/weather/README.md"
+   ],
+   "file_count": 1
+  }
+ ],
+ "gitignored_generated": [
+  {
+   "file": "examples/assetlod/.gitignore",
+   "patterns": "tree-*-r1..r4, dolly-*, floor-*, perf-* (+ .scene.json)",
+   "generator": "tools/make_assetlod_arms.py",
+   "kind": "fixture arms"
+  },
+  {
+   "file": "examples/bioluminescent/.gitignore",
+   "patterns": "rift.scene.json, rift.scene.json.*.tmp, cp1/, cp2/, diag-*, __pycache__/",
+   "generator": "examples/bioluminescent/build.py (+ cp1.py/cp2.py)",
+   "kind": "REVIEWABLE SCENE (the-rift) + checkpoints"
+  },
+  {
+   "file": "examples/biovalley/.gitignore",
+   "patterns": "meshes/, sky/, shots/, __pycache__/",
+   "generator": "examples/biovalley/valley.py (+ Blender hero_assets/build.py, colorways.py)",
+   "kind": "REVIEWABLE SCENE (biovalley-macro) + frozen shots"
+  },
+  {
+   "file": "examples/world/renders/.gitignore",
+   "patterns": "* (render output)",
+   "generator": "-",
+   "kind": "output"
+  },
+  {
+   "file": ".gitignore (root)",
+   "patterns": "/examples/world/_bench/, /examples/world/_flicker_*.scene.json, /examples/world/_v3*, /examples/world/.avgen_node_set_probe_*.json, /examples/treeisland/_fog-*, _fogshape-*, _fogheight-*, _fogshadow-*, _fogshadowshot-*, _fogtemporal-*, _vx2-*, /examples/quality/out/, /examples/world/out/",
+   "generator": "tools/make_bench_scenes.py, make_fx_bench_scenes.py, make_fog_arms.py, make_fog_primitive_arms.py, make_height_fog_arms.py, make_vortex2_arms.py, make_gv3_state_arms.py",
+   "kind": "fixture/bench arms and outputs"
+  }
+ ],
+ "branch_only_scenes": [
+  {
+   "id": "astral-furnace",
+   "name": "The Astral Furnace",
+   "branch": "proto/astral-furnace",
+   "tip": "3367f704 (2026-10-08)",
+   "category": "Live",
+   "also_supports": "Offline",
+   "files": [
+    "examples/astral-furnace/astral-furnace-live.json",
+    "examples/astral-furnace/astral-furnace-trench.json",
+    "examples/astral-furnace/astral-furnace.scene.json",
+    "examples/astral-furnace/astral-furnace-2d-trench.json",
+    "examples/astral-furnace/astral-furnace-2d.scene.json"
+   ],
+   "engine_diff": "12 src files, +3116/-37",
+   "status": "PAUSED at cp17 (docs/prototypes/astral-furnace/PAUSED.md on the branch); owner: faces from fire, 2D path intriguing; not merged",
+   "docs": [
+    "docs/prototypes/astral-furnace/PAUSED.md",
+    "docs/prototypes/astral-furnace/README.md"
+   ]
+  },
+  {
+   "id": "astral-forge-2",
+   "name": "Astral Forge 2 (moonlit ocean faces)",
+   "branch": "proto/astral-forge-2",
+   "tip": "7c78e487 (2026-10-07)",
+   "category": "Live",
+   "also_supports": "Offline",
+   "files": [
+    "examples/astral-forge-2/astral-forge-2-live.json",
+    "examples/astral-forge-2/astral-forge-2-trench.json",
+    "examples/astral-forge-2/astral-forge-2.scene.json"
+   ],
+   "engine_diff": "6 src files, +614/-30",
+   "status": "PAUSED; faces never read; owner: repurpose the ocean renderer as a reactive water scene later; suites not run on final commit",
+   "docs": [
+    "docs/prototypes/astral-forge-2/README.md"
+   ]
+  },
+  {
+   "id": "rootworks",
+   "name": "THE ROOTWORKS (Rift jungle)",
+   "branch": "proto/rift-jungle",
+   "tip": "72370e52 (2026-10-08)",
+   "category": "Offline",
+   "also_supports": "Live",
+   "files": [
+    "examples/bioluminescent/rootworks.json",
+    "examples/bioluminescent/rootworks-live.json",
+    "examples/bioluminescent/rootworks.py",
+    "examples/bioluminescent/jungle_flora.py",
+    "examples/bioluminescent/concepts.py"
+   ],
+   "engine_diff": "1 src file, +1/-1",
+   "status": "WIP paused (owner moved the bioluminescent scene to a new direction); its avgen_tests failed test_rift + test_character_lab_slopes (uninvestigated); scene presumably generated by rootworks.py (not verified)",
+   "docs": [
+    "docs/prototypes/bioluminescent/PROGRESS.md (branch copy)"
+   ]
+  },
+  {
+   "id": "biovalley-2d",
+   "name": "Biovalley 2D / Wetland of Veils",
+   "branch": "proto/biovalley-2d -> proto/biovalley-original (descendant)",
+   "tip": "ed9c5b97 / 48533e44 (2026-10-12)",
+   "category": "Offline",
+   "also_supports": "Live",
+   "files": [
+    "examples/biovalley-2d/biovalley-2d-live.json",
+    "examples/biovalley-2d/biovalley-2d-trench.json",
+    "examples/biovalley-2d/biovalley-2d-reference.json",
+    "examples/biovalley-2d/biovalley-2d.scene.json",
+    "examples/biovalley-2d/build.py",
+    "(original only) tools/biovalley2d/original/{wetland,cathedral,concepts,fetch_textures}.py"
+   ],
+   "engine_diff": "12 src files, +1491/-2",
+   "status": "2D reference-locked audio-reactive renderer; original-environment pass (Wetland of Veils) STOPPED for owner verdict; RESUME.md on branch",
+   "docs": [
+    "docs/prototypes/biovalley-2d/RESUME.md",
+    "docs/prototypes/biovalley-2d/21-wetland-report.md (original)"
+   ]
+  },
+  {
+   "id": "biovalley-water",
+   "name": "Biovalley water lab",
+   "branch": "proto/bio-valley-water",
+   "tip": "1ee7cceb (2026-10-12)",
+   "category": "Offline",
+   "also_supports": null,
+   "files": [
+    "examples/biovalley/waterlab.py"
+   ],
+   "engine_diff": "10 src files, +417/-86",
+   "status": "variant of biovalley-macro, not a separate scene; ADR-1294/1295 chosen (variant B), ADR-1296 half-done; ADR-1291 rejected (do not merge)",
+   "docs": [
+    "WATER-PAUSED.md (branch)",
+    "docs/prototypes/bioluminescent-valley/PAUSED.md"
+   ]
+  },
+  {
+   "id": "sonic-garden-branch",
+   "name": "(proto/sonic-garden)",
+   "branch": "proto/sonic-garden",
+   "tip": "fd61230e (2026-10-03)",
+   "category": null,
+   "also_supports": null,
+   "files": [],
+   "engine_diff": "n/a",
+   "status": "NO branch-only scenes: every example file on the branch also exists on main (main is newer)",
+   "docs": []
+  }
+ ]
+}
