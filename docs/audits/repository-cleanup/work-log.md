@@ -85,7 +85,7 @@ The owner's checkout (`av-gen`, on `main`) is not modified.
    - 11 unlisted scenes added (84 to 95 entries).
    - Missing generated files are shown greyed, with their `generate` command.
    - The index test now requires each project's scene to load.
-6. **Docs fixes merged** from `cleanup/docs-fixes` (15 commits, `docs/audits/.../data/docs-fixes-applied.md`).
+6. **Docs fixes merged** from `cleanup/docs-fixes` (15 commits, `docs/audits/repository-cleanup/data/docs-fixes-applied.md`).
 7. **Windows runner guide** plus the opt-in `windows.yml` (`deff6dea`).
 8. **Branch cleanup:**
    - Deleted 7 local branches whose commits are all in `main`, a remote branch, or a retained sibling. The tips are
