@@ -128,8 +128,9 @@ every walking pose, so the digest moved. It was re-pinned, as ADR-830 did before
 | `tools/gv3/cuts.py` | The frames either side of every cut, for eye-trace and geography. |
 | `tools/gv3/shimmer.py` | Frame-to-frame change inside a band of a locked-off shot: shimmer and crawl on water, measured. |
 
-The CMake engine source list that `avgen_character_quality` used is now one named list,
-`AVGEN_OFFLINE_ENGINE_SOURCES`, shared with `avgen_cast_trace`.
+The CMake engine source list that `avgen_character_quality` used is now one object library,
+`avgen_tool_engine` in `tools/CMakeLists.txt`, shared with `avgen_cast_trace` and the other
+offline tools (code audit CA-010).
 
 ## 7.5 A 30 fps preview is a different film
 
