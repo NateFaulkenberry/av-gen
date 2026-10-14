@@ -108,6 +108,16 @@ jobs:
           cp build/release/tests/avgen_tests build/release/tests/avgen_render_tests build/release/src/avgen \
              build/release/tools/avgen_world_preview "$RESULTS/bin/"
           ls -la "$RESULTS/bin"
+          # The test jobs run these on other VMs, which have only the OS. A binary that links a dylib from
+          # Homebrew (or anywhere outside /usr/lib and /System) dies in dyld there, every shard, with no test run:
+          # it happened on 2026-10-14 when the build image gained simdjson (cmake/Dependencies.cmake, fastgltf).
+          # (awk, not grep -v: under `bash -e -o pipefail` a grep that selects nothing would fail the clean case)
+          leaks=$(for b in "$RESULTS"/bin/*; do otool -L "$b" | tail -n +2 \
+                  | awk -v n="$(basename "$b")" '$1 !~ "^/usr/lib/" && $1 !~ "^/System/Library/" {print n ": " $1}'; done)
+          if [ -n "$leaks" ]; then
+            echo "::error title=Non-system dylib linked::$leaks"
+            exit 1
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: bin-release

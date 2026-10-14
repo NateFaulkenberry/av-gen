@@ -69,7 +69,12 @@ CPMAddPackage(
     GITHUB_REPOSITORY spnda/fastgltf
     GIT_TAG v0.9.0
     SYSTEM YES EXCLUDE_FROM_ALL YES
-    OPTIONS "FASTGLTF_COMPILE_AS_CPP20 ON" "FASTGLTF_ENABLE_TESTS OFF" "FASTGLTF_ENABLE_EXAMPLES OFF")
+    # CMAKE_DISABLE_FIND_PACKAGE_simdjson: fastgltf links any simdjson find_package() finds, and a machine with
+    # Homebrew's simdjson then links its dylib -- unpinned, and absent wherever the binary runs next. CI hit exactly
+    # that on 2026-10-14 (the build image had simdjson, the test runners did not: every shard died in dyld). With the
+    # lookup off, fastgltf compiles its own pinned single-header simdjson (v3.12.3) into the static library.
+    OPTIONS "FASTGLTF_COMPILE_AS_CPP20 ON" "FASTGLTF_ENABLE_TESTS OFF" "FASTGLTF_ENABLE_EXAMPLES OFF"
+            "CMAKE_DISABLE_FIND_PACKAGE_simdjson ON")
 
 # ---- meshoptimizer (mesh optimisation and LOD simplification) ----------------------------------
 # ADR-078. Only the library target is built: the demo and gltfpack pull in extra sources and, in
