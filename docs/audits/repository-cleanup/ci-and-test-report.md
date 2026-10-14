@@ -100,7 +100,8 @@ The one expected failure is the documented `[!shouldfail]` in `test_character_la
 | `38594164369` | `9cd8f010`+ | success, including the dylib guard | failure: passed 3983, **failed 4**, skipped 227 | Rift arc ×3 and the Tree of Life check |
 | `38597524868` | `f35ad350` | success | **success**: passed 3984, failed 0, skipped 230, needs-assets-failed 26, ran 4241/4241 | the first green CI run since 2026-10-07 |
 | `38601296548` | `b7b8a0f5` (all fixes merged) | success | **success**: passed 3971, failed 0, skipped 244, needs-assets-failed 26, ran 4242/4242 | skips +14: the CA-002 path-trace cases now SKIP without assets instead of passing |
-| on `main` after the merge | see §6 | | | |
+| `38608340513` (push to `main`) | `99fabf5f` | success | **success**: passed 3971, failed 0, skipped 244, ran 4242/4242 | the hosted GPU job (informational) crashed in its paravirtual Metal, as it did on the pre-cleanup nightly (34/656 ran there) |
+| `38608348660` (dispatch on `main`, gpu + assets) | `99fabf5f` | success | **success**: CPU 3971 / 0 failed; **CPU with private assets: passed 4153, failed 0, skipped 88, ran 4242/4242** | the asset tier had failed every nightly since 2026-10-08 |
 
 ## 5. Remaining failures and environmental limitations
 
@@ -120,5 +121,9 @@ The one expected failure is the documented `[!shouldfail]` in `test_character_la
   - GPU suite exit 0 (656 of 656 ran, 0 failed);
   - examples review 95 of 95 ok.
 - **Remote, on the branch:** `38601296548` green at `b7b8a0f5`.
-- **On `main`:** the push run and a dispatched full run (`gpu: true`, `assets: true`, so the private-asset tier runs
-  too). Their results are recorded in the commit that follows them.
+- **On `main` at `99fabf5f`:**
+  - push run `38608340513`: green;
+  - dispatched full run `38608348660`: green, including the private-asset tier (4153 passed / 0 failed / 4242 ran).
+- **Sanitizers:** dispatched on `main` (`38608392071`), because `sanitizers.yml` gained the test-inputs step. It was
+  still running when this was written (about 3.5 h); the nightly run will repeat it.
+- **Examples review on the final build:** 95/95 ok.

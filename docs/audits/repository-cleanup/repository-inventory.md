@@ -55,6 +55,37 @@ Gitignored and generated, so git would never have protected them:
 - **THE RIFT.** `examples/bioluminescent/rift.scene.json` was copied into the owner's checkout. `test_rift`
   generates it with `build.py --scene-only`, which writes the same file as `build.py`.
 
-## Ending state
+## Ending state (2026-10-14)
 
-Filled in at the end of the sprint: see "Final state" in `cleanup-summary.md`.
+- **`main`** = `origin/main`, fast-forwarded from `7b83fd58` to the cleanup branch (`99fabf5f`, plus the final
+  results commit). The owner's checkout is on `main` and clean.
+- **Local branches (8):**
+  - `main`;
+  - `cleanup/repo-consolidation`: merged, kept until the final commit, then deleted along with its worktree;
+  - `investigate/live-render-perf`: retained, the probe code the reports cite;
+  - the five paused prototypes, each with its worktree: `proto/astral-forge-2`, `proto/astral-furnace`,
+    `proto/bio-valley-water`, `proto/biovalley-original`, `proto/rift-jungle`.
+- **Worktrees:** `av-gen` (`main`) and the five prototype worktrees. Removed: `av-gen-furnace-eng`,
+  `av-gen-biovalley`, `av-gen-biovalley-assets`, and this sprint's `av-gen-cleanup-code` and `av-gen-cleanup-docs`.
+- **Deleted local branches**, with their tips (restore with `git branch <name> <sha>`):
+
+  | Branch | Tip |
+  |---|---|
+  | `live/quality` | `5fcd7ad4` |
+  | `merge/bio-valley-macro` | `cee3169b` |
+  | `qa/ci` | `2f89010a` |
+  | `proto/liminal-space` | `b3862d23` |
+  | `proto/sonic-garden` | `fd61230e` |
+  | `proto/biovalley-2d` | `ed9c5b97` |
+  | `proto/astral-furnace-eng` | `b5a1fe3a` |
+  | `proto/bio-valley` | `74cf7f30` |
+  | `proto/bio-valley-assets` | `b50bcf97` |
+  | `cleanup/code-fixes` | `53dbfb6e` |
+  | `cleanup/docs-fixes` | `28b4fd5a` |
+
+- **Remote branches:**
+  - unchanged: `live/optimizer`, `live/quality`, `proto/liminal-space`, `proto/sonic-garden`, `qa/ci`, `qa/coord`;
+  - added: `cleanup/repo-consolidation`, this sprint's integration branch, merged.
+
+  Any of them can be deleted once the owner agrees.
+- **Stashes:** the three listed above, untouched.

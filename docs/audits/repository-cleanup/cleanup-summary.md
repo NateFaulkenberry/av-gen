@@ -50,7 +50,10 @@
 - **Remote CI is green again:**
   - `38597524868` and `38601296548` on the branch, the latter 3971 passed / 0 failed / 4242 ran. These were the
     first green CI runs since 2026-10-07.
-  - The runs on `main` after the merge are in [ci-and-test-report.md](ci-and-test-report.md) §6.
+  - On `main`, the push run `38608340513` and a dispatched full run `38608348660` are both green. The full run
+    includes the private-asset tier (4153 passed / 0 failed / 4242 ran), which had failed every nightly since
+    2026-10-08.
+  - Sanitizers was dispatched on `main` (`38608392071`); it takes about 3.5 h.
 - **Not covered by CI:** no self-hosted Apple GPU runner is registered, so the GPU suite's authoritative evidence is
   the local run above.
 
