@@ -10,7 +10,7 @@
 // attribute are spread across three static libraries (avgen_core holds EntityWorld, avgen_app
 // holds Engine, the loop that owns the PhaseProfiler is in Application), and threading an
 // instrument through all three would be a refactor -- which the brief forbids. These are
-// main-thread-only counters that the frame loop reads and zeroes once per frame.
+// per-thread counters (see `frame()`) that the frame loop reads and zeroes once per frame.
 //
 // Nothing here changes behaviour. Every field is written by a `steady_clock` difference or an
 // increment; no control flow reads any of them.
@@ -74,9 +74,13 @@ struct Frame {
     void clear() { *this = Frame{}; }
 };
 
-// One instance, main thread only. `inline` so the three libraries share it.
+// One instance per thread. `inline` so the three libraries share it. Everything that reads it --
+// the frame loop, the live profile run, the tests -- reads it on the thread that ran the work it
+// measures. The Director's scratch Engines seek on worker threads, and before this was thread-local
+// those seeks raced the main thread's counters (CA-001); now each lands in its own thread's copy,
+// which nobody reads, and the main thread's numbers count only the main thread's work.
 inline Frame& frame() {
-    static Frame f;
+    thread_local Frame f;
     return f;
 }
 

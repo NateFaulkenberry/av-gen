@@ -10,6 +10,7 @@
 #include "core/log.hpp"
 
 #include <array>
+#include <mutex>
 #include <set>
 #include <cmath>
 #include <limits>
@@ -793,7 +794,10 @@ void packMediumSlot(const EffectInstance& e, float envelope, MediumSlot& slot,
     slot.lane[kMediumLanes - 1] = glm::vec4(kReserved);
     schema->resolve.pack(e, envelope, flow, slot);
     if (slot.lane[kMediumLanes - 1] != glm::vec4(kReserved)) {
+        // Locked: a Director scratch Engine on a worker thread packs media too (CA-001).
+        static std::mutex warnedMutex;
         static std::set<EffectKind> warned;
+        const std::lock_guard lock(warnedMutex);
         if (warned.insert(e.kind).second) {
             log::warn("medium kind '{}' writes lane {} in its packer, which is reserved for the "
                       "kind tag: that value is discarded and the effect will look wrong",

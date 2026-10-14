@@ -558,7 +558,9 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     // Generators that scenes can name (ADR-175). Registering here rather than from a static
     // initialiser keeps the order explicit and keeps `scene` free of any knowledge of what a
     // mushroom is; re-registering a name is defined to replace it, so calling this per Engine is
-    // harmless.
+    // harmless. The registry is locked (CA-001): the Director builds Engines on worker threads while
+    // this one runs. Not `std::call_once`: tests `clearGenerators()`, and the next Engine has to put
+    // them back.
     organism::registerMushroomGenerator();
     scene::registerTreeGenerator();
     ensureControlSource();
