@@ -728,11 +728,25 @@ TEST_CASE("Every example in the index exists and loads", "[integration][project]
     CHECK(listed->size() == index["examples"].size());
 
     std::set<std::string> names;
+    std::size_t loaded = 0;
+    std::vector<std::string> notHere;
     for (const app::ExampleInfo& info : *listed) {
         INFO("example: " << info.name);
         CHECK(names.insert(info.name).second);     // the list is a menu; two identical rows is a bug
         CHECK(!info.description.empty());
-        REQUIRE(std::filesystem::exists(info.file));
+        // An entry whose files are not on this machine is listed greyed with what is missing (the menu reads the
+        // same app::exampleStatus). That is only acceptable for generated files, so it must name its generator --
+        // and it is reported below, not counted as a load. Before 2026-10-14 a project whose generated scene was
+        // missing (THE RIFT) "loaded" here as an empty world, and the case passed.
+        const app::ExampleStatus status = app::exampleStatus(info);
+        if (status.readiness == app::ExampleReadiness::Unavailable) {
+            INFO("missing " << status.missing.front().string() << "; an entry whose files may be absent must say how "
+                            "to make them (\"generate\")");
+            CHECK(!info.generate.empty());
+            notHere.push_back(info.name);
+            continue;
+        }
+        ++loaded;
         // An index entry is a project or a recipe, and they open by different verbs: a project is
         // loaded, a recipe is composed. The routing rule is shared with the application rather
         // than restated here, so the menu and the test cannot disagree about what a file is.
@@ -742,19 +756,29 @@ TEST_CASE("Every example in the index exists and loads", "[integration][project]
             CHECK(recipe.has_value());
         } else {
             app::Engine engine(app::EngineMode::Offline);
-            const auto loaded = engine.loadProject(info.file);
-            INFO((loaded ? std::string() : loaded.error().message));
-            CHECK(loaded.has_value());
+            const auto opened = engine.loadProject(info.file);
+            INFO((opened ? std::string() : opened.error().message));
+            CHECK(opened.has_value());
+            // ...and its scene loaded: a project whose scene failed opens on the default orb (ADR-1288), which is
+            // not the example the menu promised.
+            const auto scene = engine.requireProjectScene();
+            INFO((scene ? std::string() : scene.error().message));
+            CHECK(scene.has_value());
         }
     }
+    // What this machine could not load, by name, so a green run says what it did not cover.
+    for (const auto& name : notHere) {
+        WARN("not loaded here (its generated files are missing): " << name);
+    }
+    CHECK(loaded + notHere.size() == listed->size());
 #endif
 }
 
-// File > Live Projects lists the index entries marked `"live": true`. What makes a project one to play is its own
+// File > Examples > Live lists the index entries marked `"live": true`. What makes a project one to play is its own
 // `sonic.live` (ADR-1025: opening it turns live input on), so the flag and the project must agree both ways: a live
 // entry whose project would open with live input off is a dead item in a performer's menu, and a `sonic.live` project
 // anywhere under examples/ that the index does not list as live is one the owner made and the menu forgot.
-TEST_CASE("Live Projects lists exactly the sonic.live projects", "[integration][project][examples][live]") {
+TEST_CASE("Examples > Live lists exactly the sonic.live projects", "[integration][project][examples][live]") {
 #ifndef AVGEN_SOURCE_DIR
     SKIP("AVGEN_SOURCE_DIR not defined");
 #else
@@ -776,7 +800,11 @@ TEST_CASE("Live Projects lists exactly the sonic.live projects", "[integration][
     std::set<std::filesystem::path> liveEntries;
     for (const app::ExampleInfo& info : *listed) {
         INFO("example: " << info.name);
-        REQUIRE(std::filesystem::exists(info.file));
+        if (!std::filesystem::exists(info.file)) {
+            CHECK(!info.generate.empty()); // a generated project (Biovalley's macro) not made on this machine
+            CHECK_FALSE(info.live);        // a live entry must always be playable from a checkout
+            continue;
+        }
         CHECK(info.live == sonicLive(info.file));
         if (info.live) {
             liveEntries.insert(info.file);

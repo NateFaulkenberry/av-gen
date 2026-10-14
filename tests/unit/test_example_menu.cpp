@@ -1,11 +1,13 @@
-// File > Live Projects and File > Examples (2026-10-07): which index entries each menu shows, under which headings.
-// The menus themselves are ImGui; the decisions are app::exampleSections, tested here without a window.
+// File > Examples > Live and Offline (2026-10-07; one Examples menu with the two submenus since 2026-10-14): which
+// index entries each submenu shows, under which headings, and whether an entry can open on this machine. The menus
+// themselves are ImGui; the decisions are app::exampleSections and app::exampleStatus, tested here without a window.
 
 #include "app/examples.hpp"
 #include "app/live_scenes.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -130,4 +132,75 @@ TEST_CASE("The real index: Live Projects and the switcher's sets", "[examples][l
         }
     }
 #endif
+}
+
+// Nothing is hidden: an entry whose files are missing is listed, greyed, with what is missing and how to make it.
+TEST_CASE("An example whose files are missing says so, and how to make them", "[examples]") {
+    const auto dir = std::filesystem::temp_directory_path() / "avgen_example_status_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    // A project that names a scene and a song, neither of which exists yet.
+    std::ofstream(dir / "p.json") << R"({"format":"avgen-project","assets":{
+        "scene":{"kind":"composition","path":{"path":"p.scene.json"}},"audio":{"path":"song.wav"}}})";
+    std::ofstream(dir / "index.json") << R"({"examples":[
+        {"name":"Gen","category":"C","description":"d","project":"p.json","generate":"python3 make.py"},
+        {"name":"Gone","category":"C","description":"d","project":"absent.json"}]})";
+    const auto all = app::loadExampleIndex(dir / "index.json");
+    REQUIRE(all.has_value());
+    REQUIRE(all->size() == 2);
+    const app::ExampleInfo& gen = (*all)[0];
+    CHECK(gen.generate == "python3 make.py");
+    REQUIRE(gen.required.size() == 1);
+    CHECK(gen.required[0] == (dir / "p.scene.json").lexically_normal());
+    CHECK(gen.audio == (dir / "song.wav").lexically_normal());
+
+    // The scene is missing: it cannot open, and the label and tooltip say why and how to fix it.
+    auto status = app::exampleStatus(gen);
+    CHECK(status.readiness == app::ExampleReadiness::Unavailable);
+    CHECK(app::exampleLabel(gen, status) == "Gen  (needs generating)");
+    const std::string tip = app::exampleTooltip(gen, status);
+    CHECK(tip.find("p.scene.json") != std::string::npos);
+    CHECK(tip.find("song.wav") != std::string::npos);
+    CHECK(tip.find("python3 make.py") != std::string::npos);
+
+    // The generator has run (no restart): the scene opens, but without its song.
+    std::ofstream(dir / "p.scene.json") << "{}";
+    status = app::exampleStatus(gen);
+    CHECK(status.readiness == app::ExampleReadiness::NoAudio);
+    CHECK(app::exampleLabel(gen, status) == "Gen  (no audio)");
+    CHECK(app::exampleTooltip(gen, status).find("python3 make.py") == std::string::npos);
+
+    std::ofstream(dir / "song.wav") << "x";
+    status = app::exampleStatus(gen);
+    CHECK(status.readiness == app::ExampleReadiness::Ready);
+    CHECK(status.missing.empty());
+    CHECK(app::exampleLabel(gen, status) == "Gen");
+    CHECK(app::exampleTooltip(gen, status) == "d");
+
+    // A missing file with no generator is a broken entry, and is labelled as such rather than "needs generating".
+    const auto gone = app::exampleStatus((*all)[1]);
+    CHECK(gone.readiness == app::ExampleReadiness::Unavailable);
+    CHECK(app::exampleLabel((*all)[1], gone) == "Gone  (missing files)");
+
+    // `generate` is a command or nothing.
+    std::ofstream(dir / "index.json") << R"({"examples":[{"name":"A","category":"C","description":"d","project":"p.json","generate":1}]})";
+    CHECK_FALSE(app::loadExampleIndex(dir / "index.json").has_value());
+    std::filesystem::remove_all(dir);
+}
+
+// "~/..." in a project is the user's home, exactly as the project loader reads it (app/project_paths.hpp).
+TEST_CASE("An example's song under ~ is looked for in the home folder", "[examples]") {
+    const char* home = std::getenv("HOME");
+    if (home == nullptr || *home == '\0') {
+        SKIP("no HOME");
+    }
+    const auto dir = std::filesystem::temp_directory_path() / "avgen_example_home_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "p.json") << R"({"format":"avgen-project","assets":{"audio":{"path":"~/x/song.wav"}}})";
+    std::ofstream(dir / "index.json") << R"({"examples":[{"name":"A","category":"C","description":"d","project":"p.json"}]})";
+    const auto all = app::loadExampleIndex(dir / "index.json");
+    REQUIRE(all.has_value());
+    CHECK((*all)[0].audio == (std::filesystem::path(home) / "x" / "song.wav").lexically_normal());
+    std::filesystem::remove_all(dir);
 }

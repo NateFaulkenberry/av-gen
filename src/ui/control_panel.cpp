@@ -271,9 +271,10 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         if (ImGui::MenuItem("Open Project...") && onOpenProject) {
             onOpenProject();
         }
-        // The examples index in two menus: the projects made to be played (`"live": true`) under Live Projects,
-        // right below Open Project, and everything else under Examples. Each is headed by category; the grouping
-        // is app::exampleSections, tested without ImGui.
+        // The examples index, right below Open Project: File > Examples > Live (`"live": true`, made to be played)
+        // and Offline (made to be rendered), each headed by family. The grouping, the labels and whether an entry
+        // can open here are app::exampleSections / exampleStatus / exampleLabel, tested without ImGui. An entry
+        // whose files are missing stays listed, greyed, with what is missing and how to make it in the tooltip.
         const auto exampleMenu = [&](const char* title, bool live) {
             const auto sections = app::exampleSections(examples, live);
             if (!ImGui::BeginMenu(title, !sections.empty())) {
@@ -286,18 +287,27 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
                 ImGui::TextDisabled("%s", sections[s].category.c_str());
                 for (const std::size_t i : sections[s].entries) {
                     const app::ExampleInfo& ex = examples[i];
-                    if (ImGui::MenuItem(ex.name.c_str()) && onOpenExample) {
+                    const app::ExampleStatus status = app::exampleStatus(ex);
+                    const bool openable = status.readiness != app::ExampleReadiness::Unavailable;
+                    const std::string label = app::exampleLabel(ex, status);
+                    if (ImGui::MenuItem(label.c_str(), nullptr, false, openable) && onOpenExample) {
                         onOpenExample(ex);
                     }
-                    if (ImGui::IsItemHovered() && !ex.description.empty()) {
-                        tooltip("%s", ex.description.c_str());
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                        const std::string text = app::exampleTooltip(ex, status);
+                        if (!text.empty()) {
+                            tooltip("%s", text.c_str());
+                        }
                     }
                 }
             }
             ImGui::EndMenu();
         };
-        exampleMenu(app::kLiveProjectsMenu, true);
-        exampleMenu("Examples", false);
+        if (ImGui::BeginMenu(app::kExamplesMenu, !examples.empty())) {
+            exampleMenu(app::kLiveExamplesMenu, true);
+            exampleMenu(app::kOfflineExamplesMenu, false);
+            ImGui::EndMenu();
+        }
         // The Engineering Lab Suite (ADR-261, spec 6). Beside Examples rather than in a panel of
         // its own: opening a lab *is* opening a scene, and this is the menu a person already uses
         // to do that. What it adds over Examples is the two things a file list cannot carry -- the

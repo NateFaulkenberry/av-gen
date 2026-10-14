@@ -7,11 +7,17 @@
 // Each entry names a project (preferred: it carries the scene, presets, routes and timeline) or a
 // scene file, relative to the index. Nothing is compiled in: the showcases are data.
 //
-// An entry with `"live": true` is a project made to be played (live audio input and/or MIDI; in practice a
-// `sonic.live` project, ADR-1025). The File menu lists those in their own Live Projects submenu, beside Open
-// Project, rather than among the Examples. `live` is a flag rather than a category because the category is
-// also the live scene switcher's set (ADR-1063/1074: "Sonic VFX", "Sonic Abstract"), so a live project keeps
-// its family as its category and the menu shows the family as a heading inside Live Projects.
+// File > Examples has exactly two submenus, Live and Offline (repository cleanup, 2026-10-14). An entry with
+// `"live": true` is a project made to be played (live audio input and/or MIDI; in practice a `sonic.live` project,
+// ADR-1025) and is listed under Live; every other entry is made to be rendered (a film, a showcase, a look, a lab)
+// and is listed under Offline. `live` is a flag rather than a category because the category is also the live scene
+// switcher's set (ADR-1063/1074: "Sonic VFX", "Sonic Abstract"), so an entry keeps its family as its category and
+// each submenu shows the families as headings.
+//
+// Nothing is hidden. An entry whose files are not on this machine -- a generated scene a checkout does not have
+// until its generator runs (THE RIFT's rift.scene.json), the owner's song -- is listed with what is missing, so a
+// reviewer sees that the scene exists and how to make it openable, instead of a menu that silently omits it or an
+// open that fails half-way. An optional `"generate"` names the command that makes the missing files.
 
 #include "core/error.hpp"
 
@@ -26,11 +32,35 @@ struct ExampleInfo {
     std::string description;
     std::string category;
     std::filesystem::path file; // absolute path of the project or scene file
-    bool live = false;          // `"live": true`: listed under File > Live Projects, not File > Examples
+    bool live = false;          // `"live": true`: listed under Examples > Live, else Examples > Offline
+    // What the entry cannot open without, read from the project when the index loads: the project or scene file
+    // itself and the scene file a project names. Absolute.
+    std::vector<std::filesystem::path> required;
+    std::filesystem::path audio; // the project's song, if it names one; without it the scene opens silent
+    std::string generate;        // index `"generate"`: the command that makes the entry's generated files
 };
 
-// The menu's title for the live projects.
-inline constexpr const char* kLiveProjectsMenu = "Live Projects";
+// File > Examples and its two submenus.
+inline constexpr const char* kExamplesMenu = "Examples";
+inline constexpr const char* kLiveExamplesMenu = "Live";
+inline constexpr const char* kOfflineExamplesMenu = "Offline";
+
+// Whether an entry can be opened here, asked when the menu is drawn (a file check, no parsing), so a scene whose
+// generator has just run becomes openable without a restart.
+enum class ExampleReadiness {
+    Ready,       // everything it loads is here
+    NoAudio,     // opens, but its song is not on this machine: the scene runs without its audio
+    Unavailable, // the project or its scene file is missing: opening it would fail
+};
+struct ExampleStatus {
+    ExampleReadiness readiness = ExampleReadiness::Ready;
+    std::vector<std::filesystem::path> missing; // the missing files, required ones first
+};
+[[nodiscard]] ExampleStatus exampleStatus(const ExampleInfo& example);
+// The menu label: the name, plus "(needs generating)", "(missing files)" or "(no audio)" when it is not Ready.
+[[nodiscard]] std::string exampleLabel(const ExampleInfo& example, const ExampleStatus& status);
+// The hover text: the description, then what is missing and the command that makes it.
+[[nodiscard]] std::string exampleTooltip(const ExampleInfo& example, const ExampleStatus& status);
 
 // One heading of a menu: a category and its entries (indices into the examples list, in index order).
 struct ExampleSection {

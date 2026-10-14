@@ -83,13 +83,17 @@ The file dialogs filter as follows. Audio: `wav`, `flac`, `mp3`, `ogg`, `aif`, `
 
 ## Examples
 
-**File ▸ Examples** lists the projects that ship with AV Gen, grouped by category — Showcase, Look
-development, Performance, Lab and Benchmark. Hovering an entry shows its description. The four
+**File ▸ Examples** lists the projects that ship with AV Gen in two submenus, **Live** and **Offline**.
+**Offline** holds the projects made to be rendered, grouped by category — Showcase, Look development,
+Performance, Lab, Weather and Benchmark. Hovering an entry shows its description. Nothing is hidden: an
+entry whose files are not on this machine is greyed, and its tooltip names the missing files and, for a
+generated scene such as THE RIFT, the command that makes them. An entry marked "(no audio)" opens without
+its song (the owner's songs are not in the repository). The four
 **Glowmere Density** entries under Performance are a deliberate ladder from a light scene to a
 heavy one, with their measured frame times in the descriptions; they are the quickest way to see
 what your machine does with a known workload.
 
-**File ▸ Live Projects** lists the projects made to be played rather than rendered: Astral Forge Live, Digital
+**File ▸ Examples ▸ Live** lists the projects made to be played rather than rendered: Astral Forge Live, Digital
 Mosh Live, the Sonic Abstract and Sonic VFX scenes, and Sonic Live. Opening one turns live input on; pick the
 audio input and MIDI device in **View ▸ Live**. Each entry's description says what to play into it and which MIDI
 controls it maps. Inside a Sonic Abstract or Sonic VFX scene, PageUp and PageDown step to the next scene in its set.

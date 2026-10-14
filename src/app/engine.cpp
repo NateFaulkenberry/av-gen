@@ -1,4 +1,5 @@
 #include "app/engine.hpp"
+#include "app/project_paths.hpp"
 
 #include "scene/authored_cut.hpp"
 
@@ -1718,21 +1719,6 @@ std::string relativeTo(const std::filesystem::path& file, const std::filesystem:
     }
     const auto rel = abs.lexically_relative(base);
     return rel.empty() ? abs.generic_string() : rel.generic_string();
-}
-
-std::filesystem::path resolveFrom(const std::string& stored, const std::filesystem::path& baseDir) {
-    std::filesystem::path p(stored);
-    // "~/..." is the user's home (the Liminal example names the owner's song as ~/Desktop/..., which
-    // must never be copied into the repository).
-    if (stored.size() >= 2 && stored[0] == '~' && (stored[1] == '/' || stored[1] == '\\')) {
-        if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
-            p = std::filesystem::path(home) / stored.substr(2);
-        }
-    }
-    if (p.is_absolute()) {
-        return p.lexically_normal();
-    }
-    return (baseDir / p).lexically_normal();
 }
 
 // Asset references in the project's "assets" block and shader entries: an object

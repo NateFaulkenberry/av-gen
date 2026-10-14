@@ -201,7 +201,8 @@
       "description": "Play any music with a clear build and drop into the live input (BlackHole or a mixer feed). MIDI: CC1 sensitivity, CC2 wave speed, CC3 how easily the ecosystem fires, CC4 how much light floods the canyon; pads 36-42 force a stage (Dark ... Drop ... Aftermath). Run examples/bioluminescent/build.py first (it writes the 14 MB scene).",
       "live": true,
       "name": "THE RIFT LIVE",
-      "project": "bioluminescent/rift-live.json"
+      "project": "bioluminescent/rift-live.json",
+      "generate": "python3 examples/bioluminescent/build.py --scene-only   (needs numpy and build/release/tools/avgen_world_preview)"
     },
     {
       "category": "Benchmark",
@@ -531,7 +532,75 @@
       "category": "Showcase",
       "description": "THE RIFT: a drained abyssal trench alive with bioluminescent life on Trench. The music travels through it as waves of light, the canopy answers late, and the drop ignites the whole canyon. Needs assets/audio/trench.wav; run examples/bioluminescent/build.py first (it writes the 14 MB scene). See docs/prototypes/bioluminescent/.",
       "name": "THE RIFT (Bioluminescent Environment)",
-      "project": "bioluminescent/rift.json"
+      "project": "bioluminescent/rift.json",
+      "generate": "python3 examples/bioluminescent/build.py --scene-only   (needs numpy and build/release/tools/avgen_world_preview)"
+    },
+    {
+      "category": "Showcase",
+      "name": "Astral Forge - Trench",
+      "project": "astral-forge/astral-forge-trench.json",
+      "description": "The Astral Forge as a film on Trench: a god of metal dust assembles from the music, holds a face and collapses on the drop. The offline render of the live Astral Forge (Examples > Live). Needs assets/audio/trench.wav. See docs/prototypes/astral-forge/09-production.md."
+    },
+    {
+      "category": "Showcase",
+      "name": "Digital Mosh - Feline Footwear",
+      "project": "digital-mosh/digital-mosh.json",
+      "description": "Digital Mosh as a film on Feline Footwear: a painted dream the music corrupts like a datamosh, then restores. The offline render of Digital Mosh Live. Needs assets/audio/feline-footwear.wav. See docs/prototypes/digital-mosh/."
+    },
+    {
+      "category": "Showcase",
+      "name": "Digital Mosh - Trench",
+      "project": "digital-mosh/digital-mosh-trench.json",
+      "description": "Digital Mosh rendered on Trench. Needs assets/audio/trench.wav. See docs/prototypes/digital-mosh/."
+    },
+    {
+      "category": "Showcase",
+      "name": "Chorus Field - Trench God",
+      "project": "chorus-field/p8-god-trench.json",
+      "description": "Chorus Field (paused spike, ADR-1180..1182): a curtain of fibers gathers into a silver god's face through eddy fields; the bass forms it, breakdowns dissolve it. On Trench. See docs/prototypes/chorus-field/README.md."
+    },
+    {
+      "category": "Showcase",
+      "name": "Liminal - All You Got",
+      "project": "liminal/all-you-got-pass4.json",
+      "description": "The All You Got music video (pass 4, final): one continuous walk through pale, impossible liminal rooms built from SDFs. Its song is the owner's, at assets/audio/all-you-got.wav (gitignored). See docs/prototypes/liminal-space/REPORT.md."
+    },
+    {
+      "category": "Showcase",
+      "name": "Biovalley - Macro",
+      "project": "biovalley/shots/macro_audio.json",
+      "generate": "python3 examples/biovalley/valley.py   (after a build; needs the Blender-built examples/biovalley/meshes/hero and meshes/env: hero_assets/build.py and colorways.py)",
+      "description": "The Bioluminescent Valley macro showcase: a static-camera, audio-reactive forest floor built from the Blender hero-asset library, on Trench. Generated and gitignored. See docs/prototypes/bioluminescent-valley/PAUSED.md."
+    },
+    {
+      "category": "Showcase",
+      "name": "The Tide",
+      "project": "tide/tide.json",
+      "description": "An enormous translucent body moving through a warm luminous medium: an early ocean prototype."
+    },
+    {
+      "category": "Showcase",
+      "name": "Glowmere Valley 2 - Song",
+      "project": "world/glowmere-valley-2-song.json",
+      "description": "Glowmere Valley 2 cut to the song's structure by the auto-director, over Rebuild (assets/audio/rebuild.mp3, the owner's, not committed)."
+    },
+    {
+      "category": "Lab",
+      "name": "Procedural Space - Showcase",
+      "project": "space/showcase.json",
+      "description": "The Procedural Space POC's showcase preset: the five space presets in one evolving piece. See docs/prototypes/procedural-space/REPORT.md."
+    },
+    {
+      "category": "Look development",
+      "name": "Bioluminescent Valley (recipe)",
+      "recipe": "recipes/bioluminescent-valley.recipe.json",
+      "description": "A cinematic alien rainforest at night, generated from a world recipe."
+    },
+    {
+      "category": "Performance",
+      "name": "Open Vista (stress)",
+      "recipe": "stress/open-vista.recipe.json",
+      "description": "Renderer stress profile: 1.4 km of mountainous relief, thin ground cover and large negative space."
     }
   ]
 }
