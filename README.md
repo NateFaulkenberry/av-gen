@@ -131,7 +131,8 @@ writes a scene file. `--help` lists the flags.
   [experiments](docs/quality-lab/experiments.md)
 - [docs/decisions/](docs/decisions/): Architecture Decision Records
 - [docs/research/](docs/research/): the Phase 0 technology research with sources
-- [docs/development-log.md](docs/development-log.md): what was built, tested, and measured
+- [docs/development-log.md](docs/development-log.md): what was built, tested, and measured, up to
+  2026-09-11 (ADR-097); later work is recorded in the ADRs
 
 ## Status
 
