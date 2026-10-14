@@ -12,6 +12,8 @@
 #include "assets/exr.hpp"
 #include "assets/image.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
 
@@ -58,10 +60,7 @@ app::TraceSequenceRequest smallRequest(const std::filesystem::path& out, double 
 } // namespace
 
 TEST_CASE("A path-traced range writes one EXR per frame", "[pathtrace][sequence]") {
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("the shipped project is not in this worktree");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto dir = scratch("exr");
     app::TraceSequence seq(smallRequest(dir, 12.0, 12.3));
     const auto ok = seq.run();
@@ -89,10 +88,7 @@ TEST_CASE("The frames of a sequence are different frames", "[pathtrace][sequence
     // for an implementation that traced second 12.0 three times and wrote it out under three names
     // -- which is precisely what a naive "queue of TraceJobs" bolted to one time would do. Three
     // distinct hashes is the arm that says the engine was actually walked forward.
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("the shipped project is not in this worktree");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto dir = scratch("distinct");
     auto request = smallRequest(dir, 12.0, 12.3);
     // A second apart rather than a tenth, so the difference is a difference in the world and not
@@ -117,10 +113,7 @@ TEST_CASE("The frames of a sequence are different frames", "[pathtrace][sequence
 }
 
 TEST_CASE("A path-traced sequence is deterministic", "[pathtrace][sequence]") {
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("the shipped project is not in this worktree");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto a = scratch("det-a");
     const auto b = scratch("det-b");
     app::TraceSequence first(smallRequest(a, 12.0, 12.2));
@@ -139,10 +132,7 @@ TEST_CASE("A one-frame range is the single frame it always was", "[pathtrace][se
     // exactly one so that the sequence path and the single-frame path are the same code -- which is
     // only an improvement if the picture does not move. A range of one must be one frame, at the
     // time asked for, and not two or zero.
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("the shipped project is not in this worktree");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto dir = scratch("one");
     auto request = smallRequest(dir, 12.0, 12.3);
     request.trace.endSeconds = -1.0;   // not a sequence
@@ -162,8 +152,7 @@ TEST_CASE("A trace sequence refuses what it cannot deliver", "[pathtrace][sequen
     CHECK_FALSE(r.validate().has_value());              // no project
     r.project = projectPath();
     if (!std::filesystem::exists(r.project)) {
-        SUCCEED("the shipped project is not in this worktree");
-        return;
+        SKIP("the shipped project " << r.project.string() << " is not in this worktree");
     }
     CHECK_FALSE(r.validate().has_value());              // no output
     r.output = "/tmp/avgen-trace-seq-validate";
@@ -256,10 +245,7 @@ TEST_CASE("A path-traced range with AOVs holds a flat amount of memory and write
     // a vector nothing ever read or wrote: ~140 MB per 1080p frame, for the whole range. Two claims,
     // both of which that code fails: what is held does not grow with the frame count, and the AOVs
     // a person asked for are on disk.
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("the shipped project is not in this worktree");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto dir = scratch("aov");
     auto request = smallRequest(dir, 12.0, 12.6);   // six frames
     request.trace.writeAovs = true;

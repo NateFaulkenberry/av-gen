@@ -119,6 +119,8 @@
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <mutex>
+#include <shared_mutex>
 #include <cstring>
 #include <limits>
 #include <unordered_map>
@@ -550,18 +552,27 @@ const MeshData* generatedMeshForBounds(const SourceSpec& s) {
         key += '/';
         key += std::to_string(v);
     }
+    // Process-wide, and reached from every Engine -- including the Director's scratch Engines on
+    // worker threads (CA-001) -- so it is locked. Not while generating: two threads that miss the
+    // same key both build it and the first insert wins, which is the same mesh. A returned pointer
+    // stays valid after the lock is released because std::map nodes never move and nothing erases.
+    static std::mutex mutex;
     static std::map<std::string, std::optional<MeshData>, std::less<>> cache;
-    const auto it = cache.find(key);
-    if (it != cache.end()) {
-        return it->second ? &*it->second : nullptr;
+    {
+        const std::lock_guard lock(mutex);
+        const auto it = cache.find(key);
+        if (it != cache.end()) {
+            return it->second ? &*it->second : nullptr;
+        }
     }
     // A generator that refuses is remembered as a refusal, so a broken source is not re-run every
     // frame. The caller then keeps the symmetric fallback, which is what it had before.
-    auto built = makeSourceMesh(s);
-    auto& slot = cache[key];
-    if (built && !built->vertices.empty()) {
-        slot = std::move(*built);
+    std::optional<MeshData> built;
+    if (auto mesh = makeSourceMesh(s); mesh && !mesh->vertices.empty()) {
+        built = std::move(*mesh);
     }
+    const std::lock_guard lock(mutex);
+    const auto& slot = cache.try_emplace(std::move(key), std::move(built)).first->second;
     return slot ? &*slot : nullptr;
 }
 
@@ -711,26 +722,47 @@ void detail::primitiveBox(const SourceSpec& s, glm::vec3& centre, glm::vec3& hal
 // ================================================================================================
 
 // ---- the generator registry (ADR-175) --------------------------------------------------------
+// Process-wide and shared by every Engine, including the Director's scratch Engines on worker
+// threads, so every access holds the lock (CA-001). A lookup copies the builder out and calls it
+// unlocked: a generator is slow, and a registration must not wait for one.
 namespace {
-std::map<std::string, GeneratedMeshBuilder, std::less<>>& generatorRegistry() {
-    static std::map<std::string, GeneratedMeshBuilder, std::less<>> registry;
+struct GeneratorRegistry {
+    std::shared_mutex mutex;
+    std::map<std::string, GeneratedMeshBuilder, std::less<>> builders;
+};
+GeneratorRegistry& generatorRegistry() {
+    static GeneratorRegistry registry;
     return registry;
+}
+GeneratedMeshBuilder findGenerator(std::string_view name) {
+    GeneratorRegistry& r = generatorRegistry();
+    const std::shared_lock lock(r.mutex);
+    const auto it = r.builders.find(name);
+    return it != r.builders.end() ? it->second : GeneratedMeshBuilder{};
 }
 } // namespace
 
 void registerGenerator(std::string name, GeneratedMeshBuilder builder) {
-    generatorRegistry()[std::move(name)] = std::move(builder);
+    GeneratorRegistry& r = generatorRegistry();
+    const std::unique_lock lock(r.mutex);
+    r.builders.insert_or_assign(std::move(name), std::move(builder));
 }
-bool hasGenerator(std::string_view name) { return generatorRegistry().find(name) != generatorRegistry().end(); }
+bool hasGenerator(std::string_view name) { return static_cast<bool>(findGenerator(name)); }
 std::vector<std::string> registeredGenerators() {
+    GeneratorRegistry& r = generatorRegistry();
+    const std::shared_lock lock(r.mutex);
     std::vector<std::string> out;
-    out.reserve(generatorRegistry().size());
-    for (const auto& [name, _] : generatorRegistry()) {
+    out.reserve(r.builders.size());
+    for (const auto& [name, _] : r.builders) {
         out.push_back(name);
     }
     return out;
 }
-void clearGenerators() { generatorRegistry().clear(); }
+void clearGenerators() {
+    GeneratorRegistry& r = generatorRegistry();
+    const std::unique_lock lock(r.mutex);
+    r.builders.clear();
+}
 
 Result<void> GeneratedSource::validate() const {
     if (generator.empty()) {
@@ -1716,9 +1748,8 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
         return makeTube(spec.curve, spec.tubeRadius, spec.tubeTaper, spec.tubeSides, spec.tubeSegments,
                         spec.tubeTwist, spec.tubeCaps);
     case PrimitiveKind::Generated: {
-        const auto& registry = generatorRegistry();
-        const auto it = registry.find(spec.generated.generator);
-        if (it == registry.end()) {
+        const GeneratedMeshBuilder builder = findGenerator(spec.generated.generator);
+        if (!builder) {
             std::string have;
             for (const std::string& n : registeredGenerators()) {
                 have += have.empty() ? n : ", " + n;
@@ -1726,7 +1757,7 @@ Result<MeshData> makeSourceMesh(const SourceSpec& spec) {
             return fail("no generator named '{}' is registered (have: {})", spec.generated.generator,
                         have.empty() ? std::string("none") : have);
         }
-        return it->second(spec.generated, spec.generatedPart);
+        return builder(spec.generated, spec.generatedPart);
     }
     case PrimitiveKind::Mesh:
         if (!spec.assetMesh) {

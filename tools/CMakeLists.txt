@@ -31,6 +31,48 @@ add_executable(avgen_sonic_probe sonic_live_probe.cpp)
 target_link_libraries(avgen_sonic_probe PRIVATE avgen_core miniaudio::miniaudio)
 
 
+# The engine outside the application (code audit CA-010). `app::Engine` and what it needs live in
+# the executable's glob rather than in a library, so a tool that loads a project names them -- and the
+# three hand-copied lists this replaces had already drifted. One list of the app/ sources, and the
+# ui/ files `edit_system.cpp` and `ai_edit_sink.cpp` reach into (the undo stack), named here so a
+# tool that does not link `avgen_platform` stays free of Dear ImGui and a window. `frame_range.cpp`
+# goes with `render_settings.cpp` (ADR-383), as it does in `avgen_render_tests`.
+set(AVGEN_TOOL_ENGINE_APP_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
+    "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/examples.cpp")
+set(AVGEN_TOOL_ENGINE_UI_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/ui/edit_history.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_edit.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_probe.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp")
+
+# Compiled once for every tool here that links `avgen_core` alone, instead of once per tool.
+add_library(avgen_tool_engine OBJECT ${AVGEN_TOOL_ENGINE_APP_SOURCES} ${AVGEN_TOOL_ENGINE_UI_SOURCES})
+target_link_libraries(avgen_tool_engine PUBLIC avgen_core)
+
 # The viewport overlay, rasterised into a PNG with no window and no GPU (ADR-194).
 #
 # This repository states in two places that it cannot screenshot an ImGui frame, and the world
@@ -40,38 +82,11 @@ target_link_libraries(avgen_sonic_probe PRIVATE avgen_core miniaudio::miniaudio)
 # assertions. This runs the real `drawViewportOverlay` against a real scene and rasterises the draw
 # list in software, so what comes out is the overlay itself and not a second implementation of it.
 #
-# It needs avgen_platform for the overlay and Dear ImGui, and engine.cpp for app::Engine -- which
-# lives in the application's sources rather than in a library, the same reason avgen_tests compiles
-# it in. No device is touched at runtime.
+# It needs avgen_platform for the overlay and Dear ImGui, and the app/ sources for app::Engine (see
+# AVGEN_TOOL_ENGINE_APP_SOURCES above). No device is touched at runtime.
 if(TARGET avgen_platform)
-    add_executable(avgen_overlay_shot overlay_shot.cpp
-        "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
-        "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
-        # ADR-383 split the frame range out of RenderSettings, and `render_settings.cpp` above calls
-        # three of its symbols. A target that lists one and not the other links fine until somebody
-        # builds it -- which for these tools is rarely, and for `avgen_render_tests` was a day.
-        # Third target to need this line; the other two are `avgen_render_tests` and
-        # `avgen_metal_rt_probe`. They go together.
-        "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
+    # The app/ list, not `avgen_tool_engine`: `avgen_platform` already carries the ui/ files.
+    add_executable(avgen_overlay_shot overlay_shot.cpp ${AVGEN_TOOL_ENGINE_APP_SOURCES}
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
     target_link_libraries(avgen_overlay_shot PRIVATE avgen_platform)
     avgen_set_warnings(avgen_overlay_shot)
@@ -122,49 +137,11 @@ target_link_libraries(avgen_seek_probe PRIVATE avgen_core)
 # TEMPORARY (ADR-383, the audit's W6). The Metal ray-tracing DECISION, not a backend: does Metal
 # beat Embree on an M2, where there is no hardware RT unit? Delete it with the decision it informs.
 if(APPLE)
-    # The same app/ sources `avgen_overlay_shot` lists, and for the same reason: `Engine` lives in
-    # the executable's glob rather than in `avgen_core`, so anything outside the app that wants to
-    # load a project has to name them.
-    add_executable(avgen_metal_rt_probe metal_rt_probe.mm
-        "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
-        "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
-        # `edit_system.cpp` and `ai_edit_sink.cpp` reach into the editor's undo stack, which lives
-        # in `src/ui/`. Three files rather than linking `avgen_platform`, because that would drag
-        # Dear ImGui and a window into a probe that wants neither.
-        "${CMAKE_SOURCE_DIR}/src/ui/edit_history.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/world_edit.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/world_probe.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp")
+    add_executable(avgen_metal_rt_probe metal_rt_probe.mm)
     set_source_files_properties(metal_rt_probe.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-    target_link_libraries(avgen_metal_rt_probe PRIVATE avgen_core
+    target_link_libraries(avgen_metal_rt_probe PRIVATE avgen_tool_engine
         "-framework Metal" "-framework Foundation")
 endif()
-
-add_executable(avgen_slope_probe _slope_probe.cpp)
-target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
 
 
 # Phase D §58/§64: simulate a scene headless and print one line per decision any character makes,
@@ -176,57 +153,24 @@ target_link_libraries(avgen_behavior_trace PRIVATE avgen_core)
 # ADR-826 (Glowmere review build, item 9): simulate a scene or a project headless and report each
 # character's motion and behaviour quality -- root pops, foot slip, stuck time, activity churn --
 # as individual metrics in JSON. It drives the real `app::Engine`, so a project's Director and
-# staging move the cast exactly as they do in the film; that needs the same app/ sources
-# `avgen_metal_rt_probe` lists, for the same reason (`Engine` lives in the executable's glob), and
-# the ui/ files that keep it free of Dear ImGui and a window. `avgen_cast_trace` below needs exactly
-# the same engine, so the list is named once.
-set(AVGEN_OFFLINE_ENGINE_SOURCES
-    "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
-    "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
-    "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/edit_history.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/world_edit.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/world_probe.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp")
-add_executable(avgen_character_quality character_quality.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
-target_link_libraries(avgen_character_quality PRIVATE avgen_core)
+# staging move the cast exactly as they do in the film; that is `avgen_tool_engine` (top of this file).
+add_executable(avgen_character_quality character_quality.cpp)
+target_link_libraries(avgen_character_quality PRIVATE avgen_tool_engine)
 
 # Glowmere Valley 3: where every character is at every moment of a film, so a camera can be placed
 # on somebody who is not following a script. Runs the same offline engine as the quality meter.
-add_executable(avgen_cast_trace cast_trace.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
-target_link_libraries(avgen_cast_trace PRIVATE avgen_core)
+add_executable(avgen_cast_trace cast_trace.cpp)
+target_link_libraries(avgen_cast_trace PRIVATE avgen_tool_engine)
 
 # The GV3 art pass (ADR-982): how far a character's planted feet slide as it sets off from standing,
 # read from the drawn pose every frame of the same offline engine.
-add_executable(avgen_foot_probe foot_probe.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
-target_link_libraries(avgen_foot_probe PRIVATE avgen_core)
+add_executable(avgen_foot_probe foot_probe.cpp)
+target_link_libraries(avgen_foot_probe PRIVATE avgen_tool_engine)
 
 # ADR-923: the Director's Song Mode cut of a project as JSON -- every shot's span, subject, arc and
 # the reason for its duration -- on the CPU, for a generator iterating on a plan without the GPU.
-add_executable(avgen_song_cut song_cut.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
-target_link_libraries(avgen_song_cut PRIVATE avgen_core)
+add_executable(avgen_song_cut song_cut.cpp)
+target_link_libraries(avgen_song_cut PRIVATE avgen_tool_engine)
 
 # Phase D §58: validate a scene's autonomous characters before runtime.
 add_executable(avgen_character_validate character_validate.cpp)

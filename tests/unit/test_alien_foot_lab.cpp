@@ -272,8 +272,8 @@ TEST_CASE("body compensation is what puts the alien's feet on the ground", "[ali
         // **This was investigated twice and the explanation changed both times.**
         //
         // First reading: "the fixture is too flat". Refuted by measurement -- `tools/_slope_probe.cpp`
-        // put these aliens on ground with 0.3499 m of relief across their own 0.9 m footprint and
-        // nothing changed.
+        // (since removed) put these aliens on ground with 0.3499 m of relief across their own 0.9 m
+        // footprint and nothing changed.
         //
         // Second reading: "one ground plane per body makes every foot target reachable by
         // construction". That was true and is now fixed (ADR-551): each foot asks an `IGroundQuery`

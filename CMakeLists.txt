@@ -34,8 +34,6 @@ option(AVGEN_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 # (docs/development/ci.md, "Sanitizers"). AVGEN_ENABLE_ASAN already includes these checks.
 option(AVGEN_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer alone" OFF)
 option(AVGEN_WARNINGS_AS_ERRORS "Treat warnings as errors for engine targets" OFF)
-# Transitional (ADR-023): link the test-only scene::makeSourceMesh stub from tests/support while the
-# CPU side of scene/procedural.hpp lives on another branch. Off once both branches are merged.
 
 if(APPLE)
     # The prebuilt Dawn archive is built against the macOS 26 SDK with a 26.0 deployment floor.

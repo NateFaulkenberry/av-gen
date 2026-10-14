@@ -263,6 +263,20 @@ TEST_CASE("a discontinuity drops the history rather than smearing across it", "[
     CHECK(ctx->errorCount() == 0);
 }
 
+// Where the [.capture] cases below write: AVGEN_CAPTURE_DIR, else <source>/build/captures (ignored by
+// git, and kept: the per-process TMPDIR the suite sets is deleted when the run ends). Never the
+// working directory: run from the repository root, that committed six PNGs to it (e841d1e0).
+namespace {
+std::filesystem::path captureDir() {
+    const char* env = std::getenv("AVGEN_CAPTURE_DIR");
+    std::filesystem::path dir = env != nullptr ? std::filesystem::path(env)
+                                               : std::filesystem::path(AVGEN_SOURCE_DIR) / "build" / "captures";
+    std::filesystem::create_directories(dir);
+    WARN("captures written to " << dir.string());
+    return dir;
+}
+} // namespace
+
 // ---- a render to LOOK at ------------------------------------------------------------------
 //
 // Hidden ([.capture]) because it writes files rather than asserting. It exists because a hash is
@@ -274,8 +288,7 @@ TEST_CASE("a discontinuity drops the history rather than smearing across it", "[
 TEST_CASE("capture: the echo, the plain frame and the ring itself", "[.capture][gpu][temporal]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
-    const std::filesystem::path out =
-        std::filesystem::path(std::getenv("AVGEN_CAPTURE_DIR") ? std::getenv("AVGEN_CAPTURE_DIR") : ".");
+    const std::filesystem::path out = captureDir();
 
     const int w = 420;
     const int h = 300;
@@ -396,8 +409,7 @@ TEST_CASE("the history debug view shows the ring, and is reachable by name", "[g
 TEST_CASE("capture: the history-state debug view", "[.capture][gpu][temporal]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
-    const std::filesystem::path out =
-        std::filesystem::path(std::getenv("AVGEN_CAPTURE_DIR") ? std::getenv("AVGEN_CAPTURE_DIR") : ".");
+    const std::filesystem::path out = captureDir();
 
     auto shootRing = [&](int frames, int ringFrames, const char* name) {
         scene::Scene s = withEcho(movingLight(), ringFrames, 0.85f);

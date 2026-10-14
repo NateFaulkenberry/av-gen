@@ -2167,8 +2167,15 @@ MotionDatabaseSlot* Composition::motionSlotFor(const entity::MotionMatchingDesc&
     if (it == motionSlots_.end()) {
         it = motionSlots_.emplace(key, std::make_unique<MotionDatabaseSlot>()).first;
         it->second->requestLoad(m.packResolved, m.databaseResolved);
-        if (blockingMotionLoads_) {
-            (void)it->second->waitIdle(std::chrono::seconds(120));
+        // CA-009: a timeout must not pass silently. Past it the body plays its clips until the
+        // database arrives, so the frames depend on how long the load took -- the thing blocking
+        // loads exist to prevent. There is no channel for a render to refuse on yet, so say it loudly.
+        constexpr auto kBlockingLoadTimeout = std::chrono::seconds(120);
+        if (blockingMotionLoads_ && !it->second->waitIdle(kBlockingLoadTimeout)) {
+            log::error("motion database '{}' (pack '{}') did not finish loading within {} s; characters "
+                       "that use it play their clips until it arrives, so this render's motion depends "
+                       "on load time",
+                       m.databaseResolved, m.packResolved, kBlockingLoadTimeout.count());
         }
     }
     return it->second.get();
