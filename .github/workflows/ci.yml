@@ -104,7 +104,9 @@ jobs:
       - name: Package test binaries
         run: |
           mkdir -p "$RESULTS/bin"
-          cp build/release/tests/avgen_tests build/release/tests/avgen_render_tests build/release/src/avgen "$RESULTS/bin/"
+          # avgen_world_preview: test_rift generates the gitignored Rift world with it (.github/actions/test-inputs).
+          cp build/release/tests/avgen_tests build/release/tests/avgen_render_tests build/release/src/avgen \
+             build/release/tools/avgen_world_preview "$RESULTS/bin/"
           ls -la "$RESULTS/bin"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -131,6 +133,9 @@ jobs:
         with:
           name: bin-release
           path: build/release/bin
+      - uses: ./.github/actions/test-inputs
+        with:
+          bin: build/release/bin
       - name: Run avgen_tests
         run: |
           chmod +x build/release/bin/*
@@ -230,6 +235,9 @@ jobs:
           AVGEN_TEST_ASSETS_TOKEN: ${{ secrets.AVGEN_TEST_ASSETS_TOKEN }}
           AVGEN_TEST_ASSETS_SSH_KEY: ${{ secrets.AVGEN_TEST_ASSETS_SSH_KEY }}
         run: tools/fetch-test-assets.sh
+      - uses: ./.github/actions/test-inputs
+        with:
+          bin: build/release/bin
       - name: Run avgen_tests with the assets
         run: |
           chmod +x build/release/bin/*

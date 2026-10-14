@@ -19,6 +19,7 @@
 #include "core/time.hpp"
 #include "entity/entity.hpp"
 #include "scene/composition.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -65,6 +66,10 @@ void load(app::Engine& engine, bool withAudio) {
     engine.setDetailLimits(limits);
     if (!withAudio) {
         REQUIRE(engine.setAudioClips({}).has_value());
+    } else {
+        // Every "with its audio" case first SKIPs unless the project's song is here, so a project that
+        // loads without its track is a defect, not a missing file.
+        REQUIRE(engine.seekReplaysSignals());
     }
 }
 
@@ -142,6 +147,8 @@ TEST_CASE("an Engine scrub of the Glowmere film with its audio lands where the p
     if (!assetsPresent()) {
         SKIP("farm or alien assets missing");
     }
+    // The film's song (the project's audio, ~/Desktop/Rebuild.mp3) is the owner's and is on no CI runner.
+    testsupport::skipUnlessProjectAssetsPresent(project());
     requireScrubEqualsPlay(true, {1800, 5400, 9000});
 }
 
@@ -187,6 +194,8 @@ TEST_CASE("an Engine scrub of the film with its audio that resumes from a checkp
     if (!assetsPresent()) {
         SKIP("farm or alien assets missing");
     }
+    // The film's song (the project's audio, ~/Desktop/Rebuild.mp3) is the owner's and is on no CI runner.
+    testsupport::skipUnlessProjectAssetsPresent(project());
     constexpr long long kTarget = 2710; // 45.17 s: ten frames past the 45 s checkpoint
     app::Engine played(app::EngineMode::Offline);
     load(played, true);
@@ -219,6 +228,8 @@ TEST_CASE("an Engine that plays on after a scrub of the film with its audio stay
     if (!assetsPresent()) {
         SKIP("farm or alien assets missing");
     }
+    // The film's song (the project's audio, ~/Desktop/Rebuild.mp3) is the owner's and is on no CI runner.
+    testsupport::skipUnlessProjectAssetsPresent(project());
     constexpr long long kScrub = 1800;
     constexpr long long kFrames = 300;
     app::Engine played(app::EngineMode::Offline);

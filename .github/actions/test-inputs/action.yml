@@ -1,0 +1,41 @@
+# What a job that runs avgen_tests needs beside the binary, for the inputs the suites generate rather than read
+# from the repository (docs/development/ci.md, "Generated inputs"):
+#
+#   - Python with tools/ci/requirements.txt (numpy), first on PATH. tools/ci/generate-audio.sh makes the seven
+#     sonic-* scores with it, and test_rift makes the gitignored rift.scene.json with it. Without numpy both
+#     quietly SKIP: from 2026-10-07 to 2026-10-14 the sonic cases skipped on every run.
+#   - avgen_world_preview where examples/bioluminescent/land.py and test_rift look for it,
+#     build/release/tools/, when the job's binaries include it.
+#
+#   - uses: ./.github/actions/test-inputs
+#     with: { bin: build/release/bin }
+name: Test inputs
+description: Python venv with tools/ci/requirements.txt on PATH; avgen_world_preview where the Rift build expects it
+inputs:
+  bin:
+    description: Directory holding the downloaded binaries (avgen_world_preview is taken from here if present)
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Python test dependencies
+      shell: bash
+      run: |
+        python3 -m venv "$RUNNER_TEMP/avgen-venv"
+        "$RUNNER_TEMP/avgen-venv/bin/python" -m pip install --quiet --disable-pip-version-check -r tools/ci/requirements.txt
+        echo "$RUNNER_TEMP/avgen-venv/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/avgen-venv/bin/python" -c 'import numpy; print("numpy", numpy.__version__)'
+    - name: World preview tool
+      if: inputs.bin != ''
+      shell: bash
+      env:
+        BIN: ${{ inputs.bin }}
+      run: |
+        if [ -f "$BIN/avgen_world_preview" ]; then
+          mkdir -p build/release/tools
+          cp "$BIN/avgen_world_preview" build/release/tools/
+          chmod +x build/release/tools/avgen_world_preview
+        else
+          echo "::notice title=No avgen_world_preview::$BIN has none; the Rift cases will SKIP"
+        fi

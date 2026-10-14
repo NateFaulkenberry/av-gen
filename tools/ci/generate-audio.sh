@@ -24,21 +24,35 @@ for t in json.load(open(sys.argv[1]))["tracks"]:
     print("\t".join([t["name"], "assets/" + t["file"], t["command"], t["sha256"]]))
 ' "$manifest") || { echo "generate-audio: cannot read $manifest" >&2; exit 1; }
 
-pids=(); names=()
+# One generator can write several tracks (tools/make_sonic_material.py writes all seven sonic-* scores), so each
+# distinct command runs once and every track it wrote is checked against its own hash. Started seven times over,
+# the copies raced each other writing the same files. Plain arrays: macOS's /bin/bash 3.2 has no associative ones.
+pids=(); names=(); commands=(); logs=()
 while IFS=$'\t' read -r name file command sha; do
     [[ -e "$file" ]] && { echo "generate-audio: $file present, left alone"; continue; }
-    echo "generate-audio: $name <- $command"
-    # The manifest's command is this repository's own; it is run as written, from the root.
-    (eval "$command" > "${TMPDIR:-/tmp}/generate-audio-$name.log" 2>&1) &
-    pids+=($!); names+=("$name|$file|$sha")
+    slot=-1
+    for i in "${!commands[@]}"; do [[ "${commands[$i]}" == "$command" ]] && slot=$i; done
+    if [[ $slot -lt 0 ]]; then
+        echo "generate-audio: $name <- $command"
+        # The manifest's command is this repository's own; it is run as written, from the root.
+        (eval "$command" > "${TMPDIR:-/tmp}/generate-audio-$name.log" 2>&1) &
+        slot=${#commands[@]}; commands+=("$command"); pids+=($!); logs+=("${TMPDIR:-/tmp}/generate-audio-$name.log")
+    else
+        echo "generate-audio: $name <- (the same command, already running)"
+    fi
+    names+=("$name|$file|$sha|$slot")
 done <<< "$tracks"
 
 [[ ${#pids[@]} -eq 0 ]] && exit 0
+statuses=()
 for i in "${!pids[@]}"; do
-    IFS='|' read -r name file sha <<< "${names[$i]}"
-    if ! wait "${pids[$i]}"; then
+    wait "${pids[$i]}"; statuses+=($?)
+done
+for entry in "${names[@]}"; do
+    IFS='|' read -r name file sha slot <<< "$entry"
+    if [[ ${statuses[$slot]} -ne 0 ]]; then
         echo "::warning title=Score not generated::$name: the generator failed (log below); its cases will SKIP"
-        cat "${TMPDIR:-/tmp}/generate-audio-$name.log" >&2
+        cat "${logs[$slot]}" >&2
         rm -f "$file"; continue
     fi
     got=$(shasum -a 256 "$file" | cut -d' ' -f1)

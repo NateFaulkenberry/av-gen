@@ -109,6 +109,7 @@ jobs:
         with:
           name: bin-asan
           path: build/asan/tests
+      - uses: ./.github/actions/test-inputs   # numpy, for the sonic-* scores
       - name: Run avgen_tests under ASan
         env:
           JOB: ${{ matrix.job }}
@@ -148,6 +149,7 @@ jobs:
         with:
           preset: ubsan   # Debug + -fsanitize=undefined
           out: ${{ env.RESULTS }}/build-ubsan
+      - uses: ./.github/actions/test-inputs   # numpy, for the sonic-* scores
       - name: Run avgen_tests under UBSan
         run: |
           tools/ci/run-suite.sh ubsan --bin build/ubsan/tests --out "$RESULTS/ubsan" \
@@ -183,6 +185,7 @@ jobs:
         with:
           preset: tsan    # Debug + -fsanitize=thread
           out: ${{ env.RESULTS }}/build-tsan
+      - uses: ./.github/actions/test-inputs   # numpy, for the sonic-* scores
       - name: Run avgen_tests under TSan
         run: |
           tools/ci/run-suite.sh tsan --bin build/tsan/tests --out "$RESULTS/tsan" \
