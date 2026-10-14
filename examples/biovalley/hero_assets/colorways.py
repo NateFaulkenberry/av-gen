@@ -37,6 +37,10 @@ C = {
     "teal": (0.20, 0.91, 0.75), "cyan": (0.19, 0.81, 0.93), "blue": (0.15, 0.40, 1.00),
     "deepblue": (0.33, 0.39, 0.82), "violet": (0.55, 0.25, 1.00), "magenta": (0.79, 0.39, 0.87),
     "gold": (1.00, 0.75, 0.25), "amber": (0.92, 0.60, 0.25), "mint": (0.55, 1.0, 0.75),
+    # warm and magenta accents (the owner, 2026-10-09: "more colour")
+    "magentaw": (0.88, 0.15, 0.78), "rose": (1.0, 0.33, 0.58), "pink": (1.0, 0.55, 0.78),
+    "amberw": (1.0, 0.6, 0.12), "orange": (1.0, 0.42, 0.08), "coral": (1.0, 0.32, 0.26),
+    "deepviolet": (0.42, 0.08, 1.0), "indigo": (0.26, 0.16, 1.0),
 }
 
 # a colourway: what the three source bands (green, cyan, blue/violet) become, the body glow's colour and level,
@@ -51,6 +55,56 @@ VARIANTS = {
     "blue":       dict(green="blue", cyan="cyan", blue="deepblue", body="blue", tint=True),
     "violet":     dict(green="violet", cyan="blue", blue="magenta", body="violet", tint=True),
     "cyan":       dict(green="cyan", cyan="teal", blue="blue", body="cyan", tint=True),
+    # warm and magenta accents: each source band goes to a neighbouring hue, so a body and its tips still differ
+    "magenta":    dict(green="magentaw", cyan="rose", blue="deepviolet", body="magentaw", tint=True),
+    "rose":       dict(green="rose", cyan="pink", blue="magentaw", body="rose", tint=True),
+    "amber":      dict(green="amberw", cyan="gold", blue="orange", body="amberw", tint=False),
+    "orange":     dict(green="orange", cyan="amberw", blue="coral", body="orange", tint=False),
+    "coral":      dict(green="coral", cyan="rose", blue="orange", body="coral", tint=False),
+    "deepviolet": dict(green="deepviolet", cyan="indigo", blue="magentaw", body="deepviolet", tint=True),
+    "ambertip":   dict(green="teal", cyan="amberw", blue="teal", body="teal", tint=False),  # amber tips, teal body
+    "ambersparks": dict(green="amberw", cyan="cyan", blue="blue", body="emerald", tint=False),  # amber specks only
+}
+
+def _hex(h):
+    return tuple(int(h[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
+
+
+C.update({"lead_magenta": _hex("#D34BDB"), "lead_magenta_deep": (0.6, 0.16, 0.74), "lead_coral": _hex("#FF6F59"),
+          "lead_warmpink": (1.0, 0.5, 0.62), "lead_amber": _hex("#FFB347"), "lead_orange": _hex("#FF8C42"),
+          "lead_rose": _hex("#E07A9A"), "lead_rose_light": (0.96, 0.6, 0.76), "lead_violet": (0.55, 0.25, 1.0),
+          "lead_core_orange": (1.0, 0.5, 0.14), "lead_blue": (0.25, 0.3, 0.9)})
+
+# The lead's exact requests (2026-10-09): per-species band maps, so the colour lands on the named anatomy.
+LEAD_VARIANTS = {
+    # sacs #D34BDB, deeper at the base (the blue-band sacs and stems go deep magenta)
+    ("beadcluster", "magenta"): dict(green="lead_magenta", cyan="lead_magenta_deep", blue="lead_magenta_deep",
+                                     body="lead_magenta", tint=True),
+    # #FF6F59 sacs, warm pink rims
+    ("beadcluster", "coral"): dict(green="lead_coral", cyan="lead_warmpink", blue="lead_warmpink", body="lead_coral",
+                                   tint=False),
+    # #FFB347 berries, orange cores
+    ("lanternberry", "amber"): dict(green="lead_amber", cyan="lead_core_orange", blue="lead_amber", body="lead_amber",
+                                    tint=False),
+    # #FF8C42 bulbs, amber stalk glow (kept low: the stalk's emission is already low)
+    ("bulbstalk", "orange"): dict(green="lead_orange", cyan="lead_amber", blue="lead_orange", body="lead_orange",
+                                  tint=False),
+    # #E07A9A fronds (the margins and outer veins), violet midrib (the emerald band at the centre)
+    ("veilfern", "rose"): dict(green="lead_violet", cyan="lead_rose", blue="lead_rose_light", body="lead_rose",
+                               tint=True),
+    # magenta tips (the cyan band toward the tips) on a violet body (the emerald band low down)
+    ("filigree", "magenta"): dict(green="lead_violet", cyan="lead_magenta", blue="lead_magenta", body="lead_violet",
+                                  tint=True),
+    # amber nodules and specks on the dark moss; the threads stay blue
+    ("glowmound", "amber"): dict(green="lead_amber", cyan="lead_amber", blue="lead_blue", body="emerald", tint=False),
+}
+
+# the warm pass: which species take which warm colourway (exported in addition to COLORWAYS)
+WARM = {
+    "beadcluster": ["magenta", "coral", "rose"], "lanternberry": ["amber", "magenta", "rose", "orange"],
+    "bulbstalk": ["orange", "amber", "coral"], "veilfern": ["rose", "deepviolet"], "filigree": ["magenta", "ambertip"],
+    "glowmound": ["amber", "ambersparks"], "chalice": ["magenta", "rose"], "bellspire": ["magenta", "rose"],
+    "glowmat": ["ambersparks"], "lacefan": ["deepviolet"], "reliquary": ["deepviolet"],
 }
 
 # per species: the colourways to make, and the body-glow level per material slot (0 = keep the slot as painted)
@@ -248,7 +302,26 @@ def recolor_glb(src, dst, var, levels, species):
     write_glb(dst, js, views)
 
 
+def warm(raw, out):
+    """Only the warm pass's variants, with each species' own body-glow levels."""
+    os.makedirs(out, exist_ok=True)
+    for sp, names in WARM.items():
+        _, levels = COLORWAYS[sp]
+        for colour in names:
+            tag = f"{sp}_{colour}"
+            for lod in (0, 1):
+                src = os.path.join(raw, f"hero_{sp}_lod{lod}.glb")
+                var = LEAD_VARIANTS.get((sp, colour), VARIANTS.get(colour))
+                recolor_glb(src, os.path.join(out, f"hero_{tag}_lod{lod}.glb"), var, levels, sp)
+            emit = os.path.join(raw, f"hero_{sp}.emit.json")
+            if os.path.exists(emit):
+                shutil.copy2(emit, os.path.join(out, f"hero_{tag}.emit.json"))
+            print("colourway", tag)
+
+
 def main(argv):
+    if argv[0] == "--warm":
+        return warm(argv[1], argv[2])
     raw, out = argv[0], argv[1]
     species = argv[2:] or list(COLORWAYS)
     os.makedirs(out, exist_ok=True)
