@@ -34,6 +34,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 650-669 | `agent/anim-cinfra` -- Phase C infrastructure and tooling |
 | 670-699 | `agent/anim-phase-d` -- Phase D |
 | 700 | `agent/seek-checkpoints` -- simulation checkpoints (taken with the supervisor's assignment) |
+| 701-979 | landed on main from several branches before this table was kept current (used: 701-719, 750-770, 800, 820-835, 870, 880, 890-952); treat the whole block as taken |
 | 980-989 | gv3/art-pass -- the GV3 targeted art pass |
 | 990-999 | gv3/art-pass -- the GV3 targeted art pass (980-989 exhausted) |
 | 1000-1019 | proto/procedural-space |
@@ -42,9 +43,16 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1060-1079 | proto/sonic-garden VFX expansion |
 | 1080-1089 | live/quality -- the live adaptive quality system |
 | 1090-1109 | live/optimizer -- the live scene profiler, scalability levers, panel and runtime gaps |
+| 1110-1113 | live/optimizer Phase 5 (1090-1109 exhausted) |
+| 1114-1115 | the GPU-simulation seek fix and the particle warm-up clamp |
+| 1116-1124 | GPU productionization |
 | 1140-1159 | proto/astral-forge -- THE ASTRAL FORGE scene experiment's production path |
+| 1160-1168 | proto/digital-mosh (1167 was reverted; do not reuse it) |
+| 1180-1182 | proto/chorus-field |
+| 1200-1219 | the Bioluminescent Environment, THE RIFT (on main: 1200-1202) |
+| 1220-1239 | THE ASTRAL FORGE production build (on main: 1221-1222) |
 | 1280-1299 | proto/bio-valley -- the Bioluminescent Valley (1240-1259 astral-forge-2, 1260-1279 astral-furnace) |
-| 701+ | unassigned; ask before taking |
+| 1300+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
 cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index
