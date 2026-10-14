@@ -2,7 +2,7 @@
 id: reference/command-line
 title: Command Line
 category: Reference
-summary: Every flag, every AVGEN environment variable, and the exit codes.
+summary: The common flags, the common AVGEN environment variables, and the exit codes. avgen --help lists the rest.
 order: 92
 audience: expert
 tags: cli, command line, flags, headless, environment, arguments
@@ -12,6 +12,9 @@ features: subsystem.cli
 ---
 
 # Command Line
+
+This page covers the flags and `AVGEN_*` variables most work needs; it is not complete. `avgen --help` prints the
+full flag list.
 
 ## Loading
 
