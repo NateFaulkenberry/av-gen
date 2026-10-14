@@ -255,7 +255,7 @@ where it landed did not.
 ## Phase 5 in particular
 
 **CPU skinning.** Four-influence linear blend skinning from `Scene::rigs[e.rig].palette`, the same
-model `shaders/skinning.wgsl` runs. Normals take the skin matrix's inverse transpose, which only
+model `shaders/pbr_skinned.wgsl` runs. Normals take the skin matrix's inverse transpose, which only
 differs under a non-uniform joint scale -- and when it differs, the shading shears in a way that
 looks like a BSDF fault. A rig whose palette is empty is **refused and counted**: that happens when
 `SkinnedRig::cullDistance` froze it, and the bind pose is not where the character is. Set
