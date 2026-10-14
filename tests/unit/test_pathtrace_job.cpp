@@ -7,6 +7,8 @@
 #include "pathtrace/trace_job.hpp"
 
 #include <catch2/catch_approx.hpp>
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
@@ -84,10 +86,7 @@ TEST_CASE("the state names cover every state and only terminal ones are terminal
 
 TEST_CASE("a job renders a real project to an EXR, off the calling thread",
           "[unit][pathtrace][job]") {
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("project or assets absent from this worktree");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob.exr";
     std::filesystem::remove(out);
 
@@ -139,10 +138,7 @@ TEST_CASE("a job renders a real project to an EXR, off the calling thread",
 
 TEST_CASE("cancelling a job stops it and reports Cancelled, without writing a file",
           "[unit][pathtrace][job]") {
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("project or assets absent");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_cancel.exr";
     std::filesystem::remove(out);
 
@@ -165,10 +161,7 @@ TEST_CASE("cancelling a job stops it and reports Cancelled, without writing a fi
 }
 
 TEST_CASE("cancelling a job that already finished is harmless", "[unit][pathtrace][job]") {
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("project or assets absent");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_late.exr";
     std::filesystem::remove(out);
     pathtrace::TraceJob job(smallRequest(out));
@@ -182,10 +175,7 @@ TEST_CASE("cancelling a job that already finished is harmless", "[unit][pathtrac
 TEST_CASE("progress does not claim to know what it cannot", "[unit][pathtrace][job]") {
     // Spec section 36 asks for real progress. A stage with no intermediate signal must say
     // `fractionKnown == false` rather than interpolate a bar that creeps while nothing is happening.
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("project or assets absent");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_progress.exr";
     std::filesystem::remove(out);
     auto request = smallRequest(out);
@@ -230,10 +220,7 @@ TEST_CASE("a running job does not block the thread that started it", "[unit][pat
     // loops doing work and polling, exactly as a UI frame loop does, and must get many turns while
     // the job is still going. It is NOT a substitute for a human dragging a window, and I could not
     // do that -- but a caller that is starved would fail here.
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("project or assets absent");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_nonblock.exr";
     std::filesystem::remove(out);
     auto request = smallRequest(out);
@@ -266,10 +253,7 @@ TEST_CASE("a running job does not block the thread that started it", "[unit][pat
 TEST_CASE("cancelling mid-render leaves a terminal state and no file", "[unit][pathtrace][job]") {
     // The panel's Cancel button reaches exactly this. Cancelled partway through the samples rather
     // than before the job starts, which is the case the button is actually for.
-    if (!std::filesystem::exists(projectPath())) {
-        SUCCEED("project or assets absent");
-        return;
-    }
+    testsupport::skipUnlessProjectAssetsPresent(projectPath());
     const auto out = std::filesystem::temp_directory_path() / "avgen_tracejob_midcancel.exr";
     std::filesystem::remove(out);
     auto request = smallRequest(out);

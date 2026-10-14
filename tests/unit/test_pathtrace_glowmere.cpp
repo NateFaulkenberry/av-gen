@@ -6,16 +6,17 @@
 // honest, complete, tested account of what does and what does not, produced BEFORE the render
 // rather than discovered after somebody looks at the frame.
 //
-// Every assertion is conditional on the project loading, because the assets are gitignored and a
-// worktree without them must skip rather than fail. That is the rule main landed in
-// `test_treeisland_example.cpp` after a half-linked worktree produced a confusing failure -- and
-// after this branch reported that failure as somebody else's twice.
+// The assets are gitignored, so a worktree or a CI runner without them SKIPs, naming the missing
+// file (`testsupport::skipUnlessProjectAssetsPresent`). With them present the project must load: a
+// load failure is a FAILURE, never a pass that asserted nothing (code audit CA-002).
 
 #include "app/engine.hpp"
 #include "core/time.hpp"
 #include "pathtrace/path_tracer.hpp"
 #include "pathtrace/snapshot.hpp"
 #include "scene/scene.hpp"
+
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -36,13 +37,13 @@ std::filesystem::path projectPath(const char* name) {
     return std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / name;
 }
 
-// Loads a project and evaluates it at `seconds`. Returns null if the project or its assets are
-// absent, so a worktree without them skips instead of failing.
+// Loads a project and evaluates it at `seconds`. SKIPs the calling test if the project or any file it
+// loads is absent; REQUIREs the load otherwise, so a project that stops loading fails the test.
 std::unique_ptr<app::Engine> loadAt(const char* name, double seconds) {
     const auto path = projectPath(name);
-    if (!std::filesystem::exists(path)) return nullptr;
+    testsupport::skipUnlessProjectAssetsPresent(path);
     auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
-    if (!engine->loadProject(path)) return nullptr;
+    REQUIRE(engine->loadProject(path));
     // One warm-up at dt 0 then the real step, which is what app::RenderJob does: some systems need
     // a frame to settle and a snapshot of frame zero is not a snapshot of the scene.
     engine->update(FrameTime{seconds, 0.0, 0});
@@ -63,10 +64,6 @@ float luminance(const glm::vec3& c) { return 0.2126f * c.x + 0.7152f * c.y + 0.0
 
 TEST_CASE("Glowmere Valley reaches the path tracer as geometry", "[unit][pathtrace][glowmere]") {
     auto engine = loadAt("glowmere-valley-2-multicam.json", 12.0);
-    if (engine == nullptr) {
-        SUCCEED("glowmere-valley-2-multicam.json or its assets are not in this worktree");
-        return;
-    }
 
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(engine->scene());
     pathtrace::logCapabilities(snap);
@@ -96,10 +93,6 @@ TEST_CASE("Glowmere Valley reaches the path tracer as geometry", "[unit][pathtra
 TEST_CASE("the capability report accounts for what Glowmere contains",
           "[unit][pathtrace][glowmere][capability]") {
     auto engine = loadAt("glowmere-valley-2-multicam.json", 12.0);
-    if (engine == nullptr) {
-        SUCCEED("project or assets absent");
-        return;
-    }
     const scene::Scene& scene = engine->scene();
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(scene);
 
@@ -145,10 +138,6 @@ TEST_CASE("the capability report accounts for what Glowmere contains",
 TEST_CASE("a Glowmere frame renders and is a picture rather than a colour",
           "[unit][pathtrace][glowmere]") {
     auto engine = loadAt("glowmere-valley-2-multicam.json", 12.0);
-    if (engine == nullptr) {
-        SUCCEED("project or assets absent");
-        return;
-    }
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(engine->scene());
 
     pathtrace::TraceSettings t;
@@ -216,10 +205,6 @@ TEST_CASE("a Glowmere frame renders and is a picture rather than a colour",
 
 TEST_CASE("preview: render Glowmere to /tmp", "[.pathtrace-glowmere-preview]") {
     auto engine = loadAt("glowmere-valley-2-multicam.json", 12.0);
-    if (engine == nullptr) {
-        WARN("project or assets absent");
-        return;
-    }
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(engine->scene());
     pathtrace::logCapabilities(snap);
 
