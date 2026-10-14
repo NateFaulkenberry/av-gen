@@ -31,8 +31,8 @@ fixed.
 
 ## Scenes and examples
 
-`examples/index.json` is the scene catalogue, and the app's File > Examples and File > Live Projects
-menus read it. No doc counts its entries. A live scene needs `"live": true` and a `sonic.live` block,
+`examples/index.json` is the scene catalogue, and the app's File > Examples > Live and Offline
+menus read it (ADR-1340). No doc counts its entries. A live scene needs `"live": true` and a `sonic.live` block,
 and the tests enforce that. Diagnostic arms sit beside their deliverable with a leading `_`. Run
 `python3 tools/check_project_integrity.py` before committing a change under `examples/`. It must exit 0.
 

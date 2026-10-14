@@ -28,7 +28,7 @@ multiple output windows with warp and blend, and Syphon and NDI sharing.
 The example worlds ship as data, from the Geometry Lab to the flagship Infinite Temple with its
 seven macros and four-minute state arc. None of them required a line of C++.
 [examples/index.json](examples/index.json) is the catalogue; the app lists the same entries under
-File > Examples (and the live scenes under File > Live Projects), and `--example "<name>"` opens one.
+File > Examples, in two submenus (Live and Offline; ADR-1340), and `--example "<name>"` opens one.
 
 ```
 Audio -> AnalysisRunner -> SignalBus -> Timeline -> Modulator -> ParameterSet

@@ -52,7 +52,9 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1200-1219 | the Bioluminescent Environment, THE RIFT (on main: 1200-1202) |
 | 1220-1239 | THE ASTRAL FORGE production build (on main: 1221-1222) |
 | 1280-1299 | proto/bio-valley -- the Bioluminescent Valley (1240-1259 astral-forge-2, 1260-1279 astral-furnace) |
-| 1300+ | unassigned; ask before taking |
+| 1300-1329 | proto/biovalley-2d and proto/biovalley-original (unmerged; 1300-1303 and 1320-1323 in use there) |
+| 1340-1359 | the 2026-10-14 repository cleanup |
+| 1360+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
 cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index
