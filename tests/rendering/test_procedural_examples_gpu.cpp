@@ -86,10 +86,9 @@ TEST_CASE("Showcase projects render bit-identically across fresh engines and ren
                          // subsystem coverage, not autonomous motion.
                          Case{"qa/renderer-qa.json", 0.0, false}}) {
         const auto project = examples / c.project;
-        if (!fs::exists(project)) {
-            continue;
-        }
         INFO(project.string());
+        // A named, tracked example: missing means this list is stale, not that the case may skip it.
+        REQUIRE(fs::exists(project));
         const auto a = renderSequenceHash(*ctx, shaders, project, tmp / "a", c.start, 4);
         const auto b = renderSequenceHash(*ctx, shaders, project, tmp / "b", c.start, 4);
         CHECK(a == b);

@@ -80,7 +80,15 @@
    "shared_example_deps": [],
    "menu": "Live Projects: astral-forge-live.json (indexed). Offline astral-forge-trench.json is not indexed; it would go under Examples, but NOT under the category \"Astral Forge\" (test_example_menu forbids a live category in Examples).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live, Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Astral Forge Live",
+    "Astral Forge - Trench"
+   ],
+   "menus_after": [
+    "Live",
+    "Offline"
+   ]
   },
   {
    "id": "digital-mosh",
@@ -127,7 +135,16 @@
    "shared_example_deps": [],
    "menu": "Live Projects: digital-mosh-live.json (indexed). digital-mosh.json (Feline Footwear) and digital-mosh-trench.json are offline and not indexed.",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live, Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Digital Mosh Live",
+    "Digital Mosh - Feline Footwear",
+    "Digital Mosh - Trench"
+   ],
+   "menus_after": [
+    "Live",
+    "Offline"
+   ]
   },
   {
    "id": "the-rift",
@@ -177,7 +194,15 @@
    "shared_example_deps": [],
    "menu": "Both indexed: rift.json under Examples > Showcase, rift-live.json under Live Projects > The Rift. Both point at the gitignored rift.scene.json.",
    "notes": "missing files: examples/bioluminescent/rift.scene.json",
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live, Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "THE RIFT (Bioluminescent Environment)",
+    "THE RIFT LIVE"
+   ],
+   "menus_after": [
+    "Live",
+    "Offline"
+   ]
   },
   {
    "id": "sonic-live",
@@ -218,7 +243,13 @@
    ],
    "menu": "Live Projects > Sonic Garden (indexed). Hard-coded by name in src/app/live_scenes.cpp and src/app/application.cpp.",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Live"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-salt-flat-mirage",
@@ -250,7 +281,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Salt Flat Mirage"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-lantern-lake",
@@ -282,7 +319,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Lantern Lake"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-aurora-tundra",
@@ -314,7 +357,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Aurora Tundra"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-breathing-deep",
@@ -346,7 +395,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - The Breathing Deep"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-abyssal-bloom",
@@ -378,7 +433,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Abyssal Bloom"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-cymatic-plate",
@@ -410,7 +471,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Cymatic Plate"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-silk-theatre",
@@ -442,7 +509,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Silk Theatre"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-ferrofluid-crown",
@@ -474,7 +547,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Ferrofluid Crown"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-feedback-mirror",
@@ -506,7 +585,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Feedback Mirror"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-tesla-choir",
@@ -538,7 +623,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Tesla Choir"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-datascape",
@@ -570,7 +661,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Datascape"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-ember-forest",
@@ -602,7 +699,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Ember Forest"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-corrupted-cathedral",
@@ -634,7 +737,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - The Corrupted Cathedral"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-storm-cell",
@@ -666,7 +775,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Storm Cell"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-stellar-nursery",
@@ -698,7 +813,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Stellar Nursery"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-vfx-event-horizon",
@@ -730,7 +851,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic VFX (indexed); member of the live switcher set (test asserts the set has 17 = Sonic Live + 16).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic VFX - Event Horizon"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-sacred-flight",
@@ -762,7 +889,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Sacred Geometry Flight"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-neon-vector",
@@ -794,7 +927,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Neon Vector World"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-cel-dream",
@@ -826,7 +965,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Cel-Shaded Dream World"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-color-geometry",
@@ -858,7 +1003,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Infinite Color Geometry"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-organic-garden",
@@ -890,7 +1041,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Organic Digital Garden"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-digital-alpine",
@@ -924,7 +1081,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Digital Alpine"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-chromatic-topography",
@@ -958,7 +1121,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Chromatic Topography"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-glitch-signal",
@@ -990,7 +1159,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - Glitch Signal"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "sonic-abstract-bit-ocean",
@@ -1024,7 +1199,13 @@
    "shared_example_deps": [],
    "menu": "Live Projects > Sonic Abstract (indexed); member of the live switcher set (test asserts 9).",
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Live) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Abstract - 8-Bit Ocean"
+   ],
+   "menus_after": [
+    "Live"
+   ]
   },
   {
    "id": "benchmark",
@@ -1051,7 +1232,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Procedural Benchmark"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "stress",
@@ -1078,7 +1265,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Stress Test (1K to 1M)"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "alien",
@@ -1109,7 +1302,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Alien - Skinned Character"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "alien-squad",
@@ -1140,7 +1339,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Alien Squad - Modular Characters"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "character-animation-lab",
@@ -1174,7 +1379,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Character Animation Lab"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "farm-animals",
@@ -1205,7 +1416,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Farm Animals - Imported Pack"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "astronaut-musicians",
@@ -1238,7 +1455,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Astronaut Musicians - Prototype"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "procedural-geometry-lab",
@@ -1265,7 +1488,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Procedural Geometry Lab"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "renderer-qa",
@@ -1294,7 +1523,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Renderer QA"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "alien-wander",
@@ -1327,7 +1562,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Wanderer - Behaviour and Navigation"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "bioluminescent-world",
@@ -1356,7 +1597,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Bioluminescent World"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "fungi",
@@ -1385,7 +1632,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Fungi"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "glowmere-stylized",
@@ -1431,7 +1684,15 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Glowmere Valley - Painterly",
+    "Glowmere Valley - Matched PBR",
+    "Glowmere Valley - Lyrics"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "hero-metal",
@@ -1464,7 +1725,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Hero Metal"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "organic-curves",
@@ -1493,7 +1760,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Organic Curves"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "plant-grammar",
@@ -1522,7 +1795,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Plant Grammar"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "glowmere-density",
@@ -1563,7 +1842,16 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Glowmere Density - Medium",
+    "Glowmere Density - Low",
+    "Glowmere Density - Dense",
+    "Glowmere Density - Extreme"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "grove",
@@ -1594,7 +1882,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Bioluminescent Grove"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "glowmere-valley",
@@ -1634,7 +1928,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Glowmere Valley"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "glowmere-valley-2",
@@ -1686,7 +1986,15 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Glowmere Valley 2",
+    "Glowmere Valley 2 - Multi-Camera",
+    "Glowmere Valley 2 - Song"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "glowmere-valley-3",
@@ -1733,7 +2041,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Glowmere Valley 3"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "glowmere-atmospherics",
@@ -1775,7 +2089,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Glowmere Atmospherics"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "hyperspace",
@@ -1804,7 +2124,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Hyperspace"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "chamber",
@@ -1832,7 +2158,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Impossible Chamber"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "reassembly",
@@ -1861,7 +2193,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Metallic Reassembly"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "night-shift",
@@ -1901,7 +2239,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Night Shift"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "cathedral",
@@ -1928,7 +2272,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Cathedral"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "helix",
@@ -1955,7 +2305,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Helix"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "infinite-temple",
@@ -1984,7 +2340,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Infinite Temple"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "constellation",
@@ -2017,7 +2379,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Living Constellation"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "machine",
@@ -2048,7 +2416,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Living Machine"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "temple",
@@ -2077,7 +2451,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Temple"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "tree-of-life-island",
@@ -2111,7 +2491,14 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Tree of Life - Floating Island",
+    "Tree of Life - Celestial Night"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "tree-of-life-ocean",
@@ -2142,7 +2529,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Tree of Life - Ocean World"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "worlds",
@@ -2169,7 +2562,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Worlds (preset morph)"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "quality-aliasing",
@@ -2202,7 +2601,14 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Quality Lab: aliasing",
+    "Quality Lab: aliasing dolly"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-rain",
@@ -2234,7 +2640,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Rain"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-snow",
@@ -2266,7 +2678,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Snow"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-ashfall",
@@ -2298,7 +2716,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Ashfall"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-weather-front",
@@ -2330,7 +2754,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Weather front"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-dust-motes",
@@ -2362,7 +2792,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Dust motes"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-fireflies",
@@ -2394,7 +2830,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Fireflies"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-pollen",
@@ -2426,7 +2868,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Pollen, spores and seeds"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "weather-season",
@@ -2458,7 +2906,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Season shift"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "procedural-space",
@@ -2514,7 +2968,14 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Procedural Space (POC)",
+    "Procedural Space - Showcase"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "sonic-garden",
@@ -2563,7 +3024,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Sonic Garden"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "chorus-field",
@@ -2711,7 +3178,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Chorus Field - Trench God"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "liminal",
@@ -2789,7 +3262,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Liminal - All You Got"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "biovalley-macro",
@@ -2837,7 +3316,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": "missing files: examples/biovalley/shots/macro_audio.json, examples/biovalley/shots/macro.json",
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Biovalley - Macro"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "tide",
@@ -2865,7 +3350,13 @@
    ],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "The Tide"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "bioluminescent-valley-recipe",
@@ -2898,7 +3389,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Bioluminescent Valley (recipe)"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   },
   {
    "id": "open-vista",
@@ -2931,7 +3428,13 @@
    "shared_example_deps": [],
    "menu": null,
    "notes": null,
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5 renders a valid frame: opened via File > Examples (Offline) by `--example`, exit 0, non-black, non-flat, inspected on the contact sheet (2026-10-14). Audio/MIDI reactivity (6) and live budget (7) not measured in this pass",
+   "index_names_after": [
+    "Open Vista (stress)"
+   ],
+   "menus_after": [
+    "Offline"
+   ]
   }
  ],
  "fixtures": [

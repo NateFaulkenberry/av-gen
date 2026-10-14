@@ -2,7 +2,28 @@
 
 Audit of every scene in `examples/` at `ed9926db` (branch `cleanup/repo-consolidation`), 2026-10-14. Machine-readable version: [`data/scene-inventory.json`](data/scene-inventory.json). Removal impact: [`scene-removal-impact.md`](scene-removal-impact.md).
 
-## Summary
+## Final status (after the cleanup, `examples/index.json` with 95 entries)
+
+- **81 unique scenes: 53 Offline, 28 Live.** Every one has at least one entry in File > Examples (ADR-1340): the
+  Live submenu has 29 entries, the Offline submenu 66. Every one of the 95 entries maps to one of the 81 scenes.
+  The difference between entries and scenes is variants: the two Rift projects, Glowmere's looks, the Tree of Life
+  nights, the density ladder and the offline films of the live scenes.
+- **Verification:** all 95 entries were opened the way the menu opens them (`avgen --example "<name>" --render`,
+  `tools/review_examples.py`), rendered a 640x360 frame at 10 s, exited 0, and passed the black and flat checks:
+  **95 ok, 0 failed**. The two contact sheets were inspected by eye. Verification level **5** (renders a valid
+  frame) for every scene. Levels 6 (audio/MIDI reactivity) and 7 (live budget) were not measured in this pass.
+  The sheets and frames are in `~/Desktop/av-gen-review/47-repository-cleanup/`. Run the tool again for a fresh
+  pass.
+- **Generated scenes** (THE RIFT, the Biovalley macro) carry a `generate` command. On a checkout without the
+  generated files they are listed greyed, with the command. In the owner's checkout both were made reviewable: the
+  Rift world was copied in and the Biovalley outputs were moved in (`repository-inventory.md`).
+- **Not given an entry, as variants or fixtures:** the Sonic Garden timbre variants, the six extra Procedural Space
+  presets, the Chorus Field p1-p7 iterations and Liminal passes 1-3, and every fixture and arm below.
+
+*The sections below are the audit as it was taken at `ed9926db`, before the index change. Their menu names ("Live
+Projects", "Examples") are the old ones.*
+
+## Summary (at audit time)
 
 - **81 genuinely different scenes**: **53 Offline**, **28 Live**. Three of them also run in the other mode (`also_supports`): THE RIFT (offline, also live), The Astral Forge and Digital Mosh (live, also offline).
 - The 84 entries of `examples/index.json` map onto 75 of these scenes (several entries are variants of one scene).
@@ -63,87 +84,87 @@ Verification level is filled in by the coordinator after load and render checks.
 
 | # | Scene | Category | Also | Family | Status | Primary file | Variants | Index names | Key assets | Status docs | Verification level |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | The Astral Forge | Live | Offline | Astral Forge | indexed-reviewable | `astral-forge/astral-forge-live.json` | 1 | Astral Forge Live | assets/audio/trench.wav | astral-forge/README.md, astral-forge/09-production.md | TBD (coordinator) |
-| 2 | Digital Mosh | Live | Offline | Digital Mosh | indexed-reviewable | `digital-mosh/digital-mosh-live.json` | 2 | Digital Mosh Live | assets/audio/feline-footwear.wav, assets/audio/trench.wav | digital-mosh/PROGRESS.md, digital-mosh/02-design.md | TBD (coordinator) |
-| 3 | Sonic Abstract - 8-Bit Ocean | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/bit-ocean.json` | 0 | Sonic Abstract - 8-Bit Ocean |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 4 | Sonic Abstract - Cel-Shaded Dream World | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/cel-dream.json` | 0 | Sonic Abstract - Cel-Shaded Dream World |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 5 | Sonic Abstract - Chromatic Topography | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/chromatic-topography.json` | 0 | Sonic Abstract - Chromatic Topography |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 6 | Sonic Abstract - Digital Alpine | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/digital-alpine.json` | 0 | Sonic Abstract - Digital Alpine |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 7 | Sonic Abstract - Glitch Signal | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/glitch-signal.json` | 0 | Sonic Abstract - Glitch Signal |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 8 | Sonic Abstract - Infinite Color Geometry | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/color-geometry.json` | 0 | Sonic Abstract - Infinite Color Geometry |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 9 | Sonic Abstract - Neon Vector World | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/neon-vector.json` | 0 | Sonic Abstract - Neon Vector World |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 10 | Sonic Abstract - Organic Digital Garden | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/organic-garden.json` | 0 | Sonic Abstract - Organic Digital Garden |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 11 | Sonic Abstract - Sacred Geometry Flight | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/sacred-flight.json` | 0 | Sonic Abstract - Sacred Geometry Flight |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | TBD (coordinator) |
-| 12 | Sonic Live | Live |  | Sonic Garden | indexed-reviewable | `sonic-garden/sonic-live.json` | 0 | Sonic Live |  | sonic-garden/LIVE-QUICKSTART.md, sonic-garden/01-brief-live.md | TBD (coordinator) |
-| 13 | Sonic VFX - Abyssal Bloom | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/abyssal-bloom.json` | 0 | Sonic VFX - Abyssal Bloom |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 14 | Sonic VFX - Aurora Tundra | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/aurora-tundra.json` | 0 | Sonic VFX - Aurora Tundra |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 15 | Sonic VFX - Cymatic Plate | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/cymatic-plate.json` | 0 | Sonic VFX - Cymatic Plate |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 16 | Sonic VFX - Datascape | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/datascape.json` | 0 | Sonic VFX - Datascape |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 17 | Sonic VFX - Ember Forest | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/ember-forest.json` | 0 | Sonic VFX - Ember Forest |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 18 | Sonic VFX - Event Horizon | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/event-horizon.json` | 0 | Sonic VFX - Event Horizon |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 19 | Sonic VFX - Feedback Mirror | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/feedback-mirror.json` | 0 | Sonic VFX - Feedback Mirror |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 20 | Sonic VFX - Ferrofluid Crown | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/ferrofluid-crown.json` | 0 | Sonic VFX - Ferrofluid Crown |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 21 | Sonic VFX - Lantern Lake | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/lantern-lake.json` | 0 | Sonic VFX - Lantern Lake |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 22 | Sonic VFX - Salt Flat Mirage | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/salt-flat-mirage.json` | 0 | Sonic VFX - Salt Flat Mirage |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 23 | Sonic VFX - Silk Theatre | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/silk-theatre.json` | 0 | Sonic VFX - Silk Theatre |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 24 | Sonic VFX - Stellar Nursery | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/stellar-nursery.json` | 0 | Sonic VFX - Stellar Nursery |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 25 | Sonic VFX - Storm Cell | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/storm-cell.json` | 0 | Sonic VFX - Storm Cell |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 26 | Sonic VFX - Tesla Choir | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/tesla-choir.json` | 0 | Sonic VFX - Tesla Choir |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 27 | Sonic VFX - The Breathing Deep | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/breathing-deep.json` | 0 | Sonic VFX - The Breathing Deep |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 28 | Sonic VFX - The Corrupted Cathedral | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/corrupted-cathedral.json` | 0 | Sonic VFX - The Corrupted Cathedral |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | TBD (coordinator) |
-| 29 | Procedural Benchmark | Offline |  | Benchmark | indexed-reviewable | `benchmark/benchmark.json` | 0 | Procedural Benchmark |  |  | TBD (coordinator) |
-| 30 | Stress Test (1K to 1M) | Offline |  | Benchmark | indexed-reviewable | `stress/stress.json` | 0 | Stress Test (1K to 1M) |  |  | TBD (coordinator) |
-| 31 | Biovalley Macro Showcase | Offline |  | Biovalley | generated-missing | `biovalley/shots/macro_audio.json` | 1 |  | assets/audio/trench.wav, examples/biovalley/meshes/hero, meshes/env | bioluminescent-valley/PAUSED.md, bioluminescent-valley/09-macro-showcase.md | TBD (coordinator) |
-| 32 | Chorus Field (Trench god) | Offline |  | Chorus Field | not-indexed | `chorus-field/p8-god-trench.json` | 56 |  | assets/audio/trench.wav | chorus-field/README.md | TBD (coordinator) |
-| 33 | Alien - Skinned Character | Offline |  | Lab | indexed-reviewable | `characters/alien.json` | 0 | Alien - Skinned Character |  |  | TBD (coordinator) |
-| 34 | Alien Squad - Modular Characters | Offline |  | Lab | indexed-reviewable | `characters/alien-squad.json` | 0 | Alien Squad - Modular Characters | assets/aliens |  | TBD (coordinator) |
-| 35 | Astronaut Musicians - Prototype | Offline |  | Lab | indexed-reviewable | `musicians/astronaut-musicians.json` | 0 | Astronaut Musicians - Prototype | assets/musicians | astronaut-musicians/PROGRESS.md | TBD (coordinator) |
-| 36 | Character Animation Lab | Offline |  | Lab | indexed-reviewable | `lab/character-animation-lab.json` | 0 | Character Animation Lab | assets/aliens, assets/farm | docs/character-animation-lab.md | TBD (coordinator) |
-| 37 | Farm Animals - Imported Pack | Offline |  | Lab | indexed-reviewable | `farm/farm-animals.json` | 0 | Farm Animals - Imported Pack | assets/farm |  | TBD (coordinator) |
-| 38 | Procedural Geometry Lab | Offline |  | Lab | indexed-reviewable | `lab/lab.json` | 0 | Procedural Geometry Lab |  |  | TBD (coordinator) |
-| 39 | Procedural Space (POC) | Offline |  | Lab | indexed-reviewable | `space/space.json` | 7 | Procedural Space (POC) | assets/audio/night-shift.wav | procedural-space/REPORT.md, procedural-space/PROGRESS.md | TBD (coordinator) |
-| 40 | Quality Lab: aliasing (+ dolly) | Offline |  | Lab | indexed-reviewable | `quality/aliasing.json` | 1 | Quality Lab: aliasing; Quality Lab: aliasing dolly |  | docs/quality-lab/README.md | TBD (coordinator) |
-| 41 | Renderer QA | Offline |  | Lab | indexed-reviewable | `qa/renderer-qa.json` | 0 | Renderer QA |  |  | TBD (coordinator) |
-| 42 | Sonic Garden | Offline |  | Lab | indexed-reviewable | `sonic-garden/sonic-garden.json` | 7 | Sonic Garden | assets/audio/sonic-bass.wav, assets/audio/sonic-bell.wav, assets/audio/sonic-context-bell.wav, assets/audio/sonic-context-pad.wav, assets/audio/sonic-morph.wav, assets/audio/sonic-pad.wav, assets/audio/sonic-perc.wav | sonic-garden/PROGRESS.md, sonic-garden/00-brief.md | TBD (coordinator) |
-| 43 | Wanderer - Behaviour and Navigation | Offline |  | Lab | indexed-reviewable | `characters/alien-wander.json` | 0 | Wanderer - Behaviour and Navigation | assets/audio/glowmere-valley.wav |  | TBD (coordinator) |
-| 44 | Liminal Euclidean World: All You Got | Offline |  | Liminal | not-indexed | `liminal/all-you-got-pass4.json` | 30 |  | EXTERNAL owner-machine file: ~/Desktop/All You Got.wav | liminal-space/PROGRESS-art.md, liminal-space/REPORT.md | TBD (coordinator) |
-| 45 | Bioluminescent Valley (recipe) | Offline |  | Look development | not-indexed | `recipes/bioluminescent-valley.recipe.json` | 0 |  |  | docs/world-editor.md | TBD (coordinator) |
-| 46 | Bioluminescent World | Offline |  | Look development | indexed-reviewable | `world/world.json` | 0 | Bioluminescent World |  |  | TBD (coordinator) |
-| 47 | Fungi | Offline |  | Look development | indexed-reviewable | `organic/fungi.json` | 0 | Fungi |  |  | TBD (coordinator) |
-| 48 | Glowmere Valley - Painterly / Matched PBR / Lyrics | Offline |  | Look development | indexed-reviewable | `world/glowmere-stylized.json` | 2 | Glowmere Valley - Painterly; Glowmere Valley - Matched PBR; Glowmere Valley - Lyrics | assets/audio/glowmere-valley.wav | docs/art-direction.md | TBD (coordinator) |
-| 49 | Hero Metal | Offline |  | Look development | indexed-reviewable | `hero/hero.json` | 0 | Hero Metal |  | docs/bevels-and-hero-objects.md | TBD (coordinator) |
-| 50 | Organic Curves | Offline |  | Look development | indexed-reviewable | `organic/organic.json` | 0 | Organic Curves |  |  | TBD (coordinator) |
-| 51 | Plant Grammar | Offline |  | Look development | indexed-reviewable | `organic/plants.json` | 0 | Plant Grammar |  |  | TBD (coordinator) |
-| 52 | Glowmere Density ladder (Low/Medium/Dense/Extreme) | Offline |  | Performance | indexed-reviewable | `recipes/glowmere-medium.recipe.json` | 4 | Glowmere Density - Medium; Glowmere Density - Low; Glowmere Density - Dense; Glowmere Density - Extreme |  |  | TBD (coordinator) |
-| 53 | Open Vista (stress recipe) | Offline |  | Performance | not-indexed | `stress/open-vista.recipe.json` | 0 |  |  | docs/renderer-upgrade/05-scope-contract.md | TBD (coordinator) |
-| 54 | Bioluminescent Grove | Offline |  | Showcase | indexed-reviewable | `world/grove.json` | 0 | Bioluminescent Grove |  |  | TBD (coordinator) |
-| 55 | Glowmere Atmospherics | Offline |  | Showcase | indexed-reviewable | `world/glowmere-atmospherics.json` | 0 | Glowmere Atmospherics | EXTERNAL owner-machine file: ~/Desktop/MP3/bass.mp3, assets/aliens, assets/farm |  | TBD (coordinator) |
-| 56 | Glowmere Valley | Offline |  | Showcase | indexed-reviewable | `world/terrain.json` | 0 | Glowmere Valley | assets/hdri/kloppenheim_02_puresky_4k.hdr |  | TBD (coordinator) |
-| 57 | Glowmere Valley 2 (+ Multi-Camera, Song) | Offline |  | Showcase | indexed-reviewable | `world/glowmere-valley-2.json` | 2 | Glowmere Valley 2; Glowmere Valley 2 - Multi-Camera | EXTERNAL owner-machine file: ~/Desktop/Rebuild.mp3, assets/aliens, assets/farm | docs/glowmere-valley-2 | TBD (coordinator) |
-| 58 | Glowmere Valley 3 | Offline |  | Showcase | indexed-reviewable | `world/glowmere-valley-3.json` | 0 | Glowmere Valley 3 | EXTERNAL owner-machine file: ~/Desktop/Rebuild.mp3, assets/aliens, assets/farm, assets/musicians | docs/glowmere-valley-3 | TBD (coordinator) |
-| 59 | Hyperspace | Offline |  | Showcase | indexed-reviewable | `hyperspace/hyperspace.json` | 0 | Hyperspace |  |  | TBD (coordinator) |
-| 60 | Impossible Chamber | Offline |  | Showcase | indexed-reviewable | `chamber/chamber.json` | 0 | Impossible Chamber |  |  | TBD (coordinator) |
-| 61 | Metallic Reassembly | Offline |  | Showcase | indexed-reviewable | `reassembly/reassembly.json` | 0 | Metallic Reassembly |  |  | TBD (coordinator) |
-| 62 | Night Shift | Offline |  | Showcase | indexed-reviewable | `city/night-shift.json` | 1 | Night Shift | assets/audio/night-shift.wav | docs/group-d-city-brief.md, docs/sequencer.md | TBD (coordinator) |
-| 63 | The Cathedral | Offline |  | Showcase | indexed-reviewable | `cathedral/cathedral.json` | 0 | The Cathedral |  |  | TBD (coordinator) |
-| 64 | The Helix | Offline |  | Showcase | indexed-reviewable | `helix/helix.json` | 0 | The Helix |  |  | TBD (coordinator) |
-| 65 | The Infinite Temple | Offline |  | Showcase | indexed-reviewable | `infinite/infinite.json` | 0 | The Infinite Temple |  |  | TBD (coordinator) |
-| 66 | The Living Constellation | Offline |  | Showcase | indexed-reviewable | `constellation/constellation.json` | 0 | The Living Constellation | assets/audio/glowmere-valley.wav | docs/constellation.md | TBD (coordinator) |
-| 67 | The Living Machine | Offline |  | Showcase | indexed-reviewable | `machine/machine.json` | 0 | The Living Machine |  |  | TBD (coordinator) |
-| 68 | The Temple | Offline |  | Showcase | indexed-reviewable | `temple/temple.json` | 0 | The Temple |  |  | TBD (coordinator) |
-| 69 | The Tide (leviathan) | Offline |  | Showcase | not-indexed | `tide/tide.json` | 0 |  |  |  | TBD (coordinator) |
-| 70 | Tree of Life - Floating Island / Celestial Night | Offline |  | Showcase | indexed-reviewable | `treeisland/tree-of-life-floating-island.json` | 1 | Tree of Life - Floating Island; Tree of Life - Celestial Night | EXTERNAL owner-machine file: ~/Desktop/MP3/Hellopines 2.mp3, assets/treeisle |  | TBD (coordinator) |
-| 71 | Tree of Life - Ocean World | Offline |  | Showcase | indexed-reviewable | `treeisland/tree-of-life-ocean-world.json` | 0 | Tree of Life - Ocean World | assets/environments/tree_of_life_day.exr, assets/environments/tree_of_life_night.exr, assets/treeisle |  | TBD (coordinator) |
-| 72 | Worlds (preset morph) | Offline |  | Showcase | indexed-reviewable | `worlds/worlds.json` | 0 | Worlds (preset morph) |  |  | TBD (coordinator) |
-| 73 | THE RIFT (Bioluminescent Environment) | Offline | Live | The Rift | generated-missing | `bioluminescent/rift.json` | 1 | THE RIFT (Bioluminescent Environment); THE RIFT LIVE | assets/audio/trench.wav | bioluminescent/PROGRESS.md, bioluminescent/04-design.md | TBD (coordinator) |
-| 74 | Ashfall | Offline |  | Weather | indexed-reviewable | `weather/ashfall.json` | 0 | Ashfall |  | examples/weather/README.md | TBD (coordinator) |
-| 75 | Dust motes | Offline |  | Weather | indexed-reviewable | `weather/dust-motes.json` | 0 | Dust motes |  | examples/weather/README.md | TBD (coordinator) |
-| 76 | Fireflies | Offline |  | Weather | indexed-reviewable | `weather/fireflies.json` | 0 | Fireflies |  | examples/weather/README.md | TBD (coordinator) |
-| 77 | Pollen, spores and seeds | Offline |  | Weather | indexed-reviewable | `weather/pollen.json` | 0 | Pollen, spores and seeds |  | examples/weather/README.md | TBD (coordinator) |
-| 78 | Rain | Offline |  | Weather | indexed-reviewable | `weather/rain.json` | 0 | Rain |  | examples/weather/README.md | TBD (coordinator) |
-| 79 | Season shift | Offline |  | Weather | indexed-reviewable | `weather/season.json` | 0 | Season shift |  | examples/weather/README.md | TBD (coordinator) |
-| 80 | Snow | Offline |  | Weather | indexed-reviewable | `weather/snow.json` | 0 | Snow |  | examples/weather/README.md | TBD (coordinator) |
-| 81 | Weather front | Offline |  | Weather | indexed-reviewable | `weather/weather-front.json` | 0 | Weather front |  | examples/weather/README.md | TBD (coordinator) |
+| 1 | The Astral Forge | Live | Offline | Astral Forge | indexed-reviewable | `astral-forge/astral-forge-live.json` | 1 | Astral Forge Live | assets/audio/trench.wav | astral-forge/README.md, astral-forge/09-production.md | 5: frame ok (2026-10-14 review) |
+| 2 | Digital Mosh | Live | Offline | Digital Mosh | indexed-reviewable | `digital-mosh/digital-mosh-live.json` | 2 | Digital Mosh Live | assets/audio/feline-footwear.wav, assets/audio/trench.wav | digital-mosh/PROGRESS.md, digital-mosh/02-design.md | 5: frame ok (2026-10-14 review) |
+| 3 | Sonic Abstract - 8-Bit Ocean | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/bit-ocean.json` | 0 | Sonic Abstract - 8-Bit Ocean |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 4 | Sonic Abstract - Cel-Shaded Dream World | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/cel-dream.json` | 0 | Sonic Abstract - Cel-Shaded Dream World |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 5 | Sonic Abstract - Chromatic Topography | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/chromatic-topography.json` | 0 | Sonic Abstract - Chromatic Topography |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 6 | Sonic Abstract - Digital Alpine | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/digital-alpine.json` | 0 | Sonic Abstract - Digital Alpine |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 7 | Sonic Abstract - Glitch Signal | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/glitch-signal.json` | 0 | Sonic Abstract - Glitch Signal |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 8 | Sonic Abstract - Infinite Color Geometry | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/color-geometry.json` | 0 | Sonic Abstract - Infinite Color Geometry |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 9 | Sonic Abstract - Neon Vector World | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/neon-vector.json` | 0 | Sonic Abstract - Neon Vector World |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 10 | Sonic Abstract - Organic Digital Garden | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/organic-garden.json` | 0 | Sonic Abstract - Organic Digital Garden |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 11 | Sonic Abstract - Sacred Geometry Flight | Live |  | Sonic Abstract | indexed-reviewable | `sonic-abstract/sacred-flight.json` | 0 | Sonic Abstract - Sacred Geometry Flight |  | sonic-garden/PROGRESS-abstract.md, sonic-garden/04-brief-abstract-direction.md | 5: frame ok (2026-10-14 review) |
+| 12 | Sonic Live | Live |  | Sonic Garden | indexed-reviewable | `sonic-garden/sonic-live.json` | 0 | Sonic Live |  | sonic-garden/LIVE-QUICKSTART.md, sonic-garden/01-brief-live.md | 5: frame ok (2026-10-14 review) |
+| 13 | Sonic VFX - Abyssal Bloom | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/abyssal-bloom.json` | 0 | Sonic VFX - Abyssal Bloom |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 14 | Sonic VFX - Aurora Tundra | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/aurora-tundra.json` | 0 | Sonic VFX - Aurora Tundra |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 15 | Sonic VFX - Cymatic Plate | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/cymatic-plate.json` | 0 | Sonic VFX - Cymatic Plate |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 16 | Sonic VFX - Datascape | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/datascape.json` | 0 | Sonic VFX - Datascape |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 17 | Sonic VFX - Ember Forest | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/ember-forest.json` | 0 | Sonic VFX - Ember Forest |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 18 | Sonic VFX - Event Horizon | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/event-horizon.json` | 0 | Sonic VFX - Event Horizon |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 19 | Sonic VFX - Feedback Mirror | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/feedback-mirror.json` | 0 | Sonic VFX - Feedback Mirror |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 20 | Sonic VFX - Ferrofluid Crown | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/ferrofluid-crown.json` | 0 | Sonic VFX - Ferrofluid Crown |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 21 | Sonic VFX - Lantern Lake | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/lantern-lake.json` | 0 | Sonic VFX - Lantern Lake |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 22 | Sonic VFX - Salt Flat Mirage | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/salt-flat-mirage.json` | 0 | Sonic VFX - Salt Flat Mirage |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 23 | Sonic VFX - Silk Theatre | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/silk-theatre.json` | 0 | Sonic VFX - Silk Theatre |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 24 | Sonic VFX - Stellar Nursery | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/stellar-nursery.json` | 0 | Sonic VFX - Stellar Nursery |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 25 | Sonic VFX - Storm Cell | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/storm-cell.json` | 0 | Sonic VFX - Storm Cell |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 26 | Sonic VFX - Tesla Choir | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/tesla-choir.json` | 0 | Sonic VFX - Tesla Choir |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 27 | Sonic VFX - The Breathing Deep | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/breathing-deep.json` | 0 | Sonic VFX - The Breathing Deep |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 28 | Sonic VFX - The Corrupted Cathedral | Live |  | Sonic VFX | indexed-reviewable | `sonic-vfx/corrupted-cathedral.json` | 0 | Sonic VFX - The Corrupted Cathedral |  | sonic-garden/SCENE-CATALOG.md, sonic-garden/PROGRESS-vfx-art.md | 5: frame ok (2026-10-14 review) |
+| 29 | Procedural Benchmark | Offline |  | Benchmark | indexed-reviewable | `benchmark/benchmark.json` | 0 | Procedural Benchmark |  |  | 5: frame ok (2026-10-14 review) |
+| 30 | Stress Test (1K to 1M) | Offline |  | Benchmark | indexed-reviewable | `stress/stress.json` | 0 | Stress Test (1K to 1M) |  |  | 5: frame ok (2026-10-14 review) |
+| 31 | Biovalley Macro Showcase | Offline |  | Biovalley | generated (index entry has `generate`) | `biovalley/shots/macro_audio.json` | 1 |  | assets/audio/trench.wav, examples/biovalley/meshes/hero, meshes/env | bioluminescent-valley/PAUSED.md, bioluminescent-valley/09-macro-showcase.md | 5: frame ok (2026-10-14 review) |
+| 32 | Chorus Field (Trench god) | Offline |  | Chorus Field | not-indexed at audit; **indexed 2026-10-14** | `chorus-field/p8-god-trench.json` | 56 |  | assets/audio/trench.wav | chorus-field/README.md | 5: frame ok (2026-10-14 review) |
+| 33 | Alien - Skinned Character | Offline |  | Lab | indexed-reviewable | `characters/alien.json` | 0 | Alien - Skinned Character |  |  | 5: frame ok (2026-10-14 review) |
+| 34 | Alien Squad - Modular Characters | Offline |  | Lab | indexed-reviewable | `characters/alien-squad.json` | 0 | Alien Squad - Modular Characters | assets/aliens |  | 5: frame ok (2026-10-14 review) |
+| 35 | Astronaut Musicians - Prototype | Offline |  | Lab | indexed-reviewable | `musicians/astronaut-musicians.json` | 0 | Astronaut Musicians - Prototype | assets/musicians | astronaut-musicians/PROGRESS.md | 5: frame ok (2026-10-14 review) |
+| 36 | Character Animation Lab | Offline |  | Lab | indexed-reviewable | `lab/character-animation-lab.json` | 0 | Character Animation Lab | assets/aliens, assets/farm | docs/character-animation-lab.md | 5: frame ok (2026-10-14 review) |
+| 37 | Farm Animals - Imported Pack | Offline |  | Lab | indexed-reviewable | `farm/farm-animals.json` | 0 | Farm Animals - Imported Pack | assets/farm |  | 5: frame ok (2026-10-14 review) |
+| 38 | Procedural Geometry Lab | Offline |  | Lab | indexed-reviewable | `lab/lab.json` | 0 | Procedural Geometry Lab |  |  | 5: frame ok (2026-10-14 review) |
+| 39 | Procedural Space (POC) | Offline |  | Lab | indexed-reviewable | `space/space.json` | 7 | Procedural Space (POC) | assets/audio/night-shift.wav | procedural-space/REPORT.md, procedural-space/PROGRESS.md | 5: frame ok (2026-10-14 review) |
+| 40 | Quality Lab: aliasing (+ dolly) | Offline |  | Lab | indexed-reviewable | `quality/aliasing.json` | 1 | Quality Lab: aliasing; Quality Lab: aliasing dolly |  | docs/quality-lab/README.md | 5: frame ok (2026-10-14 review) |
+| 41 | Renderer QA | Offline |  | Lab | indexed-reviewable | `qa/renderer-qa.json` | 0 | Renderer QA |  |  | 5: frame ok (2026-10-14 review) |
+| 42 | Sonic Garden | Offline |  | Lab | indexed-reviewable | `sonic-garden/sonic-garden.json` | 7 | Sonic Garden | assets/audio/sonic-bass.wav, assets/audio/sonic-bell.wav, assets/audio/sonic-context-bell.wav, assets/audio/sonic-context-pad.wav, assets/audio/sonic-morph.wav, assets/audio/sonic-pad.wav, assets/audio/sonic-perc.wav | sonic-garden/PROGRESS.md, sonic-garden/00-brief.md | 5: frame ok (2026-10-14 review) |
+| 43 | Wanderer - Behaviour and Navigation | Offline |  | Lab | indexed-reviewable | `characters/alien-wander.json` | 0 | Wanderer - Behaviour and Navigation | assets/audio/glowmere-valley.wav |  | 5: frame ok (2026-10-14 review) |
+| 44 | Liminal Euclidean World: All You Got | Offline |  | Liminal | not-indexed at audit; **indexed 2026-10-14** | `liminal/all-you-got-pass4.json` | 30 |  | EXTERNAL owner-machine file: ~/Desktop/All You Got.wav | liminal-space/PROGRESS-art.md, liminal-space/REPORT.md | 5: frame ok (2026-10-14 review) |
+| 45 | Bioluminescent Valley (recipe) | Offline |  | Look development | not-indexed at audit; **indexed 2026-10-14** | `recipes/bioluminescent-valley.recipe.json` | 0 |  |  | docs/world-editor.md | 5: frame ok (2026-10-14 review) |
+| 46 | Bioluminescent World | Offline |  | Look development | indexed-reviewable | `world/world.json` | 0 | Bioluminescent World |  |  | 5: frame ok (2026-10-14 review) |
+| 47 | Fungi | Offline |  | Look development | indexed-reviewable | `organic/fungi.json` | 0 | Fungi |  |  | 5: frame ok (2026-10-14 review) |
+| 48 | Glowmere Valley - Painterly / Matched PBR / Lyrics | Offline |  | Look development | indexed-reviewable | `world/glowmere-stylized.json` | 2 | Glowmere Valley - Painterly; Glowmere Valley - Matched PBR; Glowmere Valley - Lyrics | assets/audio/glowmere-valley.wav | docs/art-direction.md | 5: frame ok (2026-10-14 review) |
+| 49 | Hero Metal | Offline |  | Look development | indexed-reviewable | `hero/hero.json` | 0 | Hero Metal |  | docs/bevels-and-hero-objects.md | 5: frame ok (2026-10-14 review) |
+| 50 | Organic Curves | Offline |  | Look development | indexed-reviewable | `organic/organic.json` | 0 | Organic Curves |  |  | 5: frame ok (2026-10-14 review) |
+| 51 | Plant Grammar | Offline |  | Look development | indexed-reviewable | `organic/plants.json` | 0 | Plant Grammar |  |  | 5: frame ok (2026-10-14 review) |
+| 52 | Glowmere Density ladder (Low/Medium/Dense/Extreme) | Offline |  | Performance | indexed-reviewable | `recipes/glowmere-medium.recipe.json` | 4 | Glowmere Density - Medium; Glowmere Density - Low; Glowmere Density - Dense; Glowmere Density - Extreme |  |  | 5: frame ok (2026-10-14 review) |
+| 53 | Open Vista (stress recipe) | Offline |  | Performance | not-indexed at audit; **indexed 2026-10-14** | `stress/open-vista.recipe.json` | 0 |  |  | docs/renderer-upgrade/05-scope-contract.md | 5: frame ok (2026-10-14 review) |
+| 54 | Bioluminescent Grove | Offline |  | Showcase | indexed-reviewable | `world/grove.json` | 0 | Bioluminescent Grove |  |  | 5: frame ok (2026-10-14 review) |
+| 55 | Glowmere Atmospherics | Offline |  | Showcase | indexed-reviewable | `world/glowmere-atmospherics.json` | 0 | Glowmere Atmospherics | EXTERNAL owner-machine file: ~/Desktop/MP3/bass.mp3, assets/aliens, assets/farm |  | 5: frame ok (2026-10-14 review) |
+| 56 | Glowmere Valley | Offline |  | Showcase | indexed-reviewable | `world/terrain.json` | 0 | Glowmere Valley | assets/hdri/kloppenheim_02_puresky_4k.hdr |  | 5: frame ok (2026-10-14 review) |
+| 57 | Glowmere Valley 2 (+ Multi-Camera, Song) | Offline |  | Showcase | indexed-reviewable | `world/glowmere-valley-2.json` | 2 | Glowmere Valley 2; Glowmere Valley 2 - Multi-Camera | EXTERNAL owner-machine file: ~/Desktop/Rebuild.mp3, assets/aliens, assets/farm | docs/glowmere-valley-2 | 5: frame ok (2026-10-14 review) |
+| 58 | Glowmere Valley 3 | Offline |  | Showcase | indexed-reviewable | `world/glowmere-valley-3.json` | 0 | Glowmere Valley 3 | EXTERNAL owner-machine file: ~/Desktop/Rebuild.mp3, assets/aliens, assets/farm, assets/musicians | docs/glowmere-valley-3 | 5: frame ok (2026-10-14 review) |
+| 59 | Hyperspace | Offline |  | Showcase | indexed-reviewable | `hyperspace/hyperspace.json` | 0 | Hyperspace |  |  | 5: frame ok (2026-10-14 review) |
+| 60 | Impossible Chamber | Offline |  | Showcase | indexed-reviewable | `chamber/chamber.json` | 0 | Impossible Chamber |  |  | 5: frame ok (2026-10-14 review) |
+| 61 | Metallic Reassembly | Offline |  | Showcase | indexed-reviewable | `reassembly/reassembly.json` | 0 | Metallic Reassembly |  |  | 5: frame ok (2026-10-14 review) |
+| 62 | Night Shift | Offline |  | Showcase | indexed-reviewable | `city/night-shift.json` | 1 | Night Shift | assets/audio/night-shift.wav | docs/group-d-city-brief.md, docs/sequencer.md | 5: frame ok (2026-10-14 review) |
+| 63 | The Cathedral | Offline |  | Showcase | indexed-reviewable | `cathedral/cathedral.json` | 0 | The Cathedral |  |  | 5: frame ok (2026-10-14 review) |
+| 64 | The Helix | Offline |  | Showcase | indexed-reviewable | `helix/helix.json` | 0 | The Helix |  |  | 5: frame ok (2026-10-14 review) |
+| 65 | The Infinite Temple | Offline |  | Showcase | indexed-reviewable | `infinite/infinite.json` | 0 | The Infinite Temple |  |  | 5: frame ok (2026-10-14 review) |
+| 66 | The Living Constellation | Offline |  | Showcase | indexed-reviewable | `constellation/constellation.json` | 0 | The Living Constellation | assets/audio/glowmere-valley.wav | docs/constellation.md | 5: frame ok (2026-10-14 review) |
+| 67 | The Living Machine | Offline |  | Showcase | indexed-reviewable | `machine/machine.json` | 0 | The Living Machine |  |  | 5: frame ok (2026-10-14 review) |
+| 68 | The Temple | Offline |  | Showcase | indexed-reviewable | `temple/temple.json` | 0 | The Temple |  |  | 5: frame ok (2026-10-14 review) |
+| 69 | The Tide (leviathan) | Offline |  | Showcase | not-indexed at audit; **indexed 2026-10-14** | `tide/tide.json` | 0 |  |  |  | 5: frame ok (2026-10-14 review) |
+| 70 | Tree of Life - Floating Island / Celestial Night | Offline |  | Showcase | indexed-reviewable | `treeisland/tree-of-life-floating-island.json` | 1 | Tree of Life - Floating Island; Tree of Life - Celestial Night | EXTERNAL owner-machine file: ~/Desktop/MP3/Hellopines 2.mp3, assets/treeisle |  | 5: frame ok (2026-10-14 review) |
+| 71 | Tree of Life - Ocean World | Offline |  | Showcase | indexed-reviewable | `treeisland/tree-of-life-ocean-world.json` | 0 | Tree of Life - Ocean World | assets/environments/tree_of_life_day.exr, assets/environments/tree_of_life_night.exr, assets/treeisle |  | 5: frame ok (2026-10-14 review) |
+| 72 | Worlds (preset morph) | Offline |  | Showcase | indexed-reviewable | `worlds/worlds.json` | 0 | Worlds (preset morph) |  |  | 5: frame ok (2026-10-14 review) |
+| 73 | THE RIFT (Bioluminescent Environment) | Offline | Live | The Rift | generated (index entry has `generate`) | `bioluminescent/rift.json` | 1 | THE RIFT (Bioluminescent Environment); THE RIFT LIVE | assets/audio/trench.wav | bioluminescent/PROGRESS.md, bioluminescent/04-design.md | 5: frame ok (2026-10-14 review) |
+| 74 | Ashfall | Offline |  | Weather | indexed-reviewable | `weather/ashfall.json` | 0 | Ashfall |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 75 | Dust motes | Offline |  | Weather | indexed-reviewable | `weather/dust-motes.json` | 0 | Dust motes |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 76 | Fireflies | Offline |  | Weather | indexed-reviewable | `weather/fireflies.json` | 0 | Fireflies |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 77 | Pollen, spores and seeds | Offline |  | Weather | indexed-reviewable | `weather/pollen.json` | 0 | Pollen, spores and seeds |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 78 | Rain | Offline |  | Weather | indexed-reviewable | `weather/rain.json` | 0 | Rain |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 79 | Season shift | Offline |  | Weather | indexed-reviewable | `weather/season.json` | 0 | Season shift |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 80 | Snow | Offline |  | Weather | indexed-reviewable | `weather/snow.json` | 0 | Snow |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
+| 81 | Weather front | Offline |  | Weather | indexed-reviewable | `weather/weather-front.json` | 0 | Weather front |  | examples/weather/README.md | 5: frame ok (2026-10-14 review) |
 
 Asset notes: `assets/aliens` and `assets/farm` are purchased and must never be committed. `assets/treeisle` is the owner's only copy. `assets/audio/trench.wav` and `feline-footwear.wav` are owner-supplied songs: they are not in `assets/audio/manifest.json` and cannot be regenerated. `glowmere-valley.wav`, `night-shift.wav` and the seven `sonic-*.wav` clips can be regenerated from the manifest. The `sonic-*.wav` clips are missing on the owner checkout as well. `EXTERNAL` means a file on the owner's Desktop: `~/Desktop/Rebuild.mp3`, `~/Desktop/MP3/bass.mp3`, `~/Desktop/MP3/Hellopines 2.mp3` and `~/Desktop/All You Got.wav`.
 

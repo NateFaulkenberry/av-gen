@@ -102,7 +102,7 @@
     "Cut the scene only, or the Astral engine subsystem too? The compare-t01/t02/latent fixtures and three GPU tests also use the astral path.",
     "Should astral-forge-trench.json (offline Trench) be indexed?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "digital-mosh",
@@ -169,7 +169,7 @@
    "open_questions": [
     "Offline projects digital-mosh.json (Feline Footwear) and digital-mosh-trench.json are not indexed: index them or drop them?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "the-rift",
@@ -266,7 +266,7 @@
     "rift.scene.json is gitignored and 14 MB: commit it, generate it on build, or keep the generate-or-skip test?",
     "Does `Every example in the index exists and loads` pass on a clean checkout where rift.scene.json is absent? (coordinator to verify)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-live",
@@ -380,7 +380,7 @@
    "open_questions": [
     "If removed, what should the Live panel demo button open, and should the VFX switcher stop special-casing a name?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-salt-flat-mirage",
@@ -431,7 +431,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-lantern-lake",
@@ -478,7 +478,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-aurora-tundra",
@@ -525,7 +525,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-breathing-deep",
@@ -575,7 +575,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-abyssal-bloom",
@@ -622,7 +622,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-cymatic-plate",
@@ -669,7 +669,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-silk-theatre",
@@ -716,7 +716,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-ferrofluid-crown",
@@ -769,7 +769,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-feedback-mirror",
@@ -816,7 +816,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-tesla-choir",
@@ -867,7 +867,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-datascape",
@@ -915,7 +915,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-ember-forest",
@@ -961,7 +961,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-corrupted-cathedral",
@@ -1008,7 +1008,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-storm-cell",
@@ -1056,7 +1056,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-stellar-nursery",
@@ -1106,7 +1106,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-vfx-event-horizon",
@@ -1160,7 +1160,7 @@
    "open_questions": [
     "Regenerate via tools/sonic_vfx/ after removal? (the generator lists every scene in tools/sonic_vfx/scenes/__init__.py)"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-sacred-flight",
@@ -1205,7 +1205,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-neon-vector",
@@ -1250,7 +1250,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-cel-dream",
@@ -1295,7 +1295,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-color-geometry",
@@ -1342,7 +1342,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-organic-garden",
@@ -1387,7 +1387,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-digital-alpine",
@@ -1434,7 +1434,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-chromatic-topography",
@@ -1479,7 +1479,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-glitch-signal",
@@ -1529,7 +1529,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-abstract-bit-ocean",
@@ -1578,7 +1578,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "benchmark",
@@ -1617,7 +1617,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "stress",
@@ -1664,7 +1664,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "alien",
@@ -1724,7 +1724,7 @@
    "open_questions": [
     "Keep as a fixture even if dropped from the menu?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "alien-squad",
@@ -1761,7 +1761,7 @@
    "recommended_test_replacements": [],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "character-animation-lab",
@@ -1812,7 +1812,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "farm-animals",
@@ -1849,7 +1849,7 @@
    "recommended_test_replacements": [],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "astronaut-musicians",
@@ -1893,7 +1893,7 @@
    "open_questions": [
     "Prototype brief (docs/prototypes/astronaut-musicians) may still be active work."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "procedural-geometry-lab",
@@ -1935,7 +1935,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "renderer-qa",
@@ -2009,7 +2009,7 @@
    "open_questions": [
     "Should it leave the Examples menu but stay as a fixture (move to tests/data)?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "alien-wander",
@@ -2053,7 +2053,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "bioluminescent-world",
@@ -2096,7 +2096,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "fungi",
@@ -2136,7 +2136,7 @@
    "recommended_test_replacements": [],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "glowmere-stylized",
@@ -2346,7 +2346,7 @@
    "open_questions": [
     "Owner rule: never touch Glowmere Valley without approval."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "hero-metal",
@@ -2396,7 +2396,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "organic-curves",
@@ -2435,7 +2435,7 @@
    "recommended_test_replacements": [],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "plant-grammar",
@@ -2478,7 +2478,7 @@
    "recommended_test_replacements": [],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "glowmere-density",
@@ -2537,7 +2537,7 @@
    "open_questions": [
     "glowmere.recipe.json is the base recipe the ladder scales; not indexed itself."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "grove",
@@ -2581,7 +2581,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "glowmere-valley",
@@ -2679,7 +2679,7 @@
    "open_questions": [
     "Owner rule: Glowmere Valley is protected."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "glowmere-valley-2",
@@ -3121,7 +3121,7 @@
     "Owner rule: Glowmere Valley is protected.",
     "glowmere-valley-2-song.json is not indexed."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "glowmere-valley-3",
@@ -3258,7 +3258,7 @@
    "open_questions": [
     "Owner rule: Glowmere Valley is protected."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "glowmere-atmospherics",
@@ -3340,7 +3340,7 @@
    ],
    "effort": "medium",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "hyperspace",
@@ -3390,7 +3390,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "chamber",
@@ -3438,7 +3438,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "reassembly",
@@ -3488,7 +3488,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "night-shift",
@@ -3627,7 +3627,7 @@
    ],
    "effort": "medium",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "cathedral",
@@ -3671,7 +3671,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "helix",
@@ -3720,7 +3720,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "infinite-temple",
@@ -3778,7 +3778,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "constellation",
@@ -3829,7 +3829,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "machine",
@@ -3893,7 +3893,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "temple",
@@ -3941,7 +3941,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "tree-of-life-island",
@@ -4079,7 +4079,7 @@
    "open_questions": [
     "Assets (assets/treeisle GLBs) are gitignored and not reproducible; the owner holds the only copy."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "tree-of-life-ocean",
@@ -4123,7 +4123,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "worlds",
@@ -4171,7 +4171,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "quality-aliasing",
@@ -4226,7 +4226,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-rain",
@@ -4268,7 +4268,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-snow",
@@ -4310,7 +4310,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-ashfall",
@@ -4352,7 +4352,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-weather-front",
@@ -4394,7 +4394,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-dust-motes",
@@ -4438,7 +4438,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-fireflies",
@@ -4480,7 +4480,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-pollen",
@@ -4522,7 +4522,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "weather-season",
@@ -4568,7 +4568,7 @@
    ],
    "effort": "trivial",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "procedural-space",
@@ -4645,7 +4645,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "sonic-garden",
@@ -4705,7 +4705,7 @@
    "open_questions": [
     "assets/audio/sonic-*.wav are missing on the owner checkout: run tools/make_sonic_material.py (or tools/ci/generate-audio.sh) before review."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "chorus-field",
@@ -4761,7 +4761,7 @@
    "open_questions": [
     "Keep only p8-god-trench (the show) and drop the 56 p1..p7 iteration projects? They are regenerable by build.py."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "liminal",
@@ -4902,7 +4902,7 @@
     "Audio is ~/Desktop/All You Got.wav (owner machine only).",
     "Keep pass4 only?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "biovalley-macro",
@@ -4947,7 +4947,7 @@
     "Commit the generated shots (or a reduced macro scene) so it can be indexed?",
     "Live entry needs sonic.live (PAUSED.md)."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "tide",
@@ -4986,7 +4986,7 @@
    "open_questions": [
     "Early prototype (2026-09-10): keep as a showcase or remove?"
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "bioluminescent-valley-recipe",
@@ -5027,7 +5027,7 @@
    ],
    "effort": "small",
    "open_questions": [],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   },
   {
    "id": "open-vista",
@@ -5066,7 +5066,7 @@
    "open_questions": [
     "Candidate replacement fixture for the Integration/Stress lab."
    ],
-   "verification_level": "TBD (coordinator)"
+   "verification_level": "5: frame ok (2026-10-14 review)"
   }
  ]
 }

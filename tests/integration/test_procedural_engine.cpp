@@ -124,10 +124,10 @@ TEST_CASE("Projects round-trip procedural scenes and the example worlds load", "
                              "chamber/chamber.json", "hyperspace/hyperspace.json", "worlds/worlds.json",
                              "benchmark/benchmark.json"}) {
         const auto file = examples / name;
-        if (!fs::exists(file)) {
-            continue; // authored later in the phase
-        }
         INFO(file.string());
+        // A named, tracked example: missing means this list is stale (a removed or renamed scene), and the case must
+        // say so rather than quietly lose its coverage (repository cleanup, 2026-10-14).
+        REQUIRE(fs::exists(file));
         app::Engine ex(app::EngineMode::Offline);
         REQUIRE(ex.loadProject(file).has_value());
         CHECK(ex.projectWarnings().empty());
