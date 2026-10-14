@@ -4620,7 +4620,6 @@ void Engine::seekSeconds(double seconds) {
 // transition and timers, every route's chain (integrals, followers, envelopes) and every source's own history (an
 // interpret mapping's follower). A target off the grid lands on the frame before it.
 void Engine::replayControl(double target) {
-    const auto tStart = std::chrono::steady_clock::now();
     const double fps = renderSettings().fps > 0.0 ? renderSettings().fps : 60.0;
     ReplaySignals replay(*this);
     replay.begin(isPlaying(), durationSeconds());
@@ -4630,8 +4629,6 @@ void Engine::replayControl(double target) {
     sources_.reset();
     states_.reset(params_, presets_);
     signals::SignalBus scratch = bus_;
-    std::array<double, 6> prof{};
-    prof[5] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();
     // The finals a step must reset are the ones the routes write (everything else is never moved off its base by
     // this replay); resetting all ~4,000 of them every step was a third of the replay's cost.
     std::vector<params::IParameter*> targets;
@@ -4654,10 +4651,7 @@ void Engine::replayControl(double target) {
     for (std::uint64_t k = 0; k <= frames; ++k) {
         const double now = static_cast<double>(k) / fps;
         const double dt = k == 0 ? 0.0 : 1.0 / fps;
-        const auto t0 = std::chrono::steady_clock::now();
         replay.build(now, dt);
-        const auto t1 = std::chrono::steady_clock::now();
-        prof[0] += std::chrono::duration<double, std::milli>(t1 - t0).count();
         scratch.clearEvents();
         const signals::SignalBus& built = replay.bus();
         for (std::size_t i = 0; i < built.size() && i < scratch.size(); ++i) {
@@ -4678,10 +4672,7 @@ void Engine::replayControl(double target) {
         ctx.musicalBeats = clock.haveClockBeats ? meter().beats(clock.clockBeats) : 0.0;
         ctx.tempoBpm = static_cast<float>(replay.lastBpm());
         ctx.beatEvent = replay.lastPulse();
-        const auto t2 = std::chrono::steady_clock::now();
         sources_.update(scratch, ctx);
-        const auto t3 = std::chrono::steady_clock::now();
-        prof[1] += std::chrono::duration<double, std::milli>(t3 - t2).count();
         BeatInfo beat;
         beat.beatPulse = scratch.event(timeSignals_.beatPulse);
         beat.barPhase = scratch.value(timeSignals_.barPhase);
@@ -4695,20 +4686,10 @@ void Engine::replayControl(double target) {
         states_.update(now, dt, scratch, beat, params_, presets_);
         scratch.set(stateProgressSignal_, states_.progress());
         scratch.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
-        const auto t4 = std::chrono::steady_clock::now();
-        prof[2] += std::chrono::duration<double, std::milli>(t4 - t3).count();
         for (params::IParameter* p : targets) {
             p->resetFinal();
         }
-        const auto t5 = std::chrono::steady_clock::now();
-        prof[3] += std::chrono::duration<double, std::milli>(t5 - t4).count();
         modulator_.applyRoutes(scratch, params_, dt);
-        prof[4] += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t5).count();
-    }
-    if (std::getenv("AVGEN_PROFILE_CONTROL_REPLAY") != nullptr) {
-        log::info("control replay to {:.1f} s: setup {:.0f} ms, build {:.0f} ms, sources {:.0f}, states {:.0f}, resetFinals {:.0f}, "
-                  "routes {:.0f}, total {:.0f}", target, prof[5], prof[0], prof[1], prof[2], prof[3], prof[4],
-                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count());
     }
     ++stats_.controlReplays;
 }
