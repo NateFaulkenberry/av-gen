@@ -209,10 +209,11 @@ public:
     std::function<void(const std::string&)> onLiveAudioInput;
     std::function<void(const std::string&)> onLiveMidiInput;
     std::function<void(float)> onLiveSmoothing;
-    std::function<void()> onOpenLiveDemo;
-    // ADR-1063: the live scene switcher. The names the Scenes row lists, which of them is open (-1 none), and the
-    // request to open one (by index into the list).
+    // ADR-1063/1341: the live scene switcher. The names the Scene dropdown lists (every live example), each one's
+    // family (shown as a heading above its run of scenes), which of them is open (-1 none), and the request to open
+    // one (by index into the list).
     std::vector<std::string> liveScenes;
+    std::vector<std::string> liveSceneFamilies;
     int liveSceneCurrent = -1;
     std::function<void(int)> onLiveScene;
     // ADR-1026: the Live panel's projection. The host owns the state machine and the output; the panel shows what

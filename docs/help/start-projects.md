@@ -96,7 +96,9 @@ what your machine does with a known workload.
 **File ▸ Examples ▸ Live** lists the projects made to be played rather than rendered: Astral Forge Live, Digital
 Mosh Live, the Sonic Abstract and Sonic VFX scenes, and Sonic Live. Opening one turns live input on; pick the
 audio input and MIDI device in **View ▸ Live**. Each entry's description says what to play into it and which MIDI
-controls it maps. Inside a Sonic Abstract or Sonic VFX scene, PageUp and PageDown step to the next scene in its set.
+controls it maps. The Live panel's **Scene** dropdown lists every live scene, headed by family; its arrows, PageUp and
+PageDown step through the same list, and a MIDI program change n opens scene n. **Target** holds the live picture to
+30, 60, 90 or 120 fps.
 
 ## Where the editor keeps its own files
 

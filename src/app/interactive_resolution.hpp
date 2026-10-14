@@ -68,7 +68,7 @@
 // samples, a dwell between decisions, up to two rungs down at once, one rung up only with margin,
 // and the CPU-bound hold -- and changes three things about what it moves and what it aims at:
 //
-//  * **The budget comes from a target frame rate** the performer picks (60, 90 or 120 fps), with 12%
+//  * **The budget comes from a target frame rate** the performer picks (30, 60, 90 or 120 fps), with 12%
 //    headroom, in one function: `liveBudget()` (ADR-1080). It never reads the display's refresh rate:
 //    that is where the picture is shown, not what the performer asked for.
 //  * **A rung is a bundle of existing `QualitySettings` fields**, not just a scale: the render scale,
@@ -109,8 +109,9 @@ namespace avgen::app {
 inline constexpr double kLiveBudgetHeadroom = 0.12;
 inline constexpr int kLiveTargetFpsMin = 24;
 inline constexpr int kLiveTargetFpsMax = 240;
-// The targets the Settings panel offers. Any value in [min, max] loads from a settings file.
-inline constexpr std::array<int, 3> kLiveTargetChoices{60, 90, 120};
+// The targets the Live and Settings panels offer (30 since ADR-1341: a heavy scene held steady at 30 rather than
+// lowered to Emergency chasing 60). Any value in [min, max] loads from a settings file.
+inline constexpr std::array<int, 4> kLiveTargetChoices{30, 60, 90, 120};
 
 struct LiveBudget {
     double targetFps = 60.0;

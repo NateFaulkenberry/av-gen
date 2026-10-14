@@ -4,7 +4,7 @@
 // output window -- an `OutputManager` output like any other, flagged as this machine's projection -- showing the
 // project that is open. ADR-1088: it projects the open project as it is configured, whatever it is; it no longer
 // swaps in the Sonic Live demo or turns live input on (a `sonic.live` project turns its own input on at load, and
-// "Open live demo" is still the way to the demo).
+// the Live panel's Scene list opens any live scene, ADR-1341).
 //
 // This file is the decisions, with no window, device or ImGui in it, so they can be checked in the CPU suite:
 //   * which display (the remembered one by name, else the first non-primary display, else the primary);

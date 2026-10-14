@@ -105,8 +105,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
         ImGui::PopStyleColor(4);
         if (ImGui::IsItemHovered()) {
             tooltip("Opens a clean window with just the picture of this project -- no panels -- for a projector or a "
-                    "second screen. Esc in the projection window, closing it, or Stop ends it. For the Sonic Live "
-                    "demo, open it first (Open live demo, below).");
+                    "second screen. Esc in the projection window, closing it, or Stop ends it. To project a live "
+                    "scene, pick it under Scene, below, first.");
         }
         if (machine != nullptr) {
             auto& pj = machine->projection;
@@ -392,10 +392,6 @@ void ControlPanel::drawLive(app::Engine& engine) {
         tooltip("MIDI notes and the audio input drive the Sonic Character (sonic.*, timbre.*) and the musical "
                 "context (notes.*) in place of the project's MIDI file and audio. Off: nothing live runs.");
     }
-    ImGui::SameLine();
-    if (onOpenLiveDemo && ImGui::Button("Open live demo")) {
-        onOpenLiveDemo();
-    }
     ImGui::Separator();
 
     // ---- ADR-1063: the scenes, stepped through while playing ----
@@ -414,11 +410,23 @@ void ControlPanel::drawLive(app::Engine& engine) {
         int current = liveSceneCurrent;
         ImGui::SetNextItemWidth(-ImGui::GetFrameHeight() - ImGui::GetStyle().ItemSpacing.x);
         const char* preview = current >= 0 ? names[static_cast<std::size_t>(current)] : "(not a live scene)";
-        if (ImGui::BeginCombo("##scene", preview)) {
+        if (ImGui::BeginCombo("##scene", preview, ImGuiComboFlags_HeightLargest)) {
+            // ADR-1341: every live scene, under its family's heading (Sonic Garden, Astral Forge, Sonic VFX, ...).
+            const std::string* family = nullptr;
             for (int i = 0; i < static_cast<int>(names.size()); ++i) {
-                if (ImGui::Selectable(names[static_cast<std::size_t>(i)], i == current)) {
+                const auto at = static_cast<std::size_t>(i);
+                if (at < liveSceneFamilies.size() && (family == nullptr || *family != liveSceneFamilies[at])) {
+                    family = &liveSceneFamilies[at];
+                    ImGui::SeparatorText(family->c_str());
+                }
+                ImGui::PushID(i);
+                if (ImGui::Selectable(names[at], i == current)) {
                     onLiveScene(i);
                 }
+                if (i == current && ImGui::IsWindowAppearing()) {
+                    ImGui::SetScrollHereY();
+                }
+                ImGui::PopID();
             }
             ImGui::EndCombo();
         }

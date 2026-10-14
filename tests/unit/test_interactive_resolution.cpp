@@ -95,6 +95,10 @@ TEST_CASE("the live budget is the target's frame less 12 percent, in one place",
     CHECK(b60.qualityBudgetMs == Catch::Approx(14.667).margin(1e-3));
     CHECK(app::liveBudget(90).qualityBudgetMs == Catch::Approx(9.778).margin(1e-3));
     CHECK(app::liveBudget(120).qualityBudgetMs == Catch::Approx(7.333).margin(1e-3));
+    // ADR-1341: 30 fps is offered, and is a real budget (33.3 ms frame, 29.3 ms for the GPU), not clamped.
+    CHECK(app::kLiveTargetChoices.front() == 30);
+    CHECK(app::liveBudget(30).targetFps == 30.0);
+    CHECK(app::liveBudget(30).qualityBudgetMs == Catch::Approx(29.333).margin(1e-3));
     // The brief's "approximately 12%": every target keeps the same share for what the GPU timer misses.
     for (const int fps : app::kLiveTargetChoices) {
         const app::LiveBudget b = app::liveBudget(fps);

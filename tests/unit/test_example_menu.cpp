@@ -119,17 +119,15 @@ TEST_CASE("The real index: Live Projects and the switcher's sets", "[examples][l
         }
     }
 
-    // The switcher: Sonic Live then the sixteen Sonic VFX scenes, and the nine Sonic Abstract scenes, all live.
-    const auto vfx = app::liveSceneSet(*all, "Sonic VFX");
-    REQUIRE(vfx.size() == 17);
-    CHECK(vfx.front().name == "Sonic Live");
-    const auto abstract = app::liveSceneSet(*all, "Sonic Abstract");
-    CHECK(abstract.size() == 9);
-    for (const auto* set : {&vfx, &abstract}) {
-        for (const auto& e : *set) {
-            INFO(e.name);
-            CHECK(e.live);
-        }
+    // The switcher (ADR-1341): every live entry, Sonic Live first -- exactly the Live submenu's entries.
+    const auto scenes = app::liveSceneList(*all);
+    REQUIRE(!scenes.empty());
+    CHECK(scenes.front().name == "Sonic Live");
+    CHECK(scenes.size() == liveNames.size());
+    for (const auto& e : scenes) {
+        INFO(e.name);
+        CHECK(e.live);
+        CHECK(liveNames.contains(e.name));
     }
 #endif
 }

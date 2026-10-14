@@ -1,6 +1,7 @@
 # ADR-1074: The live scene switcher steps through the set the open project belongs to
 
-- **Status:** Accepted (2026-10-02), proto/sonic-garden. Amends ADR-1063.
+- **Status:** Accepted (2026-10-02), proto/sonic-garden. Amends ADR-1063. **Superseded by ADR-1341** (2026-10-14):
+  the list is every live scene, whatever is open.
 - **Code:** `liveSceneSet`, `liveSceneListFor`, `kLiveSceneSets` and `liveSceneLabel` in `src/app/live_scenes.*`;
   `Application::refreshLiveScenes` (`src/app/application.cpp`).
 - **Tests:** `tests/unit/test_live_scenes.cpp` (`[live][adr1074]`, a fixture index, not the real one).

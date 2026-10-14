@@ -2064,26 +2064,16 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             saveSettings();
         };
         if (auto examples = loadExamples(exampleSearchDirs(executablePath)); examples) {
-            for (const auto& ex : *examples) {
-                if (ex.name == "Sonic Live") {
-                    liveDemoPath_ = ex.file;
-                }
+            // ADR-1063/1341: the scenes a performer steps through -- every live example, whatever is open.
+            liveScenes_ = liveSceneList(*examples);
+            panel_->liveScenes.clear();
+            panel_->liveSceneFamilies.clear();
+            for (const ExampleInfo& scene : liveScenes_) {
+                panel_->liveScenes.push_back(liveSceneLabel(scene));
+                panel_->liveSceneFamilies.push_back(scene.category);
             }
-            // ADR-1063/1074: the scenes a performer steps through -- the set the open project belongs to,
-            // chosen again whenever the open project changes (refreshLiveScenes).
-            liveExamples_ = *examples;
-            liveScenesFor_.reset();
-            refreshLiveScenes();
         }
         panel_->onLiveScene = [this](int index) { switchLiveScene(index); };
-        panel_->onOpenLiveDemo = [this] {
-            if (liveDemoPath_.empty()) {
-                panel_->setStatus("the Sonic Live example was not found");
-                return;
-            }
-            // Through the unsaved-changes prompt (ADR-440), like every other way of opening a project.
-            loadAny(liveDemoPath_);
-        };
         panel_->onStartProjection = [this] { startProjection(); };
         panel_->onStopProjection = [this] { stopProjection(); };
         panel_->onLiveQualityChanged = [this] { saveSettings(); }; // ADR-1087: serviceLiveQuality applies it
@@ -2455,24 +2445,7 @@ void Application::loadAny(const std::filesystem::path& path) {
 
 // ---- ADR-1063: the live scene switcher ------------------------------------------------------------------------
 
-// ADR-1074: the list follows the open project's set. Recomputed only when the project changes.
-void Application::refreshLiveScenes() {
-    const std::filesystem::path project = engine_ != nullptr ? engine_->projectPath() : std::filesystem::path{};
-    if (liveScenesFor_ && *liveScenesFor_ == project) {
-        return;
-    }
-    liveScenesFor_ = project;
-    liveScenes_ = liveSceneListFor(liveExamples_, project);
-    if (panel_ != nullptr) {
-        panel_->liveScenes.clear();
-        for (const ExampleInfo& scene : liveScenes_) {
-            panel_->liveScenes.push_back(liveSceneLabel(scene));
-        }
-    }
-}
-
 void Application::switchLiveScene(int index) {
-    refreshLiveScenes();
     if (engine_ == nullptr || index < 0 || index >= static_cast<int>(liveScenes_.size())) {
         return;
     }
@@ -2495,7 +2468,6 @@ void Application::serviceLiveScenes() {
     if (engine_ == nullptr) {
         return;
     }
-    refreshLiveScenes();
     if (panel_ != nullptr) {
         panel_->liveSceneCurrent = liveSceneIndex(liveScenes_, engine_->projectPath());
     }
@@ -3861,7 +3833,6 @@ bool Application::handleTransportShortcut(const SDL_Event& event) {
     case SDLK_PAGEUP:
     case SDLK_PAGEDOWN: {
         // ADR-1063: the previous / next live scene, while live input runs or a live scene is open.
-        refreshLiveScenes();
         const int count = static_cast<int>(liveScenes_.size());
         const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
         if (count == 0 || (current < 0 && !engine_->liveSonic())) {
@@ -7028,7 +6999,7 @@ void Application::startProjection() {
     }
     // ADR-1088: the open project, as it is. No project is swapped in and no input is switched on: a
     // general audiovisual engine projects what it is showing. (A `sonic.live` project turns its own live
-    // input on when it loads, ADR-1025, and "Open live demo" in the Live panel is still the way to the demo.)
+    // input on when it loads, ADR-1025; the Live panel's Scene list opens any live scene, ADR-1341.)
     if (projection_.start() == Projection::Action::OpenWindow) {
         openProjectionWindow();
     }
