@@ -205,8 +205,9 @@ Some inputs of `avgen_tests` are generated rather than committed: they are deter
 derived from code. Every job that runs `avgen_tests` (`cpu-tests`, `cpu-assets`, and the ASan, UBSan
 and TSan jobs) first runs the composite action `.github/actions/test-inputs`:
 
-- **Python:** a venv in `$RUNNER_TEMP` with `tools/ci/requirements.txt` (`numpy==2.0.2`), put first
-  on `PATH`, so every `python3` the suite starts has numpy. Without it, the seven sonic-* scores and
+- **Python:** a venv in `$RUNNER_TEMP`, built from Apple's `/usr/bin/python3` (3.9, the interpreter the score
+  hashes were verified with; the image's Homebrew 3.14 has no numpy 2.0.2 wheel), with
+  `tools/ci/requirements.txt` (`numpy==2.0.2`), put first on `PATH`, so every `python3` the suite starts has numpy. Without it, the seven sonic-* scores and
   the Rift scene below are not generated and their cases SKIP. From 2026-10-07 to 2026-10-14 the
   sonic cases skipped on every run for that reason.
 - **`avgen_world_preview`:** when the action gets `bin:` (the CI workflow's two CPU jobs pass the

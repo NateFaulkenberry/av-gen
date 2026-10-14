@@ -22,7 +22,13 @@ runs:
     - name: Python test dependencies
       shell: bash
       run: |
-        python3 -m venv "$RUNNER_TEMP/avgen-venv"
+        # Apple's /usr/bin/python3 (Xcode's, 3.9), not the image's Homebrew python: numpy==2.0.2 has a wheel for it,
+        # and it is the interpreter the sonic-* hashes were verified with. On the Homebrew python pip found no
+        # wheel, built numpy from source, and failed (run 38584566817).
+        py=/usr/bin/python3
+        [ -x "$py" ] || py=python3
+        "$py" --version
+        "$py" -m venv "$RUNNER_TEMP/avgen-venv"
         "$RUNNER_TEMP/avgen-venv/bin/python" -m pip install --quiet --disable-pip-version-check -r tools/ci/requirements.txt
         echo "$RUNNER_TEMP/avgen-venv/bin" >> "$GITHUB_PATH"
         "$RUNNER_TEMP/avgen-venv/bin/python" -c 'import numpy; print("numpy", numpy.__version__)'
