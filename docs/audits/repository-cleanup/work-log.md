@@ -54,3 +54,40 @@ The owner's checkout (`av-gen`, on `main`) is not modified.
    - Sibling "with audio" cases pass without exercising audio at all.
 3. **sonic-\* scores.** `tools/make_sonic_material.py` needs numpy, which the hosted runner lacks.
    `generate-audio.sh` also runs that one command 7 times concurrently (once per manifest entry).
+
+## 2026-10-14: consolidation and fixes (in order)
+
+1. **Audits run in parallel** (read-only agents): the scene inventory and removal impact, the code audit, and the
+   docs and artifacts audit. Their raw data is in `data/`.
+2. **Integrated**:
+   - `proto/bio-valley-assets` (merge);
+   - the `test_rift` fix `2ade3979` (cherry-pick);
+   - the two live-render reports from `investigate/live-render-perf` (cherry-pick).
+
+   See `repository-inventory.md`.
+3. **CI inputs** (`ed9926db`, `22a56ce7`):
+   - `.github/actions/test-inputs`, a numpy venv built from `/usr/bin/python3`;
+   - `avgen_world_preview` packaged with the test binaries;
+   - `generate-audio.sh` runs each distinct generator command once;
+   - the seek-parity "with audio" cases SKIP without the song and REQUIRE the track when it is present.
+   - The first remote run (`38584566817`) failed in the new step: no numpy 2.0.2 wheel for the image's Homebrew
+     Python 3.14. Fixed by using `/usr/bin/python3`.
+4. **The owner's songs moved into the checkout** (owner's request):
+   - `assets/audio/rebuild.mp3` (`464995fe`) and `assets/audio/all-you-got.wav` (`13f89fc5`), both gitignored and
+     never committed.
+   - All project, test, tool and doc references updated.
+   - The Desktop originals were *copied*, not moved: moving a file off the Desktop was refused by the permission
+     classifier. The owner can delete the Desktop copies.
+   - The relative audio paths in the GV2/GV3 projects used to resolve only at the owner's directory depth; they now
+     resolve in any checkout.
+5. **Examples menu** (`d5e0e65b`, ADR-1340):
+   - File > Examples > Live and Offline.
+   - 11 unlisted scenes added (84 to 95 entries).
+   - Missing generated files are shown greyed, with their `generate` command.
+   - The index test now requires each project's scene to load.
+6. **Docs fixes merged** from `cleanup/docs-fixes` (15 commits, `docs/audits/.../data/docs-fixes-applied.md`).
+7. **Windows runner guide** plus the opt-in `windows.yml` (`deff6dea`).
+8. **Branch cleanup:**
+   - Deleted 7 local branches whose commits are all in `main`, a remote branch, or a retained sibling. The tips are
+     recorded in `repository-inventory.md`.
+   - Removed the `av-gen-furnace-eng` worktree.
