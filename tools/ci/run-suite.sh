@@ -88,6 +88,9 @@ if [[ -z "$bin" ]]; then
 fi
 binary() { [[ -x "$bin/$1" ]] || { echo "run-suite: no $bin/$1 (build it, or pass --build / --bin)" >&2; exit 2; }; echo "$bin/$1"; }
 out="${out:-ci-results/${suite/:/-}}"
+# Absolute from here on (a relative --out is relative to the repository root, where this script runs). Each shard's
+# TMPDIR is made inside it, and a relative TMPDIR fails about ten cases that compare absolute paths (one segfaulted).
+mkdir -p "$out" && out="$(cd "$out" && pwd)"
 
 # The CPU suites play the repository's generated scores; make them where they are missing (a no-op
 # when they are present, e.g. linked into a worktree).
