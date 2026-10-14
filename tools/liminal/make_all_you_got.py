@@ -17,7 +17,7 @@ The film is one continuous walk through a strange, ordinary building. It is buil
     warms the beacon, phrase-end noise makes near walls tremble; a timeline 'coupling' source scales every
     route by the section's intent, so the silent bars are silent.
 
-The song is referenced as ~/Desktop/All You Got.wav and never copied. Run from the repository root:
+The song is referenced as assets/audio/all-you-got.wav (gitignored, never committed). Run from the repository root:
 
     python3 tools/liminal/make_all_you_got.py [--end SECONDS] [--check]
 """
@@ -1372,7 +1372,7 @@ def build(check_only=False, end=SONG_END):
     }
     project = {
         "format": "avgen-project", "version": 4, "app": {"name": "avgen", "version": "0.1.0"},
-        "assets": {"audio": {"path": "~/Desktop/All You Got.wav"},
+        "assets": {"audio": {"path": "../../assets/audio/all-you-got.wav"},
                    "scene": {"kind": "composition", "path": "all-you-got.scene.json"}},
         "parameters": {
             "camera/exposure/mode": 0, "camera/exposure/compensation": 0.0, "post/tonemap/operator": 1,

@@ -21,7 +21,7 @@ direction replaces the palette, the light and the air.
     edge light;
   * placed assets: the walking figure on the journey.
 
-The song is referenced as ~/Desktop/All You Got.wav and never copied. Run from the repository root:
+The song is referenced as assets/audio/all-you-got.wav (gitignored, never committed). Run from the repository root:
     python3 tools/make_liminal_example.py
 """
 
@@ -273,7 +273,7 @@ palette = {
 
 project = {
     "format": "avgen-project", "version": 4, "app": {"name": "avgen", "version": "0.1.0"},
-    "assets": {"audio": {"path": "~/Desktop/All You Got.wav"},
+    "assets": {"audio": {"path": "../../assets/audio/all-you-got.wav"},
                "scene": {"kind": "composition", "path": "liminal.scene.json"}},
     "parameters": {
         "camera/exposure/mode": 0, "camera/exposure/compensation": 0.0, "post/tonemap/operator": 1,

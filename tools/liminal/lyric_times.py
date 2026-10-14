@@ -8,7 +8,7 @@ start and end times, which song_analysis.py and the analyst cross-check against 
 owner's lyric sheet. A recogniser mishears sung words and invents text in instrumental passages, so treat a result
 as a timing hint, never as a transcript.
 
-    tools/liminal/lyric_times.py "~/Desktop/All You Got.wav" --model small.en --out /tmp/lyrics.json
+    tools/liminal/lyric_times.py assets/audio/all-you-got.wav --model small.en --out /tmp/lyrics.json
 
 Needs numpy, scipy and `pip install faster-whisper` (it downloads the model to the Hugging Face cache on first use).
 """

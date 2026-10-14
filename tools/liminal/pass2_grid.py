@@ -247,7 +247,7 @@ def build() -> dict:
               for e, bar, beat, note in EVENTS]
     return {
         "format": "avgen-liminal-pass2-grid", "version": 1,
-        "song": {"path": "~/Desktop/All You Got.wav", "duration": SONG_END},
+        "song": {"path": "assets/audio/all-you-got.wav", "duration": SONG_END},
         "numbering": "owner bar N = analysis bar N + 1; owner bar 0 is the count-in; beats 1-based, 4.5 = the and of 4",
         "tempo": [{"bar": 0, "bpm": BPM1, "t": 0.0, "barSeconds": BAR1},
                   {"bar": STEP_BAR, "bpm": BPM2, "t": round(T_STEP, 4), "barSeconds": BAR2}],

@@ -447,7 +447,7 @@ art-directed render by the morning of 2026-10-01; safety net at 05:30 (render th
 ```sh
 S=/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/fed9412c-8e5e-42c0-a62b-e703644796ad/scratchpad/liminal
 V=~/Desktop/av-gen-review/24-liminal-space/all-you-got-v1.mp4
-python3 tools/liminal_critic.py temporal --video $V --audio ~/Desktop/"All You Got.wav" \
+python3 tools/liminal_critic.py temporal --video $V --audio assets/audio/all-you-got.wav \
     --sections tools/liminal/all-you-got.sections.json --video-start 0 --out $S/temporal-v1
 python3 tools/liminal_critic.py inputs --project examples/liminal/all-you-got.json \
     --sections tools/liminal/all-you-got.sections.json --video $V --video-start 0 --out $S/critic-v1

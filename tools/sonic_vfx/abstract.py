@@ -42,11 +42,10 @@ from tools.sonic_vfx import review, kit  # noqa: E402
 from tools.sonic_vfx.variant import make_silent  # noqa: E402
 
 OUT = os.path.expanduser("~/Desktop/av-gen-review/28-sonic-abstract")
-# The excerpts: (source, start second, length). Both songs are the owner's: All You Got is read from the Desktop,
-# Rebuild from the gitignored assets/audio/rebuild.mp3. All You Got from 34 s builds into the bass
+# The excerpts: (source, start second, length). Both songs are the owner's, gitignored in assets/audio/. All You Got from 34 s builds into the bass
 # entry at about 42 s; Rebuild from 156 s holds a breakdown (162-178 s) and the return at 180 s.
 MUSIC = {
-    "allyougot": (os.path.expanduser("~/Desktop/All You Got.wav"), 34.0, 30.0),
+    "allyougot": (os.path.join(REPO, "assets", "audio", "all-you-got.wav"), 34.0, 30.0),
     "rebuild": (os.path.join(REPO, "assets", "audio", "rebuild.mp3"), 156.0, 30.0),
 }
 

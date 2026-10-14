@@ -6,7 +6,7 @@ where the brief asked for them.*
 - **Branch and worktree:** `proto/liminal-space` in `../av-gen-liminal`, from main `31a1e42e`. Main has the
   Procedural Space POC (`examples/space/`, ADR-1000 to 1005), the Sonic system (ADR-1020 to 1024) and live AA.
   Main stays the owner's.
-- **The song:** `~/Desktop/All You Got.wav` (48 kHz, 24-bit stereo, 253.8 s). It is the owner's own song. NEVER
+- **The song:** `assets/audio/all-you-got.wav` (48 kHz, 24-bit stereo, 253.8 s). It is the owner's own song. NEVER
   commit it, cache it, or upload it; refer to it by path.
 - **Deadline:** a complete, viewable, art-directed music-video render by the morning of 2026-10-01 (§22).
 - **Staffing (the owner's instruction: a coding agent and an art agent, as in the first POC):**

@@ -7,7 +7,7 @@
  },
  "assets": {
   "audio": {
-   "path": "~/Desktop/All You Got.wav"
+   "path": "../../assets/audio/all-you-got.wav"
   },
   "scene": {
    "kind": "composition",

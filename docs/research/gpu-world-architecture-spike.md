@@ -574,7 +574,7 @@ exponential height fog integrated along the ray, a sky with stars and a low moon
 ACES. It is still a sketchbook: no shadows, no PBR, no clustered lights. It is not the production
 renderer, and per-pixel costs in production will be higher (see the Bad-Idea list).
 
-**The audio is real.** The track is *All You Got* (`~/Desktop/All You Got.wav`, the Liminal scene's
+**The audio is real.** The track is *All You Got* (`assets/audio/all-you-got.wav`, the Liminal scene's
 music, 253.8 s). It is analysed once with production's own `analysis::AnalysisTrack`: the same
 analyzer, the offline beat tracker and the ADR-898 band onsets a render uses. That takes 2.4 s for the
 whole song and is cached. The analysis is reduced to three things:

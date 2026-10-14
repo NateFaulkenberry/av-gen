@@ -20,7 +20,7 @@ look returns to luminous line-drawn geometry on dark, and audio reactivity must 
     - the luminous line-drawn edge look.
 - **The owner's session limit is close:** commit at every milestone, and keep `PROGRESS-art.md` and
   `PROGRESS-eng.md` resumable cold.
-- **The song:** `~/Desktop/All You Got.wav`; never commit it.
+- **The song:** `assets/audio/all-you-got.wav`; never commit it.
 - **ADRs:** 1045-1059.
 - **Review media:** `~/Desktop/av-gen-review/24-liminal-space/pass2/`.
 

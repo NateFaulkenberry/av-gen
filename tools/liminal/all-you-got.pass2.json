@@ -2,7 +2,7 @@
  "format": "avgen-liminal-pass2-grid",
  "version": 1,
  "song": {
-  "path": "~/Desktop/All You Got.wav",
+  "path": "assets/audio/all-you-got.wav",
   "duration": 253.786
  },
  "numbering": "owner bar N = analysis bar N + 1; owner bar 0 is the count-in; beats 1-based, 4.5 = the and of 4",

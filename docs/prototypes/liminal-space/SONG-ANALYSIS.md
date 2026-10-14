@@ -1,6 +1,6 @@
 # Liminal Euclidean World: song analysis of *All You Got*
 
-*The art agent, 2026-09-30. This is an independent analysis of `~/Desktop/All You Got.wav`, the owner's song,
+*The art agent, 2026-09-30. This is an independent analysis of `assets/audio/all-you-got.wav`, the owner's song,
 which never enters the repository. It answers §9-10 of the brief. It uses its own tools, not AV Gen's analysis
 labels: `tools/liminal/song_analysis.py` (numpy, scipy, matplotlib), `tools/liminal/lyric_times.py` (a local
 speech recogniser, faster-whisper `small.en` on the CPU, used only to time the sung lines), and `afinfo`. The
@@ -205,10 +205,10 @@ loudness in LUFS.
 
 ```bash
 # a scratch venv (python3.12 -m venv v; v/bin/pip install numpy scipy matplotlib faster-whisper)
-v/bin/python tools/liminal/song_analysis.py "$HOME/Desktop/All You Got.wav" \
+v/bin/python tools/liminal/song_analysis.py assets/audio/all-you-got.wav \
     --sections tools/liminal/all-you-got.sections.json \
     --out "$HOME/Desktop/av-gen-review/24-liminal-space/analysis"
-v/bin/python tools/liminal/lyric_times.py "$HOME/Desktop/All You Got.wav" --model small.en --out /tmp/lyrics.json
+v/bin/python tools/liminal/lyric_times.py assets/audio/all-you-got.wav --model small.en --out /tmp/lyrics.json
 ```
 
 - **Plots:**

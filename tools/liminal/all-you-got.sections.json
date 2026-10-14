@@ -1,5 +1,5 @@
 {
- "song": "All You Got (the owner's song; ~/Desktop/All You Got.wav, never committed)",
+ "song": "All You Got (the owner's song; assets/audio/all-you-got.wav, gitignored, never committed)",
  "analyst": "space-art, 2026-09-30; see docs/prototypes/liminal-space/SONG-ANALYSIS.md",
  "grid": {
   "downbeat_s": 0.0,

@@ -25,7 +25,7 @@ camera for the Procedural Space POC, whose art pass hand-wrote its inputs. This 
 
 Dependencies: python3, numpy, ffmpeg (all already used by the repository's tools). Examples:
 
-  python3 tools/liminal_critic.py temporal --video render.mp4 --audio ~/Desktop/"All You Got.wav" \\
+  python3 tools/liminal_critic.py temporal --video render.mp4 --audio assets/audio/all-you-got.wav \\
       --sections tools/liminal/all-you-got.sections.json --out /tmp/critique
   python3 tools/liminal_critic.py inputs --project examples/liminal/liminal.json \\
       --sections tools/liminal/all-you-got.sections.json --video render.mp4 --out /tmp/critic-inputs

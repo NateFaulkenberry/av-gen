@@ -18,7 +18,7 @@ file's cue chunk, lays the bar grid, and measures what a director needs bar by b
 It prints a per-bar table and the boundary candidates, writes bars.json, and, when a sections file is given, draws
 the review plots with the analyst's section labels.
 
-    tools/liminal/song_analysis.py "~/Desktop/All You Got.wav" \\
+    tools/liminal/song_analysis.py assets/audio/all-you-got.wav \\
         --sections tools/liminal/all-you-got.sections.json \\
         --lyrics /path/to/lyric_times.json \\
         --out ~/Desktop/av-gen-review/24-liminal-space/analysis

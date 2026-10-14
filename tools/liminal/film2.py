@@ -23,6 +23,8 @@ from typing import Optional
 
 import kit as K
 
+# The owner's song, gitignored in the checkout (never committed); projects name it relative to their own folder.
+SONG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "audio", "all-you-got.wav")
 SCREW_T = (5000.0, 0.0, 0.0)
 CHAPTER_STRIDE = 1000.0
 
@@ -495,7 +497,7 @@ class Film:
                            "distance": 2.0, "intensity": 0.0, "color": [1.0, 1.0, 1.0], "temperature": 6500,
                            "castsShadow": False, "volumetric": 0.0, "followCamera": False}]}
         project = {"format": "avgen-project", "version": 4, "app": {"name": "avgen", "version": "0.1.0"},
-                   "assets": {"audio": {"path": "~/Desktop/All You Got.wav"},
+                   "assets": {"audio": {"path": os.path.relpath(SONG, out_dir)},
                               "scene": {"kind": "composition", "path": f"{stem}.scene.json"}},
                    "parameters": params, "sources": sources, "routes": self.routes,
                    "timeline": {"enabled": True, "cues": [], "tracks": T},

@@ -693,7 +693,7 @@ tools/gpu-lock.sh ./build/release/src/avgen --headless --project <p> --frames 15
   the palette timeline, the routes, and the addendum's ten questions in the intent. Then
   `cd ../creative-critic && .venv/bin/critic submit --inputs <d>/inputs.json --mode preview --wait`.
   Checked: job `job_1a0f4beb258918319` (fast mode, the 32 s example) completed with full coverage and 10 shots.
-- `temporal --video <render> --audio ~/Desktop/"All You Got.wav" --sections ... [--video-start s] --out <d>` writes
+- `temporal --video <render> --audio assets/audio/all-you-got.wav --sections ... [--video-start s] --out <d>` writes
   `temporal.json`/`.md`: **aggression-unanswered** (4-bar windows where the music's aggression -- loudness,
   high-band energy and noisiness together -- rises and the picture's activity does not), **snapping** and **flicker**
   (isolated change spikes, A-B-A flips, and whether they sit on audio transients), **colour-too-fast** /

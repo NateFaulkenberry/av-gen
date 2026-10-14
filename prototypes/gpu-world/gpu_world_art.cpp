@@ -923,7 +923,7 @@ int main(int argc, char** argv) {
         else if (a == "--size") { const auto s = next(); std::sscanf(s.c_str(), "%ux%u", &width, &height); }
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
     }
-    if (songPath.empty()) songPath = std::string(std::getenv("HOME")) + "/Desktop/All You Got.wav";
+    if (songPath.empty()) songPath = (std::filesystem::path(__FILE__).parent_path() / "../../assets/audio/all-you-got.wav").lexically_normal().string();
 
     // ---- audio: production's offline analysis of the real track, cached ----
     std::filesystem::create_directories(std::filesystem::path(argv[0]).parent_path() / "cache");
