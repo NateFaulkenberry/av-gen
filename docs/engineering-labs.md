@@ -177,7 +177,7 @@ Named by file and symbol, because a category is not an address.
 * `rendering::VolumeRenderer`, passes `volume.march` and `volume.composite`, scaled by
   `volumeResolutionScale` / `volumeStepScale`.
 * `rendering::ParticleRenderer` — compute emit / simulate / prefix-sum compaction / indirect draw.
-* World effects and atmospherics are CPU-resolved in `src/world/effects.hpp` and
+* World effects and atmospherics are CPU-resolved in `src/world/effects/` and
   `src/world/atmospherics.hpp` and uploaded as GPU blocks.
 
 ### AOVs and debug targets
@@ -444,7 +444,6 @@ or it will be refused. Then:
 
 ```
 avgen --lab-case <lab>:<n>          # open the fixture at the case's time with the lab's overlays
-avgen --lab-case <lab>:<n> --print  # print the reproduce command without running anything
 ```
 
 ### Turn a reproduction into a regression
@@ -511,8 +510,9 @@ the debug flag. `[gpu]` tests take `tools/gpu-lock.sh`.
    halves a small highlight's glow across the delivered picture. Measured, with two controls, in
    ADR-279; deliberately not changed, because the fix is an art-direction decision. **Owner: the
    owner.**
-8. **`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists, and
-   `avgen_bench_flatten` is marked temporary and slated for deletion with its investigation.
+8. ~~**`indtune.cpp` at the repository root is a 0-byte file** referenced by no CMakeLists.~~
+   **Removed, 2026-10-14 (repository cleanup).** Still open: `avgen_bench_flatten` is marked
+   temporary and slated for deletion with its investigation.
 9. ~~**An authored particle `burst` is inert.**~~ **Fixed, 2026-09-20 (ADR-399).**
    `registerParticleParameters` (`src/scene/particles.cpp`) seeded `particles/<name>/burst` with a
    hard-coded `0.0f` while every neighbour — `spawnRate`, `spread`, `position` — was seeded from the

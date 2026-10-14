@@ -100,9 +100,16 @@ night from two agents who never spoke to each other.
 
 ### The run did not happen as you think
 
-1. **Stale binary.** The test glob is *configure-time*, so an incremental build after a merge
-   silently omits test files the merge added and the suite passes without ever compiling them.
-   Always `cmake -S . -B build/release` after a merge.
+1. **Stale binary.** A suite that never compiled the test files a merge added passes without
+   running them. On 2026-09-18 a post-merge run reported 2,249 cases where a clean build had 2,280.
+   It was first blamed on the test glob, but the glob is not the cause:
+   `tests/CMakeLists.txt` globs with `CONFIGURE_DEPENDS` (since 2026-09-09), and with the Ninja
+   generator every preset uses, every build re-checks the globs and re-runs CMake when a file was
+   added, even a build of one target. That was re-verified on 2026-10-14 with CMake 4.0.1 and
+   Ninja 1.13.2. The 09-18 mechanism was never established; a binary built before the last merge
+   is the likeliest. The guard is the **case count**: a count lower than the last run's is the
+   tell, and the assertion total will not show it. When the counts disagree, reconfigure
+   (`cmake --preset release`), rebuild and rerun before believing either number.
 
    **The same thing happens without a merge, on a timescale of minutes.** A suite started before
    your last edit is not a suite of your last edit: the process has the old binary mapped and goes

@@ -25,8 +25,10 @@ audio, LFOs, envelopes, noise and macros, keyframe automation with cues, presets
 migration and bundling, deterministic offline renders to PNG, EXR or video, OSC and MIDI control,
 multiple output windows with warp and blend, and Syphon and NDI sharing.
 
-Ten example worlds ship as data, from the Geometry Lab to the flagship Infinite Temple with its
+The example worlds ship as data, from the Geometry Lab to the flagship Infinite Temple with its
 seven macros and four-minute state arc. None of them required a line of C++.
+[examples/index.json](examples/index.json) is the catalogue; the app lists the same entries under
+File > Examples (and the live scenes under File > Live Projects), and `--example "<name>"` opens one.
 
 ```
 Audio -> AnalysisRunner -> SignalBus -> Timeline -> Modulator -> ParameterSet
@@ -37,8 +39,10 @@ Audio -> AnalysisRunner -> SignalBus -> Timeline -> Modulator -> ParameterSet
 
 ## Build (macOS, Apple silicon)
 
-Requirements: Xcode 26 command-line tools, CMake >= 3.28 (4.0 tested), Ninja, Python 3 (only for
-the test-audio generator). Everything else is fetched and pinned by CMake.
+Requirements: Xcode 26 command-line tools, CMake >= 3.28 (4.0 tested), Ninja, and `python3` with
+numpy (`pip install -r tools/ci/requirements.txt`) for the test suites' generated inputs -- the
+generated audio scores and the generated THE RIFT scene. Some tools also need Pillow or Blender.
+Everything else is fetched and pinned by CMake.
 
 ```sh
 cmake --preset debug
@@ -72,12 +76,15 @@ python3 tools/make_test_audio.py /tmp/track.wav        # deterministic 120 BPM t
 Keys: Space play/pause, O open audio, S open scene, E open environment, Left/Right seek 5 s.
 Drop an audio, .glb/.gltf, .hdr, .wgsl, project or scene .json file on the window to load it.
 The Modulation window's Scene tab adds and removes composition nodes; File > Save Scene As
-writes a scene file. `--help` lists every flag.
+writes a scene file. `--help` lists the flags.
 
 ## Documentation
 
 - [docs/architecture.md](docs/architecture.md): modules, data flow, threading, seams for growth
 - [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md)
+- [docs/development/ci.md](docs/development/ci.md): the CI workflows and how to run them locally;
+  [docs/development/maintenance-conventions.md](docs/development/maintenance-conventions.md): where
+  docs, ADRs, prototype logs, review media and generated files go
 - Performance is two documents, deliberately: [docs/performance.md](docs/performance.md) is the
   GPU's frame, [docs/application-performance.md](docs/application-performance.md) is the main
   thread -- the UI, the engine update, threading, allocation and latency
@@ -124,7 +131,8 @@ writes a scene file. `--help` lists every flag.
   [experiments](docs/quality-lab/experiments.md)
 - [docs/decisions/](docs/decisions/): Architecture Decision Records
 - [docs/research/](docs/research/): the Phase 0 technology research with sources
-- [docs/development-log.md](docs/development-log.md): what was built, tested, and measured
+- [docs/development-log.md](docs/development-log.md): what was built, tested, and measured, up to
+  2026-09-11 (ADR-097); later work is recorded in the ADRs
 
 ## Status
 

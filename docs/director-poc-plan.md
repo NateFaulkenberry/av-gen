@@ -78,7 +78,7 @@ until `agent/farm-animals` lands. And `glowmere-valley-2.scene.json` is fingerpr
 
 1. Merge `agent/farm-animals`, `agent/anim-cleanup`, `agent/world-effects`; run the full suite.
 2. **Part 1** — scatter. Use the existing placement/spatial-query infrastructure
-   (`src/app/placement.*`, `src/scene/placement`, `ObstacleField`), not a new scatterer. Visible
+   (`src/app/placement.*`, `ObstacleField`), not a new scatterer. Visible
    groups in clearings and near water; concealed ones behind vegetation. Refresh the scene
    fingerprint.
 3. **Part 2** — wander. A `Territory`-style behaviour in the existing `behaviors.cpp` idiom: a home

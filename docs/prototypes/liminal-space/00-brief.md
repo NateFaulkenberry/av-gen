@@ -29,7 +29,7 @@ where the brief asked for them.*
   #29). Other agents share the GPU, and the owner's use comes first.
 - **ADRs:** the block **1040-1059** is assigned to `proto/liminal-space`.
 - **Review media:** `~/Desktop/av-gen-review/24-liminal-space/`.
-- **Notes:** `docs/prototypes/liminal-space/PROGRESS.md`.
+- **Notes:** `docs/prototypes/liminal-space/PROGRESS-eng.md` and `docs/prototypes/liminal-space/PROGRESS-art.md` (the single `PROGRESS.md` was split in two).
 
 ---
 

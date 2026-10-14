@@ -3,6 +3,11 @@
 **Branch:** `live/quality` in `/Users/natefaulkenberry/Documents/GitHub/av-gen-live`. ADRs 1080-1089 are this branch's.
 **Brief:** `docs/live-quality/00-brief.md`. **Report target:** `~/Desktop/av-gen-review/30-live-quality/REPORT.md` and `docs/live-quality/REPORT.md`.
 
+> Note (2026-10-14): `docs/live-quality/REPORT.md` was never committed. The in-repo measurement report is
+> [docs/investigations/live-projection-2026-10-02.md](../investigations/live-projection-2026-10-02.md) (also kept here as
+> `evidence-live-projection-2026-10-02.md`); the decisions are ADR-1080 to ADR-1089. The two temporary commits below were
+> reverted (see "Commits that are temporary-and-reverted"; neither `AVGEN_LIVE_FRAME_CSV` nor `AVGEN_X_PROJECT_ANY` is in `src/`).
+
 ## Temporary commits (must be reverted before merge)
 - `7a67ace1` TEMPORARY live-render-perf instrumentation (cherry-pick of 8f953f53): `AVGEN_LIVE_FRAME_CSV`.
 - `b0c652e1` TEMPORARY live-projection probe (cherry-pick of 319946ad): `AVGEN_X_PROJECT_ANY`, `AVGEN_X_PROJ_W/H`.

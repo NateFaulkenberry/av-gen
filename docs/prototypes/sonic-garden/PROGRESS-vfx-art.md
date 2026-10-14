@@ -12,7 +12,7 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
 - **Done and committed:**
   - research reports 1 and 3; `SCENE-CATALOG.md` (as-built notes for Salt Flat, Storm Cell and tier B);
   - the kit and tools in `tools/sonic_vfx/`;
-  - **all 16 scenes**, listed in `examples/index.json` in set-list order (`scenes/__init__.py` SCENES);
+  - **all 16 scenes**, listed in `examples/index.json` in set-list order (`tools/sonic_vfx/scenes/__init__.py` SCENES);
   - the perf pass (`4423e4da`): static SDFs as surface-nets meshes (`kit.sdf(..., mesh=128)`), Cathedral without its
     Voronoi fracture, Ferrofluid without the shimmer noise, no surface-pass march in Salt Flat and Lantern Lake;
   - the matrix report (`1d079577`): set-list order, an at-a-glance grid, verdicts from `tools/sonic_vfx/matrix_notes.py`
@@ -39,7 +39,7 @@ paths (`git commit -- <paths>`). Review media: `~/Desktop/av-gen-review/25-sonic
   (`abl/tc-mesh`: 24.1 -> 22.4 ms) and a milder Ferrofluid tower twist (`abl/ff4-*`), both awaiting a look.
 - **GPU etiquette:** one job per lock hold. The lock is shared with the engineer and other agents (a full
   `avgen_tests` run held it for 45 minutes at 12:25); do CPU work meanwhile.
-- **The set list** is `scenes/__init__.py`'s SCENES order, which is also the index order. The live switcher
+- **The set list** is `tools/sonic_vfx/scenes/__init__.py`'s SCENES order, which is also the index order. The live switcher
   (ADR-1063) steps Sonic Live, then the SCENES in order; MIDI program n opens scene n mod count:
   1 Salt Flat, 2 Lantern Lake, 3 Aurora Tundra, 4 Breathing Deep, 5 Abyssal Bloom, 6 Cymatic Plate, 7 Silk Theatre,
   8 Ferrofluid Crown, 9 Feedback Mirror, 10 Tesla Choir, 11 Datascape, 12 Ember Forest, 13 Cathedral, 14 Storm Cell,

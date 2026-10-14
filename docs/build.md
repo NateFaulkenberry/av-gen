@@ -15,6 +15,11 @@
 | `release` | Release | |
 | `relwithdebinfo` | RelWithDebInfo | |
 | `asan` | Debug | AddressSanitizer + UndefinedBehaviorSanitizer on engine targets |
+| `tsan` | Debug | ThreadSanitizer (`AVGEN_ENABLE_TSAN`) |
+| `ubsan` | Debug | UndefinedBehaviorSanitizer alone, without ASan's shadow memory (`AVGEN_ENABLE_UBSAN`) |
+
+Every preset has a matching build preset. Every preset except `relwithdebinfo` also has a test
+preset, so `ctest --preset relwithdebinfo` does not exist; run the binaries directly there.
 
 ```sh
 cmake --preset debug          # configure into build/debug
@@ -35,7 +40,13 @@ Binaries: `build/<preset>/src/avgen`, `build/<preset>/tests/avgen_tests`,
 |---|---|---|
 | `AVGEN_BUILD_TESTS` | ON | build Catch2 test targets |
 | `AVGEN_DAWN_FROM_SOURCE` | OFF | build Dawn from the pinned commit instead of the prebuilt archive |
-| `AVGEN_ENABLE_ASAN` | OFF | sanitizers (set by the `asan` preset) |
+| `AVGEN_ENABLE_ASAN` | OFF | AddressSanitizer + UndefinedBehaviorSanitizer (set by the `asan` preset) |
+| `AVGEN_ENABLE_TSAN` | OFF | ThreadSanitizer (set by the `tsan` preset) |
+| `AVGEN_ENABLE_UBSAN` | OFF | UndefinedBehaviorSanitizer alone (set by the `ubsan` preset); ignored when `AVGEN_ENABLE_ASAN` is ON, which already includes it |
+| `AVGEN_ALLOC_COUNTERS` | OFF | replace global `operator new`/`delete` with per-thread allocation counters, so profile output can attribute allocations (see `docs/application-performance.md`) |
+| `AVGEN_PATHTRACE_DENOISE` | OFF | fetch the prebuilt Open Image Denoise 2.3.3 (arm64 macOS, about 51 MB) and enable path-tracer denoising; without it the tracer reports denoising as unavailable |
+| `AVGEN_GPUWORLD_PROTOTYPE` | OFF | build the GPU World research prototype in `prototypes/gpu-world/` |
+| `AVGEN_ASTRAL_FORGE_PROTOTYPE` | OFF | build the Astral Forge scene-experiment prototype in `prototypes/astral-forge/` |
 | `AVGEN_WARNINGS_AS_ERRORS` | OFF | `-Werror` on engine targets |
 | `CPM_SOURCE_CACHE` | `<repo>/.cache/cpm` | where dependency sources are cached |
 
