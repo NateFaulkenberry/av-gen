@@ -1,0 +1,84 @@
+# AV Gen on the owner's Windows PC: a self-hosted runner, staged and opt-in.
+# docs/audits/repository-cleanup/windows-self-hosted-runner.md is the setup guide and explains every stage.
+#
+# Nothing here runs until the owner has registered the runner AND set the repository variable
+# AVGEN_WINDOWS_RUNNER to 'true'. It is workflow_dispatch only: never push, never pull_request. The repository is
+# public, and a pull request from a fork must never run code on a persistent machine in someone's house.
+# No job here receives a secret, and none fetches the private test assets.
+#
+# Stages (the `stage` input; each includes the ones before it):
+#   connectivity  the runner picks the job up and reports its toolchain (no checkout of build code is run)
+#   validators    platform-independent Python checks over the checkout (project integrity, the examples index)
+#   configure     CMake configure with MSVC + Ninja: INFORMATIONAL. AV Gen has never been built on Windows; this
+#                 stage reports the first porting gap (the guide lists the known ones) and must not gate anything.
+name: Windows (self-hosted, opt-in)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "How far to go: connectivity, validators or configure"
+        type: choice
+        options: [connectivity, validators, configure]
+        default: connectivity
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-self-hosted
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows (${{ inputs.stage }})
+    if: vars.AVGEN_WINDOWS_RUNNER == 'true'
+    runs-on: [self-hosted, Windows, X64, avgen-win]
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Runner and toolchain
+        run: |
+          "runner: $env:RUNNER_NAME  os: $env:RUNNER_OS/$env:RUNNER_ARCH  workspace: $env:GITHUB_WORKSPACE"
+          Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion | Format-Table -AutoSize
+          foreach ($tool in 'git', 'python', 'cmake', 'ninja') {
+            $cmd = Get-Command $tool -ErrorAction SilentlyContinue
+            if ($cmd) { "{0,-7} {1}" -f $tool, (& $tool --version | Select-Object -First 1) } else { "{0,-7} MISSING" -f $tool }
+          }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) { "MSVC:   " + (& $vswhere -latest -products * -property catalog_productDisplayVersion) } else { "MSVC:   vswhere not found" }
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: inputs.stage != 'connectivity'
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Validators (Python, no build)
+        if: inputs.stage != 'connectivity'
+        run: |
+          python tools/check_project_integrity.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -c "import json; d = json.load(open('examples/index.json', encoding='utf-8')); print(len(d['examples']), 'examples in the index')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Configure with MSVC (informational)
+        if: inputs.stage == 'configure'
+        continue-on-error: true
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          cmake -S . -B build/win -G Ninja -DCMAKE_BUILD_TYPE=Release `
+                -DCPM_SOURCE_CACHE="$env:RUNNER_TOOL_CACHE\avgen-cpm" 2>&1 | Tee-Object -FilePath configure.log
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && inputs.stage == 'configure'
+        with:
+          name: windows-configure-log
+          path: configure.log
+          retention-days: 14
