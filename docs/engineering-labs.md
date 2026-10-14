@@ -177,7 +177,7 @@ Named by file and symbol, because a category is not an address.
 * `rendering::VolumeRenderer`, passes `volume.march` and `volume.composite`, scaled by
   `volumeResolutionScale` / `volumeStepScale`.
 * `rendering::ParticleRenderer` — compute emit / simulate / prefix-sum compaction / indirect draw.
-* World effects and atmospherics are CPU-resolved in `src/world/effects.hpp` and
+* World effects and atmospherics are CPU-resolved in `src/world/effects/` and
   `src/world/atmospherics.hpp` and uploaded as GPU blocks.
 
 ### AOVs and debug targets
@@ -444,7 +444,6 @@ or it will be refused. Then:
 
 ```
 avgen --lab-case <lab>:<n>          # open the fixture at the case's time with the lab's overlays
-avgen --lab-case <lab>:<n> --print  # print the reproduce command without running anything
 ```
 
 ### Turn a reproduction into a regression
