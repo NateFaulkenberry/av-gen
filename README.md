@@ -82,6 +82,9 @@ writes a scene file. `--help` lists the flags.
 
 - [docs/architecture.md](docs/architecture.md): modules, data flow, threading, seams for growth
 - [docs/build.md](docs/build.md), [docs/testing.md](docs/testing.md)
+- [docs/development/ci.md](docs/development/ci.md): the CI workflows and how to run them locally;
+  [docs/development/maintenance-conventions.md](docs/development/maintenance-conventions.md): where
+  docs, ADRs, prototype logs, review media and generated files go
 - Performance is two documents, deliberately: [docs/performance.md](docs/performance.md) is the
   GPU's frame, [docs/application-performance.md](docs/application-performance.md) is the main
   thread -- the UI, the engine update, threading, allocation and latency
