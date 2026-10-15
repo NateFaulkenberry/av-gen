@@ -43,6 +43,7 @@ struct StarField {
     float band = 0.0f;          // strength of the galactic band (0 = none)
     float bandTilt = 0.6f;      // radians: the band's great circle tilted from the horizon
     float daylight = 1.0f;      // how far a bright sky behind a star hides it (0 = never)
+    bool wholeSky = false;      // ADR-1350: stars on the whole sphere, no horizon (space); false = above the horizon
     float envelope = 1.0f;      // the instance's lifecycle envelope, folded into brightness
     float seconds = 0.0f;       // the transport second, wrapped at kTwinklePeriod
 };

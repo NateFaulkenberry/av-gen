@@ -90,3 +90,15 @@ TEST_CASE("Stars: an Entity owner draws nothing", "[stars][effects]") {
     CHECK(world::starFieldRecords(e, ctx) == 0u);
     CHECK(world::starFieldRecords(stars("World"), ctx) == 1u);
 }
+
+TEST_CASE("Stars: whole sky (space) is off by default and resolves when set (ADR-1350)", "[stars][effects][adr1350]") {
+    const Built plain = build({stars("Night", "Deep Space")}, 10.0);
+    REQUIRE(plain.field.on);
+    CHECK_FALSE(plain.field.wholeSky);
+
+    world::EffectInstance space = stars("Space", "Deep Space");
+    space.values.setBool("stars/wholeSky", true);
+    const Built whole = build({space}, 10.0);
+    REQUIRE(whole.field.on);
+    CHECK(whole.field.wholeSky);
+}
