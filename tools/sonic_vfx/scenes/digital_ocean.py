@@ -148,19 +148,26 @@ def sea_deformers():
 #   sss                       light through a backlit crest
 #   glint                     the sun on the water
 #   foam                      crest foam
+#   cshade, clit, crim        clouds: the shadowed body, the underside lit by the low sun, the silver rim
+#   isle                      the distant island's silhouette
 PALETTES = {
     "golden": dict(zenith="#203b78", mid="#9a86b4", warm="#ffc489", cool="#e8949a", sun="#fff3d6", glow="#ffa15e",
-                   deep="#0b2453", rzen="#1c3a74", rhor="#d9988e", sss="#2fb3a3", glint="#fff0c8", foam="#fff1d8"),
+                   deep="#0b2453", rzen="#1c3a74", rhor="#d9988e", sss="#2fb3a3", glint="#fff0c8", foam="#fff1d8",
+                cshade="#7d6c9e", clit="#ffbf8a", crim="#fff0d2", isle="#6a5a92"),
     "twilight": dict(zenith="#100d36", mid="#563a8a", warm="#ff9b7d", cool="#8a6cc2", sun="#ffe2cc", glow="#ff7f68",
-                     deep="#0a0b35", rzen="#191c58", rhor="#8a6cbd", sss="#18cfe0", glint="#ffd6c2", foam="#bdfde6"),
+                     deep="#0a0b35", rzen="#191c58", rhor="#8a6cbd", sss="#18cfe0", glint="#ffd6c2", foam="#bdfde6",
+                cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68"),
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
-                     deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0"),
+                     deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
+                cshade="#0a0a22", clit="#33346e", crim="#a8b6ff", isle="#0a0a26"),
     "tropical": dict(zenith="#1546a8", mid="#6aa6de", warm="#ffb04a", cool="#ff8fae", sun="#fff6d2", glow="#ff9a3a",
-                     deep="#003d63", rzen="#0b5a8a", rhor="#ffae8a", sss="#22e0c0", glint="#fff4c4", foam="#fffbea"),
+                     deep="#003d63", rzen="#0b5a8a", rhor="#ffae8a", sss="#22e0c0", glint="#fff4c4", foam="#fffbea",
+                cshade="#8b7fbd", clit="#ffab6a", crim="#fff2d2", isle="#5a5096"),
 }
 PALETTE = "twilight"
 DEBUG_SKY = None
 BANDS = 0
+DEBUG_CLOUD = None
 
 
 def pal(name, key, scale=1.0):
@@ -358,6 +365,110 @@ def sky_program():
     return P
 
 
+def cloud_program():
+    """The clouds, unlit: a dusky body, the underside and the sun-facing side lit coral by the low sun, a bright rim where
+    a cloud's edge is backlit near the sun, and the haze of distance (the horizon's own colour, warm toward the sun).
+    Registers: 0 N, 1 V."""
+    P = Prog("doCloud")
+    sx, sy, sz = S
+    pn = PALETTE
+    P.op("N", "input", 0, inp="normal")
+    P.op("V", "input", 1, inp="viewDirection")
+    # the underside, lit by the low sun -- strongly toward the sun, faintly away from it
+    P.op(None, "gradient", 2, a=0, k=[0.0, -1.0, 0.0, 0.08], f=1.0)
+    P.op(None, "power", 2, a=2, f=1.6)
+    P.op("toward", "gradient", 4, a=1, k=[-sx, -sy, -sz, 0.0], f=1.0)     # cos of the angle to the sun
+    P.op(None, "smoothstep", 5, a=4, k=[math.cos(math.radians(CLOUD_POOL[1])), math.cos(math.radians(CLOUD_POOL[0]))])
+    P.op(None, "remap", 5, a=5, k=[0.0, 1.0, CLOUD_AWAY, 1.0])
+    P.op(None, "multiply", 2, a=2, b=5)
+    P.colour("cshade", 3, pal(pn, "cshade"))
+    P.colour("clit", 5, pal(pn, "clit"), 1.1)
+    P.op("body", "mixBy", 3, a=3, b=5, c=2)
+    # the rim: grazing edges, toward the sun
+    P.op(None, "fresnel", 2, f=2.0)
+    P.op(None, "power", 4, a=4, f=40.0)
+    P.op(None, "multiply", 2, a=2, b=4)
+    P.colour("crim", 4, pal(pn, "crim"), 3.0)
+    P.op(None, "multiply", 2, a=2, b=4)
+    P.op("rim", "add", 3, a=3, b=2)
+    # distance haze: decametres (op constants are clamped to +-1000)
+    P.op(None, "input", 2, inp="cameraDistance")
+    P.op(None, "remap", 2, a=2, k=[1500.0 / 10.0, 7000.0 / 10.0, 0.0, 1.0], f=0.0)
+    P.op(None, "constant", 4, k=[0.1, 0.1, 0.1, 0.1])
+    P.op(None, "multiply", 2, a=2, b=4)
+    P.op(None, "remap", 2, a=2, k=[0.0, 1.0, CLOUD_HAZE0, CLOUD_HAZE1], f=1.0)
+    P.op(None, "gradient", 4, a=1, k=[-0.5 * SH[0], 0.0, -0.5 * SH[2], 0.5], f=1.0)
+    P.op(None, "power", 4, a=4, f=2.4)
+    P.colour("hcool", 5, pal(pn, "mid"))
+    P.colour("hwarm", 6, pal(pn, "warm"))
+    P.op(None, "mixBy", 5, a=5, b=6, c=4)
+    P.op("hazed", "mixBy", 3, a=3, b=5, c=2)
+    return P
+
+
+CLOUD_HAZE0, CLOUD_HAZE1 = 0.1, 0.5
+CLOUD_POOL = (2.0, 19.0)     # degrees from the sun: fully lit inside, CLOUD_AWAY outside
+CLOUD_AWAY = 0.1
+
+
+def cloud_points():
+    """The cloud field: banks round the whole horizon (the slow drift turns them past the view forever), each a cluster
+    of squashed puffs. Twilight stratus -- long, thin, flat-bottomed streaks low on the horizon -- with a few cumulus
+    banks behind them. Deterministic. Returns distribution points [px, py, pz, qx, qy, qz, qw, sx, sy, sz]."""
+    pts = []
+    n_banks = 26
+    for b in range(n_banks):
+        h = lambda k: mx._hash(b, k, 71)
+        theta = 2.0 * math.pi * (b + 0.6 * h(1)) / n_banks
+        D = 3200.0 + 2600.0 * h(2)
+        cumulus = False
+        tier = int(3 * h(3))                           # three decks: low and long, middle, high and thin
+        alt = (150.0, 330.0, 520.0)[tier] + 90.0 * (h(4) - 0.5)
+        npuff = 6 + int(8 * h(5))
+        length = (520.0 + 900.0 * h(6)) * (1.0, 0.8, 1.3)[tier]
+        tx, tz = math.cos(theta), math.sin(theta)
+        phi = -theta
+        q = (0.0, math.sin(phi / 2.0), 0.0, math.cos(phi / 2.0))
+        for i in range(npuff):
+            u = (i + 0.5) / npuff - 0.5
+            g = lambda k: mx._hash(b * 31 + i, k, 73)
+            along = u * length + (g(1) - 0.5) * 60.0
+            bulge = 1.0 - (2.0 * u) ** 2
+            if cumulus:
+                sx = 70.0 + 90.0 * g(2) * bulge
+                sy = (35.0 + 70.0 * g(3)) * (0.5 + bulge)
+                y = alt + sy * 0.45
+            else:
+                sx = (90.0 + 170.0 * g(2)) * (0.5 + 0.5 * bulge)
+                sy = (6.0 + 13.0 * g(3) * (0.3 + bulge)) * (1.0, 0.8, 0.55)[tier]
+                y = alt + (g(4) - 0.5) * 24.0 + sy * 0.5
+            sz = sx * (0.5 + 0.4 * g(5))
+            r = D + (g(6) - 0.5) * 120.0
+            x = r * math.sin(theta) + along * tx
+            z = -r * math.cos(theta) + along * tz
+            pts.append([round(x, 2), round(y, 2), round(z, 2), 0.0, round(q[1], 5), 0.0, round(q[3], 5),
+                        round(sx, 2), round(sy, 2), round(sz, 2)])
+    return pts
+
+
+CLOUD_DRIFT = 0.0016        # radians a second the cloud field turns round the viewer (about 65 minutes a turn)
+
+
+def island_meshes():
+    """The distant island on the left third: a long low mesa and a sea stack, faceted, its foot sunk under the sea."""
+    tris = []
+    tris += mx.rock(91, 300.0, 70.0, 15, 4, sink=40.0, lean=(0.03, 0.0))
+    tris += mx.translate(mx.rock(93, 260.0, 52.0, 13, 3, sink=40.0), (420.0, 0.0, 40.0))
+    tris += mx.translate(mx.rock(95, 200.0, 30.0, 11, 3, sink=30.0), (-420.0, 0.0, -30.0))
+    tris += mx.translate(mx.rock(99, 160.0, 22.0, 9, 3, sink=30.0), (760.0, 0.0, 80.0))
+    tris = mx.clip_above(tris, -2.0)
+    mx.write_faceted(os.path.join(MESH_DIR, "do-isle.glb"), tris, "isle")
+    return len(tris)
+
+
+ISLE_AZ, ISLE_DIST = -16.0, 4300.0
+
+
 SUN_RADIUS_DEG = 1.7
 SUN_COS = math.cos(math.radians(SUN_RADIUS_DEG))
 
@@ -403,6 +514,24 @@ def build():
     for name, *_ in SEA_PIECES:
         s.proc("sea_" + name, {"kind": "mesh", "asset": "meshes/do-sea-%s.glb" % name},
                material=unlit("doSea" if name == "near" else "doSeaFar"), deformers=sea_deformers())
+    # the clouds: one node of puffs, turned slowly round the viewer by a world-space twist (seamless, and running with
+    # no transport)
+    cp = cloud_program()
+    if DEBUG_CLOUD:
+        cp.ops = cp.ops[:DEBUG_CLOUD[0]]
+    s.program(cp.doc(emission=DEBUG_CLOUD[1] if DEBUG_CLOUD else 3))
+    s.proc("clouds", {"kind": "sphere", "radius": 1.0, "segments": 20, "rings": 12},
+           distribution={"kind": "points", "points": cloud_points()}, material=unlit("doCloud"),
+           deformers=[{"kind": "twist", "amount": 0.0, "speed": CLOUD_DRIFT, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
+                       "center": [0.0, 0.0, 0.0], "space": "world"}])
+    # the island: a flat silhouette in the horizon's haze
+    island_meshes()
+    a = math.radians(ISLE_AZ)
+    s.proc("isle", {"kind": "mesh", "asset": "meshes/do-isle.glb"},
+           material={"baseColor": [0.0, 0.0, 0.0], "emissiveColor": pal(PALETTE, "isle"), "emissiveIntensity": 1.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True},
+           transform={"position": [round(ISLE_DIST * math.sin(a), 2), 0.0, round(-ISLE_DIST * math.cos(a), 2)],
+                      "rotation": [0.0, 20.0, 0.0], "scale": [1.7, 0.95, 1.0]})
     camera(s)
     s.params_({"post/bloom/intensity": 0.22, "post/bloom/threshold": 1.4, "post/bloom/emissionWeight": 1.0,
                "post/tonemap/operator": 4, "post/output/vignette": 0.25, "post/output/grain": 0.008})

@@ -71,3 +71,20 @@ Brief: `00-brief.md` (the owner's, verbatim). Plan: `01-plan.md`. Worktree `../a
 - Cost check (headless 1080p, scale 0.85): GPU median 14.0 ms with the first two programs; noted, measured again later.
 - Media: `stage3-twilight.png`, `stage3-golden.png`, `stage3-palettes-4.png`, `stage3-smooth-vs-bands.png`,
   `stage3-motion.mp4`.
+
+## Stage 4: sky, clouds, atmosphere (done)
+
+- **Clouds**: one procedural node, a `points` distribution of 196 squashed sphere puffs in 26 banks round the WHOLE
+  horizon (3.2-5.8 km), three decks of twilight stratus (low and long, middle, high and thin). A world-space `twist`
+  about the camera's vertical axis (amount 0, speed 0.0016 rad/s, ~65 min a turn) drifts the field: seamless, running
+  with no transport, and the view never empties because the banks go all the way round.
+- **Cloud program** (`doCloud`, 25 ops): a dusky violet body; undersides lit coral in a pool round the sun (smoothstep on
+  the true angle to the sun, 2-19 deg); a bright rim on grazing edges near the sun; distance haze toward the sky's
+  middle colour. Two wrong turns recorded: (1) seen from below every visible face IS an underside, and every cloud in
+  frame is within 25 deg of the sun, so a (1+cos)/2 falloff lit them all peach -- found by rendering the registers;
+  (2) hazing toward the horizon colour turned clouds at 3-10 deg peach too; they now haze toward the sky's middle.
+  Cumulus puffs read as clip-art circles and were dropped.
+- **Island**: a long low faceted mesa group (meshes.rock, stretched) at 4.3 km on the left third, a flat hazy violet
+  silhouette: it balances the sun on the right third and gives the horizon scale. A needle stack read as a shark fin
+  and was removed.
+- Media: `stage4-sky.png`, `stage4-sky-drift-4s-120s-300s.png` (the drift over five minutes).
