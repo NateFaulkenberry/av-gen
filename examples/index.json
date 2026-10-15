@@ -86,7 +86,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A salt flat at dusk; chords paint the sky, melodies fall as meteors. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. On an endless salt flat at dusk the sky is the instrument: chords paint it, melodies fall through it as meteors, the bass makes the horizon shimmer, and a black monolith answers the drums. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Salt Flat Mirage",
       "project": "sonic-vfx/salt-flat-mirage.json",
@@ -94,7 +94,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note releases a paper lantern from a still lake. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note releases a paper lantern from the surface of a still lake at dusk; the melody becomes a drifting constellation, and the bass a slow swell beneath it. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Lantern Lake",
       "project": "sonic-vfx/lantern-lake.json",
@@ -102,7 +102,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Chords hang aurora curtains, hats glitter as diamond dust, the snare cracks the ice. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Over a frozen lake the aurora is the pad: chords hang curtains of light, the melody ripples them, the hats are diamond dust glittering in the air, and the snare cracks the ice with light. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Aurora Tundra",
       "project": "sonic-vfx/aurora-tundra.json",
@@ -110,7 +110,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A colossal fungal organism breathes with the bass. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A colossal fungal organism hangs from the roof of a flooded cavern and breathes with the bass; melodies climb its hanging threads as light. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - The Breathing Deep",
       "project": "sonic-vfx/breathing-deep.json",
@@ -118,7 +118,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Deep-sea siphonophores pulse with the melody. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Two kilometres down, a colony of siphonophores answers the melody in pulses of cold light while marine snow falls through the hats. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Abyssal Bloom",
       "project": "sonic-vfx/abyssal-bloom.json",
@@ -126,14 +126,14 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Every note sings its own standing-wave figure into black sand. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Black sand on a resonating plate: every note sings its own standing-wave figure into the sand, and a chord is two figures at war. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Cymatic Plate",
       "project": "sonic-vfx/cymatic-plate.json"
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Silk ribbons draw the melody; the kick cracks them like whips. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Silk ribbons draw the melody in the air of an empty theatre: pitch is height, legato is one unbroken stroke, and the kick cracks the ribbons like whips. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Silk Theatre",
       "project": "sonic-vfx/silk-theatre.json",
@@ -141,7 +141,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note pulls a spike from a magnetic liquid. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A black magnetic liquid listens: each note pulls a spike from its surface, and harmony shapes the crown. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Ferrofluid Crown",
       "project": "sonic-vfx/ferrofluid-crown.json",
@@ -149,14 +149,14 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A glyph inside a video feedback loop the music turns and recolours. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Howlround: a camera pointed at its own monitor. The screen's frame recurs inward as a corridor of screens twisting to a vanishing point, a glyph of light burns in it, and the music turns, deepens and recolours the loop, so the world is the instrument's own echo. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Feedback Mirror",
       "project": "sonic-vfx/feedback-mirror.json"
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Twelve Tesla towers, one per pitch class, draw every chord in lightning. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Twelve Tesla towers stand in a ring round a humming core, one for each pitch class; every chord is drawn in lightning, so harmony has a shape. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Tesla Choir",
       "project": "sonic-vfx/tesla-choir.json",
@@ -164,28 +164,28 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A landscape of barcode ridges written and erased by the music. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A landscape of pure measurement, barcode ridges and numerals to the horizon, written and erased by the music. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Datascape",
       "project": "sonic-vfx/datascape.json"
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. The bass breathes on the embers of a burnt forest, the snare flares. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. The night after the burn: a dead forest still smouldering under a cold sky while the fire front crawls along the far ridge. The bass is the wind breathing on the coals, the snare a tree torching, and every note lifts an ember from the ground where its pitch says. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Ember Forest",
       "project": "sonic-vfx/ember-forest.json"
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A cathedral of light decays under the drums and rebuilds on held chords. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A cathedral drawn in lines of light decays into data under the drums and rebuilds itself on held chords. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - The Corrupted Cathedral",
       "project": "sonic-vfx/corrupted-cathedral.json"
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. The bass winds a supercell's funnel, the snare strikes. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A supercell walks across the night prairie: the bass winds its funnel, the snare strikes, and the melody crawls as light inside the cloud. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Storm Cell",
       "project": "sonic-vfx/storm-cell.json",
@@ -193,7 +193,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Chords ignite newborn stars coloured by pitch. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Inside a pillar of gas, chords ignite newborn stars: their number is the polyphony, their colour the pitch, and the bass is the density of the cloud. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Stellar Nursery",
       "project": "sonic-vfx/stellar-nursery.json",
@@ -201,7 +201,7 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Every note is a star falling into a black hole. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A black hole is eating a star: the star is stretched into a stream of plasma that pours into a Doppler-bright disk, every note tears another fragment off it, and the bass is the hole's own mass bending the sky. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
       "name": "Sonic VFX - Event Horizon",
       "project": "sonic-vfx/event-horizon.json"

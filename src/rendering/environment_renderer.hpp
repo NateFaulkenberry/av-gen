@@ -19,6 +19,7 @@
 #include "core/error.hpp"
 #include "core/time.hpp"
 
+#include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
 
 #include <cstdint>
@@ -54,6 +55,13 @@ struct EnvironmentFrame {
     std::uint32_t height = 0;
     const QualitySettings* quality = nullptr;    // the live ladder's levers (render scale, tier...)
     gpu::FrameTimeline* timeline = nullptr;
+    // ADR-1344: the camera the frame uniforms hold (`frame.viewProj`, `cameraPos`, `cameraForward`), on the CPU, so an
+    // environment can skip work the GPU would only discard. `haveCamera` false (a caller that never filled them) means
+    // "cull nothing".
+    bool haveCamera = false;
+    glm::mat4 viewProj{1.0f};
+    glm::vec3 cameraPos{0.0f};
+    glm::vec3 cameraForward{0.0f, 0.0f, -1.0f};
 };
 
 class EnvironmentRenderer {

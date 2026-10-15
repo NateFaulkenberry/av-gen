@@ -987,7 +987,7 @@ def project(name, audio, live=False, sensitivity=None):
         "format": "avgen-project", "version": 4,
         "app": {"name": name},
         "assets": {"scene": {"kind": "composition", "path": "digital-mosh.scene.json"}},
-        "live": {"qualityStrategy": "effects_first", "targetFps": 60},
+        "live": {"qualityStrategy": "effects_first"},
         "parameters": dict(POST),
         "sources": [LISTEN, ARC] + [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}}
                                     for n in ("driftA", "driftB", "driftC", "circleA", "circleB")],

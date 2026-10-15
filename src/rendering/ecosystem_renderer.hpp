@@ -41,7 +41,8 @@ namespace avgen::rendering {
 struct EcosystemStats {
     std::uint32_t layers = 0;      // drawn this frame
     std::uint64_t hosts = 0;       // host instances carrying a template
-    std::uint64_t candidates = 0;  // host instances x template points (the dispatch)
+    std::uint64_t hostsDrawn = 0;  // ADR-1344: hosts that survived the CPU cull and were dispatched
+    std::uint64_t candidates = 0;  // dispatched host instances x template points (the dispatch)
     std::uint32_t dispatches = 0;
 };
 
@@ -73,12 +74,28 @@ private:
         wgpu::Buffer uniforms;
         wgpu::Buffer hosts;
         wgpu::Buffer points;
+        wgpu::Buffer hostList;          // ADR-1344: this frame's dispatched host indices (u32), capacity hostCount
         wgpu::BindGroup group;
+        // ADR-1344: each host's origin (xyz) and its largest axis scale (w), for the CPU cull, and the x-axis scale the
+        // shader's own early-out reads (`hostScaleX`).
+        std::vector<glm::vec4> hostSpheres;
+        std::vector<float> hostScaleX;
     };
 
     [[nodiscard]] Result<void> createPipelines(gpu::ShaderLibrary& shaders);
     void ensureTargets(std::uint32_t width, std::uint32_t height, std::uint32_t maxSprites);
     void syncLayer(std::size_t index, const scene::Scene& scene, const scene::EmitterLayer& layer);
+    // ADR-1344: the hosts of `g` that can put a point on screen this frame, into `out` (all of them without a camera).
+    static void cullHosts(const LayerGpu& g, const scene::EmitterLayer& layer, const EnvironmentFrame& f, bool enabled,
+                          std::vector<std::uint32_t>& out);
+
+public:
+    // ADR-1344, for tests and A/B: off dispatches every host as before the cull. Output is the same either way.
+    void setHostCulling(bool enabled) { hostCulling_ = enabled; }
+
+private:
+    bool hostCulling_ = true;
+    std::vector<std::uint32_t> hostScratch_;
 
     gpu::Context* context_ = nullptr;
     wgpu::TextureFormat hdrFormat_ = wgpu::TextureFormat::RGBA16Float;

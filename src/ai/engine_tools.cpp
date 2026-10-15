@@ -3482,14 +3482,14 @@ void registerPerformanceTools(ToolRegistry& registry) {
             return startPhase5(ctx, request, args);
         });
     add(registry, "performance.get_live_quality", "Read the live quality settings",
-        "The project's live block (ADR-1084/1100): target frame rate, profile (QUALITY/BALANCED/PERFORMANCE), the "
-        "strategy, the lowest level the controller may use, the degradation priority, and the ceilings the Optimize "
-        "review applied. Unset fields are reported as null and mean the machine's or the default.",
+        "The project's live block (ADR-1084/1100): profile (QUALITY/BALANCED/PERFORMANCE), the strategy, the lowest "
+        "level the controller may use, the degradation priority, and the ceilings the Optimize review applied. Unset "
+        "fields are reported as null and mean the default. The frame-rate target is not the project's: it is the Live "
+        "panel's, for every scene (ADR-1360).",
         noArgs(), readOnly(), [](const json&, ToolContext& ctx) -> ToolResult {
             const app::Engine& e = ctx.engine();
             const app::LiveProjectSettings& s = e.liveSettings();
             json j;
-            j["targetFps"] = s.targetFps ? json(*s.targetFps) : json(nullptr);
             j["profile"] = s.profile ? json(std::string(app::qualityProfileToken(*s.profile))) : json(nullptr);
             j["strategy"] = std::string(app::liveQualityStrategyToken(e.liveQualityStrategy()));
             j["strategyStated"] = e.liveQualityStrategyStated();
@@ -3505,8 +3505,7 @@ void registerPerformanceTools(ToolRegistry& registry) {
         "levers (the candidates' \"lever\" names: volumequarter, posttaps, castercull, lodbias2, ...) to the project's "
         "ceilings -- what the Optimize review's Apply does. Never edits the scene; the quality only ever lowers what the "
         "scene asks for, and heroes are exempt. Save the project to keep it.",
-        schema::object({{"targetFps", schema::integer("24..240, or null to clear", 24.0, 240.0)},
-                        {"profile", schema::string("quality, balanced, performance (or null)")},
+        schema::object({{"profile", schema::string("quality, balanced, performance (or null)")},
                         {"strategy", schema::string("resolution_first, balanced, effects_first")},
                         {"minimumLevel", schema::string("ultra, high, medium, low, emergency (or null)")},
                         {"priority", schema::array(schema::string("a lever group"),
@@ -3517,10 +3516,6 @@ void registerPerformanceTools(ToolRegistry& registry) {
         liveWrite, [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& e = ctx.engine();
             app::LiveProjectSettings s = e.liveSettings();
-            if (args.contains("targetFps")) {
-                if (args["targetFps"].is_null()) s.targetFps.reset();
-                else s.targetFps = std::clamp(args["targetFps"].get<int>(), app::kLiveTargetFpsMin, app::kLiveTargetFpsMax);
-            }
             if (args.contains("profile")) {
                 if (args["profile"].is_null()) {
                     s.profile.reset();

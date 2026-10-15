@@ -24,6 +24,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -442,4 +443,85 @@ TEST_CASE("the grazing emissive rim follows the emissive texture: black emission
     CHECK(maxBlack <= 3);                      // nothing emitted, nothing added at the rim (it is lit, not glowing)
     CHECK(std::abs(sumWhite - sumNone) <= 16); // a white texture is the untextured material
     CHECK(sumNone > 16 * 60);                  // and the untextured material still has its rim
+}
+
+// ADR-1344: the CPU host cull. cs_emit discards every point of a host that is too far, behind the camera or off screen;
+// the cull drops such hosts before the dispatch. What it must never do is drop a host with a point on screen -- here one
+// whose origin is outside the frame's left edge while its emitter, 3 m to its right, is inside. The picture with the
+// cull is the same bytes as without it, and the dispatch is smaller.
+TEST_CASE("the host cull dispatches only hosts that can be seen, and changes no pixel (ADR-1344)",
+          "[gpu][ecosystem][adr1344]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // 60 degrees vertical at 240x135: the frame's half width at 20 m is 20.5 m.
+    const float halfW = std::tan(glm::radians(30.0f)) * 20.0f * static_cast<float>(kWidth) / static_cast<float>(kHeight);
+    const std::vector<glm::vec3> placements = {
+        {0.0f, -1.0f, -20.0f},              // in frame
+        {-halfW - 1.0f, -1.0f, -20.0f},     // origin off the left edge; its emitter (+3 m in x) is in frame
+        {0.0f, -1.0f, 20.0f},               // behind the camera
+        {0.0f, -1.0f, -400.0f},             // past maxDistance (300 m)
+        {-3.0f * halfW, -1.0f, -20.0f},     // far off the left edge
+        {0.0f, 40.0f, -20.0f},              // far above the frame
+    };
+    scene::Scene s = darkStage();
+    {
+        scene::ProceduralGeometry host;
+        host.name = "host";
+        host.source.kind = scene::PrimitiveKind::Box;
+        host.source.size = glm::vec3(0.001f);
+        host.distribution.kind = scene::DistributionKind::Points;
+        std::vector<scene::Transform> places;
+        for (const glm::vec3& p : placements) {
+            scene::Transform t;
+            t.position = p;
+            places.push_back(t);
+        }
+        host.distribution.setPoints(std::move(places));
+        host.material.baseColor = glm::vec3(0.0f);
+        REQUIRE(host.rebuild());
+        REQUIRE(host.instances.size() == placements.size());
+        s.procedurals.push_back(std::move(host));
+        scene::EmitterLayer layer;
+        layer.name = "polyps";
+        layer.hosts = {"host"};
+        layer.templatePath = "inline";
+        layer.intensity = 40.0f;
+        layer.flicker = 0.5f; // hashed per host and point: a host index that moved would change its light
+        layer.points = std::make_shared<const std::vector<scene::EmitterPoint>>(
+            std::vector<scene::EmitterPoint>{point(glm::vec3(3.0f, 1.0f, 0.0f), 0.04f)});
+        layer.pointsHash = 43;
+        s.ecosystem.layers.push_back(std::move(layer));
+    }
+
+    rendering::SceneRenderer::PassToggles toggles = renderer.passToggles();
+    toggles.ecosystemHostCull = false; // the --ab arm "ecohostcull"
+    renderer.setPassToggles(toggles);
+    const gpu::Image8 all = render(renderer, s, 1.0);
+    const auto allStats = renderer.ecosystem().stats();
+    toggles.ecosystemHostCull = true;
+    renderer.setPassToggles(toggles);
+    const gpu::Image8 culled = render(renderer, s, 1.0);
+    const auto culledStats = renderer.ecosystem().stats();
+    dump(culled, "ecosystem-host-cull");
+
+    INFO("hosts " << allStats.hosts << ", dispatched without the cull " << allStats.hostsDrawn << ", with it "
+                  << culledStats.hostsDrawn);
+    CHECK(allStats.hostsDrawn == placements.size());
+    CHECK(culledStats.hosts == placements.size());
+    CHECK(culledStats.hostsDrawn == 2);
+    CHECK(culledStats.candidates == 2);
+    // The edge host's emitter is on screen (x = -halfW + 2 m), so the frame shows two lights, and they are identical.
+    const float ex = ((-halfW + 2.0f) / halfW * 0.5f + 0.5f) * static_cast<float>(kWidth);
+    int edge = 0;
+    for (int dx = -2; dx <= 2; ++dx) {
+        for (int dy = -2; dy <= 2; ++dy) {
+            edge = std::max(edge, luma(culled, static_cast<std::uint32_t>(std::lround(ex) + dx), kHeight / 2 + dy));
+        }
+    }
+    INFO("the edge host's emitter near x = " << ex << ": " << edge);
+    CHECK(edge > 60);
+    CHECK(all.rgba == culled.rgba);
 }

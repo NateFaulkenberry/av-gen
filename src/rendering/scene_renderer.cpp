@@ -1766,6 +1766,8 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         // ADR-230. Off: the sky-layer draw is skipped entirely, which is what makes the "effects
         // disabled" arm in §12 a real arm rather than a frame that renders the same pixels.
         {"atmospherics", &T::atmospherics},
+        // ADR-1344. Off: the ecosystem dispatches every host (no CPU host cull); same picture, more threads.
+        {"ecohostcull", &T::ecosystemHostCull},
         // ADR-390. Off: the Cosmic Ocean's `Draw(3)` is not recorded AND its uniform is not
     };
     return kArms;
@@ -3222,7 +3224,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Effect Library Wave 2: the Stars effect's field. All zero with no live instance, which the
     // background pass reads as "draw your own fixed field", so the frame is unchanged.
     if (const world::StarField& stars = scene.stars; stars.on) {
-        frame.starsA = glm::vec4(1.0f, stars.density, stars.brightness * stars.envelope, stars.magnitudeSlope);
+        // x is the mode: 1 = on, 2 = on over the whole sphere (ADR-1350)
+        frame.starsA = glm::vec4(stars.wholeSky ? 2.0f : 1.0f, stars.density, stars.brightness * stars.envelope,
+                                 stars.magnitudeSlope);
         frame.starsB = glm::vec4(stars.colorSpread, stars.twinkle, stars.twinkleRate, stars.horizonFade);
         frame.starsC = glm::vec4(stars.band, stars.bandTilt, stars.daylight, stars.seconds);
     } else {
@@ -4596,6 +4600,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         envFrame.height = hdr_.height();
         envFrame.quality = &qualitySettings_;
         envFrame.timeline = timeline_.get();
+        envFrame.haveCamera = true; // ADR-1344
+        ecosystem_->setHostCulling(toggles_.ecosystemHostCull);
+        envFrame.viewProj = frame.viewProj;
+        envFrame.cameraPos = glm::vec3(frame.cameraPos);
+        envFrame.cameraForward = glm::vec3(frame.cameraForward);
         for (EnvironmentRenderer* env : environments_) {
             if (env->wants(scene)) {
                 env->encode(envFrame);

@@ -1036,13 +1036,26 @@ def write_index(scenes, category="Sonic VFX", out_dir=OUT_DIR, prefix=None, doc=
         idx = json.load(f)
     examples = os.path.join(REPO, "examples")
     prefix = prefix if prefix is not None else category + " - "
+    # What the index says about an entry that is the owner's, not the generator's, survives a rebuild: "hidden"
+    # (ADR-1343: the owner cut it from the menu) and "generate". Every scene here is a sonic.live project, so it is
+    # "live" (ADR-1340; the index test requires the two to agree). Before 2026-10-15 a full rebuild dropped both
+    # flags, emptying the Live menu of this category and un-hiding the cut scenes.
+    previous = {e.get("project"): e for e in idx["examples"] if e.get("category") == category}
     entries = []
     for sc in scenes:
-        entries.append({"category": category,
-                        "description": sc.design.get("thesis", "") + " Live: opening it turns live input on "
-                        "(View > Live). See docs/prototypes/sonic-garden/" + doc + ".",
-                        "name": prefix + sc.title,
-                        "project": os.path.relpath(os.path.join(out_dir, sc.id + ".json"), examples)})
+        project = os.path.relpath(os.path.join(out_dir, sc.id + ".json"), examples)
+        entry = {"category": category,
+                 "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. "
+                 + sc.design.get("thesis", "") + " Opening it turns live input on (View > Live); the Scene list, "
+                 "PageUp/PageDown and MIDI program changes step through the live scenes. See "
+                 "docs/prototypes/sonic-garden/" + doc + ".",
+                 "live": True,
+                 "name": prefix + sc.title,
+                 "project": project}
+        for kept in ("hidden", "generate"):
+            if kept in previous.get(project, {}):
+                entry[kept] = previous[project][kept]
+        entries.append(entry)
     # replace the category's entries where they stand (or append them), keeping every other entry in place
     out, placed = [], False
     for e in idx["examples"]:

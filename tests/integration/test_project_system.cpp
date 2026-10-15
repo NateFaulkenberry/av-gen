@@ -1370,3 +1370,32 @@ TEST_CASE("A live project's transport is endless; any other project's is not", "
     CHECK_FALSE(film.transport().endless());
 #endif
 }
+
+// ADR-1360: the Live panel's Target is the one live frame-rate target. A project no longer states one (Astral Forge
+// Live, Digital Mosh Live and THE RIFT LIVE said 60 and silently outranked the panel); one that still does loads with a
+// warning that names the rule rather than having its number quietly ignored.
+TEST_CASE("A project's live.targetFps is not read, and says so", "[integration][project][live][adr1360]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path examples = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples";
+    for (const char* live : {"astral-forge/astral-forge-live.json", "digital-mosh/digital-mosh-live.json",
+                             "bioluminescent/rift-live.json"}) {
+        INFO(live);
+        const auto doc = readJson(examples / live);
+        CHECK_FALSE((doc.contains("live") && doc["live"].contains("targetFps")));
+    }
+    const auto dir = std::filesystem::temp_directory_path() / "avgen_live_target_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "p.json") << R"({"format":"avgen-project","version":4,"live":{"targetFps":30}})";
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(dir / "p.json").has_value());
+    bool named = false;
+    for (const auto& w : engine.projectWarnings()) {
+        named = named || w.find("live.targetFps is no longer read") != std::string::npos;
+    }
+    CHECK(named);
+    std::filesystem::remove_all(dir);
+#endif
+}

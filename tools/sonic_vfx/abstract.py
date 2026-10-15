@@ -81,6 +81,11 @@ def build(modules, out_dir=None):
             len(sc.mappings) + len(sc.mappings2) + len(sc.mappings3), os.path.relpath(pp, REPO)))
     if not modules and not out_dir:
         kit.write_index(built, category=kit.ABSTRACT_CATEGORY, out_dir=kit.ABSTRACT_DIR, doc="ABSTRACT-PLAN.md")
+        # a scene that writes its own entry (its description names its MIDI map) keeps it over the generic one
+        for name in names:
+            entry = getattr(importlib.import_module("tools.sonic_vfx.scenes." + name), "INDEX_ENTRY", None)
+            if entry:
+                kit.upsert_index_entry(entry)
         print("examples/index.json: the %s category lists %d scenes" % (kit.ABSTRACT_CATEGORY, len(built)))
 
 

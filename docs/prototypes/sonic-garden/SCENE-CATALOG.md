@@ -119,6 +119,9 @@ target.
 - The kick flashes the photon ring and pulses the jets, and sends a shock ring out from the hole (ADR-1065's
   `post/shock`, centred on the hole's projected position).
 - No fog; the cost is the lens, in the scene pass.
+- **Art pass 2026-10** (`ART-PASS-2026-10-event-horizon.md`): "Gargantua feeding". A tidal disruption: a blue-white
+  star stretched on its orbit bleeds a plasma stream into a Doppler-beamed disk; there is scanned wreckage, jets, and
+  the stars of the whole sky (ADR-1350).
 
 ### 2. The Breathing Deep (organic)
 
@@ -425,6 +428,9 @@ chord is two figures at war.
   the lines.
 - The key is a pool rather than a flood (an 8 to 19 degree cone), so the figure's centre is the brightest place and
   the corners sink toward the void.
+- **Art pass 2026-10** (`ART-PASS-2026-10-cymatic-plate.md`, the owner's request): top-down and 2D. A 16:9 black
+  plate fills the frame, seen straight down on a long lens; the plate is unlit, with its pool of light painted. With
+  audio alone, the timbre's brightness sets the mode.
 
 ### 7. Storm Cell (atmospheric, violent)
 
@@ -721,6 +727,9 @@ black trunks, the melody one ember dancing through the smoke.
   - The bass stirs the smoke's structure, never its density: a density route drowned the trunks.
   - The coal seams are broken into live lengths and dead ones (an unbroken contour read as a map's line), and the
     sustained glow lifts the sky again: ADR-1070 made a slow sky route cheap live.
+- **Art pass 2026-10** (`ART-PASS-2026-10-ember-forest.md`): "the night after the burn". A cold night against hot
+  points of fire: Quaternius dead pines, scanned logs and stumps burning from inside, ragged coal beds, a broken fire
+  front on the far ridge, embers on the wind and ash falling.
 
 ### 14. Lantern Lake (atmospheric, warm)
 
@@ -784,6 +793,9 @@ the world is the instrument's own echo.
     spiral toward the frame's centre.
   - The interval turns the spiral, the bass deepens it, the kick punches it, and chords walk its hue from gold
     toward magenta.
+- **Art pass 2026-10** (`ART-PASS-2026-10-feedback-mirror.md`): "howlround". A glowing monitor bezel with viewfinder
+  brackets at the frame's edge, which the loop carries inward as a twisting corridor of nested screens walking the
+  hue circle, with the glyph's echoes spiralling down it.
 
 ### 16. Datascape (digital, data)
 

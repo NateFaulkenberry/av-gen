@@ -227,23 +227,33 @@ def m(base, emit=None, intensity=0.0, rough=0.55, double=False):
 
 
 def bodies(P):
-    """The organisms' bodies. No decimated LOD levels: vertex clustering turns a feathery sea pen or a fan's lattice
-    into blocky blobs (seen in v1). Bodies are culled by distance instead; past it the emitters carry the far field."""
+    """The organisms' bodies, culled by distance; past it the emitters carry the far field.
+
+    Live only (docs/prototypes/bioluminescent/live-30fps-report.md): an offline render lifts both the distance culls and
+    the LOD rungs (ADR-186), so what follows shapes the live picture and nothing else.
+    - The sea pens' bodies stop at 30 m. Past that they are dark, double-sided fronds a few pixels tall whose light is
+      the seapenPolyps layer (which keeps its own 300 m), and drawing them from 30 to 80 m was 19 ms of a 51 ms frame
+      at High (1080p, the drop). Matched stills at 40/96/150 s: identical.
+    - The fans, whips and crinoids carry meshoptimizer LOD rungs (35% / 12% of the triangles, ADR-078). An offline
+      render keeps LOD rungs (ADR-191), so the scene's thresholds are 0 -- a ladder that ends at LOD0, the mesh as it
+      was -- and only the live project sets them (LIVE_LOD). v1's blobs were the old grid clustering; these were
+      checked with matched stills (differences only at emitter occlusion edges)."""
     N = []
     N.append(mesh_node("crinoidStalk", "crinoid_stalk", P["crinoid"], m(BODY, VIOLET_DIM, 0.01, 0.6),
-                       max_distance=600.0))
+                       lod=(0.0, 0.0), max_distance=600.0))
     N.append(mesh_node("crinoidArms", "crinoid_arms", P["crinoid"],
-                       m([0.05, 0.04, 0.08], VIOLET_DIM, 0.06, 0.5, double=True), max_distance=450.0))
+                       m([0.05, 0.04, 0.08], VIOLET_DIM, 0.06, 0.5, double=True), lod=(0.0, 0.0),
+                       max_distance=450.0))
     for i, part in enumerate(chunks(P["seapen"])):
         N.append(mesh_node(f"seapen{i}", "seapen", part, m([0.03, 0.05, 0.07], PEN, 0.04, 0.45, double=True),
-                           max_distance=80.0))
+                           max_distance=30.0))
     for i, part in enumerate(chunks(P["mat"])):
         N.append(mesh_node(f"mat{i}", "mat_cushion", part, m([0.006, 0.008, 0.012], None, 0.0, 0.95),
                            max_distance=70.0))
     N.append(mesh_node("fanBody", "fan_body", P["fan"], m([0.03, 0.025, 0.05], VIOLET_DIM, 0.01, 0.6),
-                       max_distance=140.0))
+                       lod=(0.0, 0.0), max_distance=140.0))
     N.append(mesh_node("whipsBody", "whips_body", P["whips"], m([0.03, 0.04, 0.05], CYAN, 0.05, 0.5),
-                       max_distance=150.0))
+                       lod=(0.0, 0.0), max_distance=150.0))
     N.append(mesh_node("lanternStalks", "lantern_stalks", P["lanterns"], m([0.05, 0.03, 0.02]), max_distance=120.0))
     N.append(mesh_node("lanternPods", "lantern_pods", P["lanterns"], m([0.3, 0.12, 0.03], AMBER, 14.0, 0.25),
                        max_distance=500.0))
@@ -643,6 +653,13 @@ POST = {
 # may raise its scene's noise but never zero it (test_volumetric_noise_authoring.cpp: a zero override is how a saved
 # session's accident looks), so the zero lives in the scene.
 LIVE_PARAMETERS = {"scene/volumeSteps": 16}
+# Live only: where the bodies step down their LOD rungs (metres; the scene's own thresholds are 0, so offline draws LOD0).
+# docs/prototypes/bioluminescent/live-30fps-report.md, ADR-1344.
+LIVE_LOD = {"fanBody": (35.0, 70.0), "whipsBody": (35.0, 70.0), "crinoidArms": (120.0, 240.0),
+            "crinoidStalk": (150.0, 300.0)}
+for _body, (_d1, _d2) in LIVE_LOD.items():
+    LIVE_PARAMETERS[f"procedural/{_body}/lod/distance1"] = _d1
+    LIVE_PARAMETERS[f"procedural/{_body}/lod/distance2"] = _d2
 OFFLINE_PARAMETERS = {"scene/volumeNoise": 0.6}
 
 
@@ -651,7 +668,7 @@ def project(name, audio, length, live=False):
         "format": "avgen-project", "version": 4,
         "app": {"name": name},
         "assets": {"scene": {"kind": "composition", "path": "rift.scene.json"}},
-        "live": {"qualityStrategy": "effects_first", "targetFps": 60},
+        "live": {"qualityStrategy": "effects_first"},
         "parameters": dict(POST),
         "sources": [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}} for n in ("driftA", "driftC")],
         "sonic": {},
@@ -700,10 +717,30 @@ def probe_project(p):
     return q
 
 
+def generator_stamp():
+    """What rift.scene.json is made from: this folder's Python and its committed meshes. Written beside the world as
+    rift.scene.json.stamp, so a world made by an older generator is known to be stale -- a test that only checked
+    the file existed passed or failed on whatever an earlier build.py had left (2026-10-15, after ADR-1344)."""
+    import hashlib
+    h = hashlib.sha256()
+    for f in sorted(list(HERE.glob("*.py")) + list((HERE / "meshes").glob("*"))):
+        if f.is_file():
+            h.update(f.relative_to(HERE).as_posix().encode())
+            h.update(f.read_bytes())
+    return h.hexdigest()
+
+
 def main():
     # --scene-only: write just the generated world (rift.scene.json, gitignored) from the committed meshes and leave
     # every committed file alone. tests/integration/test_rift.cpp runs it on a clean checkout.
+    # --if-stale (with --scene-only): do nothing when the world exists and was made by these exact sources.
     scene_only = "--scene-only" in sys.argv[1:]
+    stamp_path = HERE / "rift.scene.json.stamp"
+    stamp = generator_stamp()
+    if scene_only and "--if-stale" in sys.argv[1:]:
+        if (HERE / "rift.scene.json").exists() and stamp_path.exists() and stamp_path.read_text().strip() == stamp:
+            print("rift.scene.json is up to date")
+            return
     if not scene_only:
         organisms.build_all()
     print("ground...")
@@ -716,6 +753,7 @@ def main():
     tmp = HERE / f"rift.scene.json.{os.getpid()}.tmp"
     tmp.write_text(json.dumps(sc, separators=(",", ":")))
     os.replace(tmp, HERE / "rift.scene.json")
+    stamp_path.write_text(stamp + "\n")
     if scene_only:
         print(f"wrote rift.scene.json ({(HERE / 'rift.scene.json').stat().st_size / 1e6:.1f} MB)")
         return
