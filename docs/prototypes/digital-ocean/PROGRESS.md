@@ -100,3 +100,29 @@ Brief: `00-brief.md` (the owner's, verbatim). Plan: `01-plan.md`. Worktree `../a
 - **Spray**: deliberately not scattered over the sea. Spray belongs to events -- dolphin splashes, the hero wave, the
   drums -- and is built with them (Stages 6-7).
 - Media: `stage5-foam-caps.png` (two thresholds x two moments; right column chosen).
+
+## Stage 6: signature -- the dolphins (done)
+
+- **Mesh** (`dolphin_mesh`, 240 faceted triangles): a lofted bottlenose (melon, beak, tapering peduncle), a swept dorsal
+  fin, pectorals and flukes; 3.1 m. Its first render was flat coral: the loft's winding was inverted, so every normal
+  pointed inward and the rim term flooded the body. Rewound, and the generator now ASSERTS every body facet faces out.
+- **Motion with no engine change**: each dolphin is a procedural node with a local `sine` (the tail's kick, growing from
+  the nose to the flukes) and a `path` deformer that bends the body along a scene spline; `deform/2/pathOffset` is where
+  its tail is. The spline is the engine's Catmull-Rom with rotation-minimising frames from `up`, so the back stays up
+  over the arc; `catmull()` in the generator reproduces it to place splashes.
+- **Ambient pods** (`PODS`): pod A, three dolphins crossing the sun's path at ~88 m left to right, every 31 s, staggered
+  0.55 and 1.25 s; pod B, two smaller and far (~150 m) near the island, right to left every 47 s (31 and 47 never align,
+  so the rhythm of leaps never repeats exactly). Each rides a CLOSED loop: an arc out of the deep, ~2.3 m over the mean
+  sea, back down, and a long return far under the opaque sea; the loop is solved to period x 8.5 m/s. An LFO **saw** per
+  pod drives `pathOffset` = loop length x saw: pure in time, no transport, and seamless at the wrap (the loop is closed).
+- **The hero leap** (`HERO`): an open path at 56 m with a 4.2 m arc over the glitter, driven by an **envelope** source
+  (`env.leap`): its linear attack (~4 s) carries the hero from deep on the left to deep on the right; its 1 ms release
+  sends it back to the start, unseen under the sea. A retrigger mid-leap continues from where it is (no reversal);
+  nothing accumulates. Fired by a pad in Stage 8 (`LEAP_TRIGGER`); here by a scored timeline event for review.
+- **Splashes**: a particle system at every surface crossing (exit and entry, per dolphin), its `spawnRate` opened by two
+  binary routes from the same saw/envelope for exactly the moment the body passes (nose to tail + 0.15 s); the drops'
+  `collision: splash` leaves rings on the water. Pools are fixed (320/600), so nothing can grow.
+- Placement iterated: the hero first breached at the bottom edge of the frame; moved out to 56 m so the arc silhouettes
+  against the sun's path. Pod A moved from 52 to 88 m so the two never compete.
+- Media: `stage6-dolphins.mp4` (pod at 1-4 s, hero fired at 5 s), `stage6-hero-sequence.png`,
+  `stage6-pod-sequence.png`.

@@ -492,6 +492,7 @@ class Scene:
         self.response = None
         self.regions = []         # the evaluator's screen-space regions (sonicScene.regions), see region()
         self.control = None       # the project's control map (MIDI CC / OSC bindings), see modwheel()
+        self.sources = []         # further signal sources (lfo, envelope, noise, timeline), listed after the interpret ones
 
     # ---------------------------------------------------------------- world
     def proc(self, name, source, distribution=None, material=None, deformers=None, variation=None,
@@ -933,6 +934,7 @@ class Scene:
             sources.append({"kind": "interpret", "name": "scene2", "settings": {"mappings": self.mappings2}})
         if self.mappings3:
             sources.append({"kind": "interpret", "name": "scene3", "settings": {"mappings": self.mappings3}})
+        sources.extend(self.sources)
         params = dict(BASE_PARAMS)
         params.update(self.params)
         doc = {"format": "avgen-project", "version": 4, "app": {"name": "Sonic VFX"},

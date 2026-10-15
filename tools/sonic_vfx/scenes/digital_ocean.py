@@ -150,24 +150,30 @@ def sea_deformers():
 #   foam                      crest foam
 #   cshade, clit, crim        clouds: the shadowed body, the underside lit by the low sun, the silver rim
 #   isle                      the distant island's silhouette
+#   dback, dbelly, drim       a dolphin: its back, its belly, the sun's rim on it
 PALETTES = {
     "golden": dict(zenith="#203b78", mid="#9a86b4", warm="#ffc489", cool="#e8949a", sun="#fff3d6", glow="#ffa15e",
                    deep="#0b2453", rzen="#1c3a74", rhor="#d9988e", sss="#2fb3a3", glint="#fff0c8", foam="#fff1d8",
-                cshade="#7d6c9e", clit="#ffbf8a", crim="#fff0d2", isle="#6a5a92"),
+                cshade="#7d6c9e", clit="#ffbf8a", crim="#fff0d2", isle="#6a5a92",
+                dback="#2a2550", dbelly="#7e6f9e", drim="#ffd9a8"),
     "twilight": dict(zenith="#100d36", mid="#563a8a", warm="#ff9b7d", cool="#8a6cc2", sun="#ffe2cc", glow="#ff7f68",
                      deep="#0a0b35", rzen="#191c58", rhor="#8a6cbd", sss="#18cfe0", glint="#ffd6c2", foam="#bdfde6",
-                cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68"),
+                cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68",
+                dback="#140f33", dbelly="#4a3a78", drim="#ffc3a8"),
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
                      deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
-                cshade="#0a0a22", clit="#33346e", crim="#a8b6ff", isle="#0a0a26"),
+                cshade="#0a0a22", clit="#33346e", crim="#a8b6ff", isle="#0a0a26",
+                dback="#020410", dbelly="#141a3a", drim="#9fb4ff"),
     "tropical": dict(zenith="#1546a8", mid="#6aa6de", warm="#ffb04a", cool="#ff8fae", sun="#fff6d2", glow="#ff9a3a",
                      deep="#003d63", rzen="#0b5a8a", rhor="#ffae8a", sss="#22e0c0", glint="#fff4c4", foam="#fffbea",
-                cshade="#8b7fbd", clit="#ffab6a", crim="#fff2d2", isle="#5a5096"),
+                cshade="#8b7fbd", clit="#ffab6a", crim="#fff2d2", isle="#5a5096",
+                dback="#1a2e5a", dbelly="#6f86b0", drim="#ffe0b0"),
 }
 PALETTE = "twilight"
 DEBUG_SKY = None
 BANDS = 0
 DEBUG_CLOUD = None
+HERO_TEST_TIMES = None
 
 
 def pal(name, key, scale=1.0):
@@ -475,6 +481,299 @@ def island_meshes():
 ISLE_AZ, ISLE_DIST = -16.0, 4300.0
 
 
+# ================================================================================================ dolphins
+DOLPHIN_LEN = 3.1
+
+
+def dolphin_mesh():
+    """A stylised bottlenose dolphin, faceted (the Alpine family's grammar), nose at +X, dorsal +Y, length
+    DOLPHIN_LEN, tail at x = 0. A lofted body (elliptical rings along a profile with a melon and a beak), a swept
+    dorsal fin, two pectorals and the tail flukes."""
+    L = DOLPHIN_LEN
+    # stations: (x / L, half height, half width, centre-line y), all in units of L
+    prof = [(0.0, 0.010, 0.012, 0.0), (0.06, 0.022, 0.020, 0.004), (0.18, 0.045, 0.040, 0.010),
+            (0.34, 0.075, 0.068, 0.018), (0.52, 0.095, 0.085, 0.020), (0.68, 0.092, 0.083, 0.016),
+            (0.80, 0.075, 0.068, 0.010), (0.88, 0.058, 0.052, 0.004), (0.92, 0.036, 0.034, -0.012),
+            (0.97, 0.020, 0.020, -0.016), (1.0, 0.004, 0.004, -0.017)]
+    ring = 10
+    rings = []
+    for fx, hh, hw, cy in prof:
+        r = []
+        for k in range(ring):
+            a = 2.0 * math.pi * k / ring
+            r.append((fx * L, (cy + hh * math.cos(a)) * L, hw * math.sin(a) * L))
+        rings.append(r)
+    tris = []
+    for i in range(len(rings) - 1):
+        for k in range(ring):
+            a, b = rings[i][k], rings[i][(k + 1) % ring]
+            c, d = rings[i + 1][(k + 1) % ring], rings[i + 1][k]
+            tris += [(a, c, d), (a, b, c)]
+    tip = (L * 1.004, -0.017 * L, 0.0)
+    for k in range(ring):
+        tris.append((rings[-1][k], rings[-1][(k + 1) % ring], tip))
+    tail = (-0.004 * L, 0.0, 0.0)
+    for k in range(ring):
+        tris.append((rings[0][(k + 1) % ring], rings[0][k], tail))
+
+    def fin(pts, thick):
+        """A flat fin as a thin wedge: the outline `pts` (a fan from pts[0]) offset +-thick along z."""
+        out = []
+        for i in range(1, len(pts) - 1):
+            p0, p1, p2 = pts[0], pts[i], pts[i + 1]
+            up = [(q[0], q[1], q[2] + thick) for q in (p0, p1, p2)]
+            dn = [(q[0], q[1], q[2] - thick) for q in (p0, p1, p2)]
+            out += [tuple(up), (dn[0], dn[2], dn[1])]
+        return out
+
+    # dorsal fin: swept back, rooted on the back at x ~ 0.5 L
+    top = (0.115 * L)
+    tris += fin([(0.58 * L, top - 0.01 * L, 0.0), (0.40 * L, top - 0.01 * L, 0.0), (0.36 * L, top + 0.11 * L, 0.0),
+                 (0.46 * L, top + 0.07 * L, 0.0)], 0.012 * L)
+
+    def flat(pts, thick):
+        """A horizontal fin (y up): the outline in x/z, offset +-thick in y."""
+        out = []
+        for i in range(1, len(pts) - 1):
+            p0, p1, p2 = pts[0], pts[i], pts[i + 1]
+            up = [(q[0], q[1] + thick, q[2]) for q in (p0, p1, p2)]
+            dn = [(q[0], q[1] - thick, q[2]) for q in (p0, p1, p2)]
+            out += [(up[0], up[2], up[1]), tuple(dn)]
+        return out
+
+    for side in (1.0, -1.0):
+        # flukes
+        tris += flat([(0.03 * L, 0.0, 0.0), (0.0, 0.0, side * 0.03 * L), (-0.07 * L, 0.0, side * 0.17 * L),
+                      (-0.02 * L, 0.0, side * 0.15 * L), (0.06 * L, 0.0, side * 0.02 * L)], 0.006 * L)
+        # pectorals: below the sides, angled down and back
+        tris += [((0.70 * L, -0.03 * L, side * 0.07 * L), (0.60 * L, -0.11 * L, side * 0.17 * L),
+                  (0.64 * L, -0.04 * L, side * 0.08 * L))]
+        tris += [((0.70 * L, -0.03 * L, side * 0.07 * L), (0.64 * L, -0.04 * L, side * 0.08 * L),
+                  (0.60 * L, -0.11 * L, side * 0.17 * L))]
+    body = 2 * (len(prof) - 1) * ring + 2 * ring
+    # every body facet must face outward (its normal away from the centre line): checked, not assumed
+    for t in tris[:body]:
+        n = mx.cross(mx.sub(t[1], t[0]), mx.sub(t[2], t[0]))
+        cx = sum(v[0] for v in t) / 3.0
+        cy = sum(v[1] for v in t) / 3.0
+        cz = sum(v[2] for v in t) / 3.0
+        assert n[1] * cy + n[2] * cz >= -1e-9 or abs(cx - L) < 0.05 * L or cx < 0.02 * L, "inward facet"
+    mx.write_faceted(os.path.join(MESH_DIR, "do-dolphin.glb"), tris, "dolphin")
+    return len(tris)
+
+
+def dolphin_program():
+    """A dolphin against the low sun: a dark backlit body, a paler belly, a rim of sunlight on the edges that face
+    it and a wet sheen. Registers: 0 N, 1 V."""
+    P = Prog("doDolphin")
+    sx, sy, sz = S
+    pn = PALETTE
+    P.op("N", "input", 0, inp="normal")
+    P.op("V", "input", 1, inp="viewDirection")
+    P.op(None, "gradient", 2, a=0, k=[0.0, -1.0, 0.0, 0.2], f=0.8)                 # the belly
+    P.colour("dback", 3, pal(pn, "dback"))
+    P.colour("dbelly", 4, pal(pn, "dbelly"))
+    P.op("body", "mixBy", 3, a=3, b=4, c=2)
+    P.op(None, "fresnel", 2, f=2.2)                                               # the rim, toward the sun
+    P.op(None, "gradient", 4, a=1, k=[-0.5 * sx, -0.5 * sy, -0.5 * sz, 0.5], f=1.0)
+    P.op(None, "power", 4, a=4, f=5.0)
+    P.op(None, "multiply", 2, a=2, b=4)
+    P.colour("drim", 4, pal(pn, "drim"), 2.2)
+    P.op(None, "multiply", 2, a=2, b=4)
+    P.op(None, "add", 3, a=3, b=2)
+    P.op(None, "gradient", 2, a=0, k=[sx, sy, sz, 0.0], f=1.0)                     # wet sheen
+    P.op(None, "power", 2, a=2, f=24.0)
+    P.colour("dsheen", 4, pal(pn, "glint"), 1.5)
+    P.op(None, "multiply", 2, a=2, b=4)
+    P.op("lit", "add", 3, a=3, b=2)
+    return P
+
+
+def catmull(points, closed, samples=64):
+    """The engine's Catmull-Rom (spatial/spline.cpp: a Hermite segment with tangents (next - prev) * tension, tension
+    0.5), sampled densely: [(x, y, z, distance)]."""
+    n = len(points)
+    segs = n if closed else n - 1
+
+    def P(i):
+        return points[i % n] if closed else points[max(0, min(n - 1, i))]
+
+    out = []
+    dist = 0.0
+    last = None
+    for sg in range(segs):
+        a, b, pv, nx = P(sg), P(sg + 1), P(sg - 1), P(sg + 2)
+        m0 = [(b[k] - pv[k]) * 0.5 for k in range(3)]
+        m1 = [(nx[k] - a[k]) * 0.5 for k in range(3)]
+        for j in range(samples):
+            u = j / samples
+            u2, u3 = u * u, u * u * u
+            h00, h10, h01, h11 = 2 * u3 - 3 * u2 + 1, u3 - 2 * u2 + u, -2 * u3 + 3 * u2, u3 - u2
+            q = tuple(a[k] * h00 + m0[k] * h10 + b[k] * h01 + m1[k] * h11 for k in range(3))
+            if last is not None:
+                dist += math.sqrt(sum((q[k] - last[k]) ** 2 for k in range(3)))
+            out.append((q[0], q[1], q[2], dist))
+            last = q
+    end = P(segs) if not closed else P(0)
+    dist += math.sqrt(sum((end[k] - last[k]) ** 2 for k in range(3)))
+    out.append((end[0], end[1], end[2], dist))
+    return out
+
+
+def crossings(samples):
+    """Where the curve passes through the mean sea level going up (an exit) and down (an entry): [(kind, distance,
+    point)]."""
+    out = []
+    for p, q in zip(samples, samples[1:]):
+        if (p[1] < 0.0) != (q[1] < 0.0):
+            t = p[1] / (p[1] - q[1])
+            pt = tuple(p[k] + (q[k] - p[k]) * t for k in range(3))
+            out.append(("exit" if q[1] > p[1] else "entry", p[3] + (q[3] - p[3]) * t, pt))
+    return out
+
+
+def leap_points(centre, heading_deg, height, half_span, loop=True, depth=36.0, reach=60.0):
+    """A leap in the vertical plane through `centre` along `heading` (degrees from +X toward -Z): out of the deep, an
+    arc `height` m over the mean sea level and `2 half_span` m wide, back down; with `loop`, a long return far below
+    (invisible under the opaque sea) closes it. In the plane: (along, up)."""
+    h = math.radians(heading_deg)
+    T = (math.cos(h), 0.0, -math.sin(h))
+    w = half_span
+    prof = [(-2.4 * w, -6.5), (-1.25 * w, -2.6), (-0.55 * w, 0.75 * height), (0.0, height),
+            (0.55 * w, 0.75 * height), (1.25 * w, -2.6), (2.4 * w, -6.5)]
+    if loop:
+        prof += [(2.4 * w + 0.4 * reach, -0.45 * depth), (1.2 * w + 0.5 * reach, -depth),
+                 (-1.2 * w - 0.5 * reach, -depth), (-2.4 * w - 0.4 * reach, -0.45 * depth)]
+    return [(round(centre[0] + T[0] * a, 3), round(b, 3), round(centre[2] + T[2] * a, 3)) for a, b in prof]
+
+
+# The pods: (name, centre (x, z), heading deg, height, half span, period s, lag s per member, member offsets (along
+# the view's depth, height scale)). Pod A crosses the sun's path at 70 m left to right; pod B, smaller and far, swims
+# right to left near the island side.
+PODS = [
+    ("podA", (17.0, -88.0), -4.0, 2.3, 5.5, 31.0, [(0.0, 0.0, 1.0), (0.55, -3.5, 0.85), (1.25, 2.8, 0.92)]),
+    ("podB", (-42.0, -150.0), 176.0, 2.0, 5.0, 47.0, [(0.0, 0.0, 1.0), (0.7, 3.0, 0.8)]),
+]
+LEAP_SPEED = 8.5             # metres a second along the path (a dolphin's leap)
+HERO = ("hero", (10.0, -56.0), -2.0, 4.2, 7.0)
+HERO_ATTACK_MS = None        # computed from the hero path's length
+
+
+def spline_node(name, points, closed):
+    return {"name": name, "kind": "spline", "spline": {
+        "name": name, "kind": "catmullRom", "closed": bool(closed), "tension": 0.5, "generator": "points",
+        "points": [{"position": list(p), "roll": 0.0, "scale": 1.0} for p in points], "samplesPerSegment": 48,
+        "up": [0.0, 1.0, 0.0]}}
+
+
+def dolphin_node(s, name, spline):
+    """One dolphin: the tail's kick (a local sine growing from the nose to the flukes), then bent along `spline` by the
+    path deformer, whose `pathOffset` (deform/2) is where along the path its tail is."""
+    s.proc(name, {"kind": "mesh", "asset": "meshes/do-dolphin.glb"}, material=unlit("doDolphin"), deformers=[
+        {"kind": "sine", "amount": 0.07, "frequency": round(2.0 * math.pi / (1.7 * DOLPHIN_LEN), 5), "speed": 7.5,
+         "phase": 0.0, "axis": [1.0, 0.0, 0.0], "displacementAxis": [0.0, 1.0, 0.0], "center": [DOLPHIN_LEN, 0.0, 0.0],
+         "falloff": DOLPHIN_LEN, "space": "local"},
+        {"kind": "path", "spline": spline, "amount": 1.0, "axis": [1.0, 0.0, 0.0], "center": [0.0, 0.0, 0.0],
+         "pathOffset": 0.0, "pathScale": 1.0, "pathRoll": 0.0, "space": "local"}])
+
+
+def splash(s, name, point, capacity=320):
+    """Water thrown up where a dolphin breaks the surface, and the rings its drops leave (`spawnRate` is routed open for
+    the moment the body passes through)."""
+    s.particles(name, capacity=capacity, seed=zlib_seed(name), shape="sphere",
+                position=[round(point[0], 3), 0.25, round(point[2], 3)], extent=[0.45, 0.45, 0.45],
+                direction=[0.0, 1.0, 0.0], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=1.1, spread=0.34,
+                speedMin=3.0, speedMax=7.5, gravity=[0.0, -9.8, 0.0], drag=0.3, sizeStart=0.085, sizeEnd=0.025,
+                colorStart=pal(PALETTE, "foam") + [0.95], colorEnd=pal(PALETTE, "sss") + [0.0], emissive=1.6,
+                blend="additive", turbulence=0.0, collision="splash", collisionHeight=0.0, splashLifetime=1.3,
+                splashSize=9.0, ringThickness=0.07)
+
+
+def zlib_seed(name):
+    import zlib
+    return zlib.crc32(name.encode()) % 100000
+
+
+def window_routes(source, target, lo, hi, amount, period_wrap=True):
+    """`amount` on `target` while `source` (0..1) is in [lo, hi): two binary steps, +amount at lo and -amount at hi.
+    Wrapped into 0..1 (a window across the wrap is split)."""
+    lo, hi = lo % 1.0, hi % 1.0
+    if hi < lo:          # across the wrap: [lo, 1) and [0, hi)
+        return (window_routes(source, target, lo, 0.99999, amount) + window_routes(source, target, 0.0, hi, amount))
+    out = []
+    if lo > 0.0:
+        out.append(R(source, target, amount, threshold="binary", thresholdLevel=round(lo, 5)))
+    else:
+        out.append(R(source, target, amount, gain=0.0, offset=1.0))
+    out.append(R(source, target, -amount, threshold="binary", thresholdLevel=round(hi, 5)))
+    return out
+
+
+def solve_loop(centre, heading, height, span, length):
+    """The return depth/reach that makes a closed leap loop `length` metres long (bisection on the reach)."""
+    lo, hi = 10.0, 900.0
+    for _ in range(40):
+        mid = 0.5 * (lo + hi)
+        pts = leap_points(centre, heading, height, span, True, depth=0.35 * mid + 20.0, reach=mid)
+        L = catmull(pts, True)[-1][3]
+        if L < length:
+            lo = mid
+        else:
+            hi = mid
+    return pts
+
+
+def dolphins(s):
+    """The pods (ambient: an LFO saw per pod, pure in time, seamless at its wrap because the loop is closed), and the
+    hero leap (an envelope fired by a pad: its linear attack carries the hero along an open path, its instant release
+    sends it back to the start, deep under the opaque sea, unseen)."""
+    dolphin_mesh()
+    s.program(dolphin_program().doc(emission=3))
+    for pod, (cx, cz), heading, height, span, period, members in PODS:
+        s.sources.append({"kind": "lfo", "name": pod, "settings": {"shape": "saw"}})
+        s.param("sources/%s/rate" % pod, round(1.0 / period, 6))
+        for m, (lag, depth_off, hscale) in enumerate(members):
+            h = math.radians(heading)
+            nrm = (math.sin(h), 0.0, math.cos(h))                  # across the leap plane, toward the camera
+            c = (cx + nrm[0] * depth_off, 0.0, cz + nrm[2] * depth_off)
+            pts = solve_loop(c, heading, height * hscale, span * (0.85 + 0.15 * hscale), period * LEAP_SPEED)
+            curve = catmull(pts, True)
+            L = curve[-1][3]
+            name = "%s_%d" % (pod, m)
+            s.nodes.append(spline_node(name + "_path", pts, True))
+            dolphin_node(s, name, name + "_path")
+            off = -lag / period
+            s.route(R("lfo." + pod, "procedural/%s/deform/2/pathOffset" % name, L, offset=round(off, 5)))
+            for kind, dc, pt in crossings(curve):
+                sp = "%s_%s" % (name, kind)
+                splash(s, sp, pt)
+                # the nose reaches the surface at tail offset dc - L_d, the tail leaves it at dc
+                lo = (dc - DOLPHIN_LEN) / L - off
+                hi = dc / L - off
+                s.route(*window_routes("lfo." + pod, "particles/%s/spawnRate" % sp, lo, hi + 0.15 / period, 520.0))
+    # the hero
+    name, (cx, cz), heading, height, span = HERO
+    pts = leap_points((cx, 0.0, cz), heading, height, span, loop=False)
+    curve = catmull(pts, False)
+    L = curve[-1][3]
+    s.nodes.append(spline_node("hero_path", pts, False))
+    dolphin_node(s, "hero", "hero_path")
+    attack = (L - DOLPHIN_LEN) / LEAP_SPEED * 1000.0
+    s.sources.append({"kind": "envelope", "name": "leap", "settings": {"trigger": LEAP_TRIGGER}})
+    s.params_({"sources/leap/attackMs": round(attack, 1), "sources/leap/decayMs": 0.0, "sources/leap/sustain": 1.0,
+               "sources/leap/holdMs": 250.0, "sources/leap/releaseMs": 1.0})
+    span_d = L - DOLPHIN_LEN
+    s.route(R("env.leap", "procedural/hero/deform/2/pathOffset", span_d))
+    for kind, dc, pt in crossings(curve):
+        sp = "hero_%s" % kind
+        splash(s, sp, pt, capacity=600)
+        lo, hi = (dc - DOLPHIN_LEN) / span_d, dc / span_d + 0.2 * LEAP_SPEED / span_d
+        s.route(*window_routes("env.leap", "particles/%s/spawnRate" % sp, max(lo, 0.001), min(hi, 0.999), 800.0))
+
+
+LEAP_TRIGGER = "control.padLeap"
+
+
 SUN_RADIUS_DEG = 1.7
 SUN_COS = math.cos(math.radians(SUN_RADIUS_DEG))
 
@@ -538,6 +837,13 @@ def build():
                      "roughness": 1.0, "metallic": 0.0, "unlit": True},
            transform={"position": [round(ISLE_DIST * math.sin(a), 2), 0.0, round(-ISLE_DIST * math.cos(a), 2)],
                       "rotation": [0.0, 20.0, 0.0], "scale": [1.7, 0.95, 1.0]})
+    dolphins(s)
+    if HERO_TEST_TIMES:      # look development: fire the hero leap from a scored timeline instead of a pad
+        s.sources.append({"kind": "timeline", "name": "leaptest", "settings": {
+            "mode": "event", "keys": [{"time": t, "value": 1.0} for t in HERO_TEST_TIMES]}})
+        for src in s.sources:
+            if src["name"] == "leap":
+                src["settings"]["trigger"] = "timeline.leaptest"
     camera(s)
     s.params_({"post/bloom/intensity": 0.22, "post/bloom/threshold": 1.4, "post/bloom/emissionWeight": 1.0,
                "post/tonemap/operator": 4, "post/output/vignette": 0.25, "post/output/grain": 0.008})
