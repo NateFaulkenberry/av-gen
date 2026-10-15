@@ -13,8 +13,13 @@
 #include "params/modulation.hpp"
 #include "params/preset.hpp"
 #include "scene/scene.hpp"
+#include "core/time.hpp"
+#include "spatial/audio_history.hpp"
+#include "support/groove.hpp"
 #include "support/project_assets.hpp"
+#include "support/temp_dir.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <fcntl.h>
@@ -301,4 +306,76 @@ TEST_CASE("THE RIFT: the bodies' live limits are live-only (ADR-1344)", "[rift][
     }
     const app::RenderSettings render; // tier "offline", limits "tier": what `avgen --render` of rift.json uses
     CHECK_FALSE(render.resolvedLimits().proceduralDistanceCull);
+}
+
+TEST_CASE("THE RIFT LIVE: the arc, the stage machine's listeners and the fields hear the Response (ADR-1361)",
+          "[rift][live][adr1361]") {
+    REQUIRE_RIFT_SCENE();
+    static const fs::path wav = [] {
+        testsupport::GrooveSpec spec;
+        spec.bars = 8;
+        const auto g = testsupport::makeGroove(spec);
+        const fs::path p = testsupport::processTempDir() / "rift_live_response.wav";
+        REQUIRE(g.file.writeWav(p).has_value());
+        return p;
+    }();
+    struct Heard {
+        double energy = 0.0, bass = 0.0;
+        spatial::AudioResponse response;
+    };
+    auto run = [](float sensitivity, float transient) {
+        app::Engine engine(app::EngineMode::Offline);
+        engine.setLiveControl(false);
+        REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift-live.json").has_value());
+        REQUIRE(engine.loadAudio(wav).has_value());
+        engine.params().findAs<float>("sonic/response/sensitivity")->setBase(sensitivity);
+        engine.params().findAs<float>("sonic/response/transient")->setBase(transient);
+        FixedStepClock clock(30.0);
+        Heard h;
+        int n = 0;
+        for (int i = 0; i < 240; ++i) {
+            const FrameTime t = engine.tick(clock);
+            engine.update(t);
+            if (t.renderTime >= 1.0) {
+                h.energy += engine.params().find("macros/energy")->finalComponent(0);
+                h.bass += engine.params().find("macros/bassSlow")->finalComponent(0);
+                ++n;
+            }
+        }
+        h.energy /= n;
+        h.bass /= n;
+        REQUIRE(engine.audioHistory() != nullptr);
+        h.response = engine.audioHistory()->response();
+        return h;
+    };
+    const Heard dull = run(0.2f, 0.5f);
+    const Heard neutral = run(0.5f, 0.5f);
+    const Heard keen = run(0.8f, 0.5f);
+    INFO("energy " << dull.energy << " / " << neutral.energy << " / " << keen.energy << "; bassSlow " << dull.bass
+                   << " / " << neutral.bass << " / " << keen.bass);
+    CHECK(dull.energy < neutral.energy);
+    CHECK(neutral.energy < keen.energy);
+    CHECK(dull.bass < neutral.bass); // the listener the Breath / Awake / Drop thresholds read
+    CHECK(neutral.bass < keen.bass);
+    // The fields (the kick front, the highs) read the history through the same controls; neutral is the identity.
+    CHECK(neutral.response.neutral());
+    const Heard kicks = run(0.5f, 0.2f);
+    CHECK(kicks.response.hitSensitivity == Catch::Approx(0.2f));
+    CHECK(kicks.response.levelSensitivity == Catch::Approx(0.5f));
+}
+
+TEST_CASE("THE RIFT LIVE: a seek on Trench lands in the drop, through the response-heard listeners", "[rift][live][adr1361][adr1168]") {
+    REQUIRE_RIFT_SCENE();
+    testsupport::skipUnlessProjectAssetsPresent(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json");
+    app::Engine engine(app::EngineMode::Offline);
+    engine.setLiveControl(false);
+    REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift-live.json").has_value());
+    REQUIRE(engine.loadAudio(fs::path(AVGEN_SOURCE_DIR) / "assets/audio/trench.wav").has_value());
+    engine.seekSeconds(100.0);
+    FrameTime t{};
+    t.renderTime = 100.0;
+    t.deltaTime = 0.0;
+    engine.update(t);
+    INFO("state after a seek to 100 s: '" << engine.states().current() << "'");
+    CHECK(engine.states().current() == "Drop");
 }

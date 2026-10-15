@@ -44,7 +44,8 @@ namespace avgen::rendering {
 // Mirrors `FieldAudio` in shaders/fields.wgsl (ADR-1116, 288 bytes).
 struct FieldAudioGpu {
     glm::uvec4 ring{0u};   // x = ring offset in the table (floats), y = rows, z = bins, w = 1 when audio is bound
-    glm::vec4 timing{0.0f, -1.0f, 0.0f, 0.0f}; // x = rows per second, y = newest row (-1 none), z = audible rows
+    glm::vec4 timing{0.0f, -1.0f, 0.0f, 0.0f}; // x = rows per second, y = newest row (-1 none), z = audible rows,
+                                               // w = onset decay scale (1 / Release, ADR-1361)
     // Literal extents: the layout guard (tests/unit/test_renderer_layout_guards.cpp) scrapes them.
     glm::vec4 onsetAge[8];      // source s: [2s], [2s + 1]; < 0 = none
     glm::vec4 onsetStrength[8];

@@ -2,14 +2,14 @@
   "examples": [
     {
       "category": "Astral Forge",
-      "description": "Play live audio with a strong kick (a mix or a drum bus) plus a MIDI controller: CC 1-13 summon, hold and shape the god, pad 36 collapses it, pads 37-44 pick a god. A god of dust forms from the music and collapses on the drop. MIDI map: docs/prototypes/astral-forge/09-production.md.",
+      "description": "Play live audio with a strong kick (a mix or a drum bus) plus a MIDI controller: CC 1-13 summon, hold and shape the god, pad 36 collapses it, pads 37-44 pick a god. A god of dust forms from the music and collapses on the drop. The Live panel's Response controls shape what the conductor hears: Transients which kicks count (and collapse the god), Sensitivity and Sustain the spectrum the matter reads, Attack and Release its envelopes. MIDI map: docs/prototypes/astral-forge/09-production.md.",
       "live": true,
       "name": "Astral Forge Live",
       "project": "astral-forge/astral-forge-live.json"
     },
     {
       "category": "Digital Mosh",
-      "description": "Play live audio (a full mix) plus a MIDI controller: CC 1 sets the sensitivity, drum pads 36-43 force a stage (Dream to Recovery). A painted Dali/Tanguy dream that the music corrupts like a datamosh, then restores. See docs/prototypes/digital-mosh/03-implementation.md.",
+      "description": "Play live audio (a full mix) plus a MIDI controller: CC 1 sets the sensitivity, drum pads 36-43 force a stage (Dream to Recovery). A painted Dali/Tanguy dream that the music corrupts like a datamosh, then restores. The Live panel's Response controls set what it hears: Sensitivity how loud the music reads (a quiet input drives the arc less), Transients the kick, snare and hat. See docs/prototypes/digital-mosh/03-implementation.md.",
       "live": true,
       "name": "Digital Mosh Live",
       "project": "digital-mosh/digital-mosh-live.json"
@@ -208,14 +208,14 @@
     },
     {
       "category": "Sonic Garden",
-      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard (pad, bell, bass or percussion). The Sonic Garden played live: the same Sonic Character and worlds as the file version. Opening it turns live input on; pick devices in View > Live. See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
+      "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard (pad, bell, bass or percussion). The Sonic Garden played live: the same Sonic Character and worlds as the file version; its loudness, strikes and note gestures follow the Live panel's Response controls. Opening it turns live input on; pick devices in View > Live. See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
       "live": true,
       "name": "Sonic Live",
       "project": "sonic-garden/sonic-live.json"
     },
     {
       "category": "The Rift",
-      "description": "Play any music with a clear build and drop into the live input (BlackHole or a mixer feed). MIDI: CC1 sensitivity, CC2 wave speed, CC3 how easily the ecosystem fires, CC4 how much light floods the canyon; pads 36-42 force a stage (Dark ... Drop ... Aftermath). Run examples/bioluminescent/build.py first (it writes the 14 MB scene).",
+      "description": "Play any music with a clear build and drop into the live input (BlackHole or a mixer feed). MIDI: CC1 sensitivity, CC2 wave speed, CC3 how easily the ecosystem fires, CC4 how much light floods the canyon; pads 36-42 force a stage (Dark ... Drop ... Aftermath). The Live panel's Response controls set what the canyon hears: Sensitivity how loud the music reads (and so how far the arc goes), Transients the kicks that launch the fronts and the snares. Run examples/bioluminescent/build.py first (it writes the 14 MB scene).",
       "live": true,
       "name": "THE RIFT LIVE",
       "project": "bioluminescent/rift-live.json",

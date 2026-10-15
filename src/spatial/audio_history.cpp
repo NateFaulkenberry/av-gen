@@ -28,6 +28,61 @@ std::optional<OnsetSource> onsetSourceFromName(std::string_view name) {
     return std::nullopt;
 }
 
+namespace {
+
+float clamp01(float v) {
+    return std::clamp(v, 0.0f, 1.0f);
+}
+
+// sonic/response.cpp's curve and presence (ADR-1062), which tests/unit/test_live_response.cpp holds these to.
+float responseCurve(float x, float sensitivity) {
+    return std::pow(clamp01(x), std::exp2((0.5f - sensitivity) * 1.6f));
+}
+
+float presence(float sensitivity) {
+    return clamp01(sensitivity / 0.1f);
+}
+
+} // namespace
+
+bool AudioResponse::neutral() const {
+    return *this == AudioResponse{};
+}
+
+float AudioResponse::hit(float strength) const {
+    if (hitSensitivity == 0.5f) {
+        return strength;
+    }
+    if (hitSensitivity <= 0.0f || strength < std::max(0.0f, 0.5f - hitSensitivity) * 1.2f) {
+        return 0.0f;
+    }
+    return responseCurve(strength, hitSensitivity) * presence(hitSensitivity);
+}
+
+float AudioResponse::level(float value) const {
+    if (levelSensitivity == 0.5f) {
+        return value;
+    }
+    return responseCurve(value, levelSensitivity) * presence(levelSensitivity);
+}
+
+float onsetDecayScale(const AudioResponse& response) {
+    return 1.0f / std::clamp(response.release, 0.25f, 4.0f);
+}
+
+void AudioHistory::setResponse(const AudioResponse& response) {
+    if (response == response_) {
+        return;
+    }
+    // Only what changes the rows' or the onsets' meaning refills a ring; attack and release are the readers'.
+    const bool heard = response.hitSensitivity != response_.hitSensitivity ||
+                       response.levelSensitivity != response_.levelSensitivity;
+    response_ = response;
+    if (heard) {
+        ++revision_;
+    }
+}
+
 AudioHistory AudioHistory::whole(double rowRate, double firstRowTime, std::vector<float> rows,
                                  std::array<std::vector<AudioOnset>, kOnsetSources> onsets) {
     AudioHistory h;
@@ -127,7 +182,7 @@ float AudioHistory::value(std::int64_t row, int bin) const {
     if (row < firstHeld_ || row >= rowCount() || bin < 0 || bin >= kAudioBins) {
         return 0.0f;
     }
-    return rows_[static_cast<std::size_t>(row - firstHeld_) * kAudioBins + static_cast<std::size_t>(bin)];
+    return response_.level(rows_[static_cast<std::size_t>(row - firstHeld_) * kAudioBins + static_cast<std::size_t>(bin)]);
 }
 
 int AudioHistory::lastOnsets(OnsetSource source, double clock, std::span<float> ages, std::span<float> strengths) const {
@@ -139,8 +194,12 @@ int AudioHistory::lastOnsets(OnsetSource source, double clock, std::span<float> 
     int written = 0;
     while (it != list.begin() && static_cast<std::size_t>(written) < n) {
         --it;
+        const float heard = response_.hit(it->strength);
+        if (heard <= 0.0f) {
+            continue; // ADR-1361: below the performer's floor -- an older onset takes its place
+        }
         ages[static_cast<std::size_t>(written)] = static_cast<float>(clock - it->time);
-        strengths[static_cast<std::size_t>(written)] = it->strength;
+        strengths[static_cast<std::size_t>(written)] = heard;
         ++written;
     }
     return written;

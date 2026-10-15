@@ -87,6 +87,7 @@ Result<void> ResponseSettings::applyJson(const nlohmann::json& j) {
     fluxAttack = j.value("fluxAttack", fluxAttack);
     fluxRelease = j.value("fluxRelease", fluxRelease);
     intensitySeconds = j.value("intensitySeconds", intensitySeconds);
+    levelSlowSeconds = std::max(0.05f, j.value("levelSlowSeconds", levelSlowSeconds));
     hatRateSeconds = std::max(0.1f, j.value("hatRateSeconds", hatRateSeconds));
     hatRateFull = std::max(0.1f, j.value("hatRateFull", hatRateFull));
     melodicFull = std::max(0.1f, j.value("melodicFull", melodicFull));
@@ -129,6 +130,9 @@ void ResponseModel::declare(signals::SignalBus& bus) {
     bus.setLabel(ids_.pitch, "pitch of the latest note or confident pitch (0 = C1, 1 = C8)");
     ids_.intensity = bus.declare("response.intensity");
     bus.setLabel(ids_.intensity, "intensity (level over 12 s: the macro dynamics)");
+    // ADR-1361: declared last, after every older id.
+    ids_.levelSlow = bus.declare("response.levelSlow");
+    bus.setLabel(ids_.levelSlow, "level, slow (over about 3 s: when a rest becomes silence)");
 }
 
 void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseControls& c, const ResponseSettings& s) {
@@ -194,6 +198,7 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
                               levelS) * presence(levelS);
     follow(flux_, fluxN, dt, s.fluxAttack * att, s.fluxRelease * rel);
     follow(intensity_, levelN, dt, s.intensitySeconds, s.intensitySeconds);
+    follow(levelSlow_, levelN, dt, s.levelSlowSeconds * att, s.levelSlowSeconds * rel); // ADR-1361
     // Melodic activity from the audio: confident pitch moves of half a semitone or more, weighted by size (7 = 1).
     float move = 0.0f;
     if (f.f0Hz > 0.0f && f.pitchConfidence >= 0.5f) {
@@ -284,6 +289,7 @@ void ResponseModel::publish(signals::SignalBus& bus, const NoteTrack& notes, dou
     bus.set(ids_.melodic, std::max(clamp01(melodic_ / s.melodicFull), clamp01(midiMelodic)));
     bus.set(ids_.pitch, midiPitch >= 0.0f ? midiPitch : std::max(audioPitch_, 0.0f));
     bus.set(ids_.intensity, intensity_);
+    bus.set(ids_.levelSlow, levelSlow_);
 }
 
 void ResponseModel::publishZeros(signals::SignalBus& bus) {
@@ -295,7 +301,7 @@ void ResponseModel::publishZeros(signals::SignalBus& bus) {
         bus.set(ids_.env[h], 0.0f);
     }
     for (const signals::SignalId id : {ids_.bass, ids_.level, ids_.transient, ids_.sustain, ids_.flux, ids_.hatRate,
-                                       ids_.melodic, ids_.pitch, ids_.intensity}) {
+                                       ids_.melodic, ids_.pitch, ids_.intensity, ids_.levelSlow}) {
         bus.set(id, 0.0f);
     }
 }

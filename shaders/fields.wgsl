@@ -60,7 +60,7 @@ struct FieldGpu {
 // are held; anything older or newer reads 0.
 struct FieldAudio {
     ring: vec4<u32>,                    // x = ring offset in gridTable (floats), y = rows, z = bins, w = 1 when audio is bound
-    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none), z = audible rows (kAudioMaxDelayRows)
+    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none), z = audible rows (kAudioMaxDelayRows), w = onset decay scale (1 / Release, ADR-1361)
     onsetAge: array<vec4<f32>, 8>,      // source s (low, mid, high, beat): [2s] and [2s + 1] hold its newest 8 onsets' ages (s), < 0 none
     onsetStrength: array<vec4<f32>, 8>,
 };
@@ -489,7 +489,7 @@ fn audioShape(fi: u32, q: vec3<f32>) -> f32 {
                 let x = (d - age * params0.w) / params1.w;
                 front = exp(-(x * x));
             }
-            sum = sum + fieldBlock.audio.onsetStrength[lane][k % 4u] * exp(-max(params1.z, 0.0) * age) * front;
+            sum = sum + fieldBlock.audio.onsetStrength[lane][k % 4u] * exp(-max(params1.z, 0.0) * fieldBlock.audio.timing.w * age) * front;
         }
         return sum;
     }

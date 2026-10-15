@@ -34,7 +34,7 @@ public:
     explicit LiveAudioHistoryFeed(const AnalyzerConfig& config);
     // Push the render frame's newest analysis frame (events already latched).
     void push(const AnalysisFrame& frame);
-    [[nodiscard]] std::shared_ptr<const spatial::AudioHistory> history() const { return history_; }
+    [[nodiscard]] std::shared_ptr<spatial::AudioHistory> history() const { return history_; }
 
 private:
     AnalyzerConfig config_;

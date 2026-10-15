@@ -13,6 +13,9 @@
 namespace avgen::analysis {
 class AnalysisTrack;
 }
+namespace avgen::spatial {
+struct AudioResponse;
+}
 
 namespace avgen::astral {
 
@@ -40,6 +43,7 @@ struct SongAnalysis {
     std::vector<Section> sections;
     std::vector<float> novelty;   // beat-synchronous Foote novelty, one per beat
     double analyseSeconds = 0.0;
+    float release = 1.0f;         // ADR-1361: the performer's Release, which lengthens the hit envelopes' decay
 };
 
 // From a track production already analysed (an offline render's or the editor's track): no second analysis.
@@ -47,6 +51,12 @@ struct SongAnalysis {
 SongAnalysis buildSong(const analysis::AnalysisTrack& track, double durationSeconds);
 // The prototype's path: analyse a file (cached at `cachePath` when non-empty). Exits on an unreadable file.
 SongAnalysis loadSong(const std::string& path, const std::string& cachePath);
+// ADR-1361: the song as the performer's Response controls hear it -- the spectrogram through the level sensitivity,
+// the band envelopes and the centroid folded again from it with the attack and release multiplied, the hits through
+// the hit sensitivity (one below its floor is dropped). Neutral controls give `base` back unchanged.
+SongAnalysis conditionSong(const SongAnalysis& base, const spatial::AudioResponse& response);
+// The band envelopes (env0, env1.x) and the centroid of `s.spec`, the attack and release times multiplied.
+void foldSongEnvelopes(SongAnalysis& s, float attackScale, float releaseScale);
 
 struct AudioAtT {
     glm::vec4 env0{0.0f}, env1{0.0f};

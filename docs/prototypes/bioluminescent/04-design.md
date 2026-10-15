@@ -154,3 +154,13 @@ controls:
 | pads 36-42 | states | Dark, Stirring, Awake, Build, Drop, Body, Aftermath: force a stage, and the arc carries on from it |
 
 Every ecosystem layer's behaviour is also a parameter (`ecosystem/<layer>/...`), so any of them can be mapped.
+
+**The Live panel's Response controls (ADR-1361).** THE RIFT LIVE hears the music through `sonic/response/*`. The
+routes read the response layer (`examples/bioluminescent/build.py`, `LIVE_HEARD`): the snare that throws the swarm is
+`response.snare`, and `audio.energy`, `audio.bass`, `audio.mid` and `audio.trebleLevel` keep their shape but are
+multiplied by the response level they are heard at (fixed dB, -44..-2), so the arc's two listeners -- and the stage
+machine -- answer Sensitivity and Sustain. The kick front and the highs read the audio history, which the engine
+hears through the same controls: Transients decides which kicks launch a front, Sustain curves the highs, Release
+lengthens the front. At the neutral controls the stage sequence on Trench is the old one, stage for stage; a take
+15 dB down now stays in the early stages until Sensitivity is raised. CC 1 still trims how far the arc follows.
+docs/development/live-response-everywhere.md has the measurements.

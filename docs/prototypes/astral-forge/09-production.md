@@ -135,6 +135,12 @@ editor reach it.
 - **Summon outranks collapse.** A collapse while summon is up flashes and restarts the phrase, but the god stays
   formed.
 
+**The Live panel's Response controls (ADR-1361)** shape what either conductor hears: Transients which kicks,
+snares and hats count (a kick under the floor never collapses the god, the rest land softer or harder against the
+collapse's 0.5 and the blast), Sensitivity and Sustain the spectrum the matter reads, Attack and Release the band and
+hit envelopes. At the neutral controls the song conductor conducts the very song it did before, so offline renders
+are unchanged.
+
 ## 3. Live and offline tiers
 
 `QualitySettings::astralTier` is ADR-1222. It changes the sampling only, never the composition.

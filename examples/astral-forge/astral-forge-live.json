@@ -4,7 +4,7 @@
   "app": {
     "name": "THE ASTRAL FORGE LIVE"
   },
-  "_note": "Live input + MIDI (ADR-1222). The live conductor builds phrases from the beats it hears; a strong kick on a phrase downbeat (or pad 36) collapses the god. MIDI map: docs/prototypes/astral-forge/09-production.md.",
+  "_note": "Live input + MIDI (ADR-1222). The live conductor builds phrases from the beats it hears; a strong kick on a phrase downbeat (or pad 36) collapses the god. MIDI map: docs/prototypes/astral-forge/09-production.md. The Live panel's Response controls (sonic/response/*) shape what the conductor hears (ADR-1361): Transients which kicks count, Sensitivity and Sustain the spectrum, Attack and Release the envelopes.",
   "assets": {
     "scene": {
       "kind": "composition",

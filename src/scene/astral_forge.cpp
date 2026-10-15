@@ -247,8 +247,12 @@ void AstralLiveConductor::ingest(const spatial::AudioHistory& audio, double now)
         song_.t0 = static_cast<float>(now - static_cast<double>(newest - nextRow_) / rate);
     }
     // The prototype's envelopes (buildSong), one row at a time: band attack 12 ms / release 220 ms, a slow centroid.
-    const float att = 1.0f - std::exp(-1.0f / (0.012f * song_.hopRate));
-    const float rel = 1.0f - std::exp(-1.0f / (0.22f * song_.hopRate));
+    // ADR-1361: the rows are heard through the performer's Response controls (AudioHistory::value), and Attack and
+    // Release multiply the two times.
+    const spatial::AudioResponse& heard = audio.response();
+    song_.release = std::clamp(heard.release, 0.25f, 4.0f);
+    const float att = 1.0f - std::exp(-1.0f / (0.012f * std::clamp(heard.attack, 0.25f, 4.0f) * song_.hopRate));
+    const float rel = 1.0f - std::exp(-1.0f / (0.22f * song_.release * song_.hopRate));
     const float cen = 1.0f - std::exp(-1.0f / (1.5f * song_.hopRate));
     auto binOf = [&](float hz) { return std::clamp(static_cast<int>(std::log(hz / 32.0f) / std::log(16000.0f / 32.0f) * B), 0, B); };
     const int cuts[6] = {0, binOf(150), binOf(400), binOf(2000), binOf(6000), B};
@@ -283,8 +287,12 @@ void AstralLiveConductor::ingest(const spatial::AudioHistory& audio, double now)
         for (const spatial::AudioOnset& o : list) {
             if (o.time <= last + 1e-6 || o.time > now + 1e-6) continue;
             if (T != nullptr) {
+                // ADR-1361: a hit as heard -- one below the performer's floor is not a kick at all, and the curve
+                // moves the rest against the collapse's 0.5 (kickNear) and the blast.
+                const float strength = heard.hit(std::max(0.25f, o.strength)); // the song path's order (conditionSong)
+                if (strength <= 0.0f) continue;
                 T->push_back(static_cast<float>(o.time));
-                S->push_back(std::max(0.25f, o.strength));
+                S->push_back(strength);
             } else {
                 beats->push_back(o.time);
             }

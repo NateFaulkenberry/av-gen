@@ -5,7 +5,7 @@
 //
 //   raw -> floor gate -> normalise -> sensitivity -> response curve -> attack/release -> response.*
 //
-// Levels (bass, level, sustain, flux) are read in dB on a fixed range, never auto-gained, so a quiet passage looks
+// Levels (bass, level, levelSlow, sustain, flux) are read in dB on a fixed range, never auto-gained, so a quiet passage looks
 // quiet. Sensitivity MOVES THE FLOOR (+-18 dB) and the curve (gamma = 2^((0.5 - s) 1.6)); it never multiplies the
 // top, so a loud sound cannot be pushed past 1 and a quiet one is lifted rather than scaled. Hits (kick, snare,
 // hat, low, onset) come from ADR-1060's causal ratios, which are level-free by construction: sensitivity moves
@@ -58,6 +58,7 @@ struct ResponseSettings {
     float sustainAttack = 0.25f, sustainRelease = 0.9f;
     float fluxAttack = 0.01f, fluxRelease = 0.15f;
     float intensitySeconds = 12.0f;
+    float levelSlowSeconds = 3.0f; // ADR-1361: `response.levelSlow`, the level over a few seconds (attack/release x)
     float hatRateSeconds = 1.5f; // the hat-rate's leaky window
     float hatRateFull = 12.0f;   // hats a second that read 1
     float melodicFull = 6.0f;    // pitch moves a second that read 1
@@ -80,7 +81,7 @@ struct ResponseSignals {
                       transient = signals::kInvalidSignal, sustain = signals::kInvalidSignal,
                       flux = signals::kInvalidSignal, hatRate = signals::kInvalidSignal,
                       melodic = signals::kInvalidSignal, pitch = signals::kInvalidSignal,
-                      intensity = signals::kInvalidSignal;
+                      intensity = signals::kInvalidSignal, levelSlow = signals::kInvalidSignal; // ADR-1361
 };
 
 class ResponseModel {
@@ -111,7 +112,7 @@ private:
     std::array<float, kResponseHitCount> envBefore_{};
     std::array<std::uint64_t, kResponseHitCount> demoted_{};
     std::array<std::uint64_t, kResponseHitCount> count_{};
-    float bass_ = 0.0f, level_ = 0.0f, sustain_ = 0.0f, flux_ = 0.0f, intensity_ = 0.0f;
+    float bass_ = 0.0f, level_ = 0.0f, sustain_ = 0.0f, flux_ = 0.0f, intensity_ = 0.0f, levelSlow_ = 0.0f;
     float fastDb_ = -120.0f, slowDb_ = -120.0f, transient_ = 0.0f, percussive_ = 0.0f;
     float hatRate_ = 0.0f, melodic_ = 0.0f;
     float lastSemitone_ = -1.0f, audioPitch_ = -1.0f;

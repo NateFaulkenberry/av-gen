@@ -49,6 +49,8 @@ What live play needs is put in (the live art pass; LIVE-ART-NOTES.md has the mea
      faintly -- instead of a grey plain.
  10. THE CAMERA drifts slowly (a 64 s loop, about 1.6 m of travel round the master's mid-move framing), so the
      world keeps its depth; it does not follow the music. Weight lowers it only in the heavy world.
+ 11. THE RESPONSE (ADR-1361): the Live panel's Response controls govern the garden's dynamics -- its loudness, its
+     strikes and its note gestures read `response.*` -- while its character stays the Sonic Character's.
 """
 import copy
 import json
@@ -200,6 +202,48 @@ ACCENT = {"visual.organic": "visual.organicAccent", "visual.crystalline": "visua
           "visual.tectonic": "visual.tectonicAccent"}
 LIVE_VOLUME_STEPS = 24
 FAMILY_SHARPNESS = 4.0  # the master's 3: the leading world leads a little more clearly in a three-way blend
+
+
+# ------------------------------------------------------------------------------------------------ 11. the response
+# ADR-1361: the performer's Response controls (the Live panel: Sensitivity, Transients, Sustain, Attack, Release =
+# `sonic/response/*`, ADR-1062) govern the DYNAMICS the garden hears; its CHARACTER (warmth, brightness, roughness,
+# the families) is not theirs and stays the Sonic Character's.
+#   loudness   the character's energy (sonic.energy, sonic.energy.slow: a fixed-dB loudness with a little attack and
+#              change in it) becomes the response level (response.level, response.levelSlow), scaled by the ratio
+#              of their means on Trench so the neutral garden is the old one. Sensitivity and Sustain move its
+#              floor: a quiet input reads quiet, and the waiting world (silence) comes later or sooner.
+#   strikes    sonic.transient (a fast rise in level) becomes `strike`: response.onset (an attack, level-free) above
+#              0.75 of 1, stretched over 0..1 (an onset of 0.85 strikes 0.4, like a middling old transient). On
+#              Trench that is the strongest eighth of the onsets (89 in 207 s; sonic.transient fired 31 times, 26 of
+#              them in the sparse intro) rather than every hat; Transients curves the onsets, so it decides how many
+#              strike the chaotic world. The routes and their gates are the master's.
+#   notes      notes.noteOn becomes response.note: the same event, its velocity through the hit curve (identical at
+#              the neutral controls).
+# A first interpret source, `heard`, makes the two loudness channels so the garden reads them on the same frame.
+RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}   # the Sonic Abstract scenes' level range
+HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
+    M("loud", [("response.level", 1.0, False)], "mean", gain=0.89),        # mean sonic.energy / mean response.level
+    M("loudSlow", [("response.levelSlow", 1.0, False)], "mean", gain=0.94),  # ... and their slow tiers
+    M("strike", [("response.onset", 1.0, False)], "mean", -3.0, 4.0),
+]}}
+LOUDNESS = {"sonic.energy": "visual.loud", "sonic.energy.slow": "visual.loudSlow"}
+
+
+def respond(live):
+    """The response layer's dynamics in place of the character's (ADR-1361)."""
+    live.setdefault("sonic", {})["response"] = dict(RESPONSE)
+    live["sources"].insert(0, copy.deepcopy(HEARD))
+    for src in live["sources"]:
+        if src.get("kind") != "interpret" or src["name"] == "heard":
+            continue
+        for m in src["settings"]["mappings"]:
+            for i in m["inputs"]:
+                i["signal"] = LOUDNESS.get(i["signal"], i["signal"])
+    for r in live["routes"]:
+        if r["source"] == "notes.noteOn":
+            r["source"] = "response.note"
+        elif r["source"] == "sonic.transient":
+            r["source"] = "visual.strike"
 
 
 # ------------------------------------------------------------------------------------------------ routes
@@ -515,6 +559,9 @@ def main():
     with open(MASTER) as f:
         doc = json.load(f)
     live = copy.deepcopy(doc)
+    # the live quality block, placed where the committed project had it (ADR-1100's strategy; no target, ADR-1360)
+    live = {"format": live.pop("format"), "version": live.pop("version"),
+            "live": {"qualityStrategy": "effects_first"}, **live}
     live["app"] = {"name": "Sonic Live"}
     assets = live.setdefault("assets", {})
     assets.pop("audio", None)
@@ -538,6 +585,7 @@ def main():
         if r["source"] == "notes.noteOn" and r.get("depthSource") in ACCENT:
             r["depthSource"] = ACCENT[r["depthSource"]]
     live["routes"] = routes
+    respond(live)
 
     # the camera: a slow drift round the master's mid-move framing
     tracks = live.get("timeline", {}).get("tracks", [])
