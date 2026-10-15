@@ -130,6 +130,8 @@
   "sources/leap/sustain": 1.0,
   "sources/leap/holdMs": 250.0,
   "sources/leap/releaseMs": 1.0,
+  "sources/rays0/rate": 0.0137,
+  "sources/rays1/rate": 0.0089,
   "post/tonemap/operator": 4
  },
  "sources": [
@@ -152,6 +154,20 @@
    "name": "leap",
    "settings": {
     "trigger": "control.padLeap"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "rays0",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "rays1",
+   "settings": {
+    "shape": "sine"
    }
   }
  ],
@@ -476,6 +492,22 @@
     "threshold": "binary",
     "thresholdLevel": 0.88556
    }
+  },
+  {
+   "source": "lfo.rays0.bipolar",
+   "target": "material/doSky/op/24/noise/constant",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "bipolar",
+   "component": 0
+  },
+  {
+   "source": "lfo.rays1.bipolar",
+   "target": "material/doSky/op/24/noise/constant",
+   "amount": 2.3,
+   "op": "add",
+   "polarity": "bipolar",
+   "component": 2
   },
   {
    "source": "response.level",
@@ -1400,7 +1432,7 @@
   {
    "source": "control.night",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": -0.21295,
+   "amount": -0.18253,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -1412,7 +1444,7 @@
   {
    "source": "control.night",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": -0.05781,
+   "amount": -0.04954,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1424,7 +1456,7 @@
   {
    "source": "control.night",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": 0.19805,
+   "amount": 0.16975,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -2960,7 +2992,7 @@
   {
    "source": "control.golden",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": 0.09106,
+   "amount": 0.07806,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -2972,7 +3004,7 @@
   {
    "source": "control.golden",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": 0.08341,
+   "amount": 0.07148,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,

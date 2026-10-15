@@ -913,8 +913,8 @@ def land_program():
     return P
 
 
-LAND_STEEP0, LAND_STEEP1 = 0.62, 0.78
-LAND_SAND0, LAND_SAND1 = 1.5, 5.0
+LAND_STEEP0, LAND_STEEP1 = 0.74, 0.84
+LAND_SAND0, LAND_SAND1 = 4.0, 9.0
 
 
 ILLUS_BAND0, ILLUS_BAND1 = 0.32, 0.42
@@ -1347,6 +1347,35 @@ def spray(s):
                 emissive=4.0, blend="additive", turbulence=0.0)
 
 
+def atmosphere(s, sky):
+    """Pass D: the rays drift (two LFO sines on two axes of the ray noise's offset: pure in time, never a spin, never in
+    step), and the boat throws a bow wave and leaves a wake on the side the swell comes from."""
+    M = "material/%s/op/%d/noise/constant" % (sky.name, sky["rayNoise"])
+    for k, (hz, amp) in enumerate(RAY_DRIFT):
+        name = "rays%d" % k
+        s.sources.append({"kind": "lfo", "name": name, "settings": {"shape": "sine"}})
+        s.param("sources/%s/rate" % name, hz)
+        s.route(R("lfo.%s.bipolar" % name, M, amp, comp=(0 if k == 0 else 2), polarity="bipolar"))
+    h = math.radians(BOAT_HEADING)
+    fwd = (math.cos(h), 0.0, -math.sin(h))
+    bow = [BOAT_AT[0] + fwd[0] * 5.0, 0.4, BOAT_AT[1] + fwd[2] * 5.0]
+    stern = [BOAT_AT[0] - fwd[0] * 5.5, 0.15, BOAT_AT[1] - fwd[2] * 5.5]
+    s.particles("bowWave", capacity=500, seed=31, shape="sphere", position=bow, extent=[0.8, 0.2, 0.8],
+                direction=[fwd[0], 0.6, fwd[2]], spawnRate=BOW_RATE, lifetimeMin=0.5, lifetimeMax=0.9, spread=0.5,
+                speedMin=1.0, speedMax=2.6, gravity=[0.0, -9.8, 0.0], drag=0.4, sizeStart=0.12, sizeEnd=0.04,
+                colorStart=pal(PALETTE, "foam") + [0.9], colorEnd=pal(PALETTE, "sss") + [0.0], emissive=1.2,
+                blend="additive", turbulence=0.0)
+    s.particles("wake", capacity=700, seed=37, shape="box", position=stern, extent=[0.9, 0.05, 0.9],
+                direction=[-fwd[0], 0.0, -fwd[2]], spawnRate=WAKE_RATE, lifetimeMin=2.5, lifetimeMax=4.0, spread=0.15,
+                speedMin=0.8, speedMax=1.6, gravity=[0.0, 0.0, 0.0], drag=0.3, sizeStart=0.35, sizeEnd=0.9,
+                colorStart=pal(PALETTE, "foam") + [0.55], colorEnd=pal(PALETTE, "foam") + [0.0], emissive=0.9,
+                blend="additive", turbulence=0.2, turbulenceScale=0.3)
+
+
+BOW_RATE = 60.0
+WAKE_RATE = 70.0
+
+
 SEA_NODES = ["sea_near", "sea_mid", "sea_far"]
 
 
@@ -1518,10 +1547,11 @@ HERO_WAVE_HEIGHT = 1.9      # metres (2.6 saturated the crest light into a slab 
 SUN_RADIUS_DEG = 1.7
 RAYS = True
 RAY_FREQ = 2.6         # how many rays round the sun (the noise's frequency on the unit circle)
-RAY_LO, RAY_HI = 0.48, 0.62
-RAY_REACH = 55.0       # degrees from the sun at which a ray has faded
-RAY_FALL = 2.2
-RAY_GAIN = 0.35
+RAY_LO, RAY_HI = 0.44, 0.7
+RAY_REACH = 62.0       # degrees from the sun at which a ray has faded
+RAY_FALL = 3.2
+RAY_GAIN = 0.3
+RAY_DRIFT = ((0.0137, 1.6), (0.0089, 2.3))   # (Hz, amplitude) of the two slow sines that move the rays
 SUN_COS = math.cos(math.radians(SUN_RADIUS_DEG))
 
 
@@ -1596,6 +1626,7 @@ def build():
     ip, lp = world(s)
     dp = dolphins(s)
     spray(s)
+    atmosphere(s, sky)
     instrument(s, sea, seafar, sky)
     midi(s, [sea, seafar, sky, cp, dp, ip, lp], sea, seafar, sky)
     if REVIEW_MIDI:

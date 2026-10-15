@@ -327,3 +327,13 @@ Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. 
 - Seen and carried to later passes: the island's sand and rock regions barely register; the dolphin is still small;
   one cloud row near the sun reads as a string of equal balls; the rays are hard white wedges.
 - Media: `passC-illustration-palettes-and-bands.png` (violet, afternoon, electric, violet with banded water).
+
+## Pass D: atmospheric effects (done)
+
+- **Sun rays**, painted into the sky program (so clouds and land occlude them): a noise of the view ray's direction
+  around the sun (its component across the sun's axis, normalized -- `power -0.5` stands in for the reciprocal no op
+  offers), thresholded into tapered wedges that fade with angle. Two slow LFO sines (0.0137 and 0.0089 Hz, pure in time)
+  drift the noise's offset on two axes: rays lengthen, part and merge, never spin. Softer edges, lower gain and a
+  steeper falloff than the first trial (`passD-rays-drift-2-10-20-29s.png`, `passD-30s.mp4`).
+- Bow wave and stern wake particles on the boat (superseded by the boat step: the wake read as a round blob).
+- Island regions retuned (rock on the steeper flanks, wider sand band) -- superseded by the island step.

@@ -7700,6 +7700,115 @@
     "blend": "additive",
     "turbulence": 0.0
    }
+  },
+  {
+   "name": "bowWave",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 500,
+    "seed": 31,
+    "shape": "sphere",
+    "position": [
+     -19.585262035705366,
+     0.4,
+     -60.347357813929456
+    ],
+    "extent": [
+     0.8,
+     0.2,
+     0.8
+    ],
+    "direction": [
+     0.882947592858927,
+     0.6,
+     -0.4694715627858908
+    ],
+    "spawnRate": 60.0,
+    "lifetimeMin": 0.5,
+    "lifetimeMax": 0.9,
+    "spread": 0.5,
+    "speedMin": 1.0,
+    "speedMax": 2.6,
+    "gravity": [
+     0.0,
+     -9.8,
+     0.0
+    ],
+    "drag": 0.4,
+    "sizeStart": 0.12,
+    "sizeEnd": 0.04,
+    "colorStart": [
+     1.0,
+     0.68669,
+     0.87137,
+     0.9
+    ],
+    "colorEnd": [
+     0.87137,
+     0.12214,
+     0.57758,
+     0.0
+    ],
+    "emissive": 1.2,
+    "blend": "additive",
+    "turbulence": 0.0
+   }
+  },
+  {
+   "name": "wake",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 700,
+    "seed": 37,
+    "shape": "box",
+    "position": [
+     -28.8562117607241,
+     0.15,
+     -55.4179064046776
+    ],
+    "extent": [
+     0.9,
+     0.05,
+     0.9
+    ],
+    "direction": [
+     -0.882947592858927,
+     0.0,
+     0.4694715627858908
+    ],
+    "spawnRate": 70.0,
+    "lifetimeMin": 2.5,
+    "lifetimeMax": 4.0,
+    "spread": 0.15,
+    "speedMin": 0.8,
+    "speedMax": 1.6,
+    "gravity": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "drag": 0.3,
+    "sizeStart": 0.35,
+    "sizeEnd": 0.9,
+    "colorStart": [
+     1.0,
+     0.68669,
+     0.87137,
+     0.55
+    ],
+    "colorEnd": [
+     1.0,
+     0.68669,
+     0.87137,
+     0.0
+    ],
+    "emissive": 0.9,
+    "blend": "additive",
+    "turbulence": 0.2,
+    "turbulenceScale": 0.3
+   }
   }
  ],
  "lights": [
@@ -8718,8 +8827,8 @@
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.48,
-      0.62,
+      0.44,
+      0.7,
       0.0,
       0.0
      ]
@@ -8729,7 +8838,7 @@
      "dst": 2,
      "srcA": 4,
      "constant": [
-      0.573576,
+      0.469472,
       1.0,
       0.0,
       1.0
@@ -8740,7 +8849,7 @@
      "kind": "power",
      "dst": 2,
      "srcA": 2,
-     "value": 2.2
+     "value": 3.2
     },
     {
      "kind": "multiply",
@@ -8752,9 +8861,9 @@
      "kind": "constant",
      "dst": 2,
      "constant": [
-      0.35,
-      0.225568,
-      0.151952,
+      0.3,
+      0.193344,
+      0.130245,
       1.0
      ]
     },
@@ -9395,8 +9504,8 @@
      "dst": 5,
      "srcA": 5,
      "constant": [
-      0.78,
-      0.62,
+      0.84,
+      0.74,
       0.0,
       0.0
      ]
@@ -9424,8 +9533,8 @@
      "dst": 5,
      "srcA": 5,
      "constant": [
-      5.0,
-      1.5,
+      9.0,
+      4.0,
       0.0,
       0.0
      ]
