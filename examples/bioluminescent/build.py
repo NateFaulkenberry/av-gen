@@ -601,7 +601,51 @@ def macros():
             for n in names]
 
 
-def routes(length):
+# ============================================================================================ the response (ADR-1361)
+# LIVE ONLY. The performer's Response controls (the Live panel: Sensitivity, Transients, Sustain, Attack, Release =
+# `sonic/response/*`, ADR-1062) reach THE RIFT LIVE twice:
+#   the routes  the snare is the response model's (Transients decides how many fire and how hard); an auto-gained
+#               band or the analyser's energy keeps its shape (what the music is doing) and is multiplied by the
+#               response level it is heard at (fixed dB, never auto-gained), so a quiet input wakes the canyon less
+#               and Sensitivity lifts it. The arc's two listeners (macro.energy, macro.bassSlow), and so the stage
+#               machine, hear the same.
+#   the fields  the kick front (an onset field) and the highs (a spectrum field) read the audio history, which the
+#               engine hears through the same controls (AudioHistory::setResponse): a kick under the hit floor
+#               launches no front, the highs are curved by the level sensitivity, Release lengthens the front's
+#               decay.
+# Each gain is 1 / the response level's mean on Trench at the neutral controls, so the neutral picture is the old one
+# (docs/development/live-response-everywhere.md). The level range is the Sonic Abstract scenes' (-44..-2 dB). The
+# offline project keeps its audio.* routes.
+RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}
+LIVE_SOURCES = {"audio.energy": "visual.hEnergy", "audio.bass": "visual.hBass", "audio.trebleLevel": "visual.hTreble",
+                "audio.mid": "visual.hMid", "audio.onsetMid": "response.snare"}
+LIVE_HIT_SCALE = {"audio.onsetMid": 0.78}   # a response snare's mean strength is 0.95 to the onset's 0.745
+
+
+def heard(name, band, level, gain):
+    """An auto-gained band (its shape) times the response level it is heard at."""
+    return {"name": name, "combine": "product", "inputs": [{"signal": band, "weight": 1.0},
+                                                          {"signal": level, "weight": 1.0}], "gain": gain}
+
+
+LIVE_HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
+    heard("hEnergy", "audio.energy", "response.level", 1.2),
+    heard("hBass", "audio.bass", "response.bass", 1.22),
+    heard("hTreble", "audio.trebleLevel", "response.level", 1.19),
+    heard("hMid", "audio.mid", "response.level", 1.19),
+]}}
+
+
+def respond(route):
+    src = route["source"]
+    if route.get("amount", 0.0) == 0.0 or src not in LIVE_SOURCES:
+        return route  # the zero defaults, and everything that does not listen
+    route["source"] = LIVE_SOURCES[src]
+    route["amount"] = round(route["amount"] * LIVE_HIT_SCALE.get(src, 1.0), 5)
+    return route
+
+
+def routes(length, live=False):
     r = list(ZERO_DEFAULTS)
     sens = {"depthSource": "macro.sensitivity", "depthMin": 0.0, "depthMax": 4.0}
     # the arc's two slow listeners
@@ -637,7 +681,7 @@ def routes(length):
     for src, comp, amt in (("driftA", 0, 2.0), ("driftC", 1, 1.0)):
         r.append({"source": f"lfo.{src}.bipolar", "target": "camera/splineOffset", "op": "add", "amount": amt,
                   "component": comp, "depthSource": "macro.energy", "depthMin": 0.4, "depthMax": 1.0})
-    return r
+    return [respond(x) for x in r] if live else r
 
 
 POST = {
@@ -672,7 +716,7 @@ def project(name, audio, length, live=False):
         "parameters": dict(POST),
         "sources": [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}} for n in ("driftA", "driftC")],
         "sonic": {},
-        "routes": routes(length),
+        "routes": routes(length, live),
         "worldMacros": macros(),
         "presets": [preset(n, length) for n in STAGES],
         "states": states(),
@@ -686,7 +730,8 @@ def project(name, audio, length, live=False):
         # Live: the same world, cheaper medium. The march costs ~1 ms per step at 1080p (03-architecture.md §6);
         # 16 steps halve it. LIVE AUTO's render scale takes the pixel-bound rest. Offline keeps 32.
         p["parameters"].update(LIVE_PARAMETERS)
-        p["sonic"] = {"live": True}
+        p["sonic"] = {"live": True, "response": dict(RESPONSE)}
+        p["sources"].append(LIVE_HEARD)
         bindings = [
             {"source": "*", "channel": -1, "kind": "cc", "number": 1, "parameter": "macros/sensitivity",
              "component": 0, "min": 0.0, "max": 1.0},

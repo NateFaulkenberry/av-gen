@@ -50,10 +50,82 @@
    "settings": {
     "shape": "sine"
    }
+  },
+  {
+   "kind": "interpret",
+   "name": "heard",
+   "settings": {
+    "mappings": [
+     {
+      "name": "hEnergy",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.energy",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.2
+     },
+     {
+      "name": "hBass",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.bass",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.bass",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.22
+     },
+     {
+      "name": "hTreble",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.trebleLevel",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.19
+     },
+     {
+      "name": "hMid",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.mid",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.19
+     }
+    ]
+   }
   }
  ],
  "sonic": {
-  "live": true
+  "live": true,
+  "response": {
+   "floorDb": -44.0,
+   "rangeDb": 42.0
+  }
  },
  "routes": [
   {
@@ -81,7 +153,7 @@
    "amount": 0.0
   },
   {
-   "source": "audio.energy",
+   "source": "visual.hEnergy",
    "target": "macros/energy",
    "op": "add",
    "amount": 1.0,
@@ -94,7 +166,7 @@
    "depthMax": 4.0
   },
   {
-   "source": "audio.bass",
+   "source": "visual.hBass",
    "target": "macros/bassSlow",
    "op": "add",
    "amount": 1.0,
@@ -145,7 +217,7 @@
    "component": 2
   },
   {
-   "source": "audio.bass",
+   "source": "visual.hBass",
    "target": "grid/prop/injectRate",
    "op": "add",
    "amount": 0.6,
@@ -155,7 +227,7 @@
    }
   },
   {
-   "source": "audio.trebleLevel",
+   "source": "visual.hTreble",
    "target": "particles/spores/spawnRate",
    "op": "add",
    "amount": 1600.0,
@@ -165,10 +237,10 @@
    }
   },
   {
-   "source": "audio.onsetMid",
+   "source": "response.snare",
    "target": "particles/swarm/spawnRate",
    "op": "add",
-   "amount": 6000.0,
+   "amount": 4680.0,
    "chain": {
     "envelope": "peakhold",
     "envelopeHoldMs": 40,
@@ -179,7 +251,7 @@
    "depthMax": 1.0
   },
   {
-   "source": "audio.mid",
+   "source": "visual.hMid",
    "target": "ecosystem/crinoidChains/intensity",
    "op": "add",
    "amount": 1.2,
