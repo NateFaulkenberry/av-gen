@@ -279,3 +279,36 @@ cannot be used with `--compare` ("no form the project can keep"), so the program
   spread 44.8; `stage11-review-examples-frame.png`).
 - `tools/ci/run-suite.sh gpu --bin build/release/tests`: **exit 0**, 657 passed, 0 failed, 1 skipped, 658/658 ran.
 - Live, end to end: Stage 8 (the editor in `--live`, the probe as a MIDI controller, every gesture in the capture).
+
+# Pass 2: an illustrated ocean world (brief `04-brief-art-pass-2.md`)
+
+Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. Media:
+`~/Desktop/av-gen-review/54-digital-ocean-2/` (`before-pass1.png` is the merged Pass 1 scene).
+
+## Pass A: research and style frames (done)
+
+- Direction chosen: **graphic travel poster x anime background**. Bold silhouettes and flat colour regions for
+  land, boats and creatures (poster/woodblock); painted gradients, luminous rays and lit cloud banks for the sky
+  (anime backgrounds); the water stays the animated surface, its crests and glints simplified into colour bands.
+- **Palettes**, each designed as a whole (every key -- sky, water, crest light, foam, clouds, land, leaf, trunk, hull,
+  sail, rays -- is set per palette, never derived): **violet sunset** (primary: cobalt water, magenta-lavender crest
+  light, peach rays, pink-orange clouds, dark violet land, an amber sail), **golden afternoon** (turquoise water,
+  cream foam, coral sun, soft blue sky, green island, a vermilion sail), **electric blue** (ultramarine and cyan,
+  mint surf, saturated blue, yellow hull and coral sail, navy land), and the **midnight** night end kept from Pass 1.
+- **Compositions** (`passA-studies.png`, in order: Pass 1, E1, E2, E3, E1 afternoon, E1 electric): E1 (18 m) cut the
+  boat at the frame edge and the island crowded the sun; E2 (26 m) flattened the swell; **E3 (14 m, 32 mm)** keeps the
+  boat whole in the lower-left third, the island behind it, the sun on the right third.
+
+## Pass B: composition and silhouette (done)
+
+- **The island** (`island_height`, a polar heightfield): twin volcanic summits, a ridged flank, a beach shelf toward
+  the camera; 980 m out on the left third. **Far chain**: three hazy islets on the horizon. **Palms** (11, a curved
+  trunk + nine drooping blades, two meshes for two colours) on the shelf and low slopes, scaled 1.5-2.5x so they read.
+- **The hero sailboat** (`boat_meshes`): a lofted hull with sheer and raked bow, mast, boom, a bellied mainsail and
+  a jib; 11 m, 58 m from the camera. It RIDES the water: its deformer stack is the sea's own Gerstner stack (world
+  space), so it rises and travels with the surface under it, plus a slow two-axis local roll.
+- **Dolphins** twice as long (6.4 m), leaps 4-7.5 m high, at 78-300 m; the leap path now has an approach just under
+  the surface before the rise (the brief's preparation beat).
+- One illustrated program (`doIllus`) paints land, trees and boat: flat colour per node (palette-routable), a broad
+  light band and shadow band, a warm rim toward the sun, distance haze.
+- Media: `passB-composition-before-after.png` (Pass 1; violet at 2 s and 6 s; afternoon).
