@@ -145,6 +145,39 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     CHECK(soft < hard);
 }
 
+TEST_CASE("Sonic Live: the garden's loudness and strikes are the Response's", "[live][sonic][adr1361]") {
+    Play p{.project = example("sonic-garden/sonic-live.json")};
+    p.response = {{"sensitivity", 0.25f}};
+    const double dull = meanSignal(p, "visual.energy");
+    p.response = {{"sensitivity", 0.75f}};
+    const double keen = meanSignal(p, "visual.energy");
+    INFO("visual.energy: " << dull << " / " << keen);
+    CHECK(dull < keen);
+    // Sustain alone moves the levels too (the Transients slider does not).
+    p.response = {{"sustain", 0.25f}};
+    const double lowSustain = meanSignal(p, "visual.energy");
+    p.response = {{"transient", 0.25f}};
+    const double lowTransient = meanSignal(p, "visual.energy");
+    p.response = {};
+    const double neutral = meanSignal(p, "visual.energy");
+    CHECK(lowSustain < neutral);
+    CHECK(lowTransient == neutral);
+
+    // At Sensitivity 0 nothing is heard: the waiting world holds while the groove plays.
+    p.response = {{"sensitivity", 0.0f}};
+    CHECK(meanSignal(p, "visual.silence") > 0.9);
+    p.response = {};
+    CHECK(meanSignal(p, "visual.silence") < 0.1);
+
+    // Strikes: Transients decides how many onsets strike.
+    p.response = {{"transient", 0.2f}};
+    const double fewer = meanSignal(p, "visual.strike");
+    p.response = {{"transient", 0.9f}};
+    const double more = meanSignal(p, "visual.strike");
+    INFO("visual.strike: " << fewer << " / " << more);
+    CHECK(fewer < more);
+}
+
 TEST_CASE("THE ASTRAL FORGE LIVE: the conductor's song is heard through the Response; neutral is the song itself",
           "[live][astral][adr1361]") {
     struct Heard {
