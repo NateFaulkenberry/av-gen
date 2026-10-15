@@ -44,3 +44,30 @@ Brief: `00-brief.md` (the owner's, verbatim). Plan: `01-plan.md`. Worktree `../a
 - Media: `stage2-swell-still.png`, `stage2-swell-motion.mp4` (12 s), `stage2-swell-motion-sheet.png` (1 fps).
 - Seen and deferred to the material stage: the lit graybox shows GTAO speckle in the near troughs and specular
   dashes at the horizon; both belong to the lit PBR path the scene will not use.
+
+## Stage 3: water colour, lighting, material (done)
+
+- Everything unlit, painted by programs (Alpine's pattern). `Prog`, a small assembler in the generator, numbers ops by
+  label so routes can address `material/<prog>/op/<n>` by name. Found: an op's `value` defaults to 1, so a `remap`
+  without one CLAMPS -- my first sky had no vertical gradient because e = -v.y was clamped to [-1, 0]. The assembler now
+  writes `value: 0` for every remap unless told otherwise.
+- **Sea program** (`doSea`, 46 ops, the near piece): micro-ripples (a noise carried by the rest position tilts the
+  normal, faded out by 200 m), the reflected sky by the reflected ray's elevation, the sun on the water by the reflected
+  ray's angle to the sun (a broad warm path + crisp glints, two smoothsteps), a Fresnel mix with the water's body colour,
+  and light through the backlit crests (crest height x (toward the sun)^3). The reflected ray is never built: r.y/2+1/2
+  and r.l/2 are each a product plus a gradient, which saved the ops that foam needs.
+- **Far sea program** (`doSeaFar`, mid and far pieces): their rows undersample the shorter trains, which drew crest
+  light and normals as dashes that changed every frame (seen in 8-frame horizon crops). The normal leans to vertical and
+  the crest light fades between 200 and 700 m: the distant sea becomes smooth colour and the glitter path, as a painter
+  would treat it. Crops after: coherent.
+- **Sky dome** (`doSky`, 31 ops): horizon warm toward the sun and cool away, a violet middle, the zenith; a broad glow,
+  a halo and a crisp disc (1.7 deg, smoothstep-edged); below the horizon the far water's colour.
+- **Palettes compared on the real scene** (`stage3-palettes-4.png`): golden hour, electric twilight, bioluminescent
+  midnight, surreal tropical. **Chosen: electric twilight** (indigo water, cyan crest light, violet-to-coral sky, a
+  cream sun with a pink halo): the strongest value structure and the most distinct from Alpine's rose and violet.
+  Golden hour and midnight stay as the related variations for the performance (Stage 8).
+- Banded vs continuous (`stage3-smooth-vs-bands.png`): quantized reflection (3-4 bands) reads as a cel illustration
+  but loses the sheen and its hard edges would crawl at grazing angles; continuous kept (`BANDS` knob, 0).
+- Cost check (headless 1080p, scale 0.85): GPU median 14.0 ms with the first two programs; noted, measured again later.
+- Media: `stage3-twilight.png`, `stage3-golden.png`, `stage3-palettes-4.png`, `stage3-smooth-vs-bands.png`,
+  `stage3-motion.mp4`.
