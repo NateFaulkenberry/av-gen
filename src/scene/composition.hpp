@@ -1438,6 +1438,9 @@ public:
     [[nodiscard]] const Clouds& clouds() const { return clouds_; }
     // The song the conductor is reading (null in live mode or before the first frame with a track).
     [[nodiscard]] std::shared_ptr<const AstralSong> astralSong() const { return astralSong_; }
+    // ADR-1361: the song as the performer's Response controls hear it -- what song mode conducts (`astralSong()` itself
+    // at the neutral controls).
+    [[nodiscard]] std::shared_ptr<const AstralSong> astralHeardSong() const { return astralHeardSong_; }
     [[nodiscard]] std::vector<spatial::GridField>& grids() { return grids_; }
 
     // ---- the ecosystem (ADR-1200): the first Environment, scene-level (`"ecosystem"`) ----
@@ -2335,6 +2338,9 @@ private:
     AstralLiveConductor astralLive_;          // live mode: the song as heard so far
     std::shared_ptr<const AstralSong> astralSong_; // song mode: built once per track
     const analysis::AnalysisTrack* astralSongTrack_ = nullptr; // the track `astralSong_` was built from
+    // ADR-1361: the song as the Response controls hear it (`astralSong_` itself at neutral), and what it was heard with.
+    std::shared_ptr<const AstralSong> astralHeardSong_;
+    spatial::AudioResponse astralHeardResponse_{};
     float astralCollapseLevel_ = 0.0f;        // `astral/collapse` last frame (it fires on the rising edge)
     int astralShot_ = -1;                     // the conductor's shot last frame (a change is a cut)
     std::shared_ptr<const analysis::AnalysisTrack> analysisTrack_; // ADR-1221: see `setAnalysisTrack`

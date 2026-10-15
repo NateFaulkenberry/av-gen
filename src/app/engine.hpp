@@ -1337,7 +1337,7 @@ private:
     std::uint64_t audioRevision_ = 1;
     // ADR-1116: see audioHistory(). Rebuilt when audioRevision_ moves; the live feed only without a track.
     void updateAudioHistory(bool newFrame);
-    std::shared_ptr<const spatial::AudioHistory> audioHistory_;
+    std::shared_ptr<spatial::AudioHistory> audioHistory_; // heard through the Response controls (ADR-1361)
     std::uint64_t audioHistoryRevision_ = 0;
     std::unique_ptr<analysis::LiveAudioHistoryFeed> liveAudioFeed_;
     audio::ClipSources clipSources_;

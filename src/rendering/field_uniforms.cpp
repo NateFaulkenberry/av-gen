@@ -60,7 +60,8 @@ FieldBlock FieldUniforms::pack(const spatial::FieldSet& fields, double time) {
         a.ring = glm::uvec4(kAudioRingOffset, static_cast<std::uint32_t>(spatial::kAudioRingRows),
                             static_cast<std::uint32_t>(spatial::kAudioBins), 1u);
         a.timing = glm::vec4(static_cast<float>(audio.rowRate()), static_cast<float>(audio.newestRow(clock)),
-                             static_cast<float>(spatial::kAudioMaxDelayRows), 0.0f);
+                             static_cast<float>(spatial::kAudioMaxDelayRows),
+                             spatial::onsetDecayScale(audio.response())); // ADR-1361
         for (int s = 0; s < spatial::kOnsetSources; ++s) {
             std::array<float, spatial::kOnsetHistory> ages{};
             std::array<float, spatial::kOnsetHistory> strengths{};

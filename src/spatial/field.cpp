@@ -344,7 +344,9 @@ float audioShape(const FieldSpec& f, const glm::vec3& q, double time, const Fiel
         std::array<float, kOnsetHistory> strengths{};
         ages.fill(-1.0f);
         audio.lastOnsets(f.onsetSource, clock, ages, strengths);
-        return onsetResponse(ages, strengths, d, f.audioSpeed, f.onsetWidth, f.onsetDecay);
+        // ADR-1361: the performer's Release lengthens every onset's decay (the GPU's audio.timing.w).
+        return onsetResponse(ages, strengths, d, f.audioSpeed, f.onsetWidth,
+                             f.onsetDecay * onsetDecayScale(audio.response()));
     }
     const float delay = std::max(f.audioDelay, 0.0f) + travel;
     const float lo = saturate(f.bandLow);

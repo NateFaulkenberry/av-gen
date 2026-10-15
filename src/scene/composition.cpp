@@ -1085,6 +1085,7 @@ void Composition::setAstral(AstralForge astral) {
     astral_ = std::move(astral);
     astralSong_.reset();
     astralSongTrack_ = nullptr;
+    astralHeardSong_.reset();
     astralLive_.reset();
     if (params_ != nullptr) { // attached already: register its knobs now
         if (astralParams_) {
@@ -1134,9 +1135,23 @@ void Composition::updateAstral() {
                       song->song.kickT.size());
             astralSong_ = std::move(song);
             astralSongTrack_ = analysisTrack_.get();
+            astralHeardSong_.reset();
         }
-        live.song = astralSong_;
-        live.state = astral::conductSong(currentTime_, astralSong_->song, astralSong_->score, live.live);
+        // ADR-1361: the performer's Response controls, as the history carries them. Neutral: the song itself.
+        const spatial::AudioResponse heard = audioHistory_ != nullptr ? audioHistory_->response() : spatial::AudioResponse{};
+        if (!astralHeardSong_ || heard != astralHeardResponse_) {
+            if (heard.neutral()) {
+                astralHeardSong_ = astralSong_;
+            } else {
+                auto song = std::make_shared<AstralSong>();
+                song->song = astral::conditionSong(astralSong_->song, heard);
+                song->score = astral::buildScore(song->song);
+                astralHeardSong_ = std::move(song);
+            }
+            astralHeardResponse_ = heard;
+        }
+        live.song = astralHeardSong_;
+        live.state = astral::conductSong(currentTime_, astralHeardSong_->song, astralHeardSong_->score, live.live);
     } else if (audioHistory_ != nullptr) {
         live.song.reset();
         live.state = astralLive_.update(*audioHistory_, audioHistory_->now(currentTime_), live.live, collapseEdge);
