@@ -247,3 +247,35 @@ kept, but it is the first thing to tame if a palette variation is added.
 
 Earlier critique-driven fixes (Stages 3-8) are in their own sections: the far-field dashes, the foil (ADR-1370), the
 moire, the spray specks, the foam slabs at full swell and on the hero wave, a hero wave that saturated at 2.6 m.
+
+## Stage 11: performance and final validation (done)
+
+Measured with `tools/live_scene_profile.py` (headless, 1080p and 2160p, M2 Max) under `tools/gpu-lock.sh`; reports in
+`~/Desktop/av-gen-review/50-digital-ocean/stage11-profiles/` (`prof-*` baseline, `prof2-*` final, `elim-*`).
+
+| case | GPU median / p95 | frame median / p95 | CPU work |
+|---|---|---|---|
+| 1080p silence Ultra, baseline | 21.6 / 22.2 | 24.0 / 28.7 | 1.2 |
+| 1080p Trench Ultra, baseline | 27.1 / 27.7 | 32.7 / 35.4 | 4.7 |
+| 1080p silence Ultra, final | 22.4 / 22.8 | 25.2 / 30.0 | 1.6 |
+| 1080p silence auto, final (settles at Ultra) | 22.4 / 22.9 | 24.8 / 29.3 | 1.3 |
+| 1080p Trench Ultra, final | 26.1 / 26.5 | 28.3 / 34.4 | 1.7 |
+| 2160p silence Ultra, final | 61.6 / 62.1 | 64.2 / 68.8 | 1.4 |
+
+Live target 30 fps (33.3 ms, ADR-1341/1360): met at 1080p with headroom in every measured case; 4K is over and the live
+ladder's render scale takes it (fragment-bound: 4K costs 2.7x 1080p). The final silence numbers include the round-3
+crest work (+3 ops) and the hemisphere sky; the Trench case gained ~1 ms from the cheaper tide (13 taps x 6 bins).
+
+**Feature costs by elimination** (1080p silence, against 22.4 ms): sky dome 3.1 ms, clouds 1.6, the near sea's detail
+0.85, dolphins and all particles 0.4; the sea (meshes, ten deformers, programs) ~16 ms. The hemisphere-sky hypothesis
+(sky program shaded under the sea) was rejected by measurement: no change. The engine's `noprograms` diagnostic lever
+cannot be used with `--compare` ("no form the project can keep"), so the programs' total was not isolated directly.
+
+**Validation:** after merging origin/main (`b498a314`; the coordinator's index-preserving `write_index`, ADR-1344/1350/
+1360; one conflict in the ADR table, resolved in order), regenerating the scene (unchanged) and
+`check_project_integrity.py` (0 problems):
+- `tools/ci/run-suite.sh cpu-assets`: **exit 0**, 4231 passed, 0 failed, 19 skipped, 1 expected failure, 4251/4251 ran.
+- `python3 tools/review_examples.py --only "Digital Ocean"`: **ok** (Live > Sonic Abstract, Ready, exit 0, mean 103.6,
+  spread 44.8; `stage11-review-examples-frame.png`).
+- `tools/ci/run-suite.sh gpu --bin build/release/tests`: **exit 0**, 657 passed, 0 failed, 1 skipped, 658/658 ran.
+- Live, end to end: Stage 8 (the editor in `--live`, the probe as a MIDI controller, every gesture in the capture).
