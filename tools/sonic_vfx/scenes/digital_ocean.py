@@ -264,39 +264,39 @@ PALETTES = {
     # ---- Pass 2: three coordinated families on one axis (dusk -> day -> electric), each designed as a whole
     # violet sunset: cobalt water with magenta-lavender crest light, peach rays, pink-orange clouds, dark violet land
     "violet": dict(zenith="#24185e", mid="#7b45a0", warm="#ffa27c", cool="#c070b0", sun="#fff0d8", glow="#ff7f66",
-                   deep="#16206a", rzen="#2c2f86", rhor="#d58cc0", sss="#f062c8", glint="#ffe2cc", foam="#ffd8f0",
+                   deep="#150f46", rzen="#2c2f86", rhor="#d58cc0", sss="#7d4fc0", glint="#ffe2cc", foam="#ffd8f0",
                    cshade="#5a3486", clit="#ff9c86", crim="#ffe0c0", isle="#6a4a96",
                    dback="#1d1448", dbelly="#7a58a8", drim="#ffc8a8",
                    land="#4e3488", land2="#2c1d5c", rock="#8a4e8e", sand="#f0a6a0", leaf="#3a2a78", trunk="#3a2266",
-                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0", land3="#c27aa8", pearl="#f4ece8", glaze="#1c1a4a", deck="#d9cdd8", hshade="#a99ac8"),
+                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0", land3="#c27aa8", pearl="#f4ece8", glaze="#1c1a4a", deck="#d9cdd8", hshade="#a99ac8", wmain="#33287e", wcrest="#d47ad6", hl="#ffd6ee"),
     # golden afternoon: turquoise and teal water, cream foam, coral sun, soft blue sky, warm green island
     "afternoon": dict(zenith="#2b68cc", mid="#7fb4ec", warm="#ffe0ac", cool="#bfe2f4", sun="#fffbe8", glow="#ffc884",
-                      deep="#0a5a80", rzen="#2c78bc", rhor="#a8dcea", sss="#2fe6c8", glint="#fffbe8", foam="#fff4dc",
+                      deep="#0a3c84", rzen="#2c78bc", rhor="#a8dcea", sss="#1fb4c8", glint="#fffbe8", foam="#fff4dc",
                       cshade="#90a8d8", clit="#fff5e6", crim="#fffbf0", isle="#7e9cc4",
                       dback="#284a7c", dbelly="#d0e2f0", drim="#fff4dc",
                       land="#45a85c", land2="#1f6e62", rock="#c88a5c", sand="#f6e2b4", leaf="#2f9a52", trunk="#8a5a3c",
-                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#d8c090", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc"),
+                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#d8c090", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc", wmain="#1270b4", wcrest="#86ecdc", hl="#f6fff2"),
     # electric blue: ultramarine and cyan water, mint surf, saturated blue sky, yellow-coral accents, navy land
     "electric": dict(zenith="#0a2a9c", mid="#2c6ae4", warm="#8ff0ff", cool="#4a8cf0", sun="#fff7a8", glow="#ffd84a",
-                     deep="#06186a", rzen="#0e40b6", rhor="#62d4ff", sss="#3cf4ff", glint="#ffffe0", foam="#c8fff0",
+                     deep="#05126a", rzen="#0e40b6", rhor="#62d4ff", sss="#1c84f0", glint="#ffffe0", foam="#c8fff0",
                      cshade="#2448b0", clit="#c4ecff", crim="#fff6c0", isle="#2244a0",
                      dback="#0a1a56", dbelly="#4a80d8", drim="#fff7b0",
                      land="#14266a", land2="#0a1446", rock="#2a4aa0", sand="#4a76d0", leaf="#0e1c5a", trunk="#0c1650",
-                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#8cc8f0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8"),
+                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#8cc8f0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8", wmain="#0c38c8", wcrest="#62eaff", hl="#eafff8"),
     # the night end (CC 1): bioluminescent
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
                      deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
                      cshade="#0a0a22", clit="#33346e", crim="#a8b6ff", isle="#0a0a26",
                      dback="#020410", dbelly="#141a3a", drim="#9fb4ff",
                      land="#0a0c26", land2="#05061a", rock="#14183a", sand="#1a2650", leaf="#060a20", trunk="#05081a",
-                     hull="#c8d4ff", hull2="#3a4a9a", sail="#6a7ad8", sail2="#a8b6ff", ray="#a8b8ff", land3="#1a2050", pearl="#7c88b8", glaze="#02040e", deck="#4a5488", hshade="#2a3260"),
+                     hull="#c8d4ff", hull2="#3a4a9a", sail="#6a7ad8", sail2="#a8b6ff", ray="#a8b8ff", land3="#1a2050", pearl="#7c88b8", glaze="#02040e", deck="#4a5488", hshade="#2a3260", wmain="#06123a", wcrest="#14c09a", hl="#8affe0"),
     # Pass 1's electric twilight, kept for before/after comparisons
     "twilight": dict(zenith="#100d36", mid="#563a8a", warm="#ff9b7d", cool="#8a6cc2", sun="#ffe2cc", glow="#ff7f68",
                      deep="#0a0b35", rzen="#191c58", rhor="#8a6cbd", sss="#18cfe0", glint="#ffd6c2", foam="#bdfde6",
                      cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68",
                      dback="#140f33", dbelly="#4a3a78", drim="#ffc3a8",
                      land="#3f2a68", land2="#24184a", rock="#5a3a7a", sand="#c08aa0", leaf="#2a1f52", trunk="#2a1f4a",
-                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d6c8d2", hshade="#8a7aa8"),
+                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d6c8d2", hshade="#8a7aa8", wmain="#22266e", wcrest="#18cfe0", hl="#ffe0f0"),
 }
 PALETTE = "violet"
 DEBUG_SKY = None
@@ -477,6 +477,99 @@ SSS_FOCUS = 3.0
 CREST_NEAR0, CREST_NEAR1, CREST_NEAR_MIN = 12.0, 60.0, 0.55
 FOAM_H0, FOAM_H1 = 0.64, 0.8          # of the crest ramp (0.3..1.9 m): the tops of the highest crests
 FOAM_GAIN = 0.6
+
+
+def water_program(far=False):
+    """THE ANIME WATER (Pass 3; the owner's brief 06). A material program on the displaced sea mesh, unlit.
+
+    Every look is driven by the wave geometry, never by posterizing a colour:
+      t       the illustration's light, centred on 0: the displaced HEIGHT (crests +, troughs -, over `crest`'s
+              span) mixed with the face's orientation (`face`), and a little surface detail (a noise of the REST
+              position, which the swell's orbits carry, so it rides the water instead of sliding over it)
+      AA      the derivative-based part: the engine's per-pixel `footprint` (world metres per pixel, from screen
+              derivatives) becomes a contrast gain g, 1 near and falling to G_MIN as a pixel covers more water; t is
+              multiplied by it before any edge, so no edge is sharper than the pixels can draw, and toward the horizon
+              every band converges on the middle tone: the detail simplifies by itself
+      bands   four colour regions on t g -- deep (troughs), main, lit faces (`sss`), crest accent -- each a
+              smoothstep edge whose half-width `bandSoft` is the band contrast
+      strokes thin highlight lines in a narrow band of t just under the crest: they ride the crests because t is
+              the crest
+      foam    the detail noise mixed with t g and cut (`foamMask`): broken caps on the reinforced crests only
+      glints  the reflected ray against the sun (r.l / 2 = (n.v)(n.l) - v.l / 2), jittered by the detail noise and
+              cut into sparks: the broken sun path
+      horizon a Fresnel blend into the reflected horizon colour, the same in both programs, so the near and far
+              pieces meet without a seam
+    The far program (beyond 200 m) is the same less the strokes and the foam.
+    Registers: 0 N, 1 V, 2 g, 3 t, 4/5 scratch, 6 detail noise, 7 colour."""
+    P = Prog("doSeaFar" if far else "doSea")
+    sx, sy, sz = S
+    P.op("N", "input", 0, inp="normal")
+    P.op("V", "input", 1, inp="viewDirection")
+    P.op("foot", "input", 2, inp="footprint")
+    P.op("aaGain", "remap", 2, a=2, k=[0.0, W_AA_FP, 1.0, W_AA_MIN], f=1.0)             # g, clamped
+    P.op("wp", "input", 3, inp="worldPosition")
+    P.op("crest", "gradient", 3, a=3, k=[0.0, 1.0 / W_HEIGHT, 0.0, 0.0], f=1.0)        # height / span, centred
+    P.op("face", "gradient", 4, a=0, k=[-W_FACE * SH[0], W_FLAT, -W_FACE * SH[2], -W_FLAT], f=1.0)
+    P.op("faceMix", "mix", 3, a=3, b=4, f=W_FACE_MIX)
+    P.op(None, "input", 6, inp="localPosition")
+    P.op("detailNoise", "noise", 6, a=6, f=W_DETAIL_FREQ, k=[0.0, 0.0, 0.0], seed=19)
+    P.op("detail", "mix", 3, a=3, b=6, f=W_DETAIL)                                       # t (1 - D) + noise D
+    P.op("contrast", "multiply", 3, a=3, b=2)                                            # t g
+    dz = 0.5 * W_DETAIL                                                                  # the noise's mean
+    P.pcolour("deep", 7, "deep")
+    for lab, e, key in (("band1", W_E1, "wmain"), ("band2", W_E2, "sss"), ("band3", W_E3, "wcrest")):
+        P.op(lab, "smoothstep", 4, a=3, k=[e + dz - W_SOFT, e + dz + W_SOFT])
+        P.pcolour(key, 5, key)
+        P.op(None, "mixBy", 7, a=7, b=5, c=4)
+    if not far:
+        P.op("strokeLo", "smoothstep", 4, a=3, k=[W_S0 + dz, W_S0 + dz + W_SW])
+        P.op("strokeHi", "smoothstep", 5, a=3, k=[W_S1 + dz + W_SW, W_S1 + dz])           # descending
+        P.op(None, "multiply", 4, a=4, b=5)
+        P.pcolour("hl", 5, "hl", W_HL)
+        P.op("stroked", "mixBy", 7, a=7, b=5, c=4)
+        P.op("foamMix", "mix", 4, a=6, b=3, f=W_FOAM_CREST)
+        P.op(None, "multiply", 4, a=4, b=2)
+        P.op("foamMask", "smoothstep", 4, a=4, k=[W_FOAM_CUT, W_FOAM_CUT + W_FOAM_SOFT])
+        P.pcolour("foam", 5, "foam", W_FOAM_GAIN)
+        P.op("foamed", "mixBy", 7, a=7, b=5, c=4)
+    # glints: the reflected ray against the sun, jittered by the detail and cut into sparks
+    P.op(None, "fresnel", 4, f=1.0)
+    P.op("nv", "remap", 4, a=4, k=[0.0, 1.0, 1.0, 0.0])
+    P.op(None, "gradient", 5, a=0, k=[sx, sy, sz, 0.0], f=1.0)                           # n.l
+    P.op(None, "multiply", 5, a=5, b=4)
+    P.op(None, "gradient", 4, a=1, k=[-0.5 * sx, -0.5 * sy, -0.5 * sz, 0.0], f=1.0)      # -v.l / 2
+    P.op("rl", "add", 5, a=5, b=4)
+    P.op("jitter", "mix", 5, a=5, b=6, f=W_GLINT_JIT)
+    j = W_GLINT_JIT
+    c0, c1 = (c / 2.0 * (1.0 - j) + 0.5 * j for c in (GLINT_COS0, GLINT_COS1))
+    P.op("glints", "smoothstep", 5, a=5, k=[c0, c1])
+    P.pcolour("glint", 4, "glint", GLINT_GAIN)
+    P.op("sunlit", "mixBy", 7, a=7, b=4, c=5)
+    P.op("fres", "fresnel", 4, f=W_FRES_POWER)
+    P.pcolour("rhor", 5, "rhor", W_HORIZON)
+    P.op("horizon", "mixBy", 7, a=7, b=5, c=4)
+    P.emit = 7
+    return P
+
+
+# the anime water's look (each a parameter of the op it sits in, so routes and MIDI reach them)
+W_HEIGHT = 3.2          # metres of height over which t runs from trough to crest (the `crest` op)
+W_FACE, W_FLAT = 0.9, 0.25   # weight of the face's orientation / of flatness in the `face` term
+W_FACE_MIX = 0.35       # how much of t is orientation (the rest is height)
+W_DETAIL_FREQ = 0.32    # the surface detail's scale (1/m)
+W_DETAIL = 0.07         # its share of t
+W_AA_FP, W_AA_MIN = 0.6, 0.35   # g falls linearly from 1 (sharp pixels) to W_AA_MIN at a footprint of W_AA_FP m
+W_SOFT = 0.07           # band edge half-width in centred t (the band contrast: smaller is crisper)
+W_E1, W_E2, W_E3 = -0.12, 0.05, 0.22   # the band thresholds in centred t
+W_S0, W_S1, W_SW = 0.14, 0.2, 0.02     # the stroke band (centred t) and its edge width
+W_HL = 1.1
+W_FOAM_CREST = 0.6      # foam = mix(noise, t g, this): how much the crest decides
+W_FOAM_CUT, W_FOAM_SOFT = 0.35, 0.03
+W_FOAM_GAIN = 0.95
+W_GLINT_JIT = 0.12      # the detail's share in the glint test: breaks the path into sparks
+W_FRES_POWER = 4.0
+W_HORIZON = 1.0
+WATER = "anime"         # "anime" (Pass 3) or "pass2"
 
 
 def sky_program():
@@ -1734,8 +1827,9 @@ def instrument(s, sea, seafar, sky):
             R("sustain", M % (sky.name, sky["glow"]), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500,
               decayMs=3500))
     for prog in (sea, seafar):
-        s.route(R("sustain", M % (prog.name, prog["pathCol"]), 1.0, op="multiply", gain=0.8, offset=1.0,
-                  attackMs=1500, decayMs=3500))
+        if "pathCol" in prog.at:
+            s.route(R("sustain", M % (prog.name, prog["pathCol"]), 1.0, op="multiply", gain=0.8, offset=1.0,
+                      attackMs=1500, decayMs=3500))
     # BRIGHTNESS: the palette drifts a little warmer or cooler with the music's centroid, very slowly
     s.route(R("brightnessSlow", "post/grade/hueShift", 0.03, offset=-0.5, attackMs=4000, decayMs=8000))
     # NOTES: a spark burst on the sun's path, its distance by pitch (low near, high far), its size by velocity
@@ -1817,8 +1911,9 @@ def midi(s, progs, sea, seafar, sky, cp=None):
             R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
             R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
     for prog, key, g in ((sky, "ray", 1.0), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
-                         (seafar, "pathCol", 0.9)):
-        s.route(R("control.rays", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **CC))
+                         (seafar, "pathCol", 0.9), (sea, "glint", 0.6), (seafar, "glint", 0.6)):
+        if key in prog.at:
+            s.route(R("control.rays", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **CC))
     s.route(R("control.rays", "material/doSky/op/%d/remap/constant" % sky["rayLen"], -0.08, comp=0, **CC))
     if cp is not None:
         for key, g in (("clit", 0.6), ("crim", 1.2)):
@@ -1841,7 +1936,8 @@ def midi(s, progs, sea, seafar, sky, cp=None):
     flare = {"envelope": "peakhold", "envelopeHoldMs": 250, "envelopeFallPerSecond": 0.45}
     for prog, key, g in ((sky, "halo", 1.6), (sky, "glow", 0.7), (sea, "pathCol", 1.2), (seafar, "pathCol", 1.2),
                          (sea, "glint", 0.6)):
-        s.route(R("control.padFlare", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **flare))
+        if key in prog.at:
+            s.route(R("control.padFlare", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **flare))
     s.route(R("control.padSpray", "particles/snareSpray/burst", 420.0))
 
 
@@ -1930,10 +2026,13 @@ def build():
                 "groundColor": pal(PALETTE, "rhor"), "haze": 0.3, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
-    sea, seafar, sky = sea_program(), sea_program(far=True), sky_program()
+    if WATER == "anime":
+        sea, seafar, sky = water_program(), water_program(far=True), sky_program()
+    else:
+        sea, seafar, sky = sea_program(), sea_program(far=True), sky_program()
     audio_fields(s)
-    s.program(sea.doc(emission=5))
-    s.program(seafar.doc(emission=5))
+    s.program(sea.doc(emission=getattr(sea, "emit", 5)))
+    s.program(seafar.doc(emission=getattr(seafar, "emit", 5)))
     if DEBUG_SKY:
         sky.ops = sky.ops[:DEBUG_SKY[0]]
         s.program(sky.doc(emission=DEBUG_SKY[1]))

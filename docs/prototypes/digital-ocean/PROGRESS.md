@@ -493,3 +493,30 @@ a clip from 0 s with a scored leap and hero wave (`passG-events-leap-herowave.pn
 - MIDI stress (`avgen_sonic_probe stress`, a new scenario): 899 messages, every pad hammered at 4 Hz, palette and
   night sweeps, repeated hero waves. GPU flat at 29.5-29.7 ms in every phase, no errors, nothing accumulates.
 - Report: `05-report-art-pass-2.md`.
+
+## Pass 3 (water)
+
+*Brief: `06-brief-anime-water-shader.md`. Media: `~/Desktop/av-gen-review/55-digital-ocean-water/`. The water stays a
+material program on the displaced sea mesh: no new renderer, no new pass.*
+
+### Pass A: baseline and style frames
+
+- `passA-styles.png`: the Pass 2 water (baseline: reflected-sky colours posterized by `quantize`) and the first anime
+  program with four treatments made from its knobs: A1 smooth bands, A2 strong graphic highlights, A3 stylized crest
+  foam, A4 painterly surface detail. All at 1080p, silent, 20 s. `passA-draft1-music-95s.png` is draft 1 under
+  Feline Footwear (the afternoon end of the mood).
+- The new program (`water_program`) builds one scalar, the illustration's light `t`, from the geometry: the displaced
+  height (crests up, troughs down) mixed with the face's orientation and a little detail noise of the rest position.
+  Four colour regions are smoothstep bands on `t` (deep, main, lit faces, crest accent). Strokes, foam and glints are
+  all cuts of the same `t`, so they ride the waves.
+- Anti-aliasing: the engine's per-pixel `footprint` (from screen derivatives) becomes a contrast gain g that falls from
+  1 to 0.35 as a pixel covers more water. `t` is multiplied by g before every edge, so edges soften where pixels
+  are large and the far sea converges on its middle tone.
+- **Chosen: A1's soft bands as the body**, with A2's highlight strokes kept thin and few, A3's foam only on the
+  reinforced crests, and A4's detail kept low (at 0.16 it reads as camouflage, not water). A2 and A3 at full strength
+  turn the foreground into white blotches; A1 alone is lovely but has no accent.
+- Draft 1's worst problems, fixed in draft 2 (the committed program): a hard seam at 200 m where the far program
+  (with a Fresnel blend into the horizon colour) met the near one (without it), now one shared horizon blend; glints
+  as a few large crescents, now jittered by the detail noise into a broken path of sparks; foam too common.
+  Draft 2 also frees ops: the gain is one clamped remap, the detail one `mix`, and `t` is centred by the gradients'
+  offsets (45 ops near, 35 far, of 48).
