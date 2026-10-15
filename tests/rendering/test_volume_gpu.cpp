@@ -312,6 +312,54 @@ TEST_CASE("The fog is lit by every light that declares a volumetric strength", "
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1344: the march decides once per pixel which of the eight frame lights its ray can meet (a light with a range
+// adds exactly zero past it) and skips the rest at every step. What that must never do is drop a light the ray does
+// reach -- including one whose range the ray enters only at the far end of the march. A pixel whose ray misses every
+// range is the same bytes with or without the lights.
+TEST_CASE("A ranged light lights exactly the rays that enter its range, to the end of the march (ADR-1344)",
+          "[volume][gpu][adr1344]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.04f);
+    s.environment.volumeLocalLights = 0.0f; // the eight frame lights only, not the froxel list
+    s.lights[0].volumetricStrength = 0.0f;  // the key does not light the air
+    const gpu::ImageF none = renderFloat(*renderer, s);
+
+    // Straight ahead and past the march's 120 m: the centre ray's last metres are inside its 12 m range.
+    scene::PunctualLight far;
+    far.type = scene::PunctualLight::Type::Point;
+    far.position = {0.0f, 0.0f, -128.0f};
+    far.range = 12.0f;
+    far.intensity = 4000.0f;
+    far.color = glm::vec3(0.2f, 0.6f, 1.0f);
+    s.addLight(far);
+    // Up and to the left, near: the centre ray never comes within its range.
+    scene::PunctualLight aside;
+    aside.type = scene::PunctualLight::Type::Point;
+    aside.position = {-14.0f, 9.0f, -20.0f};
+    aside.range = 4.0f;
+    aside.intensity = 400.0f;
+    s.addLight(aside);
+    const gpu::ImageF lit = renderFloat(*renderer, s);
+
+    constexpr std::uint32_t kCentre = kSize / 2;
+    const float before = luminanceAt(none, kCentre, kCentre);
+    const float after = luminanceAt(lit, kCentre, kCentre);
+    INFO("centre (its ray ends inside the far light's range): " << before << " -> " << after);
+    CHECK(after > before * 10.0f);
+    CHECK(after > before + 1e-4f);
+    // The bottom-right corner looks away from both ranges: not a bit moved.
+    const float* a = none.pixel(kSize - 3, kSize - 3);
+    const float* b = lit.pixel(kSize - 3, kSize - 3);
+    CHECK(a[0] == b[0]);
+    CHECK(a[1] == b[1]);
+    CHECK(a[2] == b[2]);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("Two fresh renderers produce identical volumetric frames", "[volume][gpu]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

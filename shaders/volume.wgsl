@@ -790,10 +790,42 @@ fn mediumSelfShadow(p: vec3<f32>, towards: vec3<f32>, t: f32) -> f32 {
     return exp(-tau * vol.params1.x * strength);
 }
 
-fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32> {
+// ADR-1344: which of the eight frame lights can reach any sample of this pixel's ray, as a bit mask, decided once per
+// pixel. A light with a range contributes exactly zero past it (lightRadiance's window is clamped to 0 there), so a
+// light whose range sphere the ray segment [0, reach] never enters is skipped at every step without changing a bit of
+// the result. THE RIFT's eight are the moon and seven crown lights of 30-40 m range at the canyon's head: from most of
+// the flight every sample evaluated seven lights, a phase function and a shadow call each, to add zero.
+fn frameLightMask(origin: vec3<f32>, direction: vec3<f32>, reach: f32) -> u32 {
+    var mask = 0u;
+    let count = min(i32(frame.envParams.z), 8);
+    for (var i = 0; i < count; i = i + 1) {
+        let light = frame.lights[i];
+        if (light.cone.z <= 0.0) {
+            continue;
+        }
+        let range = light.directionRange.w;
+        if (light.positionType.w < 0.5 || range <= 0.0) {
+            mask = mask | (1u << u32(i));
+            continue;
+        }
+        let toLight = light.positionType.xyz - origin;
+        let along = clamp(dot(toLight, direction), 0.0, reach);
+        let closest = toLight - direction * along;
+        let r = range * 1.001 + 0.01; // rounding: never drop a light the window still reaches
+        if (dot(closest, closest) < r * r) {
+            mask = mask | (1u << u32(i));
+        }
+    }
+    return mask;
+}
+
+fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32, lightMask: u32) -> vec3<f32> {
     var total = vec3<f32>(0.0);
     let count = min(i32(frame.envParams.z), 8);
     for (var i = 0; i < count; i = i + 1) {
+        if ((lightMask & (1u << u32(i))) == 0u) {
+            continue;
+        }
         let strength = frame.lights[i].cone.z;
         if (strength <= 0.0) {
             continue;
@@ -999,6 +1031,10 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         samples = samples + schedule.count[g];
     }
 
+    // ADR-1344: the frame lights this ray can meet at all. The samples lie in [0, maxDistance] (a jittered step can
+    // reach one step past a segment's start, never past its end); a step of slack keeps the test conservative.
+    let lightMask = frameLightMask(origin, direction, maxDistance + stepLength);
+
     var transmittance = 1.0;
     var scattered = vec3<f32>(0.0);
     // One flat loop over the schedule's samples, walking its segments in order, so transmittance
@@ -1137,7 +1173,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         // The particle glow arrives as light to scatter, not as fog emission, so denser dust
         // catches more of it - which is what reads as "the sparks are lighting the dust".
         let local = localInScatterAt(p, screenUv, max(t * depthAlongRay, 1e-3), direction, anisotropy);
-        let source = scattering * (inScatterAt(p, direction, anisotropy) + particleGlowAt(p) + local) + emission;
+        let source = scattering * (inScatterAt(p, direction, anisotropy, lightMask) + particleGlowAt(p) + local) + emission;
         scattered = scattered + transmittance * source * segmentStep;
         transmittance = transmittance * exp(-extinction * segmentStep);
         if (transmittance < 0.002) {
