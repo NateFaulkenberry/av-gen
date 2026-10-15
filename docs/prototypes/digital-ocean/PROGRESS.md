@@ -166,3 +166,45 @@ Brief: `00-brief.md` (the owner's, verbatim). Plan: `01-plan.md`. Worktree `../a
 
 Media: `stage7-silent-trench-allyougot-glowmere.png` (same scene, four inputs), `stage7-crumple-found-tide-off-vs-on.png`,
 `stage7-after-adr1370.png` (Glowmere x2, Trench), `stage7-trench-60-90s-before-taps-fix.mp4`.
+
+## Stage 8: MIDI as a performance instrument (done)
+
+**The map** (`MIDI_CC`, `MIDI_PADS`, `midi()`; any device, any channel; the project's `control.midi.bindings`):
+
+| control | signal | gesture |
+|---|---|---|
+| CC 1 | `control.night` | NIGHT: the palette's other end -- navy sea, emerald bioluminescent crests and foam, a pale moon |
+| CC 2 | `control.swell` | SWELL: long swell +1.1 m, cross swell +0.5 m (the crest ramp follows, so foam stays a cap) |
+| CC 3 | `control.chop` | CHOP: the wind sea roughens, the glints multiply |
+| CC 4 | `control.foam` | FOAM: the foam threshold drops, foam brightens |
+| CC 5 | `control.sun` | SUN: halo, glow and the sun's path x2.5 |
+| CC 6 | `control.tide` | TIDE: the bass-history swell from x0.4 to x2 |
+| CC 7 | `control.golden` | GOLDEN: toward golden hour |
+| CC 8 | `control.spray` | SPRAY: drum spray and note sparks up to x3.5 |
+| pad 36 | `control.padLeap` | LEAP: the hero dolphin's envelope (a full ~4 s arc across the sun's path, splashes at exit and entry) |
+| pad 37 | `control.padWave` | HERO WAVE: a triggered pulse front (ADR-906) rises 240 m out and rolls in at 13 m/s, foaming |
+| pad 38 | `control.padGlow` | BLOOM: emerald light along every crest and in the foam, held 0.7 s, fading over ~3 s |
+| pad 39 | `control.padFlare` | FLARE: halo x4, glow, path and glints blaze and settle over ~2 s |
+| pad 40 | `control.padSpray` | SPRAY: a gust of 420 drops off the near swell |
+
+- **Palettes as a time of day**: every palette colour a program paints with is recorded by the assembler
+  (`Prog.pcolour`), and `palette_routes()` adds (target - twilight) per channel at full control: one control moves the
+  whole world coherently (sky, sea, clouds, dolphins, island). CC 1 and CC 7 are alternatives (both up adds both).
+- **Gestures, not switches**: pads carry their own envelopes (peak-hold + fall), the leap is a complete arc, the hero
+  wave a complete crossing; repeated hits restart a gesture, never accumulate (no growing state anywhere: fixed pools,
+  stateless fields, an envelope source).
+- **Wave speed and direction are deliberately NOT on a control**: a deformer's angle is `k.x + speed t`, so changing
+  `speed` (or the axis) mid-performance jumps every wave; an integrated phase would run into the phase parameter's
+  +-100 rad bound within minutes. Swell, chop, tide and the hero wave cover the expressive range instead.
+- **Fixed in this stage**: foam turned into flat mint slabs when CC 2 raised the sea (the crest ramp tracked only the
+  loudness) and when the hero wave arrived (mixed foam erased the crest's form). The crest ramp now follows CC 2 too,
+  foam is ADDED over the crest's shading (ops freed by replacing the micro-ripples' hand-made distance fade with the
+  engine's anti-aliased `microDetail`), and the hero wave is 1.9 m (2.6 saturated the crest light).
+- **Offline review**: `REVIEW_MIDI` (generator knob) replaces each control signal, wherever it is read, by a scored
+  timeline source; `stage8-scored-midi-offline.mp4` plays the probe's script with no audio.
+- **Live, end to end**: `avgen_sonic_probe controller` (a scenario added to the probe tool: CC ramps and pads 36-40 over
+  a held synth note into BlackHole) as a CoreMIDI virtual source, the editor in `--live` mode with the project. 370 of
+  the probe's messages and 8 notes arrived; every gesture appears in the capture (`stage8-live-midi-end-to-end.png`,
+  `stage8-live-midi-capture.mp4`). Two harness lessons: this machine's saved MIDI device (`SE49 MIDI1`) overrides the
+  project's `*` filter, so the first run received nothing; and with a name filter a source must exist BEFORE the editor
+  opens (it is never retried), so the probe starts first with a 25 s lead-in.

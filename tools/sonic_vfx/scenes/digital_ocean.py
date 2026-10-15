@@ -336,12 +336,11 @@ def sea_program(far=False):
     else:
         # micro-ripples: the normal tilted by a fine noise carried by the surface (its rest position, so the swell's
         # orbits carry it); `shimmer`'s offset drifts (a slow saw), `shimmerAmp` is how rough
+        # (microDetail: a noise that fades to its mean as a pixel's footprint grows over its period -- the engine's
+        # own anti-aliasing, which replaced a hand-made distance fade and freed two ops)
         P.op(None, "input", 2, inp="localPosition")
-        P.op("shimmer", "noise", 2, a=2, f=SHIMMER_FREQ, k=[0.0, 0.0, 0.0], seed=11)
+        P.op("shimmer", "microDetail", 2, a=2, f=SHIMMER_FREQ, k=[0.0, 0.0, 0.0], seed=11)
         P.op("shimmerAmp", "remap", 2, a=2, k=[0.3, 0.7, -SHIMMER_AMP, SHIMMER_AMP])
-        P.op(None, "input", 3, inp="cameraDistance")                     # fade them out by the seam at 200 m
-        P.op("shimmerFade", "remap", 3, a=3, k=[SHIMMER_NEAR, SHIMMER_FAR, 1.0, 0.0], f=1.0)
-        P.op(None, "multiply", 2, a=2, b=3)
         P.op(None, "add", 0, a=0, b=2)                                   # a tilt along (1, 1, 1): enough
     P.op(None, "fresnel", 2, f=1.0)                                      # 1 - n.v (the fragment's own normal)
     P.op("nv", "remap", 2, a=2, k=[0.0, 1.0, 1.0, 0.0])
@@ -391,11 +390,12 @@ def sea_program(far=False):
         P.op(None, "multiply", 6, a=6, b=7)
     P.op("lit", "add", 5, a=5, b=6)
     if not far:
-        # foam: thin caps on the highest crests only (where the trains reinforce), seen edge-on from this height as
+        # foam (ADDED, not mixed: a tall crest under a mixed foam was a flat slab): thin caps on the highest crests only (where the trains reinforce), seen edge-on from this height as
         # ribbons; screen-space curvature was tried and gave a broad wash. `foam`'s colour is what the drums scale
         P.op("foamMask", "smoothstep", 6, a=7, k=[FOAM_H0, FOAM_H1])
         P.pcolour("foam", 7, "foam", FOAM_GAIN)
-        P.op("foamed", "mixBy", 5, a=5, b=7, c=6)
+        P.op(None, "multiply", 6, a=6, b=7)
+        P.op("foamed", "add", 5, a=5, b=6)                               # added: the crest's form stays under it
     return P
 
 
@@ -415,7 +415,7 @@ CREST_LO, CREST_HI = 0.3, 1.9
 SSS_GAIN = 0.9
 SSS_FOCUS = 3.0
 FOAM_H0, FOAM_H1 = 0.64, 0.8          # of the crest ramp (0.3..1.9 m): the tops of the highest crests
-FOAM_GAIN = 1.0
+FOAM_GAIN = 0.6
 
 
 def sky_program():
@@ -906,8 +906,8 @@ def audio_fields(s):
     # second hit restarts it far out). Added to the kick fronts in one compound: one deformer slot for both.
     wave_origin = [round(-ax[0] * HERO_WAVE_FROM, 3), 0.0, round(-ax[2] * HERO_WAVE_FROM, 3)]
     s.nodes.append({"name": "heroWave", "kind": "field", "position": wave_origin, "field": dict(
-        common, kind="wave", waveShape="pulse", amplitude=1.0, wavelength=34.0, waveSpeed=HERO_WAVE_SPEED,
-        waveWidth=14.0, waveOrigin=0.0, strength=round(HERO_WAVE_HEIGHT / KICK_LIFT, 4),
+        common, kind="wave", waveShape="pulse", amplitude=1.0, wavelength=30.0, waveSpeed=HERO_WAVE_SPEED,
+        waveWidth=10.0, waveOrigin=0.0, strength=round(HERO_WAVE_HEIGHT / KICK_LIFT, 4),
         trigger={"source": "signal", "name": HERO_WAVE_TRIGGER, "threshold": 0.3})})
     s.nodes.append({"name": "lift", "kind": "field", "position": [0, 0, 0], "field": {
         "kind": "compound", "combine": "add", "children": ["kickFront", "heroWave"], "strength": 1.0}})
@@ -1045,6 +1045,9 @@ def midi(s, progs, sea, seafar, sky):
                 R("control.chop", D % 5, 0.16, **CC),
                 R("control.tide", D % 7, 1.0, op="multiply", gain=1.6, offset=0.4, **CC))
     s.route(R("control.chop", M % (sea.name, sea["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
+    # a taller sea needs a taller crest to foam (as with the level): the crest ramp follows the swell control
+    s.route(R("control.swell", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply",
+              gain=-0.42, offset=1.0, **CC))
     s.route(R("control.foam", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.16, comp=0, **CC),
             R("control.foam", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
             R("control.foam", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
@@ -1058,7 +1061,7 @@ def midi(s, progs, sea, seafar, sky):
     em = pal("midnight", "sss")
     for prog in (sea, seafar):
         for c in range(3):
-            s.route(R("control.padGlow", M % (prog.name, prog["sss"]), round(em[c] * 3.0, 4), comp=c, **glow))
+            s.route(R("control.padGlow", M % (prog.name, prog["sss"]), round(em[c] * 6.0, 4), comp=c, **glow))
     for c in range(3):
         s.route(R("control.padGlow", M % (sea.name, sea["foam"]), round(pal("midnight", "foam")[c] * 1.5, 4), comp=c,
                   **glow))
@@ -1095,7 +1098,7 @@ def score_midi(s, score):
 
 HERO_WAVE_FROM = 240.0      # metres out the hero wave rises
 HERO_WAVE_SPEED = 13.0      # m/s: about 18 s to your feet
-HERO_WAVE_HEIGHT = 2.6      # metres
+HERO_WAVE_HEIGHT = 1.9      # metres (2.6 saturated the crest light into a slab as it arrived)
 
 
 SUN_RADIUS_DEG = 1.7

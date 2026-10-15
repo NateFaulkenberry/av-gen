@@ -175,11 +175,11 @@
     "kind": "wave",
     "waveShape": "pulse",
     "amplitude": 1.0,
-    "wavelength": 34.0,
+    "wavelength": 30.0,
     "waveSpeed": 13.0,
-    "waveWidth": 14.0,
+    "waveWidth": 10.0,
     "waveOrigin": 0.0,
-    "strength": 4.7273,
+    "strength": 3.4545,
     "trigger": {
      "source": "signal",
      "name": "control.padWave",
@@ -5804,7 +5804,7 @@
      "input": "localPosition"
     },
     {
-     "kind": "noise",
+     "kind": "microDetail",
      "dst": 2,
      "srcA": 2,
      "constant": [
@@ -5827,29 +5827,6 @@
       0.055
      ],
      "value": 0.0
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "remap",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      50.0,
-      200.0,
-      1.0,
-      0.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
     },
     {
      "kind": "add",
@@ -6162,18 +6139,23 @@
      "kind": "constant",
      "dst": 7,
      "constant": [
-      0.50888,
-      0.98225,
-      0.7913,
+      0.305328,
+      0.58935,
+      0.47478,
       1.0
      ]
     },
     {
-     "kind": "mixBy",
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
      "dst": 5,
      "srcA": 5,
-     "srcB": 7,
-     "srcC": 6
+     "srcB": 6
     }
    ],
    "baseColor": -1,
