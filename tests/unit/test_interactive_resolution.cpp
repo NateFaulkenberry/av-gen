@@ -583,3 +583,285 @@ TEST_CASE("the frame cap's steps hold a fixed grid: no drift from oversleeping, 
     }
     CHECK((now - 9.0 - start) == Catch::Approx(600 * period + 0.4).margin(0.01));
 }
+
+// ---- ADR-1362: paced to the target, misses decide ------------------------------------------------------------------
+//
+// Measured on THE RIFT LIVE at a 30 fps target with the cap on (docs/development/live-controller-30fps.md): the GPU
+// span read 24-26 ms at High and 29-30 ms at Emergency, every frame on time. The clock governor slows the GPU until the
+// busy time fills most of the period, so the span reads the clock, not the level. The model below is that: a frame on
+// time reads 86-92% of the period whatever the level costs; a frame over the period reads its cost and misses.
+
+namespace {
+
+struct PacedLevel {
+    double costMs = 20.0;   // what the level costs at full clock
+    int missEvery = 0;      // 0: never misses; n: every n-th frame misses (a level on the edge)
+};
+
+struct PacedScene {
+    std::array<PacedLevel, app::kLiveQualityLevels> levels{};
+    double periodMs = 1000.0 / 30.0;
+    double refreshHz = 60.0;
+};
+
+struct PacedRun {
+    std::uint64_t frames = 0;
+    std::uint64_t misses = 0;
+    std::array<std::uint64_t, app::kLiveQualityLevels> framesAt{};
+};
+
+// One closed-loop run. `paced = false` feeds the same frames to a controller that was never told about the cap: the
+// pre-ADR-1362 controller, which is the paired arm (ADR-182).
+PacedRun runPaced(app::InteractiveResolution& c, const PacedScene& scene, int frames, bool paced = true,
+                  std::uint32_t seed = 1) {
+    PacedRun out;
+    std::uint32_t rng = seed;
+    const auto jitter = [&] { // deterministic, in [0, 1)
+        rng = rng * 1664525u + 1013904223u;
+        return static_cast<double>(rng >> 8) / static_cast<double>(1u << 24);
+    };
+    std::array<int, app::kLiveQualityLevels> nth{};
+    for (int i = 0; i < frames; ++i) {
+        if (paced) {
+            c.setPacing(scene.periodMs, scene.refreshHz);
+        }
+        const std::size_t r = c.rung();
+        const PacedLevel& level = scene.levels[r];
+        const bool overPeriod = level.costMs > scene.periodMs;
+        const bool edgeMiss = level.missEvery > 0 && ++nth[r] % level.missEvery == 0;
+        const bool miss = overPeriod || edgeMiss;
+        const double gpu = miss ? std::max(level.costMs, scene.periodMs * 1.02) // saturated: the span is the cost
+                                : scene.periodMs * (0.86 + 0.06 * jitter()); // the governor's fill
+        const double wall = miss ? scene.periodMs + 1000.0 / scene.refreshHz : scene.periodMs + 0.6 * jitter();
+        ++out.frames;
+        out.misses += miss ? 1 : 0;
+        ++out.framesAt[r];
+        c.note(gpu, wall);
+    }
+    return out;
+}
+
+app::InteractiveResolutionSettings live(double targetFps) {
+    app::InteractiveResolutionSettings s; // the production law: dwell 30, window 20, hold 120, 3 misses in 90
+    s.enabled = true;
+    s.targetFps = targetFps;
+    s.budgetMs = app::liveBudget(targetFps).qualityBudgetMs;
+    s.strategy = LiveQualityStrategy::EffectsFirst;
+    return s;
+}
+
+// THE RIFT LIVE at 30, roughly: Ultra is over the frame, High holds most frames but misses some, Medium and below hold.
+PacedScene riftAt30() {
+    PacedScene s;
+    s.levels = {PacedLevel{38.0, 0}, PacedLevel{31.0, 12}, PacedLevel{25.0, 0}, PacedLevel{20.0, 0},
+                PacedLevel{16.0, 0}};
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("a paced deadline is missed by a frame that lands a refresh late, not by the cap's wake-up jitter",
+          "[unit][resolution][live-quality][adr1362]") {
+    app::InteractiveResolution c;
+    c.configure(live(30));
+    // 30 on 60 Hz: 33-39 ms is on time (the main thread's interval jitters around the vsync); 50 ms is a lost refresh.
+    c.setPacing(1000.0 / 30.0, 60.0);
+    for (int i = 0; i < 10; ++i) {
+        c.note(20.0, i % 2 == 0 ? 33.3 : 39.0);
+    }
+    CHECK(c.stats().missedDeadlines == 0);
+    c.note(20.0, 50.0);
+    CHECK(c.stats().missedDeadlines == 1);
+    // 30 on 120 Hz, the editor's own screen: 38 ms is jitter (measured: no frame lost), 42 ms is a quarter period late.
+    app::InteractiveResolution b;
+    b.configure(live(30));
+    b.setPacing(1000.0 / 30.0, 120.0);
+    b.note(20.0, 38.4);
+    CHECK(b.stats().missedDeadlines == 0);
+    b.note(20.0, 42.5);
+    CHECK(b.stats().missedDeadlines == 1);
+    // 60 on 120 Hz: 25 ms is a miss, 16.7-19 ms is not.
+    app::InteractiveResolution d;
+    d.configure(live(60));
+    d.setPacing(1000.0 / 60.0, 120.0);
+    d.note(10.0, 19.0);
+    d.note(10.0, 25.0);
+    CHECK(d.stats().missedDeadlines == 1);
+    // Not paced: nothing is a deadline (the uncapped law reads the span and the interval as before).
+    app::InteractiveResolution e;
+    e.configure(live(30));
+    e.note(20.0, 50.0);
+    CHECK(e.stats().missedDeadlines == 0);
+}
+
+TEST_CASE("paced: a span the clock governor inflates to the budget does not move the ladder when frames are on time",
+          "[unit][resolution][live-quality][adr1362]") {
+    // Every level holds; the span reads 86-92% of the period (28.7-30.7 ms: over the 29.3 ms budget about a third of
+    // the time) because the GPU clocks down into the idle part of each frame.
+    PacedScene scene;
+    scene.levels = {PacedLevel{20.0, 0}, PacedLevel{17.0, 0}, PacedLevel{14.0, 0}, PacedLevel{12.0, 0},
+                    PacedLevel{10.0, 0}};
+    app::InteractiveResolution c;
+    c.configure(live(30));
+    runPaced(c, scene, 6000);
+    CHECK(c.rung() == 0);
+    CHECK(c.stats().drops == 0);
+    CHECK_FALSE(c.unsustainable());
+    // The paired arm: the same frames, the cap not declared -- the old law reads the span against the budget and walks
+    // a scene that holds every level down the ladder.
+    app::InteractiveResolution d;
+    d.configure(live(30));
+    runPaced(d, scene, 6000, false);
+    CHECK(d.rung() > 0);
+}
+
+TEST_CASE("paced: a level whose frames are on time is climbed back to, slowly, although its span reads at the budget",
+          "[unit][resolution][live-quality][adr1362]") {
+    const PacedScene scene = riftAt30();
+    app::InteractiveResolution c;
+    const app::InteractiveResolutionSettings s = live(30);
+    c.configure(s);
+    // Down from Ultra (over the frame) on its misses.
+    PacedScene heavy = scene;
+    heavy.levels[1] = heavy.levels[2] = PacedLevel{36.0, 0}; // a heavy passage: High and Medium miss too
+    for (int i = 0; i < 1000 && c.rung() < 3; ++i) {
+        runPaced(c, heavy, 1, true, 7 + static_cast<std::uint32_t>(i));
+    }
+    REQUIRE(c.rung() == 3); // Low
+    // The passage ends. Medium holds with every frame on time while its span reads 86-92% of the period. It is
+    // climbed to -- but not before the hold: a dwell, then `raiseHoldFrames` frames with no miss in the window.
+    const std::uint64_t raisesBefore = c.stats().raises;
+    runPaced(c, scene, s.dwellFrames + s.raiseHoldFrames - 10);
+    CHECK(c.rung() == 3);
+    runPaced(c, scene, 2 * (s.dwellFrames + s.raiseHoldFrames));
+    CHECK(c.rung() <= 2);
+    CHECK(c.stats().raises > raisesBefore);
+    // The paired arm: told nothing about the cap, the same frames never climb back to Medium.
+    app::InteractiveResolution d;
+    d.configure(s);
+    runPaced(d, heavy, 200, false);
+    runPaced(d, scene, 3000, false);
+    CHECK(d.rung() >= 3);
+}
+
+TEST_CASE("paced: real misses still descend, and misses the GPU did not cause do not",
+          "[unit][resolution][live-quality][adr1362]") {
+    // Ultra misses every frame: down, one level per decision, until the frames are on time.
+    app::InteractiveResolution c;
+    c.configure(live(30));
+    runPaced(c, riftAt30(), 600);
+    CHECK(c.rung() >= 1);
+    CHECK(c.stats().drops >= 1);
+    // A level that misses one frame in twelve is left within a few seconds even though most of its frames are on
+    // time and its span reads under the budget between misses.
+    app::InteractiveResolution e;
+    e.configure(live(30));
+    PacedScene edge;
+    edge.levels = {PacedLevel{31.0, 12}, PacedLevel{25.0, 0}, PacedLevel{20.0, 0}, PacedLevel{16.0, 0},
+                   PacedLevel{12.0, 0}};
+    runPaced(e, edge, 300); // ten seconds
+    CHECK(e.rung() >= 1);
+    // The rate that decides: a level losing one frame in sixty (1.7%) is left within half a minute; one losing one in
+    // six hundred (a hitch every twenty seconds) is kept.
+    PacedScene rare = edge;
+    rare.levels[0] = PacedLevel{30.0, 60};
+    app::InteractiveResolution r1;
+    r1.configure(live(30));
+    runPaced(r1, rare, 900);
+    CHECK(r1.rung() >= 1);
+    rare.levels[0] = PacedLevel{30.0, 600};
+    app::InteractiveResolution r2;
+    r2.configure(live(30));
+    runPaced(r2, rare, 3000);
+    CHECK(r2.rung() == 0);
+    CHECK(r2.stats().drops == 0);
+    // Misses with the GPU finishing early (a main-thread stall, another process): held, not degraded (§8).
+    app::InteractiveResolution f;
+    f.configure(live(30));
+    for (int i = 0; i < 2000; ++i) {
+        f.setPacing(1000.0 / 30.0, 60.0);
+        f.note(12.0, i % 10 == 0 ? 50.0 : 33.4);
+    }
+    CHECK(f.rung() == 0);
+    CHECK(f.stats().lateNotGpu > 0);
+    CHECK_FALSE(f.unsustainable());
+    // Nor at a span the clock governor holds at 85-90% of the period: measured, the late frames of a light scene at
+    // 60 fps (the cap's wake-up, the main thread) sat there, and a GPU-share test would have called them the GPU's.
+    app::InteractiveResolution h;
+    h.configure(live(30));
+    for (int i = 0; i < 2000; ++i) {
+        h.setPacing(1000.0 / 30.0, 60.0);
+        h.note(29.5, i % 10 == 0 ? 50.0 : 33.4);
+    }
+    CHECK(h.rung() == 0);
+    CHECK(h.stats().lateNotGpu > 0);
+    // The control: the same late frames with a span that reached the period -- the span arriving two frames after the
+    // late frame, as FrameTimeline delivers it -- do go down.
+    app::InteractiveResolution g;
+    g.configure(live(30));
+    for (int i = 0; i < 2000 && g.rung() == 0; ++i) {
+        g.setPacing(1000.0 / 30.0, 60.0);
+        g.note(i % 10 == 2 ? 36.0 : 29.5, i % 10 == 0 ? 50.0 : 33.4);
+    }
+    CHECK(g.rung() > 0);
+}
+
+TEST_CASE("paced: a GPU stall is not the level's cost, a level far over the period is",
+          "[unit][resolution][live-quality][adr1362]") {
+    // Measured on Neon Vector World at 60 fps: single 40 ms spans (2.4x the period) with a 14 ms median -- a compile,
+    // an upload, another process -- each making two or three frames late. No level fixes that.
+    app::InteractiveResolution c;
+    c.configure(live(60));
+    for (int i = 0; i < 3600; ++i) {
+        c.setPacing(1000.0 / 60.0, 120.0);
+        const int k = i % 300; // a stall every five seconds, three late frames each
+        const bool stall = k >= 100 && k < 103;
+        c.note(k == 101 ? 40.0 : 14.0, stall ? 26.0 : 16.7);
+    }
+    CHECK(c.rung() == 0);
+    CHECK(c.stats().drops == 0);
+    CHECK(c.stats().missedDeadlines > 0);
+    // The control: a level that is far over every frame (a 40 ms span at a 16.7 ms period, so the median is over the
+    // period too) goes down although every span is a "stall" by size.
+    app::InteractiveResolution d;
+    d.configure(live(60));
+    for (int i = 0; i < 600 && d.rung() == 0; ++i) {
+        d.setPacing(1000.0 / 60.0, 120.0);
+        d.note(40.0, 41.7);
+    }
+    CHECK(d.rung() > 0);
+}
+
+TEST_CASE("paced: under a steady load it settles on the highest level that holds, without hunting",
+          "[unit][resolution][live-quality][adr1362]") {
+    // Three minutes at 30 fps on THE RIFT's shape: High misses one frame in twelve, Medium holds.
+    app::InteractiveResolution c;
+    c.configure(live(30));
+    const PacedRun run = runPaced(c, riftAt30(), 30 * 180);
+    INFO("ended at " << app::liveQualityLevelName(c.level()) << "; drops " << c.stats().drops << " raises "
+                     << c.stats().raises << " reverts " << c.stats().reverts << "; misses " << run.misses);
+    CHECK(c.level() == LiveQualityLevel::Medium);
+    // Most of the run at Medium, the highest level that holds.
+    CHECK(run.framesAt[2] > run.frames * 8 / 10);
+    // Each probe of High that misses comes back down and the next waits twice as long (ADR-1104, up to 8x): a handful
+    // of probes in three minutes, not a level change every few seconds.
+    CHECK(c.stats().raises <= 6);
+    CHECK(c.stats().reverts + 1 >= c.stats().raises);
+    // What the viewer sees: under 1% of frames missed over the whole run, the descent from Ultra included.
+    CHECK(run.misses * 100 < run.frames);
+}
+
+TEST_CASE("paced at 60 on a 120 Hz display: the same law, a level that holds is kept",
+          "[unit][resolution][live-quality][adr1362]") {
+    PacedScene scene;
+    scene.periodMs = 1000.0 / 60.0;
+    scene.refreshHz = 120.0;
+    scene.levels = {PacedLevel{19.0, 0}, PacedLevel{15.5, 9}, PacedLevel{12.0, 0}, PacedLevel{10.0, 0},
+                    PacedLevel{8.0, 0}};
+    app::InteractiveResolution c;
+    c.configure(live(60));
+    const PacedRun run = runPaced(c, scene, 60 * 120);
+    CHECK(c.level() == LiveQualityLevel::Medium);
+    CHECK(run.framesAt[2] > run.frames * 7 / 10);
+    CHECK(c.stats().raises <= 6);
+}

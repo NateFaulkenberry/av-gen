@@ -271,7 +271,10 @@ void ControlPanel::drawLive(app::Engine& engine) {
                 tooltip("Present frames at the target rate, on a whole number of the display's refreshes (60 on a "
                         "120 Hz screen: every second refresh), rather than as fast as the GPU allows. A steady 60 "
                         "looks smoother than frames alternating 9 and 25 ms. Off: as fast as possible. Never "
-                        "affects a render (ADR-1107).");
+                        "affects a render (ADR-1107).\n\nWith the cap on, Auto goes by missed frames rather than the "
+                        "GPU time: the GPU slows its clock into the idle part of each frame, so its time reads close "
+                        "to the budget at any level. Frames missing their deadline lower the level; a few seconds "
+                        "with none tries the level above, and keeps it only if it holds (ADR-1362).");
             }
         }
         ImGui::Text("Now: %s%s  scale %.2f  %ux%u into %ux%u", q.level.c_str(), q.automatic ? " (auto)" : "",
@@ -283,12 +286,27 @@ void ControlPanel::drawLive(app::Engine& engine) {
                                        : std::string(" (the default; a project can say otherwise with live.qualityStrategy)."))
                      + " Quality changes this session: " + std::to_string(q.transitions) + ".").c_str());
         }
-        const bool gpuOver = q.gpuMs > q.budgetMs;
+        // ADR-1362: capped, the GPU time is clock-scaled (it fills the idle part of the frame), so it is shown but not
+        // flagged; the frames that missed their deadline are what Auto acts on, and what is flagged.
+        const bool gpuOver = !q.paced && q.gpuMs > q.budgetMs;
         if (q.gpuMs >= 0.0) {
             ImGui::TextColored(gpuOver ? ImVec4(1.0f, 0.6f, 0.3f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Text),
                                "GPU %.1f ms of %.1f ms budget", q.gpuMs, q.budgetMs);
         } else {
             ImGui::Text("GPU -- of %.1f ms budget", q.budgetMs);
+        }
+        if (q.paced && ImGui::IsItemHovered()) {
+            tooltip("Capped at the target, the GPU clocks down into the idle part of each frame, so this reads close "
+                    "to the budget whether or not the level has room. Auto goes by missed frames instead (ADR-1362).");
+        }
+        if (q.paced) {
+            ImGui::SameLine();
+            ImGui::TextColored(q.recentMisses > 0 ? ImVec4(1.0f, 0.6f, 0.3f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                               "  missed %d", q.recentMisses);
+            if (ImGui::IsItemHovered()) {
+                tooltip("Frames in the last few seconds at this level that took a display refresh longer than the "
+                        "target allows (ADR-1362).");
+            }
         }
         ImGui::SameLine();
         ImGui::Text("  CPU %.1f ms", q.cpuMs >= 0.0 ? q.cpuMs : 0.0);
@@ -334,7 +352,11 @@ void ControlPanel::drawLive(app::Engine& engine) {
                             "live settings, so the project opens with them. The scene itself is not changed.");
                 }
             }
-            if (q.unsustainable) {
+            if (q.unsustainable && q.paced) {
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
+                                   "LIVE TARGET UNSUSTAINABLE: at the lowest level (%s) and still missing frames.",
+                                   q.minimumLevel.c_str());
+            } else if (q.unsustainable) {
                 ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
                                    "LIVE TARGET UNSUSTAINABLE: at the lowest level (%s) and still %.1f ms over %.1f ms.",
                                    q.minimumLevel.c_str(), q.gpuMs, q.budgetMs);
@@ -364,7 +386,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
                             s.particleCullDistance > 0.0f ? (std::to_string(static_cast<int>(s.particleCullDistance)) + " m").c_str()
                                                           : "kept");
                 if (q.reverts > 0) {
-                    ImGui::TextDisabled("%llu raise(s) undone because the next frames missed the budget",
+                    ImGui::TextDisabled("%llu raise(s) undone because the frames after them did not hold",
                                         static_cast<unsigned long long>(q.reverts));
                 }
                 ImGui::TreePop();
@@ -376,7 +398,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
                                "The CPU alone (%.1f ms) is longer than a %.0f fps frame: lowering quality cannot reach it.",
                                q.cpuMs, q.targetFps);
         } else if (q.atBottomOver) {
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "At the lowest quality and still over the budget.");
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), q.paced ? "At the lowest quality and still missing frames."
+                                                                        : "At the lowest quality and still over the budget.");
         }
         ImGui::Separator();
     }

@@ -13,7 +13,8 @@ using Catch::Approx;
 TEST_CASE("live profile: the command line takes its own flags and leaves the rest", "[live-profile]") {
     const auto a = parseLiveProfileArgs({"avgen", "--live-profile", "--project", "p.json", "--mode", "live",
                                          "--target-fps", "90", "--size", "1280x720", "--start", "60", "--json",
-                                         "o.json", "--tier", "realtime", "--verify-candidates", "3", "--no-audio"});
+                                         "o.json", "--tier", "realtime", "--verify-candidates", "3", "--no-audio",
+                                         "--trace", "frames.csv"});
     REQUIRE(a.error.empty());
     CHECK(a.options.enabled);
     CHECK(a.options.mode == LiveProfileMode::Live);
@@ -25,6 +26,8 @@ TEST_CASE("live profile: the command line takes its own flags and leaves the res
     CHECK_FALSE(a.options.audio);
     REQUIRE(a.options.json);
     CHECK(a.options.json->string() == "o.json");
+    REQUIRE(a.options.trace); // ADR-1362
+    CHECK(a.options.trace->string() == "frames.csv");
     CHECK(a.rest == std::vector<std::string>{"avgen", "--project", "p.json", "--tier", "realtime"});
 }
 
@@ -41,6 +44,8 @@ TEST_CASE("live profile: fast and deep defaults, and bad values are refused", "[
     CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--size", "big"}).error.empty());
     CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--target-fps", "500"}).error.empty());
     CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--measure"}).error.empty());
+    CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--trace"}).error.empty());
+    CHECK_FALSE(fast.options.trace);
 }
 
 TEST_CASE("live profile: steady state needs a median that stopped moving", "[live-profile]") {

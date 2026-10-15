@@ -255,7 +255,9 @@ public:
         std::string profile = "QUALITY";   // the profile in force
         bool profileStated = false;        // the project chose it (live.profile)
         std::string minimumLevel;          // the lowest level the project allows
-        bool unsustainable = false;        // at the minimum and still over the budget
+        bool unsustainable = false;        // at the minimum and still over the budget (paced: still missing frames)
+        bool paced = false;                // ADR-1362: the loop is capped at the target; misses decide, not the GPU
+        int recentMisses = 0;              // ADR-1362: deadline misses in the level's recent frames (paced only)
         std::string priority;              // the project's degradation order, "" = the strategy's table
         std::uint64_t reverts = 0;         // raises undone by the recovery rule
         std::string overrides;             // the project's Optimize ceilings as JSON, "" = none

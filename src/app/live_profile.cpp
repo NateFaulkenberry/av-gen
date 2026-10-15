@@ -46,6 +46,7 @@ std::string liveProfileUsage() {
            "                        --midi <filter>        a MIDI input to open while measuring\n"
            "                        --capture <png>        the last measured frame\n"
            "                        --json <file>          the record (avgen.liveprofile/1)\n"
+           "                        --trace <csv>          live: one row per frame (interval, GPU, level), warm-up on\n"
            "                        --text / --no-text     the human report on stdout (default on)\n"
            "                        --verify-candidates <n> measure the top n candidates' savings (A/B)\n"
            "                        --no-prewarm           SDF variants compiled at first use on the main thread (the\n"
@@ -161,6 +162,10 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
             std::string p;
             if (!text(i, "--capture", p)) return out;
             o.capture = p;
+        } else if (a == "--trace") {
+            std::string p;
+            if (!text(i, "--trace", p)) return out;
+            o.trace = p;
         } else if (a == "--json") {
             std::string p;
             if (!text(i, "--json", p)) return out;
