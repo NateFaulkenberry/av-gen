@@ -49,6 +49,8 @@ What live play needs is put in (the live art pass; LIVE-ART-NOTES.md has the mea
      faintly -- instead of a grey plain.
  10. THE CAMERA drifts slowly (a 64 s loop, about 1.6 m of travel round the master's mid-move framing), so the
      world keeps its depth; it does not follow the music. Weight lowers it only in the heavy world.
+ 11. THE RESPONSE (ADR-1361): the Live panel's Response controls govern the garden's dynamics -- its loudness, its
+     strikes and its note gestures read `response.*` -- while its character stays the Sonic Character's.
 """
 import copy
 import json
