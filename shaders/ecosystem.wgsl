@@ -22,7 +22,8 @@ struct Layer {
     response: vec4<f32>,    // x = gain, y = threshold, z = travel, w = size
     rest: vec4<f32>,        // x = breath, y = breath rate, z = flicker, w = flicker rate
     pulse: vec4<f32>,       // x = pulses per minute, y = pulse decay (s), z = sparsity, w = max distance
-    slots: vec4<i32>,       // x = response field slot (-1 none), y = lag field slot, z = point count, w = host count
+    slots: vec4<i32>,       // x = response field slot (-1 none), y = lag field slot, z = point count, w = hosts
+                            // dispatched (the length of `hostList`, ADR-1344)
     bound: vec4<f32>,       // x = host bounding radius (template extent, before host scale), y = wake field slot
                             // (-1 none), z = wake gain, w = near fade (m, 0 = off)
     optics: vec4<f32>,      // x = iridescence, y = spectral cycles along v, z = cycles per second, w = bob (m)
@@ -58,6 +59,9 @@ struct Sprite {
 @group(2) @binding(0) var<uniform> layer: Layer;
 @group(2) @binding(1) var<storage, read> hosts: array<Host>;
 @group(2) @binding(2) var<storage, read> points: array<Point>;
+// ADR-1344: the hosts this frame dispatches (the CPU cull's survivors), by their index in `hosts`. `layer.slots.w` is
+// their count. The index, not the slot, keys every hash below, so a host lights the same whatever else was culled.
+@group(2) @binding(3) var<storage, read> hostList: array<u32>;
 
 fn ecoHash(x: u32) -> u32 {
     var h = x * 747796405u + 2891336453u;
@@ -86,12 +90,13 @@ fn splatAdd(px: i32, py: i32, rgb: vec3<f32>) {
 @compute @workgroup_size(64)
 fn cs_emit(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
     let pointIndex = wg.x * 64u + lid.x;
-    let hostIndex = wg.y + wg.z * 65535u;
+    let slot = wg.y + wg.z * 65535u;
     let pointCount = u32(layer.slots.z);
-    let hostCount = u32(layer.slots.w);
-    if (hostIndex >= hostCount || pointIndex >= pointCount) {
+    let drawnCount = u32(layer.slots.w);
+    if (slot >= drawnCount || pointIndex >= pointCount) {
         return;
     }
+    let hostIndex = hostList[slot];
     let host = hosts[hostIndex];
     let origin = vec3<f32>(host.row0.w, host.row1.w, host.row2.w);
     let hostScale = length(vec3<f32>(host.row0.x, host.row1.x, host.row2.x));

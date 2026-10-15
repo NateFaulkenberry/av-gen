@@ -97,10 +97,11 @@ Result<void> EcosystemRenderer::init(gpu::Context& context, gpu::ShaderLibrary& 
         emptyLayout_ = device.CreateBindGroupLayout(&d);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 3> e{};
+        std::array<wgpu::BindGroupLayoutEntry, 4> e{};
         e[0] = bufferEntry(0, C, wgpu::BufferBindingType::Uniform);
         e[1] = bufferEntry(1, C, wgpu::BufferBindingType::ReadOnlyStorage);
         e[2] = bufferEntry(2, C, wgpu::BufferBindingType::ReadOnlyStorage);
+        e[3] = bufferEntry(3, C, wgpu::BufferBindingType::ReadOnlyStorage); // ADR-1344: the dispatched hosts
         wgpu::BindGroupLayoutDescriptor d{};
         d.label = "ecosystem-layer";
         d.entryCount = e.size();
@@ -306,6 +307,8 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
     const wgpu::Device& device = context_->device();
     if (key != g.key || !g.uniforms) {
         std::vector<HostGpu> rows;
+        g.hostSpheres.clear();
+        g.hostScaleX.clear();
         for (const scene::ProceduralGeometry* p : hosts) {
             // The records the procedural renderer draws (distribution, variation and transform already applied),
             // then the source transform the vertex stage applies after them.
@@ -320,6 +323,12 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
                 h.row1 = glm::vec4(m[0][1], m[1][1], m[2][1], m[3][1]);
                 h.row2 = glm::vec4(m[0][2], m[1][2], m[2][2], m[3][2]);
                 rows.push_back(h);
+                // ADR-1344: the cull's copy. The x-axis length is the scale the shader's early-out reads; the largest
+                // axis bounds where a point can be under a non-uniform scale.
+                const float sx = glm::length(glm::vec3(m[0]));
+                const float smax = std::max({sx, glm::length(glm::vec3(m[1])), glm::length(glm::vec3(m[2]))});
+                g.hostSpheres.emplace_back(glm::vec3(m[3]), smax);
+                g.hostScaleX.push_back(sx);
             }
         }
         const auto& pts = *layer.points;
@@ -336,6 +345,7 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
         };
         g.hosts = makeBuffer("ecosystem-hosts", rows.size() * sizeof(HostGpu), wgpu::BufferUsage::Storage);
         g.points = makeBuffer("ecosystem-points", pts.size() * sizeof(scene::EmitterPoint), wgpu::BufferUsage::Storage);
+        g.hostList = makeBuffer("ecosystem-host-list", rows.size() * sizeof(std::uint32_t), wgpu::BufferUsage::Storage);
         if (!g.uniforms) {
             g.uniforms = makeBuffer("ecosystem-layer", sizeof(LayerUniformGpu), wgpu::BufferUsage::Uniform);
         }
@@ -345,7 +355,7 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
         if (!pts.empty()) {
             context_->queue().WriteBuffer(g.points, 0, pts.data(), pts.size() * sizeof(scene::EmitterPoint));
         }
-        std::array<wgpu::BindGroupEntry, 3> e{};
+        std::array<wgpu::BindGroupEntry, 4> e{};
         e[0].binding = 0;
         e[0].buffer = g.uniforms;
         e[0].size = sizeof(LayerUniformGpu);
@@ -355,6 +365,9 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
         e[2].binding = 2;
         e[2].buffer = g.points;
         e[2].size = g.points.GetSize();
+        e[3].binding = 3;
+        e[3].buffer = g.hostList;
+        e[3].size = g.hostList.GetSize();
         wgpu::BindGroupDescriptor bd{};
         bd.label = "ecosystem-layer";
         bd.layout = layerLayout_;
@@ -365,6 +378,65 @@ void EcosystemRenderer::syncLayer(std::size_t index, const scene::Scene& scene, 
         g.pointCount = static_cast<std::uint32_t>(pts.size());
         g.boundRadius = bound;
         g.key = key;
+    }
+}
+
+// ADR-1344: which hosts to dispatch. cs_emit already discards every point of a host that is too far or behind the camera,
+// and every point that projects outside the frame -- but only after a thread per (host, point) has been launched for it,
+// and THE RIFT's twelve layers launch 57 M of them a frame. This applies the same tests to whole hosts on the CPU, each
+// one looser than the shader's, so a host it drops is one whose every point the shader would have dropped: the picture
+// is unchanged, and the dispatch is the hosts that can be seen. Host indices are kept (the list holds them), because the
+// shader's hashes -- sparsity, flicker, phase -- are keyed on them.
+void EcosystemRenderer::cullHosts(const LayerGpu& g, const scene::EmitterLayer& layer, const EnvironmentFrame& f,
+                                  bool enabled, std::vector<std::uint32_t>& out) {
+    out.clear();
+    const auto count = static_cast<std::uint32_t>(g.hostSpheres.size());
+    if (!enabled || !f.haveCamera) {
+        out.resize(count);
+        for (std::uint32_t i = 0; i < count; ++i) {
+            out[i] = i;
+        }
+        return;
+    }
+    // The shader's two early-outs: `hostDistance - reach > maxDistance` and `dot(toHost, forward) < -reach`, with
+    // reach = (template bound + bob) x the host's x-axis scale. Slack absorbs the CPU/GPU rounding at the threshold.
+    const float maxDistance = layer.maxDistance;
+    const float boundPlusBob = g.boundRadius + layer.bob;
+    // The frustum: a point survives only inside |ndc.x|, |ndc.y| <= 1.05 (cs_emit). The four planes of that widened
+    // frustum, as (w * 1.06 -+ x) >= 0 on homogeneous clip coordinates: 1.06 rather than 1.05 for rounding.
+    const glm::mat4& m = f.viewProj;
+    const auto row = [&](int r) { return glm::vec4(m[0][r], m[1][r], m[2][r], m[3][r]); };
+    const glm::vec4 rx = row(0), ry = row(1), rw = row(3);
+    constexpr float kEdge = 1.06f;
+    const std::array<glm::vec4, 4> planes{kEdge * rw - rx, kEdge * rw + rx, kEdge * rw - ry, kEdge * rw + ry};
+    std::array<float, 4> planeNorm{};
+    for (std::size_t i = 0; i < planes.size(); ++i) {
+        planeNorm[i] = glm::length(glm::vec3(planes[i]));
+    }
+    // A point is at most bound x the largest axis scale from its host's origin, plus the bob's drift, which is not
+    // scaled: |(sin, 0.6 sin, cos)| <= sqrt(2.36) < 1.54.
+    const float drift = 1.54f * layer.bob;
+    out.reserve(count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const glm::vec3 origin(g.hostSpheres[i]);
+        const glm::vec3 toHost = origin - f.cameraPos;
+        const float hostDistance = glm::length(toHost);
+        const float reach = boundPlusBob * g.hostScaleX[i];
+        const float slack = 1e-3f * (hostDistance + maxDistance) + 0.01f;
+        if (hostDistance - reach > maxDistance + slack || glm::dot(toHost, f.cameraForward) < -reach - slack) {
+            continue;
+        }
+        const float radius = g.boundRadius * g.hostSpheres[i].w + drift + slack;
+        bool inside = true;
+        for (std::size_t k = 0; k < planes.size(); ++k) {
+            if (glm::dot(glm::vec3(planes[k]), origin) + planes[k].w < -radius * planeNorm[k]) {
+                inside = false;
+                break;
+            }
+        }
+        if (inside) {
+            out.push_back(i);
+        }
     }
 }
 
@@ -462,6 +534,13 @@ void EcosystemRenderer::encode(const EnvironmentFrame& f) {
         if (g.hostCount == 0 || g.pointCount == 0) {
             continue;
         }
+        cullHosts(g, layer, f, hostCulling_, hostScratch_);
+        stats_.hosts += g.hostCount;
+        if (hostScratch_.empty()) {
+            continue;
+        }
+        const auto drawn = static_cast<std::uint32_t>(hostScratch_.size());
+        context_->queue().WriteBuffer(g.hostList, 0, hostScratch_.data(), drawn * sizeof(std::uint32_t));
         LayerUniformGpu u{};
         u.color = glm::vec4(layer.color, layer.intensity);
         u.excited = glm::vec4(layer.excitedColor, layer.excitedIntensity);
@@ -470,7 +549,7 @@ void EcosystemRenderer::encode(const EnvironmentFrame& f) {
         u.pulse = glm::vec4(layer.pulseRate, layer.pulseDecay, layer.sparsity, layer.maxDistance);
         u.slots = glm::ivec4(layer.responseField.empty() ? -1 : fields.slotOf(layer.responseField),
                              layer.lagField.empty() ? -1 : fields.slotOf(layer.lagField),
-                             static_cast<int>(g.pointCount), static_cast<int>(g.hostCount));
+                             static_cast<int>(g.pointCount), static_cast<int>(drawn));
         const int wakeSlot = layer.wakeField.empty() ? -1 : fields.slotOf(layer.wakeField);
         u.bound = glm::vec4(g.boundRadius + layer.bob, static_cast<float>(wakeSlot), layer.wakeGain, layer.nearFade);
         u.optics = glm::vec4(layer.iridescence, layer.iridescenceScale, layer.iridescenceSpeed, layer.bob);
@@ -479,13 +558,13 @@ void EcosystemRenderer::encode(const EnvironmentFrame& f) {
         context_->queue().WriteBuffer(g.uniforms, 0, &u, sizeof(u));
         cp.SetBindGroup(2, g.group);
         const std::uint32_t wx = (g.pointCount + 63u) / 64u;
-        const std::uint32_t wy = std::min<std::uint32_t>(g.hostCount, 65535u);
-        const std::uint32_t wz = (g.hostCount + 65534u) / 65535u;
+        const std::uint32_t wy = std::min<std::uint32_t>(drawn, 65535u);
+        const std::uint32_t wz = (drawn + 65534u) / 65535u;
         cp.DispatchWorkgroups(wx, wy, wz);
         ++stats_.layers;
         ++stats_.dispatches;
-        stats_.hosts += g.hostCount;
-        stats_.candidates += static_cast<std::uint64_t>(g.hostCount) * g.pointCount;
+        stats_.hostsDrawn += drawn;
+        stats_.candidates += static_cast<std::uint64_t>(drawn) * g.pointCount;
     }
     cp.SetPipeline(spriteArgs_);
     cp.DispatchWorkgroups(1);

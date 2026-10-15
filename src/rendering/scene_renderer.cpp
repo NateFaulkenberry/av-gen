@@ -1766,6 +1766,8 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         // ADR-230. Off: the sky-layer draw is skipped entirely, which is what makes the "effects
         // disabled" arm in §12 a real arm rather than a frame that renders the same pixels.
         {"atmospherics", &T::atmospherics},
+        // ADR-1344. Off: the ecosystem dispatches every host (no CPU host cull); same picture, more threads.
+        {"ecohostcull", &T::ecosystemHostCull},
         // ADR-390. Off: the Cosmic Ocean's `Draw(3)` is not recorded AND its uniform is not
     };
     return kArms;
@@ -4596,6 +4598,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         envFrame.height = hdr_.height();
         envFrame.quality = &qualitySettings_;
         envFrame.timeline = timeline_.get();
+        envFrame.haveCamera = true; // ADR-1344
+        ecosystem_->setHostCulling(toggles_.ecosystemHostCull);
+        envFrame.viewProj = frame.viewProj;
+        envFrame.cameraPos = glm::vec3(frame.cameraPos);
+        envFrame.cameraForward = glm::vec3(frame.cameraForward);
         for (EnvironmentRenderer* env : environments_) {
             if (env->wants(scene)) {
                 env->encode(envFrame);

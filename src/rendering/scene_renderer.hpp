@@ -708,6 +708,9 @@ public:
         // produces is wrong wherever post reads one of them, which is what makes it an arm and not
         // a quality setting.
         bool auxTargetStores = true;
+        // ADR-1344. Off: the ecosystem dispatches every host, as before its CPU host cull. The picture is the same
+        // bytes either way (test_ecosystem_gpu.cpp), so this arm measures the cull and nothing else.
+        bool ecosystemHostCull = true;
     };
 
     // The arms by name, in one place (renderer forensics Phase 8.3). The CLI's `--disable <list>`,
