@@ -56,11 +56,17 @@ TEST_CASE("A live scene switch carries no parameter from the scene before it", "
         for (const char* to : {"sonic-abstract/neon-vector.json", "sonic-abstract/glitch-signal.json",
                                "sonic-vfx/event-horizon.json", "sonic-garden/sonic-live.json"}) {
             INFO((mode == app::EngineMode::Live ? "live: " : "offline: ") << "feedback-mirror -> " << to);
+            // Live control off on both engines (ADR-1390's audit): in Live mode an engine opens this machine's MIDI and
+            // OSC, and with a controller connected the two engines read different knob positions -- 2026-10-15 this
+            // failed on `lights/heart/intensity 0 vs 2.05` with one MIDI source attached, and passed with it off. The
+            // test is about what a switch carries, not about what a device sends.
             app::Engine switched(mode);
+            switched.setLiveControl(false);
             REQUIRE(switched.loadProject(ex / "sonic-vfx" / "feedback-mirror.json").has_value());
             play(switched, 30);
             REQUIRE(switched.loadProject(ex / to).has_value());
             app::Engine fresh(mode);
+            fresh.setLiveControl(false);
             REQUIRE(fresh.loadProject(ex / to).has_value());
             const std::string afterLoad = differences(switched.params(), fresh.params(), false);
             INFO("after the load: " << afterLoad);

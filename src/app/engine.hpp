@@ -651,6 +651,11 @@ public:
     // assistant rollback. The director's state compares it so a revision counter from one scene is
     // never read as a change in the next one (ADR-582: that coincidence was an implicit re-cut).
     [[nodiscard]] std::uint64_t sceneGeneration() const { return sceneGeneration_; }
+    // ADR-1390: bumped when a project or a scene document *replaces* the open one (loadProject, loadComposition,
+    // newProject) -- not on an assistant rollback or a re-flatten, which `sceneGeneration` also counts. Whatever the
+    // editor holds about the open project outside this engine (its overlays, its selection, its renderer history) is
+    // reset when this moves, in one place (`Application::resetProjectViewState`), however the load was asked for.
+    [[nodiscard]] std::uint64_t projectGeneration() const { return projectGeneration_; }
 
     // ADR-225: the Auto-director's controls, saved with the project.
     //
@@ -1200,6 +1205,7 @@ private:
     mutable AuthoredCutCache authoredCut_;
     ParkedDirectorsCut parkedCut_;      // ADR-582: the steering half of a cut, kept while parked
     std::uint64_t sceneGeneration_ = 0; // ADR-582: see sceneGeneration()
+    std::uint64_t projectGeneration_ = 0; // ADR-1390: see projectGeneration()
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     std::vector<directing::Plan> directingPlans_;           // ADR-755
     std::vector<nlohmann::json> unreadableDirectingPlans_;  // ...kept verbatim, written back

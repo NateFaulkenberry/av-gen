@@ -2763,6 +2763,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // `installController` re-registers post and camera parameters from them (`keep = post_`),
     // using the current values as the new *defaults*, so a stale struct here would come back as a
     // stale default that no later reset could tell from an authored one.
+    ++projectGeneration_; // ADR-1390: the editor's view state goes with the project this replaces
     for (params::IParameter* param : params_.ordered()) {
         if (param != nullptr && param->flags().serialized) {
             param->resetToDefault();
@@ -3561,6 +3562,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
 }
 
 void Engine::newProject() {
+    ++projectGeneration_; // ADR-1390
     directingPlans_.clear();
     unreadableDirectingPlans_.clear();
     directingEvaluations_.clear();
@@ -3990,6 +3992,7 @@ Result<void> Engine::loadComposition(const std::filesystem::path& rawPath, const
     if (!comp) {
         return std::unexpected(comp.error());
     }
+    ++projectGeneration_; // ADR-1390: a scene opened on its own replaces the world as a project does
     compositionPath_ = path;
     return installComposition(std::move(*comp));
 }
