@@ -428,6 +428,9 @@ chord is two figures at war.
   the lines.
 - The key is a pool rather than a flood (an 8 to 19 degree cone), so the figure's centre is the brightest place and
   the corners sink toward the void.
+- **Art pass 2026-10** (`ART-PASS-2026-10-cymatic-plate.md`, the owner's request): top-down and 2D. A 16:9 black
+  plate fills the frame, seen straight down on a long lens; the plate is unlit, with its pool of light painted. With
+  audio alone, the timbre's brightness sets the mode.
 
 ### 7. Storm Cell (atmospheric, violent)
 
