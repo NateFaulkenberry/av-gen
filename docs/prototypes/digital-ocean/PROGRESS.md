@@ -589,3 +589,19 @@ material program on the displaced sea mesh: no new renderer, no new pass.*
   vocabulary, the MIDI table and the index entry list CC 9-14.
 - Caveat: integrated routes on live input are not replayed by a seek (ADR-901). After a seek the performer's
   added phase restarts from zero, and the music's (from `response.level`) does too.
+
+### Pass E: scene integration
+
+- **Island shore.** A new surf line (`shore`, program `doShore`): a low vertical ribbon round the island's waterline
+  (the footprint's superellipse), from -0.4 to 1.6 m, riding the same swell as the sea (`wave_route` reaches it
+  too). Its masked foam is broken by a 25 m world-anchored noise that the swell carries up and down the ribbon, so
+  the breaks drift as waves pass. At 900 m that is a 2-3 px light line under the dark land, the anime background's
+  surf. A flat strip would have been under a pixel tall at that grazing angle, and a fine noise would flicker. The
+  first ribbon was single-sided and culled from the camera. It follows the palette, foam colour included.
+- **Yacht wake** in the new foam language: the same palette foam and the same flat cut shapes. The cut was retuned
+  from 0.36/0.8 (Pass 2's guess, never seen against the anime water) to 0.24/0.62, so the arms read as broken foam
+  dashes trailing the hull (`passE-wake-cuts-and-surf-line.png`, `passE-leap-and-wake-40-48s.mp4`).
+- **Dolphin splashes**: larger drops (0.15 m), fading into the highlight colour rather than the lit-face colour,
+  and longer, wider rings, so the entry splash reads at 60-100 m.
+- The hull's contact: the yacht rides the swell routes too (Pass D), so it no longer sinks or floats when waves
+  or energy change.

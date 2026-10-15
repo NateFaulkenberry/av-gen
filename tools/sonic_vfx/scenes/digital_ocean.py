@@ -29,7 +29,7 @@ DESIGN = {
               "the swell.",
     "composition": {
         "background": "a violet-to-coral sky, painted cumulus banks in two drifting layers, sun rays, far island strips",
-        "midground": "a low island strip with five cut-paper trees on the left third; the yacht crossing in front",
+        "midground": "a low island strip with five cut-paper trees and a broken surf line on the left third; the yacht crossing in front",
         "foreground": "anime water: soft colour bands drawn by the swell's height and faces, thin crest strokes, foam "
                       "caps on the reinforced crests, the sun's path broken into horizontal sparks",
         "focal": "the low sun with its rays on the right third and its column of glints",
@@ -1145,11 +1145,15 @@ def wake_mesh(hl):
 
 def write_wake(hl):
     v, uv, idx = wake_mesh(hl)
-    # a GLB with UVs: meshes.write_glb carries none, so a minimal writer with TEXCOORD_0 here
+    return write_uv_glb("do-wake.glb", "wake", v, uv, idx)
+
+
+def write_uv_glb(fname, label, v, uv, idx, normals=None):
+    """A GLB with UVs (meshes.write_glb carries none): a minimal writer with TEXCOORD_0. Normals default to up."""
     import json as _json, struct as _struct
     n = len(v)
     pb = b"".join(_struct.pack("<3f", *p) for p in v)
-    nb = b"".join(_struct.pack("<3f", 0.0, 1.0, 0.0) for _ in v)
+    nb = b"".join(_struct.pack("<3f", *(normals[i] if normals else (0.0, 1.0, 0.0))) for i in range(n))
     tb = b"".join(_struct.pack("<2f", *t) for t in uv)
     ib = _struct.pack("<%dI" % len(idx), *idx)
     blob = pb + nb + tb + ib
@@ -1157,9 +1161,9 @@ def write_wake(hl):
     lo = [min(p[k] for p in v) for k in range(3)]
     hi = [max(p[k] for p in v) for k in range(3)]
     o = [0, len(pb), len(pb) + len(nb), len(pb) + len(nb) + len(tb)]
-    g = {"asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0, "name": "wake"}],
-         "materials": [{"name": "wake", "pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1]}}],
-         "meshes": [{"name": "wake", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2},
+    g = {"asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0, "name": label}],
+         "materials": [{"name": label, "pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1]}}],
+         "meshes": [{"name": label, "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2},
                                                      "indices": 3, "material": 0, "mode": 4}]}],
          "buffers": [{"byteLength": len(blob)}],
          "bufferViews": [{"buffer": 0, "byteOffset": o[0], "byteLength": len(pb), "target": 34962},
@@ -1172,7 +1176,7 @@ def write_wake(hl):
                        {"bufferView": 3, "componentType": 5125, "count": len(idx), "type": "SCALAR"}]}
     js = _json.dumps(g, separators=(",", ":")).encode()
     js += b" " * ((4 - len(js) % 4) % 4)
-    path = os.path.join(MESH_DIR, "do-wake.glb")
+    path = os.path.join(MESH_DIR, fname)
     with open(path, "wb") as f:
         f.write(_struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(blob)))
         f.write(_struct.pack("<II", len(js), 0x4E4F534A) + js)
@@ -1204,7 +1208,7 @@ def wake_program():
 
 
 WAKE_FREQ = 0.55
-WAKE_CUT0, WAKE_CUT1 = 0.36, 0.8
+WAKE_CUT0, WAKE_CUT1 = 0.24, 0.62
 
 
 RIDERS = {}     # node -> the identities of its deformer slots (filled as nodes are made; read by wave_route)
@@ -1390,8 +1394,76 @@ def world(s):
            deformers=sway)
     s.proc("canopies", {"kind": "mesh", "asset": "meshes/do-canopy.glb"},
            distribution={"kind": "points", "points": tree_points("canopy")}, material=flat(tree))
+    shore(s)
     wp = boat(s)
     return ip, lp, wp
+
+
+def shore_mesh(n=360):
+    """Pass 3, Pass E: the island's surf line. A low vertical ribbon (SHORE_LO..SHORE_HI m) round the footprint's
+    waterline (the superellipse |u|^6 + v^2 = 1 of island_height, pushed out by SHORE_OUT), facing out to sea.
+    uv = (round the shore 0..1, up the ribbon 0..1). At 900 m a pixel is ~0.5 m, so the ribbon is a 2-3 px line: the
+    white surf line of an anime background, broken by shore_program."""
+    a, b = ISLAND_W * 0.5 * SHORE_OUT, ISLAND_D * 0.5 * SHORE_OUT
+    verts, uvs, nrm, idx = [], [], [], []
+    for i in range(n + 1):
+        q = 2.0 * math.pi * i / n
+        c, sn = math.cos(q), math.sin(q)
+        x = a * math.copysign(abs(c) ** (1.0 / 3.0), c)
+        z = b * sn
+        # the outward normal of |x/a|^6 + (z/b)^2 = 1
+        gx, gz = 6.0 * (x / a) ** 5 / a, 2.0 * (z / b) / b
+        L = math.hypot(gx, gz) or 1.0
+        for k, y in ((0, SHORE_LO), (1, SHORE_HI)):
+            verts.append((round(x, 3), y, round(z, 3)))
+            uvs.append((i / n, float(k)))
+            nrm.append((gx / L, 0.0, gz / L))
+    for i in range(n):
+        p0 = 2 * i
+        idx += [p0, p0 + 2, p0 + 1, p0 + 1, p0 + 2, p0 + 3]
+    return verts, uvs, idx, nrm
+
+
+def shore_program():
+    """The surf line: brightest at the ribbon's middle height, broken by a large world-anchored noise (~25 m) that
+    the swell carries up and down the ribbon, so the breaks drift as waves pass -- lapping, not flicker. Masked."""
+    P = Prog("doShore")
+    P.op(None, "input", 0, inp="uv")
+    P.op(None, "swizzle", 1, a=0, k=[1, 1, 1, 1])                                   # up the ribbon
+    P.op(None, "remap", 1, a=1, k=[0.0, 1.0, -1.0, 1.0])
+    P.op(None, "multiply", 1, a=1, b=1)
+    P.op(None, "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.0])                            # 1 at the middle, 0 at the edges
+    P.op(None, "input", 2, inp="worldPosition")
+    P.op("shoreNoise", "noise", 2, a=2, f=SHORE_FREQ, k=[0.0, 0.0, 0.0], seed=53)
+    P.op(None, "mix", 1, a=1, b=2, f=0.5)
+    P.op("shoreCut", "smoothstep", 3, a=1, k=[SHORE_CUT, SHORE_CUT + 0.05])            # opacity
+    P.pcolour("shoreFoam", 4, "foam", SHORE_GAIN)
+    return P
+
+
+SHORE_OUT = 1.005
+SHORE_LO, SHORE_HI = -0.4, 1.6
+SHORE_FREQ = 0.04
+SHORE_CUT = 0.28
+SHORE_GAIN = 1.0
+
+
+def shore(s):
+    v, uv, idx, nrm = shore_mesh()
+    write_uv_glb("do-shore.glb", "shore", v, uv, idx, nrm)
+    sp = shore_program()
+    s.program(sp.doc(emission=4, opacity=3))
+    s.proc("shore", {"kind": "mesh", "asset": "meshes/do-shore.glb"},
+           material={"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "doShore", "alphaMode": "mask",
+                     "alphaCutoff": 0.5, "doubleSided": True},
+           transform={"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, -4.0, 0.0], "scale": [1.0, 1.0, 1.0]},
+           deformers=ride_deformers())
+    RIDERS["shore"] = list(RIDE_IDS)
+    SHORE_PROGS.append(sp)
+
+
+SHORE_PROGS = []
 
 
 
@@ -1599,10 +1671,10 @@ def splash(s, name, point, capacity=320):
     s.particles(name, capacity=capacity, seed=zlib_seed(name), shape="sphere",
                 position=[round(point[0], 3), 0.25, round(point[2], 3)], extent=[0.45, 0.45, 0.45],
                 direction=[0.0, 1.0, 0.0], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=1.1, spread=0.34,
-                speedMin=3.0, speedMax=7.5, gravity=[0.0, -9.8, 0.0], drag=0.3, sizeStart=0.085, sizeEnd=0.025,
-                colorStart=pal(PALETTE, "foam") + [0.95], colorEnd=pal(PALETTE, "sss") + [0.0], emissive=1.6,
-                blend="additive", turbulence=0.0, collision="splash", collisionHeight=0.0, splashLifetime=1.3,
-                splashSize=9.0, ringThickness=0.07)
+                speedMin=3.0, speedMax=7.5, gravity=[0.0, -9.8, 0.0], drag=0.3, sizeStart=0.15, sizeEnd=0.04,
+                colorStart=pal(PALETTE, "foam") + [0.95], colorEnd=pal(PALETTE, "hl") + [0.0], emissive=2.0,
+                blend="additive", turbulence=0.0, collision="splash", collisionHeight=0.0, splashLifetime=1.6,
+                splashSize=14.0, ringThickness=0.09)
 
 
 def zlib_seed(name):
@@ -2123,6 +2195,7 @@ def camera(s):
 
 
 def build():
+    SHORE_PROGS.clear()
     RIDERS.clear()
     generate_meshes()
     s = kit.Scene(ID, TITLE, DESIGN)
@@ -2170,8 +2243,8 @@ def build():
     spray(s)
     atmosphere(s, sky)
     instrument(s, sea, seafar, sky)
-    musical_colour(s, [sea, seafar, sky, cp, dp, ip, lp, wp], sea, seafar, sky, cp)
-    midi(s, [sea, seafar, sky, cp, dp, ip, lp, wp], sea, seafar, sky, cp)
+    musical_colour(s, [sea, seafar, sky, cp, dp, ip, lp, wp] + SHORE_PROGS, sea, seafar, sky, cp)
+    midi(s, [sea, seafar, sky, cp, dp, ip, lp, wp] + SHORE_PROGS, sea, seafar, sky, cp)
     if REVIEW_MIDI:
         score_midi(s, REVIEW_MIDI)
     camera(s)
