@@ -1157,13 +1157,27 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
 
 Application::Application() = default;
 Application::~Application() {
+    // ADR-1392: each step of the teardown is timed, and a slow one is named. "Quitting is slow after several projects"
+    // was intermittent (0.1 s to 39 s for the same sequence), and only a name says which member was waited on.
+    auto step = [last = std::chrono::steady_clock::now()](const char* what) mutable {
+        const auto now = std::chrono::steady_clock::now();
+        const double ms = std::chrono::duration<double, std::milli>(now - last).count();
+        if (ms >= 50.0) {
+            log::info("shutdown: {} took {:.0f} ms", what, ms);
+        }
+        last = now;
+    };
     // Destruction order matters: UI before GPU context, renderer before context, window last.
     // The control plane goes first of all: it cancels the running task and waits for it, and both
     // the panel (a raw pointer) and the engine (a reference) outlive it only if it goes now.
     ai_.reset();
+    step("ai_");
     panel_.reset();
+    step("panel_");
     worldBuilder_.reset();
+    step("worldBuilder_");
     jobs_.reset();
+    step("jobs_");
     // The two offline jobs, and they were missing from this list (ADR-364). A `RenderJob` owns a
     // `gpu::ReadbackRing` whose destructor calls `Context::waitFor` on an outstanding map; a
     // `unique_ptr` member destroys in reverse declaration order, and `job_` is declared at :346
@@ -1179,7 +1193,9 @@ Application::~Application() {
     // is joined by its own destructor, and a thread still running while the engine underneath it
     // is torn down is a race nobody would find twice.
     job_.reset();
+    step("job_");
     ptJob_.reset();
+    step("ptJob_");
     // ADR-383, and ADR-364's lesson applied the moment it was earned: a job that is not on this
     // list is a job whose thread outlives the engine it is reading. Cancel first, then join, then
     // destroy -- `run()` is on that thread and holds a reference to the sequence's own engine.
@@ -1190,12 +1206,19 @@ Application::~Application() {
         ptSeqThread_.join();
     }
     ptSequence_.reset();
+    step("ptSequence_");
     imgui_.reset();
+    step("imgui_");
     engine_.reset();
+    step("engine_");
     renderer_.reset();
+    step("renderer_");
     shaders_.reset();
+    step("shaders_");
     context_.reset();
+    step("context_");
     window_.reset();
+    step("window_");
 }
 
 void Application::initControlPlane() {

@@ -112,7 +112,12 @@ struct Editor {
         }
         // `Application::serviceProjectSwitch` / `resetProjectViewState`, the parts that reach a frame.
         if (auto o = projectSwitch.observe(engine.projectGeneration())) {
-            overlays = std::move(*o);
+            // AVGEN_SWITCH_AS_MAIN=1 is the control arm: the editor before ADR-1390, where a lab wrote its overlays
+            // into the panel and an ordinary open left them there. Pointed at it, the sweep must fail.
+            static const bool asMain = std::getenv("AVGEN_SWITCH_AS_MAIN") != nullptr;
+            if (!asMain || lab) {
+                overlays = std::move(*o);
+            }
             renderer.setDiagnosticEntity({});
             renderer.resetTemporalHistory();
         }
