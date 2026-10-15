@@ -790,6 +790,9 @@ the world is the instrument's own echo.
     spiral toward the frame's centre.
   - The interval turns the spiral, the bass deepens it, the kick punches it, and chords walk its hue from gold
     toward magenta.
+- **Art pass 2026-10** (`ART-PASS-2026-10-feedback-mirror.md`): "howlround". A glowing monitor bezel with viewfinder
+  brackets at the frame's edge, which the loop carries inward as a twisting corridor of nested screens walking the
+  hue circle, with the glyph's echoes spiralling down it.
 
 ### 16. Datascape (digital, data)
 

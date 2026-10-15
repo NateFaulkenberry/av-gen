@@ -116,12 +116,12 @@
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.45,
+  "post/bloom/intensity": 0.5,
   "post/bloom/threshold": 0.8,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
-  "post/output/vignette": 0.5,
-  "post/output/grain": 0.012,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.015,
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
@@ -132,17 +132,18 @@
   "temporal/mosh/enabled": false,
   "temporal/feedback/enabled": true,
   "temporal/feedback/frames": 24,
-  "temporal/feedback/amount": 1.0,
-  "temporal/feedback/decay": 0.84,
-  "temporal/feedback/zoom": 0.972,
-  "temporal/feedback/rotate": 3.0,
-  "temporal/feedback/hue": -0.004,
+  "temporal/feedback/amount": 1.6,
+  "temporal/feedback/decay": 0.9,
+  "temporal/feedback/zoom": 0.93,
+  "temporal/feedback/rotate": 1.6,
+  "temporal/feedback/hue": -0.026,
   "temporal/feedback/driftX": 0.0,
   "temporal/feedback/driftY": 0.0,
   "post/tonemap/operator": 3,
   "post/split/amount": 0.0,
   "post/split/angle": 0.0,
-  "post/split/spectral": 1.0
+  "post/split/spectral": 1.0,
+  "post/display/scanlines": 0.22
  },
  "sources": [
   {
@@ -161,6 +162,10 @@
        {
         "signal": "notes.tension",
         "weight": 1.0
+       },
+       {
+        "signal": "sonic.brightness",
+        "weight": 0.6
        }
       ]
      }
@@ -196,7 +201,7 @@
   {
    "source": "notes.interval",
    "target": "temporal/feedback/rotate",
-   "amount": 9.0,
+   "amount": 6.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -207,7 +212,7 @@
   {
    "source": "response.sustain",
    "target": "temporal/feedback/decay",
-   "amount": 0.1,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -218,7 +223,7 @@
   {
    "source": "response.bass",
    "target": "temporal/feedback/zoom",
-   "amount": -0.012,
+   "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -227,9 +232,20 @@
    }
   },
   {
+   "source": "response.bass",
+   "target": "temporal/feedback/rotate",
+   "amount": 2.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 900
+   }
+  },
+  {
    "source": "response.kick",
    "target": "temporal/feedback/zoom",
-   "amount": -0.035,
+   "amount": -0.05,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -260,9 +276,53 @@
    }
   },
   {
+   "source": "response.kick",
+   "target": "procedural/bezTop/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/bezBottom/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/bezLeft/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "procedural/bezRight/material/emissive",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 220
+   }
+  },
+  {
    "source": "visual.hueStep",
    "target": "temporal/feedback/hue",
-   "amount": -0.018,
+   "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -371,6 +431,17 @@
    }
   },
   {
+   "source": "response.hat",
+   "target": "post/display/scanlines",
+   "amount": 0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 60
+   }
+  },
+  {
    "source": "response.kick",
    "target": "post/lens/chromaticAberration",
    "amount": 0.012,
@@ -399,6 +470,31 @@
   "cues": [],
   "tracks": [
    {
+    "target": "temporal/feedback/zoom",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 24.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.93,
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": 0.915,
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": 0.93,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
     "target": "sdf/glyph/node/glyph/translation",
     "component": -1,
     "enabled": true,
@@ -409,8 +505,8 @@
      {
       "time": 0.0,
       "value": [
-       1.14,
-       0.12,
+       1.2,
+       0.05,
        0.0
       ],
       "interp": "smooth"
@@ -418,8 +514,8 @@
      {
       "time": 30.0,
       "value": [
-       1.0599999999999998,
-       0.18,
+       1.0999999999999999,
+       0.13,
        0.0
       ],
       "interp": "smooth"
@@ -427,8 +523,8 @@
      {
       "time": 60.0,
       "value": [
-       1.14,
-       0.12,
+       1.2,
+       0.05,
        0.0
       ],
       "interp": "smooth"
@@ -474,42 +570,42 @@
  },
  "sonicScene": {
   "category": "digital",
-  "thesis": "A single glyph of light inside a video feedback loop: the music turns, zooms and recolours the loop, so the world is the instrument's own echo.",
+  "thesis": "Howlround: a camera pointed at its own monitor. The screen's frame recurs inward as a corridor of screens twisting to a vanishing point, a glyph of light burns in it, and the music turns, deepens and recolours the loop, so the world is the instrument's own echo.",
   "composition": {
-   "background": "a deep violet void, darker at the edges",
-   "midground": "the spiral of the glyph's echoes, falling to the vanishing point at the frame's centre",
-   "foreground": "(none: negative space)",
+   "background": "the corridor of nested screens falling to the vanishing point at the frame's centre",
+   "midground": "the glyph's echoes spiralling into the corridor",
+   "foreground": "the glowing monitor bezel and its viewfinder brackets at the frame's edge",
    "focal": "the gold glyph on the right third",
    "secondary": [
-    "the echo spiral",
+    "the corridor's twist and colour walk",
     "the vanishing point"
    ],
-   "atmosphere": "(none)",
-   "post": "bloom; grain on the hats; an RGB split on the snare",
-   "camera": "locked off"
+   "atmosphere": "(none): CRT glass, scanlines",
+   "post": "bloom; scanlines; grain on the hats; an RGB split on the snare",
+   "camera": "locked off, square to the screen (the loop's camera)"
   },
   "palette": {
-   "dominant": "#140726",
-   "secondary": "#ff4f9a",
-   "accent": "#2a0f4f",
+   "dominant": "#05040e",
+   "secondary": "#5ad8ff",
+   "accent": "#ff4f9a",
    "highlight": "#ffbf5a",
-   "background_value": "near black (violet)",
-   "saturation": "the glyph is gold; its echoes walk round the hue circle by the feedback's own step"
+   "background_value": "near black (blue)",
+   "saturation": "the bezel and the glyph are gold and pale; their echoes walk the hue circle, step by step, toward cyan and violet"
   },
   "motion": {
    "very_slow": [
-    "the hue's walk",
+    "the corridor's breath (the loop's slow zoom)",
     "the glyph's drift"
    ],
    "medium": [
-    "the spiral's turn (melody)",
-    "the tunnel's depth (bass)"
+    "the corridor's twist (melody)",
+    "its depth (bass, sustain)"
    ],
    "fast": [
     "the triangle's turn per note"
    ],
    "extremely_fast": [
-    "the kick's zoom punch",
+    "the kick's zoom punch and bezel flash",
     "the snare's split"
    ]
   },
@@ -522,22 +618,22 @@
    [
     "interval",
     "notes.interval",
-    "a rising step winds the spiral clockwise, a falling one back"
+    "a rising step twists the corridor one way, a falling one the other"
    ],
    [
     "sustained",
     "response.sustain",
-    "the echoes last longer: the tunnel deepens"
+    "the echoes last longer: the corridor reaches further"
    ],
    [
     "bass",
     "response.bass",
-    "the tunnel deepens: the echoes pour farther in"
+    "the corridor deepens and twists: each screen falls further in, turned further"
    ],
    [
     "kick",
     "response.kick",
-    "a zoom punch: the echoes jump inward; the core flares"
+    "a zoom punch: the corridor jumps inward; the bezel and the core flash"
    ],
    [
     "snare",
@@ -547,12 +643,17 @@
    [
     "hat",
     "response.hat",
-    "grain"
+    "grain and a flicker in the scanlines"
    ],
    [
     "chord",
     "notes.polyphony",
-    "the hue step: a chord colours the echoes faster, dissonance more"
+    "the hue step: a chord colours the corridor faster round the circle, dissonance further"
+   ],
+   [
+    "brightness",
+    "sonic.brightness",
+    "a bright timbre also walks the corridor's colour further round"
    ],
    [
     "velocity",
@@ -562,38 +663,38 @@
    [
     "silence",
     "(no input)",
-    "the glyph turns slowly; a short gold tunnel"
+    "the corridor breathes slowly, the inner ring turns; a quiet gold tunnel"
    ]
   ],
-  "tier": "light: one SDF glyph, the feedback FIR (24 taps, about 1 ms at 1080p)",
+  "tier": "light: one SDF glyph, the bezel as unlit boxes, the feedback FIR (24 taps)",
   "id": "feedback-mirror",
   "title": "Feedback Mirror",
   "regions": [
    {
     "id": "glyph",
     "box": [
-     0.535,
-     0.234,
-     0.799,
-     0.704
+     0.523,
+     0.215,
+     0.829,
+     0.759
     ]
    },
    {
     "id": "tunnel",
     "box": [
-     0.35,
      0.3,
-     0.65,
-     0.7
+     0.25,
+     0.7,
+     0.75
     ]
    },
    {
-    "id": "void",
+    "id": "bezel",
     "box": [
      0.0,
      0.0,
-     0.3,
-     1.0
+     1.0,
+     0.1
     ]
    }
   ]
