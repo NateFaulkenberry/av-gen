@@ -220,6 +220,11 @@ spatial::FieldSet audioSet(std::shared_ptr<const spatial::AudioHistory> audio) {
     e.onsetSource = spatial::OnsetSource::Beat;
     e.onsetDecay = 6.0f;
     set.fields.push_back(e);
+    auto g = audioField(spatial::FieldKind::Spectrum, "smoothed"); // ADR-1370: the window, on both sides
+    g.audioBand = spatial::AudioBand::Range;
+    g.audioSpeed = 26.0f;
+    g.audioSmooth = 0.35f;
+    set.fields.push_back(g);
     return set;
 }
 

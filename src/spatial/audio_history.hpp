@@ -21,7 +21,9 @@
 // This header depends on nothing above `spatial`: who fills it (the engine, from an
 // analysis::AnalysisTrack or the live analyzer) is analysis/audio_history_builder.hpp.
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -42,6 +44,14 @@ inline constexpr std::size_t kAudioRingFloats = static_cast<std::size_t>(kAudioR
 // every step must still find all its rows, or a replayed step would hear less than the played one did.
 inline constexpr int kAudioMaxDelayRows = 1125;
 inline constexpr int kOnsetHistory = 8; // newest onsets per source handed to the GPU
+// ADR-1370: a Spectrum field's `audioSmooth` window is read as the mean of evenly spaced taps, one per history row
+// (ceil(window x row rate)), at least 2 and at most this many. Taps a row apart are a true box filter; sparser taps
+// would alias the hop-to-hop jitter instead of removing it.
+inline constexpr int kAudioSmoothMaxTaps = 32;
+[[nodiscard]] inline int audioSmoothTaps(float windowSeconds, double rowRate) {
+    const double n = std::ceil(static_cast<double>(windowSeconds) * rowRate - 1e-3); // 0.3f x 100 is 30.000001
+    return static_cast<int>(std::clamp(n, 2.0, static_cast<double>(kAudioSmoothMaxTaps)));
+}
 
 // Appended only: the integer is packed into FieldGpu and mirrored in shaders/fields.wgsl.
 enum class OnsetSource : std::uint8_t { Low, Mid, High, Beat };

@@ -152,6 +152,7 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
         r.f("audioSpeed", "the present travels outward at (m/s)", rest.audioSpeed, 0.0f, 1000.0f, 0.0f, 60.0f);
         r.f("onsetDecay", "an onset fades at (1/s)", rest.onsetDecay, 0.0f, 100.0f, 0.0f, 20.0f);
         r.f("onsetWidth", "the onset front's half width (m)", rest.onsetWidth, 0.0f, 1000.0f, 0.0f, 20.0f);
+        r.f("audioSmooth", "averages the history over (s)", rest.audioSmooth, 0.0f, 16.0f, 0.0f, 2.0f); // ADR-1370
     }
     // ADR-906: a triggered field's timing, adjustable where the field is. What it fires on -- the
     // source, and the name of the musical event or marker -- stays in the file, as an effect's does;
@@ -220,6 +221,7 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
     copyValue(p, "audioSpeed", live.audioSpeed);
     copyValue(p, "onsetDecay", live.onsetDecay);
     copyValue(p, "onsetWidth", live.onsetWidth);
+    copyValue(p, "audioSmooth", live.audioSmooth); // ADR-1370
     // ADR-906: the trigger's numbers (registered only for the source that reads them).
     if (live.trigger) {
         copyValue(p, "trigger/everyN", live.trigger->everyN);

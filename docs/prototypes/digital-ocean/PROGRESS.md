@@ -126,3 +126,43 @@ Brief: `00-brief.md` (the owner's, verbatim). Plan: `01-plan.md`. Worktree `../a
   against the sun's path. Pod A moved from 52 to 88 m so the two never compete.
 - Media: `stage6-dolphins.mp4` (pod at 1-4 s, hero fired at 5 s), `stage6-hero-sequence.png`,
   `stage6-pod-sequence.png`.
+
+## Stage 7: audio-reactive behaviour (done; one engine change, ADR-1370)
+
+**The map** (`instrument()`, `audio_fields()`): every response has its own scale and decay; nothing flashes the frame.
+
+| music | signal | the sea's response |
+|---|---|---|
+| bass | `tide`: a `spectrum` field (32-75 Hz) x a planar sine carrier, field deformer | TIDEWRITING: the bass's last ~15 s laid out as swell rolling in from 400 m at 26 m/s |
+| kick | `kickFront`: an `onset` field (low band), compound with the hero wave; `response.kickEnv` | a lifted front rolls in from 70 m; crest light +55 % and foam x2.2 flash (420/600 ms) |
+| level | `response.level` | the long swell +0.5 m (1.8 s / 4.5 s); the crest ramp scales with it so foam stays a cap |
+| intensity | `response.intensity` | STRUCTURE: the long swell's crests sharpen (Q 0.42 -> 0.52) |
+| mids | `audio.mid` | the wind sea roughens |
+| snare | `response.snare` | a burst of spray off the near swell in the sun's path |
+| hats / highs | `response.hatEnv`, `audio.treble` | the glints flare and brighten |
+| sustain | `response.sustain` | the sun's halo and glow swell, its path on the water warms |
+| brightness | `sonic.brightness.slow` | the grade drifts a little warmer or cooler |
+| MIDI notes | `notes.noteOn`, `lastPitch`, `lastVelocity` | sparks on the sun's path, distance by pitch, count by velocity |
+
+**Found and fixed, in order (each by an A/B render, not assumed):**
+1. Kick fronts changed nothing (pixel diff 0.0). For `waveGeometry: planar`, `waveDistance` is `dot(q, axis)` in the
+   field's own frame and IGNORES `point` (ADR-1116 says "about point"): every distance on the sea was negative, the
+   fronts lived behind the camera, and the tide's delay clamped to "now" (it still moved the sea, so its first A/B
+   passed while carrying no history). The fields are now placed with their node `position`. Recorded in ADR-1370 as a
+   finding for the owner; not changed (it would move existing planar fields).
+2. Under Trench the middle distance became crumpled foil. Ruled out in turn: the highs widening the micro-ripples
+   (removed anyway: it aliased), the Gerstner steepness sum (it was 1.1, which can fold the surface: now 0.85, +0.1 at
+   full intensity, kept under 1). The tide off -> clean (`stage7-crumple-found-tide-off-vs-on.png`). Cause: the history
+   ring has ~94 rows a second, so at 26 m/s one analysis hop covers 0.28 m of sea; the bass's hop-to-hop jitter became
+   spatial noise under a 1.5 m swell.
+3. **ADR-1370** (engine): a spectrum field's `audioSmooth` window reads the mean of its band round its delay. The first
+   version used eight fixed taps; over 0.9 s they were ten rows apart and ALIASED the jitter -- Glowmere showed it as
+   moire rings on the sea mesh's own concentric rows. Now a tap per history row (2..32): a true box filter. The tide
+   uses 0.17 s (16 rows, ~4.5 m of sea) over a narrower 7-bin sub-bass band. CPU reference and GPU in step; unit test
+   (alternating rows -> 0.5) and the CPU/GPU parity harness carry a smoothed field. `avgen_tests [audio-fields]` exit
+   0 (82 assertions); `avgen_render_tests [audio-fields]` exit 0 (1008 assertions).
+4. The snare spray was a scatter of specks over a 34 x 22 m box (the particle noise the brief warns about): now a gust
+   from 7 x 2.5 m on the near swell in the sun's path.
+
+Media: `stage7-silent-trench-allyougot-glowmere.png` (same scene, four inputs), `stage7-crumple-found-tide-off-vs-on.png`,
+`stage7-after-adr1370.png` (Glowmere x2, Trench), `stage7-trench-60-90s-before-taps-fix.mp4`.

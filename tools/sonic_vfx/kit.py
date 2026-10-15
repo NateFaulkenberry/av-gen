@@ -1009,6 +1009,25 @@ BASE_PARAMS = {
 }
 
 
+def upsert_index_entry(entry):
+    """One scene's own Examples-menu entry (examples/index.json), replaced in place by name, or added after the last
+    entry of its category. For a scene that writes its entry itself (its description names its MIDI map)."""
+    path = os.path.join(REPO, "examples", "index.json")
+    with open(path) as f:
+        idx = json.load(f)
+    ex = idx["examples"]
+    for i, e in enumerate(ex):
+        if e.get("name") == entry["name"]:
+            ex[i] = entry
+            break
+    else:
+        last = max((i for i, e in enumerate(ex) if e.get("category") == entry["category"]), default=len(ex) - 1)
+        ex.insert(last + 1, entry)
+    with open(path, "w") as f:
+        json.dump(idx, f, indent=2)
+        f.write("\n")
+
+
 def write_index(scenes, category="Sonic VFX", out_dir=OUT_DIR, prefix=None, doc="SCENE-CATALOG.md"):
     """Lists every scene in the Examples menu (examples/index.json), replacing this category's entries (and only
     them). "Sonic VFX" is the live switcher's category (ADR-1063); "Sonic Abstract" is the abstract project's."""

@@ -11,6 +11,7 @@
 //   avgen_sonic_probe <scenario> [--out <events.csv>] [--wav <out.wav>] [--device BlackHole] [--lead-in <s>]
 //
 // Scenarios:
+//   controller  a performer's controller on Digital Ocean's map: pads 36-40 and CC 1/2 sweeps over a held note.
 //   latency   24 notes, 0.8 s apart, a sharp attack each: MIDI -> bus, audio -> bus.
 //   sweep     one held note; a low-pass cutoff sweeps 120 Hz -> 9 kHz and back (the brief's §17 / PART 17).
 //   drive     one held note; the drive rises from clean to hard clipping (§18 / PART 18).
@@ -332,6 +333,31 @@ struct Player {
             param.store(static_cast<float>(a * std::pow(b / a, u)));
             log.row(name, -1, 0.0f, synth);
         }
+    }
+    // A control change (a knob or fader of a performer's controller), logged as `cc` with its number as the key.
+    void cc(int number, int value) {
+        const std::array<std::uint8_t, 3> bytes{0xB0, static_cast<std::uint8_t>(number & 0x7F),
+                                                static_cast<std::uint8_t>(std::clamp(value, 0, 127))};
+        static_cast<void>(midi.send(bytes));
+        log.row("cc", number, static_cast<float>(value) / 127.0f, synth);
+    }
+    // A knob turned from a to b over [t0, t1] (25 messages a second, like a real encoder).
+    void ccRamp(int number, int a, int b, double t0, double t1) {
+        for (double t = t0; t <= t1 + 1e-9; t += 0.04) {
+            waitUntil(t);
+            const double u = std::clamp((t - t0) / (t1 - t0), 0.0, 1.0);
+            cc(number, static_cast<int>(std::lround(a + (b - a) * u)));
+        }
+    }
+    // A drum pad: a short note on the pad's key (no synth voice: pads trigger, they do not sound here).
+    void pad(double t, int key, int velocity) {
+        waitUntil(t);
+        const std::array<std::uint8_t, 3> on{0x90, static_cast<std::uint8_t>(key), static_cast<std::uint8_t>(velocity)};
+        static_cast<void>(midi.send(on));
+        log.row("pad", key, static_cast<float>(velocity) / 127.0f, synth);
+        waitUntil(t + 0.15);
+        const std::array<std::uint8_t, 3> off{0x80, static_cast<std::uint8_t>(key), 0};
+        static_cast<void>(midi.send(off));
     }
 };
 
@@ -717,6 +743,25 @@ void scenario(const std::string& name, Player& p) {
             }
         }
         p.waitUntil(1.0 + 20.0 * scenes);
+    } else if (name == "controller") {
+        // A performer's controller on Digital Ocean's map (docs/prototypes/digital-ocean/02-report.md): pads 36-40
+        // and CC sweeps over a held low pad note, about 46 s.
+        usePatch(p, "pad");
+        p.waitUntil(1.0);
+        p.on(40, 70);
+        p.pad(2.0, 36, 110);        // leap
+        p.pad(8.0, 37, 110);        // hero wave
+        p.ccRamp(2, 0, 127, 12.0, 16.0);   // swell up
+        p.ccRamp(2, 127, 0, 19.0, 22.0);   // and down
+        p.pad(23.0, 38, 120);       // bloom
+        p.pad(27.0, 39, 120);       // flare
+        p.pad(29.0, 40, 120);       // spray
+        p.ccRamp(1, 0, 127, 31.0, 35.0);   // night falls
+        p.pad(37.0, 38, 120);       // a bloom at night
+        p.pad(39.0, 36, 110);       // a leap at night
+        p.ccRamp(1, 127, 0, 42.0, 45.0);   // dusk again
+        p.off(40);
+        p.waitUntil(46.0);
     } else if (name == "silence") {
         p.waitUntil(5.0);
     } else {
