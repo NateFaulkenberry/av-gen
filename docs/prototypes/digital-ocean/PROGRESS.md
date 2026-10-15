@@ -562,3 +562,30 @@ material program on the displaced sea mesh: no new renderer, no new pass.*
 - A slip worth recording: one generator edit sliced at the old program's `glints` op and duplicated half the file.
   The second `water_program` silently won, so one round of renders showed no change. It was caught because two
   renders came out byte-identical, and removed.
+
+### Pass D: audio and MIDI
+
+- `passD-controls.png`: each new control at full against none (1080p, 20 s, silent).
+  `passD-speed-ramp-4-13s-direction-14-18s.mp4` covers the speed control from 0 to full over 4-7 s, held to 11 s and
+  released by 13 s, then direction to full over 14-18 s. The frame-to-frame difference of the sea rises and falls
+  smoothly with the speed (1.2 at rest, 4.5-6 at full) with no single-frame spike, so no crest jumps.
+- **Wave speed (CC 9) needed an engine change, ADR-1372.** A sine deformer's phase is unbounded (hard range
+  +-1e6) and wrapped to an angle when the final is copied. Each swell train keeps its authored `speed` (pure in
+  time, so seeks are exact). Its `phase` gets an integrated route (ADR-1041) from the speed control with amount
+  w x 1.5, so the pace runs from the authored to 2.5x, and one from the music's level with amount w x 0.35, so loud
+  music quickens the sea. A first attempt added a `clock` signal source. It was dropped: the route chain's `integrate`
+  stage already does this, and the phase's +-100 clamp was the only thing in the way.
+- **Direction (CC 10)** cross-fades the trains' amplitudes rather than rotating them. A rotation sweeps far crests
+  sideways (a 10-degree turn shifts a 60 m wave at 1 km by 17 rad). The cross swell from the right drops to 25 % and
+  the wind sea from the left rises to 2.6x (its steepness to 2.3x, keeping the Gerstner sum under 1).
+- **Band contrast (CC 11)** narrows every band edge to 15 % of its width, and the music's intensity narrows it a
+  little. **Highlights (CC 12)**: the strokes reach 1.8x brightness and the band opens downward; hats flash them.
+  **Foam (CC 13)**: the cut drops 0.06 and the foam brightens. **Surface detail (CC 14)**: the noise's share of the
+  light rises from 0.07 to 0.2, and its mean shift is taken back out of the height term.
+- **Everything that moves the swell now moves what floats on it.** `wave_route` sends each swell route to every
+  node that carries that deformer: the three sea pieces, the yacht's parts and its wake. Before this, the waves
+  and energy controls lifted the sea under a yacht that did not rise with it.
+- Palette blend stays CC 1 plus the music's intensity (`visual.mood`); water energy stays CC 4. The scene's
+  vocabulary, the MIDI table and the index entry list CC 9-14.
+- Caveat: integrated routes on live input are not replayed by a seek (ADR-901). After a seek the performer's
+  added phase restarts from zero, and the music's (from `response.level`) does too.
