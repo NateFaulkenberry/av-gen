@@ -46,7 +46,7 @@
    "settings": {
     "mappings": [
      {
-      "name": "drive",
+      "name": "busy",
       "combine": "mean",
       "inputs": [
        {
@@ -63,6 +63,21 @@
       "curve": 1.0
      },
      {
+      "name": "drive",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "visual.busy",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.2
+     },
+     {
       "name": "bright",
       "combine": "mean",
       "inputs": [
@@ -74,6 +89,51 @@
       "bias": -0.25,
       "gain": 2.0,
       "curve": 1.0
+     },
+     {
+      "name": "hTreble",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.treble",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.2
+     },
+     {
+      "name": "hTrebleLevel",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.trebleLevel",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.2
+     },
+     {
+      "name": "hBass",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "audio.bass",
+        "weight": 1.0
+       },
+       {
+        "signal": "response.bass",
+        "weight": 1.0
+       }
+      ],
+      "gain": 1.22
      }
     ]
    }
@@ -181,7 +241,11 @@
   }
  ],
  "sonic": {
-  "live": true
+  "live": true,
+  "response": {
+   "floorDb": -44.0,
+   "rangeDb": 42.0
+  }
  },
  "routes": [
   {
@@ -256,7 +320,7 @@
    }
   },
   {
-   "source": "audio.treble",
+   "source": "visual.hTreble",
    "target": "particles/motes/spawnRate",
    "op": "add",
    "amount": 260.0,
@@ -269,10 +333,10 @@
    }
   },
   {
-   "source": "audio.onsetHigh",
+   "source": "response.hat",
    "target": "material/ground/emissionIntensity",
    "op": "add",
-   "amount": 3.0,
+   "amount": 2.73,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -283,10 +347,10 @@
    }
   },
   {
-   "source": "audio.onsetHigh",
+   "source": "response.hat",
    "target": "material/treeBlocks/emissionIntensity",
    "op": "add",
-   "amount": 4.0,
+   "amount": 3.64,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -297,10 +361,10 @@
    }
   },
   {
-   "source": "audio.onsetHigh",
+   "source": "response.hat",
    "target": "material/tanguyBlocks/emissionIntensity",
    "op": "add",
-   "amount": 4.0,
+   "amount": 3.64,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -311,7 +375,7 @@
    }
   },
   {
-   "source": "audio.trebleLevel",
+   "source": "visual.hTrebleLevel",
    "target": "post/glitch/amount",
    "op": "add",
    "amount": 0.05,
@@ -324,10 +388,10 @@
    }
   },
   {
-   "source": "audio.onsetLow",
+   "source": "response.kick",
    "target": "lights/fracture/intensity",
    "op": "add",
-   "amount": 2500.0,
+   "amount": 1925.0,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -338,10 +402,10 @@
    }
   },
   {
-   "source": "audio.onsetLow",
+   "source": "response.kick",
    "target": "procedural/treeBlocks/effector/5/strength",
    "op": "add",
-   "amount": 0.6,
+   "amount": 0.462,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -352,10 +416,10 @@
    }
   },
   {
-   "source": "audio.onsetLow",
+   "source": "response.kick",
    "target": "procedural/tanguyBlocks/effector/5/strength",
    "op": "add",
-   "amount": 0.6,
+   "amount": 0.462,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -366,10 +430,10 @@
    }
   },
   {
-   "source": "audio.onsetMid",
+   "source": "response.snare",
    "target": "field/infect/strength",
    "op": "add",
-   "amount": 4.0,
+   "amount": 3.12,
    "depthSource": "macro.gRhythm",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -380,10 +444,10 @@
    }
   },
   {
-   "source": "audio.onsetMid",
+   "source": "response.snare",
    "target": "temporal/mosh/amount",
    "op": "add",
-   "amount": 0.1,
+   "amount": 0.078,
    "depthSource": "macro.gMosh",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -394,10 +458,10 @@
    }
   },
   {
-   "source": "audio.onsetMid",
+   "source": "response.snare",
    "target": "post/glitch/tear",
    "op": "add",
-   "amount": 0.35,
+   "amount": 0.273,
    "depthSource": "macro.gGlitch",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -408,10 +472,10 @@
    }
   },
   {
-   "source": "audio.onsetLow",
+   "source": "response.kick",
    "target": "post/split/amount",
    "op": "add",
-   "amount": 6.0,
+   "amount": 4.62,
    "depthSource": "macro.gGlitch",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -422,10 +486,10 @@
    }
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/limb0/node/melt/amount",
    "op": "add",
-   "amount": 0.1,
+   "amount": 0.104,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -435,7 +499,7 @@
    }
   },
   {
-   "source": "audio.bass",
+   "source": "visual.hBass",
    "target": "nodes/limb0/position",
    "op": "add",
    "amount": 0.6,
@@ -449,10 +513,10 @@
    "component": 1
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/limb1/node/melt/amount",
    "op": "add",
-   "amount": 0.1,
+   "amount": 0.104,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -462,7 +526,7 @@
    }
   },
   {
-   "source": "audio.bass",
+   "source": "visual.hBass",
    "target": "nodes/limb1/position",
    "op": "add",
    "amount": 0.6,
@@ -476,10 +540,10 @@
    "component": 1
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/limb2/node/melt/amount",
    "op": "add",
-   "amount": -0.08,
+   "amount": -0.0832,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -489,7 +553,7 @@
    }
   },
   {
-   "source": "audio.bass",
+   "source": "visual.hBass",
    "target": "nodes/limb2/position",
    "op": "add",
    "amount": 0.6,
@@ -503,10 +567,10 @@
    "component": 1
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/trunk/node/bark/amount",
    "op": "add",
-   "amount": 0.04,
+   "amount": 0.0416,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -516,10 +580,10 @@
    }
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/limb0/node/bark/amount",
    "op": "add",
-   "amount": 0.04,
+   "amount": 0.0416,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -529,10 +593,10 @@
    }
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/limb1/node/bark/amount",
    "op": "add",
-   "amount": 0.04,
+   "amount": 0.0416,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -542,10 +606,10 @@
    }
   },
   {
-   "source": "audio.bassLevel",
+   "source": "response.bass",
    "target": "sdf/limb2/node/bark/amount",
    "op": "add",
-   "amount": 0.04,
+   "amount": 0.0416,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,

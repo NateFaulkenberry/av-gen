@@ -110,6 +110,41 @@ double meanSignal(Play p, const std::string& name) {
 
 } // namespace
 
+TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fracture", "[live][digital-mosh][adr1361]") {
+    Play p{.project = example("digital-mosh/digital-mosh-live.json")};
+    p.response = {{"sensitivity", 0.2f}};
+    const double dull = meanParam(p, "macros/energy");
+    p.response = {{"sensitivity", 0.5f}};
+    const double neutral = meanParam(p, "macros/energy");
+    p.response = {{"sensitivity", 0.8f}};
+    const double keen = meanParam(p, "macros/energy");
+    INFO("macros/energy: " << dull << " / " << neutral << " / " << keen);
+    CHECK(dull < neutral);
+    CHECK(neutral < keen);
+
+    // A take 16 dB down is heard quieter at the same setting (the limbs' bass lift, an auto-gained band times the
+    // response bass) -- where the old audio.bass route read it as loud as the mix -- and Sensitivity gives it back.
+    Play q = p;
+    q.response = {{"sensitivity", 0.5f}};
+    const double loud = meanSignal(q, "visual.hBass");
+    q.level = 0.12f;
+    const double quiet = meanSignal(q, "visual.hBass");
+    q.response = {{"sensitivity", 0.9f}};
+    const double lifted = meanSignal(q, "visual.hBass");
+    INFO("visual.hBass: loud " << loud << ", quiet " << quiet << ", lifted " << lifted);
+    CHECK(quiet < 0.8 * loud);
+    CHECK(lifted > quiet);
+
+    // The kick's fracture light (the Dream's rhythm gate opened): more Transients, harder kicks.
+    Play k{.project = example("digital-mosh/digital-mosh-live.json"), .hold = {{"macros/gRhythm", 1.0f}}};
+    k.response = {{"transient", 0.2f}};
+    const double soft = meanParam(k, "lights/fracture/intensity");
+    k.response = {{"transient", 0.8f}};
+    const double hard = meanParam(k, "lights/fracture/intensity");
+    INFO("fracture: " << soft << " / " << hard);
+    CHECK(soft < hard);
+}
+
 TEST_CASE("THE ASTRAL FORGE LIVE: the conductor's song is heard through the Response; neutral is the song itself",
           "[live][astral][adr1361]") {
     struct Heard {

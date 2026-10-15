@@ -865,6 +865,61 @@ ARC = {"kind": "interpret", "name": "arc", "settings": {"mappings": [
 ]}}
 GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 
+# ============================================================================================ the response (ADR-1361)
+# LIVE ONLY. The performer's Response controls (the Live panel: Sensitivity, Transients, Sustain, Attack, Release =
+# `sonic/response/*`, ADR-1062) reach the live scene through `response.*`:
+#   hits    the kick, snare and hat are the response model's (ADR-1067's detector, the hit sensitivity's floor and
+#           curve, so Transients decides how many fire and how hard), scaled so a hit's peak is the old onset's
+#   levels  a level is the response model's fixed-dB level, never auto-gained: the bass melt reads response.bass;
+#           an auto-gained band (the treble's glints, the limbs' lift) keeps its shape (character) and is multiplied
+#           by the response level (how loud it is heard), so a quiet input reads quiet and Sensitivity lifts it
+#   the arc the drive is how busy the music is (energy and treble: character) times how loud it is heard (the
+#           slow response level), so a whisper does not drive the arc into the Nightmare
+# Every gain below is the mean ratio on Trench at the neutral controls (docs/development/live-response-everywhere.md),
+# so the neutral live picture is the old one. The offline projects keep their audio.* routes: a file is not played.
+# The level range is the Sonic Abstract scenes' (-44..-2 dB): a mastered mix sits near 0.8, a take 15 dB down near 0.45.
+RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}
+LIVE_HITS = {"audio.onsetLow": ("response.kick", 0.77), "audio.onsetMid": ("response.snare", 0.78),
+             "audio.onsetHigh": ("response.hat", 0.91)}
+LIVE_LEVELS = {"audio.bassLevel": ("response.bass", 1.04), "audio.treble": ("visual.hTreble", 1.0),
+               "audio.trebleLevel": ("visual.hTrebleLevel", 1.0), "audio.bass": ("visual.hBass", 1.0)}
+
+
+def heard(name, band, level, gain):
+    """An auto-gained band (its shape) times the response level it is heard at; `gain` = 1 / that level's mean."""
+    return {"name": name, "combine": "product", "inputs": [{"signal": band, "weight": 1.0},
+                                                          {"signal": level, "weight": 1.0}], "gain": gain}
+
+
+LIVE_LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
+    # how busy the music is (the offline drive) ...
+    dict(LISTEN["settings"]["mappings"][0], name="busy"),
+    # ... heard: x the response level (a frame late: a source reads its own outputs from the frame before; the arc's
+    # routes smooth it over seconds)
+    {"name": "drive", "combine": "product", "inputs": [{"signal": "visual.busy", "weight": 1.0},
+                                                       {"signal": "response.level", "weight": 1.0}],
+     "gain": 1.2},
+    LISTEN["settings"]["mappings"][1],
+    heard("hTreble", "audio.treble", "response.level", 1.2),
+    heard("hTrebleLevel", "audio.trebleLevel", "response.level", 1.2),
+    heard("hBass", "audio.bass", "response.bass", 1.22),
+]}}
+
+
+def respond(route):
+    """A live route: its audio source re-sourced to the response layer, its amount rescaled (ADR-1361)."""
+    src, amt = route["source"], route["amount"]
+    if amt == 0.0:
+        return route  # the zero defaults: nothing reacts
+    if src in LIVE_HITS:
+        route["source"], k = LIVE_HITS[src]
+    elif src in LIVE_LEVELS:
+        route["source"], k = LIVE_LEVELS[src]
+    else:
+        return route
+    route["amount"] = round(amt * k, 5)
+    return route
+
 
 def macros():
     m = [{"name": n, "label": n.upper(), "default": 0.0, "targets": []}
@@ -896,7 +951,7 @@ ZERO_DEFAULTS = [
 ]
 
 
-def routes():
+def routes(live=False):
     hue_op = program_op(ground_program, "hueShift")
     r = list(ZERO_DEFAULTS)
     # ---- LAYER 4: the arc (03-implementation.md, "The arc")
@@ -966,7 +1021,7 @@ def routes():
                                                                           "clampMin": 0.0, "clampMax": 1.0}))
     r.append({"source": "lfo.driftB.bipolar", "target": "camera/target", "op": "add", "amount": 0.6, "component": 0})
     r.append({"source": "lfo.driftA.bipolar", "target": "camera/target", "op": "add", "amount": 0.25, "component": 1})
-    return r
+    return [respond(x) for x in r] if live else r
 
 
 POST = {
@@ -989,10 +1044,11 @@ def project(name, audio, live=False, sensitivity=None):
         "assets": {"scene": {"kind": "composition", "path": "digital-mosh.scene.json"}},
         "live": {"qualityStrategy": "effects_first"},
         "parameters": dict(POST),
-        "sources": [LISTEN, ARC] + [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}}
-                                    for n in ("driftA", "driftB", "driftC", "circleA", "circleB")],
+        "sources": [LIVE_LISTEN if live else LISTEN, ARC] + [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}}
+                                                            for n in ("driftA", "driftB", "driftC", "circleA",
+                                                                      "circleB")],
         "sonic": {},
-        "routes": routes(),
+        "routes": routes(live),
         "worldMacros": macros(),
         "presets": presets(),
         "states": states(),
@@ -1003,7 +1059,7 @@ def project(name, audio, live=False, sensitivity=None):
     if sensitivity is not None:
         p["parameters"]["macros/sensitivity"] = sensitivity
     if live:
-        p["sonic"] = {"live": True}
+        p["sonic"] = {"live": True, "response": dict(RESPONSE)}
         # the instrument: SENSITIVITY trims the arc to the input (CC 1); pads force
         # a stage (the arc carries on from there) -- General MIDI drum notes 36..43
         bindings = [{"source": "*", "channel": -1, "kind": "cc", "number": 1, "parameter": "macros/sensitivity",
