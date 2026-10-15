@@ -8025,7 +8025,7 @@
      "dst": 4,
      "srcA": 6,
      "srcB": 3,
-     "value": 0.6
+     "value": 0.5
     },
     {
      "kind": "multiply",
@@ -8038,8 +8038,8 @@
      "dst": 4,
      "srcA": 4,
      "constant": [
-      0.35,
-      0.38,
+      0.37,
+      0.4,
       0.0,
       0.0
      ]
@@ -8119,15 +8119,15 @@
      "dst": 5,
      "srcA": 5,
      "srcB": 6,
-     "value": 0.065
+     "value": 0.06
     },
     {
      "kind": "smoothstep",
      "dst": 5,
      "srcA": 5,
      "constant": [
-      0.499519,
-      0.499942,
+      0.506716,
+      0.509716,
       0.0,
       0.0
      ]
@@ -8387,6 +8387,24 @@
      "srcC": 4
     },
     {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.5,
+      1.5,
+      0.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 2
+    },
+    {
      "kind": "fresnel",
      "dst": 4,
      "value": 1.0
@@ -8444,15 +8462,15 @@
      "dst": 5,
      "srcA": 5,
      "srcB": 6,
-     "value": 0.065
+     "value": 0.06
     },
     {
      "kind": "smoothstep",
      "dst": 5,
      "srcA": 5,
      "constant": [
-      0.499519,
-      0.499942,
+      0.469516,
+      0.472516,
       0.0,
       0.0
      ]

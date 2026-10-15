@@ -529,22 +529,32 @@ def water_program(far=False):
         P.op(None, "multiply", 4, a=4, b=5)
         P.pcolour("hl", 5, "hl", W_HL)
         P.op("stroked", "mixBy", 7, a=7, b=5, c=4)
+    # foam (near): mix(noise, t g) times g -- the foam fades before it can break into flickering fragments.
+    # The glints' jitter: near, the raw noise; far, the noise centred and times g, so the sparks merge into one
+    # smooth path toward the horizon instead of flickering.
+    if not far:
         P.op("foamMix", "mix", 4, a=6, b=3, f=W_FOAM_CREST)
-        P.op(None, "multiply", 4, a=4, b=2)
+        P.op("foamAA", "multiply", 4, a=4, b=2)
         P.op("foamMask", "smoothstep", 4, a=4, k=[W_FOAM_CUT, W_FOAM_CUT + W_FOAM_SOFT])
         P.pcolour("foam", 5, "foam", W_FOAM_GAIN)
         P.op("foamed", "mixBy", 7, a=7, b=5, c=4)
-    # glints: the reflected ray against the sun, jittered by the detail and cut into sparks
+        # the raw noise (a crest bias here grew the path into a slab under a tall sea); even a perfect reflection
+        # sparks only where the noise is above W_GLINT_SPARSE, so a big face turned to the sun stays broken
+        j, mean = W_GLINT_JIT, W_GLINT_SPARSE
+    else:
+        P.op("noiseCentre", "remap", 6, a=6, k=[0.5, 1.5, 0.0, 1.0])
+        P.op("noiseAA", "multiply", 6, a=6, b=2)
+        j, mean = W_GLINT_JIT, 0.0
+    # glints: the reflected ray against the sun, jittered and cut into sparks
     P.op(None, "fresnel", 4, f=1.0)
     P.op("nv", "remap", 4, a=4, k=[0.0, 1.0, 1.0, 0.0])
     P.op(None, "gradient", 5, a=0, k=[sx, sy, sz, 0.0], f=1.0)                           # n.l
     P.op(None, "multiply", 5, a=5, b=4)
     P.op(None, "gradient", 4, a=1, k=[-0.5 * sx, -0.5 * sy, -0.5 * sz, 0.0], f=1.0)      # -v.l / 2
     P.op("rl", "add", 5, a=5, b=4)
-    P.op("jitter", "mix", 5, a=5, b=6, f=W_GLINT_JIT)
-    j = W_GLINT_JIT
-    c0, c1 = (c / 2.0 * (1.0 - j) + 0.5 * j for c in (GLINT_COS0, GLINT_COS1))
-    P.op("glints", "smoothstep", 5, a=5, k=[c0, c1])
+    P.op("jitter", "mix", 5, a=5, b=6, f=j)
+    c0 = GLINT_COS0 / 2.0 * (1.0 - j) + j * mean
+    P.op("glints", "smoothstep", 5, a=5, k=[c0, c0 + W_GLINT_EDGE])                      # edge: ~2 px near
     P.pcolour("glint", 4, "glint", GLINT_GAIN)
     P.op("sunlit", "mixBy", 7, a=7, b=4, c=5)
     P.op("fres", "fresnel", 4, f=W_FRES_POWER)
@@ -566,10 +576,12 @@ W_SOFT = 0.07           # band edge half-width in centred t (the band contrast: 
 W_E1, W_E2, W_E3 = -0.16, 0.05, 0.22   # the band thresholds in centred t
 W_S0, W_S1, W_SW = 0.14, 0.2, 0.02     # the stroke band (centred t) and its edge width
 W_HL = 1.1
-W_FOAM_CREST = 0.6      # foam = mix(noise, t g, this): how much the crest decides
-W_FOAM_CUT, W_FOAM_SOFT = 0.35, 0.03
+W_FOAM_CREST = 0.5      # foam = mix(noise, t g, this): how much the crest decides
+W_FOAM_CUT, W_FOAM_SOFT = 0.37, 0.03
 W_FOAM_GAIN = 0.95
-W_GLINT_JIT = 0.065     # the detail's share in the glint test: breaks the path into sparks
+W_GLINT_JIT = 0.06      # the detail's share in the glint test: breaks the path into sparks
+W_GLINT_SPARSE = 0.62   # the noise level a perfect reflection needs to spark (0.5: half the path is lit)
+W_GLINT_EDGE = 0.003    # the sparks' edge width (in the jittered r.l / 2): soft over a pixel or two near
 W_FRES_POWER = 7.0
 W_HORIZON = 1.0
 WATER = "anime"         # "anime" (Pass 3) or "pass2"
@@ -1765,13 +1777,13 @@ def musical_colour(s, progs, sea, seafar, sky, cp):
     for prog in (sea, seafar):
         s.route(R("bass", M_ % (prog.name, prog["deep"]), 1.0, op="multiply", gain=-0.35, offset=1.0, attackMs=200,
                   decayMs=1200),
-                R("bass", M_ % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=200,
+                R("bass", M_ % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.15, offset=1.0, attackMs=200,
                   decayMs=1200))
     # HIGHS add mint to the crest light (delicate, fast)
     mint = hexrgb("#a8ffe0")
     for prog in (sea, seafar):
         for c in range(3):
-            s.route(R("audio.treble", M_ % (prog.name, prog["sss"]), round(mint[c] * 0.35, 4), comp=c, attackMs=60,
+            s.route(R("audio.treble", M_ % (prog.name, prog["sss"]), round(mint[c] * 0.15, 4), comp=c, attackMs=60,
                       decayMs=600))
     # SUSTAIN shifts the sky's middle toward pink and warms the clouds' lit undersides (slow)
     pink = hexrgb("#ff8ac8")
@@ -1808,13 +1820,17 @@ def instrument(s, sea, seafar, sky):
         s.route(R("intensity", D % 2, deco[1]["amount"] * (0.10 / STEEP[0]), attackMs=4000, decayMs=8000))
     # KICK: the crest light and the foam flash for a moment (the kick's lifted front rolls in on its own)
     for prog in (sea, seafar):
-        s.route(R("kickEnv", M % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.55, offset=1.0, attackMs=0,
+        s.route(R("kickEnv", M % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.2, offset=1.0, attackMs=0,
                   decayMs=420))
-    s.route(R("kickEnv", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=0,
+    s.route(R("kickEnv", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=0,
               decayMs=600))
     # the crest ramp follows the sea's height (a taller sea needs a taller crest to foam): foam stays a cap
     s.route(R("level", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply", gain=-0.3,
               offset=1.0, attackMs=1800, decayMs=4500))
+    s.route(R("level", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], 0.05, comp=0, attackMs=1800,
+              decayMs=4500),
+            R("level", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], 0.05, comp=1, attackMs=1800,
+              decayMs=4500))
     # SNARE: spray off the near swell
     s.route(R("snare", "particles/snareSpray/burst", 70.0, threshold="binary", thresholdLevel=0.25))
     # HIGHS: the sun's glints flare and the micro-ripples deepen (more, smaller glints); hats sparkle the path
@@ -1910,8 +1926,11 @@ def midi(s, progs, sea, seafar, sky, cp=None):
     # a taller sea needs a taller crest to foam: the crest ramp follows the waves control
     s.route(R("control.waves", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply",
               gain=-0.42, offset=1.0, **CC))
-    s.route(R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.16, comp=0, **CC),
-            R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
+    # foam is a crest cap whatever the sea's height: a taller sea (waves) raises the cut as much as energy lowers it,
+    # so energy makes the caps livelier and brighter, never a slab (Pass 3, Pass C)
+    FM = "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"]
+    s.route(R("control.energy", FM, -0.04, comp=0, **CC), R("control.energy", FM, -0.04, comp=1, **CC),
+            R("control.waves", FM, 0.07, comp=0, **CC), R("control.waves", FM, 0.07, comp=1, **CC),
             R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
     for prog, key, g in ((sky, "ray", 1.0), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
                          (seafar, "pathCol", 0.9), (sea, "glint", 0.6), (seafar, "glint", 0.6)):

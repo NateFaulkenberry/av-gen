@@ -539,3 +539,26 @@ material program on the displaced sea mesh: no new renderer, no new pass.*
   (horizon), in each of violet, afternoon (turquoise/cobalt), electric (deep electric blue), midnight and twilight.
   `visual.mood` blends them as before (`palette_routes`), so the water follows the palette control and the music's
   intensity smoothly.
+
+### Pass C: highlights, foam and surface patterns
+
+- `passC-highlights-foam-before-after.png`: Pass B's water against Pass C's, silent and under three musical
+  conditions; the peak is Trench at 77 s with the waves, energy and rays controls at full (Pass 2's "white slab").
+  `passC-herowave-0-14s-draft.mp4` is the hero wave (pad 37 at 3 s) on the Pass B program.
+- **Glints.** The sun path's sparks are the reflection test jittered by the raw detail noise, and even a perfect
+  reflection sparks only where the noise is above 0.62: a big face turned to the sun stays broken into strokes.
+  A jitter drawn from the foam signal (noise mixed with the crest) made every crest face a glint and grew the path
+  into a slab. The sparks' edge is 0.003 wide in the jittered r.l/2, about two pixels near. Beyond 200 m the jitter
+  is the centred noise times the AA gain g, so the far sparks merge into one smooth path instead of flickering.
+- **Foam.** `mix(noise, t g, 0.5) g`, cut at 0.37: broken caps on the reinforced crests only, fading where pixels
+  grow. The peak's slab was foam, not glints (found by elimination: `GLINT_GAIN` 0 and `W_FOAM_CUT` 9 variants).
+  Energy used to drop the cut by 0.16, and a taller sea made every crest face foam. Now energy lowers it by 0.04,
+  while the waves control (+0.07) and the music's level (+0.05) raise it. Foam stays a cap on a tall sea and draws
+  a line along the crest, like an anime breaker.
+- **Highlights.** Thin strokes in a narrow band of `t` just under the crest (`strokeLo` x `strokeHi`), in the
+  palette's `hl`.
+- **Audio colour.** The routes that pushed the lit faces and foam toward white were lowered: bass (0.4 to 0.15),
+  kick (0.55 to 0.2 on the lit faces, 1.2 to 0.4 on foam) and highs' mint (0.35 to 0.15).
+- A slip worth recording: one generator edit sliced at the old program's `glints` op and duplicated half the file.
+  The second `water_program` silently won, so one round of renders showed no change. It was caught because two
+  renders came out byte-identical, and removed.
