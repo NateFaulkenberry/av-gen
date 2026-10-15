@@ -59,6 +59,14 @@ constexpr float kReachAlpha = 0.18f;
 // `DebugViewOptions::pointSize` defaults to 3. A light marker drawn at `pointSize` is a 3 m ball
 // across the middle of the frame; this is the same 0.12 scale `worldAxes` uses for the origin.
 constexpr float kMarkerScale = 0.12f;
+// ADR-1391: the same mistake, in every overlay written before that note. The skeleton's joints were drawn at
+// `pointSize * 0.6` -- a 1.8 m disc on every joint of a 1.7 m alien -- so with the Animation Lab's overlays on, each
+// character sat inside a pale yellow blob the union of ninety such discs makes (the owner's "yellow blobs",
+// 2026-10-15). The trail's points were 1.5 m, the IK targets 3.6 m. These scales put each marker at the size the
+// overlay meant: a joint a few centimetres across, a target or a contact a little larger so it reads over the joint.
+constexpr float kJointScale = 0.02f;   // 6 cm at the default point size
+constexpr float kTrailScale = 0.03f;   // 9 cm
+constexpr float kMotionScale = 0.035f; // 10.5 cm: IK chain ends, aim/IK targets, the pelvis correction
 constexpr glm::vec4 kLightOffColour{0.45f, 0.45f, 0.5f, 0.35f};
 
 // Blue to red across a normalised value.
@@ -574,7 +582,7 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
             draw.polyline(points, kTrailColour);
         }
         for (const glm::vec3& p : points) {
-            draw.point(p, options.pointSize * 0.5f, kTrailColour);
+            draw.point(p, options.pointSize * kTrailScale, kTrailColour);
         }
     }
 
@@ -655,7 +663,7 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
             const std::size_t joints = std::min(jointModel.size(), rig.skeleton.joints.size());
             for (std::size_t j = 0; j < joints; ++j) {
                 const glm::vec3 here = glm::vec3(model * jointModel[j][3]);
-                draw.point(here, options.pointSize * 0.6f, kJointColour);
+                draw.point(here, options.pointSize * kJointScale, kJointColour);
                 const int parent = rig.skeleton.joints[j].parent;
                 if (parent >= 0 && static_cast<std::size_t>(parent) < joints) {
                     const glm::vec3 up = glm::vec3(model * jointModel[static_cast<std::size_t>(parent)][3]);
@@ -713,7 +721,7 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                         colour.a *= std::clamp(weight, 0.15f, 1.0f);
                         draw.line(worldOf(ids.x), worldOf(ids.y), colour);
                         draw.line(worldOf(ids.y), worldOf(ids.z), colour);
-                        draw.point(worldOf(ids.z), options.pointSize * 0.9f, colour);
+                        draw.point(worldOf(ids.z), options.pointSize * kMotionScale, colour);
                     }
                 }
 
@@ -722,7 +730,7 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                     const glm::vec4 colour = layer.kind == scene::PoseLayerKind::Aim
                                                  ? glm::vec4(0.4f, 0.8f, 1.0f, 0.9f)
                                                  : glm::vec4(1.0f, 0.4f, 0.9f, 0.9f);
-                    draw.point(target, options.pointSize * 1.2f, colour);
+                    draw.point(target, options.pointSize * kMotionScale * 1.3f, colour);
                     // A line from the thing that was asked to reach it, so "the hand is not on the
                     // target" and "the target is not where you think" are distinguishable.
                     if (i < chains.size() && inRange(chains[i].z)) {
@@ -811,7 +819,7 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                                                  ? glm::vec4(1.0f, 0.3f, 0.3f, 0.95f)
                                                  : glm::vec4(0.9f, 0.5f, 1.0f, 0.95f);
                     draw.line(from, to, colour);
-                    draw.point(to, options.pointSize * 1.1f, colour);
+                    draw.point(to, options.pointSize * kMotionScale * 1.2f, colour);
                 }
             }
         }
