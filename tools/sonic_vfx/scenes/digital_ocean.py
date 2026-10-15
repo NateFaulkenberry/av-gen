@@ -275,14 +275,14 @@ PALETTES = {
                       cshade="#90a8d8", clit="#fff5e6", crim="#fffbf0", isle="#7e9cc4",
                       dback="#284a7c", dbelly="#d0e2f0", drim="#fff4dc",
                       land="#45a85c", land2="#1f6e62", rock="#c88a5c", sand="#f6e2b4", leaf="#2f9a52", trunk="#8a5a3c",
-                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#fff4d6", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc"),
+                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#d8c090", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc"),
     # electric blue: ultramarine and cyan water, mint surf, saturated blue sky, yellow-coral accents, navy land
     "electric": dict(zenith="#0a2a9c", mid="#2c6ae4", warm="#8ff0ff", cool="#4a8cf0", sun="#fff7a8", glow="#ffd84a",
                      deep="#06186a", rzen="#0e40b6", rhor="#62d4ff", sss="#3cf4ff", glint="#ffffe0", foam="#c8fff0",
                      cshade="#2448b0", clit="#c4ecff", crim="#fff6c0", isle="#2244a0",
                      dback="#0a1a56", dbelly="#4a80d8", drim="#fff7b0",
                      land="#14266a", land2="#0a1446", rock="#2a4aa0", sand="#4a76d0", leaf="#0e1c5a", trunk="#0c1650",
-                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#fffad0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8"),
+                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#8cc8f0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8"),
     # the night end (CC 1): bioluminescent
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
                      deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
@@ -628,7 +628,7 @@ def cumulus(cx, cz, base, width, height, depth, seed, flat=False):
 # The formations: (azimuth deg from the view, distance m, base m, width m, height m, depth m, ribbon?). Big banks on
 # either side of the sun, one passing near it, ribbons low on the horizon, and smaller banks round the rest of the sky
 # (the field turns slowly, so every one of them comes past the sun in time). Two layers, two drift rates: parallax.
-CLOUDS_NEAR = [(-30.0, 3600.0, 330.0, 1400.0, 520.0, 300.0, False), (34.0, 4000.0, 420.0, 1200.0, 430.0, 280.0, False),
+CLOUDS_NEAR = [(-30.0, 3600.0, 330.0, 1400.0, 520.0, 300.0, False), (34.0, 4000.0, 380.0, 1700.0, 150.0, 220.0, True),
                (6.0, 4800.0, 230.0, 2600.0, 140.0, 200.0, True), (-58.0, 3400.0, 260.0, 900.0, 380.0, 260.0, False),
                (75.0, 3800.0, 300.0, 1100.0, 460.0, 280.0, False), (140.0, 3600.0, 320.0, 1300.0, 500.0, 300.0, False),
                (-130.0, 3900.0, 280.0, 1200.0, 420.0, 300.0, False), (-180.0, 3700.0, 350.0, 1400.0, 520.0, 300.0, False)]
@@ -1263,7 +1263,7 @@ def world(s):
 
 
 # ================================================================================================ dolphins
-DOLPHIN_LEN = 6.4          # Pass 2: twice Pass 1 (3.1 m read as specks)
+DOLPHIN_LEN = 8.5          # Pass 2: twice Pass 1 (3.1 m read as specks)
 
 
 def dolphin_mesh():
@@ -1433,11 +1433,11 @@ def leap_points(centre, heading_deg, height, half_span, loop=True, depth=36.0, r
 # the view's depth, height scale)). Pod A crosses the sun's path at 70 m left to right; pod B, smaller and far, swims
 # right to left near the island side.
 PODS = [
-    ("podA", (45.0, -120.0), -4.0, 4.6, 10.0, 53.0, [(0.0, 0.0, 1.0), (0.55, -3.5, 0.85), (1.25, 2.8, 0.92)]),
+    ("podA", (40.0, -100.0), -4.0, 5.5, 11.0, 53.0, [(0.0, 0.0, 1.0), (0.55, -3.5, 0.85), (1.25, 2.8, 0.92)]),
     ("podB", (-80.0, -300.0), 176.0, 3.4, 9.0, 79.0, [(0.0, 0.0, 1.0), (0.7, 3.0, 0.8)]),
 ]
 LEAP_SPEED = 12.0            # metres a second along the path (a dolphin's leap)
-HERO = ("hero", (30.0, -78.0), -2.0, 7.0, 12.0)
+HERO = ("hero", (22.0, -55.0), -2.0, 8.0, 14.0)
 HERO_ATTACK_MS = None        # computed from the hero path's length
 
 
@@ -1816,7 +1816,7 @@ def midi(s, progs, sea, seafar, sky, cp=None):
     s.route(R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.16, comp=0, **CC),
             R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
             R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
-    for prog, key, g in ((sky, "ray", 1.6), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
+    for prog, key, g in ((sky, "ray", 1.0), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
                          (seafar, "pathCol", 0.9)):
         s.route(R("control.rays", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **CC))
     s.route(R("control.rays", "material/doSky/op/%d/remap/constant" % sky["rayLen"], -0.08, comp=0, **CC))

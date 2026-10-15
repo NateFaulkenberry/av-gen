@@ -126,7 +126,7 @@
   "sources/boat/rate": 0.014233,
   "sources/podA/rate": 0.018868,
   "sources/podB/rate": 0.012658,
-  "sources/leap/attackMs": 7218.3,
+  "sources/leap/attackMs": 8220.5,
   "sources/leap/decayMs": 0.0,
   "sources/leap/sustain": 1.0,
   "sources/leap/holdMs": 250.0,
@@ -256,7 +256,7 @@
   {
    "source": "lfo.podA",
    "target": "procedural/podA_0/deform/2/pathOffset",
-   "amount": 635.9982061378212,
+   "amount": 636.0012563320312,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -271,7 +271,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.05195
+    "thresholdLevel": 0.05392
    }
   },
   {
@@ -282,7 +282,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.06485
+    "thresholdLevel": 0.07012
    }
   },
   {
@@ -293,7 +293,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.08567
+    "thresholdLevel": 0.0924
    }
   },
   {
@@ -304,13 +304,13 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.09856
+    "thresholdLevel": 0.10859
    }
   },
   {
    "source": "lfo.podA",
    "target": "procedural/podA_1/deform/2/pathOffset",
-   "amount": 635.9999709224417,
+   "amount": 636.0014751831424,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -325,7 +325,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.06134
+    "thresholdLevel": 0.06321
    }
   },
   {
@@ -336,7 +336,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.07423
+    "thresholdLevel": 0.07941
    }
   },
   {
@@ -347,7 +347,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.09275
+    "thresholdLevel": 0.09901
    }
   },
   {
@@ -358,13 +358,13 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.10564
+    "thresholdLevel": 0.1152
    }
   },
   {
    "source": "lfo.podA",
    "target": "procedural/podA_2/deform/2/pathOffset",
-   "amount": 635.9995051491107,
+   "amount": 635.999176655328,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -379,7 +379,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.07501
+    "thresholdLevel": 0.07692
    }
   },
   {
@@ -390,7 +390,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.0879
+    "thresholdLevel": 0.09312
    }
   },
   {
@@ -401,7 +401,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.10749
+    "thresholdLevel": 0.11397
    }
   },
   {
@@ -412,7 +412,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.12039
+    "thresholdLevel": 0.13017
    }
   },
   {
@@ -433,7 +433,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.03589
+    "thresholdLevel": 0.03368
    }
   },
   {
@@ -455,7 +455,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.0548
+    "thresholdLevel": 0.05259
    }
   },
   {
@@ -487,7 +487,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.04437
+    "thresholdLevel": 0.04216
    }
   },
   {
@@ -509,7 +509,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.06165
+    "thresholdLevel": 0.05944
    }
   },
   {
@@ -526,7 +526,7 @@
   {
    "source": "env.leap",
    "target": "procedural/hero/deform/2/pathOffset",
-   "amount": 86.61928387872851,
+   "amount": 98.6459575030401,
    "op": "add",
    "polarity": "unipolar"
   },
@@ -538,7 +538,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.45562
+    "thresholdLevel": 0.44785
    }
   },
   {
@@ -549,7 +549,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.55722
+    "thresholdLevel": 0.55835
    }
   },
   {
@@ -560,7 +560,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.78397
+    "thresholdLevel": 0.78529
    }
   },
   {
@@ -571,7 +571,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.88556
+    "thresholdLevel": 0.89578
    }
   },
   {
@@ -1557,7 +1557,23 @@
   {
    "source": "visual.mood",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": 0.07806,
+   "amount": -0.09399,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 1500,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "gain": 2.0
+   }
+  },
+  {
+   "source": "visual.mood",
+   "target": "material/doSky/op/29/constant/constant",
+   "amount": -0.03521,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1573,7 +1589,7 @@
   {
    "source": "visual.mood",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": 0.07148,
+   "amount": -0.04658,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -3604,7 +3620,24 @@
   {
    "source": "visual.mood",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": 0.01539,
+   "amount": -0.12733,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 1500,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "gain": 2.0,
+    "offset": -1.0
+   }
+  },
+  {
+   "source": "visual.mood",
+   "target": "material/doSky/op/29/constant/constant",
+   "amount": 0.01514,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -3621,7 +3654,7 @@
   {
    "source": "visual.mood",
    "target": "material/doSky/op/29/constant/constant",
-   "amount": -0.0125,
+   "amount": 0.17774,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -7094,7 +7127,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.6,
+    "gain": 1.0,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120

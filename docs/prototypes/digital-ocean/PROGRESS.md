@@ -451,3 +451,35 @@ Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. 
   unchanged, checked by regenerating three and comparing bytes.
 - Wave speed and direction are still not on controls: a deformer's phase is `k.x + speed t`, so changing either
   jumps every wave. This belongs to Pass 3's water work.
+
+## Pass G: visual critique (done, two rounds)
+
+Seven conditions at 1080p (`passG-round1.png`): silence, quiet (Glowmere), bass (Trench 77 s), percussive (Feline
+Footwear 95 s), MIDI (palette 1, waves 0.8, clouds 0.7), peak (Trench + waves, rays and energy full), and night. Plus
+a clip from 0 s with a scored leap and hero wave (`passG-events-leap-herowave.png`).
+
+**Round 1: the three most significant (non-water) defects**
+
+1. The dolphin leap was still a speck, about 2 % of the frame: not an identifiable event.
+2. In the day palettes the rays washed the sky to pinkish white: near-white ray colours added onto a bright sky.
+3. The cloud formation beside the sun read as a bunch of grapes.
+
+**Fixes**
+
+- Dolphins are 8.5 m. The hero leap is at 55 m with an 8 m arc; pod A is at 100 m with 5.5 m arcs.
+- Ray colours are tinted per palette (warm in the afternoon, cool in electric blue), and the rays control is capped
+  at x2.
+- The grape formation became a long lit ribbon.
+
+**Round 2** (`passG-round2.png`, `passG-leap-round2.png`)
+
+- The leap reads as the brief's full gesture: the fin cutting the surface on the approach, the rise, a silhouetted arc
+  across the glitter, the apex, the dive and a splash.
+- The electric sky keeps its blue under the rays.
+
+**Left for Pass 3 (the water) and noted**
+
+- Under heavy bass and at the peak, the near swell's crest light and foam merge into a white slab.
+- The hero wave reads as a thin dark line rather than a rising, foaming swell.
+- At intermediate mood positions under loud music the sky can drift pale lavender (two palettes half-blended plus
+  rays).
