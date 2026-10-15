@@ -131,3 +131,11 @@ What is left to spend, if 60 fps is ever wanted for it, is the fire's shadow (2.
   it read harder.
 - The assets are gitignored (CC0, restorable). Without them the scene loads without its trees, logs and stumps, which
   is the kit's documented behaviour.
+
+## Suites (end of the four-scene pass, on 2fb8cfa5)
+
+- `tools/ci/run-suite.sh cpu-assets` (under `tools/gpu-lock.sh`): **PASS**, exit 0. 4227 passed, 0 failed, 19
+  skipped, 1 expected failure; 4247 of 4247 ran, in 19 min 25 s.
+- `tools/ci/run-suite.sh gpu --bin build/release/tests` (the engine and shader change of ADR-1350): **PASS**, exit 0.
+  655 passed, 0 failed, 1 skipped; 656 of 656 ran, in 30 min 54 s.
+- `python3 tools/check_project_integrity.py`: exit 0.

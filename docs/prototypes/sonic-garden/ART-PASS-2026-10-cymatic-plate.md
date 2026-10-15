@@ -93,3 +93,11 @@ The scene stays inside the 60 fps budget, where it was before.
 - `before/`: stills with Trench at 12, 62 and 112 s;
 - `after/`: stills with Trench at 12, 40, 62 and 112 s, and with the full test mix and MIDI at 4, 9 and 14 s;
 - `cymatic-plate-trench-50-80s.mp4` and `cymatic-plate-full-midi-0-18s.mp4` (1080p30, with audio).
+
+## Suites (end of the four-scene pass, on 2fb8cfa5)
+
+- `tools/ci/run-suite.sh cpu-assets` (under `tools/gpu-lock.sh`): **PASS**, exit 0. 4227 passed, 0 failed, 19
+  skipped, 1 expected failure; 4247 of 4247 ran, in 19 min 25 s.
+- `tools/ci/run-suite.sh gpu --bin build/release/tests` (the engine and shader change of ADR-1350): **PASS**, exit 0.
+  655 passed, 0 failed, 1 skipped; 656 of 656 ran, in 30 min 54 s.
+- `python3 tools/check_project_integrity.py`: exit 0.

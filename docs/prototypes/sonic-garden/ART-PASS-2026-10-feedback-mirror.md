@@ -102,3 +102,11 @@ measurable; a full-frame SDF would have marched every pixel. Run to run, the two
 - The loop is an exact FIR over the last 24 clean frames, not an infinite recursion. The corridor therefore ends
   about 24 screens in, at about a fifth of the frame. That is deep enough to read as infinite with the vanishing point
   this small.
+
+## Suites (end of the four-scene pass, on 2fb8cfa5)
+
+- `tools/ci/run-suite.sh cpu-assets` (under `tools/gpu-lock.sh`): **PASS**, exit 0. 4227 passed, 0 failed, 19
+  skipped, 1 expected failure; 4247 of 4247 ran, in 19 min 25 s.
+- `tools/ci/run-suite.sh gpu --bin build/release/tests` (the engine and shader change of ADR-1350): **PASS**, exit 0.
+  655 passed, 0 failed, 1 skipped; 656 of 656 ran, in 30 min 54 s.
+- `python3 tools/check_project_integrity.py`: exit 0.
