@@ -123,7 +123,7 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "sources/boat/rate": 0.00852,
+  "sources/boat/rate": 0.014233,
   "sources/podA/rate": 0.018868,
   "sources/podB/rate": 0.012658,
   "sources/leap/attackMs": 7218.3,
@@ -183,28 +183,28 @@
   {
    "source": "lfo.boat",
    "target": "procedural/boatHull/deform/2/pathOffset",
-   "amount": 375.5673632978111,
+   "amount": 224.83189157584587,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "lfo.boat",
    "target": "procedural/boatDeck/deform/2/pathOffset",
-   "amount": 375.5673632978111,
+   "amount": 224.83189157584587,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "lfo.boat",
    "target": "procedural/boatGlaze/deform/2/pathOffset",
-   "amount": 375.5673632978111,
+   "amount": 224.83189157584587,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "lfo.boat",
    "target": "particles/wake/position",
-   "amount": 374.064,
+   "amount": 224.055,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -212,7 +212,7 @@
   {
    "source": "lfo.boat",
    "target": "particles/wake/position",
-   "amount": 33.57,
+   "amount": 18.671,
    "op": "add",
    "polarity": "unipolar",
    "component": 2
@@ -220,7 +220,7 @@
   {
    "source": "lfo.boat",
    "target": "particles/bowWave/position",
-   "amount": 374.064,
+   "amount": 224.055,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -228,7 +228,7 @@
   {
    "source": "lfo.boat",
    "target": "particles/bowWave/position",
-   "amount": 33.57,
+   "amount": 18.671,
    "op": "add",
    "polarity": "unipolar",
    "component": 2
@@ -2345,7 +2345,7 @@
   {
    "source": "control.night",
    "target": "procedural/boatDeck/material/emissiveColor",
-   "amount": -0.73847,
+   "amount": -0.62539,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -2357,7 +2357,7 @@
   {
    "source": "control.night",
    "target": "procedural/boatDeck/material/emissiveColor",
-   "amount": -0.48892,
+   "amount": -0.52184,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -2369,7 +2369,7 @@
   {
    "source": "control.night",
    "target": "procedural/boatDeck/material/emissiveColor",
-   "amount": -0.23312,
+   "amount": -0.44049,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -3713,7 +3713,7 @@
   {
    "source": "control.golden",
    "target": "procedural/boatDeck/material/emissiveColor",
-   "amount": -0.01565,
+   "amount": 0.08195,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -3725,10 +3725,22 @@
   {
    "source": "control.golden",
    "target": "procedural/boatDeck/material/emissiveColor",
-   "amount": 0.09486,
+   "amount": 0.10519,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "procedural/boatDeck/material/emissiveColor",
+   "amount": -0.08286,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "chain": {
     "attackMs": 250,
     "decayMs": 250

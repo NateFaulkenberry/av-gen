@@ -357,3 +357,32 @@ Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. 
 - **Chosen: C.** It has the minimal geometry of A, the cleanest graphic read, and a canopy anchoring each end, so the
   strip is balanced (A leaves the left half bare). B's extra trees add clutter, not identity. C is also the least
   shaded variant, which matches the travel-poster direction chosen in Pass A.
+
+## Boats step (the owner's brief `09-brief-boats.md`) (done)
+
+- **Reference direction** (real hull profiles, no brands or logos): a modern 15-17 m express cruiser or sport motor
+  yacht. Long and low; a fine, steeply raked stem; flared bow sections over a hard chine; a sheer that steps down
+  aft; a wide transom over a swim platform. The superstructure is low, with a raked windscreen under a hardtop and a
+  long dark wraparound glazing band rather than portholes, plus a narrow hull-window strip amidships.
+- **Built from real proportions first** (`loft`, `box_loft`, `deck_surface`): hull stations are given as deck
+  half-breadth, sheer height, chine and keel, and lofted. The cabin is lofted the same way, and its upper side band is
+  the glazing. Three meshes take three colours: pearl hull, pale deck and cabin, navy glazing.
+- **Candidates**, same camera and scene, at 1080p (`54-digital-ocean-2/boats/`):
+  - A: the 16 m motor yacht.
+  - B: a 10 m deep-V performance runabout with a long foredeck and a low wraparound windshield.
+  - C: a 13 m modern sloop with a plumb bow, low coachroof, 18 m mast, and a high-aspect cambered main and jib.
+
+  At 130 m all three were too small to judge (`boats-before-A-B-C.png`), so the course moved in to ~70 m
+  (`boats-before-A-B-C-70m.png`).
+- **Chosen: A.** Silhouette first: it reads at once as a modern motor yacht. The glazing band and hardtop make a clear
+  graphic shape, and the hull is long and low with a credible bow. B is too low and small to read at live
+  resolution. C's flat sails pull the read back toward the toy it replaces. One excellent vessel, as the brief asks.
+- **Motion and water contact.** The yacht cruises at 3.2 m/s across the view on a straight course 64-84 m out. Its
+  `pathOffset` comes from an LFO saw, which is pure in time; the course runs well past both frame edges, so the wrap
+  happens out of sight (~75 s a crossing). It then goes through the sea's own world-space Gerstner stack, so it
+  rises, falls and travels with the swell; a 6 cm roll is the only local motion.
+- **The wake** is a directional trail from the stern that follows the same saw and widens behind the course. A small
+  bow wave is thrown forward and outward. There is no ring. It was toned down after the first motion check, where it
+  read as a jet trail (`yacht-A-crossing-26-44s.mp4`, `boatA-motion-crops.png`). Pass 3 revisits it to match the new
+  water.
+- Palette: pearl hull, cooler pale deck (first trial was too peach), navy glazing, each set per palette.

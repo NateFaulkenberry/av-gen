@@ -4994,18 +4994,18 @@
     "points": [
      {
       "position": [
-       -190.0,
+       -120.0,
        0.0,
-       -150.0
+       -84.0
       ],
       "roll": 0.0,
       "scale": 1.0
      },
      {
       "position": [
-       200.0,
+       120.0,
        0.0,
-       -115.0
+       -64.0
       ],
       "roll": 0.0,
       "scale": 1.0
@@ -5214,9 +5214,9 @@
       0.0
      ],
      "emissiveColor": [
-      0.80695,
-      0.57758,
-      0.47932
+      0.69387,
+      0.6105,
+      0.68669
      ],
      "emissiveIntensity": 1.0,
      "roughness": 1.0,
@@ -5555,13 +5555,13 @@
    "kind": "particles",
    "particles": {
     "enabled": true,
-    "capacity": 900,
+    "capacity": 700,
     "seed": 22293,
     "shape": "sphere",
     "position": [
-     -189.502,
+     -119.502,
      0.15,
-     -149.955
+     -83.958
     ],
     "extent": [
      0.6,
@@ -5569,29 +5569,29 @@
      0.6
     ],
     "direction": [
-     -0.996,
+     -0.9965,
      0.0,
-     -0.0894
+     -0.083
     ],
-    "spawnRate": 55.0,
-    "lifetimeMin": 4.0,
-    "lifetimeMax": 6.5,
-    "spread": 0.22,
-    "speedMin": 0.4,
-    "speedMax": 1.1,
+    "spawnRate": 40.0,
+    "lifetimeMin": 3.0,
+    "lifetimeMax": 5.0,
+    "spread": 0.3,
+    "speedMin": 0.5,
+    "speedMax": 1.2,
     "gravity": [
      0.0,
      0.0,
      0.0
     ],
     "drag": 0.35,
-    "sizeStart": 0.3,
-    "sizeEnd": 1.5,
+    "sizeStart": 0.22,
+    "sizeEnd": 0.9,
     "colorStart": [
      1.0,
      0.68669,
      0.87137,
-     0.6
+     0.32
     ],
     "colorEnd": [
      1.0,
@@ -5614,9 +5614,9 @@
     "seed": 37577,
     "shape": "sphere",
     "position": [
-     -174.861,
+     -104.853,
      0.5,
-     -148.641
+     -82.738
     ],
     "extent": [
      0.6,
@@ -5624,11 +5624,11 @@
      0.6
     ],
     "direction": [
-     0.996,
+     0.9965,
      0.5,
-     0.0894
+     0.083
     ],
-    "spawnRate": 45.0,
+    "spawnRate": 30.0,
     "lifetimeMin": 0.6,
     "lifetimeMax": 1.1,
     "spread": 0.55,
@@ -5646,7 +5646,7 @@
      1.0,
      0.68669,
      0.87137,
-     0.85
+     0.7
     ],
     "colorEnd": [
      1.0,

@@ -263,21 +263,21 @@ PALETTES = {
                    cshade="#5a3486", clit="#ff9c86", crim="#ffe0c0", isle="#6a4a96",
                    dback="#1d1448", dbelly="#7a58a8", drim="#ffc8a8",
                    land="#4e3488", land2="#2c1d5c", rock="#8a4e8e", sand="#f0a6a0", leaf="#3a2a78", trunk="#3a2266",
-                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0", land3="#c27aa8", pearl="#f4ece8", glaze="#1c1a4a", deck="#e8c8b8", hshade="#a99ac8"),
+                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0", land3="#c27aa8", pearl="#f4ece8", glaze="#1c1a4a", deck="#d9cdd8", hshade="#a99ac8"),
     # golden afternoon: turquoise and teal water, cream foam, coral sun, soft blue sky, warm green island
     "afternoon": dict(zenith="#2b68cc", mid="#7fb4ec", warm="#ffe0ac", cool="#bfe2f4", sun="#fffbe8", glow="#ffc884",
                       deep="#0a5a80", rzen="#2c78bc", rhor="#a8dcea", sss="#2fe6c8", glint="#fffbe8", foam="#fff4dc",
                       cshade="#90a8d8", clit="#fff5e6", crim="#fffbf0", isle="#7e9cc4",
                       dback="#284a7c", dbelly="#d0e2f0", drim="#fff4dc",
                       land="#45a85c", land2="#1f6e62", rock="#c88a5c", sand="#f6e2b4", leaf="#2f9a52", trunk="#8a5a3c",
-                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#fff4d6", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e6d6b8", hshade="#a8bccc"),
+                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#fff4d6", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc"),
     # electric blue: ultramarine and cyan water, mint surf, saturated blue sky, yellow-coral accents, navy land
     "electric": dict(zenith="#0a2a9c", mid="#2c6ae4", warm="#8ff0ff", cool="#4a8cf0", sun="#fff7a8", glow="#ffd84a",
                      deep="#06186a", rzen="#0e40b6", rhor="#62d4ff", sss="#3cf4ff", glint="#ffffe0", foam="#c8fff0",
                      cshade="#2448b0", clit="#c4ecff", crim="#fff6c0", isle="#2244a0",
                      dback="#0a1a56", dbelly="#4a80d8", drim="#fff7b0",
                      land="#14266a", land2="#0a1446", rock="#2a4aa0", sand="#4a76d0", leaf="#0e1c5a", trunk="#0c1650",
-                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#fffad0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#c8d8f0", hshade="#7f9ad8"),
+                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#fffad0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8"),
     # the night end (CC 1): bioluminescent
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
                      deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
@@ -291,7 +291,7 @@ PALETTES = {
                      cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68",
                      dback="#140f33", dbelly="#4a3a78", drim="#ffc3a8",
                      land="#3f2a68", land2="#24184a", rock="#5a3a7a", sand="#c08aa0", leaf="#2a1f52", trunk="#2a1f4a",
-                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d8b8c0", hshade="#8a7aa8"),
+                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d6c8d2", hshade="#8a7aa8"),
 }
 PALETTE = "violet"
 DEBUG_SKY = None
@@ -965,7 +965,7 @@ BOAT_DESIGNS = {"A": motor_yacht, "B": speedboat, "C": sloop}
 BOAT_KIND = "A"
 # the boat crosses the view left to right on a straight course 130 m out, at a cruising pace; the course runs well past
 # both edges of the frame, so the LFO saw's wrap (back to the start) happens out of sight
-BOAT_COURSE = ((-190.0, -150.0), (200.0, -115.0))
+BOAT_COURSE = ((-120.0, -84.0), (120.0, -64.0))
 BOAT_SPEED = {"A": 3.2, "B": 9.0, "C": 2.6}
 BOAT_PARTS = [("boatHull", "hull", "pearl"), ("boatDeck", "deck", "deck"), ("boatGlaze", "glaze", "glaze"),
               ("boatSail", "sail", "pearl")]
@@ -1008,13 +1008,13 @@ def boat(s):
     stern = (x0 + d[0] * 0.5, 0.15, z0 + d[2] * 0.5)
     bow = (x0 + d[0] * (hl - 0.8), 0.5, z0 + d[2] * (hl - 0.8))
     for name, at, cap_, rate, life, spd, spread, size, dirn in (
-            ("wake", stern, 900, WAKE_RATE, (4.0, 6.5), (0.4, 1.1), 0.22, (0.3, 1.5), (-d[0], 0.0, -d[2])),
+            ("wake", stern, 700, WAKE_RATE, (3.0, 5.0), (0.5, 1.2), 0.3, (0.22, 0.9), (-d[0], 0.0, -d[2])),
             ("bowWave", bow, 300, BOW_RATE, (0.6, 1.1), (1.2, 2.4), 0.55, (0.12, 0.05), (d[0], 0.5, d[2]))):
         s.particles(name, capacity=cap_, seed=zlib_seed(name), shape="sphere", position=[round(c, 3) for c in at],
                     extent=[0.6, 0.05, 0.6], direction=[round(c, 4) for c in dirn], spawnRate=rate,
                     lifetimeMin=life[0], lifetimeMax=life[1], spread=spread, speedMin=spd[0], speedMax=spd[1],
                     gravity=[0.0, -9.8 if name == "bowWave" else 0.0, 0.0], drag=0.35, sizeStart=size[0],
-                    sizeEnd=size[1], colorStart=pal(PALETTE, "foam") + [0.6 if name == "wake" else 0.85],
+                    sizeEnd=size[1], colorStart=pal(PALETTE, "foam") + [0.32 if name == "wake" else 0.7],
                     colorEnd=pal(PALETTE, "foam") + [0.0], emissive=0.8, blend="additive", turbulence=0.15,
                     turbulenceScale=0.3)
         s.route(R("lfo.boat", "particles/%s/position" % name, round(d[0] * (length - hl), 3), comp=0),
@@ -1022,8 +1022,8 @@ def boat(s):
 
 
 BOAT_ROLL = 0.06
-WAKE_RATE = 55.0
-BOW_RATE = 45.0
+WAKE_RATE = 40.0
+BOW_RATE = 30.0
 
 
 def illus_program():
