@@ -33,6 +33,10 @@ struct ExampleInfo {
     std::string category;
     std::filesystem::path file; // absolute path of the project or scene file
     bool live = false;          // `"live": true`: listed under Examples > Live, else Examples > Offline
+    // `"hidden": true` (ADR-1343): kept in the repository and in every index test, but not offered to the user -- not
+    // in File > Examples, not in the Live panel's Scene list. For a scene the owner cut from the menu that still
+    // carries test or engine coverage (e.g. the only authored use of an effect type).
+    bool hidden = false;
     // What the entry cannot open without, read from the project when the index loads: the project or scene file
     // itself and the scene file a project names. Absolute.
     std::vector<std::filesystem::path> required;
@@ -68,7 +72,7 @@ struct ExampleSection {
     std::vector<std::size_t> entries;
 };
 
-// The headings of one menu: the examples whose `live` equals `live`, grouped by category. Categories come in the
+// The headings of one menu: the examples whose `live` equals `live` and that are not hidden, grouped by category. Categories come in the
 // order each first appears in the index and a category that recurs later joins its first heading, so a menu never
 // shows the same heading twice.
 [[nodiscard]] std::vector<ExampleSection> exampleSections(const std::vector<ExampleInfo>& examples, bool live);

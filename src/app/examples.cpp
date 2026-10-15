@@ -141,6 +141,10 @@ Result<std::vector<ExampleInfo>> loadExampleIndex(const std::filesystem::path& i
             return fail("examples index: '{}': 'live' must be true or false", info.name);
         }
         info.live = e.value("live", false);
+        if (e.contains("hidden") && !e["hidden"].is_boolean()) {
+            return fail("examples index: '{}': 'hidden' must be true or false", info.name);
+        }
+        info.hidden = e.value("hidden", false);
         // Three kinds of entry, opened the same way: `Application::openAny` sniffs a recipe from a
         // project by content, so the key is documentation rather than routing. A recipe says so
         // rather than calling itself a project, since what it opens is a world that gets generated.
@@ -168,7 +172,7 @@ Result<std::vector<ExampleInfo>> loadExampleIndex(const std::filesystem::path& i
 std::vector<ExampleSection> exampleSections(const std::vector<ExampleInfo>& examples, bool live) {
     std::vector<ExampleSection> sections;
     for (std::size_t i = 0; i < examples.size(); ++i) {
-        if (examples[i].live != live) {
+        if (examples[i].live != live || examples[i].hidden) {
             continue;
         }
         auto it = std::find_if(sections.begin(), sections.end(),

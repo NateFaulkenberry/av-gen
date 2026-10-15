@@ -31,7 +31,7 @@ class ParameterSet;
 
 namespace avgen::app {
 
-// Every live example (`"live": true`), Sonic Live first, then in the index's order.
+// Every live example (`"live": true`) the menu offers (not `"hidden"`, ADR-1343), Sonic Live first, then index order.
 [[nodiscard]] std::vector<ExampleInfo> liveSceneList(const std::vector<ExampleInfo>& examples);
 // The list's index of `project` (compared as absolute, normal paths), or -1.
 [[nodiscard]] int liveSceneIndex(const std::vector<ExampleInfo>& list, const std::filesystem::path& project);

@@ -202,3 +202,58 @@ TEST_CASE("An example's song under ~ is looked for in the home folder", "[exampl
     CHECK((*all)[0].audio == (std::filesystem::path(home) / "x" / "song.wav").lexically_normal());
     std::filesystem::remove_all(dir);
 }
+
+// ADR-1343: a hidden entry stays in the index (and in every index test, which still loads it) but is offered nowhere:
+// not in File > Examples, not in the Live panel's Scene list.
+TEST_CASE("A hidden example is in the index but in no menu", "[examples][live][adr1343]") {
+    auto shown = example("Shown", "Sonic VFX", true);
+    auto hidden = example("Hidden", "Sonic VFX", true);
+    hidden.hidden = true;
+    auto offline = example("Offline hidden", "Lab", false);
+    offline.hidden = true;
+    const std::vector<app::ExampleInfo> all{shown, hidden, offline};
+    const auto live = app::exampleSections(all, true);
+    REQUIRE(live.size() == 1);
+    CHECK(names(all, live[0]) == std::vector<std::string>{"Shown"});
+    CHECK(app::exampleSections(all, false).empty());
+    const auto scenes = app::liveSceneList(all);
+    REQUIRE(scenes.size() == 1);
+    CHECK(scenes[0].name == "Shown");
+
+    const auto dir = std::filesystem::temp_directory_path() / "avgen_example_hidden_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "index.json") << R"({"examples":[{"name":"A","category":"C","description":"d","project":"a.json","hidden":"yes"}]})";
+    CHECK_FALSE(app::loadExampleIndex(dir / "index.json").has_value());
+    std::ofstream(dir / "index.json") << R"({"examples":[{"name":"A","category":"C","description":"d","project":"a.json","hidden":true}]})";
+    const auto ok = app::loadExampleIndex(dir / "index.json");
+    REQUIRE(ok.has_value());
+    CHECK((*ok)[0].hidden);
+    std::filesystem::remove_all(dir);
+}
+
+// The owner's cut (2026-10-14): the Sonic VFX family offers exactly these six; the other ten are hidden, not deleted.
+TEST_CASE("The real index offers six Sonic VFX scenes", "[examples][live][adr1343]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const auto all = app::loadExampleIndex(std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "index.json");
+    REQUIRE(all.has_value());
+    std::set<std::string> offered;
+    std::size_t hiddenVfx = 0;
+    for (const auto& e : *all) {
+        if (e.category != "Sonic VFX") {
+            continue;
+        }
+        if (e.hidden) {
+            ++hiddenVfx;
+        } else {
+            offered.insert(e.name);
+        }
+    }
+    CHECK(offered == std::set<std::string>{"Sonic VFX - Cymatic Plate", "Sonic VFX - Feedback Mirror",
+                                           "Sonic VFX - Datascape", "Sonic VFX - Ember Forest",
+                                           "Sonic VFX - The Corrupted Cathedral", "Sonic VFX - Event Horizon"});
+    CHECK(hiddenVfx == 10);
+#endif
+}

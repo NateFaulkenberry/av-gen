@@ -82,35 +82,40 @@
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A salt flat at dusk; chords paint the sky, melodies fall as meteors. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Salt Flat Mirage",
-      "project": "sonic-vfx/salt-flat-mirage.json"
+      "project": "sonic-vfx/salt-flat-mirage.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note releases a paper lantern from a still lake. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Lantern Lake",
-      "project": "sonic-vfx/lantern-lake.json"
+      "project": "sonic-vfx/lantern-lake.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Chords hang aurora curtains, hats glitter as diamond dust, the snare cracks the ice. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Aurora Tundra",
-      "project": "sonic-vfx/aurora-tundra.json"
+      "project": "sonic-vfx/aurora-tundra.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. A colossal fungal organism breathes with the bass. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - The Breathing Deep",
-      "project": "sonic-vfx/breathing-deep.json"
+      "project": "sonic-vfx/breathing-deep.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Deep-sea siphonophores pulse with the melody. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Abyssal Bloom",
-      "project": "sonic-vfx/abyssal-bloom.json"
+      "project": "sonic-vfx/abyssal-bloom.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
@@ -124,14 +129,16 @@
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Silk ribbons draw the melody; the kick cracks them like whips. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Silk Theatre",
-      "project": "sonic-vfx/silk-theatre.json"
+      "project": "sonic-vfx/silk-theatre.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Each note pulls a spike from a magnetic liquid. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Ferrofluid Crown",
-      "project": "sonic-vfx/ferrofluid-crown.json"
+      "project": "sonic-vfx/ferrofluid-crown.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
@@ -145,7 +152,8 @@
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Twelve Tesla towers, one per pitch class, draw every chord in lightning. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Tesla Choir",
-      "project": "sonic-vfx/tesla-choir.json"
+      "project": "sonic-vfx/tesla-choir.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
@@ -173,14 +181,16 @@
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. The bass winds a supercell's funnel, the snare strikes. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Storm Cell",
-      "project": "sonic-vfx/storm-cell.json"
+      "project": "sonic-vfx/storm-cell.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. Chords ignite newborn stars coloured by pitch. Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic VFX set.",
       "live": true,
       "name": "Sonic VFX - Stellar Nursery",
-      "project": "sonic-vfx/stellar-nursery.json"
+      "project": "sonic-vfx/stellar-nursery.json",
+      "hidden": true
     },
     {
       "category": "Sonic VFX",

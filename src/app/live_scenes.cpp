@@ -25,12 +25,12 @@ bool ratio(std::size_t i) {
 std::vector<ExampleInfo> liveSceneList(const std::vector<ExampleInfo>& examples) {
     std::vector<ExampleInfo> out;
     for (const ExampleInfo& e : examples) {
-        if (e.live && e.name == "Sonic Live") {
+        if (e.live && !e.hidden && e.name == "Sonic Live") {
             out.push_back(e);
         }
     }
     for (const ExampleInfo& e : examples) {
-        if (e.live && e.name != "Sonic Live") {
+        if (e.live && !e.hidden && e.name != "Sonic Live") {
             out.push_back(e);
         }
     }
