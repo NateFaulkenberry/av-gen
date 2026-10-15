@@ -724,6 +724,9 @@ black trunks, the melody one ember dancing through the smoke.
   - The bass stirs the smoke's structure, never its density: a density route drowned the trunks.
   - The coal seams are broken into live lengths and dead ones (an unbroken contour read as a map's line), and the
     sustained glow lifts the sky again: ADR-1070 made a slow sky route cheap live.
+- **Art pass 2026-10** (`ART-PASS-2026-10-ember-forest.md`): "the night after the burn". A cold night against hot
+  points of fire: Quaternius dead pines, scanned logs and stumps burning from inside, ragged coal beds, a broken fire
+  front on the far ridge, embers on the wind and ash falling.
 
 ### 14. Lantern Lake (atmospheric, warm)
 
