@@ -119,6 +119,9 @@ target.
 - The kick flashes the photon ring and pulses the jets, and sends a shock ring out from the hole (ADR-1065's
   `post/shock`, centred on the hole's projected position).
 - No fog; the cost is the lens, in the scene pass.
+- **Art pass 2026-10** (`ART-PASS-2026-10-event-horizon.md`): "Gargantua feeding". A tidal disruption: a blue-white
+  star stretched on its orbit bleeds a plasma stream into a Doppler-beamed disk; there is scanned wreckage, jets, and
+  the stars of the whole sky (ADR-1350).
 
 ### 2. The Breathing Deep (organic)
 

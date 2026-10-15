@@ -3222,7 +3222,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // Effect Library Wave 2: the Stars effect's field. All zero with no live instance, which the
     // background pass reads as "draw your own fixed field", so the frame is unchanged.
     if (const world::StarField& stars = scene.stars; stars.on) {
-        frame.starsA = glm::vec4(1.0f, stars.density, stars.brightness * stars.envelope, stars.magnitudeSlope);
+        // x is the mode: 1 = on, 2 = on over the whole sphere (ADR-1350)
+        frame.starsA = glm::vec4(stars.wholeSky ? 2.0f : 1.0f, stars.density, stars.brightness * stars.envelope,
+                                 stars.magnitudeSlope);
         frame.starsB = glm::vec4(stars.colorSpread, stars.twinkle, stars.twinkleRate, stars.horizonFade);
         frame.starsC = glm::vec4(stars.band, stars.bandTilt, stars.daylight, stars.seconds);
     } else {
