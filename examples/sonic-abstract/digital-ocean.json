@@ -9363,7 +9363,7 @@
   {
    "source": "control.detail",
    "target": "material/doSea/op/13/mix/value",
-   "amount": 0.13,
+   "amount": 0.09,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -9374,7 +9374,7 @@
   {
    "source": "control.detail",
    "target": "material/doSea/op/6/gradient/constant",
-   "amount": -0.065,
+   "amount": -0.045,
    "op": "add",
    "polarity": "unipolar",
    "component": 3,
@@ -9530,7 +9530,7 @@
   {
    "source": "control.detail",
    "target": "material/doSeaFar/op/13/mix/value",
-   "amount": 0.13,
+   "amount": 0.09,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -9541,7 +9541,7 @@
   {
    "source": "control.detail",
    "target": "material/doSeaFar/op/6/gradient/constant",
-   "amount": -0.065,
+   "amount": -0.045,
    "op": "add",
    "polarity": "unipolar",
    "component": 3,
@@ -9557,7 +9557,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 0.8,
+    "gain": 0.5,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
@@ -9566,7 +9566,7 @@
   {
    "source": "control.highlights",
    "target": "material/doSea/op/25/smoothstep/constant",
-   "amount": -0.05,
+   "amount": -0.02,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9578,7 +9578,7 @@
   {
    "source": "control.highlights",
    "target": "material/doSea/op/25/smoothstep/constant",
-   "amount": -0.05,
+   "amount": -0.02,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -9603,7 +9603,7 @@
   {
    "source": "control.foam",
    "target": "material/doSea/op/32/smoothstep/constant",
-   "amount": -0.06,
+   "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9615,7 +9615,7 @@
   {
    "source": "control.foam",
    "target": "material/doSea/op/32/smoothstep/constant",
-   "amount": -0.06,
+   "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -9631,10 +9631,98 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 0.3,
+    "gain": 0.2,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
+   }
+  },
+  {
+   "source": "control.padWave",
+   "target": "material/doSea/op/32/smoothstep/constant",
+   "amount": -0.025,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 12000,
+    "envelopeFallPerSecond": 0.15
+   }
+  },
+  {
+   "source": "control.padWave",
+   "target": "material/doSea/op/32/smoothstep/constant",
+   "amount": -0.025,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 12000,
+    "envelopeFallPerSecond": 0.15
+   }
+  },
+  {
+   "source": "control.padWave",
+   "target": "material/doSea/op/28/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.4,
+    "offset": 1.0,
+    "envelope": "peakhold",
+    "envelopeHoldMs": 12000,
+    "envelopeFallPerSecond": 0.15
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "material/doSea/op/22/smoothstep/constant",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "material/doSea/op/22/smoothstep/constant",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "material/doSeaFar/op/22/smoothstep/constant",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 4500
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "material/doSeaFar/op/22/smoothstep/constant",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 1800,
+    "decayMs": 4500
    }
   },
   {
@@ -9666,7 +9754,7 @@
   {
    "source": "control.energy",
    "target": "material/doSea/op/32/smoothstep/constant",
-   "amount": -0.04,
+   "amount": -0.02,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9678,7 +9766,7 @@
   {
    "source": "control.energy",
    "target": "material/doSea/op/32/smoothstep/constant",
-   "amount": -0.04,
+   "amount": -0.02,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,

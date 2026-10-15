@@ -177,9 +177,9 @@
     "amplitude": 1.0,
     "wavelength": 30.0,
     "waveSpeed": 13.0,
-    "waveWidth": 10.0,
+    "waveWidth": 6.0,
     "waveOrigin": 0.0,
-    "strength": 3.4545,
+    "strength": 4.1818,
     "trigger": {
      "source": "signal",
      "name": "control.padWave",
@@ -8100,8 +8100,8 @@
      "dst": 4,
      "srcA": 3,
      "constant": [
-      0.185,
-      0.325,
+      0.215,
+      0.355,
       0.0,
       0.0
      ]
@@ -8511,8 +8511,8 @@
      "dst": 4,
      "srcA": 3,
      "constant": [
-      0.185,
-      0.325,
+      0.215,
+      0.355,
       0.0,
       0.0
      ]

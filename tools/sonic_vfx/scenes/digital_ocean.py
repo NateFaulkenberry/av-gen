@@ -584,7 +584,7 @@ W_STREAK = 0.3          # the detail is stretched along x (across the view): win
 W_DETAIL = 0.07         # its share of t
 W_AA_FP, W_AA_MIN = 0.6, 0.35   # g falls linearly from 1 (sharp pixels) to W_AA_MIN at a footprint of W_AA_FP m
 W_SOFT = 0.07           # band edge half-width in centred t (the band contrast: smaller is crisper)
-W_E1, W_E2, W_E3 = -0.16, 0.05, 0.22   # the band thresholds in centred t
+W_E1, W_E2, W_E3 = -0.16, 0.05, 0.25   # the band thresholds in centred t
 W_S0, W_S1, W_SW = 0.14, 0.2, 0.02     # the stroke band (centred t) and its edge width
 W_HL = 1.1
 W_FOAM_CREST = 0.5      # foam = mix(noise, t g, this): how much the crest decides
@@ -1812,7 +1812,7 @@ def audio_fields(s):
     wave_origin = [round(-ax[0] * HERO_WAVE_FROM, 3), 0.0, round(-ax[2] * HERO_WAVE_FROM, 3)]
     s.nodes.append({"name": "heroWave", "kind": "field", "position": wave_origin, "field": dict(
         common, kind="wave", waveShape="pulse", amplitude=1.0, wavelength=30.0, waveSpeed=HERO_WAVE_SPEED,
-        waveWidth=10.0, waveOrigin=0.0, strength=round(HERO_WAVE_HEIGHT / KICK_LIFT, 4),
+        waveWidth=HERO_WAVE_WIDTH, waveOrigin=0.0, strength=round(HERO_WAVE_HEIGHT / KICK_LIFT, 4),
         trigger={"source": "signal", "name": HERO_WAVE_TRIGGER, "threshold": 0.3})})
     s.nodes.append({"name": "lift", "kind": "field", "position": [0, 0, 0], "field": {
         "kind": "compound", "combine": "add", "children": ["kickFront", "heroWave"], "strength": 1.0}})
@@ -2033,7 +2033,7 @@ def midi(s, progs, sea, seafar, sky, cp=None):
     # foam is a crest cap whatever the sea's height: a taller sea (waves) raises the cut as much as energy lowers it,
     # so energy makes the caps livelier and brighter, never a slab (Pass 3, Pass C)
     FM = "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"]
-    s.route(R("control.energy", FM, -0.04, comp=0, **CC), R("control.energy", FM, -0.04, comp=1, **CC),
+    s.route(R("control.energy", FM, -0.02, comp=0, **CC), R("control.energy", FM, -0.02, comp=1, **CC),
             R("control.waves", FM, 0.07, comp=0, **CC), R("control.waves", FM, 0.07, comp=1, **CC),
             R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
     for prog, key, g in ((sky, "ray", 1.0), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
@@ -2101,19 +2101,29 @@ def water_controls(s, sea, seafar):
                 s.route(R(src, M % (prog.name, prog[band], "smoothstep"), amt, comp=0, **CC),
                         R(src, M % (prog.name, prog[band], "smoothstep"), -amt, comp=1, **CC))
         # DETAIL: the noise's share of t (0.07 -> 0.2), its mean shift taken back out of the height term
-        s.route(R("control.detail", "material/%s/op/%d/mix/value" % (prog.name, prog["detail"]), 0.13, **CC),
-                R("control.detail", M % (prog.name, prog["crest"], "gradient"), -0.065, comp=3, **CC))
+        s.route(R("control.detail", "material/%s/op/%d/mix/value" % (prog.name, prog["detail"]), 0.09, **CC),
+                R("control.detail", M % (prog.name, prog["crest"], "gradient"), -0.045, comp=3, **CC))
     # HIGHLIGHTS: brighter (x1.8) and wider (the stroke band opens downward); hats flash them
     C = "material/%s/op/%d/constant/constant"
-    s.route(R("control.highlights", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC),
-            R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.05, comp=0, **CC),
-            R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.05, comp=1, **CC),
+    s.route(R("control.highlights", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.5, offset=1.0, **CC),
+            R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.02, comp=0, **CC),
+            R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.02, comp=1, **CC),
             R("hatEnv", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0,
               decayMs=250))
     # FOAM: the cut drops (more caps) and the foam brightens
     FM = M % (sea.name, sea["foamMask"], "smoothstep")
-    s.route(R("control.foam", FM, -0.06, comp=0, **CC), R("control.foam", FM, -0.06, comp=1, **CC),
-            R("control.foam", C % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.3, offset=1.0, **CC))
+    s.route(R("control.foam", FM, -0.03, comp=0, **CC), R("control.foam", FM, -0.03, comp=1, **CC),
+            R("control.foam", C % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.2, offset=1.0, **CC))
+    # THE HERO WAVE foams: while it rolls in (pad 37, ~18 s) the foam cut drops, so its crest -- the tallest thing
+    # on the water -- carries a white line, and its strokes brighten (Pass F)
+    hero = {"envelope": "peakhold", "envelopeHoldMs": 12000, "envelopeFallPerSecond": 0.15}
+    s.route(R("control.padWave", FM, -0.025, comp=0, **hero), R("control.padWave", FM, -0.025, comp=1, **hero),
+            R("control.padWave", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.4, offset=1.0, **hero))
+    # loud music raises the swell; the crest accent narrows to keep the near wave from paling over (Pass F)
+    for prog in (sea, seafar):
+        for c in (0, 1):
+            s.route(R("level", M % (prog.name, prog["band3"], "smoothstep"), 0.06, comp=c, attackMs=1800,
+                      decayMs=4500))
 
 
 SPEED_MAX = 2.5         # the speed control's full rate (x the authored pace)
@@ -2150,7 +2160,8 @@ def score_midi(s, score):
 
 HERO_WAVE_FROM = 240.0      # metres out the hero wave rises
 HERO_WAVE_SPEED = 13.0      # m/s: about 18 s to your feet
-HERO_WAVE_HEIGHT = 1.9      # metres (2.6 saturated the crest light into a slab as it arrived)
+HERO_WAVE_HEIGHT = 2.3      # metres (2.6 saturated Pass 2's crest light into a slab as it arrived)
+HERO_WAVE_WIDTH = 6.0       # metres: narrower than Pass 2's 10, so its faces turn and the anime water draws a face
 
 
 SUN_RADIUS_DEG = 1.7

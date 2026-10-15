@@ -605,3 +605,35 @@ material program on the displaced sea mesh: no new renderer, no new pass.*
   and longer, wider rings, so the entry splash reads at 60-100 m.
 - The hull's contact: the yacht rides the swell routes too (Pass D), so it no longer sinks or floats when waves
   or energy change.
+
+### Pass F: critique
+
+Real frames at 1080p: silent violet, electric, night, quiet music (Glowmere Valley at 8 s), Trench 77 s, Feline
+Footwear 95 s, the peak (Trench with waves, energy and rays at full), every water control at full, the hero wave
+(pad 37) from 0-14 s, and a 16-22 s clip for flicker. The far band's temporal second difference (each frame against
+the mean of its neighbours) averages 1.0 grey level, at most 1.3, so the far glitter does not flicker.
+
+The three worst defects, fixed and recaptured (`passF-critique-before-after.png`, `passF-herowave-*`,
+`passF-conditions-after.png`):
+
+1. **The hero wave read as a mottled pink patch, not a wave** (Pass 2 handed over "a thin dark line"). It was a
+   10 m-wide 1.9 m pulse, a mound whose faces barely turn, so only the height term lit it, broken by the detail
+   noise. Now it is 6 m wide and 2.3 m tall, so its faces turn and the bands draw a face. While it rolls in (pad 37,
+   a 12 s peak-hold envelope) the foam cut drops slightly, enough for its crest, the tallest thing on the water,
+   to carry a broken white line from about 110 m in. A first try dropped the cut by 0.07, which foamed every near
+   crest pink; 0.025 foams only the hero.
+2. **Every water control at full turned the foreground into white camouflage.** The controls stacked:
+   - energy's and foam's foam cuts (-0.04 each);
+   - highlights at 1.8x and wider;
+   - detail at 0.2.
+
+   They now top out at -0.02 and -0.03, 1.5x and -0.02, and 0.16. With everything at full the sea reads as choppy
+   glitter with crest strokes, busy but still water.
+3. **Under loud music the nearest wave paled into a wide crest-accent band** (Feline Footwear, Trench). The accent
+   now starts higher (0.25 in centred t, was 0.22), and the music's level raises its edge by 0.06 as it raises the
+   swell, so a taller sea keeps a thin accent.
+
+Seen and left: at intermediate mood positions under quiet music the water drifts grey-lavender, because two
+palettes are half-blended and the horizon blend's two colours meet. It is the same family as Pass 2's pale-sky
+note. The near long-swell crest at 6-8 s, without the hero, is a large lit band broken by the detail noise. It is
+legible, but busier than the rest.
