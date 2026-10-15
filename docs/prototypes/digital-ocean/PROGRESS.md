@@ -520,3 +520,22 @@ material program on the displaced sea mesh: no new renderer, no new pass.*
   as a few large crescents, now jittered by the detail noise into a broken path of sparks; foam too common.
   Draft 2 also frees ops: the gain is one clamped remap, the detail one `mix`, and `t` is centred by the gradients'
   offsets (45 ops near, 35 far, of 48).
+
+### Pass B: base geometry and colour bands
+
+- `passB-bands-and-palettes.png` (1080p, 20 s, silent): the bands alone (no strokes, no foam), a crisper band
+  contrast, and the full water in the three palettes and at night. `passB-draft3-bands.png` is the step before.
+- Draft 2 (Pass A's commit) washed the near sea out: the Fresnel horizon blend at power 4 reached 20 % even at 40 m,
+  so every band sank into one lavender. At power 7 it only takes the distance, and still joins the near and far
+  programs without a seam.
+- The bands were too faint for the swell to read: `t`'s height span is now 2.4 m (was 3.2), so the long swell's
+  troughs reach the deep band and its crests the crest accent. The deep band starts lower (-0.16) and the violet
+  deep is lifted (#1c1656), because in the bands-only frame the troughs read as dark oily lines.
+- The sun path: draft 1's glints were a few big crescents (the smooth Gerstner normals reflect the sun in a handful
+  of places). The reflection test now mixes in 6.5 % of the detail noise, which breaks the path into sparks.
+  At 12 % the near sparks were 50 px amoebas, so the detail noise is also stretched 3.3x along x (across the view):
+  the sparks and foam become horizontal strokes, the anime sun path.
+- Palettes: the water keys are `deep`, `wmain`, `sss` (lit faces), `wcrest`, `hl` (strokes), `foam`, `glint`, `rhor`
+  (horizon), in each of violet, afternoon (turquoise/cobalt), electric (deep electric blue), midnight and twilight.
+  `visual.mood` blends them as before (`palette_routes`), so the water follows the palette control and the music's
+  intensity smoothly.

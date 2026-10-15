@@ -264,7 +264,7 @@ PALETTES = {
     # ---- Pass 2: three coordinated families on one axis (dusk -> day -> electric), each designed as a whole
     # violet sunset: cobalt water with magenta-lavender crest light, peach rays, pink-orange clouds, dark violet land
     "violet": dict(zenith="#24185e", mid="#7b45a0", warm="#ffa27c", cool="#c070b0", sun="#fff0d8", glow="#ff7f66",
-                   deep="#150f46", rzen="#2c2f86", rhor="#d58cc0", sss="#7d4fc0", glint="#ffe2cc", foam="#ffd8f0",
+                   deep="#1c1656", rzen="#2c2f86", rhor="#d58cc0", sss="#7d4fc0", glint="#ffe2cc", foam="#ffd8f0",
                    cshade="#5a3486", clit="#ff9c86", crim="#ffe0c0", isle="#6a4a96",
                    dback="#1d1448", dbelly="#7a58a8", drim="#ffc8a8",
                    land="#4e3488", land2="#2c1d5c", rock="#8a4e8e", sand="#f0a6a0", leaf="#3a2a78", trunk="#3a2266",
@@ -512,6 +512,8 @@ def water_program(far=False):
     P.op("face", "gradient", 4, a=0, k=[-W_FACE * SH[0], W_FLAT, -W_FACE * SH[2], -W_FLAT], f=1.0)
     P.op("faceMix", "mix", 3, a=3, b=4, f=W_FACE_MIX)
     P.op(None, "input", 6, inp="localPosition")
+    P.op("stretch", "constant", 4, k=[W_STREAK, 1.0, 1.0, 1.0])                          # wind streaks along x
+    P.op(None, "multiply", 6, a=6, b=4)
     P.op("detailNoise", "noise", 6, a=6, f=W_DETAIL_FREQ, k=[0.0, 0.0, 0.0], seed=19)
     P.op("detail", "mix", 3, a=3, b=6, f=W_DETAIL)                                       # t (1 - D) + noise D
     P.op("contrast", "multiply", 3, a=3, b=2)                                            # t g
@@ -553,21 +555,22 @@ def water_program(far=False):
 
 
 # the anime water's look (each a parameter of the op it sits in, so routes and MIDI reach them)
-W_HEIGHT = 3.2          # metres of height over which t runs from trough to crest (the `crest` op)
+W_HEIGHT = 2.4          # metres of height over which t runs from trough to crest (the `crest` op)
 W_FACE, W_FLAT = 0.9, 0.25   # weight of the face's orientation / of flatness in the `face` term
 W_FACE_MIX = 0.35       # how much of t is orientation (the rest is height)
-W_DETAIL_FREQ = 0.32    # the surface detail's scale (1/m)
+W_DETAIL_FREQ = 0.5     # the surface detail's scale (1/m) across the view (z); along x it is W_STREAK of it
+W_STREAK = 0.3          # the detail is stretched along x (across the view): wind streaks, not blotches
 W_DETAIL = 0.07         # its share of t
 W_AA_FP, W_AA_MIN = 0.6, 0.35   # g falls linearly from 1 (sharp pixels) to W_AA_MIN at a footprint of W_AA_FP m
 W_SOFT = 0.07           # band edge half-width in centred t (the band contrast: smaller is crisper)
-W_E1, W_E2, W_E3 = -0.12, 0.05, 0.22   # the band thresholds in centred t
+W_E1, W_E2, W_E3 = -0.16, 0.05, 0.22   # the band thresholds in centred t
 W_S0, W_S1, W_SW = 0.14, 0.2, 0.02     # the stroke band (centred t) and its edge width
 W_HL = 1.1
 W_FOAM_CREST = 0.6      # foam = mix(noise, t g, this): how much the crest decides
 W_FOAM_CUT, W_FOAM_SOFT = 0.35, 0.03
 W_FOAM_GAIN = 0.95
-W_GLINT_JIT = 0.12      # the detail's share in the glint test: breaks the path into sparks
-W_FRES_POWER = 4.0
+W_GLINT_JIT = 0.065     # the detail's share in the glint test: breaks the path into sparks
+W_FRES_POWER = 7.0
 W_HORIZON = 1.0
 WATER = "anime"         # "anime" (Pass 3) or "pass2"
 
