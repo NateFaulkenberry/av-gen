@@ -927,14 +927,14 @@ class Scene:
         sonic = {"live": True, "character": character}
         if self.response:
             sonic["response"] = self.response
-        sources = []
+        # the scene's own sources first (lfo, envelope, timeline): an interpret mapping may read them
+        sources = list(self.sources)
         if self.mappings:
             sources.append({"kind": "interpret", "name": "scene", "settings": {"mappings": self.mappings}})
         if self.mappings2:
             sources.append({"kind": "interpret", "name": "scene2", "settings": {"mappings": self.mappings2}})
         if self.mappings3:
             sources.append({"kind": "interpret", "name": "scene3", "settings": {"mappings": self.mappings3}})
-        sources.extend(self.sources)
         params = dict(BASE_PARAMS)
         params.update(self.params)
         doc = {"format": "avgen-project", "version": 4, "app": {"name": "Sonic VFX"},

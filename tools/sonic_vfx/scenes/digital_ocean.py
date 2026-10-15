@@ -13,7 +13,7 @@ import os
 
 from .. import kit
 from .. import meshes as mx
-from ..kit import R, hexrgb
+from ..kit import R, M, hexrgb
 
 ID = "digital-ocean"
 TITLE = "Digital Ocean"
@@ -22,70 +22,75 @@ MESH_DIR = os.path.join(kit.ABSTRACT_DIR, "meshes")
 
 DESIGN = {
     "category": "digital seascape",
-    "thesis": "The Tidewriter: a stylized ocean at electric twilight where the music is written into the sea. The "
-              "bass's last fifteen seconds roll in as swell, every kick sends a lifted front in from the horizon, "
-              "highs glint on the sun's path, held sound swells the sun's halo; dolphins leap across the sun's "
-              "reflection, and a performer can raise a hero wave, fire a leap, bloom the crests or let night fall.",
+    "thesis": "The Tidewriter, illustrated: an anime-background ocean world at sunset -- a low island of cut-paper "
+              "palms, a sport motor yacht cruising past with its wake, dolphins leaping across the sun's path, "
+              "painted cumulus banks and drifting sun rays. Colour is the instrument: the music moves the whole world "
+              "between violet sunset, golden afternoon and electric blue, while the bass writes its history into "
+              "the swell.",
     "composition": {
-        "background": "a violet-to-coral sky, twilight stratus lit coral round the sun, a hazy island on the left third",
-        "midground": "rows of Gerstner swell with cyan light through their backlit crests",
-        "foreground": "the near swell, its foam caps and the sun's broken path",
-        "focal": "the low cream sun on the right third and its column of glints",
-        "secondary": ["dolphins leaping across the sun's path", "the hero wave", "foam ribbons on the highest crests"],
-        "atmosphere": "distance flattens the far sea into colour and glitter; clouds haze into the sky",
+        "background": "a violet-to-coral sky, painted cumulus banks in two drifting layers, sun rays, far island strips",
+        "midground": "a low island strip with five cut-paper trees on the left third; the yacht crossing in front",
+        "foreground": "banded swell rolling in, crest light and foam, the sun's broken path",
+        "focal": "the low sun with its rays on the right third and its column of glints",
+        "secondary": ["the motor yacht and its V-wake", "dolphin leaps", "the island's silhouette"],
+        "atmosphere": "distance haze on land and clouds; the far sea flattens into colour and glitter",
         "post": "a little bloom on the sun and the glints",
-        "camera": "still: 12 m over the water, 45 mm, the horizon on the upper 40 %",
+        "camera": "still: 14 m over the water, 32 mm, the horizon at ~44 % from the top",
     },
-    "palette": {"dominant": "#0a0b35", "secondary": "#563a8a", "accent": "#18cfe0", "highlight": "#ffe2cc",
+    "palette": {"dominant": "#16206a", "secondary": "#7b45a0", "accent": "#f062c8", "highlight": "#fff0d8",
                 "background_value": "mid (a coral horizon under a violet sky)",
-                "saturation": "indigo and violet, one cyan accent, one warm light; night and golden hour are the "
-                              "palette's two related ends (CC 1, CC 7)"},
+                "saturation": "three coordinated palettes on one axis (violet sunset, golden afternoon, electric "
+                              "blue) plus a bioluminescent night end"},
     "motion": {
-        "very_slow": ["the cloud field turning round the viewer", "the swell growing with the piece"],
-        "medium": ["three Gerstner trains in three directions", "the bass's history rolling in as swell"],
-        "fast": ["kick fronts rolling in", "dolphin leaps", "the sun's halo breathing with held sound"],
+        "very_slow": ["the cloud banks turning round the viewer (two layers, parallax)", "the palette following the piece"],
+        "medium": ["three Gerstner trains", "the bass's history rolling in", "the yacht's crossing", "ray drift"],
+        "fast": ["kick fronts rolling in", "dolphin leaps", "ray flashes on kicks"],
         "extremely_fast": ["glints on the sun's path", "spray"],
     },
     "vocabulary": [
-        ["bass", "tide (spectrum field, the low band)", "TIDEWRITING: what the bass played rolls in as swell, "
-         "taking ~15 s from 400 m out to your feet"],
-        ["kick", "kickFront (onset field, low band) + response.kickEnv", "a lifted front rolls in from 70 m out; the "
-         "crest light and foam flash"],
-        ["level", "response.level", "the long swell grows with loudness (slowly)"],
-        ["intensity", "response.intensity", "STRUCTURE: the swell's crests sharpen as the piece builds"],
+        ["intensity (12 s)", "response.intensity -> visual.mood", "PALETTE: a build moves the world toward golden "
+         "afternoon and electric blue; a breakdown sinks it back to the violet sunset"],
+        ["bass", "tide (spectrum field) + response.bass", "TIDEWRITING: the bass's last ~15 s roll in as swell; the "
+         "water's body deepens and the crest light lifts"],
+        ["kick", "kickFront (onset field) + response.kickEnv", "a lifted front rolls in; crest light, foam and the "
+         "sun rays flash"],
+        ["level", "response.level", "the swell grows and the rays strengthen (slowly)"],
+        ["onsets", "response.onsetEnv", "the rays reach further for a moment"],
         ["mids", "audio.mid", "the wind sea roughens"],
         ["snare", "response.snare", "spray off the near swell"],
-        ["hats", "response.hatEnv", "the glints on the sun's path flare"],
-        ["highs", "audio.treble", "the glints brighten"],
-        ["sustain", "response.sustain", "the sun's halo swells and its path on the water warms"],
-        ["brightness", "sonic.brightness.slow", "the whole palette drifts a little warmer or cooler"],
-        ["MIDI note", "notes.noteOn, notes.lastPitch, notes.lastVelocity", "a burst of sparks on the sun's path: low "
-         "notes near, high notes far, velocity is how many"],
-        ["CC 1", "control.night", "NIGHT: dusk falls into a bioluminescent night"],
-        ["CC 2", "control.swell", "SWELL: the long and cross swells rise"],
-        ["CC 3", "control.chop", "CHOP: the wind sea roughens, more glints"],
-        ["CC 4", "control.foam", "FOAM: foam caps on more crests"],
-        ["CC 5", "control.sun", "SUN: halo, glow and the sun's path"],
-        ["CC 6", "control.tide", "TIDE: how deep the music writes into the sea"],
-        ["CC 7", "control.golden", "GOLDEN: back toward golden hour"],
-        ["CC 8", "control.spray", "SPRAY: how much the drums and notes throw"],
+        ["hats / highs", "response.hatEnv, audio.treble", "glints flare; mint enters the crest light"],
+        ["sustain", "response.sustain", "the sky's middle turns pink, the clouds' lit undersides warm, the halo "
+         "swells"],
+        ["brightness", "sonic.brightness.slow", "a slight warm or cool drift of the whole grade"],
+        ["MIDI notes", "notes.noteOn, lastPitch, lastVelocity", "sparks on the sun's path, by pitch and velocity"],
+        ["CC 1", "control.palette", "PALETTE: violet sunset -> golden afternoon -> electric blue"],
+        ["CC 2", "control.night", "NIGHT: a bioluminescent night"],
+        ["CC 3", "control.waves", "WAVES: the swell's height"],
+        ["CC 4", "control.energy", "WAVE ENERGY: chop, foam and the tide's depth"],
+        ["CC 5", "control.rays", "SUN RAYS: strength, reach, halo and the sun's path"],
+        ["CC 6", "control.clouds", "CLOUDS: the glow on the clouds"],
+        ["CC 7", "control.water", "WATER COLOUR: the richness of the water"],
+        ["CC 8", "control.spray", "SPRAY: drums' spray and notes' sparks"],
         ["pad 36", "control.padLeap", "LEAP: a dolphin arcs across the sun's path"],
-        ["pad 37", "control.padWave", "HERO WAVE: one big swell rises far out and rolls in, foaming"],
-        ["pad 38", "control.padGlow", "BLOOM: bioluminescence along every crest, fading over seconds"],
-        ["pad 39", "control.padFlare", "FLARE: the sun flares and settles"],
-        ["pad 40", "control.padSpray", "SPRAY: a gust of spray off the near swell"],
-        ["silence", "(no input)", "the swell rolls on, the clouds drift, pods of dolphins leap every 31 and 47 s"],
+        ["pad 37", "control.padWave", "HERO WAVE: a big swell rises far out and rolls in, foaming"],
+        ["pad 38", "control.padGlow", "BLOOM: bioluminescence along every crest"],
+        ["pad 39", "control.padFlare", "FLARE: the sun and its rays blaze and settle"],
+        ["pad 40", "control.padSpray", "SPRAY: a gust of spray"],
+        ["pad 41", "control.padDay", "DAYBREAK: the world sweeps to electric day and back to the sunset"],
+        ["silence", "(no input)", "the swell rolls, clouds and rays drift, the yacht crosses every ~75 s, pods "
+         "leap every 53 and 79 s"],
     ],
-    "tier": "light: 78k sea vertices (three pieces) through 8 deformers, five unlit programs (48 ops on the near sea), "
-            "196 cloud puffs, six dolphins, fixed particle pools; no lights, no shadows, no fog march",
+    "tier": "light: a banded sea (three meshes, ten deformers), seven unlit programs, an island strip, five trees, a "
+            "yacht and its masked wake, ~320 cloud puffs, fixed particle pools; no lights, no shadows, no fog march",
 }
 
 INDEX_ENTRY = {
     "category": "Sonic Abstract",
-    "description": "Play live audio (a mix or a drum-heavy track) plus a MIDI controller: CC 1 night, CC 2 swell, "
-                   "CC 3 chop, CC 4 foam, CC 5 sun, CC 6 tide, CC 7 golden hour, CC 8 spray; pads 36 dolphin leap, "
-                   "37 hero wave, 38 bioluminescent bloom, 39 sun flare, 40 spray. A stylized twilight ocean that "
-                   "writes the music into its swell. See docs/prototypes/digital-ocean/02-report.md.",
+    "description": "Play live audio (a mix with a clear low end) plus a MIDI controller: CC 1 palette (violet sunset "
+                   "-> golden afternoon -> electric blue), CC 2 night, CC 3 waves, CC 4 wave energy, CC 5 sun rays, "
+                   "CC 6 clouds, CC 7 water colour, CC 8 spray; pads 36 dolphin leap, 37 hero wave, 38 "
+                   "bioluminescent bloom, 39 sun flare, 40 spray, 41 daybreak. An illustrated ocean world whose colour "
+                   "and swell follow the music. See docs/prototypes/digital-ocean/05-report-art-pass-2.md.",
     "live": True,
     "name": "Sonic Abstract - Digital Ocean",
     "project": "sonic-abstract/digital-ocean.json",
@@ -352,9 +357,9 @@ class Prog:
         self.pal.append((label, key, scale))
         return self.colour(label, dst, pal(PALETTE, key), scale)
 
-    def doc(self, emission):
+    def doc(self, emission, opacity=-1):
         return {"name": self.name, "ops": self.ops, "baseColor": -1, "metallic": -1, "roughness": -1,
-                "emission": emission, "emissionIntensity": 1.0, "opacity": -1}
+                "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
 SH = unit((S[0], 0.0, S[2]))     # towards the sun, level
@@ -872,34 +877,41 @@ def box_loft(sections):
 
 
 def motor_yacht():
-    """A: a 16 m sport motor yacht -- a long low hull, a fine raked stem, flared bow sections, a hard chine, a sheer
-    that steps down aft, a wide transom over a swim platform; a low cabin with a raked windscreen and a hardtop whose
-    long dark glazing wraps the sides."""
+    """A: a 16 m sport motor yacht. Seen abeam, its identity is the profile: a stem raked well forward (the bow
+    rises and points), a sheer that sweeps down from the bow to a low stern, a hull that narrows from amidships in
+    plan, a dark boot band at the waterline, and a low cabin whose raked windscreen and hardtop carry one long dark
+    glazing band. The parts: hull (pearl), boot (dark), deck and cabin (pale), glazing (navy)."""
     L = 16.0
     # (x from the transom, deck half-breadth, sheer height, chine half-breadth, chine height, keel depth)
-    st = [(0.0, 2.15, 1.25, 2.0, 0.05, -0.55), (2.5, 2.3, 1.3, 2.05, 0.0, -0.75), (6.0, 2.35, 1.45, 1.95, -0.05, -0.9),
-          (9.5, 2.25, 1.65, 1.7, 0.0, -0.95), (12.0, 1.85, 1.85, 1.2, 0.15, -0.8), (14.0, 1.25, 2.05, 0.6, 0.45, -0.5),
-          (15.4, 0.55, 2.2, 0.15, 0.9, 0.0), (16.0, 0.05, 2.3, 0.02, 1.6, 1.0)]
-    stations = [(x - L * 0.5, [(sh, hb), (sh - 0.25, hb * 1.0), (cy, ch), (k, 0.0)]) for x, hb, sh, ch, cy, k in st]
-    hull, rings = loft(stations)
-    hull += cap(rings[0], flip=True)                                     # the transom
-    deck = deck_surface([(x - L * 0.5, hb) for x, hb, *_ in st], lambda x: 1.3 + max(0.0, (x + 2.0)) * 0.11)
-    # the swim platform: a thin slab aft of the transom
-    deck += [((-L * 0.5 - 1.1, 0.35, 1.9), (-L * 0.5, 0.35, 1.9), (-L * 0.5, 0.35, -1.9)),
-             ((-L * 0.5 - 1.1, 0.35, 1.9), (-L * 0.5, 0.35, -1.9), (-L * 0.5 - 1.1, 0.35, -1.9))]
-    # the superstructure: from the cockpit forward to a raked windscreen, a hardtop over it
-    sup = [(-3.4, 1.45, 2.85, 1.95, 1.75), (-1.0, 1.5, 2.95, 1.98, 1.8), (1.6, 1.55, 3.0, 1.9, 1.7),
-           (3.4, 1.62, 2.55, 1.75, 1.4), (4.8, 1.7, 1.95, 1.5, 1.05)]
-    sides, glass = box_loft([(x, y0, y1, h0, h1) for x, y0, y1, h0, h1 in sup])
-    # a dark hull window band (long, narrow) under the sheer amidships
-    win = []
-    for z in (1.0, -1.0):
-        x0, x1, y0, y1 = -1.5, 4.5, 0.85, 1.05
-        hz = 2.37 * z
-        quad = [(x0, y0, hz), (x1, y0, hz), (x1, y1, hz), (x0, y1, hz)]
-        win += [(quad[0], quad[1], quad[2]), (quad[0], quad[2], quad[3])] if z > 0 else \
-               [(quad[0], quad[2], quad[1]), (quad[0], quad[3], quad[2])]
-    return {"hull": hull, "deck": deck + sides, "glaze": glass + win}
+    st = [(0.0, 2.1, 1.05, 1.95, 0.0, -0.55), (2.5, 2.25, 1.12, 2.0, -0.05, -0.75), (5.5, 2.3, 1.25, 1.95, -0.08, -0.9),
+          (8.5, 2.2, 1.45, 1.75, -0.05, -0.95), (11.0, 1.85, 1.7, 1.35, 0.0, -0.9), (13.0, 1.35, 1.98, 0.85, 0.15, -0.7),
+          (14.6, 0.75, 2.3, 0.35, 0.35, -0.4), (15.6, 0.22, 2.55, 0.08, 0.6, -0.1), (16.0, 0.02, 2.7, 0.01, 0.8, 0.2)]
+    BOOT = 0.42
+    stations = [(x - L * 0.5, [(sh, hb), (sh - 0.22, hb * 0.99), (BOOT, ch + (hb - ch) * 0.75), (cy, ch), (k, 0.0)])
+                for x, hb, sh, ch, cy, k in st]
+    tris, rings = loft(stations)
+    n = len(rings[0])                      # 9 points a ring: 0 sheer .. 4 keel .. 8 sheer (port)
+    hull, boot = [], []
+    per = (n - 1) * 2
+    for i in range(len(rings) - 1):
+        for j in range(n - 1):
+            q = tris[(i * (n - 1) + j) * 2:(i * (n - 1) + j) * 2 + 2]
+            (boot if 2 <= j <= 5 else hull).extend(q)       # the bands below the boot line are dark
+    hull += cap(rings[0], flip=True)                         # the transom
+    deck = deck_surface([(x - L * 0.5, hb) for x, hb, *_ in st], lambda x: 1.0 + max(0.0, (x + 3.0)) * 0.13)
+    deck += [((-L * 0.5 - 1.1, 0.3, 1.9), (-L * 0.5, 0.3, 1.9), (-L * 0.5, 0.3, -1.9)),
+             ((-L * 0.5 - 1.1, 0.3, 1.9), (-L * 0.5, 0.3, -1.9), (-L * 0.5 - 1.1, 0.3, -1.9))]
+    sup = [(-3.6, 1.2, 2.6, 1.95, 1.75), (-1.2, 1.25, 2.72, 1.98, 1.8), (1.4, 1.35, 2.8, 1.85, 1.65),
+           (3.2, 1.5, 2.35, 1.6, 1.25), (4.8, 1.7, 1.85, 1.3, 0.9)]
+    sides, glass = box_loft(sup)
+
+    def rake(t):
+        """The stem rakes forward with height: forward of 11 m, x moves ahead by up to 0.75 m per metre of height."""
+        out = []
+        for tri in t:
+            out.append(tuple((x + 0.75 * max(0.0, y - 0.2) * mx.smooth(3.0, 7.0, x), y, z) for x, y, z in tri))
+        return out
+    return {"hull": rake(hull), "boot": rake(boot), "deck": rake(deck) + sides, "glaze": glass}
 
 
 def speedboat():
@@ -967,8 +979,8 @@ BOAT_KIND = "A"
 # both edges of the frame, so the LFO saw's wrap (back to the start) happens out of sight
 BOAT_COURSE = ((-120.0, -84.0), (120.0, -64.0))
 BOAT_SPEED = {"A": 3.2, "B": 9.0, "C": 2.6}
-BOAT_PARTS = [("boatHull", "hull", "pearl"), ("boatDeck", "deck", "deck"), ("boatGlaze", "glaze", "glaze"),
-              ("boatSail", "sail", "pearl")]
+BOAT_PARTS = [("boatHull", "hull", "pearl"), ("boatBoot", "boot", "glaze"), ("boatDeck", "deck", "deck"),
+              ("boatGlaze", "glaze", "glaze"), ("boatSail", "sail", "pearl")]
 
 
 def boat_meshes():
@@ -977,6 +989,111 @@ def boat_meshes():
         if key in parts:
             mx.write_faceted(os.path.join(MESH_DIR, "do-%s-%s.glb" % (BOAT_KIND.lower(), key)), parts[key], key)
     return {k: len(v) for k, v in parts.items()}
+
+
+def wake_mesh(hl):
+    """A Kelvin wake in the boat's frame (+X forward, the stern at x = -hl/2): two arms diverging from the stern at
+    about 19.5 deg, 46 m long, widening as they age, and two short bow-wave arms from the stem. Flat strips at the
+    waterline with uv = (age along the arm 0..1, across 0..1); the foam program cuts them into broken graphic foam."""
+    verts, uvs, idx = [], [], []
+
+    def arm(x0, z0, ang, length, w0, w1, n=28):
+        base = len(verts)
+        dx, dz = -math.cos(ang), math.sin(ang)          # back and outward
+        px, pz = dz, -dx                                 # across the arm
+        for i in range(n + 1):
+            u = i / n
+            cx, cz = x0 + dx * length * u, z0 + dz * length * u
+            w = w0 + (w1 - w0) * u
+            for side in (-1.0, 1.0):
+                verts.append((round(cx + px * w * side, 3), 0.06, round(cz + pz * w * side, 3)))
+                uvs.append((u, 0.5 + 0.5 * side))
+        for i in range(n):
+            a = base + 2 * i
+            idx.extend([a, a + 2, a + 3, a, a + 3, a + 1, a, a + 3, a + 2, a, a + 1, a + 3])   # both faces
+    st = -hl * 0.5 + 0.3
+    k = math.radians(19.5)
+    arm(st, 1.6, k, 46.0, 0.6, 2.6)
+    arm(st, -1.6, -k, 46.0, 0.6, 2.6)
+    # the stern's own churned water: a short strip straight back
+    arm(st, 0.0, 0.0, 16.0, 1.5, 2.6, 10)
+    # the bow wave: short arms from the stem
+    bx = hl * 0.5 - 1.2
+    arm(bx, 0.6, math.radians(28.0), 7.0, 0.35, 0.9, 8)
+    arm(bx, -0.6, -math.radians(28.0), 7.0, 0.35, 0.9, 8)
+    return verts, uvs, idx
+
+
+def write_wake(hl):
+    v, uv, idx = wake_mesh(hl)
+    # a GLB with UVs: meshes.write_glb carries none, so a minimal writer with TEXCOORD_0 here
+    import json as _json, struct as _struct
+    n = len(v)
+    pb = b"".join(_struct.pack("<3f", *p) for p in v)
+    nb = b"".join(_struct.pack("<3f", 0.0, 1.0, 0.0) for _ in v)
+    tb = b"".join(_struct.pack("<2f", *t) for t in uv)
+    ib = _struct.pack("<%dI" % len(idx), *idx)
+    blob = pb + nb + tb + ib
+    blob += b"\0" * ((4 - len(blob) % 4) % 4)
+    lo = [min(p[k] for p in v) for k in range(3)]
+    hi = [max(p[k] for p in v) for k in range(3)]
+    o = [0, len(pb), len(pb) + len(nb), len(pb) + len(nb) + len(tb)]
+    g = {"asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0, "name": "wake"}],
+         "materials": [{"name": "wake", "pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1]}}],
+         "meshes": [{"name": "wake", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2},
+                                                     "indices": 3, "material": 0, "mode": 4}]}],
+         "buffers": [{"byteLength": len(blob)}],
+         "bufferViews": [{"buffer": 0, "byteOffset": o[0], "byteLength": len(pb), "target": 34962},
+                         {"buffer": 0, "byteOffset": o[1], "byteLength": len(nb), "target": 34962},
+                         {"buffer": 0, "byteOffset": o[2], "byteLength": len(tb), "target": 34962},
+                         {"buffer": 0, "byteOffset": o[3], "byteLength": len(ib), "target": 34963}],
+         "accessors": [{"bufferView": 0, "componentType": 5126, "count": n, "type": "VEC3", "min": lo, "max": hi},
+                       {"bufferView": 1, "componentType": 5126, "count": n, "type": "VEC3"},
+                       {"bufferView": 2, "componentType": 5126, "count": n, "type": "VEC2"},
+                       {"bufferView": 3, "componentType": 5125, "count": len(idx), "type": "SCALAR"}]}
+    js = _json.dumps(g, separators=(",", ":")).encode()
+    js += b" " * ((4 - len(js) % 4) % 4)
+    path = os.path.join(MESH_DIR, "do-wake.glb")
+    with open(path, "wb") as f:
+        f.write(_struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(blob)))
+        f.write(_struct.pack("<II", len(js), 0x4E4F534A) + js)
+        f.write(_struct.pack("<II", len(blob), 0x004E4942) + blob)
+    return n
+
+
+def wake_program():
+    """Graphic wake foam: a world-anchored noise (the foam stays where the boat left it while the arms move on), cut by
+    a threshold that rises with the foam's age (the arm thins and breaks up toward its end) and with the distance from
+    the arm's centre line. The result is the OPACITY of a masked material: hard, clean foam shapes, no smoke."""
+    P = Prog("doWake")
+    P.op(None, "input", 0, inp="worldPosition")
+    P.op("wakeNoise", "noise", 0, a=0, f=WAKE_FREQ, k=[0.0, 0.0, 0.0], seed=41)
+    P.op(None, "input", 1, inp="uv")
+    P.op(None, "swizzle", 2, a=1, k=[0, 0, 0, 0])                                   # age along the arm (u)
+    P.op(None, "swizzle", 3, a=1, k=[1, 1, 1, 1])                                   # across (v)
+    P.op(None, "remap", 3, a=3, k=[0.0, 1.0, -1.0, 1.0])
+    P.op(None, "multiply", 3, a=3, b=3)                                             # (2v - 1)^2: 0 centre, 1 edge
+    P.op(None, "power", 2, a=2, f=0.8)
+    P.op(None, "add", 2, a=2, b=3)                                                  # how hard it is to be foam
+    P.op("wakeCut", "remap", 2, a=2, k=[0.0, 1.6, WAKE_CUT0, WAKE_CUT1])
+    P.op(None, "constant", 5, k=[-1.0, -1.0, -1.0, -1.0])
+    P.op(None, "multiply", 2, a=2, b=5)
+    P.op(None, "add", 4, a=0, b=2)                                                  # noise - threshold
+    P.op("wakeEdge", "smoothstep", 4, a=4, k=[0.0, 0.04])                           # opacity (cut at 0.5)
+    P.pcolour("wakeFoam", 6, "foam", 1.0)
+    return P
+
+
+WAKE_FREQ = 0.55
+WAKE_CUT0, WAKE_CUT1 = 0.36, 0.8
+
+
+def ride_deformers():
+    """What a floating object rides (a node takes at most 8 deformers): the long swell's full Gerstner pair, the
+    vertical sines of the two shorter trains (their small horizontal drift does not matter for a hull), and the two
+    audio fields -- 6 deformers, leaving room for a path and a roll."""
+    d = sea_deformers()
+    return [d[0], d[1], d[2], d[4]] + audio_deformers()
 
 
 def boat(s):
@@ -996,7 +1113,7 @@ def boat(s):
              "axis": [0.0, 1.0, 0.0], "displacementAxis": [0.0, 0.0, 1.0], "space": "local"},
             {"kind": "path", "spline": "boatCourse", "amount": 1.0, "axis": [1.0, 0.0, 0.0],
              "center": [0.0, 0.0, 0.0], "pathOffset": hl * 0.5, "pathScale": 1.0, "pathRoll": 0.0, "space": "local"}]
-    ride = roll + sea_deformers()
+    ride = roll + ride_deformers()            # the hull rides the swell and the music's swell as the sea does
     keys = BOAT_DESIGNS[BOAT_KIND]()
     for name, key, colour in BOAT_PARTS:
         if key not in keys:
@@ -1004,26 +1121,20 @@ def boat(s):
         s.proc(name, {"kind": "mesh", "asset": "meshes/do-%s-%s.glb" % (BOAT_KIND.lower(), key)},
                material=flat(colour, double=(key == "sail")), deformers=ride)
         s.route(R("lfo.boat", "procedural/%s/deform/2/pathOffset" % name, length - hl))
-    # the wake: from the stern, trailing back along the course and spreading a little; it widens as it ages
-    stern = (x0 + d[0] * 0.5, 0.15, z0 + d[2] * 0.5)
-    bow = (x0 + d[0] * (hl - 0.8), 0.5, z0 + d[2] * (hl - 0.8))
-    for name, at, cap_, rate, life, spd, spread, size, dirn in (
-            ("wake", stern, 700, WAKE_RATE, (3.0, 5.0), (0.5, 1.2), 0.3, (0.22, 0.9), (-d[0], 0.0, -d[2])),
-            ("bowWave", bow, 300, BOW_RATE, (0.6, 1.1), (1.2, 2.4), 0.55, (0.12, 0.05), (d[0], 0.5, d[2]))):
-        s.particles(name, capacity=cap_, seed=zlib_seed(name), shape="sphere", position=[round(c, 3) for c in at],
-                    extent=[0.6, 0.05, 0.6], direction=[round(c, 4) for c in dirn], spawnRate=rate,
-                    lifetimeMin=life[0], lifetimeMax=life[1], spread=spread, speedMin=spd[0], speedMax=spd[1],
-                    gravity=[0.0, -9.8 if name == "bowWave" else 0.0, 0.0], drag=0.35, sizeStart=size[0],
-                    sizeEnd=size[1], colorStart=pal(PALETTE, "foam") + [0.32 if name == "wake" else 0.7],
-                    colorEnd=pal(PALETTE, "foam") + [0.0], emissive=0.8, blend="additive", turbulence=0.15,
-                    turbulenceScale=0.3)
-        s.route(R("lfo.boat", "particles/%s/position" % name, round(d[0] * (length - hl), 3), comp=0),
-                R("lfo.boat", "particles/%s/position" % name, round(d[2] * (length - hl), 3), comp=2))
+    # the wake: geometry riding the same course and the same sea, its foam cut by doWake (masked, crisp)
+    write_wake(hl)
+    wp = wake_program()
+    s.program(wp.doc(emission=6, opacity=4))
+    s.proc("boatWake", {"kind": "mesh", "asset": "meshes/do-wake.glb"},
+           material={"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "doWake", "alphaMode": "mask",
+                     "alphaCutoff": 0.5, "doubleSided": True},
+           deformers=[roll[1]] + ride_deformers())
+    s.route(R("lfo.boat", "procedural/boatWake/deform/1/pathOffset", length - hl))
+    return wp
 
 
 BOAT_ROLL = 0.06
-WAKE_RATE = 40.0
-BOW_RATE = 30.0
 
 
 def illus_program():
@@ -1117,7 +1228,8 @@ def flat(key, scale=1.0, double=False):
 
 
 # the nodes painted by doIllus and the palette key each one's colour comes from (palette_routes routes them)
-ILLUS_NODES = [("palms", "trunk"), ("canopies", "trunk"), ("boatHull", "pearl"), ("boatDeck", "deck"),
+ILLUS_NODES = [("palms", "trunk"), ("canopies", "trunk"), ("boatHull", "pearl"), ("boatBoot", "glaze"),
+               ("boatDeck", "deck"),
                ("boatGlaze", "glaze"), ("boatSail", "pearl")] + [("farIsle%d" % k, "isle") for k in range(len(FAR_ISLES))]
 
 
@@ -1144,8 +1256,8 @@ def world(s):
            deformers=sway)
     s.proc("canopies", {"kind": "mesh", "asset": "meshes/do-canopy.glb"},
            distribution={"kind": "points", "points": tree_points("canopy")}, material=flat(tree))
-    boat(s)
-    return ip, lp
+    wp = boat(s)
+    return ip, lp, wp
 
 
 
@@ -1538,6 +1650,53 @@ def atmosphere(s, sky):
 SEA_NODES = ["sea_near", "sea_mid", "sea_far"]
 
 
+def musical_colour(s, progs, sea, seafar, sky, cp):
+    """Pass E: colour as the primary instrument. ONE axis moves the whole world through three designed palettes --
+    violet sunset (0), golden afternoon (0.5), electric blue (1) -- piecewise, each segment a full coordinated palette
+    (`palette_routes`), smoothed over 1.5 s: a lighting change, not a colour cycle. Its position, `visual.mood`, is the
+    performer's palette control (CC 1) plus a slow share of the piece's 12 s intensity, so a build brightens the world
+    toward day and electric blue and a breakdown sinks it back to the sunset. On top, each band has its own colour role
+    (smoothed signals, different time constants, never all at once)."""
+    s.sources.append({"kind": "envelope", "name": "day", "settings": {"trigger": "control.padDay"}})
+    s.params_({"sources/day/attackMs": 3000.0, "sources/day/decayMs": 0.0, "sources/day/sustain": 1.0,
+               "sources/day/holdMs": 5000.0, "sources/day/releaseMs": 4000.0})
+    s.map(M("mood", [("control.palette", 1.0), ("intensity", MOOD_INTENSITY), ("env.day", 0.75)], "sum"))
+    seg = dict(attackMs=1500, decayMs=1500, clampEnabled=True, clampMin=0.0, clampMax=1.0)
+    palette_routes(s, progs, "visual.mood", "afternoon", dict(seg, gain=2.0), frm="violet")
+    palette_routes(s, progs, "visual.mood", "electric", dict(seg, gain=2.0, offset=-1.0), frm="afternoon")
+    M_ = "material/%s/op/%d/constant/constant"
+    # BASS deepens the water's body and lifts the light through the crests (weight)
+    for prog in (sea, seafar):
+        s.route(R("bass", M_ % (prog.name, prog["deep"]), 1.0, op="multiply", gain=-0.35, offset=1.0, attackMs=200,
+                  decayMs=1200),
+                R("bass", M_ % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=200,
+                  decayMs=1200))
+    # HIGHS add mint to the crest light (delicate, fast)
+    mint = hexrgb("#a8ffe0")
+    for prog in (sea, seafar):
+        for c in range(3):
+            s.route(R("audio.treble", M_ % (prog.name, prog["sss"]), round(mint[c] * 0.35, 4), comp=c, attackMs=60,
+                      decayMs=600))
+    # SUSTAIN shifts the sky's middle toward pink and warms the clouds' lit undersides (slow)
+    pink = hexrgb("#ff8ac8")
+    for c in range(3):
+        s.route(R("sustain", M_ % (sky.name, sky["mid"]), round(pink[c] * 0.15, 4), comp=c, attackMs=2500,
+                  decayMs=5000))
+    s.route(R("sustain", M_ % (cp.name, cp["clit"]), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=2500,
+              decayMs=5000))
+    # LEVEL: the rays strengthen with loudness; KICK: they flash warm and brief (each its own decay)
+    s.route(R("level", M_ % (sky.name, sky["ray"]), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=800,
+              decayMs=2500),
+            R("kickEnv", M_ % (sky.name, sky["ray"]), 1.0, op="multiply", gain=0.6, offset=1.0, attackMs=0,
+              decayMs=350))
+    # the rays reach further on strong onsets (their fade angle opens), briefly
+    s.route(R("onsetEnv", "material/doSky/op/%d/remap/constant" % sky["rayLen"], -0.04, comp=0, attackMs=0,
+              decayMs=900))
+
+
+MOOD_INTENSITY = 0.35
+
+
 def instrument(s, sea, seafar, sky):
     """The modulation map. Every audio response has its own scale and decay; nothing pulses the whole frame."""
     M = "material/%s/op/%d/constant/constant"
@@ -1570,7 +1729,7 @@ def instrument(s, sea, seafar, sky):
                   attackMs=60, decayMs=500))
     # (the highs once deepened the micro-ripples too: at 60-200 m that noise aliased into crumpled foil -- removed)
     # SUSTAIN: held sound swells the sun's halo and warms the sun's path
-    s.route(R("sustain", M % (sky.name, sky["halo"]), 1.0, op="multiply", gain=0.7, offset=1.0, attackMs=1500,
+    s.route(R("sustain", M % (sky.name, sky["halo"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=1500,
               decayMs=3500),
             R("sustain", M % (sky.name, sky["glow"]), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500,
               decayMs=3500))
@@ -1588,13 +1747,13 @@ def instrument(s, sea, seafar, sky):
 # ================================================================================================ MIDI: the performer's map
 # Any device, any channel. CCs are bus signals (control.<name>, 0..1) shaped by the routes; pads are events.
 MIDI_CC = [
-    (1, "night", "NIGHT: dusk falls into a bioluminescent night (the palette's other end: the crests and foam glow)"),
-    (2, "swell", "SWELL: the long swell and the cross swell rise"),
-    (3, "chop", "CHOP: the wind sea roughens and the glints multiply"),
-    (4, "foam", "FOAM: foam caps on more crests, brighter"),
-    (5, "sun", "SUN: the sun's halo, glow and path on the water"),
-    (6, "tide", "TIDE: how deep the music writes itself into the sea (the bass's history as swell)"),
-    (7, "golden", "GOLDEN: back toward golden hour (paler sky, softer sea)"),
+    (1, "palette", "PALETTE: the world's colour, violet sunset -> golden afternoon -> electric blue (smoothly)"),
+    (2, "night", "NIGHT: dusk falls into a bioluminescent night (the crests and foam glow)"),
+    (3, "waves", "WAVES: the swell's height (the long swell and the cross swell rise)"),
+    (4, "energy", "WAVE ENERGY: chop, foam and how deep the music writes into the sea, together"),
+    (5, "rays", "SUN RAYS: the rays' strength and reach, the halo and the sun's path"),
+    (6, "clouds", "CLOUDS: the glow on the clouds' lit undersides and rims"),
+    (7, "water", "WATER COLOUR: the richness of the water's body and crest light"),
     (8, "spray", "SPRAY: how much spray and sparkle the drums and notes throw"),
 ]
 MIDI_PADS = [
@@ -1603,6 +1762,7 @@ MIDI_PADS = [
     (38, "padGlow", "BLOOM: a burst of bioluminescence along every crest, fading over seconds"),
     (39, "padFlare", "FLARE: the sun flares; its halo and path blaze and settle"),
     (40, "padSpray", "SPRAY: a gust of spray off the near swell"),
+    (41, "padDay", "DAYBREAK: the world sweeps toward electric day over 3 s, holds, and sinks back to the sunset"),
 ]
 
 
@@ -1615,12 +1775,13 @@ def control_map():
     return {"midi": {"enabled": True, "filter": "*", "bindings": b}}
 
 
-def palette_routes(s, progs, signal, to, chain):
-    """A palette change on one control: for every palette colour every program paints with, add (to - current) per
-    channel at full control. (The island's flat colour too.)"""
+def palette_routes(s, progs, signal, to, chain, frm=None):
+    """A palette change on one control: for every palette colour every program paints with, add (to - frm) per
+    channel at full control (frm defaults to the scene's palette). Every illustrated node's flat colour too."""
+    frm = frm or PALETTE
     for prog in progs:
         for label, key, scale in getattr(prog, "pal", []):
-            a, b = pal(PALETTE, key, scale), pal(to, key, scale)
+            a, b = pal(frm, key, scale), pal(to, key, scale)
             for c in range(3):
                 d = round(b[c] - a[c], 5)
                 if abs(d) > 1e-4:
@@ -1630,34 +1791,41 @@ def palette_routes(s, progs, signal, to, chain):
     for node, key in ILLUS_NODES:
         if node not in present:
             continue
-        a, b = pal(PALETTE, key), pal(to, key)
+        a, b = pal(frm, key), pal(to, key)
         for c in range(3):
             if abs(b[c] - a[c]) > 1e-4:
                 s.route(R(signal, "procedural/%s/material/emissiveColor" % node, round(b[c] - a[c], 5), comp=c,
                           **chain))
 
 
-def midi(s, progs, sea, seafar, sky):
+def midi(s, progs, sea, seafar, sky, cp=None):
     s.control = control_map()
     M = "material/%s/op/%d/constant/constant"
     CC = {"attackMs": 120, "decayMs": 120}
-    # NIGHT and GOLDEN: the palette's two related ends (a time of day, not a colour cycle)
+    # NIGHT: the palette's dark end (a time of day). PALETTE (CC 1) is part of visual.mood (musical_colour).
     palette_routes(s, progs, "control.night", "midnight", dict(attackMs=250, decayMs=250))
-    palette_routes(s, progs, "control.golden", "afternoon", dict(attackMs=250, decayMs=250))
     for node in SEA_NODES:
         D = "procedural/%s/deform/%%d/amount" % node
-        s.route(R("control.swell", D % 1, 1.1, **CC), R("control.swell", D % 3, 0.5, **CC),
-                R("control.chop", D % 5, 0.16, **CC),
-                R("control.tide", D % 7, 1.0, op="multiply", gain=1.6, offset=0.4, **CC))
-    s.route(R("control.chop", M % (sea.name, sea["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
-    # a taller sea needs a taller crest to foam (as with the level): the crest ramp follows the swell control
-    s.route(R("control.swell", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply",
+        s.route(R("control.waves", D % 1, 1.1, **CC), R("control.waves", D % 3, 0.5, **CC),
+                R("control.energy", D % 5, 0.16, **CC),
+                R("control.energy", D % 7, 1.0, op="multiply", gain=1.4, offset=1.0, **CC))
+    s.route(R("control.energy", M % (sea.name, sea["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
+    # a taller sea needs a taller crest to foam: the crest ramp follows the waves control
+    s.route(R("control.waves", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply",
               gain=-0.42, offset=1.0, **CC))
-    s.route(R("control.foam", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.16, comp=0, **CC),
-            R("control.foam", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
-            R("control.foam", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
-    for prog, key in ((sky, "halo"), (sky, "glow"), (sea, "pathCol"), (seafar, "pathCol")):
-        s.route(R("control.sun", M % (prog.name, prog[key]), 1.0, op="multiply", gain=0.9, offset=1.0, **CC))
+    s.route(R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.16, comp=0, **CC),
+            R("control.energy", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
+            R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
+    for prog, key, g in ((sky, "ray", 1.6), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
+                         (seafar, "pathCol", 0.9)):
+        s.route(R("control.rays", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **CC))
+    s.route(R("control.rays", "material/doSky/op/%d/remap/constant" % sky["rayLen"], -0.08, comp=0, **CC))
+    if cp is not None:
+        for key, g in (("clit", 0.6), ("crim", 1.2)):
+            s.route(R("control.clouds", M % (cp.name, cp[key]), 1.0, op="multiply", gain=g, offset=1.0, **CC))
+    for prog in (sea, seafar):
+        s.route(R("control.water", M % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC),
+                R("control.water", M % (prog.name, prog["deep"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
     s.route(R("control.spray", "particles/snareSpray/burst", 1.0, op="multiply", gain=2.5, offset=1.0, **CC),
             R("control.spray", "particles/noteSparks/burst", 1.0, op="multiply", gain=2.5, offset=1.0, **CC))
     # PADS: complete gestures with their own envelopes
@@ -1692,6 +1860,10 @@ def score_midi(s, score):
         for r in s.routes:
             if r["source"] == old:
                 r["source"] = new
+        for mp in s.mappings + s.mappings2 + s.mappings3:
+            for inp in mp["inputs"]:
+                if inp["signal"] == old:
+                    inp["signal"] = new
         for src in s.sources:
             if src.get("settings", {}).get("trigger") == old:
                 src["settings"]["trigger"] = new
@@ -1785,12 +1957,13 @@ def build():
                           # slow billowing: the puffs swell and settle (a noise of world position, drifting)
                           {"kind": "noise", "amount": CLOUD_BILLOW, "scale": 0.004, "speed": 0.03, "seed": 9,
                            "space": "world"}])
-    ip, lp = world(s)
+    ip, lp, wp = world(s)
     dp = dolphins(s)
     spray(s)
     atmosphere(s, sky)
     instrument(s, sea, seafar, sky)
-    midi(s, [sea, seafar, sky, cp, dp, ip, lp], sea, seafar, sky)
+    musical_colour(s, [sea, seafar, sky, cp, dp, ip, lp, wp], sea, seafar, sky, cp)
+    midi(s, [sea, seafar, sky, cp, dp, ip, lp, wp], sea, seafar, sky, cp)
     if REVIEW_MIDI:
         score_midi(s, REVIEW_MIDI)
     camera(s)

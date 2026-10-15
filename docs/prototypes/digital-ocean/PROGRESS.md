@@ -386,3 +386,68 @@ Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. 
   read as a jet trail (`yacht-A-crossing-26-44s.mp4`, `boatA-motion-crops.png`). Pass 3 revisits it to match the new
   water.
 - Palette: pearl hull, cooler pale deck (first trial was too peach), navy glazing, each set per palette.
+
+### Boats step, revision (the coordinator's notes)
+
+- **The hull no longer reads as a box.** Seen abeam at ~70 m, the visible hull is the band between the waterline and
+  the sheer, so the plan taper never showed. Changes:
+  - The stem now rakes forward with height: forward of 11 m, points move ahead up to 0.75 m per metre of height, so
+    the bow rises and points.
+  - The sheer sweeps from 2.7 m at the bow down to 1.05 m at the stern.
+  - The hull narrows from amidships in plan.
+  - A dark **boot band** runs from the waterline to 0.42 m (its own mesh part, painted in the glazing's navy), so the
+    hull sits in the water.
+- **The wake is geometry, not particles**:
+  - `wake_mesh` builds a Kelvin wake in the boat's frame: two arms diverging from the stern at 19.5 deg, 46 m long
+    and widening; a short churned strip straight back; and two short bow-wave arms from the stem.
+  - The wake rides the same course (path deformer) and the same sea and music swell as the hull.
+  - Its foam (`doWake`) is a **world-anchored** noise, so foam stays where the boat left it while the arms move on.
+    It is cut by a threshold that rises with age along the arm and toward its edges, and written as the opacity of an
+    alpha-MASKED material.
+  - The result is crisp, broken graphic foam with two diverging arms, and no smoke or ring.
+  - No engine change: program opacity already feeds the mask discard.
+- The hull now also carries the audio swell deformers (tide, kick fronts, hero wave). Without them it would sink or
+  hover when the music raised the sea.
+- `boats-A-B-C-crops.png` was deleted: its crop windows missed the boats.
+- The first masked wake rendered as solid peach strips. A program-made cutout kept its full depth in the procedural
+  depth prepass, so the sea behind it failed the depth test and the cleared horizon colour showed through. Fixed in
+  the engine as **ADR-1371**: `fs_proc_depth` evaluates a masked material's program. The GPU test fails without the
+  fix. With the fix, the first thresholds cut nearly all the foam; they are retuned (0.36-0.8).
+  `yacht-v3-hull-1080p.png` shows the revised hull: raked rising bow, sweeping sheer, boot band.
+
+## Pass E: musical colour and wave modulation (done)
+
+- **One colour axis for the whole world** (`musical_colour`): `visual.mood` (an interpret mapping) = CC 1 + 0.35 x
+  `response.intensity` (12 s) + 0.75 x the daybreak envelope, clamped to 0..1. It drives two segments of
+  coordinated palette routes, violet sunset -> golden afternoon (0 to 0.5) and golden afternoon -> electric blue
+  (0.5 to 1). Every palette colour of every program and every illustrated node moves together, smoothed over 1.5 s.
+  A build therefore brightens the world toward day and a breakdown sinks it back to the sunset: a change of light,
+  not a colour cycle.
+- **Each band has its own role, time constant and target**, never all at once:
+  - bass deepens the water's body and lifts the crest light (200 / 1200 ms);
+  - highs add mint to the crest light (60 / 600 ms);
+  - sustain turns the sky's middle pink and warms the clouds' lit undersides (2.5 / 5 s);
+  - level strengthens the rays (0.8 / 2.5 s);
+  - kick flashes the rays warm (0 / 350 ms);
+  - onsets open the rays' reach for a moment (900 ms);
+  - Pass 1's tidewriting swell, kick fronts and the level/intensity swell remain.
+- Found by rendering: under loud music the sky washed out to milky lavender (ray, halo and sustain boosts multiplied);
+  the level-driven ray gain and the sustain pink were halved.
+- Media: `passE-F-colour-and-conditions.png` (round 1), `passE-F-round2.png` (CC 1 at 0 / 0.5 / 1, daybreak, Trench,
+  Feline Footwear).
+
+## Pass F: MIDI performance (done)
+
+- CC 1 palette (the mood axis), CC 2 night (the bioluminescent end), CC 3 waves (swell height; the crest ramp follows
+  so foam stays a cap), CC 4 wave energy (chop, foam and the tide's depth together), CC 5 sun rays (strength, reach,
+  halo, the sun's path), CC 6 clouds (the glow on lit undersides and rims), CC 7 water colour (richness of the body and
+  crest light), CC 8 spray.
+- Pads 36 leap, 37 hero wave, 38 bloom, 39 flare, 40 spray, and **41 daybreak**: an envelope (3 s attack, 5 s hold,
+  4 s release) added into the mood, so the whole world sweeps toward electric day and back to the sunset. Verified on
+  a clip from 0 s (`passF-daybreak-pad-0-14s.png`, 2 s apart). A still that starts after the pad cannot show it: a seek
+  does not replay envelopes.
+- Review tooling: the offline MIDI scorer now also rewrites interpret-mapping inputs, and the kit lists a scene's own
+  sources before its interpret sources, so a mapping can read an envelope. Every other Sonic Abstract scene is
+  unchanged, checked by regenerating three and comparing bytes.
+- Wave speed and direction are still not on controls: a deformer's phase is `k.x + speed t`, so changing either
+  jumps every wave. This belongs to Pass 3's water work.

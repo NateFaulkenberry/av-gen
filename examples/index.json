@@ -79,7 +79,7 @@
     },
     {
       "category": "Sonic Abstract",
-      "description": "Play live audio (a mix or a drum-heavy track) plus a MIDI controller: CC 1 night, CC 2 swell, CC 3 chop, CC 4 foam, CC 5 sun, CC 6 tide, CC 7 golden hour, CC 8 spray; pads 36 dolphin leap, 37 hero wave, 38 bioluminescent bloom, 39 sun flare, 40 spray. A stylized twilight ocean that writes the music into its swell. See docs/prototypes/digital-ocean/02-report.md.",
+      "description": "Play live audio (a mix with a clear low end) plus a MIDI controller: CC 1 palette (violet sunset -> golden afternoon -> electric blue), CC 2 night, CC 3 waves, CC 4 wave energy, CC 5 sun rays, CC 6 clouds, CC 7 water colour, CC 8 spray; pads 36 dolphin leap, 37 hero wave, 38 bioluminescent bloom, 39 sun flare, 40 spray, 41 daybreak. An illustrated ocean world whose colour and swell follow the music. See docs/prototypes/digital-ocean/05-report-art-pass-2.md.",
       "live": true,
       "name": "Sonic Abstract - Digital Ocean",
       "project": "sonic-abstract/digital-ocean.json"

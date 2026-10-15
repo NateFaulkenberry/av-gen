@@ -5141,19 +5141,166 @@
      },
      {
       "kind": "sine",
-      "amount": -1.531071,
+      "amount": 0.16,
+      "frequency": 0.405367,
+      "speed": 1.236375,
+      "phase": 2.1,
+      "axis": [
+       -0.615661,
+       0.0,
+       -0.788011
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "tide",
+      "amount": 1.5,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "lift",
+      "amount": 0.55,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "boatBoot",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/do-a-boot.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.01161,
+      0.01033,
+      0.06848
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "doIllus"
+    },
+    "deformers": [
+     {
+      "kind": "sine",
+      "amount": 0.06,
+      "frequency": 0.12,
+      "speed": 0.9,
+      "phase": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "space": "local"
+     },
+     {
+      "kind": "path",
+      "spline": "boatCourse",
+      "amount": 1.0,
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ],
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "pathOffset": 8.0,
+      "pathScale": 1.0,
+      "pathRoll": 0.0,
+      "space": "local"
+     },
+     {
+      "kind": "sine",
+      "amount": 1.15,
+      "frequency": 0.087266,
+      "speed": 0.573654,
+      "phase": 0.0,
+      "axis": [
+       -0.104528,
+       0.0,
+       -0.994522
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "sine",
+      "amount": -4.812845,
+      "frequency": 0.087266,
+      "speed": 0.573654,
+      "phase": 1.570796,
+      "axis": [
+       -0.104528,
+       0.0,
+       -0.994522
+      ],
+      "displacementAxis": [
+       0.104528,
+       0.0,
+       0.994522
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "sine",
+      "amount": 0.42,
       "frequency": 0.169816,
       "speed": 0.800231,
-      "phase": 2.870796,
+      "phase": 1.3,
       "axis": [
        0.515038,
        0.0,
        -0.857167
       ],
       "displacementAxis": [
-       -0.515038,
        0.0,
-       0.857167
+       1.0,
+       0.0
       ],
       "space": "world"
      },
@@ -5176,22 +5323,28 @@
       "space": "world"
      },
      {
-      "kind": "sine",
-      "amount": -0.419373,
-      "frequency": 0.405367,
-      "speed": 1.236375,
-      "phase": 3.670796,
+      "kind": "field",
+      "field": "tide",
+      "amount": 1.5,
       "axis": [
-       -0.615661,
        0.0,
-       -0.788011
+       1.0,
+       0.0
       ],
-      "displacementAxis": [
-       0.615661,
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "lift",
+      "amount": 0.55,
+      "axis": [
        0.0,
-       0.788011
+       1.0,
+       0.0
       ],
-      "space": "world"
+      "space": "world",
+      "alongNormal": false
      }
     ]
    }
@@ -5318,24 +5471,6 @@
      },
      {
       "kind": "sine",
-      "amount": -1.531071,
-      "frequency": 0.169816,
-      "speed": 0.800231,
-      "phase": 2.870796,
-      "axis": [
-       0.515038,
-       0.0,
-       -0.857167
-      ],
-      "displacementAxis": [
-       -0.515038,
-       0.0,
-       0.857167
-      ],
-      "space": "world"
-     },
-     {
-      "kind": "sine",
       "amount": 0.16,
       "frequency": 0.405367,
       "speed": 1.236375,
@@ -5353,22 +5488,28 @@
       "space": "world"
      },
      {
-      "kind": "sine",
-      "amount": -0.419373,
-      "frequency": 0.405367,
-      "speed": 1.236375,
-      "phase": 3.670796,
+      "kind": "field",
+      "field": "tide",
+      "amount": 1.5,
       "axis": [
-       -0.615661,
        0.0,
-       -0.788011
+       1.0,
+       0.0
       ],
-      "displacementAxis": [
-       0.615661,
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "lift",
+      "amount": 0.55,
+      "axis": [
        0.0,
-       0.788011
+       1.0,
+       0.0
       ],
-      "space": "world"
+      "space": "world",
+      "alongNormal": false
      }
     ]
    }
@@ -5495,19 +5636,151 @@
      },
      {
       "kind": "sine",
-      "amount": -1.531071,
+      "amount": 0.16,
+      "frequency": 0.405367,
+      "speed": 1.236375,
+      "phase": 2.1,
+      "axis": [
+       -0.615661,
+       0.0,
+       -0.788011
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "field",
+      "field": "tide",
+      "amount": 1.5,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "lift",
+      "amount": 0.55,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world",
+      "alongNormal": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "boatWake",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/do-wake.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "program": "doWake",
+     "alphaMode": "mask",
+     "alphaCutoff": 0.5,
+     "doubleSided": true
+    },
+    "deformers": [
+     {
+      "kind": "path",
+      "spline": "boatCourse",
+      "amount": 1.0,
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ],
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "pathOffset": 8.0,
+      "pathScale": 1.0,
+      "pathRoll": 0.0,
+      "space": "local"
+     },
+     {
+      "kind": "sine",
+      "amount": 1.15,
+      "frequency": 0.087266,
+      "speed": 0.573654,
+      "phase": 0.0,
+      "axis": [
+       -0.104528,
+       0.0,
+       -0.994522
+      ],
+      "displacementAxis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "sine",
+      "amount": -4.812845,
+      "frequency": 0.087266,
+      "speed": 0.573654,
+      "phase": 1.570796,
+      "axis": [
+       -0.104528,
+       0.0,
+       -0.994522
+      ],
+      "displacementAxis": [
+       0.104528,
+       0.0,
+       0.994522
+      ],
+      "space": "world"
+     },
+     {
+      "kind": "sine",
+      "amount": 0.42,
       "frequency": 0.169816,
       "speed": 0.800231,
-      "phase": 2.870796,
+      "phase": 1.3,
       "axis": [
        0.515038,
        0.0,
        -0.857167
       ],
       "displacementAxis": [
-       -0.515038,
        0.0,
-       0.857167
+       1.0,
+       0.0
       ],
       "space": "world"
      },
@@ -5530,134 +5803,30 @@
       "space": "world"
      },
      {
-      "kind": "sine",
-      "amount": -0.419373,
-      "frequency": 0.405367,
-      "speed": 1.236375,
-      "phase": 3.670796,
+      "kind": "field",
+      "field": "tide",
+      "amount": 1.5,
       "axis": [
-       -0.615661,
        0.0,
-       -0.788011
+       1.0,
+       0.0
       ],
-      "displacementAxis": [
-       0.615661,
+      "space": "world",
+      "alongNormal": false
+     },
+     {
+      "kind": "field",
+      "field": "lift",
+      "amount": 0.55,
+      "axis": [
        0.0,
-       0.788011
+       1.0,
+       0.0
       ],
-      "space": "world"
+      "space": "world",
+      "alongNormal": false
      }
     ]
-   }
-  },
-  {
-   "name": "wake",
-   "kind": "particles",
-   "particles": {
-    "enabled": true,
-    "capacity": 700,
-    "seed": 22293,
-    "shape": "sphere",
-    "position": [
-     -119.502,
-     0.15,
-     -83.958
-    ],
-    "extent": [
-     0.6,
-     0.05,
-     0.6
-    ],
-    "direction": [
-     -0.9965,
-     0.0,
-     -0.083
-    ],
-    "spawnRate": 40.0,
-    "lifetimeMin": 3.0,
-    "lifetimeMax": 5.0,
-    "spread": 0.3,
-    "speedMin": 0.5,
-    "speedMax": 1.2,
-    "gravity": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "drag": 0.35,
-    "sizeStart": 0.22,
-    "sizeEnd": 0.9,
-    "colorStart": [
-     1.0,
-     0.68669,
-     0.87137,
-     0.32
-    ],
-    "colorEnd": [
-     1.0,
-     0.68669,
-     0.87137,
-     0.0
-    ],
-    "emissive": 0.8,
-    "blend": "additive",
-    "turbulence": 0.15,
-    "turbulenceScale": 0.3
-   }
-  },
-  {
-   "name": "bowWave",
-   "kind": "particles",
-   "particles": {
-    "enabled": true,
-    "capacity": 300,
-    "seed": 37577,
-    "shape": "sphere",
-    "position": [
-     -104.853,
-     0.5,
-     -82.738
-    ],
-    "extent": [
-     0.6,
-     0.05,
-     0.6
-    ],
-    "direction": [
-     0.9965,
-     0.5,
-     0.083
-    ],
-    "spawnRate": 30.0,
-    "lifetimeMin": 0.6,
-    "lifetimeMax": 1.1,
-    "spread": 0.55,
-    "speedMin": 1.2,
-    "speedMax": 2.4,
-    "gravity": [
-     0.0,
-     -9.8,
-     0.0
-    ],
-    "drag": 0.35,
-    "sizeStart": 0.12,
-    "sizeEnd": 0.05,
-    "colorStart": [
-     1.0,
-     0.68669,
-     0.87137,
-     0.7
-    ],
-    "colorEnd": [
-     1.0,
-     0.68669,
-     0.87137,
-     0.0
-    ],
-    "emissive": 0.8,
-    "blend": "additive",
-    "turbulence": 0.15,
-    "turbulenceScale": 0.3
    }
   },
   {
@@ -9510,6 +9679,147 @@
    "emission": 3,
    "emissionIntensity": 1.0,
    "opacity": -1
+  },
+  {
+   "name": "doWake",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "noise",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "value": 0.55,
+     "seed": 41
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "uv"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 1,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 1,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      -1.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 0.8
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.6,
+      0.36,
+      0.8
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      -1.0,
+      -1.0,
+      -1.0,
+      -1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 0,
+     "srcB": 2
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.04,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      0.68669,
+      0.87137,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": -1,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": 4
   },
   {
    "name": "doDolphin",
