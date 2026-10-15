@@ -253,9 +253,7 @@ def sea_program(far=False):
         P.op(None, "input", 3, inp="cameraDistance")                     # fade them out by the seam at 200 m
         P.op("shimmerFade", "remap", 3, a=3, k=[SHIMMER_NEAR, SHIMMER_FAR, 1.0, 0.0], f=1.0)
         P.op(None, "multiply", 2, a=2, b=3)
-        P.op(None, "constant", 3, k=[1.0, 0.0, 0.55, 0.0])
-        P.op(None, "multiply", 2, a=2, b=3)
-        P.op(None, "add", 0, a=0, b=2)
+        P.op(None, "add", 0, a=0, b=2)                                   # a tilt along (1, 1, 1): enough
     P.op(None, "fresnel", 2, f=1.0)                                      # 1 - n.v (the fragment's own normal)
     P.op("nv", "remap", 2, a=2, k=[0.0, 1.0, 1.0, 0.0])
     # the reflected sky: by r.y
@@ -303,6 +301,12 @@ def sea_program(far=False):
         P.op("crestFade", "remap", 7, a=7, k=[FAR_FLAT0, FAR_FLAT1, 1.0, 1.0 - FAR_FLAT_MAX], f=1.0)
         P.op(None, "multiply", 6, a=6, b=7)
     P.op("lit", "add", 5, a=5, b=6)
+    if not far:
+        # foam: thin caps on the highest crests only (where the trains reinforce), seen edge-on from this height as
+        # ribbons; screen-space curvature was tried and gave a broad wash. `foam`'s colour is what the drums scale
+        P.op("foamMask", "smoothstep", 6, a=7, k=[FOAM_H0, FOAM_H1])
+        P.colour("foam", 7, pal(pn, "foam"), FOAM_GAIN)
+        P.op("foamed", "mixBy", 5, a=5, b=7, c=6)
     return P
 
 
@@ -313,7 +317,7 @@ PATH_GAIN = 0.55
 GLINT_COS0, GLINT_COS1 = math.cos(math.radians(2.6)), math.cos(math.radians(0.9))
 GLINT_GAIN = 2.4
 SHIMMER_FREQ = 0.55
-SHIMMER_AMP = 0.1
+SHIMMER_AMP = 0.055
 SHIMMER_NEAR, SHIMMER_FAR = 50.0, 200.0
 FAR_FLAT0, FAR_FLAT1, FAR_FLAT_MAX = 200.0, 700.0, 0.85
 FRESNEL_POWER = 3.0
@@ -321,6 +325,8 @@ FRESNEL_MIN = 0.2
 CREST_LO, CREST_HI = 0.3, 1.9
 SSS_GAIN = 0.9
 SSS_FOCUS = 3.0
+FOAM_H0, FOAM_H1 = 0.62, 0.72         # of the crest ramp (0.3..1.9 m): the tops of the highest crests
+FOAM_GAIN = 1.0
 
 
 def sky_program():

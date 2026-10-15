@@ -88,3 +88,15 @@ Brief: `00-brief.md` (the owner's, verbatim). Plan: `01-plan.md`. Worktree `../a
   silhouette: it balances the sun on the right third and gives the horizon scale. A needle stack read as a shark fin
   and was removed.
 - Media: `stage4-sky.png`, `stage4-sky-drift-4s-120s-300s.png` (the drift over five minutes).
+
+## Stage 5: foam and secondary detail (done)
+
+- **Foam caps** (near program, 3 ops): a sharp threshold on the crest-height ramp, so only the tops of the highest
+  crests -- where the three trains reinforce -- carry mint foam; seen edge-on from 12 m they read as thin ribbons that
+  come and go as the trains drift in and out of phase. Tried first and rejected: the `curvatureMask` op (screen-space
+  curvature) gave a broad mint wash over every crest, not a ribbon.
+- **Micro-ripple tilt** folded into one add along (1, 1, 1) to free ops (the near program is exactly 48 ops); its
+  amplitude dropped to 0.055 because the tilt now also moves n.y and made the near glints too large.
+- **Spray**: deliberately not scattered over the sea. Spray belongs to events -- dolphin splashes, the hero wave, the
+  drums -- and is built with them (Stages 6-7).
+- Media: `stage5-foam-caps.png` (two thresholds x two moments; right column chosen).
