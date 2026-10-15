@@ -189,6 +189,45 @@ TEST_CASE("Procedural alpha cutouts do not occlude the geometry behind them",
     CHECK(context->errorCount() == 0);
 }
 
+TEST_CASE("A program-cut procedural does not occlude the geometry behind it (ADR-1371)",
+          "[gpu][procedural][depth][adr1371]") {
+    // The same cutout as above, made by a material program's opacity instead of a texture: the lit pass discarded
+    // it, the depth prepass kept its depth, and the column behind showed the cleared colour through the hole.
+    auto context = makeContext();
+    auto scene = columnScene(1);
+    scene.camera.position = {0.0f, 1.0f, 8.0f};
+    scene.camera.target = {0.0f, 1.0f, 0.0f};
+    scene.procedurals[0].instances = gridInstances(1, 1, 1.0f);
+    scene.procedurals[0].material.unlit = true;
+    scene.procedurals[0].material.baseColor = {0.8f, 0.15f, 0.05f};
+    const auto unobstructed = renderOnce(*context, scene, 0.0, 96, 96);
+
+    scene::MaterialProgram cut;
+    cut.name = "cut";
+    scene::MaterialOp zero;
+    zero.kind = scene::MaterialOpKind::Constant;
+    zero.dst = 0;
+    zero.constant = glm::vec4(0.0f);
+    cut.ops = {zero};
+    cut.opacityRegister = 0;
+    scene.materialPrograms.push_back(cut);
+    auto foreground = columns(1, 1);
+    foreground.name = "programCut";
+    foreground.instances[0].position.z = 3.0f;
+    foreground.material.alphaMode = scene::AlphaMode::Mask;
+    foreground.material.program = "cut";
+    scene.procedurals.push_back(foreground);
+    const auto masked = renderOnce(*context, scene, 0.0, 96, 96);
+    CHECK(gpu::hashImage(unobstructed) == gpu::hashImage(masked));
+    CHECK(coverage(masked).pixels > 40);
+
+    // The guard: an opaque program (opacity 1) on the same column does occlude.
+    scene.materialPrograms[0].ops[0].constant = glm::vec4(1.0f);
+    const auto solid = renderOnce(*context, scene, 0.0, 96, 96);
+    CHECK(gpu::hashImage(solid) != gpu::hashImage(unobstructed));
+    CHECK(context->errorCount() == 0);
+}
+
 TEST_CASE("Procedural instances render, coverage grows with count, frames are stable", "[gpu][procedural]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
