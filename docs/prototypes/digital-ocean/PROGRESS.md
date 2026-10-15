@@ -483,3 +483,13 @@ a clip from 0 s with a scored leap and hero wave (`passG-events-leap-herowave.pn
 - The hero wave reads as a thin dark line rather than a rising, foaming swell.
 - At intermediate mood positions under loud music the sky can drift pale lavender (two palettes half-blended plus
   rays).
+
+## Pass H: performance and reliability (done)
+
+- Real live path at 1080p: a steady 30 fps (frame p50 33.3, p99 34.2 ms) at the ladder's Medium (scale 0.71), GPU 27.3
+  ms. Headless Ultra at 1080p: 27.1 ms silent and 33.3 ms with Trench (at risk without the ladder). 2160p: 68 ms, the
+  ladder scales it. Pass 2 costs ~5 ms more than Pass 1; Pass 3, which replaces the water, owes the per-feature
+  breakdown and the optimisation.
+- MIDI stress (`avgen_sonic_probe stress`, a new scenario): 899 messages, every pad hammered at 4 Hz, palette and
+  night sweeps, repeated hero waves. GPU flat at 29.5-29.7 ms in every phase, no errors, nothing accumulates.
+- Report: `05-report-art-pass-2.md`.

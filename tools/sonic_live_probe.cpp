@@ -12,6 +12,7 @@
 //
 // Scenarios:
 //   controller  a performer's controller on Digital Ocean's map: pads 36-40 and CC 1/2 sweeps over a held note.
+//   stress      Digital Ocean's reliability run: every pad 36-41 hammered at 4 Hz, palette/night CC sweeps, ~62 s.
 //   latency   24 notes, 0.8 s apart, a sharp attack each: MIDI -> bus, audio -> bus.
 //   sweep     one held note; a low-pass cutoff sweeps 120 Hz -> 9 kHz and back (the brief's §17 / PART 17).
 //   drive     one held note; the drive rises from clean to hard clipping (§18 / PART 18).
@@ -762,6 +763,32 @@ void scenario(const std::string& name, Player& p) {
         p.ccRamp(1, 127, 0, 42.0, 45.0);   // dusk again
         p.off(40);
         p.waitUntil(46.0);
+    } else if (name == "stress") {
+        // Digital Ocean pass 2's reliability check (Pass H): every pad hammered at 4 Hz, the palette and night CCs
+        // swept fast and slow, repeated signature events, about 62 s over a held pad note. Nothing may accumulate.
+        usePatch(p, "pad");
+        p.waitUntil(1.0);
+        p.on(40, 70);
+        double t = 2.0;
+        for (int round = 0; round < 2; ++round) {
+            for (int pad = 36; pad <= 41; ++pad) {
+                for (int k = 0; k < 8; ++k) {
+                    p.pad(t, pad, 100 + (k % 3) * 9);
+                    t += 0.25;
+                }
+            }
+        }
+        p.ccRamp(1, 0, 127, t, t + 1.0);          // palette: fast up
+        p.ccRamp(1, 127, 0, t + 1.0, t + 2.0);    // and down
+        p.ccRamp(1, 0, 127, t + 2.0, t + 12.0);   // slowly through all three palettes
+        p.ccRamp(2, 0, 127, t + 12.0, t + 15.0);  // night
+        for (int k = 0; k < 6; ++k) {
+            p.pad(t + 15.5 + 0.4 * k, 37, 120);   // hero waves while it is night
+        }
+        p.ccRamp(2, 127, 0, t + 18.5, t + 21.0);
+        p.ccRamp(1, 127, 0, t + 21.0, t + 31.0);  // back to the sunset
+        p.off(40);
+        p.waitUntil(t + 32.0);
     } else if (name == "silence") {
         p.waitUntil(5.0);
     } else {
