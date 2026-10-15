@@ -100,6 +100,11 @@ controls it maps. The Live panel's **Scene** dropdown lists every live scene, he
 PageDown step through the same list, and a MIDI program change n opens scene n. **Target** holds the live picture to
 30, 60, 90 or 120 fps.
 
+A live scene's audio and MIDI reactions run whether or not the transport plays, but its camera (and in some scenes
+the travel through the world) follows the timeline, which moves only while the transport plays. **Start projection**
+starts the transport for a live scene and **Stop projection** stops it; a live scene keeps playing past the end of
+its timeline (its camera paths loop), and switching scenes while playing keeps playing.
+
 ## Where the editor keeps its own files
 
 In SDL's preferences directory for AV Gen:

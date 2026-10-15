@@ -74,7 +74,7 @@ void Transport::setDuration(double seconds) {
     // A shorter piece must not leave the playhead or the loop hanging past the end of it. This is
     // the "timeline duration changed during playback" case: re-baking a sequence while it plays is
     // the normal way to work in this application, not an edge case.
-    if (mode_ == TransportMode::Realtime && position_ > duration_) {
+    if (mode_ == TransportMode::Realtime && !endless_ && position_ > duration_) {
         position_ = duration_;
     }
     if (loop_.endSeconds > duration_) {
@@ -120,6 +120,13 @@ double Transport::playStartSeconds() const {
     return loop_.usable() ? loop_.startSeconds : 0.0;
 }
 
+void Transport::setEndless(bool endless) {
+    if (endless_ != endless) {
+        endless_ = endless;
+        ++revision_;
+    }
+}
+
 double Transport::playEndSeconds() const {
     if (loop_.usable()) {
         return loop_.endSeconds;
@@ -138,7 +145,8 @@ double Transport::clampToRange(double seconds) const {
     // no audio -- not "this piece is zero seconds long". Such a transport is unbounded: it plays
     // forward and never reaches an end, which is what the engine did before it had a transport at
     // all. Clamping to [0,0] here would pin the playhead at zero and make Play do nothing.
-    if (!(duration_ > 0.0)) {
+    // ADR-1342: an endless transport (a live project) has no end either.
+    if (!(duration_ > 0.0) || endless_) {
         return std::max(0.0, seconds);
     }
     return std::clamp(seconds, 0.0, duration_);
@@ -160,8 +168,9 @@ bool Transport::play() {
     }
     // At (or past) the end: start again rather than play nothing. The piece has one obvious next
     // thing to do and this is it.
+    // An endless transport (ADR-1342) has no end to restart from, unless a usable loop gives it one.
     const double end = playEndSeconds();
-    if (end > 0.0 && position_ >= end - kEpsilon) {
+    if (end > 0.0 && (!endless_ || loop_.usable()) && position_ >= end - kEpsilon) {
         position_ = playStartSeconds();
     } else if (position_ < playStartSeconds() - kEpsilon && loop_.usable()) {
         // Playing from before a loop is allowed -- the loop catches it at the end. Nothing to do.
@@ -310,7 +319,7 @@ TransportTick Transport::wrapOrStop(double previous, double candidate) {
         out.positionSeconds = position_;
         return out;
     }
-    if (duration_ > 0.0 && candidate >= duration_) {
+    if (duration_ > 0.0 && !endless_ && candidate >= duration_) {
         candidate = duration_;
         out.reachedEnd = true;
         state_ = TransportState::Paused; // parked at the end, where Play starts it again

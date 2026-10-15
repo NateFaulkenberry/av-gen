@@ -4811,12 +4811,20 @@ void Engine::clearTempoOverride() {
     refreshTransport();
 }
 
+bool Engine::projectIsLive() const {
+    return sonic_ != nullptr && sonic_->live;
+}
+
 void Engine::refreshTransport() {
     // The project's length is the longest thing in it. A sequence that runs past its audio is a
     // sequence that should play to its end, and a project with no audio at all still has a length.
     double duration = audioDurationSeconds();
     duration = std::max(duration, sequence_.duration());
     duration = std::max(duration, timeline_.durationSeconds());
+    // ADR-1342: a live project plays on past that length (its camera tracks are authored loops) instead of parking
+    // at the end of its longest track -- Glitch Signal's camera stopped after 30 s of a projection. Before the
+    // duration, so the new duration does not clamp an endless playhead back.
+    transport_.setEndless(projectIsLive());
     transport_.setDuration(duration);
     // The tempo is for the bars/beats readout and for beat stepping with no analyzed grid. It comes
     // from wherever the beat clock came from this frame, so the display cannot disagree with the

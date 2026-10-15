@@ -139,6 +139,12 @@ public:
     // early. Clamps the position and the loop into the new range.
     void setDuration(double seconds);
     [[nodiscard]] double durationSeconds() const { return duration_; }
+    // ADR-1342: an endless transport plays on past the duration instead of parking at the end, and a seek or a
+    // new duration does not pull the playhead back into [0, duration]. A live project (sonic.live) is endless: its
+    // timeline tracks are authored loops (`loopLength`), so the camera keeps flying for as long as it is played.
+    // The duration still sizes the timeline the editor draws. A usable loop still wraps.
+    void setEndless(bool endless);
+    [[nodiscard]] bool endless() const { return endless_; }
     void setFrameRate(FrameRate rate);
     [[nodiscard]] FrameRate frameRate() const { return frameRate_; }
     // For the bars/beats display and for beat stepping when there is no analyzed beat grid.
@@ -232,6 +238,7 @@ private:
     TransportMode mode_ = TransportMode::Realtime;
     double position_ = 0.0;
     double duration_ = 0.0;
+    bool endless_ = false;
     double rate_ = 1.0;
     FrameRate frameRate_{};
     double tempoBpm_ = 0.0;

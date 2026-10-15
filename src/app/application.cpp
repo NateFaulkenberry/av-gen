@@ -2454,7 +2454,15 @@ void Application::switchLiveScene(int index) {
     if (current == index) {
         return;
     }
+    resumePlayAfterSwitch_.reset();
     if (current >= 0 && panel_ != nullptr) {
+        // ADR-1342: loading a project parks its transport at 0, and live input is already on, so nothing restarted
+        // it: a camera scene switched to mid-set sat on its first frame. A switch made while the picture moves
+        // (playing, or projecting) resumes play once the next scene has loaded. (From any other project, live input
+        // turning on starts the transport, serviceLiveSonic.)
+        if (engine_->isPlaying() || projection_.state() == Projection::State::Running) {
+            resumePlayAfterSwitch_ = target;
+        }
         // From one live scene to another: straight in, with the performer's response carried. A performer mid-set is
         // not asked whether to save an example; anything else goes through the prompt, as every open does (ADR-440).
         carryResponse_ = captureResponse(engine_->params());
@@ -2470,6 +2478,17 @@ void Application::serviceLiveScenes() {
     }
     if (panel_ != nullptr) {
         panel_->liveSceneCurrent = liveSceneIndex(liveScenes_, engine_->projectPath());
+    }
+    // ADR-1342: the scene a switch asked to keep playing has loaded (its load parked the transport): play it.
+    if (resumePlayAfterSwitch_ && !pendingOpen_) {
+        ExampleInfo target;
+        target.file = *resumePlayAfterSwitch_;
+        if (liveSceneIndex({target}, engine_->projectPath()) == 0 && !engine_->isPlaying()) {
+            if (auto r = engine_->play(); !r) {
+                log::warn("live scene switch: transport: {}", r.error().message);
+            }
+        }
+        resumePlayAfterSwitch_.reset(); // once: the open finished (or failed); either way the request is spent
     }
     if (const auto program = engine_->control().takeProgramChange()) {
         const int index = liveSceneForProgram(*program, static_cast<int>(liveScenes_.size()));
@@ -7002,6 +7021,13 @@ void Application::startProjection() {
     // input on when it loads, ADR-1025; the Live panel's Scene list opens any live scene, ADR-1341.)
     if (projection_.start() == Projection::Action::OpenWindow) {
         openProjectionWindow();
+        // ADR-1342: a live scene's camera and timeline move only while the transport plays, so Start projection
+        // also starts it: one step, not two. Its transport is endless, so it plays until Stop projection.
+        if (engine_ != nullptr && engine_->projectIsLive() && !engine_->isPlaying()) {
+            if (auto r = engine_->play(); !r) {
+                log::warn("projection: transport: {}", r.error().message);
+            }
+        }
     }
 }
 
@@ -7009,6 +7035,10 @@ void Application::stopProjection() {
     if (projection_.stop() == Projection::Action::CloseWindow) {
         outputs_.remove(kProjectionOutputName);
         log::info("projection stopped");
+        // ADR-1342: ...and Stop projection stops it (a live project only; any other keeps its transport).
+        if (engine_ != nullptr && engine_->projectIsLive()) {
+            engine_->stop();
+        }
     }
 }
 

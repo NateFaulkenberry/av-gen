@@ -541,6 +541,7 @@ private:
     Projection projection_;
     std::vector<ExampleInfo> liveScenes_;           // ADR-1063/1341: every live example, Sonic Live first
     std::optional<ResponseCarry> carryResponse_;    // ADR-1063: the performer's response, across a switch
+    std::optional<std::filesystem::path> resumePlayAfterSwitch_; // ADR-1342: the switched-to scene to start playing
     void switchLiveScene(int index);
     void serviceLiveScenes();
     std::vector<ProjectionDisplay> projectionDisplays_;

@@ -431,3 +431,49 @@ TEST_CASE("A piece with no stated length plays forward without end", "[transport
     tick = t.advance(5.0);
     CHECK(tick.reachedEnd);
 }
+
+// ADR-1342: a live project's transport is endless. Glitch Signal's camera stopped after 30 s of a projection because
+// the transport parked at the end of its longest timeline track; its tracks are authored loops (`loopLength`), so
+// the right behaviour is to keep the playhead running for as long as the scene is played.
+TEST_CASE("An endless transport plays on past the end; a bounded one still parks there", "[transport][adr1342]") {
+    Transport bounded;
+    bounded.setDuration(30.0);
+    REQUIRE(bounded.play());
+    const auto parked = bounded.advance(31.0);
+    CHECK(parked.reachedEnd);
+    CHECK_FALSE(bounded.isPlaying());
+    CHECK_THAT(bounded.positionSeconds(), WithinAbs(30.0, 1e-9));
+
+    Transport endless;
+    endless.setEndless(true);
+    endless.setDuration(30.0);
+    REQUIRE(endless.play());
+    const auto past = endless.advance(31.0);
+    CHECK_FALSE(past.reachedEnd);
+    CHECK(endless.isPlaying());
+    CHECK_THAT(endless.positionSeconds(), WithinAbs(31.0, 1e-9));
+    endless.advance(600.0); // ten minutes into a set
+    CHECK_THAT(endless.positionSeconds(), WithinAbs(631.0, 1e-9));
+
+    // A new duration (a re-bake while playing) does not pull the playhead back, and neither does a seek.
+    endless.setDuration(20.0);
+    CHECK_THAT(endless.positionSeconds(), WithinAbs(631.0, 1e-9));
+    endless.seek(900.0);
+    CHECK_THAT(endless.positionSeconds(), WithinAbs(900.0, 1e-9));
+
+    // Paused past the end, Play continues from there rather than restarting the piece.
+    endless.pause();
+    REQUIRE(endless.play());
+    CHECK_THAT(endless.positionSeconds(), WithinAbs(900.0, 1e-9));
+
+    // A usable loop still wraps (an endless transport ignores the end of the piece, not the loop).
+    Transport looped;
+    looped.setEndless(true);
+    looped.setDuration(30.0);
+    REQUIRE(looped.setLoop(TransportLoop{.enabled = true, .startSeconds = 2.0, .endSeconds = 6.0}));
+    looped.seek(5.0);
+    REQUIRE(looped.play());
+    const auto wrapped = looped.advance(2.0);
+    CHECK(wrapped.looped);
+    CHECK_THAT(looped.positionSeconds(), WithinAbs(3.0, 1e-9));
+}

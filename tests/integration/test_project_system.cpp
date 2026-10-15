@@ -1350,3 +1350,23 @@ TEST_CASE("A project keeps its path-trace settings across two saves", "[integrat
     CHECK(reopened.pathTraceSettings().samplesPerPixel == app::PathTraceSettings{}.samplesPerPixel);
     CHECK(reopened.pathTraceSettings().outputPath.empty());
 }
+
+// ADR-1342: a live project (sonic.live) gets an endless transport, so its looped camera keeps moving for as long as it
+// is played; any other project still stops at its end. Glitch Signal is the one the owner saw stop after 30 s.
+TEST_CASE("A live project's transport is endless; any other project's is not", "[integration][project][live][adr1342]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const std::filesystem::path examples = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples";
+    app::Engine live(app::EngineMode::Offline);
+    REQUIRE(live.loadProject(examples / "sonic-abstract" / "glitch-signal.json").has_value());
+    CHECK(live.projectIsLive());
+    CHECK(live.transport().endless());
+    CHECK(live.transport().durationSeconds() > 0.0); // the timeline still has a length for the editor to draw
+
+    app::Engine film(app::EngineMode::Offline);
+    REQUIRE(film.loadProject(examples / "temple" / "temple.json").has_value());
+    CHECK_FALSE(film.projectIsLive());
+    CHECK_FALSE(film.transport().endless());
+#endif
+}

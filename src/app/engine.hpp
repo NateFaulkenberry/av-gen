@@ -494,6 +494,8 @@ public:
     // block says `"live": true` turns it on when the live editor opens it; any other project turns it off.
     [[nodiscard]] Result<void> setLiveSonic(bool enabled);
     [[nodiscard]] bool liveSonic() const { return liveSonic_.running(); }
+    // The open project is made to be played (`sonic.live`, ADR-1025). Its transport is endless (ADR-1342).
+    [[nodiscard]] bool projectIsLive() const;
     // Called by ControlHub for every MIDI message; true when the note model used it.
     bool liveSonicMidi(const control::MidiMessage& message);
     [[nodiscard]] sonic::LiveSonic::Status liveSonicStatus() const { return liveSonic_.status(liveFrameSeconds_); }
