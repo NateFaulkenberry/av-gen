@@ -637,3 +637,50 @@ Seen and left: at intermediate mood positions under quiet music the water drifts
 palettes are half-blended and the horizon blend's two colours meet. It is the same family as Pass 2's pale-sky
 note. The near long-swell crest at 6-8 s, without the hero, is a large lit band broken by the detail noise. It is
 legible, but busier than the rest.
+
+### Pass G: performance and reliability
+
+All runs: M2 Max, `tools/live_scene_profile.py` under the GPU lock, on main's ADR-1362 controller (merged before
+measuring). Reports are in `55-digital-ocean-water/passG-profiles/`.
+
+**Per-feature GPU cost by elimination**, headless 1080p Ultra, silent. Each variant hides nodes
+(`procedural/<n>/visible`) or disables a feature's program ops (`material/<p>/op/<n>/<kind>/enabled`):
+
+| Variant | GPU p50 (ms) | vs full |
+|---|---|---|
+| full | 26.54 | |
+| the Pass 2 water program instead | 27.26 | +0.72 |
+| no sea at all | 9.83 | -16.71 |
+| sea without its program | 18.61 | -7.93 |
+| sea without its deformers | 23.40 | -3.14 |
+| no strokes and foam | 25.49 | -1.05 |
+| no glints | 25.17 | -1.38 |
+| no surface detail | 25.62 | -0.92 |
+| no sun rays (sky ops) | 25.69 | -0.85 |
+| no clouds | 24.18 | -2.36 |
+| no yacht and wake | 26.35 | -0.20 |
+| no island, trees and surf line | 26.54 | 0.00 |
+| no dolphins | 26.35 | -0.20 |
+
+- The anime water is 0.7 ms *cheaper* than Pass 2's (fewer ops, no `quantize`). The sea is 63 % of the frame:
+  about 8 ms of program, 3 ms of deformers (eight a vertex, with finite-difference normals, two of them audio
+  fields), and the rest the sea's raster and depth.
+- Tried and reverted: dropping the far program's detail noise saved nothing measurable (26.61 ms) and lost the far
+  sparks. AO off saves 0.85 ms (A/B), but nothing in this scene is lit. The shadow mask's A/B was void (drift).
+  Neither is a scene setting, so both are left.
+- **The live path at 1080p** (the real editor loop, Fifo, the projection on a 120 Hz display):
+  - auto settles at High (internal 1632 x 918, scale 0.85);
+  - frame interval median 33.36 ms (30 fps), p95 35.3;
+  - GPU median 29.6 ms;
+  - 3.3 % of frames miss one 8.3 ms vsync;
+  - the profiler's status is "at risk".
+
+  Pinned at Medium (scale 0.71, GPU 25.3 ms) the miss rate is the same, 3.1 %. Removing the 84 integrated phase
+  routes doesn't change it either. So the misses are not the GPU. The CPU breakdown shows "UI build and record"
+  at 8.7-9.8 ms a frame (the editor); `bit-ocean` measures 6.4 ms of CPU work on the same path. Pass 2's live run
+  (60 Hz display, before ADR-1362) had 2.2 ms of CPU and no misses. This is recorded as a finding for the
+  live-controller and editor owners, not fixed here.
+- **Reliability** (`live-stress/`, `stress-sheet.png`): the probe's stress scenario played 902 MIDI messages over
+  83 s into the live editor with BlackHole audio: every pad hammered at 4 Hz, palette and night sweeps, repeated
+  hero waves. GPU p50 stayed between 26.6 and 30.8 ms in every 10 s window with nothing accumulating, the frame
+  interval p50 was 33.3-33.6 ms throughout, and there were 0 GPU errors.
