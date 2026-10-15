@@ -199,7 +199,11 @@ Files are in `~/Desktop/av-gen-review/48-rift-live-30fps/stills/`.
 
 ## 7. Suites
 
-Both full suites were run on the merged branch (`47afa203` plus this report), under the lock, one after the other.
+Both full suites were run on the merged branch (`72ba5d04`: `47afa203` plus the ADR and this report), reconfigured
+and rebuilt after the merge, under the lock, one after the other.
 
-- CPU: `tools/ci/run-suite.sh cpu-assets` -- SUITE_CPU
-- GPU: `tools/ci/run-suite.sh gpu --bin build/release/tests` -- SUITE_GPU
+- CPU: `tools/ci/run-suite.sh cpu-assets` -- **exit 0**, PASS: 4249 cases, 4229 passed, 0 failed, 19 skipped, 1
+  expected failure (the known shouldfail), 19 m 19 s.
+- GPU: `tools/ci/run-suite.sh gpu --bin build/release/tests` -- **exit 0**, PASS: 658 cases, 657 passed, 0 failed, 1
+  skipped, 29 m 39 s.
+- New cases: `[adr1344]` (one each in `test_ecosystem_gpu.cpp`, `test_volume_gpu.cpp` and `test_rift.cpp`).
