@@ -578,7 +578,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -604,7 +604,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -698,7 +698,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.4,
+    "gain": 0.7,
     "offset": 1.0,
     "attackMs": 1500,
     "decayMs": 3500
@@ -711,7 +711,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 0.6,
+    "gain": 0.35,
     "offset": 1.0,
     "attackMs": 1500,
     "decayMs": 3500
@@ -967,7 +967,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": -0.02846,
    "op": "add",
    "polarity": "unipolar",
@@ -979,7 +979,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": 1.78133,
    "op": "add",
    "polarity": "unipolar",
@@ -991,7 +991,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": -2.54759,
    "op": "add",
    "polarity": "unipolar",
@@ -1003,7 +1003,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": -0.18856,
    "op": "add",
    "polarity": "unipolar",
@@ -1015,7 +1015,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 0.01065,
    "op": "add",
    "polarity": "unipolar",
@@ -1027,7 +1027,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": -0.02754,
    "op": "add",
    "polarity": "unipolar",
@@ -1616,7 +1616,7 @@
   {
    "source": "control.night",
    "target": "material/doCloud/op/15/constant/constant",
-   "amount": -1.82528,
+   "amount": -0.66927,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -1628,7 +1628,7 @@
   {
    "source": "control.night",
    "target": "material/doCloud/op/15/constant/constant",
-   "amount": -0.55087,
+   "amount": -0.20199,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -1640,7 +1640,7 @@
   {
    "source": "control.night",
    "target": "material/doCloud/op/15/constant/constant",
-   "amount": 1.63077,
+   "amount": 0.59795,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -2059,7 +2059,7 @@
   },
   {
    "source": "control.golden",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": 0.1389,
    "op": "add",
    "polarity": "unipolar",
@@ -2071,7 +2071,7 @@
   },
   {
    "source": "control.golden",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": -1.24685,
    "op": "add",
    "polarity": "unipolar",
@@ -2083,7 +2083,7 @@
   },
   {
    "source": "control.golden",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": -2.72989,
    "op": "add",
    "polarity": "unipolar",
@@ -2095,7 +2095,7 @@
   },
   {
    "source": "control.golden",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 0.29467,
    "op": "add",
    "polarity": "unipolar",
@@ -2107,7 +2107,7 @@
   },
   {
    "source": "control.golden",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": -0.06158,
    "op": "add",
    "polarity": "unipolar",
@@ -2119,7 +2119,7 @@
   },
   {
    "source": "control.golden",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": -0.06277,
    "op": "add",
    "polarity": "unipolar",
@@ -2624,7 +2624,7 @@
   {
    "source": "control.golden",
    "target": "material/doCloud/op/15/constant/constant",
-   "amount": 0.65988,
+   "amount": 0.24195,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -2636,7 +2636,7 @@
   {
    "source": "control.golden",
    "target": "material/doCloud/op/15/constant/constant",
-   "amount": 0.56421,
+   "amount": 0.20688,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -3015,7 +3015,7 @@
   },
   {
    "source": "control.foam",
-   "target": "material/doSea/op/42/smoothstep/constant",
+   "target": "material/doSea/op/45/smoothstep/constant",
    "amount": -0.16,
    "op": "add",
    "polarity": "unipolar",
@@ -3027,7 +3027,7 @@
   },
   {
    "source": "control.foam",
-   "target": "material/doSea/op/42/smoothstep/constant",
+   "target": "material/doSea/op/45/smoothstep/constant",
    "amount": -0.1,
    "op": "add",
    "polarity": "unipolar",
@@ -3039,7 +3039,7 @@
   },
   {
    "source": "control.foam",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -3057,7 +3057,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.5,
+    "gain": 0.9,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
@@ -3070,7 +3070,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.5,
+    "gain": 0.9,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
@@ -3083,7 +3083,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.5,
+    "gain": 0.9,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
@@ -3096,7 +3096,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.5,
+    "gain": 0.9,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
@@ -3130,7 +3130,7 @@
   },
   {
    "source": "control.padGlow",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": 0.0311,
    "op": "add",
    "polarity": "unipolar",
@@ -3143,7 +3143,7 @@
   },
   {
    "source": "control.padGlow",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": 5.2282,
    "op": "add",
    "polarity": "unipolar",
@@ -3156,7 +3156,7 @@
   },
   {
    "source": "control.padGlow",
-   "target": "material/doSea/op/39/constant/constant",
+   "target": "material/doSea/op/42/constant/constant",
    "amount": 2.3494,
    "op": "add",
    "polarity": "unipolar",
@@ -3208,7 +3208,7 @@
   },
   {
    "source": "control.padGlow",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 0.2919,
    "op": "add",
    "polarity": "unipolar",
@@ -3221,7 +3221,7 @@
   },
   {
    "source": "control.padGlow",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 1.5,
    "op": "add",
    "polarity": "unipolar",
@@ -3234,7 +3234,7 @@
   },
   {
    "source": "control.padGlow",
-   "target": "material/doSea/op/43/constant/constant",
+   "target": "material/doSea/op/46/constant/constant",
    "amount": 1.1181,
    "op": "add",
    "polarity": "unipolar",
@@ -3252,7 +3252,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 3.0,
+    "gain": 1.6,
     "offset": 1.0,
     "envelope": "peakhold",
     "envelopeHoldMs": 250,
@@ -3266,7 +3266,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.4,
+    "gain": 0.7,
     "offset": 1.0,
     "envelope": "peakhold",
     "envelopeHoldMs": 250,
@@ -3280,7 +3280,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.6,
+    "gain": 1.2,
     "offset": 1.0,
     "envelope": "peakhold",
     "envelopeHoldMs": 250,
@@ -3294,7 +3294,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.6,
+    "gain": 1.2,
     "offset": 1.0,
     "envelope": "peakhold",
     "envelopeHoldMs": 250,
@@ -3308,7 +3308,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 0.8,
+    "gain": 0.6,
     "offset": 1.0,
     "envelope": "peakhold",
     "envelopeHoldMs": 250,

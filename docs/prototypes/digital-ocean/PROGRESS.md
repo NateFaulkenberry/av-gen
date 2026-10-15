@@ -220,3 +220,30 @@ Media: `stage7-silent-trench-allyougot-glowmere.png` (same scene, four inputs), 
 - **Rhythms in the world** (none shares a period): swell trains 10.9 / 7.8 / 5.1 s, tide arrives over ~15 s, kick fronts
   over ~3 s, pods 53 / 79 s, clouds ~65 min a turn, camera 26 / 71 s.
 - Silence check: `stage9-silent-60s.mp4` and its 4 s sheet: the sea never repeats, a pod crosses, the frame stays calm.
+
+## Stage 10: visual critique and iteration (done, three rounds)
+
+Seven conditions, one frame each, same scene (`stage10-critique-round{1,2,3}.png`): (1) no audio, (2) quiet (Glowmere
+intro), (3) bass-heavy (Trench, 77 s), (4) dense percussion (Feline Footwear, 95 s), (5) sustained (Night Shift, 40 s),
+(6) MIDI (hero wave + leap + night at 0.6, scored), (7) peak (Trench + swell, sun and chop full + a flare).
+
+**Round 1, the three most significant weaknesses:**
+1. *The nearest crest became a flat glowing slab* (2, 4, 5): crest light and foam saturated on the closest swell, the
+   brightest shape in the frame, competing with the sun and showing no form.
+2. *The peak blew out* (7): sustain x the sun control x the flare multiplied the halo ~24x; the sky washed to pink
+   haze and the sun disc nearly vanished -- the "excessive glow" the brief warns against.
+3. *Clouds read as cut-paper lenses*: identical flat discs with bright outlines (the rim term at 3x drew a hard edge).
+
+**Fixes:** (1) a near fade -- first on the crest light only (round 2 showed the slab was mostly additive foam, so it
+persisted), then on the crest-height ramp itself, before both the crest light and the foam use it (round 3: the
+nearest crest is a lit edge over shaded water); (2) the glow gains rebalanced (sustain halo 1.4 -> 0.7, sun control 1.5
+-> 0.9, flare halo 3.0 -> 1.6) so the three add up to a bright sun, not a white sky (round 2: the disc holds at peak);
+(3) the cloud rim 3.0 -> 1.1 and more, smaller, more varied puffs per bank (352 instead of 196) with flatter bases.
+
+**What remains, judged honestly:** the clouds are better but still lean toward stacked lenses -- the weakest element
+next to the sea; a sculptural cloud technique (ADR-1289's lobes, or authored meshes) would be the next step and was not
+taken for cost. Under the hottest settings the crest light is still a dominant cyan; it is the scene's accent and is
+kept, but it is the first thing to tame if a palette variation is added.
+
+Earlier critique-driven fixes (Stages 3-8) are in their own sections: the far-field dashes, the foil (ADR-1370), the
+moire, the spray specks, the foam slabs at full swell and on the hero wave, a hero wave that saturated at 2.6 m.

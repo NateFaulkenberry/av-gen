@@ -165,9 +165,32 @@ SEA_PIECES = [("near", 0.6, 200.0, 200), ("mid", 200.0, 1200.0, 200), ("far", 12
 SEA_HALF_ANGLE = 62.0
 
 
+def dome_mesh(radius=8000.0, segments=64, rings=24, skirt_deg=2.0):
+    """The sky: a hemisphere and a 2 deg skirt below the horizon (to close the gap beyond the sea's far edge, which is
+    0.1 deg down) -- NOT a full sphere. A sphere centred on the camera is drawn first and was shaded under the whole sea
+    as well (the sky program ran on every pixel of the frame, not on the 40 % that is sky)."""
+    verts = []
+    elevs = [-skirt_deg] + [90.0 * (i / rings) ** 1.4 for i in range(rings + 1)]
+    for e in elevs:
+        er = math.radians(e)
+        for j in range(segments + 1):
+            a = 2.0 * math.pi * j / segments
+            verts.append((round(radius * math.cos(er) * math.sin(a), 3), round(radius * math.sin(er), 3),
+                          round(-radius * math.cos(er) * math.cos(a), 3)))
+    idx = []
+    cols = segments + 1
+    for i in range(len(elevs) - 1):
+        for j in range(segments):
+            a = i * cols + j
+            idx += [a, a + 1, a + cols + 1, a, a + cols + 1, a + cols]
+    norms = [tuple(-c / radius for c in v) for v in verts]
+    mx.write_glb(os.path.join(MESH_DIR, "do-dome.glb"), verts, norms, idx, "dome")
+    return len(verts)
+
+
 def generate_meshes():
     yaw = COMPOSITIONS[COMPOSITION][3]
-    out = {}
+    out = {"dome": dome_mesh()}
     for name, r0, r1, seg in SEA_PIECES:
         radii = ocean_rings(r0, r1, 0.5, 6.0e-5)
         v, n, i = ocean_wedge(radii, SEA_HALF_ANGLE, seg, yaw)
@@ -382,6 +405,13 @@ def sea_program(far=False):
     P.op("wp", "input", 7, inp="worldPosition")
     P.op("crest", "gradient", 7, a=7, k=[0.0, 1.0 / (CREST_HI - CREST_LO), 0.0, -CREST_LO / (CREST_HI - CREST_LO)],
          f=1.0)
+    if not far:
+        # (critique rounds 1-2) crest light and foam are middle-distance things: right under the eye the face is seen
+        # front-on, and the nearest swell became a flat glowing slab of foam. The crest ramp itself fades toward the
+        # camera, so both the light through it and the foam on it need a taller crest there.
+        P.op(None, "input", 3, inp="cameraDistance")
+        P.op("crestNear", "remap", 3, a=3, k=[CREST_NEAR0, CREST_NEAR1, CREST_NEAR_MIN, 1.0], f=1.0)
+        P.op(None, "multiply", 7, a=7, b=3)
     P.op(None, "multiply", 6, a=6, b=7)
     P.pcolour("sss", 3, "sss", 2.0 ** SSS_FOCUS * SSS_GAIN)
     P.op(None, "multiply", 6, a=6, b=3)
@@ -415,6 +445,7 @@ FRESNEL_MIN = 0.2
 CREST_LO, CREST_HI = 0.3, 1.9
 SSS_GAIN = 0.9
 SSS_FOCUS = 3.0
+CREST_NEAR0, CREST_NEAR1, CREST_NEAR_MIN = 12.0, 60.0, 0.55
 FOAM_H0, FOAM_H1 = 0.64, 0.8          # of the crest ramp (0.3..1.9 m): the tops of the highest crests
 FOAM_GAIN = 0.6
 
@@ -484,7 +515,7 @@ def cloud_program():
     P.op(None, "fresnel", 2, f=2.0)
     P.op(None, "power", 4, a=4, f=40.0)
     P.op(None, "multiply", 2, a=2, b=4)
-    P.pcolour("crim", 4, "crim", 3.0)
+    P.pcolour("crim", 4, "crim", 1.1)                                  # (round 1: 3.0 drew cut-paper outlines)
     P.op(None, "multiply", 2, a=2, b=4)
     P.op("rim", "add", 3, a=3, b=2)
     # distance haze: decametres (op constants are clamped to +-1000)
@@ -520,7 +551,7 @@ def cloud_points():
         cumulus = False
         tier = int(3 * h(3))                           # three decks: low and long, middle, high and thin
         alt = (150.0, 330.0, 520.0)[tier] + 90.0 * (h(4) - 0.5)
-        npuff = 6 + int(8 * h(5))
+        npuff = 9 + int(10 * h(5))
         length = (520.0 + 900.0 * h(6)) * (1.0, 0.8, 1.3)[tier]
         tx, tz = math.cos(theta), math.sin(theta)
         phi = -theta
@@ -535,9 +566,10 @@ def cloud_points():
                 sy = (35.0 + 70.0 * g(3)) * (0.5 + bulge)
                 y = alt + sy * 0.45
             else:
-                sx = (90.0 + 170.0 * g(2)) * (0.5 + 0.5 * bulge)
-                sy = (6.0 + 13.0 * g(3) * (0.3 + bulge)) * (1.0, 0.8, 0.55)[tier]
-                y = alt + (g(4) - 0.5) * 24.0 + sy * 0.5
+                # (round 1) more, smaller, more varied puffs: an irregular top and a flat, slightly stepped base
+                sx = (55.0 + 150.0 * g(2) ** 1.5) * (0.45 + 0.55 * bulge)
+                sy = (5.0 + 16.0 * g(3) ** 2 * (0.3 + bulge)) * (1.0, 0.8, 0.55)[tier]
+                y = alt + (g(4) - 0.5) * 14.0 + sy * 0.55
             sz = sx * (0.5 + 0.4 * g(5))
             r = D + (g(6) - 0.5) * 120.0
             x = r * math.sin(theta) + along * tx
@@ -869,7 +901,7 @@ def travel_axis(direction_deg):
 
 TIDE_ORIGIN = 400.0         # the music enters the sea this far out (m), under the sun
 TIDE_SPEED = 26.0           # and rolls in at this speed (m/s): 15 s from there to the viewer (the history holds 16.4)
-TIDE_SMOOTH = 0.17          # seconds of history averaged (ADR-1370): 16 rows, ~4.5 m of sea, a true low-pass
+TIDE_SMOOTH = 0.13          # seconds of history averaged (ADR-1370): 13 rows, ~3.5 m of sea, a true low-pass
 TIDE_AMOUNT = 1.5           # metres of swell at a full band
 KICK_SPEED = 22.0
 KICK_ORIGIN = 70.0
@@ -890,7 +922,7 @@ def audio_fields(s):
     kick_origin = [round(-ax[0] * KICK_ORIGIN, 3), 0.0, round(-ax[2] * KICK_ORIGIN, 3)]
     common = {"waveGeometry": "planar", "axis": ax, "falloff": {"kind": "none"}}
     s.nodes.append({"name": "tideBass", "kind": "field", "position": origin, "field": dict(
-        common, kind="spectrum", audioBand="range", bandLow=0.0, bandHigh=0.1, audioSpeed=TIDE_SPEED,
+        common, kind="spectrum", audioBand="range", bandLow=0.0, bandHigh=0.08, audioSpeed=TIDE_SPEED,
         audioSmooth=TIDE_SMOOTH, strength=1.0)})
     s.nodes.append({"name": "tideCarrier", "kind": "field", "position": origin, "field": dict(
         common, kind="wave", waveShape="sine", amplitude=1.0, wavelength=46.0, waveSpeed=7.5, waveWidth=0.0,
@@ -971,9 +1003,9 @@ def instrument(s, sea, seafar, sky):
                   attackMs=60, decayMs=500))
     # (the highs once deepened the micro-ripples too: at 60-200 m that noise aliased into crumpled foil -- removed)
     # SUSTAIN: held sound swells the sun's halo and warms the sun's path
-    s.route(R("sustain", M % (sky.name, sky["halo"]), 1.0, op="multiply", gain=1.4, offset=1.0, attackMs=1500,
+    s.route(R("sustain", M % (sky.name, sky["halo"]), 1.0, op="multiply", gain=0.7, offset=1.0, attackMs=1500,
               decayMs=3500),
-            R("sustain", M % (sky.name, sky["glow"]), 1.0, op="multiply", gain=0.6, offset=1.0, attackMs=1500,
+            R("sustain", M % (sky.name, sky["glow"]), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500,
               decayMs=3500))
     for prog in (sea, seafar):
         s.route(R("sustain", M % (prog.name, prog["pathCol"]), 1.0, op="multiply", gain=0.8, offset=1.0,
@@ -1053,7 +1085,7 @@ def midi(s, progs, sea, seafar, sky):
             R("control.foam", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], -0.1, comp=1, **CC),
             R("control.foam", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
     for prog, key in ((sky, "halo"), (sky, "glow"), (sea, "pathCol"), (seafar, "pathCol")):
-        s.route(R("control.sun", M % (prog.name, prog[key]), 1.0, op="multiply", gain=1.5, offset=1.0, **CC))
+        s.route(R("control.sun", M % (prog.name, prog[key]), 1.0, op="multiply", gain=0.9, offset=1.0, **CC))
     s.route(R("control.spray", "particles/snareSpray/burst", 1.0, op="multiply", gain=2.5, offset=1.0, **CC),
             R("control.spray", "particles/noteSparks/burst", 1.0, op="multiply", gain=2.5, offset=1.0, **CC))
     # PADS: complete gestures with their own envelopes
@@ -1067,8 +1099,8 @@ def midi(s, progs, sea, seafar, sky):
         s.route(R("control.padGlow", M % (sea.name, sea["foam"]), round(pal("midnight", "foam")[c] * 1.5, 4), comp=c,
                   **glow))
     flare = {"envelope": "peakhold", "envelopeHoldMs": 250, "envelopeFallPerSecond": 0.45}
-    for prog, key, g in ((sky, "halo", 3.0), (sky, "glow", 1.4), (sea, "pathCol", 1.6), (seafar, "pathCol", 1.6),
-                         (sea, "glint", 0.8)):
+    for prog, key, g in ((sky, "halo", 1.6), (sky, "glow", 0.7), (sea, "pathCol", 1.2), (seafar, "pathCol", 1.2),
+                         (sea, "glint", 0.6)):
         s.route(R("control.padFlare", M % (prog.name, prog[key]), 1.0, op="multiply", gain=g, offset=1.0, **flare))
     s.route(R("control.padSpray", "particles/snareSpray/burst", 420.0))
 
@@ -1156,9 +1188,7 @@ def build():
         s.program(sky.doc(emission=DEBUG_SKY[1]))
     else:
         s.program(sky.doc(emission=5))
-    s.proc("dome", {"kind": "sphere", "radius": 1000.0, "segments": 64, "rings": 32},
-           material=dict(unlit("doSky"), doubleSided=True),
-           transform={"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [8.0, 8.0, 8.0]})
+    s.proc("dome", {"kind": "mesh", "asset": "meshes/do-dome.glb"}, material=dict(unlit("doSky"), doubleSided=True))
     for name, *_ in SEA_PIECES:
         s.proc("sea_" + name, {"kind": "mesh", "asset": "meshes/do-sea-%s.glb" % name},
                material=unlit("doSea" if name == "near" else "doSeaFar"), deformers=sea_deformers() + audio_deformers())
