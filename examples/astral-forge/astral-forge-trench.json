@@ -6,7 +6,6 @@
     "scene": { "kind": "composition", "path": "astral-forge.scene.json" },
     "audio": { "path": "../../assets/audio/trench.wav" }
   },
-  "live": { "targetFps": 60 },
   "sources": [],
   "routes": [],
   "presets": [],

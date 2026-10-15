@@ -11,8 +11,7 @@
   }
  },
  "live": {
-  "qualityStrategy": "effects_first",
-  "targetFps": 60
+  "qualityStrategy": "effects_first"
  },
  "parameters": {
   "post/bloom/enabled": true,
