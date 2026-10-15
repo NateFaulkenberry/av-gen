@@ -16,12 +16,13 @@ Measured here (`docs/development/live-controller-30fps.md`, per-frame traces fro
   20-26 at Low and **29-30 ms at Emergency** (half the pixels, every effect off), with every frame on time in each.
   The clock governor slows the GPU until the busy time fills most of the period.
 - **So the law walked down on noise.** ADR-1085's law drops a level when the 20-frame median span exceeds the budget
-  (29.3 ms at 30 fps). Readings hovering at 85-95% of the period crossed it every few seconds. Main's controller left
-  High at 10 s with no frame missed, and in four of six minute-long runs it went on to Low or Emergency, again with no
-  frame missed. Its climbs (ADR-1107's 90% margin) were rare and undone by the next spike.
+  (29.3 ms at 30 fps). Readings hovering at 75-90% of the period crossed it on ordinary noise. Main's controller left
+  High at 10 s with no frame missed, and it went on to Low or Emergency in every one of the six final runs, mostly with
+  no frame missed. Its climbs (ADR-1107's 90% margin) were rare and undone by the next spike. On a light scene
+  (Neon Vector World at 30) it walked from Ultra to Emergency with the GPU at half the frame.
 - **Two GPU-based fixes were tried and did not help.** One raised the margin to 100% of the budget while frames were
   on time. The other probed up when the window was clean, but still dropped on the span. In the same interleaved runs
-  both ended at Low like main, with 5-10 level changes a minute. A clock-correction factor cannot be learned from a
+  they ended at Low in four of their six runs, like main, and the probe changed level 10-11 times a minute. A clock-correction factor cannot be learned from a
   reading that does not depend on the load. Neither Metal nor Dawn reports the GPU clock; IOKit's
   `PerformanceStatistics` gives utilisation only, which is the span again.
 
@@ -73,9 +74,17 @@ span, the level, the scale, the controller's reading and the cap's period.
 
 ## Consequences
 
-- At 30 fps, THE RIFT LIVE settles where the frames hold rather than where the governor's reading happens to sit.
-  The before/after table, over interleaved 75 s runs per scene and target, is in
-  `docs/development/live-controller-30fps.md`.
+- **Measured** (interleaved, 2 x 75 s per case, 1080p projection, transport playing;
+  `docs/development/live-controller-30fps.md` §5):
+  - **THE RIFT LIVE at 30.** Main held Low or Emergency (mean scale 0.66, 0.18% missed). Now it holds Medium in all
+    six runs (mean scale 0.83, 0.40% missed). Through the build and drop (one 200 s run) it settles at Low against
+    main's Emergency, with no level change in the last 100 s.
+  - **Neon Vector World at 30.** Main walked it from Ultra to Emergency with the GPU at half the frame. Now it stays at
+    Ultra with no level change.
+  - **At 60.** Neon reaches Ultra and Medium where main ended at Emergency or High. THE RIFT LIVE and Digital Mosh
+    Live are at Emergency under both.
+- **ADR-1107 understated the effect.** It measured capped spans 5-15% longer at the same level. What matters is that
+  the span hardly depends on the level.
 - Probing is the only way to learn that a level above has room, so a level on the edge is visited now and then, and
   each failed visit costs a missed frame or two. The backoff makes these visits a minute apart at most.
 - Unit tests (`tests/unit/test_interactive_resolution.cpp`, tag `[adr1362]`) close the loop on a model of the
