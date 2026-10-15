@@ -18,6 +18,9 @@
 #include "support/groove.hpp"
 #include "support/project_assets.hpp"
 #include "support/temp_dir.hpp"
+#include "world/world_map.hpp"
+
+#include <nlohmann/json.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -378,4 +381,89 @@ TEST_CASE("THE RIFT LIVE: a seek on Trench lands in the drop, through the respon
     engine.update(t);
     INFO("state after a seek to 100 s: '" << engine.states().current() << "'");
     CHECK(engine.states().current() == "Drop");
+}
+
+// The grounding pass (docs/prototypes/bioluminescent/grounding-pass-2026-10.md), checked on the generated world with
+// the engine's own height function rather than the generator's probe lattice:
+//   - the terrain draws one level (LOD 0): its coarser rungs moved the drawn ground metres off the placements;
+//   - the world map holds every placement and the whole flight plus the terrain's view distance ahead of it: the
+//     map stopped at z = +-1200 while the flight started at -1300, and the opening looked at the ground's cut edge;
+//   - no body's origin stands above the ground the terrain draws there (the LOD 0 triangles: map heights at the
+//     chunk grid's 2 m vertices, split along the b-c diagonal as terrain.cpp does), and none is sunk deeper than its
+//     kind's seat allows (grounding.py fits each one so its base touches with no gap).
+TEST_CASE("THE RIFT: every body stands on the ground the terrain draws and the ground covers the flight", "[rift]") {
+    REQUIRE_RIFT_SCENE();
+    const fs::path path = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.scene.json";
+    std::ifstream in(path);
+    const nlohmann::json sc = nlohmann::json::parse(in);
+    const nlohmann::json* land = nullptr;
+    const nlohmann::json* flight = nullptr;
+    for (const nlohmann::json& n : sc.at("nodes")) {
+        if (n.value("kind", "") == "terrain") land = &n;
+        if (n.value("name", "") == "flight") flight = &n;
+    }
+    REQUIRE(land != nullptr);
+    REQUIRE(flight != nullptr);
+    const nlohmann::json& ts = land->at("terrain");
+    CHECK(ts.at("lodLevels").get<int>() == 1);
+    auto parsed = world::worldMapFromJson(land->at("world"));
+    REQUIRE(parsed.has_value());
+    world::WorldMap map = std::move(*parsed);
+    map.prepare();
+    const glm::vec2 lo = map.min();
+    const glm::vec2 hi = -map.min();
+    const float view = ts.at("viewDistance").get<float>();
+    for (const nlohmann::json& p : flight->at("spline").at("points")) {
+        const auto& q = p.at("position");
+        INFO("flight point z " << q[2].get<float>());
+        CHECK(q[0].get<float>() > lo.x);
+        CHECK(q[0].get<float>() < hi.x);
+        CHECK(q[2].get<float>() - view >= lo.y);
+        CHECK(q[2].get<float>() + view <= hi.y);
+    }
+    const float step = ts.at("chunkSize").get<float>() / ts.at("resolution").get<float>();
+    const auto drawn = [&](float x, float z) {
+        const float fx = (x - lo.x) / step;
+        const float fz = (z - lo.y) / step;
+        const float ix = std::floor(fx);
+        const float iz = std::floor(fz);
+        const float tx = fx - ix;
+        const float tz = fz - iz;
+        const auto h = [&](float i, float j) { return map.height(glm::vec2(lo.x + i * step, lo.y + j * step)); };
+        const float a = h(ix, iz), b = h(ix + 1, iz), c = h(ix, iz + 1), d = h(ix + 1, iz + 1);
+        return tx + tz <= 1.0f ? a + (b - a) * tx + (c - a) * tz : d + (c - d) * (1.0f - tx) + (b - d) * (1.0f - tz);
+    };
+    // How far below the drawn ground an origin may sit, per body: a trunk's holdfast is set into the rock on a slope
+    // (its downhill rim touches, its uphill rim and centre are under); a cushion or a frond's foot only a little.
+    // A cushion's origin is the middle of its dome, 0.1 m above its underside. A fan stands on walls up to 70 degrees
+    // with its foot tilted to them: measured vertically, its seated origin can be 0.15 m over the ground beneath it.
+    struct Body {
+        std::string name;
+        float deepest;
+        float highest;
+    };
+    const std::vector<Body> bodies = {{"crinoidStalk", 4.5f, 0.05f}, {"seapen0", 0.4f, 0.05f}, {"fanBody", 0.8f, 0.2f},
+                                      {"whipsBody", 0.7f, 0.05f},    {"lanternStalks", 0.5f, 0.05f},
+                                      {"mat0", 0.6f, 0.15f}};
+    for (const auto& [name, deepest, highest] : bodies) {
+        const nlohmann::json* node = nullptr;
+        for (const nlohmann::json& n : sc.at("nodes")) {
+            if (n.value("name", "") == name) node = &n;
+        }
+        REQUIRE(node != nullptr);
+        const nlohmann::json& pts = node->at("procedural").at("distribution").at("points");
+        float above = -1e9f;
+        float below = 1e9f;
+        const std::size_t stride = std::max<std::size_t>(1, pts.size() / 4000);
+        for (std::size_t k = 0; k < pts.size(); k += stride) {
+            const auto& r = pts[k];
+            const float off = r[1].get<float>() - drawn(r[0].get<float>(), r[2].get<float>());
+            above = std::max(above, off);
+            below = std::min(below, off);
+        }
+        INFO(name << ": " << pts.size() << " instances; origin above the drawn ground at most " << above
+                  << " m, below it at most " << -below << " m");
+        CHECK(above <= highest);
+        CHECK(below >= -deepest);
+    }
 }

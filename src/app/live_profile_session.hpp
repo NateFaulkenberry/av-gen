@@ -10,6 +10,7 @@
 #include "rendering/scene_renderer.hpp"
 
 #include <chrono>
+#include <string>
 #include <vector>
 
 namespace avgen::app {
@@ -25,6 +26,7 @@ struct Application::LiveProfileSession {
     int waitFrames = 0;
     LiveProfileRecord record;
     std::vector<LiveProfileFrame> frames;
+    std::string trace; // --trace's rows (ADR-1362), written when measurement ends
     std::vector<rendering::RenderStats> stats;
     gpu::PipelineCounters compilesBefore;
     std::chrono::steady_clock::time_point measureStart;

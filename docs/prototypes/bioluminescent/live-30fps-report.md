@@ -166,7 +166,10 @@ Files are in `~/Desktop/av-gen-review/48-rift-live-30fps/stills/`.
 
 ## 6. Remaining risks
 
-1. **High is not held live, and the reason is the GPU clock, not the scene.**
+1. **High is not held live, and the reason is the GPU clock, not the scene.** *(2026-10-15: the controller half is
+   fixed by [ADR-1362](../../decisions/ADR-1362-paced-live-quality-is-decided-by-missed-frames.md). Capped, the span
+   reads the clock governor, not the level, so paced decisions are taken on missed frames. See
+   `docs/development/live-controller-30fps.md`.)*
    - **The clock effect:** under the 30 fps frame cap, the GPU idles part of every frame and Apple silicon lowers its
      clock. The measured GPU time inflates with it. Pinned Low, 96 s (`data/D2-*`):
 

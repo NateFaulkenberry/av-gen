@@ -53,6 +53,9 @@ struct LiveProfileOptions {
     std::string midi;             // a MIDI input filter; empty = the machine's setting
     std::optional<std::filesystem::path> capture; // a PNG of the last measured frame
     std::optional<std::filesystem::path> json;    // the record, avgen.liveprofile/1
+    // --trace <csv>, live only (ADR-1362): one row per frame from the warm-up on -- the frame interval, the GPU span,
+    // the level in force and the controller's reading -- so a controller's settling can be read, not inferred.
+    std::optional<std::filesystem::path> trace;
     bool text = true;                              // the human report on stdout
     int verifyCandidates = 0;                      // measure the top N candidates' savings (A/B), 0 = estimate only
     bool prewarm = true; // --no-prewarm: the pre-ADR-1102 behaviour (SDF variants compiled on the main thread at first

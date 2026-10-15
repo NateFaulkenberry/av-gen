@@ -3,6 +3,8 @@
 **Status:** Accepted (live quality, `docs/live-quality/00-brief.md` §13-14).
 **Date:** 2026-10-03
 
+**Amended by [ADR-1362](ADR-1362-paced-live-quality-is-decided-by-missed-frames.md) (2026-10-15):** while the live loop is paced to the target, the decision is taken on missed frames and no step ratio is learned; everything here holds for the unpaced loop.
+
 ## Context
 
 The existing control law does not oscillate (measured: Liminal from 40 s over 2,400 frames held 0.5 with no hunting).

@@ -2,6 +2,8 @@
 
 **Status:** Accepted (live optimizer; the coordinator's decision on the open 60-target tuning question). **Date:** 2026-10-03
 
+**Amended by [ADR-1362](ADR-1362-paced-live-quality-is-decided-by-missed-frames.md) (2026-10-15):** with the cap on, the GPU span measures the clock governor rather than the level (its "5-15% longer" below was 2-6x larger at a 30 target), so paced decisions are taken on missed frames and the 90% raise margin applies only when the loop is not paced.
+
 ## Context
 
 `~/Desktop/av-gen-review/30-live-quality/REPORT.md` §4 measured the 60 target through a 1080p projection:

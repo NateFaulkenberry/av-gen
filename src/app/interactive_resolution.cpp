@@ -290,6 +290,8 @@ void InteractiveResolution::configure(const InteractiveResolutionSettings& s) {
     // which that happens.
     settings_.dwellFrames = std::max({1, settings_.dwellFrames, settings_.windowFrames});
     settings_.raiseHoldFrames = std::max(1, settings_.raiseHoldFrames);
+    settings_.missWindowFrames = std::clamp(settings_.missWindowFrames, 1, static_cast<int>(miss_.size()));
+    settings_.missesToDrop = std::max(1, settings_.missesToDrop);
     settings_.scaleFloor = std::clamp(settings_.scaleFloor, kLiveScaleFloorMin, 1.0f);
     settings_.lowestLevel = std::min(settings_.lowestLevel, kLiveQualityLevels - 1);
     if (!settings_.enabled || settings_.strategy != before.strategy || settings_.ladder != before.ladder) {
@@ -313,6 +315,12 @@ void InteractiveResolution::reset() {
     pending_ = {};
     probation_ = false;
     holdScale_.fill(1);
+    miss_.fill(0);
+    missCursor_ = 0;
+    lateWaiting_ = 0;
+    gpuFullAge_ = 1000;
+    atLevel_ = 0;
+    raisedInto_ = false;
     unsustainable_ = false;
 }
 
@@ -361,6 +369,133 @@ double InteractiveResolution::gpuCost() const {
     return interval > 0.0 && interval < span ? interval : span;
 }
 
+bool InteractiveResolution::missedDeadline(double wallMs) const {
+    // Late by a quarter of the period and at least half a refresh: a frame that landed on the next vsync or later. Not
+    // the vsync count alone -- the interval is taken on the main thread, not at the display, and wakes from the cap's
+    // sleep jitter by several milliseconds: measured with the editor on a 120 Hz screen at a 30 target, intervals of
+    // 37.5-39 ms with no frame lost read as misses by a half-refresh rule and walked a light scene to Emergency.
+    const double period = pacing_.periodMs;
+    if (!(period > 0.0) || !(wallMs > 0.0)) {
+        return false;
+    }
+    return wallMs > period + std::max(0.25 * period, 0.5 * pacing_.refreshMs);
+}
+
+void InteractiveResolution::noteDeadline(double gpuMs, double wallMs) {
+    // A late frame is the GPU's when a GPU span around it reached the period. Capped, the governor holds a level that
+    // has room at 80-90% of the period, so a frame that took the whole period is one the GPU could not fit; measured,
+    // every late frame on THE RIFT LIVE (High, Medium, Low) had a span of 1.0-1.4x the period within a few frames,
+    // and the late frames of a light scene at 60 fps, the cap's wake-up and the main thread, 0.80-0.85x. The span
+    // arrives two or three frames after its frame (gpu::FrameTimeline), so a late frame waits up to
+    // `kAttributeFrames` for one; the frame before counts too. Late frames the GPU did not cause never move the level
+    // (§8: a smaller picture is no answer to the main thread).
+    // One span over twice the period while the window's median fits is a stall -- a pipeline compile, an upload,
+    // another process on the GPU -- not the level's cost, and no level fixes it: measured, Neon Vector World at 60 fps
+    // dropped from High four times in a minute on single 40 ms spans with a 14 ms median. A level that is truly far
+    // over keeps a median over the period, and its late frames still count.
+    const double period = pacing_.periodMs;
+    const bool gpuFull = period > 0.0 && gpuMs >= period * kGpuFull &&
+                         (gpuMs <= period * kGpuStall || medianGpu() >= period);
+    bool miss = false;
+    if (missedDeadline(wallMs)) {
+        ++stats_.missedDeadlines;
+        if (gpuFull || gpuFullAge_ <= 1) {
+            miss = true;
+        } else {
+            lateWaiting_ = kAttributeFrames;
+        }
+    } else if (lateWaiting_ > 0) {
+        if (gpuFull) {
+            miss = true;
+            lateWaiting_ = 0;
+        } else if (--lateWaiting_ == 0) {
+            ++stats_.lateNotGpu;
+        }
+    }
+    gpuFullAge_ = gpuFull ? 0 : std::min(gpuFullAge_ + 1, 1000);
+    miss_[missCursor_] = miss ? 1 : 0;
+    missCursor_ = (missCursor_ + 1) % miss_.size();
+    ++atLevel_;
+}
+
+int InteractiveResolution::recentMisses() const {
+    // The level's own frames only: none from before the last move, and not the first few after it, where the move
+    // itself (a render-target reallocation, ADR-1086: at most one vsync) lands.
+    const int own = std::max(0, atLevel_ - kTransitionFrames);
+    const auto n = static_cast<std::size_t>(std::min(own, settings_.missWindowFrames));
+    int misses = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        misses += miss_[(missCursor_ + miss_.size() - 1 - i) % miss_.size()] != 0 ? 1 : 0;
+    }
+    return misses;
+}
+
+InteractiveResolution::Decision InteractiveResolution::decidePaced(double gpu, bool onProbation, double missedCost) {
+    // ADR-1362. Paced to the target (ADR-1107), the GPU idles part of every frame and its clock governor slows it until
+    // the busy time fills most of the period: measured on THE RIFT LIVE at 30 fps, the span read 24-26 ms at High and
+    // 29-30 ms at Emergency, frames on time throughout. The span measures the clock, not the level, so it decides
+    // nothing here. What the viewer sees -- a frame that missed its deadline -- the governor cannot fake, and decides
+    // both ways: misses go down, a sustained run of frames on time probes up, and a probe that misses comes back
+    // down and waits twice as long next time (ADR-1104). The span is kept for one question: was a late frame the
+    // GPU's (`noteDeadline`)?
+    Decision d{rung_, false};
+    const std::size_t last = settings_.lowestLevel;
+    const int misses = recentMisses();
+    // A raise is on probation (ADR-1104) until it has held as long as it waited: one miss there and it did not hold.
+    const bool probing = onProbation || onWatch();
+    const int missesToAct = probing ? 1 : settings_.missesToDrop;
+    if (misses >= missesToAct) {
+        // Every miss counted here was the GPU's (`noteDeadline`): the main thread's never reach this.
+        raiseStreak_ = 0;
+        if (rung_ >= last) {
+            unsustainable_ = true; // at the minimum and still missing (ADR-1103)
+            if (rung_ > last) {
+                moveTo(last, gpu);
+                return {rung_, true};
+            }
+            sinceDecision_ = 0;
+            return d;
+        }
+        unsustainable_ = false;
+        if (probing) {
+            ++stats_.reverts; // ADR-1104's revert
+        }
+        // Every level left on its misses waits twice as long before it is tried again, the descent's too: the only
+        // way back up is a probe, and a probe into a level already seen to miss costs the viewer frames. Measured on
+        // THE RIFT LIVE with the doubling on reverts alone, the controller probed High (and Ultra) five times in the
+        // first minute for 0.6% missed frames. And a level whose frames are missing is the one case where the span
+        // is the level's cost (the GPU is busy all the time, so at full clock): one that read more than a tenth over
+        // the period is not on the edge, and waits the longest at once.
+        const bool clearlyOver = missedCost > pacing_.periodMs * kClearlyOver;
+        holdScale_[rung_] = clearlyOver ? kPacedMaxHoldScale : std::min(kPacedMaxHoldScale, holdScale_[rung_] * 2);
+        // One level at a time: misses say the level is over, not by how much.
+        moveTo(rung_ + 1, gpu);
+        ++stats_.drops;
+        return {rung_, true};
+    }
+    unsustainable_ = false;
+    if (rung_ > last) {
+        moveTo(last, gpu); // a minimum raised above the level in force: go up to it
+        return {rung_, true};
+    }
+    if (rung_ > 0) {
+        // Up one level after `raiseHoldFrames` consecutive frames with no miss in the level's recent window (ADR-1085's
+        // hold, ADR-1104's backoff), whatever the span reads.
+        if (misses == 0) {
+            ++raiseStreak_;
+        } else {
+            raiseStreak_ = 0;
+        }
+        if (raiseStreak_ >= settings_.raiseHoldFrames * holdScale_[rung_ - 1]) {
+            moveTo(rung_ - 1, gpu);
+            ++stats_.raises;
+            probation_ = true;
+            return {rung_, true};
+        }
+    }
+    return d;
+}
+
 double InteractiveResolution::medianWall() const {
     const std::size_t n = std::min(count_, static_cast<std::size_t>(settings_.windowFrames));
     if (n == 0) {
@@ -402,6 +537,9 @@ double InteractiveResolution::stepRatio(std::size_t k) const {
 }
 
 void InteractiveResolution::moveTo(std::size_t rung, double medianAtLeave) {
+    raisedInto_ = rung < rung_;
+    atLevel_ = 0;
+    lateWaiting_ = 0; // a late frame of the level being left is not the next level's
     pending_ = {rung_, rung, medianAtLeave, true};
     rung_ = rung;
     sinceDecision_ = 0;
@@ -417,6 +555,8 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
     if (rung_ > 0) {
         ++stats_.framesReduced;
     }
+    // ADR-1362: a deadline is met or missed whether or not the GPU timeline reported, so it is counted first.
+    noteDeadline(gpuMs, wallMs);
     // A frame the GPU timeline could not report is not a free frame. FrameTimeline has no completed
     // frame for the first two or three of a session and none at all on a build without timestamp
     // queries, and counting those as 0 ms would walk the ladder straight back to the top.
@@ -429,6 +569,7 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
     ++count_;
     ++sinceDecision_;
 
+    const bool paced = pacing_.periodMs > 0.0;
     const auto window = static_cast<std::size_t>(settings_.windowFrames);
     if (count_ < window) {
         return d;
@@ -441,6 +582,11 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
     // The ratio is cost(higher-quality rung) / cost(lower-quality rung) across each step crossed;
     // a two-rung move is split evenly in log space. Clamped to [1, 4]: content moving under a
     // measurement can make a step look free or ruinous, and neither should steer the climb.
+    // ADR-1362: not while paced. There the clock governor, not the level, sets the reading (THE RIFT LIVE read 29.5 ms
+    // at Emergency and 24-26 ms at High), so a ratio taken across a step would be noise steering the unpaced climb.
+    if (pending_.active && paced) {
+        pending_.active = false;
+    }
     if (pending_.active && sinceDecision_ >= settings_.windowFrames) {
         const std::size_t hi = std::min(pending_.from, pending_.to);
         const std::size_t lo = std::max(pending_.from, pending_.to);
@@ -454,6 +600,13 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
         }
         pending_.active = false;
     }
+    if (paced && (probation_ || onWatch()) && atLevel_ > kTransitionFrames &&
+        miss_[(missCursor_ + miss_.size() - 1) % miss_.size()] != 0) {
+        // ADR-1362: a raise is judged on every frame until it has held as long as it waited, not at the end of a
+        // dwell -- a probe into a level that does not hold costs the viewer the frames it misses, so the first ends it.
+        probation_ = false;
+        return decidePaced(gpu, true, std::max(gpu, gpuMs));
+    }
     if (sinceDecision_ < settings_.dwellFrames) {
         return d;
     }
@@ -463,6 +616,9 @@ InteractiveResolution::Decision InteractiveResolution::note(double gpuMs, double
     // ADR-1104: the first decision after a raise is the raise's measurement.
     const bool onProbation = probation_;
     probation_ = false;
+    if (paced) {
+        return decidePaced(gpu, onProbation, gpu);
+    }
 
     if (gpu > budget) {
         raiseStreak_ = 0;

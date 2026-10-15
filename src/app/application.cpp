@@ -4670,6 +4670,7 @@ int Application::runLive() {
         // Live editor only (`runHeadless` never gets here), and never while a render job shares the loop
         // or an --ui-ab measurement is running.
         double paceWaitMs = 0.0;
+        double pacePeriodMs = 0.0; // the cap's period this frame, 0 = not capped (ADR-1362 reads it)
         {
             const bool capOn = options_.liveFrameCap.value_or(settings_.liveFrameCap) && !job_ && !abRunning;
             if (capOn && --paceRefreshAge <= 0) {
@@ -4688,6 +4689,7 @@ int Application::runLive() {
                 }
             }
             const double period = liveFrameCapPeriodMs(capOn, autoResolution_.settings().targetFps, paceRefreshHz);
+            pacePeriodMs = period;
             const double nowMs = std::chrono::duration<double, std::milli>(frameStart.time_since_epoch()).count();
             const LivePaceStep step = livePaceStep(nowMs, paceDeadlineMs, period);
             paceDeadlineMs = step.nextDeadlineMs;
@@ -5645,6 +5647,9 @@ int Application::runLive() {
             // span is not inflated by overlapping frames -- the case the interval cap exists for. Subtracting
             // the wait instead was measured to be wrong: the GPU works *during* the wait, so interval minus wait
             // read 3-5 ms on a 12 ms GPU frame, and the controller climbed and fell back every few seconds.
+            // ADR-1362: the pacing the interval was taken under -- a capped loop's intervals are the deadlines the
+            // viewer sees met or missed.
+            autoResolution_.setPacing(pacePeriodMs, paceRefreshHz);
             static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs));
             // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
             // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
@@ -7272,6 +7277,8 @@ void Application::serviceLiveQuality() {
     // The panel's three warnings are latched with hysteresis (`StickyWarning`): raised after a second of the
     // condition, cleared after a second clearly without it. A reading sitting on a line must not show and hide the
     // line every frame -- each flip moved everything below it, which read as the whole panel flickering.
+    view.paced = autoResolution_.pacing().periodMs > 0.0;
+    view.recentMisses = autoResolution_.recentMisses();
     {
         const auto now = std::chrono::steady_clock::now();
         const double frame = view.targetFrameMs;
@@ -7279,8 +7286,10 @@ void Application::serviceLiveQuality() {
         view.cpuOverFrame = cpuWarning_.update(liveCpuMsShown_ > frame,
                                                liveCpuMsShown_ >= 0.0 && liveCpuMsShown_ < frame * 0.9, now);
         view.unsustainable = unsustainableWarning_.update(view.unsustainable, !view.unsustainable, now);
-        view.atBottomOver = atBottomWarning_.update(view.atBottom && gpu > view.budgetMs,
-                                                    !view.atBottom || gpu < view.budgetMs * 0.9, now);
+        // ADR-1362: paced, "over" is frames missing their deadlines; the GPU's clock-scaled time is no measure of it.
+        const bool over = view.paced ? view.recentMisses > 0 : gpu > view.budgetMs;
+        const bool clear = view.paced ? view.recentMisses == 0 : gpu < view.budgetMs * 0.9;
+        view.atBottomOver = atBottomWarning_.update(view.atBottom && over, !view.atBottom || clear, now);
     }
     view.renderScale = renderer_->qualitySettings().renderScale;
     view.internalWidth = renderer_->stats().width;

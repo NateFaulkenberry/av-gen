@@ -681,6 +681,21 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
     LiveProfileSession& s = *liveProfileSession_;
     const LiveProfileOptions& o = options_.liveProfile;
     using P = LiveProfileSession::Phase;
+    if (o.trace && (s.phase == P::Warmup || s.phase == P::Measure)) {
+        // ADR-1362: the frame as the controller saw it, and the level the frame rendered at.
+        const auto pinned = livePinnedQuality();
+        const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
+        if (s.trace.empty()) {
+            s.trace = "phase,t,frameMs,gpuMs,rung,level,scale,costMs,paceMs,refreshMs\n";
+        }
+        s.trace += fmt::format("{},{:.4f},{:.3f},{:.3f},{},{},{:.2f},{:.3f},{:.3f},{:.3f}\n", s.phase == P::Warmup ? 'w' : 'm',
+                               msSince(s.phaseStart) / 1000.0, frame.frameMs, frame.gpuMs, rung,
+                               liveQualityLevelName(autoResolution_.ladder()[rung].level),
+                               static_cast<double>(effectiveRenderScale(autoResolution_.ladder()[rung],
+                                                                        autoResolution_.settings().scaleFloor)),
+                               autoResolution_.gpuCostMs(), autoResolution_.pacing().periodMs,
+                               autoResolution_.pacing().refreshMs);
+    }
     switch (s.phase) {
     case P::WaitingForOutput: {
         const Output* out = outputs_.find(kProjectionOutputName);
@@ -769,6 +784,13 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         fillLiveProfileResources(r, s.stats);
         fillLiveProfileEntities(r);
         r.candidates = optimizationCandidates(candidateInputs(r, renderer_->qualitySettings()));
+        if (o.trace) {
+            std::ofstream out(*o.trace, std::ios::binary);
+            out << s.trace;
+            if (!out) {
+                log::error("--live-profile: cannot write {}", o.trace->string());
+            }
+        }
         if (liveTransitions_ > s.transitionsSeen) {
             r.notes.push_back(fmt::format("the live level changed {} time(s) WHILE MEASURING; the statistics mix "
                                           "levels and the level at the end is the one reported",

@@ -84,6 +84,18 @@
 // across each step on the way down and uses it on the way up, and it climbs only after the frame
 // has fit comfortably for a sustained stretch (`raiseHoldFrames`), not after one good window.
 //
+// ---- ADR-1362: paced to the target, misses decide ---------------------------------------------------------------
+//
+// With ADR-1107's frame cap on, the GPU idles part of every frame and its clock governor slows it until the busy time
+// fills most of the period: THE RIFT LIVE at 30 fps read 24-26 ms at High and 29-30 ms at Emergency, every frame on
+// time. Measured that way the span reads the clock, not the level, and the law above walked a scene that held High
+// down to Low or Emergency on noise. So while the loop is paced (`setPacing`), the decision is taken on what the
+// viewer sees: a level goes down when its frames miss their deadlines (`missesToDrop` in `missWindowFrames`, each
+// with a GPU span near it that reached the period, so the main thread's late frames and a lone GPU stall do not
+// count), and up -- one level, after the same dwell and hold -- when none has missed; a raise
+// that then misses comes back down, and every level left on its misses waits twice as long (up to 16x) before it is
+// tried again. Not paced (the cap off, or a target above the refresh), nothing changes.
+//
 // LIVE only. `RenderJob` and the headless runner never construct this, and the Offline tier's
 // promise (`QualityPolicy::assertOfflineIsUncompromised`) includes the two effect gates this adds.
 
@@ -345,7 +357,8 @@ struct InteractiveResolutionSettings {
     // The decision is taken on the median of this many recent GPU samples, so one stalled frame
     // (a shader compile, another agent's process) cannot move the rung.
     int windowFrames = 20;
-    // A higher rung must be predicted to fit inside `budgetMs * raiseMargin` ... ADR-1107 raised it from
+    // Not paced (ADR-1362 decides paced frames on their misses instead):
+    // a higher rung must be predicted to fit inside `budgetMs * raiseMargin` ... ADR-1107 raised it from
     // 0.80: at 0.80 the level that would hold a 60 target sat within 20% of the budget and was never climbed
     // back to. A raise that then misses is undone by ADR-1104's probation.
     double raiseMargin = 0.90;
@@ -356,6 +369,13 @@ struct InteractiveResolutionSettings {
     // is much longer than the GPU frame, the frame is waiting on the main thread and a smaller,
     // plainer world buys nothing. "The GPU must be at least this fraction of the wall clock".
     double gpuShareToAct = 0.70;
+    // ADR-1362: paced to the target (ADR-1107's cap), the decision is taken on deadline misses, not the GPU span (the
+    // clock governor fills the idle part of each frame, so the span reads the clock rather than the level). A level
+    // goes down when at least `missesToDrop` of its last `missWindowFrames` frames missed -- three in ten seconds at
+    // 30 fps (1%), so a stray hitch is not a reason but a level losing a frame every few seconds is left -- and goes
+    // up only after that whole window has been clean.
+    int missWindowFrames = 300;
+    int missesToDrop = 3;
 };
 
 // Pure decision logic: no GPU, no renderer, no clock of its own. Everything it knows arrives
@@ -376,6 +396,18 @@ public:
     // "LIVE TARGET UNSUSTAINABLE"; cleared as soon as a window fits.
     [[nodiscard]] bool unsustainable() const { return unsustainable_; }
     [[nodiscard]] const InteractiveResolutionSettings& settings() const { return settings_; }
+
+    // ADR-1362: the frame cap the live loop is paced to (`liveFrameCapPeriodMs`, 0 = not capped) and the display's
+    // refresh (0 = unknown), set by the loop before each `note()`. Not settings: the refresh changes with the display
+    // the projection is on, and nothing learned is stale when it does.
+    struct Pacing {
+        double periodMs = 0.0;
+        double refreshMs = 0.0;
+    };
+    void setPacing(double periodMs, double refreshHz) {
+        pacing_ = {periodMs > 0.0 ? periodMs : 0.0, refreshHz > 0.0 ? 1000.0 / refreshHz : 0.0};
+    }
+    [[nodiscard]] const Pacing& pacing() const { return pacing_; }
 
     // One frame's measurement. `gpuMs < 0` means the GPU timeline had nothing to report (the first
     // frames, or a build without timestamps) and the frame is ignored rather than counted as free.
@@ -407,7 +439,11 @@ public:
         std::uint64_t framesSeen = 0;
         std::uint64_t heldByCpu = 0;    // decisions declined because the GPU was not the binder
         std::uint64_t reverts = 0;      // ADR-1104: raises undone because the next window missed the budget
+        std::uint64_t missedDeadlines = 0; // ADR-1362: paced frames that landed a refresh or more late
+        std::uint64_t lateNotGpu = 0;      // ADR-1362: ... of which no GPU span came near the period (not acted on)
     };
+    // ADR-1362: deadline misses among the level's recent frames (`missWindowFrames`; always 0 when not paced).
+    [[nodiscard]] int recentMisses() const;
     [[nodiscard]] const Stats& stats() const { return stats_; }
 
 private:
@@ -416,6 +452,13 @@ private:
     [[nodiscard]] double meanWall() const;
     [[nodiscard]] double gpuCost() const;
     [[nodiscard]] double priorRatio(std::size_t k) const;
+    [[nodiscard]] bool missedDeadline(double wallMs) const;
+    void noteDeadline(double gpuMs, double wallMs);
+    Decision decidePaced(double gpu, bool onProbation, double missedCost);
+    // ADR-1362: the level was reached by a raise that has not yet held as long as the raise waited.
+    [[nodiscard]] bool onWatch() const {
+        return raisedInto_ && atLevel_ < settings_.raiseHoldFrames * holdScale_[rung_];
+    }
     void moveTo(std::size_t rung, double medianAtLeave);
 
     InteractiveResolutionSettings settings_{};
@@ -424,6 +467,22 @@ private:
     int raiseStreak_ = 0;
     std::array<double, 64> gpu_{};
     std::array<double, 64> wall_{};
+    // ADR-1362: per frame, whether it missed its deadline because of the GPU (paced only), its own ring: longer than
+    // the GPU window, and filled even on frames the GPU timeline could not report.
+    std::array<std::uint8_t, 512> miss_{};
+    std::size_t missCursor_ = 0;
+    int atLevel_ = 0;          // frames since the last move
+    bool raisedInto_ = false;  // the last move was a raise
+    static constexpr int kTransitionFrames = 3;
+    int lateWaiting_ = 0;     // a late frame waiting this many more frames for a GPU span to attribute it
+    int gpuFullAge_ = 1000;   // frames since a GPU span reached `kGpuFull` of the period
+    static constexpr int kAttributeFrames = 5;
+    static constexpr double kGpuFull = 1.0;
+    static constexpr double kGpuStall = 2.0;
+    // ADR-1362: paced, a probe is the only way to learn that a level holds, so a failed one backs off further than
+    // ADR-1104's 8x: 16x the hold, about a minute at 30 fps, before the same raise is tried again.
+    static constexpr int kPacedMaxHoldScale = 16;
+    static constexpr double kClearlyOver = 1.10; // a missing level's span over the period by this much: not marginal
     std::size_t count_ = 0;
     std::size_t cursor_ = 0;
     // ADR-1085: measured cost ratio across step k (rung k-1 -> k), 0 = not measured. Index 0 unused.
@@ -442,6 +501,7 @@ private:
     bool probation_ = false;
     std::array<int, kLiveQualityLevels> holdScale_{1, 1, 1, 1, 1};
     bool unsustainable_ = false;
+    Pacing pacing_{};
 };
 
 } // namespace avgen::app
