@@ -360,3 +360,19 @@ TEST_CASE("THE RIFT LIVE: the arc, the stage machine's listeners and the fields 
     CHECK(kicks.response.hitSensitivity == Catch::Approx(0.2f));
     CHECK(kicks.response.levelSensitivity == Catch::Approx(0.5f));
 }
+
+TEST_CASE("THE RIFT LIVE: a seek on Trench lands in the drop, through the response-heard listeners", "[rift][live][adr1361][adr1168]") {
+    REQUIRE_RIFT_SCENE();
+    testsupport::skipUnlessProjectAssetsPresent(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift.json");
+    app::Engine engine(app::EngineMode::Offline);
+    engine.setLiveControl(false);
+    REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent/rift-live.json").has_value());
+    REQUIRE(engine.loadAudio(fs::path(AVGEN_SOURCE_DIR) / "assets/audio/trench.wav").has_value());
+    engine.seekSeconds(100.0);
+    FrameTime t{};
+    t.renderTime = 100.0;
+    t.deltaTime = 0.0;
+    engine.update(t);
+    INFO("state after a seek to 100 s: '" << engine.states().current() << "'");
+    CHECK(engine.states().current() == "Drop");
+}

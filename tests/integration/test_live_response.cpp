@@ -8,6 +8,7 @@
 #include "core/time.hpp"
 #include "scene/composition.hpp"
 #include "support/groove.hpp"
+#include "support/project_assets.hpp"
 #include "support/temp_dir.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -217,4 +218,23 @@ TEST_CASE("THE ASTRAL FORGE LIVE: the conductor's song is heard through the Resp
     // Release: the hit envelopes' decay is lengthened.
     const Heard slow = run({{"release", 3.0f}});
     CHECK(slow.heard->song.release == 3.0f);
+}
+
+TEST_CASE("Digital Mosh Live: a seek lands the response-heard arc where play does", "[live][digital-mosh][adr1361][adr1168]") {
+    // The arc leaves the Dream only on Trench (the owner's song, on no CI runner). The live drive is the product of two
+    // outputs of an earlier interpret source and the response layer's level: a seek's control replay (ADR-1168) must
+    // rebuild both, or a still mid-song lands in the Dream while play is in the Infection.
+    testsupport::skipUnlessProjectAssetsPresent(example("digital-mosh/digital-mosh-trench.json"));
+    app::Engine engine(app::EngineMode::Offline);
+    engine.setLiveControl(false);
+    REQUIRE(engine.loadProject(example("digital-mosh/digital-mosh-live.json")).has_value());
+    REQUIRE(engine.loadAudio(fs::path(AVGEN_SOURCE_DIR) / "assets/audio/trench.wav").has_value());
+    engine.seekSeconds(45.0);
+    FrameTime t{};
+    t.renderTime = 45.0;
+    t.deltaTime = 0.0;
+    engine.update(t);
+    INFO("state after a seek to 45 s: '" << engine.states().current() << "'");
+    CHECK(engine.states().current().starts_with("Infection")); // play: Infection from 37 s (the trace in the report)
+    CHECK(engine.params().find("macros/energy")->finalComponent(0) > 0.3f);
 }

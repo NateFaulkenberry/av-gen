@@ -892,22 +892,26 @@ def heard(name, band, level, gain):
                                                           {"signal": level, "weight": 1.0}], "gain": gain}
 
 
-LIVE_LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
-    # how busy the music is (the offline drive) ...
+# The first live source: what the music is doing (character) and how present it is heard (the response). A source
+# reads an earlier source's outputs on the same frame, so the drive below (in `listen`) multiplies two of these on the
+# frame they are made, as THE RIFT's and Sonic Live's `heard` sources are read.
+LIVE_HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
+    # how busy the music is (the offline drive)
     dict(LISTEN["settings"]["mappings"][0], name="busy"),
-    # ... heard: x how present the music is -- the response level with a knee (1 from a level of 0.8, which a mastered
-    # mix holds at neutral, so the arc on a full mix is the offline one; 0.5 at 0.6; 0 at 0.4). The arc integrates
-    # its drive into the stage ladder, so a plain x level (whose small swings on a mix the old drive never had) moved
-    # Trench's stages by 16 s; the knee keeps them. (A frame late: a source reads its own outputs from the frame
-    # before; the arc's routes smooth over seconds.)
+    # how present it is: the response level with a knee -- 1 from a level of 0.65, which a mastered mix holds at
+    # neutral, so the arc on a full mix is the offline one; 0.5 at 0.45; 0 at 0.25. The arc integrates its drive into
+    # the stage ladder, so a plain x level (whose small swings on a mix the old drive never had) moved Trench's
+    # stages by 16 s; the knee keeps them.
     {"name": "presence", "combine": "mean", "inputs": [{"signal": "response.level", "weight": 1.0}],
      "gain": 2.5, "bias": -0.625},
-    {"name": "drive", "combine": "product", "inputs": [{"signal": "visual.busy", "weight": 1.0},
-                                                       {"signal": "visual.presence", "weight": 1.0}]},
-    LISTEN["settings"]["mappings"][1],
     heard("hTreble", "audio.treble", "response.level", 1.2),
     heard("hTrebleLevel", "audio.trebleLevel", "response.level", 1.2),
     heard("hBass", "audio.bass", "response.bass", 1.22),
+]}}
+LIVE_LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
+    {"name": "drive", "combine": "product", "inputs": [{"signal": "visual.busy", "weight": 1.0},
+                                                       {"signal": "visual.presence", "weight": 1.0}]},
+    LISTEN["settings"]["mappings"][1],
 ]}}
 
 
@@ -1049,9 +1053,9 @@ def project(name, audio, live=False, sensitivity=None):
         "assets": {"scene": {"kind": "composition", "path": "digital-mosh.scene.json"}},
         "live": {"qualityStrategy": "effects_first"},
         "parameters": dict(POST),
-        "sources": [LIVE_LISTEN if live else LISTEN, ARC] + [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}}
-                                                            for n in ("driftA", "driftB", "driftC", "circleA",
-                                                                      "circleB")],
+        "sources": ([LIVE_HEARD, LIVE_LISTEN] if live else [LISTEN]) + [ARC] + [
+            {"kind": "lfo", "name": n, "settings": {"shape": "sine"}}
+            for n in ("driftA", "driftB", "driftC", "circleA", "circleB")],
         "sonic": {},
         "routes": routes(live),
         "worldMacros": macros(),

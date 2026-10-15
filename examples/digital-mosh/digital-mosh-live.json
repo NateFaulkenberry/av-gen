@@ -42,7 +42,7 @@
  "sources": [
   {
    "kind": "interpret",
-   "name": "listen",
+   "name": "heard",
    "settings": {
     "mappings": [
      {
@@ -73,33 +73,6 @@
       ],
       "gain": 2.5,
       "bias": -0.625
-     },
-     {
-      "name": "drive",
-      "combine": "product",
-      "inputs": [
-       {
-        "signal": "visual.busy",
-        "weight": 1.0
-       },
-       {
-        "signal": "visual.presence",
-        "weight": 1.0
-       }
-      ]
-     },
-     {
-      "name": "bright",
-      "combine": "mean",
-      "inputs": [
-       {
-        "signal": "sonic.brightness.slow",
-        "weight": 1.0
-       }
-      ],
-      "bias": -0.25,
-      "gain": 2.0,
-      "curve": 1.0
      },
      {
       "name": "hTreble",
@@ -145,6 +118,41 @@
        }
       ],
       "gain": 1.22
+     }
+    ]
+   }
+  },
+  {
+   "kind": "interpret",
+   "name": "listen",
+   "settings": {
+    "mappings": [
+     {
+      "name": "drive",
+      "combine": "product",
+      "inputs": [
+       {
+        "signal": "visual.busy",
+        "weight": 1.0
+       },
+       {
+        "signal": "visual.presence",
+        "weight": 1.0
+       }
+      ]
+     },
+     {
+      "name": "bright",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "sonic.brightness.slow",
+        "weight": 1.0
+       }
+      ],
+      "bias": -0.25,
+      "gain": 2.0,
+      "curve": 1.0
      }
     ]
    }
