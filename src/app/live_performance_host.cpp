@@ -202,14 +202,14 @@ void Application::wireLivePerformancePanel() {
     };
     panel_->onSaveLiveProfile = [this] {
         LiveProjectSettings next = engine_->liveSettings();
-        next.targetFps = options_.liveTargetFps > 0 ? options_.liveTargetFps : settings_.liveTargetFps;
         if (!next.profile) {
             next.profile = QualityProfile::Quality;
         }
         engine_->setLiveSettings(next);
         engine_->setLiveQualityStrategy(engine_->liveQualityStrategy()); // stated, so it is written
-        panel_->setStatus(fmt::format("live profile set in the project: {} fps, {}; save the project to keep it",
-                                      *next.targetFps, qualityProfileLabel(*next.profile)));
+        panel_->setStatus(fmt::format("live profile set in the project: {}; save the project to keep it (the target "
+                                      "is the Live panel's, for every scene)",
+                                      qualityProfileLabel(*next.profile)));
     };
     panel_->onMeasureMemory = [this] {
         const gpu::MemoryReport m = gpu::memoryReport(context_->device(), 3);

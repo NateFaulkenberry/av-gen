@@ -7149,11 +7149,10 @@ std::optional<QualityProfile> Application::liveQualityProfile() const {
 
 InteractiveResolutionSettings Application::liveQualitySettings() const {
     InteractiveResolutionSettings rs = autoResolution_.settings(); // the law's constants stay as they are
-    // ADR-1100: the run's flag, then the project's target, then this machine's setting.
+    // ADR-1360: the run's flag, else the Live panel's Target -- for every scene. (ADR-1100's project target, which
+    // silently outranked the panel in Astral Forge Live, Digital Mosh Live and THE RIFT LIVE, is gone.)
     const LiveProjectSettings& project = engine_ != nullptr ? engine_->liveSettings() : LiveProjectSettings{};
-    const int targetFps = options_.liveTargetFps > 0 ? options_.liveTargetFps
-                          : project.targetFps        ? *project.targetFps
-                                                     : settings_.liveTargetFps;
+    const int targetFps = options_.liveTargetFps > 0 ? options_.liveTargetFps : settings_.liveTargetFps;
     const LiveBudget budget = liveBudget(targetFps);
     // ADR-1105: a ladder from the project's priority, when it names one.
     rs.ladder.reset();

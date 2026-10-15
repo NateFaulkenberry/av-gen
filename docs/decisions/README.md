@@ -53,8 +53,11 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1220-1239 | THE ASTRAL FORGE production build (on main: 1221-1222) |
 | 1280-1299 | proto/bio-valley -- the Bioluminescent Valley (1240-1259 astral-forge-2, 1260-1279 astral-furnace) |
 | 1300-1329 | proto/biovalley-2d and proto/biovalley-original (unmerged; 1300-1303 and 1320-1323 in use there) |
-| 1340-1359 | the 2026-10-14 repository cleanup |
-| 1360+ | unassigned; ask before taking |
+| 1340-1343 | the 2026-10-14 repository cleanup, and the Live panel and menu changes after it |
+| 1344-1349 | perf/rift-live-30fps (THE RIFT LIVE at 30 fps) |
+| 1350-1359 | art/sonic-vfx-pass (the Sonic VFX art pass) |
+| 1360-1369 | live performance follow-ups (2026-10-14) |
+| 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
 cheap failure: this index already skips 301-309, 311-319 and 321-329, and a non-contiguous index
@@ -687,7 +690,7 @@ confirm the citation you are about to change is your own.
 | [1097](ADR-1097-importance-is-inferred-and-heroes-are-exempt.md) | Importance is inferred, and heroes are exempt from every live lever. live/optimizer | Accepted |
 | [1098](ADR-1098-far-emitters-stop-and-material-programs-can-be-measured.md) | Far emitters stop, and material programs can be measured. live/optimizer | Accepted |
 | [1099](ADR-1099-profiles-are-ceilings-in-the-ladders-table-family.md) | QUALITY / BALANCED / PERFORMANCE are ceilings in the ladder's table family. live/optimizer | Accepted |
-| [1100](ADR-1100-the-projects-live-block-holds-target-profile-minimum-priority-and-ceilings.md) | The project's live block holds the target, profile, minimum, priority and Optimize's ceilings. live/optimizer | Accepted |
+| [1100](ADR-1100-the-projects-live-block-holds-target-profile-minimum-priority-and-ceilings.md) | The project's live block holds the target, profile, minimum, priority and Optimize's ceilings. live/optimizer | Accepted; the target superseded by 1360 (the Live panel's Target is the one target) |
 | [1101](ADR-1101-optimize-applies-ticked-levers-as-project-ceilings-with-an-undo.md) | Optimize applies only ticked levers, as project ceilings, with an Undo. live/optimizer | Accepted |
 | [1102](ADR-1102-sdf-variants-are-prewarmed-and-compile-on-dawns-workers-live.md) | SDF variants are pre-warmed, and compile on Dawn's workers live. live/optimizer | Accepted |
 | [1103](ADR-1103-a-project-minimum-level-and-live-target-unsustainable.md) | A project minimum level, and "LIVE TARGET UNSUSTAINABLE". live/optimizer | Accepted |
@@ -762,3 +765,4 @@ confirm the citation you are about to change is your own.
 | [1341](ADR-1341-the-live-scene-list-is-every-live-scene.md) | The live scene list is every live scene (Sonic Live first, then index order, under family headings; supersedes ADR-1074's sets); a 30 fps live target; "Open live demo" removed. The owner's request | Accepted |
 | [1342](ADR-1342-a-live-scene-plays-until-the-projection-stops.md) | A live scene plays until the projection stops: a live project's transport is endless (its looped camera tracks keep moving), Start projection starts it and Stop projection stops it, and a live scene switch keeps it playing. The owner's request | Accepted |
 | [1343](ADR-1343-an-example-can-be-kept-out-of-the-menu.md) | An example can be kept out of the menu (`"hidden": true`: still in the index and every index test, offered nowhere); ten of the sixteen Sonic VFX scenes hidden at the owner's request, four of them the only authored use of an effect type. The owner's request | Accepted |
+| [1360](ADR-1360-the-live-panels-target-is-the-one-target.md) | The Live panel's Target is the one live frame-rate target: a project's `live.targetFps` (ADR-1100), which silently outranked the panel in Astral Forge Live, Digital Mosh Live and THE RIFT LIVE, is removed and warned about. The owner's request | Accepted |

@@ -2482,9 +2482,6 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         doc["live"]["qualityStrategy"] = std::string(liveQualityStrategyToken(*liveQualityStrategy_));
     }
     // ADR-1100: the rest of the live block, each field only when stated.
-    if (liveSettings_.targetFps) {
-        doc["live"]["targetFps"] = *liveSettings_.targetFps;
-    }
     if (liveSettings_.profile) {
         doc["live"]["profile"] = std::string(qualityProfileToken(*liveSettings_.profile));
     }
@@ -2775,6 +2772,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     lens_ = scene::LensSettings{};
     exposure_ = scene::ExposureSettings{};
     focus_ = scene::FocusSettings{};
+    // The temporal effects (frame echo, mosh, feedback) re-register from `temporal_` the same way and were missing
+    // here: after Feedback Mirror had played, every scene switched to kept its feedback on -- the owner's "spinning
+    // tunnel that carried over from one scene" (2026-10-14; tests/integration/test_live_switch_carryover.cpp).
+    temporal_ = scene::TemporalSettings{};
     meterSettings_ = MeterSettings{}; // ADR-896: the loop above reset the parameters; this, what they re-register from
     auto warn = [&](std::string message) {
         log::warn("project: {}", message);
@@ -2809,13 +2810,11 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         // ADR-1100: absent fields are unset, never the last project's.
         LiveProjectSettings ls;
         if (const auto live = doc.find("live"); live != doc.end() && live->is_object()) {
-            if (const auto v = live->find("targetFps"); v != live->end()) {
-                if (v->is_number_integer() && v->get<int>() >= kLiveTargetFpsMin && v->get<int>() <= kLiveTargetFpsMax) {
-                    ls.targetFps = v->get<int>();
-                } else {
-                    warn(fmt::format("live.targetFps must be an integer from {} to {}", kLiveTargetFpsMin,
-                                     kLiveTargetFpsMax));
-                }
+            if (live->contains("targetFps")) {
+                // ADR-1360: named rather than silently ignored, so a project written before it says why its number
+                // no longer applies.
+                warn("live.targetFps is no longer read: the Live panel's Target is the one live frame-rate target "
+                     "for every scene (ADR-1360)");
             }
             if (const auto v = live->find("profile"); v != live->end()) {
                 const auto p = v->is_string() ? qualityProfileFromToken(v->get<std::string>()) : std::nullopt;

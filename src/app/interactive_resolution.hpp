@@ -303,11 +303,11 @@ inline constexpr std::size_t kQualityProfiles = 3;
 [[nodiscard]] rendering::QualitySettings applyQualityProfile(const rendering::QualitySettings& q, QualityProfile profile);
 
 // ---- ADR-1100: the project's live block, beyond the strategy (ADR-1084) --------------------------------------------
-// `"live": {"qualityStrategy", "targetFps", "profile", "minimumLevel", "priority": [...], "overrides": {...}}`. Every
-// field optional and written only when stated, so a project that never chose round-trips unchanged. `overrides` is
-// what the Optimize review applies: ceilings the project keeps, never an edit to the scene.
+// `"live": {"qualityStrategy", "profile", "minimumLevel", "priority": [...], "overrides": {...}}`. Every field
+// optional and written only when stated, so a project that never chose round-trips unchanged. `overrides` is what the
+// Optimize review applies: ceilings the project keeps, never an edit to the scene. There is no project frame-rate
+// target (ADR-1360): the Live panel's Target is the one target for every scene, `--live-target` overrides it for a run.
 struct LiveProjectSettings {
-    std::optional<int> targetFps;
     std::optional<QualityProfile> profile;
     std::optional<LiveQualityLevel> minimumLevel;
     std::vector<std::string> priority;

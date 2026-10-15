@@ -668,7 +668,7 @@ def project(name, audio, length, live=False):
         "format": "avgen-project", "version": 4,
         "app": {"name": name},
         "assets": {"scene": {"kind": "composition", "path": "rift.scene.json"}},
-        "live": {"qualityStrategy": "effects_first", "targetFps": 60},
+        "live": {"qualityStrategy": "effects_first"},
         "parameters": dict(POST),
         "sources": [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}} for n in ("driftA", "driftC")],
         "sonic": {},
