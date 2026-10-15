@@ -337,3 +337,23 @@ Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. 
   steeper falloff than the first trial (`passD-rays-drift-2-10-20-29s.png`, `passD-30s.mp4`).
 - Bow wave and stern wake particles on the boat (superseded by the boat step: the wake read as a round blob).
 - Island regions retuned (rock on the steeper flanks, wider sand band) -- superseded by the island step.
+
+## Island step (the owner's brief `08-brief-island-simplification.md`) (done)
+
+- The mound is gone. The island is now an extruded silhouette, not terrain: a long rounded-rectangle footprint
+  (640 x 150 m, 900 m out on the left third) whose top line `island_top` is almost flat with a few soft bumps, one dip
+  and a long low tail; a shallow rise from the water; 26 m at its highest. It reads as a low island as a flat
+  single-colour silhouette. ~3 % of the image height for the land, ~7 % at the tree crowns; sky ~44 %, ocean ~56 %.
+- The trees use one vocabulary: windswept palms (a curved trunk, six broad tapered fronds, a silhouette rather than
+  leaves) and broad low canopies (three overlapping flattened masses on a short trunk), with gaps between them.
+- About three land colours (`doLand`): the main colour on faces that look up, a darker underside on the steep faces,
+  and in variants A/B a sun-facing accent; B and C add a narrow sand line at the water. No outlines and no foam ring.
+- Stable: no deformer on the island and nothing routed to its shape. Only the palms sway, 0.2 m at the crown over 9 s;
+  the canopies hold still. Palettes still recolour it, and the far chain is now two faint low strips.
+- Variants from the same camera, sea, sun and clouds at 1080p (`54-digital-ocean-2/island/`): **A** minimal (4 trees,
+  three tones), **B** tropical anime (7 trees, sand line), **C** cut-paper (5 trees, hard two-tone land, trees one
+  dark tone). Round 1 placed the strip at 1.45 km and it vanished into the haze (`island-before-A-B-C.png`); round 2
+  brought it to 900 m (`island-before-A-B-C-round2.png`).
+- **Chosen: C.** It has the minimal geometry of A, the cleanest graphic read, and a canopy anchoring each end, so the
+  strip is balanced (A leaves the left half bare). B's extra trees add clutter, not identity. C is also the least
+  shaded variant, which matches the travel-poster direction chosen in Pass A.

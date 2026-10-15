@@ -263,35 +263,35 @@ PALETTES = {
                    cshade="#5a3486", clit="#ff9c86", crim="#ffe0c0", isle="#6a4a96",
                    dback="#1d1448", dbelly="#7a58a8", drim="#ffc8a8",
                    land="#4e3488", land2="#2c1d5c", rock="#8a4e8e", sand="#f0a6a0", leaf="#3a2a78", trunk="#3a2266",
-                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0"),
+                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0", land3="#c27aa8", pearl="#f4ece8", glaze="#1c1a4a", deck="#e8c8b8", hshade="#a99ac8"),
     # golden afternoon: turquoise and teal water, cream foam, coral sun, soft blue sky, warm green island
     "afternoon": dict(zenith="#2b68cc", mid="#7fb4ec", warm="#ffe0ac", cool="#bfe2f4", sun="#fffbe8", glow="#ffc884",
                       deep="#0a5a80", rzen="#2c78bc", rhor="#a8dcea", sss="#2fe6c8", glint="#fffbe8", foam="#fff4dc",
                       cshade="#90a8d8", clit="#fff5e6", crim="#fffbf0", isle="#7e9cc4",
                       dback="#284a7c", dbelly="#d0e2f0", drim="#fff4dc",
                       land="#45a85c", land2="#1f6e62", rock="#c88a5c", sand="#f6e2b4", leaf="#2f9a52", trunk="#8a5a3c",
-                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#fff4d6"),
+                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#fff4d6", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e6d6b8", hshade="#a8bccc"),
     # electric blue: ultramarine and cyan water, mint surf, saturated blue sky, yellow-coral accents, navy land
     "electric": dict(zenith="#0a2a9c", mid="#2c6ae4", warm="#8ff0ff", cool="#4a8cf0", sun="#fff7a8", glow="#ffd84a",
                      deep="#06186a", rzen="#0e40b6", rhor="#62d4ff", sss="#3cf4ff", glint="#ffffe0", foam="#c8fff0",
                      cshade="#2448b0", clit="#c4ecff", crim="#fff6c0", isle="#2244a0",
                      dback="#0a1a56", dbelly="#4a80d8", drim="#fff7b0",
                      land="#14266a", land2="#0a1446", rock="#2a4aa0", sand="#4a76d0", leaf="#0e1c5a", trunk="#0c1650",
-                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#fffad0"),
+                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#fffad0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#c8d8f0", hshade="#7f9ad8"),
     # the night end (CC 1): bioluminescent
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
                      deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
                      cshade="#0a0a22", clit="#33346e", crim="#a8b6ff", isle="#0a0a26",
                      dback="#020410", dbelly="#141a3a", drim="#9fb4ff",
                      land="#0a0c26", land2="#05061a", rock="#14183a", sand="#1a2650", leaf="#060a20", trunk="#05081a",
-                     hull="#c8d4ff", hull2="#3a4a9a", sail="#6a7ad8", sail2="#a8b6ff", ray="#a8b8ff"),
+                     hull="#c8d4ff", hull2="#3a4a9a", sail="#6a7ad8", sail2="#a8b6ff", ray="#a8b8ff", land3="#1a2050", pearl="#7c88b8", glaze="#02040e", deck="#4a5488", hshade="#2a3260"),
     # Pass 1's electric twilight, kept for before/after comparisons
     "twilight": dict(zenith="#100d36", mid="#563a8a", warm="#ff9b7d", cool="#8a6cc2", sun="#ffe2cc", glow="#ff7f68",
                      deep="#0a0b35", rzen="#191c58", rhor="#8a6cbd", sss="#18cfe0", glint="#ffd6c2", foam="#bdfde6",
                      cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68",
                      dback="#140f33", dbelly="#4a3a78", drim="#ffc3a8",
                      land="#3f2a68", land2="#24184a", rock="#5a3a7a", sand="#c08aa0", leaf="#2a1f52", trunk="#2a1f4a",
-                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0"),
+                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d8b8c0", hshade="#8a7aa8"),
 }
 PALETTE = "violet"
 DEBUG_SKY = None
@@ -652,73 +652,97 @@ CLOUD_DRIFT = 0.0022        # radians a second the cloud field turns round the v
 # The hero island on the left third, a chain of far islands, palms on its beach, the hero sailboat in the middle
 # distance. Every one of them is painted by one illustrated program (doIllus): a flat colour (the node's emission, so
 # palettes route onto it), a broad sun-side light band and a shadow band, and the haze of distance.
-ISLAND_C = (-330.0, -980.0)     # the hero island's centre (x, z)
-ISLAND_R = 270.0
+# ---- the island (the owner's simplification brief, 08): a long, LOW strip near the horizon -- an extruded silhouette,
+# not terrain. A gently irregular top, a shallow slope to the water, a narrow sand line; 3-8 % of the image height.
+ISLAND_C = (-300.0, -900.0)      # centre (x, z): the left third, near the horizon
+ISLAND_W, ISLAND_D, ISLAND_H = 640.0, 150.0, 26.0   # length across the view, depth, the highest point (m)
+TREE_SCALE = 2.2
+ISLAND_STYLE = "C"               # A minimal silhouette, B tropical anime, C cut-paper travel illustration
+
+
+def island_top(u):
+    """The top line along the island, u in [-1, 1]: almost flat, a few soft bumps and one dip, asymmetric (higher
+    toward the right end, a long low tail to the left)."""
+    bumps = [(-0.62, 0.22, 0.35), (-0.15, 0.3, 0.75), (0.28, 0.18, 0.55), (0.55, 0.25, 1.0), (0.82, 0.12, 0.6)]
+    h = 0.45 + sum(a * math.exp(-((u - c) / w) ** 2) for c, w, a in bumps) * 0.6
+    return min(h, 1.0)
 
 
 def island_height(x, z):
-    """The hero island: a twin-summit volcanic hill, a cliffed seaward face, a long beach shelf toward the camera."""
-    def bump(cx, cz, rx, rz, h):
-        d = ((x - cx) / rx) ** 2 + ((z - cz) / rz) ** 2
-        return h * math.exp(-d * 2.2)
-    h = bump(0.0, 0.0, 210.0, 150.0, 128.0) + bump(-120.0, 40.0, 120.0, 100.0, 70.0) + bump(140.0, -30.0, 110.0, 90.0, 52.0)
-    h += 6.0 * (mx.fbm(x / 70.0, z / 70.0, 17, 4, ridged=True) - 0.5) * min(1.0, h / 40.0)
-    # the beach shelf: a low, flat apron that runs out toward the camera on the right
-    shelf = bump(60.0, 150.0, 170.0, 70.0, 7.0)
-    r = math.hypot(x / 1.15, z)
-    edge = mx.smooth(ISLAND_R, ISLAND_R * 0.7, r)          # 1 inland, 0 beyond the coast
-    return max(h, shelf) * edge - 6.0 * (1.0 - edge)
-
-
-def polar_heightfield(height, R, rings, segments):
-    verts, faces = [], []
-    verts.append((0.0, height(0.0, 0.0), 0.0))
-    for i in range(1, rings + 1):
-        r = R * (i / rings) ** 0.85
-        for j in range(segments):
-            a = 2.0 * math.pi * j / segments
-            x, z = r * math.sin(a), r * math.cos(a)
-            verts.append((x, height(x, z), z))
-    for j in range(segments):
-        faces.append((0, 1 + j, 1 + (j + 1) % segments))
-    for i in range(rings - 1):
-        b0, b1 = 1 + i * segments, 1 + (i + 1) * segments
-        for j in range(segments):
-            j1 = (j + 1) % segments
-            faces += [(b0 + j, b1 + j, b1 + j1), (b0 + j, b1 + j1, b0 + j1)]
-    v, n, idx = mx.smooth_shaded(verts, faces)
-    return v, n, idx
+    u, v = x / (ISLAND_W * 0.5), z / (ISLAND_D * 0.5)
+    r = math.hypot(u ** 6, v) if False else (abs(u) ** 6 + v * v) ** 0.5     # a long rounded rectangle footprint
+    if r >= 1.0:
+        return -3.0
+    edge = mx.smooth(1.0, 0.72, r)                  # a shallow rise from the water, then the flat top
+    return ISLAND_H * island_top(max(-1.0, min(1.0, u))) * edge ** 0.6 - 0.5
 
 
 def island_meshes():
-    v, n, i = polar_heightfield(island_height, ISLAND_R * 1.15, 44, 120)
-    mx.write_glb(os.path.join(MESH_DIR, "do-island.glb"), [tuple(round(c, 3) for c in p) for p in v],
-                 [tuple(round(c, 4) for c in q) for q in n], i, "island")
-    # the far chain: three hazy silhouettes (a smaller shape, reused)
+    nx, nz = 160, 26
+    verts, faces = [], []
+    for i in range(nz + 1):
+        for j in range(nx + 1):
+            x = (j / nx - 0.5) * ISLAND_W * 1.04
+            z = (i / nz - 0.5) * ISLAND_D * 1.1
+            verts.append((round(x, 3), round(island_height(x, z), 3), round(z, 3)))
+    for i in range(nz):
+        for j in range(nx):
+            a = i * (nx + 1) + j
+            faces += [(a, a + nx + 1, a + 1), (a + 1, a + nx + 1, a + nx + 2)]
+    v, n, idx = mx.smooth_shaded(verts, faces)
+    mx.write_glb(os.path.join(MESH_DIR, "do-island-low.glb"), v, [tuple(round(c, 4) for c in q) for q in n], idx,
+                 "island")
+    # the far chain: two faint low strips on the horizon
     def far(x, z):
-        r = math.hypot(x, z / 0.7)
-        return max(0.0, 60.0 * math.exp(-(r / 120.0) ** 2 * 2.0) + 4.0 * (mx.fbm(x / 50.0, z / 50.0, 23, 3) - 0.5)) - 3.0
-    v, n, i = polar_heightfield(far, 260.0, 18, 64)
-    mx.write_glb(os.path.join(MESH_DIR, "do-farisle.glb"), [tuple(round(c, 3) for c in p) for p in v],
-                 [tuple(round(c, 4) for c in q) for q in n], i, "isle")
-    return len(v)
+        u, w = x / 300.0, z / 60.0
+        r = (abs(u) ** 4 + w * w) ** 0.5
+        return 9.0 * mx.smooth(1.0, 0.6, r) * (0.7 + 0.3 * math.exp(-((u - 0.3) / 0.4) ** 2)) - 1.0 if r < 1 else -3.0
+    verts = []
+    for i in range(11):
+        for j in range(41):
+            x, z = (j / 40 - 0.5) * 620.0, (i / 10 - 0.5) * 130.0
+            verts.append((round(x, 3), round(far(x, z), 3), round(z, 3)))
+    faces = []
+    for i in range(10):
+        for j in range(40):
+            a = i * 41 + j
+            faces += [(a, a + 41, a + 1), (a + 1, a + 41, a + 42)]
+    v, n, idx = mx.smooth_shaded(verts, faces)
+    mx.write_glb(os.path.join(MESH_DIR, "do-farstrip.glb"), v, [tuple(round(c, 4) for c in q) for q in n], idx,
+                 "farstrip")
+    return len(verts)
 
 
-FAR_ISLES = [((-1300.0, -3400.0), 1.9, 0.9), ((900.0, -4200.0), 1.4, 0.7), ((2300.0, -3700.0), 1.0, 0.55)]
+FAR_ISLES = [((-2400.0, -5200.0), 1.6, 1.0), ((2700.0, -5600.0), 1.2, 0.8)]
+
+
+def ellipsoid(c, r, seg=16, rings=10):
+    verts, faces = [], []
+    for i in range(rings + 1):
+        th = math.pi * i / rings
+        for j in range(seg):
+            ph = 2 * math.pi * j / seg
+            verts.append((c[0] + r[0] * math.sin(th) * math.cos(ph), c[1] + r[1] * math.cos(th),
+                          c[2] + r[2] * math.sin(th) * math.sin(ph)))
+    for i in range(rings):
+        for j in range(seg):
+            a, b = i * seg + j, i * seg + (j + 1) % seg
+            c2, d = (i + 1) * seg + (j + 1) % seg, (i + 1) * seg + j
+            faces += [(a, b, c2), (a, c2, d)]
+    return verts, faces
 
 
 def palm_meshes():
-    """A graphic palm: a curved, tapering trunk (its top at the origin's +Y, 1 unit = 1 m at scale 1, 20 m tall) and a
-    crown of nine drooping blades. Two meshes, so the trunk and the crown take their own colours."""
-    H = 20.0
-    lean = 3.2
+    """One tree vocabulary, two shapes: a windswept palm (a curved tapering trunk, six broad tapered fronds -- a
+    silhouette, not leaves) and a broad low tropical canopy (three overlapping flattened masses on a short trunk)."""
+    H, lean = 16.0, 4.0
     tris = []
-    segs, sides = 9, 7
+    segs, sides = 8, 6
     rings = []
     for k in range(segs + 1):
         u = k / segs
         cx, cy = lean * u * u, H * u
-        rr = 0.75 * (1.0 - 0.45 * u)
+        rr = 0.6 * (1.0 - 0.45 * u)
         rings.append([(cx + rr * math.cos(2 * math.pi * j / sides), cy, rr * math.sin(2 * math.pi * j / sides))
                       for j in range(sides)])
     for k in range(segs):
@@ -726,118 +750,280 @@ def palm_meshes():
             a, b = rings[k][j], rings[k][(j + 1) % sides]
             c, d = rings[k + 1][(j + 1) % sides], rings[k + 1][j]
             tris += [(a, c, b), (a, d, c)]
-    mx.write_faceted(os.path.join(MESH_DIR, "do-palm-trunk.glb"), tris, "trunk")
     top = (lean, H, 0.0)
-    crown = []
-    blades = 9
-    for b in range(blades):
-        az = 2.0 * math.pi * (b + 0.37 * (b % 2)) / blades
-        L = 9.5 + 2.5 * ((b * 7) % 3) / 2.0
+    for b, (az, L, droop) in enumerate([(0.2, 8.0, 0.55), (1.15, 7.0, 0.7), (2.2, 6.5, 0.6), (3.3, 7.5, 0.5),
+                                        (4.3, 6.0, 0.8), (5.3, 7.2, 0.65)]):
         dx, dz = math.cos(az), math.sin(az)
         px, pz = -dz, dx
+        n = 5
         pts = []
-        n = 7
         for k in range(n + 1):
             u = k / n
-            r = L * u
-            y = 1.6 * math.sin(math.pi * u * 0.55) - 6.0 * u * u
-            w = 1.5 * math.sin(math.pi * min(1.0, u * 1.1)) * (1.0 - 0.25 * u)
-            c = (top[0] + dx * r, top[1] + y, top[2] + dz * r)
-            pts.append((c, w))
+            y = 0.9 * math.sin(math.pi * u * 0.6) - droop * 6.0 * u * u
+            w = 1.3 * math.sin(math.pi * min(1.0, u * 1.15)) * (1.0 - 0.3 * u) + 0.05
+            pts.append(((top[0] + dx * L * u, top[1] + y, top[2] + dz * L * u), w))
         for k in range(n):
             (c0, w0), (c1, w1) = pts[k], pts[k + 1]
             a = (c0[0] + px * w0, c0[1], c0[2] + pz * w0)
             bq = (c0[0] - px * w0, c0[1], c0[2] - pz * w0)
-            cq = (c1[0] - px * w1, c1[1] + 0.2, c1[2] - pz * w1)
-            d = (c1[0] + px * w1, c1[1] + 0.2, c1[2] + pz * w1)
-            crown += [(a, bq, cq), (a, cq, d), (a, cq, bq), (a, d, cq)]       # both faces
-    mx.write_faceted(os.path.join(MESH_DIR, "do-palm-crown.glb"), crown, "crown")
-    return len(tris), len(crown)
+            cq = (c1[0] - px * w1, c1[1], c1[2] - pz * w1)
+            d = (c1[0] + px * w1, c1[1], c1[2] + pz * w1)
+            tris += [(a, bq, cq), (a, cq, d), (a, cq, bq), (a, d, cq)]
+    mx.write_faceted(os.path.join(MESH_DIR, "do-palm.glb"), tris, "palm")
+    verts, faces = [], []
+    for c, r in (((0.0, 9.0, 0.0), (7.5, 3.6, 6.0)), ((5.5, 10.5, 1.0), (5.5, 3.4, 4.5)),
+                 ((-4.5, 8.2, -0.5), (5.0, 3.0, 4.2))):
+        v, f = ellipsoid(c, r)
+        off = len(verts)
+        verts += v
+        faces += [(a + off, b + off, c2 + off) for a, b, c2 in f]
+    v, f = ellipsoid((0.0, 3.5, 0.0), (0.7, 4.0, 0.7), 8, 4)
+    off = len(verts)
+    verts += v
+    faces += [(a + off, b + off, c2 + off) for a, b, c2 in f]
+    v, n, idx = mx.smooth_shaded(verts, faces)
+    mx.write_glb(os.path.join(MESH_DIR, "do-canopy.glb"), v, n, idx, "canopy")
+    return len(tris)
 
 
-def palm_points():
-    """Palms on the beach shelf and the low slopes, leaning seaward, varied in size (Python-side island heights)."""
-    rnd = lambda k, s: mx._hash(k, s, 91)
-    spots = [(70, 165), (100, 150), (130, 170), (40, 130), (160, 140), (-20, 150), (190, 120), (85, 120), (10, 175),
-             (-60, 120), (140, 105)]
+# trees: (along the island u in [-1, 1], across v, kind, scale, yaw deg). Gaps on purpose; one tall palm marks it.
+TREES = {
+    "A": [(-0.35, 0.1, "palm", 1.25, 20.0), (0.12, -0.05, "palm", 0.95, -15.0), (0.52, 0.0, "canopy", 1.0, 0.0),
+          (0.7, 0.15, "palm", 1.05, 35.0)],
+    "B": [(-0.6, 0.0, "canopy", 0.85, 30.0), (-0.35, 0.1, "palm", 1.3, 20.0), (-0.2, -0.1, "palm", 0.85, 60.0),
+          (0.12, -0.05, "palm", 1.0, -15.0), (0.5, 0.0, "canopy", 1.05, 0.0), (0.68, 0.15, "palm", 1.1, 35.0),
+          (0.82, 0.0, "palm", 0.8, -40.0)],
+}
+TREES["C"] = TREES["A"] + [(-0.62, 0.0, "canopy", 0.8, 30.0)]
+
+
+def tree_points(kind):
     pts = []
-    for k, (lx, lz) in enumerate(spots):
-        y = island_height(lx, lz)
-        sc = 1.5 + 1.0 * rnd(k, 1)       # Pass B: palms that read at this distance
-        yaw = math.radians(-60.0 + 70.0 * rnd(k, 2))
-        q = (0.0, math.sin(yaw / 2.0), 0.0, math.cos(yaw / 2.0))
-        pts.append([round(ISLAND_C[0] + lx, 2), round(y - 0.8, 2), round(ISLAND_C[1] + lz, 2),
-                    0.0, round(q[1], 5), 0.0, round(q[3], 5), round(sc, 3), round(sc, 3), round(sc, 3)])
+    for u, v, k, sc, yaw in TREES[ISLAND_STYLE]:
+        if k != kind:
+            continue
+        x, z = u * ISLAND_W * 0.5, v * ISLAND_D * 0.5
+        y = island_height(x, z)
+        q = math.radians(yaw) / 2.0
+        pts.append([round(ISLAND_C[0] + x, 2), round(y - 0.6, 2), round(ISLAND_C[1] + z, 2), 0.0, round(math.sin(q), 5),
+                    0.0, round(math.cos(q), 5), sc * TREE_SCALE, sc * TREE_SCALE, sc * TREE_SCALE])
     return pts
 
 
-BOAT_AT = (-24.0, -58.0)     # the hero boat's position (x, z): left of centre, in the middle distance
-BOAT_HEADING = 28.0          # degrees: the bow toward the right, a little away from the camera
-
-
-def boat_meshes():
-    """The hero sailboat, local +X forward, +Y up, the waterline at y = 0: a lofted hull with a sheer and a raked bow,
-    a mast and boom, and a big curved mainsail and a jib (one mesh, the sails' colour)."""
-    L, B = 11.0, 3.4
-    st = [(0.0, 0.55, 1.5), (0.12, 0.85, 1.35), (0.35, 1.0, 1.3), (0.6, 0.95, 1.4), (0.82, 0.65, 1.65), (0.95, 0.25, 1.9),
-          (1.0, 0.02, 2.05)]
-    rings = []
-    for fx, half, sheer in st:
-        x = fx * L - L * 0.5
-        hb = half * B * 0.5
-        rings.append([(x, sheer, hb), (x, 0.45, hb * 1.02), (x, -0.55, hb * 0.6), (x, -0.95, 0.0),
-                      (x, -0.55, -hb * 0.6), (x, 0.45, -hb * 1.02), (x, sheer, -hb)])
+# ---- the boats (the owner's brief 09): a real boat designed first, simplified second, stylized third. Three
+# candidates share one builder: stations along the hull give the deck half-breadth, the sheer, the chine and the keel;
+# the superstructure is lofted the same way. Local +X is forward, +Y up, the waterline at y = 0.
+def loft(stations, closed_bottom=True):
+    """Rings of points [(x, [(y, z_half), ...]), ...] -> a closed hull surface, mirrored to port (z < 0)."""
     tris = []
+    rings = []
+    for x, prof in stations:
+        half = [(x, y, z) for y, z in prof]                       # starboard, from the deck edge down to the keel
+        ring = half + [(x, y, -z) for y, z in reversed(prof[:-1])]  # back up the port side (the keel shared)
+        rings.append(ring)
     for i in range(len(rings) - 1):
-        for j in range(len(rings[i]) - 1):
-            a, b = rings[i][j], rings[i][j + 1]
-            c, d = rings[i + 1][j + 1], rings[i + 1][j]
+        r0, r1 = rings[i], rings[i + 1]
+        for j in range(len(r0) - 1):
+            a, b, c, d = r0[j], r0[j + 1], r1[j + 1], r1[j]
             tris += [(a, b, c), (a, c, d)]
-        # the deck between the two sheer points
-        tris += [(rings[i][0], rings[i + 1][0], rings[i + 1][-1]), (rings[i][0], rings[i + 1][-1], rings[i][-1])]
-    stern = rings[0]
-    for j in range(1, len(stern) - 1):
-        tris.append((stern[0], stern[j + 1], stern[j]))
-    # mast and boom
-    def box(c0, c1, w):
-        (x0, y0, z0), (x1, y1, z1) = c0, c1
-        q = []
-        corners = lambda x, y, z: [(x - w, y, z - w), (x + w, y, z - w), (x + w, y, z + w), (x - w, y, z + w)]
-        b0, b1 = corners(x0, y0, z0), corners(x1, y1, z1)
-        for k in range(4):
-            a, bq, c, d = b0[k], b0[(k + 1) % 4], b1[(k + 1) % 4], b1[k]
-            q += [(a, bq, c), (a, c, d)]
-        return q
-    mast_x = 0.6
-    tris += box((mast_x, 1.2, 0.0), (mast_x, 14.5, 0.0), 0.12)
-    tris += box((mast_x, 2.6, 0.0), (mast_x - 5.6, 2.6, 0.0), 0.09)
-    mx.write_faceted(os.path.join(MESH_DIR, "do-boat-hull.glb"), tris, "hull")
-    # sails: a curved mainsail (luff on the mast, foot on the boom, its belly bowed to leeward) and a jib to the bow
-    sail = []
-    def panel(p00, p10, p01, p11, belly, n=6):
+    return tris, rings
+
+
+def cap(ring, flip=False):
+    """A flat cap over a closed ring (a fan from its centroid): the deck, the transom."""
+    cx = sum(p[0] for p in ring) / len(ring)
+    cy = sum(p[1] for p in ring) / len(ring)
+    cz = sum(p[2] for p in ring) / len(ring)
+    out = []
+    for j in range(len(ring)):
+        a, b = ring[j], ring[(j + 1) % len(ring)]
+        out.append(((cx, cy, cz), b, a) if flip else ((cx, cy, cz), a, b))
+    return out
+
+
+def deck_surface(stations, y_of):
+    """The deck between the two sheer lines (x, half-breadth) at height y_of(x)."""
+    out = []
+    for (x0, h0), (x1, h1) in zip(stations, stations[1:]):
+        a, b = (x0, y_of(x0), h0), (x0, y_of(x0), -h0)
+        c, d = (x1, y_of(x1), -h1), (x1, y_of(x1), h1)
+        out += [(a, b, c), (a, c, d)]
+    return out
+
+
+def box_loft(sections):
+    """A superstructure: [(x, y_bottom, y_top, half_bottom, half_top), ...] -> a closed lofted solid (rounded by the
+    taper only). Returns (side tris, glazing-band tris) -- the band is the upper 55 % of the sides."""
+    sides, glass = [], []
+    rings = []
+    for x, y0, y1, h0, h1 in sections:
+        ym = y0 + 0.45 * (y1 - y0)
+        hm = h0 + 0.45 * (h1 - h0)
+        rings.append([(x, y0, h0), (x, ym, hm), (x, y1, h1), (x, y1, -h1), (x, ym, -hm), (x, y0, -h0)])
+    for i in range(len(rings) - 1):
+        r0, r1 = rings[i], rings[i + 1]
+        for j in range(len(r0)):
+            a, b = r0[j], r0[(j + 1) % 6]
+            c, d = r1[(j + 1) % 6], r1[j]
+            quad = [(a, d, c), (a, c, b)]
+            (glass if j in (1, 4) else sides).extend(quad)
+    sides += cap(rings[0], flip=True) + cap(rings[-1])
+    return sides, glass
+
+
+def motor_yacht():
+    """A: a 16 m sport motor yacht -- a long low hull, a fine raked stem, flared bow sections, a hard chine, a sheer
+    that steps down aft, a wide transom over a swim platform; a low cabin with a raked windscreen and a hardtop whose
+    long dark glazing wraps the sides."""
+    L = 16.0
+    # (x from the transom, deck half-breadth, sheer height, chine half-breadth, chine height, keel depth)
+    st = [(0.0, 2.15, 1.25, 2.0, 0.05, -0.55), (2.5, 2.3, 1.3, 2.05, 0.0, -0.75), (6.0, 2.35, 1.45, 1.95, -0.05, -0.9),
+          (9.5, 2.25, 1.65, 1.7, 0.0, -0.95), (12.0, 1.85, 1.85, 1.2, 0.15, -0.8), (14.0, 1.25, 2.05, 0.6, 0.45, -0.5),
+          (15.4, 0.55, 2.2, 0.15, 0.9, 0.0), (16.0, 0.05, 2.3, 0.02, 1.6, 1.0)]
+    stations = [(x - L * 0.5, [(sh, hb), (sh - 0.25, hb * 1.0), (cy, ch), (k, 0.0)]) for x, hb, sh, ch, cy, k in st]
+    hull, rings = loft(stations)
+    hull += cap(rings[0], flip=True)                                     # the transom
+    deck = deck_surface([(x - L * 0.5, hb) for x, hb, *_ in st], lambda x: 1.3 + max(0.0, (x + 2.0)) * 0.11)
+    # the swim platform: a thin slab aft of the transom
+    deck += [((-L * 0.5 - 1.1, 0.35, 1.9), (-L * 0.5, 0.35, 1.9), (-L * 0.5, 0.35, -1.9)),
+             ((-L * 0.5 - 1.1, 0.35, 1.9), (-L * 0.5, 0.35, -1.9), (-L * 0.5 - 1.1, 0.35, -1.9))]
+    # the superstructure: from the cockpit forward to a raked windscreen, a hardtop over it
+    sup = [(-3.4, 1.45, 2.85, 1.95, 1.75), (-1.0, 1.5, 2.95, 1.98, 1.8), (1.6, 1.55, 3.0, 1.9, 1.7),
+           (3.4, 1.62, 2.55, 1.75, 1.4), (4.8, 1.7, 1.95, 1.5, 1.05)]
+    sides, glass = box_loft([(x, y0, y1, h0, h1) for x, y0, y1, h0, h1 in sup])
+    # a dark hull window band (long, narrow) under the sheer amidships
+    win = []
+    for z in (1.0, -1.0):
+        x0, x1, y0, y1 = -1.5, 4.5, 0.85, 1.05
+        hz = 2.37 * z
+        quad = [(x0, y0, hz), (x1, y0, hz), (x1, y1, hz), (x0, y1, hz)]
+        win += [(quad[0], quad[1], quad[2]), (quad[0], quad[2], quad[3])] if z > 0 else \
+               [(quad[0], quad[2], quad[1]), (quad[0], quad[3], quad[2])]
+    return {"hull": hull, "deck": deck + sides, "glaze": glass + win}
+
+
+def speedboat():
+    """B: a 10 m deep-V performance runabout -- long narrow hull, a sharp bow, a long foredeck, a low wraparound
+    windshield over a cockpit aft."""
+    L = 10.0
+    st = [(0.0, 1.25, 0.95, 1.15, 0.0, -0.45), (2.5, 1.35, 0.95, 1.15, -0.05, -0.6), (5.5, 1.3, 1.0, 1.0, 0.0, -0.65),
+          (7.8, 1.0, 1.1, 0.6, 0.15, -0.45), (9.3, 0.45, 1.2, 0.15, 0.5, 0.0), (10.0, 0.03, 1.3, 0.02, 1.0, 0.8)]
+    stations = [(x - L * 0.5, [(sh, hb), (sh - 0.2, hb), (cy, ch), (k, 0.0)]) for x, hb, sh, ch, cy, k in st]
+    hull, rings = loft(stations)
+    hull += cap(rings[0], flip=True)
+    deck = deck_surface([(x - L * 0.5, hb) for x, hb, *_ in st], lambda x: 0.95 + max(0.0, x) * 0.05)
+    sides, glass = box_loft([(-0.6, 1.0, 1.55, 1.2, 1.1), (0.4, 1.0, 1.6, 1.22, 1.05), (1.2, 1.02, 1.3, 1.1, 0.7)])
+    return {"hull": hull, "deck": deck + sides, "glaze": glass}
+
+
+def sloop():
+    """C: a 13 m modern sloop -- a long narrow hull with a plumb bow, a low coachroof, a slender 18 m mast, a high
+    aspect mainsail and a fractional jib (designed fabric: each a gentle camber), trimmed for the wind from the left."""
+    L = 13.0
+    st = [(0.0, 1.85, 1.05, 1.6, 0.05, -0.4), (3.0, 2.0, 1.1, 1.65, 0.0, -0.55), (6.5, 1.95, 1.2, 1.4, 0.0, -0.6),
+          (10.0, 1.3, 1.35, 0.7, 0.2, -0.45), (12.5, 0.35, 1.45, 0.1, 0.7, -0.1), (13.0, 0.03, 1.5, 0.02, 1.2, 0.6)]
+    stations = [(x - L * 0.5, [(sh, hb), (sh - 0.2, hb), (cy, ch), (k, 0.0)]) for x, hb, sh, ch, cy, k in st]
+    hull, rings = loft(stations)
+    hull += cap(rings[0], flip=True)
+    deck = deck_surface([(x - L * 0.5, hb) for x, hb, *_ in st], lambda x: 1.08 + max(0.0, x) * 0.03)
+    sides, glass = box_loft([(-2.0, 1.1, 1.55, 1.3, 1.15), (1.2, 1.15, 1.6, 1.25, 1.05), (2.4, 1.2, 1.4, 1.0, 0.7)])
+    mast = []
+    for k in range(6):
+        a0, a1 = 2 * math.pi * k / 6, 2 * math.pi * (k + 1) / 6
+        p = lambda a, y, r: (1.0 + r * math.cos(a), y, r * math.sin(a))
+        mast += [(p(a0, 1.2, 0.09), p(a1, 1.2, 0.09), p(a1, 19.0, 0.06)), (p(a0, 1.2, 0.09), p(a1, 19.0, 0.06), p(a0, 19.0, 0.06))]
+    def sail(luff0, luff1, clew, belly, n=8):
+        out = []
+        for i in range(n):
+            for j in range(n - i):
+                pass
         grid = []
         for i in range(n + 1):
             u = i / n
             row = []
             for j in range(n + 1):
-                v = j / n
-                x = (1 - u) * ((1 - v) * p00[0] + v * p01[0]) + u * ((1 - v) * p10[0] + v * p11[0])
-                y = (1 - u) * ((1 - v) * p00[1] + v * p01[1]) + u * ((1 - v) * p10[1] + v * p11[1])
-                z = (1 - u) * ((1 - v) * p00[2] + v * p01[2]) + u * ((1 - v) * p10[2] + v * p11[2])
-                z += belly * math.sin(math.pi * u) * (1.0 - v * 0.8)
+                v = j / n                                                   # 0 the luff .. 1 the leech
+                lx = luff0[0] + (luff1[0] - luff0[0]) * u
+                ly = luff0[1] + (luff1[1] - luff0[1]) * u
+                w = 1.0 - u                                                 # the sail narrows to its head
+                x = lx + (clew[0] - luff0[0]) * v * w
+                y = ly + (clew[1] - luff0[1]) * v * w
+                z = belly * math.sin(math.pi * v) * w + clew[2] * v * w
                 row.append((x, y, z))
             grid.append(row)
-        out = []
         for i in range(n):
             for j in range(n):
                 a, b, c, d = grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]
                 out += [(a, b, c), (a, c, d), (a, c, b), (a, d, c)]
         return out
-    sail += panel((mast_x, 2.75, 0.0), (mast_x - 5.4, 2.75, 0.0), (mast_x, 14.2, 0.0), (mast_x - 0.4, 14.2, 0.0), 0.9)
-    sail += panel((mast_x + 0.2, 13.2, 0.0), (L * 0.5 - 0.3, 2.3, 0.0), (mast_x + 0.2, 13.2, 0.0),
-                  (mast_x + 0.6, 2.4, 0.0), 0.6)
-    mx.write_faceted(os.path.join(MESH_DIR, "do-boat-sail.glb"), sail, "sail")
-    return len(tris), len(sail)
+    sails = sail((1.0, 1.9, 0.0), (1.0, 18.6, 0.0), (-4.3, 1.9, 1.1), 0.55)
+    sails += sail((6.2, 1.5, 0.0), (1.2, 15.0, 0.0), (0.4, 1.7, 1.6), 0.45)
+    return {"hull": hull, "deck": deck + sides + mast, "glaze": glass, "sail": sails}
+
+
+BOAT_DESIGNS = {"A": motor_yacht, "B": speedboat, "C": sloop}
+BOAT_KIND = "A"
+# the boat crosses the view left to right on a straight course 130 m out, at a cruising pace; the course runs well past
+# both edges of the frame, so the LFO saw's wrap (back to the start) happens out of sight
+BOAT_COURSE = ((-190.0, -150.0), (200.0, -115.0))
+BOAT_SPEED = {"A": 3.2, "B": 9.0, "C": 2.6}
+BOAT_PARTS = [("boatHull", "hull", "pearl"), ("boatDeck", "deck", "deck"), ("boatGlaze", "glaze", "glaze"),
+              ("boatSail", "sail", "pearl")]
+
+
+def boat_meshes():
+    parts = BOAT_DESIGNS[BOAT_KIND]()
+    for _, key, _c in BOAT_PARTS:
+        if key in parts:
+            mx.write_faceted(os.path.join(MESH_DIR, "do-%s-%s.glb" % (BOAT_KIND.lower(), key)), parts[key], key)
+    return {k: len(v) for k, v in parts.items()}
+
+
+def boat(s):
+    """The chosen boat on its course: a straight open spline across the view, `pathOffset` from an LFO saw (pure in
+    time), then the sea's own world-space Gerstner stack, so it rises, falls and travels with the surface under it; a
+    gentle local roll. The wake and the bow wave are emitters that follow the same saw: the wake trails behind the
+    course, widening, and nothing forms a ring."""
+    (x0, z0), (x1, z1) = BOAT_COURSE
+    length = math.hypot(x1 - x0, z1 - z0)
+    d = ((x1 - x0) / length, 0.0, (z1 - z0) / length)
+    s.nodes.append(spline_node("boatCourse", [(x0, 0.0, z0), (x1, 0.0, z1)], False))
+    hl = {"A": 16.0, "B": 10.0, "C": 13.0}[BOAT_KIND]
+    speed = BOAT_SPEED[BOAT_KIND]
+    s.sources.append({"kind": "lfo", "name": "boat", "settings": {"shape": "saw"}})
+    s.param("sources/boat/rate", round(speed / (length - hl), 6))
+    roll = [{"kind": "sine", "amount": BOAT_ROLL, "frequency": 0.12, "speed": 0.9, "phase": 0.0,
+             "axis": [0.0, 1.0, 0.0], "displacementAxis": [0.0, 0.0, 1.0], "space": "local"},
+            {"kind": "path", "spline": "boatCourse", "amount": 1.0, "axis": [1.0, 0.0, 0.0],
+             "center": [0.0, 0.0, 0.0], "pathOffset": hl * 0.5, "pathScale": 1.0, "pathRoll": 0.0, "space": "local"}]
+    ride = roll + sea_deformers()
+    keys = BOAT_DESIGNS[BOAT_KIND]()
+    for name, key, colour in BOAT_PARTS:
+        if key not in keys:
+            continue
+        s.proc(name, {"kind": "mesh", "asset": "meshes/do-%s-%s.glb" % (BOAT_KIND.lower(), key)},
+               material=flat(colour, double=(key == "sail")), deformers=ride)
+        s.route(R("lfo.boat", "procedural/%s/deform/2/pathOffset" % name, length - hl))
+    # the wake: from the stern, trailing back along the course and spreading a little; it widens as it ages
+    stern = (x0 + d[0] * 0.5, 0.15, z0 + d[2] * 0.5)
+    bow = (x0 + d[0] * (hl - 0.8), 0.5, z0 + d[2] * (hl - 0.8))
+    for name, at, cap_, rate, life, spd, spread, size, dirn in (
+            ("wake", stern, 900, WAKE_RATE, (4.0, 6.5), (0.4, 1.1), 0.22, (0.3, 1.5), (-d[0], 0.0, -d[2])),
+            ("bowWave", bow, 300, BOW_RATE, (0.6, 1.1), (1.2, 2.4), 0.55, (0.12, 0.05), (d[0], 0.5, d[2]))):
+        s.particles(name, capacity=cap_, seed=zlib_seed(name), shape="sphere", position=[round(c, 3) for c in at],
+                    extent=[0.6, 0.05, 0.6], direction=[round(c, 4) for c in dirn], spawnRate=rate,
+                    lifetimeMin=life[0], lifetimeMax=life[1], spread=spread, speedMin=spd[0], speedMax=spd[1],
+                    gravity=[0.0, -9.8 if name == "bowWave" else 0.0, 0.0], drag=0.35, sizeStart=size[0],
+                    sizeEnd=size[1], colorStart=pal(PALETTE, "foam") + [0.6 if name == "wake" else 0.85],
+                    colorEnd=pal(PALETTE, "foam") + [0.0], emissive=0.8, blend="additive", turbulence=0.15,
+                    turbulenceScale=0.3)
+        s.route(R("lfo.boat", "particles/%s/position" % name, round(d[0] * (length - hl), 3), comp=0),
+                R("lfo.boat", "particles/%s/position" % name, round(d[2] * (length - hl), 3), comp=2))
+
+
+BOAT_ROLL = 0.06
+WAKE_RATE = 55.0
+BOW_RATE = 45.0
 
 
 def illus_program():
@@ -875,35 +1061,34 @@ def illus_program():
 
 
 def land_program():
-    """The island, painted in colour regions (poster style): sand on the low shore, rock on the steep faces, vegetation
-    on the gentle slopes, each with a sun side and a shadow side split by one hard-ish band, then distance haze.
-    Registers: 0 N, 1 V, 2 world position."""
+    """The island as an anime background paints it: about three land colours -- the main colour on the faces that
+    look up, a darker underside on the steep faces toward the camera, a lighter accent on the edges that catch the low
+    sun -- and a narrow sand line at the water. In cut-paper style (C) the bands are hard and there is no accent.
+    Then the haze that ties it to the horizon. Registers: 0 N, 1 V, 2 world position."""
     P = Prog("doLand")
     sx, sy, sz = S
     P.op("N", "input", 0, inp="normal")
     P.op("V", "input", 1, inp="viewDirection")
     P.op("wp", "input", 2, inp="worldPosition")
     P.pcolour("land", 3, "land")
-    P.pcolour("rock", 4, "rock")
-    P.op(None, "swizzle", 5, a=0, k=[1, 1, 1, 1])                                   # n.y: how flat
-    P.op("steep", "smoothstep", 5, a=5, k=[LAND_STEEP1, LAND_STEEP0])               # 1 on a cliff
-    P.op(None, "mixBy", 3, a=3, b=4, c=5)
-    P.op(None, "swizzle", 5, a=2, k=[1, 1, 1, 1])                                   # height
-    P.op("shore", "smoothstep", 5, a=5, k=[LAND_SAND1, LAND_SAND0])                 # 1 on the beach
-    P.pcolour("sand", 4, "sand")
-    P.op(None, "mixBy", 3, a=3, b=4, c=5)
-    P.op(None, "gradient", 4, a=0, k=[0.8 * SH[0], 0.45, 0.8 * SH[2], 0.0], f=1.0)   # facing the low sun
-    P.op("band", "smoothstep", 4, a=4, k=[ILLUS_BAND0, ILLUS_BAND1])
-    P.op(None, "remap", 4, a=4, k=[0.0, 1.0, 0.0, 1.0])
-    P.pcolour("land2", 5, "land2")
-    P.op("lit", "mixBy", 3, a=5, b=3, c=4)                                          # the shadow side is land2
-    P.op(None, "fresnel", 4, f=3.0)                                                  # the rim toward the sun
-    P.op(None, "gradient", 5, a=1, k=[-sx, -sy, -sz, 0.0], f=1.0)
-    P.op(None, "power", 5, a=5, f=6.0)
-    P.op(None, "multiply", 4, a=4, b=5)
-    P.pcolour("landRim", 5, "glow", ILLUS_RIM)
-    P.op(None, "multiply", 4, a=4, b=5)
-    P.op(None, "add", 3, a=3, b=4)
+    P.pcolour("land2", 4, "land2")
+    P.op(None, "swizzle", 5, a=0, k=[1, 1, 1, 1])                                   # n.y
+    hard = ISLAND_STYLE == "C"
+    P.op("under", "smoothstep", 5, a=5, k=[LAND_UNDER0, LAND_UNDER0 + (0.01 if hard else LAND_UNDER_SOFT)])
+    P.op(None, "mixBy", 3, a=4, b=3, c=5)                                           # steep faces: the underside
+    if not hard:
+        P.op(None, "fresnel", 4, f=2.5)                                              # the sun-facing accent
+        P.op(None, "gradient", 5, a=1, k=[-sx, -sy, -sz, 0.0], f=1.0)
+        P.op(None, "power", 5, a=5, f=5.0)
+        P.op(None, "multiply", 4, a=4, b=5)
+        P.op(None, "smoothstep", 4, a=4, k=[0.12, 0.2])
+        P.pcolour("land3", 5, "land3")
+        P.op(None, "mixBy", 3, a=3, b=5, c=4)
+    if ISLAND_STYLE != "A":
+        P.op(None, "swizzle", 5, a=2, k=[1, 1, 1, 1])                                # the sand line at the water
+        P.op("shore", "smoothstep", 5, a=5, k=[LAND_SAND1, LAND_SAND0])
+        P.pcolour("sand", 4, "sand")
+        P.op(None, "mixBy", 3, a=3, b=4, c=5)
     P.op(None, "input", 4, inp="cameraDistance")
     P.op(None, "constant", 5, k=[0.1, 0.1, 0.1, 0.1])
     P.op(None, "multiply", 4, a=4, b=5)
@@ -913,8 +1098,8 @@ def land_program():
     return P
 
 
-LAND_STEEP0, LAND_STEEP1 = 0.74, 0.84
-LAND_SAND0, LAND_SAND1 = 4.0, 9.0
+LAND_UNDER0, LAND_UNDER_SOFT = 0.55, 0.12
+LAND_SAND0, LAND_SAND1 = 0.6, 1.6
 
 
 ILLUS_BAND0, ILLUS_BAND1 = 0.32, 0.42
@@ -932,8 +1117,8 @@ def flat(key, scale=1.0, double=False):
 
 
 # the nodes painted by doIllus and the palette key each one's colour comes from (palette_routes routes them)
-ILLUS_NODES = [("palmTrunks", "trunk"), ("palmCrowns", "leaf"), ("boatHull", "hull"),
-               ("boatSail", "sail")] + [("farIsle%d" % k, "isle") for k in range(len(FAR_ISLES))]
+ILLUS_NODES = [("palms", "trunk"), ("canopies", "trunk"), ("boatHull", "pearl"), ("boatDeck", "deck"),
+               ("boatGlaze", "glaze"), ("boatSail", "pearl")] + [("farIsle%d" % k, "isle") for k in range(len(FAR_ISLES))]
 
 
 def world(s):
@@ -944,35 +1129,25 @@ def world(s):
     s.program(ip.doc(emission=2))
     lp = land_program()
     s.program(lp.doc(emission=3))
-    s.proc("island", {"kind": "mesh", "asset": "meshes/do-island.glb"}, material=unlit("doLand"),
-           transform={"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]})
+    # the island is a stable anchor: no deformer, nothing routed to its shape
+    s.proc("island", {"kind": "mesh", "asset": "meshes/do-island-low.glb"}, material=unlit("doLand"),
+           transform={"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, -4.0, 0.0], "scale": [1.0, 1.0, 1.0]})
     for k, ((x, z), sc, sy) in enumerate(FAR_ISLES):
-        s.proc("farIsle%d" % k, {"kind": "mesh", "asset": "meshes/do-farisle.glb"}, material=flat("isle"),
-               transform={"position": [x, 0.0, z], "rotation": [0.0, 25.0 * k, 0.0], "scale": [sc, sy, sc]})
-    pts = palm_points()
-    sway = [{"kind": "sine", "amount": 0.35, "frequency": 0.09, "speed": 0.9, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
-             "displacementAxis": [0.8, 0.0, 0.6], "center": [0.0, 0.0, 0.0], "falloff": 20.0, "space": "local"}]
-    s.proc("palmTrunks", {"kind": "mesh", "asset": "meshes/do-palm-trunk.glb"},
-           distribution={"kind": "points", "points": pts}, material=flat("trunk"), deformers=sway)
-    s.proc("palmCrowns", {"kind": "mesh", "asset": "meshes/do-palm-crown.glb"},
-           distribution={"kind": "points", "points": pts}, material=flat("leaf", double=True),
-           deformers=sway + [{"kind": "noise", "amount": 0.35, "scale": 0.15, "speed": 0.6, "seed": 5, "space": "local"}])
-    # the boat rides the water: the sea's own deformer stack (world space) moves it exactly as it moves the surface
-    # under it, and a slow local roll leans the mast
-    yaw = BOAT_HEADING
-    roll = [{"kind": "sine", "amount": BOAT_ROLL, "frequency": 0.055, "speed": 1.05, "phase": 0.0,
-             "axis": [0.0, 1.0, 0.0], "displacementAxis": [0.0, 0.0, 1.0], "space": "local"},
-            {"kind": "sine", "amount": BOAT_ROLL * 0.5, "frequency": 0.055, "speed": 0.71, "phase": 1.3,
-             "axis": [0.0, 1.0, 0.0], "displacementAxis": [1.0, 0.0, 0.0], "space": "local"}]
-    ride = roll + sea_deformers()
-    for name, asset, key in (("boatHull", "do-boat-hull.glb", "hull"), ("boatSail", "do-boat-sail.glb", "sail")):
-        s.proc(name, {"kind": "mesh", "asset": "meshes/" + asset}, material=flat(key, double=(name == "boatSail")),
-               deformers=ride, transform={"position": [BOAT_AT[0], 0.0, BOAT_AT[1]], "rotation": [0.0, yaw, 0.0],
-                                          "scale": [1.0, 1.0, 1.0]})
+        s.proc("farIsle%d" % k, {"kind": "mesh", "asset": "meshes/do-farstrip.glb"}, material=flat("isle"),
+               transform={"position": [x, 0.0, z], "rotation": [0.0, 8.0 * k, 0.0], "scale": [sc, sy, sc]})
+    tree = "trunk"                                 # one dark cut-paper tone for every tree (variant C)
+    # only the palms sway, gently (0.2 m at the crown, 9 s); the canopies hold still
+    sway = [{"kind": "sine", "amount": 0.2, "frequency": 0.12, "speed": 0.7, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
+             "displacementAxis": [0.8, 0.0, 0.6], "center": [0.0, 0.0, 0.0], "falloff": 16.0, "space": "local"}]
+    s.proc("palms", {"kind": "mesh", "asset": "meshes/do-palm.glb"},
+           distribution={"kind": "points", "points": tree_points("palm")}, material=flat(tree, double=True),
+           deformers=sway)
+    s.proc("canopies", {"kind": "mesh", "asset": "meshes/do-canopy.glb"},
+           distribution={"kind": "points", "points": tree_points("canopy")}, material=flat(tree))
+    boat(s)
     return ip, lp
 
 
-BOAT_ROLL = 0.55
 
 
 # ================================================================================================ dolphins
@@ -1356,24 +1531,8 @@ def atmosphere(s, sky):
         s.sources.append({"kind": "lfo", "name": name, "settings": {"shape": "sine"}})
         s.param("sources/%s/rate" % name, hz)
         s.route(R("lfo.%s.bipolar" % name, M, amp, comp=(0 if k == 0 else 2), polarity="bipolar"))
-    h = math.radians(BOAT_HEADING)
-    fwd = (math.cos(h), 0.0, -math.sin(h))
-    bow = [BOAT_AT[0] + fwd[0] * 5.0, 0.4, BOAT_AT[1] + fwd[2] * 5.0]
-    stern = [BOAT_AT[0] - fwd[0] * 5.5, 0.15, BOAT_AT[1] - fwd[2] * 5.5]
-    s.particles("bowWave", capacity=500, seed=31, shape="sphere", position=bow, extent=[0.8, 0.2, 0.8],
-                direction=[fwd[0], 0.6, fwd[2]], spawnRate=BOW_RATE, lifetimeMin=0.5, lifetimeMax=0.9, spread=0.5,
-                speedMin=1.0, speedMax=2.6, gravity=[0.0, -9.8, 0.0], drag=0.4, sizeStart=0.12, sizeEnd=0.04,
-                colorStart=pal(PALETTE, "foam") + [0.9], colorEnd=pal(PALETTE, "sss") + [0.0], emissive=1.2,
-                blend="additive", turbulence=0.0)
-    s.particles("wake", capacity=700, seed=37, shape="box", position=stern, extent=[0.9, 0.05, 0.9],
-                direction=[-fwd[0], 0.0, -fwd[2]], spawnRate=WAKE_RATE, lifetimeMin=2.5, lifetimeMax=4.0, spread=0.15,
-                speedMin=0.8, speedMax=1.6, gravity=[0.0, 0.0, 0.0], drag=0.3, sizeStart=0.35, sizeEnd=0.9,
-                colorStart=pal(PALETTE, "foam") + [0.55], colorEnd=pal(PALETTE, "foam") + [0.0], emissive=0.9,
-                blend="additive", turbulence=0.2, turbulenceScale=0.3)
 
 
-BOW_RATE = 60.0
-WAKE_RATE = 70.0
 
 
 SEA_NODES = ["sea_near", "sea_mid", "sea_far"]
@@ -1467,7 +1626,10 @@ def palette_routes(s, progs, signal, to, chain):
                 if abs(d) > 1e-4:
                     s.route(R(signal, "material/%s/op/%d/constant/constant" % (prog.name, prog[label]), d, comp=c,
                               **chain))
+    present = {n["name"] for n in s.nodes}
     for node, key in ILLUS_NODES:
+        if node not in present:
+            continue
         a, b = pal(PALETTE, key), pal(to, key)
         for c in range(3):
             if abs(b[c] - a[c]) > 1e-4:
