@@ -250,6 +250,7 @@ PALETTE = "twilight"
 DEBUG_SKY = None
 BANDS = 0
 DEBUG_CLOUD = None
+CAMERA_BREATH = True
 REVIEW_MIDI = None          # look development: {"padLeap": [t, ...], "night": [(t, v), ...]} scores the MIDI offline
 
 
@@ -734,8 +735,8 @@ def leap_points(centre, heading_deg, height, half_span, loop=True, depth=36.0, r
 # the view's depth, height scale)). Pod A crosses the sun's path at 70 m left to right; pod B, smaller and far, swims
 # right to left near the island side.
 PODS = [
-    ("podA", (17.0, -88.0), -4.0, 2.3, 5.5, 31.0, [(0.0, 0.0, 1.0), (0.55, -3.5, 0.85), (1.25, 2.8, 0.92)]),
-    ("podB", (-42.0, -150.0), 176.0, 2.0, 5.0, 47.0, [(0.0, 0.0, 1.0), (0.7, 3.0, 0.8)]),
+    ("podA", (17.0, -88.0), -4.0, 2.3, 5.5, 53.0, [(0.0, 0.0, 1.0), (0.55, -3.5, 0.85), (1.25, 2.8, 0.92)]),
+    ("podB", (-42.0, -150.0), 176.0, 2.0, 5.0, 79.0, [(0.0, 0.0, 1.0), (0.7, 3.0, 0.8)]),
 ]
 LEAP_SPEED = 8.5             # metres a second along the path (a dolphin's leap)
 HERO = ("hero", (10.0, -56.0), -2.0, 4.2, 7.0)
@@ -1112,6 +1113,9 @@ def unlit(program):
 
 
 def camera(s):
+    """The composed view (C2), and a breath so the frame is never frozen: the eye rises and settles 0.35 m over 26 s,
+    the aim drifts 0.7 deg across over 71 s. Two components on two periods (never in step); every track a seamless
+    loop (loopLength = span, first key = last key) because a live transport is endless (ADR-1342)."""
     h, focal, pitch, yaw = COMPOSITIONS[COMPOSITION]
     p, y = math.radians(pitch), math.radians(yaw)
     pos = [0.0, h, 0.0]
@@ -1119,6 +1123,17 @@ def camera(s):
     tgt = [round(pos[k] + 100.0 * fwd[k], 4) for k in range(3)]
     s.camera = {"mode": 1, "position": pos, "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
     s.params_({"camera/lens/focalLength": focal})
+    if CAMERA_BREATH:
+        rise, Tr = 0.35, 26.0
+        s.track("camera/position", [{"time": 0.0, "value": h, "interp": "smooth"},
+                                    {"time": Tr * 0.5, "value": round(h + rise, 4), "interp": "smooth"},
+                                    {"time": Tr, "value": h, "interp": "smooth"}], loop=Tr, comp=1)
+        pan, Tp = 1.2, 71.0
+        k = [{"time": 0.0, "value": tgt[0], "interp": "smooth"},
+             {"time": Tp * 0.25, "value": round(tgt[0] + pan, 4), "interp": "smooth"},
+             {"time": Tp * 0.75, "value": round(tgt[0] - pan, 4), "interp": "smooth"},
+             {"time": Tp, "value": tgt[0], "interp": "smooth"}]
+        s.track("camera/target", k, loop=Tp, comp=0)
 
 
 def build():

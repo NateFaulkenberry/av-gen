@@ -208,3 +208,15 @@ Media: `stage7-silent-trench-allyougot-glowmere.png` (same scene, four inputs), 
   `stage8-live-midi-capture.mp4`). Two harness lessons: this machine's saved MIDI device (`SE49 MIDI1`) overrides the
   project's `*` filter, so the first run received nothing; and with a name filter a source must exist BEFORE the editor
   opens (it is never retried), so the probe starts first with a 25 s lead-in.
+
+## Stage 9: animation polish (done)
+
+- **Rarity of the signature**: the pods leap every 53 s (pod A, three dolphins) and 79 s (pod B, two): incommensurate,
+  so the pattern of leaps does not repeat for over an hour; the hero leap stays the performer's. 31/47 s was too often
+  for a set piece.
+- **The camera breathes**: a seamless 0.35 m rise over 26 s (`camera/position` component 1) and a 0.7 deg pan over 71 s
+  (`camera/target` component 0): two periods never in step, each track first key = last key and loopLength = span (an
+  endless live transport, ADR-1342). The composition never moves enough to read as camera motion.
+- **Rhythms in the world** (none shares a period): swell trains 10.9 / 7.8 / 5.1 s, tide arrives over ~15 s, kick fronts
+  over ~3 s, pods 53 / 79 s, clouds ~65 min a turn, camera 26 / 71 s.
+- Silence check: `stage9-silent-60s.mp4` and its 4 s sheet: the sea never repeats, a pod crosses, the frame stays calm.

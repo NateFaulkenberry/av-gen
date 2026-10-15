@@ -123,8 +123,8 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "sources/podA/rate": 0.032258,
-  "sources/podB/rate": 0.021277,
+  "sources/podA/rate": 0.018868,
+  "sources/podB/rate": 0.012658,
   "sources/leap/attackMs": 4491.9,
   "sources/leap/decayMs": 0.0,
   "sources/leap/sustain": 1.0,
@@ -159,7 +159,7 @@
   {
    "source": "lfo.podA",
    "target": "procedural/podA_0/deform/2/pathOffset",
-   "amount": 263.50158064995077,
+   "amount": 450.50193871741175,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -174,7 +174,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.02984
+    "thresholdLevel": 0.02064
    }
   },
   {
@@ -185,7 +185,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.04645
+    "thresholdLevel": 0.03035
    }
   },
   {
@@ -196,7 +196,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.07145
+    "thresholdLevel": 0.04497
    }
   },
   {
@@ -207,17 +207,17 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.08805
+    "thresholdLevel": 0.05469
    }
   },
   {
    "source": "lfo.podA",
    "target": "procedural/podA_1/deform/2/pathOffset",
-   "amount": 263.5002870248734,
+   "amount": 450.5006568597279,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "offset": -0.01774
+    "offset": -0.01038
    }
   },
   {
@@ -228,7 +228,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.04729
+    "thresholdLevel": 0.03112
    }
   },
   {
@@ -239,7 +239,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.06389
+    "thresholdLevel": 0.04083
    }
   },
   {
@@ -250,7 +250,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.08604
+    "thresholdLevel": 0.05378
    }
   },
   {
@@ -261,17 +261,17 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.10264
+    "thresholdLevel": 0.06349
    }
   },
   {
    "source": "lfo.podA",
    "target": "procedural/podA_2/deform/2/pathOffset",
-   "amount": 263.49998336217527,
+   "amount": 450.49944991146816,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "offset": -0.04032
+    "offset": -0.02358
    }
   },
   {
@@ -282,7 +282,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.07
+    "thresholdLevel": 0.04427
    }
   },
   {
@@ -293,7 +293,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.08661
+    "thresholdLevel": 0.05398
    }
   },
   {
@@ -304,7 +304,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.11009
+    "thresholdLevel": 0.06772
    }
   },
   {
@@ -315,13 +315,13 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.12669
+    "thresholdLevel": 0.07743
    }
   },
   {
    "source": "lfo.podB",
    "target": "procedural/podB_0/deform/2/pathOffset",
-   "amount": 399.49833342942077,
+   "amount": 671.5014521565702,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -336,7 +336,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.02099
+    "thresholdLevel": 0.02071
    }
   },
   {
@@ -347,7 +347,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.03194
+    "thresholdLevel": 0.02722
    }
   },
   {
@@ -358,7 +358,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.0454
+    "thresholdLevel": 0.03523
    }
   },
   {
@@ -369,17 +369,17 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.05635
+    "thresholdLevel": 0.04175
    }
   },
   {
    "source": "lfo.podB",
    "target": "procedural/podB_1/deform/2/pathOffset",
-   "amount": 399.4994432666087,
+   "amount": 671.5010412213962,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "offset": -0.01489
+    "offset": -0.00886
    }
   },
   {
@@ -390,7 +390,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.03599
+    "thresholdLevel": 0.02973
    }
   },
   {
@@ -401,7 +401,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.04694
+    "thresholdLevel": 0.03624
    }
   },
   {
@@ -412,7 +412,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.05818
+    "thresholdLevel": 0.04293
    }
   },
   {
@@ -423,7 +423,7 @@
    "polarity": "unipolar",
    "chain": {
     "threshold": "binary",
-    "thresholdLevel": 0.06913
+    "thresholdLevel": 0.04945
    }
   },
   {
@@ -3327,7 +3327,63 @@
  "timeline": {
   "enabled": true,
   "cues": [],
-  "tracks": []
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": 1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 26.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 12.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 13.0,
+      "value": 12.35,
+      "interp": "smooth"
+     },
+     {
+      "time": 26.0,
+      "value": 12.0,
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": 0,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 71.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 6.9619,
+      "interp": "smooth"
+     },
+     {
+      "time": 17.75,
+      "value": 8.1619,
+      "interp": "smooth"
+     },
+     {
+      "time": 53.25,
+      "value": 5.7619,
+      "interp": "smooth"
+     },
+     {
+      "time": 71.0,
+      "value": 6.9619,
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
  },
  "render": {
   "width": 1920,
