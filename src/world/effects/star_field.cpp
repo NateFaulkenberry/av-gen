@@ -35,6 +35,7 @@ StarField resolve(const EffectInstance& e) {
     f.band = std::max(value(e, "band", d.band), 0.0f);
     f.bandTilt = value(e, "bandTilt", d.bandTilt);
     f.daylight = std::clamp(value(e, "daylight", d.daylight), 0.0f, 1.0f);
+    f.wholeSky = e.values.getBool("stars/wholeSky", d.wholeSky);
     return f;
 }
 

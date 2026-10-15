@@ -41,6 +41,9 @@ constexpr EffectField kFields[] = {
     storedFloat("daylight", "Hide in daylight", kDefault.daylight, 0.0f, 1.0f, 0.0f, 1.0f)
         .tooltip("How far a bright sky behind a star hides it. 1: stars vanish in daylight, as real\n"
                  "ones do. 0: they show through any sky (a stylised choice)."),
+    storedBool("wholeSky", "Whole sky (space)", false)
+        .tooltip("Stars on the whole sphere, below the horizon too, with no horizon fade: open space,\n"
+                 "where there is no ground. Off: the sky above a horizon (ADR-1350)."),
 };
 
 void set(E& e, const char* leaf, float v) { e.values.setFloat(std::string("stars/") + leaf, v); }

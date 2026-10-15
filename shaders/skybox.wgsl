@@ -53,9 +53,15 @@ fn starSmoothNoise(p: vec2<f32>) -> f32 {
 fn effectStars(dir: vec3<f32>, sky: vec3<f32>) -> vec3<f32> {
     let brightness = frame.starsA.z;
     let horizon = frame.starsB.w;
-    let fade = smoothstep(horizon * 0.15, horizon, dir.y);
+    // ADR-1350: in whole-sky mode (space) there is no horizon: no fade, and the lower hemisphere gets its
+    // own projection from the north pole (offset, so it does not mirror the upper one). Both projections
+    // meet at the horizon with the same scale, so the field's density is continuous across it.
+    let whole = frame.starsA.x > 1.5;
+    let fade = select(smoothstep(horizon * 0.15, horizon, dir.y), 1.0, whole);
     let hide = 1.0 - frame.starsC.z * smoothstep(0.02, 0.4, dot(sky, vec3<f32>(0.2126, 0.7152, 0.0722)));
-    let coordinate = dir.xz / max(dir.y + 1.0, 0.02) * 190.0;
+    let lower = whole && dir.y < 0.0;
+    let coordinate = select(dir.xz / max(dir.y + 1.0, 0.02) * 190.0,
+                            dir.xz / max(1.0 - dir.y, 0.02) * 190.0 + vec2<f32>(5173.0, -2911.0), lower);
     let footprint = max(length(fwidth(coordinate)), 0.015);
     // The band: a great circle tilted `bandTilt` from the horizon, Gaussian across.
     let tilt = frame.starsC.y;

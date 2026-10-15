@@ -20,9 +20,9 @@
  "environment": {
   "intensity": 0.0,
   "background": [
-   0.007,
-   0.00212,
-   0.01938
+   0.00152,
+   0.00121,
+   0.00439
   ],
   "fogColor": [
    0,
@@ -34,19 +34,19 @@
   "sky": {
    "enabled": true,
    "zenithColor": [
-    0.00335,
+    0.00152,
     0.00121,
-    0.00913
+    0.00439
    ],
    "horizonColor": [
-    0.007,
-    0.00212,
-    0.01938
+    0.00243,
+    0.00182,
+    0.01033
    ],
    "groundColor": [
-    0.00335,
+    0.00152,
     0.00121,
-    0.00913
+    0.00439
    ],
    "haze": 0.9,
    "sunIntensity": 0.0,
@@ -65,8 +65,8 @@
      "root": {
       "kind": "translate",
       "translation": [
-       1.14,
-       0.12,
+       1.2,
+       0.05,
        0.0
       ],
       "children": [
@@ -83,8 +83,8 @@
           "children": [
            {
             "kind": "torus",
-            "radius": 0.82,
-            "rounding": 0.016,
+            "radius": 0.95,
+            "rounding": 0.02,
             "material": 0
            }
           ]
@@ -103,8 +103,8 @@
              {
               "kind": "translate",
               "translation": [
-               -0.3302154864630064,
-               0.19064999999999993,
+               -0.3825667221217757,
+               0.22087499999999993,
                0.0
               ],
               "children": [
@@ -118,8 +118,8 @@
                 "children": [
                  {
                   "kind": "capsule",
-                  "radius": 0.011,
-                  "height": 1.3208619458520257,
+                  "radius": 0.014,
+                  "height": 1.5302668884871031,
                   "material": 1
                  }
                 ]
@@ -130,7 +130,7 @@
               "kind": "translate",
               "translation": [
                -1.1102230246251565e-16,
-               -0.3813000000000002,
+               -0.4417500000000002,
                0.0
               ],
               "children": [
@@ -144,8 +144,8 @@
                 "children": [
                  {
                   "kind": "capsule",
-                  "radius": 0.011,
-                  "height": 1.3208619458520254,
+                  "radius": 0.014,
+                  "height": 1.5302668884871027,
                   "material": 1
                  }
                 ]
@@ -155,8 +155,8 @@
              {
               "kind": "translate",
               "translation": [
-               0.3302154864630063,
-               0.19064999999999982,
+               0.3825667221217756,
+               0.2208749999999998,
                0.0
               ],
               "children": [
@@ -170,8 +170,8 @@
                 "children": [
                  {
                   "kind": "capsule",
-                  "radius": 0.011,
-                  "height": 1.3208619458520259,
+                  "radius": 0.014,
+                  "height": 1.5302668884871033,
                   "material": 1
                  }
                 ]
@@ -181,14 +181,14 @@
              {
               "kind": "translate",
               "translation": [
-               4.6695782451488574e-17,
-               0.7626,
+               5.409877235233432e-17,
+               0.8835,
                0.0
               ],
               "children": [
                {
                 "kind": "sphere",
-                "radius": 0.042,
+                "radius": 0.05,
                 "material": 1
                }
               ]
@@ -196,14 +196,14 @@
              {
               "kind": "translate",
               "translation": [
-               -0.6604309729260128,
-               -0.3813000000000001,
+               -0.7651334442435515,
+               -0.4417500000000001,
                0.0
               ],
               "children": [
                {
                 "kind": "sphere",
-                "radius": 0.042,
+                "radius": 0.05,
                 "material": 1
                }
               ]
@@ -211,14 +211,14 @@
              {
               "kind": "translate",
               "translation": [
-               0.6604309729260126,
-               -0.3813000000000003,
+               0.7651334442435512,
+               -0.44175000000000036,
                0.0
               ],
               "children": [
                {
                 "kind": "sphere",
-                "radius": 0.042,
+                "radius": 0.05,
                 "material": 1
                }
               ]
@@ -245,14 +245,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.42,
+                 0.48,
                  0.0,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -260,14 +260,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.4108219923081984,
-                 0.08732291014345891,
+                 0.46951084835222673,
+                 0.09979761159252448,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -275,14 +275,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.38368909220989234,
-                 0.1708293900918361,
+                 0.4385018196684484,
+                 0.1952335886763841,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -290,14 +290,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.3397871376374779,
-                 0.2468698059628387,
+                 0.3883281572999748,
+                 0.2821369211003871,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -305,14 +305,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.2810348546707204,
-                 0.31212082670050556,
+                 0.32118269105225195,
+                 0.3567095162291492,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -320,14 +320,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.21000000000000005,
-                 0.3637306695894642,
+                 0.24000000000000005,
+                 0.4156921938165305,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -335,14 +335,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.12978713763747793,
-                 0.39944373684396445,
+                 0.14832815729997478,
+                 0.4565071278216737,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -350,14 +350,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.04390195457241445,
-                 0.41769919605467476,
+                 0.050173662368473655,
+                 0.47737050977677115,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -370,14 +370,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.04390195457241449,
-                 0.41769919605467476,
+                 -0.050173662368473704,
+                 0.47737050977677115,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -385,14 +385,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.12978713763747787,
-                 0.3994437368439645,
+                 -0.14832815729997473,
+                 0.45650712782167374,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -400,14 +400,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.2099999999999999,
-                 0.36373066958946426,
+                 -0.2399999999999999,
+                 0.41569219381653055,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -415,14 +415,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.2810348546707204,
-                 0.31212082670050556,
+                 -0.32118269105225195,
+                 0.3567095162291492,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -430,14 +430,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.33978713763747787,
-                 0.24686980596283875,
+                 -0.3883281572999747,
+                 0.28213692110038713,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -445,14 +445,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.3836890922098923,
-                 0.17082939009183618,
+                 -0.43850181966844837,
+                 0.1952335886763842,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -460,14 +460,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.4108219923081984,
-                 0.08732291014345891,
+                 -0.46951084835222673,
+                 0.09979761159252447,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -475,14 +475,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.42,
-                 5.143516556418883e-17,
+                 -0.48,
+                 5.878304635907295e-17,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -495,14 +495,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.4108219923081983,
-                 -0.08732291014345898,
+                 -0.4695108483522267,
+                 -0.09979761159252457,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -510,14 +510,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.38368909220989234,
-                 -0.1708293900918361,
+                 -0.4385018196684484,
+                 -0.1952335886763841,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -525,14 +525,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.3397871376374779,
-                 -0.24686980596283867,
+                 -0.3883281572999748,
+                 -0.282136921100387,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -540,14 +540,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.2810348546707204,
-                 -0.3121208267005056,
+                 -0.3211826910522519,
+                 -0.35670951622914926,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -555,14 +555,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.2100000000000002,
-                 -0.3637306695894641,
+                 -0.2400000000000002,
+                 -0.4156921938165304,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -570,14 +570,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.12978713763747798,
-                 -0.39944373684396445,
+                 -0.1483281572999748,
+                 -0.4565071278216737,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -585,14 +585,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 -0.04390195457241441,
-                 -0.4176991960546748,
+                 -0.050173662368473614,
+                 -0.4773705097767712,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -600,14 +600,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.043901954572414255,
-                 -0.4176991960546748,
+                 0.05017366236847343,
+                 -0.4773705097767712,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -620,14 +620,14 @@
                {
                 "kind": "translate",
                 "translation": [
-                 0.12978713763747785,
-                 -0.3994437368439645,
+                 0.14832815729997467,
+                 -0.45650712782167374,
                  0.0
                 ],
                 "children": [
                  {
                   "kind": "sphere",
-                  "radius": 0.02,
+                  "radius": 0.024,
                   "material": 0
                  }
                 ]
@@ -641,7 +641,7 @@
          },
          {
           "kind": "sphere",
-          "radius": 0.07,
+          "radius": 0.085,
           "name": "core",
           "material": 2
          }
@@ -669,13 +669,13 @@
      "metallic": 0.0
     },
     "boundsMin": [
-     -0.5,
-     -1.0,
+     -0.15,
+     -1.2,
      -0.3
     ],
     "boundsMax": [
-     2.8,
-     1.25,
+     2.55,
+     1.3,
      0.3
     ],
     "castShadows": false,
@@ -734,6 +734,496 @@
     0.0,
     0.0
    ]
+  },
+  {
+   "name": "bezTop",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.2,
+      0.035,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.62396
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    0.0,
+    1.68,
+    0.0
+   ]
+  },
+  {
+   "name": "bezBottom",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      6.2,
+      0.035,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.62396
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    0.0,
+    -1.68,
+    0.0
+   ]
+  },
+  {
+   "name": "bezLeft",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      3.36,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.62396
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    -3.1,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "bezRight",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.035,
+      3.36,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.87137,
+      0.62396
+     ],
+     "emissiveIntensity": 7.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    3.1,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "brkH0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.05,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    2.6350000000000002,
+    1.44,
+    0.0
+   ]
+  },
+  {
+   "name": "brkV0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.05,
+      0.42,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    2.8200000000000003,
+    1.255,
+    0.0
+   ]
+  },
+  {
+   "name": "brkH1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.05,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    -2.6350000000000002,
+    1.44,
+    0.0
+   ]
+  },
+  {
+   "name": "brkV1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.05,
+      0.42,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    -2.8200000000000003,
+    1.255,
+    0.0
+   ]
+  },
+  {
+   "name": "brkH2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.05,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    2.6350000000000002,
+    -1.44,
+    0.0
+   ]
+  },
+  {
+   "name": "brkV2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.05,
+      0.42,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    2.8200000000000003,
+    -1.255,
+    0.0
+   ]
+  },
+  {
+   "name": "brkH3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.05,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    -2.6350000000000002,
+    -1.44,
+    0.0
+   ]
+  },
+  {
+   "name": "brkV3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.05,
+      0.42,
+      0.02
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.521,
+      0.10224
+     ],
+     "emissiveIntensity": 10.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    -2.8200000000000003,
+    -1.255,
+    0.0
+   ]
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.35
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0,
+   "temperature": 5600.0,
+   "softness": 1.0,
+   "castsShadow": false,
+   "contactShadow": false
   }
  ],
  "composition": {
@@ -741,11 +1231,11 @@
    {
     "name": "glyph",
     "position": [
-     1.14,
-     0.12,
+     1.2,
+     0.05,
      0.0
     ],
-    "radius": 0.82,
+    "radius": 0.95,
     "weight": 1.0
    }
   ]

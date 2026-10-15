@@ -58,15 +58,18 @@ const RiftScene& riftScene() {
         if (lock >= 0) {
             ::flock(lock, LOCK_EX);
         }
-        if (!fs::exists(scene)) {
-            const fs::path tool = fs::path(AVGEN_SOURCE_DIR) / "build/release/tools/avgen_world_preview";
-            if (std::system("python3 -c 'import numpy' >/dev/null 2>&1") != 0) {
-                r.skip = "rift.scene.json is missing and python3 with numpy is not available: " + remedy;
-            } else if (!fs::exists(tool)) {
-                r.skip = "rift.scene.json is missing and " + tool.string() + " is not built: " + remedy;
-            } else {
+        // Made or remade whenever the tools are here: `--if-stale` is a hash check when the world is current, and
+        // regenerates it when build.py, its helpers or the committed meshes changed since it was made. Without the
+        // tools a present world is used as it is, and a missing one SKIPs.
+        const fs::path tool = fs::path(AVGEN_SOURCE_DIR) / "build/release/tools/avgen_world_preview";
+        const bool tools = std::system("python3 -c 'import numpy' >/dev/null 2>&1") == 0 && fs::exists(tool);
+        if (!tools && !fs::exists(scene)) {
+            r.skip = "rift.scene.json is missing and python3 with numpy, or " + tool.string() + ", is not available: " +
+                     remedy;
+        } else if (tools) {
+            {
                 const fs::path log = fs::temp_directory_path() / "avgen-rift-build.log";
-                const std::string cmd = "python3 \"" + (dir / "build.py").string() + "\" --scene-only >\"" +
+                const std::string cmd = "python3 \"" + (dir / "build.py").string() + "\" --scene-only --if-stale >\"" +
                                         log.string() + "\" 2>&1";
                 if (std::system(cmd.c_str()) != 0 || !fs::exists(scene)) {
                     std::ifstream in(log);
