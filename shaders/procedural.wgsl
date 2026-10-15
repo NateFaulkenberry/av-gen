@@ -826,6 +826,44 @@ fn fs_proc_depth(in: ProcVertexOut) {
         if ((u32(object.flags.w + 0.5) & 1u) != 0u) {
             opacity *= textureSample(baseColorTex, materialSampler, in.uv).a;
         }
+        // ADR-1371: a masked material whose program writes opacity is cut by the program here too, as the lit
+        // pass cuts it (pbr_shade.wgsl): otherwise the prepass keeps the whole surface's depth, and where the lit
+        // pass discards, what lies behind fails the depth test and the cleared colour shows through. The context
+        // is the lit pass's, less the screen-space inputs (curvature, cavity, occlusion, footprint: 0 here), which
+        // need derivatives; a cutout program should not read them. The program runs only on masked draws.
+        let programIndex = materialSelect.program;
+        if (programIndex >= 0 &&
+            materialProgramAdmits(programIndex, in.instRandom, distance(frame.cameraPos.xyz, in.worldPos))) {
+            var ctx = materialContextZero();
+            ctx.worldPosition = in.worldPos;
+            ctx.localPosition = in.localPos;
+            ctx.normal = normalize(in.normal);
+            ctx.uv = in.uv;
+            ctx.objectId = pickIndex(object.ids.x);
+            ctx.instanceIndex = in.instIndex;
+            ctx.instanceId = in.instColor.a;
+            ctx.instanceRandom = in.instRandom;
+            ctx.instanceColor = in.instColor;
+            ctx.instanceEmissive = in.instEmissive;
+            ctx.time = frame.params.x;
+            ctx.audio = frame.audio;
+            ctx.audioBands = frame.audioBands;
+            ctx.beat = frame.beat;
+            ctx.viewDirection = normalize(frame.cameraPos.xyz - in.worldPos);
+            ctx.depth = distance(frame.cameraPos.xyz, in.worldPos);
+            ctx.materialEmission = vec4<f32>(object.emissive.rgb * in.instEmissive.rgb * object.emissive.w, 1.0);
+            var base = materialResultZero();
+            base.baseColor = object.baseColor.rgb;
+            base.metallic = object.material.y;
+            base.roughness = object.material.x;
+            base.emission = object.emissive.rgb * object.emissive.w;
+            base.opacity = object.baseColor.a;
+            var programOpacity = evaluateMaterialProgram(programIndex, ctx, base).opacity;
+            if ((u32(object.flags.w + 0.5) & 1u) != 0u) {
+                programOpacity *= opacity / max(object.baseColor.a, 1e-6);
+            }
+            opacity = programOpacity;
+        }
         if (opacity < object.flags.y) {
             discard;
         }

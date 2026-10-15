@@ -279,3 +279,418 @@ cannot be used with `--compare` ("no form the project can keep"), so the program
   spread 44.8; `stage11-review-examples-frame.png`).
 - `tools/ci/run-suite.sh gpu --bin build/release/tests`: **exit 0**, 657 passed, 0 failed, 1 skipped, 658/658 ran.
 - Live, end to end: Stage 8 (the editor in `--live`, the probe as a MIDI controller, every gesture in the capture).
+
+# Pass 2: an illustrated ocean world (brief `04-brief-art-pass-2.md`)
+
+Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. Media:
+`~/Desktop/av-gen-review/54-digital-ocean-2/` (`before-pass1.png` is the merged Pass 1 scene).
+
+## Pass A: research and style frames (done)
+
+- Direction chosen: **graphic travel poster x anime background**. Bold silhouettes and flat colour regions for
+  land, boats and creatures (poster/woodblock); painted gradients, luminous rays and lit cloud banks for the sky
+  (anime backgrounds); the water stays the animated surface, its crests and glints simplified into colour bands.
+- **Palettes**, each designed as a whole (every key -- sky, water, crest light, foam, clouds, land, leaf, trunk, hull,
+  sail, rays -- is set per palette, never derived): **violet sunset** (primary: cobalt water, magenta-lavender crest
+  light, peach rays, pink-orange clouds, dark violet land, an amber sail), **golden afternoon** (turquoise water,
+  cream foam, coral sun, soft blue sky, green island, a vermilion sail), **electric blue** (ultramarine and cyan,
+  mint surf, saturated blue, yellow hull and coral sail, navy land), and the **midnight** night end kept from Pass 1.
+- **Compositions** (`passA-studies.png`, in order: Pass 1, E1, E2, E3, E1 afternoon, E1 electric): E1 (18 m) cut the
+  boat at the frame edge and the island crowded the sun; E2 (26 m) flattened the swell; **E3 (14 m, 32 mm)** keeps the
+  boat whole in the lower-left third, the island behind it, the sun on the right third.
+
+## Pass B: composition and silhouette (done)
+
+- **The island** (`island_height`, a polar heightfield): twin volcanic summits, a ridged flank, a beach shelf toward
+  the camera; 980 m out on the left third. **Far chain**: three hazy islets on the horizon. **Palms** (11, a curved
+  trunk + nine drooping blades, two meshes for two colours) on the shelf and low slopes, scaled 1.5-2.5x so they read.
+- **The hero sailboat** (`boat_meshes`): a lofted hull with sheer and raked bow, mast, boom, a bellied mainsail and
+  a jib; 11 m, 58 m from the camera. It RIDES the water: its deformer stack is the sea's own Gerstner stack (world
+  space), so it rises and travels with the surface under it, plus a slow two-axis local roll.
+- **Dolphins** twice as long (6.4 m), leaps 4-7.5 m high, at 78-300 m; the leap path now has an approach just under
+  the surface before the rise (the brief's preparation beat).
+- One illustrated program (`doIllus`) paints land, trees and boat: flat colour per node (palette-routable), a broad
+  light band and shadow band, a warm rim toward the sun, distance haze.
+- Media: `passB-composition-before-after.png` (Pass 1; violet at 2 s and 6 s; afternoon).
+
+## Pass C: illustration treatment (done)
+
+- **Clouds rebuilt** as illustrated formations (`cumulus`): a flat base row of wide squashed puffs, rows stacked above
+  it narrowing to a rounded crown (anime cumulus), or long wind-stretched ribbons low on the horizon. Two layers at
+  ~3.6 km and ~6.5 km drift round the viewer at different rates (parallax), with a slow world-space noise that makes
+  the puffs swell and settle. Lit in two BANDS, not a gradient: undersides facing the low sun glow (`clit`), tops and
+  far sides fall into one flat shadow tone (`cshade`), a warm rim on the edges near the sun.
+- **The island** gets its own painted program (`doLand`): vegetation on gentle slopes, rock on steep faces, sand on
+  the shore, and a sun side / shadow side split by one band, a warm rim and haze.
+- **The water's reflection is quantized into three colour regions** (`BANDS = 3`, which Pass 1 rejected for a
+  realistic sea): flat woodblock-like patches over the swell. It reads far more illustrated.
+- Seen and carried to later passes: the island's sand and rock regions barely register; the dolphin is still small;
+  one cloud row near the sun reads as a string of equal balls; the rays are hard white wedges.
+- Media: `passC-illustration-palettes-and-bands.png` (violet, afternoon, electric, violet with banded water).
+
+## Pass D: atmospheric effects (done)
+
+- **Sun rays**, painted into the sky program (so clouds and land occlude them): a noise of the view ray's direction
+  around the sun (its component across the sun's axis, normalized -- `power -0.5` stands in for the reciprocal no op
+  offers), thresholded into tapered wedges that fade with angle. Two slow LFO sines (0.0137 and 0.0089 Hz, pure in time)
+  drift the noise's offset on two axes: rays lengthen, part and merge, never spin. Softer edges, lower gain and a
+  steeper falloff than the first trial (`passD-rays-drift-2-10-20-29s.png`, `passD-30s.mp4`).
+- Bow wave and stern wake particles on the boat (superseded by the boat step: the wake read as a round blob).
+- Island regions retuned (rock on the steeper flanks, wider sand band) -- superseded by the island step.
+
+## Island step (the owner's brief `08-brief-island-simplification.md`) (done)
+
+- The mound is gone. The island is now an extruded silhouette, not terrain: a long rounded-rectangle footprint
+  (640 x 150 m, 900 m out on the left third) whose top line `island_top` is almost flat with a few soft bumps, one dip
+  and a long low tail; a shallow rise from the water; 26 m at its highest. It reads as a low island as a flat
+  single-colour silhouette. ~3 % of the image height for the land, ~7 % at the tree crowns; sky ~44 %, ocean ~56 %.
+- The trees use one vocabulary: windswept palms (a curved trunk, six broad tapered fronds, a silhouette rather than
+  leaves) and broad low canopies (three overlapping flattened masses on a short trunk), with gaps between them.
+- About three land colours (`doLand`): the main colour on faces that look up, a darker underside on the steep faces,
+  and in variants A/B a sun-facing accent; B and C add a narrow sand line at the water. No outlines and no foam ring.
+- Stable: no deformer on the island and nothing routed to its shape. Only the palms sway, 0.2 m at the crown over 9 s;
+  the canopies hold still. Palettes still recolour it, and the far chain is now two faint low strips.
+- Variants from the same camera, sea, sun and clouds at 1080p (`54-digital-ocean-2/island/`): **A** minimal (4 trees,
+  three tones), **B** tropical anime (7 trees, sand line), **C** cut-paper (5 trees, hard two-tone land, trees one
+  dark tone). Round 1 placed the strip at 1.45 km and it vanished into the haze (`island-before-A-B-C.png`); round 2
+  brought it to 900 m (`island-before-A-B-C-round2.png`).
+- **Chosen: C.** It has the minimal geometry of A, the cleanest graphic read, and a canopy anchoring each end, so the
+  strip is balanced (A leaves the left half bare). B's extra trees add clutter, not identity. C is also the least
+  shaded variant, which matches the travel-poster direction chosen in Pass A.
+
+## Boats step (the owner's brief `09-brief-boats.md`) (done)
+
+- **Reference direction** (real hull profiles, no brands or logos): a modern 15-17 m express cruiser or sport motor
+  yacht. Long and low; a fine, steeply raked stem; flared bow sections over a hard chine; a sheer that steps down
+  aft; a wide transom over a swim platform. The superstructure is low, with a raked windscreen under a hardtop and a
+  long dark wraparound glazing band rather than portholes, plus a narrow hull-window strip amidships.
+- **Built from real proportions first** (`loft`, `box_loft`, `deck_surface`): hull stations are given as deck
+  half-breadth, sheer height, chine and keel, and lofted. The cabin is lofted the same way, and its upper side band is
+  the glazing. Three meshes take three colours: pearl hull, pale deck and cabin, navy glazing.
+- **Candidates**, same camera and scene, at 1080p (`54-digital-ocean-2/boats/`):
+  - A: the 16 m motor yacht.
+  - B: a 10 m deep-V performance runabout with a long foredeck and a low wraparound windshield.
+  - C: a 13 m modern sloop with a plumb bow, low coachroof, 18 m mast, and a high-aspect cambered main and jib.
+
+  At 130 m all three were too small to judge (`boats-before-A-B-C.png`), so the course moved in to ~70 m
+  (`boats-before-A-B-C-70m.png`).
+- **Chosen: A.** Silhouette first: it reads at once as a modern motor yacht. The glazing band and hardtop make a clear
+  graphic shape, and the hull is long and low with a credible bow. B is too low and small to read at live
+  resolution. C's flat sails pull the read back toward the toy it replaces. One excellent vessel, as the brief asks.
+- **Motion and water contact.** The yacht cruises at 3.2 m/s across the view on a straight course 64-84 m out. Its
+  `pathOffset` comes from an LFO saw, which is pure in time; the course runs well past both frame edges, so the wrap
+  happens out of sight (~75 s a crossing). It then goes through the sea's own world-space Gerstner stack, so it
+  rises, falls and travels with the swell; a 6 cm roll is the only local motion.
+- **The wake** is a directional trail from the stern that follows the same saw and widens behind the course. A small
+  bow wave is thrown forward and outward. There is no ring. It was toned down after the first motion check, where it
+  read as a jet trail (`yacht-A-crossing-26-44s.mp4`, `boatA-motion-crops.png`). Pass 3 revisits it to match the new
+  water.
+- Palette: pearl hull, cooler pale deck (first trial was too peach), navy glazing, each set per palette.
+
+### Boats step, revision (the coordinator's notes)
+
+- **The hull no longer reads as a box.** Seen abeam at ~70 m, the visible hull is the band between the waterline and
+  the sheer, so the plan taper never showed. Changes:
+  - The stem now rakes forward with height: forward of 11 m, points move ahead up to 0.75 m per metre of height, so
+    the bow rises and points.
+  - The sheer sweeps from 2.7 m at the bow down to 1.05 m at the stern.
+  - The hull narrows from amidships in plan.
+  - A dark **boot band** runs from the waterline to 0.42 m (its own mesh part, painted in the glazing's navy), so the
+    hull sits in the water.
+- **The wake is geometry, not particles**:
+  - `wake_mesh` builds a Kelvin wake in the boat's frame: two arms diverging from the stern at 19.5 deg, 46 m long
+    and widening; a short churned strip straight back; and two short bow-wave arms from the stem.
+  - The wake rides the same course (path deformer) and the same sea and music swell as the hull.
+  - Its foam (`doWake`) is a **world-anchored** noise, so foam stays where the boat left it while the arms move on.
+    It is cut by a threshold that rises with age along the arm and toward its edges, and written as the opacity of an
+    alpha-MASKED material.
+  - The result is crisp, broken graphic foam with two diverging arms, and no smoke or ring.
+  - No engine change: program opacity already feeds the mask discard.
+- The hull now also carries the audio swell deformers (tide, kick fronts, hero wave). Without them it would sink or
+  hover when the music raised the sea.
+- `boats-A-B-C-crops.png` was deleted: its crop windows missed the boats.
+- The first masked wake rendered as solid peach strips. A program-made cutout kept its full depth in the procedural
+  depth prepass, so the sea behind it failed the depth test and the cleared horizon colour showed through. Fixed in
+  the engine as **ADR-1371**: `fs_proc_depth` evaluates a masked material's program. The GPU test fails without the
+  fix. With the fix, the first thresholds cut nearly all the foam; they are retuned (0.36-0.8).
+  `yacht-v3-hull-1080p.png` shows the revised hull: raked rising bow, sweeping sheer, boot band.
+
+## Pass E: musical colour and wave modulation (done)
+
+- **One colour axis for the whole world** (`musical_colour`): `visual.mood` (an interpret mapping) = CC 1 + 0.35 x
+  `response.intensity` (12 s) + 0.75 x the daybreak envelope, clamped to 0..1. It drives two segments of
+  coordinated palette routes, violet sunset -> golden afternoon (0 to 0.5) and golden afternoon -> electric blue
+  (0.5 to 1). Every palette colour of every program and every illustrated node moves together, smoothed over 1.5 s.
+  A build therefore brightens the world toward day and a breakdown sinks it back to the sunset: a change of light,
+  not a colour cycle.
+- **Each band has its own role, time constant and target**, never all at once:
+  - bass deepens the water's body and lifts the crest light (200 / 1200 ms);
+  - highs add mint to the crest light (60 / 600 ms);
+  - sustain turns the sky's middle pink and warms the clouds' lit undersides (2.5 / 5 s);
+  - level strengthens the rays (0.8 / 2.5 s);
+  - kick flashes the rays warm (0 / 350 ms);
+  - onsets open the rays' reach for a moment (900 ms);
+  - Pass 1's tidewriting swell, kick fronts and the level/intensity swell remain.
+- Found by rendering: under loud music the sky washed out to milky lavender (ray, halo and sustain boosts multiplied);
+  the level-driven ray gain and the sustain pink were halved.
+- Media: `passE-F-colour-and-conditions.png` (round 1), `passE-F-round2.png` (CC 1 at 0 / 0.5 / 1, daybreak, Trench,
+  Feline Footwear).
+
+## Pass F: MIDI performance (done)
+
+- CC 1 palette (the mood axis), CC 2 night (the bioluminescent end), CC 3 waves (swell height; the crest ramp follows
+  so foam stays a cap), CC 4 wave energy (chop, foam and the tide's depth together), CC 5 sun rays (strength, reach,
+  halo, the sun's path), CC 6 clouds (the glow on lit undersides and rims), CC 7 water colour (richness of the body and
+  crest light), CC 8 spray.
+- Pads 36 leap, 37 hero wave, 38 bloom, 39 flare, 40 spray, and **41 daybreak**: an envelope (3 s attack, 5 s hold,
+  4 s release) added into the mood, so the whole world sweeps toward electric day and back to the sunset. Verified on
+  a clip from 0 s (`passF-daybreak-pad-0-14s.png`, 2 s apart). A still that starts after the pad cannot show it: a seek
+  does not replay envelopes.
+- Review tooling: the offline MIDI scorer now also rewrites interpret-mapping inputs, and the kit lists a scene's own
+  sources before its interpret sources, so a mapping can read an envelope. Every other Sonic Abstract scene is
+  unchanged, checked by regenerating three and comparing bytes.
+- Wave speed and direction are still not on controls: a deformer's phase is `k.x + speed t`, so changing either
+  jumps every wave. This belongs to Pass 3's water work.
+
+## Pass G: visual critique (done, two rounds)
+
+Seven conditions at 1080p (`passG-round1.png`): silence, quiet (Glowmere), bass (Trench 77 s), percussive (Feline
+Footwear 95 s), MIDI (palette 1, waves 0.8, clouds 0.7), peak (Trench + waves, rays and energy full), and night. Plus
+a clip from 0 s with a scored leap and hero wave (`passG-events-leap-herowave.png`).
+
+**Round 1: the three most significant (non-water) defects**
+
+1. The dolphin leap was still a speck, about 2 % of the frame: not an identifiable event.
+2. In the day palettes the rays washed the sky to pinkish white: near-white ray colours added onto a bright sky.
+3. The cloud formation beside the sun read as a bunch of grapes.
+
+**Fixes**
+
+- Dolphins are 8.5 m. The hero leap is at 55 m with an 8 m arc; pod A is at 100 m with 5.5 m arcs.
+- Ray colours are tinted per palette (warm in the afternoon, cool in electric blue), and the rays control is capped
+  at x2.
+- The grape formation became a long lit ribbon.
+
+**Round 2** (`passG-round2.png`, `passG-leap-round2.png`)
+
+- The leap reads as the brief's full gesture: the fin cutting the surface on the approach, the rise, a silhouetted arc
+  across the glitter, the apex, the dive and a splash.
+- The electric sky keeps its blue under the rays.
+
+**Left for Pass 3 (the water) and noted**
+
+- Under heavy bass and at the peak, the near swell's crest light and foam merge into a white slab.
+- The hero wave reads as a thin dark line rather than a rising, foaming swell.
+- At intermediate mood positions under loud music the sky can drift pale lavender (two palettes half-blended plus
+  rays).
+
+## Pass H: performance and reliability (done)
+
+- Real live path at 1080p: a steady 30 fps (frame p50 33.3, p99 34.2 ms) at the ladder's Medium (scale 0.71), GPU 27.3
+  ms. Headless Ultra at 1080p: 27.1 ms silent and 33.3 ms with Trench (at risk without the ladder). 2160p: 68 ms, the
+  ladder scales it. Pass 2 costs ~5 ms more than Pass 1; Pass 3, which replaces the water, owes the per-feature
+  breakdown and the optimisation.
+- MIDI stress (`avgen_sonic_probe stress`, a new scenario): 899 messages, every pad hammered at 4 Hz, palette and
+  night sweeps, repeated hero waves. GPU flat at 29.5-29.7 ms in every phase, no errors, nothing accumulates.
+- Report: `05-report-art-pass-2.md`.
+
+## Pass 3 (water)
+
+*Brief: `06-brief-anime-water-shader.md`. Media: `~/Desktop/av-gen-review/55-digital-ocean-water/`. The water stays a
+material program on the displaced sea mesh: no new renderer, no new pass.*
+
+### Pass A: baseline and style frames
+
+- `passA-styles.png`: the Pass 2 water (baseline: reflected-sky colours posterized by `quantize`) and the first anime
+  program with four treatments made from its knobs: A1 smooth bands, A2 strong graphic highlights, A3 stylized crest
+  foam, A4 painterly surface detail. All at 1080p, silent, 20 s. `passA-draft1-music-95s.png` is draft 1 under
+  Feline Footwear (the afternoon end of the mood).
+- The new program (`water_program`) builds one scalar, the illustration's light `t`, from the geometry: the displaced
+  height (crests up, troughs down) mixed with the face's orientation and a little detail noise of the rest position.
+  Four colour regions are smoothstep bands on `t` (deep, main, lit faces, crest accent). Strokes, foam and glints are
+  all cuts of the same `t`, so they ride the waves.
+- Anti-aliasing: the engine's per-pixel `footprint` (from screen derivatives) becomes a contrast gain g that falls from
+  1 to 0.35 as a pixel covers more water. `t` is multiplied by g before every edge, so edges soften where pixels
+  are large and the far sea converges on its middle tone.
+- **Chosen: A1's soft bands as the body**, with A2's highlight strokes kept thin and few, A3's foam only on the
+  reinforced crests, and A4's detail kept low (at 0.16 it reads as camouflage, not water). A2 and A3 at full strength
+  turn the foreground into white blotches; A1 alone is lovely but has no accent.
+- Draft 1's worst problems, fixed in draft 2 (the committed program): a hard seam at 200 m where the far program
+  (with a Fresnel blend into the horizon colour) met the near one (without it), now one shared horizon blend; glints
+  as a few large crescents, now jittered by the detail noise into a broken path of sparks; foam too common.
+  Draft 2 also frees ops: the gain is one clamped remap, the detail one `mix`, and `t` is centred by the gradients'
+  offsets (45 ops near, 35 far, of 48).
+
+### Pass B: base geometry and colour bands
+
+- `passB-bands-and-palettes.png` (1080p, 20 s, silent): the bands alone (no strokes, no foam), a crisper band
+  contrast, and the full water in the three palettes and at night. `passB-draft3-bands.png` is the step before.
+- Draft 2 (Pass A's commit) washed the near sea out: the Fresnel horizon blend at power 4 reached 20 % even at 40 m,
+  so every band sank into one lavender. At power 7 it only takes the distance, and still joins the near and far
+  programs without a seam.
+- The bands were too faint for the swell to read: `t`'s height span is now 2.4 m (was 3.2), so the long swell's
+  troughs reach the deep band and its crests the crest accent. The deep band starts lower (-0.16) and the violet
+  deep is lifted (#1c1656), because in the bands-only frame the troughs read as dark oily lines.
+- The sun path: draft 1's glints were a few big crescents (the smooth Gerstner normals reflect the sun in a handful
+  of places). The reflection test now mixes in 6.5 % of the detail noise, which breaks the path into sparks.
+  At 12 % the near sparks were 50 px amoebas, so the detail noise is also stretched 3.3x along x (across the view):
+  the sparks and foam become horizontal strokes, the anime sun path.
+- Palettes: the water keys are `deep`, `wmain`, `sss` (lit faces), `wcrest`, `hl` (strokes), `foam`, `glint`, `rhor`
+  (horizon), in each of violet, afternoon (turquoise/cobalt), electric (deep electric blue), midnight and twilight.
+  `visual.mood` blends them as before (`palette_routes`), so the water follows the palette control and the music's
+  intensity smoothly.
+
+### Pass C: highlights, foam and surface patterns
+
+- `passC-highlights-foam-before-after.png`: Pass B's water against Pass C's, silent and under three musical
+  conditions; the peak is Trench at 77 s with the waves, energy and rays controls at full (Pass 2's "white slab").
+  `passC-herowave-0-14s-draft.mp4` is the hero wave (pad 37 at 3 s) on the Pass B program.
+- **Glints.** The sun path's sparks are the reflection test jittered by the raw detail noise, and even a perfect
+  reflection sparks only where the noise is above 0.62: a big face turned to the sun stays broken into strokes.
+  A jitter drawn from the foam signal (noise mixed with the crest) made every crest face a glint and grew the path
+  into a slab. The sparks' edge is 0.003 wide in the jittered r.l/2, about two pixels near. Beyond 200 m the jitter
+  is the centred noise times the AA gain g, so the far sparks merge into one smooth path instead of flickering.
+- **Foam.** `mix(noise, t g, 0.5) g`, cut at 0.37: broken caps on the reinforced crests only, fading where pixels
+  grow. The peak's slab was foam, not glints (found by elimination: `GLINT_GAIN` 0 and `W_FOAM_CUT` 9 variants).
+  Energy used to drop the cut by 0.16, and a taller sea made every crest face foam. Now energy lowers it by 0.04,
+  while the waves control (+0.07) and the music's level (+0.05) raise it. Foam stays a cap on a tall sea and draws
+  a line along the crest, like an anime breaker.
+- **Highlights.** Thin strokes in a narrow band of `t` just under the crest (`strokeLo` x `strokeHi`), in the
+  palette's `hl`.
+- **Audio colour.** The routes that pushed the lit faces and foam toward white were lowered: bass (0.4 to 0.15),
+  kick (0.55 to 0.2 on the lit faces, 1.2 to 0.4 on foam) and highs' mint (0.35 to 0.15).
+- A slip worth recording: one generator edit sliced at the old program's `glints` op and duplicated half the file.
+  The second `water_program` silently won, so one round of renders showed no change. It was caught because two
+  renders came out byte-identical, and removed.
+
+### Pass D: audio and MIDI
+
+- `passD-controls.png`: each new control at full against none (1080p, 20 s, silent).
+  `passD-speed-ramp-4-13s-direction-14-18s.mp4` covers the speed control from 0 to full over 4-7 s, held to 11 s and
+  released by 13 s, then direction to full over 14-18 s. The frame-to-frame difference of the sea rises and falls
+  smoothly with the speed (1.2 at rest, 4.5-6 at full) with no single-frame spike, so no crest jumps.
+- **Wave speed (CC 9) needed an engine change, ADR-1372.** A sine deformer's phase is unbounded (hard range
+  +-1e6) and wrapped to an angle when the final is copied. Each swell train keeps its authored `speed` (pure in
+  time, so seeks are exact). Its `phase` gets an integrated route (ADR-1041) from the speed control with amount
+  w x 1.5, so the pace runs from the authored to 2.5x, and one from the music's level with amount w x 0.35, so loud
+  music quickens the sea. A first attempt added a `clock` signal source. It was dropped: the route chain's `integrate`
+  stage already does this, and the phase's +-100 clamp was the only thing in the way.
+- **Direction (CC 10)** cross-fades the trains' amplitudes rather than rotating them. A rotation sweeps far crests
+  sideways (a 10-degree turn shifts a 60 m wave at 1 km by 17 rad). The cross swell from the right drops to 25 % and
+  the wind sea from the left rises to 2.6x (its steepness to 2.3x, keeping the Gerstner sum under 1).
+- **Band contrast (CC 11)** narrows every band edge to 15 % of its width, and the music's intensity narrows it a
+  little. **Highlights (CC 12)**: the strokes reach 1.8x brightness and the band opens downward; hats flash them.
+  **Foam (CC 13)**: the cut drops 0.06 and the foam brightens. **Surface detail (CC 14)**: the noise's share of the
+  light rises from 0.07 to 0.2, and its mean shift is taken back out of the height term.
+- **Everything that moves the swell now moves what floats on it.** `wave_route` sends each swell route to every
+  node that carries that deformer: the three sea pieces, the yacht's parts and its wake. Before this, the waves
+  and energy controls lifted the sea under a yacht that did not rise with it.
+- Palette blend stays CC 1 plus the music's intensity (`visual.mood`); water energy stays CC 4. The scene's
+  vocabulary, the MIDI table and the index entry list CC 9-14.
+- Caveat: integrated routes on live input are not replayed by a seek (ADR-901). After a seek the performer's
+  added phase restarts from zero, and the music's (from `response.level`) does too.
+
+### Pass E: scene integration
+
+- **Island shore.** A new surf line (`shore`, program `doShore`): a low vertical ribbon round the island's waterline
+  (the footprint's superellipse), from -0.4 to 1.6 m, riding the same swell as the sea (`wave_route` reaches it
+  too). Its masked foam is broken by a 25 m world-anchored noise that the swell carries up and down the ribbon, so
+  the breaks drift as waves pass. At 900 m that is a 2-3 px light line under the dark land, the anime background's
+  surf. A flat strip would have been under a pixel tall at that grazing angle, and a fine noise would flicker. The
+  first ribbon was single-sided and culled from the camera. It follows the palette, foam colour included.
+- **Yacht wake** in the new foam language: the same palette foam and the same flat cut shapes. The cut was retuned
+  from 0.36/0.8 (Pass 2's guess, never seen against the anime water) to 0.24/0.62, so the arms read as broken foam
+  dashes trailing the hull (`passE-wake-cuts-and-surf-line.png`, `passE-leap-and-wake-40-48s.mp4`).
+- **Dolphin splashes**: larger drops (0.15 m), fading into the highlight colour rather than the lit-face colour,
+  and longer, wider rings, so the entry splash reads at 60-100 m.
+- The hull's contact: the yacht rides the swell routes too (Pass D), so it no longer sinks or floats when waves
+  or energy change.
+
+### Pass F: critique
+
+Real frames at 1080p: silent violet, electric, night, quiet music (Glowmere Valley at 8 s), Trench 77 s, Feline
+Footwear 95 s, the peak (Trench with waves, energy and rays at full), every water control at full, the hero wave
+(pad 37) from 0-14 s, and a 16-22 s clip for flicker. The far band's temporal second difference (each frame against
+the mean of its neighbours) averages 1.0 grey level, at most 1.3, so the far glitter does not flicker.
+
+The three worst defects, fixed and recaptured (`passF-critique-before-after.png`, `passF-herowave-*`,
+`passF-conditions-after.png`):
+
+1. **The hero wave read as a mottled pink patch, not a wave** (Pass 2 handed over "a thin dark line"). It was a
+   10 m-wide 1.9 m pulse, a mound whose faces barely turn, so only the height term lit it, broken by the detail
+   noise. Now it is 6 m wide and 2.3 m tall, so its faces turn and the bands draw a face. While it rolls in (pad 37,
+   a 12 s peak-hold envelope) the foam cut drops slightly, enough for its crest, the tallest thing on the water,
+   to carry a broken white line from about 110 m in. A first try dropped the cut by 0.07, which foamed every near
+   crest pink; 0.025 foams only the hero.
+2. **Every water control at full turned the foreground into white camouflage.** The controls stacked:
+   - energy's and foam's foam cuts (-0.04 each);
+   - highlights at 1.8x and wider;
+   - detail at 0.2.
+
+   They now top out at -0.02 and -0.03, 1.5x and -0.02, and 0.16. With everything at full the sea reads as choppy
+   glitter with crest strokes, busy but still water.
+3. **Under loud music the nearest wave paled into a wide crest-accent band** (Feline Footwear, Trench). The accent
+   now starts higher (0.25 in centred t, was 0.22), and the music's level raises its edge by 0.06 as it raises the
+   swell, so a taller sea keeps a thin accent.
+
+Seen and left: at intermediate mood positions under quiet music the water drifts grey-lavender, because two
+palettes are half-blended and the horizon blend's two colours meet. It is the same family as Pass 2's pale-sky
+note. The near long-swell crest at 6-8 s, without the hero, is a large lit band broken by the detail noise. It is
+legible, but busier than the rest.
+
+### Pass G: performance and reliability
+
+All runs: M2 Max, `tools/live_scene_profile.py` under the GPU lock, on main's ADR-1362 controller (merged before
+measuring). Reports are in `55-digital-ocean-water/passG-profiles/`.
+
+**Per-feature GPU cost by elimination**, headless 1080p Ultra, silent. Each variant hides nodes
+(`procedural/<n>/visible`) or disables a feature's program ops (`material/<p>/op/<n>/<kind>/enabled`):
+
+| Variant | GPU p50 (ms) | vs full |
+|---|---|---|
+| full | 26.54 | |
+| the Pass 2 water program instead | 27.26 | +0.72 |
+| no sea at all | 9.83 | -16.71 |
+| sea without its program | 18.61 | -7.93 |
+| sea without its deformers | 23.40 | -3.14 |
+| no strokes and foam | 25.49 | -1.05 |
+| no glints | 25.17 | -1.38 |
+| no surface detail | 25.62 | -0.92 |
+| no sun rays (sky ops) | 25.69 | -0.85 |
+| no clouds | 24.18 | -2.36 |
+| no yacht and wake | 26.35 | -0.20 |
+| no island, trees and surf line | 26.54 | 0.00 |
+| no dolphins | 26.35 | -0.20 |
+
+- The anime water is 0.7 ms *cheaper* than Pass 2's (fewer ops, no `quantize`). The sea is 63 % of the frame:
+  about 8 ms of program, 3 ms of deformers (eight a vertex, with finite-difference normals, two of them audio
+  fields), and the rest the sea's raster and depth.
+- Tried and reverted: dropping the far program's detail noise saved nothing measurable (26.61 ms) and lost the far
+  sparks. AO off saves 0.85 ms (A/B), but nothing in this scene is lit. The shadow mask's A/B was void (drift).
+  Neither is a scene setting, so both are left.
+- **The live path at 1080p** (the real editor loop, Fifo, the projection on a 120 Hz display):
+  - auto settles at High (internal 1632 x 918, scale 0.85);
+  - frame interval median 33.36 ms (30 fps), p95 35.3;
+  - GPU median 29.6 ms;
+  - 3.3 % of frames miss one 8.3 ms vsync;
+  - the profiler's status is "at risk".
+
+  Pinned at Medium (scale 0.71, GPU 25.3 ms) the miss rate is the same, 3.1 %. Removing the 84 integrated phase
+  routes doesn't change it either. So the misses are not the GPU. The CPU breakdown shows "UI build and record"
+  at 8.7-9.8 ms a frame (the editor); `bit-ocean` measures 6.4 ms of CPU work on the same path. Pass 2's live run
+  (60 Hz display, before ADR-1362) had 2.2 ms of CPU and no misses. This is recorded as a finding for the
+  live-controller and editor owners, not fixed here.
+- **Reliability** (`live-stress/`, `stress-sheet.png`): the probe's stress scenario played 902 MIDI messages over
+  83 s into the live editor with BlackHole audio: every pad hammered at 4 Hz, palette and night sweeps, repeated
+  hero waves. GPU p50 stayed between 26.6 and 30.8 ms in every 10 s window with nothing accumulating, the frame
+  interval p50 was 33.3-33.6 ms throughout, and there were 0 GPU errors.
+
+### Pass 3 checks
+
+On the branch after merging main at ef94826a:
+- `check_project_integrity`: 0 problems.
+- `cpu-assets`: exit 0, 4251 passed. The first run failed "A live scene switch carries no parameter from the scene
+  before it" (main's test, on event-horizon and sonic-live, in the live mode only). It passed alone twice, and the
+  rerun of the whole suite passed, so it is a load-sensitive flake outside this scene.
+- `gpu`: exit 0, 658 passed.
+- `review_examples --only "Digital Ocean"`: ok.
