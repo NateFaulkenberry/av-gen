@@ -656,6 +656,8 @@ public:
     // editor holds about the open project outside this engine (its overlays, its selection, its renderer history) is
     // reset when this moves, in one place (`Application::resetProjectViewState`), however the load was asked for.
     [[nodiscard]] std::uint64_t projectGeneration() const { return projectGeneration_; }
+    // ADR-1392: the decoded-asset cache, for the checks that its size follows the open project.
+    [[nodiscard]] const assets::AssetRegistry& assetRegistry() const { return registry_; }
 
     // ADR-225: the Auto-director's controls, saved with the project.
     //

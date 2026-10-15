@@ -3988,13 +3988,21 @@ Result<void> Engine::loadComposition(const std::filesystem::path& rawPath) {
 Result<void> Engine::loadComposition(const std::filesystem::path& rawPath, const nlohmann::json& nodeEdits) {
     const auto path = std::filesystem::absolute(rawPath).lexically_normal();
     registry_.setBaseDirectory(path.parent_path());
+    // ADR-1392: the asset cache keeps what THIS scene loads and lets the last one's go once it is installed.
+    registry_.beginUse();
     auto comp = scene::Composition::loadFile(path, registry_, nodeEdits);
     if (!comp) {
+        static_cast<void>(registry_.releaseUnused()); // nothing was replaced; nothing that was in use is lost
         return std::unexpected(comp.error());
     }
     ++projectGeneration_; // ADR-1390: a scene opened on its own replaces the world as a project does
     compositionPath_ = path;
-    return installComposition(std::move(*comp));
+    auto installed = installComposition(std::move(*comp));
+    const std::size_t released = registry_.releaseUnused();
+    if (released > 0) {
+        log::info("assets: released {} cached asset(s) the new scene does not use", released);
+    }
+    return installed;
 }
 
 Result<void> Engine::setCompositionJson(const nlohmann::json& document) {
