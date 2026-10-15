@@ -2,6 +2,7 @@
 # clean checkout has the organisms; rift.scene.json (14 MB, the CPU placement) is not: run build.py.
 rift.scene.json
 rift.scene.json.*.tmp
+rift.scene.json.stamp
 cp1/
 __pycache__/
 cp2/

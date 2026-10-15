@@ -717,10 +717,30 @@ def probe_project(p):
     return q
 
 
+def generator_stamp():
+    """What rift.scene.json is made from: this folder's Python and its committed meshes. Written beside the world as
+    rift.scene.json.stamp, so a world made by an older generator is known to be stale -- a test that only checked
+    the file existed passed or failed on whatever an earlier build.py had left (2026-10-15, after ADR-1344)."""
+    import hashlib
+    h = hashlib.sha256()
+    for f in sorted(list(HERE.glob("*.py")) + list((HERE / "meshes").glob("*"))):
+        if f.is_file():
+            h.update(f.relative_to(HERE).as_posix().encode())
+            h.update(f.read_bytes())
+    return h.hexdigest()
+
+
 def main():
     # --scene-only: write just the generated world (rift.scene.json, gitignored) from the committed meshes and leave
     # every committed file alone. tests/integration/test_rift.cpp runs it on a clean checkout.
+    # --if-stale (with --scene-only): do nothing when the world exists and was made by these exact sources.
     scene_only = "--scene-only" in sys.argv[1:]
+    stamp_path = HERE / "rift.scene.json.stamp"
+    stamp = generator_stamp()
+    if scene_only and "--if-stale" in sys.argv[1:]:
+        if (HERE / "rift.scene.json").exists() and stamp_path.exists() and stamp_path.read_text().strip() == stamp:
+            print("rift.scene.json is up to date")
+            return
     if not scene_only:
         organisms.build_all()
     print("ground...")
@@ -733,6 +753,7 @@ def main():
     tmp = HERE / f"rift.scene.json.{os.getpid()}.tmp"
     tmp.write_text(json.dumps(sc, separators=(",", ":")))
     os.replace(tmp, HERE / "rift.scene.json")
+    stamp_path.write_text(stamp + "\n")
     if scene_only:
         print(f"wrote rift.scene.json ({(HERE / 'rift.scene.json').stat().st_size / 1e6:.1f} MB)")
         return
