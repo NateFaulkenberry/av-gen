@@ -2775,6 +2775,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     lens_ = scene::LensSettings{};
     exposure_ = scene::ExposureSettings{};
     focus_ = scene::FocusSettings{};
+    // The temporal effects (frame echo, mosh, feedback) re-register from `temporal_` the same way and were missing
+    // here: after Feedback Mirror had played, every scene switched to kept its feedback on -- the owner's "spinning
+    // tunnel that carried over from one scene" (2026-10-14; tests/integration/test_live_switch_carryover.cpp).
+    temporal_ = scene::TemporalSettings{};
     meterSettings_ = MeterSettings{}; // ADR-896: the loop above reset the parameters; this, what they re-register from
     auto warn = [&](std::string message) {
         log::warn("project: {}", message);
