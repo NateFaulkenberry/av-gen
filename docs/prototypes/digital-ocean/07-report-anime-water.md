@@ -136,3 +136,11 @@ live-controller and editor owners.
 - **Integrated routes and seeks.** The routes on live input (speed, and the level's quickening) are not replayed by
   a seek (ADR-901), so a seek drops their accumulated phase. Offline, a scored timeline is replayed exactly.
 - **Program budget.** The near program uses 47 of 48 ops, so one more water feature means removing one.
+
+## Checks
+
+- Integrity check: 0 problems.
+- `cpu-assets`: exit 0, 4251 passed. The first run failed main's live-switch carryover test, a load-sensitive flake
+  that passes alone and on the rerun.
+- `gpu`: exit 0, 658 passed.
+- `review_examples` on Digital Ocean: ok.

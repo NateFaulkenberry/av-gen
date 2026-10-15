@@ -684,3 +684,13 @@ measuring). Reports are in `55-digital-ocean-water/passG-profiles/`.
   83 s into the live editor with BlackHole audio: every pad hammered at 4 Hz, palette and night sweeps, repeated
   hero waves. GPU p50 stayed between 26.6 and 30.8 ms in every 10 s window with nothing accumulating, the frame
   interval p50 was 33.3-33.6 ms throughout, and there were 0 GPU errors.
+
+### Pass 3 checks
+
+On the branch after merging main at ef94826a:
+- `check_project_integrity`: 0 problems.
+- `cpu-assets`: exit 0, 4251 passed. The first run failed "A live scene switch carries no parameter from the scene
+  before it" (main's test, on event-horizon and sonic-live, in the live mode only). It passed alone twice, and the
+  rerun of the whole suite passed, so it is a load-sensitive flake outside this scene.
+- `gpu`: exit 0, 658 passed.
+- `review_examples --only "Digital Ocean"`: ok.
