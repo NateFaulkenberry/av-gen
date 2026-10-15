@@ -559,6 +559,9 @@ def main():
     with open(MASTER) as f:
         doc = json.load(f)
     live = copy.deepcopy(doc)
+    # the live quality block, placed where the committed project had it (ADR-1100's strategy; no target, ADR-1360)
+    live = {"format": live.pop("format"), "version": live.pop("version"),
+            "live": {"qualityStrategy": "effects_first"}, **live}
     live["app"] = {"name": "Sonic Live"}
     assets = live.setdefault("assets", {})
     assets.pop("audio", None)
