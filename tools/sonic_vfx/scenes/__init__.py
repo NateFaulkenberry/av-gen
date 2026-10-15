@@ -39,4 +39,5 @@ ABSTRACT = [
     "chromatic_topography",     # 7 Chromatic Topography: Contour Valley (05-brief-direction-correction.md)
     "glitch_signal",            # 8 Glitch Signal: Pixel Canyon (06-brief-glitch-signal.md)
     "bit_ocean",                # 9 8-Bit Ocean: Bubble Reef (08-brief-8bit-ocean.md)
+    "digital_ocean",            # 10 Digital Ocean: The Tidewriter (docs/prototypes/digital-ocean/00-brief.md)
 ]

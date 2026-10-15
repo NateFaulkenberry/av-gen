@@ -6751,13 +6751,22 @@ bool Engine::liveSonicMidi(const control::MidiMessage& message) {
 }
 
 void Engine::updateAudioHistory(bool newFrame) {
+    // ADR-1361: every reader of the history (spectrum and onset fields, the GPU ring, THE ASTRAL FORGE's conductors)
+    // hears it through the performer's Response controls, as the routes hear `response.*`. The identity at neutral.
+    syncResponseControls();
+    spatial::AudioResponse heard;
+    heard.hitSensitivity = sonic::hitSensitivity(responseControls_);
+    heard.levelSensitivity = sonic::levelSensitivity(responseControls_);
+    heard.attack = responseControls_.attack;
+    heard.release = responseControls_.release;
     if (track_ && !track_->empty()) {
         // The whole track: a pure function of the transport second, so a seek is exact (ADR-1116).
         if (!audioHistory_ || audioHistoryRevision_ != audioRevision_ || liveAudioFeed_) {
-            audioHistory_ = std::make_shared<const spatial::AudioHistory>(analysis::buildAudioHistory(*track_));
+            audioHistory_ = std::make_shared<spatial::AudioHistory>(analysis::buildAudioHistory(*track_));
             audioHistoryRevision_ = audioRevision_;
             liveAudioFeed_.reset();
         }
+        audioHistory_->setResponse(heard);
         return;
     }
     if (mode_ == EngineMode::Live && runner_) {
@@ -6768,6 +6777,7 @@ void Engine::updateAudioHistory(bool newFrame) {
             liveAudioFeed_->push(clock_.latest);
         }
         audioHistory_ = liveAudioFeed_->history();
+        audioHistory_->setResponse(heard);
         return;
     }
     audioHistory_.reset();

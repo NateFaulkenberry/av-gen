@@ -146,6 +146,12 @@ controls, bound in `control.midi`:
 - **Stage pads** (General MIDI drum notes 36 to 43) force a stage: Dream, Uncanny, Infection, Corruption, Nightmare,
   Collapse, Respite, Recovery. They are ordinary signal triggers on the states (`control.pad<Stage>`). The arc then
   continues from the forced stage, because the dose is still the music's own.
+- **The Live panel's Response controls (ADR-1361)** decide what is heard at all; CC 1 then trims how far the arc
+  follows it. Live, the kick, snare and hat are `response.kick/snare/hat` (Transients sets how many fire and how
+  hard), the bass melt reads `response.bass`, the treble's glints and the limbs' lift are their old signals
+  multiplied by the response level (fixed dB, -44..-2), and the drive is multiplied by `presence` (the response
+  level with a knee: 1 on a mastered mix, so the arc above is unchanged on one): Sensitivity and Sustain move them,
+  and a quiet input drives the arc less until Sensitivity is raised. The offline projects keep the `audio.*` routes. docs/development/live-response-everywhere.md.
 
 `play_live.py` plays a track into BlackHole and records the host time it started, so a capture
 (`--live-capture`) and a sonic log (`--sonic-live-log`) can be joined to the music afterwards.

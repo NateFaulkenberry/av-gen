@@ -344,23 +344,38 @@ float audioShape(const FieldSpec& f, const glm::vec3& q, double time, const Fiel
         std::array<float, kOnsetHistory> strengths{};
         ages.fill(-1.0f);
         audio.lastOnsets(f.onsetSource, clock, ages, strengths);
-        return onsetResponse(ages, strengths, d, f.audioSpeed, f.onsetWidth, f.onsetDecay);
+        // ADR-1361: the performer's Release lengthens every onset's decay (the GPU's audio.timing.w).
+        return onsetResponse(ages, strengths, d, f.audioSpeed, f.onsetWidth,
+                             f.onsetDecay * onsetDecayScale(audio.response()));
     }
     const float delay = std::max(f.audioDelay, 0.0f) + travel;
     const float lo = saturate(f.bandLow);
     const float hi = saturate(f.bandHigh);
-    switch (f.audioBand) {
-    case AudioBand::Range:
-        return spectrumRange(audio, clock, delay, lo, hi);
-    case AudioBand::Element:
-        return spectrumAt(audio, clock, delay, lo + saturate(element) * (hi - lo));
-    case AudioBand::Angle: {
-        const float u = fract(angleTurns(f, q) * static_cast<float>(std::max(f.bandRepeat, 1)));
-        const float tri = 1.0f - std::abs(2.0f * u - 1.0f);
-        return spectrumAt(audio, clock, delay, lo + tri * (hi - lo));
+    const auto at = [&](float delaySeconds) -> float {
+        switch (f.audioBand) {
+        case AudioBand::Range:
+            return spectrumRange(audio, clock, delaySeconds, lo, hi);
+        case AudioBand::Element:
+            return spectrumAt(audio, clock, delaySeconds, lo + saturate(element) * (hi - lo));
+        case AudioBand::Angle: {
+            const float u = fract(angleTurns(f, q) * static_cast<float>(std::max(f.bandRepeat, 1)));
+            const float tri = 1.0f - std::abs(2.0f * u - 1.0f);
+            return spectrumAt(audio, clock, delaySeconds, lo + tri * (hi - lo));
+        }
+        }
+        return 0.0f;
+    };
+    // ADR-1370: the mean over a window centred on the delay, a tap per history row (audioSmoothTaps).
+    if (!(f.audioSmooth > 0.0f)) {
+        return at(delay);
     }
+    const int taps = audioSmoothTaps(f.audioSmooth, audio.rowRate());
+    float sum = 0.0f;
+    for (int k = 0; k < taps; ++k) {
+        const float u = (static_cast<float>(k) + 0.5f) / static_cast<float>(taps) - 0.5f;
+        sum += at(delay + f.audioSmooth * u);
     }
-    return 0.0f;
+    return sum / static_cast<float>(taps);
 }
 
 // Enabled, resolvable children (first kMaxCompoundChildren names).
@@ -949,6 +964,9 @@ Result<void> FieldSpec::validate() const {
         if (audioDelay < 0.0f || audioSpeed < 0.0f || onsetDecay < 0.0f || onsetWidth < 0.0f) {
             return fail("field '{}': audioDelay, audioSpeed, onsetDecay and onsetWidth must be >= 0", name);
         }
+        if (!(audioSmooth >= 0.0f && audioSmooth <= 16.0f)) { // ADR-1370
+            return fail("field '{}': audioSmooth must be in [0, 16] seconds", name);
+        }
     }
     return {};
 }
@@ -1012,6 +1030,9 @@ std::uint64_t FieldSpec::structuralHash() const {
         h.u8(static_cast<std::uint8_t>(onsetSource));
         h.f32(onsetDecay);
         h.f32(onsetWidth);
+        if (audioSmooth > 0.0f) { // ADR-1370: hashed only when set, so every audio field keeps its hash
+            h.f32(audioSmooth);
+        }
     }
     // ADR-906: hashed only when present, so a field without one keeps the hash it always had.
     if (trigger) {
@@ -1088,6 +1109,9 @@ json FieldSpec::toJson() const {
         j["onsetSource"] = onsetSourceName(onsetSource);
         j["onsetDecay"] = onsetDecay;
         j["onsetWidth"] = onsetWidth;
+        if (audioSmooth > 0.0f) {
+            j["audioSmooth"] = audioSmooth; // ADR-1370: written only when set
+        }
     }
     // ADR-906: written only when set, so every field file before it round-trips unchanged.
     if (trigger) {
@@ -1145,6 +1169,7 @@ Result<FieldSpec> FieldSpec::fromJson(const json& root) {
         AVGEN_SPATIAL_READ_ENUM(f.onsetSource, "onsetSource", &onsetSourceFromName, "onset source");
         AVGEN_SPATIAL_READ(f.onsetDecay, "onsetDecay", detail::readFloat);
         AVGEN_SPATIAL_READ(f.onsetWidth, "onsetWidth", detail::readFloat);
+        AVGEN_SPATIAL_READ(f.audioSmooth, "audioSmooth", detail::readFloat);
     }
     if (root.contains("falloff")) {
         const json& j = root.at("falloff");
@@ -1299,7 +1324,8 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
         g.gridBounds0 = glm::vec4(field.bandLow, field.bandHigh, field.audioDelay, field.audioSpeed);
         g.gridBounds1 = glm::vec4(static_cast<float>(static_cast<int>(field.audioBand)),
                                   static_cast<float>(std::max(field.bandRepeat, 1)), field.onsetDecay, field.onsetWidth);
-        g.gridRes = glm::vec4(static_cast<float>(static_cast<int>(field.onsetSource)), 0.0f, 0.0f, 0.0f);
+        g.gridRes = glm::vec4(static_cast<float>(static_cast<int>(field.onsetSource)), std::max(field.audioSmooth, 0.0f),
+                              0.0f, 0.0f);
     }
     g.children = glm::ivec4(-1);
     for (int c = 0; c < kMaxCompoundChildren; ++c) {

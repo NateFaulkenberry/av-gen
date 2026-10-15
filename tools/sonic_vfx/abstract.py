@@ -70,14 +70,22 @@ def build(modules, out_dir=None):
     names = modules or ABSTRACT
     built = []
     for name in names:
-        sc = importlib.import_module("tools.sonic_vfx.scenes." + name).build()
+        mod = importlib.import_module("tools.sonic_vfx.scenes." + name)
+        sc = mod.build()
         pp, _ = sc.write(out_dir or kit.ABSTRACT_DIR)
         built.append(sc)
+        if getattr(mod, "INDEX_ENTRY", None) and not out_dir:
+            kit.upsert_index_entry(mod.INDEX_ENTRY)
         print("%-24s %3d nodes %2d effects %4d routes %3d mappings -> %s" % (
             sc.id, len(sc.nodes), len(sc.effects), len(sc.routes),
             len(sc.mappings) + len(sc.mappings2) + len(sc.mappings3), os.path.relpath(pp, REPO)))
     if not modules and not out_dir:
         kit.write_index(built, category=kit.ABSTRACT_CATEGORY, out_dir=kit.ABSTRACT_DIR, doc="ABSTRACT-PLAN.md")
+        # a scene that writes its own entry (its description names its MIDI map) keeps it over the generic one
+        for name in names:
+            entry = getattr(importlib.import_module("tools.sonic_vfx.scenes." + name), "INDEX_ENTRY", None)
+            if entry:
+                kit.upsert_index_entry(entry)
         print("examples/index.json: the %s category lists %d scenes" % (kit.ABSTRACT_CATEGORY, len(built)))
 
 

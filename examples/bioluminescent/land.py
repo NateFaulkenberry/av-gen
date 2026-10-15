@@ -22,9 +22,14 @@ REPO = Path(__file__).resolve().parents[2]
 TOOL = REPO / "build" / "release" / "tools" / "avgen_world_preview"
 CACHE = REPO / "build" / "biolum"
 
-SIZE = 2400.0
+SIZE = 2400.0        # across the canyon (x)
+# Along it (z): the map must hold the whole flight (+-1300 m), the placement (+-1400 m) and the terrain's view distance
+# (1000 m) ahead of either end. It was 2400 m, so the terrain stopped at z = +-1200 -- and the flight starts at -1300:
+# the opening shot looked from 100 m outside the world at the ground's cut edge, a lit strip of growth on a ledge over
+# the sky's dark ground colour (grounding-pass-2026-10.md).
+SIZE_Z = 4600.0
 FLOOR = -150.0       # the canyon floor's level
-Z_RANGE = (-1700.0, 1700.0)
+Z_RANGE = (-2300.0, 2300.0)
 
 
 def centre_x(z):
@@ -41,11 +46,13 @@ def _path(fn, level_fn, step=40.0):
     return [[round(fn(z), 2), round(level_fn(z), 2), round(float(z), 2)] for z in zs]
 
 
-def world():
-    return {
+def world(floodplain=True):
+    """The Rift's world. `floodplain=False` is the world before the 2026-10 grounding pass, which build.py reads only
+    as the layout ground (where things grow); everything drawn and placed stands on the full world."""
+    w = {
         "name": "rift",
         "seed": 20261006,
-        "size": [SIZE, SIZE],
+        "size": [SIZE, SIZE_Z],
         "baseHeight": 0.0,
         "erosion": 0.35,
         "seaLevel": -1000.0,
@@ -61,12 +68,21 @@ def world():
              "amplitude": 175.0, "falloff": 4.0, "roughness": 1.0, "smoothing": 3},
             {"name": "shelf", "kind": "flat", "path": _path(centre_x, lambda z: FLOOR + 2.0 - z * 0.004),
              "width": 62.0, "falloff": 3.0, "flatten": 0.92, "roughness": 0.3, "smoothing": 3},
+            # the floodplain: the river's banks hold its water. The river's water reaches 15 m from its line, and
+            # where the shelf's edge or a gully put the ground lower than the water there, the sheet ended in mid-air
+            # -- up to 11 m over the gully floor (grounding-pass-2026-10.md). A broad, nearly flat strip a little
+            # above the water line, cut by the river after it, contains it everywhere.
+            {"name": "floodplain", "kind": "flat", "path": _path(river_x, lambda z: FLOOR + 0.6 - z * 0.004, 30.0),
+             "width": 40.0, "falloff": 0.5, "flatten": 0.97, "roughness": 0.35, "smoothing": 3},
             {"name": "river", "kind": "river", "path": _path(river_x, lambda z: FLOOR - 1.5 - z * 0.004, 30.0),
              "width": 15.0, "amplitude": 3.0, "falloff": 1.2, "flatten": 0.9, "roughness": 0.15,
              "water": True, "waterDepth": 1.3, "smoothing": 3},
         ],
         "biomes": [],
     }
+    if not floodplain:
+        w["features"] = [f for f in w["features"] if f["name"] != "floodplain"]
+    return w
 
 
 class Ground:
@@ -78,6 +94,10 @@ class Ground:
         CACHE.mkdir(parents=True, exist_ok=True)
         f = CACHE / f"heights-{key}.npz"
         self.x0, self.z0, self.step = x0, z0, step
+        # the lattice must be the terrain mesh's own vertices: chunks start at the map's corner, LOD 0 every
+        # chunkSize / resolution metres (scene(): 80 / 40 = 2 m)
+        corner = -0.5 * w["size"][0], -0.5 * w["size"][1]
+        assert ((x0 - corner[0]) / step).is_integer() and ((z0 - corner[1]) / step).is_integer(), "lattice off-grid"
         xs = np.arange(x0, x1 + step, step)
         zs = np.arange(z0, z1 + step, step)
         if f.exists():
@@ -111,8 +131,23 @@ class Ground:
         return (a[iz, ix] * (1 - tx) * (1 - tz) + a[iz, ix + 1] * tx * (1 - tz) + a[iz + 1, ix] * (1 - tx) * tz +
                 a[iz + 1, ix + 1] * tx * tz)
 
+    def _tri(self, a, x, z):
+        """`a` as the terrain's LOD 0 mesh draws it: the same vertices (this lattice is the chunk grid's, 2 m from the
+        map's corner) and the same diagonal (terrain.cpp splits each quad (a, b, c, d) into a-c-b and b-c-d, along
+        the b-c diagonal). Bilinear interpolation is not what is on screen; this is, to float rounding."""
+        fx = (np.asarray(x, float) - self.x0) / self.step
+        fz = (np.asarray(z, float) - self.z0) / self.step
+        ix = np.clip(np.floor(fx).astype(int), 0, a.shape[1] - 2)
+        iz = np.clip(np.floor(fz).astype(int), 0, a.shape[0] - 2)
+        tx, tz = np.clip(fx - ix, 0, 1), np.clip(fz - iz, 0, 1)
+        ha, hb, hc, hd = a[iz, ix], a[iz, ix + 1], a[iz + 1, ix], a[iz + 1, ix + 1]
+        first = ha + (hb - ha) * tx + (hc - ha) * tz
+        second = hd + (hc - hd) * (1 - tx) + (hb - hd) * (1 - tz)
+        return np.where(tx + tz <= 1.0, first, second)
+
     def height(self, x, z):
-        return self._bil(self.h, x, z)
+        """The drawn ground's height (the LOD 0 mesh's triangles)."""
+        return self._tri(self.h, x, z)
 
     def wet(self, x, z):
         """True where the point is under water."""

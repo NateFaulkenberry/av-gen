@@ -60,7 +60,7 @@ struct FieldGpu {
 // are held; anything older or newer reads 0.
 struct FieldAudio {
     ring: vec4<u32>,                    // x = ring offset in gridTable (floats), y = rows, z = bins, w = 1 when audio is bound
-    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none), z = audible rows (kAudioMaxDelayRows)
+    timing: vec4<f32>,                  // x = rows per second, y = newest row (-1 none), z = audible rows (kAudioMaxDelayRows), w = onset decay scale (1 / Release, ADR-1361)
     onsetAge: array<vec4<f32>, 8>,      // source s (low, mid, high, beat): [2s] and [2s + 1] hold its newest 8 onsets' ages (s), < 0 none
     onsetStrength: array<vec4<f32>, 8>,
 };
@@ -106,6 +106,7 @@ const FIELD_COMPOUND: u32 = 23u;
 const FIELD_GRID: u32 = 24u;
 const FIELD_SPECTRUM: u32 = 25u;
 const FIELD_ONSET: u32 = 26u;
+const AUDIO_SMOOTH_MAX_TAPS: i32 = 32; // ADR-1370: spatial::kAudioSmoothMaxTaps
 
 const FIELD_TYPE_SCALAR: u32 = 0u;
 const FIELD_TYPE_VECTOR: u32 = 1u;
@@ -488,11 +489,28 @@ fn audioShape(fi: u32, q: vec3<f32>) -> f32 {
                 let x = (d - age * params0.w) / params1.w;
                 front = exp(-(x * x));
             }
-            sum = sum + fieldBlock.audio.onsetStrength[lane][k % 4u] * exp(-max(params1.z, 0.0) * age) * front;
+            sum = sum + fieldBlock.audio.onsetStrength[lane][k % 4u] * exp(-max(params1.z, 0.0) * fieldBlock.audio.timing.w * age) * front;
         }
         return sum;
     }
     let delay = max(params0.z, 0.0) + travel;
+    // ADR-1370: the mean over a window audioSmooth seconds wide centred on the delay, a tap per history row
+    // (spatial::audioSmoothTaps: ceil(window x row rate), 2..32), exactly as the CPU.
+    let window = fieldBlock.fields[fi].gridRes.y;
+    if (!(window > 0.0)) {
+        return audioSpectrumTap(fi, q, delay, params0, params1);
+    }
+    let taps = i32(clamp(ceil(window * fieldBlock.audio.timing.x - 1e-3), 2.0, f32(AUDIO_SMOOTH_MAX_TAPS)));
+    var sum = 0.0;
+    for (var k = 0; k < taps; k = k + 1) {
+        let u = (f32(k) + 0.5) / f32(taps) - 0.5;
+        sum = sum + audioSpectrumTap(fi, q, delay + window * u, params0, params1);
+    }
+    return sum / f32(taps);
+}
+
+// One read of a Spectrum field's band at `delay` (ADR-1116).
+fn audioSpectrumTap(fi: u32, q: vec3<f32>, delay: f32, params0: vec4<f32>, params1: vec4<f32>) -> f32 {
     let lo = saturate(params0.x);
     let hi = saturate(params0.y);
     let band = u32(params1.x + 0.5);

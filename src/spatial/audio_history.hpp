@@ -21,7 +21,9 @@
 // This header depends on nothing above `spatial`: who fills it (the engine, from an
 // analysis::AnalysisTrack or the live analyzer) is analysis/audio_history_builder.hpp.
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -42,6 +44,14 @@ inline constexpr std::size_t kAudioRingFloats = static_cast<std::size_t>(kAudioR
 // every step must still find all its rows, or a replayed step would hear less than the played one did.
 inline constexpr int kAudioMaxDelayRows = 1125;
 inline constexpr int kOnsetHistory = 8; // newest onsets per source handed to the GPU
+// ADR-1370: a Spectrum field's `audioSmooth` window is read as the mean of evenly spaced taps, one per history row
+// (ceil(window x row rate)), at least 2 and at most this many. Taps a row apart are a true box filter; sparser taps
+// would alias the hop-to-hop jitter instead of removing it.
+inline constexpr int kAudioSmoothMaxTaps = 32;
+[[nodiscard]] inline int audioSmoothTaps(float windowSeconds, double rowRate) {
+    const double n = std::ceil(static_cast<double>(windowSeconds) * rowRate - 1e-3); // 0.3f x 100 is 30.000001
+    return static_cast<int>(std::clamp(n, 2.0, static_cast<double>(kAudioSmoothMaxTaps)));
+}
 
 // Appended only: the integer is packed into FieldGpu and mirrored in shaders/fields.wgsl.
 enum class OnsetSource : std::uint8_t { Low, Mid, High, Beat };
@@ -52,6 +62,24 @@ inline constexpr int kOnsetSources = 4;
 struct AudioOnset {
     double time = 0.0; // history-clock seconds
     float strength = 1.0f;
+};
+
+// ADR-1361: the performer's Response controls (`sonic/response/*`, ADR-1062) as every reader of the history hears
+// them -- spectrum and onset fields, the GPU ring, THE ASTRAL FORGE's conductors. The same chain as the response
+// model's (sonic/response.cpp): a hit below the floor the hit sensitivity sets is not heard and the rest are curved;
+// a level is curved by the level sensitivity and fades out over its first tenth. The identity at the neutral
+// controls, exactly: a project that never moves the sliders reads the history it always read.
+struct AudioResponse {
+    float hitSensitivity = 0.5f;   // sonic::hitSensitivity(controls): Sensitivity + Transients - 0.5
+    float levelSensitivity = 0.5f; // sonic::levelSensitivity(controls): Sensitivity + Sustain - 0.5
+    float attack = 1.0f;           // multiplies every attack time (an envelope a reader builds from the history)
+    float release = 1.0f;          // multiplies every release and decay time (an onset field's decay too)
+    [[nodiscard]] bool operator==(const AudioResponse&) const = default;
+    [[nodiscard]] bool neutral() const;
+    // An onset's strength as heard: 0 when it is below the floor (the onset is not heard at all).
+    [[nodiscard]] float hit(float strength) const;
+    // A [0, 1] level (a spectrogram bin) as heard.
+    [[nodiscard]] float level(float value) const;
 };
 
 class AudioHistory {
@@ -70,6 +98,12 @@ public:
     void appendLive(double time, std::span<const float> row);
     void addLiveOnset(OnsetSource source, double time, float strength);
 
+    // ADR-1361: how the history is heard. `value` and `lastOnsets` answer through it; `onsets` stays the raw
+    // record (a reader of the list applies `response().hit`). A change bumps the revision, so a GPU ring
+    // refills with the newly heard rows.
+    void setResponse(const AudioResponse& response);
+    [[nodiscard]] const AudioResponse& response() const { return response_; }
+
     [[nodiscard]] bool live() const { return live_; }
     [[nodiscard]] double rowRate() const { return rowRate_; }
     // The history's clock at transport second `renderTime`: the transport second itself offline, the
@@ -77,10 +111,10 @@ public:
     [[nodiscard]] double now(double renderTime) const { return live_ ? liveNow_ : renderTime; }
     // The newest row at clock `clock`, or -1 when there is none yet.
     [[nodiscard]] std::int64_t newestRow(double clock) const;
-    // Bin `bin` of row `row`, 0 when the row is not held.
+    // Bin `bin` of row `row` as heard (ADR-1361), 0 when the row is not held.
     [[nodiscard]] float value(std::int64_t row, int bin) const;
-    // The newest <= ages.size() onsets of `source` at or before `clock`, newest first: ages in seconds
-    // (clock - time) and strengths. Returns how many were written.
+    // The newest <= ages.size() onsets of `source` at or before `clock` that are heard (ADR-1361), newest
+    // first: ages in seconds (clock - time) and strengths as heard. Returns how many were written.
     int lastOnsets(OnsetSource source, double clock, std::span<float> ages, std::span<float> strengths) const;
     [[nodiscard]] const std::vector<AudioOnset>& onsets(OnsetSource source) const {
         return onsets_[static_cast<std::size_t>(source)];
@@ -102,8 +136,12 @@ private:
     std::int64_t firstHeld_ = 0;    // absolute index of rows_[0]
     double liveNow_ = 0.0;
     std::array<std::vector<AudioOnset>, kOnsetSources> onsets_{};
+    AudioResponse response_{};
     std::uint64_t revision_ = 1;
 };
+
+// ADR-1361: what an onset field's decay rate is multiplied by: 1 / Release (the GPU's `audio.timing.w`).
+[[nodiscard]] float onsetDecayScale(const AudioResponse& response);
 
 // ---- the sampling maths the GPU mirrors (shaders/fields.wgsl `audio*`) -----------------------------
 

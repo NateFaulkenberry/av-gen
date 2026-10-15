@@ -84,3 +84,8 @@ Branch `proto/bioluminescent`, worktree `../av-gen-biolum`, from main f56eaab0.
 11. A project may raise its scene's volumetric noise but never zero it
     (`test_volumetric_noise_authoring.cpp`: a zero override is how a saved session's accident looks). So the scene
     asks for clear air, which is what live runs, and `rift.json` raises it to 0.6 offline.
+12. Everything placed must stand on the ground the renderer DRAWS, inside the map the terrain covers. The map used
+    to stop at z = +-1200 while the flight started at -1300 (the opening looked at the ground's cut edge), and the
+    terrain's 4/8/16 m LOD rungs moved the drawn ground up to 6-10 m off the placements. `build.py` now seats every
+    kind on the LOD 0 mesh and stops on a violation; the camera's corridor clears the trunks by 2.5 m
+    (grounding-pass-2026-10.md).

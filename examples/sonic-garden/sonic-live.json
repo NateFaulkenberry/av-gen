@@ -108,7 +108,11 @@
     }
    }
   },
-  "live": true
+  "live": true,
+  "response": {
+   "floorDb": -44.0,
+   "rangeDb": 42.0
+  }
  },
  "parameters": {
   "post/bloom/enabled": true,
@@ -140,6 +144,48 @@
   "camera/focus/mode": 2
  },
  "sources": [
+  {
+   "kind": "interpret",
+   "name": "heard",
+   "settings": {
+    "mappings": [
+     {
+      "name": "loud",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 0.89
+     },
+     {
+      "name": "loudSlow",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "response.levelSlow",
+        "weight": 1.0
+       }
+      ],
+      "gain": 0.94
+     },
+     {
+      "name": "strike",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "response.onset",
+        "weight": 1.0
+       }
+      ],
+      "bias": -3.0,
+      "gain": 4.0
+     }
+    ]
+   }
+  },
   {
    "kind": "interpret",
    "name": "garden",
@@ -222,7 +268,7 @@
       "combine": "mean",
       "inputs": [
        {
-        "signal": "sonic.energy.slow",
+        "signal": "visual.loudSlow",
         "weight": 1.0,
         "invert": true
        }
@@ -237,7 +283,7 @@
       "combine": "product",
       "inputs": [
        {
-        "signal": "sonic.energy.slow",
+        "signal": "visual.loudSlow",
         "weight": 0.5
        },
        {
@@ -267,7 +313,7 @@
         "weight": 1.0
        },
        {
-        "signal": "sonic.energy",
+        "signal": "visual.loud",
         "weight": 1.0
        }
       ]
@@ -294,7 +340,7 @@
         "weight": 1.0
        },
        {
-        "signal": "sonic.energy",
+        "signal": "visual.loud",
         "weight": 0.5
        }
       ]
@@ -357,7 +403,7 @@
       "combine": "mean",
       "inputs": [
        {
-        "signal": "sonic.energy",
+        "signal": "visual.loud",
         "weight": 1.0
        }
       ]
@@ -497,7 +543,7 @@
         "weight": 1.0
        },
        {
-        "signal": "sonic.energy",
+        "signal": "visual.loud",
         "weight": 0.4
        },
        {
@@ -3900,7 +3946,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "particles/spores/burst",
    "amount": 6.0,
    "op": "add",
@@ -3912,7 +3958,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/prisms/material/emissive",
    "amount": 1.4,
    "op": "add",
@@ -3924,7 +3970,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/spires/material/emissive",
    "amount": 1.6,
    "op": "add",
@@ -3936,7 +3982,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/cluster/material/emissive",
    "amount": 1.2,
    "op": "add",
@@ -3948,7 +3994,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/halos/material/emissive",
    "amount": 5.0,
    "op": "add",
@@ -3960,7 +4006,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/meridians/material/emissive",
    "amount": 5.0,
    "op": "add",
@@ -3972,7 +4018,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/facets/material/emissive",
    "amount": 1.2,
    "op": "add",
@@ -3984,7 +4030,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "particles/glints/burst",
    "amount": 25.0,
    "op": "add",
@@ -3996,7 +4042,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/shards/material/emissive",
    "amount": 0.25,
    "op": "add",
@@ -4008,7 +4054,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/hero/source/scale",
    "amount": 1.0,
    "op": "multiply",
@@ -4022,7 +4068,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/hero/material/emissive",
    "amount": 0.5,
    "op": "add",
@@ -4178,7 +4224,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "procedural/shards/transform/scale",
    "amount": 0.35,
    "op": "add",
@@ -4192,7 +4238,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "procedural/shards/material/emissive",
    "amount": 1.6,
    "op": "add",
@@ -4204,7 +4250,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "particles/sparks/burst",
    "amount": 90.0,
    "op": "add",
@@ -4216,7 +4262,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "procedural/hero/material/emissive",
    "amount": 1.0,
    "op": "add",
@@ -4228,7 +4274,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "procedural/shock/transform/scale",
    "amount": 1.0,
    "op": "multiply",
@@ -4244,7 +4290,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "procedural/shock/material/emissive",
    "amount": 6.0,
    "op": "add",
@@ -4280,7 +4326,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "lights/top/intensity",
    "amount": 270.0,
    "op": "add",
@@ -4586,7 +4632,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "lights/heart/intensity",
    "amount": 6.0,
    "op": "add",
@@ -4598,7 +4644,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "particles/spores/burst",
    "amount": 30.0,
    "op": "add",
@@ -4610,7 +4656,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "particles/glints/burst",
    "amount": 40.0,
    "op": "add",
@@ -4832,7 +4878,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "lights/heart/intensity",
    "amount": 2.5,
    "op": "add",
@@ -4844,7 +4890,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "lights/heart/intensity",
    "amount": 5.0,
    "op": "add",
@@ -4856,7 +4902,7 @@
    }
   },
   {
-   "source": "sonic.transient",
+   "source": "visual.strike",
    "target": "lights/heart/intensity",
    "amount": 20.0,
    "op": "add",
@@ -5415,7 +5461,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/seed/material/emissive",
    "amount": 0.8,
    "op": "add",
@@ -5427,7 +5473,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/stalks/material/emissive",
    "amount": 1.6,
    "op": "add",
@@ -5439,7 +5485,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/gills/material/emissive",
    "amount": 1.4,
    "op": "add",
@@ -5451,7 +5497,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/caps/material/emissive",
    "amount": 0.8,
    "op": "add",
@@ -5463,7 +5509,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/petals/material/emissive",
    "amount": 0.7,
    "op": "add",
@@ -5595,7 +5641,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/petals/deform/1/amount",
    "amount": -0.08,
    "op": "add",
@@ -5607,7 +5653,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/outerpetals/deform/1/amount",
    "amount": -0.07,
    "op": "add",
@@ -5619,7 +5665,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/outerpetals/source/scale",
    "amount": 1.0,
    "op": "multiply",
@@ -5633,7 +5679,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "particles/spores/burst",
    "amount": 10.0,
    "op": "add",
@@ -5645,7 +5691,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/halos/transform/rotation",
    "amount": 9.0,
    "op": "add",
@@ -5658,7 +5704,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "procedural/meridians/transform/rotation",
    "amount": -8.0,
    "op": "add",
@@ -5671,7 +5717,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "lights/heart/intensity",
    "amount": 3.5,
    "op": "add",
@@ -5700,7 +5746,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "lights/note/intensity",
    "amount": 6.0,
    "op": "add",
@@ -5712,7 +5758,7 @@
    }
   },
   {
-   "source": "notes.noteOn",
+   "source": "response.note",
    "target": "lights/note/intensity",
    "amount": 8.0,
    "op": "add",

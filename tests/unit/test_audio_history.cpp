@@ -183,6 +183,62 @@ TEST_CASE("Audio fields sample the history at their delay, band and distance on 
     CHECK(spatial::sampleScalar(o, glm::vec3(3.0f), 2.5, &set) == Approx(1.75f));
 }
 
+TEST_CASE("A spectrum field's audioSmooth reads the mean of its band over a window round its delay (ADR-1370)",
+          "[unit][audio-fields]") {
+    spatial::FieldSet set;
+    // Rows alternate 0 and 1 (every bin): the hop-to-hop jitter the window exists to remove.
+    constexpr int kRows = 3000;
+    std::vector<float> data(static_cast<std::size_t>(kRows) * spatial::kAudioBins);
+    for (int r = 0; r < kRows; ++r) {
+        for (int b = 0; b < spatial::kAudioBins; ++b) {
+            data[static_cast<std::size_t>(r) * spatial::kAudioBins + static_cast<std::size_t>(b)] =
+                static_cast<float>(r % 2);
+        }
+    }
+    set.audio = std::make_shared<const spatial::AudioHistory>(spatial::AudioHistory::whole(
+        100.0, 0.0, std::move(data), std::array<std::vector<spatial::AudioOnset>, spatial::kOnsetSources>{}));
+    spatial::FieldSpec f;
+    f.name = "tide";
+    f.kind = spatial::FieldKind::Spectrum;
+    f.audioBand = spatial::AudioBand::Range;
+    f.bandLow = 0.0f;
+    f.bandHigh = 0.2f;
+    f.audioSpeed = 26.0f;
+    f.waveGeometry = spatial::WaveGeometry::Spherical;
+    f.falloff.kind = spatial::FalloffKind::None;
+    set.fields.push_back(f);
+    // Unsmoothed, neighbouring points 0.26 m apart (one row at 26 m/s, 100 rows/s) read 0 and 1.
+    const float a = spatial::sampleScalar(f, glm::vec3(26.0f, 0.0f, 0.0f), 20.0, &set);
+    const float b = spatial::sampleScalar(f, glm::vec3(26.26f, 0.0f, 0.0f), 20.0, &set);
+    CHECK(std::abs(a - b) == Approx(1.0f).margin(1e-3));
+    // Smoothed over 0.3 s: the mean of 30 taps a row apart (one per row at 100 rows/s) -- 0.5 wherever it is read.
+    f.audioSmooth = 0.3f;
+    REQUIRE(f.validate().has_value());
+    set.fields[0] = f;
+    for (const float x : {26.0f, 26.13f, 26.26f, 40.0f}) {
+        CHECK(spatial::sampleScalar(f, glm::vec3(x, 0.0f, 0.0f), 20.0, &set) == Approx(0.5f).margin(0.07f));
+    }
+    // Written, hashed and registered only when set; validated.
+    CHECK(f.toJson().at("audioSmooth") == Approx(0.3f));
+    auto back = spatial::FieldSpec::fromJson(f.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->audioSmooth == Approx(0.3f));
+    spatial::FieldSpec plain = f;
+    plain.audioSmooth = 0.0f;
+    CHECK_FALSE(plain.toJson().contains("audioSmooth"));
+    CHECK(plain.structuralHash() != f.structuralHash());
+    // The taps follow the rows: one per row, at least 2, at most kAudioSmoothMaxTaps.
+    CHECK(spatial::audioSmoothTaps(0.3f, 100.0) == 30);
+    CHECK(spatial::audioSmoothTaps(0.001f, 100.0) == 2);
+    CHECK(spatial::audioSmoothTaps(5.0f, 100.0) == spatial::kAudioSmoothMaxTaps);
+    params::ParameterSet params;
+    scene::registerFieldParameters(params, f, "field/tide/");
+    CHECK(params.find("field/tide/audioSmooth") != nullptr);
+    spatial::FieldSpec bad = f;
+    bad.audioSmooth = -1.0f;
+    CHECK_FALSE(bad.validate().has_value());
+}
+
 TEST_CASE("Audio field parameters round-trip through JSON and register only for audio kinds", "[unit][audio-fields]") {
     spatial::FieldSpec f;
     f.name = "rings";

@@ -33,6 +33,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import cp1  # noqa: E402  (placement helpers: candidates, records, value_noise, basis, quat_from_matrix)
+import grounding  # noqa: E402  (seating on the drawn ground; the camera's corridor)
 import land  # noqa: E402
 import organisms  # noqa: E402
 
@@ -77,10 +78,18 @@ def op(kind, dst, **kw):
 
 
 # ============================================================================================ placement
-def place(g):
-    """The ecosystem along the whole reach (cp1.place's rules, over REGION)."""
+def place(g, L=None):
+    """The ecosystem along the whole reach (cp1.place's rules, over REGION).
+
+    `L` is the LAYOUT ground: the world as it was before the floodplain (land.world(floodplain=False)). Where things
+    grow -- the slope and wetness masks that shape the meadows' drifts -- is read from it, so the approved pattern is
+    kept; how high they stand is read from `g`, the ground that is drawn. The floodplain flattened the floor by the
+    river, and reading the masks from it tripled the sea pens (25,640 -> 83,578) and doubled the whips and lanterns.
+    A wall organism must still be on a wall: its slope mask holds on both grounds."""
+    L = L or g
     R = REGION
     P = {}
+    dry = lambda X, Z: ~(g.wet(X, Z) | L.wet(X, Z))  # noqa: E731
     dxc = lambda X, Z: X - np.array([land.centre_x(z) for z in Z])  # noqa: E731
     dxr = lambda X, Z: X - np.array([land.river_x(z) for z in Z])  # noqa: E731
 
@@ -99,53 +108,68 @@ def place(g):
         Z.append(z + r.uniform(-8, 8))
         S.append(r.uniform(0.45, 0.9))
     X, Z, S = np.array(X), np.array(Z), np.array(S)
-    P["crinoid"] = cp1.records(g, X, Z, S, 0.0, 102, facing=lambda x, z: np.array([land.river_x(z) - x, 0, 0.01]),
-                               sink=0.3)
+    crinoids = lambda X, Z: cp1.records(g, X, Z, S, 0.0, 102, sink=SINK["crinoid"],  # noqa: E731
+                                        facing=lambda x, z: np.array([land.river_x(z) - x, 0, 0.01]))
+    P["crinoid"] = crinoids(X, Z)
+    # the camera never passes through a trunk: a stalk inside the eye's corridor steps out sideways until it clears
+    # by CAMERA_MARGIN (grounding.py), and is placed again from there (its height and its lean toward the river)
+    start = np.asarray(P["crinoid"])[:, [0, 2]]
+    for _ in range(4):
+        moved, _far = grounding.clear_corridor(FLIGHT, EYE_HULL, P, CAMERA_MARGIN)
+        if not moved:
+            break
+        a = np.asarray(P["crinoid"])
+        P["crinoid"] = crinoids(a[:, 0], a[:, 2])
+    shift = np.linalg.norm(np.asarray(P["crinoid"])[:, [0, 2]] - start, axis=1)
+    GROUNDING["corridor/crinoid"] = {"moved": int((shift > 0).sum()), "maxShift": float(shift.max())}
 
     # sea-pen meadows on the floor and lower slopes, in drifts
     X, Z = cp1.candidates(g, 1.8, 201, R)
-    sl = g.slope(X, Z)
+    sl = L.slope(X, Z)
     cl = cp1.value_noise(X, Z, 22.0, 7) * 0.7 + cp1.value_noise(X, Z, 7.0, 8) * 0.3
-    keep = (sl < 0.45) & (~g.wet(X, Z)) & (np.abs(dxc(X, Z)) < 60) & (cl > 0.42)
+    keep = (sl < 0.45) & dry(X, Z) & (np.abs(dxc(X, Z)) < 60) & (cl > 0.42)
     X, Z = X[keep], Z[keep]
-    P["seapen"] = cp1.records(g, X, Z, np.random.default_rng(202).uniform(0.6, 1.5, len(X)), 0.3, 203, sink=0.02)
+    P["seapen"] = cp1.records(g, X, Z, np.random.default_rng(202).uniform(0.6, 1.5, len(X)), 0.3, 203,
+                               sink=SINK["seapen"])
 
     # polyp mats on gentle ground (the walls belong to the crust)
     X, Z = cp1.candidates(g, 0.45, 301, R)
-    sl = g.slope(X, Z)
+    sl = L.slope(X, Z)
     d = np.abs(dxc(X, Z))
     p = np.clip(1.3 - d / 160.0, 0, 1) * (cp1.value_noise(X, Z, 15.0, 9) * 0.6 + 0.5)
-    keep = (sl < 1.1) & (~g.wet(X, Z)) & (np.random.default_rng(302).random(len(X)) < p)
+    keep = (sl < 1.1) & dry(X, Z) & (np.random.default_rng(302).random(len(X)) < p)
     X, Z = X[keep], Z[keep]
-    P["mat"] = cp1.records(g, X, Z, np.random.default_rng(303).uniform(0.7, 1.8, len(X)), 0.85, 304, sink=0.03)
+    P["mat"] = cp1.records(g, X, Z, np.random.default_rng(303).uniform(0.7, 1.8, len(X)), 0.85, 304,
+                            sink=SINK["mat"])
 
     # sea fans on the walls, face-on to the canyon's axis; fewer than CP2 (their violet must not own the walls)
     X, Z = cp1.candidates(g, 0.032, 401, R)
-    sl = g.slope(X, Z)
+    sl = np.minimum(L.slope(X, Z), g.slope(X, Z))
     d = np.abs(dxc(X, Z))
-    keep = (sl > 0.35) & (sl < 3.0) & (d > 16) & (d < 120) & (cp1.value_noise(X, Z, 30.0, 10) > 0.38)
+    keep = (sl > 0.35) & (np.maximum(L.slope(X, Z), g.slope(X, Z)) < 3.0) & (d > 16) & (d < 120) &\
+        (cp1.value_noise(X, Z, 30.0, 10) > 0.38)
     X, Z = X[keep], Z[keep]
     P["fan"] = cp1.records(g, X, Z, np.random.default_rng(402).uniform(0.6, 1.9, len(X)), 0.35, 403,
-                           facing=cp1.toward_centre, sink=0.05)
+                           facing=cp1.toward_centre, sink=SINK["fan"])
 
     # whip tufts along the banks
     X, Z = cp1.candidates(g, 0.15, 501, R)
     dr = np.abs(dxr(X, Z))
-    keep = (dr > 7) & (dr < 26) & (~g.wet(X, Z)) & (g.slope(X, Z) < 0.8) & \
+    keep = (dr > 7) & (dr < 26) & dry(X, Z) & (L.slope(X, Z) < 0.8) & \
         (cp1.value_noise(X, Z, 12.0, 11) > 0.35)
     X, Z = X[keep], Z[keep]
     P["whips"] = cp1.records(g, X, Z, np.random.default_rng(502).uniform(0.7, 1.4, len(X)), 0.2, 503)
 
     # lanterns: rare clusters in hollows
     X, Z = cp1.candidates(g, 0.09, 601, R)
-    keep = (~g.wet(X, Z)) & (g.slope(X, Z) < 1.0) & (np.abs(dxc(X, Z)) < 70) & \
+    keep = dry(X, Z) & (L.slope(X, Z) < 1.0) & (np.abs(dxc(X, Z)) < 70) & \
         (cp1.value_noise(X, Z, 9.0, 12) > 0.64)
     X, Z = X[keep], Z[keep]
     P["lanterns"] = cp1.records(g, X, Z, np.random.default_rng(602).uniform(0.8, 1.6, len(X)), 0.5, 603)
 
     # wall crust patches (emitters only): steep rock, clumped along ledges
     X, Z = cp1.candidates(g, 0.09, 801, R)
-    sl = g.slope(X, Z)
+    sl = np.minimum(L.slope(X, Z), g.slope(X, Z))
     d = np.abs(dxc(X, Z))
     cl = cp1.value_noise(X, Z, 18.0, 13) * 0.6 + cp1.value_noise(X, Z, 5.0, 14) * 0.4
     keep = (sl > 0.6) & (d > 15) & (d < 150) & (cl > 0.45)
@@ -154,7 +178,7 @@ def place(g):
 
     # embers: deep in the wall's gullies (the rarest accent)
     X, Z = cp1.candidates(g, 0.004, 851, R)
-    sl = g.slope(X, Z)
+    sl = np.minimum(L.slope(X, Z), g.slope(X, Z))
     keep = (sl > 0.8) & (cp1.value_noise(X, Z, 6.0, 15) > 0.7)
     X, Z = X[keep], Z[keep]
     P["ember"] = cp1.records(g, X, Z, np.random.default_rng(852).uniform(0.6, 1.2, len(X)), 0.95, 853)
@@ -187,7 +211,41 @@ def place(g):
         s = r.uniform(0.6, 1.6)
         out.append([round(x, 3), round(y, 3), round(z, 3), *[round(v, 5) for v in q], s, s, s])
     P["comb"] = out
+    seat(g, P)
     return P
+
+
+# ============================================================================================ grounding (2026-10)
+# docs/prototypes/bioluminescent/grounding-pass-2026-10.md. How deep each kind's base is meant to go (x its scale): a
+# trunk's holdfast is set into the rock, a cushion settles a little; the rest stand on the surface.
+SINK = {"crinoid": 0.3, "seapen": 0.02, "mat": 0.03, "fan": 0.05, "whips": 0.0, "lanterns": 0.0, "crust": 0.0,
+        "ember": 0.0}
+CAMERA_MARGIN = 2.5      # metres between the eye's corridor and a trunk's surface
+BODY_MARGIN = 1.0        # ... and the bulk of a fan, whip tuft or lantern cluster
+GROUNDING = {}           # filled by seat(): the check's numbers, printed and kept for the report
+
+
+def seat(g, P):
+    """Seat every grounded kind on the drawn surface (grounding.fit), keep the bodies out of the camera's corridor,
+    then check the result -- a failure stops the build, so a regression cannot ship a floating world."""
+    for kind in grounding.CONTACT:
+        P[kind], shrunk, dropped = grounding.fit(g, kind, P[kind], SINK[kind])
+        GROUNDING[f"fit/{kind}"] = {"shrunk": shrunk, "dropped": dropped}
+    for kind in grounding.BODY_SPHERES:
+        before = len(P[kind])
+        P[kind] = grounding.outside_corridor(FLIGHT, EYE_HULL, P, kind, BODY_MARGIN)
+        GROUNDING[f"corridor/{kind}"] = {"removed": before - len(P[kind])}
+    report = grounding.check(g, P, SINK)
+    free = grounding.check_free(g, P)
+    GROUNDING.update(report)
+    GROUNDING.update(free)
+    GROUNDING["river"] = grounding.check_river(g)
+    GROUNDING["camera"] = grounding.camera_clearance(FLIGHT, EYE_HULL, P, g)
+    grounding.assert_grounded(report, free)
+    grounding.assert_river(GROUNDING["river"])
+    cam = GROUNDING["camera"]
+    if cam["crinoid"] < CAMERA_MARGIN - 0.05 or min(cam[k] for k in grounding.BODY_SPHERES) < BODY_MARGIN - 0.05:
+        raise SystemExit(f"camera clearance check failed: {cam}")
 
 
 def chunks(lst, n=60000):
@@ -400,7 +458,9 @@ def crown_lights(P):
 def scene(P):
     nodes = list(fields())
     nodes.append({"name": "land", "kind": "terrain", "position": [0, 0, 0], "world": land.world(),
-                  "terrain": {"chunkSize": 80.0, "resolution": 40, "lodLevels": 4, "lodDistance": 70.0,
+                  # one level: the drawn ground is the 2 m mesh the organisms are seated on, everywhere
+                  # (grounding-pass-2026-10.md: the 4/8/16 m rungs moved it up to 6-10 m off them)
+                  "terrain": {"chunkSize": 80.0, "resolution": 40, "lodLevels": 1, "lodDistance": 70.0,
                               "viewDistance": 1000.0, "shadowDistance": 150.0, "skirtDepth": 2.0,
                               "groundMottle": False,
                               "water": {"shallowColor": [0.004, 0.008, 0.014], "deepColor": [0.001, 0.003, 0.008],
@@ -408,6 +468,8 @@ def scene(P):
                                         "fresnel": 0.3, "foam": 0.0, "ripple": 0.45}},
                   "material": {"program": "rock", "baseColor": [0.022, 0.026, 0.036], "roughness": 0.8,
                                "metallic": 0.0}})
+    grounding.assert_terrain_full_resolution(nodes[-1]["terrain"])
+    grounding.assert_world_covers(nodes[-1]["world"], nodes[-1]["terrain"], REGION, flight_points())
     body = bodies(P)
     nodes += body
     pts = flight_points()
@@ -470,6 +532,11 @@ CAM = {
     "reveal":  (70.0, -10.0, 120.0, 58.0, 4.0), # high: the canyon's length
     "after":   (9.0, 4.0, 50.0, 40.0, 2.0),     # the aftermath: slow, pulling up
 }
+
+# The eye's corridor (grounding.py): every offset the stages can blend between, grown by the LFO drift (routes():
+# driftA +-2 m lateral, driftC +-1 m up), swept along the flight.
+EYE_HULL = grounding.eye_hull(CAM, drift=(2.0, 1.0))
+FLIGHT = None  # set in main(), after flight_points() is defined
 
 # Per state: camera behaviour, pace (m/s), ignition gain, wave speed (m/s), rock glow, haze glow,
 # spores (per s), swarm (per s), transition (s, easing), medium threshold, kick-front decay (1/s), kick-front speed.
@@ -601,7 +668,51 @@ def macros():
             for n in names]
 
 
-def routes(length):
+# ============================================================================================ the response (ADR-1361)
+# LIVE ONLY. The performer's Response controls (the Live panel: Sensitivity, Transients, Sustain, Attack, Release =
+# `sonic/response/*`, ADR-1062) reach THE RIFT LIVE twice:
+#   the routes  the snare is the response model's (Transients decides how many fire and how hard); an auto-gained
+#               band or the analyser's energy keeps its shape (what the music is doing) and is multiplied by the
+#               response level it is heard at (fixed dB, never auto-gained), so a quiet input wakes the canyon less
+#               and Sensitivity lifts it. The arc's two listeners (macro.energy, macro.bassSlow), and so the stage
+#               machine, hear the same.
+#   the fields  the kick front (an onset field) and the highs (a spectrum field) read the audio history, which the
+#               engine hears through the same controls (AudioHistory::setResponse): a kick under the hit floor
+#               launches no front, the highs are curved by the level sensitivity, Release lengthens the front's
+#               decay.
+# Each gain is 1 / the response level's mean on Trench at the neutral controls, so the neutral picture is the old one
+# (docs/development/live-response-everywhere.md). The level range is the Sonic Abstract scenes' (-44..-2 dB). The
+# offline project keeps its audio.* routes.
+RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}
+LIVE_SOURCES = {"audio.energy": "visual.hEnergy", "audio.bass": "visual.hBass", "audio.trebleLevel": "visual.hTreble",
+                "audio.mid": "visual.hMid", "audio.onsetMid": "response.snare"}
+LIVE_HIT_SCALE = {"audio.onsetMid": 0.78}   # a response snare's mean strength is 0.95 to the onset's 0.745
+
+
+def heard(name, band, level, gain):
+    """An auto-gained band (its shape) times the response level it is heard at."""
+    return {"name": name, "combine": "product", "inputs": [{"signal": band, "weight": 1.0},
+                                                          {"signal": level, "weight": 1.0}], "gain": gain}
+
+
+LIVE_HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
+    heard("hEnergy", "audio.energy", "response.level", 1.2),
+    heard("hBass", "audio.bass", "response.bass", 1.22),
+    heard("hTreble", "audio.trebleLevel", "response.level", 1.19),
+    heard("hMid", "audio.mid", "response.level", 1.19),
+]}}
+
+
+def respond(route):
+    src = route["source"]
+    if route.get("amount", 0.0) == 0.0 or src not in LIVE_SOURCES:
+        return route  # the zero defaults, and everything that does not listen
+    route["source"] = LIVE_SOURCES[src]
+    route["amount"] = round(route["amount"] * LIVE_HIT_SCALE.get(src, 1.0), 5)
+    return route
+
+
+def routes(length, live=False):
     r = list(ZERO_DEFAULTS)
     sens = {"depthSource": "macro.sensitivity", "depthMin": 0.0, "depthMax": 4.0}
     # the arc's two slow listeners
@@ -637,7 +748,7 @@ def routes(length):
     for src, comp, amt in (("driftA", 0, 2.0), ("driftC", 1, 1.0)):
         r.append({"source": f"lfo.{src}.bipolar", "target": "camera/splineOffset", "op": "add", "amount": amt,
                   "component": comp, "depthSource": "macro.energy", "depthMin": 0.4, "depthMax": 1.0})
-    return r
+    return [respond(x) for x in r] if live else r
 
 
 POST = {
@@ -672,7 +783,7 @@ def project(name, audio, length, live=False):
         "parameters": dict(POST),
         "sources": [{"kind": "lfo", "name": n, "settings": {"shape": "sine"}} for n in ("driftA", "driftC")],
         "sonic": {},
-        "routes": routes(length),
+        "routes": routes(length, live),
         "worldMacros": macros(),
         "presets": [preset(n, length) for n in STAGES],
         "states": states(),
@@ -686,7 +797,8 @@ def project(name, audio, length, live=False):
         # Live: the same world, cheaper medium. The march costs ~1 ms per step at 1080p (03-architecture.md §6);
         # 16 steps halve it. LIVE AUTO's render scale takes the pixel-bound rest. Offline keeps 32.
         p["parameters"].update(LIVE_PARAMETERS)
-        p["sonic"] = {"live": True}
+        p["sonic"] = {"live": True, "response": dict(RESPONSE)}
+        p["sources"].append(LIVE_HEARD)
         bindings = [
             {"source": "*", "channel": -1, "kind": "cc", "number": 1, "parameter": "macros/sensitivity",
              "component": 0, "min": 0.0, "max": 1.0},
@@ -744,10 +856,15 @@ def main():
     if not scene_only:
         organisms.build_all()
     print("ground...")
+    global FLIGHT
+    FLIGHT = grounding.Flight(flight_points())
     g = land.Ground(land.world(), *REGION, step=2.0)
-    P = place(g)
+    P = place(g, land.Ground(land.world(floodplain=False), *REGION, step=2.0))
     for k, v in P.items():
         print(f"  {k}: {len(v)}")
+    print("grounding (metres, along the surface normal; + = off the ground):")
+    for k, v in GROUNDING.items():
+        print(f"  {k}: " + ", ".join(f"{a} {b:.3f}" if isinstance(b, float) else f"{a} {b}" for a, b in v.items()))
     sc, length = scene(P)
     # written beside and renamed into place, so a reader never sees a half-written world
     tmp = HERE / f"rift.scene.json.{os.getpid()}.tmp"

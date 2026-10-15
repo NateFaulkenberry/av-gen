@@ -492,6 +492,7 @@ class Scene:
         self.response = None
         self.regions = []         # the evaluator's screen-space regions (sonicScene.regions), see region()
         self.control = None       # the project's control map (MIDI CC / OSC bindings), see modwheel()
+        self.sources = []         # further signal sources (lfo, envelope, noise, timeline), listed after the interpret ones
 
     # ---------------------------------------------------------------- world
     def proc(self, name, source, distribution=None, material=None, deformers=None, variation=None,
@@ -933,6 +934,7 @@ class Scene:
             sources.append({"kind": "interpret", "name": "scene2", "settings": {"mappings": self.mappings2}})
         if self.mappings3:
             sources.append({"kind": "interpret", "name": "scene3", "settings": {"mappings": self.mappings3}})
+        sources.extend(self.sources)
         params = dict(BASE_PARAMS)
         params.update(self.params)
         doc = {"format": "avgen-project", "version": 4, "app": {"name": "Sonic VFX"},
@@ -1005,6 +1007,25 @@ BASE_PARAMS = {
     "temporal/echo/enabled": False,
     "temporal/mosh/enabled": False,
 }
+
+
+def upsert_index_entry(entry):
+    """One scene's own Examples-menu entry (examples/index.json), replaced in place by name, or added after the last
+    entry of its category. For a scene that writes its entry itself (its description names its MIDI map)."""
+    path = os.path.join(REPO, "examples", "index.json")
+    with open(path) as f:
+        idx = json.load(f)
+    ex = idx["examples"]
+    for i, e in enumerate(ex):
+        if e.get("name") == entry["name"]:
+            ex[i] = entry
+            break
+    else:
+        last = max((i for i, e in enumerate(ex) if e.get("category") == entry["category"]), default=len(ex) - 1)
+        ex.insert(last + 1, entry)
+    with open(path, "w") as f:
+        json.dump(idx, f, indent=2)
+        f.write("\n")
 
 
 def write_index(scenes, category="Sonic VFX", out_dir=OUT_DIR, prefix=None, doc="SCENE-CATALOG.md"):

@@ -4,6 +4,7 @@
 #include "analysis/analysis_track.hpp"
 #include "analysis/structure.hpp"
 #include "audio/audio_file.hpp"
+#include "spatial/audio_history.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -144,16 +145,38 @@ SongAnalysis buildSong(const avgen::analysis::AnalysisTrack& track, double durat
             for (int k2 = 0; k2 < B; ++k2) s.spec[static_cast<std::size_t>(h) * B + k2] *= g;
         }
     }
+    s.env1.resize(s.hops);
+    foldSongEnvelopes(s, 1.0f, 1.0f);
+    float rmsPeak = 1e-4f;
+    for (const auto& f : frames) rmsPeak = std::max(rmsPeak, f.rms);
+    for (int h = 0; h < s.hops; ++h) {
+        s.env1[h] = glm::vec4(s.env1[h].x, frames[h].energy, frames[h].beatPhase, frames[h].rms / rmsPeak);
+        if (frames[h].lowOnset) { s.kickT.push_back(static_cast<float>(frames[h].timeSeconds)); s.kickS.push_back(std::max(0.25f, frames[h].lowOnsetStrength)); }
+        if (frames[h].midOnset) { s.snareT.push_back(static_cast<float>(frames[h].timeSeconds)); s.snareS.push_back(std::max(0.25f, frames[h].midOnsetStrength)); }
+        if (frames[h].highOnset) { s.hatT.push_back(static_cast<float>(frames[h].timeSeconds)); s.hatS.push_back(std::max(0.25f, frames[h].highOnsetStrength)); }
+    }
+    if (auto st = avgen::analysis::detectStructure(track)) {
+        for (const auto& sec : st->sections)
+            s.sections.push_back(Section{sec.startSeconds, sec.endSeconds, sec.repetitionGroup, sec.energy, sec.density,
+                                         avgen::analysis::sectionFunctionName(sec.function)});
+        s.novelty = st->novelty;
+        if (!st->beatTimes.empty()) s.beats = st->beatTimes;
+    } else {
+        std::fprintf(stderr, "structure: %s\n", st.error().message.c_str());
+    }
+    return s;
+}
+
+void foldSongEnvelopes(SongAnalysis& s, float attackScale, float releaseScale) {
+    constexpr int B = SongAnalysis::kBins;
     auto binOf = [&](float hz) { return std::clamp(static_cast<int>(std::log(hz / 32.0f) / std::log(16000.0f / 32.0f) * B), 0, B); };
     const int cuts[6] = {0, binOf(150), binOf(400), binOf(2000), binOf(6000), B};
     s.env0.resize(s.hops);
     s.env1.resize(s.hops);
     s.centroid.resize(s.hops);
     float e[5] = {0, 0, 0, 0, 0};
-    float rmsPeak = 1e-4f;
-    for (const auto& f : frames) rmsPeak = std::max(rmsPeak, f.rms);
-    const float att = 1.0f - std::exp(-1.0f / (0.012f * s.hopRate));
-    const float rel = 1.0f - std::exp(-1.0f / (0.22f * s.hopRate));
+    const float att = 1.0f - std::exp(-1.0f / (0.012f * attackScale * s.hopRate));
+    const float rel = 1.0f - std::exp(-1.0f / (0.22f * releaseScale * s.hopRate));
     const float cen = 1.0f - std::exp(-1.0f / (1.5f * s.hopRate));
     float c = 0.5f;
     for (int h = 0; h < s.hops; ++h) {
@@ -168,20 +191,35 @@ SongAnalysis buildSong(const avgen::analysis::AnalysisTrack& track, double durat
             e[b] += (m - e[b]) * (m > e[b] ? att : rel);
         }
         s.env0[h] = glm::vec4(e[0], e[1], e[2], e[3]);
-        s.env1[h] = glm::vec4(e[4], frames[h].energy, frames[h].beatPhase, frames[h].rms / rmsPeak);
-        if (frames[h].lowOnset) { s.kickT.push_back(static_cast<float>(frames[h].timeSeconds)); s.kickS.push_back(std::max(0.25f, frames[h].lowOnsetStrength)); }
-        if (frames[h].midOnset) { s.snareT.push_back(static_cast<float>(frames[h].timeSeconds)); s.snareS.push_back(std::max(0.25f, frames[h].midOnsetStrength)); }
-        if (frames[h].highOnset) { s.hatT.push_back(static_cast<float>(frames[h].timeSeconds)); s.hatS.push_back(std::max(0.25f, frames[h].highOnsetStrength)); }
+        s.env1[h].x = e[4];
     }
-    if (auto st = avgen::analysis::detectStructure(track)) {
-        for (const auto& sec : st->sections)
-            s.sections.push_back(Section{sec.startSeconds, sec.endSeconds, sec.repetitionGroup, sec.energy, sec.density,
-                                         avgen::analysis::sectionFunctionName(sec.function)});
-        s.novelty = st->novelty;
-        if (!st->beatTimes.empty()) s.beats = st->beatTimes;
-    } else {
-        std::fprintf(stderr, "structure: %s\n", st.error().message.c_str());
+}
+
+SongAnalysis conditionSong(const SongAnalysis& base, const spatial::AudioResponse& response) {
+    if (response.neutral()) {
+        return base;
     }
+    SongAnalysis s = base;
+    s.release = std::clamp(response.release, 0.25f, 4.0f);
+    for (float& v : s.spec) v = response.level(v);
+    for (std::size_t h = 0; h < s.env1.size(); ++h) s.env1[h].w = response.level(s.env1[h].w);
+    foldSongEnvelopes(s, std::clamp(response.attack, 0.25f, 4.0f), s.release);
+    // The hits: as heard, the kick's 0.25 floor kept (buildSong's); one below the performer's floor is not heard.
+    auto hits = [&](std::vector<float>& T, std::vector<float>& S) {
+        std::size_t w = 0;
+        for (std::size_t i = 0; i < T.size(); ++i) {
+            const float heard = response.hit(S[i]);
+            if (heard <= 0.0f) continue;
+            T[w] = T[i];
+            S[w] = heard;
+            ++w;
+        }
+        T.resize(w);
+        S.resize(w);
+    };
+    hits(s.kickT, s.kickS);
+    hits(s.snareT, s.snareS);
+    hits(s.hatT, s.hatS);
     return s;
 }
 
@@ -225,9 +263,10 @@ AudioAtT sampleSong(const SongAnalysis& s, double t) {
         for (int k = 0; k < 6 && idx >= 0; ++k, --idx) e += S[idx] * std::exp(-decay * static_cast<float>(t - T[idx]));
         return std::min(e, 1.5f);
     };
-    a.kickEnv = env(s.kickT, s.kickS, 7.0f, a.lastKick, &a.lastKickS);
-    a.snareEnv = env(s.snareT, s.snareS, 9.0f, a.lastSnare, &a.lastSnareS);
-    a.hatEnv = env(s.hatT, s.hatS, 14.0f, a.lastHat, nullptr);
+    const float rel = std::max(s.release, 0.25f); // ADR-1361: 1 unless the performer moved Release
+    a.kickEnv = env(s.kickT, s.kickS, 7.0f / rel, a.lastKick, &a.lastKickS);
+    a.snareEnv = env(s.snareT, s.snareS, 9.0f / rel, a.lastSnare, &a.lastSnareS);
+    a.hatEnv = env(s.hatT, s.hatS, 14.0f / rel, a.lastHat, nullptr);
     return a;
 }
 

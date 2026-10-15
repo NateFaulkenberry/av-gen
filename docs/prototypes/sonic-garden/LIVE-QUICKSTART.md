@@ -197,6 +197,9 @@ BlackHole as the input, then run the probe.
   - The four meters show the kick, snare, hat and note as the detector hears them.
   - **Reset** returns the five sliders to the scene's own values.
   - The old "Sensitivity" is now **Input gain** (the interface level).
+  - Every live scene answers these (ADR-1361). In Sonic Live they set the garden's dynamics, not its character: its
+    loudness (the glow that holds a note, the waiting world), its strikes (the chaotic world's shards and sparks on
+    the strongest onsets) and its note gestures (a note-on's velocity through the Transients curve).
 - **Scenes:** step through Sonic Live and the Sonic VFX scenes with the Scene row's arrows or list, PageUp/PageDown,
   or a program change from the keyboard (program n = scene n). Live input, the projection and your Response
   adjustments carry across.

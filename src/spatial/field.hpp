@@ -193,6 +193,12 @@ struct FieldSpec {
     int bandRepeat = 2;                    // Angle: sweeps round the circle
     float audioDelay = 0.0f;               // seconds behind the present, everywhere
     float audioSpeed = 0.0f;               // m/s the present travels outward from `point` (0 = no travel)
+    // ADR-1370: a Spectrum field reads the MEAN of its band over a window this many seconds wide centred on
+    // its delay (a tap per history row, audioSmoothTaps), instead of one row. With audioSpeed the history is laid out in space at
+    // audioSpeed / rowRate metres a row (0.28 m at 26 m/s), so a row's hop-to-hop jitter becomes spatial noise;
+    // the window is the low-pass that turns it back into the envelope. 0 = one row, as before (unwritten,
+    // unhashed). Onset fields ignore it.
+    float audioSmooth = 0.0f;
     OnsetSource onsetSource = OnsetSource::Low;
     float onsetDecay = 4.0f;               // 1/s
     float onsetWidth = 0.0f;               // m, the front's half width (0 = a flash everywhere at once)
@@ -279,7 +285,8 @@ struct alignas(16) FieldGpu {
     // Grid kind (ADR-032). Zero for every other kind, and gridRes.w = 0 means "no grid bound",
     // which samples as 0 (so a scene without grids never reads the table).
     // Audio kinds (ADR-1116) reuse the three lanes: gridBounds0 = (bandLow, bandHigh, audioDelay,
-    // audioSpeed), gridBounds1 = (audioBand, bandRepeat, onsetDecay, onsetWidth), gridRes.x = onsetSource.
+    // audioSpeed), gridBounds1 = (audioBand, bandRepeat, onsetDecay, onsetWidth), gridRes.x = onsetSource,
+    // gridRes.y = audioSmooth (ADR-1370).
     glm::vec4 gridBounds0;             // grid boundsMin.xyz, offset into the grid table (floats)
     glm::vec4 gridBounds1;             // grid boundsMax.xyz, components per cell
     glm::vec4 gridRes;                 // resolution.xyz, w = 1 bound + 2 when wrapping + 4 * (channel + 1) (0 = unbound)
