@@ -36,7 +36,7 @@ While the live loop is paced (`InteractiveResolution::setPacing`, set each frame
 
 1. **A miss.** A frame is late when its interval is longer than the period by a quarter of the period and at least
    half a refresh. That is a frame that landed on a later vsync. It is not the vsync count alone: the interval is
-   taken on the main thread, and the cap's wake-up jitters by several milliseconds. With the editor on a 120 Hz
+   taken on the main thread, and the cap's wake-up jitters by several milliseconds. With the projection on a 120 Hz
    screen, a half-refresh rule read 37.5-39 ms intervals as misses and walked a light scene to Emergency.
 2. **The GPU's miss.** A late frame counts only when a GPU span within a few frames of it reached the period.
    The span arrives two or three frames after its frame, so the frame waits up to five frames, and the frame before

@@ -40,7 +40,7 @@ descent (§5 has every run):
 | | |
 |---|---|
 | Machine | MacBook Pro Mac14,6, Apple M2 Max, 64 GB; macOS 26.7.1 |
-| Displays | the built-in Liquid Retina XDR at 120 Hz (the editor window); an LG UltraFine 5K at 60 Hz (the projection window) |
+| Displays | one display at a time, as the projection's logs record: the built-in Liquid Retina XDR at 120 Hz in the earlier runs, an LG UltraFine at 60 Hz in the later ones (`AB2-*`). Editor and projection window shared it (display 0, windowed) |
 | Build | Release, branch `live/controller-30fps` from main `4ac7ed3d`. "main" is that commit's controller plus the `--trace` instrumentation (the decision code byte-for-byte main's), "ADR-1362" is this branch |
 | Path | `avgen --live-profile --mode live`: the editor's own loop, with the projection window at 1920x1080, present, Fifo, the frame cap (ADR-1107) and the UI all in the frame |
 | Target | 30 and 60 fps, `--quality auto`, `--trace` on (one row per frame from the start of warm-up) |
@@ -109,7 +109,7 @@ Both GPU-based variants still drop on the span. They ended at Low like main in f
 | # | Change | What the next run showed |
 |---|---|---|
 | v1 | misses decide both ways; a miss is a frame a whole refresh late (the live profile's rule); revert on probation, 8x backoff | RIFT at Medium 84-91% (main: Low/Medium), but 0.4-0.8% missed: High and Ultra were probed 5 times in the first minute (`S-*`) |
-| v2 | every level left on its misses doubles its hold, up to 16x | fewer probes, but Neon Vector at 30 fell from Ultra to Emergency with **no** missed frame (`S2-neon30`). The cap used the editor's 120 Hz screen, so a half-refresh rule called the cap's 37.5-39 ms wake-up jitter a miss. A replay of its trace at 120 Hz reproduced every drop to the frame; at 60 Hz, none |
+| v2 | every level left on its misses doubles its hold, up to 16x | fewer probes, but Neon Vector at 30 fell from Ultra to Emergency with **no** missed frame (`S2-neon30`). The projection was on the 120 Hz built-in screen, so a half-refresh rule called the cap's 37.5-39 ms wake-up jitter a miss. A replay of its trace at 120 Hz reproduced every drop to the frame; at 60 Hz, none |
 | v3 | a miss is a quarter-period and half-a-refresh late | a failed probe cost a cascade of misses (1.5-2.2%, `v3/`) |
 | v4 | revert on the probe's first miss, on that frame; a level whose missing span is >10% over the period backs off 16x at once | 0.45-0.54% missed. Medium itself was losing a frame every ~10 s and was kept on 3 in 90 (`S3-*`) |
 | v5 | 3 misses in 300 frames (1%), not 3 in 90 | 0.11-0.23% (`v5/`). A probe that held its first dwell and then missed was not treated as a probe |
@@ -273,9 +273,10 @@ Both on `a30a609b`, which holds every code and test change in this work. Runs we
 - **The interval is the main thread's, not the display's.** A present timestamp (`CAMetalDrawable.presentedTime`,
   not exposed through Dawn) would replace the late-frame threshold and the GPU attribution.
 - **The 120 Hz projector case was not measured.** No such display was attached.
-  - **What the runs used instead.** The trace's `refreshMs` column reads 8.33 ms (120 Hz) in these runs: the cap took
-    the editor's built-in screen while the projection window was on the 60 Hz LG. ADR-1107 says the projection's
-    display should set it. This was not investigated further and is left as a follow-up.
+  - **What the runs used instead.** The projection opened on whichever display was connected (the logs' "projection
+    open on ..." line). The 17 runs on the built-in screen read `refreshMs` 8.33 ms (120 Hz) and the 17 on the LG read
+    16.67 ms (60 Hz): the cap followed the projection's display in every run, as ADR-1107 says. An earlier draft of
+    this section reported the cap reading the editor's screen while projecting on the LG; the logs do not support it.
   - **What it showed.** At 30 and 60 the cap's period comes out the same either way. The miss threshold does not:
     the 120 Hz value is the stricter one. It is how the jitter defect of v2 and the 0.95-0.98x spans of v8 surfaced.
   - **Coverage.** The unit tests cover 60 on 120 Hz.
