@@ -27,7 +27,15 @@
   "camera/mode": 2,
   "sources/driftA/rate": 0.031,
   "sources/driftC/rate": 0.047,
-  "scene/volumeSteps": 16
+  "scene/volumeSteps": 16,
+  "procedural/fanBody/lod/distance1": 35.0,
+  "procedural/fanBody/lod/distance2": 70.0,
+  "procedural/whipsBody/lod/distance1": 35.0,
+  "procedural/whipsBody/lod/distance2": 70.0,
+  "procedural/crinoidArms/lod/distance1": 120.0,
+  "procedural/crinoidArms/lod/distance2": 240.0,
+  "procedural/crinoidStalk/lod/distance1": 150.0,
+  "procedural/crinoidStalk/lod/distance2": 300.0
  },
  "sources": [
   {

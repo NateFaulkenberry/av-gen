@@ -9,6 +9,7 @@
 // world-preview tool are present, and the tests SKIP with the command to run when they are not.
 
 #include "app/engine.hpp"
+#include "app/render_settings.hpp"
 #include "params/modulation.hpp"
 #include "params/preset.hpp"
 #include "scene/scene.hpp"
@@ -246,4 +247,55 @@ TEST_CASE("THE RIFT: the flight does not run out of path before the track ends",
     }
     INFO("camera/splineT at " << end << " s: " << last);
     CHECK(last < 0.97f);
+}
+
+// ADR-1344 (docs/prototypes/bioluminescent/live-30fps-report.md): the live picture's body limits, and that they are
+// live-only. Drawing the sea pens' dark bodies from 30 to 80 m was 19 ms of a 51 ms frame at High; an offline render
+// lifts distance culls (ADR-186), so the scene's 30 m is live-only by itself. An offline render KEEPS LOD rungs
+// (ADR-191), so the fans', whips' and crinoids' rungs are in the scene with thresholds of 0 (LOD0 everywhere) and only
+// rift-live.json sets the thresholds. Both halves are checked on what the engine loaded.
+TEST_CASE("THE RIFT: the bodies' live limits are live-only (ADR-1344)", "[rift][adr1344]") {
+    REQUIRE_RIFT_SCENE();
+    const auto load = [](const char* name, app::Engine& engine) {
+        const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/bioluminescent" / name;
+        auto loaded = engine.loadProject(project);
+        INFO(project.string() << (loaded ? "" : (": " + loaded.error().message)));
+        REQUIRE(loaded.has_value());
+        FrameTime t{};
+        t.renderTime = 0.0;
+        engine.update(t);
+    };
+    const auto body = [](const scene::Scene& s, const std::string& name) -> const scene::ProceduralGeometry& {
+        const auto it = std::find_if(s.procedurals.begin(), s.procedurals.end(),
+                                     [&](const scene::ProceduralGeometry& p) { return p.name == name; });
+        REQUIRE(it != s.procedurals.end());
+        return *it;
+    };
+    const std::vector<std::string> laddered = {"fanBody", "whipsBody", "crinoidArms", "crinoidStalk"};
+
+    app::Engine live(app::EngineMode::Offline);
+    load("rift-live.json", live);
+    CHECK(body(live.scene(), "seapen0").lod.cull);
+    CHECK(body(live.scene(), "seapen0").lod.maxDistance > 0.0f);
+    CHECK(body(live.scene(), "seapen0").lod.maxDistance <= 30.0f);
+    for (const std::string& name : laddered) {
+        INFO("rift-live.json: " << name);
+        const scene::LodSettings& lod = body(live.scene(), name).lod;
+        CHECK(lod.lodCount == 3);
+        CHECK_FALSE(lod.lodByScreenSize);
+        CHECK(lod.lodDistances[0] > 0.0f);
+        CHECK(lod.lodDistances[1] > lod.lodDistances[0]);
+        CHECK(lod.lodDistances[1] < lod.maxDistance);
+    }
+
+    // The offline project: the rungs exist and are never reached, and its render lifts the 30 m.
+    app::Engine offline(app::EngineMode::Offline);
+    load("rift.json", offline);
+    for (const std::string& name : laddered) {
+        INFO("rift.json: " << name);
+        const scene::LodSettings& lod = body(offline.scene(), name).lod;
+        CHECK(lod.lodDistances[0] == 0.0f); // a threshold of 0 ends the ladder at LOD0
+    }
+    const app::RenderSettings render; // tier "offline", limits "tier": what `avgen --render` of rift.json uses
+    CHECK_FALSE(render.resolvedLimits().proceduralDistanceCull);
 }
