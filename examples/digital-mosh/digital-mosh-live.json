@@ -63,6 +63,18 @@
       "curve": 1.0
      },
      {
+      "name": "presence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "response.level",
+        "weight": 1.0
+       }
+      ],
+      "gain": 2.5,
+      "bias": -0.625
+     },
+     {
       "name": "drive",
       "combine": "product",
       "inputs": [
@@ -71,11 +83,10 @@
         "weight": 1.0
        },
        {
-        "signal": "response.level",
+        "signal": "visual.presence",
         "weight": 1.0
        }
-      ],
-      "gain": 1.2
+      ]
      },
      {
       "name": "bright",

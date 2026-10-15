@@ -873,8 +873,9 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 #   levels  a level is the response model's fixed-dB level, never auto-gained: the bass melt reads response.bass;
 #           an auto-gained band (the treble's glints, the limbs' lift) keeps its shape (character) and is multiplied
 #           by the response level (how loud it is heard), so a quiet input reads quiet and Sensitivity lifts it
-#   the arc the drive is how busy the music is (energy and treble: character) times how loud it is heard (the
-#           slow response level), so a whisper does not drive the arc into the Nightmare
+#   the arc the drive is how busy the music is (energy and treble: character) times how present it is heard (the
+#           response level with a knee: 1 on a mastered mix), so a quiet input does not drive the arc into the
+#           Nightmare, and Sensitivity brings it back
 # Every gain below is the mean ratio on Trench at the neutral controls (docs/development/live-response-everywhere.md),
 # so the neutral live picture is the old one. The offline projects keep their audio.* routes: a file is not played.
 # The level range is the Sonic Abstract scenes' (-44..-2 dB): a mastered mix sits near 0.8, a take 15 dB down near 0.45.
@@ -894,11 +895,15 @@ def heard(name, band, level, gain):
 LIVE_LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
     # how busy the music is (the offline drive) ...
     dict(LISTEN["settings"]["mappings"][0], name="busy"),
-    # ... heard: x the response level (a frame late: a source reads its own outputs from the frame before; the arc's
-    # routes smooth it over seconds)
+    # ... heard: x how present the music is -- the response level with a knee (1 from a level of 0.8, which a mastered
+    # mix holds at neutral, so the arc on a full mix is the offline one; 0.5 at 0.6; 0 at 0.4). The arc integrates
+    # its drive into the stage ladder, so a plain x level (whose small swings on a mix the old drive never had) moved
+    # Trench's stages by 16 s; the knee keeps them. (A frame late: a source reads its own outputs from the frame
+    # before; the arc's routes smooth over seconds.)
+    {"name": "presence", "combine": "mean", "inputs": [{"signal": "response.level", "weight": 1.0}],
+     "gain": 2.5, "bias": -0.625},
     {"name": "drive", "combine": "product", "inputs": [{"signal": "visual.busy", "weight": 1.0},
-                                                       {"signal": "response.level", "weight": 1.0}],
-     "gain": 1.2},
+                                                       {"signal": "visual.presence", "weight": 1.0}]},
     LISTEN["settings"]["mappings"][1],
     heard("hTreble", "audio.treble", "response.level", 1.2),
     heard("hTrebleLevel", "audio.trebleLevel", "response.level", 1.2),
