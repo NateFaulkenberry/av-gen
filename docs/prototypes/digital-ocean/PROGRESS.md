@@ -312,3 +312,18 @@ Worktree `../av-gen-ocean2`, branch `art/digital-ocean-2` from main `f3851d75`. 
 - One illustrated program (`doIllus`) paints land, trees and boat: flat colour per node (palette-routable), a broad
   light band and shadow band, a warm rim toward the sun, distance haze.
 - Media: `passB-composition-before-after.png` (Pass 1; violet at 2 s and 6 s; afternoon).
+
+## Pass C: illustration treatment (done)
+
+- **Clouds rebuilt** as illustrated formations (`cumulus`): a flat base row of wide squashed puffs, rows stacked above
+  it narrowing to a rounded crown (anime cumulus), or long wind-stretched ribbons low on the horizon. Two layers at
+  ~3.6 km and ~6.5 km drift round the viewer at different rates (parallax), with a slow world-space noise that makes
+  the puffs swell and settle. Lit in two BANDS, not a gradient: undersides facing the low sun glow (`clit`), tops and
+  far sides fall into one flat shadow tone (`cshade`), a warm rim on the edges near the sun.
+- **The island** gets its own painted program (`doLand`): vegetation on gentle slopes, rock on steep faces, sand on
+  the shore, and a sun side / shadow side split by one band, a warm rim and haze.
+- **The water's reflection is quantized into three colour regions** (`BANDS = 3`, which Pass 1 rejected for a
+  realistic sea): flat woodblock-like patches over the swell. It reads far more illustrated.
+- Seen and carried to later passes: the island's sand and rock regions barely register; the dolphin is still small;
+  one cloud row near the sun reads as a string of equal balls; the rays are hard white wedges.
+- Media: `passC-illustration-palettes-and-bands.png` (violet, afternoon, electric, violet with banded water).

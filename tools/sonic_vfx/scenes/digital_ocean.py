@@ -295,7 +295,7 @@ PALETTES = {
 }
 PALETTE = "violet"
 DEBUG_SKY = None
-BANDS = 0
+BANDS = 3
 DEBUG_CLOUD = None
 CAMERA_BREATH = True
 REVIEW_MIDI = None          # look development: {"padLeap": [t, ...], "night": [(t, v), ...]} scores the MIDI offline
@@ -545,13 +545,14 @@ def cloud_program():
     pn = PALETTE
     P.op("N", "input", 0, inp="normal")
     P.op("V", "input", 1, inp="viewDirection")
-    # the underside, lit by the low sun -- strongly toward the sun, faintly away from it
-    P.op(None, "gradient", 2, a=0, k=[0.0, -1.0, 0.0, 0.08], f=1.0)
-    P.op(None, "power", 2, a=2, f=1.6)
+    # Pass C: painted in two bands, like an anime sky -- the undersides that face the low sun glow, the tops and the
+    # sides away from it fall into a flat shadow tone, split by one soft edge (not a gradient)
+    P.op(None, "gradient", 2, a=0, k=[0.55 * SH[0], -0.75, 0.55 * SH[2], 0.15], f=1.0)
     P.op("toward", "gradient", 4, a=1, k=[-sx, -sy, -sz, 0.0], f=1.0)     # cos of the angle to the sun
     P.op(None, "smoothstep", 5, a=4, k=[math.cos(math.radians(CLOUD_POOL[1])), math.cos(math.radians(CLOUD_POOL[0]))])
     P.op(None, "remap", 5, a=5, k=[0.0, 1.0, CLOUD_AWAY, 1.0])
-    P.op(None, "multiply", 2, a=2, b=5)
+    P.op(None, "add", 2, a=2, b=5)
+    P.op("cband", "smoothstep", 2, a=2, k=[CLOUD_BAND0, CLOUD_BAND1])
     P.pcolour("cshade", 3, "cshade")
     P.pcolour("clit", 5, "clit", 1.1)
     P.op("body", "mixBy", 3, a=3, b=5, c=2)
@@ -580,50 +581,69 @@ def cloud_program():
 CLOUD_HAZE0, CLOUD_HAZE1 = 0.1, 0.5
 CLOUD_POOL = (2.0, 19.0)     # degrees from the sun: fully lit inside, CLOUD_AWAY outside
 CLOUD_AWAY = 0.1
+CLOUD_BAND0, CLOUD_BAND1 = 0.62, 0.74
 
 
-def cloud_points():
-    """The cloud field: banks round the whole horizon (the slow drift turns them past the view forever), each a cluster
-    of squashed puffs. Twilight stratus -- long, thin, flat-bottomed streaks low on the horizon -- with a few cumulus
-    banks behind them. Deterministic. Returns distribution points [px, py, pz, qx, qy, qz, qw, sx, sy, sz]."""
-    pts = []
-    n_banks = 26
-    for b in range(n_banks):
-        h = lambda k: mx._hash(b, k, 71)
-        theta = 2.0 * math.pi * (b + 0.6 * h(1)) / n_banks
-        D = 3200.0 + 2600.0 * h(2)
-        cumulus = False
-        tier = int(3 * h(3))                           # three decks: low and long, middle, high and thin
-        alt = (150.0, 330.0, 520.0)[tier] + 90.0 * (h(4) - 0.5)
-        npuff = 9 + int(10 * h(5))
-        length = (520.0 + 900.0 * h(6)) * (1.0, 0.8, 1.3)[tier]
-        tx, tz = math.cos(theta), math.sin(theta)
-        phi = -theta
-        q = (0.0, math.sin(phi / 2.0), 0.0, math.cos(phi / 2.0))
-        for i in range(npuff):
-            u = (i + 0.5) / npuff - 0.5
-            g = lambda k: mx._hash(b * 31 + i, k, 73)
-            along = u * length + (g(1) - 0.5) * 60.0
-            bulge = 1.0 - (2.0 * u) ** 2
-            if cumulus:
-                sx = 70.0 + 90.0 * g(2) * bulge
-                sy = (35.0 + 70.0 * g(3)) * (0.5 + bulge)
-                y = alt + sy * 0.45
+def cumulus(cx, cz, base, width, height, depth, seed, flat=False):
+    """One illustrated formation: a flat base row of wide squashed puffs, then rows stacked above it, each narrower,
+    their puffs rounder and bigger toward the crown (an anime cumulus bank); `flat` gives a long wind-stretched
+    ribbon instead. Faces the camera (it stands across the line to the origin)."""
+    out = []
+    th = math.atan2(cx, -cz)
+    tx, tz = math.cos(th), math.sin(th)                       # across the view
+    nx, nz = math.sin(th), -math.cos(th)                       # away from the camera
+    q = (0.0, math.sin(-th / 2.0), 0.0, math.cos(-th / 2.0))
+    rows = 1 if flat else 4
+    k = 0
+    for r in range(rows):
+        frac = r / max(rows - 1, 1)
+        row_w = width * (1.0 - 0.55 * frac ** 1.3)
+        n = (14 if flat else max(3, int(9 - 5 * frac)))
+        for i in range(n):
+            g = lambda j: mx._hash(seed * 97 + k, j, 77)
+            k += 1
+            u = (i + 0.5) / n - 0.5 + (g(1) - 0.5) * 0.6 / n
+            along = u * row_w
+            if flat:
+                sx_, sy_ = width / n * (1.2 + 0.8 * g(2)), height * (0.25 + 0.2 * g(3))
+                y = base + sy_ * 0.4
             else:
-                # (round 1) more, smaller, more varied puffs: an irregular top and a flat, slightly stepped base
-                sx = (55.0 + 150.0 * g(2) ** 1.5) * (0.45 + 0.55 * bulge)
-                sy = (5.0 + 16.0 * g(3) ** 2 * (0.3 + bulge)) * (1.0, 0.8, 0.55)[tier]
-                y = alt + (g(4) - 0.5) * 14.0 + sy * 0.55
-            sz = sx * (0.5 + 0.4 * g(5))
-            r = D + (g(6) - 0.5) * 120.0
-            x = r * math.sin(theta) + along * tx
-            z = -r * math.cos(theta) + along * tz
-            pts.append([round(x, 2), round(y, 2), round(z, 2), 0.0, round(q[1], 5), 0.0, round(q[3], 5),
-                        round(sx, 2), round(sy, 2), round(sz, 2)])
+                rad = height * (0.22 + 0.14 * frac + 0.12 * g(2)) * (1.0 - 0.6 * abs(2 * u) ** 2)
+                sx_, sy_ = rad * (1.5 - 0.4 * frac), rad * (0.7 if r == 0 else 1.0)
+                y = base + (0.0 if r == 0 else height * (0.12 + 0.62 * frac) + (g(3) - 0.5) * rad * 0.3)
+            sz_ = depth * (0.4 + 0.3 * g(4))
+            d = (g(5) - 0.5) * depth
+            x = cx + along * tx + d * nx
+            z = cz + along * tz + d * nz
+            out.append([round(x, 2), round(y, 2), round(z, 2), 0.0, round(q[1], 5), 0.0, round(q[3], 5),
+                        round(sx_, 2), round(sy_, 2), round(sz_, 2)])
+    return out
+
+
+# The formations: (azimuth deg from the view, distance m, base m, width m, height m, depth m, ribbon?). Big banks on
+# either side of the sun, one passing near it, ribbons low on the horizon, and smaller banks round the rest of the sky
+# (the field turns slowly, so every one of them comes past the sun in time). Two layers, two drift rates: parallax.
+CLOUDS_NEAR = [(-30.0, 3600.0, 330.0, 1400.0, 520.0, 300.0, False), (34.0, 4000.0, 420.0, 1200.0, 430.0, 280.0, False),
+               (6.0, 4800.0, 230.0, 2600.0, 140.0, 200.0, True), (-58.0, 3400.0, 260.0, 900.0, 380.0, 260.0, False),
+               (75.0, 3800.0, 300.0, 1100.0, 460.0, 280.0, False), (140.0, 3600.0, 320.0, 1300.0, 500.0, 300.0, False),
+               (-130.0, 3900.0, 280.0, 1200.0, 420.0, 300.0, False), (-180.0, 3700.0, 350.0, 1400.0, 520.0, 300.0, False)]
+CLOUDS_FAR = [(-12.0, 6500.0, 170.0, 3000.0, 110.0, 200.0, True), (52.0, 6800.0, 200.0, 2400.0, 120.0, 200.0, True),
+              (-75.0, 6200.0, 520.0, 1800.0, 380.0, 300.0, False), (20.0, 7000.0, 700.0, 2000.0, 300.0, 300.0, False),
+              (110.0, 6600.0, 180.0, 2600.0, 120.0, 200.0, True), (-150.0, 6800.0, 560.0, 1800.0, 360.0, 300.0, False),
+              (170.0, 6400.0, 200.0, 2800.0, 120.0, 200.0, True)]
+
+
+def cloud_points(layer):
+    pts = []
+    for k, (az, dist, base, w, h, d, flat) in enumerate(layer):
+        a = math.radians(az + SUN_AZ * 0.0)
+        pts += cumulus(dist * math.sin(a), -dist * math.cos(a), base, w, h, d, seed=k + (50 if layer is CLOUDS_FAR else 0),
+                       flat=flat)
     return pts
 
 
-CLOUD_DRIFT = 0.0016        # radians a second the cloud field turns round the viewer (about 65 minutes a turn)
+CLOUD_BILLOW = 40.0
+CLOUD_DRIFT = 0.0022        # radians a second the cloud field turns round the viewer (about 65 minutes a turn)
 
 
 
@@ -854,10 +874,53 @@ def illus_program():
     return P
 
 
+def land_program():
+    """The island, painted in colour regions (poster style): sand on the low shore, rock on the steep faces, vegetation
+    on the gentle slopes, each with a sun side and a shadow side split by one hard-ish band, then distance haze.
+    Registers: 0 N, 1 V, 2 world position."""
+    P = Prog("doLand")
+    sx, sy, sz = S
+    P.op("N", "input", 0, inp="normal")
+    P.op("V", "input", 1, inp="viewDirection")
+    P.op("wp", "input", 2, inp="worldPosition")
+    P.pcolour("land", 3, "land")
+    P.pcolour("rock", 4, "rock")
+    P.op(None, "swizzle", 5, a=0, k=[1, 1, 1, 1])                                   # n.y: how flat
+    P.op("steep", "smoothstep", 5, a=5, k=[LAND_STEEP1, LAND_STEEP0])               # 1 on a cliff
+    P.op(None, "mixBy", 3, a=3, b=4, c=5)
+    P.op(None, "swizzle", 5, a=2, k=[1, 1, 1, 1])                                   # height
+    P.op("shore", "smoothstep", 5, a=5, k=[LAND_SAND1, LAND_SAND0])                 # 1 on the beach
+    P.pcolour("sand", 4, "sand")
+    P.op(None, "mixBy", 3, a=3, b=4, c=5)
+    P.op(None, "gradient", 4, a=0, k=[0.8 * SH[0], 0.45, 0.8 * SH[2], 0.0], f=1.0)   # facing the low sun
+    P.op("band", "smoothstep", 4, a=4, k=[ILLUS_BAND0, ILLUS_BAND1])
+    P.op(None, "remap", 4, a=4, k=[0.0, 1.0, 0.0, 1.0])
+    P.pcolour("land2", 5, "land2")
+    P.op("lit", "mixBy", 3, a=5, b=3, c=4)                                          # the shadow side is land2
+    P.op(None, "fresnel", 4, f=3.0)                                                  # the rim toward the sun
+    P.op(None, "gradient", 5, a=1, k=[-sx, -sy, -sz, 0.0], f=1.0)
+    P.op(None, "power", 5, a=5, f=6.0)
+    P.op(None, "multiply", 4, a=4, b=5)
+    P.pcolour("landRim", 5, "glow", ILLUS_RIM)
+    P.op(None, "multiply", 4, a=4, b=5)
+    P.op(None, "add", 3, a=3, b=4)
+    P.op(None, "input", 4, inp="cameraDistance")
+    P.op(None, "constant", 5, k=[0.1, 0.1, 0.1, 0.1])
+    P.op(None, "multiply", 4, a=4, b=5)
+    P.op("haze", "remap", 4, a=4, k=[ILLUS_HAZE0, ILLUS_HAZE1, 0.0, ILLUS_HAZE_MAX], f=1.0)
+    P.pcolour("landHaze", 5, "cool")
+    P.op("hazed", "mixBy", 3, a=3, b=5, c=4)
+    return P
+
+
+LAND_STEEP0, LAND_STEEP1 = 0.62, 0.78
+LAND_SAND0, LAND_SAND1 = 1.5, 5.0
+
+
 ILLUS_BAND0, ILLUS_BAND1 = 0.32, 0.42
 ILLUS_SHADOW, ILLUS_LIT = 0.62, 1.12
 ILLUS_RIM = 0.9
-ILLUS_HAZE0, ILLUS_HAZE1, ILLUS_HAZE_MAX = 60.0, 500.0, 0.75
+ILLUS_HAZE0, ILLUS_HAZE1, ILLUS_HAZE_MAX = 60.0, 500.0, 0.55
 
 
 def flat(key, scale=1.0, double=False):
@@ -869,7 +932,7 @@ def flat(key, scale=1.0, double=False):
 
 
 # the nodes painted by doIllus and the palette key each one's colour comes from (palette_routes routes them)
-ILLUS_NODES = [("island", "land"), ("palmTrunks", "trunk"), ("palmCrowns", "leaf"), ("boatHull", "hull"),
+ILLUS_NODES = [("palmTrunks", "trunk"), ("palmCrowns", "leaf"), ("boatHull", "hull"),
                ("boatSail", "sail")] + [("farIsle%d" % k, "isle") for k in range(len(FAR_ISLES))]
 
 
@@ -879,7 +942,9 @@ def world(s):
     boat_meshes()
     ip = illus_program()
     s.program(ip.doc(emission=2))
-    s.proc("island", {"kind": "mesh", "asset": "meshes/do-island.glb"}, material=flat("land"),
+    lp = land_program()
+    s.program(lp.doc(emission=3))
+    s.proc("island", {"kind": "mesh", "asset": "meshes/do-island.glb"}, material=unlit("doLand"),
            transform={"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]})
     for k, ((x, z), sc, sy) in enumerate(FAR_ISLES):
         s.proc("farIsle%d" % k, {"kind": "mesh", "asset": "meshes/do-farisle.glb"}, material=flat("isle"),
@@ -904,7 +969,7 @@ def world(s):
         s.proc(name, {"kind": "mesh", "asset": "meshes/" + asset}, material=flat(key, double=(name == "boatSail")),
                deformers=ride, transform={"position": [BOAT_AT[0], 0.0, BOAT_AT[1]], "rotation": [0.0, yaw, 0.0],
                                           "scale": [1.0, 1.0, 1.0]})
-    return ip
+    return ip, lp
 
 
 BOAT_ROLL = 0.55
@@ -1520,15 +1585,19 @@ def build():
     if DEBUG_CLOUD:
         cp.ops = cp.ops[:DEBUG_CLOUD[0]]
     s.program(cp.doc(emission=DEBUG_CLOUD[1] if DEBUG_CLOUD else 3))
-    s.proc("clouds", {"kind": "sphere", "radius": 1.0, "segments": 20, "rings": 12},
-           distribution={"kind": "points", "points": cloud_points()}, material=unlit("doCloud"),
-           deformers=[{"kind": "twist", "amount": 0.0, "speed": CLOUD_DRIFT, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
-                       "center": [0.0, 0.0, 0.0], "space": "world"}])
-    ip = world(s)
+    for name, layer, drift in (("clouds", CLOUDS_NEAR, CLOUD_DRIFT), ("cloudsFar", CLOUDS_FAR, CLOUD_DRIFT * 0.55)):
+        s.proc(name, {"kind": "sphere", "radius": 1.0, "segments": 18, "rings": 12},
+               distribution={"kind": "points", "points": cloud_points(layer)}, material=unlit("doCloud"),
+               deformers=[{"kind": "twist", "amount": 0.0, "speed": drift, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
+                           "center": [0.0, 0.0, 0.0], "space": "world"},
+                          # slow billowing: the puffs swell and settle (a noise of world position, drifting)
+                          {"kind": "noise", "amount": CLOUD_BILLOW, "scale": 0.004, "speed": 0.03, "seed": 9,
+                           "space": "world"}])
+    ip, lp = world(s)
     dp = dolphins(s)
     spray(s)
     instrument(s, sea, seafar, sky)
-    midi(s, [sea, seafar, sky, cp, dp, ip], sea, seafar, sky)
+    midi(s, [sea, seafar, sky, cp, dp, ip, lp], sea, seafar, sky)
     if REVIEW_MIDI:
         score_midi(s, REVIEW_MIDI)
     camera(s)

@@ -1999,7 +1999,7 @@
   },
   {
    "source": "control.night",
-   "target": "procedural/island/material/emissiveColor",
+   "target": "material/doLand/op/4/constant/constant",
    "amount": -0.07315,
    "op": "add",
    "polarity": "unipolar",
@@ -2011,7 +2011,7 @@
   },
   {
    "source": "control.night",
-   "target": "procedural/island/material/emissiveColor",
+   "target": "material/doLand/op/4/constant/constant",
    "amount": -0.03066,
    "op": "add",
    "polarity": "unipolar",
@@ -2023,8 +2023,188 @@
   },
   {
    "source": "control.night",
-   "target": "procedural/island/material/emissiveColor",
+   "target": "material/doLand/op/4/constant/constant",
    "amount": -0.22682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/5/constant/constant",
+   "amount": -0.24715,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/5/constant/constant",
+   "amount": -0.06706,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/5/constant/constant",
+   "amount": -0.22819,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/11/constant/constant",
+   "amount": -0.86104,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/11/constant/constant",
+   "amount": -0.36195,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/11/constant/constant",
+   "amount": -0.27131,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/16/constant/constant",
+   "amount": -0.02367,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/16/constant/constant",
+   "amount": -0.01047,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/16/constant/constant",
+   "amount": -0.09669,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/22/constant/constant",
+   "amount": -0.80148,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/22/constant/constant",
+   "amount": -0.03957,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/22/constant/constant",
+   "amount": 0.40024,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/29/constant/constant",
+   "amount": -0.51483,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/29/constant/constant",
+   "amount": -0.14682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.night",
+   "target": "material/doLand/op/29/constant/constant",
+   "amount": -0.35393,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -3259,7 +3439,7 @@
   },
   {
    "source": "control.golden",
-   "target": "procedural/island/material/emissiveColor",
+   "target": "material/doLand/op/4/constant/constant",
    "amount": -0.01668,
    "op": "add",
    "polarity": "unipolar",
@@ -3271,7 +3451,7 @@
   },
   {
    "source": "control.golden",
-   "target": "procedural/island/material/emissiveColor",
+   "target": "material/doLand/op/4/constant/constant",
    "amount": 0.35723,
    "op": "add",
    "polarity": "unipolar",
@@ -3283,8 +3463,176 @@
   },
   {
    "source": "control.golden",
-   "target": "procedural/island/material/emissiveColor",
+   "target": "material/doLand/op/4/constant/constant",
    "amount": -0.13918,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/5/constant/constant",
+   "amount": 0.32343,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/5/constant/constant",
+   "amount": 0.17796,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/5/constant/constant",
+   "amount": -0.16348,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/11/constant/constant",
+   "amount": 0.05021,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/11/constant/constant",
+   "amount": 0.37919,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/11/constant/constant",
+   "amount": 0.10488,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/16/constant/constant",
+   "amount": -0.01149,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/16/constant/constant",
+   "amount": 0.14364,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/16/constant/constant",
+   "amount": 0.01512,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/22/constant/constant",
+   "amount": 0.32881,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/22/constant/constant",
+   "amount": 0.08809,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/29/constant/constant",
+   "amount": -0.00612,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/29/constant/constant",
+   "amount": 0.59849,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 250
+   }
+  },
+  {
+   "source": "control.golden",
+   "target": "material/doLand/op/29/constant/constant",
+   "amount": 0.47051,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
