@@ -118,6 +118,7 @@
 #include <bit>
 #include <cassert>
 #include <cmath>
+#include <numbers>
 #include <map>
 #include <mutex>
 #include <shared_mutex>
@@ -3936,7 +3937,7 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         };
         p.deformerAmount[slot] = addF("amount", def.amount, -100.0f, 100.0f, -3.0f, 3.0f);
         p.deformerSpeed[slot] = addF("speed", def.speed, -100.0f, 100.0f, -5.0f, 5.0f);
-        addF("phase", def.phase, -100.0f, 100.0f, -kTwoPi, kTwoPi);
+        addF("phase", def.phase, -1.0e6f, 1.0e6f, -kTwoPi, kTwoPi); // ADR-1372: wide, so a clock can drive it
         addF("frequency", def.frequency, 0.0f, 100.0f, 0.0f, 10.0f);
         addF("scale", def.scale, 0.001f, 100.0f, 0.05f, 5.0f);
         addF("falloff", def.falloff, 0.0f, 1000.0f, 0.0f, 10.0f);
@@ -4195,6 +4196,9 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
         copyValue(p, base + "amount", def.amount);
         copyValue(p, base + "speed", def.speed);
         copyValue(p, base + "phase", def.phase);
+        // ADR-1372: a route may drive the phase without bound (an integrated wave speed); a phase is an angle, so
+        // it is wrapped here, in double, and the f32 sine downstream keeps its precision however long a set runs.
+        def.phase = static_cast<float>(std::remainder(static_cast<double>(def.phase), 2.0 * std::numbers::pi));
         copyValue(p, base + "frequency", def.frequency);
         copyValue(p, base + "scale", def.scale);
         copyValue(p, base + "falloff", def.falloff);

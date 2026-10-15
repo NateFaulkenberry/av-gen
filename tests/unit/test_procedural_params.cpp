@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cmath>
 #include <string>
 
 using namespace avgen;
@@ -221,4 +222,26 @@ TEST_CASE("unregisterProceduralParameters removes everything it registered", "[s
     const ProceduralParameters again = registerProceduralParameters(params, rest, "procedural/columns/");
     CHECK(again.all.size() == registered);
     CHECK(params.size() == registered + 1);
+}
+
+TEST_CASE("A deformer's phase takes a value far beyond one turn and is wrapped to an angle (ADR-1372)",
+          "[scene][procedural][params][adr1372]") {
+    // An integrated wave speed drives the phase without bound: the parameter must not clamp it (a clamp would stop
+    // the waves), and what the shader receives must be the same angle, small enough for an f32 sine.
+    params::ParameterSet params;
+    ProceduralGeometry rest = makeRest();
+    rest.deformers[0].kind = DeformerKind::Sine;
+    const ProceduralParameters p = registerProceduralParameters(params, rest, "procedural/columns/");
+    ProceduralGeometry live = rest;
+    auto* phase = params.findAs<float>("procedural/columns/deform/1/phase");
+    REQUIRE(phase != nullptr);
+    phase->setBase(12345.678f);
+    params.resetFinals();
+    applyProceduralParameters(p, rest, live);
+    const double expected = std::remainder(static_cast<double>(12345.678f), 2.0 * 3.14159265358979323846);
+    CHECK_THAT(static_cast<double>(live.deformers[0].phase), WithinAbs(expected, 1e-5));
+    CHECK(std::abs(live.deformers[0].phase) <= 3.1416f);
+    // the same angle: sin agrees with the unwrapped value's (in double)
+    CHECK_THAT(std::sin(static_cast<double>(live.deformers[0].phase)),
+               WithinAbs(std::sin(static_cast<double>(12345.678f)), 1e-5));
 }
