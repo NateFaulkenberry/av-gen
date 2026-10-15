@@ -1146,6 +1146,14 @@ void Composition::updateAstral() {
                 auto song = std::make_shared<AstralSong>();
                 song->song = astral::conditionSong(astralSong_->song, heard);
                 song->score = astral::buildScore(song->song);
+                const auto opens = [](const astral::Score& sc) {
+                    return std::count_if(sc.phrases.begin(), sc.phrases.end(), [](const astral::Phrase& p) { return p.kickOpens; });
+                };
+                log::info("astral: heard through the Response (hits {:.2f}, levels {:.2f}, attack {:.2f}x, release {:.2f}x): "
+                          "{} of {} kicks, {} of {} phrases kick-opened",
+                          heard.hitSensitivity, heard.levelSensitivity, heard.attack, heard.release,
+                          song->song.kickT.size(), astralSong_->song.kickT.size(), opens(song->score),
+                          opens(astralSong_->score));
                 astralHeardSong_ = std::move(song);
             }
             astralHeardResponse_ = heard;
