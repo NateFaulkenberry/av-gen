@@ -190,7 +190,7 @@
    "procedural": {
     "source": {
      "kind": "mesh",
-     "asset": "../cymatic-world/meshes/cw-ground.glb"
+     "asset": "meshes/cw-ground.glb"
     },
     "distribution": {
      "kind": "single"
