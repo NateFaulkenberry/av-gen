@@ -428,62 +428,103 @@ def ground_readers(s):
                                    "reliefVibration": 0.23})
 
 
-def ground_program(counter=0.0, line=0.35, moon=6.0, sky=0.08):
+# ---- the colour language (the colour pass, 03-brief-color-lighting-art-pass.md) -------------------------------------
+# Every palette names the same roles, so a palette is data and the program is one:
+#   stone  the scoured basalt (the antinodes, most of the ground)     grit   the settled sand on the nodal ridges
+#   key    the raking light (from the moon's quarter, low)            fill   its complement, from the opposite quarter
+#   rim    grazing light at silhouettes and ridge lips (Fresnel)      sky    the hemisphere's fill on up-facing ground
+#   haze   distance: far ground and walls fade into it (so far = world, never void)
+#   line   the nodal line's light (emission, sparse)                  hollow energy in the scoured antinodes (emission)
+PALETTES = {
+    # A, ultraviolet resonance: ultramarine stone, violet grit, electric-blue key, violet fill, cyan-white light
+    "A": {"stone": "#1a1d6b", "grit": "#5b3fd6", "key": "#8fb0ff", "fill": "#8a3dff", "rim": "#bff3ff",
+          "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
+          "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
+    # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
+    "B": {"stone": "#0b1640", "grit": "#106a7c", "key": "#5ff2ff", "fill": "#c13bff", "rim": "#ff8fe6",
+          "sky": "#170f45", "haze": "#160d40", "line": "#d4fffb", "hollow": "#ff3fd2",
+          "keyI": 2.1, "fillI": 0.988, "rimI": 0.56, "skyI": 0.122, "lineI": 2.4, "hollowI": 0.113},
+    # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
+    "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
+          "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
+          "keyI": 2.31, "fillI": 0.76, "rimI": 0.42, "skyI": 0.105, "lineI": 2.2, "hollowI": 0.1},
+}
+PALETTE = os.environ.get("CW_PALETTE", "B")   # chosen in Pass B (plasma interference)
+KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
+FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
+
+
+def pc(key, scale=1.0):
+    return hexrgb(PALETTES[PALETTE][key], scale)
+
+
+def ground_program():
     """The basin's ground, UNLIT with its light painted in the program (the lit path cost ~7 ms at 1080p for a
-    surface whose light is three terms). One `field` op reads the resonance's shading channel (sand, crest,
-    amplitude) in a single pass over the modes. Basalt where the field has scoured it, settled grit on the nodal
-    ridges; a raking warm moon (Lambert on the deformed normal: the relief draws itself); optionally a cool counter
-    light from the other side; a dim sky; and a thin
-    cold light only on the nodal line where the ground rings."""
+    surface whose light is a few terms). One `field` op reads the resonance's shading channel (sand, crest,
+    amplitude) in one pass over the modes. Two materials (scoured stone, settled grit); a raking key and its
+    complementary fill from the opposite quarter, so a ridge's two flanks take two colours; a grazing rim; a
+    hemisphere sky fill so shadows hold detail; distance haze so the far walls read as world; and two emissions that
+    follow the resonance: a thin light on the nodal line where the ground rings, and a low glow in the hollows that
+    ring hardest."""
+    P_ = PALETTES[PALETTE]
     g = Prog("cwGround")
     g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
     g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
     g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
     g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
     g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])
+    g.op("stone", "constant", 4, k=pc("stone") + [1.0])
+    g.op("grit", "constant", 5, k=pc("grit") + [1.0])
+    g.op(None, "mixBy", 4, a=4, b=5, c=1)                          # r4: albedo
+    # ---- light, into r5 ----
+    g.op(None, "input", 6, inp="normal")
+    g.op("keyDot", "gradient", 7, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
+    g.op("key", "constant", 5, k=pc("key", P_["keyI"]) + [1.0])
+    g.op(None, "multiply", 5, a=5, b=7)                            # key
+    g.op("fillDot", "gradient", 7, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
+    g.op(None, "power", 7, a=7, f=1.5)
+    g.op("fill", "constant", 1, k=pc("fill", P_["fillI"]) + [1.0])
+    g.op(None, "multiply", 7, a=7, b=1)
+    g.op(None, "add", 5, a=5, b=7)                                 # + fill
+    g.op("skyDot", "gradient", 7, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
+    g.op("sky", "constant", 1, k=pc("sky", P_["skyI"]) + [1.0])
+    g.op(None, "multiply", 7, a=7, b=1)
+    g.op(None, "add", 5, a=5, b=7)                                 # + sky
+    g.op("rimMask", "fresnel", 7, f=3.0)
+    g.op("rim", "constant", 1, k=pc("rim", P_["rimI"]) + [1.0])
+    g.op(None, "multiply", 7, a=7, b=1)
+    g.op(None, "add", 5, a=5, b=7)                                 # + rim
+    dbg = os.environ.get("CW_DEBUG", "")
+    if dbg == "light":
+        g.op(None, "add", 4, a=5, b=7)                             # r4: the light alone (on white)
+        g.op(None, "add", 4, a=5, b=5)
+        g.op(None, "mix", 4, a=4, b=5, f=1.0)
+    elif dbg != "albedo":
+        g.op(None, "multiply", 4, a=4, b=5)                        # r4: lit colour
+    # ---- distance haze ----
+    g.op(None, "input", 7, inp="cameraDistance")
+    g.op("hazeRamp", "remap", 7, a=7, k=[70.0, 700.0, 0.0, 0.85], f=1.0)
+    g.op("haze", "constant", 1, k=pc("haze", 1.0) + [1.0])
+    g.op(None, "mixBy", 4, a=4, b=1, c=7)
+    # ---- emission, into r2 ----
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
-    g.op("lineCol", "constant", 3, k=C("sandHot", line) + [1.0])
-    g.op(None, "multiply", 2, a=2, b=3)                            # r2: emission (an accent)
-    g.op("stone", "constant", 3, k=C("stone") + [1.0])
-    g.op("grit", "constant", 4, k=C("sand") + [1.0])
-    g.op(None, "mixBy", 1, a=3, b=4, c=1)                          # r1: albedo
-    L = _unit([-x for x in MOON_DIR])
-    g.op(None, "input", 3, inp="normal")
-    g.op("moonDot", "gradient", 3, a=3, k=L + [0.0], f=1.0)
-    g.op("moon", "constant", 4, k=C("moon", moon) + [1.0])
-    g.op(None, "multiply", 3, a=3, b=4)                            # r3: moonlight
-    if counter > 0.0:
-        # a cool counter light low from the opposite quarter: the ridges' other flanks, so the relief reads both ways
-        Lc = _unit([-MOON_DIR[0], 0.28, -MOON_DIR[2] * 0.4 + 0.6])
-        g.op(None, "input", 4, inp="normal")
-        g.op("counterDot", "gradient", 4, a=4, k=Lc + [0.0], f=1.0)
-        g.op(None, "power", 4, a=4, f=2.0)                          # a tighter, grazing lobe
-        g.op("counter", "constant", 5, k=C("counter", counter) + [1.0])
-        g.op(None, "multiply", 4, a=4, b=5)
-        g.op(None, "add", 3, a=3, b=4)
-    g.op("sky", "constant", 4, k=C("horizon", sky) + [1.0])
-    g.op(None, "add", 3, a=3, b=4)                                 # r3: all the light
-    dbg = os.environ.get("CW_DEBUG", "")
-    if dbg == "albedo":       # the base colours alone
+    g.op("line", "constant", 1, k=pc("line", P_["lineI"]) + [1.0])
+    g.op(None, "multiply", 2, a=2, b=1)
+    g.op(None, "swizzle", 6, a=0, k=[0, 0, 0, 0])
+    g.op(None, "smoothstep", 6, a=6, k=[0.04, 0.3])
+    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.0, 0.0], f=1.0)     # 1 where no sand: the antinodes
+    g.op(None, "multiply", 6, a=6, b=3)
+    g.op(None, "multiply", 6, a=6, b=3)                            # x amplitude^2: only the hardest-ringing hollows
+    g.op(None, "multiply", 6, a=6, b=3)                            # ^3: sparse
+    g.op("hollow", "constant", 1, k=pc("hollow", P_["hollowI"]) + [1.0])
+    g.op(None, "multiply", 6, a=6, b=1)
+    g.op(None, "add", 2, a=2, b=6)                                 # r2: emission
+    if dbg in ("albedo", "light"):
         g.op(None, "constant", 2, k=[0, 0, 0, 1])
-    elif dbg == "light":      # the light alone, on a white surface
-        g.op(None, "constant", 4, k=[1, 1, 1, 1])
-        g.op(None, "multiply", 1, a=3, b=4)
-        g.op(None, "constant", 2, k=[0, 0, 0, 1])
-    elif dbg == "emission":   # the emission alone
-        g.op(None, "constant", 1, k=[0, 0, 0, 1])
-    elif dbg == "normal":
-        g.op(None, "input", 1, inp="normal")
-        g.op(None, "remap", 1, a=1, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
-        g.op(None, "constant", 2, k=[0, 0, 0, 1])
-    elif dbg == "depth":
-        g.op(None, "input", 1, inp="cameraDistance")
-        g.op(None, "remap", 1, a=1, k=[0.0, 250.0, 1.0, 0.0], f=1.0)
-        g.op(None, "constant", 2, k=[0, 0, 0, 1])
-    else:
-        g.op(None, "multiply", 1, a=1, b=3)                        # r1: lit colour (unlit output)
-    g.base, g.emit = 1, 2
+    elif dbg == "emission":
+        g.op(None, "constant", 4, k=[0, 0, 0, 1])
+    g.base, g.emit = 4, 2
     return g
 
 
@@ -503,13 +544,13 @@ def environment(s, rim=1.2):
     s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=rim, castsShadow=False)
 
 
-def ground(s, relief, counter=0.0, line=0.35, write_mesh=False, moon=6.0, sky=0.08):
+def ground(s, relief, write_mesh=False):
     if write_mesh:
         pos, nrm, idx = ground_mesh()
         write_glb(os.path.join(MESH_DIR, "cw-ground.glb"), pos, nrm, idx, "ground")
         print("ground: %d vertices, %d triangles, %.1f MB" % (len(pos), len(idx) // 3,
                                                               os.path.getsize(os.path.join(MESH_DIR, "cw-ground.glb")) / 1e6))
-    g = ground_program(counter, line, moon, sky)
+    g = ground_program()
     s.program(g.doc(base=g.base, emission=g.emit))
     s.proc("ground", {"kind": "mesh", "asset": GROUND_REL},
            material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
@@ -558,6 +599,7 @@ def field_instrument(s):
 
 
 POST = {
+    "post/motionBlur/amount": 0.0, "post/dof/physical": False,
     "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
     "post/output/grain": 0.012, "post/grade/contrast": 1.22, "post/lens/chromaticAberration": 0.0,
     "camera/exposure/compensation": 0.2, "post/dof/enabled": False,
@@ -602,15 +644,15 @@ def build_world():
          "reach": 46.0, "gain": 0.7, "depth": 9.0},
     ])
     ground_readers(s)
-    g = ground(s, relief=2.6, counter=0.9, line=0.45, write_mesh=True, moon=11.0, sky=0.03)
+    g = ground(s, relief=2.6, write_mesh=True)
     spires(s)
     s.camera = {"mode": 1, "position": [0.0, 16.0, 44.0], "target": [-2.0, -3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.arc_camera([-2.0, -3.0, 0.0], 44.0, 16.0, period=160.0, centre_deg=8.0, sweep_deg=80.0, steps=24, side=0.0,
                  lift=0.0, height_bob=2.0)
     s.params_({"camera/lens/focalLength": 26.0})
     F = field_instrument(s)
-    counter = "material/cwGround/op/%d/constant/constant" % g["counter"]
-    line = "material/cwGround/op/%d/constant/constant" % g["lineCol"]
+    counter = "material/cwGround/op/%d/constant/constant" % g["fill"]
+    line = "material/cwGround/op/%d/constant/constant" % g["line"]
     # the music's loudness lifts the counter light a little (a breath of light over the ridges, slow)
     s.route(R("level", counter, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=600, decayMs=2000))
     s.control = control_map(cc, pads)

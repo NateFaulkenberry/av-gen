@@ -130,6 +130,8 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
+  "post/motionBlur/amount": 0.0,
+  "post/dof/physical": false,
   "post/grade/contrast": 1.22,
   "post/lens/chromaticAberration": 0.0,
   "post/dof/enabled": false
@@ -237,7 +239,7 @@
   },
   {
    "source": "response.level",
-   "target": "material/cwGround/op/20/constant/constant",
+   "target": "material/cwGround/op/15/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -261,7 +263,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/20/constant/constant",
+   "target": "material/cwGround/op/15/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -274,7 +276,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/8/constant/constant",
+   "target": "material/cwGround/op/33/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
