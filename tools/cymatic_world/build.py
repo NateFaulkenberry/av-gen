@@ -441,8 +441,8 @@ PALETTES = {
           "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
           "sheen": "#e6f7ff", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
-    "B": {"stone": "#081236", "grit": "#0f5f74", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
-          "sky": "#1a1250", "haze": "#1d1356", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
+    "B": {"stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
+          "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
           "sheenI": 1.6,
           "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 2.4, "hollowI": 0.5},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
@@ -474,7 +474,7 @@ def ground_program():
     g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
     g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
     g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
-    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])          # r1: where grit has settled
+    g.op("gritMask", "smoothstep", 1, a=1, k=[0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
@@ -483,6 +483,11 @@ def ground_program():
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
     g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.5, 2.2])          # only where it rings hard
     g.op(None, "multiply", 3, a=3, b=7)
+    # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
+    # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
+    g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
+    g.op("wallBand", "smoothstep", 4, a=4, k=[0.025, 0.1])
+    g.op(None, "multiply", 3, a=3, b=4)
     g.op("hollow", "constant", 4, k=pc("hollow", P_["hollowI"]) + [1.0])
     g.op(None, "multiply", 3, a=3, b=4)
     g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
@@ -519,13 +524,11 @@ def ground_program():
         g.op(None, "add", 4, a=4, b=1)                             # + sheen
     # ---- distance haze: the far ground and walls fade into the world's air ----
     g.op(None, "input", 3, inp="cameraDistance")
-    g.op("hazeRamp", "remap", 3, a=3, k=[70.0, 700.0, 0.0, 0.85], f=1.0)
+    g.op("hazeRamp", "remap", 3, a=3, k=[45.0, 320.0, 0.0, 0.8], f=1.0)
     g.op("haze", "constant", 7, k=pc("haze", 1.0) + [1.0])
     g.op(None, "mixBy", 4, a=4, b=7, c=3)
     if dbg in ("albedo", "light"):
         g.op(None, "constant", 2, k=[0, 0, 0, 1])
-    elif dbg == "emission":
-        g.op(None, "constant", 4, k=[0, 0, 0, 1])
     g.base, g.emit = 4, 2
     return g
 
@@ -626,7 +629,7 @@ def build_world():
     raking warm moon and a cool counter light from the opposite quarter, so every ridge reads on both flanks and the
     hollows stay dark; the nodal lines carry a thin cold light only where the ground rings."""
     cc = CC_FIELD + [(5, "relief", "TERRAIN: how deeply the ground's sand relief is carved"),
-                     (8, "light", "LIGHT: the counter light over the ridges, and the nodal lines' glow")]
+                     (8, "light", "LIGHT: the fuchsia counter light over the ridges, and the nodal lines' glow")]
     pads = [PAD_STRIKE]
     s = kit.Scene("cymatic-world", "Cymatic World", design(
         "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, "
@@ -653,10 +656,27 @@ def build_world():
                  lift=0.0, height_bob=2.0)
     s.params_({"camera/lens/focalLength": 26.0})
     F = field_instrument(s)
-    counter = "material/cwGround/op/%d/constant/constant" % g["fill"]
-    line = "material/cwGround/op/%d/constant/constant" % g["line"]
-    # the music's loudness lifts the counter light a little (a breath of light over the ridges, slow)
-    s.route(R("level", counter, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=600, decayMs=2000))
+    OP = "material/cwGround/op/%d/constant/constant"
+    counter, line, hollow, sheen, grit = (OP % g["fill"], OP % g["line"], OP % g["hollow"], OP % g["sheen"],
+                                          OP % g["grit"])
+    # THE COLOUR AND LIGHT RESPONSE (the colour pass, Pass D). The field already places the light: the nodal-line
+    # glow is crest x the field's own amplitude, the hollow glow lives only on the inner walls of cells that ring hard,
+    # so every route below scales a SPATIALLY LOCALISED term, never the whole frame. Colour and brightness move on
+    # separate routes, on separate time scales:
+    #   persistent (seconds): the song's build (intensity, a 12 s follower) turns the grit from deep teal toward a
+    #     brighter cyan -- a HUE/value change of a material, no brightness pulse; held sound (sustain) builds the
+    #     hollow glow's presence.
+    #   transient (a few hundred ms): kicks flare the hollow glow where the cells already ring; snares brighten the
+    #     nodal lines; hats sharpen the stone's sheen (fine highlights only); spectral change (flux) lifts the
+    #     fuchsia counter-fill on the far flanks.
+    tgt = hexrgb("#0f6b82")
+    base = pc("grit")
+    s.route(*[R("intensity", grit, round(tgt[c] - base[c], 5), comp=c, attackMs=4000, decayMs=9000) for c in range(3)])
+    s.route(R("sustain", hollow, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000),
+            R("kickEnv", hollow, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380),
+            R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
+            R("hatEnv", sheen, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180),
+            R("flux", counter, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     s.route(R("control.light", counter, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR),

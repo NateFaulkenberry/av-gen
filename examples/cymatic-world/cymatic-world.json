@@ -238,16 +238,104 @@
    }
   },
   {
-   "source": "response.level",
-   "target": "material/cwGround/op/29/constant/constant",
+   "source": "response.intensity",
+   "target": "material/cwGround/op/20/constant/constant",
+   "amount": 0.00143,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 9000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "material/cwGround/op/20/constant/constant",
+   "amount": 0.08922,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 9000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "material/cwGround/op/20/constant/constant",
+   "amount": 0.12564,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 9000
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/cwGround/op/16/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 1500,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/cwGround/op/16/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.6,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "material/cwGround/op/8/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.9,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hatEnv",
+   "target": "material/cwGround/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
     "gain": 0.5,
     "offset": 1.0,
-    "attackMs": 600,
-    "decayMs": 2000
+    "attackMs": 0,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "material/cwGround/op/32/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.8,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 1500
    }
   },
   {
@@ -263,7 +351,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/29/constant/constant",
+   "target": "material/cwGround/op/32/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
