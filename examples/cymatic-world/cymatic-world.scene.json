@@ -75,7 +75,7 @@
      "kind": "none"
     },
     "resonance": {
-     "modes": 14.0,
+     "modes": 17.0,
      "fLow": 40.0,
      "fHigh": 6000.0,
      "lambdaMax": 16.0,
@@ -96,50 +96,76 @@
       {
        "kind": "point",
        "position": [
-        0.0,
+        7.0,
         3.0,
-        0.0
+        -7.0
        ],
-       "order": 8,
+       "order": 6,
        "bandLow": 0.0,
-       "bandHigh": 0.3,
+       "bandHigh": 0.15,
        "reach": 90.0,
        "gain": 1.0,
        "amplitude": 1.0,
        "breath": 0.4,
-       "drift": 3.0,
-       "driftPeriod": 120.0,
+       "drift": 12.0,
+       "driftPeriod": 100.0,
        "spin": 0.03,
        "orders": [
-        0,
         3,
         4,
         2,
-        6,
-        5
+        6
        ],
-       "focus": 0.13,
+       "focus": 0.07,
        "focusWidth": 0.045,
-       "focusSweep": 0.13,
+       "focusSweep": 0.09,
        "focusPeriod": 47.0,
-       "focusFloor": 0.04
+       "focusFloor": 0.03
       },
       {
        "kind": "point",
        "position": [
-        0.0,
+        -20.0,
+        2.0,
+        15.0
+       ],
+       "order": 6,
+       "bandLow": 0.15,
+       "bandHigh": 0.3,
+       "reach": 90.0,
+       "gain": 1.0,
+       "amplitude": 0.42,
+       "breath": 0.5,
+       "drift": 9.0,
+       "driftPeriod": 80.0,
+       "spin": -0.04,
+       "orders": [
+        3,
+        2,
+        5
+       ],
+       "focus": 0.23,
+       "focusWidth": 0.045,
+       "focusSweep": 0.09,
+       "focusPeriod": 61.0,
+       "focusFloor": 0.03
+      },
+      {
+       "kind": "point",
+       "position": [
         3.0,
-        0.0
+        3.0,
+        -3.5
        ],
        "order": 8,
        "bandLow": 0.3,
        "bandHigh": 0.66,
        "reach": 80.0,
        "gain": 0.9,
-       "amplitude": 0.55,
+       "amplitude": 0.5,
        "breath": 0.7,
-       "drift": 3.0,
-       "driftPeriod": 120.0,
+       "drift": 6.0,
+       "driftPeriod": 100.0,
        "spin": 0.045,
        "orders": [
         0,
@@ -153,29 +179,7 @@
        "focusWidth": 0.05,
        "focusSweep": 0.16,
        "focusPeriod": 29.0,
-       "focusFloor": 0.04
-      },
-      {
-       "kind": "point",
-       "position": [
-        -23.0,
-        0.0,
-        9.0
-       ],
-       "order": 5,
-       "bandLow": 0.4,
-       "bandHigh": 0.48,
-       "reach": 55.0,
-       "gain": 0.8,
-       "amplitude": 0.45,
-       "breath": 0.7,
-       "drift": 7.0,
-       "driftPeriod": 90.0,
-       "spin": 0.05,
-       "orders": [
-        3,
-        5
-       ]
+       "focusFloor": 0.03
       },
       {
        "kind": "lattice",
@@ -210,7 +214,7 @@
      "rippleArea": 30.0,
      "rippleCount": 2.0,
      "rippleFade": 0.35,
-     "layout": 18.0,
+     "layout": 22.0,
      "attack": [
       0.18,
       0.08,
@@ -263,15 +267,16 @@
     },
     "resonance": {
      "channel": "relief",
-     "sharpness": 0.7,
+     "sharpness": 0.5,
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
-     "reliefVibration": 0.25,
+     "reliefVibration": 0.2,
      "listenLow": 0.0,
      "listenHigh": 0.3,
      "listenWidth": 0.04,
-     "reliefSand": 0.55,
-     "reliefFigure": 0.8
+     "reliefSand": 1.0,
+     "reliefAmplitude": -0.55,
+     "reliefRound": 0.35
     }
    }
   },
@@ -292,7 +297,7 @@
     },
     "resonance": {
      "channel": "relief",
-     "sharpness": 0.45,
+     "sharpness": 0.5,
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
      "reliefVibration": 0.0,
@@ -300,7 +305,8 @@
      "listenHigh": 0.7,
      "listenWidth": 0.04,
      "reliefSand": 1.0,
-     "reliefAmplitude": -0.3
+     "reliefAmplitude": -0.35,
+     "reliefRound": 0.3
     }
    }
   },
@@ -364,7 +370,7 @@
      {
       "kind": "field",
       "field": "relief-large",
-      "amount": 3.2,
+      "amount": 3.4,
       "axis": [
        0.0,
        1.0,
@@ -376,7 +382,7 @@
      {
       "kind": "field",
       "field": "relief-medium",
-      "amount": 1.2,
+      "amount": 0.8,
       "axis": [
        0.0,
        1.0,

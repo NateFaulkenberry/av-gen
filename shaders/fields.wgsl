@@ -651,6 +651,14 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec4<f32> {
     return sums;
 }
 
+// ADR-1405: |x| with its cusp rounded over c (c = 0: exactly |x|)
+fn resonanceRoundAbs(x: f32, c: f32) -> f32 {
+    if (c > 0.0) {
+        return sqrt(x * x + c * c) - c;
+    }
+    return abs(x);
+}
+
 fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     let channel = u32(fieldBlock.fields[fi].gridBounds0.z + 0.5);
     let s = resonanceSums(fi, q, channel == RES_CHANNEL_SAND || channel == RES_CHANNEL_RELIEF);
@@ -658,7 +666,7 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
         let lanes = fieldBlock.fields[fi].gridRes;
         let more = fieldBlock.fields[fi].wave0; // ADR-1405: (sand, signed figure, |figure|) weights
         return more.x * resonanceSand(s.xyz, fieldBlock.fields[fi].gridBounds1.w) + lanes.z * resonanceSand(s.xyz, lanes.y) +
-               lanes.w * s.x + more.y * s.w + more.z * abs(s.w);
+               lanes.w * s.x + more.y * s.w + more.z * resonanceRoundAbs(s.w, more.w * sqrt(max(s.z, 0.0)));
     }
     if (channel == RES_CHANNEL_DISPLACEMENT) {
         return s.x;

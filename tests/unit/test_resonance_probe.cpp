@@ -342,11 +342,12 @@ TEST_CASE("resonance trace (diagnostic)", "[.resonance-trace]") {
     set.audio = std::make_shared<const spatial::AudioHistory>(analysis::buildAudioHistory(track));
     const spatial::FieldSpec* resonator = nullptr;
     const spatial::FieldSpec* relief = nullptr;
+    const std::string want = std::getenv("CW_FIELD") ? std::getenv("CW_FIELD") : "relief";
     for (const auto& f : set.fields) {
         if (f.isResonance() && f.reference.empty()) {
             resonator = &f;
         }
-        if (f.name == "relief") {
+        if (f.name == want || (relief == nullptr && f.isResonance() && f.resonance.channel == spatial::ResonanceChannel::Relief)) {
             relief = &f;
         }
     }

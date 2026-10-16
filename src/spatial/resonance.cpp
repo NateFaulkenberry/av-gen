@@ -250,7 +250,7 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
         return fail("field '{}': resonance listening window must be 0 <= listenLow <= listenHigh <= 1, width >= 0",
                     field);
     }
-    if (!(finite(reliefSand) && finite(reliefFigure) && finite(reliefAmplitude))) {
+    if (!(finite(reliefSand) && finite(reliefFigure) && finite(reliefAmplitude) && reliefRound >= 0.0f && reliefRound <= 10.0f)) {
         return fail("field '{}': resonance relief weights must be finite", field);
     }
     if (!(sharpness > 0.0f && finite(sharpness) && reliefLineSharpness > 0.0f && finite(reliefLine) &&
@@ -266,7 +266,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
                           memory, competition, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
                           reliefLine, reliefLineSharpness, reliefVibration, derivativeStep, ripple, rippleSpeed, rippleLife,
                           rippleWidth, rippleArea, rippleCount, rippleFade, layout, attack[0], attack[1], attack[2],
-                          release[0], release[1], release[2], reliefSand, reliefFigure, reliefAmplitude}) {
+                          release[0], release[1], release[2], reliefSand, reliefFigure, reliefAmplitude, reliefRound}) {
         h.f32(v);
     }
     h.u8(static_cast<std::uint8_t>(channel));
@@ -393,10 +393,11 @@ json ResonanceSpec::toJson() const {
         j["reliefLine"] = reliefLine;
         j["reliefLineSharpness"] = reliefLineSharpness;
         j["reliefVibration"] = reliefVibration;
-        if (reliefSand != 1.0f || reliefFigure != 0.0f || reliefAmplitude != 0.0f) { // ADR-1405
+        if (reliefSand != 1.0f || reliefFigure != 0.0f || reliefAmplitude != 0.0f || reliefRound != 0.0f) { // ADR-1405
             j["reliefSand"] = reliefSand;
             j["reliefFigure"] = reliefFigure;
             j["reliefAmplitude"] = reliefAmplitude;
+            j["reliefRound"] = reliefRound;
         }
     }
     return j;
@@ -455,6 +456,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.reliefSand, "reliefSand", detail::readFloat);
     AVGEN_SPATIAL_READ(r.reliefFigure, "reliefFigure", detail::readFloat);
     AVGEN_SPATIAL_READ(r.reliefAmplitude, "reliefAmplitude", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.reliefRound, "reliefRound", detail::readFloat);
     if (j.contains("probe")) {
         glm::vec3 p(0.0f);
         AVGEN_SPATIAL_READ(p, "probe", detail::readVec3);
@@ -1085,6 +1087,11 @@ ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader
 
 namespace {
 
+// ADR-1405: |x| with its cusp rounded over c (c = 0: exactly |x|)
+float roundAbs(float x, float c) {
+    return c > 0.0f ? std::sqrt(x * x + c * c) - c : std::abs(x);
+}
+
 float sandOf(const ResonanceSums& s, float sharpness) {
     if (!(s.meanEnergy > 1e-12f)) {
         return 0.0f;
@@ -1099,7 +1106,8 @@ float scalarChannel(const ResonanceSums& s, const ResonanceSpec& r) {
     switch (channel) {
     case ResonanceChannel::Relief:
         return r.reliefSand * sandOf(s, sharpness) + r.reliefLine * sandOf(s, r.reliefLineSharpness) +
-               r.reliefVibration * s.displacement + r.reliefFigure * s.figure + r.reliefAmplitude * std::abs(s.figure);
+               r.reliefVibration * s.displacement + r.reliefFigure * s.figure +
+               r.reliefAmplitude * roundAbs(s.figure, r.reliefRound * std::sqrt(std::max(s.meanEnergy, 0.0f)));
     case ResonanceChannel::Displacement:
         return s.displacement;
     case ResonanceChannel::Amplitude:

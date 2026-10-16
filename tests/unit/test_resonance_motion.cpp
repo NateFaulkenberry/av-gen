@@ -491,6 +491,18 @@ TEST_CASE("The relief's signed-figure and magnitude terms raise lobes, sink anti
     CHECK(spatial::resonanceScalar(st, relief, {0.0f, 0.0f, 0.0f}) == Approx(-phi0));
     CHECK(spatial::resonanceScalar(st, relief, {3.14159265f / k, 0.0f, 0.0f}) == Approx(-phi0));
     CHECK(spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k, 0.0f, 0.0f}) == Approx(0.0f).margin(1e-5));
+    // a rounded magnitude: smooth through the node (no cusp), still |F| far from it
+    relief.resonance.reliefRound = 0.5f;
+    const float eps = 0.02f;
+    const float left = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k - eps, 0.0f, 0.0f});
+    const float mid = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k, 0.0f, 0.0f});
+    const float right = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k + eps, 0.0f, 0.0f});
+    CHECK(std::abs(left - 2.0f * mid + right) < 1e-3f); // the crest is round: no kink at the node
+    relief.resonance.reliefRound = 0.0f;
+    const float kinkL = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k - eps, 0.0f, 0.0f});
+    const float kinkM = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k, 0.0f, 0.0f});
+    const float kinkR = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k + eps, 0.0f, 0.0f});
+    CHECK(std::abs(kinkL - 2.0f * kinkM + kinkR) > 5e-3f); // the exact |F| has its cusp
     // the default weights are ADR-1400's relief
     spatial::FieldSpec plain;
     plain.kind = spatial::FieldKind::Resonance;

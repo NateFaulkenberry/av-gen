@@ -370,7 +370,7 @@ def reader(s, name, channel, extra=None, frame=None):
 #   P2 nodal boundaries       -- the nodal lines stand as ridges (sand) between antinode basins (-|F|); medium: creases
 #   P3 hybrid                 -- large: signed lobes with their nodal ridges; medium: nodal creases; fine: vibration
 SCALES = {"large": (0.0, 0.3), "medium": (0.28, 0.7), "fine": (0.68, 1.0)}
-LAYOUT = 18.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYOUT - 1)
+LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYOUT - 1)
 # DEBUG VIEWS (08-brief §16), build-time like the palettes: CW_DEBUG=
 #   mode:<i>        the geometry of ONE mode (its nodal figure), every scale's reader listening to it alone
 #   scale:<name>    only that scale's deformer (large, medium, fine)
@@ -378,13 +378,14 @@ LAYOUT = 18.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 #   nodal           the material shows the nodal lines (sand) of the whole figure, white on black
 #   envelope        the material shows the excitation |F| (the fast figure's amplitude), black to orange
 DEBUG = os.environ.get("CW_DEBUG", "")
-PROTO = os.environ.get("CW_PROTO", "P3")
+PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
 SHAPES = {
     "P1": {"large": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.35}, 3.2),
            "medium": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.3}, 1.3),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
-    "P2": {"large": ({"reliefSand": 1.0, "sharpness": 0.75, "reliefAmplitude": -0.7, "reliefVibration": 0.2}, 3.4),
-           "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.35}, 1.2),
+    "P2": {"large": ({"reliefSand": 1.0, "sharpness": 0.5, "reliefAmplitude": -0.55, "reliefRound": 0.35,
+                     "reliefVibration": 0.2}, 3.4),
+           "medium": ({"reliefSand": 1.0, "sharpness": 0.5, "reliefAmplitude": -0.35, "reliefRound": 0.3}, 0.8),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
     "P3": {"large": ({"reliefSand": 0.55, "sharpness": 0.7, "reliefFigure": 0.8, "reliefVibration": 0.25}, 3.2),
            "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.3}, 1.2),
@@ -469,7 +470,7 @@ def ground_program():
     if dbg in ("signed", "nodal", "envelope"):  # the debug views' material (08-brief §16): the field, lit by the key
         g.op("view", "field", 0, field="dbgview")
         if dbg == "signed":
-            g.op(None, "remap", 1, a=0, k=[-1.2, 1.2, 0.0, 1.0], f=1.0)
+            g.op(None, "remap", 1, a=0, k=[-0.6, 0.6, 0.0, 1.0], f=1.0)
             g.op(None, "ramp", 4, a=1, k=[0.1, 0.25, 1.0, 1.0], k2=[0.85, 0.85, 0.85, 1.0], k3=[1.0, 0.2, 0.1, 1.0])
         elif dbg == "nodal":
             g.op(None, "remap", 1, a=0, k=[0.0, 0.6, 0.0, 1.0], f=1.0)
@@ -656,28 +657,31 @@ def build_world():
     # one or two lead a scale, so its figure is legible), petals turn slowly (some against the others) and the centres
     # wander a little: the figure transforms instead of sliding apart.
     resonator(s, [
-        # P, the plate's large figure: frame-filling lobes, stars and rings about one centre (bass); competition
-        # within it lets one or two modes lead, so the figure is legible
-        {"kind": "point", "position": [0.0, 3.0, 0.0], "order": 8, "bandLow": 0.0, "bandHigh": 0.3, "reach": 90.0,
-         "gain": 1.0, "amplitude": 1.0, "breath": 0.4, "drift": 3.0, "driftPeriod": 120.0, "spin": 0.03,
-         "orders": [0, 3, 4, 2, 6, 5],
-         # ADR-1405: a focus window leads one or two modes at a time, sweeping the bank: the figure morphs from one
-         # designed mode to the next (rings -> 4 lobes -> 6 -> a trefoil -> ...) instead of all ringing at once
-         "focus": 0.13, "focusWidth": 0.045, "focusSweep": 0.13, "focusPeriod": 47.0, "focusFloor": 0.04},
-        # M, the plate's medium figure: finer rings and petals about the SAME centre, so they nest inside the large ones
-        {"kind": "point", "position": [0.0, 3.0, 0.0], "order": 8, "bandLow": 0.3, "bandHigh": 0.66, "reach": 80.0,
-         "gain": 0.9, "amplitude": 0.55, "breath": 0.7, "drift": 3.0, "driftPeriod": 120.0, "spin": 0.045,
+        # A, the large figure about an off-centre point (bass): frame-filling rings, stars and lobes; its focus leads one
+        # or two modes and sweeps the bank. The centre sits off the frame's middle and wanders, so the frame is never one
+        # centred target
+        {"kind": "point", "position": [7.0, 3.0, -7.0], "order": 6, "bandLow": 0.0, "bandHigh": 0.15, "reach": 90.0,
+         "gain": 1.0, "amplitude": 1.0, "breath": 0.4, "drift": 12.0, "driftPeriod": 100.0, "spin": 0.03,
+         "orders": [3, 4, 2, 6],
+         "focus": 0.07, "focusWidth": 0.045, "focusSweep": 0.09, "focusPeriod": 47.0, "focusFloor": 0.03},
+        # B, a second large figure about a centre off to the south-west: where A and B both ring, their rings interfere
+        # (hyperbolic nodal lines, unequal lobes); as the two foci sweep at different rates the large figure moves from
+        # A's to B's through their interference
+        {"kind": "point", "position": [-20.0, 2.0, 15.0], "order": 6, "bandLow": 0.15, "bandHigh": 0.3, "reach": 90.0,
+         "gain": 1.0, "amplitude": 0.42, "breath": 0.5, "drift": 9.0, "driftPeriod": 80.0, "spin": -0.04,
+         "orders": [3, 2, 5],
+         "focus": 0.23, "focusWidth": 0.045, "focusSweep": 0.09, "focusPeriod": 61.0, "focusFloor": 0.03},
+        # M, the medium figure: finer rings and petals about a centre a few metres from A's -- nested inside the large
+        # lobes, but eccentric, so the frame is never a bullseye (rings live here, not in the large figure)
+        {"kind": "point", "position": [3.0, 3.0, -3.5], "order": 8, "bandLow": 0.3, "bandHigh": 0.66, "reach": 80.0,
+         "gain": 0.9, "amplitude": 0.5, "breath": 0.7, "drift": 6.0, "driftPeriod": 100.0, "spin": 0.045,
          "orders": [0, 8, 4, 6, 3, 5],
-         "focus": 0.48, "focusWidth": 0.05, "focusSweep": 0.16, "focusPeriod": 29.0, "focusFloor": 0.04},
-        # S, a second centre off to the west: one or two petal modes that bend the plate's figure (controlled asymmetry)
-        {"kind": "point", "position": list(SECOND), "order": 5, "bandLow": 0.4, "bandHigh": 0.48, "reach": 55.0,
-         "gain": 0.8, "amplitude": 0.45, "breath": 0.7, "drift": 7.0, "driftPeriod": 90.0, "spin": 0.05,
-         "orders": [3, 5]},
+         "focus": 0.48, "focusWidth": 0.05, "focusSweep": 0.16, "focusPeriod": 29.0, "focusFloor": 0.03},
         # F, the fine layer: standing bands, squares and hexagons, faint and local
         {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.66, "bandHigh": 1.0,
          "reach": 46.0, "gain": 0.55, "amplitude": 0.1, "breath": 1.5, "depth": 9.0, "drift": 2.0,
          "driftPeriod": 60.0, "spin": 0.02, "orders": [2, 1, 3]},
-    ], modes=14.0, lambdaMax=16.0, lambdaMin=2.6, competition=1.5, selectivity=4.0, limit=1.5, breath=0.15,
+    ], modes=17.0, lambdaMax=16.0, lambdaMin=2.6, competition=1.5, selectivity=4.0, limit=1.5, breath=0.15,
        # E, transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
        ripple=0.5, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35,
        # ADR-1404: fixed mode places (a route on `modes` adds modes, it never re-places them), and per-band response

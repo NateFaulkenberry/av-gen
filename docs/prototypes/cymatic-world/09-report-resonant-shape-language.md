@@ -108,3 +108,62 @@ On the same passage with the same `modes` ramp:
 | Ripple layer, worst step (% of rms) | 223% | 43% |
 
 None of this came from slowing the animation: the median frame-to-frame motion of the large layers is unchanged or larger.
+
+## Stage 3: the shape and interference system (P2 built out)
+
+### The bank
+
+| Source | Role | Centre | Band (u) | Orders | λ | Focus sweep | Notes |
+|---|---|---|---|---|---|---|---|
+| A, large | lobes and stars | (7, 3, −7), wanders 12 m / 100 s | 0-0.15 | [3, 4, 2, 6] | 16-11 m | every 47 s | |
+| B, large | a second centre | (−20, 2, 15) | 0.15-0.3 | [3, 2, 5] | 11-7.5 m | every 61 s | amplitude 0.42: it bends A's figure, never replaces it |
+| M, medium | rings and petals nested in the large lobes | (3, 3, −3.5), eccentric to A | 0.3-0.66 | [0, 8, 4, 6, 3, 5] | 7.5-3.8 m | every 29 s | |
+| F, fine | standing bands, squares, hexagons | | 0.66-1 | | | | amplitude 0.1 |
+
+The rest of the resonator:
+- layout 22 and base modes 17 (the song's build fills the bank to 22, never re-placing it);
+- λ 16 → 2.6 m; competition 1.5; selectivity 4; per-band attack 0.18 / 0.08 / 0.04 s and release 3 / 1.4 / 0.6 s;
+- ripples at 0.5, two a band, fading over 0.35 s.
+
+### Geometry, per scale (P2)
+
+| Scale | Shaping | Amount |
+|---|---|---|
+| Large | nodal ridge (sand, sharpness 0.5) + antinode basins (−0.55·\|F\|, rounded) + 0.2 vibration | 3.4 m |
+| Medium | sharper creases (sharpness 0.5) + −0.35·\|F\| | 0.8 m |
+| Fine | the vibration alone | 0.25 m |
+
+### What changed after the Stage 2 gate, and why
+
+- **The centred bullseye.**
+  - The plate's centre now wanders across the frame, and B, off to the south-west, bends its figure.
+  - The large figure carries lobes (orders 2-6) and rings live only in the medium, about a centre eccentric to A's. A trace at 96 s showed that a large ring mode and a medium ring mode about one centre made a bullseye, and from the oblique camera an apparent spiral (the rejected vortex).
+  - Tried and rejected: moving both large centres 24 m off-frame with longer wavelengths (30 m). The frame then saw only their outer folds, which read as drapery, not structure.
+- **Medium clutter.** M's amplitude is 0.55 and its deformer 0.8 m. The separate petal source is gone, so the medium figure always nests in the large one.
+- **The rounded crease (ADR-1405 `reliefRound`).** The antinode basins' −|F| put a cusp on every nodal line, a crest no mesh can carry, which was the main source of the sawtooth. |F| is now √(F² + (cσ)²) − cσ with c = 0.35 (large) and 0.3 (medium), σ the figure's local rms. A test checks that the crest is round (zero second difference at the node) where the exact |F| has its kink. Sawtooth from the mesh itself remains for Stage 7.
+
+**Result:** `stage3-shape-system/shape-system-geometry-only-hyperborea-40-70s.mp4` and `shape-system-stills-geometry-only.png` (10, 44, 52, 60, 68, 96, 116, 134 s). In neutral grey:
+- a trefoil star with rings over the fine hexagons (quiet, 10 s);
+- sculpted cells (44, 52 s);
+- spokes crossing bands (60 s);
+- a radial fan (68 s);
+- off-centre rosettes (96, 116 s);
+- nested arcs (134 s).
+
+The nodal network is the subject, with large forms leading and medium figures nested in them.
+
+### Debug views (§16)
+
+These are build-time, like the palettes; `CW_DEBUG=` selects one:
+
+| View | Shows |
+|---|---|
+| `mode:<i>` | one mode's figure in the geometry |
+| `scale:large\|medium\|fine` | one scale's deformer alone |
+| `signed` | the signed standing figure, blue to red, on the real geometry |
+| `nodal` | the nodal lines, white on black |
+| `envelope` | the excitation \|F\| |
+
+The envelopes, phases, limiter and ripples over time come from the `[.resonance-trace]` diagnostic and `trace_video.py`.
+
+Sheets: `stage1-audit/modes-isolated-hyperborea-50s.png` and `stage3-shape-system/debug-views-60s-116s.png`.

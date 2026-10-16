@@ -190,6 +190,9 @@ struct ResonanceSpec {
     float reliefSand = 1.0f;
     float reliefFigure = 0.0f;
     float reliefAmplitude = 0.0f;
+    // ... and how round the magnitude's crease is: |F| becomes sqrt(F^2 + (c sigma)^2) - c sigma, sigma = sqrt(Ebar) the
+    // figure's local rms. 0 = the exact |F|, whose cusp on every nodal line is a crest no mesh can carry (a sawtooth).
+    float reliefRound = 0.0f;
     // ADR-1402: a reader may publish its value at one world point to the signal bus every frame, as
     // `field.<name>.probe` (the coupling hook: a route can let one part of the field drive another).
     std::optional<glm::vec3> probe;

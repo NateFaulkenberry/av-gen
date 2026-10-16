@@ -338,6 +338,7 @@ TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (AD
     shaped.resonance.reliefSand = 0.4f;
     shaped.resonance.reliefFigure = 1.1f;
     shaped.resonance.reliefAmplitude = -0.7f;
+    shaped.resonance.reliefRound = 0.3f;
     shaped.resonance.reliefVibration = 0.3f;
     fields.fields.push_back(shaped);
     fields.audio = song(4000);
