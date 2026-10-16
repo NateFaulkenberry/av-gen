@@ -4,6 +4,11 @@
 //
 //   avgen_world_preview [--biomes] [--seams] [world.json] [out.png] [pixels] [probeX probeZ]...
 //   avgen_world_preview --terrain <style> [--seed N] [--set key=value]... [out.png] [pixels]
+//   avgen_world_preview --heights <points.txt> <heights.txt> [world.json] [out.png] [pixels]
+//
+// `--heights` answers the ground height at every "x z" line of points.txt, one line of heights.txt each:
+// the batch form of the probes, for a generator that builds its own mesh over a WorldMap's geography
+// (Cymatic World's resonant ground, ADR-1400, which the GPU deforms and so cannot be a terrain node).
 //
 // The second form generates a map from `terrain_gen`'s artistic parameters instead of loading one,
 // which is the only way to look at a style before it has been committed to a recipe. It installs the
@@ -230,6 +235,8 @@ int main(int argc, char** argv) {
     bool seams = false;
     bool generate = false;
     std::string recipePath;
+    std::string heightsIn;
+    std::string heightsOut;
     world::TerrainParams params;
     while (arg < argc && std::string(argv[arg]).rfind("--", 0) == 0) {
         const std::string flag = argv[arg];
@@ -248,6 +255,10 @@ int main(int argc, char** argv) {
             params = world::terrainPreset(*style);
             generate = true;
             arg += 2;
+        } else if (flag == "--heights" && arg + 2 < argc) {
+            heightsIn = argv[arg + 1];
+            heightsOut = argv[arg + 2];
+            arg += 3;
         } else if (flag == "--recipe" && arg + 1 < argc) {
             recipePath = argv[arg + 1];
             generate = true;
@@ -467,6 +478,26 @@ int main(int argc, char** argv) {
         }
     }
     const std::size_t seamCount = seams ? scanSeams(map, size, rgba) : 0;
+    if (!heightsIn.empty()) {
+        std::ifstream in(heightsIn);
+        std::FILE* out = std::fopen(heightsOut.c_str(), "w");
+        if (!in || out == nullptr) {
+            std::fprintf(stderr, "--heights: cannot read %s or write %s\n", heightsIn.c_str(), heightsOut.c_str());
+            if (out != nullptr) {
+                std::fclose(out);
+            }
+            return 1;
+        }
+        float x = 0.0f;
+        float z = 0.0f;
+        std::size_t n = 0;
+        while (in >> x >> z) {
+            std::fprintf(out, "%.4f\n", map.height(glm::vec2(x, z)));
+            ++n;
+        }
+        std::fclose(out);
+        std::printf("heights: %zu points -> %s\n", n, heightsOut.c_str());
+    }
     // Probes: the heights a scene author actually needs -- where to stand a camera, where the ground
     // is under a focal point -- printed rather than guessed at from a colour ramp. The water level
     // too, not only whether it is wet: a surface that jumps between two probes a step apart is a

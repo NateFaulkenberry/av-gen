@@ -171,6 +171,7 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
             r.f("resonance/persistence", "ring-down of the lowest mode (s)", rs.persistence, 0.01f, 30.0f, 0.2f, 8.0f);
             r.f("resonance/buildup", "rise, as a share of the ring-down", rs.buildup, 0.0f, 1.0f, 0.0f, 1.0f);
             r.f("resonance/memory", "the sand's memory (s)", rs.memory, 0.0f, 30.0f, 0.0f, 6.0f);
+            r.f("resonance/competition", "mode competition", rs.competition, 0.0f, 8.0f, 0.0f, 4.0f);
             r.f("resonance/sustain", "excitation by sustained sound", rs.sustain, -100.0f, 100.0f, 0.0f, 4.0f);
             r.f("resonance/transient", "excitation by onsets", rs.transient, -100.0f, 100.0f, 0.0f, 4.0f);
             r.f("resonance/idle", "level in silence", rs.idle, 0.0f, 100.0f, 0.0f, 1.0f);
@@ -288,6 +289,7 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
         copyValue(p, "resonance/persistence", rs.persistence);
         copyValue(p, "resonance/buildup", rs.buildup);
         copyValue(p, "resonance/memory", rs.memory);
+        copyValue(p, "resonance/competition", rs.competition);
         copyValue(p, "resonance/sustain", rs.sustain);
         copyValue(p, "resonance/transient", rs.transient);
         copyValue(p, "resonance/idle", rs.idle);

@@ -1,0 +1,174 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "cymatic-world.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.18,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.012,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.9,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 28.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.08,
+  "post/lens/chromaticAberration": 0.0,
+  "post/dof/enabled": false
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": []
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-cymatic-world.mp4"
+ },
+ "sonicScene": {
+  "category": "abstract",
+  "thesis": "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, the grit settles on its nodal lines, and the world's forms each answer the same field.",
+  "composition": {
+   "background": "a ring of far mountains under an indigo sky",
+   "midground": "the basin's terraced rim",
+   "foreground": "the basin floor, its sand relief drawing the figure",
+   "focal": "the basin's centre",
+   "camera": "an elevated three-quarter view from the rim's gap"
+  },
+  "palette": {
+   "dominant": "#0d0c16",
+   "secondary": "#4a4766",
+   "accent": "#8fe8ff",
+   "highlight": "#7a3cff",
+   "background_value": "near black",
+   "saturation": "low, with selective cyan and violet"
+  },
+  "tier": "one field, three consumers",
+  "id": "cymatic-world",
+  "title": "Cymatic World"
+ }
+}

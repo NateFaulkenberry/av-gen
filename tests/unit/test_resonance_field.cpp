@@ -409,3 +409,45 @@ TEST_CASE("The sand's memory settles slower and remembers longer than the vibrat
     const auto same = spatial::evaluateResonance(f, h, 2.5);
     CHECK(same.memory[0] == Approx(same.envelope[0]).epsilon(1e-4));
 }
+
+TEST_CASE("Mode competition lets the strongest mode lead without silencing the field", "[unit][resonance]") {
+    auto f = resonator(8.0f);
+    // A loud low tone and a quieter high one, held.
+    const auto h = history(10.0, [](double, int b) {
+        return b == binOf(50.0f) ? 1.0f : (b == binOf(3500.0f) ? 0.5f : 0.0f);
+    });
+    f.resonance.competition = 0.0f;
+    const auto free = spatial::evaluateResonance(f, h, 9.0);
+    f.resonance.competition = 2.0f;
+    const auto fought = spatial::evaluateResonance(f, h, 9.0);
+    const float freeRatio = free.modes[7].drive.y / free.modes[0].drive.y;
+    const float foughtRatio = fought.modes[7].drive.y / fought.modes[0].drive.y;
+    CHECK(foughtRatio < 0.5f * freeRatio);
+    CHECK(fought.modes[0].drive.y > 0.0f);
+    // The driven envelopes (diagnostics) are the same either way: competition acts after the drive.
+    CHECK(fought.envelope[0] == free.envelope[0]);
+}
+
+TEST_CASE("Sand gathers on nodal LINES of the superposed figure, not only where every mode vanishes",
+          "[unit][resonance]") {
+    // Two crossed one-direction modes of equal weight: F ~ cos(kx) + cos(kz), zero along the diagonal lines
+    // x + z = pi / k (+ 2 pi n / k). Each mode alone is non-zero almost everywhere on that line.
+    spatial::FieldSpec f = resonator(2.0f);
+    f.resonance.channel = spatial::ResonanceChannel::Sand;
+    spatial::ResonanceState st;
+    st.count = 2;
+    st.lambdaMin = 8.0f;
+    const float k = 6.2831853f / 8.0f;
+    st.modes[0].shape = glm::vec4(k, 1.0f, 0.0f, 1.0f);              // cos(k x)
+    st.modes[1].shape = glm::vec4(k, 1.0f, 1.5707963f, 1.0f);        // cos(k z)
+    st.modes[0].drive = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    st.modes[1].drive = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f);
+    const float a = 3.14159265f / (2.0f * k);
+    float onLine = 1e9f;
+    for (float t = -1.5f; t <= 1.5f; t += 0.25f) {
+        onLine = std::min(onLine, spatial::resonanceScalar(st, f, glm::vec3(a + t, 0.0f, a - t)));
+    }
+    const float offLine = spatial::resonanceScalar(st, f, glm::vec3(0.0f, 0.0f, 0.0f)); // both antinodes
+    CHECK(onLine > 0.9f * std::sqrt(2.0f)); // the whole line carries sand (sqrt(Ebar) = sqrt(2))
+    CHECK(offLine < 0.01f);
+}

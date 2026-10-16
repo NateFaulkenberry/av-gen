@@ -614,9 +614,10 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
         let pe = resonanceModeShape(row, q);
         let e = w * select(drive.y, drive.w, memory);
         sums.x = sums.x + w * drive.x * pe.x;
-        sums.y = sums.y + (e * pe.x) * (e * pe.x);
+        sums.y = sums.y + e * pe.x;
         sums.z = sums.z + e * e * pe.y;
     }
+    sums.y = sums.y * sums.y;
     return sums;
 }
 

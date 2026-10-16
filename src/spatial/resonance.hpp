@@ -27,9 +27,9 @@
 // Readers (any Resonance field; a field whose `reference` names a resonator shares its modes) ask
 // one channel:
 //     displacement  D
-//     amplitude     sqrt(E),  E = sum (e_i phi_i)^2 -- the local excitation
+//     amplitude     |F|, F = sum e_i phi_i -- the standing figure (the modes in their resting phase), E = F^2
 //     sand          sqrt(Ebar) exp(-E / (s^2 Ebar)), Ebar = sum e_i^2 <phi_i^2> -- where Chladni sand
-//                   gathers: the nodal lines of the energised region (s = sharpness). Sand reads the SLOW
+//                   gathers: the nodal LINES of the figure, F = 0 (s = sharpness). Sand reads the SLOW
 //                   envelope (`memory`): it settles over a second or two instead of jumping with every hit.
 //     force         -grad E (vector): towards the nodes, the acoustic radiation force on a grain
 //     gradient      grad D (vector)
@@ -101,6 +101,7 @@ struct ResonanceSpec {
     float buildup = 0.25f;      // a mode's rise time as a fraction of its ring-down
     float memory = 1.5f;        // seconds: the slow envelope the sand channel reads rises over memory / 2 and
                                 // rings down over the mode's ring-down plus this (where sand settles, not where it jumps)
+    float competition = 1.0f;   // mode competition: a_i (a_i / a_max)^competition (0 = independent modes)
     float sustain = 1.0f;       // gain of the spectral drive
     float transient = 0.8f;     // gain of the onsets' strikes
     float idle = 0.12f;         // the lowest modes' level in silence
@@ -136,8 +137,8 @@ struct ResonanceState {
     int count = 0;
     std::array<ResonanceMode, kMaxResonanceModes> modes{};
     std::array<float, kMaxResonanceModes> frequency{}; // Hz, per mode (diagnostics and tests)
-    std::array<float, kMaxResonanceModes> envelope{};  // a_i before the limiter (diagnostics and tests)
-    std::array<float, kMaxResonanceModes> memory{};    // the slow envelope before its limiter
+    std::array<float, kMaxResonanceModes> envelope{};  // a_i before competition and the limiter (diagnostics, tests)
+    std::array<float, kMaxResonanceModes> memory{};    // the slow envelope, likewise
     std::array<float, kMaxResonanceModes> weight{};    // fade-in x source gain
     double clock = 0.0;
     float limiterGain = 1.0f;

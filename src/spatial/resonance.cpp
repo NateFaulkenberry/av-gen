@@ -164,6 +164,9 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
     if (!(persistence > 0.0f && persistence <= 30.0f)) {
         return fail("field '{}': resonance.persistence must be in (0, 30] seconds", field);
     }
+    if (!(competition >= 0.0f && competition <= 8.0f)) {
+        return fail("field '{}': resonance.competition must be in [0, 8]", field);
+    }
     if (!(memory >= 0.0f && memory <= 30.0f)) {
         return fail("field '{}': resonance.memory must be in [0, 30] seconds", field);
     }
@@ -203,7 +206,7 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
 std::uint64_t ResonanceSpec::structuralHash() const {
     detail::Fnv h;
     for (const float v : {modes, fLow, fHigh, lambdaMax, lambdaMin, scale, selectivity, contrast, persistence, buildup,
-                          memory, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
+                          memory, competition, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
                           derivativeStep}) {
         h.f32(v);
     }
@@ -235,6 +238,7 @@ json ResonanceSpec::toJson() const {
     j["persistence"] = persistence;
     j["buildup"] = buildup;
     j["memory"] = memory;
+    j["competition"] = competition;
     j["sustain"] = sustain;
     j["transient"] = transient;
     j["idle"] = idle;
@@ -279,6 +283,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.persistence, "persistence", detail::readFloat);
     AVGEN_SPATIAL_READ(r.buildup, "buildup", detail::readFloat);
     AVGEN_SPATIAL_READ(r.memory, "memory", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.competition, "competition", detail::readFloat);
     AVGEN_SPATIAL_READ(r.sustain, "sustain", detail::readFloat);
     AVGEN_SPATIAL_READ(r.transient, "transient", detail::readFloat);
     AVGEN_SPATIAL_READ(r.idle, "idle", detail::readFloat);
@@ -428,7 +433,11 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
             m = std::floor(hash01(field.seed, i, 2u) * static_cast<float>(cap + 1));
             m = std::min(m, static_cast<float>(cap));
         }
-        const float theta = hash01(field.seed, i, 3u) * kTwoPi;
+        // A lattice's modes share their source's orientation, so lattices of different wavelengths nest (a crystal)
+        // instead of crossing into a moire; a point source's modes each turn their petals their own way.
+        const float theta = src.kind == ResonanceSourceKind::Lattice
+                                ? hash01(field.seed, 1000 + si, 3u) * kTwoPi
+                                : hash01(field.seed, i, 3u) * kTwoPi;
         float weight = src.gain;
         if (i == count - 1 && fade > 1e-4f) {
             weight *= fade;
@@ -551,13 +560,31 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         a[static_cast<std::size_t>(i)] += r.idle * shape;
         slow[static_cast<std::size_t>(i)] += r.idle * shape;
     }
+    for (int i = 0; i < count; ++i) { // the envelopes as driven (diagnostics and tests)
+        st.envelope[static_cast<std::size_t>(i)] = a[static_cast<std::size_t>(i)];
+        st.memory[static_cast<std::size_t>(i)] = slow[static_cast<std::size_t>(i)];
+    }
+    // Mode competition: the stronger modes suppress the weaker (a_i (a_i / a_max)^c), as a Faraday layer selects one
+    // pattern -- a figure stays legible when many modes are driven at once. 0 = every mode independent.
+    if (r.competition > 0.0f) {
+        for (auto* env : {&a, &slow}) {
+            float top = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                top = std::max(top, (*env)[static_cast<std::size_t>(i)] * st.weight[static_cast<std::size_t>(i)]);
+            }
+            if (top > 1e-9f) {
+                for (int i = 0; i < count; ++i) {
+                    float& v = (*env)[static_cast<std::size_t>(i)];
+                    v *= std::pow(std::max(v * st.weight[static_cast<std::size_t>(i)], 0.0f) / top, r.competition);
+                }
+            }
+        }
+    }
     // The soft limiter: dense music rings more modes, not louder ones (the memory has its own).
     float total = 0.0f;
     float slowTotal = 0.0f;
     for (int i = 0; i < count; ++i) {
         const auto si = static_cast<std::size_t>(i);
-        st.envelope[si] = a[si];
-        st.memory[si] = slow[si];
         const float w = a[si] * st.weight[si];
         const float ws = slow[si] * st.weight[si];
         total += w * w;
@@ -687,9 +714,10 @@ ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader
         const float phi = resonanceModeShape(md, q, &e2);
         const float e = w * (memory ? md.drive.w : md.drive.y);
         s.displacement += w * md.drive.x * phi;
-        s.energy += (e * phi) * (e * phi);
+        s.energy += e * phi; // the figure F, squared below
         s.meanEnergy += e * e * e2;
     }
+    s.energy *= s.energy;
     return s;
 }
 
