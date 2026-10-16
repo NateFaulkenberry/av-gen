@@ -181,6 +181,32 @@
    }
   },
   {
+   "source": "response.level",
+   "target": "material/cwGround/op/29/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.9,
+    "offset": 1.0,
+    "attackMs": 400,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/cwGround/op/29/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.3,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 350
+   }
+  },
+  {
    "source": "response.kick",
    "target": "particles/veil/burst",
    "amount": 160.0,
@@ -308,6 +334,19 @@
    "op": "add",
    "polarity": "unipolar",
    "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/cwGround/op/29/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.8,
+    "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
    }

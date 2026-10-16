@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -54,6 +55,21 @@ TEST_CASE("resonance probe (diagnostic)", "[.resonance-probe]") {
     const auto track = analysis::AnalysisTrack::analyze(*file, analysis::AnalyzerConfig{});
     set.audio = std::make_shared<const spatial::AudioHistory>(analysis::buildAudioHistory(track));
     spatial::ResonanceCache cache;
+    {
+        // the CPU cost a frame pays: 300 frames played at 30 fps through one cache (after one warm frame)
+        spatial::resolveResonance(set, cache, t - 10.0);
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int k = 1; k <= 300; ++k) {
+            spatial::resolveResonance(set, cache, t - 10.0 + k / 30.0);
+        }
+        const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / 300.0;
+        std::printf("resolveResonance: %.1f us a frame (played, cached)\n", us);
+        spatial::ResonanceCache cold;
+        const auto t1 = std::chrono::steady_clock::now();
+        spatial::resolveResonance(set, cold, t);
+        std::printf("resolveResonance after a seek (cold cache): %.1f us\n",
+                    std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t1).count());
+    }
     spatial::resolveResonance(set, cache, t);
     for (const auto& f : set.fields) {
         if (!f.resonanceState) {

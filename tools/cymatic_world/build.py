@@ -350,32 +350,61 @@ class Prog:
                 "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
+MOON_DIR = (0.93, -0.2, -0.3)       # the direction the moonlight travels (normalised in use)
+HEART_LIGHT = 1600.0                 # the medusa's lamp (painted on the ground; a real point light on the rest)
+LIGHT_RANGE = 200.0                  # metres: the painted lamp's normalising distance
+
+
+def _unit(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v]
+
+
 def ground_program():
-    """The basin's ground: one `field` op reads the resonance's shading channel (sand, crest, amplitude) in a single
-    pass over the modes. Basalt where the field has scoured it, settled grit on the nodal ridges, and a thin cold
-    light only on the nodal line where the ground is ringing. Emission is an accent; the relief and the light carry
-    the figure."""
+    """The basin's ground, UNLIT with its light painted in the program (the lit path cost ~7 ms at 1080p for a
+    surface whose light is three terms). One `field` op reads the resonance's shading channel (sand, crest,
+    amplitude) in a single pass over the modes. Basalt where the field has scoured it, settled grit on the nodal
+    ridges; a raking warm moon (Lambert on the deformed normal: the relief draws itself), the medusa's cold lamp
+    (inverse square from the heart), a dim sky; and a thin cold light only on the nodal line where the ground rings."""
     g = Prog("cwGround")
     g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
     g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
     g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
     g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
-    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])          # where grit has settled
-    g.op(None, "input", 4, inp="worldPosition")
-    g.op("mottle", "noise", 4, a=4, f=0.09, seed=5)
-    g.op(None, "remap", 4, a=4, k=[0.2, 0.8, 0.7, 1.25], f=1.0)
-    g.op("stone", "constant", 5, k=C("stone") + [1.0])
-    g.op(None, "multiply", 5, a=5, b=4)
-    g.op("grit", "constant", 6, k=C("sand") + [1.0])
-    g.op(None, "mixBy", 5, a=5, b=6, c=1)                          # r5: base colour
+    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
-    g.op("lineCol", "constant", 6, k=C("sandHot", 0.35) + [1.0])
-    g.op(None, "multiply", 6, a=6, b=2)                            # r6: emission (an accent)
-    g.op("rough", "constant", 7, k=[0.62, 0.62, 0.62, 1.0])
-    g.op("roughGrit", "constant", 4, k=[0.95, 0.95, 0.95, 1.0])
-    g.op(None, "mixBy", 7, a=7, b=4, c=1)
-    g.base, g.emit, g.rough = 5, 6, 7
+    g.op("lineCol", "constant", 3, k=C("sandHot", 0.35) + [1.0])
+    g.op(None, "multiply", 2, a=2, b=3)                            # r2: emission (an accent)
+    g.op("stone", "constant", 3, k=C("stone") + [1.0])
+    g.op("grit", "constant", 4, k=C("sand") + [1.0])
+    g.op(None, "mixBy", 1, a=3, b=4, c=1)                          # r1: albedo
+    # the moon: Lambert on the deformed normal
+    L = _unit([-x for x in MOON_DIR])
+    g.op(None, "input", 3, inp="normal")
+    g.op("moonDot", "gradient", 3, a=3, k=L + [0.0], f=1.0)
+    g.op("moon", "constant", 4, k=C("moon", 6.0) + [1.0])
+    g.op(None, "multiply", 3, a=3, b=4)                            # r3: moonlight
+    # the lamp: (N . v) / |v|^3 from the heart, through two saturating dots normalised by LIGHT_RANGE
+    g.op(None, "input", 4, inp="worldPosition")
+    g.op(None, "constant", 5, k=[-1.0, -1.0, -1.0, 0.0])
+    g.op(None, "multiply", 4, a=4, b=5)
+    g.op(None, "constant", 5, k=[HEART[0], HEART[1] - 1.0, HEART[2], 0.0])
+    g.op(None, "add", 4, a=4, b=5)                                 # r4 = v, toward the lamp
+    g.op(None, "multiply", 5, a=4, b=4)
+    g.op(None, "gradient", 5, a=5, k=[1.0, 1.0, 1.0, 2e-4], f=1.0 / (LIGHT_RANGE * LIGHT_RANGE))   # |v|^2 / R^2
+    g.op(None, "input", 6, inp="normal")
+    g.op(None, "multiply", 6, a=6, b=4)
+    g.op(None, "gradient", 6, a=6, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / LIGHT_RANGE)                   # max(N . v, 0) / R
+    g.op(None, "power", 5, a=5, f=-1.5)
+    g.op(None, "multiply", 6, a=6, b=5)
+    g.op("lamp", "constant", 5, k=C("sandHot", HEART_LIGHT / (LIGHT_RANGE * LIGHT_RANGE)) + [1.0])
+    g.op(None, "multiply", 6, a=6, b=5)                            # r6: lamplight
+    g.op(None, "add", 3, a=3, b=6)
+    g.op("sky", "constant", 4, k=C("horizon", 0.08) + [1.0])
+    g.op(None, "add", 3, a=3, b=4)                                 # r3: all the light
+    g.op(None, "multiply", 1, a=1, b=3)                            # r1: lit colour (unlit output)
+    g.base, g.emit = 1, 2
     return g
 
 
@@ -394,7 +423,7 @@ def environment(s):
             castsShadow=False, contactShadow=False, softness=0.4)
     # the singer's own light: the bell is the basin's lamp, so every ridge facing the heart catches it and the
     # rings read from the light as well as from the relief
-    s.light("heart", "point", position=[HEART[0], HEART[1] - 1.0, HEART[2]], color=C("sandHot"), intensity=1600.0,
+    s.light("heart", "point", position=[HEART[0], HEART[1] - 1.0, HEART[2]], color=C("sandHot"), intensity=HEART_LIGHT,
             range=140.0, castsShadow=False)
     # a violet rim from behind the basin
     s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=1.2, castsShadow=False)
@@ -405,10 +434,11 @@ def ground(s):
     write_glb(os.path.join(MESH_DIR, "cw-ground.glb"), pos, nrm, idx, "ground")
     print("ground: %d vertices, %d triangles" % (len(pos), len(idx) // 3))
     g = ground_program()
-    s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
+    s.program(g.doc(base=g.base, emission=g.emit))
     s.proc("ground", {"kind": "mesh", "asset": "meshes/cw-ground.glb"},
            material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
-                     "roughness": 0.6, "metallic": 0.0, "program": "" if os.environ.get("CW_NOPROG") else g.name},
+                     "roughness": 0.6, "metallic": 0.0, "unlit": True,
+                     "program": "" if os.environ.get("CW_NOPROG") else g.name},
            extra={"normalStep": 0.12},  # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m
            deformers=[
                # ONE pass over the modes (the relief channel): the sand's ridges along the nodal lines, a crisp crest on
@@ -682,8 +712,11 @@ def instrument(s, g):
     # held sound lets the sand settle and remember longer
     s.route(R("sustain", F + "memory", 1.2, attackMs=2000, decayMs=5000))
     # the medusa's light follows the music's loudness (slowly: a lamp, not a strobe), and flares a little on kicks
+    lamp = "material/cwGround/op/%d/constant/constant" % g["lamp"]
     s.route(R("level", "lights/heart/intensity", 1400.0, attackMs=400, decayMs=1800),
-            R("kickEnv", "lights/heart/intensity", 500.0, attackMs=0, decayMs=350))
+            R("kickEnv", "lights/heart/intensity", 500.0, attackMs=0, decayMs=350),
+            R("level", lamp, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=400, decayMs=1800),
+            R("kickEnv", lamp, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=0, decayMs=350))
     # kicks shed strands from the bell's rim
     s.route(R("kick", "particles/veil/burst", 160.0, attackMs=0, decayMs=40))
     # ---- MIDI (control.*) ----
@@ -697,7 +730,8 @@ def instrument(s, g):
     s.route(R("control.druse", "procedural/druse/effector/1/strength", 0.15, **CC),
             R("control.druse", "procedural/druse/effector/2/strength", 50.0, **CC))
     s.route(R("control.swirl", "particles/matter/orbit", 25.0, **CC))
-    s.route(R("control.light", "lights/heart/intensity", 3000.0, **CC))
+    s.route(R("control.light", "lights/heart/intensity", 3000.0, **CC),
+            R("control.light", lamp, 1.0, op="multiply", gain=1.8, offset=1.0, **CC))
     s.route(R("control.padStrike", F + "idle", 2.5, attackMs=30, decayMs=3500))
     s.route(R("control.padShed", "particles/veil/burst", 1500.0, attackMs=0, decayMs=40))
 
