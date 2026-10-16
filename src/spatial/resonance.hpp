@@ -90,6 +90,8 @@ struct ResonanceSource {
     float gain = 1.0f;
     float depth = 0.0f;       // whole metres: amplitude e^{-|y - y0| / depth} away from its height (a surface wave's
                               // layer); 0 = none
+    float drive = 0.0f;       // ADR-1402: excitation added straight into its modes (both envelopes): what a route --
+                              // a coupling -- uses to make one body ring because another does
     float scale = 1.0f;       // multiplies its modes' wavenumbers: a smaller body draws finer figures at the same pitch
     [[nodiscard]] bool operator==(const ResonanceSource&) const = default;
 };
@@ -125,6 +127,9 @@ struct ResonanceSpec {
     float reliefLine = 0.0f;           // relief: the crest's weight (a second, narrower sand line) ...
     float reliefLineSharpness = 0.3f;  // ... and its width
     float reliefVibration = 0.0f;      // relief: the vibration's weight (D)
+    // ADR-1402: a reader may publish its value at one world point to the signal bus every frame, as
+    // `field.<name>.probe` (the coupling hook: a route can let one part of the field drive another).
+    std::optional<glm::vec3> probe;
     float derivativeStep = 0.0f;// metres, the finite-difference step of the vector channels (0 = lambdaMin / 24)
 
     [[nodiscard]] Result<void> validate(std::string_view field) const;
@@ -191,6 +196,14 @@ private:
 // only). Readers (a `reference`) are pointed at their resonator's state. Called once a frame after the
 // parameters are applied (Composition, beside resolveFieldTriggers).
 void resolveResonance(FieldSet& fields, ResonanceCache& cache, double time);
+
+// ADR-1402: every resonance field with a `probe`: its signal name (`field.<name>.probe`) and its scalar value at the
+// probe point at `time` (0 when disabled or unresolved). Called once a frame after `resolveResonance`.
+struct ResonanceProbe {
+    std::string signal;
+    float value = 0.0f;
+};
+[[nodiscard]] std::vector<ResonanceProbe> resonanceProbes(const FieldSet& fields, double time);
 
 // The state a resonance field reads: its own, or its resonator's. Null when there is none.
 [[nodiscard]] const ResonanceState* resonanceStateOf(const FieldSpec& field, const FieldSet* set);

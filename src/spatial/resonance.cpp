@@ -195,7 +195,7 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
             return fail("field '{}': a resonance source's band must be 0 <= bandLow <= bandHigh <= 1", field);
         }
         if (!(s.reach >= 0.0f && finite(s.reach) && finite(s.gain) && s.scale > 0.0f && finite(s.scale) && s.depth >= 0.0f &&
-              finite(s.depth))) {
+              finite(s.depth) && finite(s.drive))) {
             return fail("field '{}': a resonance source's reach must be >= 0 and its gain finite", field);
         }
     }
@@ -219,6 +219,10 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     }
     h.u8(static_cast<std::uint8_t>(channel));
     h.boolean(listenAlongAxis);
+    h.boolean(probe.has_value());
+    if (probe) {
+        h.v3(*probe);
+    }
     h.u64(sources.size());
     for (const ResonanceSource& s : sources) {
         h.u8(static_cast<std::uint8_t>(s.kind));
@@ -230,6 +234,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
         h.f32(s.gain);
         h.f32(s.scale);
         h.f32(s.depth);
+        h.f32(s.drive);
     }
     return h.value();
 }
@@ -263,7 +268,8 @@ json ResonanceSpec::toJson() const {
                        {"reach", s.reach},
                        {"gain", s.gain},
                        {"scale", s.scale},
-                       {"depth", s.depth}});
+                       {"depth", s.depth},
+                       {"drive", s.drive}});
     }
     j["sources"] = std::move(src);
     j["channel"] = resonanceChannelName(channel);
@@ -274,6 +280,9 @@ json ResonanceSpec::toJson() const {
     j["sharpness"] = sharpness;
     if (derivativeStep > 0.0f) {
         j["derivativeStep"] = derivativeStep;
+    }
+    if (probe) {
+        j["probe"] = detail::vecToJson(*probe); // ADR-1402: written only when set
     }
     if (channel == ResonanceChannel::Relief) {
         j["reliefLine"] = reliefLine;
@@ -315,6 +324,11 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.reliefLine, "reliefLine", detail::readFloat);
     AVGEN_SPATIAL_READ(r.reliefLineSharpness, "reliefLineSharpness", detail::readFloat);
     AVGEN_SPATIAL_READ(r.reliefVibration, "reliefVibration", detail::readFloat);
+    if (j.contains("probe")) {
+        glm::vec3 p(0.0f);
+        AVGEN_SPATIAL_READ(p, "probe", detail::readVec3);
+        r.probe = p;
+    }
     if (j.contains("sources")) {
         const json& arr = j.at("sources");
         if (!arr.is_array()) {
@@ -336,6 +350,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
                 AVGEN_SPATIAL_READ(s.gain, "gain", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.scale, "scale", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.depth, "depth", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.drive, "drive", detail::readFloat);
             }
             r.sources.push_back(s);
         }
@@ -577,6 +592,14 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
             }
         }
     }
+    // A source's direct drive (ADR-1402: a coupling's input), into every mode it owns.
+    for (int i = 0; i < count; ++i) {
+        const float d = sources[static_cast<std::size_t>(st.source[static_cast<std::size_t>(i)])].drive;
+        if (d != 0.0f) {
+            a[static_cast<std::size_t>(i)] += d;
+            slow[static_cast<std::size_t>(i)] += d;
+        }
+    }
     // Idle: the three lowest modes keep breathing in silence (a pure function of the clock).
     for (int i = 0; i < std::min(count, 3); ++i) {
         const float fi = static_cast<float>(i);
@@ -609,28 +632,37 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
             }
         }
     }
-    // The soft limiter: dense music rings more modes, not louder ones (the memory has its own).
-    float total = 0.0f;
-    float slowTotal = 0.0f;
+    // The soft limiter, per source (each source is its own body with its own energy budget, as competition is):
+    // dense music rings more modes, not louder ones; the memory has its own.
+    std::array<float, kMaxResonanceSources> total{};
+    std::array<float, kMaxResonanceSources> slowTotal{};
     for (int i = 0; i < count; ++i) {
         const auto si = static_cast<std::size_t>(i);
+        const auto src = static_cast<std::size_t>(st.source[si]);
         const float w = a[si] * st.weight[si];
         const float ws = slow[si] * st.weight[si];
-        total += w * w;
-        slowTotal += ws * ws;
+        total[src] += w * w;
+        slowTotal[src] += ws * ws;
     }
-    st.limiterGain = 1.0f / std::sqrt(1.0f + total / (r.limit * r.limit));
-    const float slowGain = 1.0f / std::sqrt(1.0f + slowTotal / (r.limit * r.limit));
+    std::array<float, kMaxResonanceSources> gain{};
+    std::array<float, kMaxResonanceSources> slowGainOf{};
+    st.limiterGain = 1.0f;
+    for (std::size_t src = 0; src < kMaxResonanceSources; ++src) {
+        gain[src] = 1.0f / std::sqrt(1.0f + total[src] / (r.limit * r.limit));
+        slowGainOf[src] = 1.0f / std::sqrt(1.0f + slowTotal[src] / (r.limit * r.limit));
+        st.limiterGain = std::min(st.limiterGain, gain[src]); // the hardest-limited source (diagnostics)
+    }
     for (int i = 0; i < count; ++i) {
         const auto si = static_cast<std::size_t>(i);
-        const float e = a[si] * st.limiterGain * st.weight[si];
+        const auto src = static_cast<std::size_t>(st.source[si]);
+        const float e = a[si] * gain[src] * st.weight[si];
         const float omega = kTwoPi * r.breath * std::pow(st.frequency[si] / r.fLow, 0.3f);
         const float psi = hash01(field.seed, i, 4u) * kTwoPi;
         // The phase in double: an evening's clock times Omega is far past float's exact range.
         const double phase = std::fmod(static_cast<double>(omega) * clock + static_cast<double>(psi), 6.283185307179586);
         st.modes[si].drive.x = e * static_cast<float>(std::cos(phase));
         st.modes[si].drive.y = e;
-        st.modes[si].drive.w = slow[si] * slowGain * st.weight[si];
+        st.modes[si].drive.w = slow[si] * slowGainOf[src] * st.weight[si];
     }
     return st;
 }
@@ -647,6 +679,20 @@ void resolveResonance(FieldSet& fields, ResonanceCache& cache, double time) {
             f.resonanceState.reset();
         }
     }
+}
+
+std::vector<ResonanceProbe> resonanceProbes(const FieldSet& fields, double time) {
+    std::vector<ResonanceProbe> out;
+    for (const FieldSpec& f : fields.fields) {
+        if (!f.isResonance() || !f.resonance.probe) {
+            continue;
+        }
+        ResonanceProbe p;
+        p.signal = "field." + f.name + ".probe";
+        p.value = f.enabled ? sampleScalar(f, *f.resonance.probe, time, &fields) : 0.0f;
+        out.push_back(std::move(p));
+    }
+    return out;
 }
 
 const ResonanceState* resonanceStateOf(const FieldSpec& field, const FieldSet* set) {

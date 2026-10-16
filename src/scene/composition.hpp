@@ -2134,6 +2134,8 @@ public:
     // Computes every character's signals from the camera as it stands now and writes them to
     // `character.<name>.{isHero,inShot,distanceToCamera,visibility,screenImportance}`.
     void publishCinematicSignals(signals::SignalBus& bus);
+    // ADR-1402: every resonance field's probe (`field.<name>.probe`), read by routes from the next frame.
+    void publishFieldProbes(signals::SignalBus& bus);
 
 private:
 
@@ -2293,6 +2295,8 @@ private:
     std::shared_ptr<const spatial::AudioHistory> audioHistory_; // ADR-1116: the engine's; see `setAudioHistory`
     std::uint64_t simulationInputKey_ = 0;                     // ADR-1119: see `setSimulationInputKey`
     spatial::ResonanceCache resonanceCache_;                   // ADR-1400: the resonators' filtered rows (a cache)
+    std::vector<std::pair<std::string, signals::SignalId>> probeSignals_; // ADR-1402: declared probe signals
+    const signals::SignalBus* probeBus_ = nullptr;                       // ... on this bus
     // A node's own transform with its XFORM offset composed in (identity when it has none).
     [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;

@@ -69,6 +69,16 @@ HEART = (0.0, 12.0, 0.0)          # the singing source above the basin's centre 
 SPIRE = (-23.0, 0.0, 9.0)       # the sculpture's foot: a second, local source
 
 
+# THE COUPLING (ADR-1402): sympathetic resonance. The druse's own source (the field's second) is driven not only by the
+# music but by how hard the GROUND rings at the druse's foot in the heart's low modes: a probe reader that hears only
+# u < 0.22 publishes `field.druseFoot.probe`, and a route adds it to that source's `drive` -- excitation straight into
+# its middle modes, which no part of the probe's band can feed back into (one way, no loop). So a bass note that rings
+# the basin makes the druse answer in its own, higher voice -- rings round its foot, light in its tuned crystals --
+# even when the music has nothing in that register. Turn it off (CW_NOCOUPLE=1) and the druse hears only the music.
+COUPLING_REST = 0.8
+COUPLING_GAIN = 0.0 if os.environ.get("CW_NOCOUPLE") else 2.0
+
+
 def fields(s):
     """The resonator and its readers. Everything that answers the music reads one of these."""
     res = {
@@ -81,7 +91,7 @@ def fields(s):
              "gain": 1.0},
             # the choir's foot: middle modes, three-fold at most, local
             {"kind": "point", "position": list(SPIRE), "order": 3, "bandLow": 0.25, "bandHigh": 0.6, "reach": 50.0,
-             "gain": 0.8},
+             "gain": COUPLING_REST},
             # the singer (the matter's own voice): upper-middle modes about the heart, bounded to its body
             {"kind": "point", "position": list(HEART), "order": 5, "bandLow": 0.45, "bandHigh": 0.8, "reach": 16.0,
              "gain": 1.6, "scale": 2.2},
@@ -98,7 +108,10 @@ def fields(s):
                                  ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.3, "reliefLineSharpness": 0.45,
                                                        "reliefVibration": 0.23}),
                                  # the matter hears the heart's modes only (its spherical shells, not the far lattice)
-                                 ("force", "force", {"listenLow": 0.45, "listenHigh": 0.8, "listenWidth": 0.04})):
+                                 ("force", "force", {"listenLow": 0.45, "listenHigh": 0.8, "listenWidth": 0.04}),
+                                 # the coupling's ear: the heart's low modes at the druse's foot, published as a signal
+                                 ("druseFoot", "amplitude", {"listenLow": 0.0, "listenHigh": 0.22, "listenWidth": 0.02,
+                                                             "probe": [SPIRE[0], -5.0, SPIRE[2]]})):
         r = {"channel": channel}
         r.update(extra)
         s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
@@ -717,6 +730,9 @@ def instrument(s, g):
             R("kickEnv", "lights/heart/intensity", 500.0, attackMs=0, decayMs=350),
             R("level", lamp, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=400, decayMs=1800),
             R("kickEnv", lamp, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=0, decayMs=350))
+    # the coupling: the ground's ringing at the druse's foot drives the druse's own source (sympathetic resonance)
+    if COUPLING_GAIN:
+        s.route(R("field.druseFoot.probe", F + "source/1/drive", COUPLING_GAIN, attackMs=250, decayMs=2000))
     # kicks shed strands from the bell's rim
     s.route(R("kick", "particles/veil/burst", 160.0, attackMs=0, decayMs=40))
     # ---- MIDI (control.*) ----

@@ -2346,6 +2346,28 @@ Composition::CinematicSignals Composition::cinematicSignals(std::string_view ent
     return CinematicSignals{};
 }
 
+void Composition::publishFieldProbes(signals::SignalBus& bus) {
+    if (probeBus_ != &bus) {
+        probeSignals_.clear();
+        probeBus_ = &bus;
+    }
+    for (const spatial::ResonanceProbe& p : spatial::resonanceProbes(scene_.fields, currentTime_)) {
+        signals::SignalId id{};
+        bool found = false;
+        for (const auto& [name, sid] : probeSignals_) {
+            if (name == p.signal) {
+                id = sid;
+                found = true;
+            }
+        }
+        if (!found) {
+            id = bus.declare(p.signal, 0.0f, 4.0f);
+            probeSignals_.emplace_back(p.signal, id);
+        }
+        bus.set(id, p.value);
+    }
+}
+
 void Composition::publishCinematicSignals(signals::SignalBus& bus) {
     const auto& entities = entityWorld_.entities();
     // (Re)declared when the cast or the bus changes; otherwise the ids are cached and a frame

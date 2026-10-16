@@ -207,6 +207,17 @@
    }
   },
   {
+   "source": "field.druseFoot.probe",
+   "target": "field/cymatic/resonance/source/1/drive",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 2000
+   }
+  },
+  {
    "source": "response.kick",
    "target": "particles/veil/burst",
    "amount": 160.0,

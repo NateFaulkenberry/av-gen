@@ -521,3 +521,46 @@ TEST_CASE("A source's depth fades its modes away from its height; its scale refi
     CHECK(fine.modes[0].shape.x == Catch::Approx(2.0f * s.modes[0].shape.x));
     CHECK(fine.lambdaMin == Catch::Approx(0.5f * s.lambdaMin));
 }
+
+TEST_CASE("A resonance reader with a probe publishes its value at that point", "[unit][resonance]") {
+    spatial::FieldSet set;
+    auto owner = resonator(6.0f);
+    owner.resonance.idle = 0.6f;
+    set.fields.push_back(owner);
+    spatial::FieldSpec reader;
+    reader.name = "foot";
+    reader.kind = spatial::FieldKind::Resonance;
+    reader.reference = "res";
+    reader.resonance.channel = spatial::ResonanceChannel::Amplitude;
+    reader.resonance.probe = glm::vec3(4.0f, 0.0f, -3.0f);
+    set.fields.push_back(reader);
+    spatial::ResonanceCache cache;
+    spatial::resolveResonance(set, cache, 2.0);
+    const auto probes = spatial::resonanceProbes(set, 2.0);
+    REQUIRE(probes.size() == 1); // only the reader with a probe
+    CHECK(probes[0].signal == "field.foot.probe");
+    CHECK(probes[0].value == Approx(spatial::sampleScalar(set.fields[1], glm::vec3(4.0f, 0.0f, -3.0f), 2.0, &set)));
+    CHECK(probes[0].value > 0.0f);
+    auto back = spatial::FieldSpec::fromJson(set.fields[1].toJson());
+    REQUIRE(back.has_value());
+    REQUIRE(back->resonance.probe.has_value());
+    CHECK(*back->resonance.probe == glm::vec3(4.0f, 0.0f, -3.0f));
+    set.fields[1].enabled = false;
+    CHECK(spatial::resonanceProbes(set, 2.0)[0].value == 0.0f);
+}
+
+TEST_CASE("A source's drive rings its own modes without the music (a coupling's input)", "[unit][resonance]") {
+    auto f = resonator(8.0f);
+    f.resonance.sources = {spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {}, 3, 0.0f, 0.45f, 0.0f, 1.0f},
+                           spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {9, 0, 0}, 3, 0.55f, 1.0f, 0.0f, 1.0f}};
+    f.resonance.sources[1].drive = 0.6f;
+    const auto s = spatial::evaluateResonance(f, nullptr, 1.0);
+    for (int i = 0; i < s.count; ++i) {
+        const float e = s.modes[static_cast<std::size_t>(i)].drive.y;
+        if (s.source[static_cast<std::size_t>(i)] == 1) {
+            CHECK(e > 0.0f);
+        } else {
+            CHECK(e == 0.0f); // idle is 0 and there is no audio: only the driven source rings
+        }
+    }
+}

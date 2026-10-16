@@ -201,6 +201,13 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
                 dr.softMin = 0.0f;
                 dr.softMax = 500.0f;
                 r.add(std::move(dr), (base + "reach").c_str());
+                params::ParamDesc<float> dd; // ADR-1402: a coupling's input
+                dd.defaultValue = src.drive;
+                dd.hardMin = -100.0f;
+                dd.hardMax = 100.0f;
+                dd.softMin = 0.0f;
+                dd.softMax = 2.0f;
+                r.add(std::move(dd), (base + "drive").c_str());
             }
         }
         r.f("resonance/listenLow", "hears modes from (0..1)", rs.listenLow, 0.0f, 1.0f, 0.0f, 1.0f);
@@ -300,6 +307,7 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
             copyValue(p, base + "position", rs.sources[i].position);
             copyValue(p, base + "gain", rs.sources[i].gain);
             copyValue(p, base + "reach", rs.sources[i].reach);
+            copyValue(p, base + "drive", rs.sources[i].drive);
         }
         copyValue(p, "resonance/listenLow", rs.listenLow);
         copyValue(p, "resonance/listenHigh", rs.listenHigh);

@@ -1284,6 +1284,9 @@ void Engine::rebind() {
     // by the time the modulator resolves it.
     refreshHistorySubscriptions();
     declareStagingSignals(); // ADR-930: likewise the staging beats, before the routes naming them bind
+    if (auto* comp = composition()) {
+        comp->publishFieldProbes(bus_); // ADR-1402: a resonance probe's signal, before a route naming it binds
+    }
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels must exist on the bus first
     }
@@ -6407,6 +6410,7 @@ void Engine::update(const FrameTime& time) {
     // other bus signal; never read by the simulation's own step.
     if (auto* comp = composition()) {
         comp->publishCinematicSignals(bus_);
+        comp->publishFieldProbes(bus_); // ADR-1402
     }
     // Without this line every temporal parameter resolves, round-trips and reaches nothing --
     // ADR-039's selective bloom and ADR-035's identifier mask were both shipped missing exactly

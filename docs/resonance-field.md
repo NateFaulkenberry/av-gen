@@ -110,3 +110,11 @@ A tuned reader (each height hears its own band of modes): `"listenAlongAxis": tr
 - The memory and the ring-down are bounded by the history ring (~12 s audible).
 - Modes are analytic standing waves, not a solved PDE on the actual geometry: the ground does not reflect waves off
   its own walls. That is the trade for being exact under seek and cheap enough to evaluate per vertex.
+
+## Coupling (ADR-1402)
+
+A reader with `"probe": [x, y, z]` publishes `field.<name>.probe` (its value there) to the signal bus each frame; a
+source's `drive` adds excitation straight into the modes it owns. A route from one to the other couples two parts of
+the field. Keep the probe's listening band disjoint from the driven source's band, or the loop closes (Cymatic World:
+the probe hears u < 0.22, the druse's source owns u 0.25-0.6). Competition and the limiter act per source, so a
+driven body keeps its own figure beside a louder one.

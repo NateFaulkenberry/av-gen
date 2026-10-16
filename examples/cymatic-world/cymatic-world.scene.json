@@ -222,6 +222,34 @@
    }
   },
   {
+   "name": "druseFoot",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "cymatic",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "amplitude",
+     "listenLow": 0.0,
+     "listenHigh": 0.22,
+     "listenWidth": 0.02,
+     "probe": [
+      -23.0,
+      -5.0,
+      9.0
+     ]
+    }
+   }
+  },
+  {
    "name": "ground",
    "kind": "procedural",
    "procedural": {
