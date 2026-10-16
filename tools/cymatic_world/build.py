@@ -97,7 +97,7 @@ def fields(s):
     for name, channel, extra in (("sand", "sand", {"sharpness": 0.9}),
                                  ("line", "sand", {"sharpness": 0.3}),
                                  ("glow", "amplitude", {}),
-                                 ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.42, "reliefLineSharpness": 0.3,
+                                 ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.3, "reliefLineSharpness": 0.45,
                                                        "reliefVibration": 0.23}),
                                  # the matter hears the heart's modes only (its spherical shells, not the far lattice)
                                  ("force", "force", {"listenLow": 0.45, "listenHigh": 0.8, "listenWidth": 0.04})):
@@ -394,7 +394,7 @@ def ground_program():
 # ================================================================================================ the scene
 def environment(s):
     s.environment = {
-        "intensity": 0.12, "background": C("zenith"), "fogColor": C("fog"),
+        "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
         "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
         "shadowRange": 180.0,
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
@@ -402,10 +402,14 @@ def environment(s):
                 "background": True, "useKeyLight": False},
     }
     # the moon: low and to the side, so it rakes the ridges and every hollow holds a shadow
-    s.light("moon", "directional", direction=[0.9, -0.3, -0.31], color=C("moon"), intensity=3.6,
-            castsShadow=True, contactShadow=False, softness=0.4)
+    s.light("moon", "directional", direction=[0.93, -0.2, -0.3], color=C("moon"), intensity=4.0,
+            castsShadow=False, contactShadow=False, softness=0.4)
+    # the singer's own light: the bell is the basin's lamp, so every ridge facing the heart catches it and the
+    # rings read from the light as well as from the relief
+    s.light("heart", "point", position=[HEART[0], HEART[1] - 1.0, HEART[2]], color=C("sandHot"), intensity=3200.0,
+            range=140.0, castsShadow=False)
     # a violet rim from behind the basin
-    s.light("rim", "directional", direction=[-0.2, -0.15, 0.97], color=C("rim"), intensity=0.45, castsShadow=False)
+    s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=1.2, castsShadow=False)
 
 
 def ground(s):
@@ -416,7 +420,8 @@ def ground(s):
     s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
     s.proc("ground", {"kind": "mesh", "asset": "meshes/cw-ground.glb"},
            material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
-                     "roughness": 0.6, "metallic": 0.0, "program": g.name},
+                     "roughness": 0.6, "metallic": 0.0, "program": "" if os.environ.get("CW_NOPROG") else g.name},
+           extra={"normalStep": 0.12},  # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m
            deformers=[
                # ONE pass over the modes (the relief channel): the sand's ridges along the nodal lines, a crisp crest on
                # the line itself, and the vibration that makes the hollows breathe
@@ -537,7 +542,7 @@ GROUND_Y = None  # set in build(): the WorldMap's height at (x, z)
 
 
 def camera(s):
-    pos, tgt = [22.0, 24.0, 74.0], [-8.0, 2.0, -4.0]
+    pos, tgt = [6.0, 13.0, 47.0], [-4.0, 3.0, 0.0]
     s.camera = {"mode": 1, "position": pos, "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
     s.params_({"camera/lens/focalLength": 28.0})
 

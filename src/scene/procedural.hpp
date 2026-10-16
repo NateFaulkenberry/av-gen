@@ -630,6 +630,10 @@ struct ProceduralGeometry {
     std::vector<spatial::Effector> effectors;
     std::string emissiveField;
     float emissiveFieldAmount = 0.0f;
+    // ADR-1401: metres between the three points the vertex stage deforms to rebuild a deformed normal. 0 (the
+    // default, unwritten) is 1/1000 of the source mesh's radius, which on a mesh kilometres wide is metres -- far
+    // coarser than its vertices, so a deformation finer than that is lit as noise. A per-draw uniform, not structural.
+    float normalStep = 0.0f;
     std::string extraLane;
     // ADR-903/905: the object's emission lanes, applied by the lit shader AFTER the material program
     // to everything the surface emits: a gain, and a hue rotation in turns (OKLCH, so the displayed

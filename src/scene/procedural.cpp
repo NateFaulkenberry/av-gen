@@ -3141,6 +3141,9 @@ json ProceduralGeometry::toJson() const {
     }
     j["emissiveField"] = emissiveField;
     j["emissiveFieldAmount"] = emissiveFieldAmount;
+    if (normalStep > 0.0f) {
+        j["normalStep"] = normalStep; // ADR-1401: written only when set
+    }
     j["extraLane"] = extraLane;
     {
         json s2 = json::object();
@@ -3235,6 +3238,10 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);
         AVGEN_PROC_READ(g.emissiveField, "emissiveField", readString);
         AVGEN_PROC_READ(g.emissiveFieldAmount, "emissiveFieldAmount", readFloat);
+        AVGEN_PROC_READ(g.normalStep, "normalStep", readFloat);
+        if (!(g.normalStep >= 0.0f) || !std::isfinite(g.normalStep)) {
+            return fail("'normalStep' must be >= 0 metres");
+        }
         AVGEN_PROC_READ(g.extraLane, "extraLane", readString);
     }
     if (root.contains("source")) {

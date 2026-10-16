@@ -5,20 +5,20 @@
  "camera": {
   "mode": 1,
   "position": [
-   22.0,
-   24.0,
-   74.0
+   6.0,
+   13.0,
+   47.0
   ],
   "target": [
-   -8.0,
-   2.0,
-   -4.0
+   -4.0,
+   3.0,
+   0.0
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
  },
  "environment": {
-  "intensity": 0.12,
+  "intensity": 0.05,
   "background": [
    0.00152,
    0.00182,
@@ -143,8 +143,9 @@
        "order": 3,
        "bandLow": 0.65,
        "bandHigh": 1.0,
-       "reach": 45.0,
-       "gain": 0.75
+       "reach": 60.0,
+       "gain": 0.75,
+       "depth": 9.0
       }
      ],
      "channel": "displacement"
@@ -231,8 +232,8 @@
     "resonance": {
      "channel": "relief",
      "sharpness": 0.9,
-     "reliefLine": 0.42,
-     "reliefLineSharpness": 0.3,
+     "reliefLine": 0.3,
+     "reliefLineSharpness": 0.45,
      "reliefVibration": 0.23
     }
    }
@@ -300,7 +301,8 @@
       "space": "world",
       "alongNormal": false
      }
-    ]
+    ],
+    "normalStep": 0.12
    }
   },
   {
@@ -892,35 +894,53 @@
    "name": "moon",
    "type": "directional",
    "direction": [
-    0.9,
-    -0.3,
-    -0.31
+    0.93,
+    -0.2,
+    -0.3
    ],
    "color": [
     0.73791,
     0.77582,
     1.0
    ],
-   "intensity": 3.6,
-   "castsShadow": true,
+   "intensity": 4.0,
+   "castsShadow": false,
    "contactShadow": false,
    "softness": 0.4
+  },
+  {
+   "id": "heart",
+   "name": "heart",
+   "type": "point",
+   "position": [
+    0.0,
+    11.0,
+    0.0
+   ],
+   "color": [
+    0.27468,
+    0.80695,
+    1.0
+   ],
+   "intensity": 3200.0,
+   "range": 140.0,
+   "castsShadow": false
   },
   {
    "id": "rim",
    "name": "rim",
    "type": "directional",
    "direction": [
-    -0.2,
-    -0.15,
-    0.97
+    -0.25,
+    -0.12,
+    0.96
    ],
    "color": [
     0.38643,
     0.19807,
     1.0
    ],
-   "intensity": 0.45,
+   "intensity": 1.2,
    "castsShadow": false
   }
  ],
