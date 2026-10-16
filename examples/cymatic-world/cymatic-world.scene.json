@@ -5,9 +5,9 @@
  "camera": {
   "mode": 1,
   "position": [
-   4.1236,
-   16.0,
-   43.5718
+   2.1752,
+   32.0,
+   29.708
   ],
   "target": [
    -2.0,
@@ -228,72 +228,6 @@
     ],
     "normalStep": 0.12
    }
-  },
-  {
-   "name": "spires",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "mesh",
-     "asset": "meshes/cw-spires.glb"
-    },
-    "distribution": {
-     "kind": "single"
-    },
-    "material": {
-     "baseColor": [
-      0.00535,
-      0.00644,
-      0.01119
-     ],
-     "emissiveColor": [
-      0,
-      0,
-      0
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.7,
-     "metallic": 0.0
-    }
-   }
-  }
- ],
- "lights": [
-  {
-   "id": "moon",
-   "name": "moon",
-   "type": "directional",
-   "direction": [
-    0.93,
-    -0.2,
-    -0.3
-   ],
-   "color": [
-    1.0,
-    0.81485,
-    0.67244
-   ],
-   "intensity": 6.0,
-   "castsShadow": false,
-   "contactShadow": false,
-   "softness": 0.4
-  },
-  {
-   "id": "rim",
-   "name": "rim",
-   "type": "directional",
-   "direction": [
-    -0.25,
-    -0.12,
-    0.96
-   ],
-   "color": [
-    0.38643,
-    0.19807,
-    1.0
-   ],
-   "intensity": 0.8,
-   "castsShadow": false
   }
  ],
  "materialPrograms": [
@@ -440,20 +374,27 @@
      "srcB": 4
     },
     {
-     "kind": "constant",
-     "dst": 4,
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
      "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.25,
+      0.012425,
+      0.16112,
+      0.5
+     ],
+     "constant3": [
       0.5,
       0.02485,
       0.32224,
       1.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
     },
     {
      "kind": "add",
@@ -462,31 +403,27 @@
      "srcB": 3
     },
     {
-     "kind": "constant",
+     "kind": "ramp",
      "dst": 4,
+     "srcA": 1,
      "constant": [
       0.00243,
       0.00605,
       0.03689,
       1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
+     ],
+     "constant2": [
+      0.00289,
+      0.03193,
+      0.06724,
+      1.0
+     ],
+     "constant3": [
       0.00335,
       0.05781,
       0.09759,
       1.0
      ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5,
-     "srcC": 1
     },
     {
      "kind": "input",
@@ -506,20 +443,27 @@
      "value": 1.0
     },
     {
-     "kind": "constant",
+     "kind": "ramp",
      "dst": 5,
+     "srcA": 1,
      "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.14046,
+      0.96462,
+      1.15,
+      0.5
+     ],
+     "constant3": [
       0.28092,
       1.92924,
       2.3,
       1.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 1
     },
     {
      "kind": "power",
@@ -534,20 +478,27 @@
      "srcB": 7
     },
     {
-     "kind": "constant",
-     "dst": 3,
+     "kind": "ramp",
+     "dst": 1,
+     "srcA": 1,
      "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.40585,
+      0.535395,
+      0.55,
+      0.5
+     ],
+     "constant3": [
       0.8117,
       1.07079,
       1.1,
       1.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 3
     },
     {
      "kind": "gradient",
@@ -568,20 +519,27 @@
      "value": 4.0
     },
     {
-     "kind": "constant",
-     "dst": 7,
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
      "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.239975,
+      0.01968,
+      0.45,
+      0.5
+     ],
+     "constant3": [
       0.47995,
       0.03936,
       0.9,
       1.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 7
     },
     {
      "kind": "add",
@@ -602,20 +560,27 @@
      "value": 1.0
     },
     {
-     "kind": "constant",
-     "dst": 7,
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
      "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.00036,
+      0.00021,
+      0.00281,
+      0.5
+     ],
+     "constant3": [
       0.00072,
       0.00042,
       0.00562,
       1.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 7
     },
     {
      "kind": "add",
@@ -629,20 +594,27 @@
      "value": 3.0
     },
     {
-     "kind": "constant",
-     "dst": 7,
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
      "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.175,
+      0.04807,
+      0.138475,
+      0.5
+     ],
+     "constant3": [
       0.35,
       0.09614,
       0.27695,
       1.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 7
     },
     {
      "kind": "add",

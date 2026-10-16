@@ -125,7 +125,7 @@
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.2,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 26.0,
+  "camera/lens/focalLength": 30.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
@@ -240,7 +240,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/20/constant/constant",
+   "target": "material/cwGround/op/18/ramp/constant3",
    "amount": 0.00143,
    "op": "add",
    "polarity": "unipolar",
@@ -252,7 +252,19 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/20/constant/constant",
+   "target": "material/cwGround/op/18/ramp/constant2",
+   "amount": 0.00072,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 9000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "material/cwGround/op/18/ramp/constant3",
    "amount": 0.08922,
    "op": "add",
    "polarity": "unipolar",
@@ -264,7 +276,19 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/20/constant/constant",
+   "target": "material/cwGround/op/18/ramp/constant2",
+   "amount": 0.04461,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 9000
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "material/cwGround/op/18/ramp/constant3",
    "amount": 0.12564,
    "op": "add",
    "polarity": "unipolar",
@@ -275,8 +299,33 @@
    }
   },
   {
+   "source": "response.intensity",
+   "target": "material/cwGround/op/18/ramp/constant2",
+   "amount": 0.06282,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 9000
+   }
+  },
+  {
    "source": "response.sustain",
-   "target": "material/cwGround/op/16/constant/constant",
+   "target": "material/cwGround/op/16/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 1500,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/cwGround/op/16/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -289,7 +338,20 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/16/constant/constant",
+   "target": "material/cwGround/op/16/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.6,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/cwGround/op/16/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -315,7 +377,20 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/28/constant/constant",
+   "target": "material/cwGround/op/24/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.5,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "response.hatEnv",
+   "target": "material/cwGround/op/24/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -328,7 +403,20 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/32/constant/constant",
+   "target": "material/cwGround/op/27/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.8,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "material/cwGround/op/27/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -352,7 +440,20 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/32/constant/constant",
+   "target": "material/cwGround/op/27/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/cwGround/op/27/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -393,225 +494,225 @@
      {
       "time": 0.0,
       "value": [
-       4.1236,
-       16.0,
-       43.5718
+       2.1752,
+       32.0,
+       29.708
       ],
       "interp": "smooth"
      },
      {
       "time": 6.6667,
       "value": [
-       11.8541,
-       17.0,
-       41.762
+       7.446,
+       33.0,
+       28.4741
       ],
       "interp": "smooth"
      },
      {
       "time": 13.3333,
       "value": [
-       18.6567,
-       17.7321,
-       38.8497
+       12.0841,
+       33.7321,
+       26.4884
       ],
       "interp": "smooth"
      },
      {
       "time": 20.0,
       "value": [
-       24.0388,
-       18.0,
-       35.468
+       15.7538,
+       34.0,
+       24.1827
       ],
       "interp": "smooth"
      },
      {
       "time": 26.6667,
       "value": [
-       27.8057,
-       17.7321,
-       32.3669
+       18.3221,
+       33.7321,
+       22.0684
       ],
       "interp": "smooth"
      },
      {
       "time": 33.3333,
       "value": [
-       29.9888,
-       17.0,
-       30.2112
+       19.8106,
+       33.0,
+       20.5985
       ],
       "interp": "smooth"
      },
      {
       "time": 40.0,
       "value": [
-       30.6984,
-       16.0,
-       29.4417
+       20.2943,
+       32.0,
+       20.0739
       ],
       "interp": "smooth"
      },
      {
       "time": 46.6667,
       "value": [
-       29.9888,
-       15.0,
-       30.2112
+       19.8106,
+       31.0,
+       20.5985
       ],
       "interp": "smooth"
      },
      {
       "time": 53.3333,
       "value": [
-       27.8057,
-       14.2679,
-       32.3669
+       18.3221,
+       30.2679,
+       22.0684
       ],
       "interp": "smooth"
      },
      {
       "time": 60.0,
       "value": [
-       24.0388,
-       14.0,
-       35.468
+       15.7538,
+       30.0,
+       24.1827
       ],
       "interp": "smooth"
      },
      {
       "time": 66.6667,
       "value": [
-       18.6567,
-       14.2679,
-       38.8497
+       12.0841,
+       30.2679,
+       26.4884
       ],
       "interp": "smooth"
      },
      {
       "time": 73.3333,
       "value": [
-       11.8541,
-       15.0,
-       41.762
+       7.446,
+       31.0,
+       28.4741
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       4.1236,
-       16.0,
-       43.5718
+       2.1752,
+       32.0,
+       29.708
       ],
       "interp": "smooth"
      },
      {
       "time": 86.6667,
       "value": [
-       -3.8063,
-       17.0,
-       43.9629
+       -3.2316,
+       33.0,
+       29.9747
       ],
       "interp": "smooth"
      },
      {
       "time": 93.3333,
       "value": [
-       -11.1481,
-       17.7321,
-       43.0385
+       -8.2374,
+       33.7321,
+       29.3444
       ],
       "interp": "smooth"
      },
      {
       "time": 100.0,
       "value": [
-       -17.2538,
-       18.0,
-       41.2713
+       -12.4003,
+       34.0,
+       28.1395
       ],
       "interp": "smooth"
      },
      {
       "time": 106.6667,
       "value": [
-       -21.7296,
-       17.7321,
-       39.3287
+       -15.452,
+       33.7321,
+       26.815
       ],
       "interp": "smooth"
      },
      {
       "time": 113.3333,
       "value": [
-       -24.4223,
-       17.0,
-       37.8582
+       -17.2879,
+       33.0,
+       25.8124
       ],
       "interp": "smooth"
      },
      {
       "time": 120.0,
       "value": [
-       -25.3164,
-       16.0,
-       37.3141
+       -17.8976,
+       32.0,
+       25.4414
       ],
       "interp": "smooth"
      },
      {
       "time": 126.6667,
       "value": [
-       -24.4223,
-       15.0,
-       37.8582
+       -17.2879,
+       31.0,
+       25.8124
       ],
       "interp": "smooth"
      },
      {
       "time": 133.3333,
       "value": [
-       -21.7296,
-       14.2679,
-       39.3287
+       -15.452,
+       30.2679,
+       26.815
       ],
       "interp": "smooth"
      },
      {
       "time": 140.0,
       "value": [
-       -17.2538,
-       14.0,
-       41.2713
+       -12.4003,
+       30.0,
+       28.1395
       ],
       "interp": "smooth"
      },
      {
       "time": 146.6667,
       "value": [
-       -11.1481,
-       14.2679,
-       43.0385
+       -8.2374,
+       30.2679,
+       29.3444
       ],
       "interp": "smooth"
      },
      {
       "time": 153.3333,
       "value": [
-       -3.8063,
-       15.0,
-       43.9629
+       -3.2316,
+       31.0,
+       29.9747
       ],
       "interp": "smooth"
      },
      {
       "time": 160.0,
       "value": [
-       4.1236,
-       16.0,
-       43.5718
+       2.1752,
+       32.0,
+       29.708
       ],
       "interp": "smooth"
      }
@@ -865,8 +966,8 @@
   "category": "abstract",
   "thesis": "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, and the grit settles on its nodal lines, carving rings, petals and cells into the ground.",
   "composition": {
-   "background": "a ring of basalt spires and far mountains under an indigo sky",
-   "midground": "the basin's terraced rim",
+   "background": "none: the camera looks down into the basin, the ground fills the frame",
+   "midground": "the outer rings of the figure",
    "foreground": "the basin floor, its sand relief drawing the figure",
    "focal": "the basin floor's figure",
    "camera": "a slow high arc over the basin, there and back in 160 s"

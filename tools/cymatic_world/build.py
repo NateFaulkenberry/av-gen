@@ -31,7 +31,7 @@ from tools.sonic_vfx import kit, meshes  # noqa: E402
 from tools.sonic_vfx.kit import R, hexrgb  # noqa: E402
 
 OUT = os.path.join(REPO, "examples", "cymatic-world")
-MESH_DIR = os.path.join(OUT, "meshes")   # the shared ground and spires
+MESH_DIR = os.path.join(OUT, "meshes")   # the ground
 
 # ================================================================================================ palette
 # Night in a basalt basin: blue-black stone, indigo air, a violet rim on the horizon; the only saturated light is
@@ -301,64 +301,6 @@ class Prog:
                 "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
-# ================================================================================================ the spires
-def spire_tris(base, radius, height, sides, lean, seed):
-    """An eroded basalt pinnacle: five drums, each narrower and a little offset (a weathered column), drawn to a
-    blunt point; faceted, so the moon picks out its planes."""
-    rnd = np.random.default_rng(seed + 77)
-    a0 = rnd.random() * 2.0 * math.pi
-    levels = []
-    n = 5
-    for k in range(n + 1):
-        u = k / n
-        r = radius * (1.0 - 0.82 * u ** 1.25) * (0.92 + 0.16 * rnd.random())
-        y = base[1] + height * u
-        off = (lean[0] * height * u + (rnd.random() - 0.5) * 0.15 * radius,
-               lean[1] * height * u + (rnd.random() - 0.5) * 0.15 * radius)
-        levels.append([(base[0] + off[0] + r * math.cos(a0 + 2 * math.pi * j / sides), y,
-                        base[2] + off[1] + r * math.sin(a0 + 2 * math.pi * j / sides)) for j in range(sides)])
-    tris = []
-    for lo, hi in zip(levels[:-1], levels[1:]):
-        for j in range(sides):
-            j1 = (j + 1) % sides
-            tris += [(lo[j], hi[j], hi[j1]), (lo[j], hi[j1], lo[j1])]
-    top = levels[-1]
-    cx = sum(p[0] for p in top) / sides
-    cz = sum(p[2] for p in top) / sides
-    apex = (cx, top[0][1] + radius * 0.5, cz)
-    for j in range(sides):
-        tris.append((top[j], apex, top[(j + 1) % sides]))
-    return tris
-
-
-# ================================================================================================ the world beyond
-# Basalt spires: columns of the same dark stone standing on the rim and in ranks across the plateau, so every
-# direction has layered silhouettes against the violet horizon (no edge, no void) -- atmosphere, never a hero.
-def spires(s):
-    rnd = np.random.default_rng(20261016)
-    places = []
-    for ring_r, n, hmin, hmax, rmin, rmax in ((112.0, 26, 9.0, 26.0, 2.0, 4.5), (190.0, 34, 14.0, 42.0, 3.0, 7.0),
-                                              (330.0, 40, 25.0, 70.0, 5.0, 11.0), (620.0, 36, 50.0, 130.0, 9.0, 20.0)):
-        for k in range(n):
-            a = (k + rnd.random() * 0.7) * 2.0 * math.pi / n
-            r = ring_r * (0.85 + 0.3 * rnd.random())
-            x, z = r * math.cos(a), r * math.sin(a)
-            # keep the camera's gap (toward +z, |x| small near the rim) open
-            if ring_r < 150.0 and z > 40.0 and abs(x) < 45.0:
-                continue
-            places.append((x, z, hmin + (hmax - hmin) * rnd.random() ** 1.6, rmin + (rmax - rmin) * rnd.random(),
-                           (rnd.random() - 0.5) * 0.12, (rnd.random() - 0.5) * 0.12, int(rnd.integers(5, 8))))
-    ys = world_heights(np.array([[p[0], p[1]] for p in places], dtype=np.float64))
-    tris = []
-    for k, ((x, z, h, r, lx, lz, sides), y) in enumerate(zip(places, ys)):
-        tris += spire_tris((x, y - 3.0, z), r, h + 3.0, sides, (lx, lz), k)
-    pos, nrm = meshes.faceted(tris)
-    meshes.write_glb(os.path.join(MESH_DIR, "cw-spires.glb"), pos, nrm, None, "spires")
-    s.proc("spires", {"kind": "mesh", "asset": "meshes/cw-spires.glb"},
-           material={"baseColor": C("stone", 1.6), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
-                     "roughness": 0.7, "metallic": 0.0})
-
-
 def variant(project, wav, out, camera=None, params=None):
     """A file project of the live scene driven by `wav` (the review renders): optionally another camera
     ("x,y,z:tx,ty,tz") and parameter overrides."""
@@ -387,7 +329,6 @@ SCENES = {"world": {"id": "cymatic-world", "title": "Cymatic World"}}
 FIELD = "cymatic"
 HEART = (0.0, 12.0, 0.0)          # the basin's voice: the low modes' centre, above the floor's middle
 SECOND = (-23.0, 0.0, 9.0)        # the world's second centre (interference with the first)
-MOON_DIR = (0.93, -0.2, -0.3)     # the direction the moonlight travels (normalised in use)
 GROUND_REL = "meshes/cw-ground.glb"
 
 
@@ -470,6 +411,14 @@ def ground_program():
     P_ = PALETTES[PALETTE]
     dbg = os.environ.get("CW_DEBUG", "")
     g = Prog("cwGround")
+
+    def tint(label, dst, src, key, scale=1.0):
+        # scalar (0..1) x colour in ONE op: a ramp from black through half the colour to the colour is exactly
+        # t x colour on [0, 1] (the interpreter costs ~0.36 ms per op at 1080p High, so a constant + multiply pair
+        # is twice the price). A route scales the colour through constant2 AND constant3 (see ramp_paths).
+        c = pc(key, scale)
+        g.op(label, "ramp", dst, a=src, k=[0, 0, 0, 0], k2=[x * 0.5 for x in c] + [0.5], k3=c + [1.0])
+
     g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
     g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
     g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
@@ -477,7 +426,7 @@ def ground_program():
     g.op("gritMask", "smoothstep", 1, a=1, k=[0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
-    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
+    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
     g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
     g.op(None, "multiply", 2, a=2, b=7)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
@@ -488,34 +437,27 @@ def ground_program():
     g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
     g.op("wallBand", "smoothstep", 4, a=4, k=[0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
-    g.op("hollow", "constant", 4, k=pc("hollow", P_["hollowI"]) + [1.0])
-    g.op(None, "multiply", 3, a=3, b=4)
+    tint("hollow", 3, 3, "hollow", P_["hollowI"])
     g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
-    # ---- materials: scoured satin stone, matte settled grit ----
-    g.op("stone", "constant", 4, k=pc("stone") + [1.0])
-    g.op("grit", "constant", 5, k=pc("grit") + [1.0])
-    g.op(None, "mixBy", 4, a=4, b=5, c=1)                          # r4: albedo
+    # ---- materials: scoured satin stone, matte settled grit (one ramp: stone -> grit by the grit mask) ----
+    st, gr = pc("stone"), pc("grit")
+    g.op("albedo", "ramp", 4, a=1, k=st + [1.0], k2=[(x + y) * 0.5 for x, y in zip(st, gr)] + [1.0], k3=gr + [1.0])
     # ---- light, into r5 (sheen into r1) ----
     g.op(None, "input", 6, inp="normal")
     g.op("keyDot", "gradient", 1, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
-    g.op("key", "constant", 5, k=pc("key", P_["keyI"]) + [1.0])
-    g.op(None, "multiply", 5, a=5, b=1)                            # the raking key
-    g.op("sheenLobe", "power", 1, a=1, f=12.0)                      # the key's highlight ...
+    tint("key", 5, 1, "key", P_["keyI"])                           # the raking key
+    g.op("sheenLobe", "power", 1, a=1, f=12.0)                     # the key's highlight ...
     g.op(None, "multiply", 1, a=1, b=7)                            # ... on the smooth stone only
-    g.op("sheen", "constant", 3, k=pc("sheen", P_["sheenI"]) + [1.0])
-    g.op(None, "multiply", 1, a=1, b=3)                            # r1: sheen
+    tint("sheen", 1, 1, "sheen", P_["sheenI"])                     # r1: sheen
     g.op("fillDot", "gradient", 3, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
     g.op(None, "power", 3, a=3, f=4.0)                             # the fill grazes: a narrow lobe on the far flanks
-    g.op("fill", "constant", 7, k=pc("fill", P_["fillI"]) + [1.0])
-    g.op(None, "multiply", 3, a=3, b=7)
+    tint("fill", 3, 3, "fill", P_["fillI"])
     g.op(None, "add", 5, a=5, b=3)                                 # + fill
     g.op("skyDot", "gradient", 3, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
-    g.op("sky", "constant", 7, k=pc("sky", P_["skyI"]) + [1.0])
-    g.op(None, "multiply", 3, a=3, b=7)
+    tint("sky", 3, 3, "sky", P_["skyI"])
     g.op(None, "add", 5, a=5, b=3)                                 # + sky
     g.op("rimMask", "fresnel", 3, f=3.0)
-    g.op("rim", "constant", 7, k=pc("rim", P_["rimI"]) + [1.0])
-    g.op(None, "multiply", 3, a=3, b=7)
+    tint("rim", 3, 3, "rim", P_["rimI"])
     g.op(None, "add", 5, a=5, b=3)                                 # + rim
     if dbg == "light":
         g.op(None, "add", 4, a=5, b=1)                             # the light alone (on white)
@@ -533,7 +475,7 @@ def ground_program():
     return g
 
 
-def environment(s, rim=1.2):
+def environment(s):
     s.environment = {
         "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
         "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
@@ -542,11 +484,7 @@ def environment(s, rim=1.2):
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
-    # the moon: low and to the side, so it rakes the ridges and every hollow holds a shadow (it lights what is not
-    # painted: the spires)
-    s.light("moon", "directional", direction=list(MOON_DIR), color=C("moon"), intensity=6.0,
-            castsShadow=False, contactShadow=False, softness=0.4)
-    s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=rim, castsShadow=False)
+    # no scene lights: the ground is unlit, its key, fill, sky and rim are painted in its program (ground_program)
 
 
 def ground(s, relief, write_mesh=False):
@@ -617,8 +555,8 @@ POST = {
 def design(thesis, focal, foreground, camera):
     return {
         "category": "abstract", "thesis": thesis,
-        "composition": {"background": "a ring of basalt spires and far mountains under an indigo sky",
-                        "midground": "the basin's terraced rim", "foreground": foreground, "focal": focal,
+        "composition": {"background": "none: the camera looks down into the basin, the ground fills the frame",
+                        "midground": "the outer rings of the figure", "foreground": foreground, "focal": focal,
                         "camera": camera},
         "palette": {"dominant": P["stone"], "secondary": P["sand"], "accent": P["sandHot"], "highlight": P["hollow"],
                     "background_value": "near black", "saturation": "low, with selective cyan and violet"},
@@ -628,9 +566,9 @@ def design(thesis, focal, foreground, camera):
 
 # ------------------------------------------------------------------------------------------------ Cymatic World
 def build_world():
-    """THE RESONANT GROUND: the basin is the instrument. The ground is lit by a
-    raking warm moon and a cool counter light from the opposite quarter, so every ridge reads on both flanks and the
-    hollows stay dark; the nodal lines carry a thin cold light only where the ground rings."""
+    """THE RESONANT GROUND: the basin is the instrument. Seen from high and steep, the ground fills the frame; its
+    light is painted in its program -- a raking cyan key and a fuchsia counter-fill from the opposite quarter, so
+    every ridge reads on both flanks -- and the nodal lines and the hardest-ringing hollows carry the emission."""
     cc = CC_FIELD + [(5, "relief", "TERRAIN: how deeply the ground's sand relief is carved"),
                      (8, "light", "LIGHT: the fuchsia counter light over the ridges, and the nodal lines' glow")]
     pads = [PAD_STRIKE]
@@ -639,7 +577,7 @@ def build_world():
         "and the grit settles on its nodal lines, carving rings, petals and cells into the ground.",
         "the basin floor's figure", "the basin floor, its sand relief drawing the figure",
         "a slow high arc over the basin, there and back in 160 s"))
-    environment(s, rim=0.8)
+    environment(s)
     resonator(s, [
         # the basin's voice: the low modes -- broad rings and petals about its centre
         {"kind": "point", "position": list(HEART), "order": 4, "bandLow": 0.0, "bandHigh": 0.45, "reach": 75.0,
@@ -653,15 +591,21 @@ def build_world():
     ])
     ground_readers(s)
     g = ground(s, relief=2.6, write_mesh=True)
-    spires(s)
-    s.camera = {"mode": 1, "position": [0.0, 16.0, 44.0], "target": [-2.0, -3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
-    s.arc_camera([-2.0, -3.0, 0.0], 44.0, 16.0, period=160.0, centre_deg=8.0, sweep_deg=80.0, steps=24, side=0.0,
+    # LOOKING INTO THE GROUND: high and steep (about 47 degrees down) on a 30 mm lens, so the frame's top edge meets
+    # the ground inside r ~60 m all round the arc and the basin's walls (they rise from r ~90 m) never enter it -- the
+    # frame is all ground (checked by ray-casting the top edge and corners along the whole loop)
+    s.camera = {"mode": 1, "position": [0.0, 32.0, 30.0], "target": [-2.0, -3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
+    s.arc_camera([-2.0, -3.0, 0.0], 30.0, 32.0, period=160.0, centre_deg=8.0, sweep_deg=80.0, steps=24, side=0.0,
                  lift=0.0, height_bob=2.0)
-    s.params_({"camera/lens/focalLength": 26.0})
+    s.params_({"camera/lens/focalLength": 30.0})
     F = field_instrument(s)
-    OP = "material/cwGround/op/%d/constant/constant"
-    counter, line, hollow, sheen, grit = (OP % g["fill"], OP % g["line"], OP % g["hollow"], OP % g["sheen"],
-                                          OP % g["grit"])
+    # a ramp-tinted term's colour is its constant2 (half) and constant3 (whole); a route scales both
+    RP = "material/cwGround/op/%d/ramp/%s"
+    def ramp_paths(label):
+        return [RP % (g[label], "constant2"), RP % (g[label], "constant3")]
+    counter, hollow, sheen = ramp_paths("fill"), ramp_paths("hollow"), ramp_paths("sheen")
+    line = "material/cwGround/op/%d/constant/constant" % g["line"]
+    grit_mid, grit = RP % (g["albedo"], "constant2"), RP % (g["albedo"], "constant3")
     # THE COLOUR AND LIGHT RESPONSE (the colour pass, Pass D). The field already places the light: the nodal-line
     # glow is crest x the field's own amplitude, the hollow glow lives only on the inner walls of cells that ring hard,
     # so every route below scales a SPATIALLY LOCALISED term, never the whole frame. Colour and brightness move on
@@ -674,15 +618,16 @@ def build_world():
     #     fuchsia counter-fill on the far flanks.
     tgt = hexrgb("#0f6b82")
     base = pc("grit")
-    s.route(*[R("intensity", grit, round(tgt[c] - base[c], 5), comp=c, attackMs=4000, decayMs=9000) for c in range(3)])
-    s.route(R("sustain", hollow, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000),
-            R("kickEnv", hollow, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380),
+    s.route(*[R("intensity", path, round((tgt[c] - base[c]) * w, 5), comp=c, attackMs=4000, decayMs=9000)
+              for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5))])
+    s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
+            *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
             R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
-            R("hatEnv", sheen, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180),
-            R("flux", counter, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500))
+            *[R("hatEnv", p_, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180) for p_ in sheen],
+            *[R("flux", p_, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500) for p_ in counter])
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
-    s.route(R("control.light", counter, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR),
+    s.route(*[R("control.light", p_, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR) for p_ in counter],
             R("control.light", line, 1.0, op="multiply", gain=2.0, offset=1.0, **CCR))
     s.params_(POST)
     return s, cc, pads
