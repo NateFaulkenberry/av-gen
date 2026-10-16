@@ -69,6 +69,19 @@ TEST_CASE("resonance probe (diagnostic)", "[.resonance-probe]") {
                         s.memory[static_cast<std::size_t>(i)], m.drive.y, m.drive.w);
         }
     }
+    // CW_LINE=x,z,y0,y1: every field along a vertical line (a tuned structure's axis)
+    if (const char* line = std::getenv("CW_LINE")) {
+        float x = 0.0f, z = 0.0f, y0 = 0.0f, y1 = 10.0f;
+        std::sscanf(line, "%f,%f,%f,%f", &x, &z, &y0, &y1);
+        for (int k = 0; k <= 8; ++k) {
+            const glm::vec3 p(x, y0 + (y1 - y0) * static_cast<float>(k) / 8.0f, z);
+            std::printf("  y %6.2f:", p.y);
+            for (const auto& f : set.fields) {
+                std::printf(" %s %.3f", f.name.c_str(), static_cast<double>(spatial::sampleScalar(f, p, t, &set)));
+            }
+            std::printf("\n");
+        }
+    }
     // every reader's value statistics over a ball round the probe
     for (const auto& f : set.fields) {
         double sum = 0.0;

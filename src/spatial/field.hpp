@@ -222,6 +222,9 @@ struct FieldSpec {
 
     [[nodiscard]] FieldType type() const {
         if (kind == FieldKind::Resonance) {
+            if (resonance.channel == ResonanceChannel::Shading) {
+                return FieldType::Color;
+            }
             return resonanceChannelIsVector(resonance.channel) ? FieldType::Vector : FieldType::Scalar;
         }
         return fieldTypeOf(kind);

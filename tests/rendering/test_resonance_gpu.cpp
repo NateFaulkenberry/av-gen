@@ -41,7 +41,7 @@ std::unique_ptr<gpu::Context> makeContext() {
     return std::move(*ctx);
 }
 
-// samples[i].xyz = position, .w = slot. results[i] = (fieldScalar, fieldVector).
+// samples[i].xyz = position, .w = slot. results[2i] = (fieldScalar, fieldVector), results[2i + 1] = fieldColor.
 constexpr const char* kKernel = R"(
 @group(0) @binding(0) var<uniform> fieldBlock: FieldBlock;
 @group(0) @binding(1) var<storage, read> samples: array<vec4<f32>>;
@@ -54,7 +54,8 @@ fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     let s = samples[i];
     let slot = i32(s.w + 0.5);
     let v = fieldVector(slot, s.xyz);
-    results[i] = vec4<f32>(fieldScalar(slot, s.xyz), v);
+    results[2u * i] = vec4<f32>(fieldScalar(slot, s.xyz), v);
+    results[2u * i + 1u] = fieldColor(slot, s.xyz);
 }
 )";
 
@@ -100,7 +101,7 @@ public:
         wgpu::Buffer in = device.CreateBuffer(&sdesc);
         ctx_.queue().WriteBuffer(in, 0, samples.data(), sdesc.size);
         wgpu::BufferDescriptor rdesc{};
-        rdesc.size = samples.size() * sizeof(glm::vec4);
+        rdesc.size = 2 * samples.size() * sizeof(glm::vec4);
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer out = device.CreateBuffer(&rdesc);
         std::array<wgpu::BindGroupEntry, 4> entries{};
@@ -131,7 +132,7 @@ public:
         ctx_.queue().Submit(1, &commands);
         auto bytes = gpu::readBuffer(ctx_, out, 0, rdesc.size);
         REQUIRE(bytes.has_value());
-        std::vector<glm::vec4> values(samples.size());
+        std::vector<glm::vec4> values(2 * samples.size());
         std::memcpy(values.data(), bytes->data(), rdesc.size);
         return values;
     }
@@ -215,6 +216,10 @@ spatial::FieldSet makeFields() {
     relief.resonance.reliefLineSharpness = 0.3f;
     relief.resonance.reliefVibration = 0.25f;
     set.fields.push_back(relief);
+    auto shading = reader("shading", spatial::ResonanceChannel::Shading);
+    shading.resonance.sharpness = 0.8f;
+    shading.resonance.reliefLineSharpness = 0.3f;
+    set.fields.push_back(shading);
     auto framed = reader("framed", spatial::ResonanceChannel::Sand);
     framed.position = glm::vec3(3.0f, -1.0f, 2.0f);
     framed.rotationDegrees = glm::vec3(10.0f, 35.0f, -5.0f);
@@ -263,13 +268,19 @@ TEST_CASE("Resonance fields on the GPU match the CPU reference in every channel"
             const glm::vec3 p(samples[i]);
             const float cpuS = spatial::sampleScalar(fields.fields[slot], p, t, &fields);
             const glm::vec3 cpuV = spatial::sampleVector(fields.fields[slot], p, t, &fields);
+            const glm::vec4 cpuC = spatial::sampleColor(fields.fields[slot], p, t, &fields);
             const float scale = 1.0f + std::abs(cpuS) + glm::length(cpuV);
             INFO("t " << t << " field " << fields.fields[slot].name << " p (" << p.x << ", " << p.y << ", " << p.z << ")");
-            CHECK(std::isfinite(gpu[i].x));
-            CHECK(close(gpu[i].x, cpuS, scale));
-            CHECK(close(gpu[i].y, cpuV.x, scale));
-            CHECK(close(gpu[i].z, cpuV.y, scale));
-            CHECK(close(gpu[i].w, cpuV.z, scale));
+            const glm::vec4 g = gpu[2 * i];
+            const glm::vec4 gc = gpu[2 * i + 1];
+            CHECK(std::isfinite(g.x));
+            CHECK(close(g.x, cpuS, scale));
+            CHECK(close(g.y, cpuV.x, scale));
+            CHECK(close(g.z, cpuV.y, scale));
+            CHECK(close(g.w, cpuV.z, scale));
+            for (int c = 0; c < 4; ++c) {
+                CHECK(close(gc[c], cpuC[c], scale + std::abs(cpuC[c])));
+            }
             ++checked;
         }
         CHECK(checked == static_cast<int>(samples.size()));
@@ -297,6 +308,6 @@ TEST_CASE("The resonance table holds 48 modes; a resonator that does not fit sam
     CHECK(block.fields[1].gridBounds0 == glm::vec4(20.0f, 20.0f, 1.0f, 0.0f));
     CHECK(block.fields[2].gridBounds0.y == 0.0f); // 60 modes do not fit in 48
     CHECK(gpu[0].x > 0.0f);
-    CHECK(gpu[1].x == gpu[0].x); // same spec, same clock: same modes, in different rows
-    CHECK(gpu[2].x == 0.0f);
+    CHECK(gpu[2].x == gpu[0].x); // same spec, same clock: same modes, in different rows
+    CHECK(gpu[4].x == 0.0f);
 }

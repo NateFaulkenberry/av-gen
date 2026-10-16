@@ -115,13 +115,16 @@ const char* resonanceChannelName(ResonanceChannel channel) {
         return "gradient";
     case ResonanceChannel::Relief:
         return "relief";
+    case ResonanceChannel::Shading:
+        return "shading";
     }
     return "displacement";
 }
 
 std::optional<ResonanceChannel> resonanceChannelFromName(std::string_view name) {
     for (const ResonanceChannel c : {ResonanceChannel::Displacement, ResonanceChannel::Amplitude, ResonanceChannel::Sand,
-                                     ResonanceChannel::Force, ResonanceChannel::Gradient, ResonanceChannel::Relief}) {
+                                     ResonanceChannel::Force, ResonanceChannel::Gradient, ResonanceChannel::Relief,
+                                     ResonanceChannel::Shading}) {
         if (name == resonanceChannelName(c)) {
             return c;
         }
@@ -746,6 +749,7 @@ ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader
         const float e = w * (memory ? md.drive.w : md.drive.y);
         s.displacement += w * md.drive.x * phi;
         s.energy += e * phi; // the figure F, squared below
+        s.fast += w * md.drive.y * phi;
         s.meanEnergy += e * e * e2;
     }
     s.energy *= s.energy;
@@ -793,7 +797,17 @@ float derivativeStepOf(const ResonanceState& state, const FieldSpec& reader) {
 
 } // namespace
 
+glm::vec3 resonanceShading(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q) {
+    const ResonanceSums s = resonanceSums(state, reader, q, true);
+    return glm::vec3(sandOf(s, reader.resonance.sharpness), sandOf(s, reader.resonance.reliefLineSharpness),
+                     std::abs(s.fast));
+}
+
 float resonanceScalar(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q) {
+    if (reader.resonance.channel == ResonanceChannel::Shading) { // a colour read as a scalar: its luminance
+        const glm::vec3 c = resonanceShading(state, reader, q);
+        return 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+    }
     if (resonanceChannelIsVector(reader.resonance.channel)) {
         return glm::length(resonanceVector(state, reader, q));
     }
@@ -808,7 +822,8 @@ glm::vec3 resonanceVector(const ResonanceState& state, const FieldSpec& reader, 
     }
     const float h = derivativeStepOf(state, reader);
     const auto value = [&](const glm::vec3& p) {
-        const ResonanceSums s = resonanceSums(state, reader, p, false);
+        // the force reads the SLOW figure: its nodes move as the sand's do, so matter held on them settles
+        const ResonanceSums s = resonanceSums(state, reader, p, c == ResonanceChannel::Force);
         return c == ResonanceChannel::Force ? s.energy : s.displacement;
     };
     const glm::vec3 g((value(q + glm::vec3(h, 0, 0)) - value(q - glm::vec3(h, 0, 0))) / (2.0f * h),

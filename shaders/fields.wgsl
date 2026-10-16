@@ -660,8 +660,36 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
 }
 
 fn resonanceValueFor(fi: u32, q: vec3<f32>, force: bool) -> f32 {
-    let s = resonanceSums(fi, q, false);
+    let s = resonanceSums(fi, q, force);
     return select(s.x, s.y, force);
+}
+
+// The shading channel (a colour): (sand, sand at the crest's sharpness, |fast figure|) in one pass.
+fn resonanceShadingAt(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    let first = u32(fieldBlock.fields[fi].gridBounds0.x + 0.5);
+    let count = u32(fieldBlock.fields[fi].gridBounds0.y + 0.5);
+    var slow = 0.0;
+    var fast = 0.0;
+    var ebar = 0.0;
+    for (var i = 0u; i < count; i = i + 1u) {
+        let row = first + i;
+        if (row >= 48u) {
+            break;
+        }
+        let drive = fieldBlock.resonance[row * 3u + 2u];
+        let w = resonanceListen(fi, drive.z, q);
+        if (w <= 0.0) {
+            continue;
+        }
+        let pe = resonanceModeShape(row, q);
+        let e = w * drive.w;
+        slow = slow + e * pe.x;
+        fast = fast + w * drive.y * pe.x;
+        ebar = ebar + e * e * pe.y;
+    }
+    let s = vec3<f32>(0.0, slow * slow, ebar);
+    return vec3<f32>(resonanceSand(s, fieldBlock.fields[fi].gridBounds1.w), resonanceSand(s, fieldBlock.fields[fi].gridRes.y),
+                     abs(fast));
 }
 
 // The vector channels in the field frame: force = -grad E, gradient = grad D (central differences).
@@ -774,6 +802,9 @@ fn colorShape(fi: u32, q: vec3<f32>, a: vec4<f32>, b: vec4<f32>) -> vec3<f32> {
     }
     if (kind == FIELD_POSITION_COLOR) {
         return fract(q * fieldBlock.fields[fi].freqExpInvertBias.x);
+    }
+    if (kind == FIELD_RESONANCE) {
+        return resonanceShadingAt(fi, q);
     }
     return vec3<f32>(0.0);
 }

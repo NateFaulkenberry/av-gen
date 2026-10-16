@@ -52,10 +52,10 @@ P = {
     "horizon": "#3b2a78",
     "glowHorizon": "#5b3aa6",
     "fog": "#0c0b1f",
-    "moon": "#dfe4ff",       # the key: a cold moon, low, raking the ridges
+    "moon": "#ffe9d6",       # the key: a cold moon, low, raking the ridges
     "rim": "#a77bff",
-    "spire": "#3d4250",      # the blades: dark steel: dark steel under a thin oxide film (the film makes the colour)
-    "spireEdge": "#7fe6ff",  # a ringing tier's light
+    "crystal": "#2c3040",    # smoky dark quartz-steel under a thin film (the film makes the colour)
+    "crystalGlow": "#6fdcff",# a ringing crystal's inner light
 }
 
 
@@ -66,7 +66,7 @@ def C(key, scale=1.0):
 # ================================================================================================ the field
 FIELD = "cymatic"
 HEART = (0.0, 12.0, 0.0)          # the singing source above the basin's centre (the matter floats here)
-SPIRE = (-34.0, 0.0, 12.0)       # the sculpture's foot: a second, local source
+SPIRE = (-23.0, 0.0, 9.0)       # the sculpture's foot: a second, local source
 
 
 def fields(s):
@@ -87,16 +87,14 @@ def fields(s):
              "gain": 1.6, "scale": 2.2},
             # a Faraday carpet for the fine modes on the basin floor (hexagons), evanescent above it
             {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.65, "bandHigh": 1.0,
-             "reach": 60.0, "gain": 0.75, "depth": 9.0},
+             "reach": 42.0, "gain": 0.6, "depth": 9.0},
         ],
         "channel": "displacement",
     }
     s.nodes.append({"name": FIELD, "kind": "field", "position": [0, 0, 0],
                     "field": {"kind": "resonance", "seed": 7, "strength": 1.0, "falloff": {"kind": "none"},
                               "resonance": res}})
-    for name, channel, extra in (("sand", "sand", {"sharpness": 0.9}),
-                                 ("line", "sand", {"sharpness": 0.3}),
-                                 ("glow", "amplitude", {}),
+    for name, channel, extra in (                                 ("shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35}),
                                  ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.3, "reliefLineSharpness": 0.45,
                                                        "reliefVibration": 0.23}),
                                  # the matter hears the heart's modes only (its spherical shells, not the far lattice)
@@ -353,41 +351,31 @@ class Prog:
 
 
 def ground_program():
-    """The basin's ground. Basalt where the field has scoured it, settled grit on the nodal ridges (the sand field),
-    a cold light along the nodal line only where the ground is ringing (sand x amplitude), and a faint violet in the
-    hollows that ring hardest. Emission stays a minor term: the relief and the raking moon carry the figure."""
+    """The basin's ground: one `field` op reads the resonance's shading channel (sand, crest, amplitude) in a single
+    pass over the modes. Basalt where the field has scoured it, settled grit on the nodal ridges, and a thin cold
+    light only on the nodal line where the ground is ringing. Emission is an accent; the relief and the light carry
+    the figure."""
     g = Prog("cwGround")
-    g.op("sand", "field", 0, field="sand")                         # r0: sand (0 .. ~1)
-    g.op("glow", "field", 1, field="glow")                         # r1: the local excitation (fast)
-    # the grit mask: where sand has settled (a soft step of the sand field)
-    g.op("gritMask", "smoothstep", 2, a=0, k=[0.10, 0.55])
-    # stone with a mottle so a hillside is not one flat colour (a world-space fbm, cheap, low contrast)
-    g.op(None, "input", 3, inp="worldPosition")
-    g.op("mottle", "noise", 3, a=3, f=0.11, seed=5)
-    g.op(None, "remap", 3, a=3, k=[0.2, 0.8, 0.75, 1.2], f=1.0)
-    g.op("stone", "constant", 4, k=C("stone") + [1.0])
-    g.op(None, "multiply", 4, a=4, b=3)
-    g.op("grit", "constant", 5, k=C("sand") + [1.0])
-    g.op(None, "mixBy", 4, a=4, b=5, c=2)                          # r4: base colour
-    # the nodal line's light: sand that is sharply on the line (a tighter step) x how hard the ground rings there
-    g.op("line", "field", 6, field="line")
-    g.op("lineMask", "smoothstep", 6, a=6, k=[0.35, 0.8])
-    g.op(None, "multiply", 6, a=6, b=1)
-    g.op("lineCol", "constant", 7, k=C("sandHot", 0.55) + [1.0])
-    g.op(None, "multiply", 6, a=6, b=7)                            # r6: line emission
-    # the hollows: the excitation where there is no sand (antinodes), violet, faint
-    g.op(None, "remap", 2, a=2, k=[0.0, 1.0, 1.0, 0.0], f=1.0)     # 1 - grit
-    g.op(None, "multiply", 2, a=2, b=1)
-    g.op(None, "multiply", 2, a=2, b=1)                            # ~ amplitude^2 in the hollows
-    g.op("hollowCol", "constant", 7, k=C("hollow", 0.03) + [1.0])
-    g.op(None, "multiply", 2, a=2, b=7)
-    g.op(None, "add", 6, a=6, b=2)                                 # r6: emission
-    # roughness: grit is matte, scoured basalt a little polished (it catches the moon as a sheen)
-    g.op("rough", "constant", 3, k=[0.82, 0.82, 0.82, 1.0])
-    g.op("roughGrit", "constant", 5, k=[0.86, 0.86, 0.86, 1.0])
-    g.op(None, "smoothstep", 7, a=0, k=[0.10, 0.55])
-    g.op(None, "mixBy", 3, a=3, b=5, c=7)
-    g.base, g.emit, g.rough = 4, 6, 3
+    g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
+    g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
+    g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
+    g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
+    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])          # where grit has settled
+    g.op(None, "input", 4, inp="worldPosition")
+    g.op("mottle", "noise", 4, a=4, f=0.09, seed=5)
+    g.op(None, "remap", 4, a=4, k=[0.2, 0.8, 0.7, 1.25], f=1.0)
+    g.op("stone", "constant", 5, k=C("stone") + [1.0])
+    g.op(None, "multiply", 5, a=5, b=4)
+    g.op("grit", "constant", 6, k=C("sand") + [1.0])
+    g.op(None, "mixBy", 5, a=5, b=6, c=1)                          # r5: base colour
+    g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
+    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
+    g.op("lineCol", "constant", 6, k=C("sandHot", 0.35) + [1.0])
+    g.op(None, "multiply", 6, a=6, b=2)                            # r6: emission (an accent)
+    g.op("rough", "constant", 7, k=[0.62, 0.62, 0.62, 1.0])
+    g.op("roughGrit", "constant", 4, k=[0.95, 0.95, 0.95, 1.0])
+    g.op(None, "mixBy", 7, a=7, b=4, c=1)
+    g.base, g.emit, g.rough = 5, 6, 7
     return g
 
 
@@ -402,11 +390,11 @@ def environment(s):
                 "background": True, "useKeyLight": False},
     }
     # the moon: low and to the side, so it rakes the ridges and every hollow holds a shadow
-    s.light("moon", "directional", direction=[0.93, -0.2, -0.3], color=C("moon"), intensity=4.0,
+    s.light("moon", "directional", direction=[0.93, -0.2, -0.3], color=C("moon"), intensity=6.0,
             castsShadow=False, contactShadow=False, softness=0.4)
     # the singer's own light: the bell is the basin's lamp, so every ridge facing the heart catches it and the
     # rings read from the light as well as from the relief
-    s.light("heart", "point", position=[HEART[0], HEART[1] - 1.0, HEART[2]], color=C("sandHot"), intensity=3200.0,
+    s.light("heart", "point", position=[HEART[0], HEART[1] - 1.0, HEART[2]], color=C("sandHot"), intensity=1600.0,
             range=140.0, castsShadow=False)
     # a violet rim from behind the basin
     s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=1.2, castsShadow=False)
@@ -431,90 +419,131 @@ def ground(s):
     return g
 
 
-# ================================================================================================ Prototype B: the choir
-# A crescent of tuned crystal blades on the basin's west terrace, facing the heart: long blades at one end, short at
-# the other, two staggered rows (a layered silhouette, not a tower). The choir is TUNED along its chord -- each blade
-# hears the band of modes its place selects (a reader with `listenAlongAxis`): long blades the low modes, short ones
-# the high -- so a bass note sways the long end, a high one the short end, and a chord lights two groups at once.
-# Each blade answers the shared field at its own position: it tilts with the displacement it hears (a struck tine
-# swaying from its root) and its edges light with the ringing (emission is an accent, zero at rest).
-def blade_tris():
-    """One crystal blade, root at the origin, 1 m tall, 1 m wide: a flattened hexagonal prism that tapers, with a
-    chisel termination -- faceted, so every face takes its own light."""
-    def ring(y, w, t):
-        return [(0.5 * w, y, 0.0), (0.25 * w, y, 0.5 * t), (-0.25 * w, y, 0.5 * t), (-0.5 * w, y, 0.0),
-                (-0.25 * w, y, -0.5 * t), (0.25 * w, y, -0.5 * t)]
-    levels = [ring(0.0, 1.0, 0.32), ring(0.55, 0.92, 0.3), ring(0.82, 0.78, 0.26)]
-    tip = [(0.18, 1.0, 0.0), (-0.18, 1.0, 0.0)]
+# ================================================================================================ Prototype B: the druse
+# One composed crystal cluster on the basin's west terrace: thirty-odd quartz-habit crystals radiating from a common
+# root -- a crown, leaning outward and away from the heart, long at its core and short at its fringe. Each crystal
+# is a stepped (sceptre) hexagonal prism with a pyramidal tip: growth bands that catch the light as ledges, and that
+# its material lights from inside when it rings. The cluster is TUNED: every crystal hears the band of modes its
+# length selects (a reader with `listenAlongAxis` up the cluster: the long core crystals reach highest and hear the
+# lowest modes; the short fringe hears the high ones), so a bass note lights the core and a high note the fringe.
+def crystal_tris():
+    """One crystal, centred on the origin, 1 m long on +Y, radius 1: a three-stage stepped hexagonal prism (each stage
+    a little narrower, with a sloped ledge between) and a six-face pyramidal termination."""
+    def ring(y, r, twist=0.0):
+        return [(r * math.cos(twist + k * math.pi / 3.0), y, r * math.sin(twist + k * math.pi / 3.0)) for k in range(6)]
+    rings = [ring(-0.5, 1.0), ring(-0.12, 1.0), ring(-0.08, 0.86), ring(0.18, 0.86), ring(0.22, 0.72), ring(0.36, 0.72)]
+    tip = (0.0, 0.5, 0.0)
     tris = []
-    for a, b in zip(levels[:-1], levels[1:]):
-        for j in range(6):
-            p0, p1, q0, q1 = a[j], a[(j + 1) % 6], b[j], b[(j + 1) % 6]
+    for a, b in zip(rings[:-1], rings[1:]):
+        for k in range(6):
+            p0, p1, q0, q1 = a[k], a[(k + 1) % 6], b[k], b[(k + 1) % 6]
             tris += [(p0, q1, p1), (p0, q0, q1)]
-    top = levels[-1]
-    # chisel: faces from the top ring to a short ridge
-    tris += [(top[0], tip[0], top[1]), (top[1], tip[0], top[2]), (top[2], tip[0], tip[1]), (top[2], tip[1], top[3]),
-             (top[3], tip[1], top[4]), (top[4], tip[1], tip[0]), (top[4], tip[0], top[5]), (top[5], tip[0], top[0])]
-    base = levels[0]
-    for j in range(1, 5):
-        tris.append((base[0], base[j], base[j + 1]))
+    top = rings[-1]
+    for k in range(6):
+        tris.append((top[k], tip, top[(k + 1) % 6]))
+    base = rings[0]
+    for k in range(1, 5):
+        tris.append((base[0], base[k + 1], base[k]))
     return tris
 
 
-CHOIR_ARC = (200.0, 320.0)   # degrees about SPIRE (0 = +x): the crescent opens toward the heart
-CHOIR_R = 15.0
+DRUSE = (SPIRE[0], SPIRE[2])   # the cluster's root (x, z)
 
 
-def choir_layout():
-    """[(x, z, height, width, yaw_deg, row)] -- long blades at the arc's start, short at its end."""
+def druse_layout():
+    """[(dir (unit), length, radius)]: a crown of crystals about a lean away from the heart. Deterministic."""
+    rnd = np.random.default_rng(1407)
+    away = np.array([DRUSE[0], 0.0, DRUSE[1]]) / math.hypot(DRUSE[0], DRUSE[1])
+    lean = np.array([away[0] * 0.35, 1.0, away[2] * 0.35])
+    lean /= np.linalg.norm(lean)
+    side = np.cross(lean, [0.0, 0.0, 1.0])
+    side /= np.linalg.norm(side)
+    up2 = np.cross(side, lean)
     out = []
-    for row, (n, dr, hscale) in enumerate(((17, 0.0, 1.0), (12, -3.4, 0.6))):
-        for i in range(n):
-            t = i / (n - 1)
-            a = math.radians(CHOIR_ARC[0] + (CHOIR_ARC[1] - CHOIR_ARC[0]) * (t + 0.5 * row / n))
-            r = CHOIR_R + dr
-            x, z = SPIRE[0] + r * math.cos(a), SPIRE[2] + r * math.sin(a)
-            h = hscale * (4.5 + 13.5 * (1.0 - t) ** 1.15)
-            w = 1.1 + 1.4 * (1.0 - t)
-            yaw = -math.degrees(a)  # blade faces the crescent's centre
-            out.append((x, z, h, w, yaw, row))
+    n = 34
+    for k in range(n):
+        # golden-angle spiral over a cap: the core near the lean axis, the fringe spread to ~70 degrees
+        t = (k + 0.5) / n
+        polar = math.radians(8.0 + 64.0 * t ** 0.8) * (0.85 + 0.3 * rnd.random())
+        az = k * 2.39996 + 0.4 * rnd.random()
+        d = math.cos(polar) * lean + math.sin(polar) * (math.cos(az) * side + math.sin(az) * up2)
+        d /= np.linalg.norm(d)
+        length = (15.0 * (1.0 - t) ** 1.3 + 2.2) * (0.8 + 0.4 * rnd.random())
+        radius = 0.32 + 0.10 * length ** 0.75
+        out.append((d, length, radius))
     return out
 
 
-def choir_points(ground_y):
+def _quat_from_y(d):
+    """The rotation taking +Y to unit d, as (x, y, z, w)."""
+    y = np.array([0.0, 1.0, 0.0])
+    c = float(np.dot(y, d))
+    if c > 0.99999:
+        return (0.0, 0.0, 0.0, 1.0)
+    axis = np.cross(y, d)
+    axis /= np.linalg.norm(axis)
+    a = math.acos(max(-1.0, min(1.0, c)))
+    sa = math.sin(a / 2.0)
+    return (axis[0] * sa, axis[1] * sa, axis[2] * sa, math.cos(a / 2.0))
+
+
+def druse_points(ground_y):
+    root = np.array([DRUSE[0], ground_y(DRUSE[0], DRUSE[1]) - 1.2, DRUSE[1]])
     pts = []
-    for (x, z, h, w, yaw, row) in choir_layout():
-        y = ground_y(x, z) - 0.35
-        # stand each blade with a slight outward lean (a fan), then turn it to face the centre
-        q_yaw = (0.0, math.sin(math.radians(yaw) / 2.0), 0.0, math.cos(math.radians(yaw) / 2.0))
-        pts.append([round(x, 4), round(y, 4), round(z, 4), q_yaw[0], round(q_yaw[1], 6), q_yaw[2], round(q_yaw[3], 6),
-                    round(w, 4), round(h, 4), round(w, 4)])
-    return pts
+    for d, length, radius in druse_layout():
+        c = root + d * (length * 0.5)
+        q = _quat_from_y(d)
+        pts.append([round(float(c[0]), 4), round(float(c[1]), 4), round(float(c[2]), 4),
+                    round(q[0], 6), round(q[1], 6), round(q[2], 6), round(q[3], 6),
+                    round(radius, 4), round(length, 4), round(radius, 4)])
+    return pts, root
+
+
+def crystal_program():
+    """The crystal's light from inside: growth bands along its length (the stepped stages read as layers of a
+    phantom crystal), lit by the instance's own emission -- which is zero until the field rings that crystal."""
+    c = Prog("cwCrystal")
+    c.op(None, "input", 0, inp="localPosition")
+    c.op(None, "swizzle", 0, a=0, k=[1, 1, 1, 1])                   # local y, -0.5..0.5
+    c.op("bands", "palette", 1, a=0, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1.5, 1.5, 1.5, 0],
+         k4=[0.1, 0.1, 0.1, 0])                                     # 0.5 + 0.5 cos(2 pi (5 y + 0.1)): bands
+    c.op(None, "power", 1, a=1, f=16.0)                              # thin bright layers
+    c.op(None, "remap", 0, a=0, k=[-0.5, 0.5, 0.25, 1.0], f=1.0)    # brighter toward the tip
+    c.op(None, "multiply", 1, a=1, b=0)
+    c.op("core", "constant", 2, k=[0.03, 0.03, 0.03, 1.0])          # a faint core glow under the bands
+    c.op(None, "add", 1, a=1, b=2)
+    c.op(None, "input", 3, inp="materialEmission")
+    c.op(None, "multiply", 3, a=3, b=1)
+    c.emit = 3
+    return c
 
 
 def sculpture(s):
-    pos, nrm = meshes.faceted(blade_tris())
-    meshes.write_glb(os.path.join(MESH_DIR, "cw-blade.glb"), pos, nrm, None, "blade")
-    lay = choir_layout()
-    first, last = lay[0], lay[16]
-    ax = (last[0] - first[0], 0.0, last[1] - first[1])
-    length = math.hypot(ax[0], ax[2])
-    mid = [(first[0] + last[0]) * 0.5, GROUND_Y(SPIRE[0], SPIRE[2]) + 3.0, (first[1] + last[1]) * 0.5]
+    pos, nrm = meshes.faceted(crystal_tris())
+    meshes.write_glb(os.path.join(MESH_DIR, "cw-crystal.glb"), pos, nrm, None, "crystal")
+    pts, root = druse_points(GROUND_Y)
+    top = max(p[1] for p in pts)
+    span = top - float(root[1])
     for name, channel in (("tuned", "displacement"), ("tunedRing", "amplitude")):
         s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
                         "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"},
-                                  "axis": [ax[0] / length, 0.0, ax[2] / length], "point": mid, "length": length,
+                                  # down the cluster: the highest crystal centres (the long core) hear the low modes
+                                  "axis": [0.0, -1.0, 0.0], "point": [DRUSE[0], float(root[1]) + span * 0.5, DRUSE[1]],
+                                  "length": span,
                                   "resonance": {"channel": channel, "listenAlongAxis": True, "listenLow": 0.0,
-                                                "listenHigh": 1.0, "listenWidth": 0.12}}})
-    s.proc("choir", {"kind": "mesh", "asset": "meshes/cw-blade.glb"},
-           distribution={"kind": "points", "points": choir_points(GROUND_Y)},
-           material={"baseColor": C("spire"), "emissiveColor": C("spireEdge"), "emissiveIntensity": 0.03,
-                     "roughness": 0.18, "metallic": 1.0, "thinFilm": {"thickness": 380.0, "ior": 1.9}},
+                                                "listenHigh": 1.0, "listenWidth": 0.14}}})
+    c = crystal_program()
+    s.program(c.doc(emission=c.emit))
+    s.proc("druse", {"kind": "mesh", "asset": "meshes/cw-crystal.glb"},
+           distribution={"kind": "points", "points": pts},
+           material={"baseColor": C("crystal"), "emissiveColor": C("crystalGlow"), "emissiveIntensity": 0.025,
+                     "roughness": 0.12, "metallic": 0.85, "thinFilm": {"thickness": 420.0, "ior": 1.7},
+                     "program": c.name},
            extra={"effectors": [
-               # a blade tilts from its root with the displacement it hears: the choir's nodes stand, its antinodes sway
-               {"field": "tuned", "op": "rotation", "strength": 0.16, "axis": [1.0, 0.0, 0.0]},
-               # and its edges light with the ringing it hears
-               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 30.0},
+               # a ringing crystal quivers about its centre with the displacement it hears (the cluster's antinodes)
+               {"field": "tuned", "op": "rotation", "strength": 0.06, "axis": [1.0, 0.0, 0.0]},
+               # and lights its growth bands from inside with the ringing it hears
+               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 40.0},
            ]})
 
 
@@ -527,23 +556,96 @@ def matter(s):
     s.nodes.append({"name": "bellCut", "kind": "field", "position": [HEART[0], HEART[1] - 3.0, HEART[2]],
                     "field": {"kind": "plane", "axis": [0.0, -1.0, 0.0], "softness": 0.01, "strength": 1.0,
                               "falloff": {"kind": "none"}}})
-    s.particles("matter", capacity=110000, seed=5, shape="sphere", position=list(HEART), extent=[10.0, 10.0, 10.0],
-                direction=[0, 1, 0], spawnRate=4600.0, lifetimeMin=18.0, lifetimeMax=28.0, spread=1.0, speedMin=0.0,
-                speedMax=0.15, gravity=[0, 0, 0], drag=4.0, turbulence=0.0, turbulenceScale=0.3, turbulenceSpeed=0.1,
-                attractorPosition=list(HEART), attractorStrength=0.5, attractorRadius=11.0, orbit=0.0,
-                fieldForces=[{"field": "force", "mode": "force", "strength": 220.0, "mix": 1.0, "axis": [0, 1, 0]},
+    # the bell: grains held on the nodal shells, circulating along them (a weak swirl about the heart's axis), each
+    # drawing a short ribbon of where it has been -- so the shells read as luminous filament rings, not speckle
+    s.particles("matter", capacity=14000, seed=5, shape="sphere", position=list(HEART), extent=[10.0, 10.0, 10.0],
+                direction=[0, 1, 0], spawnRate=280.0, lifetimeMin=40.0, lifetimeMax=60.0, spread=1.0, speedMin=0.0,
+                speedMax=0.15, gravity=[0, 0, 0], drag=14.0, turbulence=0.0, turbulenceScale=0.3, turbulenceSpeed=0.1,
+                attractorPosition=list(HEART), attractorStrength=1.5, attractorRadius=11.0, orbit=14.0,
+                fieldForces=[{"field": "force", "mode": "force", "strength": 600.0, "mix": 1.0, "axis": [0, 1, 0]},
                              # the bell: grains below its rim fall out of the body (a dome, not a ball)
                              {"field": "bellCut", "mode": "kill", "strength": 1.0, "mix": 1.0, "axis": [0, 1, 0]}],
-                sizeStart=0.035, sizeEnd=0.03, sizeVariance=0.5, sizeSkew=2.0,
-                colorStart=C("sandHot") + [0.9], colorEnd=C("hollow") + [0.0], emissive=1.1, blend="additive")
+                sizeStart=0.05, sizeEnd=0.04, sizeVariance=0.4,
+                trailEnabled=True, trailLength=32, trailStride=6, trailWidth=0.45, trailTaper=0.15, trailFade=0.05,
+                colorStart=C("sandHot") + [0.85], colorEnd=C("hollow") + [0.0], emissive=1.3, blend="additive")
+    # the veil: strands let fall from the bell's rim, drawn into the field's nodal surfaces as they sink -- the
+    # entity's trailing filaments, shaped by the same force as its shells
+    s.particles("veil", capacity=6000, seed=9, shape="disc", position=[HEART[0], HEART[1] - 3.2, HEART[2]],
+                extent=[8.5, 8.5, 8.5], direction=[0, -1, 0], spawnRate=420.0, lifetimeMin=10.0, lifetimeMax=14.0,
+                spread=0.1, speedMin=0.2, speedMax=0.5, gravity=[0, -2.5, 0], drag=6.0, turbulence=0.0,
+                orbit=0.0, attractorStrength=0.0,
+                fieldForces=[{"field": "force", "mode": "force", "strength": 400.0, "mix": 1.0, "axis": [0, 1, 0]}],
+                sizeStart=0.04, sizeEnd=0.015, sizeVariance=0.3,
+                trailEnabled=True, trailLength=32, trailStride=5, trailWidth=0.5, trailTaper=0.05, trailFade=0.0,
+                colorStart=C("sandHot") + [0.7], colorEnd=C("hollow") + [0.0], emissive=1.1, blend="additive")
+
+
+def spire_tris(base, radius, height, sides, lean, seed):
+    """An eroded basalt pinnacle: five drums, each narrower and a little offset (a weathered column), drawn to a
+    blunt point; faceted, so the moon picks out its planes."""
+    rnd = np.random.default_rng(seed + 77)
+    a0 = rnd.random() * 2.0 * math.pi
+    levels = []
+    n = 5
+    for k in range(n + 1):
+        u = k / n
+        r = radius * (1.0 - 0.82 * u ** 1.25) * (0.92 + 0.16 * rnd.random())
+        y = base[1] + height * u
+        off = (lean[0] * height * u + (rnd.random() - 0.5) * 0.15 * radius,
+               lean[1] * height * u + (rnd.random() - 0.5) * 0.15 * radius)
+        levels.append([(base[0] + off[0] + r * math.cos(a0 + 2 * math.pi * j / sides), y,
+                        base[2] + off[1] + r * math.sin(a0 + 2 * math.pi * j / sides)) for j in range(sides)])
+    tris = []
+    for lo, hi in zip(levels[:-1], levels[1:]):
+        for j in range(sides):
+            j1 = (j + 1) % sides
+            tris += [(lo[j], hi[j], hi[j1]), (lo[j], hi[j1], lo[j1])]
+    top = levels[-1]
+    cx = sum(p[0] for p in top) / sides
+    cz = sum(p[2] for p in top) / sides
+    apex = (cx, top[0][1] + radius * 0.5, cz)
+    for j in range(sides):
+        tris.append((top[j], apex, top[(j + 1) % sides]))
+    return tris
+
+
+# ================================================================================================ the world beyond
+# Basalt spires: columns of the same dark stone standing on the rim and in ranks across the plateau, so every
+# direction has layered silhouettes against the violet horizon (no edge, no void) -- atmosphere, never a hero.
+def spires(s):
+    rnd = np.random.default_rng(20261016)
+    places = []
+    for ring_r, n, hmin, hmax, rmin, rmax in ((112.0, 26, 9.0, 26.0, 2.0, 4.5), (190.0, 34, 14.0, 42.0, 3.0, 7.0),
+                                              (330.0, 40, 25.0, 70.0, 5.0, 11.0), (620.0, 36, 50.0, 130.0, 9.0, 20.0)):
+        for k in range(n):
+            a = (k + rnd.random() * 0.7) * 2.0 * math.pi / n
+            r = ring_r * (0.85 + 0.3 * rnd.random())
+            x, z = r * math.cos(a), r * math.sin(a)
+            # keep the camera's gap (toward +z, |x| small near the rim) open
+            if ring_r < 150.0 and z > 40.0 and abs(x) < 45.0:
+                continue
+            places.append((x, z, hmin + (hmax - hmin) * rnd.random() ** 1.6, rmin + (rmax - rmin) * rnd.random(),
+                           (rnd.random() - 0.5) * 0.12, (rnd.random() - 0.5) * 0.12, int(rnd.integers(5, 8))))
+    ys = world_heights(np.array([[p[0], p[1]] for p in places], dtype=np.float64))
+    tris = []
+    for k, ((x, z, h, r, lx, lz, sides), y) in enumerate(zip(places, ys)):
+        tris += spire_tris((x, y - 3.0, z), r, h + 3.0, sides, (lx, lz), k)
+    pos, nrm = meshes.faceted(tris)
+    meshes.write_glb(os.path.join(MESH_DIR, "cw-spires.glb"), pos, nrm, None, "spires")
+    s.proc("spires", {"kind": "mesh", "asset": "meshes/cw-spires.glb"},
+           material={"baseColor": C("stone", 1.6), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
+                     "roughness": 0.7, "metallic": 0.0})
 
 
 GROUND_Y = None  # set in build(): the WorldMap's height at (x, z)
 
 
 def camera(s):
-    pos, tgt = [6.0, 13.0, 47.0], [-4.0, 3.0, 0.0]
-    s.camera = {"mode": 1, "position": pos, "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
+    """A slow arc over the basin's south side, there and back in 150 s (a seamless loop: a live transport is
+    endless), holding the heart a little right of centre with the druse in the left foreground."""
+    s.camera = {"mode": 1, "position": [6.0, 13.0, 47.0], "target": [-4.0, 3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
+    s.arc_camera([-4.0, 4.0, 0.0], 48.0, 13.0, period=150.0, centre_deg=12.0, sweep_deg=70.0, steps=24, side=4.0,
+                 lift=0.0, height_bob=1.5)
     s.params_({"camera/lens/focalLength": 28.0})
 
 
@@ -585,12 +687,14 @@ def build():
         sculpture(s)
     if PROTOTYPE in ("c", "all"):
         matter(s)
+    if PROTOTYPE == "all":
+        spires(s)
     camera(s)
     instrument(s, g)
     s.params_({
         "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
-        "post/output/grain": 0.012, "post/grade/contrast": 1.08, "post/lens/chromaticAberration": 0.0,
-        "camera/exposure/compensation": 0.5, "post/dof/enabled": False
+        "post/output/grain": 0.012, "post/grade/contrast": 1.22, "post/lens/chromaticAberration": 0.0,
+        "camera/exposure/compensation": 0.2, "post/dof/enabled": False
     })
     return s
 

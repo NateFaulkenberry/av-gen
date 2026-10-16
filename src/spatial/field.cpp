@@ -544,6 +544,10 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, double td, const Field
     const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
     const float w = fieldWeight(f, q);
+    if (f.isResonance() && f.resonance.channel == ResonanceChannel::Shading) { // ADR-1400
+        const ResonanceState* state = resonanceStateOf(f, set);
+        return state == nullptr ? glm::vec4(0.0f, 0.0f, 0.0f, w) : glm::vec4(resonanceShading(*state, f, q), w);
+    }
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
         if (g != nullptr && f.channel < 0 && (g->mode == GridMode::Vector || g->mode == GridMode::Agents)) {

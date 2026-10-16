@@ -31,7 +31,7 @@
 //     sand          sqrt(Ebar) exp(-E / (s^2 Ebar)), Ebar = sum e_i^2 <phi_i^2> -- where Chladni sand
 //                   gathers: the nodal LINES of the figure, F = 0 (s = sharpness). Sand reads the SLOW
 //                   envelope (`memory`): it settles over a second or two instead of jumping with every hit.
-//     force         -grad E (vector): towards the nodes, the acoustic radiation force on a grain
+//     force         -grad F_slow^2 (vector): towards the nodes of the slow figure, the radiation force on a grain
 //     gradient      grad D (vector)
 // optionally through a listening window over u (a tuned structure hears only some modes; laid along
 // the field's axis, each part of it hears its own band).
@@ -67,7 +67,9 @@ inline constexpr int kResonanceModeVec4s = 3;     // shape, place, drive
 
 // Relief (appended): sand(sharpness) + reliefLine x sand(reliefLineSharpness) + reliefVibration x D in ONE pass over
 // the modes -- a ground's whole displacement for the price of one deformer (and one finite-difference normal).
-enum class ResonanceChannel : std::uint8_t { Displacement, Amplitude, Sand, Force, Gradient, Relief };
+// Shading (appended): a COLOUR field, rgb = (sand, sand at reliefLineSharpness, amplitude): what a surface's
+// material needs, read by one `field` op in one pass over the modes.
+enum class ResonanceChannel : std::uint8_t { Displacement, Amplitude, Sand, Force, Gradient, Relief, Shading };
 [[nodiscard]] const char* resonanceChannelName(ResonanceChannel channel);
 [[nodiscard]] std::optional<ResonanceChannel> resonanceChannelFromName(std::string_view name);
 [[nodiscard]] inline bool resonanceChannelIsVector(ResonanceChannel c) {
@@ -203,7 +205,10 @@ struct ResonanceSums {
     float displacement = 0.0f; // D
     float energy = 0.0f;       // E
     float meanEnergy = 0.0f;   // Ebar
+    float fast = 0.0f;         // the fast figure (sum e_i phi_i), whatever `memory` chose for `energy`
 };
+// The shading channel's rgb at q.
+[[nodiscard]] glm::vec3 resonanceShading(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q);
 // `memory`: E and Ebar from the slow envelope (the sand channel) instead of the fast one.
 [[nodiscard]] ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q,
                                          bool memory = false);
