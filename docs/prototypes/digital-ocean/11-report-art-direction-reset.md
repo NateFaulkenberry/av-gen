@@ -124,11 +124,17 @@ The sea program is at its budget (48 ops near); the pillows are ~27 k triangles 
 - **The foreground path** is the brightest thing on the water under loud music: the level raises the swell and the
   near marks grow with it. It stays broken by the troughs, but it is the first thing to restrain if the owner
   finds it loud.
-- **The hero leap** (pad 36) was checked at its peak in the review frames (HEROLEAP).
+- **A scored trigger before a render's start never fires.** Two review renders of the hero leap (pad 36) showed
+  nothing because the harness started 3 s before the still and the pad sat 5.8 s before the peak. With the
+  trigger inside the rendered range the leap arcs across the path (`work/leap6-leap.png`); a live pad is live.
 - **Intermediate moods**: with the music's share at 0.12 the sunset holds; CC 1 between palettes still lands on a
   blend, as Pass 3 noted.
 - **The near program has no headroom**: 48 of 48 ops. One more water feature means removing one.
 
 ## Checks
 
-CHECKS
+On the branch after merging origin/main (the project-switch work; the engine rebuilt):
+- `check_project_integrity`: 0 problems.
+- `review_examples --only "Digital Ocean"`: ok, exit 0.
+- `cpu-assets`: exit 0, 4255 passed, 0 failed, 19 skipped, the 1 expected failure.
+- `gpu`: exit 0, 661 passed, 0 failed, 1 skipped (42 m 26 s).

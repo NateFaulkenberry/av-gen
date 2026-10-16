@@ -831,3 +831,29 @@ illustration's light `t`, is cut into every layer; nothing posterizes a colour a
   program colours, so the lighting holds under every palette. The camera sees the island from the side away from
   the sun (the sun is ahead, low), so most of what it shows is the shadow side with the lit rim and the warm-lit
   rock faces that turn toward the sun: a backlit island, as a sunset makes one.
+
+### Pass 4.5: boats, dolphins, performance, the capture
+
+- **The yacht and the dolphins** are Pass 3's, integrated: the hull sits in the water with a quieter wake (arms
+  1.8 m wide at 40 m, cuts 0.42-0.78) under the illustrated foam; the pods leap across the path as dark forms with
+  a warm rim and a splash (`work/podA-podA.png`); the hero leap (pad 36) arcs across the path
+  (`work/leap6-leap.png`). Two review renders of the hero showed nothing because the harness rendered from 3 s
+  before the still and the scored pad sat 5.8 s before the peak: a render that starts after a scored event never
+  fires it (a seek past a trigger, ADR-901). The harness grew a `--preroll`; the leap took 8 s of it.
+- **The silent variant** (`make_silent`) strips every route, which parks the yacht at its course's start, off
+  frame; look-development stills park it mid-course with `BOAT_REVIEW_OFFSET` (a knob the real scene leaves at 0).
+- **Performance** (`profiles/`, `tools/live_scene_profile.py`, M2 Max): headless 1080p Ultra GPU 24.58 ms median
+  (Pass 3: 26.54; scene 20.05 + depth 3.15, particles 0.52, AO 0.46, post 0.26); the live path at 1080p (Auto ->
+  High, 1632 x 918, 30 fps target): 150 frames in 5 s, GPU 25.49 ms, CPU work 13.1 ms (the editor's UI build),
+  3 misses (2.0 %), "at risk" -- Pass 3's finding again, the swapchain wait and the editor's CPU, not the scene's
+  GPU; at 1280 x 720 (High, 1088 x 612): GPU 21.89 ms, 2 misses (1.3 %).
+- **The capture**: `05-final-clip-music.mp4`, 4-26 s of the All You Got excerpt at 1080p, the hero wave scored at
+  6 s and the hero leap at 10 s.
+
+### Pass 4 checks
+
+On the branch after merging origin/main (the project-switch work, 27 files of engine and tests; rebuilt):
+- `check_project_integrity`: 0 problems.
+- `review_examples --only "Digital Ocean"`: ok, exit 0.
+- `cpu-assets`: exit 0, 4255 passed, 0 failed, 19 skipped, 1 expected failure (20 m 05 s).
+- `gpu`: exit 0, 661 passed, 0 failed, 1 skipped (42 m 26 s).
