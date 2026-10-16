@@ -35,6 +35,7 @@ OUT = os.path.join(REPO, "examples", "resonant-silk")
 CATEGORY = "Resonant Silk"
 
 COMPOSITION = "a"
+MUSIC = not os.environ.get("RS_NOMUSIC")
 SAIL = float(os.environ.get("RS_SAIL", "-0.8"))  # look development: the sail's extra roll
 
 # ================================================================================================ palette (sRGB refs)
@@ -125,10 +126,11 @@ class SheetSpec:
     stretched across), the cloth's own width (the excess gathers into pleats), billow and pleat counts."""
 
     def __init__(self, name, points, roll, span, cloth, billow, pleats, nu=520, nv=112, pleat_wander=0.6, seed=1,
-                 curl=0.0, edge_wave=0.0):
+                 curl=0.0, edge_wave=0.0, end_round=0.0):
         self.name, self.points, self.roll, self.span, self.cloth = name, points, roll, span, cloth
         self.billow, self.pleats, self.nu, self.nv = billow, pleats, nu, nv
         self.pleat_wander, self.seed, self.curl, self.edge_wave = pleat_wander, seed, curl, edge_wave
+        self.end_round = end_round
 
 
 def sheet_mesh(spec):
@@ -168,8 +170,18 @@ def sheet_mesh(spec):
     pos = c[:, None, :] + (V * span[:, None])[..., None] * W[:, None, :] + D[..., None] * N[:, None, :]
     if spec.edge_wave:
         # the free edges ripple along their length (a hem that is longer than the span)
-        ew = spec.edge_wave * np.abs(V) ** 4 * np.sin(2 * math.pi * 9.0 * U + 3.0 * V)
+        ew = spec.edge_wave * np.abs(V) ** 4 * np.sin(2 * math.pi * 9.0 * U + 3.0 * V) * (1.0 + 3.0 * np.clip(
+            (U - 0.7) / 0.3, 0.0, 1.0))
         pos = pos + (ew * span[:, None])[..., None] * N[:, None, :]
+    if spec.end_round:
+        # the free end is cloth, not a cut: its hem is an arc (the corners fall back along u) that flutters
+        ramp = np.clip((U - 0.8) / 0.2, 0.0, 1.0) ** 2
+        flutter = 1.0 + 0.35 * np.sin(5.0 * math.pi * V + 1.3) * 0.5
+        u2 = U * (1.0 - spec.end_round * ramp * (V * V) * flutter)
+        u2 = np.broadcast_to(u2, (nu, nv))
+        for j in range(nv):
+            for k in range(3):
+                pos[:, j, k] = np.interp(u2[:, j], u, pos[:, j, k])
     pos = pos.reshape(-1, 3)
     uv = np.stack(np.meshgrid(u, 0.5 * (v + 1.0), indexing="ij"), axis=-1).reshape(-1, 2)
     idx = []
@@ -236,14 +248,14 @@ def sheets_for(comp):
         # mirrored: a long low wall on one side of the gather, a tall turning sail on the other.
         main = SheetSpec(
             "silk",
-            points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 12, -180),
-                    (42, 26, -180), (64, 48, -188), (74, 76, -214)],
+            points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 12, -176),
+                    (44, 24, -162), (70, 42, -150), (86, 64, -156)],
             roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.72, 2.6 + SAIL), (0.86, 3.2 + SAIL), (1.0, 3.6 + SAIL)],
-            span=[(0.0, 30.0), (0.32, 26.0), (0.55, 10.0), (0.66, 2.5), (0.72, 10.0), (0.86, 40.0), (1.0, 46.0)],
+            span=[(0.0, 30.0), (0.32, 26.0), (0.55, 10.0), (0.66, 2.5), (0.72, 10.0), (0.86, 40.0), (1.0, 50.0)],
             cloth=[(0.0, 40.0), (0.66, 44.0), (1.0, 54.0)],
             billow=[(0.0, 6.0), (0.35, 9.0), (0.6, 0.0), (0.68, 0.0), (0.84, -11.0), (1.0, -7.0)],
-            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=5, curl=0.1, edge_wave=0.03, nu=720, nv=128)
-        cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0}
+            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=5, curl=0.1, edge_wave=0.03, nu=720, nv=128, end_round=0.12)
+        cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0, "drift": True}
         return [main], cam
     if comp == "b":
         # THE PASSAGE: two broad sheets bow toward each other and form a curved corridor the eye travels down; they
@@ -335,6 +347,10 @@ def silk_program():
     g.op("hemWidth", "power", 1, a=1, f=400.0)                          # r1: 1 on the hems, falling fast inward
     g.op(None, "swizzle", 2, a=0, k=[0, 0, 0, 0])                      # r2 = u
     g.op("hemHue", "ramp", 3, a=2, k=C("teal") + [1], k2=C("cyan") + [1], k3=C("violet") + [1])
+    g.op(None, "input", 4, inp="time")
+    g.op("drift", "palette", 4, a=4, k=[0, 0, 0, 0], k2=[0.06, 0.06, 0.06, 0], k3=[1 / 96.0] * 3 + [0],
+         k4=[0, 0, 0, 0])                                              # r4: +-0.06 turns, a 96 s cycle
+    g.op("hue", "hueShift", 3, a=3, b=4, f=0.0)                        # value: the performer's Color Drift
     g.op(None, "multiply", 1, a=1, b=3)
     g.op("hemGain", "constant", 3, k=[1.6, 1.6, 1.6, 1])
     g.op(None, "multiply", 1, a=1, b=3)                                # r1: emission (the hems)
@@ -342,9 +358,116 @@ def silk_program():
     g.op("body", "constant", 5, k=C("indigo", 1.6) + [1])
     g.op("bodyEdge", "constant", 6, k=C("violet", 0.55) + [1])
     g.op(None, "mixBy", 5, a=5, b=6, c=4)                              # r5: albedo
+    if MUSIC:
+        # the music's light, each on a geometry it belongs to (registers 0, 2, 3, 6, 7 are free here)
+        g.op(None, "power", 6, a=4, f=2.0)                             # r6: the folds' turning edges (narrow)
+        g.op("treble", "field", 2, field="trebleTrace")                 # the treble of the last moments, out from the gather
+        g.op(None, "multiply", 2, a=2, b=6)
+        g.op("trebleCol", "constant", 3, k=C("cyan", 1.6) + [1])
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op(None, "add", 1, a=1, b=2)                                  # + shimmer on the folds
+        g.op("kick", "field", 2, field="kickFront")                     # a kick's front, riding out across the cloth
+        g.op("kickCol", "constant", 3, k=kit.mix(C("pearl"), C("cyan"), 0.5) + [1])
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op(None, "multiply", 2, a=2, b=4)                             # on the folds' turning faces only
+        g.op("kickGain", "constant", 3, k=[0.5, 0.5, 0.5, 1])
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op(None, "add", 1, a=1, b=2)
+        g.op("amp", "field", 2, field="silkAmp")                        # where the modes ring hardest ...
+        g.op("ampMask", "smoothstep", 2, a=2, k=[0.9, 1.8])
+        g.op(None, "multiply", 2, a=2, b=4)                             # ... and the cloth turns away: magenta
+        g.op(None, "multiply", 2, a=2, b=4)
+        g.op("ampCol", "constant", 3, k=C("magenta", 1.4) + [1])
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op(None, "add", 1, a=1, b=2)
     g.base, g.emit = 5, 1
     return g
 
+
+
+# ================================================================================================ the music's fields
+GATHER = (0.0, 4.0, -170.0)     # the invisible ring: where everything converges, and where every wave starts
+WALL_MID = (-28.0, 4.0, -40.0)  # the middle of the near wall (where the snare's fronts start)
+FIELD = "silk"
+WALL_RUN = [-0.27, 0.03, 0.96]   # from the gather back along the wall, toward the camera
+SAIL_RUN = [0.81, 0.57, 0.13]    # from the gather out along the sail
+WALL_N = [-0.96, -0.094, -0.263] # the wall's mean normal (of the unpleated sheet)
+SAIL_N = [0.536, -0.244, -0.809] # the sail's
+
+
+def fields(s):
+    """Everything that hears the music: one resonator (ADR-1400), one travelling bass swell (ADR-1116 spectrum x a
+    carrier wave), onset fronts (ADR-1116), a treble trace for the light.
+
+    - The resonator: a point source behind the wall owns the low modes (40-~400 Hz): broad bows whose rings cross
+      the sheet as long arcs, building under held notes and ringing down; a second point source below the sheet owns
+      the middle band: curved creases across the pleats. Fixed layout and per-band response (ADR-1404).
+    - The swell: the bass of the last seconds laid out outward from the gather at `audioSpeed` (what was loud two
+      seconds ago is 50 m out), times a carrier of 90 m wavelength moving with it: a kick or a bass note sends a bow
+      out along both fans over several beats.
+    - Fronts: a kick launches a broad slow front from the gather; a snare a quicker, narrower one from the wall.
+
+    The cloth moves as cloth: every displacement is along the sheet's own mean normal (the wall's, or the sail's),
+    never along the pleated surface's normal (which pushes a pleat's two faces apart and inflates it into pillows).
+    The two halves are told apart by plane masks through the gather, so the ring itself stays still."""
+    res = {
+        "modes": 8.0, "layout": 12.0, "fLow": 40.0, "fHigh": 4000.0, "lambdaMax": 220.0, "lambdaMin": 12.0,
+        "selectivity": 2.5, "contrast": 0.5, "memory": 2.0, "competition": 1.5, "sustain": 1.0, "transient": 0.4,
+        "idle": 0.5, "breath": 0.1, "limit": 1.0,
+        "attack": [0.8, 0.3, 0.12], "release": [4.0, 1.8, 0.7],
+        "sources": [
+            {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.5,
+             "gain": 1.0, "amplitude": 1.0},
+            {"kind": "point", "position": [20.0, -40.0, -70.0], "order": 3, "bandLow": 0.5, "bandHigh": 1.0,
+             "gain": 1.0, "amplitude": 0.3},
+        ],
+        "channel": "displacement",
+    }
+    s.nodes.append({"name": FIELD, "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "resonance", "seed": 17, "strength": 1.0, "falloff": {"kind": "none"},
+                              "resonance": res}})
+
+    def fnode(name, field, position=(0.0, 0.0, 0.0)):
+        f = {"strength": 1.0, "falloff": {"kind": "none"}}
+        f.update(field)
+        s.nodes.append({"name": name, "kind": "field", "position": list(position), "field": f})
+
+    # the halves: 0 at the gather, 1 thirty metres out along each fan
+    fnode("wallSide", {"kind": "plane", "axis": WALL_RUN, "softness": 35.0}, GATHER)
+    fnode("sailSide", {"kind": "plane", "axis": SAIL_RUN, "softness": 30.0}, GATHER)
+    fnode("bassHistory", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.22,
+                          "audioSpeed": 26.0, "audioSmooth": 0.6, "point": list(GATHER),
+                          "waveGeometry": "spherical"})
+    fnode("bassCarrier", {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine", "point": list(GATHER),
+                          "wavelength": 90.0, "waveSpeed": 26.0, "waveWidth": 0.0, "amplitude": 1.0})
+    fnode("kickFront", {"kind": "onset", "onsetSource": "low", "point": list(GATHER), "waveGeometry": "spherical",
+                        "audioSpeed": 34.0, "onsetWidth": 14.0, "onsetDecay": 0.9})
+    fnode("snareFront", {"kind": "onset", "onsetSource": "mid", "point": list(WALL_MID),
+                         "waveGeometry": "spherical", "audioSpeed": 55.0, "onsetWidth": 5.0, "onsetDecay": 2.2})
+    fnode("trebleTrace", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.62, "bandHigh": 1.0,
+                          "audioSpeed": 30.0, "audioSmooth": 0.35, "point": list(GATHER),
+                          "waveGeometry": "spherical"})
+    s.nodes.append({"name": "silkAmp", "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"},
+                              "resonance": {"channel": "amplitude"}}})
+    for side in ("wall", "sail"):
+        mask = side + "Side"
+        fnode(side + "Res", {"kind": "compound", "combine": "multiply", "children": [FIELD, mask]})
+        fnode(side + "Kick", {"kind": "compound", "combine": "multiply", "children": ["kickFront", mask]})
+    # the swell runs along the wall only (the sail answers the gather's fronts and its own modes)
+    fnode("wallSwell", {"kind": "compound", "combine": "multiply", "children": ["bassHistory", "bassCarrier",
+                                                                               "wallSide"]})
+
+
+def music_deformers():
+    """The music's displacement, along each half's mean normal (amounts in metres per unit of field)."""
+    def fd(field, amount, axis):
+        return {"kind": "field", "field": field, "amount": amount, "space": "world", "alongNormal": False,
+                "axis": axis}
+    return [fd("wallRes", 6.0, WALL_N), fd("sailRes", 6.0, SAIL_N),
+            fd("wallSwell", 3.0, WALL_N),
+            fd("wallKick", 3.0, WALL_N), fd("sailKick", 3.5, SAIL_N),
+            fd("snareFront", 0.9, WALL_N)]
 
 # ================================================================================================ world
 def environment(s):
@@ -380,29 +503,85 @@ def silk_material(name, program="rsSilk"):
 def sheets(s, specs, mesh_dir):
     g = silk_program()
     s.program(g.doc(base=g.base, emission=g.emit))
+    s.silk_program = g
     for spec in specs:
         pos, nrm, uv, idx, length = sheet_mesh(spec)
         write_glb(os.path.join(mesh_dir, "rs-%s.glb" % spec.name), pos, nrm, uv, idx, spec.name)
         print("%s: %d vertices, %d triangles, %.0f m long" % (spec.name, len(pos), len(idx) // 3, length))
         s.proc(spec.name, {"kind": "mesh", "asset": "meshes/rs-%s.glb" % spec.name},
-               material=silk_material(spec.name), extra={"normalStep": 0.15}, deformers=drift_deformers())
+               material=silk_material(spec.name), extra={"normalStep": 0.15}, deformers=drift_deformers() + (music_deformers() if MUSIC else []))
 
 
 def drift_deformers():
-    """The sculpture's own slow life, independent of the music (Stage A): a swell that travels along the wall toward
-    the gather, and a very slow, broad, coherent drift that keeps the silhouette evolving without ever repeating."""
-    along = [0.17, 0.0, -0.985]   # the wall's run, from the camera side toward the gather
+    """The sculpture's own slow life, independent of the music: a very slow, broad, coherent drift that keeps the
+    silhouette evolving without ever repeating (the resonator's idle adds a breathing bow on top)."""
     return [
-        {"kind": "noise", "amount": 3.5, "space": "world", "scale": 0.011, "speed": 0.035, "seed": 11,
+        {"kind": "noise", "amount": 7.0, "space": "world", "scale": 0.009, "speed": 0.06, "seed": 11,
          "axisMask": [1.0, 1.0, 0.6]},
-        {"kind": "sine", "amount": 1.4, "space": "world", "axis": along, "frequency": 2 * math.pi / 64.0,
-         "speed": -0.55, "displacementAxis": [0.85, 0.5, 0.15]},
+        # a long, slow swell travelling along the wall into the gather (its phase also takes the performer's
+        # Motion Scale through an integrating route, ADR-1372, so the rate changes without a jump)
+        {"kind": "sine", "amount": 2.2, "space": "world", "axis": [0.27, -0.03, -0.96],
+         "frequency": 2 * math.pi / 70.0, "speed": -0.5, "displacementAxis": WALL_N},
     ]
 
 
 def camera(s, cam):
+    """A slow drift about the framing (never following the music): 120 s, a few metres."""
     s.camera = {"mode": 1, "position": cam["position"], "target": cam["target"], "fov": 40.0, "orbitSpeed": 0.0}
+    if cam.get("drift"):
+        s.drift_camera(cam["position"], cam["target"], period=120.0, amp=(6.0, 2.5, 5.0), tamp=(4.0, 2.0, 0.0),
+                       steps=12)
     s.params_({"camera/lens/focalLength": cam["focal"]})
+
+
+MIDI_CC = [
+    (1, "resonance", "RESONANCE: how hard the music drives the sheet's modes (held and struck)"),
+    (2, "foldDepth", "FOLD DEPTH: the broad bows and creases the modes draw"),
+    (3, "waveTravel", "WAVE TRAVEL: the bass swell and the onset fronts running out from the gather"),
+    (4, "detail", "SURFACE DETAIL: the middle band's fine creases"),
+    (5, "iridescence", "IRIDESCENCE: the thin film thickens and the violet sheen widens"),
+    (6, "light", "LIGHT RESPONSE: the shimmer, the fronts' light and the magenta in the hardest-ringing folds"),
+    (7, "colorDrift", "COLOR DRIFT: the hems' hue turns (teal toward violet)"),
+    (8, "motion", "MOTION SCALE: the travelling swell quickens and the drift widens"),
+]
+
+
+def control_map():
+    return {"midi": {"enabled": True, "filter": "*", "bindings": [
+        {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": name} for n, name, _ in MIDI_CC]}}
+
+
+def instrument(s, g):
+    """The performer's surface. The fields hear the audio history themselves (ADR-1400/1116, through the Response
+    controls, ADR-1361); routes add what they do not: the build of a song rings more modes, held sound deepens the
+    bows, the lights follow the level, and eight MIDI controls (each 0 = the authored look, turning up adds)."""
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    F = "field/%s/resonance/" % FIELD
+    D = "procedural/silk/deform/%d/"
+    op = lambda label: "material/%s/op/%d/" % (g.name, g[label])  # noqa: E731
+    # music -> instrument (slow, never a strobe)
+    s.route(R("intensity", F + "modes", 4.0, attackMs=4000, decayMs=8000))      # 8 modes at rest, 12 in a build
+    s.route(R("sustain", F + "sustain", 0.6, attackMs=1500, decayMs=4000))
+    s.route(R("level", "lights/sail/intensity", 9000.0, attackMs=300, decayMs=1600),
+            R("kickEnv", "lights/key/intensity", 1.2, attackMs=0, decayMs=400))
+    # MIDI
+    s.control = control_map()
+    CC = {"attackMs": 150, "decayMs": 150}
+    s.route(R("control.resonance", F + "sustain", 1.5, **CC), R("control.resonance", F + "transient", 1.0, **CC))
+    for i in (3, 4):
+        s.route(R("control.foldDepth", D % i + "amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC))
+    for i in (5, 6, 7, 8):
+        s.route(R("control.waveTravel", D % i + "amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC))
+    s.route(R("control.detail", F + "source/1/amplitude", 0.7, **CC))
+    s.route(R("control.iridescence", "procedural/silk/material/thinFilm/thickness", 260.0, **CC),
+            R("control.iridescence", op("bodyEdge") + "constant", 1.0, op="multiply", gain=1.4, offset=1.0, **CC))
+    for label in ("trebleCol", "kickGain", "ampCol"):
+        s.route(R("control.light", op(label) + "constant", 1.0, op="multiply", gain=2.0, offset=1.0, **CC))
+    s.route(R("control.colorDrift", op("hue") + "value", 0.22, **CC))
+    # Motion Scale: the swell's phase integrates the control (ADR-1372: a rate change never jumps) ...
+    s.route(R("control.motion", D % 2 + "phase", -0.9, attackMs=300, decayMs=300, integrate=True))
+    # ... and the drift widens
+    s.route(R("control.motion", D % 1 + "amount", 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
 
 
 DESIGN = {
@@ -426,14 +605,20 @@ DESIGN = {
 def build(comp, mesh_dir):
     s = kit.Scene(ID, TITLE, DESIGN)
     environment(s)
+    if MUSIC:
+        fields(s)
     specs, cam = sheets_for(comp)
     sheets(s, specs, mesh_dir)
     camera(s, cam)
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if MUSIC:
+        instrument(s, s.silk_program)
+    else:
+        s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
     s.params_({
         "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.0, "post/output/vignette": 0.4,
         "post/output/grain": 0.008, "post/grade/contrast": 1.1, "post/lens/chromaticAberration": 0.0,
         "camera/exposure/compensation": 0.8, "post/dof/enabled": False,
+        "post/motionBlur/amount": 0.0,
     })
     return s
 
@@ -474,6 +659,15 @@ def main():
     s = build(comp, os.path.join(out_dir, "meshes"))
     pp, sp = s.write(out_dir)
     print(pp)
+    if out_dir == OUT and comp == COMPOSITION and MUSIC:
+        cc = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in MIDI_CC)
+        kit.upsert_index_entry({
+            "category": CATEGORY,
+            "description": "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". "
+                           + DESIGN["thesis"] + " See docs/prototypes/resonant-silk/02-report.md.",
+            "live": True,
+            "name": TITLE,
+            "project": "resonant-silk/resonant-silk.json"})
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(variant(pp, a.out, a.wav, a.camera, params))
