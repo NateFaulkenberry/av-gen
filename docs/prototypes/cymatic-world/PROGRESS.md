@@ -27,12 +27,30 @@ Branch `proto/cymatic-world` (worktree `../av-gen-cymatic`, from main `4421568b`
    - mode competition (`competition`): many driven modes otherwise make a maze; one figure leads;
    - a lattice's modes share their orientation (nested crystal instead of moire).
 4. Prototype A (ground): first critique sheet `prototype-a/a1-first-critique-sheet.png`, `a2-sheet.png`. Field reads
-   from geometry alone; low tone -> broad rings, high tone -> hexagonal cells. Coordinator's notes (2026-10-16):
-   visible world edge, still a flat plane + displacement, murky violet grade. In progress: terraced amphitheatre
-   geography (terraces, gullies, outcrops, rim, two mountain rings), raking shadowed moon, silent-vs-loud proof.
+   from geometry alone; low tone -> broad rings, high tone -> hexagonal cells. Coordinator's notes (2026-10-16): a
+   visible world edge, a flat plane with displacement, a murky grade. Answered with a terraced amphitheatre (WorldMap
+   terraces, gullies, outcrops, rim, two mountain rings), basalt spires on every horizon, a raking warm moon, a
+   silent-vs-loud proof (`prototype-a/a3-silent-landform.png`).
+5. ADR-1401 (`normalStep`): the black ragged craters were the 5 km mesh's 3.7 m finite-difference normal step.
+6. Prototype B: a crescent "choir" of blades was rejected (a fence of cones, the brief's avoid list); replaced by the
+   druse: 34 stepped quartz-habit crystals radiating from one root on the basin floor, tuned by length (listening
+   along the cluster's height; long core = low modes).
+7. Prototype C: particles on nodal shells. The fixes: the lattice made evanescent (later a general source `depth`),
+   the singer's own source (finer `scale`), the force reading the slow figure, critical damping (the grains rang
+   radially), an orbit and trails to weave the shells, a bell cut, a veil of falling strands. Note: a particle field
+   force's strength is hard-capped at 100.
+8. Performance: the ground's lit path (~7 ms) and its program (~12 ms) dominated; one `shading` field op, one `relief`
+   deformer, an unlit ground with painted light: 33.2 -> 26.6 ms GPU at 1080p Ultra; live (`--mode live`, Auto, 30
+   fps) holds at High.
+9. Coupling (ADR-1402): probes to the bus, a driven source, competition and limiter per source; the druse rings
+   sympathetically with the ground at its foot (`coupling/sympathetic-resonance-off-on.png`).
+10. Instrument: response.* routes (intensity -> complexity, sustain -> memory, level/kick -> the lamp, kick -> veil),
+    8 CCs and 2 pads; registered as the live example "Cymatic World".
+11. Final media in `final/`; origin/main merged (43993c75); suites, integrity, review_examples: see `02-report.md`.
 
 ## Open items
 
-- Ragged dark patches in hollows came from glossy stone reflecting the dark lower sky; roughness raised.
-- Volumetric haze at 0.0006 already washed the frame: atmosphere to revisit with the composition.
+- The medusa still reads as a woven dome / hairy ball in dense passages (grains crossing between shells).
+- Far crater rims alias against the mesh; the crystals' stepped ledges read as stripes from some angles.
+- Next experiment: bake the field to a plane texture once a frame (see `02-report.md` section 9).
 - `examples/cymatic-world/meshes/cw-ground.glb` is ~6 MB (committed like Digital Ocean's meshes).

@@ -38,8 +38,12 @@ its Chladni figure inside one material program, so nothing else can read it.
    (`breath`) advances only with the clock. No state is carried between frames: seek = play, reset is free, live and
    offline agree. Response Attack/Release scale the kernels (ADR-1361; the history is already heard through the rest).
 3. **Readers choose a channel:** `displacement` (D), `amplitude` (|F|, F the coherent figure sum e_i phi_i), `sand`
-   (where Chladni sand gathers: F = 0, from the slow envelope), `force` (-grad F^2, vector), `gradient` (grad D,
-   vector); optionally through a listening window over u, or one laid along the field's axis (a tuned structure).
+   (where Chladni sand gathers: F = 0, from the slow envelope), `relief` (sand + a crest + vibration in one pass: a
+   ground's whole deformer), `shading` (a COLOUR: sand, crest, amplitude in one pass: a material's one field op),
+   `force` (-grad F^2 of the slow figure, vector), `gradient` (grad D, vector); optionally through a listening window
+   over u, or one laid along the field's axis (a tuned structure). Competition and the limiter act per source (each
+   source is a body with its own budget; ADR-1402). Sources may carry `reach`, `depth` (a vertical layer) and `scale`
+   (a finer body).
 4. **GPU data:** `FieldBlock` grows a `resonance` table of 144 vec4 (48 modes, three vec4 each); a record's grid lanes
    carry its first row, count, channel and window. No new binding. `FieldUniforms::pack` lays every resonator out
    once; readers point at their resonator's rows.
