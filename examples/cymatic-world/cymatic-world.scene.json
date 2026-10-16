@@ -192,8 +192,8 @@
     "resonance": {
      "channel": "relief",
      "sharpness": 0.9,
-     "reliefLine": 0.3,
-     "reliefLineSharpness": 0.45,
+     "reliefLine": 0.15,
+     "reliefLineSharpness": 0.6,
      "reliefVibration": 0.23
     }
    }
@@ -820,7 +820,7 @@
       "field": "tunedRing",
       "op": "emission",
       "blend": "multiply",
-      "strength": 40.0
+      "strength": 22.0
      }
     ]
    }
@@ -921,7 +921,7 @@
     "sizeEnd": 0.04,
     "sizeVariance": 0.4,
     "trailEnabled": true,
-    "trailLength": 32,
+    "trailLength": 18,
     "trailStride": 6,
     "trailWidth": 0.45,
     "trailTaper": 0.15,
@@ -1443,7 +1443,7 @@
      "kind": "power",
      "dst": 1,
      "srcA": 1,
-     "value": 16.0
+     "value": 40.0
     },
     {
      "kind": "remap",

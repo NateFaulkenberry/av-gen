@@ -105,7 +105,7 @@ def fields(s):
                     "field": {"kind": "resonance", "seed": 7, "strength": 1.0, "falloff": {"kind": "none"},
                               "resonance": res}})
     for name, channel, extra in (                                 ("shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35}),
-                                 ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.3, "reliefLineSharpness": 0.45,
+                                 ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.15, "reliefLineSharpness": 0.6,
                                                        "reliefVibration": 0.23}),
                                  # the matter hears the heart's modes only (its spherical shells, not the far lattice)
                                  ("force", "force", {"listenLow": 0.45, "listenHigh": 0.8, "listenWidth": 0.04}),
@@ -550,7 +550,7 @@ def crystal_program():
     c.op(None, "swizzle", 0, a=0, k=[1, 1, 1, 1])                   # local y, -0.5..0.5
     c.op("bands", "palette", 1, a=0, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1.5, 1.5, 1.5, 0],
          k4=[0.1, 0.1, 0.1, 0])                                     # 0.5 + 0.5 cos(2 pi (5 y + 0.1)): bands
-    c.op(None, "power", 1, a=1, f=16.0)                              # thin bright layers
+    c.op(None, "power", 1, a=1, f=40.0)                              # thin bright layers
     c.op(None, "remap", 0, a=0, k=[-0.5, 0.5, 0.25, 1.0], f=1.0)    # brighter toward the tip
     c.op(None, "multiply", 1, a=1, b=0)
     c.op("core", "constant", 2, k=[0.03, 0.03, 0.03, 1.0])          # a faint core glow under the bands
@@ -586,7 +586,7 @@ def sculpture(s):
                # a ringing crystal quivers about its centre with the displacement it hears (the cluster's antinodes)
                {"field": "tuned", "op": "rotation", "strength": 0.06, "axis": [1.0, 0.0, 0.0]},
                # and lights its growth bands from inside with the ringing it hears
-               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 40.0},
+               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 22.0},
            ]})
 
 
@@ -609,7 +609,7 @@ def matter(s):
                              # the bell: grains below its rim fall out of the body (a dome, not a ball)
                              {"field": "bellCut", "mode": "kill", "strength": 1.0, "mix": 1.0, "axis": [0, 1, 0]}],
                 sizeStart=0.05, sizeEnd=0.04, sizeVariance=0.4,
-                trailEnabled=True, trailLength=32, trailStride=6, trailWidth=0.45, trailTaper=0.15, trailFade=0.05,
+                trailEnabled=True, trailLength=18, trailStride=6, trailWidth=0.45, trailTaper=0.15, trailFade=0.05,
                 colorStart=C("sandHot") + [0.85], colorEnd=C("hollow") + [0.0], emissive=1.3, blend="additive")
     # the veil: strands let fall from the bell's rim, drawn into the field's nodal surfaces as they sink -- the
     # entity's trailing filaments, shaped by the same force as its shells
