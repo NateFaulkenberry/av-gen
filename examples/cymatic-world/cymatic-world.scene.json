@@ -279,48 +279,6 @@
    }
   },
   {
-   "name": "shade-crest",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "resonance": {
-     "channel": "sand",
-     "sharpness": 0.25,
-     "sandNormalized": true,
-     "listenLow": 0.0,
-     "listenHigh": 0.3,
-     "listenWidth": 0.04
-    }
-   }
-  },
-  {
-   "name": "shade-crest-grid",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "grid",
-    "reference": "shade-crest-bake",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
    "name": "shade-amp",
    "kind": "field",
    "position": [
@@ -354,6 +312,48 @@
    "field": {
     "kind": "grid",
     "reference": "shade-amp-bake",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "shade-tint",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "cymatic",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "relief",
+     "reliefSand": 0.0,
+     "reliefFigure": 1.0,
+     "listenLow": 0.0,
+     "listenHigh": 0.3,
+     "listenWidth": 0.04
+    }
+   }
+  },
+  {
+   "name": "shade-tint-grid",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "grid",
+    "reference": "shade-tint-bake",
     "strength": 1.0,
     "falloff": {
      "kind": "none"
@@ -563,14 +563,32 @@
      "field": "shade-sand-grid"
     },
     {
-     "kind": "field",
+     "kind": "power",
      "dst": 2,
-     "field": "shade-crest-grid"
+     "srcA": 0,
+     "value": 13.0
     },
     {
      "kind": "field",
      "dst": 3,
      "field": "shade-amp-grid"
+    },
+    {
+     "kind": "field",
+     "dst": 5,
+     "field": "shade-tint-grid"
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      -0.55,
+      0.55,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
     },
     {
      "kind": "swizzle",
@@ -685,6 +703,24 @@
      "srcB": 4
     },
     {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 5,
+     "constant": [
+      0.45,
+      0.15,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4
+    },
+    {
      "kind": "ramp",
      "dst": 3,
      "srcA": 3,
@@ -716,25 +752,42 @@
     {
      "kind": "ramp",
      "dst": 4,
-     "srcA": 1,
+     "srcA": 5,
      "constant": [
+      0.04231,
+      0.00605,
+      0.2462,
+      1.0
+     ],
+     "constant2": [
       0.00243,
       0.00605,
       0.03689,
       1.0
      ],
-     "constant2": [
-      0.00289,
-      0.03193,
-      0.06724,
-      1.0
-     ],
      "constant3": [
+      0.00368,
+      0.04231,
+      0.36131,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
       0.00335,
       0.05781,
       0.09759,
       1.0
      ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6,
+     "srcC": 1
     },
     {
      "kind": "input",
@@ -944,36 +997,14 @@
    "injectField": "shade-sand"
   },
   {
-   "name": "shade-crest-bake",
-   "enabled": true,
-   "mode": "bake",
-   "wrap": "clamp",
-   "resolution": [
-    896,
-    1,
-    896
-   ],
-   "boundsMin": [
-    -86.0,
-    -4.0,
-    -86.0
-   ],
-   "boundsMax": [
-    86.0,
-    -2.0,
-    86.0
-   ],
-   "injectField": "shade-crest"
-  },
-  {
    "name": "shade-amp-bake",
    "enabled": true,
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    896,
+    512,
     1,
-    896
+    512
    ],
    "boundsMin": [
     -86.0,
@@ -986,6 +1017,28 @@
     86.0
    ],
    "injectField": "shade-amp"
+  },
+  {
+   "name": "shade-tint-bake",
+   "enabled": true,
+   "mode": "bake",
+   "wrap": "clamp",
+   "resolution": [
+    640,
+    1,
+    640
+   ],
+   "boundsMin": [
+    -86.0,
+    -4.0,
+    -86.0
+   ],
+   "boundsMax": [
+    86.0,
+    -2.0,
+    86.0
+   ],
+   "injectField": "shade-tint"
   },
   {
    "name": "relief-bake",

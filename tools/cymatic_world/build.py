@@ -399,11 +399,15 @@ def ground_readers(s):
         win = {"listenLow": 0.0, "listenHigh": 0.7, "listenWidth": 0.04}
         large = {"listenLow": 0.0, "listenHigh": 0.3, "listenWidth": 0.04}   # the correction: the large figure leads
         # the sand masks normalised (ADR-1405): the network is marked in a quiet passage too; loudness is |F|'s
-        for name, channel, extra in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **large}),
-                                     ("shade-crest", "sand", {"sharpness": 0.25, "sandNormalized": True, **large}),
-                                     ("shade-amp", "amplitude", dict(win))):
+        # (the crest line is the sand raised to a power in the program -- exp(-F^2/(s^2 E)) at s = 0.25 is the s = 0.9
+        # value to the power 13 -- which frees a field slot: a program samples at most four fields)
+        for name, channel, extra, res in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **large}, BAKE_RES),
+                                          ("shade-amp", "amplitude", dict(win), 512),
+                                          # 10-brief Stage B, the colour field: the large figure's signed standing
+                                          # pattern F -- each lobe a broad colour region, anchored to the geometry
+                                          ("shade-tint", "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, **large}, 640)):
             reader(s, name, channel, extra)
-            bake_grid(s, name)
+            bake_grid(s, name, res)
     else:
         reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
     if DEBUG in ("signed", "nodal", "envelope"):
@@ -438,13 +442,13 @@ def ground_readers(s):
     return [("relief-grid", 1.0)]
 
 
-def bake_grid(s, source):
+def bake_grid(s, source, res=None):
     """ADR-1407: a plane grid `<source>-bake` holding `source` sampled at its cells every frame, and the field
     `<source>-grid` that reads it."""
     if not hasattr(s, "grids"):
         s.grids = []
     s.grids.append({"name": source + "-bake", "enabled": True, "mode": "bake", "wrap": "clamp",
-                    "resolution": [BAKE_RES, 1, BAKE_RES], "boundsMin": [-BAKE_HALF, -4.0, -BAKE_HALF],
+                    "resolution": [res or BAKE_RES, 1, res or BAKE_RES], "boundsMin": [-BAKE_HALF, -4.0, -BAKE_HALF],
                     "boundsMax": [BAKE_HALF, -2.0, BAKE_HALF], "injectField": source})
     s.nodes.append({"name": source + "-grid", "kind": "field", "position": [0, 0, 0],
                     "field": {"kind": "grid", "reference": source + "-bake", "strength": 1.0,
@@ -464,7 +468,7 @@ PALETTES = {
           "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
           "sheen": "#e6f7ff", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
-    "B": {"stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
+    "B": {"violet": "#3a1288", "blue": "#0c3aa2", "stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
           "sheenI": 1.1,
           "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.4},
@@ -484,7 +488,8 @@ FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the
 
 
 def pc(key, scale=1.0):
-    return hexrgb(PALETTES[PALETTE][key], scale)
+    pal = PALETTES[PALETTE]
+    return hexrgb(pal.get(key, pal["stone"]), scale)  # a palette without a colour role reads its stone there
 
 
 def ground_program():
@@ -525,10 +530,13 @@ def ground_program():
         c = pc(key, scale)
         g.op(label, "ramp", dst, a=src, k=[0, 0, 0, 0], k2=[x * 0.5 for x in c] + [0.5], k3=c + [1.0])
 
-    if BAKE:  # ADR-1407: three baked grids, sampled (cheap) -- r0 = sand, r2 = crest, r3 = amplitude
+    if BAKE:  # ADR-1407: baked grids, sampled (cheap) -- r0 = sand, r2 = crest (sand^13), r3 = amplitude
         g.op("shade", "field", 0, field="shade-sand-grid")
-        g.op(None, "field", 2, field="shade-crest-grid")
+        g.op(None, "power", 2, a=0, f=13.0)
         g.op(None, "field", 3, field="shade-amp-grid")
+        # the colour field's coordinate (10-brief Stage B): the large figure's signed F, 0 (one sign) .. 1 (the other)
+        g.op("tintField", "field", 5, field="shade-tint-grid")
+        g.op(None, "remap", 5, a=5, k=[-0.55, 0.55, 0.0, 1.0], f=1.0)
     else:
         g.op("shade", "field", 0, field="shade")                   # r0 = (sand, crest, amplitude, w)
         g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])               # r2 = crest
@@ -548,11 +556,22 @@ def ground_program():
     g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
     g.op("wallBand", "smoothstep", 4, a=4, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
+    if BAKE:  # the fuchsia glow belongs to the violet lobes: the colour field chooses which cells glow
+        g.op("violetLobes", "remap", 4, a=5, k=[0.45, 0.15, 0.0, 1.0], f=1.0)
+        g.op(None, "multiply", 3, a=3, b=4)
     tint("hollow", 3, 3, "hollow", P_["hollowI"])
     g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
     # ---- materials: scoured satin stone, matte settled grit (one ramp: stone -> grit by the grit mask) ----
     st, gr = pc("stone"), pc("grit")
-    g.op("albedo", "ramp", 4, a=1, k=st + [1.0], k2=[(x + y) * 0.5 for x, y in zip(st, gr)] + [1.0], k3=gr + [1.0])
+    if BAKE:
+        # THE COLOUR FIELD (10-brief Stage B): the stone takes its colour from the large figure's signed pattern F --
+        # deep violet on one sign of lobe, the navy stone at the nodes, deep blue on the other -- so broad regions of
+        # colour fill the lobes and change as the figure changes; quiet music (small F) settles them toward navy
+        g.op("tint", "ramp", 4, a=5, k=pc("violet") + [1.0], k2=st + [1.0], k3=pc("blue") + [1.0])
+        g.op("grit", "constant", 6, k=gr + [1.0])
+        g.op("albedo", "mixBy", 4, a=4, b=6, c=1)                  # r4: the coloured stone, the grit on the ridges
+    else:
+        g.op("albedo", "ramp", 4, a=1, k=st + [1.0], k2=[(x + y) * 0.5 for x, y in zip(st, gr)] + [1.0], k3=gr + [1.0])
     # ---- light, into r5 (sheen into r1) ----
     g.op(None, "input", 6, inp="normal")
     g.op("keyDot", "gradient", 1, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
@@ -660,7 +679,7 @@ POST = {
     # Pass E: AgX keeps more of the cyan and magenta (chroma retention 0.9: the hottest nodal lines stay tinted rather
     # than clip to white); bloom only around what is genuinely bright, tight, so neighbouring cells stay separate
     "post/tonemap/chroma-retention": 0.9, "post/bloom/radius": 0.6,
-    "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.2, "post/output/vignette": 0.45,
+    "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.2, "post/output/vignette": 0.0,
     "post/output/grain": 0.012, "post/grade/contrast": 1.22, "post/lens/chromaticAberration": 0.0,
     "camera/exposure/compensation": 0.2, "post/dof/enabled": False,
 }
@@ -768,7 +787,10 @@ def build_world():
         return [RP % (g[label], "constant2"), RP % (g[label], "constant3")]
     counter, hollow, sheen = ramp_paths("fill"), ramp_paths("hollow"), ramp_paths("sheen")
     line = "material/cwGround/op/%d/constant/constant" % g["line"]
-    grit_mid, grit = RP % (g["albedo"], "constant2"), RP % (g["albedo"], "constant3")
+    if BAKE:  # the grit is a constant of its own beside the colour field (light pass): the build turns it, whole
+        grit, grit_mid = "material/cwGround/op/%d/constant/constant" % g["grit"], None
+    else:
+        grit_mid, grit = RP % (g["albedo"], "constant2"), RP % (g["albedo"], "constant3")
     # THE COLOUR AND LIGHT RESPONSE (the colour pass, Pass D). The field already places the light: the nodal-line
     # glow is crest x the field's own amplitude, the hollow glow lives only on the inner walls of cells that ring hard,
     # so every route below scales a SPATIALLY LOCALISED term, never the whole frame. Colour and brightness move on
@@ -784,7 +806,7 @@ def build_world():
     colour_routes = PALETTE != "G"
     if colour_routes:
         s.route(*[R("intensity", path, round((tgt[c] - base[c]) * w, 5), comp=c, attackMs=4000, decayMs=9000)
-                  for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5))])
+                  for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5)) if path is not None])
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
                 *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
                 R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),

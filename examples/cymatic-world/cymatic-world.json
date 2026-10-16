@@ -120,7 +120,7 @@
   "post/bloom/threshold": 1.2,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.9,
-  "post/output/vignette": 0.45,
+  "post/output/vignette": 0.0,
   "post/output/grain": 0.012,
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.2,
@@ -334,7 +334,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/18/ramp/constant3",
+   "target": "material/cwGround/op/23/constant/constant",
    "amount": 0.00143,
    "op": "add",
    "polarity": "unipolar",
@@ -346,19 +346,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/18/ramp/constant2",
-   "amount": 0.00072,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 4000,
-    "decayMs": 9000
-   }
-  },
-  {
-   "source": "response.intensity",
-   "target": "material/cwGround/op/18/ramp/constant3",
+   "target": "material/cwGround/op/23/constant/constant",
    "amount": 0.08922,
    "op": "add",
    "polarity": "unipolar",
@@ -370,19 +358,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/18/ramp/constant2",
-   "amount": 0.04461,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 4000,
-    "decayMs": 9000
-   }
-  },
-  {
-   "source": "response.intensity",
-   "target": "material/cwGround/op/18/ramp/constant3",
+   "target": "material/cwGround/op/23/constant/constant",
    "amount": 0.12564,
    "op": "add",
    "polarity": "unipolar",
@@ -393,20 +369,8 @@
    }
   },
   {
-   "source": "response.intensity",
-   "target": "material/cwGround/op/18/ramp/constant2",
-   "amount": 0.06282,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 4000,
-    "decayMs": 9000
-   }
-  },
-  {
    "source": "response.sustain",
-   "target": "material/cwGround/op/16/ramp/constant2",
+   "target": "material/cwGround/op/20/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -419,7 +383,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/16/ramp/constant3",
+   "target": "material/cwGround/op/20/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -432,7 +396,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/16/ramp/constant2",
+   "target": "material/cwGround/op/20/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -445,7 +409,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/16/ramp/constant3",
+   "target": "material/cwGround/op/20/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -458,7 +422,7 @@
   },
   {
    "source": "response.snareEnv",
-   "target": "material/cwGround/op/8/constant/constant",
+   "target": "material/cwGround/op/10/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -471,7 +435,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/24/ramp/constant2",
+   "target": "material/cwGround/op/30/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -484,7 +448,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/24/ramp/constant3",
+   "target": "material/cwGround/op/30/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -497,7 +461,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/27/ramp/constant2",
+   "target": "material/cwGround/op/33/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -510,7 +474,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/27/ramp/constant3",
+   "target": "material/cwGround/op/33/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -523,7 +487,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/27/ramp/constant2",
+   "target": "material/cwGround/op/33/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -536,7 +500,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/27/ramp/constant3",
+   "target": "material/cwGround/op/33/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -549,7 +513,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/8/constant/constant",
+   "target": "material/cwGround/op/10/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
