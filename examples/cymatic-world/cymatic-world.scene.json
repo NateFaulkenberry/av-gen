@@ -361,6 +361,69 @@
    }
   },
   {
+   "name": "shade-sandm",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "cymatic",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "sand",
+     "sharpness": 0.6,
+     "sandNormalized": true,
+     "listenLow": 0.28,
+     "listenHigh": 0.7,
+     "listenWidth": 0.04
+    }
+   }
+  },
+  {
+   "name": "shade-mline",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "compound",
+    "children": [
+     "shade-sandm",
+     "shade-amp"
+    ],
+    "combine": "multiply",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "shade-mline-grid",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "grid",
+    "reference": "shade-mline-bake",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
    "name": "relief-large",
    "kind": "field",
    "position": [
@@ -646,6 +709,51 @@
      "srcB": 7
     },
     {
+     "kind": "field",
+     "dst": 6,
+     "field": "shade-mline-grid"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.45,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.042445,
+      0.093555,
+      0.2,
+      0.5
+     ],
+     "constant3": [
+      0.08489,
+      0.18711,
+      0.4,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
      "kind": "remap",
      "dst": 7,
      "srcA": 1,
@@ -754,21 +862,21 @@
      "dst": 4,
      "srcA": 5,
      "constant": [
-      0.04231,
-      0.00605,
-      0.2462,
+      0.02519,
+      0.00368,
+      0.15593,
       1.0
      ],
      "constant2": [
-      0.00243,
-      0.00605,
-      0.03689,
+      0.00152,
+      0.00304,
+      0.016,
       1.0
      ],
      "constant3": [
-      0.00368,
-      0.04231,
-      0.36131,
+      0.00304,
+      0.02519,
+      0.23074,
       1.0
      ]
     },
@@ -788,6 +896,24 @@
      "srcA": 4,
      "srcB": 6,
      "srcC": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.4,
+      0.1,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
     },
     {
      "kind": "input",
@@ -811,16 +937,16 @@
      "dst": 5,
      "srcA": 1,
      "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
+      0.00072,
+      0.00042,
+      0.00562,
+      1.0
      ],
      "constant2": [
-      0.14046,
-      0.96462,
-      1.15,
-      0.5
+      0.14082,
+      0.96483,
+      1.15281,
+      1.0
      ],
      "constant3": [
       0.28092,
@@ -852,15 +978,15 @@
       0.0
      ],
      "constant2": [
-      0.40585,
-      0.535395,
-      0.55,
+      0.130015,
+      0.296735,
+      0.375,
       0.5
      ],
      "constant3": [
-      0.8117,
-      1.07079,
-      1.1,
+      0.26003,
+      0.59347,
+      0.75,
       1.0
      ]
     },
@@ -902,47 +1028,6 @@
       0.47995,
       0.03936,
       0.9,
-      1.0
-     ]
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 3
-    },
-    {
-     "kind": "gradient",
-     "dst": 3,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.5,
-      0.0,
-      0.5
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "ramp",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ],
-     "constant2": [
-      0.00036,
-      0.00021,
-      0.00281,
-      0.5
-     ],
-     "constant3": [
-      0.00072,
-      0.00042,
-      0.00562,
       1.0
      ]
     },
@@ -1039,6 +1124,28 @@
     86.0
    ],
    "injectField": "shade-tint"
+  },
+  {
+   "name": "shade-mline-bake",
+   "enabled": true,
+   "mode": "bake",
+   "wrap": "clamp",
+   "resolution": [
+    768,
+    1,
+    768
+   ],
+   "boundsMin": [
+    -86.0,
+    -4.0,
+    -86.0
+   ],
+   "boundsMax": [
+    86.0,
+    -2.0,
+    86.0
+   ],
+   "injectField": "shade-mline"
   },
   {
    "name": "relief-bake",

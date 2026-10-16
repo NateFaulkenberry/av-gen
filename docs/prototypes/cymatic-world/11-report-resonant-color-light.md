@@ -40,3 +40,18 @@ The brief is [10-brief-resonant-color-light-optics.md](10-brief-resonant-color-l
 - **Material:** 39 ops.
 
 **Evidence** (`stageB-colour-field/`): `colour-field-alone-left-full-right-feline-40-70s.mp4` (the albedo debug view beside the full shade, with audio) and stills at the six timestamps.
+
+## Stage C: geometry-aware illumination, and the darkness back
+
+The coordinator's Stage B review: the colour field reads lobe by lobe, but the frame had lost its darkness, with cells bright electric blue where the correction round had navy and black hollows. Stage C gives the light a hierarchy and gives the dark back.
+
+- **Hollow floors fall to near-black.** The albedo is multiplied by the sand, remapped so that the deepest sand (the cell floor inside its walls) keeps a tenth of its colour: `remap(sand, 0..0.4 → 0.1..1)`. The stone, violet and blue are darker as well (`#050a22`, `#2c0c6e`, `#0a2c84`). The violet and blue lobes now live on the cell walls, so the ridges and their light stand out against real negative space.
+- **The light's hierarchy, large > medium > fine.**
+  - *Large:* the crest line on the large figure's nodal ridges (sand¹³ × excitation), unchanged and the brightest thing in the frame.
+  - *Medium:* a new secondary light. The medium network's crests multiplied by the excitation are summed by a compound before the bake (`shade-mline`, 768²), so the program spends one field slot on it. It is drawn at 0.4 in a soft blue (`#7fb6ff`), so it appears only where the medium figure is both a crest and excited. It is a faint second tier, not an outline on every contour.
+  - *Fine:* glints only. The sheen is cooler and dimmer (`#9fe6ff`, 0.75 from 1.1), which tames the white hot spots on the stone flanks.
+- **The ambient floor** is folded into the key's ramp (black-to-key becomes sky-to-key), so the hemisphere's three ops are gone with no change in look.
+- **Rejected on the way:** reading the excitation as |F| from the colour field. It is zero exactly on the nodal lines, so it killed the crest line. The amplitude grid came back.
+- **Fields:** sand, amp, tint and mline (four of four). Stage D's light has to share a grid through a compound. **Material:** 42 ops.
+
+**Evidence** (`stageC-geometry-light/`): `stageB-top-stageC-bottom-feline-six.png` and `stageC-feline-six.png` (Feline at 4, 18, 60, 125, 160 and 190 s).

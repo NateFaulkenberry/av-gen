@@ -401,6 +401,7 @@ def ground_readers(s):
         # the sand masks normalised (ADR-1405): the network is marked in a quiet passage too; loudness is |F|'s
         # (the crest line is the sand raised to a power in the program -- exp(-F^2/(s^2 E)) at s = 0.25 is the s = 0.9
         # value to the power 13 -- which frees a field slot: a program samples at most four fields)
+        medium = {"listenLow": 0.28, "listenHigh": 0.7, "listenWidth": 0.04}
         for name, channel, extra, res in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **large}, BAKE_RES),
                                           ("shade-amp", "amplitude", dict(win), 512),
                                           # 10-brief Stage B, the colour field: the large figure's signed standing
@@ -408,6 +409,13 @@ def ground_readers(s):
                                           ("shade-tint", "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, **large}, 640)):
             reader(s, name, channel, extra)
             bake_grid(s, name, res)
+        # 10-brief Stage C, the SECONDARY light: the medium network's crests times the excitation, multiplied before
+        # the bake (a compound), so the program spends one field slot on it and keeps the fourth for Stage D
+        reader(s, "shade-sandm", "sand", {"sharpness": 0.6, "sandNormalized": True, **medium})
+        s.nodes.append({"name": "shade-mline", "kind": "field", "position": [0, 0, 0],
+                        "field": {"kind": "compound", "children": ["shade-sandm", "shade-amp"], "combine": "multiply",
+                                  "strength": 1.0, "falloff": {"kind": "none"}}})
+        bake_grid(s, "shade-mline", 768)
     else:
         reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
     if DEBUG in ("signed", "nodal", "envelope"):
@@ -468,9 +476,9 @@ PALETTES = {
           "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
           "sheen": "#e6f7ff", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
-    "B": {"violet": "#3a1288", "blue": "#0c3aa2", "stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
-          "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
-          "sheenI": 1.1,
+    "B": {"line2": "#7fb6ff", "line2I": 0.4, "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
+          "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#9fe6ff",
+          "sheenI": 0.75,
           "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.4},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
@@ -534,9 +542,9 @@ def ground_program():
         g.op("shade", "field", 0, field="shade-sand-grid")
         g.op(None, "power", 2, a=0, f=13.0)
         g.op(None, "field", 3, field="shade-amp-grid")
-        # the colour field's coordinate (10-brief Stage B): the large figure's signed F, 0 (one sign) .. 1 (the other)
+        # the colour field (Stage B): the large figure's signed F
         g.op("tintField", "field", 5, field="shade-tint-grid")
-        g.op(None, "remap", 5, a=5, k=[-0.55, 0.55, 0.0, 1.0], f=1.0)
+        g.op(None, "remap", 5, a=5, k=[-0.55, 0.55, 0.0, 1.0], f=1.0)   # r5: the colour coordinate, 0 .. 1
     else:
         g.op("shade", "field", 0, field="shade")                   # r0 = (sand, crest, amplitude, w)
         g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])               # r2 = crest
@@ -548,6 +556,13 @@ def ground_program():
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
     g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
     g.op(None, "multiply", 2, a=2, b=7)
+    if BAKE:
+        # Stage C, the SECONDARY light: the medium network's crests glow faintly, and only where the figure is excited
+        # -- a restrained second tier under the large figure's lines, never an equal outline on every contour
+        g.op("sandM", "field", 6, field="shade-mline-grid")      # medium crest x excitation, baked
+        g.op("lineM", "smoothstep", 6, a=6, k=[0.45, 0.95])
+        tint("line2", 6, 6, "line2", P_["line2I"])
+        g.op(None, "add", 2, a=2, b=6)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
     g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.3, 1.0] if BAKE else [0.8, 2.4])          # only where it rings hard
     g.op(None, "multiply", 3, a=3, b=7)
@@ -570,12 +585,21 @@ def ground_program():
         g.op("tint", "ramp", 4, a=5, k=pc("violet") + [1.0], k2=st + [1.0], k3=pc("blue") + [1.0])
         g.op("grit", "constant", 6, k=gr + [1.0])
         g.op("albedo", "mixBy", 4, a=4, b=6, c=1)                  # r4: the coloured stone, the grit on the ridges
+        # Stage C (coordinator, after B): the hollow FLOORS fall back toward black -- the deepest sand (the cell floor
+        # inside the walls) keeps a fifth of its colour, so the lobes' violet and blue live on the walls and the frame
+        # has real negative space for the light to stand out against
+        g.op("floorDark", "remap", 6, a=0, k=[0.0, 0.4, 0.1, 1.0], f=1.0)
+        g.op(None, "multiply", 4, a=4, b=6)
     else:
         g.op("albedo", "ramp", 4, a=1, k=st + [1.0], k2=[(x + y) * 0.5 for x, y in zip(st, gr)] + [1.0], k3=gr + [1.0])
     # ---- light, into r5 (sheen into r1) ----
     g.op(None, "input", 6, inp="normal")
     g.op("keyDot", "gradient", 1, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
-    tint("key", 5, 1, "key", P_["keyI"])                           # the raking key
+    if BAKE:  # the key over an ambient floor (the hemisphere's 3 ops folded into the key's ramp)
+        kc, sc = pc("key", P_["keyI"]), pc("sky", P_["skyI"])
+        g.op("key", "ramp", 5, a=1, k=sc + [1.0], k2=[(a + b) * 0.5 for a, b in zip(sc, kc)] + [1.0], k3=kc + [1.0])
+    else:
+        tint("key", 5, 1, "key", P_["keyI"])                       # the raking key
     g.op("sheenLobe", "power", 1, a=1, f=12.0)                     # the key's highlight ...
     g.op(None, "multiply", 1, a=1, b=7)                            # ... on the smooth stone only
     tint("sheen", 1, 1, "sheen", P_["sheenI"])                     # r1: sheen
@@ -583,9 +607,10 @@ def ground_program():
     g.op(None, "power", 3, a=3, f=4.0)                             # the fill grazes: a narrow lobe on the far flanks
     tint("fill", 3, 3, "fill", P_["fillI"])
     g.op(None, "add", 5, a=5, b=3)                                 # + fill
-    g.op("skyDot", "gradient", 3, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
-    tint("sky", 3, 3, "sky", P_["skyI"])
-    g.op(None, "add", 5, a=5, b=3)                                 # + sky
+    if not BAKE:
+        g.op("skyDot", "gradient", 3, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
+        tint("sky", 3, 3, "sky", P_["skyI"])
+        g.op(None, "add", 5, a=5, b=3)                             # + sky
     # (the Fresnel rim and the distance haze went in the shape-language pass: seen from 35-70 m, straight down, the
     # ground grazes almost nothing and hazes almost nothing -- 7 ops, ~2.5 ms of interpreter at High)
     if dbg == "light":
@@ -706,8 +731,9 @@ def build_world():
                      (8, "light", "LIGHT: the fuchsia counter light over the ridges, and the nodal lines' glow")]
     pads = [PAD_STRIKE]
     s = kit.Scene("cymatic-world", "Cymatic World", design(
-        "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, "
-        "and the grit settles on its nodal lines, carving rings, petals and cells into the ground.",
+        "A night basin whose ground is a resonating plate: the music excites one designed bank of standing waves, and "
+        "its nodal lines stand as ridges between sunken antinodes, carving rings, petals and cells that wander and "
+        "re-form with the music.",
         "the basin floor's figure", "the basin floor, its sand relief drawing the figure",
         "a slow high arc over the basin, there and back in 160 s"))
     environment(s)
@@ -819,7 +845,7 @@ def build_world():
 
 BUILDERS = {"world": build_world}
 OUT_DIRS = {k: os.path.join(REPO, "examples", v["id"]) for k, v in SCENES.items()}
-DESCRIPTION_TAIL = {"world": "The ground's figure is drawn by one resonance field (ADR-1400)."}
+DESCRIPTION_TAIL = {"world": "The ground's figure is drawn by one resonance field (ADR-1400, ADR-1403 to 1407); the scene carries no track of its own."}
 
 
 def write_scene(key):

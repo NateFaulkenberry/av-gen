@@ -334,7 +334,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/23/constant/constant",
+   "target": "material/cwGround/op/27/constant/constant",
    "amount": 0.00143,
    "op": "add",
    "polarity": "unipolar",
@@ -346,7 +346,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/23/constant/constant",
+   "target": "material/cwGround/op/27/constant/constant",
    "amount": 0.08922,
    "op": "add",
    "polarity": "unipolar",
@@ -358,7 +358,7 @@
   },
   {
    "source": "response.intensity",
-   "target": "material/cwGround/op/23/constant/constant",
+   "target": "material/cwGround/op/27/constant/constant",
    "amount": 0.12564,
    "op": "add",
    "polarity": "unipolar",
@@ -370,7 +370,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/20/ramp/constant2",
+   "target": "material/cwGround/op/24/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -383,7 +383,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/20/ramp/constant3",
+   "target": "material/cwGround/op/24/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -396,7 +396,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/20/ramp/constant2",
+   "target": "material/cwGround/op/24/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -409,7 +409,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/20/ramp/constant3",
+   "target": "material/cwGround/op/24/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -435,7 +435,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/30/ramp/constant2",
+   "target": "material/cwGround/op/36/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -448,7 +448,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/30/ramp/constant3",
+   "target": "material/cwGround/op/36/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -461,7 +461,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/33/ramp/constant2",
+   "target": "material/cwGround/op/39/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -474,7 +474,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/33/ramp/constant3",
+   "target": "material/cwGround/op/39/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -487,7 +487,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/33/ramp/constant2",
+   "target": "material/cwGround/op/39/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -500,7 +500,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/33/ramp/constant3",
+   "target": "material/cwGround/op/39/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -1011,7 +1011,7 @@
  },
  "sonicScene": {
   "category": "abstract",
-  "thesis": "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, and the grit settles on its nodal lines, carving rings, petals and cells into the ground.",
+  "thesis": "A night basin whose ground is a resonating plate: the music excites one designed bank of standing waves, and its nodal lines stand as ridges between sunken antinodes, carving rings, petals and cells that wander and re-form with the music.",
   "composition": {
    "background": "none: the camera looks down into the basin, the ground fills the frame",
    "midground": "the outer rings of the figure",
