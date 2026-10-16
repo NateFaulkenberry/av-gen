@@ -198,7 +198,8 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
     }
     if (!(finite(ripple) && rippleSpeed > 0.0f && rippleSpeed <= 1000.0f && rippleLife > 0.0f && rippleLife <= 30.0f &&
           rippleWidth > 0.0f && rippleWidth <= 10.0f && rippleArea >= 0.0f && finite(rippleArea) && rippleCount >= 0.0f &&
-          rippleCount <= static_cast<float>(kMaxRipplesPerBand) && rippleFade >= 0.0f && rippleFade <= 10.0f)) {
+          rippleCount <= static_cast<float>(kMaxRipplesPerBand) && rippleFade >= 0.0f && rippleFade <= 10.0f && rippleU[0] >= 0.0f && rippleU[0] <= 1.0f && rippleU[1] >= 0.0f &&
+          rippleU[1] <= 1.0f && rippleU[2] >= 0.0f && rippleU[2] <= 1.0f)) {
         return fail("field '{}': resonance ripples need speed in (0, 1000] m/s, life in (0, 30] s, width in (0, 10], "
                     "area >= 0, count in [0, {}] a band and fade in [0, 10] s",
                     field, kMaxRipplesPerBand);
@@ -265,7 +266,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     for (const float v : {modes, fLow, fHigh, lambdaMax, lambdaMin, scale, selectivity, contrast, persistence, buildup,
                           memory, competition, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
                           reliefLine, reliefLineSharpness, reliefVibration, derivativeStep, ripple, rippleSpeed, rippleLife,
-                          rippleWidth, rippleArea, rippleCount, rippleFade, layout, attack[0], attack[1], attack[2],
+                          rippleWidth, rippleArea, rippleCount, rippleFade, rippleU[0], rippleU[1], rippleU[2], layout, attack[0], attack[1], attack[2],
                           release[0], release[1], release[2], reliefSand, reliefFigure, reliefAmplitude, reliefRound}) {
         h.f32(v);
     }
@@ -331,6 +332,7 @@ json ResonanceSpec::toJson() const {
         j["rippleArea"] = rippleArea;
         j["rippleCount"] = rippleCount;
         j["rippleFade"] = rippleFade;
+        j["rippleU"] = {rippleU[0], rippleU[1], rippleU[2]};
     }
     if (layout > 0.0f) { // ADR-1404: written only when set
         j["layout"] = layout;
@@ -434,7 +436,8 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.rippleFade, "rippleFade", detail::readFloat);
     AVGEN_SPATIAL_READ(r.layout, "layout", detail::readFloat);
     for (const auto& [key, band] : {std::pair<const char*, std::array<float, 3>*>{"attack", &r.attack},
-                                    std::pair<const char*, std::array<float, 3>*>{"release", &r.release}}) {
+                                    std::pair<const char*, std::array<float, 3>*>{"release", &r.release},
+                                    std::pair<const char*, std::array<float, 3>*>{"rippleU", &r.rippleU}}) {
         if (j.contains(key)) {
             const json& a = j.at(key);
             if (!a.is_array() || a.size() != 3 || !a[0].is_number() || !a[1].is_number() || !a[2].is_number()) {
@@ -883,7 +886,6 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         constexpr float kSpeed[3] = {1.0f, 1.6f, 2.2f};
         constexpr float kLife[3] = {1.0f, 0.55f, 0.35f};
         constexpr float kGain[3] = {1.0f, 0.6f, 0.3f};
-        constexpr float kU[3] = {0.1f, 0.45f, 0.85f};       // where on the dispersion each band's ring sits
         constexpr float kLocal[3] = {0.0f, 0.6f, 0.35f};    // reach as a share of the area (0 = unbounded)
         const int cap = std::clamp(static_cast<int>(std::lround(r.rippleCount)), 0, kMaxRipplesPerBand);
         const float fade = std::max(r.rippleFade, 0.0f);
@@ -914,7 +916,7 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
                     }
                 }
                 keep *= 1.0f - smoothstepf(3.0f * life, 4.0f * life, age);
-                const float u = kU[band];
+                const float u = std::clamp(r.rippleU[static_cast<std::size_t>(band)], 0.0f, 1.0f);
                 const float lambda = r.lambdaMax * std::pow(r.lambdaMin / r.lambdaMax, u) / scale;
                 const float k = kTwoPi / lambda;
                 const float rise = r.attack[0] > 0.0f ? std::max(kStrikeRise, bandTime(r.attack, u)) : kStrikeRise;

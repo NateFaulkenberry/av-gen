@@ -173,6 +173,10 @@ struct ResonanceSpec {
     float rippleCount = 2.0f;   // ADR-1404: the most rings each band keeps alive (0..kMaxRipplesPerBand); a ring a newer
                                 // one displaces fades out over rippleFade instead of vanishing
     float rippleFade = 0.35f;   // seconds
+    // ADR-1405: where each band's ring (low, mid, high) sits on the dispersion axis -- its wavelength, and which readers
+    // hear it (a reader's listening window): a kick's ring can travel through the medium scale, leaving the large figure
+    // to answer the kick through its strikes
+    std::array<float, 3> rippleU{0.1f, 0.45f, 0.85f};
     std::vector<ResonanceSource> sources; // empty = one point source at the origin, order 4
     // ---- the reader (any resonance field) --------------------------------------------------------
     ResonanceChannel channel = ResonanceChannel::Displacement;

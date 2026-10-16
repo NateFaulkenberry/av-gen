@@ -167,3 +167,54 @@ These are build-time, like the palettes; `CW_DEBUG=` selects one:
 The envelopes, phases, limiter and ripples over time come from the `[.resonance-trace]` diagnostic and `trace_video.py`.
 
 Sheets: `stage1-audit/modes-isolated-hyperborea-50s.png` and `stage3-shape-system/debug-views-60s-116s.png`.
+
+## Stage 4: pattern evolution
+
+The world moves between configurations through **persistent mode identities** and continuous weights; nothing is reset or re-drawn:
+- **The foci** (ADR-1405) sweep each figure's bank at incommensurate periods: A every 47 s, B every 61 s, M every 29 s. They are narrow (width 0.032-0.04 in u, against a mode spacing of 0.048), so one designed mode leads at a time and the figure crossfades into the next: a trefoil into a star, into spokes and rings.
+- **The centres wander:** A by 12 m over 100 s, M about its own eccentric centre.
+- **The petals turn:** 0.03 and 0.045 rad/s, some against the others.
+- **Envelopes rise and decay** per band (ADR-1404).
+- **Phase is Ω·t at fixed Ω,** continuous by construction. The layout fixes every mode's frequency.
+
+**Capture:** `stage4-evolution/evolution-geometry-only-hyperborea-100-160s.mp4` (60 s at normal speed, geometry-only) and `evolution-stills-geometry-only.png`. The figure passes through off-centre spokes and rings, Chladni webs of cells and spokes, radial fans, and cell networks with the medium figure nested in the large.
+
+**One finding changed the design:** B's constant interference turned the large figure into a labyrinth. With B silent, 125 s is a clean web of spokes and rings; at 0.22, a maze (`stage4-evolution` notes, and the B comparison in the commit history). So **interference is now an event.** B rests at zero, and the sound's roughness raises it (Stage 5).
+
+## Stage 5: audio as excitation
+
+The mapping is deliberately small. It decides which figure leads and how hard each scale is excited, never the finished height directly:
+
+| Feature | Acts on | How |
+|---|---|---|
+| every mode's own band of the spectrum (ADR-1400) | its envelope | selectivity 4, contrast 0.7, per-band attack and release (0.18 / 0.08 / 0.04 s, 3 / 1.4 / 0.6 s) |
+| onsets (low, mid, high) | the modes their band reaches | a strike: a bounded two-time-constant impulse (ADR-1404) |
+| onsets | a travelling ring each | kick broad, slow and in the medium scale (rippleU 0.36); snare faster and local; hat fine; two a band, fading out when displaced |
+| `sonic.brightness.slow` | A's and B's focus (+0.08, +0.06) | a brighter sound leads higher-order lobes, over seconds |
+| `sonic.brightness` | M's focus (+0.14) | petal subdivision follows the timbre |
+| `sonic.roughness.slow` | B's amplitude (0 → 0.45) | turbulence brings the second centre's interference |
+| `response.bass` | the large layer (× 1 + 0.35) | |
+| `response.sustain` | the medium layer (× 1 + 0.3) | held sound adds intricacy |
+| `response.hat` | the fine layer (× 1 + 1.5) | fine vibration only |
+| `response.intensity` (the song's build) | `modes` (+5, filling the 22-mode bank) | finer modes join; none is re-placed |
+| `response.sustain` | `memory` | |
+| MIDI | | CC 1-4 (excitation, complexity, persistence, scale), CC 5 terrain depth, CC 8 light, pad 36 strike; unchanged |
+
+**Reproducible test signals** (`stage5-audio/test-signals-geometry-only-0-60s.mp4`, generated, 60 s): silence, 55 Hz sustained bass, kicks at 2 Hz, off-beat snares, a sustained 440/554/660 Hz chord, 8 Hz hats, and a 40 Hz → 8 kHz sweep.
+- Silence keeps a clean idle rosette.
+- Bass deepens and broadens the large cells.
+- Kicks heave the large ridges and send rings through the medium.
+- Snares sharpen the medium network.
+- The mid chord brings a finer network while the large forms stay quiet.
+- Hats bring fine detail.
+- The sweep carries the figure through the bank.
+
+## Stage 6: stability on the final system
+
+The trace on the kick-heavy passage (Hyperborea 82-94 s), with the build route ramping `modes` 17 → 22:
+- **Large relief:** median one-frame change 2.5% of its rms; worst 11% (4.5× the median). The large figure holds and then morphs as a focus passes between modes. That is a deliberate transition at the sweep's pace, not a pop.
+- **Medium relief:** 1.9× its median, no jumps.
+- **Ripples:** 0 evictions.
+- **Oscillators:** still clean.
+
+The root causes from §9 (evictions, strike steps, layout shifts) stay fixed by ADR-1404.

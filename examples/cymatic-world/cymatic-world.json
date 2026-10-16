@@ -239,6 +239,89 @@
    }
   },
   {
+   "source": "sonic.brightness.slow",
+   "target": "field/cymatic/resonance/source/0/focus",
+   "amount": 0.08,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "sonic.brightness.slow",
+   "target": "field/cymatic/resonance/source/1/focus",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "field/cymatic/resonance/source/2/focus",
+   "amount": 0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "sonic.roughness.slow",
+   "target": "field/cymatic/resonance/source/1/amplitude",
+   "amount": 0.45,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/ground/deform/1/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.35,
+    "offset": 1.0,
+    "attackMs": 80,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "procedural/ground/deform/2/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.3,
+    "offset": 1.0,
+    "attackMs": 1200,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "procedural/ground/deform/3/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 10,
+    "decayMs": 220
+   }
+  },
+  {
    "source": "control.relief",
    "target": "procedural/ground/deform/1/amount",
    "amount": 3.0,

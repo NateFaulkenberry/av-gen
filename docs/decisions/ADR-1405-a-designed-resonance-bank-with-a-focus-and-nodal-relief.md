@@ -35,6 +35,9 @@ Cymatic Plate is compelling because it shows one coherent figure at a time, move
 
    Several readers with listening windows give each spatial scale its own shaping and its own deformer.
 
+   `reliefRound` rounds the magnitude's crease: |F| becomes √(F² + (cσ)²) − cσ, with σ the figure's local rms. The exact |F| has a cusp on every nodal line, a crest no mesh can carry, and it was the main source of Cymatic World's sawtooth crests.
+4. **Where each band's ring sits.** `rippleU` (low, mid, high) places each band's ripple on the dispersion axis, which sets its wavelength and which scale's readers hear it. A kick's ring can travel through the medium scale while the large figure answers the kick through its strikes.
+
 ## Consequences
 
 - Files without these members behave exactly as before (default weights and empty orders reproduce ADR-1400).

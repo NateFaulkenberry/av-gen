@@ -663,27 +663,27 @@ def build_world():
         {"kind": "point", "position": [7.0, 3.0, -7.0], "order": 6, "bandLow": 0.0, "bandHigh": 0.15, "reach": 90.0,
          "gain": 1.0, "amplitude": 1.0, "breath": 0.4, "drift": 12.0, "driftPeriod": 100.0, "spin": 0.03,
          "orders": [3, 4, 2, 6],
-         "focus": 0.07, "focusWidth": 0.045, "focusSweep": 0.09, "focusPeriod": 47.0, "focusFloor": 0.03},
-        # B, a second large figure about a centre off to the south-west: where A and B both ring, their rings interfere
-        # (hyperbolic nodal lines, unequal lobes); as the two foci sweep at different rates the large figure moves from
-        # A's to B's through their interference
+         "focus": 0.07, "focusWidth": 0.032, "focusSweep": 0.09, "focusPeriod": 47.0, "focusFloor": 0.0},
+        # B, a second large figure about a centre off to the south-west. At rest silent: its amplitude follows the
+        # sound's roughness (a route), so interference is an EVENT -- a rough, turbulent passage bends A's clean figure
+        # into crossing, hyperbolic nodal lines; a clean or sustained passage shows A's figure itself
         {"kind": "point", "position": [-20.0, 2.0, 15.0], "order": 6, "bandLow": 0.15, "bandHigh": 0.3, "reach": 90.0,
-         "gain": 1.0, "amplitude": 0.42, "breath": 0.5, "drift": 9.0, "driftPeriod": 80.0, "spin": -0.04,
+         "gain": 1.0, "amplitude": 0.0, "breath": 0.5, "drift": 9.0, "driftPeriod": 80.0, "spin": -0.04,
          "orders": [3, 2, 5],
-         "focus": 0.23, "focusWidth": 0.045, "focusSweep": 0.09, "focusPeriod": 61.0, "focusFloor": 0.03},
+         "focus": 0.23, "focusWidth": 0.032, "focusSweep": 0.09, "focusPeriod": 61.0, "focusFloor": 0.0},
         # M, the medium figure: finer rings and petals about a centre a few metres from A's -- nested inside the large
         # lobes, but eccentric, so the frame is never a bullseye (rings live here, not in the large figure)
         {"kind": "point", "position": [3.0, 3.0, -3.5], "order": 8, "bandLow": 0.3, "bandHigh": 0.66, "reach": 80.0,
          "gain": 0.9, "amplitude": 0.5, "breath": 0.7, "drift": 6.0, "driftPeriod": 100.0, "spin": 0.045,
          "orders": [0, 8, 4, 6, 3, 5],
-         "focus": 0.48, "focusWidth": 0.05, "focusSweep": 0.16, "focusPeriod": 29.0, "focusFloor": 0.03},
+         "focus": 0.48, "focusWidth": 0.04, "focusSweep": 0.16, "focusPeriod": 29.0, "focusFloor": 0.0},
         # F, the fine layer: standing bands, squares and hexagons, faint and local
         {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.66, "bandHigh": 1.0,
          "reach": 46.0, "gain": 0.55, "amplitude": 0.1, "breath": 1.5, "depth": 9.0, "drift": 2.0,
          "driftPeriod": 60.0, "spin": 0.02, "orders": [2, 1, 3]},
     ], modes=17.0, lambdaMax=16.0, lambdaMin=2.6, competition=1.5, selectivity=4.0, limit=1.5, breath=0.15,
        # E, transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
-       ripple=0.5, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35,
+       ripple=0.5, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35, rippleU=[0.36, 0.5, 0.85],
        # ADR-1404: fixed mode places (a route on `modes` adds modes, it never re-places them), and per-band response
        layout=LAYOUT, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
     layers = ground_readers(s)
@@ -696,6 +696,21 @@ def build_world():
                  lift=0.0, height_bob=2.0)
     s.params_({"camera/lens/focalLength": 30.0})
     F = field_instrument(s)
+    # THE MUSIC'S HAND ON THE FIGURE (08-brief §8, Stage 5): the music chooses WHICH figure leads and how hard each scale
+    # is excited -- never the finished height directly.
+    #   the sound's brightness moves the large focus (a brighter sound leads higher-order lobes; slow, so the figure
+    #     morphs over seconds) and, faster, the medium focus (petal subdivision follows the timbre)
+    #   bass excites the large figure's relief, held sound the medium's intricacy, hats the fine vibration -- each a
+    #     bounded, smoothed gain on its own scale; kicks and snares also strike the modes and launch rings (the field's
+    #     own response, ADR-1403/1404); the song's build fills the bank (intensity -> modes, ADR-1404's layout)
+    D = "procedural/ground/deform/%d/amount"
+    s.route(R("sonic.brightness.slow", F + "source/0/focus", 0.08, attackMs=2000, decayMs=4000),
+            R("sonic.brightness.slow", F + "source/1/focus", 0.06, attackMs=2500, decayMs=5000),
+            R("sonic.brightness", F + "source/2/focus", 0.14, attackMs=400, decayMs=1200),
+            R("sonic.roughness.slow", F + "source/1/amplitude", 0.45, attackMs=1500, decayMs=3000),
+            R("response.bass", D % 1, 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
+            R("response.sustain", D % 2, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
+            R("response.hat", D % 3, 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     s.params_(POST)
