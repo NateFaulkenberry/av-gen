@@ -621,10 +621,24 @@
     },
     {
       "category": "Cymatic World",
-      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 terrain, CC 6 sculpture, CC 7 matter, CC 8 light; pad 36 strike, pad 37 shed. A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, the grit settles on its nodal lines, and the world's forms each answer the same field. One resonance field (ADR-1400) drives the ground's sand relief, the crystal druse and the floating medusa. See docs/prototypes/cymatic-world/02-report.md.",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 terrain, CC 8 light; pad 36 strike. A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, and the grit settles on its nodal lines, carving rings, petals and cells into the ground. The resonant ground alone (Prototype A of the brief). One resonance field (ADR-1400). See docs/prototypes/cymatic-world/.",
       "live": true,
       "name": "Cymatic World",
       "project": "cymatic-world/cymatic-world.json"
+    },
+    {
+      "category": "Cymatic World",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 floor, CC 6 crystals, CC 7 sympathy, CC 8 light; pad 36 strike. A crystal druse on a basalt floor that rings at its foot: each crystal is tuned by its length to its own band of the field, a bass note rings the floor and the crystals answer in their higher voice. The tuned crystal druse (Prototype B); the floor's ringing drives the crystals (sympathetic resonance, ADR-1402). One resonance field (ADR-1400). See docs/prototypes/cymatic-world/.",
+      "live": true,
+      "name": "Cymatic Crystals",
+      "project": "cymatic-crystals/cymatic-crystals.json"
+    },
+    {
+      "category": "Cymatic World",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 floor, CC 7 swirl, CC 8 light; pad 36 strike, pad 37 shed. A medusa of grains held on the nodal shells of a sound field above a basalt basin: the music re-forms its body, its veil falls through the same field, and its cold light pools on the floor below. The resonant matter (Prototype C): a medusa of grains on the field's nodal shells. One resonance field (ADR-1400). See docs/prototypes/cymatic-world/.",
+      "live": true,
+      "name": "Cymatic Creature",
+      "project": "cymatic-creature/cymatic-creature.json"
     }
   ]
 }

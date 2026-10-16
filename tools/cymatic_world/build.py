@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""CYMATIC WORLD: the generator (docs/prototypes/cymatic-world/).
+"""CYMATIC WORLD, CYMATIC CRYSTALS, CYMATIC CREATURE: the generator (docs/prototypes/cymatic-world/).
 
-    python3 tools/cymatic_world/build.py            # writes examples/cymatic-world/ (scene, project, meshes)
-    python3 tools/cymatic_world/build.py --variant <wav> --out <project.json> [--prototype a|b|c|all]
+    python3 tools/cymatic_world/build.py                    # all three scenes, their meshes and index entries
+    python3 tools/cymatic_world/build.py --scene crystals   # one (world | crystals | creature)
+    python3 tools/cymatic_world/build.py --scene world --variant <wav> --out <project.json> [--camera ...] [--set ...]
 
-One shared resonance field (FieldKind::Resonance, ADR-1400) drives everything: the audio history excites its modes;
-the ground's sand relief and vibration, the sculpture's tiers and the floating matter each read it their own way.
+Three live scenes, the brief's three prototypes, each its own composition on the same subsystem: a resonance field
+(FieldKind::Resonance, ADR-1400) excited by the audio history.
+  Cymatic World     examples/cymatic-world/     the resonant ground (owns the shared ground and spire meshes)
+  Cymatic Crystals  examples/cymatic-crystals/  the tuned crystal druse on a resonating floor
+  Cymatic Creature  examples/cymatic-creature/  the medusa of grains on nodal shells, with its veil
 
 The ground's geography comes from the engine's WorldMap (the terrain system's noise layers and ridge/valley/flat
 features), probed through `avgen_world_preview --heights` at every vertex of one screen-density mesh, because the
-resonance has to move it on the GPU and a terrain node's chunks take no deformers.
+resonance has to move it on the GPU and a terrain node's chunks take no deformers. One ground mesh serves all three.
 """
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
 import math
@@ -29,23 +32,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, REPO)
 from tools.sonic_vfx import kit, meshes  # noqa: E402
-from tools.sonic_vfx.kit import R, M, hexrgb  # noqa: E402
+from tools.sonic_vfx.kit import R, hexrgb  # noqa: E402
 
-ID = "cymatic-world"
-TITLE = "Cymatic World"
 OUT = os.path.join(REPO, "examples", "cymatic-world")
-MESH_DIR = os.path.join(OUT, "meshes")
-CATEGORY = "Cymatic World"
-
-PROTOTYPE = "all"  # a | b | c | all (set by --prototype)
+MESH_DIR = os.path.join(OUT, "meshes")   # the shared ground and spires
 
 # ================================================================================================ palette
 # Night in a basalt basin: blue-black stone, indigo air, a violet rim on the horizon; the only saturated light is
 # the field's own (cyan-teal on the nodal lines, violet in the energised hollows), and it is used sparingly.
 P = {
-    "stone": "#0d0c16",      # basalt
+    "stone": "#0b0d14",      # basalt (blue-black)
     "stoneLit": "#1b1930",   # its lit face
-    "sand": "#24223a",       # the settled grit on the nodal ridges (cool grey-violet)
+    "sand": "#232a38",       # the settled grit on the nodal ridges (cool slate)
     "sandHot": "#8fe8ff",    # the nodal line's light (cyan)
     "hollow": "#7a3cff",     # energy in the antinodes (violet)
     "zenith": "#05060f",
@@ -54,6 +52,7 @@ P = {
     "fog": "#0c0b1f",
     "moon": "#ffe9d6",       # the key: a cold moon, low, raking the ridges
     "rim": "#a77bff",
+    "counter": "#5f8cff",    # the world's cool counter light (blue, a step from the violet rim)
     "crystal": "#2c3040",    # smoky dark quartz-steel under a thin film (the film makes the colour)
     "crystalGlow": "#6fdcff",# a ringing crystal's inner light
 }
@@ -62,61 +61,6 @@ P = {
 def C(key, scale=1.0):
     return hexrgb(P[key], scale)
 
-
-# ================================================================================================ the field
-FIELD = "cymatic"
-HEART = (0.0, 12.0, 0.0)          # the singing source above the basin's centre (the matter floats here)
-SPIRE = (-23.0, 0.0, 9.0)       # the sculpture's foot: a second, local source
-
-
-# THE COUPLING (ADR-1402): sympathetic resonance. The druse's own source (the field's second) is driven not only by the
-# music but by how hard the GROUND rings at the druse's foot in the heart's low modes: a probe reader that hears only
-# u < 0.22 publishes `field.druseFoot.probe`, and a route adds it to that source's `drive` -- excitation straight into
-# its middle modes, which no part of the probe's band can feed back into (one way, no loop). So a bass note that rings
-# the basin makes the druse answer in its own, higher voice -- rings round its foot, light in its tuned crystals --
-# even when the music has nothing in that register. Turn it off (CW_NOCOUPLE=1) and the druse hears only the music.
-COUPLING_REST = 0.8
-COUPLING_GAIN = 0.0 if os.environ.get("CW_NOCOUPLE") else 2.0
-
-
-def fields(s):
-    """The resonator and its readers. Everything that answers the music reads one of these."""
-    res = {
-        "modes": 14.0, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 34.0, "lambdaMin": 5.0, "scale": 1.0,
-        "selectivity": 3.0, "contrast": 0.7, "persistence": 2.8, "buildup": 0.3, "memory": 1.6,
-        "sustain": 1.0, "transient": 0.9, "idle": 0.5, "breath": 0.16, "limit": 0.9, "competition": 3.0,
-        "sources": [
-            # the heart: the low modes -- broad rings and petals about the basin's centre, heard everywhere
-            {"kind": "point", "position": list(HEART), "order": 4, "bandLow": 0.0, "bandHigh": 0.4, "reach": 75.0,
-             "gain": 1.0},
-            # the choir's foot: middle modes, three-fold at most, local
-            {"kind": "point", "position": list(SPIRE), "order": 3, "bandLow": 0.25, "bandHigh": 0.6, "reach": 50.0,
-             "gain": COUPLING_REST},
-            # the singer (the matter's own voice): upper-middle modes about the heart, bounded to its body
-            {"kind": "point", "position": list(HEART), "order": 5, "bandLow": 0.45, "bandHigh": 0.8, "reach": 16.0,
-             "gain": 1.6, "scale": 2.2},
-            # a Faraday carpet for the fine modes on the basin floor (hexagons), evanescent above it
-            {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.65, "bandHigh": 1.0,
-             "reach": 42.0, "gain": 0.6, "depth": 9.0},
-        ],
-        "channel": "displacement",
-    }
-    s.nodes.append({"name": FIELD, "kind": "field", "position": [0, 0, 0],
-                    "field": {"kind": "resonance", "seed": 7, "strength": 1.0, "falloff": {"kind": "none"},
-                              "resonance": res}})
-    for name, channel, extra in (                                 ("shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35}),
-                                 ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.15, "reliefLineSharpness": 0.6,
-                                                       "reliefVibration": 0.23}),
-                                 # the matter hears the heart's modes only (its spherical shells, not the far lattice)
-                                 ("force", "force", {"listenLow": 0.45, "listenHigh": 0.8, "listenWidth": 0.04}),
-                                 # the coupling's ear: the heart's low modes at the druse's foot, published as a signal
-                                 ("druseFoot", "amplitude", {"listenLow": 0.0, "listenHigh": 0.22, "listenWidth": 0.02,
-                                                             "probe": [SPIRE[0], -5.0, SPIRE[2]]})):
-        r = {"channel": channel}
-        r.update(extra)
-        s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
-                        "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0,
-                                  "falloff": {"kind": "none"}, "resonance": r}})
 
 
 # ================================================================================================ the world map
@@ -363,112 +307,7 @@ class Prog:
                 "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
-MOON_DIR = (0.93, -0.2, -0.3)       # the direction the moonlight travels (normalised in use)
-HEART_LIGHT = 1600.0                 # the medusa's lamp (painted on the ground; a real point light on the rest)
-LIGHT_RANGE = 200.0                  # metres: the painted lamp's normalising distance
-
-
-def _unit(v):
-    n = math.sqrt(sum(x * x for x in v))
-    return [x / n for x in v]
-
-
-def ground_program():
-    """The basin's ground, UNLIT with its light painted in the program (the lit path cost ~7 ms at 1080p for a
-    surface whose light is three terms). One `field` op reads the resonance's shading channel (sand, crest,
-    amplitude) in a single pass over the modes. Basalt where the field has scoured it, settled grit on the nodal
-    ridges; a raking warm moon (Lambert on the deformed normal: the relief draws itself), the medusa's cold lamp
-    (inverse square from the heart), a dim sky; and a thin cold light only on the nodal line where the ground rings."""
-    g = Prog("cwGround")
-    g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
-    g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
-    g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
-    g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
-    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])
-    g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
-    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
-    g.op("lineCol", "constant", 3, k=C("sandHot", 0.35) + [1.0])
-    g.op(None, "multiply", 2, a=2, b=3)                            # r2: emission (an accent)
-    g.op("stone", "constant", 3, k=C("stone") + [1.0])
-    g.op("grit", "constant", 4, k=C("sand") + [1.0])
-    g.op(None, "mixBy", 1, a=3, b=4, c=1)                          # r1: albedo
-    # the moon: Lambert on the deformed normal
-    L = _unit([-x for x in MOON_DIR])
-    g.op(None, "input", 3, inp="normal")
-    g.op("moonDot", "gradient", 3, a=3, k=L + [0.0], f=1.0)
-    g.op("moon", "constant", 4, k=C("moon", 6.0) + [1.0])
-    g.op(None, "multiply", 3, a=3, b=4)                            # r3: moonlight
-    # the lamp: (N . v) / |v|^3 from the heart, through two saturating dots normalised by LIGHT_RANGE
-    g.op(None, "input", 4, inp="worldPosition")
-    g.op(None, "constant", 5, k=[-1.0, -1.0, -1.0, 0.0])
-    g.op(None, "multiply", 4, a=4, b=5)
-    g.op(None, "constant", 5, k=[HEART[0], HEART[1] - 1.0, HEART[2], 0.0])
-    g.op(None, "add", 4, a=4, b=5)                                 # r4 = v, toward the lamp
-    g.op(None, "multiply", 5, a=4, b=4)
-    g.op(None, "gradient", 5, a=5, k=[1.0, 1.0, 1.0, 2e-4], f=1.0 / (LIGHT_RANGE * LIGHT_RANGE))   # |v|^2 / R^2
-    g.op(None, "input", 6, inp="normal")
-    g.op(None, "multiply", 6, a=6, b=4)
-    g.op(None, "gradient", 6, a=6, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / LIGHT_RANGE)                   # max(N . v, 0) / R
-    g.op(None, "power", 5, a=5, f=-1.5)
-    g.op(None, "multiply", 6, a=6, b=5)
-    g.op("lamp", "constant", 5, k=C("sandHot", HEART_LIGHT / (LIGHT_RANGE * LIGHT_RANGE)) + [1.0])
-    g.op(None, "multiply", 6, a=6, b=5)                            # r6: lamplight
-    g.op(None, "add", 3, a=3, b=6)
-    g.op("sky", "constant", 4, k=C("horizon", 0.08) + [1.0])
-    g.op(None, "add", 3, a=3, b=4)                                 # r3: all the light
-    g.op(None, "multiply", 1, a=1, b=3)                            # r1: lit colour (unlit output)
-    g.base, g.emit = 1, 2
-    return g
-
-
-# ================================================================================================ the scene
-def environment(s):
-    s.environment = {
-        "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
-        "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
-        "shadowRange": 180.0,
-        "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
-                "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
-                "background": True, "useKeyLight": False},
-    }
-    # the moon: low and to the side, so it rakes the ridges and every hollow holds a shadow
-    s.light("moon", "directional", direction=[0.93, -0.2, -0.3], color=C("moon"), intensity=6.0,
-            castsShadow=False, contactShadow=False, softness=0.4)
-    # the singer's own light: the bell is the basin's lamp, so every ridge facing the heart catches it and the
-    # rings read from the light as well as from the relief
-    s.light("heart", "point", position=[HEART[0], HEART[1] - 1.0, HEART[2]], color=C("sandHot"), intensity=HEART_LIGHT,
-            range=140.0, castsShadow=False)
-    # a violet rim from behind the basin
-    s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=1.2, castsShadow=False)
-
-
-def ground(s):
-    pos, nrm, idx = ground_mesh()
-    write_glb(os.path.join(MESH_DIR, "cw-ground.glb"), pos, nrm, idx, "ground")
-    print("ground: %d vertices, %d triangles" % (len(pos), len(idx) // 3))
-    g = ground_program()
-    s.program(g.doc(base=g.base, emission=g.emit))
-    s.proc("ground", {"kind": "mesh", "asset": "meshes/cw-ground.glb"},
-           material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
-                     "roughness": 0.6, "metallic": 0.0, "unlit": True,
-                     "program": "" if os.environ.get("CW_NOPROG") else g.name},
-           extra={"normalStep": 0.12},  # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m
-           deformers=[
-               # ONE pass over the modes (the relief channel): the sand's ridges along the nodal lines, a crisp crest on
-               # the line itself, and the vibration that makes the hollows breathe
-               {"kind": "field", "field": "relief", "amount": 2.6, "axis": [0.0, 1.0, 0.0], "space": "world",
-                "alongNormal": False},
-           ])
-    return g
-
-
-# ================================================================================================ Prototype B: the druse
-# One composed crystal cluster on the basin's west terrace: thirty-odd quartz-habit crystals radiating from a common
-# root -- a crown, leaning outward and away from the heart, long at its core and short at its fringe. Each crystal
-# is a stepped (sceptre) hexagonal prism with a pyramidal tip: growth bands that catch the light as ledges, and that
-# its material lights from inside when it rings. The cluster is TUNED: every crystal hears the band of modes its
-# length selects (a reader with `listenAlongAxis` up the cluster: the long core crystals reach highest and hear the
-# lowest modes; the short fringe hears the high ones), so a bass note lights the core and a high note the fringe.
+# ================================================================================================ the crystals
 def crystal_tris():
     """One crystal, centred on the origin, 1 m long on +Y, radius 1: a three-stage stepped hexagonal prism (each stage
     a little narrower, with a sloped ledge between) and a six-face pyramidal termination."""
@@ -490,13 +329,12 @@ def crystal_tris():
     return tris
 
 
-DRUSE = (SPIRE[0], SPIRE[2])   # the cluster's root (x, z)
 
 
 def druse_layout():
-    """[(dir (unit), length, radius)]: a crown of crystals about a lean away from the heart. Deterministic."""
+    """[(dir (unit), length, radius)]: a crown of crystals about a slight lean. Deterministic."""
     rnd = np.random.default_rng(1407)
-    away = np.array([DRUSE[0], 0.0, DRUSE[1]]) / math.hypot(DRUSE[0], DRUSE[1])
+    away = np.array([-0.6, 0.0, 0.8])   # the crown leans a little off vertical (a druse is never plumb)
     lean = np.array([away[0] * 0.35, 1.0, away[2] * 0.35])
     lean /= np.linalg.norm(lean)
     side = np.cross(lean, [0.0, 0.0, 1.0])
@@ -530,8 +368,8 @@ def _quat_from_y(d):
     return (axis[0] * sa, axis[1] * sa, axis[2] * sa, math.cos(a / 2.0))
 
 
-def druse_points(ground_y):
-    root = np.array([DRUSE[0], ground_y(DRUSE[0], DRUSE[1]) - 1.2, DRUSE[1]])
+def druse_points(gy):
+    root = np.array([CRYSTAL_ROOT[0], gy - 1.2, CRYSTAL_ROOT[1]])
     pts = []
     for d, length, radius in druse_layout():
         c = root + d * (length * 0.5)
@@ -561,68 +399,7 @@ def crystal_program():
     return c
 
 
-def sculpture(s):
-    pos, nrm = meshes.faceted(crystal_tris())
-    meshes.write_glb(os.path.join(MESH_DIR, "cw-crystal.glb"), pos, nrm, None, "crystal")
-    pts, root = druse_points(GROUND_Y)
-    top = max(p[1] for p in pts)
-    span = top - float(root[1])
-    for name, channel in (("tuned", "displacement"), ("tunedRing", "amplitude")):
-        s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
-                        "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"},
-                                  # down the cluster: the highest crystal centres (the long core) hear the low modes
-                                  "axis": [0.0, -1.0, 0.0], "point": [DRUSE[0], float(root[1]) + span * 0.5, DRUSE[1]],
-                                  "length": span,
-                                  "resonance": {"channel": channel, "listenAlongAxis": True, "listenLow": 0.0,
-                                                "listenHigh": 1.0, "listenWidth": 0.14}}})
-    c = crystal_program()
-    s.program(c.doc(emission=c.emit))
-    s.proc("druse", {"kind": "mesh", "asset": "meshes/cw-crystal.glb"},
-           distribution={"kind": "points", "points": pts},
-           material={"baseColor": C("crystal"), "emissiveColor": C("crystalGlow"), "emissiveIntensity": 0.025,
-                     "roughness": 0.12, "metallic": 0.85, "thinFilm": {"thickness": 420.0, "ior": 1.7},
-                     "program": c.name},
-           extra={"effectors": [
-               # a ringing crystal quivers about its centre with the displacement it hears (the cluster's antinodes)
-               {"field": "tuned", "op": "rotation", "strength": 0.06, "axis": [1.0, 0.0, 0.0]},
-               # and lights its growth bands from inside with the ringing it hears
-               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 22.0},
-           ]})
-
-
-# ================================================================================================ Prototype C: the matter
-# Grains floating in the heart's sound field, the way acoustic levitation traps them: overdamped (high drag), pushed by
-# the field's radiation force (-grad F^2) onto the nodal shells about the heart, held in a loose sphere by a weak pull.
-# A new grain is born anywhere in the body and migrates to the nearest node; when the modes change, the whole body
-# re-forms into the new figure. Nothing here animates: the shape is the field's.
-def matter(s):
-    s.nodes.append({"name": "bellCut", "kind": "field", "position": [HEART[0], HEART[1] - 3.0, HEART[2]],
-                    "field": {"kind": "plane", "axis": [0.0, -1.0, 0.0], "softness": 0.01, "strength": 1.0,
-                              "falloff": {"kind": "none"}}})
-    # the bell: grains held on the nodal shells, circulating along them (a weak swirl about the heart's axis), each
-    # drawing a short ribbon of where it has been -- so the shells read as luminous filament rings, not speckle
-    s.particles("matter", capacity=14000, seed=5, shape="sphere", position=list(HEART), extent=[10.0, 10.0, 10.0],
-                direction=[0, 1, 0], spawnRate=280.0, lifetimeMin=40.0, lifetimeMax=60.0, spread=1.0, speedMin=0.0,
-                speedMax=0.15, gravity=[0, 0, 0], drag=14.0, turbulence=0.0, turbulenceScale=0.3, turbulenceSpeed=0.1,
-                attractorPosition=list(HEART), attractorStrength=1.5, attractorRadius=11.0, orbit=14.0,
-                fieldForces=[{"field": "force", "mode": "force", "strength": 100.0, "mix": 1.0, "axis": [0, 1, 0]},
-                             # the bell: grains below its rim fall out of the body (a dome, not a ball)
-                             {"field": "bellCut", "mode": "kill", "strength": 1.0, "mix": 1.0, "axis": [0, 1, 0]}],
-                sizeStart=0.05, sizeEnd=0.04, sizeVariance=0.4,
-                trailEnabled=True, trailLength=18, trailStride=6, trailWidth=0.45, trailTaper=0.15, trailFade=0.05,
-                colorStart=C("sandHot") + [0.85], colorEnd=C("hollow") + [0.0], emissive=1.3, blend="additive")
-    # the veil: strands let fall from the bell's rim, drawn into the field's nodal surfaces as they sink -- the
-    # entity's trailing filaments, shaped by the same force as its shells
-    s.particles("veil", capacity=6000, seed=9, shape="disc", position=[HEART[0], HEART[1] - 3.2, HEART[2]],
-                extent=[8.5, 8.5, 8.5], direction=[0, -1, 0], spawnRate=420.0, lifetimeMin=10.0, lifetimeMax=14.0,
-                spread=0.1, speedMin=0.2, speedMax=0.5, gravity=[0, -2.5, 0], drag=6.0, turbulence=0.0,
-                orbit=0.0, attractorStrength=0.0,
-                fieldForces=[{"field": "force", "mode": "force", "strength": 100.0, "mix": 1.0, "axis": [0, 1, 0]}],
-                sizeStart=0.04, sizeEnd=0.015, sizeVariance=0.3,
-                trailEnabled=True, trailLength=32, trailStride=5, trailWidth=0.5, trailTaper=0.05, trailFade=0.0,
-                colorStart=C("sandHot") + [0.7], colorEnd=C("hollow") + [0.0], emissive=1.1, blend="additive")
-
-
+# ================================================================================================ the spires
 def spire_tris(base, radius, height, sides, lean, seed):
     """An eroded basalt pinnacle: five drums, each narrower and a little offset (a weathered column), drawn to a
     blunt point; faceted, so the moon picks out its planes."""
@@ -680,127 +457,6 @@ def spires(s):
                      "roughness": 0.7, "metallic": 0.0})
 
 
-GROUND_Y = None  # set in build(): the WorldMap's height at (x, z)
-
-
-def camera(s):
-    """A slow arc over the basin's south side, there and back in 150 s (a seamless loop: a live transport is
-    endless), holding the heart a little right of centre with the druse in the left foreground."""
-    s.camera = {"mode": 1, "position": [6.0, 13.0, 47.0], "target": [-4.0, 3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
-    s.arc_camera([-4.0, 4.0, 0.0], 48.0, 13.0, period=150.0, centre_deg=12.0, sweep_deg=70.0, steps=24, side=4.0,
-                 lift=0.0, height_bob=1.5)
-    s.params_({"camera/lens/focalLength": 28.0})
-
-
-MIDI_CC = [
-    (1, "excite", "EXCITATION: how hard the music drives the field (its sustained and struck excitation)"),
-    (2, "complexity", "COMPLEXITY: more modes ring at once -- finer, more intricate figures"),
-    (3, "persistence", "PERSISTENCE: the field rings longer and the sand remembers longer"),
-    (4, "scale", "SPATIAL SCALE: every wavelength shrinks -- the same music draws a finer figure"),
-    (5, "relief", "TERRAIN: how deeply the ground's sand relief is carved"),
-    (6, "druse", "SCULPTURE: how strongly the crystal druse quivers and lights"),
-    (7, "swirl", "MATTER: the medusa's grains circle faster along its shells"),
-    (8, "light", "LIGHT: the medusa's own light over the basin"),
-]
-MIDI_PADS = [
-    (36, "padStrike", "STRIKE: the basin's lowest modes swell, as if the ground were struck, and ring down"),
-    (37, "padShed", "SHED: the medusa lets fall a curtain of strands"),
-]
-
-
-def control_map():
-    b = [{"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": name} for n, name, _ in MIDI_CC]
-    b += [{"source": "*", "channel": -1, "kind": "noteEvent", "number": n, "signal": name} for n, name, _ in MIDI_PADS]
-    return {"midi": {"enabled": True, "filter": "*", "bindings": b}}
-
-
-def instrument(s, g):
-    """The performer's surface. The field hears the audio history itself (ADR-1400; heard through the Response
-    controls, ADR-1361); these routes read `response.*` for what the field's own excitation does not do, and map a
-    MIDI controller onto the field's few meaningful controls."""
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
-    F = "field/%s/resonance/" % FIELD
-    # the song's build (a 12 s follower): more modes ring as it grows -- a dense section draws an intricate figure
-    s.route(R("intensity", F + "modes", 5.0, attackMs=4000, decayMs=8000))
-    # held sound lets the sand settle and remember longer
-    s.route(R("sustain", F + "memory", 1.2, attackMs=2000, decayMs=5000))
-    # the medusa's light follows the music's loudness (slowly: a lamp, not a strobe), and flares a little on kicks
-    lamp = "material/cwGround/op/%d/constant/constant" % g["lamp"]
-    s.route(R("level", "lights/heart/intensity", 1400.0, attackMs=400, decayMs=1800),
-            R("kickEnv", "lights/heart/intensity", 500.0, attackMs=0, decayMs=350),
-            R("level", lamp, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=400, decayMs=1800),
-            R("kickEnv", lamp, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=0, decayMs=350))
-    # the coupling: the ground's ringing at the druse's foot drives the druse's own source (sympathetic resonance)
-    if COUPLING_GAIN:
-        s.route(R("field.druseFoot.probe", F + "source/1/drive", COUPLING_GAIN, attackMs=250, decayMs=2000))
-    # kicks shed strands from the bell's rim
-    s.route(R("kick", "particles/veil/burst", 160.0, attackMs=0, decayMs=40))
-    # ---- MIDI (control.*) ----
-    s.control = control_map()
-    CC = {"attackMs": 120, "decayMs": 120}
-    s.route(R("control.excite", F + "sustain", 1.5, **CC), R("control.excite", F + "transient", 1.2, **CC))
-    s.route(R("control.complexity", F + "modes", 10.0, **CC))
-    s.route(R("control.persistence", F + "persistence", 5.0, **CC), R("control.persistence", F + "memory", 3.0, **CC))
-    s.route(R("control.scale", F + "scale", 1.2, **CC))
-    s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CC))
-    s.route(R("control.druse", "procedural/druse/effector/1/strength", 0.15, **CC),
-            R("control.druse", "procedural/druse/effector/2/strength", 50.0, **CC))
-    s.route(R("control.swirl", "particles/matter/orbit", 25.0, **CC))
-    s.route(R("control.light", "lights/heart/intensity", 3000.0, **CC),
-            R("control.light", lamp, 1.0, op="multiply", gain=1.8, offset=1.0, **CC))
-    s.route(R("control.padStrike", F + "idle", 2.5, attackMs=30, decayMs=3500))
-    s.route(R("control.padShed", "particles/veil/burst", 1500.0, attackMs=0, decayMs=40))
-
-
-DESIGN = {
-    "category": "abstract",
-    "thesis": "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing "
-              "waves, the grit settles on its nodal lines, and the world's forms each answer the same field.",
-    "composition": {
-        "background": "a ring of far mountains under an indigo sky",
-        "midground": "the basin's terraced rim",
-        "foreground": "the basin floor, its sand relief drawing the figure",
-        "focal": "the basin's centre",
-        "camera": "an elevated three-quarter view from the rim's gap",
-    },
-    "palette": {"dominant": P["stone"], "secondary": P["sand"], "accent": P["sandHot"], "highlight": P["hollow"],
-                "background_value": "near black", "saturation": "low, with selective cyan and violet"},
-    "tier": "one field, three consumers",
-}
-
-
-def ground_y(x, z):
-    return float(world_heights(np.array([[x, z]], dtype=np.float64))[0])
-
-
-def build():
-    global GROUND_Y
-    GROUND_Y = ground_y
-    s = kit.Scene(ID, TITLE, DESIGN)
-    environment(s)
-    fields(s)
-    g = ground(s)
-    if PROTOTYPE in ("b", "all"):
-        sculpture(s)
-    if PROTOTYPE in ("c", "all"):
-        matter(s)
-    if PROTOTYPE == "all":
-        spires(s)
-    camera(s)
-    instrument(s, g)
-    s.params_({
-        "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
-        "post/output/grain": 0.012, "post/grade/contrast": 1.22, "post/lens/chromaticAberration": 0.0,
-        "camera/exposure/compensation": 0.2, "post/dof/enabled": False
-    })
-    return s
-
-
-def write(s, out_dir=OUT):
-    pp, sp = s.write(out_dir)
-    return pp, sp
-
-
 def variant(project, wav, out, camera=None, params=None):
     """A file project of the live scene driven by `wav` (the review renders): optionally another camera
     ("x,y,z:tx,ty,tz") and parameter overrides."""
@@ -821,31 +477,472 @@ def variant(project, wav, out, camera=None, params=None):
     return out
 
 
+
+# ================================================================================================ the scenes
+# Three live scenes, three prototypes of one idea, each its own composition on the SAME subsystem: one resonance field
+# (FieldKind::Resonance, ADR-1400) per scene, excited by the audio history, read by that scene's forms.
+#   world     the resonant ground alone (Prototype A)
+#   crystals  the tuned crystal druse on a resonating floor (Prototype B)
+#   creature  the medusa of grains on nodal shells, with its veil (Prototype C)
+SCENES = {
+    "world": {"id": "cymatic-world", "title": "Cymatic World"},
+    "crystals": {"id": "cymatic-crystals", "title": "Cymatic Crystals"},
+    "creature": {"id": "cymatic-creature", "title": "Cymatic Creature"},
+}
+FIELD = "cymatic"
+HEART = (0.0, 12.0, 0.0)          # the creature floats here; the world's low modes are centred on it too
+SECOND = (-23.0, 0.0, 9.0)        # the world's second centre (interference with the first)
+MOON_DIR = (0.93, -0.2, -0.3)     # the direction the moonlight travels (normalised in use)
+LIGHT_RANGE = 200.0               # metres: a painted lamp's normalising distance
+GROUND_REL = "../cymatic-world/meshes/cw-ground.glb"   # one ground mesh, shared by all three scenes
+SPIRES_REL = "../cymatic-world/meshes/cw-spires.glb"
+
+
+def _unit(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v]
+
+
+def ground_y(x, z):
+    return float(world_heights(np.array([[x, z]], dtype=np.float64))[0])
+
+
+def resonator(s, sources, **over):
+    """The scene's resonator: shared defaults, the scene's sources and overrides."""
+    res = {
+        "modes": 14.0, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 34.0, "lambdaMin": 5.0, "scale": 1.0,
+        "selectivity": 3.0, "contrast": 0.7, "persistence": 2.8, "buildup": 0.3, "memory": 1.6,
+        "sustain": 1.0, "transient": 0.9, "idle": 0.5, "breath": 0.16, "limit": 0.9, "competition": 3.0,
+        "sources": sources, "channel": "displacement",
+    }
+    res.update(over)
+    s.nodes.append({"name": FIELD, "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "resonance", "seed": 7, "strength": 1.0, "falloff": {"kind": "none"},
+                              "resonance": res}})
+
+
+def reader(s, name, channel, extra=None, frame=None):
+    r = {"channel": channel}
+    r.update(extra or {})
+    f = {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"}, "resonance": r}
+    f.update(frame or {})
+    s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0], "field": f})
+
+
+def ground_readers(s):
+    reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
+    reader(s, "relief", "relief", {"sharpness": 0.9, "reliefLine": 0.08, "reliefLineSharpness": 0.6,
+                                   "reliefVibration": 0.23})
+
+
+def ground_program(lamp=None, counter=0.0, line=0.35, moon=6.0, sky=0.08):
+    """The basin's ground, UNLIT with its light painted in the program (the lit path cost ~7 ms at 1080p for a
+    surface whose light is three terms). One `field` op reads the resonance's shading channel (sand, crest,
+    amplitude) in a single pass over the modes. Basalt where the field has scoured it, settled grit on the nodal
+    ridges; a raking warm moon (Lambert on the deformed normal: the relief draws itself); optionally a cool counter
+    light from the other side and a lamp (inverse square from `lamp` = (position, intensity)); a dim sky; and a thin
+    cold light only on the nodal line where the ground rings."""
+    g = Prog("cwGround")
+    g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
+    g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
+    g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
+    g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
+    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])
+    g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
+    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
+    g.op("lineCol", "constant", 3, k=C("sandHot", line) + [1.0])
+    g.op(None, "multiply", 2, a=2, b=3)                            # r2: emission (an accent)
+    g.op("stone", "constant", 3, k=C("stone") + [1.0])
+    g.op("grit", "constant", 4, k=C("sand") + [1.0])
+    g.op(None, "mixBy", 1, a=3, b=4, c=1)                          # r1: albedo
+    L = _unit([-x for x in MOON_DIR])
+    g.op(None, "input", 3, inp="normal")
+    g.op("moonDot", "gradient", 3, a=3, k=L + [0.0], f=1.0)
+    g.op("moon", "constant", 4, k=C("moon", moon) + [1.0])
+    g.op(None, "multiply", 3, a=3, b=4)                            # r3: moonlight
+    if counter > 0.0:
+        # a cool counter light low from the opposite quarter: the ridges' other flanks, so the relief reads both ways
+        Lc = _unit([-MOON_DIR[0], 0.28, -MOON_DIR[2] * 0.4 + 0.6])
+        g.op(None, "input", 4, inp="normal")
+        g.op("counterDot", "gradient", 4, a=4, k=Lc + [0.0], f=1.0)
+        g.op(None, "power", 4, a=4, f=2.0)                          # a tighter, grazing lobe
+        g.op("counter", "constant", 5, k=C("counter", counter) + [1.0])
+        g.op(None, "multiply", 4, a=4, b=5)
+        g.op(None, "add", 3, a=3, b=4)
+    if lamp is not None:
+        (lx, ly, lz), intensity = lamp
+        # (N . v) / |v|^3 from the lamp, through two saturating dots normalised by LIGHT_RANGE
+        g.op(None, "input", 4, inp="worldPosition")
+        g.op(None, "constant", 5, k=[-1.0, -1.0, -1.0, 0.0])
+        g.op(None, "multiply", 4, a=4, b=5)
+        g.op(None, "constant", 5, k=[lx, ly, lz, 0.0])
+        g.op(None, "add", 4, a=4, b=5)                             # r4 = v, toward the lamp
+        g.op(None, "multiply", 5, a=4, b=4)
+        g.op(None, "gradient", 5, a=5, k=[1.0, 1.0, 1.0, 2e-4], f=1.0 / (LIGHT_RANGE * LIGHT_RANGE))
+        g.op(None, "input", 6, inp="normal")
+        g.op(None, "multiply", 6, a=6, b=4)
+        g.op(None, "gradient", 6, a=6, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / LIGHT_RANGE)
+        g.op(None, "power", 5, a=5, f=-1.5)
+        g.op(None, "multiply", 6, a=6, b=5)
+        g.op("lamp", "constant", 5, k=C("sandHot", intensity / (LIGHT_RANGE * LIGHT_RANGE)) + [1.0])
+        g.op(None, "multiply", 6, a=6, b=5)                        # r6: lamplight
+        g.op(None, "add", 3, a=3, b=6)
+    g.op("sky", "constant", 4, k=C("horizon", sky) + [1.0])
+    g.op(None, "add", 3, a=3, b=4)                                 # r3: all the light
+    g.op(None, "multiply", 1, a=1, b=3)                            # r1: lit colour (unlit output)
+    g.base, g.emit = 1, 2
+    return g
+
+
+def environment(s, rim=1.2):
+    s.environment = {
+        "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
+        "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
+        "shadowRange": 180.0,
+        "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
+                "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
+                "background": True, "useKeyLight": False},
+    }
+    # the moon: low and to the side, so it rakes the ridges and every hollow holds a shadow (it lights what is not
+    # painted: the spires, the crystals)
+    s.light("moon", "directional", direction=list(MOON_DIR), color=C("moon"), intensity=6.0,
+            castsShadow=False, contactShadow=False, softness=0.4)
+    s.light("rim", "directional", direction=[-0.25, -0.12, 0.96], color=C("rim"), intensity=rim, castsShadow=False)
+
+
+def ground(s, relief, lamp=None, counter=0.0, line=0.35, write_mesh=False, moon=6.0, sky=0.08):
+    if write_mesh:
+        pos, nrm, idx = ground_mesh()
+        write_glb(os.path.join(MESH_DIR, "cw-ground.glb"), pos, nrm, idx, "ground")
+        print("ground: %d vertices, %d triangles, %.1f MB" % (len(pos), len(idx) // 3,
+                                                              os.path.getsize(os.path.join(MESH_DIR, "cw-ground.glb")) / 1e6))
+    g = ground_program(lamp, counter, line, moon, sky)
+    s.program(g.doc(base=g.base, emission=g.emit))
+    s.proc("ground", {"kind": "mesh", "asset": GROUND_REL},
+           material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
+                     "roughness": 0.6, "metallic": 0.0, "unlit": True,
+                     "program": "" if os.environ.get("CW_NOPROG") else g.name},
+           extra={"normalStep": 0.12},  # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m
+           deformers=[
+               # ONE pass over the modes (the relief channel): the sand's ridges along the nodal lines, a crisp crest
+               # on the line itself, and the vibration that makes the hollows breathe
+               {"kind": "field", "field": "relief", "amount": relief, "axis": [0.0, 1.0, 0.0], "space": "world",
+                "alongNormal": False},
+           ])
+    return g
+
+
+def spire_node(s):
+    s.proc("spires", {"kind": "mesh", "asset": SPIRES_REL},
+           material={"baseColor": C("stone", 1.6), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
+                     "roughness": 0.7, "metallic": 0.0})
+
+
+def control_map(cc, pads):
+    b = [{"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": name} for n, name, _ in cc]
+    b += [{"source": "*", "channel": -1, "kind": "noteEvent", "number": n, "signal": name} for n, name, _ in pads]
+    return {"midi": {"enabled": True, "filter": "*", "bindings": b}}
+
+
+CC_FIELD = [  # CC 1-4: the field itself, the same in all three scenes
+    (1, "excite", "EXCITATION: how hard the music drives the field (its sustained and struck excitation)"),
+    (2, "complexity", "COMPLEXITY: more modes ring at once -- finer, more intricate figures"),
+    (3, "persistence", "PERSISTENCE: the field rings longer and remembers longer"),
+    (4, "scale", "SPATIAL SCALE: every wavelength shrinks -- the same music draws a finer figure"),
+]
+PAD_STRIKE = (36, "padStrike", "STRIKE: the field's lowest modes swell, as if struck, and ring down")
+CCR = {"attackMs": 120, "decayMs": 120}
+
+
+def field_instrument(s):
+    """What every scene shares: the Response controls, the song's build and held sound on the field, CC 1-4, the
+    strike pad. The field hears the audio history itself (ADR-1400, heard through the Response controls, ADR-1361)."""
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    F = "field/%s/resonance/" % FIELD
+    s.route(R("intensity", F + "modes", 5.0, attackMs=4000, decayMs=8000))      # the build: more modes ring
+    s.route(R("sustain", F + "memory", 1.2, attackMs=2000, decayMs=5000))       # held sound: a longer memory
+    s.route(R("control.excite", F + "sustain", 1.5, **CCR), R("control.excite", F + "transient", 1.2, **CCR))
+    s.route(R("control.complexity", F + "modes", 10.0, **CCR))
+    s.route(R("control.persistence", F + "persistence", 5.0, **CCR),
+            R("control.persistence", F + "memory", 3.0, **CCR))
+    s.route(R("control.scale", F + "scale", 1.2, **CCR))
+    s.route(R("control.padStrike", F + "idle", 2.5, attackMs=30, decayMs=3500))
+    return F
+
+
+POST = {
+    "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
+    "post/output/grain": 0.012, "post/grade/contrast": 1.22, "post/lens/chromaticAberration": 0.0,
+    "camera/exposure/compensation": 0.2, "post/dof/enabled": False,
+}
+
+
+def design(thesis, focal, foreground, camera):
+    return {
+        "category": "abstract", "thesis": thesis,
+        "composition": {"background": "a ring of basalt spires and far mountains under an indigo sky",
+                        "midground": "the basin's terraced rim", "foreground": foreground, "focal": focal,
+                        "camera": camera},
+        "palette": {"dominant": P["stone"], "secondary": P["sand"], "accent": P["sandHot"], "highlight": P["hollow"],
+                    "background_value": "near black", "saturation": "low, with selective cyan and violet"},
+        "tier": "one resonance field (ADR-1400)",
+    }
+
+
+# ------------------------------------------------------------------------------------------------ Cymatic World
+def build_world():
+    """THE RESONANT GROUND, alone: the basin is the instrument. Without the creature's lamp the ground is lit by a
+    raking warm moon and a cool counter light from the opposite quarter, so every ridge reads on both flanks and the
+    hollows stay dark; the nodal lines carry a thin cold light only where the ground rings."""
+    cc = CC_FIELD + [(5, "relief", "TERRAIN: how deeply the ground's sand relief is carved"),
+                     (8, "light", "LIGHT: the counter light over the ridges, and the nodal lines' glow")]
+    pads = [PAD_STRIKE]
+    s = kit.Scene("cymatic-world", "Cymatic World", design(
+        "A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, "
+        "and the grit settles on its nodal lines, carving rings, petals and cells into the ground.",
+        "the basin floor's figure", "the basin floor, its sand relief drawing the figure",
+        "a slow high arc over the basin, there and back in 160 s"))
+    environment(s, rim=0.8)
+    resonator(s, [
+        # the basin's voice: the low modes -- broad rings and petals about its centre
+        {"kind": "point", "position": list(HEART), "order": 4, "bandLow": 0.0, "bandHigh": 0.45, "reach": 75.0,
+         "gain": 1.0},
+        # a second centre off to the west: middle modes whose rings interfere with the first's
+        {"kind": "point", "position": list(SECOND), "order": 3, "bandLow": 0.3, "bandHigh": 0.7, "reach": 50.0,
+         "gain": 0.8},
+        # a Faraday carpet for the fine modes on the floor (hexagons), a layer that fades up the terraces
+        {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.62, "bandHigh": 1.0,
+         "reach": 46.0, "gain": 0.7, "depth": 9.0},
+    ])
+    ground_readers(s)
+    g = ground(s, relief=2.6, counter=0.9, line=0.45, write_mesh=True, moon=11.0, sky=0.03)
+    spires(s)
+    s.camera = {"mode": 1, "position": [0.0, 16.0, 44.0], "target": [-2.0, -3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
+    s.arc_camera([-2.0, -3.0, 0.0], 44.0, 16.0, period=160.0, centre_deg=8.0, sweep_deg=80.0, steps=24, side=0.0,
+                 lift=0.0, height_bob=2.0)
+    s.params_({"camera/lens/focalLength": 26.0})
+    F = field_instrument(s)
+    counter = "material/cwGround/op/%d/constant/constant" % g["counter"]
+    line = "material/cwGround/op/%d/constant/constant" % g["lineCol"]
+    # the music's loudness lifts the counter light a little (a breath of light over the ridges, slow)
+    s.route(R("level", counter, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=600, decayMs=2000))
+    s.control = control_map(cc, pads)
+    s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
+    s.route(R("control.light", counter, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR),
+            R("control.light", line, 1.0, op="multiply", gain=2.0, offset=1.0, **CCR))
+    s.params_(POST)
+    return s, cc, pads
+
+
+# ------------------------------------------------------------------------------------------------ Cymatic Crystals
+CRYSTAL_ROOT = (0.0, 0.0)        # the druse stands at the basin's centre
+
+
+def build_crystals():
+    """THE TUNED DRUSE, the hero: thirty-odd stepped quartz-habit crystals radiating from one root on the basin
+    floor, tuned by length (the long core hears the low modes, the short fringe the high). Its setting is the basin,
+    whose floor RINGS AT ITS FOOT: the floor's own low modes draw rings round the root, and -- sympathetic resonance,
+    ADR-1402, kept because in this scene it is the reason the floor is there -- the floor's ringing at the root drives
+    the druse's own source, so a bass note rings the floor and the crystals answer in their higher voice."""
+    cc = CC_FIELD + [(5, "relief", "FLOOR: how deeply the resonating floor at the druse's foot is carved"),
+                     (6, "druse", "CRYSTALS: how strongly the druse quivers and lights"),
+                     (7, "sympathy", "SYMPATHY: how much the floor's ringing drives the crystals (the coupling)"),
+                     (8, "light", "LIGHT: the druse's own light on the floor and in its heart")]
+    pads = [PAD_STRIKE]
+    s = kit.Scene("cymatic-crystals", "Cymatic Crystals", design(
+        "A crystal druse on a basalt floor that rings at its foot: each crystal is tuned by its length to its own band "
+        "of the field, a bass note rings the floor and the crystals answer in their higher voice.",
+        "the druse", "the resonating floor at the druse's foot",
+        "a slow orbit round the druse, a little below its crown"))
+    environment(s, rim=1.4)
+    gy = ground_y(*CRYSTAL_ROOT)
+    resonator(s, [
+        # the floor: the low modes, rings about the root
+        {"kind": "point", "position": [CRYSTAL_ROOT[0], gy, CRYSTAL_ROOT[1]], "order": 3, "bandLow": 0.0,
+         "bandHigh": 0.3, "reach": 60.0, "gain": 1.0},
+        # the druse's own voice: everything above, about the cluster (driven by the music AND by the floor)
+        {"kind": "point", "position": [CRYSTAL_ROOT[0], gy + 6.0, CRYSTAL_ROOT[1]], "order": 4, "bandLow": 0.32,
+         "bandHigh": 1.0, "reach": 30.0, "gain": 0.9, "scale": 1.4},
+    ], idle=0.45)
+    ground_readers(s)
+    # the coupling's ear: the floor's low modes at the root, published as `field.druseFoot.probe`
+    reader(s, "druseFoot", "amplitude", {"listenLow": 0.0, "listenHigh": 0.26, "listenWidth": 0.02,
+                                         "probe": [CRYSTAL_ROOT[0], gy + 0.5, CRYSTAL_ROOT[1]]})
+    glow = ([CRYSTAL_ROOT[0], gy + 3.5, CRYSTAL_ROOT[1]], 520.0)
+    g = ground(s, relief=1.4, lamp=glow, line=0.3)
+    druse(s, gy)
+    s.light("heart", "point", position=glow[0], color=C("crystalGlow"), intensity=90.0, range=40.0, castsShadow=False)
+    spire_node(s)
+    tgt = [CRYSTAL_ROOT[0], gy + 4.5, CRYSTAL_ROOT[1]]
+    s.camera = {"mode": 1, "position": [0.0, gy + 10.0, 22.0], "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
+    s.orbit_camera(tgt, 22.0, gy + 10.0, period=200.0, start_deg=0.0, sweep_deg=360.0, steps=24, height_bob=1.5)
+    s.params_({"camera/lens/focalLength": 32.0})
+    F = field_instrument(s)
+    lamp = "material/cwGround/op/%d/constant/constant" % g["lamp"]
+    s.route(R("level", lamp, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=400, decayMs=1800),
+            R("level", "lights/heart/intensity", 70.0, attackMs=400, decayMs=1800))
+    # THE COUPLING: the floor's ringing at the root drives the druse's own source
+    s.route(R("field.druseFoot.probe", F + "source/1/drive", 2.0, attackMs=250, decayMs=2000))
+    s.control = control_map(cc, pads)
+    s.route(R("control.relief", "procedural/ground/deform/1/amount", 2.0, **CCR))
+    s.route(R("control.druse", "procedural/druse/effector/1/strength", 0.15, **CCR),
+            R("control.druse", "procedural/druse/effector/2/strength", 50.0, **CCR))
+    s.route(R("control.sympathy", F + "source/1/drive", 1.5, depth="field.druseFoot.probe", **CCR))
+    s.route(R("control.light", "lights/heart/intensity", 200.0, **CCR),
+            R("control.light", lamp, 1.0, op="multiply", gain=1.8, offset=1.0, **CCR))
+    s.params_(POST)
+    return s, cc, pads
+
+
+def druse(s, gy):
+    pos, nrm = meshes.faceted(crystal_tris())
+    meshes.write_glb(os.path.join(OUT_CRYSTALS, "meshes", "cw-crystal.glb"), pos, nrm, None, "crystal")
+    pts, root = druse_points(gy)
+    top = max(p[1] for p in pts)
+    span = top - float(root[1])
+    for name, channel in (("tuned", "displacement"), ("tunedRing", "amplitude")):
+        # down the cluster: the highest crystal centres (the long core) hear the low modes
+        reader(s, name, channel, {"listenAlongAxis": True, "listenLow": 0.0, "listenHigh": 1.0, "listenWidth": 0.14},
+               {"axis": [0.0, -1.0, 0.0], "point": [CRYSTAL_ROOT[0], float(root[1]) + span * 0.5, CRYSTAL_ROOT[1]],
+                "length": span})
+    c = crystal_program()
+    s.program(c.doc(emission=c.emit))
+    s.proc("druse", {"kind": "mesh", "asset": "meshes/cw-crystal.glb"},
+           distribution={"kind": "points", "points": pts},
+           material={"baseColor": C("crystal"), "emissiveColor": C("crystalGlow"), "emissiveIntensity": 0.025,
+                     "roughness": 0.12, "metallic": 0.85, "thinFilm": {"thickness": 420.0, "ior": 1.7},
+                     "program": c.name},
+           extra={"effectors": [
+               {"field": "tuned", "op": "rotation", "strength": 0.06, "axis": [1.0, 0.0, 0.0]},
+               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 22.0},
+           ]})
+
+
+# ------------------------------------------------------------------------------------------------ Cymatic Creature
+def build_creature():
+    """THE MEDUSA, the hero: grains held by the field's radiation force on the nodal shells about the heart, woven
+    into rings by a slow swirl, a veil of strands let fall from its rim through the same force. It is the basin's
+    lamp: its cold light pools on the floor below, where its low modes draw faint rings. Its own resonator has a long
+    memory and strong competition, so its shells hold one figure and move slowly: grains settle on a shell instead of
+    streaming between shells (the combined scene's 'hairy ball' in dense passages)."""
+    cc = CC_FIELD + [(5, "relief", "FLOOR: how deeply the floor below the medusa is carved"),
+                     (7, "swirl", "SWIRL: the grains circle faster along the medusa's shells"),
+                     (8, "light", "LIGHT: the medusa's own light over the basin")]
+    pads = [PAD_STRIKE, (37, "padShed", "SHED: the medusa lets fall a curtain of strands")]
+    s = kit.Scene("cymatic-creature", "Cymatic Creature", design(
+        "A medusa of grains held on the nodal shells of a sound field above a basalt basin: the music re-forms its "
+        "body, its veil falls through the same field, and its cold light pools on the floor below.",
+        "the medusa", "the lamplit floor below the medusa", "a slow arc round the medusa, level with its rim"))
+    environment(s, rim=1.0)
+    resonator(s, [
+        # the floor below: the low modes, faint rings in the lamplight
+        {"kind": "point", "position": list(HEART), "order": 3, "bandLow": 0.0, "bandHigh": 0.3, "reach": 60.0,
+         "gain": 0.8},
+        # the medusa's own voice: everything above, a fine body bounded to it
+        {"kind": "point", "position": list(HEART), "order": 5, "bandLow": 0.32, "bandHigh": 1.0, "reach": 16.0,
+         "gain": 1.6, "scale": 2.2},
+    ], memory=3.5, competition=4.5, idle=0.45)
+    ground_readers(s)
+    reader(s, "force", "force", {"listenLow": 0.32, "listenHigh": 1.0, "listenWidth": 0.04})
+    lampPos = [HEART[0], HEART[1] - 1.0, HEART[2]]
+    g = ground(s, relief=1.0, lamp=(lampPos, 1600.0), line=0.25)
+    medusa(s)
+    s.light("heart", "point", position=lampPos, color=C("sandHot"), intensity=1600.0, range=140.0, castsShadow=False)
+    spire_node(s)
+    tgt = [HEART[0], HEART[1] - 2.0, HEART[2]]
+    s.camera = {"mode": 1, "position": [0.0, 17.0, 32.0], "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
+    s.arc_camera(tgt, 32.0, 17.0, period=150.0, centre_deg=10.0, sweep_deg=90.0, steps=24, side=0.0, lift=0.0,
+                 height_bob=1.5)
+    s.params_({"camera/lens/focalLength": 30.0})
+    F = field_instrument(s)
+    lamp = "material/cwGround/op/%d/constant/constant" % g["lamp"]
+    s.route(R("level", "lights/heart/intensity", 1400.0, attackMs=400, decayMs=1800),
+            R("kickEnv", "lights/heart/intensity", 500.0, attackMs=0, decayMs=350),
+            R("level", lamp, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=400, decayMs=1800),
+            R("kickEnv", lamp, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=0, decayMs=350))
+    s.route(R("kick", "particles/veil/burst", 160.0, attackMs=0, decayMs=40))   # kicks shed strands
+    s.control = control_map(cc, pads)
+    s.route(R("control.relief", "procedural/ground/deform/1/amount", 2.0, **CCR))
+    s.route(R("control.swirl", "particles/matter/orbit", 25.0, **CCR))
+    s.route(R("control.light", "lights/heart/intensity", 3000.0, **CCR),
+            R("control.light", lamp, 1.0, op="multiply", gain=1.8, offset=1.0, **CCR))
+    s.route(R("control.padShed", "particles/veil/burst", 1500.0, attackMs=0, decayMs=40))
+    s.params_(POST)
+    return s, cc, pads
+
+
+def medusa(s):
+    """Grains floating in the heart's sound field, the way acoustic levitation traps them: critically damped, pushed
+    by the field's radiation force (-grad F^2 of the slow figure) onto the nodal shells, swirled along them, each
+    drawing a short ribbon; a plane field cuts the bell; a veil of strands falls from its rim through the same force."""
+    s.nodes.append({"name": "bellCut", "kind": "field", "position": [HEART[0], HEART[1] - 3.0, HEART[2]],
+                    "field": {"kind": "plane", "axis": [0.0, -1.0, 0.0], "softness": 0.01, "strength": 1.0,
+                              "falloff": {"kind": "none"}}})
+    s.particles("matter", capacity=22000, seed=5, shape="sphere", position=list(HEART), extent=[10.0, 10.0, 10.0],
+                direction=[0, 1, 0], spawnRate=260.0, lifetimeMin=70.0, lifetimeMax=100.0, spread=1.0, speedMin=0.0,
+                speedMax=0.1, gravity=[0, 0, 0], drag=14.0, turbulence=0.0, turbulenceScale=0.3, turbulenceSpeed=0.1,
+                attractorPosition=list(HEART), attractorStrength=1.5, attractorRadius=11.0, orbit=14.0,
+                fieldForces=[{"field": "force", "mode": "force", "strength": 100.0, "mix": 1.0, "axis": [0, 1, 0]},
+                             {"field": "bellCut", "mode": "kill", "strength": 1.0, "mix": 1.0, "axis": [0, 1, 0]}],
+                sizeStart=0.05, sizeEnd=0.04, sizeVariance=0.4,
+                trailEnabled=True, trailLength=18, trailStride=6, trailWidth=0.45, trailTaper=0.15, trailFade=0.05,
+                colorStart=C("sandHot") + [0.85], colorEnd=C("hollow") + [0.0], emissive=1.3, blend="additive")
+    s.particles("veil", capacity=6000, seed=9, shape="disc", position=[HEART[0], HEART[1] - 3.2, HEART[2]],
+                extent=[8.5, 8.5, 8.5], direction=[0, -1, 0], spawnRate=420.0, lifetimeMin=10.0, lifetimeMax=14.0,
+                spread=0.1, speedMin=0.2, speedMax=0.5, gravity=[0, -2.5, 0], drag=6.0, turbulence=0.0,
+                orbit=0.0, attractorStrength=0.0,
+                fieldForces=[{"field": "force", "mode": "force", "strength": 100.0, "mix": 1.0, "axis": [0, 1, 0]}],
+                sizeStart=0.04, sizeEnd=0.015, sizeVariance=0.3,
+                trailEnabled=True, trailLength=32, trailStride=5, trailWidth=0.5, trailTaper=0.05, trailFade=0.0,
+                colorStart=C("sandHot") + [0.7], colorEnd=C("hollow") + [0.0], emissive=1.1, blend="additive")
+
+
+BUILDERS = {"world": build_world, "crystals": build_crystals, "creature": build_creature}
+OUT_DIRS = {k: os.path.join(REPO, "examples", v["id"]) for k, v in SCENES.items()}
+OUT_CRYSTALS = OUT_DIRS["crystals"]
+DESCRIPTION_TAIL = {
+    "world": "The resonant ground alone (Prototype A of the brief).",
+    "crystals": "The tuned crystal druse (Prototype B); the floor's ringing drives the crystals (sympathetic "
+                "resonance, ADR-1402).",
+    "creature": "The resonant matter (Prototype C): a medusa of grains on the field's nodal shells.",
+}
+
+
+def write_scene(key):
+    os.makedirs(OUT_DIRS[key], exist_ok=True)
+    s, cc, pads = BUILDERS[key]()
+    pp, sp = s.write(OUT_DIRS[key])
+    ccs = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in cc)
+    pds = ", ".join("pad %d %s" % (n, d.split(":")[0].lower()) for n, _, d in pads)
+    kit.upsert_index_entry({
+        "category": "Cymatic World",
+        "description": "Play live audio (any mix) and, optionally, a MIDI controller: " + ccs + "; " + pds + ". "
+                       + s.design["thesis"] + " " + DESCRIPTION_TAIL[key] + " One resonance field (ADR-1400). See "
+                       "docs/prototypes/cymatic-world/.",
+        "live": True,
+        "name": SCENES[key]["title"],
+        "project": "%s/%s.json" % (SCENES[key]["id"], SCENES[key]["id"])})
+    return pp
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--variant", help="also write a file project driven by this WAV")
+    ap.add_argument("--scene", default="all", choices=["all", "world", "crystals", "creature"])
+    ap.add_argument("--variant", help="also write a file project of --scene driven by this WAV")
     ap.add_argument("--out", help="the variant's path")
-    ap.add_argument("--prototype", default="all")
     ap.add_argument("--camera", help="x,y,z:tx,ty,tz for the variant")
     ap.add_argument("--set", action="append", default=[], help="path=json value, for the variant")
     a = ap.parse_args()
-    global PROTOTYPE
-    PROTOTYPE = a.prototype
-    s = build()
-    pp, sp = write(s)
-    print(pp)
-    if PROTOTYPE == "all":
-        cc = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in MIDI_CC)
-        pads = ", ".join("pad %d %s" % (n, d.split(":")[0].lower()) for n, _, d in MIDI_PADS)
-        kit.upsert_index_entry({
-            "category": CATEGORY,
-            "description": "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + "; " + pads + ". "
-                           + DESIGN["thesis"] + " One resonance field (ADR-1400) drives the ground's sand relief, the "
-                           "crystal druse and the floating medusa. See docs/prototypes/cymatic-world/02-report.md.",
-            "live": True,
-            "name": TITLE,
-            "project": "cymatic-world/cymatic-world.json"})
+    keys = ["world", "crystals", "creature"] if a.scene == "all" else [a.scene]
+    if "world" not in keys and not os.path.exists(os.path.join(MESH_DIR, "cw-ground.glb")):
+        keys = ["world"] + keys  # the shared ground and spire meshes live with Cymatic World
+    pp = None
+    for k in keys:
+        pp = write_scene(k)
+        print(pp)
     if a.variant:
+        if a.scene == "all":
+            raise SystemExit("--variant needs one --scene")
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(variant(pp, a.variant, a.out, a.camera, params))
 

@@ -5,14 +5,14 @@
  "camera": {
   "mode": 1,
   "position": [
-   5.9798,
-   13.0,
-   46.9511
+   4.1236,
+   16.0,
+   43.5718
   ],
   "target": [
-   -7.9126,
-   4.0,
-   0.8316
+   -2.0,
+   -3.0,
+   0.0
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
@@ -102,7 +102,7 @@
        ],
        "order": 4,
        "bandLow": 0.0,
-       "bandHigh": 0.4,
+       "bandHigh": 0.45,
        "reach": 75.0,
        "gain": 1.0
       },
@@ -114,24 +114,10 @@
         9.0
        ],
        "order": 3,
-       "bandLow": 0.25,
-       "bandHigh": 0.6,
+       "bandLow": 0.3,
+       "bandHigh": 0.7,
        "reach": 50.0,
        "gain": 0.8
-      },
-      {
-       "kind": "point",
-       "position": [
-        0.0,
-        12.0,
-        0.0
-       ],
-       "order": 5,
-       "bandLow": 0.45,
-       "bandHigh": 0.8,
-       "reach": 16.0,
-       "gain": 1.6,
-       "scale": 2.2
       },
       {
        "kind": "lattice",
@@ -141,10 +127,10 @@
         0.0
        ],
        "order": 3,
-       "bandLow": 0.65,
+       "bandLow": 0.62,
        "bandHigh": 1.0,
-       "reach": 42.0,
-       "gain": 0.6,
+       "reach": 46.0,
+       "gain": 0.7,
        "depth": 9.0
       }
      ],
@@ -192,60 +178,9 @@
     "resonance": {
      "channel": "relief",
      "sharpness": 0.9,
-     "reliefLine": 0.15,
+     "reliefLine": 0.08,
      "reliefLineSharpness": 0.6,
      "reliefVibration": 0.23
-    }
-   }
-  },
-  {
-   "name": "force",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "resonance": {
-     "channel": "force",
-     "listenLow": 0.45,
-     "listenHigh": 0.8,
-     "listenWidth": 0.04
-    }
-   }
-  },
-  {
-   "name": "druseFoot",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "resonance": {
-     "channel": "amplitude",
-     "listenLow": 0.0,
-     "listenHigh": 0.22,
-     "listenWidth": 0.02,
-     "probe": [
-      -23.0,
-      -5.0,
-      9.0
-     ]
     }
    }
   },
@@ -255,7 +190,7 @@
    "procedural": {
     "source": {
      "kind": "mesh",
-     "asset": "meshes/cw-ground.glb"
+     "asset": "../cymatic-world/meshes/cw-ground.glb"
     },
     "distribution": {
      "kind": "single"
@@ -295,730 +230,6 @@
    }
   },
   {
-   "name": "tuned",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "axis": [
-     0.0,
-     -1.0,
-     0.0
-    ],
-    "point": [
-     -23.0,
-     1.8462999999999994,
-     9.0
-    ],
-    "length": 9.482,
-    "resonance": {
-     "channel": "displacement",
-     "listenAlongAxis": true,
-     "listenLow": 0.0,
-     "listenHigh": 1.0,
-     "listenWidth": 0.14
-    }
-   }
-  },
-  {
-   "name": "tunedRing",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "axis": [
-     0.0,
-     -1.0,
-     0.0
-    ],
-    "point": [
-     -23.0,
-     1.8462999999999994,
-     9.0
-    ],
-    "length": 9.482,
-    "resonance": {
-     "channel": "amplitude",
-     "listenAlongAxis": true,
-     "listenLow": 0.0,
-     "listenHigh": 1.0,
-     "listenWidth": 0.14
-    }
-   }
-  },
-  {
-   "name": "druse",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "mesh",
-     "asset": "meshes/cw-crystal.glb"
-    },
-    "distribution": {
-     "kind": "points",
-     "points": [
-      [
-       -24.3711,
-       6.5873,
-       10.817,
-       0.093816,
-       -0.0,
-       0.070796,
-       0.993069,
-       1.2481,
-       19.5027,
-       1.2481
-      ],
-      [
-       -26.2828,
-       2.8125,
-       10.3719,
-       0.106087,
-       -0.0,
-       0.253857,
-       0.961406,
-       1.0224,
-       13.4509,
-       1.0224
-      ],
-      [
-       -24.4495,
-       4.7839,
-       7.9999,
-       -0.063878,
-       0.0,
-       0.092584,
-       0.993654,
-       1.1108,
-       15.7559,
-       1.1108
-      ],
-      [
-       -23.7972,
-       4.3327,
-       12.157,
-       0.203677,
-       -0.0,
-       0.051433,
-       0.977686,
-       1.1145,
-       15.854,
-       1.1145
-      ],
-      [
-       -27.2857,
-       3.4392,
-       8.8102,
-       -0.012975,
-       0.0,
-       0.292996,
-       0.956026,
-       1.0936,
-       15.2998,
-       1.0936
-      ],
-      [
-       -22.3907,
-       4.4424,
-       9.2184,
-       0.014838,
-       0.0,
-       -0.0414,
-       0.999032,
-       1.0719,
-       14.7312,
-       1.0719
-      ],
-      [
-       -25.5176,
-       1.6423,
-       11.8707,
-       0.257659,
-       -0.0,
-       0.225966,
-       0.939442,
-       0.9591,
-       11.8598,
-       0.9591
-      ],
-      [
-       -25.6995,
-       3.1537,
-       6.3659,
-       -0.192193,
-       0.0,
-       0.196965,
-       0.961388,
-       1.0537,
-       14.256,
-       1.0537
-      ],
-      [
-       -21.9298,
-       2.8882,
-       11.7152,
-       0.215438,
-       0.0,
-       -0.084914,
-       0.972819,
-       1.0029,
-       12.9553,
-       1.0029
-      ],
-      [
-       -27.5551,
-       1.0859,
-       10.7793,
-       0.156219,
-       -0.0,
-       0.399939,
-       0.903131,
-       0.9892,
-       12.6111,
-       0.9892
-      ],
-      [
-       -22.544,
-       2.8289,
-       7.0167,
-       -0.165657,
-       0.0,
-       -0.038087,
-       0.985448,
-       0.9707,
-       12.1492,
-       0.9707
-      ],
-      [
-       -24.6128,
-       0.9984,
-       13.2965,
-       0.393377,
-       -0.0,
-       0.14766,
-       0.907442,
-       0.9662,
-       12.0362,
-       0.9662
-      ],
-      [
-       -25.992,
-       0.0144,
-       8.003,
-       -0.126848,
-       0.0,
-       0.380654,
-       0.915976,
-       0.8214,
-       8.5811,
-       0.8214
-      ],
-      [
-       -21.7918,
-       1.4307,
-       9.3791,
-       0.042487,
-       0.0,
-       -0.135411,
-       0.989878,
-       0.8402,
-       9.0139,
-       0.8402
-      ],
-      [
-       -25.5118,
-       -0.8614,
-       11.5051,
-       0.354041,
-       -0.0,
-       0.354995,
-       0.865236,
-       0.8036,
-       8.1777,
-       0.8036
-      ],
-      [
-       -23.484,
-       0.2103,
-       7.0205,
-       -0.278137,
-       0.0,
-       0.068009,
-       0.958131,
-       0.7699,
-       7.428,
-       0.7699
-      ],
-      [
-       -21.7781,
-       0.9105,
-       11.6662,
-       0.293138,
-       0.0,
-       -0.13434,
-       0.946585,
-       0.8657,
-       9.6085,
-       0.8657
-      ],
-      [
-       -27.034,
-       -0.9487,
-       9.1442,
-       0.018995,
-       -0.0,
-       0.531517,
-       0.846834,
-       0.838,
-       8.9622,
-       0.838
-      ],
-      [
-       -20.9154,
-       0.9333,
-       8.0767,
-       -0.107465,
-       0.0,
-       -0.242634,
-       0.964147,
-       0.8358,
-       8.911,
-       0.8358
-      ],
-      [
-       -24.3278,
-       -0.9934,
-       11.5926,
-       0.423789,
-       -0.0,
-       0.217041,
-       0.879373,
-       0.7484,
-       6.957,
-       0.7484
-      ],
-      [
-       -24.3515,
-       -1.1494,
-       7.4127,
-       -0.322166,
-       0.0,
-       0.2743,
-       0.906073,
-       0.6761,
-       5.4378,
-       0.6761
-      ],
-      [
-       -21.3775,
-       -0.5773,
-       9.8859,
-       0.15831,
-       0.0,
-       -0.289939,
-       0.943861,
-       0.6999,
-       5.9287,
-       0.6999
-      ],
-      [
-       -25.0226,
-       -2.0124,
-       10.0353,
-       0.257353,
-       -0.0,
-       0.502773,
-       0.82522,
-       0.6481,
-       4.8748,
-       0.6481
-      ],
-      [
-       -22.808,
-       -0.8726,
-       7.4895,
-       -0.314597,
-       0.0,
-       -0.03999,
-       0.948383,
-       0.6575,
-       5.0626,
-       0.6575
-      ],
-      [
-       -22.7712,
-       -1.3071,
-       11.3605,
-       0.468814,
-       0.0,
-       -0.045452,
-       0.882127,
-       0.6893,
-       5.7077,
-       0.6893
-      ],
-      [
-       -24.8976,
-       -2.5158,
-       8.363,
-       -0.203033,
-       0.0,
-       0.604798,
-       0.770063,
-       0.6068,
-       4.0745,
-       0.6068
-      ],
-      [
-       -21.5636,
-       -1.6358,
-       8.8934,
-       -0.030606,
-       0.0,
-       -0.412332,
-       0.910519,
-       0.5936,
-       3.826,
-       0.5936
-      ],
-      [
-       -24.0713,
-       -2.4783,
-       10.5111,
-       0.509687,
-       -0.0,
-       0.361334,
-       0.780805,
-       0.592,
-       3.7971,
-       0.592
-      ],
-      [
-       -23.534,
-       -1.9067,
-       7.7052,
-       -0.425436,
-       0.0,
-       0.17546,
-       0.887817,
-       0.5719,
-       3.428,
-       0.5719
-      ],
-      [
-       -22.311,
-       -1.8351,
-       10.0157,
-       0.344471,
-       0.0,
-       -0.233648,
-       0.909257,
-       0.5617,
-       3.243,
-       0.5617
-      ],
-      [
-       -24.3194,
-       -2.9624,
-       9.0553,
-       0.030373,
-       -0.0,
-       0.724352,
-       0.688761,
-       0.5274,
-       2.6447,
-       0.5274
-      ],
-      [
-       -22.4484,
-       -2.2642,
-       8.0189,
-       -0.440718,
-       0.0,
-       -0.247784,
-       0.86277,
-       0.5236,
-       2.5802,
-       0.5236
-      ],
-      [
-       -23.2998,
-       -2.8314,
-       10.3792,
-       0.675325,
-       -0.0,
-       0.146778,
-       0.722768,
-       0.5379,
-       2.8257,
-       0.5379
-      ],
-      [
-       -23.9151,
-       -2.8112,
-       8.1988,
-       -0.449583,
-       0.0,
-       0.513454,
-       0.730917,
-       0.5151,
-       2.4383,
-       0.5151
-      ]
-     ]
-    },
-    "material": {
-     "baseColor": [
-      0.02519,
-      0.02956,
-      0.05127
-     ],
-     "emissiveColor": [
-      0.15896,
-      0.71569,
-      1.0
-     ],
-     "emissiveIntensity": 0.025,
-     "roughness": 0.12,
-     "metallic": 0.85,
-     "thinFilm": {
-      "thickness": 420.0,
-      "ior": 1.7
-     },
-     "program": "cwCrystal"
-    },
-    "effectors": [
-     {
-      "field": "tuned",
-      "op": "rotation",
-      "strength": 0.06,
-      "axis": [
-       1.0,
-       0.0,
-       0.0
-      ]
-     },
-     {
-      "field": "tunedRing",
-      "op": "emission",
-      "blend": "multiply",
-      "strength": 22.0
-     }
-    ]
-   }
-  },
-  {
-   "name": "bellCut",
-   "kind": "field",
-   "position": [
-    0.0,
-    9.0,
-    0.0
-   ],
-   "field": {
-    "kind": "plane",
-    "axis": [
-     0.0,
-     -1.0,
-     0.0
-    ],
-    "softness": 0.01,
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "matter",
-   "kind": "particles",
-   "particles": {
-    "enabled": true,
-    "capacity": 14000,
-    "seed": 5,
-    "shape": "sphere",
-    "position": [
-     0.0,
-     12.0,
-     0.0
-    ],
-    "extent": [
-     10.0,
-     10.0,
-     10.0
-    ],
-    "direction": [
-     0,
-     1,
-     0
-    ],
-    "spawnRate": 280.0,
-    "lifetimeMin": 40.0,
-    "lifetimeMax": 60.0,
-    "spread": 1.0,
-    "speedMin": 0.0,
-    "speedMax": 0.15,
-    "gravity": [
-     0,
-     0,
-     0
-    ],
-    "drag": 14.0,
-    "turbulence": 0.0,
-    "turbulenceScale": 0.3,
-    "turbulenceSpeed": 0.1,
-    "attractorPosition": [
-     0.0,
-     12.0,
-     0.0
-    ],
-    "attractorStrength": 1.5,
-    "attractorRadius": 11.0,
-    "orbit": 14.0,
-    "fieldForces": [
-     {
-      "field": "force",
-      "mode": "force",
-      "strength": 100.0,
-      "mix": 1.0,
-      "axis": [
-       0,
-       1,
-       0
-      ]
-     },
-     {
-      "field": "bellCut",
-      "mode": "kill",
-      "strength": 1.0,
-      "mix": 1.0,
-      "axis": [
-       0,
-       1,
-       0
-      ]
-     }
-    ],
-    "sizeStart": 0.05,
-    "sizeEnd": 0.04,
-    "sizeVariance": 0.4,
-    "trailEnabled": true,
-    "trailLength": 18,
-    "trailStride": 6,
-    "trailWidth": 0.45,
-    "trailTaper": 0.15,
-    "trailFade": 0.05,
-    "colorStart": [
-     0.27468,
-     0.80695,
-     1.0,
-     0.85
-    ],
-    "colorEnd": [
-     0.19462,
-     0.04519,
-     1.0,
-     0.0
-    ],
-    "emissive": 1.3,
-    "blend": "additive"
-   }
-  },
-  {
-   "name": "veil",
-   "kind": "particles",
-   "particles": {
-    "enabled": true,
-    "capacity": 6000,
-    "seed": 9,
-    "shape": "disc",
-    "position": [
-     0.0,
-     8.8,
-     0.0
-    ],
-    "extent": [
-     8.5,
-     8.5,
-     8.5
-    ],
-    "direction": [
-     0,
-     -1,
-     0
-    ],
-    "spawnRate": 420.0,
-    "lifetimeMin": 10.0,
-    "lifetimeMax": 14.0,
-    "spread": 0.1,
-    "speedMin": 0.2,
-    "speedMax": 0.5,
-    "gravity": [
-     0,
-     -2.5,
-     0
-    ],
-    "drag": 6.0,
-    "turbulence": 0.0,
-    "orbit": 0.0,
-    "attractorStrength": 0.0,
-    "fieldForces": [
-     {
-      "field": "force",
-      "mode": "force",
-      "strength": 100.0,
-      "mix": 1.0,
-      "axis": [
-       0,
-       1,
-       0
-      ]
-     }
-    ],
-    "sizeStart": 0.04,
-    "sizeEnd": 0.015,
-    "sizeVariance": 0.3,
-    "trailEnabled": true,
-    "trailLength": 32,
-    "trailStride": 5,
-    "trailWidth": 0.5,
-    "trailTaper": 0.05,
-    "trailFade": 0.0,
-    "colorStart": [
-     0.27468,
-     0.80695,
-     1.0,
-     0.7
-    ],
-    "colorEnd": [
-     0.19462,
-     0.04519,
-     1.0,
-     0.0
-    ],
-    "emissive": 1.1,
-    "blend": "additive"
-   }
-  },
-  {
    "name": "spires",
    "kind": "procedural",
    "procedural": {
@@ -1031,9 +242,9 @@
     },
     "material": {
      "baseColor": [
+      0.00535,
       0.00644,
-      0.00588,
-      0.01284
+      0.01119
      ],
      "emissiveColor": [
       0,
@@ -1068,24 +279,6 @@
    "softness": 0.4
   },
   {
-   "id": "heart",
-   "name": "heart",
-   "type": "point",
-   "position": [
-    0.0,
-    11.0,
-    0.0
-   ],
-   "color": [
-    0.27468,
-    0.80695,
-    1.0
-   ],
-   "intensity": 1600.0,
-   "range": 140.0,
-   "castsShadow": false
-  },
-  {
    "id": "rim",
    "name": "rim",
    "type": "directional",
@@ -1099,7 +292,7 @@
     0.19807,
     1.0
    ],
-   "intensity": 1.2,
+   "intensity": 0.8,
    "castsShadow": false
   }
  ],
@@ -1177,9 +370,9 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.09614,
-      0.28243,
-      0.35,
+      0.1236,
+      0.36313,
+      0.45,
       1.0
      ]
     },
@@ -1193,9 +386,9 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
+      0.00335,
       0.00402,
-      0.00368,
-      0.00802,
+      0.007,
       1.0
      ]
     },
@@ -1203,9 +396,9 @@
      "kind": "constant",
      "dst": 4,
      "constant": [
-      0.01764,
-      0.016,
-      0.04231,
+      0.01681,
+      0.02315,
+      0.03955,
       1.0
      ]
     },
@@ -1237,9 +430,9 @@
      "kind": "constant",
      "dst": 4,
      "constant": [
-      6.0,
-      4.88908,
-      4.03466,
+      11.0,
+      8.96331,
+      7.39687,
       1.0
      ]
     },
@@ -1252,122 +445,55 @@
     {
      "kind": "input",
      "dst": 4,
-     "input": "worldPosition"
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      -1.0,
-      -1.0,
-      -1.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.0,
-      11.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5
-    },
-    {
-     "kind": "multiply",
-     "dst": 5,
-     "srcA": 4,
-     "srcB": 4
-    },
-    {
-     "kind": "gradient",
-     "dst": 5,
-     "srcA": 5,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      0.0002
-     ],
-     "value": 2.5e-05
-    },
-    {
-     "kind": "input",
-     "dst": 6,
      "input": "normal"
     },
     {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 4
-    },
-    {
      "kind": "gradient",
-     "dst": 6,
-     "srcA": 6,
+     "dst": 4,
+     "srcA": 4,
      "constant": [
-      1.0,
-      1.0,
-      1.0,
+      -0.769226,
+      0.231595,
+      0.59553,
       0.0
      ],
-     "value": 0.005
+     "value": 1.0
     },
     {
      "kind": "power",
-     "dst": 5,
-     "srcA": 5,
-     "value": -1.5
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 5
+     "dst": 4,
+     "srcA": 4,
+     "value": 2.0
     },
     {
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.01099,
-      0.03228,
-      0.04,
+      0.10299,
+      0.23603,
+      0.9,
       1.0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
+     "dst": 4,
+     "srcA": 4,
      "srcB": 5
     },
     {
      "kind": "add",
      "dst": 3,
      "srcA": 3,
-     "srcB": 6
+     "srcB": 4
     },
     {
      "kind": "constant",
      "dst": 4,
      "constant": [
-      0.0035,
-      0.00185,
-      0.01503,
+      0.00131,
+      0.00069,
+      0.00563,
       1.0
      ]
     },
@@ -1388,113 +514,6 @@
    "metallic": -1,
    "roughness": -1,
    "emission": 2,
-   "emissionIntensity": 1.0,
-   "opacity": -1
-  },
-  {
-   "name": "cwCrystal",
-   "ops": [
-    {
-     "kind": "input",
-     "dst": 0,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 0,
-     "srcA": 0,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "palette",
-     "dst": 1,
-     "srcA": 0,
-     "constant": [
-      0.5,
-      0.5,
-      0.5,
-      0.0
-     ],
-     "constant2": [
-      0.5,
-      0.5,
-      0.5,
-      0.0
-     ],
-     "constant3": [
-      1.5,
-      1.5,
-      1.5,
-      0.0
-     ],
-     "constant4": [
-      0.1,
-      0.1,
-      0.1,
-      0.0
-     ]
-    },
-    {
-     "kind": "power",
-     "dst": 1,
-     "srcA": 1,
-     "value": 40.0
-    },
-    {
-     "kind": "remap",
-     "dst": 0,
-     "srcA": 0,
-     "constant": [
-      -0.5,
-      0.5,
-      0.25,
-      1.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 0
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.03,
-      0.03,
-      0.03,
-      1.0
-     ]
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "materialEmission"
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 1
-    }
-   ],
-   "baseColor": -1,
-   "metallic": -1,
-   "roughness": -1,
-   "emission": 3,
    "emissionIntensity": 1.0,
    "opacity": -1
   }
