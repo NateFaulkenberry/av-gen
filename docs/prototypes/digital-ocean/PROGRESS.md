@@ -729,3 +729,28 @@ now a small, recognisable one with one tree and a few rocks). Worktree `../av-ge
   hard foam, a distortion texture to break the slide, intersection foam by depth, smoothstep anti-aliasing. The
   parts that transfer to an opaque sea seen from 14 m: colour by region, foam as a thresholded noise that follows
   the surface, anti-aliased cuts. Depth-based colour has no seabed here; distance plays its role (`zone`).
+
+### Pass 4.1: composition and the island
+
+- The island is rebuilt from scratch (`island_radius`, `island_height`, `island_meshes`): a small irregular
+  footprint (an ellipse 96 x 52 m with three gentle lobes, on a polar grid, so the outline is one clean curve), a
+  low dune 7.5 m at its highest under the palm, a shallow rise from the water, a skirt to -3 m under the sea. No
+  deformer, nothing routed to it.
+- **One tree** (`palm_mesh`): a windswept coconut palm, 18 m, designed as a silhouette: a trunk that leans and
+  curves toward the sun with a slight S and a root flare, nine tapered ribbon fronds that rise, arc and droop, all
+  swept toward the sun, each twisted a little so some read broad and some thin, three dead fronds hanging under the
+  crown, a coconut cluster. The trunk stands still; the crown sways 0.25 m over ~9 s.
+- **Rocks**: seven Kenney rocks (`rock_tallB`, `rock_largeA/C/E`, `rock_smallA`, `rock_smallFlatA`), scaled
+  9-14x: a tall stack at the left end balancing the palm on the right, low rocks along the near shore, one standing
+  in the water off the left end. Painted by `doIllus` in the palette's `rock`.
+- **Framings** (`comp-sheet.png`, 1080p, the same sea, sun and clouds): F1 low and close (eye 10 m, 36 mm, the
+  horizon at ~47 %), F2 the classic poster (14 m, 32 mm, ~43 %), F3 elevated and wide (21 m, 28 mm, ~40 %).
+  **Chosen: F1.** It is the only one where the island is recognised at once: the palm is ~110 px tall and the land
+  ~430 px wide. F2 keeps more wave pattern but the island is a sliver again; F3 loses it entirely. F1 was then
+  adjusted (the island 270 m out at 1.2x; the eye at 10 m) so the sky holds ~47 %, the ocean ~50 %, the island the
+  left third with the palm reaching toward the sun on the right third.
+- A bug found on the first composition renders: the whole island painted the horizon's peach. Not the land
+  program -- the polar grid (and the cloud pillows, written the same session) were wound clockwise seen from
+  outside, so the colour pass culled every face while the depth prepass still wrote them, leaving a hole in the
+  sea that showed the clear colour. Both windings are now checked numerically (every face's normal against the
+  outward direction) before a render.
