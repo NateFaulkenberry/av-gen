@@ -857,3 +857,29 @@ On the branch after merging origin/main (the project-switch work, 27 files of en
 - `review_examples --only "Digital Ocean"`: ok, exit 0.
 - `cpu-assets`: exit 0, 4255 passed, 0 failed, 19 skipped, 1 expected failure (20 m 05 s).
 - `gpu`: exit 0, 661 passed, 0 failed, 1 skipped (42 m 26 s).
+
+### Pass 4.6: the coordinator's round 2 (`07-round2-before-after.png`)
+
+Three visible defects on `04-selected-still.png`, each judged as a flat silhouette first:
+- **The island read as a table.** The top was a flat plateau with a straight edge; the rock base one horizontal
+  stripe; a lit rock half-buried in the plateau's edge read as a translucent patch; and the island's left end sat
+  beyond the frame edge (its centre at -92 m put the end at 27.4 deg; the 36 mm frame ends at 26.6), which read as
+  a loose slab. Now: the island 24 m further right (az -23.6 .. -4.7 deg, the sun at +13); the top an organic,
+  asymmetric silhouette (a rise under the palm, a long soft fall to the right, soft swells, nothing straight); the
+  rock face's top varies along the shore (`rock_top`: higher under the rise, lower at the ends, wobbling), its
+  vertices jittered radially and round on a 56-facet grid and its height bumped by sector and band, so it reads as
+  clustered masses; the paint's rock line wobbles with a noise and the rock is mottled (boulders); ten rounded
+  Kenney rocks (the flat ones went) tucked inside the footprint, none buried in the plateau's edge.
+- **The clouds were still hard-cut.** The underside was a plane clip (a ruler line with corners where it met the
+  lobes); now the outline's lower half is squashed toward the base with a tanh, so the flat underside curves into
+  the end lobes; ribbons are sampled in proportion to their aspect (up to 8x), their lobes near-equal (a shallow
+  scallop) and the contour smoothed over the lobe joints; the big left bank moved inside the frame (az -14, 1100 m
+  wide). Nothing clips: the far plane is beyond the 8 km dome, and the only straight edges left are the frame's.
+- **The far sun path was a uniform vertical stripe with hard sides.** The far program's column had a constant
+  angular width and cut the product (column x marks), so its sides were wherever the column crossed the threshold.
+  Now the far column narrows a further 2.6x from 200 m to 3 km (continuous with the near program's taper at
+  200 m), the marks are cut first (at 0.17, inside the crest rows, so the waves break it) and the column's soft
+  profile multiplies after: soft sides, a taper from narrow at the horizon, broken by the rows. doSeaFar: 41 ops.
+Only the generator's scene data changed; integrity and review_examples rerun below.
+- Round 2 checks (only the generator's scene data changed since the suites): `check_project_integrity` 0 problems;
+  `review_examples --only "Digital Ocean"` ok, exit 0. `04-selected-still.png` is the round-2 frame.

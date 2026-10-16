@@ -114,6 +114,16 @@ stage-dependent op is guarded, so the look-development stages A-C build without 
 The sea program is at its budget (48 ops near); the pillows are ~27 k triangles for 16 formations against the
 ~138 k of Pass 3's spheres.
 
+## Round 2 (the coordinator's review of the selected still)
+
+`07-round2-before-after.png`, before/after crops of the three defects: the island no longer reads as a table (an
+organic asymmetric top rising under the palm, a varying mottled rock base of irregular masses, the island moved
+inside the frame, no buried rock); the clouds' undersides curve into their lobes (a tanh squash instead of a plane
+clip; ribbons sampled by aspect, their lobes near-equal, the contour smoothed over the joints; the left bank inside
+the frame; nothing clips a plane or the far distance); the far sun path tapers from narrow at the horizon (a further
+2.6x over 200 m - 3 km), is cut inside the crest rows so the waves break it, and takes the column's soft profile
+after the cut, so its sides are soft. Details in PROGRESS "Pass 4.6".
+
 ## Known limitations
 
 - **A whole cloud layer in one GLB, instanced at the origin, never drew single-sided.** Not winding (checked on
@@ -138,3 +148,4 @@ On the branch after merging origin/main (the project-switch work; the engine reb
 - `review_examples --only "Digital Ocean"`: ok, exit 0.
 - `cpu-assets`: exit 0, 4255 passed, 0 failed, 19 skipped, the 1 expected failure.
 - `gpu`: exit 0, 661 passed, 0 failed, 1 skipped (42 m 26 s).
+- After round 2 (generator scene data only): integrity 0 problems; `review_examples --only "Digital Ocean"` ok, exit 0.

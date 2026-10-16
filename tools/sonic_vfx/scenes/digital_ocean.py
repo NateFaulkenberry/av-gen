@@ -153,7 +153,7 @@ COMPOSITIONS = {
     "F3": (21.0, 28.0, -4.6, 0.0),   # elevated and wide: more sea, the island smaller and further right
 }
 # per composition: the island's centre (x, z) and its scale
-COMP_ISLAND = {"F1": ((-92.0, -270.0), 1.2), "F2": ((-128.0, -330.0), 1.0), "F3": ((-70.0, -340.0), 1.1)}
+COMP_ISLAND = {"F1": ((-68.0, -270.0), 1.2), "F2": ((-128.0, -330.0), 1.0), "F3": ((-70.0, -340.0), 1.1)}
 
 
 # ================================================================================================ the ocean mesh
@@ -581,17 +581,24 @@ def water_program(far=False):
         P.op(None, "remap", 5, a=5, k=[0.0, 1.0, -0.5, 0.5])
         if not far:
             P.op("pathWidth", "remap", 6, a=0, k=[0.0, 1.0, W_PATH_NARROW, 1.0], f=1.0)   # narrows with distance
-            P.op(None, "multiply", 5, a=5, b=6)
             w = W_PATH_W
         else:
+            # beyond 200 m the column keeps narrowing toward the horizon (the coordinator's round 2)
+            P.op(None, "input", 6, inp="cameraDistance")
+            P.op("pathWidth", "remap", 6, a=6, k=[200.0, 3000.0, 1.0, W_PATH_FAR_NARROW], f=1.0)
             w = W_PATH_W / W_PATH_NARROW
+        P.op(None, "multiply", 5, a=5, b=6)
         P.op(None, "multiply", 5, a=5, b=5)
         P.op("column", "smoothstep", 5, a=5, k=[w * w, 0.0])
-        # the marks scalar TIMES the column, then one cut: at the column's centre every lit back is a mark, toward
-        # its edges only the crests are, so the edges are ragged and the path scatters (the coordinator's note 1)
-        P.op(None, "multiply", 5, a=5, b=4)
-        p0 = W_P0_FAR if far else W_P0
-        P.op("pathMarks", "smoothstep", 5, a=5, k=[p0, p0 + W_PW])
+        if not far:
+            # the marks scalar TIMES the column, then one cut: at the column's centre every lit back is a mark,
+            # toward its edges only the crests are, so the edges are ragged and the path scatters
+            P.op(None, "multiply", 5, a=5, b=4)
+            P.op("pathMarks", "smoothstep", 5, a=5, k=[W_P0, W_P0 + W_PW])
+        else:
+            # far: the cut first (the crest rows break the marks), THEN the column's soft profile: soft sides
+            P.op("pathMarks", "smoothstep", 6, a=4, k=[W_P0_FAR, W_P0_FAR + W_PW_FAR])
+            P.op(None, "multiply", 5, a=5, b=6)
         P.pcolour("glint", 6, "glint", W_PATH_GAIN)
         P.op("sunlit", "mixBy", 7, a=7, b=6, c=5)
     # the horizon: confined to the last degrees (a 10 m eye sees most of the sea at a grazing angle, and a gentle
@@ -625,7 +632,8 @@ W_FOAM_GAIN = 0.95
 W_PATH_W = 0.15         # the sun path's half-width near (the sine of its angle across the sun's azimuth)
 W_PATH_NARROW = 3.2     # how much narrower the path is beyond the foreground zone
 W_P0, W_PW = 0.2, 0.1      # the path marks' cut in m x column and its edge width (near)
-W_P0_FAR = 0.1              # far: the merged marks make one soft column at the horizon
+W_P0_FAR, W_PW_FAR = 0.17, 0.08   # far: the cut sits in the crest rows, so the column breaks by the waves
+W_PATH_FAR_NARROW = 2.6     # the far column narrows this much more from 200 m to 3 km
 W_PATH_GAIN = 1.8
 W_FRES_POWER, W_FRES_POWER_FAR = 24.0, 10.0   # the Fresnel power near / far
 W_HORIZON, W_HORIZON_FAR = 0.45, 0.8           # how far the horizon colour reaches into the water near / far
@@ -749,7 +757,7 @@ def cloud_outline(lobes, belly, n=72, c0=(0.0, 0.0)):
     """A cloud's silhouette in its own plane (x along, y up): the union of a few circles `lobes` [(cx, cy, r)] over
     a flat underside at y = -belly, sampled as a star-shaped polygon from c0 (which must lie inside a lobe). One clean
     contour: the lobes are what the top reads as; the base is one line."""
-    pts = []
+    pts, rads = [], []
     for i in range(n):
         th = 2.0 * math.pi * i / n
         dx, dy = math.cos(th), math.sin(th)
@@ -762,9 +770,16 @@ def cloud_outline(lobes, belly, n=72, c0=(0.0, 0.0)):
             disc = b * b - c
             if disc > 0.0:
                 far = max(far, -b + math.sqrt(disc))
-        if dy < -1e-6:
-            far = min(far, (c0[1] + belly) / -dy)              # the flat underside
-        pts.append((c0[0] + dx * far, c0[1] + dy * far))
+        rads.append(far)
+    # the joints between lobes are cusps: smooth the radius over five samples, so the contour is one soft curve
+    w = max(2, n // 144)                                       # half the window: wider for the densely sampled ribbons
+    sm = [sum(rads[(i + k) % n] for k in range(-w, w + 1)) / (2 * w + 1) for i in range(n)]
+    for i in range(n):
+        th = 2.0 * math.pi * i / n
+        x, y = c0[0] + math.cos(th) * sm[i], c0[1] + math.sin(th) * sm[i]
+        if y < 0.0:
+            y = -belly * math.tanh(-y / belly)                   # the underside: flat, but curving into the lobes' ends
+        pts.append((x, y))
     return pts
 
 
@@ -774,6 +789,9 @@ def cloud_pillow(lobes, belly, thick, n=72, rings=(1.0, 0.86, 0.68, 0.48, 0.28, 
     normals from smooth_shaded: the two-band cloud program then splits it into one lit and one shadowed region with
     a single soft edge -- not one rim per lobe."""
     c0 = (sum(l[0] * l[2] for l in lobes) / sum(l[2] for l in lobes), 0.35 * max(l[1] + l[2] for l in lobes))
+    span = max(l[0] + l[2] for l in lobes) - min(l[0] - l[2] for l in lobes)
+    height = max(l[1] + l[2] for l in lobes)
+    n = int(n * max(1.0, min(8.0, span / (3.0 * height))))          # a ribbon needs many more samples round
     out = cloud_outline(lobes, belly, n, c0)
     verts, faces = [], []
     for side in (1.0, -1.0):
@@ -809,7 +827,9 @@ def cloud_lobes(width, height, n, seed, tier=0.0):
     for i in range(n):
         u = (i + 0.5) / n - 0.5 + (g(i) - 0.5) * 0.3 / n
         r = height * (0.5 + 0.5 * (1.0 - (2.0 * u) ** 2) ** 0.7) * (0.6 + 0.4 * g(i + 20))
-        r = max(min(r, height * 0.95), 0.6 * height)
+        r = max(min(r, height * 0.95), 0.72 * height)
+        if width > 6.0 * height:                                 # a ribbon: near-equal lobes, a shallow scallop on top
+            r = height * (0.88 + 0.07 * g(i + 20))
         lobes.append((u * width * (1.0 - r / width), r * 0.82, r))
     if tier > 0.0:
         m = max(2, n - 2)
@@ -825,12 +845,12 @@ def cloud_lobes(width, height, n, seed, tier=0.0):
 # ribbon on the right, one formation above-right of the sun; the rest round the sky, so as the field turns (65 min a
 # turn) every one comes past the sun. Two layers, two drift rates: parallax.
 CLOUDS_NEAR = {
-    "layered": [(-19.0, 3600.0, 520.0, 1300.0, 360.0, 4, 0.0), (50.0, 4000.0, 210.0, 1500.0, 120.0, 3, 0.0),
+    "layered": [(-14.0, 3600.0, 520.0, 1100.0, 340.0, 4, 0.0), (50.0, 4000.0, 210.0, 1500.0, 120.0, 3, 0.0),
                 (23.0, 4600.0, 1120.0, 850.0, 240.0, 3, 0.0), (-2.0, 4800.0, 1000.0, 600.0, 170.0, 3, 0.0),
                 (-66.0, 3500.0, 280.0, 1300.0, 420.0, 4, 0.0), (80.0, 3800.0, 320.0, 1200.0, 380.0, 4, 0.0),
                 (140.0, 3600.0, 300.0, 1500.0, 440.0, 4, 0.0), (-130.0, 3900.0, 290.0, 1300.0, 400.0, 4, 0.0),
                 (-180.0, 3700.0, 330.0, 1500.0, 460.0, 4, 0.0)],
-    "rich": [(-19.0, 3600.0, 520.0, 1300.0, 440.0, 5, 0.55), (50.0, 4000.0, 210.0, 1500.0, 130.0, 4, 0.0),
+    "rich": [(-14.0, 3600.0, 520.0, 1100.0, 420.0, 5, 0.55), (50.0, 4000.0, 210.0, 1500.0, 130.0, 4, 0.0),
              (23.0, 4600.0, 1120.0, 900.0, 280.0, 4, 0.45), (-2.0, 4800.0, 1000.0, 620.0, 190.0, 3, 0.4),
              (-66.0, 3500.0, 280.0, 1300.0, 480.0, 5, 0.5), (-52.0, 4300.0, 640.0, 600.0, 170.0, 3, 0.0),
              (80.0, 3800.0, 320.0, 1200.0, 420.0, 5, 0.5), (140.0, 3600.0, 300.0, 1500.0, 500.0, 5, 0.55),
@@ -909,39 +929,55 @@ def island_radius(theta):
                 + 0.04 * math.sin(5.0 * theta + 0.4))
 
 
-def island_height(x, z):
-    """The land (the owner's island direction): a low plateau (a gentle dome, higher under the palm) over an ERODED
-    ROCK BASE -- from the sand line down to the water the rim is a steep, terraced cliff whose radius is jogged in
-    and out per angular sector (a hash), so the base is a jagged ring of rock, not a smooth skirt. Below the
-    waterline it falls to -3 m."""
+def island_height(x, z, jitter=True):
+    """The land (the owner's island direction, the coordinator's round 2): an organic, asymmetric top -- a gentle
+    rise toward the palm (x > 0), a softer fall to the right, a few soft swells, no straight edge -- over an ERODED
+    ROCK BASE: from the sand line down to the water the rim is a steep irregular face whose radius is jogged per
+    angular sector and per height (a hash), so it reads as clustered boulders and irregular masses, not terraces.
+    Below the waterline it falls to -3 m."""
     th = math.atan2(z, x)
     R = island_radius(th)
-    sector = int((th + math.pi) / (2.0 * math.pi) * 36.0) % 36
-    jag = 1.0 + 0.09 * (mx._hash(sector, 3, 17) - 0.5) + 0.05 * (mx._hash(sector, 5, 23) - 0.5)
+    sector = int((th + math.pi) / (2.0 * math.pi) * 28.0) % 28
+    jag = 1.0 + 0.1 * (mx._hash(sector, 3, 17) - 0.5) + 0.06 * (mx._hash(sector, 5, 23) - 0.5)
     r = math.hypot(x, z) / R
-    rc = r / jag                                                  # the cliff's own radius
+    rc = r / jag                                                  # the rock face's own radius
     if rc >= 1.0:
         return -3.0 * min(1.0, (rc - 1.0) * 6.0) - 0.5
-    # the top: nearly flat (a dome under two cel bands drew contour rings), a touch higher under the palm
-    top = ISLAND_H * (0.95 + 0.05 * max(0.0, 1.0 - (r / 0.55) ** 2)) * (0.95 + 0.05 * math.tanh((x + 4.0) / 22.0))
-    if rc < 0.55:
+    # the top: a rise under the palm, a long soft fall to the right, soft swells
+    rise = math.exp(-((x - 18.0) / 26.0) ** 2) * math.exp(-(z / 30.0) ** 2)
+    swell = 0.06 * math.sin(x * 0.11 + 1.0) * math.cos(z * 0.14 + 0.4) + 0.04 * math.sin(x * 0.23 - z * 0.17)
+    top = ISLAND_H * (0.62 + 0.38 * rise + swell) * (1.0 - 0.12 * max(0.0, x / 48.0))
+    rt = rock_top(x, z)
+    if rc < 0.5:
         return top
-    if rc < 0.72:
-        return top + (ROCK_TOP + 0.2 - top) * mx.smooth(0.55, 0.72, rc)      # the sand slope to the rock shelf
-    u = (rc - 0.72) / 0.28
-    h = ROCK_TOP + 0.2 - (ROCK_TOP + 0.7) * u ** 1.5                          # the cliff
-    step = 1.1
-    return 0.5 * h + 0.5 * (math.floor(h / step) * step + 0.4)              # half terraced
+    if rc < 0.74:
+        return top + (rt + 0.3 - top) * mx.smooth(0.5, 0.74, rc)            # the sand slope to the rock
+    u = (rc - 0.74) / 0.26
+    h = rt + 0.3 - (rt + 0.8) * u ** 1.3                                      # the rock face
+    if jitter:                                                                # boulder masses: bumps by sector and height
+        band = int(h / 1.6)
+        h += 0.9 * (mx._hash(sector * 7 + band, 11, 29) - 0.5) * (1.0 - u) + 0.5 * (mx._hash(sector * 3 + band, 13, 31) - 0.5)
+    return h
+
+
+def rock_top(x, z):
+    """Where the rock gives way to the sand: higher under the rise, lower at the ends, wobbling along the shore, so
+    the rock band is a varying mass rather than one horizontal stripe."""
+    rise = math.exp(-((x - 18.0) / 30.0) ** 2)
+    return ROCK_TOP * (0.72 + 0.4 * rise + 0.12 * math.sin(x * 0.17 + z * 0.1 + 0.6) + 0.08 * math.sin(x * 0.31 - 1.1))
 
 
 def island_meshes():
-    nr, nt = 30, 72                                 # 72 facets round: chunky rock at 270 m
+    nr, nt = 34, 56                                 # 56 facets round: chunky rock at 270 m
     verts, faces = [(0.0, island_height(0.0, 0.0), 0.0)], []
     for i in range(1, nr + 1):
         u = (i / nr) ** 0.7 * 1.2                   # to 1.2 of the radius: the skirt under the water
         for j in range(nt):
             th = 2.0 * math.pi * j / nt
-            x, z = u * island_radius(th) * math.cos(th), u * island_radius(th) * math.sin(th)
+            # the rock band's vertices are jittered radially and round, so its facets are irregular masses
+            jr = 1.0 + (0.06 * (mx._hash(i, j, 41) - 0.5) if 0.74 <= u <= 1.0 else 0.0)
+            ta = th + (0.02 * (mx._hash(i, j, 43) - 0.5) if 0.74 <= u <= 1.0 else 0.0)
+            x, z = u * jr * island_radius(ta) * math.cos(ta), u * jr * island_radius(ta) * math.sin(ta)
             verts.append((round(x, 3), round(island_height(x, z), 3), round(z, 3)))
     for j in range(nt):
         faces.append((0, 1 + (j + 1) % nt, 1 + j))                 # wound so the faces look up (+y)
@@ -1046,11 +1082,11 @@ def palm_mesh():
 
 # the rocks (island-local x across the view, z toward the camera; Kenney rock, scale, yaw deg, sink m): a tall stack
 # at the left end balancing the palm on the right, low rocks along the near shore, one standing in the water
-ROCKS = [(-50.0, 6.0, "rock_largeC", 16.0, 25.0, 0.0), (-42.0, 16.0, "rock_largeE", 12.0, -40.0, 0.0),
-         (-54.0, -6.0, "rock_largeA", 13.0, 70.0, 0.0), (-38.0, -12.0, "rock_largeA", 9.0, 140.0, 0.0),
-         (16.0, 27.0, "rock_largeE", 10.0, 15.0, 0.0), (40.0, 14.0, "rock_largeA", 11.0, 0.0, 0.0),
-         (-62.0, 12.0, "rock_largeC", 10.0, 80.0, 0.0), (-8.0, 29.0, "rock_smallFlatA", 12.0, 40.0, 0.0),
-         (30.0, -22.0, "rock_largeC", 9.0, 200.0, 0.0), (-20.0, 10.0, "rock_smallA", 12.0, 30.0, 0.0)]
+ROCKS = [(-34.0, 12.0, "rock_largeA", 9.0, 25.0, 0.6), (-30.0, 19.0, "rock_largeE", 8.0, -40.0, 0.6),
+         (-37.0, -4.0, "rock_largeE", 8.0, 70.0, 0.6), (-30.0, -14.0, "rock_largeA", 8.0, 140.0, 0.5),
+         (-22.0, 23.0, "rock_smallA", 11.0, 30.0, 0.5), (8.0, 27.0, "rock_largeE", 8.0, 15.0, 0.6),
+         (18.0, 26.0, "rock_smallA", 12.0, 40.0, 0.5), (32.0, 19.0, "rock_smallA", 10.0, 0.0, 0.5),
+         (-12.0, 27.0, "rock_largeA", 7.0, 40.0, 0.6), (30.0, -19.0, "rock_largeE", 8.0, 200.0, 0.5)]
 PALM_AT = (24.0, -3.0)
 PALM_YAW = 0.0
 
@@ -1458,11 +1494,14 @@ def land_program():
     P.op("wp", "input", 2, inp="worldPosition")
     P.pcolour("rock", 3, "rock")
     P.pcolour("land2", 4, "land2")
-    P.op(None, "swizzle", 5, a=0, k=[1, 1, 1, 1])                                   # n.y: the overhangs darker
-    P.op("facet", "smoothstep", 5, a=5, k=[0.1, 0.12])
+    P.op(None, "noise", 5, a=2, f=0.14, k=[0.0, 0.0, 0.0], seed=61)                  # mottled rock: boulder masses
+    P.op("mottle", "smoothstep", 5, a=5, k=[0.42, 0.5])
     P.op(None, "mixBy", 3, a=4, b=3, c=5)
+    P.op(None, "noise", 6, a=2, f=0.045, k=[0.0, 0.0, 0.0], seed=67)                 # the rock line wobbles
+    P.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.6, -1.6])
     P.op(None, "swizzle", 5, a=2, k=[1, 1, 1, 1])                                   # the height
-    P.op("sandLine", "smoothstep", 6, a=5, k=[ROCK_TOP - 0.1, ROCK_TOP + 0.1])
+    P.op(None, "add", 5, a=5, b=6)
+    P.op("sandLine", "smoothstep", 6, a=5, k=[ROCK_TOP * 0.85 - 0.1, ROCK_TOP * 0.85 + 0.1])
     P.pcolour("sand", 4, "sand")
     P.op(None, "mixBy", 3, a=3, b=4, c=6)
     P.op("landTop", "smoothstep", 6, a=5, k=[SAND_TOP - 0.1, SAND_TOP + 0.1])
@@ -1546,7 +1585,7 @@ def world(s):
     by_asset = {}
     for x, z, asset, scale, yaw, sink in ROCKS:
         p = island_point(x, z)
-        p[1] = max(-0.3 * sc, min(p[1], ROCK_TOP * sc)) - sink * sc          # on the shelf, the cliff or in the surf
+        p[1] = max(-0.3 * sc, min(p[1], (ROCK_TOP - 0.5) * sc)) - sink * sc  # on the rock face or in the surf
         q = math.radians(yaw) / 2.0
         by_asset.setdefault(asset, []).append(p + [0.0, round(math.sin(q), 5), 0.0, round(math.cos(q), 5),
                                                  scale * sc, scale * sc, scale * sc])

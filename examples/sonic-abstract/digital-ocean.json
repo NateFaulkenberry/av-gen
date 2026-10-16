@@ -1001,7 +1001,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -1014,7 +1014,7 @@
   },
   {
    "source": "audio.treble",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -1591,7 +1591,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 0.52604,
    "op": "add",
    "polarity": "unipolar",
@@ -1607,7 +1607,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 0.74768,
    "op": "add",
    "polarity": "unipolar",
@@ -1623,7 +1623,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": -0.29512,
    "op": "add",
    "polarity": "unipolar",
@@ -1639,7 +1639,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": 0.4017,
    "op": "add",
    "polarity": "unipolar",
@@ -1655,7 +1655,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": 0.21896,
    "op": "add",
    "polarity": "unipolar",
@@ -2599,7 +2599,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": 0.01692,
    "op": "add",
    "polarity": "unipolar",
@@ -2615,7 +2615,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": 0.2334,
    "op": "add",
    "polarity": "unipolar",
@@ -2631,7 +2631,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": -0.07071,
    "op": "add",
    "polarity": "unipolar",
@@ -2647,7 +2647,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.04273,
    "op": "add",
    "polarity": "unipolar",
@@ -2663,7 +2663,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": 0.32309,
    "op": "add",
    "polarity": "unipolar",
@@ -2679,7 +2679,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.28455,
    "op": "add",
    "polarity": "unipolar",
@@ -2695,7 +2695,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.05658,
    "op": "add",
    "polarity": "unipolar",
@@ -2711,7 +2711,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": 0.5659,
    "op": "add",
    "polarity": "unipolar",
@@ -2727,7 +2727,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": 0.42534,
    "op": "add",
    "polarity": "unipolar",
@@ -3479,198 +3479,6 @@
   },
   {
    "source": "visual.mood",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": 0.32343,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": 0.14713,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": -0.18042,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.00945,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": 0.1456,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": 0.01021,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": 0.32343,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": 0.14713,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": -0.18042,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": -0.00945,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": 0.1456,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": 0.01021,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0
-   }
-  },
-  {
-   "source": "visual.mood",
    "target": "material/doSea/op/16/constant/constant",
    "amount": -0.00152,
    "op": "add",
@@ -4198,7 +4006,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 0.06356,
    "op": "add",
    "polarity": "unipolar",
@@ -4215,7 +4023,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": -0.11078,
    "op": "add",
    "polarity": "unipolar",
@@ -4232,7 +4040,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": -0.26943,
    "op": "add",
    "polarity": "unipolar",
@@ -4249,7 +4057,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": -0.05732,
    "op": "add",
    "polarity": "unipolar",
@@ -4266,7 +4074,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": 0.17721,
    "op": "add",
    "polarity": "unipolar",
@@ -5337,7 +5145,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": -0.8531,
    "op": "add",
    "polarity": "unipolar",
@@ -5354,7 +5162,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": -0.57936,
    "op": "add",
    "polarity": "unipolar",
@@ -5371,7 +5179,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": 0.17435,
    "op": "add",
    "polarity": "unipolar",
@@ -5388,7 +5196,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.05251,
    "op": "add",
    "polarity": "unipolar",
@@ -5405,7 +5213,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.37219,
    "op": "add",
    "polarity": "unipolar",
@@ -5422,7 +5230,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": 0.03711,
    "op": "add",
    "polarity": "unipolar",
@@ -5439,7 +5247,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.45252,
    "op": "add",
    "polarity": "unipolar",
@@ -5456,7 +5264,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.49827,
    "op": "add",
    "polarity": "unipolar",
@@ -5473,7 +5281,7 @@
   },
   {
    "source": "visual.mood",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.03329,
    "op": "add",
    "polarity": "unipolar",
@@ -6305,210 +6113,6 @@
    }
   },
   {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": -0.55443,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": -0.18567,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": 0.24451,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.01066,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.14893,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.06089,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": -0.55443,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": -0.18567,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": 0.24451,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": -0.01066,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": -0.14893,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
-   "source": "visual.mood",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": -0.06089,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 1500,
-    "decayMs": 1500,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "gain": 2.0,
-    "offset": -1.0
-   }
-  },
-  {
    "source": "response.bass",
    "target": "material/doSea/op/16/constant/constant",
    "amount": 1.0,
@@ -7117,7 +6721,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": -0.67687,
    "op": "add",
    "polarity": "unipolar",
@@ -7129,7 +6733,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 0.13133,
    "op": "add",
    "polarity": "unipolar",
@@ -7141,7 +6745,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 1.09517,
    "op": "add",
    "polarity": "unipolar",
@@ -7153,7 +6757,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": -0.66354,
    "op": "add",
    "polarity": "unipolar",
@@ -7165,7 +6769,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": -0.29277,
    "op": "add",
    "polarity": "unipolar",
@@ -7177,7 +6781,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doSeaFar/op/37/constant/constant",
+   "target": "material/doSeaFar/op/40/constant/constant",
    "amount": -0.49681,
    "op": "add",
    "polarity": "unipolar",
@@ -8017,7 +7621,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": -0.89433,
    "op": "add",
    "polarity": "unipolar",
@@ -8029,7 +7633,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": -0.50774,
    "op": "add",
    "polarity": "unipolar",
@@ -8041,7 +7645,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/10/constant/constant",
+   "target": "material/doLand/op/13/constant/constant",
    "amount": -0.4469,
    "op": "add",
    "polarity": "unipolar",
@@ -8053,7 +7657,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.0992,
    "op": "add",
    "polarity": "unipolar",
@@ -8065,7 +7669,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.0648,
    "op": "add",
    "polarity": "unipolar",
@@ -8077,7 +7681,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/13/constant/constant",
+   "target": "material/doLand/op/16/constant/constant",
    "amount": -0.37219,
    "op": "add",
    "polarity": "unipolar",
@@ -8089,7 +7693,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.56529,
    "op": "add",
    "polarity": "unipolar",
@@ -8101,7 +7705,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.17941,
    "op": "add",
    "polarity": "unipolar",
@@ -8113,7 +7717,7 @@
   },
   {
    "source": "control.night",
-   "target": "material/doLand/op/19/constant/constant",
+   "target": "material/doLand/op/22/constant/constant",
    "amount": -0.3991,
    "op": "add",
    "polarity": "unipolar",
@@ -8690,150 +8294,6 @@
   {
    "source": "control.night",
    "target": "procedural/rocks2/material/toon/shadowColor",
-   "amount": -0.1016,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": -0.24715,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": -0.09789,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks3/material/baseColor",
-   "amount": -0.24513,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.02163,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.00851,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks3/material/toon/shadowColor",
-   "amount": -0.1016,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": -0.24715,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": -0.09789,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks4/material/baseColor",
-   "amount": -0.24513,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": -0.02163,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks4/material/toon/shadowColor",
-   "amount": -0.00851,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 250,
-    "decayMs": 250
-   }
-  },
-  {
-   "source": "control.night",
-   "target": "procedural/rocks4/material/toon/shadowColor",
    "amount": -0.1016,
    "op": "add",
    "polarity": "unipolar",
@@ -11106,7 +10566,7 @@
   },
   {
    "source": "control.rays",
-   "target": "material/doSeaFar/op/33/constant/constant",
+   "target": "material/doSeaFar/op/36/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
