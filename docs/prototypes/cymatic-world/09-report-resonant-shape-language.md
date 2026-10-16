@@ -279,3 +279,115 @@ What changed:
 **Stills:** `stage8-art/plasma-stills-hyperborea-*.png` and `before-art-pass-same-times.png` (the same timestamps before this stage), plus `plasma-1080p-52s.png`. Quiet, dense and transitional passages are all coloured and legible, and the crispness the owner asked for now comes from the thin crest lines and the grit edges.
 
 **Cost:** live 1080p, High: GPU median 28.8 ms, 0 deadline misses. Auto holds High. The colour-pass baseline was 26.0 ms.
+
+## Stage 9: performance (live 1080p, 30 fps target)
+
+Final scene on Hyperborea at 116 s (a dense passage), M2 Max:
+
+| Quality | Internal resolution | GPU median (P95) | CPU work | Deadline misses |
+|---|---|---|---|---|
+| Emergency | 960×540 | 17.0 ms (20.0) | 5.4 ms | 1.3% |
+| Low | 960×540 | 16.9 ms (17.3) | 5.1 ms | 0.7% |
+| Medium | 1362×766 | 22.5 ms (22.9) | 5.0 ms | 0 |
+| High | 1632×918 | 26.9 ms (27.5) | 1.1 ms | 0 |
+| Ultra | 1920×1080 | 33.7 ms (34.6) | 1.2 ms | 0.7% |
+| **Auto → High** | 1632×918 | **26.8 ms (27.4)** | 1.1 ms | **0** |
+
+Headless Ultra: GPU 32.2 ms, CPU work 0.5 ms.
+
+**Against the colour-pass baseline** (High, 26.0 ms, 0 misses): +0.8 ms. That buys the motion system, the shape language, a mesh with square cells (235k vertices against 130k), and four bake grids (0.5 ms).
+
+**Where it goes now:**
+- the material interpreter: 33 ops, about 0.36 ms each at High;
+- the bare mesh: about 40 ns a vertex;
+- field evaluation: per grid cell in the bakes, no longer per vertex or per pixel.
+
+**Quality scaling** uses the engine's existing ladder, with no new settings:
+- Auto holds High;
+- lower tiers scale the render, and the material scales with it;
+- the field cost is fixed and small.
+
+**Measured along the way** (High, 116 s), the history that led here:
+
+| State | GPU median |
+|---|---|
+| Colour pass | 26.0 ms |
+| 05's Pass 2 | 32.1 ms |
+| Stage 3 bank, three per-vertex deformers | 39.6 ms |
+| Fixed mesh, per-vertex | 82-116 ms |
+| Baked, square mesh | 33.0 ms |
+| 33-op material | 28.8 ms |
+| Final | 26.8 ms |
+
+## Stage 10: validation (§14)
+
+All in `stage10-validation/`. Each scenario is geometry-only, shaded, and the two side by side with audio, from the real scene camera. A contact sheet of every pair at its 5th second is in `validation-frames-at-5s-geometry-left-shaded-right.png`.
+
+| # | Scenario | Passage (why) | What it shows |
+|---|---|---|---|
+| 1 | Near silence | Hyperborea 0-10 s (low band 65 dB down) | A faint rosette held by the idle modes, coloured by the normalised network. No autonomous chaos. |
+| 2 | Sustained bass | 156-166 s (low and mid near peak, few onsets) | A large spoked ring figure with a trefoil star, steady and legible. |
+| 3 | Kick-heavy | 84-94 s (16-20 kicks per 6 s) | Large cells heave on each kick and settle (two-time-constant strikes); medium rings pass through. |
+| 4 | Snare and transients | 120-130 s | The medium network sharpens and local rings cross it; the large figure holds. |
+| 5 | Sustained midrange | 62-72 s (mid at peak, bass 18 dB down) | Arcs and spokes; the medium figures lead, the large forms are quiet. |
+| 6 | High frequency | 174-184 s (about 49 hat onsets per 6 s) | A fine cell network over a held large figure; the fine layer stays small. |
+| 7 | Dense full band | 20-30 s | A rosette: large, medium and fine together, organised. |
+| 8 | Quiet to loud | 10-20 s | The figure grows from a faint rosette into deep cells as the bass enters at 16 s. |
+| 9 | Loud to quiet | 54-66 s | Cells relax and the excitation (fuchsia) drains while the network stays. |
+| 10 | Other material | Feline Footwear 40-50 s, Trench 50-60 s | The same vocabulary from different music: spoked arcs with fuchsia hollows (Feline), a rosette network (Trench). |
+
+Also:
+- **Stability before/after** (`stage6-stability/`): Pass 2 against the final system, Hyperborea 40-70 s, geometry-only. The final system holds its figure and morphs where Pass 2 jumped.
+- **Before/after stills** (`final/before-after-stills-hyperborea-10-48-116-134s.png`): the colour pass (before any motion work) against the final scene, same seconds.
+
+## §19 summary
+
+1. **Root causes of the blobs.**
+   - Five or six modes from four unrelated, independently wandering sources at comparable weights. Their sum is a random field.
+   - A relief led by the soft signed vibration.
+   - One reader for every scale.
+2. **Prototyped.** P1, the signed modal figure; P2, nodal ridges between antinode basins; P3, a hybrid. All on one designed bank. A GPU wave simulation was considered: the engine's grid simulation has no wave mode, and the analytic system gave the required reorganisation first.
+3. **Selected: P2.** It is the only prototype whose organisation survives in neutral grey: spoked cells, nested rings, rosettes.
+4. **How the vocabulary arises.**
+   - A designed bank (`orders`) of shared-centre point modes, a second centre and lattice bands.
+   - Per-scale readers turn each scale's nodal lines into ridges (sand) with antinode basins (−|F|, rounded).
+   - A focus window per source leads one or two modes at a time, so the figure is a recognisable Chladni form.
+5. **Evolution and phase.** Persistent modes at fixed places (`layout`). Foci sweep the banks continuously, centres wander, petals turn. Phase is Ω·t at fixed Ω, so there are no resets, swaps or re-placements. Everything is a pure function of the clock and the history, exact under seek.
+6. **Audio as excitation.**
+   - Each mode hears its band.
+   - Onsets strike as bounded impulses and launch rings.
+   - Brightness moves the foci; roughness brings the second centre's interference.
+   - Bass, held sound and hats excite their own scales.
+   - The build fills the bank.
+7. **Stability.** Four diagnosed causes (evictions, strike steps, layout shifts, fast fine detail), each fixed at the cause (ADR-1404).
+8. **Mesh, normals, screen detail.**
+   - The polar mesh bug (256 vertices a ring) is replaced by a square 0.36 m grid.
+   - Creases are rounded and widened beyond the mesh's resolution.
+   - The field is baked once a frame into grids (ADR-1407); normals are differenced across bake cells.
+   - The unlit scene drops the depth prepass (ADR-1406).
+   - The softness is the surface's own, not a filter; crispness comes from the material's thin crest lines.
+9. **Evidence.** Stages 1-10 in `shape-language/`.
+10. **Performance.** Live 1080p, Auto → High: 26.8 ms, 0 misses (baseline 26.0). Per level as above.
+11. **Tests.** See the final report and the commit. The CPU and GPU suites, `review_examples` and `check_project_integrity` are run at the end.
+12. **Limitations and next.**
+    - The bake samples the field at one height, so the raised sources' vertical structure is gone.
+    - Live MIDI on `breath` or `spin` would slew phase; the scene does not route them.
+    - Very dense onsets still put up to 12 rings on screen.
+    - The softness of broad forms is a design choice that could be revisited with a per-pixel normal from the bake.
+    - The most valuable next iteration is a per-cell memory of excitation (the hollows remember where the music has been), and a live-performer CC on the foci (choose the figure by hand).
+
+### Doc edits waiting for owner approval (not made)
+
+- **02-report.md and PROGRESS.md:**
+  - the terrain-only scene;
+  - the Crystals and Creature cut;
+  - the colour pass (04);
+  - the motion overhaul (05/06), stability (07) and shape language (08/09);
+  - ADR-1403 to 1407.
+- **docs/resonance-field.md:**
+  - drop the druse-coupling example;
+  - document kinematics, ripples, layout, per-band response, orders, focus, the relief terms, `sandNormalized`, the silent-row skip;
+  - point at bake grids for costly consumers.
+- **ADR-1402:** note that it has no current scene user.
+- **README / examples rows:** Cymatic World's description. The generator already rewrites `examples/index.json`; its CC list is unchanged.
+- **docs/decisions/README.md:** already carries rows for the new ADR-1403 to 1407, which the hygiene test requires; there are no edits to existing rows.
