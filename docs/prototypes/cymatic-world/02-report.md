@@ -6,11 +6,18 @@
 (`examples/cymatic-world/cymatic-world.json`, `"live": true`, a `sonic.live` project); generator
 `tools/cymatic_world/build.py`.*
 
-**What it is.** A night basin of basalt whose ground is a resonating plate. The music excites one field of standing
-waves. Grit settles on the field's nodal lines and carves the ground into rings and cells. A crystal druse on the floor
-rings in the band each crystal is tuned to. A floating medusa of grains holds itself on the field's nodal shells and
-trails a veil of strands. It is lit by a raking warm moon and by the medusa's own cold lamp, under a ring of basalt
-spires.
+**What it is now (owner-approved, merged to main at 74edc063).** A night basin whose ground is a resonating plate,
+and nothing else: no crystals, no creature, no props, walls or sky in frame. The music excites one designed bank of
+standing waves; the figure's nodal lines stand as ridges between sunken antinodes, carving rings, petals and cells
+that wander and re-form with the music (the plasma palette: navy and violet stone, teal grit, cyan light, fuchsia
+glow). A slow high arc (camera B) looks down on it. It is a live scene with no audio file of its own. Section 10
+summarises how it got here; sections 1-9 are the original prototype report and describe the first version.
+
+**What it was (the first version, sections 1-9).** A night basin of basalt whose ground is a resonating plate. The
+music excites one field of standing waves. Grit settles on the field's nodal lines and carves the ground into rings
+and cells. A crystal druse on the floor rings in the band each crystal is tuned to. A floating medusa of grains holds
+itself on the field's nodal shells and trails a veil of strands. It is lit by a raking warm moon and by the medusa's
+own cold lamp, under a ring of basalt spires.
 
 ## 1. The architecture, and why
 
@@ -207,3 +214,29 @@ the same 14-mode sum runs per vertex (three times, for the normal), per pixel an
 the ground's cost by several milliseconds and allow more modes and a finer mesh (no rim aliasing). Close behind it:
 give the medusa true filaments, either fibres (ADR-1180/1181) following the force field's streamlines between the
 shells, or a stiffer constraint so grains stop crossing between shells.
+
+## 10. After this report: from prototype to the approved scene
+
+Each step has its own brief and report in this folder.
+
+1. **Terrain only.** The Crystals and Creature prototypes were cut; the druse's coupling (ADR-1402) stays in the
+   engine without a scene user. The spires and lights went with the reframe, so no wall or prop is in frame.
+2. **Colour pass** (`03-brief-color-lighting-art-pass.md`, `04-report-color-lighting-pass.md`): an unlit ground with
+   its light painted in the material program; three palettes, the plasma palette (B) chosen.
+3. **Motion overhaul** (`05-brief-resonant-simulation-overhaul.md`, `06-report-resonant-motion.md`): ADR-1403, moving
+   figures (drift, spin) and onset ripples, with amplitude applied after the limiter.
+4. **Motion stability** (`07-brief-motion-stability.md`, in `06-report`): ADR-1404, fixed mode places, per-band
+   attack and release, ripples capped and fading -- the four diagnosed causes of the twitch.
+5. **Shape language** (`08-brief-resonant-shape-language.md`, `09-report-resonant-shape-language.md`): ADR-1405, a
+   designed bank with a focus window and relief shaped from the nodes (ridges between antinode basins, three scales);
+   ADR-1406, the unlit scene's prepass and shadow switches and silent-row skipping; ADR-1407, bake grids, so the
+   relief and the material's fields are sampled once a frame instead of per vertex and per pixel. A correction round
+   restored depth, the fuchsia glow and shape strength, and pulled the camera back (framing B).
+6. **No audio in the project.** The scene is `sonic.live` and carries no track; review renders feed a file with
+   `avgen --audio`, which ADR-1408 makes win over the saved live capture device.
+7. **Performance.** Live 1080p at 30 fps under Auto (quality ladder), measured on Feline Footwear; see `09-report`.
+8. The colour, lighting and optics pass (`10-brief-resonant-color-light-optics.md`,
+   `11-report-resonant-color-light.md`) is in progress on `proto/cymatic-split` and not yet merged.
+
+Decision records added since section 8: ADR-1403 to ADR-1408. `docs/resonance-field.md` documents the new members.
+

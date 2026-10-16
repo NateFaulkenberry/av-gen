@@ -32,3 +32,10 @@ interaction in itself.
 - A probe costs one field sample on the CPU a frame.
 - A coupling whose probe hears the band it drives would feed back; the route's clamp bounds it, but the author has to
   keep the bands apart (documented in `docs/resonance-field.md`).
+
+## Note (2026-10-16, after the owner approved Cymatic World)
+
+Cymatic World no longer has the crystal druse that used the coupling (the scene became terrain only), so the probe,
+the source drive and the per-source competition and limiter have no scene user at present. They are kept: they are
+tested (the two tests above, and the per-source limiter is exercised by every multi-source resonator), cost nothing
+unless authored, and remain the documented way to couple one part of a field to another.

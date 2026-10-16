@@ -621,7 +621,7 @@
     },
     {
       "category": "Cymatic World",
-      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 terrain, CC 8 light; pad 36 strike. A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, and the grit settles on its nodal lines, carving rings, petals and cells into the ground. The ground's figure is drawn by one resonance field (ADR-1400). See docs/prototypes/cymatic-world/.",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 terrain, CC 8 light; pad 36 strike. A night basin whose ground is a resonating plate: the music excites one designed bank of standing waves, and its nodal lines stand as ridges between sunken antinodes, carving rings, petals and cells that wander and re-form with the music. The ground's figure is drawn by one resonance field (ADR-1400, ADR-1403 to 1407); the scene carries no track of its own. See docs/prototypes/cymatic-world/.",
       "live": true,
       "name": "Cymatic World",
       "project": "cymatic-world/cymatic-world.json"

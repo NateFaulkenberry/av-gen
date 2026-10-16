@@ -1,19 +1,25 @@
 # Cymatic World: progress
 
-Branch `proto/cymatic-world` (worktree `../av-gen-cymatic`, from main `4421568b`). Brief `00-brief.md`, design
-`01-design.md`. Review media: `~/Desktop/av-gen-review/58-cymatic-world/`.
+Branch `proto/cymatic-world` (worktree `../av-gen-cymatic`, from main `4421568b`), then `proto/cymatic-split` for
+the passes after it. Approved by the owner and on main at `74edc063` (2026-10-16). Brief `00-brief.md`, design
+`01-design.md`, later briefs and reports `03`-`11`. Review media: `~/Desktop/av-gen-review/58-cymatic-world/`.
 
 ## How to resume
 
 - Build: `cmake --preset release && cmake --build --preset release`.
 - Generate the scene: `python3 tools/cymatic_world/build.py` (writes `examples/cymatic-world/`; the ground GLB's
   heights come from `build/release/tools/avgen_world_preview --heights`, so build first).
-- A review variant driven by a WAV: `python3 tools/cymatic_world/build.py --variant assets/audio/trench.wav --out
-  <v.json> [--camera x,y,z:tx,ty,tz] [--set path=json]`, then `avgen --headless --project <v.json> --render <dir>
-  --format png --range t:t+0.034 --size 960x540` through `tools/gpu-lock.sh`.
-- Test audio conditions used: quiet = all-you-got 7 s; sustained = trench 130 s; transient = night-shift 12 s; dense =
-  feline-footwear 44 s; plus a synthetic probe (55 Hz 0-8 s, 330 Hz 8-16, 2 kHz 16-24, chord 24-32, silence, clicks
-  40-48), made by the snippet in this log (kept in the scratchpad, not the repo).
+- A review variant: `python3 tools/cymatic_world/build.py --variant --out <v.json> [--camera x,y,z:tx,ty,tz]
+  [--set path=json]` (an absolute scene path, still no audio), then `avgen --headless --project <v.json> --audio
+  assets/audio/feline-footwear.wav --render <dir> --format png --range t:t+0.034 --size 960x540` through
+  `tools/gpu-lock.sh`. The scene carries no track (`sonic.live`); `--audio` wins over the saved live input (ADR-1408).
+- Generator switches (environment): `CW_PALETTE` (A, B, C; G = geometry-only grey), `CW_CAM` (A, B, C), `CW_DEBUG`
+  (debug views), `CW_BAKE`, `CW_PREPASS`, `CW_MESH_STEP`.
+- Live profile: `avgen --live-profile --project examples/cymatic-world/cymatic-world.json --audio
+  assets/audio/feline-footwear.wav --mode live --target-fps 30 --size 1920x1080 --start <t> --quality <q> --json <f>`.
+- Test audio: Feline Footwear (`assets/audio/feline-footwear.wav`, gitignored) for every render, clip and profile;
+  Trench and Hyperborea for the second-track checks. The first prototype also used a synthetic probe (55 Hz 0-8 s,
+  330 Hz 8-16, 2 kHz 16-24, chord 24-32, silence, clicks 40-48), kept in the scratchpad, not the repo.
 
 ## Log
 
@@ -47,10 +53,19 @@ Branch `proto/cymatic-world` (worktree `../av-gen-cymatic`, from main `4421568b`
 10. Instrument: response.* routes (intensity -> complexity, sustain -> memory, level/kick -> the lamp, kick -> veil),
     8 CCs and 2 pads; registered as the live example "Cymatic World".
 11. Final media in `final/`; origin/main merged (43993c75); suites, integrity, review_examples: see `02-report.md`.
+12. Terrain only: the druse and the medusa cut, the spires and lights removed by the reframe.
+13. Colour pass (`04-report-color-lighting-pass.md`): an unlit ground with painted light; plasma palette B.
+14. Motion overhaul and stability (`06-report-resonant-motion.md`): ADR-1403 (moving figures, ripples) and ADR-1404
+    (fixed places, per-band attack/release, fading ripples).
+15. Shape language (`09-report-resonant-shape-language.md`): ADR-1405 (designed bank, focus, nodal relief), ADR-1406
+    (unlit-scene prepass/shadow switches, silent rows), ADR-1407 (bake grids); a correction round; camera B; the full
+    Feline Footwear render in `shape-language/final/`.
+16. The project's audio track removed (live scene); ADR-1408. Merged to main by the coordinator at `74edc063`.
+17. Colour, lighting and optics pass (`10-brief`, `11-report`) in progress on `proto/cymatic-split`.
 
 ## Open items
 
-- The medusa still reads as a woven dome / hairy ball in dense passages (grains crossing between shells).
-- Far crater rims alias against the mesh; the crystals' stepped ledges read as stripes from some angles.
-- Next experiment: bake the field to a plane texture once a frame (see `02-report.md` section 9).
-- `examples/cymatic-world/meshes/cw-ground.glb` is ~6 MB (committed like Digital Ocean's meshes).
+- The colour, lighting and optics pass (`11-report-resonant-color-light.md`) is not merged.
+- Auto holds High with ~6% missed frames on loud Feline passages (the light pass's Stage G investigates).
+- A few large crests show a fine serrated edge in the upper right of the frame at some moments.
+- `examples/cymatic-world/meshes/cw-ground.glb` is committed like Digital Ocean's meshes.
