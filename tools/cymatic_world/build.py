@@ -773,10 +773,10 @@ def build_crystals():
     druse(s, gy)
     s.light("heart", "point", position=glow[0], color=C("crystalGlow"), intensity=90.0, range=40.0, castsShadow=False)
     spire_node(s)
-    tgt = [CRYSTAL_ROOT[0], gy + 4.5, CRYSTAL_ROOT[1]]
-    s.camera = {"mode": 1, "position": [0.0, gy + 10.0, 22.0], "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
-    s.orbit_camera(tgt, 22.0, gy + 10.0, period=200.0, start_deg=0.0, sweep_deg=360.0, steps=24, height_bob=1.5)
-    s.params_({"camera/lens/focalLength": 32.0})
+    tgt = [CRYSTAL_ROOT[0], gy + 6.5, CRYSTAL_ROOT[1]]
+    s.camera = {"mode": 1, "position": [0.0, gy + 11.0, 31.0], "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
+    s.orbit_camera(tgt, 31.0, gy + 11.0, period=200.0, start_deg=0.0, sweep_deg=360.0, steps=24, height_bob=1.5)
+    s.params_({"camera/lens/focalLength": 28.0})
     F = field_instrument(s)
     lamp = "material/cwGround/op/%d/constant/constant" % g["lamp"]
     s.route(R("level", lamp, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=400, decayMs=1800),
