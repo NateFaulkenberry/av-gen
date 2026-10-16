@@ -365,8 +365,10 @@ def reader(s, name, channel, extra=None, frame=None):
 
 def ground_readers(s):
     reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
-    reader(s, "relief", "relief", {"sharpness": 0.9, "reliefLine": 0.08, "reliefLineSharpness": 0.6,
-                                   "reliefVibration": 0.23})
+    # the ground's height: the vibration D (signed: peaks and troughs that move) leads; the sand's nodal ridges ride on
+    # it as seams, a wide crest (sharpness 0.5: several vertices across, so it does not alias)
+    reader(s, "relief", "relief", {"sharpness": 0.9, "reliefLine": 0.1, "reliefLineSharpness": 0.5,
+                                   "reliefVibration": 1.2})
 
 
 # ---- the colour language (the colour pass, 03-brief-color-lighting-art-pass.md) -------------------------------------
@@ -583,17 +585,26 @@ def build_world():
         "the basin floor's figure", "the basin floor, its sand relief drawing the figure",
         "a slow high arc over the basin, there and back in 160 s"))
     environment(s)
+    # THE RESONANT MEDIUM (the motion overhaul, 05-brief; ADR-1403). Four families of modes, each on its own source,
+    # and every source's figure MOVES: its modes' centres wander (each its own Lissajous), point modes' petals turn
+    # (some against the others), lattices slide and turn. Patterns sliding across each other move the nodal lines --
+    # ridges migrate, split and reconnect, loops break and reform -- while the music sets how hard each family rings.
     resonator(s, [
-        # the basin's voice: the low modes -- broad rings and petals about its centre
-        {"kind": "point", "position": list(HEART), "order": 4, "bandLow": 0.0, "bandHigh": 0.45, "reach": 75.0,
-         "gain": 1.0},
-        # a second centre off to the west: middle modes whose rings interfere with the first's
-        {"kind": "point", "position": list(SECOND), "order": 3, "bandLow": 0.3, "bandHigh": 0.7, "reach": 50.0,
-         "gain": 0.8},
-        # a Faraday carpet for the fine modes on the floor (hexagons), a layer that fades up the terraces
-        {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.62, "bandHigh": 1.0,
-         "reach": 46.0, "gain": 0.7, "depth": 9.0},
-    ])
+        # A. the swell: broad low-order lobes and sweeping ridges across the whole frame (bass)
+        {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 3, "bandLow": 0.0, "bandHigh": 0.2,
+         "gain": 1.0, "amplitude": 0.62, "drift": 26.0, "driftPeriod": 95.0, "spin": 0.035, "driftAudio": 0.3},
+        # B. rings: concentric, partly concentric figures about a wandering centre (low mids) -- the radial identity
+        {"kind": "point", "position": [0.0, 4.0, 0.0], "order": 2, "bandLow": 0.14, "bandHigh": 0.5, "reach": 70.0,
+         "gain": 0.9, "amplitude": 0.7, "drift": 13.0, "driftPeriod": 62.0, "spin": 0.05, "driftAudio": 0.4},
+        # C. petals: angular, asymmetric multi-lobed figures off to the west (mids), turning against each other
+        {"kind": "point", "position": list(SECOND), "order": 5, "bandLow": 0.38, "bandHigh": 0.76, "reach": 60.0,
+         "gain": 0.8, "amplitude": 0.55, "drift": 16.0, "driftPeriod": 44.0, "spin": 0.09, "driftAudio": 0.4},
+        # D. the carpet: fine Faraday ripples (highs), local, sliding faster -- detail riding on the large figure
+        {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.7, "bandHigh": 1.0,
+         "reach": 46.0, "gain": 0.55, "amplitude": 0.22, "depth": 9.0, "drift": 9.0, "driftPeriod": 26.0, "spin": 0.03},
+    ], modes=16.0, lambdaMax=42.0, lambdaMin=4.5, competition=0.8, limit=2.0, breath=0.12,
+       # E. transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
+       ripple=1.2, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=6.0)
     ground_readers(s)
     g = ground(s, relief=2.6, write_mesh=True)
     # LOOKING INTO THE GROUND: high and steep (about 47 degrees down) on a 30 mm lens, so the frame's top edge meets

@@ -311,3 +311,59 @@ TEST_CASE("The resonance table holds 48 modes; a resonator that does not fit sam
     CHECK(gpu[2].x == gpu[0].x); // same spec, same clock: same modes, in different rows
     CHECK(gpu[4].x == 0.0f);
 }
+
+TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (ADR-1403)", "[gpu][resonance][motion]") {
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    spatial::FieldSet fields = makeFields();
+    auto& ground = fields.fields[0].resonance;
+    ground.ripple = 1.3f;
+    ground.rippleCount = 6.0f;
+    ground.rippleArea = 20.0f;
+    for (std::size_t s = 0; s < ground.sources.size(); ++s) {
+        ground.sources[s].drift = 6.0f + 3.0f * static_cast<float>(s);
+        ground.sources[s].driftPeriod = 30.0f;
+        ground.sources[s].spin = s == 1 ? -0.15f : 0.1f;
+        ground.sources[s].driftAudio = 0.3f;
+        ground.sources[s].amplitude = 1.0f - 0.25f * static_cast<float>(s);
+    }
+    ground.sources[1].depth = 7.0f; // depth now packs as geometry + 4 x depth: keep a deep source in the test
+    fields.audio = song(4000);
+    spatial::ResonanceCache cache;
+    std::vector<glm::vec4> samples;
+    for (int slot = 0; slot < static_cast<int>(fields.fields.size()); ++slot) {
+        for (int k = 0; k < 48; ++k) {
+            const float a = 0.53f * static_cast<float>(k);
+            const float r = 0.7f * static_cast<float>(k);
+            samples.emplace_back(r * std::cos(a), 0.25f * static_cast<float>(k % 7) - 1.0f, r * std::sin(a),
+                                 static_cast<float>(slot));
+        }
+    }
+    int ripples = 0;
+    for (const double t : {2.2, 11.6, 27.05}) {
+        spatial::resolveResonance(fields, cache, t);
+        const auto& st = *fields.fields[0].resonanceState;
+        ripples += st.count - st.modeCount;
+        const auto gpu = harness.run(fields, t, samples);
+        CHECK(harness.block().block().fields[0].gridBounds0.y == static_cast<float>(st.count));
+        for (std::size_t i = 0; i < samples.size(); ++i) {
+            const auto slot = static_cast<std::size_t>(samples[i].w);
+            const glm::vec3 p(samples[i]);
+            const float cpuS = spatial::sampleScalar(fields.fields[slot], p, t, &fields);
+            const glm::vec3 cpuV = spatial::sampleVector(fields.fields[slot], p, t, &fields);
+            const glm::vec4 cpuC = spatial::sampleColor(fields.fields[slot], p, t, &fields);
+            const float scale = 1.0f + std::abs(cpuS) + glm::length(cpuV);
+            INFO("t " << t << " field " << fields.fields[slot].name << " p (" << p.x << ", " << p.y << ", " << p.z << ")");
+            const glm::vec4 g = gpu[2 * i];
+            const glm::vec4 gc = gpu[2 * i + 1];
+            CHECK(close(g.x, cpuS, scale));
+            CHECK(close(g.y, cpuV.x, scale));
+            CHECK(close(g.z, cpuV.y, scale));
+            CHECK(close(g.w, cpuV.z, scale));
+            for (int c = 0; c < 4; ++c) {
+                CHECK(close(gc[c], cpuC[c], scale + std::abs(cpuC[c])));
+            }
+        }
+    }
+    CHECK(ripples > 0); // the song's onsets did launch rings
+}

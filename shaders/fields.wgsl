@@ -555,12 +555,25 @@ fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
     let k = shape.x;
     let m = shape.y;
     let d = q - place.xyz;
+    let geometry = shape.w - 4.0 * floor(shape.w * 0.25);
+    if (geometry > 1.5) {
+        // ADR-1403, a ripple: a travelling ring packet about its launch point (horizontal distance), radius shape.z
+        let rho = sqrt(d.x * d.x + d.z * d.z);
+        let x = rho - shape.z;
+        let wid = max(m, 1e-3);
+        let env = exp(-(x * x) / (wid * wid)) / sqrt(1.0 + rho * k / FIELD_TWO_PI);
+        var rw = 1.0;
+        if (place.w > 0.0) {
+            rw = 1.0 / (1.0 + (rho * rho) / (place.w * place.w));
+        }
+        return vec2<f32>(cos(k * x) * env * rw, 0.5 * env * env * rw * rw);
+    }
     var w = 1.0;
     if (place.w > 0.0) {
         w = 1.0 / (1.0 + dot(d, d) / (place.w * place.w));
     }
-    let lattice = shape.w - 2.0 * floor(shape.w * 0.5);
-    let depth = floor(shape.w * 0.5);
+    let lattice = geometry;
+    let depth = floor(shape.w * 0.25);
     if (depth > 0.0) {
         w = w * exp(-abs(d.y) / depth);
     }

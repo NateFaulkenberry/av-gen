@@ -62,3 +62,45 @@ Its figure is a material program, f = cos(nπu) cos(mπv) − cos(mπu) cos(nπv
 - Clip (geometry-only, shaded, side-by-side): `motion/pass1-baseline/baseline-hyperborea-40-70s-*.mp4`. Hyperborea 40-70 s covers the dense section, the break at 60-75 s and the return.
 - Baseline stills: the colour pass's `colour-pass/f-final/` (quiet 10 s, dense 48 s, sustained 116 s, transient 134 s).
 - Cost (colour-pass baseline): live 1080p, Auto → High: GPU median 26.0 ms, 0 deadline misses. Headless Ultra: 32.1 ms. The CPU resolve is 35 µs a frame played and 1.8 ms after a seek.
+
+## Pass 2: geometry-only prototype (ADR-1403)
+
+**Engine** ([ADR-1403](../../decisions/ADR-1403-a-resonance-figure-moves-and-onsets-launch-ripples.md)). The figure itself moves, and everything stays a pure function of the clock and the history:
+- **Kinematics.** Each mode's centre wanders on its own Lissajous (`drift`, `driftPeriod`, widened by its memory envelope through `driftAudio`). Point modes' petals turn at `spin` × a per-mode ±[0.4, 1.3]. Lattices turn as one and slide mode by mode.
+- **Ripples.** The newest heard onsets each launch a travelling ring packet: a kick's broad and slow, a snare's fast, short and local, a hat's fine and faint.
+- **`amplitude`.** It scales a family after the limiter. A source's gain is cancelled by the limiter at saturation, which had made the fine carpet as tall as the swell.
+- **Tests.** `test_resonance_motion.cpp` (6 cases: wander and turn within bounds, seek = play including ripples, ring speed, decay and life, kick versus snare, the newest-N rule, amplitude after the limiter, JSON, hash, validation and parameters) and a GPU parity case for moving modes and ripples. Both pass.
+
+**The scene.** Four families, one per source, each moving:
+
+| Family | Source | Band (u) | Amplitude | Wander | Spin |
+|---|---|---|---|---|---|
+| A, swell | lattice, 3 directions | 0-0.2 | 0.62 | 26 m / 95 s | 0.035 rad/s |
+| B, rings | point at the centre, order 2 | 0.14-0.5 | 0.7 | 13 m / 62 s | 0.05 |
+| C, petals | point at (−23, 0, 9), order 5 | 0.38-0.76 | 0.55 | 16 m / 44 s | 0.09 |
+| D, carpet | lattice, local | 0.7-1 | 0.22 | 9 m / 26 s | 0.03 |
+| E, ripples | onsets | | | 9 m/s, life 1.6 s, 6 at once | |
+
+Other settings:
+- 16 modes, λ 42 → 4.5 m.
+- Competition 0.8 (was 3), so several modes interfere. Limit 2. Breath 0.12 Hz.
+- The relief is now led by the vibration D (weight 1.2, was 0.23), with the sand's crest as a wider seam (sharpness 0.5).
+
+**Measured** on Hyperborea, 3 m scale, ±35 m:
+
+| Window | Height rms (min-max) | \|ΔH\| over 1 s | Structural change at 1 s | At 10 s |
+|---|---|---|---|---|
+| 0-30 s (quiet intro) | 1.31 m (0.14-3.12) | 1.05 m | 0.55 | 1.02 |
+| 40-80 s (dense, break) | 1.75 m (0.54-4.10) | 1.42 m | 0.54 | 0.95 |
+| 100-150 s | 2.11 m (1.23-3.15) | 1.51 m | 0.42 | 0.92 |
+| baseline, 40-80 s | 0.24 m | 0.13 m | 0.26 | 0.50 |
+
+The figure is about ten times larger and moves about eleven times faster. At 10 s it is uncorrelated with itself (about 1.0), where the baseline's crater kept half its structure. The quiet intro falls to 0.14 m rms, so the music sets the size.
+
+**Gate clip:** `motion/pass2-geometry-prototype/geometry-prototype-hyperborea-40-70s-geometry-only.mp4`, with `-shaded` and `-side-by-side` beside it. Over a few seconds the hexagonal carpets slide and turn, ridges bend and part, rings form about a wandering centre and break, and broad lobes rise and sink across the frame.
+
+**Open after Pass 2:**
+- The broad swell's standing oscillation (0.12 Hz) still inverts large areas every few seconds, which is the anti-correlation at 4 s. Pass 3 balances this against the travelling motion.
+- The geometry reads soft: no fine relief, interpolated normals.
+- The polar mesh's stitched rows crease under metres of displacement (Pass 5).
+- The shading was tuned for 0.3 m of relief, so its fuchsia now floods (Pass 6).

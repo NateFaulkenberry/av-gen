@@ -75,11 +75,11 @@
      "kind": "none"
     },
     "resonance": {
-     "modes": 14.0,
+     "modes": 16.0,
      "fLow": 40.0,
      "fHigh": 6000.0,
-     "lambdaMax": 34.0,
-     "lambdaMin": 5.0,
+     "lambdaMax": 42.0,
+     "lambdaMin": 4.5,
      "scale": 1.0,
      "selectivity": 3.0,
      "contrast": 0.7,
@@ -89,22 +89,44 @@
      "sustain": 1.0,
      "transient": 0.9,
      "idle": 0.5,
-     "breath": 0.16,
-     "limit": 0.9,
-     "competition": 3.0,
+     "breath": 0.12,
+     "limit": 2.0,
+     "competition": 0.8,
      "sources": [
+      {
+       "kind": "lattice",
+       "position": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "order": 3,
+       "bandLow": 0.0,
+       "bandHigh": 0.2,
+       "gain": 1.0,
+       "amplitude": 0.62,
+       "drift": 26.0,
+       "driftPeriod": 95.0,
+       "spin": 0.035,
+       "driftAudio": 0.3
+      },
       {
        "kind": "point",
        "position": [
         0.0,
-        12.0,
+        4.0,
         0.0
        ],
-       "order": 4,
-       "bandLow": 0.0,
-       "bandHigh": 0.45,
-       "reach": 75.0,
-       "gain": 1.0
+       "order": 2,
+       "bandLow": 0.14,
+       "bandHigh": 0.5,
+       "reach": 70.0,
+       "gain": 0.9,
+       "amplitude": 0.7,
+       "drift": 13.0,
+       "driftPeriod": 62.0,
+       "spin": 0.05,
+       "driftAudio": 0.4
       },
       {
        "kind": "point",
@@ -113,11 +135,16 @@
         0.0,
         9.0
        ],
-       "order": 3,
-       "bandLow": 0.3,
-       "bandHigh": 0.7,
-       "reach": 50.0,
-       "gain": 0.8
+       "order": 5,
+       "bandLow": 0.38,
+       "bandHigh": 0.76,
+       "reach": 60.0,
+       "gain": 0.8,
+       "amplitude": 0.55,
+       "drift": 16.0,
+       "driftPeriod": 44.0,
+       "spin": 0.09,
+       "driftAudio": 0.4
       },
       {
        "kind": "lattice",
@@ -127,14 +154,24 @@
         0.0
        ],
        "order": 3,
-       "bandLow": 0.62,
+       "bandLow": 0.7,
        "bandHigh": 1.0,
        "reach": 46.0,
-       "gain": 0.7,
-       "depth": 9.0
+       "gain": 0.55,
+       "amplitude": 0.22,
+       "depth": 9.0,
+       "drift": 9.0,
+       "driftPeriod": 26.0,
+       "spin": 0.03
       }
      ],
-     "channel": "displacement"
+     "channel": "displacement",
+     "ripple": 1.2,
+     "rippleSpeed": 9.0,
+     "rippleLife": 1.6,
+     "rippleWidth": 0.9,
+     "rippleArea": 30.0,
+     "rippleCount": 6.0
     }
    }
   },
@@ -178,9 +215,9 @@
     "resonance": {
      "channel": "relief",
      "sharpness": 0.9,
-     "reliefLine": 0.08,
-     "reliefLineSharpness": 0.6,
-     "reliefVibration": 0.23
+     "reliefLine": 0.1,
+     "reliefLineSharpness": 0.5,
+     "reliefVibration": 1.2
     }
    }
   },

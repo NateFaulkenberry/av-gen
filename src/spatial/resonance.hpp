@@ -61,6 +61,8 @@ struct FieldSpec;
 struct FieldSet;
 
 inline constexpr int kMaxResonanceModes = 24;     // per resonator
+inline constexpr int kMaxResonanceRipples = 8;    // ADR-1403: travelling packets per resonator, after its modes
+inline constexpr int kMaxResonanceRows = kMaxResonanceModes + kMaxResonanceRipples;
 inline constexpr int kMaxResonanceSources = 4;    // per resonator
 inline constexpr int kMaxGpuResonanceModes = 48;  // the FieldBlock's mode table, every resonator together
 inline constexpr int kResonanceModeVec4s = 3;     // shape, place, drive
@@ -93,6 +95,19 @@ struct ResonanceSource {
     float drive = 0.0f;       // ADR-1402: excitation added straight into its modes (both envelopes): what a route --
                               // a coupling -- uses to make one body ring because another does
     float scale = 1.0f;       // multiplies its modes' wavenumbers: a smaller body draws finer figures at the same pitch
+    // ADR-1403, kinematics: the figure itself moves, as a pure function of the clock (and, through driftAudio, of the
+    // memory envelope) -- so a seek still lands where a play does. Each mode wanders its own way: its centre on a
+    // Lissajous of radius `drift` (metres) and period about `driftPeriod` (seconds; finer modes a little faster, each
+    // with its own phase), and a point mode's petals turn at `spin` rad/s times a per-mode factor in [-1.3, 1.3] (some
+    // against the others); a lattice turns as one at `spin`. Modes sliding across each other move the nodal lines:
+    // ridges migrate, split and reconnect. `driftAudio` widens a mode's wander by its memory envelope (1 + driftAudio s).
+    float drift = 0.0f;
+    float driftPeriod = 60.0f;
+    // ADR-1403: the source's amplitude AFTER competition and the limiter (gain acts before them, so at saturation the
+    // limiter cancels it): what sets a family's height against the others' -- broad modes large, fine modes small.
+    float amplitude = 1.0f;
+    float spin = 0.0f;
+    float driftAudio = 0.0f;
     [[nodiscard]] bool operator==(const ResonanceSource&) const = default;
 };
 
@@ -116,6 +131,18 @@ struct ResonanceSpec {
     float idle = 0.12f;         // the lowest modes' level in silence
     float breath = 0.2f;        // Hz: the lowest mode's visible oscillation (higher modes a little faster)
     float limit = 1.0f;         // the soft limit of sqrt(sum a_i^2)
+    // ADR-1403, ripples: every heard onset launches a travelling ring -- a wave packet cos(k (rho - R)) e^{-((rho - R) /
+    // w)^2} / sqrt(1 + rho / lambda) whose radius R = speed x age grows from a point the onset's time hashes to within
+    // `rippleArea` metres of the field's origin (horizontal distance rho). A low onset (kick) draws a broad, slow, long
+    // ring; a mid one (snare) a sharper, faster, shorter, more local one; a high one (hat) a fine, faint one. Amplitude
+    // `ripple` x heard strength x e^{-age / life}; the newest `rippleCount` (at most kMaxResonanceRipples) still alive.
+    // Pure functions of the onset list and the clock: exact under seek. ripple 0 = none.
+    float ripple = 0.0f;
+    float rippleSpeed = 9.0f;   // m/s, the kick's ring (a snare's runs 1.6x, a hat's 2.2x)
+    float rippleLife = 1.6f;    // seconds to 1/e, the kick's (a snare's 0.55x, a hat's 0.35x)
+    float rippleWidth = 0.9f;   // the packet's half-width, in its wavelengths
+    float rippleArea = 30.0f;   // metres: launch points lie within this of the origin
+    float rippleCount = 6.0f;   // the most rings alive at once (1..kMaxResonanceRipples)
     std::vector<ResonanceSource> sources; // empty = one point source at the origin, order 4
     // ---- the reader (any resonance field) --------------------------------------------------------
     ResonanceChannel channel = ResonanceChannel::Displacement;
@@ -141,8 +168,9 @@ struct ResonanceSpec {
 
 // One mode, as packed for the GPU (three vec4 a mode in the FieldBlock's table).
 struct ResonanceMode {
-    glm::vec4 shape{0.0f}; // k (rad/m), m (angular order / lattice directions), theta (rad), geometry + 2 x depth
-                           // (geometry 0 point, 1 lattice; depth whole metres, 0 = no vertical decay)
+    glm::vec4 shape{0.0f}; // k (rad/m), m (angular order / lattice directions), theta (rad), geometry + 4 x depth
+                           // (geometry 0 point, 1 lattice, 2 ripple; depth whole metres, 0 = no vertical decay).
+                           // A ripple (ADR-1403): k, the packet's half-width (m), its radius now (m), 2.
     glm::vec4 place{0.0f}; // centre (field frame), reach (0 = unbounded)
     glm::vec4 drive{0.0f}; // d = a cos(Omega t + psi) (displacement), e = a (envelope), u, s (the slow envelope, the
                            // sand's memory); d, e and s include the mode's weight (fade-in x source gain)
@@ -150,13 +178,14 @@ struct ResonanceMode {
 
 // What a resolver derives for one resonator at one clock: its modes, ready to sample.
 struct ResonanceState {
-    int count = 0;
-    std::array<ResonanceMode, kMaxResonanceModes> modes{};
-    std::array<float, kMaxResonanceModes> frequency{}; // Hz, per mode (diagnostics and tests)
-    std::array<float, kMaxResonanceModes> envelope{};  // a_i before competition and the limiter (diagnostics, tests)
-    std::array<float, kMaxResonanceModes> memory{};    // the slow envelope, likewise
-    std::array<float, kMaxResonanceModes> weight{};    // fade-in x source gain
-    std::array<int, kMaxResonanceModes> source{};      // the source each mode belongs to
+    int count = 0;       // rows to sample: the modes, then the ripples
+    int modeCount = 0;   // the modes (the arrays below are per mode)
+    std::array<ResonanceMode, kMaxResonanceRows> modes{};
+    std::array<float, kMaxResonanceRows> frequency{}; // Hz, per mode (diagnostics and tests)
+    std::array<float, kMaxResonanceRows> envelope{};  // a_i before competition and the limiter (diagnostics, tests)
+    std::array<float, kMaxResonanceRows> memory{};    // the slow envelope, likewise
+    std::array<float, kMaxResonanceRows> weight{};    // fade-in x source gain
+    std::array<int, kMaxResonanceRows> source{};      // the source each mode belongs to
     double clock = 0.0;
     float limiterGain = 1.0f;
     float lambdaMin = 3.0f; // the shortest wavelength drawn (the vector channels' default step)

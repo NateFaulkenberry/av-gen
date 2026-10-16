@@ -187,6 +187,13 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
     if (sources.size() > static_cast<std::size_t>(kMaxResonanceSources)) {
         return fail("field '{}': at most {} resonance sources", field, kMaxResonanceSources);
     }
+    if (!(finite(ripple) && rippleSpeed > 0.0f && rippleSpeed <= 1000.0f && rippleLife > 0.0f && rippleLife <= 30.0f &&
+          rippleWidth > 0.0f && rippleWidth <= 10.0f && rippleArea >= 0.0f && finite(rippleArea) && rippleCount >= 0.0f &&
+          rippleCount <= static_cast<float>(kMaxResonanceRipples))) {
+        return fail("field '{}': resonance ripples need speed in (0, 1000] m/s, life in (0, 30] s, width in (0, 10], "
+                    "area >= 0 and count in [0, {}]",
+                    field, kMaxResonanceRipples);
+    }
     for (const ResonanceSource& s : sources) {
         if (s.order < 0 || s.order > 8 || (s.kind == ResonanceSourceKind::Lattice && s.order < 1)) {
             return fail("field '{}': a resonance source's order must be 0..8 (a lattice at least 1)", field);
@@ -197,6 +204,12 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
         if (!(s.reach >= 0.0f && finite(s.reach) && finite(s.gain) && s.scale > 0.0f && finite(s.scale) && s.depth >= 0.0f &&
               finite(s.depth) && finite(s.drive))) {
             return fail("field '{}': a resonance source's reach must be >= 0 and its gain finite", field);
+        }
+        if (!(finite(s.amplitude) && std::abs(s.amplitude) <= 1000.0f && s.drift >= 0.0f && s.drift <= 1000.0f && s.driftPeriod >= 0.5f && s.driftPeriod <= 3600.0f && finite(s.spin) &&
+              std::abs(s.spin) <= 10.0f && s.driftAudio >= 0.0f && s.driftAudio <= 10.0f)) {
+            return fail("field '{}': a resonance source's |amplitude| must be <= 1000, drift in [0, 1000] m, driftPeriod "
+                        "in [0.5, 3600] s, |spin| <= 10 rad/s and driftAudio in [0, 10]",
+                        field);
         }
     }
     if (!(listenLow >= 0.0f && listenHigh <= 1.0f && listenLow <= listenHigh && listenWidth >= 0.0f)) {
@@ -214,7 +227,8 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     detail::Fnv h;
     for (const float v : {modes, fLow, fHigh, lambdaMax, lambdaMin, scale, selectivity, contrast, persistence, buildup,
                           memory, competition, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
-                          reliefLine, reliefLineSharpness, reliefVibration, derivativeStep}) {
+                          reliefLine, reliefLineSharpness, reliefVibration, derivativeStep, ripple, rippleSpeed, rippleLife,
+                          rippleWidth, rippleArea, rippleCount}) {
         h.f32(v);
     }
     h.u8(static_cast<std::uint8_t>(channel));
@@ -235,6 +249,11 @@ std::uint64_t ResonanceSpec::structuralHash() const {
         h.f32(s.scale);
         h.f32(s.depth);
         h.f32(s.drive);
+        h.f32(s.amplitude);
+        h.f32(s.drift);
+        h.f32(s.driftPeriod);
+        h.f32(s.spin);
+        h.f32(s.driftAudio);
     }
     return h.value();
 }
@@ -258,6 +277,14 @@ json ResonanceSpec::toJson() const {
     j["idle"] = idle;
     j["breath"] = breath;
     j["limit"] = limit;
+    if (ripple != 0.0f) { // ADR-1403: written only when on
+        j["ripple"] = ripple;
+        j["rippleSpeed"] = rippleSpeed;
+        j["rippleLife"] = rippleLife;
+        j["rippleWidth"] = rippleWidth;
+        j["rippleArea"] = rippleArea;
+        j["rippleCount"] = rippleCount;
+    }
     json src = json::array();
     for (const ResonanceSource& s : sources) {
         src.push_back({{"kind", resonanceSourceKindName(s.kind)},
@@ -270,6 +297,15 @@ json ResonanceSpec::toJson() const {
                        {"scale", s.scale},
                        {"depth", s.depth},
                        {"drive", s.drive}});
+        if (s.amplitude != 1.0f) { // ADR-1403
+            src.back()["amplitude"] = s.amplitude;
+        }
+        if (s.drift > 0.0f || s.spin != 0.0f) { // ADR-1403: written only when the source moves
+            src.back()["drift"] = s.drift;
+            src.back()["driftPeriod"] = s.driftPeriod;
+            src.back()["spin"] = s.spin;
+            src.back()["driftAudio"] = s.driftAudio;
+        }
     }
     j["sources"] = std::move(src);
     j["channel"] = resonanceChannelName(channel);
@@ -314,6 +350,12 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.idle, "idle", detail::readFloat);
     AVGEN_SPATIAL_READ(r.breath, "breath", detail::readFloat);
     AVGEN_SPATIAL_READ(r.limit, "limit", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.ripple, "ripple", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.rippleSpeed, "rippleSpeed", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.rippleLife, "rippleLife", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.rippleWidth, "rippleWidth", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.rippleArea, "rippleArea", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.rippleCount, "rippleCount", detail::readFloat);
     AVGEN_SPATIAL_READ_ENUM(r.channel, "channel", &resonanceChannelFromName, "resonance channel");
     AVGEN_SPATIAL_READ(r.listenLow, "listenLow", detail::readFloat);
     AVGEN_SPATIAL_READ(r.listenHigh, "listenHigh", detail::readFloat);
@@ -351,6 +393,11 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
                 AVGEN_SPATIAL_READ(s.scale, "scale", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.depth, "depth", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.drive, "drive", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.amplitude, "amplitude", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.drift, "drift", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.driftPeriod, "driftPeriod", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.spin, "spin", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.driftAudio, "driftAudio", detail::readFloat);
             }
             r.sources.push_back(s);
         }
@@ -429,6 +476,7 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
     const float span = std::max(n - 1.0f, 1e-3f);
     const float scale = std::max(r.scale, 1e-3f);
     st.count = count;
+    st.modeCount = count;
     st.lambdaMin = r.lambdaMin / scale;
     const std::vector<ResonanceSource>& sources = r.sources.empty() ? defaultSources() : r.sources;
     const AudioResponse response = audio ? audio->response() : AudioResponse{};
@@ -480,7 +528,7 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         }
         ResonanceMode& md = st.modes[static_cast<std::size_t>(i)];
         md.shape = glm::vec4(k * std::max(src.scale, 1e-3f), m, theta,
-                             geometry + 2.0f * std::round(std::clamp(src.depth, 0.0f, 10000.0f)));
+                             geometry + 4.0f * std::round(std::clamp(src.depth, 0.0f, 10000.0f)));
         md.place = glm::vec4(src.position, src.reach);
         md.drive = glm::vec4(0.0f, 0.0f, u, 0.0f);
         st.weight[static_cast<std::size_t>(i)] = weight;
@@ -655,14 +703,92 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
     for (int i = 0; i < count; ++i) {
         const auto si = static_cast<std::size_t>(i);
         const auto src = static_cast<std::size_t>(st.source[si]);
-        const float e = a[si] * gain[src] * st.weight[si];
+        const float amp = sources[src].amplitude; // ADR-1403: after the limiter
+        const float e = a[si] * gain[src] * st.weight[si] * amp;
         const float omega = kTwoPi * r.breath * std::pow(st.frequency[si] / r.fLow, 0.3f);
         const float psi = hash01(field.seed, i, 4u) * kTwoPi;
         // The phase in double: an evening's clock times Omega is far past float's exact range.
         const double phase = std::fmod(static_cast<double>(omega) * clock + static_cast<double>(psi), 6.283185307179586);
         st.modes[si].drive.x = e * static_cast<float>(std::cos(phase));
         st.modes[si].drive.y = e;
-        st.modes[si].drive.w = slow[si] * slowGainOf[src] * st.weight[si];
+        st.modes[si].drive.w = slow[si] * slowGainOf[src] * st.weight[si] * amp;
+        // ADR-1403, kinematics: the mode's pattern itself moves. Its centre wanders on a Lissajous (finer modes a
+        // little faster, each with its own phases and rate), widened by its memory envelope; its petals turn.
+        const ResonanceSource& source = sources[src];
+        if (source.drift > 0.0f || source.spin != 0.0f) {
+            const float u = st.modes[si].drive.z;
+            const double rate = (1.0 + 0.6 * static_cast<double>(u)) * (0.8 + 0.4 * static_cast<double>(hash01(field.seed, i, 5u)));
+            const double period = static_cast<double>(source.driftPeriod) / rate;
+            const double ph1 = static_cast<double>(hash01(field.seed, i, 6u)) * 6.283185307179586;
+            const double ph2 = static_cast<double>(hash01(field.seed, i, 7u)) * 6.283185307179586;
+            const double a1 = std::fmod(6.283185307179586 * clock / period + ph1, 6.283185307179586);
+            const double a2 = std::fmod(6.283185307179586 * clock / (1.37 * period) + ph2, 6.283185307179586);
+            const float wander = source.drift * (1.0f + source.driftAudio * std::max(slow[si] * slowGainOf[src], 0.0f));
+            st.modes[si].place.x += wander * static_cast<float>(std::sin(a1));
+            st.modes[si].place.z += wander * static_cast<float>(std::sin(a2));
+            // a point mode turns at its own rate, some against the others; a lattice turns as one (its modes stay
+            // parallel, so its wavelengths keep nesting while they slide)
+            double factor = 1.0;
+            if (source.kind == ResonanceSourceKind::Point) {
+                const double hsp = static_cast<double>(hash01(field.seed, i, 8u));
+                factor = (hsp < 0.5 ? -1.0 : 1.0) * (0.4 + 1.8 * std::abs(hsp - 0.5));
+            }
+            const double turn = std::fmod(static_cast<double>(source.spin) * factor * clock, 6.283185307179586);
+            st.modes[si].shape.z = static_cast<float>(std::fmod(static_cast<double>(st.modes[si].shape.z) + turn, 6.283185307179586));
+        }
+    }
+    // ADR-1403, ripples: the newest heard onsets still alive, each a ring travelling out from where its time hashes to.
+    if (audio && r.ripple != 0.0f) {
+        struct Launch {
+            double time;
+            float heard;
+            int band;
+        };
+        constexpr float kSpeed[3] = {1.0f, 1.6f, 2.2f};
+        constexpr float kLife[3] = {1.0f, 0.55f, 0.35f};
+        constexpr float kGain[3] = {1.0f, 0.6f, 0.3f};
+        constexpr float kU[3] = {0.1f, 0.45f, 0.85f};       // where on the dispersion each band's ring sits
+        constexpr float kLocal[3] = {0.0f, 0.6f, 0.35f};    // reach as a share of the area (0 = unbounded)
+        std::vector<Launch> launches;
+        for (int band = 0; band < 3; ++band) {
+            const float life = r.rippleLife * kLife[band];
+            const auto& list = audio->onsets(static_cast<OnsetSource>(band));
+            auto it = std::upper_bound(list.begin(), list.end(), clock, [](double c, const AudioOnset& o) { return c < o.time; });
+            while (it != list.begin()) {
+                --it;
+                if (clock - it->time > 4.0 * static_cast<double>(life)) {
+                    break;
+                }
+                const float heard = response.hit(it->strength);
+                if (heard > 0.0f) {
+                    launches.push_back({it->time, heard, band});
+                }
+            }
+        }
+        std::sort(launches.begin(), launches.end(), [](const Launch& x, const Launch& y) {
+            return x.time != y.time ? x.time > y.time : x.band < y.band;
+        });
+        const int cap = std::min(static_cast<int>(std::lround(r.rippleCount)), kMaxResonanceRipples);
+        const int nr = std::min(static_cast<int>(launches.size()), cap);
+        for (int j = 0; j < nr; ++j) {
+            const Launch& l = launches[static_cast<std::size_t>(j)];
+            const auto age = static_cast<float>(clock - l.time);
+            const float u = kU[l.band];
+            const float lambda = r.lambdaMax * std::pow(r.lambdaMin / r.lambdaMax, u) / scale;
+            const float k = kTwoPi / lambda;
+            const float e = r.ripple * l.heard * kGain[l.band] * std::exp(-age / (r.rippleLife * kLife[l.band])) *
+                            (1.0f - std::exp(-age / kStrikeRise));
+            // the launch point: a hash of the onset's time (milliseconds) and band, uniform over a disc
+            const int key = static_cast<int>((std::llround(l.time * 1000.0) * 7919LL + l.band * 104729LL) & 0x7fffffffLL);
+            const float h1 = hash01(field.seed, key, 9u);
+            const float h2 = hash01(field.seed, key, 10u);
+            const float rr = r.rippleArea * std::sqrt(h1);
+            ResonanceMode& md = st.modes[static_cast<std::size_t>(st.count)];
+            md.shape = glm::vec4(k, r.rippleWidth * lambda, r.rippleSpeed * kSpeed[l.band] * age, 2.0f);
+            md.place = glm::vec4(rr * std::cos(kTwoPi * h2), 0.0f, rr * std::sin(kTwoPi * h2), kLocal[l.band] * r.rippleArea);
+            md.drive = glm::vec4(e, e, u, 0.35f * e);
+            ++st.count;
+        }
     }
     return st;
 }
@@ -722,8 +848,21 @@ float resonanceModeShape(const ResonanceMode& mode, const glm::vec3& q, float* e
     const float theta = mode.shape.z;
     const glm::vec3 d = q - glm::vec3(mode.place);
     const float reach = mode.place.w;
-    const float lattice = std::fmod(mode.shape.w, 2.0f);
-    const float depth = std::floor(mode.shape.w * 0.5f);
+    const float geometry = std::fmod(mode.shape.w, 4.0f);
+    const float depth = std::floor(mode.shape.w * 0.25f);
+    if (geometry > 1.5f) {
+        // ADR-1403, a ripple: a travelling ring packet about its launch point (horizontal distance), radius shape.z
+        const float rho = std::sqrt(d.x * d.x + d.z * d.z);
+        const float x = rho - mode.shape.z;
+        const float wid = std::max(mode.shape.y, 1e-3f);
+        const float env = std::exp(-(x * x) / (wid * wid)) / std::sqrt(1.0f + rho * k / kTwoPi);
+        const float rw = reach > 0.0f ? 1.0f / (1.0f + (rho * rho) / (reach * reach)) : 1.0f;
+        if (env2 != nullptr) {
+            *env2 = 0.5f * env * env * rw * rw;
+        }
+        return std::cos(k * x) * env * rw;
+    }
+    const float lattice = geometry;
     float w = reach > 0.0f ? 1.0f / (1.0f + glm::dot(d, d) / (reach * reach)) : 1.0f;
     if (depth > 0.0f) {
         w *= std::exp(-std::abs(d.y) / depth);
