@@ -164,7 +164,7 @@ Changes that paid:
 
 | Test | Covers |
 |---|---|
-| `tests/unit/test_resonance_field.cpp` (`[resonance]`, 21 cases) | Mode shapes, normalisation and regularity; the dispersion axis and fractional modes; frequency selectivity; build-up and ring-down, with low modes ringing longest; strikes; purity under play, seek, reset and the cache; phase continuity, the limiter and late clocks; idle; channels (sand on nodes, force toward nodes, gradient); nodal lines of the coherent figure; readers and listening windows; JSON, validation and hash; parameters; memory; competition (per source); relief; depth and scale; probes; drive |
+| `tests/unit/test_resonance_field.cpp` (`[resonance]`, 20 cases) | Mode shapes, normalisation and regularity; the dispersion axis and fractional modes; frequency selectivity; build-up and ring-down, with low modes ringing longest; strikes; purity under play, seek, reset and the cache; phase continuity, the limiter and late clocks; idle; channels (sand on nodes, force toward nodes, gradient); nodal lines of the coherent figure; readers and listening windows; JSON, validation and hash; parameters; memory; competition (per source); relief; depth and scale; probes; drive |
 | `tests/rendering/test_resonance_gpu.cpp` (`[gpu][resonance]`) | CPU/GPU parity in every channel, the colour channel included, through the production FieldUniforms at four clocks; the 48-mode table limit |
 | `tests/unit/test_procedural_normal_step.cpp` | ADR-1401 |
 | Hidden `[.resonance-probe]` | A diagnostic that prints a scene's modes, reader statistics and resolve timings for a real song |
