@@ -45,15 +45,17 @@ PROTOTYPE = "all"  # a | b | c | all (set by --prototype)
 P = {
     "stone": "#0d0c16",      # basalt
     "stoneLit": "#1b1930",   # its lit face
-    "sand": "#4a4766",       # the settled grit on the nodal ridges (cool grey-violet)
+    "sand": "#24223a",       # the settled grit on the nodal ridges (cool grey-violet)
     "sandHot": "#8fe8ff",    # the nodal line's light (cyan)
     "hollow": "#7a3cff",     # energy in the antinodes (violet)
     "zenith": "#05060f",
-    "horizon": "#2a1d52",
+    "horizon": "#3b2a78",
     "glowHorizon": "#5b3aa6",
     "fog": "#0c0b1f",
     "moon": "#dfe4ff",       # the key: a cold moon, low, raking the ridges
     "rim": "#a77bff",
+    "spire": "#3d4250",      # the blades: dark steel: dark steel under a thin oxide film (the film makes the colour)
+    "spireEdge": "#7fe6ff",  # a ringing tier's light
 }
 
 
@@ -63,26 +65,29 @@ def C(key, scale=1.0):
 
 # ================================================================================================ the field
 FIELD = "cymatic"
-HEART = (0.0, 9.0, 0.0)          # the singing source above the basin's centre (the matter floats here)
+HEART = (0.0, 12.0, 0.0)          # the singing source above the basin's centre (the matter floats here)
 SPIRE = (-34.0, 0.0, 12.0)       # the sculpture's foot: a second, local source
 
 
 def fields(s):
     """The resonator and its readers. Everything that answers the music reads one of these."""
     res = {
-        "modes": 11.0, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 34.0, "lambdaMin": 5.0, "scale": 1.0,
-        "selectivity": 3.0, "contrast": 0.45, "persistence": 2.8, "buildup": 0.3, "memory": 1.6,
+        "modes": 14.0, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 34.0, "lambdaMin": 5.0, "scale": 1.0,
+        "selectivity": 3.0, "contrast": 0.7, "persistence": 2.8, "buildup": 0.3, "memory": 1.6,
         "sustain": 1.0, "transient": 0.9, "idle": 0.5, "breath": 0.16, "limit": 0.9, "competition": 3.0,
         "sources": [
-            # the heart: low and middle modes, rings and petals about the basin's centre, heard everywhere
-            {"kind": "point", "position": list(HEART), "order": 5, "bandLow": 0.0, "bandHigh": 0.7, "reach": 0.0,
+            # the heart: the low modes -- broad rings and petals about the basin's centre, heard everywhere
+            {"kind": "point", "position": list(HEART), "order": 4, "bandLow": 0.0, "bandHigh": 0.4, "reach": 75.0,
              "gain": 1.0},
-            # the sculpture's own local source: middle modes, three-fold at most
-            {"kind": "point", "position": list(SPIRE), "order": 3, "bandLow": 0.2, "bandHigh": 0.85, "reach": 55.0,
+            # the choir's foot: middle modes, three-fold at most, local
+            {"kind": "point", "position": list(SPIRE), "order": 3, "bandLow": 0.25, "bandHigh": 0.6, "reach": 50.0,
              "gain": 0.8},
-            # a Faraday carpet for the fine modes: a five-fold quasicrystal, bounded so the far ground stays calm
-            {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 3, "bandLow": 0.5, "bandHigh": 1.0,
-             "reach": 95.0, "gain": 0.75},
+            # the singer (the matter's own voice): upper-middle modes about the heart, bounded to its body
+            {"kind": "point", "position": list(HEART), "order": 5, "bandLow": 0.45, "bandHigh": 0.8, "reach": 16.0,
+             "gain": 1.6, "scale": 2.2},
+            # a Faraday carpet for the fine modes on the basin floor (hexagons), evanescent above it
+            {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.65, "bandHigh": 1.0,
+             "reach": 60.0, "gain": 0.75, "depth": 9.0},
         ],
         "channel": "displacement",
     }
@@ -92,7 +97,10 @@ def fields(s):
     for name, channel, extra in (("sand", "sand", {"sharpness": 0.9}),
                                  ("line", "sand", {"sharpness": 0.3}),
                                  ("glow", "amplitude", {}),
-                                 ("force", "force", {})):
+                                 ("relief", "relief", {"sharpness": 0.9, "reliefLine": 0.42, "reliefLineSharpness": 0.3,
+                                                       "reliefVibration": 0.23}),
+                                 # the matter hears the heart's modes only (its spherical shells, not the far lattice)
+                                 ("force", "force", {"listenLow": 0.45, "listenHigh": 0.8, "listenWidth": 0.04})):
         r = {"channel": channel}
         r.update(extra)
         s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
@@ -101,29 +109,60 @@ def fields(s):
 
 
 # ================================================================================================ the world map
+def _ring(r, n=24, level=0.0, jitter=0.0, seed=1):
+    pts = []
+    for i in range(n + 1):
+        a = i * 2.0 * math.pi / n
+        rr = r * (1.0 + jitter * math.sin(3.0 * a + seed) * math.cos(5.0 * a - seed))
+        pts.append([rr * math.cos(a), level, rr * math.sin(a)])
+    return pts
+
+
+def _features():
+    f = []
+    # an amphitheatre of terraces stepping down to the floor: each a flat ring at its own level, irregular so the
+    # steps read as worn stone, not a stadium
+    for k, (r, level, width) in enumerate([(0.0, -7.0, 72.0), (52.0, -2.5, 12.0), (68.0, 2.0, 10.0), (84.0, 7.0, 10.0)]):
+        path = [[0.0, level, 0.0]] if r == 0.0 else _ring(r, 28, level, 0.06, k)
+        f.append({"name": "terrace%d" % k, "kind": "flat", "path": path, "width": width, "amplitude": 0.0,
+                  "falloff": 2.2 if r == 0.0 else 1.6, "flatten": 0.97 if r == 0.0 else 0.85,
+                  "roughness": 0.05 if r == 0.0 else 0.2, "smoothing": 2 if r else 0})
+    # the rim: a broken ring of ridges 105 m out, high behind the basin and low toward the camera's gap
+    f.append({"name": "rim", "kind": "ridge", "path": _ring(105.0, 30, 0.0, 0.08, 4), "width": 30.0,
+              "amplitude": 16.0, "falloff": 1.4, "flatten": 0.0, "roughness": 1.4, "smoothing": 2})
+    f.append({"name": "rimBack", "kind": "ridge", "path": [[-90.0, 0.0, -80.0], [-20.0, 0.0, -125.0], [70.0, 0.0, -95.0]],
+              "width": 36.0, "amplitude": 18.0, "falloff": 1.1, "flatten": 0.0, "roughness": 1.8, "smoothing": 3})
+    # radial gullies cut through the terraces (folds that break the rings)
+    for k, a in enumerate([0.9, 2.3, 3.6, 4.4, 5.6]):
+        d = (math.cos(a), math.sin(a))
+        f.append({"name": "gully%d" % k, "kind": "valley",
+                  "path": [[d[0] * 38.0, 0.0, d[1] * 38.0], [d[0] * 80.0, 0.0, d[1] * 80.0],
+                           [d[0] * 125.0, 0.0, d[1] * 125.0]],
+                  "width": 9.0 + 2.0 * k % 5, "amplitude": 4.5, "falloff": 1.3, "flatten": 0.0, "roughness": 0.8,
+                  "smoothing": 2})
+    # outcrops on the floor: low basalt shoulders the figure has to flow around
+    for k, (x, z, h) in enumerate([(-24.0, -30.0, 3.0), (33.0, -14.0, 2.5)]):
+        f.append({"name": "outcrop%d" % k, "kind": "ridge", "path": [[x, 0.0, z]], "width": 9.0, "amplitude": h,
+                  "falloff": 1.8, "flatten": 0.0, "roughness": 2.0, "smoothing": 0})
+    # the gap in the rim toward the camera (+z): the way in, and a long view out
+    f.append({"name": "gap", "kind": "valley", "path": [[0.0, 0.0, 70.0], [6.0, 0.0, 115.0], [18.0, 0.0, 170.0]],
+              "width": 34.0, "amplitude": 12.0, "falloff": 0.9, "flatten": 0.0, "roughness": 0.6, "smoothing": 2})
+    # the plateau beyond the rim breaks into a ring of mountains 500-1100 m out: layered silhouettes, every direction
+    f.append({"name": "rangeNear", "kind": "ridge", "path": _ring(520.0, 18, 0.0, 0.18, 7), "width": 200.0,
+              "amplitude": 70.0, "falloff": 0.9, "flatten": 0.0, "roughness": 2.5, "smoothing": 2})
+    f.append({"name": "rangeFar", "kind": "ridge", "path": _ring(1050.0, 16, 0.0, 0.2, 11), "width": 380.0,
+              "amplitude": 220.0, "falloff": 0.8, "flatten": 0.0, "roughness": 3.0, "smoothing": 2})
+    return f
+
+
 WORLD = {
-    "name": "basin", "seed": 20261016, "size": [6000.0, 6000.0], "erosion": 0.55, "seaLevel": -1000.0,
+    "name": "basin", "seed": 20261016, "size": [6000.0, 6000.0], "erosion": 0.6, "seaLevel": -1000.0,
     "layers": [
-        {"frequency": 0.0035, "amplitude": 30.0, "ridged": 0.35, "warp": 40.0},
-        {"frequency": 0.012, "amplitude": 9.0, "ridged": 0.75, "warp": 12.0},
-        {"frequency": 0.045, "amplitude": 1.8, "ridged": 0.5, "warp": 2.0},
+        {"frequency": 0.0035, "amplitude": 30.0, "ridged": 0.4, "warp": 40.0},
+        {"frequency": 0.013, "amplitude": 8.0, "ridged": 0.8, "warp": 12.0},
+        {"frequency": 0.05, "amplitude": 1.6, "ridged": 0.6, "warp": 2.0},
     ],
-    "features": [
-        # the basin floor: a broad, smooth bowl where the figure plays
-        {"name": "floor", "kind": "flat", "path": [[0.0, -4.0, 0.0]], "width": 78.0, "amplitude": 0.0,
-         "falloff": 0.8, "flatten": 0.92, "roughness": 0.08, "smoothing": 0},
-        # its rim: a ring ridge 95 m out, lower toward the camera's side so the eye passes over it
-        {"name": "rim", "kind": "ridge", "path": [[95.0 * math.cos(a), 0.0, 95.0 * math.sin(a)]
-                                                 for a in [i * 2.0 * math.pi / 24 for i in range(25)]],
-         "width": 34.0, "amplitude": 10.0, "falloff": 1.2, "flatten": 0.0, "roughness": 1.0, "smoothing": 2},
-        # a gap in the rim toward the south (+z): the camera's way in, and a long view out of the basin
-        {"name": "gap", "kind": "valley", "path": [[0.0, 0.0, 60.0], [6.0, 0.0, 110.0], [18.0, 0.0, 170.0]],
-         "width": 40.0, "amplitude": 9.0, "falloff": 0.9, "flatten": 0.0, "roughness": 0.6, "smoothing": 2},
-        # far mountains: a ring of ridges 900 m out fills the horizon in every direction
-        {"name": "range", "kind": "ridge", "path": [[900.0 * math.cos(a), 0.0, 900.0 * math.sin(a)]
-                                                   for a in [i * 2.0 * math.pi / 16 for i in range(17)]],
-         "width": 520.0, "amplitude": 160.0, "falloff": 0.7, "flatten": 0.0, "roughness": 2.2, "smoothing": 2},
-    ],
+    "features": _features(),
 }
 
 
@@ -147,7 +186,7 @@ def world_heights(points):
                        capture_output=True, text=True)
     if r.returncode not in (0, 3):
         raise SystemExit("world_preview failed: " + r.stderr[-400:])
-    h = np.loadtxt(pout, dtype=np.float64)
+    h = np.atleast_1d(np.loadtxt(pout, dtype=np.float64))
     assert len(h) == len(points), (len(h), len(points))
     np.save(cache, h)
     return h
@@ -355,7 +394,7 @@ def ground_program():
 # ================================================================================================ the scene
 def environment(s):
     s.environment = {
-        "intensity": 0.22, "background": C("zenith"), "fogColor": C("fog"),
+        "intensity": 0.12, "background": C("zenith"), "fogColor": C("fog"),
         "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
         "shadowRange": 180.0,
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
@@ -363,8 +402,8 @@ def environment(s):
                 "background": True, "useKeyLight": False},
     }
     # the moon: low and to the side, so it rakes the ridges and every hollow holds a shadow
-    s.light("moon", "directional", direction=[0.62, -0.32, -0.72], color=C("moon"), intensity=4.5,
-            castsShadow=False, contactShadow=False)
+    s.light("moon", "directional", direction=[0.9, -0.3, -0.31], color=C("moon"), intensity=3.6,
+            castsShadow=True, contactShadow=False, softness=0.4)
     # a violet rim from behind the basin
     s.light("rim", "directional", direction=[-0.2, -0.15, 0.97], color=C("rim"), intensity=0.45, castsShadow=False)
 
@@ -379,21 +418,126 @@ def ground(s):
            material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                      "roughness": 0.6, "metallic": 0.0, "program": g.name},
            deformers=[
-               # the sand: ridges rise along the nodal lines, the antinodes are scoured (the figure is in the relief)
-               {"kind": "field", "field": "sand", "amount": 1.3, "axis": [0.0, 1.0, 0.0], "space": "world",
-                "alongNormal": False},
-               # ... with a crisp crest on the nodal line itself (the narrow reading of the same sand)
-               {"kind": "field", "field": "line", "amount": 0.55, "axis": [0.0, 1.0, 0.0], "space": "world",
-                "alongNormal": False},
-               # the vibration itself: the hollows breathe (the standing wave's own motion)
-               {"kind": "field", "field": FIELD, "amount": 0.3, "axis": [0.0, 1.0, 0.0], "space": "world",
+               # ONE pass over the modes (the relief channel): the sand's ridges along the nodal lines, a crisp crest on
+               # the line itself, and the vibration that makes the hollows breathe
+               {"kind": "field", "field": "relief", "amount": 2.6, "axis": [0.0, 1.0, 0.0], "space": "world",
                 "alongNormal": False},
            ])
     return g
 
 
+# ================================================================================================ Prototype B: the choir
+# A crescent of tuned crystal blades on the basin's west terrace, facing the heart: long blades at one end, short at
+# the other, two staggered rows (a layered silhouette, not a tower). The choir is TUNED along its chord -- each blade
+# hears the band of modes its place selects (a reader with `listenAlongAxis`): long blades the low modes, short ones
+# the high -- so a bass note sways the long end, a high one the short end, and a chord lights two groups at once.
+# Each blade answers the shared field at its own position: it tilts with the displacement it hears (a struck tine
+# swaying from its root) and its edges light with the ringing (emission is an accent, zero at rest).
+def blade_tris():
+    """One crystal blade, root at the origin, 1 m tall, 1 m wide: a flattened hexagonal prism that tapers, with a
+    chisel termination -- faceted, so every face takes its own light."""
+    def ring(y, w, t):
+        return [(0.5 * w, y, 0.0), (0.25 * w, y, 0.5 * t), (-0.25 * w, y, 0.5 * t), (-0.5 * w, y, 0.0),
+                (-0.25 * w, y, -0.5 * t), (0.25 * w, y, -0.5 * t)]
+    levels = [ring(0.0, 1.0, 0.32), ring(0.55, 0.92, 0.3), ring(0.82, 0.78, 0.26)]
+    tip = [(0.18, 1.0, 0.0), (-0.18, 1.0, 0.0)]
+    tris = []
+    for a, b in zip(levels[:-1], levels[1:]):
+        for j in range(6):
+            p0, p1, q0, q1 = a[j], a[(j + 1) % 6], b[j], b[(j + 1) % 6]
+            tris += [(p0, q1, p1), (p0, q0, q1)]
+    top = levels[-1]
+    # chisel: faces from the top ring to a short ridge
+    tris += [(top[0], tip[0], top[1]), (top[1], tip[0], top[2]), (top[2], tip[0], tip[1]), (top[2], tip[1], top[3]),
+             (top[3], tip[1], top[4]), (top[4], tip[1], tip[0]), (top[4], tip[0], top[5]), (top[5], tip[0], top[0])]
+    base = levels[0]
+    for j in range(1, 5):
+        tris.append((base[0], base[j], base[j + 1]))
+    return tris
+
+
+CHOIR_ARC = (200.0, 320.0)   # degrees about SPIRE (0 = +x): the crescent opens toward the heart
+CHOIR_R = 15.0
+
+
+def choir_layout():
+    """[(x, z, height, width, yaw_deg, row)] -- long blades at the arc's start, short at its end."""
+    out = []
+    for row, (n, dr, hscale) in enumerate(((17, 0.0, 1.0), (12, -3.4, 0.6))):
+        for i in range(n):
+            t = i / (n - 1)
+            a = math.radians(CHOIR_ARC[0] + (CHOIR_ARC[1] - CHOIR_ARC[0]) * (t + 0.5 * row / n))
+            r = CHOIR_R + dr
+            x, z = SPIRE[0] + r * math.cos(a), SPIRE[2] + r * math.sin(a)
+            h = hscale * (4.5 + 13.5 * (1.0 - t) ** 1.15)
+            w = 1.1 + 1.4 * (1.0 - t)
+            yaw = -math.degrees(a)  # blade faces the crescent's centre
+            out.append((x, z, h, w, yaw, row))
+    return out
+
+
+def choir_points(ground_y):
+    pts = []
+    for (x, z, h, w, yaw, row) in choir_layout():
+        y = ground_y(x, z) - 0.35
+        # stand each blade with a slight outward lean (a fan), then turn it to face the centre
+        q_yaw = (0.0, math.sin(math.radians(yaw) / 2.0), 0.0, math.cos(math.radians(yaw) / 2.0))
+        pts.append([round(x, 4), round(y, 4), round(z, 4), q_yaw[0], round(q_yaw[1], 6), q_yaw[2], round(q_yaw[3], 6),
+                    round(w, 4), round(h, 4), round(w, 4)])
+    return pts
+
+
+def sculpture(s):
+    pos, nrm = meshes.faceted(blade_tris())
+    meshes.write_glb(os.path.join(MESH_DIR, "cw-blade.glb"), pos, nrm, None, "blade")
+    lay = choir_layout()
+    first, last = lay[0], lay[16]
+    ax = (last[0] - first[0], 0.0, last[1] - first[1])
+    length = math.hypot(ax[0], ax[2])
+    mid = [(first[0] + last[0]) * 0.5, GROUND_Y(SPIRE[0], SPIRE[2]) + 3.0, (first[1] + last[1]) * 0.5]
+    for name, channel in (("tuned", "displacement"), ("tunedRing", "amplitude")):
+        s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
+                        "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"},
+                                  "axis": [ax[0] / length, 0.0, ax[2] / length], "point": mid, "length": length,
+                                  "resonance": {"channel": channel, "listenAlongAxis": True, "listenLow": 0.0,
+                                                "listenHigh": 1.0, "listenWidth": 0.12}}})
+    s.proc("choir", {"kind": "mesh", "asset": "meshes/cw-blade.glb"},
+           distribution={"kind": "points", "points": choir_points(GROUND_Y)},
+           material={"baseColor": C("spire"), "emissiveColor": C("spireEdge"), "emissiveIntensity": 0.03,
+                     "roughness": 0.18, "metallic": 1.0, "thinFilm": {"thickness": 380.0, "ior": 1.9}},
+           extra={"effectors": [
+               # a blade tilts from its root with the displacement it hears: the choir's nodes stand, its antinodes sway
+               {"field": "tuned", "op": "rotation", "strength": 0.16, "axis": [1.0, 0.0, 0.0]},
+               # and its edges light with the ringing it hears
+               {"field": "tunedRing", "op": "emission", "blend": "multiply", "strength": 30.0},
+           ]})
+
+
+# ================================================================================================ Prototype C: the matter
+# Grains floating in the heart's sound field, the way acoustic levitation traps them: overdamped (high drag), pushed by
+# the field's radiation force (-grad F^2) onto the nodal shells about the heart, held in a loose sphere by a weak pull.
+# A new grain is born anywhere in the body and migrates to the nearest node; when the modes change, the whole body
+# re-forms into the new figure. Nothing here animates: the shape is the field's.
+def matter(s):
+    s.nodes.append({"name": "bellCut", "kind": "field", "position": [HEART[0], HEART[1] - 3.0, HEART[2]],
+                    "field": {"kind": "plane", "axis": [0.0, -1.0, 0.0], "softness": 0.01, "strength": 1.0,
+                              "falloff": {"kind": "none"}}})
+    s.particles("matter", capacity=110000, seed=5, shape="sphere", position=list(HEART), extent=[10.0, 10.0, 10.0],
+                direction=[0, 1, 0], spawnRate=4600.0, lifetimeMin=18.0, lifetimeMax=28.0, spread=1.0, speedMin=0.0,
+                speedMax=0.15, gravity=[0, 0, 0], drag=4.0, turbulence=0.0, turbulenceScale=0.3, turbulenceSpeed=0.1,
+                attractorPosition=list(HEART), attractorStrength=0.5, attractorRadius=11.0, orbit=0.0,
+                fieldForces=[{"field": "force", "mode": "force", "strength": 220.0, "mix": 1.0, "axis": [0, 1, 0]},
+                             # the bell: grains below its rim fall out of the body (a dome, not a ball)
+                             {"field": "bellCut", "mode": "kill", "strength": 1.0, "mix": 1.0, "axis": [0, 1, 0]}],
+                sizeStart=0.035, sizeEnd=0.03, sizeVariance=0.5, sizeSkew=2.0,
+                colorStart=C("sandHot") + [0.9], colorEnd=C("hollow") + [0.0], emissive=1.1, blend="additive")
+
+
+GROUND_Y = None  # set in build(): the WorldMap's height at (x, z)
+
+
 def camera(s):
-    pos, tgt = [6.0, 17.0, 66.0], [0.0, 1.0, 0.0]
+    pos, tgt = [22.0, 24.0, 74.0], [-8.0, 2.0, -4.0]
     s.camera = {"mode": 1, "position": pos, "target": tgt, "fov": 40.0, "orbitSpeed": 0.0}
     s.params_({"camera/lens/focalLength": 28.0})
 
@@ -421,17 +565,27 @@ DESIGN = {
 }
 
 
+def ground_y(x, z):
+    return float(world_heights(np.array([[x, z]], dtype=np.float64))[0])
+
+
 def build():
+    global GROUND_Y
+    GROUND_Y = ground_y
     s = kit.Scene(ID, TITLE, DESIGN)
     environment(s)
     fields(s)
     g = ground(s)
+    if PROTOTYPE in ("b", "all"):
+        sculpture(s)
+    if PROTOTYPE in ("c", "all"):
+        matter(s)
     camera(s)
     instrument(s, g)
     s.params_({
         "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
         "post/output/grain": 0.012, "post/grade/contrast": 1.08, "post/lens/chromaticAberration": 0.0,
-        "camera/exposure/compensation": 0.9, "post/dof/enabled": False
+        "camera/exposure/compensation": 0.5, "post/dof/enabled": False
     })
     return s
 

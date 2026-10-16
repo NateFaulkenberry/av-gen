@@ -531,11 +531,21 @@ fn audioSpectrumTap(fi: u32, q: vec3<f32>, delay: f32, params0: vec4<f32>, param
 
 // ---- the resonance field (ADR-1400; spatial/resonance.cpp is the reference, operation for operation) ----------
 // A record's lanes: gridBounds0 = (first mode, mode count, channel, listen along axis), gridBounds1 = (listenLow,
-// listenHigh, listenWidth, sand sharpness), gridRes.x = the vector channels' finite-difference step.
+// listenHigh, listenWidth, sand sharpness), gridRes = (the vector channels' finite-difference step, relief: the crest
+// line's sharpness, the crest's weight, the vibration's weight).
 const RES_CHANNEL_DISPLACEMENT: u32 = 0u;
 const RES_CHANNEL_AMPLITUDE: u32 = 1u;
 const RES_CHANNEL_SAND: u32 = 2u;
 const RES_CHANNEL_FORCE: u32 = 3u;
+const RES_CHANNEL_RELIEF: u32 = 5u;
+
+fn resonanceSand(s: vec3<f32>, sharpness: f32) -> f32 {
+    if (!(s.z > 1e-12)) {
+        return 0.0;
+    }
+    let k = max(sharpness, 1e-3);
+    return sqrt(s.z) * exp(-s.y / (k * k * s.z));
+}
 const RES_PI: f32 = 3.14159265358979;
 
 // phi of mode `row` at q (x) and its local mean square (y).
@@ -549,7 +559,12 @@ fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
     if (place.w > 0.0) {
         w = 1.0 / (1.0 + dot(d, d) / (place.w * place.w));
     }
-    if (shape.w < 0.5) {
+    let lattice = shape.w - 2.0 * floor(shape.w * 0.5);
+    let depth = floor(shape.w * 0.5);
+    if (depth > 0.0) {
+        w = w * exp(-abs(d.y) / depth);
+    }
+    if (lattice < 0.5) {
         let kr = k * length(d);
         if (m < 0.5) {
             let x = sqrt(kr * kr + 1.0) - 1.0;
@@ -623,7 +638,11 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
 
 fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     let channel = u32(fieldBlock.fields[fi].gridBounds0.z + 0.5);
-    let s = resonanceSums(fi, q, channel == RES_CHANNEL_SAND);
+    let s = resonanceSums(fi, q, channel == RES_CHANNEL_SAND || channel == RES_CHANNEL_RELIEF);
+    if (channel == RES_CHANNEL_RELIEF) {
+        let lanes = fieldBlock.fields[fi].gridRes;
+        return resonanceSand(s, fieldBlock.fields[fi].gridBounds1.w) + lanes.z * resonanceSand(s, lanes.y) + lanes.w * s.x;
+    }
     if (channel == RES_CHANNEL_DISPLACEMENT) {
         return s.x;
     }

@@ -113,13 +113,15 @@ const char* resonanceChannelName(ResonanceChannel channel) {
         return "force";
     case ResonanceChannel::Gradient:
         return "gradient";
+    case ResonanceChannel::Relief:
+        return "relief";
     }
     return "displacement";
 }
 
 std::optional<ResonanceChannel> resonanceChannelFromName(std::string_view name) {
     for (const ResonanceChannel c : {ResonanceChannel::Displacement, ResonanceChannel::Amplitude, ResonanceChannel::Sand,
-                                     ResonanceChannel::Force, ResonanceChannel::Gradient}) {
+                                     ResonanceChannel::Force, ResonanceChannel::Gradient, ResonanceChannel::Relief}) {
         if (name == resonanceChannelName(c)) {
             return c;
         }
@@ -189,7 +191,8 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
         if (!(s.bandLow >= 0.0f && s.bandHigh <= 1.0f && s.bandLow <= s.bandHigh)) {
             return fail("field '{}': a resonance source's band must be 0 <= bandLow <= bandHigh <= 1", field);
         }
-        if (!(s.reach >= 0.0f && finite(s.reach) && finite(s.gain))) {
+        if (!(s.reach >= 0.0f && finite(s.reach) && finite(s.gain) && s.scale > 0.0f && finite(s.scale) && s.depth >= 0.0f &&
+              finite(s.depth))) {
             return fail("field '{}': a resonance source's reach must be >= 0 and its gain finite", field);
         }
     }
@@ -197,7 +200,8 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
         return fail("field '{}': resonance listening window must be 0 <= listenLow <= listenHigh <= 1, width >= 0",
                     field);
     }
-    if (!(sharpness > 0.0f && finite(sharpness) && derivativeStep >= 0.0f && finite(derivativeStep))) {
+    if (!(sharpness > 0.0f && finite(sharpness) && reliefLineSharpness > 0.0f && finite(reliefLine) &&
+          finite(reliefVibration) && derivativeStep >= 0.0f && finite(derivativeStep))) {
         return fail("field '{}': resonance.sharpness must be > 0 and derivativeStep >= 0", field);
     }
     return {};
@@ -207,7 +211,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     detail::Fnv h;
     for (const float v : {modes, fLow, fHigh, lambdaMax, lambdaMin, scale, selectivity, contrast, persistence, buildup,
                           memory, competition, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
-                          derivativeStep}) {
+                          reliefLine, reliefLineSharpness, reliefVibration, derivativeStep}) {
         h.f32(v);
     }
     h.u8(static_cast<std::uint8_t>(channel));
@@ -221,6 +225,8 @@ std::uint64_t ResonanceSpec::structuralHash() const {
         h.f32(s.bandHigh);
         h.f32(s.reach);
         h.f32(s.gain);
+        h.f32(s.scale);
+        h.f32(s.depth);
     }
     return h.value();
 }
@@ -252,7 +258,9 @@ json ResonanceSpec::toJson() const {
                        {"bandLow", s.bandLow},
                        {"bandHigh", s.bandHigh},
                        {"reach", s.reach},
-                       {"gain", s.gain}});
+                       {"gain", s.gain},
+                       {"scale", s.scale},
+                       {"depth", s.depth}});
     }
     j["sources"] = std::move(src);
     j["channel"] = resonanceChannelName(channel);
@@ -263,6 +271,11 @@ json ResonanceSpec::toJson() const {
     j["sharpness"] = sharpness;
     if (derivativeStep > 0.0f) {
         j["derivativeStep"] = derivativeStep;
+    }
+    if (channel == ResonanceChannel::Relief) {
+        j["reliefLine"] = reliefLine;
+        j["reliefLineSharpness"] = reliefLineSharpness;
+        j["reliefVibration"] = reliefVibration;
     }
     return j;
 }
@@ -296,6 +309,9 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.listenAlongAxis, "listenAlongAxis", detail::readBool);
     AVGEN_SPATIAL_READ(r.sharpness, "sharpness", detail::readFloat);
     AVGEN_SPATIAL_READ(r.derivativeStep, "derivativeStep", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.reliefLine, "reliefLine", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.reliefLineSharpness, "reliefLineSharpness", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.reliefVibration, "reliefVibration", detail::readFloat);
     if (j.contains("sources")) {
         const json& arr = j.at("sources");
         if (!arr.is_array()) {
@@ -315,6 +331,8 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
                 AVGEN_SPATIAL_READ(s.bandHigh, "bandHigh", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.reach, "reach", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.gain, "gain", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.scale, "scale", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.depth, "depth", detail::readFloat);
             }
             r.sources.push_back(s);
         }
@@ -443,15 +461,18 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
             weight *= fade;
         }
         ResonanceMode& md = st.modes[static_cast<std::size_t>(i)];
-        md.shape = glm::vec4(k, m, theta, geometry);
+        md.shape = glm::vec4(k * std::max(src.scale, 1e-3f), m, theta,
+                             geometry + 2.0f * std::round(std::clamp(src.depth, 0.0f, 10000.0f)));
         md.place = glm::vec4(src.position, src.reach);
         md.drive = glm::vec4(0.0f, 0.0f, u, 0.0f);
         st.weight[static_cast<std::size_t>(i)] = weight;
+        st.source[static_cast<std::size_t>(i)] = si;
         st.frequency[static_cast<std::size_t>(i)] = f;
         tauD[static_cast<std::size_t>(i)] = std::max(r.persistence * std::pow(r.fLow / f, 0.35f), 0.05f) * releaseScale;
         tauA[static_cast<std::size_t>(i)] =
             std::min(std::max(r.buildup * tauD[static_cast<std::size_t>(i)] / releaseScale * attackScale, 0.015f),
                      0.98f * tauD[static_cast<std::size_t>(i)]);
+        st.lambdaMin = std::min(st.lambdaMin, kTwoPi / md.shape.x); // the finest mode drawn (the vector channels' step)
         slowD[static_cast<std::size_t>(i)] = tauD[static_cast<std::size_t>(i)] + memory;
         slowA[static_cast<std::size_t>(i)] = std::min(std::max(0.5f * memory * attackScale, tauA[static_cast<std::size_t>(i)]),
                                                       0.98f * slowD[static_cast<std::size_t>(i)]);
@@ -564,18 +585,23 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         st.envelope[static_cast<std::size_t>(i)] = a[static_cast<std::size_t>(i)];
         st.memory[static_cast<std::size_t>(i)] = slow[static_cast<std::size_t>(i)];
     }
-    // Mode competition: the stronger modes suppress the weaker (a_i (a_i / a_max)^c), as a Faraday layer selects one
-    // pattern -- a figure stays legible when many modes are driven at once. 0 = every mode independent.
+    // Mode competition: within each source, the stronger modes suppress the weaker (a_i (a_i / a_max)^c), as a
+    // Faraday layer selects one pattern -- each body keeps a legible figure when many modes are driven at once, and
+    // the sources (separate bodies) keep theirs side by side. 0 = every mode independent.
     if (r.competition > 0.0f) {
         for (auto* env : {&a, &slow}) {
-            float top = 0.0f;
+            std::array<float, kMaxResonanceSources> top{};
             for (int i = 0; i < count; ++i) {
-                top = std::max(top, (*env)[static_cast<std::size_t>(i)] * st.weight[static_cast<std::size_t>(i)]);
+                const auto si = static_cast<std::size_t>(i);
+                const auto src = static_cast<std::size_t>(st.source[si]);
+                top[src] = std::max(top[src], (*env)[si] * st.weight[si]);
             }
-            if (top > 1e-9f) {
-                for (int i = 0; i < count; ++i) {
-                    float& v = (*env)[static_cast<std::size_t>(i)];
-                    v *= std::pow(std::max(v * st.weight[static_cast<std::size_t>(i)], 0.0f) / top, r.competition);
+            for (int i = 0; i < count; ++i) {
+                const auto si = static_cast<std::size_t>(i);
+                const float t = top[static_cast<std::size_t>(st.source[si])];
+                if (t > 1e-9f) {
+                    float& v = (*env)[si];
+                    v *= std::pow(std::max(v * st.weight[si], 0.0f) / t, r.competition);
                 }
             }
         }
@@ -647,10 +673,15 @@ float resonanceModeShape(const ResonanceMode& mode, const glm::vec3& q, float* e
     const float theta = mode.shape.z;
     const glm::vec3 d = q - glm::vec3(mode.place);
     const float reach = mode.place.w;
-    const float w = reach > 0.0f ? 1.0f / (1.0f + glm::dot(d, d) / (reach * reach)) : 1.0f;
+    const float lattice = std::fmod(mode.shape.w, 2.0f);
+    const float depth = std::floor(mode.shape.w * 0.5f);
+    float w = reach > 0.0f ? 1.0f / (1.0f + glm::dot(d, d) / (reach * reach)) : 1.0f;
+    if (depth > 0.0f) {
+        w *= std::exp(-std::abs(d.y) / depth);
+    }
     float phi = 0.0f;
     float e2 = 0.0f;
-    if (mode.shape.w < 0.5f) {
+    if (lattice < 0.5f) {
         // point: R_m(kr) cos(m (alpha - theta)), the asymptotic Bessel form with a regular core
         const float kr = k * glm::length(d);
         if (m < 0.5f) {
@@ -723,8 +754,20 @@ ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader
 
 namespace {
 
-float scalarChannel(const ResonanceSums& s, ResonanceChannel channel, float sharpness) {
+float sandOf(const ResonanceSums& s, float sharpness) {
+    if (!(s.meanEnergy > 1e-12f)) {
+        return 0.0f;
+    }
+    const float k = std::max(sharpness, 1e-3f);
+    return std::sqrt(s.meanEnergy) * std::exp(-s.energy / (k * k * s.meanEnergy));
+}
+
+float scalarChannel(const ResonanceSums& s, const ResonanceSpec& r) {
+    const ResonanceChannel channel = r.channel;
+    const float sharpness = r.sharpness;
     switch (channel) {
+    case ResonanceChannel::Relief:
+        return sandOf(s, sharpness) + r.reliefLine * sandOf(s, r.reliefLineSharpness) + r.reliefVibration * s.displacement;
     case ResonanceChannel::Displacement:
         return s.displacement;
     case ResonanceChannel::Amplitude:
@@ -754,8 +797,8 @@ float resonanceScalar(const ResonanceState& state, const FieldSpec& reader, cons
     if (resonanceChannelIsVector(reader.resonance.channel)) {
         return glm::length(resonanceVector(state, reader, q));
     }
-    const bool memory = reader.resonance.channel == ResonanceChannel::Sand;
-    return scalarChannel(resonanceSums(state, reader, q, memory), reader.resonance.channel, reader.resonance.sharpness);
+    const bool memory = reader.resonance.channel == ResonanceChannel::Sand || reader.resonance.channel == ResonanceChannel::Relief;
+    return scalarChannel(resonanceSums(state, reader, q, memory), reader.resonance);
 }
 
 glm::vec3 resonanceVector(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q) {

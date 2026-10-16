@@ -188,6 +188,8 @@ spatial::FieldSet makeFields() {
         spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {0.0f, 7.0f, 0.0f}, 5, 0.0f, 0.7f, 0.0f, 1.0f},
         spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {-20.0f, 0.0f, 9.0f}, 3, 0.3f, 1.0f, 40.0f, 0.8f},
         spatial::ResonanceSource{spatial::ResonanceSourceKind::Lattice, {5.0f, 0.0f, -4.0f}, 5, 0.5f, 1.0f, 0.0f, 0.6f}};
+    ground.resonance.sources[1].depth = 6.0f;   // a layer about its height
+    ground.resonance.sources[2].scale = 1.7f;   // a finer body
     set.fields.push_back(ground);
     set.fields.push_back(reader("disp", spatial::ResonanceChannel::Displacement));
     set.fields.push_back(reader("amp", spatial::ResonanceChannel::Amplitude));
@@ -207,6 +209,12 @@ spatial::FieldSet makeFields() {
     tuned.point = glm::vec3(1.0f, 4.0f, 0.0f);
     tuned.length = 9.0f;
     set.fields.push_back(tuned);
+    auto relief = reader("relief", spatial::ResonanceChannel::Relief);
+    relief.resonance.sharpness = 0.9f;
+    relief.resonance.reliefLine = 0.4f;
+    relief.resonance.reliefLineSharpness = 0.3f;
+    relief.resonance.reliefVibration = 0.25f;
+    set.fields.push_back(relief);
     auto framed = reader("framed", spatial::ResonanceChannel::Sand);
     framed.position = glm::vec3(3.0f, -1.0f, 2.0f);
     framed.rotationDegrees = glm::vec3(10.0f, 35.0f, -5.0f);

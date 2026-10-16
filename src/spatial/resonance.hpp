@@ -65,7 +65,9 @@ inline constexpr int kMaxResonanceSources = 4;    // per resonator
 inline constexpr int kMaxGpuResonanceModes = 48;  // the FieldBlock's mode table, every resonator together
 inline constexpr int kResonanceModeVec4s = 3;     // shape, place, drive
 
-enum class ResonanceChannel : std::uint8_t { Displacement, Amplitude, Sand, Force, Gradient };
+// Relief (appended): sand(sharpness) + reliefLine x sand(reliefLineSharpness) + reliefVibration x D in ONE pass over
+// the modes -- a ground's whole displacement for the price of one deformer (and one finite-difference normal).
+enum class ResonanceChannel : std::uint8_t { Displacement, Amplitude, Sand, Force, Gradient, Relief };
 [[nodiscard]] const char* resonanceChannelName(ResonanceChannel channel);
 [[nodiscard]] std::optional<ResonanceChannel> resonanceChannelFromName(std::string_view name);
 [[nodiscard]] inline bool resonanceChannelIsVector(ResonanceChannel c) {
@@ -84,6 +86,9 @@ struct ResonanceSource {
     float bandHigh = 1.0f;
     float reach = 0.0f;       // metres: amplitude 1 / (1 + (r / reach)^2); 0 = unbounded
     float gain = 1.0f;
+    float depth = 0.0f;       // whole metres: amplitude e^{-|y - y0| / depth} away from its height (a surface wave's
+                              // layer); 0 = none
+    float scale = 1.0f;       // multiplies its modes' wavenumbers: a smaller body draws finer figures at the same pitch
     [[nodiscard]] bool operator==(const ResonanceSource&) const = default;
 };
 
@@ -101,7 +106,7 @@ struct ResonanceSpec {
     float buildup = 0.25f;      // a mode's rise time as a fraction of its ring-down
     float memory = 1.5f;        // seconds: the slow envelope the sand channel reads rises over memory / 2 and
                                 // rings down over the mode's ring-down plus this (where sand settles, not where it jumps)
-    float competition = 1.0f;   // mode competition: a_i (a_i / a_max)^competition (0 = independent modes)
+    float competition = 1.0f;   // mode competition within each source: a_i (a_i / a_max)^competition (0 = off)
     float sustain = 1.0f;       // gain of the spectral drive
     float transient = 0.8f;     // gain of the onsets' strikes
     float idle = 0.12f;         // the lowest modes' level in silence
@@ -115,6 +120,9 @@ struct ResonanceSpec {
     float listenWidth = 0.08f;  // ... with soft edges this wide (along the axis: the Gaussian's width)
     bool listenAlongAxis = false; // the window's centre runs listenLow -> listenHigh along `axis` over `length`
     float sharpness = 0.35f;    // sand: the nodal line's width relative to the mean energy
+    float reliefLine = 0.0f;           // relief: the crest's weight (a second, narrower sand line) ...
+    float reliefLineSharpness = 0.3f;  // ... and its width
+    float reliefVibration = 0.0f;      // relief: the vibration's weight (D)
     float derivativeStep = 0.0f;// metres, the finite-difference step of the vector channels (0 = lambdaMin / 24)
 
     [[nodiscard]] Result<void> validate(std::string_view field) const;
@@ -126,7 +134,8 @@ struct ResonanceSpec {
 
 // One mode, as packed for the GPU (three vec4 a mode in the FieldBlock's table).
 struct ResonanceMode {
-    glm::vec4 shape{0.0f}; // k (rad/m), m (angular order / lattice directions), theta (rad), geometry (0 point, 1 lattice)
+    glm::vec4 shape{0.0f}; // k (rad/m), m (angular order / lattice directions), theta (rad), geometry + 2 x depth
+                           // (geometry 0 point, 1 lattice; depth whole metres, 0 = no vertical decay)
     glm::vec4 place{0.0f}; // centre (field frame), reach (0 = unbounded)
     glm::vec4 drive{0.0f}; // d = a cos(Omega t + psi) (displacement), e = a (envelope), u, s (the slow envelope, the
                            // sand's memory); d, e and s include the mode's weight (fade-in x source gain)
@@ -140,6 +149,7 @@ struct ResonanceState {
     std::array<float, kMaxResonanceModes> envelope{};  // a_i before competition and the limiter (diagnostics, tests)
     std::array<float, kMaxResonanceModes> memory{};    // the slow envelope, likewise
     std::array<float, kMaxResonanceModes> weight{};    // fade-in x source gain
+    std::array<int, kMaxResonanceModes> source{};      // the source each mode belongs to
     double clock = 0.0;
     float limiterGain = 1.0f;
     float lambdaMin = 3.0f; // the shortest wavelength drawn (the vector channels' default step)

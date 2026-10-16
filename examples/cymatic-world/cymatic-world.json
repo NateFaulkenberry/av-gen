@@ -123,7 +123,7 @@
   "post/output/vignette": 0.45,
   "post/output/grain": 0.012,
   "camera/exposure/mode": 0,
-  "camera/exposure/compensation": 0.9,
+  "camera/exposure/compensation": 0.5,
   "camera/lens/useExplicitFov": false,
   "camera/lens/focalLength": 28.0,
   "scene/volumeSteps": 24,
@@ -161,7 +161,7 @@
   },
   "palette": {
    "dominant": "#0d0c16",
-   "secondary": "#4a4766",
+   "secondary": "#24223a",
    "accent": "#8fe8ff",
    "highlight": "#7a3cff",
    "background_value": "near black",

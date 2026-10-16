@@ -451,3 +451,73 @@ TEST_CASE("Sand gathers on nodal LINES of the superposed figure, not only where 
     CHECK(onLine > 0.9f * std::sqrt(2.0f)); // the whole line carries sand (sqrt(Ebar) = sqrt(2))
     CHECK(offLine < 0.01f);
 }
+
+TEST_CASE("The relief channel is its three readings summed in one pass", "[unit][resonance]") {
+    spatial::FieldSet set;
+    auto owner = resonator(9.0f);
+    owner.resonance.idle = 0.6f;
+    set.fields.push_back(owner);
+    spatial::ResonanceCache cache;
+    spatial::resolveResonance(set, cache, 4.2);
+    const spatial::ResonanceState& st = *set.fields[0].resonanceState;
+    auto rd = [&](spatial::ResonanceChannel c, float sharp) {
+        spatial::FieldSpec f;
+        f.name = "r";
+        f.kind = spatial::FieldKind::Resonance;
+        f.reference = "res";
+        f.resonance.channel = c;
+        f.resonance.sharpness = sharp;
+        return f;
+    };
+    auto relief = rd(spatial::ResonanceChannel::Relief, 0.9f);
+    relief.resonance.reliefLine = 0.5f;
+    relief.resonance.reliefLineSharpness = 0.3f;
+    relief.resonance.reliefVibration = 0.2f;
+    for (const glm::vec3 p : {glm::vec3(3.0f, 0.0f, 1.0f), glm::vec3(-12.0f, 0.5f, 7.0f), glm::vec3(30.0f, 0.0f, -2.0f)}) {
+        const float expect = spatial::resonanceScalar(st, rd(spatial::ResonanceChannel::Sand, 0.9f), p) +
+                             0.5f * spatial::resonanceScalar(st, rd(spatial::ResonanceChannel::Sand, 0.3f), p) +
+                             0.2f * spatial::resonanceScalar(st, rd(spatial::ResonanceChannel::Displacement, 0.3f), p);
+        CHECK(spatial::resonanceScalar(st, relief, p) == Approx(expect).margin(1e-6));
+    }
+    auto back = spatial::FieldSpec::fromJson(relief.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->resonance.reliefVibration == 0.2f);
+}
+
+TEST_CASE("Modes compete within their own source, so every source keeps a figure", "[unit][resonance]") {
+    auto f = resonator(8.0f);
+    f.resonance.competition = 4.0f;
+    f.resonance.sources = {spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {}, 4, 0.0f, 0.45f, 0.0f, 1.0f},
+                           spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {20, 0, 0}, 4, 0.55f, 1.0f, 0.0f, 1.0f}};
+    // A loud low tone and a much quieter high one: across the whole field the high source would be silenced.
+    const auto h = history(10.0, [](double, int b) {
+        return b == binOf(50.0f) ? 1.0f : (b == binOf(3500.0f) ? 0.15f : 0.0f);
+    });
+    const auto s = spatial::evaluateResonance(f, h, 9.0);
+    float lowTop = 0.0f;
+    float highTop = 0.0f;
+    for (int i = 0; i < s.count; ++i) {
+        const float e = s.modes[static_cast<std::size_t>(i)].drive.y;
+        (s.source[static_cast<std::size_t>(i)] == 0 ? lowTop : highTop) = std::max(s.source[static_cast<std::size_t>(i)] == 0 ? lowTop : highTop, e);
+    }
+    CHECK(lowTop > 0.0f);
+    CHECK(highTop > 0.05f * lowTop); // the quiet source still leads its own body
+}
+
+TEST_CASE("A source's depth fades its modes away from its height; its scale refines them", "[unit][resonance]") {
+    auto f = resonator(4.0f);
+    f.resonance.idle = 0.5f;
+    f.resonance.sources = {spatial::ResonanceSource{}};
+    f.resonance.sources[0].depth = 5.0f;
+    const auto s = spatial::evaluateResonance(f, nullptr, 2.0);
+    float e0 = 0.0f;
+    float e10 = 0.0f;
+    (void)spatial::resonanceModeShape(s.modes[0], glm::vec3(3.0f, 0.0f, 0.0f), &e0);
+    (void)spatial::resonanceModeShape(s.modes[0], glm::vec3(3.0f, 10.0f, 0.0f), &e10);
+    CHECK(e10 < 0.2f * e0); // e^{-2} squared and a little farther
+    f.resonance.sources[0].depth = 0.0f;
+    f.resonance.sources[0].scale = 2.0f;
+    const auto fine = spatial::evaluateResonance(f, nullptr, 2.0);
+    CHECK(fine.modes[0].shape.x == Catch::Approx(2.0f * s.modes[0].shape.x));
+    CHECK(fine.lambdaMin == Catch::Approx(0.5f * s.lambdaMin));
+}
