@@ -239,6 +239,17 @@
    }
   },
   {
+   "source": "control.relief",
+   "target": "procedural/ground/deform/1/amount",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
    "source": "response.intensity",
    "target": "material/cwGround/op/18/ramp/constant3",
    "amount": 0.00143,
@@ -425,17 +436,6 @@
     "offset": 1.0,
     "attackMs": 300,
     "decayMs": 1500
-   }
-  },
-  {
-   "source": "control.relief",
-   "target": "procedural/ground/deform/1/amount",
-   "amount": 3.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 120
    }
   },
   {

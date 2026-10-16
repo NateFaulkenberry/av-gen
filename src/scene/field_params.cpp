@@ -220,6 +220,15 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
                 da.softMin = 0.0f;
                 da.softMax = 2.0f;
                 r.add(std::move(da), (base + "amplitude").c_str());
+                if (src.focus >= 0.0f) { // ADR-1405: where the source's focus sits, performable
+                    params::ParamDesc<float> df;
+                    df.defaultValue = src.focus;
+                    df.hardMin = 0.0f;
+                    df.hardMax = 1.0f;
+                    df.softMin = 0.0f;
+                    df.softMax = 1.0f;
+                    r.add(std::move(df), (base + "focus").c_str());
+                }
                 params::ParamDesc<float> dw;
                 dw.defaultValue = src.drift;
                 dw.hardMin = 0.0f;
@@ -243,6 +252,9 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
         if (rs.channel == spatial::ResonanceChannel::Relief) { // ADR-1403: the relief's mix, routable
             r.f("resonance/reliefLine", "relief: the crest's weight", rs.reliefLine, -100.0f, 100.0f, 0.0f, 2.0f);
             r.f("resonance/reliefVibration", "relief: the vibration's weight", rs.reliefVibration, -100.0f, 100.0f, 0.0f, 4.0f);
+            r.f("resonance/reliefSand", "relief: the sand ridge's weight", rs.reliefSand, -100.0f, 100.0f, 0.0f, 2.0f);
+            r.f("resonance/reliefFigure", "relief: the signed figure's weight", rs.reliefFigure, -100.0f, 100.0f, -2.0f, 2.0f);
+            r.f("resonance/reliefAmplitude", "relief: the figure's magnitude's weight", rs.reliefAmplitude, -100.0f, 100.0f, -2.0f, 2.0f);
         }
     }
     // ADR-906: a triggered field's timing, adjustable where the field is. What it fires on -- the
@@ -339,6 +351,10 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
             copyValue(p, base + "reach", rs.sources[i].reach);
             copyValue(p, base + "drive", rs.sources[i].drive);
             copyValue(p, base + "amplitude", rs.sources[i].amplitude);
+            if (rest.resonance.sources[i].focus >= 0.0f) {
+                copyValue(p, base + "focus", rs.sources[i].focus);
+                rs.sources[i].focus = std::clamp(rs.sources[i].focus, 0.0f, 1.0f);
+            }
             copyValue(p, base + "drift", rs.sources[i].drift);
             copyValue(p, base + "spin", rs.sources[i].spin);
             rs.sources[i].drift = std::clamp(rs.sources[i].drift, 0.0f, 1000.0f);
@@ -351,6 +367,9 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
         rs.rippleLife = std::clamp(rs.rippleLife, 0.01f, 30.0f);
         copyValue(p, "resonance/reliefLine", rs.reliefLine);
         copyValue(p, "resonance/reliefVibration", rs.reliefVibration);
+        copyValue(p, "resonance/reliefSand", rs.reliefSand);
+        copyValue(p, "resonance/reliefFigure", rs.reliefFigure);
+        copyValue(p, "resonance/reliefAmplitude", rs.reliefAmplitude);
         copyValue(p, "resonance/listenLow", rs.listenLow);
         copyValue(p, "resonance/listenHigh", rs.listenHigh);
         copyValue(p, "resonance/listenWidth", rs.listenWidth);

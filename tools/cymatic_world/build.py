@@ -363,12 +363,60 @@ def reader(s, name, channel, extra=None, frame=None):
     s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0], "field": f})
 
 
+# THE SHAPE LANGUAGE (08-brief, Stage 2): the ground's height is built per SCALE, one reader and one deformer each,
+# every reader listening to its band of the same designed bank (large u < 0.3, medium 0.28-0.7, fine > 0.68). The
+# prototypes differ in how a scale's figure becomes geometry:
+#   P1 structured modal field -- the signed standing figure F is the height (lobes up, opposite lobes down)
+#   P2 nodal boundaries       -- the nodal lines stand as ridges (sand) between antinode basins (-|F|); medium: creases
+#   P3 hybrid                 -- large: signed lobes with their nodal ridges; medium: nodal creases; fine: vibration
+SCALES = {"large": (0.0, 0.3), "medium": (0.28, 0.7), "fine": (0.68, 1.0)}
+LAYOUT = 18.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYOUT - 1)
+# DEBUG VIEWS (08-brief §16), build-time like the palettes: CW_DEBUG=
+#   mode:<i>        the geometry of ONE mode (its nodal figure), every scale's reader listening to it alone
+#   scale:<name>    only that scale's deformer (large, medium, fine)
+#   signed          the material shows the signed standing figure F (blue down, red up) over the real geometry
+#   nodal           the material shows the nodal lines (sand) of the whole figure, white on black
+#   envelope        the material shows the excitation |F| (the fast figure's amplitude), black to orange
+DEBUG = os.environ.get("CW_DEBUG", "")
+PROTO = os.environ.get("CW_PROTO", "P3")
+SHAPES = {
+    "P1": {"large": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.35}, 3.2),
+           "medium": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.3}, 1.3),
+           "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
+    "P2": {"large": ({"reliefSand": 1.0, "sharpness": 0.75, "reliefAmplitude": -0.7, "reliefVibration": 0.2}, 3.4),
+           "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.35}, 1.2),
+           "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
+    "P3": {"large": ({"reliefSand": 0.55, "sharpness": 0.7, "reliefFigure": 0.8, "reliefVibration": 0.25}, 3.2),
+           "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.3}, 1.2),
+           "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
+}
+
+
 def ground_readers(s):
+    """The material's shading reader (all scales), and one relief reader per scale. Returns the deformer layers."""
     reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
-    # the ground's height: the vibration D (signed: peaks and troughs that move) leads; the sand's nodal ridges ride on
-    # it as seams, a wide crest (sharpness 0.5: several vertices across, so it does not alias)
-    reader(s, "relief", "relief", {"sharpness": 0.9, "reliefLine": 0.1, "reliefLineSharpness": 0.5,
-                                   "reliefVibration": 1.2})
+    if DEBUG in ("signed", "nodal", "envelope"):
+        reader(s, "dbgview", {"signed": "relief", "nodal": "sand", "envelope": "amplitude"}[DEBUG],
+               {"reliefSand": 0.0, "reliefFigure": 1.0, "sharpness": 0.45} if DEBUG != "envelope" else {})
+    layers = []
+    only_mode = int(DEBUG.split(":")[1]) if DEBUG.startswith("mode:") else None
+    only_scale = DEBUG.split(":")[1] if DEBUG.startswith("scale:") else None
+    for name, (lo, hi) in SCALES.items():
+        extra, amount = SHAPES[PROTO][name]
+        if only_mode is not None:  # one mode's figure, drawn with the large scale's shaping
+            u = only_mode / (LAYOUT - 1.0)
+            extra, amount = SHAPES[PROTO]["large"]
+            lo = hi = u
+            if name != "large":
+                continue
+        if only_scale is not None and name != only_scale:
+            continue
+        r = {"sharpness": 0.9, "reliefLine": 0.0, "reliefLineSharpness": 0.5, "reliefVibration": 0.0,
+             "listenLow": lo, "listenHigh": hi, "listenWidth": 0.04 if only_mode is None else 0.005}
+        r.update(extra)
+        reader(s, "relief-" + name, "relief", r)
+        layers.append(("relief-" + name, amount))
+    return layers
 
 
 # ---- the colour language (the colour pass, 03-brief-color-lighting-art-pass.md) -------------------------------------
@@ -418,6 +466,25 @@ def ground_program():
     P_ = PALETTES[PALETTE]
     dbg = os.environ.get("CW_DEBUG", "")
     g = Prog("cwGround")
+    if dbg in ("signed", "nodal", "envelope"):  # the debug views' material (08-brief §16): the field, lit by the key
+        g.op("view", "field", 0, field="dbgview")
+        if dbg == "signed":
+            g.op(None, "remap", 1, a=0, k=[-1.2, 1.2, 0.0, 1.0], f=1.0)
+            g.op(None, "ramp", 4, a=1, k=[0.1, 0.25, 1.0, 1.0], k2=[0.85, 0.85, 0.85, 1.0], k3=[1.0, 0.2, 0.1, 1.0])
+        elif dbg == "nodal":
+            g.op(None, "remap", 1, a=0, k=[0.0, 0.6, 0.0, 1.0], f=1.0)
+            g.op(None, "ramp", 4, a=1, k=[0.02, 0.02, 0.03, 1.0], k2=[0.3, 0.3, 0.32, 1.0], k3=[1.0, 1.0, 1.0, 1.0])
+        else:
+            g.op(None, "remap", 1, a=0, k=[0.0, 1.5, 0.0, 1.0], f=1.0)
+            g.op(None, "ramp", 4, a=1, k=[0.0, 0.0, 0.0, 1.0], k2=[0.6, 0.15, 0.02, 1.0], k3=[1.0, 0.75, 0.2, 1.0])
+        g.op(None, "input", 6, inp="normal")
+        g.op(None, "gradient", 5, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=0.6)
+        g.op(None, "constant", 7, k=[0.45, 0.45, 0.45, 0.0])
+        g.op(None, "add", 5, a=5, b=7)
+        g.op(None, "multiply", 4, a=4, b=5)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit = 4, 2
+        return g
 
     def tint(label, dst, src, key, scale=1.0):
         # scalar (0..1) x colour in ONE op: a ramp from black through half the colour to the colour is exactly
@@ -494,7 +561,8 @@ def environment(s):
     # no scene lights: the ground is unlit, its key, fill, sky and rim are painted in its program (ground_program)
 
 
-def ground(s, relief, write_mesh=False):
+def ground(s, layers, write_mesh=False):
+    """`layers`: (reader name, metres per unit), one Field deformer each -- the ground's scales, in order."""
     if write_mesh:
         pos, nrm, idx = ground_mesh()
         write_glb(os.path.join(MESH_DIR, "cw-ground.glb"), pos, nrm, idx, "ground")
@@ -507,12 +575,8 @@ def ground(s, relief, write_mesh=False):
                      "roughness": 0.6, "metallic": 0.0, "unlit": True,
                      "program": "" if os.environ.get("CW_NOPROG") else g.name},
            extra={"normalStep": 0.12},  # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m
-           deformers=[
-               # ONE pass over the modes (the relief channel): the sand's ridges along the nodal lines, a crisp crest
-               # on the line itself, and the vibration that makes the hollows breathe
-               {"kind": "field", "field": "relief", "amount": relief, "axis": [0.0, 1.0, 0.0], "space": "world",
-                "alongNormal": False},
-           ])
+           deformers=[{"kind": "field", "field": name, "amount": amount, "axis": [0.0, 1.0, 0.0], "space": "world",
+                       "alongNormal": False} for name, amount in layers])
     return g
 
 
@@ -585,30 +649,41 @@ def build_world():
         "the basin floor's figure", "the basin floor, its sand relief drawing the figure",
         "a slow high arc over the basin, there and back in 160 s"))
     environment(s)
-    # THE RESONANT MEDIUM (the motion overhaul, 05-brief; ADR-1403). Four families of modes, each on its own source,
-    # and every source's figure MOVES: its modes' centres wander (each its own Lissajous), point modes' petals turn
-    # (some against the others), lattices slide and turn. Patterns sliding across each other move the nodal lines --
-    # ridges migrate, split and reconnect, loops break and reform -- while the music sets how hard each family rings.
+    # THE DESIGNED BANK (08-brief): one plate whose modes share a centre -- so their figures are related and nest --
+    # with designed orders (rings, a trefoil, a dipole, four and six lobes; nested rings and finer petals), a second
+    # centre off to the west that breaks the symmetry, standing bands, and a faint fine carpet. Every mode is a persistent
+    # identity at a fixed place on the dispersion axis (layout); the music moves weight between them (competition lets
+    # one or two lead a scale, so its figure is legible), petals turn slowly (some against the others) and the centres
+    # wander a little: the figure transforms instead of sliding apart.
     resonator(s, [
-        # A. the swell: broad low-order lobes and sweeping ridges across the whole frame (bass)
-        {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 3, "bandLow": 0.0, "bandHigh": 0.2,
-         "gain": 1.0, "amplitude": 0.62, "breath": 0.35, "drift": 26.0, "driftPeriod": 95.0, "spin": 0.035, "driftAudio": 0.3},
-        # B. rings: concentric, partly concentric figures about a wandering centre (low mids) -- the radial identity
-        {"kind": "point", "position": [0.0, 4.0, 0.0], "order": 2, "bandLow": 0.14, "bandHigh": 0.5, "reach": 70.0,
-         "gain": 0.9, "amplitude": 0.7, "breath": 1.0, "drift": 13.0, "driftPeriod": 62.0, "spin": 0.05, "driftAudio": 0.4},
-        # C. petals: angular, asymmetric multi-lobed figures off to the west (mids), turning against each other
-        {"kind": "point", "position": list(SECOND), "order": 5, "bandLow": 0.38, "bandHigh": 0.76, "reach": 60.0,
-         "gain": 0.8, "amplitude": 0.55, "breath": 1.5, "drift": 16.0, "driftPeriod": 44.0, "spin": 0.09, "driftAudio": 0.4},
-        # D. the carpet: fine Faraday ripples (highs), local, sliding faster -- detail riding on the large figure
-        {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.7, "bandHigh": 1.0,
-         "reach": 46.0, "gain": 0.55, "amplitude": 0.22, "breath": 1.5, "depth": 9.0, "drift": 2.5, "driftPeriod": 40.0, "spin": 0.03},
-    ], modes=16.0, lambdaMax=42.0, lambdaMin=3.0, competition=0.8, limit=2.0, breath=0.12,
-       # E. transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
-       ripple=1.2, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35,
+        # P, the plate's large figure: frame-filling lobes, stars and rings about one centre (bass); competition
+        # within it lets one or two modes lead, so the figure is legible
+        {"kind": "point", "position": [0.0, 3.0, 0.0], "order": 8, "bandLow": 0.0, "bandHigh": 0.3, "reach": 90.0,
+         "gain": 1.0, "amplitude": 1.0, "breath": 0.4, "drift": 3.0, "driftPeriod": 120.0, "spin": 0.03,
+         "orders": [0, 3, 4, 2, 6, 5],
+         # ADR-1405: a focus window leads one or two modes at a time, sweeping the bank: the figure morphs from one
+         # designed mode to the next (rings -> 4 lobes -> 6 -> a trefoil -> ...) instead of all ringing at once
+         "focus": 0.13, "focusWidth": 0.045, "focusSweep": 0.13, "focusPeriod": 47.0, "focusFloor": 0.04},
+        # M, the plate's medium figure: finer rings and petals about the SAME centre, so they nest inside the large ones
+        {"kind": "point", "position": [0.0, 3.0, 0.0], "order": 8, "bandLow": 0.3, "bandHigh": 0.66, "reach": 80.0,
+         "gain": 0.9, "amplitude": 0.55, "breath": 0.7, "drift": 3.0, "driftPeriod": 120.0, "spin": 0.045,
+         "orders": [0, 8, 4, 6, 3, 5],
+         "focus": 0.48, "focusWidth": 0.05, "focusSweep": 0.16, "focusPeriod": 29.0, "focusFloor": 0.04},
+        # S, a second centre off to the west: one or two petal modes that bend the plate's figure (controlled asymmetry)
+        {"kind": "point", "position": list(SECOND), "order": 5, "bandLow": 0.4, "bandHigh": 0.48, "reach": 55.0,
+         "gain": 0.8, "amplitude": 0.45, "breath": 0.7, "drift": 7.0, "driftPeriod": 90.0, "spin": 0.05,
+         "orders": [3, 5]},
+        # F, the fine layer: standing bands, squares and hexagons, faint and local
+        {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.66, "bandHigh": 1.0,
+         "reach": 46.0, "gain": 0.55, "amplitude": 0.1, "breath": 1.5, "depth": 9.0, "drift": 2.0,
+         "driftPeriod": 60.0, "spin": 0.02, "orders": [2, 1, 3]},
+    ], modes=14.0, lambdaMax=16.0, lambdaMin=2.6, competition=1.5, selectivity=4.0, limit=1.5, breath=0.15,
+       # E, transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
+       ripple=0.5, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35,
        # ADR-1404: fixed mode places (a route on `modes` adds modes, it never re-places them), and per-band response
-       layout=21.0, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
-    ground_readers(s)
-    g = ground(s, relief=2.6, write_mesh=True)
+       layout=LAYOUT, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
+    layers = ground_readers(s)
+    g = ground(s, layers, write_mesh=True)
     # LOOKING INTO THE GROUND: high and steep (about 47 degrees down) on a 30 mm lens, so the frame's top edge meets
     # the ground inside r ~60 m all round the arc and the basin's walls (they rise from r ~90 m) never enter it -- the
     # frame is all ground (checked by ray-casting the top edge and corners along the whole loop)
@@ -617,6 +692,11 @@ def build_world():
                  lift=0.0, height_bob=2.0)
     s.params_({"camera/lens/focalLength": 30.0})
     F = field_instrument(s)
+    s.control = control_map(cc, pads)
+    s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
+    s.params_(POST)
+    if DEBUG in ("signed", "nodal", "envelope"):  # a debug material: none of the colour routes' targets exist
+        return s, cc, pads
     # a ramp-tinted term's colour is its constant2 (half) and constant3 (whole); a route scales both
     RP = "material/cwGround/op/%d/ramp/%s"
     def ramp_paths(label):
@@ -645,11 +725,8 @@ def build_world():
                 R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
                 *[R("hatEnv", p_, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180) for p_ in sheen],
                 *[R("flux", p_, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500) for p_ in counter])
-    s.control = control_map(cc, pads)
-    s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     s.route(*[R("control.light", p_, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR) for p_ in counter],
             R("control.light", line, 1.0, op="multiply", gain=2.0, offset=1.0, **CCR))
-    s.params_(POST)
     return s, cc, pads
 
 

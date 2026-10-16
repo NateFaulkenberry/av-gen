@@ -325,6 +325,11 @@ TEST_CASE("A fixed layout keeps every mode where it is while `modes` changes", "
         CHECK(a.frequency[si] == b.frequency[si]);
     }
     CHECK(b.weight[16] == Approx(0.5f)); // the half-added mode fades in
+    // A route cannot push `modes` past the bank: it fills the layout and stops, every mode still in place.
+    f.resonance.modes = 23.0f;
+    const auto full = spatial::evaluateResonance(f, nullptr, 17.0);
+    CHECK(full.modeCount == 20);
+    CHECK(full.modes[5].drive.z == a.modes[5].drive.z);
     // Without a layout (ADR-1400) the same change re-places every mode: what the layout exists to prevent.
     auto old = f;
     old.resonance.layout = 0.0f;
@@ -422,4 +427,74 @@ TEST_CASE("A displaced ring fades out instead of vanishing: the ripples' sum nev
     const float fading = worstDrop(0.35f);
     CHECK(popping > 0.3f);
     CHECK(fading < 0.15f * popping);
+}
+
+// ---- ADR-1405: designed banks and the relief's shaping ------------------------------------------------------------
+
+TEST_CASE("A source's orders list designs its bank: each mode takes the next order, cycled", "[unit][resonance][shape]") {
+    spatial::FieldSpec f;
+    f.name = "res";
+    f.kind = spatial::FieldKind::Resonance;
+    f.resonance.modes = 8.0f;
+    f.resonance.sources = {
+        spatial::ResonanceSource{spatial::ResonanceSourceKind::Point, {0.0f, 0.0f, 0.0f}, 8, 0.0f, 0.6f, 0.0f, 1.0f},
+        spatial::ResonanceSource{spatial::ResonanceSourceKind::Lattice, {0.0f, 0.0f, 0.0f}, 3, 0.65f, 1.0f, 0.0f, 1.0f}};
+    f.resonance.sources[0].orders = {0, 4, 6};
+    f.resonance.sources[1].orders = {1, 2};
+    REQUIRE(f.validate().has_value());
+    const auto s = spatial::evaluateResonance(f, nullptr, 1.0);
+    std::vector<int> point;
+    std::vector<int> lattice;
+    for (int i = 0; i < s.modeCount; ++i) {
+        const auto& m = s.modes[static_cast<std::size_t>(i)];
+        (s.source[static_cast<std::size_t>(i)] == 0 ? point : lattice).push_back(static_cast<int>(m.shape.y));
+        CHECK(std::fmod(m.shape.w, 4.0f) == (s.source[static_cast<std::size_t>(i)] == 0 ? 0.0f : 1.0f));
+    }
+    REQUIRE(point.size() == 5);  // u 0, 1/7 ... 4/7 (<= 0.6)
+    REQUIRE(lattice.size() == 3);
+    CHECK(point == std::vector<int>{0, 4, 6, 0, 4});
+    CHECK(lattice == std::vector<int>{1, 2, 1});
+    auto bad = f;
+    bad.resonance.sources[1].orders = {0}; // a lattice needs a direction
+    CHECK_FALSE(bad.validate().has_value());
+    bad = f;
+    bad.resonance.sources[0].orders = {9};
+    CHECK_FALSE(bad.validate().has_value());
+    const auto back = spatial::FieldSpec::fromJson(f.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->resonance.sources == f.resonance.sources);
+    CHECK(back->structuralHash() == f.structuralHash());
+}
+
+TEST_CASE("The relief's signed-figure and magnitude terms raise lobes, sink antinodes and keep the nodes", "[unit][resonance][shape]") {
+    // one lattice mode cos(k x) at full, resting figure F = s cos(k x)
+    spatial::ResonanceState st;
+    st.count = 1;
+    st.modeCount = 1;
+    const float k = 0.5f;
+    st.modes[0].shape = glm::vec4(k, 1.0f, 0.0f, 1.0f);
+    st.modes[0].drive = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    spatial::FieldSpec relief;
+    relief.kind = spatial::FieldKind::Resonance;
+    relief.resonance.channel = spatial::ResonanceChannel::Relief;
+    relief.resonance.reliefSand = 0.0f;
+    relief.resonance.reliefFigure = 1.0f;
+    const float antinode = spatial::resonanceScalar(st, relief, {0.0f, 0.0f, 0.0f});
+    const float opposite = spatial::resonanceScalar(st, relief, {3.14159265f / k, 0.0f, 0.0f});
+    const float node = spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k, 0.0f, 0.0f});
+    const float phi0 = spatial::resonanceModeShape(st.modes[0], {0.0f, 0.0f, 0.0f});
+    CHECK(antinode == Approx(phi0));           // the figure itself
+    CHECK(opposite == Approx(-phi0));          // the opposite lobe goes down
+    CHECK(node == Approx(0.0f).margin(1e-5));
+    relief.resonance.reliefFigure = 0.0f;
+    relief.resonance.reliefAmplitude = -1.0f;  // basins at both lobes, the node left standing
+    CHECK(spatial::resonanceScalar(st, relief, {0.0f, 0.0f, 0.0f}) == Approx(-phi0));
+    CHECK(spatial::resonanceScalar(st, relief, {3.14159265f / k, 0.0f, 0.0f}) == Approx(-phi0));
+    CHECK(spatial::resonanceScalar(st, relief, {0.5f * 3.14159265f / k, 0.0f, 0.0f}) == Approx(0.0f).margin(1e-5));
+    // the default weights are ADR-1400's relief
+    spatial::FieldSpec plain;
+    plain.kind = spatial::FieldKind::Resonance;
+    plain.resonance.channel = spatial::ResonanceChannel::Relief;
+    CHECK(plain.resonance.reliefSand == 1.0f);
+    CHECK_FALSE(plain.toJson()["resonance"].contains("reliefFigure"));
 }

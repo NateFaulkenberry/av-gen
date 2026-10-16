@@ -1394,6 +1394,7 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
         g.gridBounds1 = glm::vec4(r.listenLow, r.listenHigh, std::max(r.listenWidth, 1e-4f), std::max(r.sharpness, 1e-3f));
         g.gridRes = glm::vec4(std::max(step, 1e-4f), std::max(r.reliefLineSharpness, 1e-3f), r.reliefLine,
                               r.reliefVibration);
+        g.wave0 = glm::vec4(r.reliefSand, r.reliefFigure, r.reliefAmplitude, 0.0f); // ADR-1405: the relief's other terms
     }
     g.children = glm::ivec4(-1);
     for (int c = 0; c < kMaxCompoundChildren; ++c) {

@@ -331,6 +331,15 @@ TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (AD
         ground.sources[s].amplitude = 1.0f - 0.25f * static_cast<float>(s);
     }
     ground.sources[1].depth = 7.0f; // depth now packs as geometry + 4 x depth: keep a deep source in the test
+    ground.sources[0].orders = {0, 4, 2, 6, 3};   // ADR-1405: a designed bank
+    ground.sources[2].orders = {1, 2};            // lattice bands and squares
+    auto shaped = reader("shaped", spatial::ResonanceChannel::Relief); // ADR-1405: the relief's other terms
+    shaped.resonance.sharpness = 0.6f;
+    shaped.resonance.reliefSand = 0.4f;
+    shaped.resonance.reliefFigure = 1.1f;
+    shaped.resonance.reliefAmplitude = -0.7f;
+    shaped.resonance.reliefVibration = 0.3f;
+    fields.fields.push_back(shaped);
     fields.audio = song(4000);
     spatial::ResonanceCache cache;
     std::vector<glm::vec4> samples;

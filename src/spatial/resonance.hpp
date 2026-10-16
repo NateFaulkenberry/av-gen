@@ -112,6 +112,21 @@ struct ResonanceSource {
     float breath = 1.0f;
     float spin = 0.0f;
     float driftAudio = 0.0f;
+    // ADR-1405: the source's modes' orders, in their order along u (cycled): a point mode's angular order m (0..8), a
+    // lattice mode's number of directions (1 bands, 2 squares, 3 hexagons, 1..8). Empty = ADR-1400 (a seeded order up
+    // to `order`, growing with u). A designed bank -- rings, then 4 lobes, 6, 3, ... -- instead of a hashed one.
+    std::vector<int> orders;
+    // ADR-1405, focus: which of the source's modes lead. A Gaussian window over u, e^{-((u - f) / focusWidth)^2}, on
+    // the modes' weights (both envelopes, so every reader -- geometry and colour -- sees the same figure), at
+    // f = focus + focusSweep sin(2 pi t / focusPeriod + phase) clamped to the source's band. One or two adjacent modes
+    // lead at a time and the figure crossfades from one designed mode to the next as f moves (a route moves `focus`
+    // with the music; the sweep keeps a steady passage evolving). focusFloor keeps the others faintly present.
+    // focus < 0 = off (every mode as ADR-1400).
+    float focus = -1.0f;
+    float focusWidth = 0.06f;
+    float focusSweep = 0.0f;
+    float focusPeriod = 60.0f;
+    float focusFloor = 0.0f;
     [[nodiscard]] bool operator==(const ResonanceSource&) const = default;
 };
 
@@ -169,6 +184,12 @@ struct ResonanceSpec {
     float reliefLine = 0.0f;           // relief: the crest's weight (a second, narrower sand line) ...
     float reliefLineSharpness = 0.3f;  // ... and its width
     float reliefVibration = 0.0f;      // relief: the vibration's weight (D)
+    // ADR-1405, the relief's other terms (on the SLOW figure F = sum s_i phi_i, the standing pattern): the base sand
+    // ridge's weight (1 = ADR-1400), the signed figure's (F: lobes up, opposite lobes down) and its magnitude's (|F|:
+    // with a negative weight the antinodes sink into basins, so the nodal lines stand as ridges between them).
+    float reliefSand = 1.0f;
+    float reliefFigure = 0.0f;
+    float reliefAmplitude = 0.0f;
     // ADR-1402: a reader may publish its value at one world point to the signal bus every frame, as
     // `field.<name>.probe` (the coupling hook: a route can let one part of the field drive another).
     std::optional<glm::vec3> probe;
@@ -263,6 +284,7 @@ struct ResonanceSums {
     float energy = 0.0f;       // E
     float meanEnergy = 0.0f;   // Ebar
     float fast = 0.0f;         // the fast figure (sum e_i phi_i), whatever `memory` chose for `energy`
+    float figure = 0.0f;       // ADR-1405: the figure sum e_i phi_i itself (signed), from the envelope `memory` chose
 };
 // The shading channel's rgb at q.
 [[nodiscard]] glm::vec3 resonanceShading(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q);

@@ -624,11 +624,12 @@ fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
     return smoothstep(b1.x - width, b1.x, u) * (1.0 - smoothstep(b1.y, b1.y + width, u));
 }
 
-// (D, E, Ebar) at q; `memory`: E and Ebar from the slow envelope (drive.w, the sand's) instead of drive.y.
-fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
+// (D, E, Ebar, F) at q; `memory`: E, Ebar and F (the signed figure, ADR-1405) from the slow envelope (drive.w, the
+// sand's) instead of drive.y.
+fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec4<f32> {
     let first = u32(fieldBlock.fields[fi].gridBounds0.x + 0.5);
     let count = u32(fieldBlock.fields[fi].gridBounds0.y + 0.5);
-    var sums = vec3<f32>(0.0);
+    var sums = vec4<f32>(0.0);
     for (var i = 0u; i < count; i = i + 1u) {
         let row = first + i;
         if (row >= 48u) {
@@ -645,6 +646,7 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
         sums.y = sums.y + e * pe.x;
         sums.z = sums.z + e * e * pe.y;
     }
+    sums.w = sums.y;
     sums.y = sums.y * sums.y;
     return sums;
 }
@@ -654,7 +656,9 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     let s = resonanceSums(fi, q, channel == RES_CHANNEL_SAND || channel == RES_CHANNEL_RELIEF);
     if (channel == RES_CHANNEL_RELIEF) {
         let lanes = fieldBlock.fields[fi].gridRes;
-        return resonanceSand(s, fieldBlock.fields[fi].gridBounds1.w) + lanes.z * resonanceSand(s, lanes.y) + lanes.w * s.x;
+        let more = fieldBlock.fields[fi].wave0; // ADR-1405: (sand, signed figure, |figure|) weights
+        return more.x * resonanceSand(s.xyz, fieldBlock.fields[fi].gridBounds1.w) + lanes.z * resonanceSand(s.xyz, lanes.y) +
+               lanes.w * s.x + more.y * s.w + more.z * abs(s.w);
     }
     if (channel == RES_CHANNEL_DISPLACEMENT) {
         return s.x;
