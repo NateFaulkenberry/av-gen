@@ -455,6 +455,7 @@ struct ProceduralRenderer::Impl {
     std::map<std::uint64_t, CachedMesh> meshes;
     std::map<std::uint64_t, WireMesh> wireMeshes; // ADR-1073
     std::map<std::string, ObjectState> objects;
+    std::uint64_t objectsScene = 0; // ADR-1394: the Scene::identity `objects` was filled from
     std::vector<DrawItem> items;
     std::vector<ComputeItem> computeItems;
     std::vector<GeneratorItem> generatorItems;
@@ -1721,6 +1722,15 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     const auto start = std::chrono::steady_clock::now();
     Impl& im = *impl_;
     stats_ = ProceduralStats{};
+    // ADR-1394: per-object state is keyed by NAME and re-uploaded when `structureVersion` moves -- and both are
+    // per scene. A project opened after another has its own "floor", its counters start where the last one's did, and
+    // on a match the previous project's instance records stayed on the GPU: the alien project opened after the
+    // Character Animation Lab drew the lab's 46 m floor under its aliens (tests/rendering/test_project_switch_gpu.cpp,
+    // 9,787 pixels). A different scene drops every object's state; the source meshes are keyed by content and stay.
+    if (scene.identity != im.objectsScene) {
+        im.objects.clear();
+        im.objectsScene = scene.identity;
+    }
     im.items.clear();
     im.computeItems.clear();
     im.generatorItems.clear();

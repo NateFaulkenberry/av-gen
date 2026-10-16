@@ -300,12 +300,19 @@ void SkinningRenderer::update(const scene::Scene& scene) {
     // not outlive the rigs it was holding -- a slice into another scene's palettes is not a frozen
     // character, it is a wrong one. The counters keep their last values rather than going to zero,
     // or the panel would read "no rigs" with a frozen character plainly on screen.
-    if (frozen_ && scene_ == &scene && !slices_.empty()) {
+    // ADR-1394: "the same scene" is the same address AND the same identity. A project opened after another builds
+    // its scene where the last one lived, its rigs start their palette versions at the same small numbers, and on
+    // the address alone every rig whose version happened to match kept the PREVIOUS project's palette on the GPU:
+    // the alien project opened after the Character Animation Lab drew its aliens in the lab's poses (9,787 pixels,
+    // tests/rendering/test_project_switch_gpu.cpp) while the engine's own poses were identical to a fresh load.
+    const bool sameScene = scene_ == &scene && sceneIdentity_ == scene.identity;
+    if (frozen_ && sameScene && !slices_.empty()) {
         stats_.uploadBytes = 0;
         return;
     }
-    const bool sceneChanged = scene_ != &scene;
+    const bool sceneChanged = !sameScene;
     scene_ = &scene;
+    sceneIdentity_ = scene.identity;
     stats_.rigs = 0;
     stats_.joints = 0;
     stats_.uploadBytes = 0;

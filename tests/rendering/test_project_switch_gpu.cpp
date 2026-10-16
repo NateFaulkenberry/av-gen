@@ -289,6 +289,10 @@ void runSweep(gpu::Context& ctx, const Probe& probe, bool everything) {
 const Probe kProbes[] = {
     {"Astral Forge - Trench", root() / "examples/astral-forge/astral-forge-trench.json"},
     {"Hero Metal", root() / "examples/hero/hero.json"},
+    // A project with skinned characters and a procedural floor: the overlays the Character and Animation labs draw
+    // (skeletons, origins, bounds) have something to draw on here, and its "floor" shares a name with other examples'
+    // floors -- which is how ADR-1394's per-object state was found.
+    {"Alien - Skinned Character", root() / "examples/characters/alien.json"},
 };
 
 } // namespace
@@ -356,5 +360,56 @@ TEST_CASE("A project renders the same whichever example was open before it", "[.
     }
     for (const Probe& probe : kProbes) {
         runSweep(*ctx, probe, true);
+    }
+}
+
+// The two probes above have no skinned characters, so the Character and Animation labs' overlays (skeletons, entity
+// origins and bounds, the trail) draw nothing in them whether or not they are carried -- the sweep cannot see that
+// case. This one looks at a project that has a character: carried (the editor before ADR-1390) the overlays draw over
+// it; switched through app::ProjectSwitch it renders as it does fresh.
+TEST_CASE("A character project does not inherit the Character and Animation labs' overlays", "[gpu][switch]") {
+    auto ctx = makeContext();
+    if (!ctx) {
+        SKIP("no GPU adapter available");
+    }
+    const fs::path probe = root() / "examples/characters/alien.json";
+    if (!fs::exists(root() / "assets/aliens/alien-scout.glb")) {
+        SKIP("the private character assets are not present");
+    }
+    std::optional<gpu::Image8> fresh;
+    {
+        Editor e(*ctx);
+        REQUIRE(e.renderer.init().has_value());
+        REQUIRE(e.open(probe));
+        fresh = e.play(kProbeStart, kProbeFrames);
+        REQUIRE(fresh.has_value());
+    }
+    for (const labs::LabId id : {labs::LabId::Character, labs::LabId::Animation}) {
+        const labs::LabDescriptor& lab = labs::lab(id);
+        INFO(lab.title);
+        Editor e(*ctx);
+        REQUIRE(e.renderer.init().has_value());
+        REQUIRE(e.open(root() / std::string(lab.fixture), id));
+        static_cast<void>(e.play(1.0, kBeforeFrames));
+        const rendering::DebugViewOptions labOverlays = e.overlays;
+        REQUIRE(e.open(probe));
+        const auto switched = e.play(kProbeStart, kProbeFrames);
+        REQUIRE(switched.has_value());
+        const Difference d = compare(*fresh, *switched);
+        if (d.pixels != 0) {
+            writeStill(fmt::format("alien after {}", lab.key), *switched);
+            writeStill("alien fresh", *fresh);
+        }
+        INFO("switched: " << d.pixels << " pixel(s), up to " << d.maxChannel);
+        CHECK(d.pixels == 0);
+        // The control: the same switch with the lab's overlays left on.
+        REQUIRE(e.open(probe));
+        e.overlays = labOverlays;
+        const auto carried = e.play(kProbeStart, kProbeFrames);
+        REQUIRE(carried.has_value());
+        writeStill(fmt::format("alien control {} overlays carried", lab.key), *carried);
+        const Difference c = compare(*fresh, *carried);
+        INFO("carried: " << c.pixels << " pixel(s)");
+        CHECK(c.pixels > 0);
     }
 }
