@@ -238,7 +238,16 @@ LIVE, four times (20 opens, 60 frames each), one process, 1280x800 window. Befor
 
 ## 6. Validation
 
-(Filled in at the end of the branch: both suites' exit codes, the integrity check, and the full `[.sweep]`.)
+All runs are on this branch after merging origin/main 4421568b, on the final source (2e143411; only this document
+changed after).
+
+| Run | Result |
+|---|---|
+| `AVGEN_GPU_LOCK_TIMEOUT=14400 tools/ci/run-suite.sh gpu` | **exit 0**: 661 passed, 0 failed, 1 skipped (NDI runtime), 662/662 ran, 48m 49s; the default switch sweep was the slowest case at 628 s |
+| `tools/ci/run-suite.sh cpu-assets` (run under the GPU lock) | **exit 0**: 4255 passed, 0 failed, 19 skipped, 1 expected failure (the documented `[!shouldfail]` slope lean), 4275/4275 ran, 19m 25s |
+| `python3 tools/check_project_integrity.py` | **exit 0**, 0 problems |
+| `[.sweep]`, every project in the index before each of the 3 probes, offline | **exit 0**, 639 assertions, 1137 s |
+| `[switch]` in Live engine mode (`AVGEN_SWITCH_LIVE=1`), sweep included, two probes, before the alien probe and ADR-1394 existed | exit 0, 648 assertions, 1710 s |
 
 ## 7. Left open
 
@@ -249,4 +258,4 @@ LIVE, four times (20 opens, 60 frames each), one process, 1280x800 window. Befor
   (`--capture-ui`, frame 330). Not investigated; Trench was used for the stills.
 - **Static caches.** The generated-mesh cache in `scene/procedural.cpp` and the text-mesh cache never evict. They are
   keyed by content, so they grow with distinct content opened, not with the number of opens. Not changed.
-- **Live-mode sweep with the alien probe** has not been run; the offline one has (§6).
+- **The Live-mode sweep with the alien probe** has not been run. The offline one has (§6).
