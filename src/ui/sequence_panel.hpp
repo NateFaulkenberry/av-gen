@@ -98,6 +98,15 @@ public:
     };
     [[nodiscard]] Selection selection() const { return selection_; }
     [[nodiscard]] int selectedIndex() const { return selected_; }
+    // ADR-1390: a new project's strip starts with nothing selected. The selection is indices into the open project's
+    // lanes, and an index into the last project's shots names whatever happens to be at that index in this one.
+    void clearSelection() {
+        selection_ = Selection::None;
+        selected_ = -1;
+        chosen_.clear();
+        marqueeKept_.clear();
+        audioSelected_ = -1;
+    }
 
     // Called by the host when a lyric file was chosen.
     void importLyrics(app::Engine& engine, const std::filesystem::path& path);

@@ -541,6 +541,20 @@ void AstralRenderer::initParticles(const scene::AstralForge& a, double t, const 
         cp.SetBindGroup(0, frameGroups_[0]);
         cp.SetBindGroup(1, simGroup_);
         dispatch1D(cp, config_.particles);
+        // ADR-1393: the density the first step repels down is `densTex`, "last frame's density" -- and a re-seed is
+        // not preceded by a last frame. Cleared here it was not: the grid was zeroed and the texture resolved from it
+        // was left holding the PREVIOUS simulation's matter, so a seek, or Astral Forge opened a second time in the
+        // same editor, pushed the new seed apart along density that was no longer there. Resolving the empty grid
+        // makes it what a fresh renderer's zero-initialised texture is (tests/rendering/test_project_switch_gpu.cpp:
+        // ~11,500 of 57,600 pixels differed after any other project, exact after this).
+        const int R = config_.gridRes;
+        const int RC = (R + 7) / 8;
+        cp.SetPipeline(resPipe_);
+        cp.SetBindGroup(1, resGroup_);
+        cp.DispatchWorkgroups((R + 3) / 4, (R + 3) / 4, (R + 3) / 4);
+        cp.SetPipeline(coarsePipe_);
+        cp.SetBindGroup(1, coarseGroup_);
+        cp.DispatchWorkgroups((RC + 3) / 4, (RC + 3) / 4, (RC + 3) / 4);
         cp.End();
     }
     wgpu::CommandBuffer cb = enc.Finish();

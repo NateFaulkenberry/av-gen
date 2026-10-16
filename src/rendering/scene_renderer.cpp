@@ -2790,10 +2790,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // itself also writes the frame origin, and every later pass's cost is the interval from the
     // previous pass's end to its own.
     timeline_->beginFrame();
-    const bool sceneChanged = temporalScene_ != &scene;
+    const bool sceneChanged = temporalScene_ != &scene || temporalSceneIdentity_ != scene.identity;
     if (sceneChanged) {
         resetTemporalHistory();
         temporalScene_ = &scene;
+        temporalSceneIdentity_ = scene.identity;
     }
     // ADR-912: a cut. The scene says so by changing `camera.cutSerial`, and a cut is a
     // discontinuity of the PICTURE -- not of the world, so the particle pools stay -- which is

@@ -459,6 +459,7 @@ private:
     wgpu::RenderPipeline shardPipeline_;     // ADR-1147
     std::vector<Pool> pools_;
     const scene::Scene* scene_ = nullptr;
+    std::uint64_t sceneIdentity_ = 0; // ADR-1394
     ParticleStats stats_;
 
     static constexpr wgpu::TextureFormat kHdrFormat = wgpu::TextureFormat::RGBA16Float;

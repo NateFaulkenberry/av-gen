@@ -24,7 +24,7 @@ namespace avgen::rendering {
 
 struct DebugVertex {
     glm::vec3 position;
-    float size;          // points: pixel size (0 for lines)
+    float size;          // points: world-space diameter in metres (shaders/debug.wgsl), NOT pixels; 0 for lines
     glm::vec4 color;     // linear rgb + alpha
 };
 

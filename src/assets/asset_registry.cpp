@@ -1,5 +1,7 @@
 #include "assets/asset_registry.hpp"
 
+#include <cstdlib>
+
 #include "assets/image.hpp"
 #include "core/log.hpp"
 
@@ -99,6 +101,9 @@ std::string AssetRegistry::assetId(const std::filesystem::path& path) const {
 Result<std::shared_ptr<const SceneAsset>> AssetRegistry::loadScene(const std::filesystem::path& path) {
     const std::filesystem::path resolved = resolve(path);
     const std::string key = resolved.string();
+    if (tracking_) {
+        used_.insert(key);
+    }
     if (const auto it = scenes_.find(key); it != scenes_.end()) {
         return it->second;
     }
@@ -118,6 +123,9 @@ Result<std::shared_ptr<const ImageAsset>> AssetRegistry::loadImage(const std::fi
                                                                    bool srgb) {
     const std::filesystem::path resolved = resolve(path);
     const std::string key = imageKey(resolved, srgb);
+    if (tracking_) {
+        used_.insert(key);
+    }
     if (const auto it = images_.find(key); it != images_.end()) {
         return it->second;
     }
@@ -189,6 +197,39 @@ Result<void> AssetRegistry::reload(const std::filesystem::path& path) {
 void AssetRegistry::clear() {
     scenes_.clear();
     images_.clear();
+    used_.clear();
+}
+
+void AssetRegistry::beginUse() {
+    used_.clear();
+    tracking_ = true;
+}
+
+std::size_t AssetRegistry::releaseUnused() {
+    // AVGEN_KEEP_ASSET_CACHE=1 keeps every entry, as before ADR-1392, so what the release saves can be measured in one
+    // binary rather than believed (the AVGEN_NO_TERRAIN_CACHE precedent).
+    static const bool keep = std::getenv("AVGEN_KEEP_ASSET_CACHE") != nullptr;
+    if (keep) {
+        used_.clear();
+        tracking_ = false;
+        return 0;
+    }
+    std::size_t released = 0;
+    const auto prune = [&](auto& cache) {
+        for (auto it = cache.begin(); it != cache.end();) {
+            if (used_.contains(it->first)) {
+                ++it;
+            } else {
+                it = cache.erase(it);
+                ++released;
+            }
+        }
+    };
+    prune(scenes_);
+    prune(images_);
+    used_.clear();
+    tracking_ = false;
+    return released;
 }
 
 std::vector<std::filesystem::path> AssetRegistry::loadedPaths() const {

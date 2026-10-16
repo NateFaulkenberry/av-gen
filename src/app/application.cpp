@@ -1,4 +1,5 @@
 #include "app/application.hpp"
+#include "core/process_memory.hpp"
 #include "app/live_profile_session.hpp"
 #include "app/cli_batch.hpp"
 #include "app/directing_evaluate.hpp"
@@ -316,6 +317,8 @@ std::string usageText() {
            "  --capture-ui-panel <a,b>  open and raise these panels first, so a closed or\n"
            "                      tab-buried panel can be photographed; last named ends up on top\n"
            "  --capture-ui-stay   keep running after the capture instead of quitting\n"
+           "  --open-sequence <a;b;...>  open these in turn, every --open-every <n> frames (60):\n"
+           "                      lab:<key>, example:<menu name> or a path; logs process memory\n"
            "  --debug-draw <list> debug overlays, comma separated: beams (every particle\n"
            "                      emitter's disc, its column's axis and where the column ends),\n"
            "                      entityOrigins, entityBounds, entityIds, skeletons, worldAxes,\n"
@@ -767,6 +770,23 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
                 start = comma + 1;
             }
             ++i;
+        } else if (arg == "--open-sequence") {
+            auto v = need(i, "--open-sequence");
+            if (!v) return std::unexpected(v.error());
+            for (std::size_t start = 0; start <= v->size();) {
+                const std::size_t semi = v->find(';', start);
+                const std::size_t end = semi == std::string::npos ? v->size() : semi;
+                if (end > start) {
+                    options.openSequence.push_back(v->substr(start, end - start));
+                }
+                start = end + 1;
+            }
+            ++i;
+        } else if (arg == "--open-every") {
+            auto v = need(i, "--open-every");
+            if (!v) return std::unexpected(v.error());
+            options.openEvery = std::max(2, std::atoi(v->c_str()));
+            ++i;
         } else if (arg == "--capture-ui-stay") {
             options.captureUiQuit = false;
         } else if (arg == "--debug-draw") {
@@ -1137,13 +1157,27 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
 
 Application::Application() = default;
 Application::~Application() {
+    // ADR-1392: each step of the teardown is timed, and a slow one is named. "Quitting is slow after several projects"
+    // was intermittent (0.1 s to 39 s for the same sequence), and only a name says which member was waited on.
+    auto step = [last = std::chrono::steady_clock::now()](const char* what) mutable {
+        const auto now = std::chrono::steady_clock::now();
+        const double ms = std::chrono::duration<double, std::milli>(now - last).count();
+        if (ms >= 50.0) {
+            log::info("shutdown: {} took {:.0f} ms", what, ms);
+        }
+        last = now;
+    };
     // Destruction order matters: UI before GPU context, renderer before context, window last.
     // The control plane goes first of all: it cancels the running task and waits for it, and both
     // the panel (a raw pointer) and the engine (a reference) outlive it only if it goes now.
     ai_.reset();
+    step("ai_");
     panel_.reset();
+    step("panel_");
     worldBuilder_.reset();
+    step("worldBuilder_");
     jobs_.reset();
+    step("jobs_");
     // The two offline jobs, and they were missing from this list (ADR-364). A `RenderJob` owns a
     // `gpu::ReadbackRing` whose destructor calls `Context::waitFor` on an outstanding map; a
     // `unique_ptr` member destroys in reverse declaration order, and `job_` is declared at :346
@@ -1159,7 +1193,9 @@ Application::~Application() {
     // is joined by its own destructor, and a thread still running while the engine underneath it
     // is torn down is a race nobody would find twice.
     job_.reset();
+    step("job_");
     ptJob_.reset();
+    step("ptJob_");
     // ADR-383, and ADR-364's lesson applied the moment it was earned: a job that is not on this
     // list is a job whose thread outlives the engine it is reading. Cancel first, then join, then
     // destroy -- `run()` is on that thread and holds a reference to the sequence's own engine.
@@ -1170,12 +1206,19 @@ Application::~Application() {
         ptSeqThread_.join();
     }
     ptSequence_.reset();
+    step("ptSequence_");
     imgui_.reset();
+    step("imgui_");
     engine_.reset();
+    step("engine_");
     renderer_.reset();
+    step("renderer_");
     shaders_.reset();
+    step("shaders_");
     context_.reset();
+    step("context_");
     window_.reset();
+    step("window_");
 }
 
 void Application::initControlPlane() {
@@ -1597,6 +1640,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
 
         panel_ = std::make_unique<ui::ControlPanel>();
         panel_->world.debug = cliDebug_; // `--debug-draw` seeds the panel; the panel then owns them
+        // ...for one project. ADR-1390: the next project opens with this set again, not whatever the last one had on.
+        projectSwitch_ = ProjectSwitch(cliDebug_);
         // The world editor records into the application's history rather than one of its own, and
         // registers as the context that answers Copy, Delete and the rest for world objects.
         panel_->editor.attachEdits(edits_);
@@ -1886,11 +1931,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             const std::filesystem::path fixture = labs::repositoryRoot() / std::string(lab.fixture);
             const auto overlays = labs::overlaysFor(lab.id);
             const std::string note = fmt::format("{}: {}", lab.title, lab.question);
+            //
+            // ADR-1390: the overlays are *expected* rather than written into the panel. Written, they outlived the lab:
+            // nothing ever wrote them back, so every project opened afterwards drew the lab's axes, light arrows and
+            // joints. Expected, they are the overlays the fixture's open applies (`serviceProjectSwitch`), and the next
+            // open applies the session's again.
             requestClose(ui::CloseIntent::OpenProject,
                          [this, fixture, overlays, note] {
+                             projectSwitch_.expectOverlays(overlays);
                              beginOpen(fixture);
-                             panel_->world.debug = overlays;
-                             panel_->world.showDebugOptions = true;
                              panel_->setStatus(note);
                          },
                          fixture);
@@ -2304,6 +2353,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     // first, and that is correct -- the run loop's next `update` is what derives the frame. A
     // `seekSeconds` here followed by a read here would report the frame the engine was already on,
     // which is the mistake that has produced two false results in this repository.
+    // ADR-1390: whatever start-up opened was configured by the code that opened it; from here on a change of project
+    // is the frame loop's to notice.
+    projectSwitch_.sync(engine_->projectGeneration());
     if (options.labCase) {
         const labs::LabCase& c = *options.labCase;
         if (c.timeSeconds > 0.0) {
@@ -2690,6 +2742,114 @@ void Application::sampleProjectDirtyIfIdle() {
     }
 }
 
+void Application::serviceProjectSwitch() {
+    if (engine_ == nullptr) {
+        return;
+    }
+    const bool fromLab = projectSwitch_.expecting();
+    if (auto overlays = projectSwitch_.observe(engine_->projectGeneration())) {
+        resetProjectViewState(std::move(*overlays), fromLab);
+    }
+}
+
+// ADR-1390. Everything the editor holds about the open project outside the engine, reset together when the engine
+// opens another. The engine resets its own on the load (`Engine::loadProject`); this is the rest, and the audit table
+// in docs/development/project-switch-state-2026-10.md lists what is here, what is deliberately not, and why.
+void Application::resetProjectViewState(rendering::DebugViewOptions overlays, bool fromLab) {
+    if (panel_ != nullptr) {
+        // The overlays: the session's, or the lab's that asked for this open.
+        panel_->world.debug = std::move(overlays);
+        if (fromLab) {
+            panel_->world.showDebugOptions = true;
+        }
+        // What was selected, picked or being pointed at named objects in the project that is gone. A name can recur
+        // in the next one ("ground", "hero"), which makes a stale selection worse than an empty one: it is wrong
+        // *and* plausible.
+        panel_->world.selection = ui::WorldSelection{};
+        panel_->world.generatorPick.reset();
+        panel_->world.focusRouteSource.clear();
+        panel_->world.focusRouteTarget.clear();
+        // The world editor's history and selection; `openAny` did this already for the menu's opens, and this covers
+        // the ones that do not come through it (an assistant's project tool).
+        panel_->editor.reset();
+        // The other panels' selections, which are names and indices into the project that is gone.
+        panel_->sequence.clearSelection();
+        panel_->composition.select(0);
+        panel_->graphEditor.select({});
+        // ADR-1100: the Live Performance numbers were measured on the previous project's frames.
+        perfFrames_.clear();
+        perfStats_.clear();
+        perfFramesSeen_ = 0;
+        perfRecord_ = LiveProfileRecord{};
+    }
+    edits_.clearHistory();
+    // ADR-1106: an Undo of "apply the optimizer's settings" restores the PREVIOUS project's live block. Applied to
+    // this one it would write another scene's ceilings into it.
+    optimizationUndo_.reset();
+    viewportSelectedNode_.clear();
+    viewportPickPending_ = false;
+    viewportGesture_ = ViewportGesture::None;
+    // Camera ids are per composition and small integers, so "look through camera 2" would look through a different
+    // camera of the new project. The Editor/Film choice is the person's and is kept.
+    if (viewportView_.mode == scene::ViewportCamera::Through) {
+        viewportView_.mode = scene::ViewportCamera::Editor;
+    }
+    viewportView_.camera = scene::kNoCamera;
+    // The selected object's recorded path (the `transformTrail` overlay) and the renderer's per-object diagnosis.
+    transformHistory_.setSubject({});
+    transformHistory_.clear();
+    // The Director panel's preview stills were of the old project's plan.
+    pendingStills_.reset();
+    stillsSession_.reset();
+    stillsSlots_ = 0;
+    stillsPhase_.clear();
+    if (renderer_ != nullptr) {
+        renderer_->setDiagnosticEntity({});
+        // The renderer notices a different scene on its own; this makes the reset unconditional rather than a
+        // consequence of a pointer comparison, the way a seek's is.
+        renderer_->resetTemporalHistory();
+    }
+}
+
+void Application::serviceOpenSequence(int framesRendered) {
+    if (panel_ == nullptr || openSequenceNext_ > options_.openSequence.size() || framesRendered <= 0 ||
+        framesRendered % options_.openEvery != 0 || pendingOpen_ || closeGate_.busy()) {
+        return;
+    }
+    const core::ProcessMemory memory = core::processMemory();
+    const std::size_t index = openSequenceNext_++;
+    log::info("open-sequence: {} of {} after '{}': footprint {:.1f} MB, resident {:.1f} MB", index,
+              options_.openSequence.size(),
+              engine_->projectPath().empty() ? std::string("(none)") : engine_->projectPath().filename().string(),
+              static_cast<double>(memory.footprint) / 1048576.0, static_cast<double>(memory.resident) / 1048576.0);
+    if (index == options_.openSequence.size()) {
+        return; // the reading after the last open, and nothing more to open
+    }
+    const std::string& item = options_.openSequence[index];
+    if (item.starts_with("lab:")) {
+        const auto id = labs::findLab(item.substr(4));
+        if (!id || !panel_->onOpenLab) {
+            log::error("open-sequence: no lab '{}' (have: {})", item.substr(4), labs::labKeys());
+            return;
+        }
+        log::info("open-sequence: Engineering Labs > {}", labs::lab(*id).title);
+        panel_->onOpenLab(labs::lab(*id));
+    } else if (item.starts_with("example:")) {
+        const std::string name = item.substr(8);
+        const auto it = std::find_if(panel_->examples.begin(), panel_->examples.end(),
+                                     [&](const ExampleInfo& ex) { return ex.name == name; });
+        if (it == panel_->examples.end() || !panel_->onOpenExample) {
+            log::error("open-sequence: no example named '{}'", name);
+            return;
+        }
+        log::info("open-sequence: File > Examples > {}", name);
+        panel_->onOpenExample(*it);
+    } else {
+        log::info("open-sequence: open {}", item);
+        loadAny(std::filesystem::path(item));
+    }
+}
+
 void Application::servicePendingOpen() {
     if (!pendingOpen_.has_value()) {
         return;
@@ -2723,6 +2883,7 @@ void Application::performOpen(const std::filesystem::path& path) {
         if (panel_) {
             panel_->setStatus(r.error().message);
         }
+        projectSwitch_.cancelExpected(); // a lab whose fixture failed to open leaves no overlays behind
         return;
     }
     if (panel_) {
@@ -4762,6 +4923,8 @@ int Application::runLive() {
         // Before anything else in the frame: a request made last frame is honoured now, so the
         // "Opening ..." frame it set up has already been presented. See `loadAny`.
         servicePendingOpen();
+        serviceOpenSequence(framesRendered);
+        serviceProjectSwitch();
         const auto eventsStart = std::chrono::steady_clock::now();
         newestInputNs_ = 0;
         auto events = window_->pollEvents([this](const SDL_Event& e) { handleInputEvent(e); });

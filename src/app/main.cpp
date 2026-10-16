@@ -9,7 +9,9 @@
 #include "core/log.hpp"
 #include "labs/lab.hpp"
 
+#include <chrono>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <filesystem>
 
@@ -90,10 +92,17 @@ int main(int argc, char** argv) {
     }
     avgen::log::info("avgen 0.1.0 starting ({} mode)", options->headless ? "headless" : "live");
 
-    avgen::app::Application app;
-    if (auto r = app.init(*options, std::filesystem::path(argv[0])); !r) {
+    // ADR-1392: the application is on the heap so the time its teardown takes can be measured and logged. "Quitting
+    // is slow after opening several projects" was a report nothing could put a number on.
+    auto app = std::make_unique<avgen::app::Application>();
+    if (auto r = app->init(*options, std::filesystem::path(argv[0])); !r) {
         avgen::log::error("initialisation failed: {}", r.error().message);
         return 1;
     }
-    return app.run();
+    const int code = app->run();
+    const auto shutdownStart = std::chrono::steady_clock::now();
+    app.reset();
+    avgen::log::info("shutdown: {:.0f} ms to tear the application down",
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - shutdownStart).count());
+    return code;
 }

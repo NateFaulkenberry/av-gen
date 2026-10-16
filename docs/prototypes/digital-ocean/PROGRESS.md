@@ -694,3 +694,192 @@ On the branch after merging main at ef94826a:
   rerun of the whole suite passed, so it is a load-sensitive flake outside this scene.
 - `gpu`: exit 0, 658 passed.
 - `review_examples --only "Digital Ocean"`: ok.
+
+## Pass 4 (art-direction reset)
+
+Brief: `10-brief-anime-art-direction-reset.md` (the owner's, verbatim; it supersedes 08's long strip: the island is
+now a small, recognisable one with one tree and a few rocks). Worktree `../av-gen-ocean3`, branch
+`art/digital-ocean-3` from main 4421568b. Review media: `~/Desktop/av-gen-review/57-digital-ocean-reset/`
+(look-development frames in `work/`). Report: `11-report-art-direction-reset.md`.
+
+### Pass 4.0: study
+
+- **Baseline** captured from the committed scene at 1080p, realtime tier, silent, t = 20 s (`00-baseline.png`).
+- **The Tree of Life** (`assets/treeisle/`, the manifest `assets/treeisle.manifest.json`): inspected by projecting
+  its vertices (`tree-glowmere-wood.glb`, 577 k triangles; `-foliage.glb`, 1.05 M): a broad spreading crown on a
+  gnarled trunk, 77 m tall and 116 m wide, every material a flat PBR factor (the Glowmere look did not survive the
+  export, ADR-338). Not reused: it is 3.16 M triangles for a silhouette that would be ~150 px tall, its licence is
+  not recorded, and it is gitignored -- a derived mesh would inherit both, and this live example must render on CI
+  without private assets. Its silhouette (a single spreading crown) was the alternative to the palm; the palm won
+  because the brief's "classic tiny-island composition" is a palm, and a spreading crown at this scale reads as a
+  park tree. The floating island (`floating-isle-bare.glb`, 32 k triangles) is a hovering rock with a cliff face:
+  the wrong shape for a low sand island.
+- **Rocks**: `assets/kenney/rock_*.glb` (CC0, tracked, 16-172 triangles each, ~1 m) are the right assets: low-poly
+  silhouettes with clean facets that read as cut-paper rocks when painted flat. Seven are placed, scaled 6-10x.
+  `assets/terrain/rocks/` (Poly Haven scans, 1k textures, gitignored) were ruled out for the same CI reason and
+  because a photoscanned rock fights the illustration.
+- **The water shader** (Pass 3): a 47-op material program on the displaced sea mesh; its bands were cut from a
+  height + orientation scalar, but the `crest` gradient saturated below the mean level, so the "centred" t was
+  never centred, the four regions were cut from a one-sided scalar, and the strokes were continuous lines along
+  every crest. The sun was a physically reflected ray (`r.l`) jittered into sparks -- the "shiny fragments" the
+  brief names. The clouds were ~320 spheres in rows, each with its own grazing rim: the "piles of blobs".
+- **Digital Alpine**: its generator builds terrain and a kit; its illustrated program (flat colour, two bands,
+  haze) is the ancestor of `doIllus` here, which the tree and rocks reuse. Nothing else transfers.
+- **The toon-water reference** (Roystan): depth-based colour gradient, a scrolling noise cut at a threshold into
+  hard foam, a distortion texture to break the slide, intersection foam by depth, smoothstep anti-aliasing. The
+  parts that transfer to an opaque sea seen from 14 m: colour by region, foam as a thresholded noise that follows
+  the surface, anti-aliased cuts. Depth-based colour has no seabed here; distance plays its role (`zone`).
+
+### Pass 4.1: composition and the island
+
+- The island is rebuilt from scratch (`island_radius`, `island_height`, `island_meshes`): a small irregular
+  footprint (an ellipse 96 x 52 m with three gentle lobes, on a polar grid, so the outline is one clean curve), a
+  low dune 7.5 m at its highest under the palm, a shallow rise from the water, a skirt to -3 m under the sea. No
+  deformer, nothing routed to it.
+- **One tree** (`palm_mesh`): a windswept coconut palm, 18 m, designed as a silhouette: a trunk that leans and
+  curves toward the sun with a slight S and a root flare, nine tapered ribbon fronds that rise, arc and droop, all
+  swept toward the sun, each twisted a little so some read broad and some thin, three dead fronds hanging under the
+  crown, a coconut cluster. The trunk stands still; the crown sways 0.25 m over ~9 s.
+- **Rocks**: seven Kenney rocks (`rock_tallB`, `rock_largeA/C/E`, `rock_smallA`, `rock_smallFlatA`), scaled
+  9-14x: a tall stack at the left end balancing the palm on the right, low rocks along the near shore, one standing
+  in the water off the left end. Painted by `doIllus` in the palette's `rock`.
+- **Framings** (`comp-sheet.png`, 1080p, the same sea, sun and clouds): F1 low and close (eye 10 m, 36 mm, the
+  horizon at ~47 %), F2 the classic poster (14 m, 32 mm, ~43 %), F3 elevated and wide (21 m, 28 mm, ~40 %).
+  **Chosen: F1.** It is the only one where the island is recognised at once: the palm is ~110 px tall and the land
+  ~430 px wide. F2 keeps more wave pattern but the island is a sliver again; F3 loses it entirely. F1 was then
+  adjusted (the island 270 m out at 1.2x; the eye at 10 m) so the sky holds ~47 %, the ocean ~50 %, the island the
+  left third with the palm reaching toward the sun on the right third.
+- A bug found on the first composition renders: the whole island painted the horizon's peach. Not the land
+  program -- the polar grid (and the cloud pillows, written the same session) were wound clockwise seen from
+  outside, so the colour pass culled every face while the depth prepass still wrote them, leaving a hole in the
+  sea that showed the clear colour. Both windings are now checked numerically (every face's normal against the
+  outward direction) before a render.
+
+### Pass 4.2: the water, in stages (`01-water-pass-A..D.png`, `work/water*.png`)
+
+The program is rewritten from its fundamentals (`water_program`, 48 ops near, 38 far). One scalar, the
+illustration's light `t`, is cut into every layer; nothing posterizes a colour and nothing reflects physically.
+
+- **t** = the displaced height over W_HEIGHT (3.6 m), CENTRED on the mean level (the Pass 3 gradient saturated below
+  it), mixed 35 % with the face's orientation (the wave backs, toward the camera, are the lit faces), plus 7 % of a
+  wind-streaked noise of the rest position. Then `t g`, with g the footprint-driven contrast gain (anti-aliasing).
+- **A. base regions**: `deep` (troughs) | `wmain` (the body) | `sss` (the lit backs), two cuts on t g, plus a
+  foreground zone (`wnear`, by camera distance, 12-120 m). The trough cut is soft (half-width 0.06: a shadow under
+  each wave, not a hole -- the coordinator's note 4); the lit cut is crisp (0.018).
+- **B. crest strokes**: `m` = the streaked noise mixed 30/70 with t g, cut at 0.42: tapered dashes that ride the
+  crests (the noise ends them along the crest, t across it), in pale turquoise `hl`.
+- **C. the sun's path**: a column under the sun (the view ray across the sun's azimuth), narrowing 3.2x beyond the
+  foreground zone, times `m`, cut once at 0.2 -- at the column's centre every lit back is a mark, toward its
+  edges only the crests are, so the edges are ragged and the path scatters toward the viewer. Far, the merged
+  marks (noise times g) make one soft column at the horizon (cut 0.1).
+- **D. foam**: `m g` cut at 0.445, pink-white, on the reinforced crests only.
+- **The horizon**: a Fresnel blend into `rhor`, confined to the last degrees (power 24 near, 10 far; gains 0.45 /
+  0.8). The first Pass A (`work/water1-A.png`, `water2-A.png`) was a smooth lavender surface: not soft cuts (they
+  were crisp) but this blend, which at a 10 m eye reached 0.5-0.9 over most of the sea and washed every band into
+  one mauve-grey (`work/dbg5-sheet.png`, the `fres` tile). `water3-A.png` is the first frame that reads as
+  illustrated water; the stages were then built on it.
+- **Wrong turns**, each found by dumping a register (`DEBUG_WATER`, `work/dbg*-sheet.png`): the marks' cut at 0.3
+  lit half the sea (m is mid-grey everywhere: the cuts had to sit on the crests); an isotropic 2 m noise gave
+  blobs, not dashes (now 1.1 m across the view, 7 m along it); the path as marks-then-column gave a hard-edged
+  uniform beam (the coordinator's note 1): the product-then-cut gives the ragged, widening one.
+- The medium trains carry more of the pattern (the cross swell 0.5 m, the wind sea 0.19 m, the long swell 1.05 m).
+
+### Pass 4.3: the sun, the clouds, the island revised
+
+- **Rays**: fewer and broader (frequency 1.9, a soft cut 0.42-0.8 times the noise again, so a ray's brightness
+  follows how far above the cut it rises), reach 58 deg, gain 0.5. The path below continues them in the same
+  palette colour (`glint`), under the same sun.
+- **Clouds**: each formation is ONE lofted pillow (`cloud_outline`, `cloud_pillow`): a silhouette that is the union
+  of 3-5 circles over a flat underside, sampled as one contour, inflated to a lens and smooth-shaded, so the
+  two-band program splits it into one lit region (the underside and the sun side, coral) and one shadow (mauve) by
+  one soft edge -- no rim per lobe. Ribbons get lobes close enough to overlap. 9 near and 7 far formations
+  (`CLOUDS_NEAR/FAR["layered"]`), the sun's negative space (az 0-26, under 9 deg) kept clear, one ribbon just over
+  the horizon behind the island for depth. The `rich` treatment adds a second tier of lobes and two formations:
+  bumpier, not better (`03-contact-sheet.png`). **Chosen: layered.** Drift: the world-space twist about the origin
+  (65 min a turn, the far layer slower) and a 14 m billow; nothing per lobe.
+- A formation whose GLB held a whole layer, instanced at the origin with 14 km bounds, never drew single-sided
+  (`work/dbg*-cloud*.png`): not winding (checked on screen), not the program, not the deformers. Per-formation
+  nodes at their own positions draw. The cause in the engine is not found; it is recorded as an open question
+  below, and the structure that works is also the cleaner one.
+- **The coordinator's notes** on `work/water6-D.png`, all taken: the path (above); the stacked Kenney rock
+  (`rock_tallB` read as a stepped tower) replaced by a low asymmetric boulder group of `rock_largeA/C/E`; the
+  top-centre cloud was cut by the frame's top edge and the right-edge wedge was a ribbon's tapering end seen
+  obliquely at the frame edge -- both moved inside (nothing clips a plane); the trough band softened.
+- The palette's music share: `MOOD_INTENSITY` 0.35 -> 0.12. The palette routes run at gain 2 (mood 0.5 = the full
+  afternoon), so 0.35 carried every reactive still a third of the way to the afternoon; the owner liked the sunset.
+  CC 1 still reaches every palette.
+
+### Pass 4.4: the owner's directions (framing, the island)
+
+- **Framing** (`05-framing-horizon-measured.png`): water and sky about half each, the horizon a touch off the
+  midline (45-48 % or 52-55 % from the top), never dead centre, held through the camera's motion. F1 measured
+  45.9 % (36 mm over the 24 mm sensor is 36.9 deg vertically, so pitch -1.5 deg put it 3.9 % above centre). Chosen:
+  a touch ABOVE the midline, 47 %, so the sun's path runs into the foreground and the island sits just over the
+  horizon; pitch -1.15. The breath (the eye rising 0.35 m against a fixed aim 100 m out) tilts the view 0.2 deg:
+  measured 47.0 % at the low eye (t = 3 s) and 46.7 % at the high eye (t = 16 s), inside the band. The horizon is
+  measured as the largest row-to-row luminance drop in the middle 60 % of the columns.
+- **The island** (`06-island-before-after.png`): taller (a 10 m plateau, nearly flat: a dome under two cel bands
+  drew contour rings), over an eroded rock base -- from the sand line at 5 m down to the water the rim is a steep,
+  half-terraced cliff whose radius is jogged per angular sector, on a 72-facet grid with flat normals, so it reads
+  as cut rock; ten Kenney rocks sit on the shelf, on the cliff and in the surf (a low boulder group at the left end
+  replaces the stacked rock). The land program now paints the BASE colour by height (rock | sand | top) and the
+  island, the palm and the rocks are lit cel materials (ADR-1071): the scene's key light is authored AT THE SUN
+  (direction -S, the palette's `glow`, intensity 5, no shadow; the engine's default key pointed down-left and
+  every other material is unlit and ignores it), so the sun-facing faces are lit warm, the faces away fall to the
+  palette's shadow tone, and a warm rim (`warm`) traces the edge toward the sun -- the same S the rays and the path
+  are painted from. The palette routes move the cel nodes' `baseColor` and `toon/shadowColor` and the island's
+  program colours, so the lighting holds under every palette. The camera sees the island from the side away from
+  the sun (the sun is ahead, low), so most of what it shows is the shadow side with the lit rim and the warm-lit
+  rock faces that turn toward the sun: a backlit island, as a sunset makes one.
+
+### Pass 4.5: boats, dolphins, performance, the capture
+
+- **The yacht and the dolphins** are Pass 3's, integrated: the hull sits in the water with a quieter wake (arms
+  1.8 m wide at 40 m, cuts 0.42-0.78) under the illustrated foam; the pods leap across the path as dark forms with
+  a warm rim and a splash (`work/podA-podA.png`); the hero leap (pad 36) arcs across the path
+  (`work/leap6-leap.png`). Two review renders of the hero showed nothing because the harness rendered from 3 s
+  before the still and the scored pad sat 5.8 s before the peak: a render that starts after a scored event never
+  fires it (a seek past a trigger, ADR-901). The harness grew a `--preroll`; the leap took 8 s of it.
+- **The silent variant** (`make_silent`) strips every route, which parks the yacht at its course's start, off
+  frame; look-development stills park it mid-course with `BOAT_REVIEW_OFFSET` (a knob the real scene leaves at 0).
+- **Performance** (`profiles/`, `tools/live_scene_profile.py`, M2 Max): headless 1080p Ultra GPU 24.58 ms median
+  (Pass 3: 26.54; scene 20.05 + depth 3.15, particles 0.52, AO 0.46, post 0.26); the live path at 1080p (Auto ->
+  High, 1632 x 918, 30 fps target): 150 frames in 5 s, GPU 25.49 ms, CPU work 13.1 ms (the editor's UI build),
+  3 misses (2.0 %), "at risk" -- Pass 3's finding again, the swapchain wait and the editor's CPU, not the scene's
+  GPU; at 1280 x 720 (High, 1088 x 612): GPU 21.89 ms, 2 misses (1.3 %).
+- **The capture**: `05-final-clip-music.mp4`, 4-26 s of the All You Got excerpt at 1080p, the hero wave scored at
+  6 s and the hero leap at 10 s.
+
+### Pass 4 checks
+
+On the branch after merging origin/main (the project-switch work, 27 files of engine and tests; rebuilt):
+- `check_project_integrity`: 0 problems.
+- `review_examples --only "Digital Ocean"`: ok, exit 0.
+- `cpu-assets`: exit 0, 4255 passed, 0 failed, 19 skipped, 1 expected failure (20 m 05 s).
+- `gpu`: exit 0, 661 passed, 0 failed, 1 skipped (42 m 26 s).
+
+### Pass 4.6: the coordinator's round 2 (`07-round2-before-after.png`)
+
+Three visible defects on `04-selected-still.png`, each judged as a flat silhouette first:
+- **The island read as a table.** The top was a flat plateau with a straight edge; the rock base one horizontal
+  stripe; a lit rock half-buried in the plateau's edge read as a translucent patch; and the island's left end sat
+  beyond the frame edge (its centre at -92 m put the end at 27.4 deg; the 36 mm frame ends at 26.6), which read as
+  a loose slab. Now: the island 24 m further right (az -23.6 .. -4.7 deg, the sun at +13); the top an organic,
+  asymmetric silhouette (a rise under the palm, a long soft fall to the right, soft swells, nothing straight); the
+  rock face's top varies along the shore (`rock_top`: higher under the rise, lower at the ends, wobbling), its
+  vertices jittered radially and round on a 56-facet grid and its height bumped by sector and band, so it reads as
+  clustered masses; the paint's rock line wobbles with a noise and the rock is mottled (boulders); ten rounded
+  Kenney rocks (the flat ones went) tucked inside the footprint, none buried in the plateau's edge.
+- **The clouds were still hard-cut.** The underside was a plane clip (a ruler line with corners where it met the
+  lobes); now the outline's lower half is squashed toward the base with a tanh, so the flat underside curves into
+  the end lobes; ribbons are sampled in proportion to their aspect (up to 8x), their lobes near-equal (a shallow
+  scallop) and the contour smoothed over the lobe joints; the big left bank moved inside the frame (az -14, 1100 m
+  wide). Nothing clips: the far plane is beyond the 8 km dome, and the only straight edges left are the frame's.
+- **The far sun path was a uniform vertical stripe with hard sides.** The far program's column had a constant
+  angular width and cut the product (column x marks), so its sides were wherever the column crossed the threshold.
+  Now the far column narrows a further 2.6x from 200 m to 3 km (continuous with the near program's taper at
+  200 m), the marks are cut first (at 0.17, inside the crest rows, so the waves break it) and the column's soft
+  profile multiplies after: soft sides, a taper from narrow at the horizon, broken by the rows. doSeaFar: 41 ops.
+Only the generator's scene data changed; integrity and review_examples rerun below.
+- Round 2 checks (only the generator's scene data changed since the suites): `check_project_integrity` 0 problems;
+  `review_examples --only "Digital Ocean"` ok, exit 0. `04-selected-still.png` is the round-2 frame.

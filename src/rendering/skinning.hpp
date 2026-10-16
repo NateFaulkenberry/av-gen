@@ -126,6 +126,7 @@ private:
     std::vector<std::uint64_t> uploadedVersions_;
     std::vector<std::uint8_t> staging_;
     const scene::Scene* scene_ = nullptr;
+    std::uint64_t sceneIdentity_ = 0; // ADR-1394: the address is not an identity (a new project's scene can reuse it)
     SkinningStats stats_;
     bool ready_ = false;
 };

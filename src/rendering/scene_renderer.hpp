@@ -1254,6 +1254,7 @@ private:
     std::unordered_map<std::string, glm::mat4> prevModels_;
     std::unordered_map<std::string, glm::mat4> prevModelsNext_;
     const scene::Scene* temporalScene_ = nullptr;
+    std::uint64_t temporalSceneIdentity_ = 0; // ADR-1394: with the address, which a new project's scene can reuse
     // The camera the freeze is holding (PassToggles::cameraMotion).
     glm::mat4 frozenView_{1.0f};
     glm::mat4 frozenProjection_{1.0f};

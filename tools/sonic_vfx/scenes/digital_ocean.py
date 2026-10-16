@@ -22,21 +22,25 @@ MESH_DIR = os.path.join(kit.ABSTRACT_DIR, "meshes")
 
 DESIGN = {
     "category": "digital seascape",
-    "thesis": "The Tidewriter, illustrated: an anime-background ocean world at sunset -- a low island of cut-paper "
-              "palms, a sport motor yacht cruising past with its wake, dolphins leaping across the sun's path, "
-              "painted cumulus banks and drifting sun rays. Colour is the instrument: the music moves the whole world "
-              "between violet sunset, golden afternoon and electric blue, while the bass writes its history into "
-              "the swell.",
+    "thesis": "The Tidewriter, illustrated (Pass 4): an anime ocean designed from the ground up -- a tiny island "
+              "with one windswept palm and a few rocks, graphic water in flat colour regions with crest strokes and "
+              "sparse foam, the sun's reflection a path of broken marks from the horizon to your feet, illustrated "
+              "cloud formations, a sport motor yacht cruising past, dolphins leaping across the path. Colour is the "
+              "instrument: the music moves the whole world between violet sunset, golden afternoon and electric "
+              "blue, while the bass writes its history into the swell.",
     "composition": {
-        "background": "a violet-to-coral sky, painted cumulus banks in two drifting layers, sun rays, far island strips",
-        "midground": "a low island strip with five cut-paper trees and a broken surf line on the left third; the yacht crossing in front",
-        "foreground": "anime water: soft colour bands drawn by the swell's height and faces, thin crest strokes, foam "
-                      "caps on the reinforced crests, the sun's path broken into horizontal sparks",
-        "focal": "the low sun with its rays on the right third and its column of glints",
-        "secondary": ["the motor yacht and its V-wake", "dolphin leaps", "the island's silhouette"],
-        "atmosphere": "distance haze on land and clouds; the far sea flattens into colour and glitter",
-        "post": "a little bloom on the sun and the glints",
-        "camera": "still: 14 m over the water, 32 mm, the horizon at ~44 % from the top",
+        "background": "a violet-to-peach sky, broad tapered sun rays, illustrated cloud formations (flat undersides, "
+                      "a few lobes, lit coral toward the sun, mauve in shadow) in two drifting layers",
+        "midground": "a tiny island on the left third: a low dune, one windswept palm reaching toward the sun, a "
+                     "boulder group at its left end, a thin surf line; the yacht crossing in front",
+        "foreground": "graphic water: indigo troughs, a cobalt body and lavender wave backs cut from the swell's "
+                      "height and faces, pale turquoise crest strokes and pink-white foam as tapered dashes, the "
+                      "sun's path a column of broken warm marks that widens toward the viewer",
+        "focal": "the low sun on the right third and its reflection path down to the foreground",
+        "secondary": ["the motor yacht and its wake", "dolphin leaps across the path", "the island's silhouette"],
+        "atmosphere": "distance haze on land and clouds; the far sea converges on its middle tone",
+        "post": "a little bloom on the sun and the path",
+        "camera": "still: 10 m over the water, 36 mm, the horizon at 47 % from the top (46.5-47.5 % through the breath)",
     },
     "palette": {"dominant": "#16206a", "secondary": "#7b45a0", "accent": "#f062c8", "highlight": "#fff0d8",
                 "background_value": "mid (a coral horizon under a violet sky)",
@@ -47,7 +51,7 @@ DESIGN = {
         "medium": ["three Gerstner trains (their pace and dominant direction on controls)", "the bass's history "
                    "rolling in", "the yacht's crossing", "ray drift"],
         "fast": ["kick fronts rolling in", "dolphin leaps", "ray flashes on kicks"],
-        "extremely_fast": ["glints on the sun's path", "spray"],
+        "extremely_fast": ["the path's marks flaring on hats", "spray"],
     },
     "vocabulary": [
         ["intensity (12 s)", "response.intensity -> visual.mood", "PALETTE: a build moves the world toward golden "
@@ -61,7 +65,7 @@ DESIGN = {
         ["onsets", "response.onsetEnv", "the rays reach further for a moment"],
         ["mids", "audio.mid", "the wind sea roughens"],
         ["snare", "response.snare", "spray off the near swell"],
-        ["hats / highs", "response.hatEnv, audio.treble", "glints and crest strokes flare; mint enters the lit faces"],
+        ["hats / highs", "response.hatEnv, audio.treble", "the sun path's marks and the crest strokes flare; mint enters the lit faces"],
         ["sustain", "response.sustain", "the sky's middle turns pink, the clouds' lit undersides warm, the halo "
          "swells"],
         ["brightness", "sonic.brightness.slow", "a slight warm or cool drift of the whole grade"],
@@ -70,7 +74,7 @@ DESIGN = {
         ["CC 2", "control.night", "NIGHT: a bioluminescent night"],
         ["CC 3", "control.waves", "WAVES: the swell's height"],
         ["CC 4", "control.energy", "WAVE ENERGY: chop, foam and the tide's depth"],
-        ["CC 5", "control.rays", "SUN RAYS: strength, reach, halo and the sun's path"],
+        ["CC 5", "control.rays", "SUN RAYS: strength, reach, halo and the sun's path on the water"],
         ["CC 6", "control.clouds", "CLOUDS: the glow on the clouds"],
         ["CC 7", "control.water", "WATER COLOUR: the richness of the water"],
         ["CC 8", "control.spray", "SPRAY: drums' spray and notes' sparks"],
@@ -89,9 +93,9 @@ DESIGN = {
         ["silence", "(no input)", "the swell rolls, clouds and rays drift, the yacht crosses every ~75 s, pods "
          "leap every 53 and 79 s"],
     ],
-    "tier": "light: an anime-water sea (three meshes, eight deformers each, a 47-op program near and 39 far), seven "
-            "unlit programs, an island strip, five trees, a "
-            "yacht and its masked wake, ~320 cloud puffs, fixed particle pools; no lights, no shadows, no fog march",
+    "tier": "light: a graphic sea (three meshes, eight deformers each, a 48-op program near and 38 far), seven "
+            "unlit programs, a tiny island with one palm and eight Kenney rocks, a yacht and its masked wake, 16 "
+            "cloud formations (one lofted pillow each), fixed particle pools; no lights, no shadows, no fog march",
 }
 
 INDEX_ENTRY = {
@@ -101,7 +105,7 @@ INDEX_ENTRY = {
                    "CC 6 clouds, CC 7 water colour, CC 8 spray, CC 9 wave speed, CC 10 wave direction, CC 11 band "
                    "contrast, CC 12 highlights, CC 13 foam, CC 14 surface detail; pads 36 dolphin leap, 37 hero wave, 38 "
                    "bioluminescent bloom, 39 sun flare, 40 spray, 41 daybreak. An illustrated ocean world whose colour "
-                   "and swell follow the music. See docs/prototypes/digital-ocean/07-report-anime-water.md.",
+                   "and swell follow the music. See docs/prototypes/digital-ocean/11-report-art-direction-reset.md.",
     "live": True,
     "name": "Sonic Abstract - Digital Ocean",
     "project": "sonic-abstract/digital-ocean.json",
@@ -110,7 +114,7 @@ INDEX_ENTRY = {
 
 # ------------------------------------------------------------------------------------------------ look-development knobs
 # Module-level so a look-development script can set them before build() (tools stay pure functions of these).
-COMPOSITION = "E3"
+COMPOSITION = "F1"
 
 
 def unit(v):
@@ -139,7 +143,17 @@ COMPOSITIONS = {
     "E1": (18.0, 38.0, -4.5, 4.0),
     "E2": (26.0, 34.0, -7.0, 2.0),
     "E3": (14.0, 32.0, -2.5, 0.0),
+    # Pass 4 (the reset brief): three framings round a tiny island, each with its own island placement (COMP_ISLAND)
+    # (the owner's framing direction: water and sky each about half, the horizon a touch off the midline, 45-48 %
+    # or 52-55 % from the top, never a dead-centre split; held through the camera's breath. A 36 mm lens over the
+    # 24 mm sensor gives 36.9 deg vertically, so pitch -1.15 puts the horizon at 47.0 %; the 0.35 m breath against
+    # the fixed aim moves it by 0.5 %, so it stays 46.5-47.5 %.)
+    "F1": (10.0, 36.0, -1.15, 0.0),  # low and close: the island large on the left, the horizon at 47 % (CHOSEN)
+    "F2": (14.0, 32.0, -2.8, 0.0),   # the classic poster: the horizon on the upper two-fifths
+    "F3": (21.0, 28.0, -4.6, 0.0),   # elevated and wide: more sea, the island smaller and further right
 }
+# per composition: the island's centre (x, z) and its scale
+COMP_ISLAND = {"F1": ((-68.0, -270.0), 1.2), "F2": ((-128.0, -330.0), 1.0), "F3": ((-70.0, -340.0), 1.1)}
 
 
 # ================================================================================================ the ocean mesh
@@ -246,9 +260,9 @@ SWELL_SPEED = 0.62      # stylised: slower than deep water, a dream's pace
 # the swell set: (direction, wavelength m, amplitude m, steepness Q (0..1), phase): the long swell from under the sun,
 # a cross swell from the right, a wind sea from the left
 SWELLS = [
-    (-6.0, 72.0, 1.15, STEEP[0], 0.0),
-    (31.0, 37.0, 0.42, STEEP[1], 1.3),
-    (-38.0, 15.5, 0.16, STEEP[2], 2.1),
+    (-6.0, 72.0, 1.05, STEEP[0], 0.0),
+    (31.0, 37.0, 0.5, STEEP[1], 1.3),
+    (-38.0, 15.5, 0.19, STEEP[2], 2.1),
 ]
 
 
@@ -274,45 +288,49 @@ def sea_deformers():
 PALETTES = {
     # ---- Pass 2: three coordinated families on one axis (dusk -> day -> electric), each designed as a whole
     # violet sunset: cobalt water with magenta-lavender crest light, peach rays, pink-orange clouds, dark violet land
-    "violet": dict(zenith="#24185e", mid="#7b45a0", warm="#ffa27c", cool="#c070b0", sun="#fff0d8", glow="#ff7f66",
-                   deep="#1c1656", rzen="#2c2f86", rhor="#d58cc0", sss="#7d4fc0", glint="#ffe2cc", foam="#ffd8f0",
-                   cshade="#5a3486", clit="#ff9c86", crim="#ffe0c0", isle="#6a4a96",
-                   dback="#1d1448", dbelly="#7a58a8", drim="#ffc8a8",
-                   land="#4e3488", land2="#2c1d5c", rock="#8a4e8e", sand="#f0a6a0", leaf="#3a2a78", trunk="#3a2266",
-                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd2b0", land3="#c27aa8", pearl="#f4ece8", glaze="#1c1a4a", deck="#d9cdd8", hshade="#a99ac8", wmain="#33287e", wcrest="#d47ad6", hl="#ffd6ee"),
+    "violet": dict(zenith="#2a1a66", mid="#8a4aa8", warm="#ffb08a", cool="#c87ab8", sun="#fff2dc", glow="#ff8a6a",
+                   deep="#2d2a96", rzen="#2c2f86", rhor="#d898cc", sss="#7a5ed0", glint="#ffd6a8", foam="#ffe4f4",
+                   cshade="#5a3690", clit="#ffa48e", crim="#ffe2c4", isle="#6a4a96",
+                   dback="#1d1448", dbelly="#8a68b8", drim="#ffc8a8",
+                   land="#5a4aa8", land2="#2a1a5e", rock="#8a5c92", sand="#f4c0c0", leaf="#3a2a78", trunk="#3a2870",
+                   hull="#fff2ea", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffd0a8", land3="#b07ab0", pearl="#fff0e6", glaze="#1c1a4a", deck="#dccbd8", hshade="#a99ac8", wmain="#3f3ab0", wcrest="#d47ad6", hl="#a8ecea", frond="#30246f", wnear="#1c1a6c"),
     # golden afternoon: turquoise and teal water, cream foam, coral sun, soft blue sky, warm green island
     "afternoon": dict(zenith="#2b68cc", mid="#7fb4ec", warm="#ffe0ac", cool="#bfe2f4", sun="#fffbe8", glow="#ffc884",
                       deep="#0a3c84", rzen="#2c78bc", rhor="#a8dcea", sss="#1fb4c8", glint="#fffbe8", foam="#fff4dc",
                       cshade="#90a8d8", clit="#fff5e6", crim="#fffbf0", isle="#7e9cc4",
                       dback="#284a7c", dbelly="#d0e2f0", drim="#fff4dc",
                       land="#45a85c", land2="#1f6e62", rock="#c88a5c", sand="#f6e2b4", leaf="#2f9a52", trunk="#8a5a3c",
-                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#d8c090", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc", wmain="#1270b4", wcrest="#86ecdc", hl="#f6fff2"),
+                      hull="#fffbf0", hull2="#e84a3a", sail="#ff6a48", sail2="#fff6e6", ray="#d8c090", land3="#a8d86a", pearl="#fbf8ef", glaze="#14304e", deck="#e4dccc", hshade="#a8bccc", wmain="#1270b4", wcrest="#86ecdc", hl="#f6fff2", frond="#2f8a4c", wnear="#0a4a90"),
     # electric blue: ultramarine and cyan water, mint surf, saturated blue sky, yellow-coral accents, navy land
     "electric": dict(zenith="#0a2a9c", mid="#2c6ae4", warm="#8ff0ff", cool="#4a8cf0", sun="#fff7a8", glow="#ffd84a",
                      deep="#05126a", rzen="#0e40b6", rhor="#62d4ff", sss="#1c84f0", glint="#ffffe0", foam="#c8fff0",
                      cshade="#2448b0", clit="#c4ecff", crim="#fff6c0", isle="#2244a0",
                      dback="#0a1a56", dbelly="#4a80d8", drim="#fff7b0",
                      land="#14266a", land2="#0a1446", rock="#2a4aa0", sand="#4a76d0", leaf="#0e1c5a", trunk="#0c1650",
-                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#8cc8f0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8", wmain="#0c38c8", wcrest="#62eaff", hl="#eafff8"),
+                     hull="#ffd84a", hull2="#ff5a4a", sail="#ff6a52", sail2="#fff7c8", ray="#8cc8f0", land3="#4a6ad8", pearl="#eef4ff", glaze="#081a52", deck="#cfd9ee", hshade="#7f9ad8", wmain="#0c38c8", wcrest="#62eaff", hl="#eafff8", frond="#10205e", wnear="#071a7a"),
     # the night end (CC 1): bioluminescent
     "midnight": dict(zenith="#03050f", mid="#17123c", warm="#3b2b6a", cool="#1d2150", sun="#e9f0ff", glow="#5d72c8",
                      deep="#02060f", rzen="#050a1c", rhor="#2a285c", sss="#10f0a8", glint="#cfe0ff", foam="#7affe0",
                      cshade="#0a0a22", clit="#33346e", crim="#a8b6ff", isle="#0a0a26",
                      dback="#020410", dbelly="#141a3a", drim="#9fb4ff",
                      land="#0a0c26", land2="#05061a", rock="#14183a", sand="#1a2650", leaf="#060a20", trunk="#05081a",
-                     hull="#c8d4ff", hull2="#3a4a9a", sail="#6a7ad8", sail2="#a8b6ff", ray="#a8b8ff", land3="#1a2050", pearl="#7c88b8", glaze="#02040e", deck="#4a5488", hshade="#2a3260", wmain="#06123a", wcrest="#14c09a", hl="#8affe0"),
+                     hull="#c8d4ff", hull2="#3a4a9a", sail="#6a7ad8", sail2="#a8b6ff", ray="#a8b8ff", land3="#1a2050", pearl="#7c88b8", glaze="#02040e", deck="#4a5488", hshade="#2a3260", wmain="#06123a", wcrest="#14c09a", hl="#8affe0", frond="#06081e", wnear="#020510"),
     # Pass 1's electric twilight, kept for before/after comparisons
     "twilight": dict(zenith="#100d36", mid="#563a8a", warm="#ff9b7d", cool="#8a6cc2", sun="#ffe2cc", glow="#ff7f68",
                      deep="#0a0b35", rzen="#191c58", rhor="#8a6cbd", sss="#18cfe0", glint="#ffd6c2", foam="#bdfde6",
                      cshade="#33245f", clit="#ff8a78", crim="#ffd3b4", isle="#3f2a68",
                      dback="#140f33", dbelly="#4a3a78", drim="#ffc3a8",
                      land="#3f2a68", land2="#24184a", rock="#5a3a7a", sand="#c08aa0", leaf="#2a1f52", trunk="#2a1f4a",
-                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d6c8d2", hshade="#8a7aa8", wmain="#22266e", wcrest="#18cfe0", hl="#ffe0f0"),
+                     hull="#f5e6e8", hull2="#e2506a", sail="#ffb35a", sail2="#ffe7c0", ray="#ffc9a0", land3="#8a5a9a", pearl="#efe4ec", glaze="#141238", deck="#d6c8d2", hshade="#8a7aa8", wmain="#22266e", wcrest="#18cfe0", hl="#ffe0f0", frond="#241a52", wnear="#0b0c3a"),
 }
 PALETTE = "violet"
 DEBUG_SKY = None
 BANDS = 3
 DEBUG_CLOUD = None
+DEBUG_CLOUD_FLAT = False   # look development: the clouds as a flat double-sided colour, no program
+CLOUD_DOUBLE = False       # the cloud material double-sided (look development)
+CLOUD_DEFORMERS = 2        # how many of the cloud deformers to keep (look development)
+DEBUG_WATER = None         # look development: (op label, register): the water emits that register after that op
 CAMERA_BREATH = True
 REVIEW_MIDI = None          # look development: {"padLeap": [t, ...], "night": [(t, v), ...]} scores the MIDI offline
 
@@ -368,8 +386,8 @@ class Prog:
         self.pal.append((label, key, scale))
         return self.colour(label, dst, pal(PALETTE, key), scale)
 
-    def doc(self, emission, opacity=-1):
-        return {"name": self.name, "ops": self.ops, "baseColor": -1, "metallic": -1, "roughness": -1,
+    def doc(self, emission, opacity=-1, base=-1):
+        return {"name": self.name, "ops": self.ops, "baseColor": base, "metallic": -1, "roughness": -1,
                 "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
@@ -491,111 +509,135 @@ FOAM_GAIN = 0.6
 
 
 def water_program(far=False):
-    """THE ANIME WATER (Pass 3; the owner's brief 06). A material program on the displaced sea mesh, unlit.
+    """THE ANIME WATER, redesigned from its fundamentals (Pass 4; the owner's brief 10, built in stages A-D).
 
-    Every look is driven by the wave geometry, never by posterizing a colour:
-      t       the illustration's light, centred on 0: the displaced HEIGHT (crests +, troughs -, over `crest`'s
-              span) mixed with the face's orientation (`face`), and a little surface detail (a noise of the REST
-              position, which the swell's orbits carry, so it rides the water instead of sliding over it)
-      AA      the derivative-based part: the engine's per-pixel `footprint` (world metres per pixel, from screen
-              derivatives) becomes a contrast gain g, 1 near and falling to G_MIN as a pixel covers more water; t is
-              multiplied by it before any edge, so no edge is sharper than the pixels can draw, and toward the horizon
-              every band converges on the middle tone: the detail simplifies by itself
-      bands   four colour regions on t g -- deep (troughs), main, lit faces (`sss`), crest accent -- each a
-              smoothstep edge whose half-width `bandSoft` is the band contrast
-      strokes thin highlight lines in a narrow band of t just under the crest: they ride the crests because t is
-              the crest
-      foam    the detail noise mixed with t g and cut (`foamMask`): broken caps on the reinforced crests only
-      glints  the reflected ray against the sun (r.l / 2 = (n.v)(n.l) - v.l / 2), jittered by the detail noise and
-              cut into sparks: the broken sun path
-      horizon a Fresnel blend into the reflected horizon colour, the same in both programs, so the near and far
-              pieces meet without a seam
-    The far program (beyond 200 m) is the same less the strokes and the foam.
-    Registers: 0 N, 1 V, 2 g, 3 t, 4/5 scratch, 6 detail noise, 7 colour."""
+    One illustrated surface in six coordinated layers, each a cut of ONE scalar from the wave geometry (nothing
+    posterizes a colour, nothing reflects physically):
+      t       the illustration's light, centred on 0: the displaced HEIGHT (crests +, troughs -, over W_HEIGHT) mixed
+              with the face's orientation (the backs of the waves, toward the camera, are the lit faces), plus a
+              small share of a wind-streaked detail noise of the REST position (the swell's orbits carry it)
+      AA      the engine's per-pixel `footprint` becomes a contrast gain g (1 near, W_AA_MIN far); t is multiplied by
+              it before any edge, so no edge is sharper than its pixels and the far sea converges on the middle tone
+      A. base regions   the foreground's deep indigo giving way to the cobalt body (`zone`, by distance), and the
+              wave-face bands: troughs (`deep`), the body (`wmain`), the lit backs (`sss`): two soft edges on t g
+      B. crest marks    `m` = the streaked noise mixed with t g: a cut of it near the crest draws tapered strokes that
+              ride the crests (the noise breaks them along the crest into dashes, t ends them across it)
+      C. the sun's path a column under the sun (the view ray across the sun's azimuth, narrowing with distance), lit
+              as broken horizontal marks by the same `m`: the rays' continuation across the sea
+      D. foam           a higher cut of `m g`, on the reinforced crests only, in the palette's pink-white
+      horizon a Fresnel blend into the reflected horizon colour, shared by both programs, so they meet without a seam
+    The far program (beyond 200 m) is the same less the zone, the strokes and the foam; its path marks are merged
+    toward one smooth path by g. Registers: 0 N then zone, 1 V, 2 g, 3 t g, 4 m, 5/6 scratch, 7 colour."""
     P = Prog("doSeaFar" if far else "doSea")
-    sx, sy, sz = S
+    stage = WATER_STAGE
     P.op("N", "input", 0, inp="normal")
     P.op("V", "input", 1, inp="viewDirection")
     P.op("foot", "input", 2, inp="footprint")
     P.op("aaGain", "remap", 2, a=2, k=[0.0, W_AA_FP, 1.0, W_AA_MIN], f=1.0)             # g, clamped
     P.op("wp", "input", 3, inp="worldPosition")
-    P.op("crest", "gradient", 3, a=3, k=[0.0, 1.0 / W_HEIGHT, 0.0, 0.0], f=1.0)        # height / span, centred
-    P.op("face", "gradient", 4, a=0, k=[-W_FACE * SH[0], W_FLAT, -W_FACE * SH[2], -W_FLAT], f=1.0)
+    P.op("crest", "gradient", 3, a=3, k=[0.0, 1.0 / W_HEIGHT, 0.0, 0.5], f=1.0)        # height / span + 0.5
+    P.op("face", "gradient", 4, a=0, k=[-W_FACE * SH[0], W_FLAT, -W_FACE * SH[2], 0.5 - W_FLAT], f=1.0)
     P.op("faceMix", "mix", 3, a=3, b=4, f=W_FACE_MIX)
     P.op(None, "input", 6, inp="localPosition")
     P.op("stretch", "constant", 4, k=[W_STREAK, 1.0, 1.0, 1.0])                          # wind streaks along x
     P.op(None, "multiply", 6, a=6, b=4)
     P.op("detailNoise", "noise", 6, a=6, f=W_DETAIL_FREQ, k=[0.0, 0.0, 0.0], seed=19)
     P.op("detail", "mix", 3, a=3, b=6, f=W_DETAIL)                                       # t (1 - D) + noise D
+    P.op("centre", "remap", 3, a=3, k=[0.0, 1.0, -0.5, 0.5])                             # t centred on 0
     P.op("contrast", "multiply", 3, a=3, b=2)                                            # t g
-    dz = 0.5 * W_DETAIL                                                                  # the noise's mean
+    # A. the base regions
     P.pcolour("deep", 7, "deep")
-    for lab, e, key in (("band1", W_E1, "wmain"), ("band2", W_E2, "sss"), ("band3", W_E3, "wcrest")):
-        P.op(lab, "smoothstep", 4, a=3, k=[e + dz - W_SOFT, e + dz + W_SOFT])
+    if not far:
+        P.op(None, "input", 0, inp="cameraDistance")
+        P.op("zone", "remap", 0, a=0, k=[W_ZONE0, W_ZONE1, 1.0, 0.0], f=1.0)             # 1 in the foreground
+        P.pcolour("wnear", 5, "wnear")
+        P.op(None, "mixBy", 7, a=7, b=5, c=0)
+    for lab, e, soft, key in (("band1", W_E1, W_SOFT1, "wmain"), ("band2", W_E2, W_SOFT, "sss")):
+        P.op(lab, "smoothstep", 4, a=3, k=[e - soft, e + soft])
         P.pcolour(key, 5, key)
         P.op(None, "mixBy", 7, a=7, b=5, c=4)
-    if not far:
-        P.op("strokeLo", "smoothstep", 4, a=3, k=[W_S0 + dz, W_S0 + dz + W_SW])
-        P.op("strokeHi", "smoothstep", 5, a=3, k=[W_S1 + dz + W_SW, W_S1 + dz])           # descending
-        P.op(None, "multiply", 4, a=4, b=5)
-        P.pcolour("hl", 5, "hl", W_HL)
-        P.op("stroked", "mixBy", 7, a=7, b=5, c=4)
-    # foam (near): mix(noise, t g) times g -- the foam fades before it can break into flickering fragments.
-    # The glints' jitter: near, the raw noise; far, the noise centred and times g, so the sparks merge into one
-    # smooth path toward the horizon instead of flickering.
-    if not far:
-        P.op("foamMix", "mix", 4, a=6, b=3, f=W_FOAM_CREST)
-        P.op("foamAA", "multiply", 4, a=4, b=2)
-        P.op("foamMask", "smoothstep", 4, a=4, k=[W_FOAM_CUT, W_FOAM_CUT + W_FOAM_SOFT])
-        P.pcolour("foam", 5, "foam", W_FOAM_GAIN)
-        P.op("foamed", "mixBy", 7, a=7, b=5, c=4)
-        # the raw noise (a crest bias here grew the path into a slab under a tall sea); even a perfect reflection
-        # sparks only where the noise is above W_GLINT_SPARSE, so a big face turned to the sun stays broken
-        j, mean = W_GLINT_JIT, W_GLINT_SPARSE
-    else:
-        P.op("noiseCentre", "remap", 6, a=6, k=[0.5, 1.5, 0.0, 1.0])
+    # the marks' scalar: the streaked noise and the crest together (far: the noise centred and faded by g, so the
+    # marks merge into one smooth path toward the horizon instead of flickering)
+    if far:
+        P.op("noiseCentre", "remap", 6, a=6, k=[0.0, 1.0, -0.5, 0.5])
         P.op("noiseAA", "multiply", 6, a=6, b=2)
-        j, mean = W_GLINT_JIT, 0.0
-    # glints: the reflected ray against the sun, jittered and cut into sparks
-    P.op(None, "fresnel", 4, f=1.0)
-    P.op("nv", "remap", 4, a=4, k=[0.0, 1.0, 1.0, 0.0])
-    P.op(None, "gradient", 5, a=0, k=[sx, sy, sz, 0.0], f=1.0)                           # n.l
-    P.op(None, "multiply", 5, a=5, b=4)
-    P.op(None, "gradient", 4, a=1, k=[-0.5 * sx, -0.5 * sy, -0.5 * sz, 0.0], f=1.0)      # -v.l / 2
-    P.op("rl", "add", 5, a=5, b=4)
-    P.op("jitter", "mix", 5, a=5, b=6, f=j)
-    c0 = GLINT_COS0 / 2.0 * (1.0 - j) + j * mean
-    P.op("glints", "smoothstep", 5, a=5, k=[c0, c0 + W_GLINT_EDGE])                      # edge: ~2 px near
-    P.pcolour("glint", 4, "glint", GLINT_GAIN)
-    P.op("sunlit", "mixBy", 7, a=7, b=4, c=5)
-    P.op("fres", "fresnel", 4, f=W_FRES_POWER)
-    P.pcolour("rhor", 5, "rhor", W_HORIZON)
-    P.op("horizon", "mixBy", 7, a=7, b=5, c=4)
+        P.op("noiseBack", "remap", 6, a=6, k=[-0.5, 0.5, 0.0, 1.0])
+    P.op("marks", "mix", 4, a=6, b=3, f=W_MARK_CREST)                                   # m
+    # B. the crest strokes (near)
+    if not far and stage in ("B", "C", "D"):
+        P.op("strokeLo", "smoothstep", 5, a=4, k=[W_S0, W_S0 + W_SW])
+        P.pcolour("hl", 6, "hl", W_HL)
+        P.op("stroked", "mixBy", 7, a=7, b=6, c=5)
+    # D. foam (near): the cut rises with the sea (routes), so caps stay caps
+    if not far and stage == "D":
+        P.op("foamAA", "multiply", 5, a=4, b=2)
+        P.op("foamMask", "smoothstep", 5, a=5, k=[W_FOAM_CUT, W_FOAM_CUT + W_FOAM_SOFT])
+        P.pcolour("foam", 6, "foam", W_FOAM_GAIN)
+        P.op("foamed", "mixBy", 7, a=7, b=6, c=5)
+    # C. the sun's path
+    if stage in ("C", "D"):
+        px, pz = SH[2], -SH[0]                                                           # across the sun's azimuth
+        P.op("across", "gradient", 5, a=1, k=[px, 0.0, pz, 0.5], f=1.0)
+        P.op(None, "remap", 5, a=5, k=[0.0, 1.0, -0.5, 0.5])
+        if not far:
+            P.op("pathWidth", "remap", 6, a=0, k=[0.0, 1.0, W_PATH_NARROW, 1.0], f=1.0)   # narrows with distance
+            w = W_PATH_W
+        else:
+            # beyond 200 m the column keeps narrowing toward the horizon (the coordinator's round 2)
+            P.op(None, "input", 6, inp="cameraDistance")
+            P.op("pathWidth", "remap", 6, a=6, k=[200.0, 3000.0, 1.0, W_PATH_FAR_NARROW], f=1.0)
+            w = W_PATH_W / W_PATH_NARROW
+        P.op(None, "multiply", 5, a=5, b=6)
+        P.op(None, "multiply", 5, a=5, b=5)
+        P.op("column", "smoothstep", 5, a=5, k=[w * w, 0.0])
+        if not far:
+            # the marks scalar TIMES the column, then one cut: at the column's centre every lit back is a mark,
+            # toward its edges only the crests are, so the edges are ragged and the path scatters
+            P.op(None, "multiply", 5, a=5, b=4)
+            P.op("pathMarks", "smoothstep", 5, a=5, k=[W_P0, W_P0 + W_PW])
+        else:
+            # far: the cut first (the crest rows break the marks), THEN the column's soft profile: soft sides
+            P.op("pathMarks", "smoothstep", 6, a=4, k=[W_P0_FAR, W_P0_FAR + W_PW_FAR])
+            P.op(None, "multiply", 5, a=5, b=6)
+        P.pcolour("glint", 6, "glint", W_PATH_GAIN)
+        P.op("sunlit", "mixBy", 7, a=7, b=6, c=5)
+    # the horizon: confined to the last degrees (a 10 m eye sees most of the sea at a grazing angle, and a gentle
+    # Fresnel washed every band into one mauve-grey, Pass 4.2); the far program blends further for depth
+    P.op("fres", "fresnel", 5, f=W_FRES_POWER_FAR if far else W_FRES_POWER)
+    P.op("fresGain", "remap", 5, a=5, k=[0.0, 1.0, 0.0, W_HORIZON_FAR if far else W_HORIZON])
+    P.pcolour("rhor", 6, "rhor")
+    P.op("horizon", "mixBy", 7, a=7, b=6, c=5)
     P.emit = 7
     return P
 
 
 # the anime water's look (each a parameter of the op it sits in, so routes and MIDI reach them)
-W_HEIGHT = 2.4          # metres of height over which t runs from trough to crest (the `crest` op)
+WATER_STAGE = "D"       # the brief's stages: A base regions, B + crest strokes, C + the sun's path, D + foam
+W_HEIGHT = 3.6          # metres of height over which t runs from trough to crest (the `crest` op)
 W_FACE, W_FLAT = 0.9, 0.25   # weight of the face's orientation / of flatness in the `face` term
 W_FACE_MIX = 0.35       # how much of t is orientation (the rest is height)
-W_DETAIL_FREQ = 0.5     # the surface detail's scale (1/m) across the view (z); along x it is W_STREAK of it
-W_STREAK = 0.3          # the detail is stretched along x (across the view): wind streaks, not blotches
+W_DETAIL_FREQ = 0.9     # the surface detail's scale (1/m) across the view (z); along x it is W_STREAK of it
+W_STREAK = 0.16         # the detail is stretched along x (across the view): dashes along the crests, not blotches
 W_DETAIL = 0.07         # its share of t
 W_AA_FP, W_AA_MIN = 0.6, 0.35   # g falls linearly from 1 (sharp pixels) to W_AA_MIN at a footprint of W_AA_FP m
-W_SOFT = 0.07           # band edge half-width in centred t (the band contrast: smaller is crisper)
-W_E1, W_E2, W_E3 = -0.16, 0.05, 0.25   # the band thresholds in centred t
-W_S0, W_S1, W_SW = 0.14, 0.2, 0.02     # the stroke band (centred t) and its edge width
+W_ZONE0, W_ZONE1 = 12.0, 120.0  # the foreground zone (wnear) fades into the body over these distances (m)
+W_SOFT1 = 0.06          # the trough edge's half-width: a soft shadow under each wave, not a hole
+W_SOFT = 0.018          # band edge half-width in centred t (the band contrast: smaller is crisper)
+W_E1, W_E2 = -0.07, 0.1    # the band thresholds in centred t: deep | main | lit
+W_MARK_CREST = 0.7      # m = mix(noise, t g, this): how much the crest decides the marks
+W_S0, W_SW = 0.42, 0.02    # the stroke cut in m and its edge width
 W_HL = 1.1
-W_FOAM_CREST = 0.5      # foam = mix(noise, t g, this): how much the crest decides
-W_FOAM_CUT, W_FOAM_SOFT = 0.37, 0.03
+W_FOAM_CUT, W_FOAM_SOFT = 0.445, 0.02
 W_FOAM_GAIN = 0.95
-W_GLINT_JIT = 0.06      # the detail's share in the glint test: breaks the path into sparks
-W_GLINT_SPARSE = 0.62   # the noise level a perfect reflection needs to spark (0.5: half the path is lit)
-W_GLINT_EDGE = 0.003    # the sparks' edge width (in the jittered r.l / 2): soft over a pixel or two near
-W_FRES_POWER = 7.0
-W_HORIZON = 1.0
-WATER = "anime"         # "anime" (Pass 3) or "pass2"
+W_PATH_W = 0.15         # the sun path's half-width near (the sine of its angle across the sun's azimuth)
+W_PATH_NARROW = 3.2     # how much narrower the path is beyond the foreground zone
+W_P0, W_PW = 0.2, 0.1      # the path marks' cut in m x column and its edge width (near)
+W_P0_FAR, W_PW_FAR = 0.17, 0.08   # far: the cut sits in the crest rows, so the column breaks by the waves
+W_PATH_FAR_NARROW = 2.6     # the far column narrows this much more from 200 m to 3 km
+W_PATH_GAIN = 1.8
+W_FRES_POWER, W_FRES_POWER_FAR = 24.0, 10.0   # the Fresnel power near / far
+W_HORIZON, W_HORIZON_FAR = 0.45, 0.8           # how far the horizon colour reaches into the water near / far
+WATER = "anime"         # "anime" (Pass 4) or "pass2"
 
 
 def sky_program():
@@ -634,7 +676,10 @@ def sky_program():
         P.op(None, "add", 3, a=3, b=0)                                                 # w = v + s c
         P.op(None, "multiply", 3, a=3, b=2)                                            # its direction
         P.op("rayNoise", "noise", 3, a=3, f=RAY_FREQ, k=[0.0, 0.0, 0.0], seed=29)
-        P.op("rayBands", "smoothstep", 3, a=3, k=[RAY_LO, RAY_HI])
+        # Pass 4: broad tapered rays of unequal strength -- a soft cut of the noise (its slopes are the tapers),
+        # times the noise again, so a ray's brightness follows how far above the cut it rises
+        P.op("rayBands", "smoothstep", 2, a=3, k=[RAY_LO, RAY_HI])
+        P.op(None, "multiply", 3, a=3, b=2)
         P.op("rayLen", "remap", 2, a=4, k=[math.cos(math.radians(RAY_REACH)), 1.0, 0.0, 1.0], f=1.0)
         P.op(None, "power", 2, a=2, f=RAY_FALL)
         P.op(None, "multiply", 3, a=3, b=2)
@@ -708,136 +753,242 @@ CLOUD_AWAY = 0.1
 CLOUD_BAND0, CLOUD_BAND1 = 0.62, 0.74
 
 
-def cumulus(cx, cz, base, width, height, depth, seed, flat=False):
-    """One illustrated formation: a flat base row of wide squashed puffs, then rows stacked above it, each narrower,
-    their puffs rounder and bigger toward the crown (an anime cumulus bank); `flat` gives a long wind-stretched
-    ribbon instead. Faces the camera (it stands across the line to the origin)."""
-    out = []
-    th = math.atan2(cx, -cz)
-    tx, tz = math.cos(th), math.sin(th)                       # across the view
-    nx, nz = math.sin(th), -math.cos(th)                       # away from the camera
-    q = (0.0, math.sin(-th / 2.0), 0.0, math.cos(-th / 2.0))
-    rows = 1 if flat else 4
-    k = 0
-    for r in range(rows):
-        frac = r / max(rows - 1, 1)
-        row_w = width * (1.0 - 0.55 * frac ** 1.3)
-        n = (14 if flat else max(3, int(9 - 5 * frac)))
-        for i in range(n):
-            g = lambda j: mx._hash(seed * 97 + k, j, 77)
-            k += 1
-            u = (i + 0.5) / n - 0.5 + (g(1) - 0.5) * 0.6 / n
-            along = u * row_w
-            if flat:
-                sx_, sy_ = width / n * (1.2 + 0.8 * g(2)), height * (0.25 + 0.2 * g(3))
-                y = base + sy_ * 0.4
-            else:
-                rad = height * (0.22 + 0.14 * frac + 0.12 * g(2)) * (1.0 - 0.6 * abs(2 * u) ** 2)
-                sx_, sy_ = rad * (1.5 - 0.4 * frac), rad * (0.7 if r == 0 else 1.0)
-                y = base + (0.0 if r == 0 else height * (0.12 + 0.62 * frac) + (g(3) - 0.5) * rad * 0.3)
-            sz_ = depth * (0.4 + 0.3 * g(4))
-            d = (g(5) - 0.5) * depth
-            x = cx + along * tx + d * nx
-            z = cz + along * tz + d * nz
-            out.append([round(x, 2), round(y, 2), round(z, 2), 0.0, round(q[1], 5), 0.0, round(q[3], 5),
-                        round(sx_, 2), round(sy_, 2), round(sz_, 2)])
-    return out
-
-
-# The formations: (azimuth deg from the view, distance m, base m, width m, height m, depth m, ribbon?). Big banks on
-# either side of the sun, one passing near it, ribbons low on the horizon, and smaller banks round the rest of the sky
-# (the field turns slowly, so every one of them comes past the sun in time). Two layers, two drift rates: parallax.
-CLOUDS_NEAR = [(-30.0, 3600.0, 330.0, 1400.0, 520.0, 300.0, False), (34.0, 4000.0, 380.0, 1700.0, 150.0, 220.0, True),
-               (6.0, 4800.0, 230.0, 2600.0, 140.0, 200.0, True), (-58.0, 3400.0, 260.0, 900.0, 380.0, 260.0, False),
-               (75.0, 3800.0, 300.0, 1100.0, 460.0, 280.0, False), (140.0, 3600.0, 320.0, 1300.0, 500.0, 300.0, False),
-               (-130.0, 3900.0, 280.0, 1200.0, 420.0, 300.0, False), (-180.0, 3700.0, 350.0, 1400.0, 520.0, 300.0, False)]
-CLOUDS_FAR = [(-12.0, 6500.0, 170.0, 3000.0, 110.0, 200.0, True), (52.0, 6800.0, 200.0, 2400.0, 120.0, 200.0, True),
-              (-75.0, 6200.0, 520.0, 1800.0, 380.0, 300.0, False), (20.0, 7000.0, 700.0, 2000.0, 300.0, 300.0, False),
-              (110.0, 6600.0, 180.0, 2600.0, 120.0, 200.0, True), (-150.0, 6800.0, 560.0, 1800.0, 360.0, 300.0, False),
-              (170.0, 6400.0, 200.0, 2800.0, 120.0, 200.0, True)]
-
-
-def cloud_points(layer):
-    pts = []
-    for k, (az, dist, base, w, h, d, flat) in enumerate(layer):
-        a = math.radians(az + SUN_AZ * 0.0)
-        pts += cumulus(dist * math.sin(a), -dist * math.cos(a), base, w, h, d, seed=k + (50 if layer is CLOUDS_FAR else 0),
-                       flat=flat)
+def cloud_outline(lobes, belly, n=72, c0=(0.0, 0.0)):
+    """A cloud's silhouette in its own plane (x along, y up): the union of a few circles `lobes` [(cx, cy, r)] over
+    a flat underside at y = -belly, sampled as a star-shaped polygon from c0 (which must lie inside a lobe). One clean
+    contour: the lobes are what the top reads as; the base is one line."""
+    pts, rads = [], []
+    for i in range(n):
+        th = 2.0 * math.pi * i / n
+        dx, dy = math.cos(th), math.sin(th)
+        far = 0.0
+        for cx, cy, r in lobes:
+            # the far intersection of the ray c0 + t d with the circle
+            ox, oy = c0[0] - cx, c0[1] - cy
+            b = ox * dx + oy * dy
+            c = ox * ox + oy * oy - r * r
+            disc = b * b - c
+            if disc > 0.0:
+                far = max(far, -b + math.sqrt(disc))
+        rads.append(far)
+    # the joints between lobes are cusps: smooth the radius over five samples, so the contour is one soft curve
+    w = max(2, n // 144)                                       # half the window: wider for the densely sampled ribbons
+    sm = [sum(rads[(i + k) % n] for k in range(-w, w + 1)) / (2 * w + 1) for i in range(n)]
+    for i in range(n):
+        th = 2.0 * math.pi * i / n
+        x, y = c0[0] + math.cos(th) * sm[i], c0[1] + math.sin(th) * sm[i]
+        if y < 0.0:
+            y = -belly * math.tanh(-y / belly)                   # the underside: flat, but curving into the lobes' ends
+        pts.append((x, y))
     return pts
 
 
-CLOUD_BILLOW = 40.0
+def cloud_pillow(lobes, belly, thick, n=72, rings=(1.0, 0.86, 0.68, 0.48, 0.28, 0.11)):
+    """The silhouette inflated into a pillow: rings of the outline scaled toward its centre, lifted out of the plane
+    by sqrt(1 - s^2) x thick on both sides, capped at the centre. Returns (verts (x, y, z), faces) with smooth-shaded
+    normals from smooth_shaded: the two-band cloud program then splits it into one lit and one shadowed region with
+    a single soft edge -- not one rim per lobe."""
+    c0 = (sum(l[0] * l[2] for l in lobes) / sum(l[2] for l in lobes), 0.35 * max(l[1] + l[2] for l in lobes))
+    span = max(l[0] + l[2] for l in lobes) - min(l[0] - l[2] for l in lobes)
+    height = max(l[1] + l[2] for l in lobes)
+    n = int(n * max(1.0, min(8.0, span / (3.0 * height))))          # a ribbon needs many more samples round
+    out = cloud_outline(lobes, belly, n, c0)
+    verts, faces = [], []
+    for side in (1.0, -1.0):
+        base = len(verts)
+        for k, sc in enumerate(rings):
+            z = side * thick * math.sqrt(max(0.0, 1.0 - sc * sc))
+            for (x, y) in out:
+                verts.append((c0[0] + (x - c0[0]) * sc, c0[1] + (y - c0[1]) * sc, z))
+        centre = len(verts)
+        verts.append((c0[0], c0[1], side * thick))
+        K = len(rings)
+        for k in range(K - 1):
+            a0, a1 = base + k * n, base + (k + 1) * n
+            for i in range(n):
+                m = (i + 1) % n
+                if side > 0:                                       # wound outward on both sheets
+                    faces += [(a0 + i, a0 + m, a1 + i), (a0 + m, a1 + m, a1 + i)]
+                else:
+                    faces += [(a0 + i, a1 + i, a0 + m), (a0 + m, a1 + i, a1 + m)]
+        last = base + (K - 1) * n
+        for i in range(n):
+            m = (i + 1) % n
+            faces.append((last + i, last + m, centre) if side > 0 else (last + i, centre, last + m))
+    return verts, faces
+
+
+def cloud_lobes(width, height, n, seed, tier=0.0):
+    """A formation's lobes: `n` circles along the width, the biggest toward the middle, their undersides near y = 0
+    (an anime cumulus: flat base, rounded top); with `tier`, a second, smaller row stacked on the first (a crown)."""
+    g = lambda j: mx._hash(seed * 131, j, 7)
+    lobes = []
+    n = max(n, int(round(width / (1.5 * height))))          # a ribbon needs lobes close enough to overlap
+    for i in range(n):
+        u = (i + 0.5) / n - 0.5 + (g(i) - 0.5) * 0.3 / n
+        r = height * (0.5 + 0.5 * (1.0 - (2.0 * u) ** 2) ** 0.7) * (0.6 + 0.4 * g(i + 20))
+        r = max(min(r, height * 0.95), 0.72 * height)
+        if width > 6.0 * height:                                 # a ribbon: near-equal lobes, a shallow scallop on top
+            r = height * (0.88 + 0.07 * g(i + 20))
+        lobes.append((u * width * (1.0 - r / width), r * 0.82, r))
+    if tier > 0.0:
+        m = max(2, n - 2)
+        for i in range(m):
+            u = (i + 0.5) / m - 0.5 + (g(i + 40) - 0.5) * 0.2
+            r = height * tier * (0.6 + 0.4 * (1.0 - (2.0 * u) ** 2)) * (0.7 + 0.3 * g(i + 60))
+            lobes.append((u * width * 0.55, height * 0.95 + r * 0.45, r))
+    return lobes
+
+
+# The formations: (azimuth deg from the view, distance m, base m, width m, height m, lobes, tier). The sun is at
+# azimuth 13, elevation 5.5: its negative space (az 0..26, below elev 9) stays clear. Big banks on the left, a low
+# ribbon on the right, one formation above-right of the sun; the rest round the sky, so as the field turns (65 min a
+# turn) every one comes past the sun. Two layers, two drift rates: parallax.
+CLOUDS_NEAR = {
+    "layered": [(-14.0, 3600.0, 520.0, 1100.0, 340.0, 4, 0.0), (50.0, 4000.0, 210.0, 1500.0, 120.0, 3, 0.0),
+                (23.0, 4600.0, 1120.0, 850.0, 240.0, 3, 0.0), (-2.0, 4800.0, 1000.0, 600.0, 170.0, 3, 0.0),
+                (-66.0, 3500.0, 280.0, 1300.0, 420.0, 4, 0.0), (80.0, 3800.0, 320.0, 1200.0, 380.0, 4, 0.0),
+                (140.0, 3600.0, 300.0, 1500.0, 440.0, 4, 0.0), (-130.0, 3900.0, 290.0, 1300.0, 400.0, 4, 0.0),
+                (-180.0, 3700.0, 330.0, 1500.0, 460.0, 4, 0.0)],
+    "rich": [(-14.0, 3600.0, 520.0, 1100.0, 420.0, 5, 0.55), (50.0, 4000.0, 210.0, 1500.0, 130.0, 4, 0.0),
+             (23.0, 4600.0, 1120.0, 900.0, 280.0, 4, 0.45), (-2.0, 4800.0, 1000.0, 620.0, 190.0, 3, 0.4),
+             (-66.0, 3500.0, 280.0, 1300.0, 480.0, 5, 0.5), (-52.0, 4300.0, 640.0, 600.0, 170.0, 3, 0.0),
+             (80.0, 3800.0, 320.0, 1200.0, 420.0, 5, 0.5), (140.0, 3600.0, 300.0, 1500.0, 500.0, 5, 0.55),
+             (-130.0, 3900.0, 290.0, 1300.0, 440.0, 5, 0.5), (-180.0, 3700.0, 330.0, 1500.0, 520.0, 5, 0.55)],
+}
+CLOUDS_FAR = {
+    "layered": [(-18.0, 6500.0, 70.0, 3200.0, 110.0, 3, 0.0), (54.0, 6800.0, 190.0, 2600.0, 130.0, 3, 0.0),
+                (-78.0, 6200.0, 520.0, 1900.0, 300.0, 4, 0.0), (18.0, 7000.0, 820.0, 2000.0, 230.0, 3, 0.0),
+                (112.0, 6600.0, 180.0, 2800.0, 120.0, 3, 0.0), (-150.0, 6800.0, 560.0, 1900.0, 320.0, 4, 0.0),
+                (170.0, 6400.0, 200.0, 3000.0, 130.0, 3, 0.0)],
+    "rich": [(-18.0, 6500.0, 70.0, 3200.0, 130.0, 4, 0.0), (54.0, 6800.0, 190.0, 2600.0, 150.0, 4, 0.0),
+             (-78.0, 6200.0, 520.0, 1900.0, 340.0, 5, 0.45), (18.0, 7000.0, 820.0, 2000.0, 260.0, 4, 0.4),
+             (-40.0, 7200.0, 1150.0, 1400.0, 180.0, 3, 0.0), (112.0, 6600.0, 180.0, 2800.0, 140.0, 4, 0.0),
+             (-150.0, 6800.0, 560.0, 1900.0, 360.0, 5, 0.45), (170.0, 6400.0, 200.0, 3000.0, 150.0, 4, 0.0)],
+}
+CLOUD_STYLE = "layered"     # "layered" (simplified layered silhouettes) or "rich" (a richer formation)
+CLOUD_THICK = 0.55          # the pillow's depth as a share of its height
+
+
+def cloud_meshes():
+    """One GLB per formation, in its own frame (x across the view, y up, z away from the camera), standing across
+    the line to the origin so it faces the camera. Returns [(node name, layer, position, yaw deg)]. One mesh per
+    node: a whole layer in one GLB instanced at the origin (bounds 14 km round the camera) never drew single-sided
+    (Pass 4.2); formations as their own nodes draw, and a world-space twist about the origin turns each of them
+    round the viewer the same way."""
+    out = []
+    for name, layer in (("near", CLOUDS_NEAR[CLOUD_STYLE]), ("far", CLOUDS_FAR[CLOUD_STYLE])):
+        for k, (az, dist, base, w, h, n, tier) in enumerate(layer):
+            a = math.radians(az)
+            cx, cz = dist * math.sin(a), -dist * math.cos(a)
+            lobes = cloud_lobes(w, h, n, seed=k + (50 if name == "far" else 0), tier=tier)
+            v, f = cloud_pillow(lobes, 0.06 * h, CLOUD_THICK * h)
+            verts = [(round(x, 2), round(y, 2), round(z, 2)) for x, y, z in v]      # +z away from the camera
+            vv, nrm, idx = mx.smooth_shaded(verts, f)
+            node = "cloud_%s%d" % (name, k)
+            mx.write_glb(os.path.join(MESH_DIR, "do-%s.glb" % node.replace("_", "-")), vv,
+                         [tuple(round(c, 4) for c in q) for q in nrm], idx, node)
+            # the frame's yaw: local +z (away) must point from the origin to the formation
+            out.append((node, name, [round(cx, 2), float(base), round(cz, 2)], round(math.degrees(math.atan2(cx, cz)), 3)))
+    return out
+
+
+CLOUD_BILLOW = 14.0         # metres of slow billow (a noise of world position, drifting): formations breathe, no puff wobbles
 CLOUD_DRIFT = 0.0022        # radians a second the cloud field turns round the viewer (about 65 minutes a turn)
 
 
 
 
-# ================================================================================================ Pass 2: the world
-# The hero island on the left third, a chain of far islands, palms on its beach, the hero sailboat in the middle
-# distance. Every one of them is painted by one illustrated program (doIllus): a flat colour (the node's emission, so
-# palettes route onto it), a broad sun-side light band and a shadow band, and the haze of distance.
-# ---- the island (the owner's simplification brief, 08): a long, LOW strip near the horizon -- an extruded silhouette,
-# not terrain. A gently irregular top, a shallow slope to the water, a narrow sand line; 3-8 % of the image height.
-ISLAND_C = (-300.0, -900.0)      # centre (x, z): the left third, near the horizon
-ISLAND_W, ISLAND_D, ISLAND_H = 640.0, 150.0, 26.0   # length across the view, depth, the highest point (m)
-TREE_SCALE = 2.2
-ISLAND_STYLE = "C"               # A minimal silhouette, B tropical anime, C cut-paper travel illustration
+# ================================================================================================ Pass 4: the world
+# The tiny island (the owner's reset brief, 10, which supersedes 08's long strip): ONE small, low piece of land with
+# ONE distinctive tree and a few rocks, close enough to be recognised at once. Everything on it is painted by the
+# illustrated programs (doLand for the land, doIllus for the tree and the rocks: a flat colour, a sun-side light band,
+# a shadow band, a warm rim, the haze of distance), so the palette moves it with the rest of the world.
+#
+# Assets: the rocks are Kenney's CC0 low-poly rocks (assets/kenney/rock_*.glb, tracked), scaled 6-10x and painted by
+# doIllus (their own dirt/grass materials are overridden). The Tree of Life (assets/treeisle/, gitignored, 3.16 M
+# triangles, no licence recorded) was inspected for its silhouette -- a broad spreading crown on a gnarled trunk, 77 m
+# tall -- and NOT used: a derived mesh would inherit its licence and its gitignore, and this scene must render on CI
+# without private assets. The tree is designed here instead: a windswept coconut palm, the tiny-island archetype.
+ISLAND_C = (-128.0, -330.0)      # centre (x, z): the left third
+ISLAND_W, ISLAND_D, ISLAND_H = 96.0, 52.0, 10.5  # across the view, depth, the top (m): a low plateau over a rock base
+ROCK_TOP, SAND_TOP = 5.0, 5.7         # the rock band runs from the water to ROCK_TOP; a sand line to SAND_TOP; the top above
+ISLAND_SCALE = 1.0               # a composition knob: scales the whole island (land, tree, rocks, surf) about ISLAND_C
+ISLAND_YAW = -6.0                # degrees
+PALM_H = 18.0                    # the palm's height (m)
+LAND_DEBUG = False               # look development: paint the island with doIllus instead of doLand
 
 
-def island_top(u):
-    """The top line along the island, u in [-1, 1]: almost flat, a few soft bumps and one dip, asymmetric (higher
-    toward the right end, a long low tail to the left)."""
-    bumps = [(-0.62, 0.22, 0.35), (-0.15, 0.3, 0.75), (0.28, 0.18, 0.55), (0.55, 0.25, 1.0), (0.82, 0.12, 0.6)]
-    h = 0.45 + sum(a * math.exp(-((u - c) / w) ** 2) for c, w, a in bumps) * 0.6
-    return min(h, 1.0)
+def island_radius(theta):
+    """The footprint's radius at polar angle theta (from +x toward +z): an ellipse (ISLAND_W x ISLAND_D) with three
+    gentle lobes, so the outline is irregular but still one simple, readable shape."""
+    a, b = ISLAND_W * 0.5, ISLAND_D * 0.5
+    c, s = math.cos(theta), math.sin(theta)
+    r = a * b / math.sqrt((b * c) ** 2 + (a * s) ** 2)
+    return r * (1.0 + 0.1 * math.sin(2.0 * theta + 1.1) + 0.07 * math.sin(3.0 * theta + 2.3)
+                + 0.04 * math.sin(5.0 * theta + 0.4))
 
 
-def island_height(x, z):
-    u, v = x / (ISLAND_W * 0.5), z / (ISLAND_D * 0.5)
-    r = math.hypot(u ** 6, v) if False else (abs(u) ** 6 + v * v) ** 0.5     # a long rounded rectangle footprint
-    if r >= 1.0:
-        return -3.0
-    edge = mx.smooth(1.0, 0.72, r)                  # a shallow rise from the water, then the flat top
-    return ISLAND_H * island_top(max(-1.0, min(1.0, u))) * edge ** 0.6 - 0.5
+def island_height(x, z, jitter=True):
+    """The land (the owner's island direction, the coordinator's round 2): an organic, asymmetric top -- a gentle
+    rise toward the palm (x > 0), a softer fall to the right, a few soft swells, no straight edge -- over an ERODED
+    ROCK BASE: from the sand line down to the water the rim is a steep irregular face whose radius is jogged per
+    angular sector and per height (a hash), so it reads as clustered boulders and irregular masses, not terraces.
+    Below the waterline it falls to -3 m."""
+    th = math.atan2(z, x)
+    R = island_radius(th)
+    sector = int((th + math.pi) / (2.0 * math.pi) * 28.0) % 28
+    jag = 1.0 + 0.1 * (mx._hash(sector, 3, 17) - 0.5) + 0.06 * (mx._hash(sector, 5, 23) - 0.5)
+    r = math.hypot(x, z) / R
+    rc = r / jag                                                  # the rock face's own radius
+    if rc >= 1.0:
+        return -3.0 * min(1.0, (rc - 1.0) * 6.0) - 0.5
+    # the top: a rise under the palm, a long soft fall to the right, soft swells
+    rise = math.exp(-((x - 18.0) / 26.0) ** 2) * math.exp(-(z / 30.0) ** 2)
+    swell = 0.06 * math.sin(x * 0.11 + 1.0) * math.cos(z * 0.14 + 0.4) + 0.04 * math.sin(x * 0.23 - z * 0.17)
+    top = ISLAND_H * (0.62 + 0.38 * rise + swell) * (1.0 - 0.12 * max(0.0, x / 48.0))
+    rt = rock_top(x, z)
+    if rc < 0.5:
+        return top
+    if rc < 0.74:
+        return top + (rt + 0.3 - top) * mx.smooth(0.5, 0.74, rc)            # the sand slope to the rock
+    u = (rc - 0.74) / 0.26
+    h = rt + 0.3 - (rt + 0.8) * u ** 1.3                                      # the rock face
+    if jitter:                                                                # boulder masses: bumps by sector and height
+        band = int(h / 1.6)
+        h += 0.9 * (mx._hash(sector * 7 + band, 11, 29) - 0.5) * (1.0 - u) + 0.5 * (mx._hash(sector * 3 + band, 13, 31) - 0.5)
+    return h
+
+
+def rock_top(x, z):
+    """Where the rock gives way to the sand: higher under the rise, lower at the ends, wobbling along the shore, so
+    the rock band is a varying mass rather than one horizontal stripe."""
+    rise = math.exp(-((x - 18.0) / 30.0) ** 2)
+    return ROCK_TOP * (0.72 + 0.4 * rise + 0.12 * math.sin(x * 0.17 + z * 0.1 + 0.6) + 0.08 * math.sin(x * 0.31 - 1.1))
 
 
 def island_meshes():
-    nx, nz = 160, 26
-    verts, faces = [], []
-    for i in range(nz + 1):
-        for j in range(nx + 1):
-            x = (j / nx - 0.5) * ISLAND_W * 1.04
-            z = (i / nz - 0.5) * ISLAND_D * 1.1
+    nr, nt = 34, 56                                 # 56 facets round: chunky rock at 270 m
+    verts, faces = [(0.0, island_height(0.0, 0.0), 0.0)], []
+    for i in range(1, nr + 1):
+        u = (i / nr) ** 0.7 * 1.2                   # to 1.2 of the radius: the skirt under the water
+        for j in range(nt):
+            th = 2.0 * math.pi * j / nt
+            # the rock band's vertices are jittered radially and round, so its facets are irregular masses
+            jr = 1.0 + (0.06 * (mx._hash(i, j, 41) - 0.5) if 0.74 <= u <= 1.0 else 0.0)
+            ta = th + (0.02 * (mx._hash(i, j, 43) - 0.5) if 0.74 <= u <= 1.0 else 0.0)
+            x, z = u * jr * island_radius(ta) * math.cos(ta), u * jr * island_radius(ta) * math.sin(ta)
             verts.append((round(x, 3), round(island_height(x, z), 3), round(z, 3)))
-    for i in range(nz):
-        for j in range(nx):
-            a = i * (nx + 1) + j
-            faces += [(a, a + nx + 1, a + 1), (a + 1, a + nx + 1, a + nx + 2)]
-    v, n, idx = mx.smooth_shaded(verts, faces)
-    mx.write_glb(os.path.join(MESH_DIR, "do-island-low.glb"), v, [tuple(round(c, 4) for c in q) for q in n], idx,
-                 "island")
-    # the far chain: two faint low strips on the horizon
-    def far(x, z):
-        u, w = x / 300.0, z / 60.0
-        r = (abs(u) ** 4 + w * w) ** 0.5
-        return 9.0 * mx.smooth(1.0, 0.6, r) * (0.7 + 0.3 * math.exp(-((u - 0.3) / 0.4) ** 2)) - 1.0 if r < 1 else -3.0
-    verts = []
-    for i in range(11):
-        for j in range(41):
-            x, z = (j / 40 - 0.5) * 620.0, (i / 10 - 0.5) * 130.0
-            verts.append((round(x, 3), round(far(x, z), 3), round(z, 3)))
-    faces = []
-    for i in range(10):
-        for j in range(40):
-            a = i * 41 + j
-            faces += [(a, a + 41, a + 1), (a + 1, a + 41, a + 42)]
-    v, n, idx = mx.smooth_shaded(verts, faces)
-    mx.write_glb(os.path.join(MESH_DIR, "do-farstrip.glb"), v, [tuple(round(c, 4) for c in q) for q in n], idx,
-                 "farstrip")
+    for j in range(nt):
+        faces.append((0, 1 + (j + 1) % nt, 1 + j))                 # wound so the faces look up (+y)
+    for i in range(1, nr):
+        a0, a1 = 1 + (i - 1) * nt, 1 + i * nt
+        for j in range(nt):
+            k = (j + 1) % nt
+            faces += [(a0 + j, a0 + k, a1 + j), (a0 + k, a1 + k, a1 + j)]
+    tris = [(verts[a], verts[b], verts[c]) for a, b, c in faces]
+    mx.write_faceted(os.path.join(MESH_DIR, "do-island.glb"), tris, "island")       # flat facets: cut rock
     return len(verts)
-
-
-FAR_ISLES = [((-2400.0, -5200.0), 1.6, 1.0), ((2700.0, -5600.0), 1.2, 0.8)]
 
 
 def ellipsoid(c, r, seg=16, rings=10):
@@ -856,82 +1007,103 @@ def ellipsoid(c, r, seg=16, rings=10):
     return verts, faces
 
 
-def palm_meshes():
-    """One tree vocabulary, two shapes: a windswept palm (a curved tapering trunk, six broad tapered fronds -- a
-    silhouette, not leaves) and a broad low tropical canopy (three overlapping flattened masses on a short trunk)."""
-    H, lean = 16.0, 4.0
-    tris = []
-    segs, sides = 8, 6
+def palm_mesh():
+    """The distinctive tree: a windswept coconut palm designed as a silhouette. A slender trunk that leans and curves
+    toward the sun (+x) with a slight S; a crown of nine fronds -- long tapered ribbons that rise, arc and droop,
+    swept to +x by the wind, each twisted a little so some read broad and some thin; three dead fronds hanging under
+    the crown; a cluster of coconuts. Trunk and crown are two meshes, so the crown alone sways. Height PALM_H."""
+    H = PALM_H
+    lean, S = 0.36 * H, 0.05 * H
+    trunk = []
+    segs, sides = 14, 7
+
+    def axis(u):
+        return (lean * u ** 1.7, H * u, S * math.sin(math.pi * u))
+
     rings = []
     for k in range(segs + 1):
         u = k / segs
-        cx, cy = lean * u * u, H * u
-        rr = 0.6 * (1.0 - 0.45 * u)
-        rings.append([(cx + rr * math.cos(2 * math.pi * j / sides), cy, rr * math.sin(2 * math.pi * j / sides))
+        cx, cy, cz = axis(u)
+        rr = 0.06 * H * (1.0 - 0.45 * u) * (1.0 + 0.06 * math.sin(26.0 * u))     # the trunk's faint rings
+        if u < 0.08:
+            rr *= 1.0 + 3.0 * (0.08 - u)                                         # the root flare
+        rings.append([(cx + rr * math.cos(2 * math.pi * j / sides), cy, cz + rr * math.sin(2 * math.pi * j / sides))
                       for j in range(sides)])
     for k in range(segs):
         for j in range(sides):
             a, b = rings[k][j], rings[k][(j + 1) % sides]
             c, d = rings[k + 1][(j + 1) % sides], rings[k + 1][j]
-            tris += [(a, c, b), (a, d, c)]
-    top = (lean, H, 0.0)
-    for b, (az, L, droop) in enumerate([(0.2, 8.0, 0.55), (1.15, 7.0, 0.7), (2.2, 6.5, 0.6), (3.3, 7.5, 0.5),
-                                        (4.3, 6.0, 0.8), (5.3, 7.2, 0.65)]):
+            trunk += [(a, c, b), (a, d, c)]
+    mx.write_faceted(os.path.join(MESH_DIR, "do-palm-trunk.glb"), trunk, "palmTrunk")
+    top = axis(1.0)
+    crown = []
+    # (azimuth rad from +x, length / H, rise, droop, twist): nine fronds spread round, the longest on the sun side
+    fronds = [(0.15, 0.72, 0.5, 1.5, 0.2), (0.75, 0.64, 0.65, 1.3, 0.9), (1.45, 0.56, 0.8, 1.1, 1.3),
+              (2.2, 0.58, 0.7, 1.2, 0.5), (2.95, 0.66, 0.45, 1.45, 1.1), (3.7, 0.6, 0.6, 1.35, 0.3),
+              (4.4, 0.54, 0.85, 1.0, 1.4), (5.1, 0.62, 0.65, 1.25, 0.7), (5.75, 0.7, 0.4, 1.55, 0.1)]
+    for az, Lf, rise, droop, twist in fronds:
+        L = Lf * H
         dx, dz = math.cos(az), math.sin(az)
-        px, pz = -dz, dx
-        n = 5
+        dx += 0.35                                       # the wind sweeps every frond toward +x
+        nrm = math.hypot(dx, dz)
+        dx, dz = dx / nrm, dz / nrm
+        n = 7
         pts = []
         for k in range(n + 1):
             u = k / n
-            y = 0.9 * math.sin(math.pi * u * 0.6) - droop * 6.0 * u * u
-            w = 1.3 * math.sin(math.pi * min(1.0, u * 1.15)) * (1.0 - 0.3 * u) + 0.05
-            pts.append(((top[0] + dx * L * u, top[1] + y, top[2] + dz * L * u), w))
+            y = rise * L * 0.55 * math.sin(math.pi * min(1.0, u * 0.8)) - droop * L * 0.55 * u * u
+            w = 0.12 * H * math.sin(math.pi * min(1.0, u * 1.2 + 0.02)) * (1.0 - 0.25 * u) + 0.03
+            tw = twist * (0.3 + 0.7 * u)                 # the ribbon turns along its length
+            px, py, pz = -dz * math.cos(tw), math.sin(tw), dx * math.cos(tw)
+            c = (top[0] + dx * L * u, top[1] + y, top[2] + dz * L * u)
+            pts.append((c, (px * w, py * w, pz * w)))
         for k in range(n):
             (c0, w0), (c1, w1) = pts[k], pts[k + 1]
-            a = (c0[0] + px * w0, c0[1], c0[2] + pz * w0)
-            bq = (c0[0] - px * w0, c0[1], c0[2] - pz * w0)
-            cq = (c1[0] - px * w1, c1[1], c1[2] - pz * w1)
-            d = (c1[0] + px * w1, c1[1], c1[2] + pz * w1)
-            tris += [(a, bq, cq), (a, cq, d), (a, cq, bq), (a, d, cq)]
-    mx.write_faceted(os.path.join(MESH_DIR, "do-palm.glb"), tris, "palm")
-    verts, faces = [], []
-    for c, r in (((0.0, 9.0, 0.0), (7.5, 3.6, 6.0)), ((5.5, 10.5, 1.0), (5.5, 3.4, 4.5)),
-                 ((-4.5, 8.2, -0.5), (5.0, 3.0, 4.2))):
-        v, f = ellipsoid(c, r)
-        off = len(verts)
-        verts += v
-        faces += [(a + off, b + off, c2 + off) for a, b, c2 in f]
-    v, f = ellipsoid((0.0, 3.5, 0.0), (0.7, 4.0, 0.7), 8, 4)
-    off = len(verts)
-    verts += v
-    faces += [(a + off, b + off, c2 + off) for a, b, c2 in f]
-    v, n, idx = mx.smooth_shaded(verts, faces)
-    mx.write_glb(os.path.join(MESH_DIR, "do-canopy.glb"), v, n, idx, "canopy")
-    return len(tris)
+            a = tuple(c0[i] + w0[i] for i in range(3))
+            b = tuple(c0[i] - w0[i] for i in range(3))
+            c = tuple(c1[i] - w1[i] for i in range(3))
+            d = tuple(c1[i] + w1[i] for i in range(3))
+            crown += [(a, b, c), (a, c, d), (a, c, b), (a, d, c)]
+    # dead fronds: three narrow ribbons hanging straight down from under the crown
+    for az, Lf in ((0.9, 0.28), (2.6, 0.24), (4.6, 0.3)):
+        L = Lf * H
+        dx, dz = math.cos(az) * 0.3, math.sin(az) * 0.3
+        a = (top[0] + dx * 0.5, top[1] - 0.02 * H, top[2] + dz * 0.5)
+        b = (top[0] + dx * L, top[1] - L, top[2] + dz * L)
+        w = 0.035 * H
+        px, pz = -math.sin(az), math.cos(az)
+        q = [(a[0] + px * w, a[1], a[2] + pz * w), (a[0] - px * w, a[1], a[2] - pz * w), (b[0], b[1], b[2])]
+        crown += [tuple(q), (q[0], q[2], q[1])]
+    v, f = ellipsoid((top[0] + 0.02 * H, top[1] - 0.03 * H, top[2]), (0.045 * H, 0.03 * H, 0.045 * H), 10, 5)
+    crown += [(v[a], v[b], v[c]) for a, b, c in f]
+    mx.write_faceted(os.path.join(MESH_DIR, "do-palm-crown.glb"), crown, "palmCrown")
+    return len(trunk) + len(crown)
 
 
-# trees: (along the island u in [-1, 1], across v, kind, scale, yaw deg). Gaps on purpose; one tall palm marks it.
-TREES = {
-    "A": [(-0.35, 0.1, "palm", 1.25, 20.0), (0.12, -0.05, "palm", 0.95, -15.0), (0.52, 0.0, "canopy", 1.0, 0.0),
-          (0.7, 0.15, "palm", 1.05, 35.0)],
-    "B": [(-0.6, 0.0, "canopy", 0.85, 30.0), (-0.35, 0.1, "palm", 1.3, 20.0), (-0.2, -0.1, "palm", 0.85, 60.0),
-          (0.12, -0.05, "palm", 1.0, -15.0), (0.5, 0.0, "canopy", 1.05, 0.0), (0.68, 0.15, "palm", 1.1, 35.0),
-          (0.82, 0.0, "palm", 0.8, -40.0)],
-}
-TREES["C"] = TREES["A"] + [(-0.62, 0.0, "canopy", 0.8, 30.0)]
+# the rocks (island-local x across the view, z toward the camera; Kenney rock, scale, yaw deg, sink m): a tall stack
+# at the left end balancing the palm on the right, low rocks along the near shore, one standing in the water
+ROCKS = [(-34.0, 12.0, "rock_largeA", 9.0, 25.0, 0.6), (-30.0, 19.0, "rock_largeE", 8.0, -40.0, 0.6),
+         (-37.0, -4.0, "rock_largeE", 8.0, 70.0, 0.6), (-30.0, -14.0, "rock_largeA", 8.0, 140.0, 0.5),
+         (-22.0, 23.0, "rock_smallA", 11.0, 30.0, 0.5), (8.0, 27.0, "rock_largeE", 8.0, 15.0, 0.6),
+         (18.0, 26.0, "rock_smallA", 12.0, 40.0, 0.5), (32.0, 19.0, "rock_smallA", 10.0, 0.0, 0.5),
+         (-12.0, 27.0, "rock_largeA", 7.0, 40.0, 0.6), (30.0, -19.0, "rock_largeE", 8.0, 200.0, 0.5)]
+PALM_AT = (24.0, -3.0)
+PALM_YAW = 0.0
 
 
-def tree_points(kind):
-    pts = []
-    for u, v, k, sc, yaw in TREES[ISLAND_STYLE]:
-        if k != kind:
-            continue
-        x, z = u * ISLAND_W * 0.5, v * ISLAND_D * 0.5
-        y = island_height(x, z)
-        q = math.radians(yaw) / 2.0
-        pts.append([round(ISLAND_C[0] + x, 2), round(y - 0.6, 2), round(ISLAND_C[1] + z, 2), 0.0, round(math.sin(q), 5),
-                    0.0, round(math.cos(q), 5), sc * TREE_SCALE, sc * TREE_SCALE, sc * TREE_SCALE])
-    return pts
+def island_point(x, z, y=None):
+    """A local island point (x across, z toward the camera) in the world: the island's yaw and scale about ISLAND_C."""
+    a = math.radians(ISLAND_YAW)
+    sc = ISLAND_SCALE
+    wx = ISLAND_C[0] + sc * (x * math.cos(a) + z * math.sin(a))
+    wz = ISLAND_C[1] + sc * (-x * math.sin(a) + z * math.cos(a))
+    wy = sc * (island_height(x, z) if y is None else y)
+    return [round(wx, 3), round(wy, 3), round(wz, 3)]
+
+
+def island_transform():
+    sc = ISLAND_SCALE
+    return {"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, ISLAND_YAW, 0.0], "scale": [sc, sc, sc]}
 
 
 # ---- the boats (the owner's brief 09): a real boat designed first, simplified second, stylized third. Three
@@ -1132,8 +1304,8 @@ def wake_mesh(hl):
             idx.extend([a, a + 2, a + 3, a, a + 3, a + 1, a, a + 3, a + 2, a, a + 1, a + 3])   # both faces
     st = -hl * 0.5 + 0.3
     k = math.radians(19.5)
-    arm(st, 1.6, k, 46.0, 0.6, 2.6)
-    arm(st, -1.6, -k, 46.0, 0.6, 2.6)
+    arm(st, 1.6, k, 40.0, 0.5, 1.8)
+    arm(st, -1.6, -k, 40.0, 0.5, 1.8)
     # the stern's own churned water: a short strip straight back
     arm(st, 0.0, 0.0, 16.0, 1.5, 2.6, 10)
     # the bow wave: short arms from the stem
@@ -1208,7 +1380,7 @@ def wake_program():
 
 
 WAKE_FREQ = 0.55
-WAKE_CUT0, WAKE_CUT1 = 0.24, 0.62
+WAKE_CUT0, WAKE_CUT1 = 0.42, 0.78     # Pass 4: a quieter wake under the illustrated foam
 
 
 RIDERS = {}     # node -> the identities of its deformer slots (filled as nodes are made; read by wave_route)
@@ -1248,7 +1420,8 @@ def boat(s):
     roll = [{"kind": "sine", "amount": BOAT_ROLL, "frequency": 0.12, "speed": 0.9, "phase": 0.0,
              "axis": [0.0, 1.0, 0.0], "displacementAxis": [0.0, 0.0, 1.0], "space": "local"},
             {"kind": "path", "spline": "boatCourse", "amount": 1.0, "axis": [1.0, 0.0, 0.0],
-             "center": [0.0, 0.0, 0.0], "pathOffset": hl * 0.5, "pathScale": 1.0, "pathRoll": 0.0, "space": "local"}]
+             "center": [0.0, 0.0, 0.0], "pathOffset": hl * 0.5 + BOAT_REVIEW_OFFSET, "pathScale": 1.0,
+             "pathRoll": 0.0, "space": "local"}]
     ride = roll + ride_deformers()            # the hull rides the swell and the music's swell as the sea does
     keys = BOAT_DESIGNS[BOAT_KIND]()
     for name, key, colour in BOAT_PARTS:
@@ -1273,6 +1446,7 @@ def boat(s):
 
 
 BOAT_ROLL = 0.06
+BOAT_REVIEW_OFFSET = 0.0     # look development only: parks the yacht this far along its course (the silent variant has no saw)
 
 
 def illus_program():
@@ -1310,34 +1484,29 @@ def illus_program():
 
 
 def land_program():
-    """The island as an anime background paints it: about three land colours -- the main colour on the faces that
-    look up, a darker underside on the steep faces toward the camera, a lighter accent on the edges that catch the low
-    sun -- and a narrow sand line at the water. In cut-paper style (C) the bands are hard and there is no accent.
-    Then the haze that ties it to the horizon. Registers: 0 N, 1 V, 2 world position."""
+    """The island's colour bands by height -- the rock base from the water to ROCK_TOP, a sand line to SAND_TOP, the
+    land on top -- written as the material's BASE COLOUR (not its emission): the island is a lit cel material
+    (ADR-1071), so the scene's key light at the sun shades it (the owner's direction: sun-facing faces lit and warm,
+    faces away in shadow, a rim toward the sun), in agreement with the rays and the path. The rock takes a little
+    facet variation from the normal. Then the haze that ties it to the horizon. Registers: 0 N, 2 wp, 3 colour."""
     P = Prog("doLand")
-    sx, sy, sz = S
     P.op("N", "input", 0, inp="normal")
-    P.op("V", "input", 1, inp="viewDirection")
     P.op("wp", "input", 2, inp="worldPosition")
-    P.pcolour("land", 3, "land")
+    P.pcolour("rock", 3, "rock")
     P.pcolour("land2", 4, "land2")
-    P.op(None, "swizzle", 5, a=0, k=[1, 1, 1, 1])                                   # n.y
-    hard = ISLAND_STYLE == "C"
-    P.op("under", "smoothstep", 5, a=5, k=[LAND_UNDER0, LAND_UNDER0 + (0.01 if hard else LAND_UNDER_SOFT)])
-    P.op(None, "mixBy", 3, a=4, b=3, c=5)                                           # steep faces: the underside
-    if not hard:
-        P.op(None, "fresnel", 4, f=2.5)                                              # the sun-facing accent
-        P.op(None, "gradient", 5, a=1, k=[-sx, -sy, -sz, 0.0], f=1.0)
-        P.op(None, "power", 5, a=5, f=5.0)
-        P.op(None, "multiply", 4, a=4, b=5)
-        P.op(None, "smoothstep", 4, a=4, k=[0.12, 0.2])
-        P.pcolour("land3", 5, "land3")
-        P.op(None, "mixBy", 3, a=3, b=5, c=4)
-    if ISLAND_STYLE != "A":
-        P.op(None, "swizzle", 5, a=2, k=[1, 1, 1, 1])                                # the sand line at the water
-        P.op("shore", "smoothstep", 5, a=5, k=[LAND_SAND1, LAND_SAND0])
-        P.pcolour("sand", 4, "sand")
-        P.op(None, "mixBy", 3, a=3, b=4, c=5)
+    P.op(None, "noise", 5, a=2, f=0.14, k=[0.0, 0.0, 0.0], seed=61)                  # mottled rock: boulder masses
+    P.op("mottle", "smoothstep", 5, a=5, k=[0.42, 0.5])
+    P.op(None, "mixBy", 3, a=4, b=3, c=5)
+    P.op(None, "noise", 6, a=2, f=0.045, k=[0.0, 0.0, 0.0], seed=67)                 # the rock line wobbles
+    P.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.6, -1.6])
+    P.op(None, "swizzle", 5, a=2, k=[1, 1, 1, 1])                                   # the height
+    P.op(None, "add", 5, a=5, b=6)
+    P.op("sandLine", "smoothstep", 6, a=5, k=[ROCK_TOP * 0.85 - 0.1, ROCK_TOP * 0.85 + 0.1])
+    P.pcolour("sand", 4, "sand")
+    P.op(None, "mixBy", 3, a=3, b=4, c=6)
+    P.op("landTop", "smoothstep", 6, a=5, k=[SAND_TOP - 0.1, SAND_TOP + 0.1])
+    P.pcolour("land", 4, "land")
+    P.op(None, "mixBy", 3, a=3, b=4, c=6)
     P.op(None, "input", 4, inp="cameraDistance")
     P.op(None, "constant", 5, k=[0.1, 0.1, 0.1, 0.1])
     P.op(None, "multiply", 4, a=4, b=5)
@@ -1347,14 +1516,31 @@ def land_program():
     return P
 
 
-LAND_UNDER0, LAND_UNDER_SOFT = 0.55, 0.12
-LAND_SAND0, LAND_SAND1 = 0.6, 1.6
+LAND_UNDER0, LAND_UNDER_SOFT = 0.6, 0.02
+LAND_LIT0, LAND_LIT_SOFT = 0.46, 0.02
+LAND_SAND0, LAND_SAND1 = 0.25, 0.75
 
 
 ILLUS_BAND0, ILLUS_BAND1 = 0.32, 0.42
 ILLUS_SHADOW, ILLUS_LIT = 0.62, 1.12
 ILLUS_RIM = 0.9
 ILLUS_HAZE0, ILLUS_HAZE1, ILLUS_HAZE_MAX = 60.0, 500.0, 0.55
+
+
+def cel(key=None, double=False, rim=0.3):
+    """A lit cel material (ADR-1071) under the scene's key light at the sun: two lit bands over the palette's shadow
+    tone, a warm rim toward the sun. `key` None: the base colour comes from a program (the island)."""
+    m = {"baseColor": pal(PALETTE, key) if key else [1.0, 1.0, 1.0], "emissiveColor": [0.0, 0.0, 0.0],
+         "emissiveIntensity": 0.0, "roughness": 0.8, "metallic": 0.0,
+         "toon": {"bands": 2, "softness": 0.02, "terminator": 0.05, "shadowColor": pal(PALETTE, "land2"),
+                  "ambient": CEL_AMBIENT, "rimWidth": rim, "rimColor": pal(PALETTE, "warm"),
+                  "rimIntensity": 1.3 if rim else 0.0, "specular": 0.0, "specularSize": 0.12}}
+    if double:
+        m["doubleSided"] = True
+    return m
+
+
+CEL_AMBIENT = 0.42
 
 
 def flat(key, scale=1.0, double=False):
@@ -1366,58 +1552,73 @@ def flat(key, scale=1.0, double=False):
 
 
 # the nodes painted by doIllus and the palette key each one's colour comes from (palette_routes routes them)
-ILLUS_NODES = [("palms", "trunk"), ("canopies", "trunk"), ("boatHull", "pearl"), ("boatBoot", "glaze"),
-               ("boatDeck", "deck"),
-               ("boatGlaze", "glaze"), ("boatSail", "pearl")] + [("farIsle%d" % k, "isle") for k in range(len(FAR_ISLES))]
+ILLUS_NODES = [("palmTrunk", "trunk"), ("palmCrown", "frond"), ("rocks", "rock"), ("boatHull", "pearl"),
+               ("boatBoot", "glaze"), ("boatDeck", "deck"), ("boatGlaze", "glaze"), ("boatSail", "pearl")]
+CEL_NODES = ["palmTrunk", "palmCrown", "rocks"]      # lit cel materials: the palette routes their baseColor
 
 
 def world(s):
     island_meshes()
-    palm_meshes()
+    palm_mesh()
     boat_meshes()
     ip = illus_program()
     s.program(ip.doc(emission=2))
     lp = land_program()
-    s.program(lp.doc(emission=3))
-    # the island is a stable anchor: no deformer, nothing routed to its shape
-    s.proc("island", {"kind": "mesh", "asset": "meshes/do-island-low.glb"}, material=unlit("doLand"),
-           transform={"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, -4.0, 0.0], "scale": [1.0, 1.0, 1.0]})
-    for k, ((x, z), sc, sy) in enumerate(FAR_ISLES):
-        s.proc("farIsle%d" % k, {"kind": "mesh", "asset": "meshes/do-farstrip.glb"}, material=flat("isle"),
-               transform={"position": [x, 0.0, z], "rotation": [0.0, 8.0 * k, 0.0], "scale": [sc, sy, sc]})
-    tree = "trunk"                                 # one dark cut-paper tone for every tree (variant C)
-    # only the palms sway, gently (0.2 m at the crown, 9 s); the canopies hold still
-    sway = [{"kind": "sine", "amount": 0.2, "frequency": 0.12, "speed": 0.7, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
+    s.program(lp.doc(emission=-1, base=3))
+    # the island is a stable anchor: no deformer, nothing routed to its shape; lit by the key light at the sun
+    s.proc("island", {"kind": "mesh", "asset": "meshes/do-island.glb"},
+           material=flat("land") if LAND_DEBUG else dict(cel(None, rim=0.35), program="doLand"),
+           transform=island_transform())
+    # the palm: the trunk stands still; the crown sways a little (0.25 m at the fronds' tips, ~9 s), never bends
+    q = math.radians(PALM_YAW) / 2.0
+    at = island_point(*PALM_AT)
+    at[1] -= 0.3 * ISLAND_SCALE
+    sc = ISLAND_SCALE
+    point = at + [0.0, round(math.sin(q), 5), 0.0, round(math.cos(q), 5), sc, sc, sc]
+    sway = [{"kind": "sine", "amount": 0.25, "frequency": 0.12, "speed": 0.7, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
              "displacementAxis": [0.8, 0.0, 0.6], "center": [0.0, 0.0, 0.0], "falloff": 16.0, "space": "local"}]
-    s.proc("palms", {"kind": "mesh", "asset": "meshes/do-palm.glb"},
-           distribution={"kind": "points", "points": tree_points("palm")}, material=flat(tree, double=True),
-           deformers=sway)
-    s.proc("canopies", {"kind": "mesh", "asset": "meshes/do-canopy.glb"},
-           distribution={"kind": "points", "points": tree_points("canopy")}, material=flat(tree))
+    s.proc("palmTrunk", {"kind": "mesh", "asset": "meshes/do-palm-trunk.glb"},
+           distribution={"kind": "points", "points": [point]}, material=cel("trunk"))
+    s.proc("palmCrown", {"kind": "mesh", "asset": "meshes/do-palm-crown.glb"},
+           distribution={"kind": "points", "points": [point]}, material=cel("frond", double=True), deformers=sway)
+    # the rocks: Kenney's low-poly rocks, scaled up and painted flat (one node per rock asset)
+    by_asset = {}
+    for x, z, asset, scale, yaw, sink in ROCKS:
+        p = island_point(x, z)
+        p[1] = max(-0.3 * sc, min(p[1], (ROCK_TOP - 0.5) * sc)) - sink * sc  # on the rock face or in the surf
+        q = math.radians(yaw) / 2.0
+        by_asset.setdefault(asset, []).append(p + [0.0, round(math.sin(q), 5), 0.0, round(math.cos(q), 5),
+                                                 scale * sc, scale * sc, scale * sc])
+    for k, (asset, pts) in enumerate(sorted(by_asset.items())):
+        s.proc("rocks" if k == 0 else "rocks%d" % k, {"kind": "mesh", "asset": kit.asset("kenney/%s.glb" % asset)},
+               distribution={"kind": "points", "points": pts}, material=cel("rock"))
+        if k:
+            ILLUS_NODES.append(("rocks%d" % k, "rock"))
+            CEL_NODES.append("rocks%d" % k)
     shore(s)
     wp = boat(s)
     return ip, lp, wp
 
 
-def shore_mesh(n=360):
+def shore_mesh(n=240):
     """Pass 3, Pass E: the island's surf line. A low vertical ribbon (SHORE_LO..SHORE_HI m) round the footprint's
-    waterline (the superellipse |u|^6 + v^2 = 1 of island_height, pushed out by SHORE_OUT), facing out to sea.
-    uv = (round the shore 0..1, up the ribbon 0..1). At 900 m a pixel is ~0.5 m, so the ribbon is a 2-3 px line: the
-    white surf line of an anime background, broken by shore_program."""
-    a, b = ISLAND_W * 0.5 * SHORE_OUT, ISLAND_D * 0.5 * SHORE_OUT
+    waterline (island_radius, pushed out by SHORE_OUT), facing out to sea. uv = (round the shore 0..1, up the ribbon
+    0..1). At 330 m a pixel is ~0.2 m, so the ribbon is a few px: the white surf line of an anime background, broken
+    by shore_program."""
     verts, uvs, nrm, idx = [], [], [], []
     for i in range(n + 1):
         q = 2.0 * math.pi * i / n
-        c, sn = math.cos(q), math.sin(q)
-        x = a * math.copysign(abs(c) ** (1.0 / 3.0), c)
-        z = b * sn
-        # the outward normal of |x/a|^6 + (z/b)^2 = 1
-        gx, gz = 6.0 * (x / a) ** 5 / a, 2.0 * (z / b) / b
-        L = math.hypot(gx, gz) or 1.0
+        r = island_radius(q) * SHORE_OUT
+        x, z = r * math.cos(q), r * math.sin(q)
+        # the outward normal: across the outline's tangent
+        q1 = q + 1e-3
+        r1 = island_radius(q1) * SHORE_OUT
+        tx, tz = r1 * math.cos(q1) - x, r1 * math.sin(q1) - z
+        L = math.hypot(tx, tz) or 1.0
         for k, y in ((0, SHORE_LO), (1, SHORE_HI)):
             verts.append((round(x, 3), y, round(z, 3)))
             uvs.append((i / n, float(k)))
-            nrm.append((gx / L, 0.0, gz / L))
+            nrm.append((-tz / L, 0.0, tx / L))
     for i in range(n):
         p0 = 2 * i
         idx += [p0, p0 + 2, p0 + 1, p0 + 1, p0 + 2, p0 + 3]
@@ -1441,10 +1642,10 @@ def shore_program():
     return P
 
 
-SHORE_OUT = 1.005
-SHORE_LO, SHORE_HI = -0.4, 1.6
-SHORE_FREQ = 0.04
-SHORE_CUT = 0.28
+SHORE_OUT = 1.01
+SHORE_LO, SHORE_HI = -0.3, 0.5
+SHORE_FREQ = 0.1
+SHORE_CUT = 0.56
 SHORE_GAIN = 1.0
 
 
@@ -1457,8 +1658,7 @@ def shore(s):
            material={"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
                      "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "doShore", "alphaMode": "mask",
                      "alphaCutoff": 0.5, "doubleSided": True},
-           transform={"position": [ISLAND_C[0], 0.0, ISLAND_C[1]], "rotation": [0.0, -4.0, 0.0], "scale": [1.0, 1.0, 1.0]},
-           deformers=ride_deformers())
+           transform=island_transform(), deformers=ride_deformers())
     RIDERS["shore"] = list(RIDE_IDS)
     SHORE_PROGS.append(sp)
 
@@ -1640,7 +1840,7 @@ def leap_points(centre, heading_deg, height, half_span, loop=True, depth=36.0, r
 # right to left near the island side.
 PODS = [
     ("podA", (40.0, -100.0), -4.0, 5.5, 11.0, 53.0, [(0.0, 0.0, 1.0), (0.55, -3.5, 0.85), (1.25, 2.8, 0.92)]),
-    ("podB", (-80.0, -300.0), 176.0, 3.4, 9.0, 79.0, [(0.0, 0.0, 1.0), (0.7, 3.0, 0.8)]),
+    ("podB", (-20.0, -240.0), 176.0, 3.4, 9.0, 79.0, [(0.0, 0.0, 1.0), (0.7, 3.0, 0.8)]),
 ]
 LEAP_SPEED = 12.0            # metres a second along the path (a dolphin's leap)
 HERO = ("hero", (22.0, -55.0), -2.0, 8.0, 14.0)
@@ -1900,7 +2100,7 @@ def musical_colour(s, progs, sea, seafar, sky, cp):
               decayMs=900))
 
 
-MOOD_INTENSITY = 0.35
+MOOD_INTENSITY = 0.12       # Pass 4: the sunset holds under most music (0.35 carried every still halfway to the afternoon; the palette routes run at gain 2, so this is 24 % of the way at full intensity)
 
 
 def instrument(s, sea, seafar, sky):
@@ -1919,23 +2119,27 @@ def instrument(s, sea, seafar, sky):
     for prog in (sea, seafar):
         s.route(R("kickEnv", M % (prog.name, prog["sss"]), 1.0, op="multiply", gain=0.2, offset=1.0, attackMs=0,
                   decayMs=420))
-    s.route(R("kickEnv", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=0,
-              decayMs=600))
-    # the crest ramp follows the sea's height (a taller sea needs a taller crest to foam): foam stays a cap
-    s.route(R("level", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply", gain=-0.3,
-              offset=1.0, attackMs=1800, decayMs=4500))
-    s.route(R("level", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], 0.05, comp=0, attackMs=1800,
-              decayMs=4500),
-            R("level", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], 0.05, comp=1, attackMs=1800,
-              decayMs=4500))
+    if "foam" in sea.at:
+        s.route(R("kickEnv", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=0,
+                  decayMs=600))
+    # the crest span follows the sea's height (a taller sea needs a taller crest to foam): foam stays a cap. The
+    # gradient's y component only: its w is the centring offset (Pass 4)
+    s.route(R("level", "material/doSea/op/%d/gradient/constant" % sea["crest"], -0.3 / W_HEIGHT, comp=1,
+              attackMs=1800, decayMs=4500))
+    if "foamMask" in sea.at:
+        s.route(R("level", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], 0.05, comp=0, attackMs=1800,
+                  decayMs=4500),
+                R("level", "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"], 0.05, comp=1, attackMs=1800,
+                  decayMs=4500))
     # SNARE: spray off the near swell
     s.route(R("snare", "particles/snareSpray/burst", 70.0, threshold="binary", thresholdLevel=0.25))
     # HIGHS: the sun's glints flare and the micro-ripples deepen (more, smaller glints); hats sparkle the path
     for prog in (sea, seafar):
-        s.route(R("hatEnv", M % (prog.name, prog["glint"]), 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0,
-                  decayMs=220),
-                R("audio.treble", M % (prog.name, prog["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0,
-                  attackMs=60, decayMs=500))
+        if "glint" in prog.at:
+            s.route(R("hatEnv", M % (prog.name, prog["glint"]), 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0,
+                      decayMs=220),
+                    R("audio.treble", M % (prog.name, prog["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0,
+                      attackMs=60, decayMs=500))
     # (the highs once deepened the micro-ripples too: at 60-200 m that noise aliased into crumpled foil -- removed)
     # SUSTAIN: held sound swells the sun's halo and warms the sun's path
     s.route(R("sustain", M % (sky.name, sky["halo"]), 1.0, op="multiply", gain=0.4, offset=1.0, attackMs=1500,
@@ -1961,7 +2165,7 @@ MIDI_CC = [
     (2, "night", "NIGHT: dusk falls into a bioluminescent night (the crests and foam glow)"),
     (3, "waves", "WAVES: the swell's height (the long swell and the cross swell rise)"),
     (4, "energy", "WAVE ENERGY: chop, foam and how deep the music writes into the sea, together"),
-    (5, "rays", "SUN RAYS: the rays' strength and reach, the halo and the sun's path"),
+    (5, "rays", "SUN RAYS: the rays' strength and reach, the halo and the sun's path on the water"),
     (6, "clouds", "CLOUDS: the glow on the clouds' lit undersides and rims"),
     (7, "water", "WATER COLOUR: the richness of the water's body and crest light"),
     (8, "spray", "SPRAY: how much spray and sparkle the drums and notes throw"),
@@ -2008,10 +2212,17 @@ def palette_routes(s, progs, signal, to, chain, frm=None):
         if node not in present:
             continue
         a, b = pal(frm, key), pal(to, key)
+        field = "baseColor" if node in CEL_NODES else "emissiveColor"
         for c in range(3):
             if abs(b[c] - a[c]) > 1e-4:
-                s.route(R(signal, "procedural/%s/material/emissiveColor" % node, round(b[c] - a[c], 5), comp=c,
+                s.route(R(signal, "procedural/%s/material/%s" % (node, field), round(b[c] - a[c], 5), comp=c,
                           **chain))
+        if node in CEL_NODES:
+            a2, b2 = pal(frm, "land2"), pal(to, "land2")
+            for c in range(3):
+                if abs(b2[c] - a2[c]) > 1e-4:
+                    s.route(R(signal, "procedural/%s/material/toon/shadowColor" % node, round(b2[c] - a2[c], 5),
+                              comp=c, **chain))
 
 
 def midi(s, progs, sea, seafar, sky, cp=None):
@@ -2026,16 +2237,18 @@ def midi(s, progs, sea, seafar, sky, cp=None):
     wave_route(s, "control.energy", "tide", 1.0, op="multiply", gain=1.4, offset=1.0, **CC)
     if WATER == "anime":
         water_controls(s, sea, seafar)
-    s.route(R("control.energy", M % (sea.name, sea["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
-    # a taller sea needs a taller crest to foam: the crest ramp follows the waves control
-    s.route(R("control.waves", "material/doSea/op/%d/gradient/constant" % sea["crest"], 1.0, op="multiply",
-              gain=-0.42, offset=1.0, **CC))
+    if "glint" in sea.at:
+        s.route(R("control.energy", M % (sea.name, sea["glint"]), 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
+    # a taller sea needs a taller crest to foam: the crest span follows the waves control (the y component only)
+    s.route(R("control.waves", "material/doSea/op/%d/gradient/constant" % sea["crest"], -0.42 / W_HEIGHT, comp=1,
+              **CC))
     # foam is a crest cap whatever the sea's height: a taller sea (waves) raises the cut as much as energy lowers it,
     # so energy makes the caps livelier and brighter, never a slab (Pass 3, Pass C)
-    FM = "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"]
-    s.route(R("control.energy", FM, -0.02, comp=0, **CC), R("control.energy", FM, -0.02, comp=1, **CC),
-            R("control.waves", FM, 0.07, comp=0, **CC), R("control.waves", FM, 0.07, comp=1, **CC),
-            R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
+    if "foamMask" in sea.at:
+        FM = "material/doSea/op/%d/smoothstep/constant" % sea["foamMask"]
+        s.route(R("control.energy", FM, -0.02, comp=0, **CC), R("control.energy", FM, -0.02, comp=1, **CC),
+                R("control.waves", FM, 0.07, comp=0, **CC), R("control.waves", FM, 0.07, comp=1, **CC),
+                R("control.energy", M % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.6, offset=1.0, **CC))
     for prog, key, g in ((sky, "ray", 1.0), (sky, "halo", 0.9), (sky, "glow", 0.5), (sea, "pathCol", 0.9),
                          (seafar, "pathCol", 0.9), (sea, "glint", 0.6), (seafar, "glint", 0.6)):
         if key in prog.at:
@@ -2057,8 +2270,9 @@ def midi(s, progs, sea, seafar, sky, cp=None):
         for c in range(3):
             s.route(R("control.padGlow", M % (prog.name, prog["sss"]), round(em[c] * 6.0, 4), comp=c, **glow))
     for c in range(3):
-        s.route(R("control.padGlow", M % (sea.name, sea["foam"]), round(pal("midnight", "foam")[c] * 1.5, 4), comp=c,
-                  **glow))
+        if "foam" in sea.at:
+            s.route(R("control.padGlow", M % (sea.name, sea["foam"]), round(pal("midnight", "foam")[c] * 1.5, 4),
+                      comp=c, **glow))
     flare = {"envelope": "peakhold", "envelopeHoldMs": 250, "envelopeFallPerSecond": 0.45}
     for prog, key, g in ((sky, "halo", 1.6), (sky, "glow", 0.7), (sea, "pathCol", 1.2), (seafar, "pathCol", 1.2),
                          (sea, "glint", 0.6)):
@@ -2096,33 +2310,34 @@ def water_controls(s, sea, seafar):
     M = "material/%s/op/%d/%s/constant"
     for prog in (sea, seafar):
         # BANDS: each edge's half-width shrinks (to 15 % at full); the music's intensity tightens them a little
-        for band in ("band1", "band2", "band3"):
+        for band in ("band1", "band2"):
             for src, amt in (("control.bands", 0.85 * W_SOFT), ("intensity", 0.3 * W_SOFT)):
                 s.route(R(src, M % (prog.name, prog[band], "smoothstep"), amt, comp=0, **CC),
                         R(src, M % (prog.name, prog[band], "smoothstep"), -amt, comp=1, **CC))
-        # DETAIL: the noise's share of t (0.07 -> 0.2), its mean shift taken back out of the height term
-        s.route(R("control.detail", "material/%s/op/%d/mix/value" % (prog.name, prog["detail"]), 0.09, **CC),
-                R("control.detail", M % (prog.name, prog["crest"], "gradient"), -0.045, comp=3, **CC))
+        # DETAIL: the noise's share of t (0.07 -> 0.16); t stays centred because the noise's mean is the middle
+        s.route(R("control.detail", "material/%s/op/%d/mix/value" % (prog.name, prog["detail"]), 0.09, **CC))
     # HIGHLIGHTS: brighter (x1.8) and wider (the stroke band opens downward); hats flash them
     C = "material/%s/op/%d/constant/constant"
-    s.route(R("control.highlights", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.5, offset=1.0, **CC),
-            R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.02, comp=0, **CC),
-            R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.02, comp=1, **CC),
-            R("hatEnv", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0,
-              decayMs=250))
-    # FOAM: the cut drops (more caps) and the foam brightens
-    FM = M % (sea.name, sea["foamMask"], "smoothstep")
-    s.route(R("control.foam", FM, -0.03, comp=0, **CC), R("control.foam", FM, -0.03, comp=1, **CC),
-            R("control.foam", C % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.2, offset=1.0, **CC))
-    # THE HERO WAVE foams: while it rolls in (pad 37, ~18 s) the foam cut drops, so its crest -- the tallest thing
-    # on the water -- carries a white line, and its strokes brighten (Pass F)
     hero = {"envelope": "peakhold", "envelopeHoldMs": 12000, "envelopeFallPerSecond": 0.15}
-    s.route(R("control.padWave", FM, -0.025, comp=0, **hero), R("control.padWave", FM, -0.025, comp=1, **hero),
-            R("control.padWave", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.4, offset=1.0, **hero))
-    # loud music raises the swell; the crest accent narrows to keep the near wave from paling over (Pass F)
+    if "hl" in sea.at:
+        s.route(R("control.highlights", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.5, offset=1.0, **CC),
+                R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.03, comp=0, **CC),
+                R("control.highlights", M % (sea.name, sea["strokeLo"], "smoothstep"), -0.03, comp=1, **CC),
+                R("hatEnv", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0,
+                  decayMs=250),
+                # THE HERO WAVE (pad 37, ~18 s): its strokes brighten
+                R("control.padWave", C % (sea.name, sea["hl"]), 1.0, op="multiply", gain=0.4, offset=1.0, **hero))
+    # FOAM: the cut drops (more caps) and the foam brightens; the hero wave's crest -- the tallest thing on the
+    # water -- carries a white line while it rolls in
+    if "foamMask" in sea.at:
+        FM = M % (sea.name, sea["foamMask"], "smoothstep")
+        s.route(R("control.foam", FM, -0.03, comp=0, **CC), R("control.foam", FM, -0.03, comp=1, **CC),
+                R("control.foam", C % (sea.name, sea["foam"]), 1.0, op="multiply", gain=0.2, offset=1.0, **CC),
+                R("control.padWave", FM, -0.025, comp=0, **hero), R("control.padWave", FM, -0.025, comp=1, **hero))
+    # loud music raises the swell; the lit band narrows to keep the near wave from paling over (Pass F)
     for prog in (sea, seafar):
         for c in (0, 1):
-            s.route(R("level", M % (prog.name, prog["band3"], "smoothstep"), 0.06, comp=c, attackMs=1800,
+            s.route(R("level", M % (prog.name, prog["band2"], "smoothstep"), 0.06, comp=c, attackMs=1800,
                       decayMs=4500))
 
 
@@ -2166,11 +2381,11 @@ HERO_WAVE_WIDTH = 6.0       # metres: narrower than Pass 2's 10, so its faces tu
 
 SUN_RADIUS_DEG = 1.7
 RAYS = True
-RAY_FREQ = 2.6         # how many rays round the sun (the noise's frequency on the unit circle)
-RAY_LO, RAY_HI = 0.44, 0.7
-RAY_REACH = 62.0       # degrees from the sun at which a ray has faded
-RAY_FALL = 3.2
-RAY_GAIN = 0.3
+RAY_FREQ = 1.9         # how many rays round the sun (the noise's frequency on the unit circle): fewer, broader
+RAY_LO, RAY_HI = 0.42, 0.8
+RAY_REACH = 58.0       # degrees from the sun at which a ray has faded
+RAY_FALL = 2.8
+RAY_GAIN = 0.5
 RAY_DRIFT = ((0.0137, 1.6), (0.0089, 2.3))   # (Hz, amplitude) of the two slow sines that move the rays
 SUN_COS = math.cos(math.radians(SUN_RADIUS_DEG))
 
@@ -2179,6 +2394,13 @@ SUN_COS = math.cos(math.radians(SUN_RADIUS_DEG))
 def unlit(program):
     return {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
             "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": program}
+
+
+def apply_composition():
+    """The composition's island placement (look development sets COMPOSITION, then builds)."""
+    global ISLAND_C, ISLAND_SCALE
+    if COMPOSITION in COMP_ISLAND:
+        ISLAND_C, ISLAND_SCALE = COMP_ISLAND[COMPOSITION]
 
 
 def camera(s):
@@ -2208,9 +2430,13 @@ def camera(s):
 def build():
     SHORE_PROGS.clear()
     RIDERS.clear()
+    apply_composition()
     generate_meshes()
     s = kit.Scene(ID, TITLE, DESIGN)
-    s.unshadowed_key()          # every material is unlit: a casting default key would be pure cost
+    # the scene's key light is the sun (the island's lit cel materials take their light from it; every other material
+    # is unlit and ignores it). No shadow: the only lit things are one island, one palm and ten rocks
+    s.light("sun", "directional", direction=[round(-c, 6) for c in S], color=pal(PALETTE, "glow"), intensity=5.0,
+            castsShadow=False, contactShadow=False)
     s.environment = {
         "intensity": 0.0, "background": pal(PALETTE, "warm"), "fogColor": pal(PALETTE, "warm"), "volumeDensity": 0.0,
         "skyIntensity": 1.0,
@@ -2223,6 +2449,11 @@ def build():
     else:
         sea, seafar, sky = sea_program(), sea_program(far=True), sky_program()
     audio_fields(s)
+    if DEBUG_WATER:
+        for prog in (sea, seafar):
+            if DEBUG_WATER[0] in prog.at:
+                prog.ops = prog.ops[:prog[DEBUG_WATER[0]]]
+                prog.emit = DEBUG_WATER[1]
     s.program(sea.doc(emission=getattr(sea, "emit", 5)))
     s.program(seafar.doc(emission=getattr(seafar, "emit", 5)))
     if DEBUG_SKY:
@@ -2241,14 +2472,18 @@ def build():
     if DEBUG_CLOUD:
         cp.ops = cp.ops[:DEBUG_CLOUD[0]]
     s.program(cp.doc(emission=DEBUG_CLOUD[1] if DEBUG_CLOUD else 3))
-    for name, layer, drift in (("clouds", CLOUDS_NEAR, CLOUD_DRIFT), ("cloudsFar", CLOUDS_FAR, CLOUD_DRIFT * 0.55)):
-        s.proc(name, {"kind": "sphere", "radius": 1.0, "segments": 18, "rings": 12},
-               distribution={"kind": "points", "points": cloud_points(layer)}, material=unlit("doCloud"),
-               deformers=[{"kind": "twist", "amount": 0.0, "speed": drift, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
-                           "center": [0.0, 0.0, 0.0], "space": "world"},
-                          # slow billowing: the puffs swell and settle (a noise of world position, drifting)
-                          {"kind": "noise", "amount": CLOUD_BILLOW, "scale": 0.004, "speed": 0.03, "seed": 9,
-                           "space": "world"}])
+    for node, layer, pos, yaw in cloud_meshes():
+        drift = CLOUD_DRIFT if layer == "near" else CLOUD_DRIFT * 0.55
+        deformers = [{"kind": "twist", "amount": 0.0, "speed": drift, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
+                      "center": [0.0, 0.0, 0.0], "space": "world"},
+                     # slow billowing: the formations swell and settle (a noise of world position, drifting)
+                     {"kind": "noise", "amount": CLOUD_BILLOW, "scale": 0.0025, "speed": 0.03, "seed": 9,
+                      "space": "world"}]
+        s.proc(node, {"kind": "mesh", "asset": "meshes/do-%s.glb" % node.replace("_", "-")},
+               material=(flat("cshade", double=True) if DEBUG_CLOUD_FLAT else
+                         dict(unlit("doCloud"), doubleSided=CLOUD_DOUBLE)),
+               deformers=deformers[:CLOUD_DEFORMERS] or None,
+               transform={"position": pos, "rotation": [0.0, yaw, 0.0], "scale": [1.0, 1.0, 1.0]})
     ip, lp, wp = world(s)
     dp = dolphins(s)
     spray(s)

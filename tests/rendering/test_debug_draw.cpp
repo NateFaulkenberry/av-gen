@@ -280,6 +280,13 @@ TEST_CASE("The forensic geometry controls each draw only their own case", "[debu
         rendering::buildDebugGeometry(draw, scene, options, 0.0);
         CHECK(draw.pointVertexCount() == 3); // one per joint
         CHECK(draw.lineVertexCount() == 4);  // two bones: root-mid and mid-tip
+        // ADR-1391: a point's size is a world-space DIAMETER. At `pointSize * 0.6` every joint was a 1.8 m disc and a
+        // character drawn with its skeleton sat inside a yellow blob its joints made together (the owner's report,
+        // 2026-10-15). A joint marker is a marker: a small fraction of the one-unit bones it sits between.
+        for (const rendering::DebugVertex& v : draw.pointVertices()) {
+            CHECK(v.size > 0.0f);
+            CHECK(v.size <= 0.1f);
+        }
 
         // Each joint is at the entity's transform times its model-space matrix. The tip is two
         // units above the root in model space and the entity is ten along x, so this is a claim
@@ -332,6 +339,9 @@ TEST_CASE("The forensic geometry controls each draw only their own case", "[debu
         rendering::buildDebugGeometry(draw, scene, options, 0.0, &history);
         CHECK(draw.lineVertexCount() == 8);  // four segments
         CHECK(draw.pointVertexCount() == 5); // one per sample
+        for (const rendering::DebugVertex& v : draw.pointVertices()) {
+            CHECK(v.size <= 0.15f); // ADR-1391: a 1.5 m disc per sample hid the path it was marking
+        }
 
         // Off again is off: the history staying alive does not keep drawing.
         draw.clear();
