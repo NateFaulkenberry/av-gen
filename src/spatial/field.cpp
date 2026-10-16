@@ -424,6 +424,21 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet
         }
         return v * fieldWeight(f, q);
     }
+    if (f.isResonance()) { // ADR-1400: the modes the frame resolved (a vector channel reads as its length)
+        const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
+        const ResonanceState* state = resonanceStateOf(f, set);
+        if (state == nullptr) {
+            return 0.0f;
+        }
+        if (resonanceChannelIsVector(f.resonance.channel)) {
+            return glm::length(vectorAt(f, p, td, set, depth, element));
+        }
+        float v = resonanceScalar(*state, f, q);
+        if (f.invert) {
+            v = 1.0f - v;
+        }
+        return v * fieldWeight(f, q);
+    }
     if (f.isAudio()) { // ADR-1116: scalar kinds on the transport clock (a trigger only gates them)
         const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
         float v = audioShape(f, q, td, set, element);
@@ -468,6 +483,17 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, double td, const Fiel
     const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     const Frame frame = frameOf(f);
     const glm::vec3 q = glm::vec3(frame.worldToLocal * glm::vec4(p, 1.0f));
+    if (f.isResonance() && resonanceChannelIsVector(f.resonance.channel)) { // ADR-1400
+        const ResonanceState* state = resonanceStateOf(f, set);
+        if (state == nullptr) {
+            return glm::vec3(0.0f);
+        }
+        glm::vec3 dir = resonanceVector(*state, f, q);
+        if (f.invert) {
+            dir = -dir;
+        }
+        return frame.rotation * (dir * fieldWeight(f, q));
+    }
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
         if (g == nullptr || f.channel >= 0 || (g->mode != GridMode::Vector && g->mode != GridMode::Agents)) {
@@ -619,6 +645,8 @@ const char* fieldKindName(FieldKind kind) {
         return "spectrum";
     case FieldKind::Onset:
         return "onset";
+    case FieldKind::Resonance:
+        return "resonance";
     }
     return "radial";
 }
@@ -632,6 +660,7 @@ constexpr FieldKind kAllFieldKinds[] = {
     FieldKind::CurlNoise,     FieldKind::Spiral,         FieldKind::WaveVector,    FieldKind::ConstantColor,
     FieldKind::Gradient,      FieldKind::RadialGradient, FieldKind::NoiseColor,    FieldKind::PositionColor,
     FieldKind::Compound,      FieldKind::Grid,           FieldKind::Spectrum,      FieldKind::Onset,
+    FieldKind::Resonance,
 };
 }
 
@@ -954,6 +983,14 @@ Result<void> FieldSpec::validate() const {
     if (channel < -1 || channel > 3 || (channel >= 0 && kind != FieldKind::Grid)) {
         return fail("field '{}': channel must be -1 (the grid's reading) or 0..3, and only on a grid field", name);
     }
+    if (isResonance()) { // ADR-1400
+        if (auto ok = resonance.validate(name); !ok) {
+            return ok;
+        }
+        if (reference == name) {
+            return fail("field '{}': a resonance field cannot read itself", name);
+        }
+    }
     if (isAudio()) {
         if (!(bandLow >= 0.0f && bandLow <= 1.0f && bandHigh >= 0.0f && bandHigh <= 1.0f)) {
             return fail("field '{}': bandLow and bandHigh must be in [0, 1]", name);
@@ -1034,6 +1071,9 @@ std::uint64_t FieldSpec::structuralHash() const {
             h.f32(audioSmooth);
         }
     }
+    if (isResonance()) { // ADR-1400: hashed only for that kind
+        h.u64(resonance.structuralHash());
+    }
     // ADR-906: hashed only when present, so a field without one keeps the hash it always had.
     if (trigger) {
         h.u8(static_cast<std::uint8_t>(trigger->source));
@@ -1112,6 +1152,9 @@ json FieldSpec::toJson() const {
         if (audioSmooth > 0.0f) {
             j["audioSmooth"] = audioSmooth; // ADR-1370: written only when set
         }
+    }
+    if (isResonance()) {
+        j["resonance"] = resonance.toJson(); // ADR-1400: written only for that kind
     }
     // ADR-906: written only when set, so every field file before it round-trips unchanged.
     if (trigger) {
@@ -1196,6 +1239,13 @@ Result<FieldSpec> FieldSpec::fromJson(const json& root) {
             }
             f.children.push_back(c.get<std::string>());
         }
+    }
+    if (root.contains("resonance")) { // ADR-1400
+        auto res = ResonanceSpec::fromJson(root.at("resonance"));
+        if (!res) {
+            return fail("field '{}': resonance: {}", f.name, res.error().message);
+        }
+        f.resonance = std::move(*res);
     }
     if (root.contains("trigger")) {
         // ADR-906: the effects' own `trigger` block, parsed by the effects' own reader, so a field
@@ -1326,6 +1376,19 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
                                   static_cast<float>(std::max(field.bandRepeat, 1)), field.onsetDecay, field.onsetWidth);
         g.gridRes = glm::vec4(static_cast<float>(static_cast<int>(field.onsetSource)), std::max(field.audioSmooth, 0.0f),
                               0.0f, 0.0f);
+    }
+    if (field.isResonance()) {
+        // ADR-1400: the grid lanes carry the reading. gridBounds0.xy (the mode table's first row and count) are
+        // filled by whoever lays the table out (rendering::FieldUniforms::pack); 0 modes samples 0.
+        const ResonanceSpec& r = field.resonance;
+        const ResonanceState* state = resonanceStateOf(field, set);
+        float step = r.derivativeStep;
+        if (!(step > 0.0f)) {
+            step = (state != nullptr ? state->lambdaMin : r.lambdaMin / std::max(r.scale, 1e-3f)) / 24.0f;
+        }
+        g.gridBounds0 = glm::vec4(0.0f, 0.0f, static_cast<float>(static_cast<int>(r.channel)), r.listenAlongAxis ? 1.0f : 0.0f);
+        g.gridBounds1 = glm::vec4(r.listenLow, r.listenHigh, std::max(r.listenWidth, 1e-4f), std::max(r.sharpness, 1e-3f));
+        g.gridRes = glm::vec4(std::max(step, 1e-4f), 0.0f, 0.0f, 0.0f);
     }
     g.children = glm::ivec4(-1);
     for (int c = 0; c < kMaxCompoundChildren; ++c) {

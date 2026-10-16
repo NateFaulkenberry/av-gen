@@ -72,6 +72,9 @@ struct FieldBlock {
     pad2: u32,
     audio: FieldAudio,
     fields: array<FieldGpu, 16>,
+    // ADR-1400: the resonators' modes, three vec4 a mode (spatial::ResonanceMode: shape, place, drive), 48 modes.
+    // A resonance record's gridBounds0.x is its first mode, .y the count.
+    resonance: array<vec4<f32>, 144>,
 };
 
 // ADR-1116: the sampling element's own random in [0, 1), read by an Element-band Spectrum field.
@@ -106,6 +109,7 @@ const FIELD_COMPOUND: u32 = 23u;
 const FIELD_GRID: u32 = 24u;
 const FIELD_SPECTRUM: u32 = 25u;
 const FIELD_ONSET: u32 = 26u;
+const FIELD_RESONANCE: u32 = 27u; // ADR-1400
 const AUDIO_SMOOTH_MAX_TAPS: i32 = 32; // ADR-1370: spatial::kAudioSmoothMaxTaps
 
 const FIELD_TYPE_SCALAR: u32 = 0u;
@@ -525,6 +529,133 @@ fn audioSpectrumTap(fi: u32, q: vec3<f32>, delay: f32, params0: vec4<f32>, param
     return audioSpectrumAt(delay, lo + tri * (hi - lo));
 }
 
+// ---- the resonance field (ADR-1400; spatial/resonance.cpp is the reference, operation for operation) ----------
+// A record's lanes: gridBounds0 = (first mode, mode count, channel, listen along axis), gridBounds1 = (listenLow,
+// listenHigh, listenWidth, sand sharpness), gridRes.x = the vector channels' finite-difference step.
+const RES_CHANNEL_DISPLACEMENT: u32 = 0u;
+const RES_CHANNEL_AMPLITUDE: u32 = 1u;
+const RES_CHANNEL_SAND: u32 = 2u;
+const RES_CHANNEL_FORCE: u32 = 3u;
+const RES_PI: f32 = 3.14159265358979;
+
+// phi of mode `row` at q (x) and its local mean square (y).
+fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
+    let shape = fieldBlock.resonance[row * 3u];
+    let place = fieldBlock.resonance[row * 3u + 1u];
+    let k = shape.x;
+    let m = shape.y;
+    let d = q - place.xyz;
+    var w = 1.0;
+    if (place.w > 0.0) {
+        w = 1.0 / (1.0 + dot(d, d) / (place.w * place.w));
+    }
+    if (shape.w < 0.5) {
+        let kr = k * length(d);
+        if (m < 0.5) {
+            let x = sqrt(kr * kr + 1.0) - 1.0;
+            let amp = 1.0 / sqrt(1.0 + x / FIELD_TWO_PI);
+            return vec2<f32>(1.41421356 * cos(x - 0.25 * RES_PI) * amp * w, amp * amp * w * w);
+        }
+        let amp = 1.0 / sqrt(1.0 + kr / FIELD_TWO_PI);
+        let rho2 = d.x * d.x + d.z * d.z;
+        let krho2 = k * k * rho2;
+        let core = pow(max(krho2 / (krho2 + m * m), 1e-30), 0.5 * m);
+        let alpha = select(0.0, atan2(d.z, d.x), rho2 > 1e-12);
+        let phi = 1.41421356 * cos(kr - (2.0 * m + 1.0) * 0.25 * RES_PI) * amp * core * cos(m * (alpha - shape.z)) * w;
+        let e = amp * core * w;
+        return vec2<f32>(phi, 0.5 * e * e);
+    }
+    let n = clamp(i32(m + 0.5), 1, 8);
+    var s = 0.0;
+    for (var j = 0; j < n; j = j + 1) {
+        let a = shape.z + f32(j) * RES_PI / f32(n);
+        s = s + cos(k * (d.x * cos(a) + d.z * sin(a)));
+    }
+    return vec2<f32>(s * sqrt(2.0 / f32(n)) * w, w * w);
+}
+
+fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
+    let b0 = fieldBlock.fields[fi].gridBounds0;
+    let b1 = fieldBlock.fields[fi].gridBounds1;
+    let width = max(b1.z, 1e-4);
+    if (b0.w > 0.5) {
+        var axis = fieldBlock.fields[fi].axisRadius.xyz;
+        if (length(axis) > 1e-6) {
+            axis = normalize(axis);
+        } else {
+            axis = vec3<f32>(0.0, 1.0, 0.0);
+        }
+        let along = saturate(dot(q - fieldBlock.fields[fi].pointLength.xyz, axis) / max(fieldBlock.fields[fi].pointLength.w, 1e-6) + 0.5);
+        let centre = b1.x + along * (b1.y - b1.x);
+        let x = (u - centre) / width;
+        return exp(-x * x);
+    }
+    if (b1.x <= 0.0 && b1.y >= 1.0) {
+        return 1.0;
+    }
+    return smoothstep(b1.x - width, b1.x, u) * (1.0 - smoothstep(b1.y, b1.y + width, u));
+}
+
+// (D, E, Ebar) at q.
+fn resonanceSums(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    let first = u32(fieldBlock.fields[fi].gridBounds0.x + 0.5);
+    let count = u32(fieldBlock.fields[fi].gridBounds0.y + 0.5);
+    var sums = vec3<f32>(0.0);
+    for (var i = 0u; i < count; i = i + 1u) {
+        let row = first + i;
+        if (row >= 48u) {
+            break;
+        }
+        let drive = fieldBlock.resonance[row * 3u + 2u];
+        let w = drive.w * resonanceListen(fi, drive.z, q);
+        if (w <= 0.0) {
+            continue;
+        }
+        let pe = resonanceModeShape(row, q);
+        let e = w * drive.y;
+        sums.x = sums.x + w * drive.x * pe.x;
+        sums.y = sums.y + (e * pe.x) * (e * pe.x);
+        sums.z = sums.z + e * e * pe.y;
+    }
+    return sums;
+}
+
+fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
+    let channel = u32(fieldBlock.fields[fi].gridBounds0.z + 0.5);
+    let s = resonanceSums(fi, q);
+    if (channel == RES_CHANNEL_DISPLACEMENT) {
+        return s.x;
+    }
+    if (channel == RES_CHANNEL_AMPLITUDE) {
+        return sqrt(max(s.y, 0.0));
+    }
+    if (channel == RES_CHANNEL_SAND) {
+        if (!(s.z > 1e-12)) {
+            return 0.0;
+        }
+        let k = max(fieldBlock.fields[fi].gridBounds1.w, 1e-3);
+        return sqrt(s.z) * exp(-s.y / (k * k * s.z));
+    }
+    return 0.0;
+}
+
+fn resonanceValueFor(fi: u32, q: vec3<f32>, force: bool) -> f32 {
+    let s = resonanceSums(fi, q);
+    return select(s.x, s.y, force);
+}
+
+// The vector channels in the field frame: force = -grad E, gradient = grad D (central differences).
+fn resonanceVectorAt(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    let channel = u32(fieldBlock.fields[fi].gridBounds0.z + 0.5);
+    let force = channel == RES_CHANNEL_FORCE;
+    let h = max(fieldBlock.fields[fi].gridRes.x, 1e-4);
+    let g = vec3<f32>(
+        (resonanceValueFor(fi, q + vec3<f32>(h, 0.0, 0.0), force) - resonanceValueFor(fi, q - vec3<f32>(h, 0.0, 0.0), force)) / (2.0 * h),
+        (resonanceValueFor(fi, q + vec3<f32>(0.0, h, 0.0), force) - resonanceValueFor(fi, q - vec3<f32>(0.0, h, 0.0), force)) / (2.0 * h),
+        (resonanceValueFor(fi, q + vec3<f32>(0.0, 0.0, h), force) - resonanceValueFor(fi, q - vec3<f32>(0.0, 0.0, h), force)) / (2.0 * h));
+    return select(g, -g, force);
+}
+
 // Scalar shape of a scalar kind (before invert and weight).
 fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     let kind = fieldBlock.fields[fi].kind;
@@ -565,6 +696,9 @@ fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     if (kind == FIELD_SPECTRUM || kind == FIELD_ONSET) {
         return audioShape(fi, q);
     }
+    if (kind == FIELD_RESONANCE) {
+        return resonanceScalarAt(fi, q);
+    }
     return 0.0; // anything unknown
 }
 
@@ -596,6 +730,9 @@ fn vectorDirection(fi: u32, q: vec3<f32>) -> vec3<f32> {
     }
     if (kind == FIELD_GRID) {
         return gridVectorAt(fi, q);
+    }
+    if (kind == FIELD_RESONANCE) {
+        return resonanceVectorAt(fi, q);
     }
     return vec3<f32>(0.0);
 }

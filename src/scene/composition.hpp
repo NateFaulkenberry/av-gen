@@ -2292,6 +2292,7 @@ private:
     const world::TriggerClock* triggerClock_ = nullptr;    // ADR-906: the engine's; see `setTriggerClock`
     std::shared_ptr<const spatial::AudioHistory> audioHistory_; // ADR-1116: the engine's; see `setAudioHistory`
     std::uint64_t simulationInputKey_ = 0;                     // ADR-1119: see `setSimulationInputKey`
+    spatial::ResonanceCache resonanceCache_;                   // ADR-1400: the resonators' filtered rows (a cache)
     // A node's own transform with its XFORM offset composed in (identity when it has none).
     [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;

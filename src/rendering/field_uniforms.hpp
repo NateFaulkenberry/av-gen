@@ -54,14 +54,19 @@ static_assert(sizeof(FieldAudioGpu) == 288);
 static_assert(spatial::kOnsetSources * 2 == 8, "FieldAudio holds two vec4s of onsets per source");
 static_assert(spatial::kOnsetHistory == 8, "FieldAudio packs eight onsets per source in two vec4s");
 
-// Mirrors `FieldBlock` in shaders/fields.wgsl (6192 bytes).
+// Mirrors `FieldBlock` in shaders/fields.wgsl (8496 bytes).
 struct FieldBlock {
     std::uint32_t count = 0;
     std::uint32_t pad[3] = {0, 0, 0};
     FieldAudioGpu audio;
     spatial::FieldGpu fields[spatial::kMaxGpuFields];
+    // ADR-1400: every resonator's modes (spatial::ResonanceMode: shape, place, drive), laid out by `pack`.
+    // Literal extent: the layout guard scrapes it (48 modes x 3).
+    glm::vec4 resonance[144];
 };
-static_assert(sizeof(FieldBlock) == 16 + sizeof(FieldAudioGpu) + sizeof(spatial::FieldGpu) * spatial::kMaxGpuFields);
+static_assert(spatial::kMaxGpuResonanceModes * spatial::kResonanceModeVec4s == 144);
+static_assert(sizeof(FieldBlock) == 16 + sizeof(FieldAudioGpu) + sizeof(spatial::FieldGpu) * spatial::kMaxGpuFields +
+                                        sizeof(glm::vec4) * 144);
 
 // What the audio ring cost this frame (ADR-1116; the live profile's gpuSystems block).
 struct FieldAudioStats {

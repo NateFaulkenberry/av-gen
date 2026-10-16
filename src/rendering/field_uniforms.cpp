@@ -48,6 +48,45 @@ FieldBlock FieldUniforms::pack(const spatial::FieldSet& fields, double time) {
         }
     }
     block.count = static_cast<std::uint32_t>(count);
+    // ADR-1400: the resonators' modes, each resonator once, in field order; every resonance record (a resonator or
+    // a reader of one) points at its resonator's rows. A resonator that does not fit samples 0 (count 0), warned.
+    {
+        std::vector<std::pair<const spatial::ResonanceState*, int>> placed;
+        int next = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            const spatial::FieldSpec& field = fields.fields[i];
+            if (!field.isResonance() || !field.enabled || field.silent()) {
+                continue;
+            }
+            const spatial::ResonanceState* state = spatial::resonanceStateOf(field, &fields);
+            if (state == nullptr || state->count <= 0) {
+                continue;
+            }
+            int first = -1;
+            for (const auto& [s, f] : placed) {
+                if (s == state) {
+                    first = f;
+                }
+            }
+            if (first < 0) {
+                if (next + state->count > spatial::kMaxGpuResonanceModes) {
+                    continue;
+                }
+                first = next;
+                for (int m = 0; m < state->count; ++m) {
+                    const spatial::ResonanceMode& mode = state->modes[static_cast<std::size_t>(m)];
+                    const auto row = static_cast<std::size_t>(first + m) * spatial::kResonanceModeVec4s;
+                    block.resonance[row] = mode.shape;
+                    block.resonance[row + 1] = mode.place;
+                    block.resonance[row + 2] = mode.drive;
+                }
+                next += state->count;
+                placed.emplace_back(state, first);
+            }
+            block.fields[i].gridBounds0.x = static_cast<float>(first);
+            block.fields[i].gridBounds0.y = static_cast<float>(state->count);
+        }
+    }
     // ADR-1116: the audio record -- the ring's place in the table, the newest row at this second, and the
     // newest onsets of each source at this second.
     FieldAudioGpu& a = block.audio;

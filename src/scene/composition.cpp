@@ -8877,6 +8877,8 @@ void Composition::applyParameters() {
     // ADR-1116: and the audio history the audio fields read.
     scene_.fields.audio = audioHistory_;
     scene_.fields.inputKey = simulationInputKey_; // ADR-1119
+    // ADR-1400: every resonator's modes at this frame's clock (a pure function of the audio history).
+    spatial::resolveResonance(scene_.fields, resonanceCache_, currentTime_);
     // ADR-1122: the grids' behaviour finals. This composition's own grids lead `scene_.fields.grids` (the
     // rebuild pushes them before any nested scene's), so index i is grids_[i]. A nested scene's grids take
     // their behaviour from that scene's own parameters at its rebuild.

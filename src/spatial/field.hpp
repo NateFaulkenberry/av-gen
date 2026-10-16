@@ -25,6 +25,7 @@
 // each event and travels out at `waveSpeed`.
 
 #include "core/error.hpp"
+#include "spatial/resonance.hpp"
 #include "spatial/audio_history.hpp"
 #include "spatial/grid_field.hpp"
 #include "world/effects/effect_timing.hpp" // world::Trigger (ADR-906)
@@ -83,6 +84,10 @@ enum class FieldKind : std::uint8_t {
     Spectrum,        // value = spectrogram at the delay, in the band `audioBand` picks (bandLow..bandHigh)
     Onset,           // value = sum over the newest onsets of `onsetSource`: strength * exp(-onsetDecay * age)
                      //         * exp(-((d - age * audioSpeed) / onsetWidth)^2) (onsetWidth 0 = a flash everywhere)
+    // resonance (ADR-1400): a modal field the audio history excites (spatial/resonance.hpp). A field with no
+    // `reference` is a resonator; one whose `reference` names a resonator reads its modes. `resonance.channel`
+    // picks what is read (displacement, amplitude, sand: scalar; force, gradient: vector).
+    Resonance,
 };
 [[nodiscard]] const char* fieldKindName(FieldKind kind);
 [[nodiscard]] std::optional<FieldKind> fieldKindFromName(std::string_view name);
@@ -209,9 +214,20 @@ struct FieldSpec {
     // latest event, written every frame by `scene::resolveFieldTriggers`; negative while none has
     // fired, which is silence. Unused when `trigger` is absent.
     double triggerAge = -1.0;
+    // ADR-1400: a Resonance field's resonator and its reading (serialised, hashed and registered only for that kind).
+    ResonanceSpec resonance;
+    // ADR-1400, runtime only (not authored, serialised or hashed): a resonator's modes at this frame's clock, written
+    // every frame by `spatial::resolveResonance`. Null for a reader (it reads its resonator's) and when unresolved.
+    std::shared_ptr<const ResonanceState> resonanceState;
 
-    [[nodiscard]] FieldType type() const { return fieldTypeOf(kind); }
+    [[nodiscard]] FieldType type() const {
+        if (kind == FieldKind::Resonance) {
+            return resonanceChannelIsVector(resonance.channel) ? FieldType::Vector : FieldType::Scalar;
+        }
+        return fieldTypeOf(kind);
+    }
     [[nodiscard]] bool isAudio() const { return kind == FieldKind::Spectrum || kind == FieldKind::Onset; }
+    [[nodiscard]] bool isResonance() const { return kind == FieldKind::Resonance; }
     [[nodiscard]] glm::mat4 localToWorld() const;
     [[nodiscard]] glm::mat4 worldToLocal() const;
     // ADR-906: the clock this field runs on at transport-clock `time`: `time` itself, or the trigger's

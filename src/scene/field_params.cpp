@@ -154,6 +154,58 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
         r.f("onsetWidth", "the onset front's half width (m)", rest.onsetWidth, 0.0f, 1000.0f, 0.0f, 20.0f);
         r.f("audioSmooth", "averages the history over (s)", rest.audioSmooth, 0.0f, 16.0f, 0.0f, 2.0f); // ADR-1370
     }
+    // ADR-1400: a resonance field's numbers. A resonator registers its modes, excitation and sources; every
+    // resonance field (a resonator or a reader) registers what it listens to. The channel, the source kinds and
+    // orders stay in the file (structural).
+    if (rest.isResonance()) {
+        const spatial::ResonanceSpec& rs = rest.resonance;
+        if (rest.reference.empty()) {
+            r.f("resonance/modes", "mode count (complexity)", rs.modes, 1.0f, 24.0f, 1.0f, 24.0f);
+            r.f("resonance/fLow", "lowest mode hears (Hz)", rs.fLow, 1.0f, 20000.0f, 20.0f, 400.0f);
+            r.f("resonance/fHigh", "highest mode hears (Hz)", rs.fHigh, 2.0f, 20000.0f, 1000.0f, 16000.0f);
+            r.f("resonance/lambdaMax", "lowest mode's wavelength (m)", rs.lambdaMax, 0.01f, 10000.0f, 1.0f, 200.0f);
+            r.f("resonance/lambdaMin", "highest mode's wavelength (m)", rs.lambdaMin, 0.01f, 10000.0f, 0.1f, 20.0f);
+            r.f("resonance/scale", "spatial scale (x wavenumber)", rs.scale, 0.01f, 100.0f, 0.25f, 4.0f);
+            r.f("resonance/selectivity", "each mode's Q", rs.selectivity, 0.05f, 100.0f, 0.5f, 12.0f);
+            r.f("resonance/contrast", "spectral contrast", rs.contrast, 0.0f, 0.95f, 0.0f, 0.9f);
+            r.f("resonance/persistence", "ring-down of the lowest mode (s)", rs.persistence, 0.01f, 30.0f, 0.2f, 8.0f);
+            r.f("resonance/buildup", "rise, as a share of the ring-down", rs.buildup, 0.0f, 1.0f, 0.0f, 1.0f);
+            r.f("resonance/sustain", "excitation by sustained sound", rs.sustain, -100.0f, 100.0f, 0.0f, 4.0f);
+            r.f("resonance/transient", "excitation by onsets", rs.transient, -100.0f, 100.0f, 0.0f, 4.0f);
+            r.f("resonance/idle", "level in silence", rs.idle, 0.0f, 100.0f, 0.0f, 1.0f);
+            r.f("resonance/breath", "visible oscillation (Hz)", rs.breath, 0.0f, 100.0f, 0.0f, 2.0f);
+            r.f("resonance/limit", "soft limit of the total amplitude", rs.limit, 0.001f, 1000.0f, 0.1f, 4.0f);
+            for (std::size_t i = 0; i < rs.sources.size(); ++i) {
+                const std::string base = "resonance/source/" + std::to_string(i) + "/";
+                const spatial::ResonanceSource& src = rs.sources[i];
+                params::ParamDesc<glm::vec3> dp;
+                dp.defaultValue = src.position;
+                dp.hardMin = glm::vec3(-1e4f);
+                dp.hardMax = glm::vec3(1e4f);
+                dp.softMin = glm::vec3(-100.0f);
+                dp.softMax = glm::vec3(100.0f);
+                r.add(std::move(dp), (base + "position").c_str());
+                params::ParamDesc<float> dg;
+                dg.defaultValue = src.gain;
+                dg.hardMin = -100.0f;
+                dg.hardMax = 100.0f;
+                dg.softMin = 0.0f;
+                dg.softMax = 2.0f;
+                r.add(std::move(dg), (base + "gain").c_str());
+                params::ParamDesc<float> dr;
+                dr.defaultValue = src.reach;
+                dr.hardMin = 0.0f;
+                dr.hardMax = 1e5f;
+                dr.softMin = 0.0f;
+                dr.softMax = 500.0f;
+                r.add(std::move(dr), (base + "reach").c_str());
+            }
+        }
+        r.f("resonance/listenLow", "hears modes from (0..1)", rs.listenLow, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("resonance/listenHigh", "hears modes to (0..1)", rs.listenHigh, 0.0f, 1.0f, 0.0f, 1.0f);
+        r.f("resonance/listenWidth", "listening edge width", rs.listenWidth, 0.0f, 1.0f, 0.0f, 0.5f);
+        r.f("resonance/sharpness", "sand line width", rs.sharpness, 0.001f, 10.0f, 0.05f, 1.5f);
+    }
     // ADR-906: a triggered field's timing, adjustable where the field is. What it fires on -- the
     // source, and the name of the musical event or marker -- stays in the file, as an effect's does;
     // the numbers that say which of those events are here, and only the ones its source reads.
@@ -222,6 +274,38 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
     copyValue(p, "onsetDecay", live.onsetDecay);
     copyValue(p, "onsetWidth", live.onsetWidth);
     copyValue(p, "audioSmooth", live.audioSmooth); // ADR-1370
+    if (live.isResonance()) { // ADR-1400
+        spatial::ResonanceSpec& rs = live.resonance;
+        copyValue(p, "resonance/modes", rs.modes);
+        copyValue(p, "resonance/fLow", rs.fLow);
+        copyValue(p, "resonance/fHigh", rs.fHigh);
+        copyValue(p, "resonance/lambdaMax", rs.lambdaMax);
+        copyValue(p, "resonance/lambdaMin", rs.lambdaMin);
+        copyValue(p, "resonance/scale", rs.scale);
+        copyValue(p, "resonance/selectivity", rs.selectivity);
+        copyValue(p, "resonance/contrast", rs.contrast);
+        copyValue(p, "resonance/persistence", rs.persistence);
+        copyValue(p, "resonance/buildup", rs.buildup);
+        copyValue(p, "resonance/sustain", rs.sustain);
+        copyValue(p, "resonance/transient", rs.transient);
+        copyValue(p, "resonance/idle", rs.idle);
+        copyValue(p, "resonance/breath", rs.breath);
+        copyValue(p, "resonance/limit", rs.limit);
+        for (std::size_t i = 0; i < rs.sources.size(); ++i) {
+            const std::string base = "resonance/source/" + std::to_string(i) + "/";
+            copyValue(p, base + "position", rs.sources[i].position);
+            copyValue(p, base + "gain", rs.sources[i].gain);
+            copyValue(p, base + "reach", rs.sources[i].reach);
+        }
+        copyValue(p, "resonance/listenLow", rs.listenLow);
+        copyValue(p, "resonance/listenHigh", rs.listenHigh);
+        copyValue(p, "resonance/listenWidth", rs.listenWidth);
+        copyValue(p, "resonance/sharpness", rs.sharpness);
+        // A modulated finals pair can cross; keep the window and the band ordered (validate()'s rules).
+        rs.fHigh = std::max(rs.fHigh, rs.fLow * 1.001f);
+        rs.listenHigh = std::max(rs.listenHigh, rs.listenLow);
+        rs.modes = std::clamp(rs.modes, 1.0f, static_cast<float>(spatial::kMaxResonanceModes));
+    }
     // ADR-906: the trigger's numbers (registered only for the source that reads them).
     if (live.trigger) {
         copyValue(p, "trigger/everyN", live.trigger->everyN);
