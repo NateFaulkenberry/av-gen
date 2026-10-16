@@ -391,3 +391,46 @@ Also:
 - **ADR-1402:** note that it has no current scene user.
 - **README / examples rows:** Cymatic World's description. The generator already rewrites `examples/index.json`; its CC list is unchanged.
 - **docs/decisions/README.md:** already carries rows for the new ADR-1403 to 1407, which the hygiene test requires; there are no edits to existing rows.
+
+## Correction round (owner review of the final stills)
+
+The owner's verdict on `final/before-after-stills-*`: against the colour pass, the final scene had regressed in four ways.
+1. It was **flatter**: a web of caustic light rather than sculpted ground.
+2. The **fuchsia was mostly gone.**
+3. The quiet and sustained frames read as a **wobbly net** rather than lobes, rings and petals.
+4. The camera was **too close**.
+
+What to keep: the wandering, no-bullseye evolution; no sawtooth; the twitch fixes; the stability.
+
+Changes (commit 8005c378):
+- **Depth.**
+  - The large relief's ridges hold a constant height whatever the loudness: `sandNormalized` now also applies to a relief reader's sand terms (ADR-1405).
+  - The antinodes sink into basins that deepen with the excitation (−1.2·|F|, from −0.55).
+  - The crease is rounded less (0.4), which the square grid carries.
+  - Large amount 2.8 m.
+  - So the quiet state keeps a deliberate, sculpted form, and loud passages carve it deeper.
+- **Shape strength.** The medium net is at about half its height (0.45 m), and the grit and nodal-line colour follow the large figure only. The large cells and ridges lead.
+- **Fuchsia.** The hollow glow is back in excited cells (excitation 0.3-1.0, wall band 0.02-0.14, intensity 0.4).
+- **Framing.** Measured along the whole loop (farthest ground reached by the top edge at 16:9 and 21:9; the basin walls start at about 90 m):
+
+  | Option | Distance / height / lens | Reach |
+  |---|---|---|
+  | A | 30 m / 32 m / 30 mm | 56 / 61 m |
+  | **B (chosen)** | 36 m / 42 m / 28 mm | 69 / 80 m |
+  | C | 40 m / 48 m / 26 mm | 82 / 92 m: reaches the walls at 21:9 |
+
+  The bake grids and the fine mesh were extended to ±86-88 m. The square grid is now graded: 0.36 m within 36 m, about 2.5% larger per step out to 88 m. That gives 172k vertices.
+- **Cost.**
+  - The deep cells seen from further back hide one another, and without a prepass every hidden fragment ran the full material: 35.3 ms.
+  - The scene now asks for the depth prepass (`environment.depthPrepass`, ADR-1406). With the deformation baked it costs 6 ms and saves 11.
+  - Live 1080p, Auto → High: **29.8 ms, 0 misses** (colour-pass baseline 26.0 ms).
+
+**Evidence** (`correction/`):
+- `shaded-before-colourpass-now-*.png` (pre-colour-pass, colour pass, now; Hyperborea 10, 48, 116, 134 s);
+- `geometry-only-colourpass-vs-now-*.png`;
+- `framing-options-A-B-C-*.png`.
+
+Honest status:
+- Relief depth now exceeds the colour pass in neutral grey.
+- Fuchsia is restored, if sparser at 116 s than the colour pass's.
+- The large figure leads. It reads as a web of deep cells with nested ridges more than as the colour pass's single centred petal-star, which is the centred mandala the earlier direction moved away from.
