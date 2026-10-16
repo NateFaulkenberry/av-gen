@@ -434,3 +434,24 @@ Honest status:
 - Relief depth now exceeds the colour pass in neutral grey.
 - Fuchsia is restored, if sparser at 116 s than the colour pass's.
 - The large figure leads. It reads as a web of deep cells with nested ridges more than as the colour pass's single centred petal-star, which is the centred mandala the earlier direction moved away from.
+
+## A live scene carries no track (owner direction)
+
+Cymatic World is a live scene: the finished project plays live input and names no audio. Feline Footwear (`assets/audio/feline-footwear.wav`) is the test track from now on, fed on the command line.
+
+- **The shipped project already named no audio.** `examples/cymatic-world/cymatic-world.json` has only the scene asset and `sonic.live: true`, as Digital Ocean, Sonic Live and THE RIFT LIVE do; only the non-live THE RIFT names a track. The scene file, the generator's scene, and `examples/index.json` name none either.
+- **The review path did.** `build.py --variant <wav>` wrote a copy of the project with an audio path, with `sonic.live` removed, for the review renders. `--variant` is now a flag: the copy names no audio and keeps `sonic.live`. Every render and profile feeds the track with `avgen --audio assets/audio/feline-footwear.wav`.
+- **The live profile.** With a `sonic.live` project, `--live-profile --audio <file>` used to measure the Live panel's saved capture device, not the file ("Audio/MIDI: live input").
+  - ADR-1408: a command-line audio file is the run's audio, so the saved device is not opened. Tested in `test_live_audio_policy.cpp`.
+  - Profiles now read "Audio/MIDI: file, playing to the output device".
+  - **How it was fed:** `avgen --live-profile --project examples/cymatic-world/cymatic-world.json --audio assets/audio/feline-footwear.wav --mode live ...`. `tools/live_scene_profile.py` has no `--audio` option, so profiles call `avgen` directly.
+- **A finding on the way.** Feline's loudest passages cost about 38 ms at High: the deep cells overdrew one another. The ground mesh had drawn its rows back to front from the camera.
+  - Its triangles are now sorted near to far, so the hardware's early depth test rejects hidden cells.
+  - Feline at 100 s fell to 31.7 ms at High; Hyperborea at 116 s is 29.4 ms.
+
+**File changes for the track removal:**
+- `tools/cymatic_world/build.py`: `variant()` and `--variant` write no audio.
+- `src/app/live_audio_policy.hpp` (new) and `src/app/application.cpp`: ADR-1408.
+- `tests/unit/test_live_audio_policy.cpp` (new).
+- `docs/decisions/ADR-1408-*.md` and its index row.
+- No change to the project, the scene, `examples/index.json`, or any committed audio.

@@ -1,3 +1,4 @@
+#include "app/live_audio_policy.hpp"
 #include "app/application.hpp"
 #include "core/process_memory.hpp"
 #include "app/live_profile_session.hpp"
@@ -7497,7 +7498,10 @@ void Application::serviceLiveSonic() {
                 log::warn("live sonic: transport: {}", r.error().message);
             }
         }
-        if (!engine_->hasLiveInput() && !options_.input && !settings_.live.audioInput.empty()) {
+        // ADR-1408: an audio file named on the command line (--audio) is the scene's audio for this run -- a live
+        // project measured or rendered against a known track -- so the saved capture device does not replace it
+        if (liveSonicOpensSavedInput(engine_->hasLiveInput(), options_.input.has_value(), options_.audio.has_value(),
+                                     settings_.live.audioInput)) {
             if (auto r = engine_->useAudioInput(settings_.live.audioInput); !r) {
                 panel_->setStatus("live audio input '" + settings_.live.audioInput + "': " + r.error().message);
                 log::warn("live sonic: audio input '{}': {}", settings_.live.audioInput, r.error().message);

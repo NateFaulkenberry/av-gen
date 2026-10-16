@@ -2,7 +2,8 @@
 """CYMATIC WORLD: the generator (docs/prototypes/cymatic-world/).
 
     python3 tools/cymatic_world/build.py                    # the scene, its meshes and its index entry
-    python3 tools/cymatic_world/build.py --variant <wav> --out <project.json> [--camera ...] [--set ...]
+    python3 tools/cymatic_world/build.py --variant --out <project.json> [--camera ...] [--set ...]
+    then: avgen --headless --project <project.json> --audio assets/audio/feline-footwear.wav --render ...
 
 A live scene of resonant terrain: a basalt basin whose ground's figure is drawn by a resonance field (FieldKind::
 Resonance, ADR-1400) excited by the audio history -- sand ridges on the nodal lines, scoured antinodes.
@@ -182,6 +183,11 @@ def ground_mesh():
     t1 = np.where(alt[:, None], np.stack([a, c, b], 1), np.stack([a, c, d], 1))
     t2 = np.where(alt[:, None], np.stack([b, c, d], 1), np.stack([a, d, b], 1))
     tri = np.concatenate([t1, t2], axis=0).astype(np.int64)
+    # front to back: the camera stands on the +z side (its arc swings +-40 degrees about it), so the rows nearest it
+    # are drawn first and the hardware's early depth test rejects the far cells' hidden fragments before they are
+    # shaded (drawn back to front, every nearer ridge overdrew a shaded one: the cost grew with the relief's depth)
+    centroid_z = pos[tri, 2].mean(axis=1)
+    tri = tri[np.argsort(-centroid_z, kind="stable")]
     e1 = pos[tri[:, 1]] - pos[tri[:, 0]]
     e2 = pos[tri[:, 2]] - pos[tri[:, 0]]
     fn = np.cross(e1, e2)
@@ -278,9 +284,11 @@ class Prog:
                 "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
-def variant(project, wav, out, camera=None, params=None):
-    """A file project of the live scene driven by `wav` (the review renders): optionally another camera
-    ("x,y,z:tx,ty,tz") and parameter overrides."""
+def variant(project, out, camera=None, params=None):
+    """A review copy of the live project (its scene by absolute path), optionally with another camera
+    ("x,y,z:tx,ty,tz") and parameter overrides. It names NO audio: the scene is a live scene and plays from live input;
+    a render or a profile feeds a test track on the command line (`avgen ... --audio assets/audio/feline-footwear.wav`,
+    ADR-1408)."""
     with open(project) as f:
         doc = json.load(f)
     if camera:
@@ -291,8 +299,6 @@ def variant(project, wav, out, camera=None, params=None):
         doc["parameters"][k] = v
     base = os.path.dirname(os.path.abspath(project))
     doc["assets"]["scene"] = {"kind": "composition", "path": os.path.join(base, doc["assets"]["scene"]["path"])}
-    doc["assets"]["audio"] = {"path": os.path.abspath(wav)}
-    doc.get("sonic", {}).pop("live", None)
     with open(out, "w") as f:
         json.dump(doc, f, indent=1)
     return out
@@ -584,7 +590,7 @@ def environment(s):
         "ambientOcclusion": False, "contactShadows": False,
         # ... but the depth prepass, asked for (ADR-1406): the deep cells hide one another from the pulled-back camera,
         # and early depth rejection saves more material shading than the (baked, cheap) extra geometry pass costs
-        "depthPrepass": True,
+        "depthPrepass": os.environ.get("CW_PREPASS", "1") != "0",
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -820,7 +826,8 @@ def write_scene(key):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scene", default="all", choices=["all", "world"])
-    ap.add_argument("--variant", help="also write a file project of --scene driven by this WAV")
+    ap.add_argument("--variant", action="store_true",
+                    help="also write a review copy of the live project at --out (no audio: feed it with avgen --audio)")
     ap.add_argument("--out", help="the variant's path")
     ap.add_argument("--camera", help="x,y,z:tx,ty,tz for the variant")
     ap.add_argument("--set", action="append", default=[], help="path=json value, for the variant")
@@ -832,7 +839,7 @@ def main():
         print(pp)
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
-        print(variant(pp, a.variant, a.out, a.camera, params))
+        print(variant(pp, a.out, a.camera, params))
 
 
 if __name__ == "__main__":
