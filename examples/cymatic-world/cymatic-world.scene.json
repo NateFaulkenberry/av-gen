@@ -868,7 +868,7 @@
      {
       "field": "force",
       "mode": "force",
-      "strength": 600.0,
+      "strength": 100.0,
       "mix": 1.0,
       "axis": [
        0,
@@ -955,7 +955,7 @@
      {
       "field": "force",
       "mode": "force",
-      "strength": 400.0,
+      "strength": 100.0,
       "mix": 1.0,
       "axis": [
        0,

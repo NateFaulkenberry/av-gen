@@ -618,6 +618,13 @@
       "name": "Open Vista (stress)",
       "recipe": "stress/open-vista.recipe.json",
       "description": "Renderer stress profile: 1.4 km of mountainous relief, thin ground cover and large negative space."
+    },
+    {
+      "category": "Cymatic World",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 excitation, CC 2 complexity, CC 3 persistence, CC 4 spatial scale, CC 5 terrain, CC 6 sculpture, CC 7 matter, CC 8 light; pad 36 strike, pad 37 shed. A night basin of basalt whose ground is a resonating plate: the music excites one field of standing waves, the grit settles on its nodal lines, and the world's forms each answer the same field. One resonance field (ADR-1400) drives the ground's sand relief, the crystal druse and the floating medusa. See docs/prototypes/cymatic-world/02-report.md.",
+      "live": true,
+      "name": "Cymatic World",
+      "project": "cymatic-world/cymatic-world.json"
     }
   ]
 }

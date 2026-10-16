@@ -562,7 +562,7 @@ def matter(s):
                 direction=[0, 1, 0], spawnRate=280.0, lifetimeMin=40.0, lifetimeMax=60.0, spread=1.0, speedMin=0.0,
                 speedMax=0.15, gravity=[0, 0, 0], drag=14.0, turbulence=0.0, turbulenceScale=0.3, turbulenceSpeed=0.1,
                 attractorPosition=list(HEART), attractorStrength=1.5, attractorRadius=11.0, orbit=14.0,
-                fieldForces=[{"field": "force", "mode": "force", "strength": 600.0, "mix": 1.0, "axis": [0, 1, 0]},
+                fieldForces=[{"field": "force", "mode": "force", "strength": 100.0, "mix": 1.0, "axis": [0, 1, 0]},
                              # the bell: grains below its rim fall out of the body (a dome, not a ball)
                              {"field": "bellCut", "mode": "kill", "strength": 1.0, "mix": 1.0, "axis": [0, 1, 0]}],
                 sizeStart=0.05, sizeEnd=0.04, sizeVariance=0.4,
@@ -574,7 +574,7 @@ def matter(s):
                 extent=[8.5, 8.5, 8.5], direction=[0, -1, 0], spawnRate=420.0, lifetimeMin=10.0, lifetimeMax=14.0,
                 spread=0.1, speedMin=0.2, speedMax=0.5, gravity=[0, -2.5, 0], drag=6.0, turbulence=0.0,
                 orbit=0.0, attractorStrength=0.0,
-                fieldForces=[{"field": "force", "mode": "force", "strength": 400.0, "mix": 1.0, "axis": [0, 1, 0]}],
+                fieldForces=[{"field": "force", "mode": "force", "strength": 100.0, "mix": 1.0, "axis": [0, 1, 0]}],
                 sizeStart=0.04, sizeEnd=0.015, sizeVariance=0.3,
                 trailEnabled=True, trailLength=32, trailStride=5, trailWidth=0.5, trailTaper=0.05, trailFade=0.0,
                 colorStart=C("sandHot") + [0.7], colorEnd=C("hollow") + [0.0], emissive=1.1, blend="additive")
@@ -649,10 +649,57 @@ def camera(s):
     s.params_({"camera/lens/focalLength": 28.0})
 
 
+MIDI_CC = [
+    (1, "excite", "EXCITATION: how hard the music drives the field (its sustained and struck excitation)"),
+    (2, "complexity", "COMPLEXITY: more modes ring at once -- finer, more intricate figures"),
+    (3, "persistence", "PERSISTENCE: the field rings longer and the sand remembers longer"),
+    (4, "scale", "SPATIAL SCALE: every wavelength shrinks -- the same music draws a finer figure"),
+    (5, "relief", "TERRAIN: how deeply the ground's sand relief is carved"),
+    (6, "druse", "SCULPTURE: how strongly the crystal druse quivers and lights"),
+    (7, "swirl", "MATTER: the medusa's grains circle faster along its shells"),
+    (8, "light", "LIGHT: the medusa's own light over the basin"),
+]
+MIDI_PADS = [
+    (36, "padStrike", "STRIKE: the basin's lowest modes swell, as if the ground were struck, and ring down"),
+    (37, "padShed", "SHED: the medusa lets fall a curtain of strands"),
+]
+
+
+def control_map():
+    b = [{"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": name} for n, name, _ in MIDI_CC]
+    b += [{"source": "*", "channel": -1, "kind": "noteEvent", "number": n, "signal": name} for n, name, _ in MIDI_PADS]
+    return {"midi": {"enabled": True, "filter": "*", "bindings": b}}
+
+
 def instrument(s, g):
-    """The performer's surface. The field reads the audio history itself (ADR-1400, response-shaped by ADR-1361);
-    these routes add the Response controls' hits and levels where the field's own excitation is not enough."""
+    """The performer's surface. The field hears the audio history itself (ADR-1400; heard through the Response
+    controls, ADR-1361); these routes read `response.*` for what the field's own excitation does not do, and map a
+    MIDI controller onto the field's few meaningful controls."""
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    F = "field/%s/resonance/" % FIELD
+    # the song's build (a 12 s follower): more modes ring as it grows -- a dense section draws an intricate figure
+    s.route(R("intensity", F + "modes", 5.0, attackMs=4000, decayMs=8000))
+    # held sound lets the sand settle and remember longer
+    s.route(R("sustain", F + "memory", 1.2, attackMs=2000, decayMs=5000))
+    # the medusa's light follows the music's loudness (slowly: a lamp, not a strobe), and flares a little on kicks
+    s.route(R("level", "lights/heart/intensity", 1400.0, attackMs=400, decayMs=1800),
+            R("kickEnv", "lights/heart/intensity", 500.0, attackMs=0, decayMs=350))
+    # kicks shed strands from the bell's rim
+    s.route(R("kick", "particles/veil/burst", 160.0, attackMs=0, decayMs=40))
+    # ---- MIDI (control.*) ----
+    s.control = control_map()
+    CC = {"attackMs": 120, "decayMs": 120}
+    s.route(R("control.excite", F + "sustain", 1.5, **CC), R("control.excite", F + "transient", 1.2, **CC))
+    s.route(R("control.complexity", F + "modes", 10.0, **CC))
+    s.route(R("control.persistence", F + "persistence", 5.0, **CC), R("control.persistence", F + "memory", 3.0, **CC))
+    s.route(R("control.scale", F + "scale", 1.2, **CC))
+    s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CC))
+    s.route(R("control.druse", "procedural/druse/effector/1/strength", 0.15, **CC),
+            R("control.druse", "procedural/druse/effector/2/strength", 50.0, **CC))
+    s.route(R("control.swirl", "particles/matter/orbit", 25.0, **CC))
+    s.route(R("control.light", "lights/heart/intensity", 3000.0, **CC))
+    s.route(R("control.padStrike", F + "idle", 2.5, attackMs=30, decayMs=3500))
+    s.route(R("control.padShed", "particles/veil/burst", 1500.0, attackMs=0, decayMs=40))
 
 
 DESIGN = {
@@ -737,6 +784,17 @@ def main():
     s = build()
     pp, sp = write(s)
     print(pp)
+    if PROTOTYPE == "all":
+        cc = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in MIDI_CC)
+        pads = ", ".join("pad %d %s" % (n, d.split(":")[0].lower()) for n, _, d in MIDI_PADS)
+        kit.upsert_index_entry({
+            "category": CATEGORY,
+            "description": "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + "; " + pads + ". "
+                           + DESIGN["thesis"] + " One resonance field (ADR-1400) drives the ground's sand relief, the "
+                           "crystal druse and the floating medusa. See docs/prototypes/cymatic-world/02-report.md.",
+            "live": True,
+            "name": TITLE,
+            "project": "cymatic-world/cymatic-world.json"})
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(variant(pp, a.variant, a.out, a.camera, params))

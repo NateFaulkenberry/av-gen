@@ -135,7 +135,206 @@
   "post/dof/enabled": false
  },
  "sources": [],
- "routes": [],
+ "routes": [
+  {
+   "source": "response.intensity",
+   "target": "field/cymatic/resonance/modes",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 8000
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/cymatic/resonance/memory",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 2000,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "lights/heart/intensity",
+   "amount": 1400.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "lights/heart/intensity",
+   "amount": 500.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 350
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "particles/veil/burst",
+   "amount": 160.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  },
+  {
+   "source": "control.excite",
+   "target": "field/cymatic/resonance/sustain",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.excite",
+   "target": "field/cymatic/resonance/transient",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.complexity",
+   "target": "field/cymatic/resonance/modes",
+   "amount": 10.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.persistence",
+   "target": "field/cymatic/resonance/persistence",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.persistence",
+   "target": "field/cymatic/resonance/memory",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.scale",
+   "target": "field/cymatic/resonance/scale",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.relief",
+   "target": "procedural/ground/deform/1/amount",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.druse",
+   "target": "procedural/druse/effector/1/strength",
+   "amount": 0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.druse",
+   "target": "procedural/druse/effector/2/strength",
+   "amount": 50.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.swirl",
+   "target": "particles/matter/orbit",
+   "amount": 25.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "lights/heart/intensity",
+   "amount": 3000.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "control.padStrike",
+   "target": "field/cymatic/resonance/idle",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 3500
+   }
+  },
+  {
+   "source": "control.padShed",
+   "target": "particles/veil/burst",
+   "amount": 1500.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 40
+   }
+  }
+ ],
  "presets": [],
  "timeline": {
   "enabled": true,
@@ -641,5 +840,83 @@
   "tier": "one field, three consumers",
   "id": "cymatic-world",
   "title": "Cymatic World"
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "excite"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "complexity"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "persistence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "scale"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "relief"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "druse"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 7,
+     "signal": "swirl"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 8,
+     "signal": "light"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 36,
+     "signal": "padStrike"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "noteEvent",
+     "number": 37,
+     "signal": "padShed"
+    }
+   ]
+  }
  }
 }
