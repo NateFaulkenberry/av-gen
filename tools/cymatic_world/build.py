@@ -443,8 +443,8 @@ PALETTES = {
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
     "B": {"stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
-          "sheenI": 1.6,
-          "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 2.4, "hollowI": 0.5},
+          "sheenI": 1.4,
+          "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.5},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
           "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
@@ -605,7 +605,10 @@ def field_instrument(s):
 
 POST = {
     "post/motionBlur/amount": 0.0, "post/dof/physical": False,
-    "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.0, "post/output/vignette": 0.45,
+    # Pass E: AgX keeps more of the cyan and magenta (chroma retention 0.9: the hottest nodal lines stay tinted rather
+    # than clip to white); bloom only around what is genuinely bright, tight, so neighbouring cells stay separate
+    "post/tonemap/chroma-retention": 0.9, "post/bloom/radius": 0.6,
+    "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.2, "post/output/vignette": 0.45,
     "post/output/grain": 0.012, "post/grade/contrast": 1.22, "post/lens/chromaticAberration": 0.0,
     "camera/exposure/compensation": 0.2, "post/dof/enabled": False,
 }
