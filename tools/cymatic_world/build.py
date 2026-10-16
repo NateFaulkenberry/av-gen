@@ -464,7 +464,25 @@ def ground_program(counter=0.0, line=0.35, moon=6.0, sky=0.08):
         g.op(None, "add", 3, a=3, b=4)
     g.op("sky", "constant", 4, k=C("horizon", sky) + [1.0])
     g.op(None, "add", 3, a=3, b=4)                                 # r3: all the light
-    g.op(None, "multiply", 1, a=1, b=3)                            # r1: lit colour (unlit output)
+    dbg = os.environ.get("CW_DEBUG", "")
+    if dbg == "albedo":       # the base colours alone
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+    elif dbg == "light":      # the light alone, on a white surface
+        g.op(None, "constant", 4, k=[1, 1, 1, 1])
+        g.op(None, "multiply", 1, a=3, b=4)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+    elif dbg == "emission":   # the emission alone
+        g.op(None, "constant", 1, k=[0, 0, 0, 1])
+    elif dbg == "normal":
+        g.op(None, "input", 1, inp="normal")
+        g.op(None, "remap", 1, a=1, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+    elif dbg == "depth":
+        g.op(None, "input", 1, inp="cameraDistance")
+        g.op(None, "remap", 1, a=1, k=[0.0, 250.0, 1.0, 0.0], f=1.0)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+    else:
+        g.op(None, "multiply", 1, a=1, b=3)                        # r1: lit colour (unlit output)
     g.base, g.emit = 1, 2
     return g
 
