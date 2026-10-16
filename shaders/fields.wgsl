@@ -547,6 +547,9 @@ fn resonanceSand(s: vec3<f32>, sharpness: f32) -> f32 {
     return sqrt(s.z) * exp(-s.y / (k * k * s.z));
 }
 const RES_PI: f32 = 3.14159265358979;
+// ADR-1406: a row whose every drive is below this contributes nothing visible and is skipped (spatial/resonance.cpp
+// kResonanceSilent, the same rule)
+const RES_SILENT: f32 = 1e-5;
 
 // phi of mode `row` at q (x) and its local mean square (y).
 fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
@@ -636,6 +639,10 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec4<f32> {
             break;
         }
         let drive = fieldBlock.resonance[row * 3u + 2u];
+        // ADR-1406: a silent row (a mode out of its focus, a faded ring) adds nothing -- skip its shape
+        if (max(max(abs(drive.x), abs(drive.y)), abs(drive.w)) < RES_SILENT) {
+            continue;
+        }
         let w = resonanceListen(fi, drive.z, q);
         if (w <= 0.0) {
             continue;
@@ -702,6 +709,9 @@ fn resonanceShadingAt(fi: u32, q: vec3<f32>) -> vec3<f32> {
             break;
         }
         let drive = fieldBlock.resonance[row * 3u + 2u];
+        if (max(max(abs(drive.x), abs(drive.y)), abs(drive.w)) < RES_SILENT) { // ADR-1406
+            continue;
+        }
         let w = resonanceListen(fi, drive.z, q);
         if (w <= 0.0) {
             continue;

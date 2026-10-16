@@ -395,3 +395,50 @@ TEST_CASE("Simulated grid field throughput", "[.perf][simulation]") {
                      << (grid.floatCount() * sizeof(float)) / (1024 * 1024) << " MB");
     }
 }
+
+// ADR-1407: a bake grid is its source field at the cell centres, at the frame's own clock -- once a frame, no state,
+// so a seek backwards lands exactly where a play would, with no catch-up.
+TEST_CASE("A bake grid holds its source field at the frame's clock, and a seek needs no catch-up",
+          "[simulation][gpu][bake]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    SimHarness harness(*ctx, shaders);
+
+    scene::Scene scene;
+    spatial::FieldSpec wave; // animated noise: the value at a cell depends on the clock
+    wave.name = "wave";
+    wave.kind = spatial::FieldKind::Noise;
+    wave.frequency = 0.6f;
+    wave.speed = 1.5f;
+    scene.fields.fields.push_back(wave);
+    spatial::GridField grid;
+    grid.name = "baked";
+    grid.mode = spatial::GridMode::Bake;
+    grid.resolution = glm::ivec3(64, 1, 48);
+    grid.boundsMin = glm::vec3(-8.0f, -0.5f, -6.0f);
+    grid.boundsMax = glm::vec3(8.0f, 0.5f, 6.0f);
+    grid.injectField = "wave";
+    REQUIRE(grid.validate().has_value());
+    scene.fields.grids.push_back(grid);
+
+    const auto reference = [&](double t) {
+        spatial::GridField g = grid;
+        g.reset();
+        g.step(1.0f / 60.0f, t, &scene.fields); // the CPU bake: the field at the centres, at t
+        return g.data;
+    };
+    harness.frame(scene, 1.0, 0);
+    harness.frame(scene, 2.5, 1);
+    const std::vector<float> played = harness.read(scene.fields, 0);
+    const std::vector<float> at25 = reference(2.5);
+    REQUIRE(played.size() == at25.size());
+    CHECK(maxAbsDifference(played, at25) < 1e-3);
+    CHECK(maxAbsDifference(played, reference(1.0)) > 0.1); // the clock moved it
+    CHECK(harness.stats().catchUpSteps == 0);
+    // A seek backwards: the bake is the field at the new clock at once
+    harness.frame(scene, 0.4, 2);
+    CHECK(maxAbsDifference(harness.read(scene.fields, 0), reference(0.4)) < 1e-3);
+    CHECK(harness.stats().catchUpSteps == 0);
+    CHECK(harness.stats().checkpoints == 0);
+    CHECK(ctx->errorCount() == 0);
+}

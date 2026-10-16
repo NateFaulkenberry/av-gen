@@ -656,7 +656,8 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
             const double sweep = std::sin(std::fmod(6.283185307179586 * clock / std::max(static_cast<double>(src.focusPeriod), 0.5), 6.283185307179586) + ph);
             const float f = std::clamp(src.focus + src.focusSweep * static_cast<float>(sweep), src.bandLow, src.bandHigh);
             const float x = (u - f) / std::max(src.focusWidth, 1e-3f);
-            weight *= src.focusFloor + (1.0f - src.focusFloor) * std::exp(-x * x);
+            const float window = x * x > 9.0f ? 0.0f : std::exp(-x * x); // exactly silent past 3 widths (ADR-1406 skips it)
+            weight *= src.focusFloor + (1.0f - src.focusFloor) * window;
         }
         ResonanceMode& md = st.modes[static_cast<std::size_t>(i)];
         md.shape = glm::vec4(k * std::max(src.scale, 1e-3f), m, theta,
@@ -1070,6 +1071,9 @@ ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader
     ResonanceSums s;
     for (int i = 0; i < state.count; ++i) {
         const ResonanceMode& md = state.modes[static_cast<std::size_t>(i)];
+        if (std::max({std::abs(md.drive.x), std::abs(md.drive.y), std::abs(md.drive.w)}) < kResonanceSilent) {
+            continue; // ADR-1406: a silent row
+        }
         const float w = resonanceListen(reader, md.drive.z, q);
         if (w <= 0.0f) {
             continue;

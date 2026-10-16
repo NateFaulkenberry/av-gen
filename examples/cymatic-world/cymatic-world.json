@@ -284,7 +284,7 @@
   },
   {
    "source": "response.bass",
-   "target": "procedural/ground/deform/1/amount",
+   "target": "field/relief-large/strength",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -297,7 +297,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "procedural/ground/deform/2/amount",
+   "target": "field/relief-medium/strength",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -310,7 +310,7 @@
   },
   {
    "source": "response.hat",
-   "target": "procedural/ground/deform/3/amount",
+   "target": "field/relief-fine/strength",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",

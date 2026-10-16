@@ -707,6 +707,11 @@ struct Environment {
     // any shadows at all, and should set it to about the depth its subject actually spans.
     // Clamped to the camera's own planes where it is read.
     float shadowRange = 0.0f; // 0 = ADR-112's automatic range
+    // ADR-1406: a scene may say it has no use for screen-space ambient occlusion or contact shadows (an unlit, painted
+    // world). Either costs the depth prepass -- the whole opaque geometry drawn twice -- which for a deformed procedural
+    // ground re-runs every deformer per vertex. Both default on; the quality tier still decides when they are on.
+    bool ambientOcclusion = true;
+    bool contactShadows = true;
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;

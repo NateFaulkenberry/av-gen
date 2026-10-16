@@ -218,3 +218,39 @@ The trace on the kick-heavy passage (Hyperborea 82-94 s), with the build route r
 - **Oscillators:** still clean.
 
 The root causes from §9 (evictions, strike steps, layout shifts) stay fixed by ADR-1404.
+
+## Stage 7: geometry and rendering quality
+
+**What the sawtooth and the softness were.** Four findings, three of them in order:
+
+1. **A mesh bug, present since before the colour pass.**
+   - The polar ground's rule "rings may only keep or double their count outward" was enforced by carrying the horizon ring's count inward, so every ring had 256 vertices.
+   - Cells were about 0.36 × 1 m at 40 m and 0.36 × 2.5 m at 100 m. Long, thin cells drew every crest crossing them as a staircase.
+   - The stitched rows where a polar count doubles drew seams of their own.
+   - **Fix:** a tensor-product grid of square 0.36 m cells (alternating diagonals) over ±66 m, which is all the camera ever sees: the frame's top edge meets the ground inside 61 m all round the arc. Spacing then grows geometrically to the 2.6 km edge. 235k vertices.
+2. **Creases narrower than the mesh.** The scale views (`sawtooth-diagnosis-large-medium-fine-before.png`) put the remaining sawtooth in the medium layer. Its creases (sand sharpness 0.5 on 4-7 m waves) were about 0.3 m wide, one vertex. The exact |F| in the antinode basins also had a cusp on every nodal line.
+   - **Fix:** the crease rounded (`reliefRound` 0.45 large, 0.5 medium, ADR-1405), and the medium crest widened (sharpness 1.0, about 0.7 m, two vertices).
+   - This filters out detail the geometry cannot carry; the crisp line itself belongs to the material.
+3. **The cost of evaluating the field per vertex.**
+   - Three readers × three samples for the normal × up to 34 rows, and again in a depth prepass that the unlit ground did not need. Fixing the mesh would have cost 82-116 ms at High.
+   - **Fixes:**
+     - ADR-1406: the unlit scene declares no AO or contact shadows, and authors one dark non-casting light, so no prepass runs. Silent rows are skipped.
+     - ADR-1407: **bake grids.** The summed relief and the three values the material reads are each sampled once a frame into a 768² plane over ±64 m (0.17 m cells, 0.6-0.7 ms in all), and the single deformer and the material sample those. The normal's step is one cell.
+4. **The softness is not a filter.**
+   - Ultra versus High, bloom on versus off, and the canvas at scale 1 all render the same pixels.
+   - The geometry-only test material is soft by nature: broad Gaussian ridges, rounded creases, sky fill, no specular.
+   - The owner's crispness has to come from the plasma material's crest lines and sheen (Stage 8), now that the crest grid is sharp.
+
+**Before/after:** `stage7-geometry-quality/sawtooth-before-after-1080p-crop-52s.png`, a 1080p crop at the same second. The staircase on every crest and the seams are gone.
+
+**Cost (live 1080p, High, 116 s):**
+
+| Mesh and evaluation | GPU median |
+|---|---|
+| Old polar mesh, per-vertex readers, prepass | 39.6 ms |
+| Fixed polar 0.36 m, per-vertex, prepass | 116 ms |
+| Fixed polar 0.36 m, baked, no prepass | 29.4 ms |
+| Square 0.36 m, baked | 33.0 ms |
+| Square 0.3 m, baked | 36.9 ms |
+
+With the field baked, what remains is the bare mesh (about 40 ns a vertex) and the material interpreter: 40 ops at about 0.36 ms each at High, raised by quad overshading on small triangles. Stage 8 trims the material.

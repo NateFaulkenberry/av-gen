@@ -46,6 +46,7 @@ const SIM_MODE_VECTOR: i32 = 1;
 const SIM_MODE_REACTION: i32 = 2;
 const SIM_MODE_AGENTS: i32 = 3;
 const SIM_MODE_EXCITABLE: i32 = 4;
+const SIM_MODE_BAKE: i32 = 5; // ADR-1407
 const SIM_TWO_PI: f32 = 6.283185307179586;
 
 @group(0) @binding(0) var<uniform> sim: SimUniforms;
@@ -188,6 +189,18 @@ fn cs_inject(@builtin(global_invocation_id) gid: vec3<u32>) {
         injected = min(injected, sim.agentDeposit.w);
     }
     dst[base + channel] = injected;
+}
+
+// ADR-1407: a bake grid is its source field at every cell centre, at the frame's clock (signed; no rate, no state).
+@compute @workgroup_size(64)
+fn cs_bake(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let i = gid.x;
+    if (i >= simCells()) {
+        return;
+    }
+    let c = simCoords(i);
+    let slot = sim.slots.x;
+    dst[simBase(c)] = select(0.0, fieldScalar(slot, simCellCenter(c)), slot >= 0);
 }
 
 // Semi-Lagrangian advection: back-trace the cell centre by the velocity field and gather.

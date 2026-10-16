@@ -64,6 +64,9 @@ inline constexpr int kMaxResonanceModes = 24;     // per resonator
 inline constexpr int kMaxResonanceRipples = 12;   // ADR-1403/1404: travelling packets per resonator, after its modes
 inline constexpr int kMaxRipplesPerBand = 3;      // ADR-1404: the most rings a band keeps alive at once
 inline constexpr int kMaxResonanceRows = kMaxResonanceModes + kMaxResonanceRipples;
+// ADR-1406: a row whose every drive (d, e, s) is below this adds nothing visible; samplers skip it (fields.wgsl
+// RES_SILENT, the same rule), so a mode out of its focus or a faded ring costs no shape evaluation
+inline constexpr float kResonanceSilent = 1e-5f;
 inline constexpr int kMaxResonanceSources = 4;    // per resonator
 inline constexpr int kMaxGpuResonanceModes = 48;  // the FieldBlock's mode table, every resonator together
 inline constexpr int kResonanceModeVec4s = 3;     // shape, place, drive

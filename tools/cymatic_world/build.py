@@ -142,69 +142,46 @@ def world_heights(points):
 
 
 # ================================================================================================ the ground mesh
-def ring_radii(r_dense=70.0, step=0.36, r_max=2600.0, growth=1.5):
-    """Ring radii: `step` apart out to r_dense, then growing as (r / r_dense)^growth (screen density for a camera
-    near the basin), to the horizon."""
-    rs = [0.0]
-    r = 0.0
-    while r < r_max:
-        dr = step if r < r_dense else step * (r / r_dense) ** growth
-        r = min(r + dr, r_max)
-        rs.append(r)
-    return rs
+FINE_STEP = float(os.environ.get("CW_MESH_STEP", "0.36"))   # 08-brief Stage 7: the visible ground's cell size (m)
+
+
+def grid_axis(half=66.0, step=None, extent=2600.0, growth=1.12):
+    """One axis of the ground's tensor grid: `step` apart within +-half (where the camera sees the ground: the frame's
+    top edge meets it inside ~61 m of the origin all round the arc), then each step `growth` times the last out to
+    +-extent (the world beyond, never in frame, closes it)."""
+    step = step if step is not None else FINE_STEP
+    n = int(round(half / step))
+    inner = [i * half / n for i in range(-n, n + 1)]
+    outer = []
+    x, d = half, half / n
+    while x < extent:
+        d *= growth
+        x = min(x + d, extent)
+        outer.append(x)
+    return np.array([-v for v in reversed(outer)] + inner + outer)
 
 
 def ground_mesh():
-    """One polar mesh over the whole world: rings `ring_radii` apart, each with a power-of-two vertex count that keeps
-    its cells about square (doubling where it must, with a stitched transition row). Heights from the WorldMap."""
-    radii = ring_radii()
-    counts = []
-    for r in radii:
-        if r == 0.0:
-            counts.append(1)
-            continue
-        dr = 0.36 if r < 70.0 else 0.36 * (r / 70.0) ** 1.5
-        want = 2.0 * math.pi * r / dr
-        n = 16
-        while n < want and n < 2048:
-            n *= 2
-        counts.append(n)
-    # rings may only keep or double their count, outward
-    for i in range(len(counts) - 2, 0, -1):
-        counts[i] = min(counts[i], counts[i + 1])
-    for i in range(2, len(counts)):
-        counts[i] = max(counts[i], counts[i - 1])
-        if counts[i] > 2 * counts[i - 1]:
-            counts[i] = 2 * counts[i - 1]
-    xs, zs, first = [0.0], [0.0], [0]
-    for r, n in zip(radii[1:], counts[1:]):
-        first.append(len(xs))
-        a = np.arange(n) * (2.0 * math.pi / n)
-        xs.extend((r * np.cos(a)).tolist())
-        zs.extend((r * np.sin(a)).tolist())
-    pts = np.stack([np.array(xs), np.array(zs)], axis=1)
+    """08-brief Stage 7: a tensor-product grid -- square cells of FINE_STEP over the ground the camera sees, alternate
+    diagonals (no preferred direction for a crest to stair-step along), no stitched seams. Heights from the WorldMap.
+    (It replaces a polar mesh whose ring-count rule had carried the horizon's 256 vertices to every ring: cells
+    ~0.36 x 1 m at 40 m, the sawtooth; and whose doubling rows drew seams.)"""
+    xs = grid_axis()
+    zs = grid_axis()
+    nx, nz = len(xs), len(zs)
+    X, Z = np.meshgrid(xs, zs, indexing="xy")
+    pts = np.stack([X.ravel(), Z.ravel()], axis=1)
     hs = world_heights(pts)
-    idx = []
-    # the centre fan
-    n1 = counts[1]
-    for j in range(n1):
-        idx += [0, first[1] + (j + 1) % n1, first[1] + j]
-    for i in range(1, len(radii) - 1):
-        na, nb = counts[i], counts[i + 1]
-        fa, fb = first[i], first[i + 1]
-        if na == nb:
-            for j in range(na):
-                a, b = fa + j, fa + (j + 1) % na
-                c, d = fb + (j + 1) % nb, fb + j
-                idx += [a, b, c, a, c, d]
-        else:  # nb == 2 na: each inner edge faces two outer edges
-            for j in range(na):
-                a, b = fa + j, fa + (j + 1) % na
-                o0, o1, o2 = fb + 2 * j, fb + (2 * j + 1) % nb, fb + (2 * j + 2) % nb
-                idx += [a, o1, o0, a, b, o1, b, o2, o1]
     pos = np.stack([pts[:, 0], hs, pts[:, 1]], axis=1)
-    tri = np.array(idx, dtype=np.int64).reshape(-1, 3)
-    # Winding: counter-clockwise seen from above (+Y); flip any triangle that came out the other way.
+    j, i = np.meshgrid(np.arange(nz - 1), np.arange(nx - 1), indexing="ij")
+    a = (j * nx + i).ravel()
+    b = a + 1
+    c = a + nx
+    d = c + 1
+    alt = ((i + j) % 2 == 0).ravel()
+    t1 = np.where(alt[:, None], np.stack([a, c, b], 1), np.stack([a, c, d], 1))
+    t2 = np.where(alt[:, None], np.stack([b, c, d], 1), np.stack([a, d, b], 1))
+    tri = np.concatenate([t1, t2], axis=0).astype(np.int64)
     e1 = pos[tri[:, 1]] - pos[tri[:, 0]]
     e2 = pos[tri[:, 2]] - pos[tri[:, 0]]
     fn = np.cross(e1, e2)
@@ -378,14 +355,20 @@ LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 #   nodal           the material shows the nodal lines (sand) of the whole figure, white on black
 #   envelope        the material shows the excitation |F| (the fast figure's amplitude), black to orange
 DEBUG = os.environ.get("CW_DEBUG", "")
+# ADR-1407: the relief is baked into a grid once a frame (CW_BAKE=0: every vertex evaluates the readers, for comparison)
+BAKE = os.environ.get("CW_BAKE", "1") != "0"
+BAKE_RES = int(os.environ.get("CW_BAKE_RES", "768"))
+BAKE_HALF = 64.0   # metres: the frame's top edge meets the ground inside ~61 m
 PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
 SHAPES = {
     "P1": {"large": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.35}, 3.2),
            "medium": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.3}, 1.3),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
-    "P2": {"large": ({"reliefSand": 1.0, "sharpness": 0.5, "reliefAmplitude": -0.55, "reliefRound": 0.35,
+    # Stage 7: a crest must span a few vertices (0.3 m) or the mesh draws it as a sawtooth: the medium crease (4-7 m
+    # waves) at sharpness 0.5 was ~0.3 m wide; 1.0 makes it ~0.7 m. The crisp line itself is the material's (shading)
+    "P2": {"large": ({"reliefSand": 1.0, "sharpness": 0.6, "reliefAmplitude": -0.55, "reliefRound": 0.45,
                      "reliefVibration": 0.2}, 3.4),
-           "medium": ({"reliefSand": 1.0, "sharpness": 0.5, "reliefAmplitude": -0.35, "reliefRound": 0.3}, 0.8),
+           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": 0.5}, 0.8),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
     "P3": {"large": ({"reliefSand": 0.55, "sharpness": 0.7, "reliefFigure": 0.8, "reliefVibration": 0.25}, 3.2),
            "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.3}, 1.2),
@@ -395,7 +378,15 @@ SHAPES = {
 
 def ground_readers(s):
     """The material's shading reader (all scales), and one relief reader per scale. Returns the deformer layers."""
-    reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
+    if BAKE:
+        # ADR-1407: what the material reads -- the sand ridge, the crest line, the excitation -- baked too, so a pixel
+        # samples three grids instead of evaluating every mode (the colour pass's `shade` colour field, split in three)
+        for name, channel, extra in (("shade-sand", "sand", {"sharpness": 0.9}), ("shade-crest", "sand", {"sharpness": 0.35}),
+                                     ("shade-amp", "amplitude", {})):
+            reader(s, name, channel, extra)
+            bake_grid(s, name)
+    else:
+        reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
     if DEBUG in ("signed", "nodal", "envelope"):
         reader(s, "dbgview", {"signed": "relief", "nodal": "sand", "envelope": "amplitude"}[DEBUG],
                {"reliefSand": 0.0, "reliefFigure": 1.0, "sharpness": 0.45} if DEBUG != "envelope" else {})
@@ -415,9 +406,30 @@ def ground_readers(s):
         r = {"sharpness": 0.9, "reliefLine": 0.0, "reliefLineSharpness": 0.5, "reliefVibration": 0.0,
              "listenLow": lo, "listenHigh": hi, "listenWidth": 0.04 if only_mode is None else 0.005}
         r.update(extra)
-        reader(s, "relief-" + name, "relief", r)
+        reader(s, "relief-" + name, "relief", r, frame={"strength": amount} if BAKE else None)
         layers.append(("relief-" + name, amount))
-    return layers
+    if not BAKE:
+        return layers
+    # ADR-1407: the scales' sum, baked once a frame into a plane grid that the ground's single deformer samples --
+    # the per-vertex cost (three readers, three samples each for the normal) becomes one evaluation per grid cell
+    s.nodes.append({"name": "relief", "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "compound", "children": [n for n, _ in layers], "combine": "add",
+                              "strength": 1.0, "falloff": {"kind": "none"}}})
+    bake_grid(s, "relief")
+    return [("relief-grid", 1.0)]
+
+
+def bake_grid(s, source):
+    """ADR-1407: a plane grid `<source>-bake` holding `source` sampled at its cells every frame, and the field
+    `<source>-grid` that reads it."""
+    if not hasattr(s, "grids"):
+        s.grids = []
+    s.grids.append({"name": source + "-bake", "enabled": True, "mode": "bake", "wrap": "clamp",
+                    "resolution": [BAKE_RES, 1, BAKE_RES], "boundsMin": [-BAKE_HALF, -4.0, -BAKE_HALF],
+                    "boundsMax": [BAKE_HALF, -2.0, BAKE_HALF], "injectField": source})
+    s.nodes.append({"name": source + "-grid", "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "grid", "reference": source + "-bake", "strength": 1.0,
+                              "falloff": {"kind": "none"}}})
 
 
 # ---- the colour language (the colour pass, 03-brief-color-lighting-art-pass.md) -------------------------------------
@@ -494,9 +506,14 @@ def ground_program():
         c = pc(key, scale)
         g.op(label, "ramp", dst, a=src, k=[0, 0, 0, 0], k2=[x * 0.5 for x in c] + [0.5], k3=c + [1.0])
 
-    g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
-    g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
-    g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
+    if BAKE:  # ADR-1407: three baked grids, sampled (cheap) -- r0 = sand, r2 = crest, r3 = amplitude
+        g.op("shade", "field", 0, field="shade-sand-grid")
+        g.op(None, "field", 2, field="shade-crest-grid")
+        g.op(None, "field", 3, field="shade-amp-grid")
+    else:
+        g.op("shade", "field", 0, field="shade")                   # r0 = (sand, crest, amplitude, w)
+        g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])               # r2 = crest
+        g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])               # r3 = amplitude
     g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
     g.op("gritMask", "smoothstep", 1, a=1, k=[0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
@@ -555,11 +572,17 @@ def environment(s):
         "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
         "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
         "shadowRange": 180.0,
+        # ADR-1406: the ground is unlit and painted -- screen-space AO and contact shadows add nothing to it and cost the
+        # depth prepass (every deformer re-run per vertex for a second pass)
+        "ambientOcclusion": False, "contactShadows": False,
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
-    # no scene lights: the ground is unlit, its key, fill, sky and rim are painted in its program (ground_program)
+    # the ground is unlit: its key, fill, sky and rim are painted in its program (ground_program). One authored light,
+    # dark and casting nothing, stands in for the default key a scene with no lights is given -- which casts, and so
+    # costs a shadow mask and the depth prepass (ADR-1406) for a world nothing in which is lit
+    s.light("unlit", "directional", direction=[0.3, -1.0, 0.2], color=[1.0, 1.0, 1.0], intensity=0.0, castsShadow=False)
 
 
 def ground(s, layers, write_mesh=False):
@@ -575,9 +598,12 @@ def ground(s, layers, write_mesh=False):
            material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                      "roughness": 0.6, "metallic": 0.0, "unlit": True,
                      "program": "" if os.environ.get("CW_NOPROG") else g.name},
-           extra={"normalStep": 0.12},  # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m
-           deformers=[{"kind": "field", "field": name, "amount": amount, "axis": [0.0, 1.0, 0.0], "space": "world",
-                       "alongNormal": False} for name, amount in layers])
+           # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m. Baked (ADR-1407): one grid cell, so the
+           # normal's differences span neighbouring cells instead of reading one bilinear cell's flat facet
+           extra={"normalStep": (2.0 * BAKE_HALF / BAKE_RES) if BAKE else 0.12},
+           deformers=[] if os.environ.get("CW_NODEFORM") else  # (a profiling switch: the bare mesh)
+           [{"kind": "field", "field": name, "amount": amount, "axis": [0.0, 1.0, 0.0], "space": "world",
+             "alongNormal": False} for name, amount in layers])
     return g
 
 
@@ -703,14 +729,17 @@ def build_world():
     #   bass excites the large figure's relief, held sound the medium's intricacy, hats the fine vibration -- each a
     #     bounded, smoothed gain on its own scale; kicks and snares also strike the modes and launch rings (the field's
     #     own response, ADR-1403/1404); the song's build fills the bank (intensity -> modes, ADR-1404's layout)
-    D = "procedural/ground/deform/%d/amount"
+    # a scale's height: its reader's strength when the relief is baked (ADR-1407), else its own deformer's amount
+    def D(n):
+        return ("field/relief-%s/strength" % ["large", "medium", "fine"][n - 1]) if BAKE else \
+            "procedural/ground/deform/%d/amount" % n
     s.route(R("sonic.brightness.slow", F + "source/0/focus", 0.08, attackMs=2000, decayMs=4000),
             R("sonic.brightness.slow", F + "source/1/focus", 0.06, attackMs=2500, decayMs=5000),
             R("sonic.brightness", F + "source/2/focus", 0.14, attackMs=400, decayMs=1200),
             R("sonic.roughness.slow", F + "source/1/amplitude", 0.45, attackMs=1500, decayMs=3000),
-            R("response.bass", D % 1, 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
-            R("response.sustain", D % 2, 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
-            R("response.hat", D % 3, 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
+            R("response.bass", D(1), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
+            R("response.sustain", D(2), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
+            R("response.hat", D(3), 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     s.params_(POST)
@@ -758,6 +787,13 @@ def write_scene(key):
     os.makedirs(OUT_DIRS[key], exist_ok=True)
     s, cc, pads = BUILDERS[key]()
     pp, sp = s.write(OUT_DIRS[key])
+    if getattr(s, "grids", None):  # the kit has no grids; they go in the scene file's top level
+        with open(sp) as f:
+            doc = json.load(f)
+        doc["grids"] = s.grids
+        with open(sp, "w") as f:
+            json.dump(doc, f, indent=1)
+            f.write("\n")
     ccs = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in cc)
     pds = ", ".join("pad %d %s" % (n, d.split(":")[0].lower()) for n, _, d in pads)
     kit.upsert_index_entry({

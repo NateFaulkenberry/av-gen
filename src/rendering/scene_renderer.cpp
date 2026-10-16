@@ -3259,7 +3259,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     updateLights(encoder, scene, view, aspect, frame);
     frame.lightCounts.z = scene.environment.stylized ? 1.0f : 0.0f;
     frame.shadowParams = glm::vec4(static_cast<float>(shadows_->resolution()), 1.5f,
-                                   qualitySettings_.contactShadows
+                                   qualitySettings_.contactShadows && scene.environment.contactShadows // ADR-1406
                                        ? static_cast<float>(qualitySettings_.contactSteps)
                                        : 0.0f,
                                    0.6f);
@@ -3282,7 +3282,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const float aoRadius = std::clamp(glm::length(scene.camera.target - scene.camera.position) * 0.05f,
                                           0.15f, 4.0f);
         QualitySettings aoQuality = qualitySettings_;
-        aoQuality.ambientOcclusion = aoQuality.ambientOcclusion && toggles_.ao;
+        aoQuality.ambientOcclusion = aoQuality.ambientOcclusion && toggles_.ao && scene.environment.ambientOcclusion;
         ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, aoQuality, time.frameIndex,
                     time.frameNonce(),
                     scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane, scene.camera.farPlane,
@@ -3297,8 +3297,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // It reads the linear depth the prepass resolves, so it can only run when there is a prepass;
     // and the prepass only runs when something needs it, which now includes this.
     {
+        // ADR-1406: the mask shades directional SHADOWS; with no directional light casting one there is nothing to mask
+        // (and the mask alone would keep the depth prepass -- the whole opaque geometry drawn twice -- for nothing)
+        const bool directionalCasts = std::any_of(scene.lights.begin(), scene.lights.end(), [](const scene::PunctualLight& l) {
+            return l.enabled && l.type == scene::PunctualLight::Type::Directional && l.castsShadow;
+        });
         shadowMask_->update(hdr_.width(), hdr_.height(), qualitySettings_, toggles_.shadowMask,
-                            static_cast<std::uint32_t>(frame.lightCounts.x + 0.5f),
+                            directionalCasts ? static_cast<std::uint32_t>(frame.lightCounts.x + 0.5f) : 0u,
                             scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane,
                             scene.camera.farPlane);
         stats_.shadowMask = shadowMask_->stats();
@@ -3950,7 +3955,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     const bool shardsWantDepth = std::any_of(scene.particles.begin(), scene.particles.end(), [](const scene::ParticleSystem& p) {
         return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
     });
-    const bool needsDepthPrepass = ao_->active() || qualitySettings_.contactShadows ||
+    const bool needsDepthPrepass = ao_->active() || (qualitySettings_.contactShadows && scene.environment.contactShadows) ||
                                    shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth ||
                                    std::any_of(environments_.begin(), environments_.end(), // ADR-1200: the seam
                                                [&](const EnvironmentRenderer* e) { return e->wants(scene); });

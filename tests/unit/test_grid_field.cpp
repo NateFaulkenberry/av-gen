@@ -357,3 +357,38 @@ TEST_CASE("a grid can start from authored values, keep them, and round-trip them
     j["initial"] = nlohmann::json::array({1.0, 2.0});
     CHECK_FALSE(spatial::GridField::fromJson(j)); // the wrong count is refused
 }
+
+// ADR-1407
+TEST_CASE("A bake grid is a plane that names its field, and a step bakes the field at the cell centres",
+          "[grid][bake]") {
+    spatial::FieldSet set;
+    spatial::FieldSpec ramp;
+    ramp.name = "ramp";
+    ramp.kind = spatial::FieldKind::LinearGradient;
+    ramp.axis = {1.0f, 0.0f, 0.0f};
+    ramp.length = 10.0f;
+    set.fields.push_back(ramp);
+    spatial::GridField g;
+    g.name = "b";
+    g.mode = spatial::GridMode::Bake;
+    g.resolution = glm::ivec3(16, 1, 4);
+    g.boundsMin = glm::vec3(-5.0f, -1.0f, -1.0f);
+    g.boundsMax = glm::vec3(5.0f, 1.0f, 1.0f);
+    CHECK_FALSE(g.validate().has_value()); // no field to bake
+    g.injectField = "ramp";
+    REQUIRE(g.validate().has_value());
+    CHECK(g.components() == 1);
+    auto thick = g;
+    thick.resolution.y = 2;
+    CHECK_FALSE(thick.validate().has_value()); // a plane
+    CHECK(spatial::gridModeFromName("bake") == spatial::GridMode::Bake);
+    g.reset();
+    g.step(0.016f, 3.0, &set);
+    for (int i = 0; i < 16; ++i) {
+        const glm::vec3 c = g.cellCenter(i, 0, 2);
+        CHECK(g.data[g.index(i, 0, 2)] == Catch::Approx(spatial::sampleScalar(ramp, c, 3.0, &set)).margin(1e-6));
+    }
+    const auto back = spatial::GridField::fromJson(g.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->mode == spatial::GridMode::Bake);
+}
