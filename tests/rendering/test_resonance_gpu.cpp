@@ -318,8 +318,11 @@ TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (AD
     spatial::FieldSet fields = makeFields();
     auto& ground = fields.fields[0].resonance;
     ground.ripple = 1.3f;
-    ground.rippleCount = 6.0f;
+    ground.rippleCount = 2.0f; // per band (ADR-1404)
     ground.rippleArea = 20.0f;
+    ground.layout = 16.0f;                        // ADR-1404
+    ground.attack = {0.2f, 0.07f, 0.03f};
+    ground.release = {2.5f, 1.0f, 0.4f};
     for (std::size_t s = 0; s < ground.sources.size(); ++s) {
         ground.sources[s].drift = 6.0f + 3.0f * static_cast<float>(s);
         ground.sources[s].driftPeriod = 30.0f;

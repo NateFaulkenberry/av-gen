@@ -61,7 +61,8 @@ struct FieldSpec;
 struct FieldSet;
 
 inline constexpr int kMaxResonanceModes = 24;     // per resonator
-inline constexpr int kMaxResonanceRipples = 8;    // ADR-1403: travelling packets per resonator, after its modes
+inline constexpr int kMaxResonanceRipples = 12;   // ADR-1403/1404: travelling packets per resonator, after its modes
+inline constexpr int kMaxRipplesPerBand = 3;      // ADR-1404: the most rings a band keeps alive at once
 inline constexpr int kMaxResonanceRows = kMaxResonanceModes + kMaxResonanceRipples;
 inline constexpr int kMaxResonanceSources = 4;    // per resonator
 inline constexpr int kMaxGpuResonanceModes = 48;  // the FieldBlock's mode table, every resonator together
@@ -106,6 +107,9 @@ struct ResonanceSource {
     // ADR-1403: the source's amplitude AFTER competition and the limiter (gain acts before them, so at saturation the
     // limiter cancels it): what sets a family's height against the others' -- broad modes large, fine modes small.
     float amplitude = 1.0f;
+    // ADR-1403: multiplies the resonator's `breath` for this source's modes -- a broad swell can morph slowly while a
+    // fine carpet shivers (0 = its modes hold their phase: they move only by their kinematics and their envelopes).
+    float breath = 1.0f;
     float spin = 0.0f;
     float driftAudio = 0.0f;
     [[nodiscard]] bool operator==(const ResonanceSource&) const = default;
@@ -114,6 +118,15 @@ struct ResonanceSource {
 struct ResonanceSpec {
     // ---- the resonator (read only from a field with no `reference`) ------------------------------
     float modes = 12.0f;        // 1..kMaxResonanceModes; a fraction fades the last mode in
+    // ADR-1404: the modes' fixed places on the dispersion axis, u_i = i / (layout - 1). 0 = `modes` sets them (ADR-1400:
+    // then a route on `modes` slides EVERY mode along the axis -- frequencies, wavelengths, sources and phases all
+    // shift during play). With a layout, `modes` only says how many of the fixed modes ring, from the lowest up.
+    float layout = 0.0f;
+    // ADR-1404: response times per band (low, mid, high: u = 0, 0.5, 1, log-interpolated between), seconds. attack is
+    // a mode's rise -- of its spectral drive and of an onset's strike (a bounded two-time-constant impulse, never a
+    // step); release its ring-down. All three 0 = the ADR-1400 rule (persistence, buildup).
+    std::array<float, 3> attack{0.0f, 0.0f, 0.0f};
+    std::array<float, 3> release{0.0f, 0.0f, 0.0f};
     float fLow = 40.0f;         // Hz, the lowest mode's eigenfrequency
     float fHigh = 6000.0f;      // Hz, the highest's
     float lambdaMax = 40.0f;    // metres, the lowest mode's wavelength
@@ -142,7 +155,9 @@ struct ResonanceSpec {
     float rippleLife = 1.6f;    // seconds to 1/e, the kick's (a snare's 0.55x, a hat's 0.35x)
     float rippleWidth = 0.9f;   // the packet's half-width, in its wavelengths
     float rippleArea = 30.0f;   // metres: launch points lie within this of the origin
-    float rippleCount = 6.0f;   // the most rings alive at once (1..kMaxResonanceRipples)
+    float rippleCount = 2.0f;   // ADR-1404: the most rings each band keeps alive (0..kMaxRipplesPerBand); a ring a newer
+                                // one displaces fades out over rippleFade instead of vanishing
+    float rippleFade = 0.35f;   // seconds
     std::vector<ResonanceSource> sources; // empty = one point source at the origin, order 4
     // ---- the reader (any resonance field) --------------------------------------------------------
     ResonanceChannel channel = ResonanceChannel::Displacement;

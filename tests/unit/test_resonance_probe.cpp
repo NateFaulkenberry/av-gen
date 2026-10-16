@@ -311,3 +311,116 @@ TEST_CASE("resonance motion (diagnostic)", "[.resonance-motion]") {
         }
     }
 }
+
+// Motion stability (07-brief): a frame-by-frame trace of a resonator over a passage, for diagnosis. Writes to CW_OUT:
+//   modes.csv   t, row, source (-1 = ripple), u, envelope (as driven), e (drive.y), d (drive.x), s (drive.w),
+//               centre x, z, theta, k, limiter
+//   points.csv  t, point, D, relief at a few fixed ground points
+//   grids.f32   per frame, CW_GRID^2 floats for each of: the families' displacement (one layer per source, then the
+//               ripples), the total vibration D, the sand base term, the relief -- top-down over +-CW_HALF m
+// Run:
+//   CW_SCENE=... CW_WAV=assets/audio/hyperborea.wav CW_T0=44 CW_T1=56 CW_OUT=/tmp/trace \
+//   ./build/release/tests/avgen_tests "[.resonance-trace]"
+TEST_CASE("resonance trace (diagnostic)", "[.resonance-trace]") {
+    const char* scenePath = std::getenv("CW_SCENE");
+    const char* wav = std::getenv("CW_WAV");
+    const char* out = std::getenv("CW_OUT");
+    if (scenePath == nullptr || wav == nullptr || out == nullptr) {
+        SKIP("set CW_SCENE, CW_WAV and CW_OUT");
+    }
+    const auto env = [](const char* k, double d) { return std::getenv(k) ? std::atof(std::getenv(k)) : d; };
+    const double t0 = env("CW_T0", 44.0);
+    const double t1 = env("CW_T1", 56.0);
+    const double fps = env("CW_FPS", 30.0);
+    const int grid = static_cast<int>(env("CW_GRID", 128.0));
+    const float half = static_cast<float>(env("CW_HALF", 35.0));
+    const float y = static_cast<float>(env("CW_Y", -3.0));
+    spatial::FieldSet set = loadFieldSet(scenePath);
+    auto file = audio::AudioFile::load(wav);
+    REQUIRE(file.has_value());
+    const auto track = analysis::AnalysisTrack::analyze(*file, analysis::AnalyzerConfig{});
+    set.audio = std::make_shared<const spatial::AudioHistory>(analysis::buildAudioHistory(track));
+    const spatial::FieldSpec* resonator = nullptr;
+    const spatial::FieldSpec* relief = nullptr;
+    for (const auto& f : set.fields) {
+        if (f.isResonance() && f.reference.empty()) {
+            resonator = &f;
+        }
+        if (f.name == "relief") {
+            relief = &f;
+        }
+    }
+    REQUIRE(resonator != nullptr);
+    REQUIRE(relief != nullptr);
+    const std::string dir(out);
+    std::ofstream modes(dir + "/modes.csv");
+    std::ofstream points(dir + "/points.csv");
+    std::ofstream grids(dir + "/grids.f32", std::ios::binary);
+    REQUIRE(modes);
+    modes << "t,row,source,u,envelope,e,d,s,cx,cz,theta,k,limiter\n";
+    points << "t,point,D,relief\n";
+    const int nsrc = static_cast<int>(resonator->resonance.sources.size());
+    const glm::vec3 probes[] = {{0, y, 0}, {-12, y, 8}, {15, y, -10}, {5, y, 20}, {-20, y, -18}};
+    spatial::ResonanceCache cache;
+    int frames = 0;
+    // CW_MODES_RAMP=a:b sweeps the resonator's `modes` from a to b over the passage, as a route on it would
+    float rampA = -1.0f, rampB = -1.0f;
+    if (const char* ramp = std::getenv("CW_MODES_RAMP")) {
+        std::sscanf(ramp, "%f:%f", &rampA, &rampB);
+    }
+    for (double t = t0; t <= t1 + 1e-9; t += 1.0 / fps) {
+        if (rampA > 0.0f) {
+            for (auto& f : set.fields) {
+                if (&f == resonator) {
+                    f.resonance.modes = rampA + (rampB - rampA) * static_cast<float>((t - t0) / std::max(t1 - t0, 1e-9));
+                }
+            }
+        }
+        spatial::resolveResonance(set, cache, t);
+        const spatial::ResonanceState& st = *resonator->resonanceState;
+        for (int i = 0; i < st.count; ++i) {
+            const auto si = static_cast<std::size_t>(i);
+            const auto& m = st.modes[si];
+            const bool ripple = i >= st.modeCount;
+            modes << t << ',' << i << ',' << (ripple ? -1 : st.source[si]) << ',' << m.drive.z << ','
+                  << (ripple ? 0.0f : st.envelope[si]) << ',' << m.drive.y << ',' << m.drive.x << ',' << m.drive.w << ','
+                  << m.place.x << ',' << m.place.z << ',' << m.shape.z << ',' << m.shape.x << ',' << st.limiterGain << '\n';
+        }
+        int pi = 0;
+        for (const glm::vec3& p : probes) {
+            const spatial::ResonanceSums s = spatial::resonanceSums(st, *relief, p, true);
+            points << t << ',' << pi++ << ',' << s.displacement << ',' << spatial::sampleScalar(*relief, p, t, &set) << '\n';
+        }
+        // the grids: per source, ripples, D, sand base, relief
+        const int layers = nsrc + 4;
+        std::vector<float> g(static_cast<std::size_t>(layers * grid * grid), 0.0f);
+        for (int j = 0; j < grid; ++j) {
+            for (int i = 0; i < grid; ++i) {
+                const glm::vec3 p(-half + 2.0f * half * static_cast<float>(i) / static_cast<float>(grid - 1), y,
+                                  -half + 2.0f * half * static_cast<float>(j) / static_cast<float>(grid - 1));
+                const auto cell = static_cast<std::size_t>(j * grid + i);
+                float total = 0.0f;
+                for (int r = 0; r < st.count; ++r) {
+                    const auto& m = st.modes[static_cast<std::size_t>(r)];
+                    const float c = m.drive.x * spatial::resonanceModeShape(m, p);
+                    const int layer = r >= st.modeCount ? nsrc : st.source[static_cast<std::size_t>(r)];
+                    g[static_cast<std::size_t>(layer) * static_cast<std::size_t>(grid * grid) + cell] += c;
+                    total += c;
+                }
+                const spatial::ResonanceSums s = spatial::resonanceSums(st, *relief, p, true);
+                float sand = 0.0f;
+                if (s.meanEnergy > 1e-12f) {
+                    const float k = std::max(relief->resonance.sharpness, 1e-3f);
+                    sand = std::sqrt(s.meanEnergy) * std::exp(-s.energy / (k * k * s.meanEnergy));
+                }
+                g[static_cast<std::size_t>(nsrc + 1) * static_cast<std::size_t>(grid * grid) + cell] = total;
+                g[static_cast<std::size_t>(nsrc + 2) * static_cast<std::size_t>(grid * grid) + cell] = sand;
+                g[static_cast<std::size_t>(nsrc + 3) * static_cast<std::size_t>(grid * grid) + cell] =
+                    spatial::sampleScalar(*relief, p, t, &set);
+            }
+        }
+        grids.write(reinterpret_cast<const char*>(g.data()), static_cast<std::streamsize>(g.size() * sizeof(float)));
+        ++frames;
+    }
+    std::printf("trace: %d frames, %d sources + ripples, grid %d, written to %s\n", frames, nsrc, grid, out);
+}

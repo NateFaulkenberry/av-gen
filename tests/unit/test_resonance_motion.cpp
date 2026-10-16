@@ -185,7 +185,8 @@ TEST_CASE("A snare's ring is faster, shorter and more local than a kick's; only 
           "[unit][resonance][motion]") {
     auto f = moving();
     f.resonance.ripple = 1.0f;
-    f.resonance.rippleCount = 3.0f;
+    f.resonance.rippleCount = 3.0f;  // per band (ADR-1404)
+    f.resonance.rippleFade = 0.0f;   // displaced rings vanish at once, so the count is exact here
     const auto h = history(20.0, 0.0f, {{{{5.0, 1.0f}}, {{5.0, 1.0f}}, {}}});
     const auto s = spatial::evaluateResonance(f, h, 5.5);
     REQUIRE(s.count == s.modeCount + 2);
@@ -198,7 +199,7 @@ TEST_CASE("A snare's ring is faster, shorter and more local than a kick's; only 
     CHECK(snare.drive.x < kick.drive.x);       // fainter, and it dies sooner:
     const auto later = spatial::evaluateResonance(f, h, 5.0 + 4.0 * 0.55 * f.resonance.rippleLife + 0.05);
     CHECK(later.count == later.modeCount + 1); // the kick's ring is still alive, the snare's gone
-    // Many onsets: only the newest rippleCount.
+    // Many onsets in one band: only its newest rippleCount.
     std::vector<spatial::AudioOnset> many;
     for (int k = 0; k < 10; ++k) {
         many.push_back({3.0 + 0.1 * k, 1.0f});
@@ -241,7 +242,7 @@ TEST_CASE("Motion round-trips through JSON, hashes, validates and registers its 
     auto f = moving();
     f.resonance.ripple = 0.8f;
     f.resonance.rippleSpeed = 12.0f;
-    f.resonance.rippleCount = 4.0f;
+    f.resonance.rippleCount = 2.0f;
     f.resonance.sources[1].amplitude = 0.3f;
     f.resonance.sources[0].driftAudio = 0.4f;
     const nlohmann::json j = f.toJson();
@@ -251,7 +252,7 @@ TEST_CASE("Motion round-trips through JSON, hashes, validates and registers its 
     CHECK(back->resonance.sources == f.resonance.sources);
     CHECK(back->resonance.ripple == 0.8f);
     CHECK(back->resonance.rippleSpeed == 12.0f);
-    CHECK(back->resonance.rippleCount == 4.0f);
+    CHECK(back->resonance.rippleCount == 2.0f);
     CHECK(back->structuralHash() == f.structuralHash());
     auto other = f;
     other.resonance.sources[0].spin = 0.3f;
@@ -271,7 +272,7 @@ TEST_CASE("Motion round-trips through JSON, hashes, validates and registers its 
     bad.resonance.sources[0].drift = -1.0f;
     CHECK_FALSE(bad.validate().has_value());
     bad = f;
-    bad.resonance.rippleCount = 9.0f;
+    bad.resonance.rippleCount = 4.0f; // at most kMaxRipplesPerBand
     CHECK_FALSE(bad.validate().has_value());
     bad = f;
     bad.resonance.rippleSpeed = 0.0f;
@@ -302,4 +303,123 @@ TEST_CASE("Motion round-trips through JSON, hashes, validates and registers its 
     params::ParameterSet ps2;
     (void)scene::registerFieldParameters(ps2, relief, "field/relief/");
     CHECK(ps2.find("field/relief/resonance/reliefVibration") != nullptr);
+}
+
+// ---- ADR-1404: stability --------------------------------------------------------------------------------------------
+
+TEST_CASE("A fixed layout keeps every mode where it is while `modes` changes", "[unit][resonance][motion]") {
+    auto f = moving();
+    f.resonance.layout = 20.0f;
+    f.resonance.modes = 12.0f;
+    const auto a = spatial::evaluateResonance(f, nullptr, 17.0);
+    f.resonance.modes = 16.5f;
+    const auto b = spatial::evaluateResonance(f, nullptr, 17.0);
+    REQUIRE(a.modeCount == 12);
+    REQUIRE(b.modeCount == 17);
+    for (int i = 0; i < a.modeCount; ++i) { // the first twelve are the same modes: place, shape, phase, source
+        const auto si = static_cast<std::size_t>(i);
+        CHECK(a.modes[si].shape == b.modes[si].shape);
+        CHECK(a.modes[si].place == b.modes[si].place);
+        CHECK(a.modes[si].drive.z == b.modes[si].drive.z);
+        CHECK(a.source[si] == b.source[si]);
+        CHECK(a.frequency[si] == b.frequency[si]);
+    }
+    CHECK(b.weight[16] == Approx(0.5f)); // the half-added mode fades in
+    // Without a layout (ADR-1400) the same change re-places every mode: what the layout exists to prevent.
+    auto old = f;
+    old.resonance.layout = 0.0f;
+    old.resonance.modes = 12.0f;
+    const auto c = spatial::evaluateResonance(old, nullptr, 17.0);
+    old.resonance.modes = 16.5f;
+    const auto d = spatial::evaluateResonance(old, nullptr, 17.0);
+    CHECK(c.modes[5].drive.z != d.modes[5].drive.z);
+    auto bad = f;
+    bad.resonance.layout = 10.0f; // fewer places than modes
+    CHECK_FALSE(bad.validate().has_value());
+}
+
+TEST_CASE("Per-band response times set the rise and ring-down; an onset's strike rises smoothly and decays",
+          "[unit][resonance][motion]") {
+    spatial::FieldSpec f;
+    f.name = "res";
+    f.kind = spatial::FieldKind::Resonance;
+    f.resonance.modes = 9.0f;
+    f.resonance.contrast = 0.0f;
+    f.resonance.idle = 0.0f;
+    f.resonance.limit = 100.0f;
+    f.resonance.transient = 1.0f;
+    f.resonance.sources = {spatial::ResonanceSource{}};
+    const auto h = history(12.0, 0.0f, {{{{3.0, 1.0f}}, {}, {}}});
+    auto banded = f;
+    banded.resonance.attack = {0.25f, 0.08f, 0.03f};
+    banded.resonance.release = {3.0f, 1.0f, 0.4f};
+    REQUIRE(banded.validate().has_value());
+    // The low mode's strike: ADR-1400 jumps within 30 ms; with a 0.25 s low-band attack it rises over ~0.25 s.
+    const float stepAt = spatial::evaluateResonance(f, h, 3.04).envelope[0];
+    const float smoothAt = spatial::evaluateResonance(banded, h, 3.04).envelope[0];
+    CHECK(smoothAt < 0.5f * stepAt);
+    float prev = 0.0f;
+    float peak = 0.0f;
+    double peakAt = 0.0;
+    for (double t = 3.0; t <= 9.0; t += 1.0 / 60.0) { // bounded, a single rise then a decay
+        const float v = spatial::evaluateResonance(banded, h, t).envelope[0];
+        CHECK(std::isfinite(v));
+        CHECK(std::abs(v - prev) < 0.1f); // no frame jumps
+        if (v > peak) {
+            peak = v;
+            peakAt = t;
+        }
+        prev = v;
+    }
+    CHECK(peak <= 1.0f);
+    CHECK(peakAt > 3.1);
+    CHECK(peakAt < 4.5);
+    // ... and it rings down over the band's release: a third of its peak about a release after the peak
+    const float later = spatial::evaluateResonance(banded, h, peakAt + 3.0).envelope[0];
+    CHECK(later < 0.6f * peak);
+    CHECK(later > 0.1f * peak);
+    // JSON round trip
+    const nlohmann::json j = banded.toJson();
+    auto back = spatial::FieldSpec::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->resonance.attack == banded.resonance.attack);
+    CHECK(back->resonance.release == banded.resonance.release);
+    CHECK(back->structuralHash() == banded.structuralHash());
+    auto bad = banded;
+    bad.resonance.attack = {0.2f, 0.0f, 0.1f}; // all three or none
+    CHECK_FALSE(bad.validate().has_value());
+}
+
+TEST_CASE("A displaced ring fades out instead of vanishing: the ripples' sum never pops", "[unit][resonance][motion]") {
+    std::vector<spatial::AudioOnset> dense;
+    for (int k = 0; k < 40; ++k) {
+        dense.push_back({2.0 + 0.23 * k, 0.9f});
+    }
+    const auto h = history(20.0, 0.0f, {{dense, {}, {}}});
+    // the largest one-frame (60 Hz) fall of the ripples' summed amplitude
+    const auto worstDrop = [&](float fade) {
+        auto f = moving();
+        f.resonance.ripple = 1.0f;
+        f.resonance.rippleCount = 2.0f;
+        f.resonance.rippleFade = fade;
+        float prev = -1.0f;
+        float worst = 0.0f;
+        for (double t = 2.0; t <= 12.0; t += 1.0 / 60.0) {
+            const auto s = spatial::evaluateResonance(f, h, t);
+            REQUIRE(s.count - s.modeCount <= spatial::kMaxResonanceRipples);
+            float sum = 0.0f;
+            for (int r = s.modeCount; r < s.count; ++r) {
+                sum += s.modes[static_cast<std::size_t>(r)].drive.y;
+            }
+            if (prev >= 0.0f) {
+                worst = std::max(worst, prev - sum);
+            }
+            prev = sum;
+        }
+        return worst;
+    };
+    const float popping = worstDrop(0.0f);  // a displaced ring drops its whole amplitude in one frame
+    const float fading = worstDrop(0.35f);
+    CHECK(popping > 0.3f);
+    CHECK(fading < 0.15f * popping);
 }

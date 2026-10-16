@@ -40,6 +40,15 @@ float smoothstepf(float e0, float e1, float x) {
 }
 
 // A deterministic hash in [0, 1) of (seed, mode, salt).
+// ADR-1404: a per-band time (low, mid, high at u = 0, 0.5, 1), interpolated in log time between them.
+float bandTime(const std::array<float, 3>& t, float u) {
+    const float x = std::clamp(u, 0.0f, 1.0f) * 2.0f;
+    const int i = std::min(static_cast<int>(x), 1);
+    const float f = x - static_cast<float>(i);
+    const auto a = static_cast<std::size_t>(i);
+    return std::exp(std::log(std::max(t[a], 1e-4f)) * (1.0f - f) + std::log(std::max(t[a + 1], 1e-4f)) * f);
+}
+
 float hash01(std::uint32_t seed, int mode, std::uint32_t salt) {
     std::uint32_t h = seed * 747796405u + static_cast<std::uint32_t>(mode) * 2891336453u + salt * 277803737u + 1u;
     h ^= h >> 16;
@@ -189,10 +198,21 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
     }
     if (!(finite(ripple) && rippleSpeed > 0.0f && rippleSpeed <= 1000.0f && rippleLife > 0.0f && rippleLife <= 30.0f &&
           rippleWidth > 0.0f && rippleWidth <= 10.0f && rippleArea >= 0.0f && finite(rippleArea) && rippleCount >= 0.0f &&
-          rippleCount <= static_cast<float>(kMaxResonanceRipples))) {
+          rippleCount <= static_cast<float>(kMaxRipplesPerBand) && rippleFade >= 0.0f && rippleFade <= 10.0f)) {
         return fail("field '{}': resonance ripples need speed in (0, 1000] m/s, life in (0, 30] s, width in (0, 10], "
-                    "area >= 0 and count in [0, {}]",
-                    field, kMaxResonanceRipples);
+                    "area >= 0, count in [0, {}] a band and fade in [0, 10] s",
+                    field, kMaxRipplesPerBand);
+    }
+    if (!(layout == 0.0f || (layout >= modes && layout <= static_cast<float>(kMaxResonanceModes)))) {
+        return fail("field '{}': resonance.layout must be 0 or in [modes, {}]", field, kMaxResonanceModes);
+    }
+    for (const auto* band : {&attack, &release}) {
+        const bool off = (*band)[0] == 0.0f && (*band)[1] == 0.0f && (*band)[2] == 0.0f;
+        const bool on = (*band)[0] > 0.0f && (*band)[1] > 0.0f && (*band)[2] > 0.0f && (*band)[0] <= 30.0f &&
+                        (*band)[1] <= 30.0f && (*band)[2] <= 30.0f;
+        if (!(off || on)) {
+            return fail("field '{}': resonance attack and release are three times in (0, 30] s, or all 0", field);
+        }
     }
     for (const ResonanceSource& s : sources) {
         if (s.order < 0 || s.order > 8 || (s.kind == ResonanceSourceKind::Lattice && s.order < 1)) {
@@ -205,9 +225,11 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
               finite(s.depth) && finite(s.drive))) {
             return fail("field '{}': a resonance source's reach must be >= 0 and its gain finite", field);
         }
-        if (!(finite(s.amplitude) && std::abs(s.amplitude) <= 1000.0f && s.drift >= 0.0f && s.drift <= 1000.0f && s.driftPeriod >= 0.5f && s.driftPeriod <= 3600.0f && finite(s.spin) &&
+        if (!(finite(s.amplitude) && std::abs(s.amplitude) <= 1000.0f && s.breath >= 0.0f && s.breath <= 100.0f &&
+              s.drift >= 0.0f && s.drift <= 1000.0f && s.driftPeriod >= 0.5f && s.driftPeriod <= 3600.0f && finite(s.spin) &&
               std::abs(s.spin) <= 10.0f && s.driftAudio >= 0.0f && s.driftAudio <= 10.0f)) {
-            return fail("field '{}': a resonance source's |amplitude| must be <= 1000, drift in [0, 1000] m, driftPeriod "
+            return fail("field '{}': a resonance source's |amplitude| must be <= 1000, breath in [0, 100], drift in [0, "
+                        "1000] m, driftPeriod "
                         "in [0.5, 3600] s, |spin| <= 10 rad/s and driftAudio in [0, 10]",
                         field);
         }
@@ -228,7 +250,8 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     for (const float v : {modes, fLow, fHigh, lambdaMax, lambdaMin, scale, selectivity, contrast, persistence, buildup,
                           memory, competition, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
                           reliefLine, reliefLineSharpness, reliefVibration, derivativeStep, ripple, rippleSpeed, rippleLife,
-                          rippleWidth, rippleArea, rippleCount}) {
+                          rippleWidth, rippleArea, rippleCount, rippleFade, layout, attack[0], attack[1], attack[2],
+                          release[0], release[1], release[2]}) {
         h.f32(v);
     }
     h.u8(static_cast<std::uint8_t>(channel));
@@ -250,6 +273,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
         h.f32(s.depth);
         h.f32(s.drive);
         h.f32(s.amplitude);
+        h.f32(s.breath);
         h.f32(s.drift);
         h.f32(s.driftPeriod);
         h.f32(s.spin);
@@ -284,6 +308,16 @@ json ResonanceSpec::toJson() const {
         j["rippleWidth"] = rippleWidth;
         j["rippleArea"] = rippleArea;
         j["rippleCount"] = rippleCount;
+        j["rippleFade"] = rippleFade;
+    }
+    if (layout > 0.0f) { // ADR-1404: written only when set
+        j["layout"] = layout;
+    }
+    if (attack[0] > 0.0f) {
+        j["attack"] = {attack[0], attack[1], attack[2]};
+    }
+    if (release[0] > 0.0f) {
+        j["release"] = {release[0], release[1], release[2]};
     }
     json src = json::array();
     for (const ResonanceSource& s : sources) {
@@ -299,6 +333,9 @@ json ResonanceSpec::toJson() const {
                        {"drive", s.drive}});
         if (s.amplitude != 1.0f) { // ADR-1403
             src.back()["amplitude"] = s.amplitude;
+        }
+        if (s.breath != 1.0f) {
+            src.back()["breath"] = s.breath;
         }
         if (s.drift > 0.0f || s.spin != 0.0f) { // ADR-1403: written only when the source moves
             src.back()["drift"] = s.drift;
@@ -356,6 +393,18 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.rippleWidth, "rippleWidth", detail::readFloat);
     AVGEN_SPATIAL_READ(r.rippleArea, "rippleArea", detail::readFloat);
     AVGEN_SPATIAL_READ(r.rippleCount, "rippleCount", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.rippleFade, "rippleFade", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.layout, "layout", detail::readFloat);
+    for (const auto& [key, band] : {std::pair<const char*, std::array<float, 3>*>{"attack", &r.attack},
+                                    std::pair<const char*, std::array<float, 3>*>{"release", &r.release}}) {
+        if (j.contains(key)) {
+            const json& a = j.at(key);
+            if (!a.is_array() || a.size() != 3 || !a[0].is_number() || !a[1].is_number() || !a[2].is_number()) {
+                return fail("'resonance.{}' must be three numbers (low, mid, high)", key);
+            }
+            *band = {a[0].get<float>(), a[1].get<float>(), a[2].get<float>()};
+        }
+    }
     AVGEN_SPATIAL_READ_ENUM(r.channel, "channel", &resonanceChannelFromName, "resonance channel");
     AVGEN_SPATIAL_READ(r.listenLow, "listenLow", detail::readFloat);
     AVGEN_SPATIAL_READ(r.listenHigh, "listenHigh", detail::readFloat);
@@ -394,6 +443,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
                 AVGEN_SPATIAL_READ(s.depth, "depth", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.drive, "drive", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.amplitude, "amplitude", detail::readFloat);
+                AVGEN_SPATIAL_READ(s.breath, "breath", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.drift, "drift", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.driftPeriod, "driftPeriod", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.spin, "spin", detail::readFloat);
@@ -473,7 +523,9 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
     const float n = std::clamp(r.modes, 1.0f, static_cast<float>(kMaxResonanceModes));
     const int count = std::clamp(static_cast<int>(std::ceil(n - 1e-4f)), 1, kMaxResonanceModes);
     const float fade = n - std::floor(n + 1e-4f); // the last mode's share while `modes` is between integers
-    const float span = std::max(n - 1.0f, 1e-3f);
+    // ADR-1404: a fixed layout keeps every mode where it is while `modes` changes (no mode is ever re-placed in play)
+    const float placed = r.layout > 0.0f ? std::clamp(r.layout, n, static_cast<float>(kMaxResonanceModes)) : n;
+    const float span = std::max(placed - 1.0f, 1e-3f);
     const float scale = std::max(r.scale, 1e-3f);
     st.count = count;
     st.modeCount = count;
@@ -538,6 +590,14 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         tauA[static_cast<std::size_t>(i)] =
             std::min(std::max(r.buildup * tauD[static_cast<std::size_t>(i)] / releaseScale * attackScale, 0.015f),
                      0.98f * tauD[static_cast<std::size_t>(i)]);
+        // ADR-1404: per-band response times, when set, in place of the rule
+        if (r.release[0] > 0.0f) {
+            tauD[static_cast<std::size_t>(i)] = std::max(bandTime(r.release, u), 0.05f) * releaseScale;
+        }
+        if (r.attack[0] > 0.0f) {
+            tauA[static_cast<std::size_t>(i)] =
+                std::min(std::max(bandTime(r.attack, u) * attackScale, 0.015f), 0.98f * tauD[static_cast<std::size_t>(i)]);
+        }
         st.lambdaMin = std::min(st.lambdaMin, kTwoPi / md.shape.x); // the finest mode drawn (the vector channels' step)
         slowD[static_cast<std::size_t>(i)] = tauD[static_cast<std::size_t>(i)] + memory;
         slowA[static_cast<std::size_t>(i)] = std::min(std::max(0.5f * memory * attackScale, tauA[static_cast<std::size_t>(i)]),
@@ -610,6 +670,7 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
                 // Strikes: every heard onset in the window, into the modes its band reaches.
                 float strikes = 0.0f;
                 float slowStrikes = 0.0f;
+                const float strikeRise = r.attack[0] > 0.0f ? std::max(kStrikeRise, ta) : kStrikeRise;
                 for (int src = 0; src < 3; ++src) {
                     const float oct = std::log2(f / kStrikeCentre[src]) / kStrikeOctaves;
                     const float reachW = std::exp(-oct * oct);
@@ -627,7 +688,8 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
                         }
                         const float heard = response.hit(it->strength);
                         if (heard > 0.0f) {
-                            strikes += heard * reachW * std::exp(-age / td) * (1.0f - std::exp(-age / kStrikeRise));
+                            // a bounded two-time-constant impulse: rises over the band's attack (ADR-1404) or 30 ms
+                            strikes += heard * reachW * std::exp(-age / td) * (1.0f - std::exp(-age / strikeRise));
                             // the memory hears a strike as a short burst of drive
                             slowStrikes += heard * reachW * kStrikeBurst * (std::exp(-age / sd) - std::exp(-age / sa)) * sinv;
                         }
@@ -705,7 +767,7 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         const auto src = static_cast<std::size_t>(st.source[si]);
         const float amp = sources[src].amplitude; // ADR-1403: after the limiter
         const float e = a[si] * gain[src] * st.weight[si] * amp;
-        const float omega = kTwoPi * r.breath * std::pow(st.frequency[si] / r.fLow, 0.3f);
+        const float omega = kTwoPi * r.breath * sources[src].breath * std::pow(st.frequency[si] / r.fLow, 0.3f);
         const float psi = hash01(field.seed, i, 4u) * kTwoPi;
         // The phase in double: an evening's clock times Omega is far past float's exact range.
         const double phase = std::fmod(static_cast<double>(omega) * clock + static_cast<double>(psi), 6.283185307179586);
@@ -737,57 +799,61 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
             st.modes[si].shape.z = static_cast<float>(std::fmod(static_cast<double>(st.modes[si].shape.z) + turn, 6.283185307179586));
         }
     }
-    // ADR-1403, ripples: the newest heard onsets still alive, each a ring travelling out from where its time hashes to.
+    // ADR-1403, ripples: each band's newest heard onsets still alive, each a ring travelling out from where its time
+    // hashes to. ADR-1404: a band keeps at most rippleCount; a ring a newer one displaces fades out over rippleFade (from
+    // the moment it was displaced), and every ring tapers out over its last life -- nothing pops.
     if (audio && r.ripple != 0.0f) {
-        struct Launch {
-            double time;
-            float heard;
-            int band;
-        };
         constexpr float kSpeed[3] = {1.0f, 1.6f, 2.2f};
         constexpr float kLife[3] = {1.0f, 0.55f, 0.35f};
         constexpr float kGain[3] = {1.0f, 0.6f, 0.3f};
         constexpr float kU[3] = {0.1f, 0.45f, 0.85f};       // where on the dispersion each band's ring sits
         constexpr float kLocal[3] = {0.0f, 0.6f, 0.35f};    // reach as a share of the area (0 = unbounded)
-        std::vector<Launch> launches;
-        for (int band = 0; band < 3; ++band) {
+        const int cap = std::clamp(static_cast<int>(std::lround(r.rippleCount)), 0, kMaxRipplesPerBand);
+        const float fade = std::max(r.rippleFade, 0.0f);
+        for (int band = 0; band < 3 && cap > 0; ++band) {
             const float life = r.rippleLife * kLife[band];
             const auto& list = audio->onsets(static_cast<OnsetSource>(band));
             auto it = std::upper_bound(list.begin(), list.end(), clock, [](double c, const AudioOnset& o) { return c < o.time; });
+            // the band's heard onsets, newest first, still within four lives
+            std::vector<AudioOnset> alive;
             while (it != list.begin()) {
                 --it;
                 if (clock - it->time > 4.0 * static_cast<double>(life)) {
                     break;
                 }
-                const float heard = response.hit(it->strength);
-                if (heard > 0.0f) {
-                    launches.push_back({it->time, heard, band});
+                if (response.hit(it->strength) > 0.0f) {
+                    alive.push_back(*it);
                 }
             }
-        }
-        std::sort(launches.begin(), launches.end(), [](const Launch& x, const Launch& y) {
-            return x.time != y.time ? x.time > y.time : x.band < y.band;
-        });
-        const int cap = std::min(static_cast<int>(std::lround(r.rippleCount)), kMaxResonanceRipples);
-        const int nr = std::min(static_cast<int>(launches.size()), cap);
-        for (int j = 0; j < nr; ++j) {
-            const Launch& l = launches[static_cast<std::size_t>(j)];
-            const auto age = static_cast<float>(clock - l.time);
-            const float u = kU[l.band];
-            const float lambda = r.lambdaMax * std::pow(r.lambdaMin / r.lambdaMax, u) / scale;
-            const float k = kTwoPi / lambda;
-            const float e = r.ripple * l.heard * kGain[l.band] * std::exp(-age / (r.rippleLife * kLife[l.band])) *
-                            (1.0f - std::exp(-age / kStrikeRise));
-            // the launch point: a hash of the onset's time (milliseconds) and band, uniform over a disc
-            const int key = static_cast<int>((std::llround(l.time * 1000.0) * 7919LL + l.band * 104729LL) & 0x7fffffffLL);
-            const float h1 = hash01(field.seed, key, 9u);
-            const float h2 = hash01(field.seed, key, 10u);
-            const float rr = r.rippleArea * std::sqrt(h1);
-            ResonanceMode& md = st.modes[static_cast<std::size_t>(st.count)];
-            md.shape = glm::vec4(k, r.rippleWidth * lambda, r.rippleSpeed * kSpeed[l.band] * age, 2.0f);
-            md.place = glm::vec4(rr * std::cos(kTwoPi * h2), 0.0f, rr * std::sin(kTwoPi * h2), kLocal[l.band] * r.rippleArea);
-            md.drive = glm::vec4(e, e, u, 0.35f * e);
-            ++st.count;
+            for (std::size_t idx = 0; idx < alive.size() && st.count < kMaxResonanceRows; ++idx) {
+                const AudioOnset& o = alive[idx];
+                const auto age = static_cast<float>(clock - o.time);
+                float keep = 1.0f;
+                if (static_cast<int>(idx) >= cap) { // displaced when the cap-th newer onset arrived
+                    const auto since = static_cast<float>(clock - alive[idx - static_cast<std::size_t>(cap)].time);
+                    keep = fade > 0.0f ? 1.0f - smoothstepf(0.0f, fade, since) : 0.0f;
+                    if (keep <= 0.0f) {
+                        break; // older ones were displaced earlier still
+                    }
+                }
+                keep *= 1.0f - smoothstepf(3.0f * life, 4.0f * life, age);
+                const float u = kU[band];
+                const float lambda = r.lambdaMax * std::pow(r.lambdaMin / r.lambdaMax, u) / scale;
+                const float k = kTwoPi / lambda;
+                const float rise = r.attack[0] > 0.0f ? std::max(kStrikeRise, bandTime(r.attack, u)) : kStrikeRise;
+                const float e = r.ripple * response.hit(o.strength) * kGain[band] * std::exp(-age / life) *
+                                (1.0f - std::exp(-age / rise)) * keep;
+                // the launch point: a hash of the onset's time (milliseconds) and band, uniform over a disc
+                const int key = static_cast<int>((std::llround(o.time * 1000.0) * 7919LL + band * 104729LL) & 0x7fffffffLL);
+                const float h1 = hash01(field.seed, key, 9u);
+                const float h2 = hash01(field.seed, key, 10u);
+                const float rr = r.rippleArea * std::sqrt(h1);
+                ResonanceMode& md = st.modes[static_cast<std::size_t>(st.count)];
+                md.shape = glm::vec4(k, r.rippleWidth * lambda, r.rippleSpeed * kSpeed[band] * age, 2.0f);
+                md.place = glm::vec4(rr * std::cos(kTwoPi * h2), 0.0f, rr * std::sin(kTwoPi * h2), kLocal[band] * r.rippleArea);
+                md.drive = glm::vec4(e, e, u, 0.35f * e);
+                ++st.count;
+            }
         }
     }
     return st;

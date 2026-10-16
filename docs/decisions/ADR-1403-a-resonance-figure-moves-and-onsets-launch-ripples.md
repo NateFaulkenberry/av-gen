@@ -27,7 +27,7 @@ The patterns themselves move. Everything stays a pure function of the clock and 
    - A lattice turns as one at `spin` (its wavelengths keep nesting) while each of its modes slides its own way.
    - The CPU writes these into the mode table it already rewrites every frame (centre, orientation). They cost nothing on the GPU.
 2. **Ripples.**
-   - Each of the newest `rippleCount` (at most 8) heard onsets still alive is a row after the modes: a travelling ring packet, cos(k(ρ − R))·e^(−((ρ − R)/w)²)/√(1 + ρ/λ), about a launch point hashed from the onset's time within `rippleArea`.
+   - Each of the newest heard onsets still alive (since ADR-1404, `rippleCount` a band, at most 3, with displaced rings fading out) is a row after the modes: a travelling ring packet, cos(k(ρ − R))·e^(−((ρ − R)/w)²)/√(1 + ρ/λ), about a launch point hashed from the onset's time within `rippleArea`.
    - Its radius is R = speed × age.
    - The low band (kick) draws a broad, slow, long ring. The mid band (snare) is faster (×1.6), shorter-lived (×0.55), sharper and local (reach 0.6 × area). The high band (hat) is fine and faint.
    - A ripple adds to the vibration and the fast figure, and 0.35 of itself to the slow figure, so a passing ring disturbs the sand's seams too.
@@ -41,6 +41,6 @@ The patterns themselves move. Everything stays a pure function of the clock and 
 
 - Seek-exact and frame-rate independent: tested by playing through a cache against a fresh and a sought evaluation, with modes, ripples and places all equal.
 - A source with no drift, spin or amplitude, and a field with no ripples, is exactly ADR-1400. Those members are written to JSON only when set.
-- The GPU table is still 48 rows. A resonator's rows are its modes plus up to 8 ripples, so a 24-mode resonator with 8 ripples takes 32.
+- The GPU table is still 48 rows. A resonator's rows are its modes plus its ripples (up to 12 since ADR-1404).
 - Ripples are only as dense as the onset analysis (ADR-1116). Music with no onsets launches none.
 - The kinematics are deterministic in the clock, not in the music's cumulative history (there is none to integrate under seek). The music moves the figure through the amplitudes, `driftAudio` and routes on the new parameters, not through its own integrated phase.

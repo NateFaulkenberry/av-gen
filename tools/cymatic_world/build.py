@@ -592,19 +592,21 @@ def build_world():
     resonator(s, [
         # A. the swell: broad low-order lobes and sweeping ridges across the whole frame (bass)
         {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 3, "bandLow": 0.0, "bandHigh": 0.2,
-         "gain": 1.0, "amplitude": 0.62, "drift": 26.0, "driftPeriod": 95.0, "spin": 0.035, "driftAudio": 0.3},
+         "gain": 1.0, "amplitude": 0.62, "breath": 0.35, "drift": 26.0, "driftPeriod": 95.0, "spin": 0.035, "driftAudio": 0.3},
         # B. rings: concentric, partly concentric figures about a wandering centre (low mids) -- the radial identity
         {"kind": "point", "position": [0.0, 4.0, 0.0], "order": 2, "bandLow": 0.14, "bandHigh": 0.5, "reach": 70.0,
-         "gain": 0.9, "amplitude": 0.7, "drift": 13.0, "driftPeriod": 62.0, "spin": 0.05, "driftAudio": 0.4},
+         "gain": 0.9, "amplitude": 0.7, "breath": 1.0, "drift": 13.0, "driftPeriod": 62.0, "spin": 0.05, "driftAudio": 0.4},
         # C. petals: angular, asymmetric multi-lobed figures off to the west (mids), turning against each other
         {"kind": "point", "position": list(SECOND), "order": 5, "bandLow": 0.38, "bandHigh": 0.76, "reach": 60.0,
-         "gain": 0.8, "amplitude": 0.55, "drift": 16.0, "driftPeriod": 44.0, "spin": 0.09, "driftAudio": 0.4},
+         "gain": 0.8, "amplitude": 0.55, "breath": 1.5, "drift": 16.0, "driftPeriod": 44.0, "spin": 0.09, "driftAudio": 0.4},
         # D. the carpet: fine Faraday ripples (highs), local, sliding faster -- detail riding on the large figure
         {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.7, "bandHigh": 1.0,
-         "reach": 46.0, "gain": 0.55, "amplitude": 0.22, "depth": 9.0, "drift": 9.0, "driftPeriod": 26.0, "spin": 0.03},
-    ], modes=16.0, lambdaMax=42.0, lambdaMin=4.5, competition=0.8, limit=2.0, breath=0.12,
+         "reach": 46.0, "gain": 0.55, "amplitude": 0.22, "breath": 1.5, "depth": 9.0, "drift": 2.5, "driftPeriod": 40.0, "spin": 0.03},
+    ], modes=16.0, lambdaMax=42.0, lambdaMin=3.0, competition=0.8, limit=2.0, breath=0.12,
        # E. transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
-       ripple=1.2, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=6.0)
+       ripple=1.2, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35,
+       # ADR-1404: fixed mode places (a route on `modes` adds modes, it never re-places them), and per-band response
+       layout=21.0, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
     ground_readers(s)
     g = ground(s, relief=2.6, write_mesh=True)
     # LOOKING INTO THE GROUND: high and steep (about 47 degrees down) on a 30 mm lens, so the frame's top edge meets

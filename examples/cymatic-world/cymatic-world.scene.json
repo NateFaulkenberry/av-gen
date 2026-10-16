@@ -79,7 +79,7 @@
      "fLow": 40.0,
      "fHigh": 6000.0,
      "lambdaMax": 42.0,
-     "lambdaMin": 4.5,
+     "lambdaMin": 3.0,
      "scale": 1.0,
      "selectivity": 3.0,
      "contrast": 0.7,
@@ -105,6 +105,7 @@
        "bandHigh": 0.2,
        "gain": 1.0,
        "amplitude": 0.62,
+       "breath": 0.35,
        "drift": 26.0,
        "driftPeriod": 95.0,
        "spin": 0.035,
@@ -123,6 +124,7 @@
        "reach": 70.0,
        "gain": 0.9,
        "amplitude": 0.7,
+       "breath": 1.0,
        "drift": 13.0,
        "driftPeriod": 62.0,
        "spin": 0.05,
@@ -141,6 +143,7 @@
        "reach": 60.0,
        "gain": 0.8,
        "amplitude": 0.55,
+       "breath": 1.5,
        "drift": 16.0,
        "driftPeriod": 44.0,
        "spin": 0.09,
@@ -159,9 +162,10 @@
        "reach": 46.0,
        "gain": 0.55,
        "amplitude": 0.22,
+       "breath": 1.5,
        "depth": 9.0,
-       "drift": 9.0,
-       "driftPeriod": 26.0,
+       "drift": 2.5,
+       "driftPeriod": 40.0,
        "spin": 0.03
       }
      ],
@@ -171,7 +175,19 @@
      "rippleLife": 1.6,
      "rippleWidth": 0.9,
      "rippleArea": 30.0,
-     "rippleCount": 6.0
+     "rippleCount": 2.0,
+     "rippleFade": 0.35,
+     "layout": 21.0,
+     "attack": [
+      0.18,
+      0.08,
+      0.04
+     ],
+     "release": [
+      3.0,
+      1.4,
+      0.6
+     ]
     }
    }
   },
