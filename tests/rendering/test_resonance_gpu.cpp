@@ -339,6 +339,7 @@ TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (AD
     shaped.resonance.reliefFigure = 1.1f;
     shaped.resonance.reliefAmplitude = -0.7f;
     shaped.resonance.reliefRound = 0.3f;
+    shaped.resonance.sandNormalized = true; // the relief's ridge without its energy (ADR-1405)
     shaped.resonance.reliefVibration = 0.3f;
     fields.fields.push_back(shaped);
     auto normal = reader("normsand", spatial::ResonanceChannel::Sand); // ADR-1405: the mask without its energy

@@ -546,6 +546,15 @@ fn resonanceSand(s: vec3<f32>, sharpness: f32) -> f32 {
     let k = max(sharpness, 1e-3);
     return sqrt(s.z) * exp(-s.y / (k * k * s.z));
 }
+
+// ADR-1405: the nodal ridge without its energy factor (a reader's normalised sand)
+fn resonanceSandNormalized(s: vec3<f32>, sharpness: f32) -> f32 {
+    if (!(s.z > 1e-12)) {
+        return 0.0;
+    }
+    let k = max(sharpness, 1e-3);
+    return exp(-s.y / (k * k * s.z));
+}
 const RES_PI: f32 = 3.14159265358979;
 // ADR-1406: a row whose every drive is below this contributes nothing visible and is skipped (spatial/resonance.cpp
 // kResonanceSilent, the same rule)
@@ -672,7 +681,11 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     if (channel == RES_CHANNEL_RELIEF) {
         let lanes = fieldBlock.fields[fi].gridRes;
         let more = fieldBlock.fields[fi].wave0; // ADR-1405: (sand, signed figure, |figure|) weights
-        return more.x * resonanceSand(s.xyz, fieldBlock.fields[fi].gridBounds1.w) + lanes.z * resonanceSand(s.xyz, lanes.y) +
+        let normalized = (u32(fieldBlock.fields[fi].gridBounds0.w + 0.5) & 2u) == 2u;
+        let ridge = select(resonanceSand(s.xyz, fieldBlock.fields[fi].gridBounds1.w),
+                           resonanceSandNormalized(s.xyz, fieldBlock.fields[fi].gridBounds1.w), normalized);
+        let crest = select(resonanceSand(s.xyz, lanes.y), resonanceSandNormalized(s.xyz, lanes.y), normalized);
+        return more.x * ridge + lanes.z * crest +
                lanes.w * s.x + more.y * s.w + more.z * resonanceRoundAbs(s.w, more.w * sqrt(max(s.z, 0.0)));
     }
     if (channel == RES_CHANNEL_DISPLACEMENT) {

@@ -76,7 +76,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "ambientOcclusion", "contactShadows", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowRange", "ambientOcclusion", "contactShadows", "depthPrepass", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -9278,6 +9278,7 @@ void Composition::applyParameters() {
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
         env.contactShadows = volumeSetting_.contactShadows;
+        env.depthPrepass = volumeSetting_.depthPrepass;
         env.volumeMaxDistance = pick(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
         // ADR-573 (§27): picked, not copied. It used not to be assigned here at all.
         env.volumeLocalLights = pick(volumeLocalLights_, volumeSetting_.volumeLocalLights);
@@ -10308,6 +10309,9 @@ nlohmann::json Composition::toJson() const {
         }
         if (!volumeSetting_.contactShadows) {
             environment["contactShadows"] = false;
+        }
+        if (volumeSetting_.depthPrepass) {
+            environment["depthPrepass"] = true;
         }
     }
     {
@@ -11572,7 +11576,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 *fk.target = *value;
             }
             for (const auto& [key, target] : {std::pair<const char*, bool*>{"ambientOcclusion", &v.ambientOcclusion},
-                                              std::pair<const char*, bool*>{"contactShadows", &v.contactShadows}}) {
+                                              std::pair<const char*, bool*>{"contactShadows", &v.contactShadows},
+                                              std::pair<const char*, bool*>{"depthPrepass", &v.depthPrepass}}) {
                 auto value = readBool(e, key, *target); // ADR-1406
                 if (!value) {
                     return std::unexpected(value.error());

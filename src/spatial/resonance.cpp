@@ -1103,12 +1103,13 @@ float roundAbs(float x, float c) {
     return c > 0.0f ? std::sqrt(x * x + c * c) - c : std::abs(x);
 }
 
-float sandOf(const ResonanceSums& s, float sharpness) {
+float sandOf(const ResonanceSums& s, float sharpness, bool normalized = false) {
     if (!(s.meanEnergy > 1e-12f)) {
         return 0.0f;
     }
     const float k = std::max(sharpness, 1e-3f);
-    return std::sqrt(s.meanEnergy) * std::exp(-s.energy / (k * k * s.meanEnergy));
+    const float line = std::exp(-s.energy / (k * k * s.meanEnergy));
+    return normalized ? line : std::sqrt(s.meanEnergy) * line; // ADR-1405: normalised, the ridge whatever the loudness
 }
 
 float scalarChannel(const ResonanceSums& s, const ResonanceSpec& r) {
@@ -1116,7 +1117,8 @@ float scalarChannel(const ResonanceSums& s, const ResonanceSpec& r) {
     const float sharpness = r.sharpness;
     switch (channel) {
     case ResonanceChannel::Relief:
-        return r.reliefSand * sandOf(s, sharpness) + r.reliefLine * sandOf(s, r.reliefLineSharpness) +
+        return r.reliefSand * sandOf(s, sharpness, r.sandNormalized) +
+               r.reliefLine * sandOf(s, r.reliefLineSharpness, r.sandNormalized) +
                r.reliefVibration * s.displacement + r.reliefFigure * s.figure +
                r.reliefAmplitude * roundAbs(s.figure, r.reliefRound * std::sqrt(std::max(s.meanEnergy, 0.0f)));
     case ResonanceChannel::Displacement:

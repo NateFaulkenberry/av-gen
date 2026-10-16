@@ -712,6 +712,9 @@ struct Environment {
     // ground re-runs every deformer per vertex. Both default on; the quality tier still decides when they are on.
     bool ambientOcclusion = true;
     bool contactShadows = true;
+    // ADR-1406: ask for the depth prepass whatever else wants it -- a deep, self-occluding surface with a costly material
+    // gains more from early depth rejection (hidden fragments never shaded) than the extra geometry pass costs
+    bool depthPrepass = false;
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;

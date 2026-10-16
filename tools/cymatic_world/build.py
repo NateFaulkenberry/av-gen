@@ -145,17 +145,17 @@ def world_heights(points):
 FINE_STEP = float(os.environ.get("CW_MESH_STEP", "0.36"))   # 08-brief Stage 7: the visible ground's cell size (m)
 
 
-def grid_axis(half=66.0, step=None, extent=2600.0, growth=1.12):
-    """One axis of the ground's tensor grid: `step` apart within +-half (where the camera sees the ground: the frame's
-    top edge meets it inside ~61 m of the origin all round the arc), then each step `growth` times the last out to
-    +-extent (the world beyond, never in frame, closes it)."""
+def grid_axis(core=36.0, half=88.0, step=None, extent=2600.0, mid=1.025, growth=1.12):
+    """One axis of the ground's tensor grid: `step` apart within +-core (the figure's middle, the nearest ground the
+    camera sees), then each step `mid` times the last out to +-half (the far ground, at the top of the frame, needs
+    fewer vertices for the same pixels), then `growth` times out to +-extent (never in frame: it closes the world)."""
     step = step if step is not None else FINE_STEP
-    n = int(round(half / step))
-    inner = [i * half / n for i in range(-n, n + 1)]
+    n = int(round(core / step))
+    inner = [i * core / n for i in range(-n, n + 1)]
     outer = []
-    x, d = half, half / n
+    x, d = core, core / n
     while x < extent:
-        d *= growth
+        d *= mid if x < half else growth
         x = min(x + d, extent)
         outer.append(x)
     return np.array([-v for v in reversed(outer)] + inner + outer)
@@ -357,8 +357,11 @@ LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 DEBUG = os.environ.get("CW_DEBUG", "")
 # ADR-1407: the relief is baked into a grid once a frame (CW_BAKE=0: every vertex evaluates the readers, for comparison)
 BAKE = os.environ.get("CW_BAKE", "1") != "0"
-BAKE_RES = int(os.environ.get("CW_BAKE_RES", "768"))
-BAKE_HALF = 64.0   # metres: the frame's top edge meets the ground inside ~61 m
+BAKE_RES = int(os.environ.get("CW_BAKE_RES", "896"))
+BAKE_HALF = 86.0   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
+# the camera (the correction round, owner: "pull back"): A the shape-language framing, B pulled back (chosen), C further
+CAMERAS = {"A": (30.0, 32.0, 30.0), "B": (36.0, 42.0, 28.0), "C": (40.0, 48.0, 26.0)}
+CAMERA = CAMERAS[os.environ.get("CW_CAM", "B")]
 PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
 SHAPES = {
     "P1": {"large": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.35}, 3.2),
@@ -366,9 +369,13 @@ SHAPES = {
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
     # Stage 7: a crest must span a few vertices (0.3 m) or the mesh draws it as a sawtooth: the medium crease (4-7 m
     # waves) at sharpness 0.5 was ~0.3 m wide; 1.0 makes it ~0.7 m. The crisp line itself is the material's (shading)
-    "P2": {"large": ({"reliefSand": 1.0, "sharpness": 0.6, "reliefAmplitude": -0.55, "reliefRound": 0.45,
-                     "reliefVibration": 0.2}, 3.4),
-           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": 0.5}, 0.8),
+    # the correction round (owner: "flatter, weaker shapes"): the large figure's ridges keep their height whatever the
+    # loudness (normalised sand, ADR-1405) so the quiet state has a deliberate form; the antinodes sink into deep
+    # basins with the excitation (-1.2 |F|, crease rounded half as much -- the square grid carries it); the medium net
+    # at about half its height so the large lobes, rings and petals lead
+    "P2": {"large": ({"reliefSand": 1.0, "sandNormalized": True, "sharpness": 0.75, "reliefAmplitude": -1.2,
+                     "reliefRound": 0.4, "reliefVibration": 0.25}, 2.8),
+           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": 0.5}, 0.45),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
     "P3": {"large": ({"reliefSand": 0.55, "sharpness": 0.7, "reliefFigure": 0.8, "reliefVibration": 0.25}, 3.2),
            "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.3}, 1.2),
@@ -384,9 +391,10 @@ def ground_readers(s):
         # the large and medium scales only (u < 0.7): colour follows the nodal network the geometry draws, not the
         # fine carpet or the rings passing through it
         win = {"listenLow": 0.0, "listenHigh": 0.7, "listenWidth": 0.04}
+        large = {"listenLow": 0.0, "listenHigh": 0.3, "listenWidth": 0.04}   # the correction: the large figure leads
         # the sand masks normalised (ADR-1405): the network is marked in a quiet passage too; loudness is |F|'s
-        for name, channel, extra in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **win}),
-                                     ("shade-crest", "sand", {"sharpness": 0.25, "sandNormalized": True, **win}),
+        for name, channel, extra in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **large}),
+                                     ("shade-crest", "sand", {"sharpness": 0.25, "sandNormalized": True, **large}),
                                      ("shade-amp", "amplitude", dict(win))):
             reader(s, name, channel, extra)
             bake_grid(s, name)
@@ -453,7 +461,7 @@ PALETTES = {
     "B": {"stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
           "sheenI": 1.1,
-          "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.5},
+          "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.4},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
           "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
@@ -527,12 +535,12 @@ def ground_program():
     g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
     g.op(None, "multiply", 2, a=2, b=7)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
-    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.35, 1.1])          # only where it rings hard
+    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.3, 1.0] if BAKE else [0.8, 2.4])          # only where it rings hard
     g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
     # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
     g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
-    g.op("wallBand", "smoothstep", 4, a=4, k=[0.08, 0.3] if BAKE else [0.035, 0.08])
+    g.op("wallBand", "smoothstep", 4, a=4, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
     tint("hollow", 3, 3, "hollow", P_["hollowI"])
     g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
@@ -574,6 +582,9 @@ def environment(s):
         # ADR-1406: the ground is unlit and painted -- screen-space AO and contact shadows add nothing to it and cost the
         # depth prepass (every deformer re-run per vertex for a second pass)
         "ambientOcclusion": False, "contactShadows": False,
+        # ... but the depth prepass, asked for (ADR-1406): the deep cells hide one another from the pulled-back camera,
+        # and early depth rejection saves more material shading than the (baked, cheap) extra geometry pass costs
+        "depthPrepass": True,
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -716,10 +727,11 @@ def build_world():
     # LOOKING INTO THE GROUND: high and steep (about 47 degrees down) on a 30 mm lens, so the frame's top edge meets
     # the ground inside r ~60 m all round the arc and the basin's walls (they rise from r ~90 m) never enter it -- the
     # frame is all ground (checked by ray-casting the top edge and corners along the whole loop)
-    s.camera = {"mode": 1, "position": [0.0, 32.0, 30.0], "target": [-2.0, -3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
-    s.arc_camera([-2.0, -3.0, 0.0], 30.0, 32.0, period=160.0, centre_deg=8.0, sweep_deg=80.0, steps=24, side=0.0,
+    cam_r, cam_h, cam_f = CAMERA
+    s.camera = {"mode": 1, "position": [0.0, cam_h, cam_r], "target": [-2.0, -3.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
+    s.arc_camera([-2.0, -3.0, 0.0], cam_r, cam_h, period=160.0, centre_deg=8.0, sweep_deg=80.0, steps=24, side=0.0,
                  lift=0.0, height_bob=2.0)
-    s.params_({"camera/lens/focalLength": 30.0})
+    s.params_({"camera/lens/focalLength": cam_f})
     F = field_instrument(s)
     # THE MUSIC'S HAND ON THE FIGURE (08-brief §8, Stage 5): the music chooses WHICH figure leads and how hard each scale
     # is excited -- never the finished height directly.

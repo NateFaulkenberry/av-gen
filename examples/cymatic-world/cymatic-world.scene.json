@@ -5,9 +5,9 @@
  "camera": {
   "mode": 1,
   "position": [
-   2.1752,
-   32.0,
-   29.708
+   3.0102,
+   42.0,
+   35.6497
   ],
   "target": [
    -2.0,
@@ -36,6 +36,7 @@
   "shadowRange": 180.0,
   "ambientOcclusion": false,
   "contactShadows": false,
+  "depthPrepass": true,
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -255,7 +256,7 @@
      "sharpness": 0.9,
      "sandNormalized": true,
      "listenLow": 0.0,
-     "listenHigh": 0.7,
+     "listenHigh": 0.3,
      "listenWidth": 0.04
     }
    }
@@ -297,7 +298,7 @@
      "sharpness": 0.25,
      "sandNormalized": true,
      "listenLow": 0.0,
-     "listenHigh": 0.7,
+     "listenHigh": 0.3,
      "listenWidth": 0.04
     }
    }
@@ -370,22 +371,23 @@
    "field": {
     "kind": "resonance",
     "reference": "cymatic",
-    "strength": 3.4,
+    "strength": 2.8,
     "falloff": {
      "kind": "none"
     },
     "resonance": {
      "channel": "relief",
-     "sharpness": 0.6,
+     "sharpness": 0.75,
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
-     "reliefVibration": 0.2,
+     "reliefVibration": 0.25,
      "listenLow": 0.0,
      "listenHigh": 0.3,
      "listenWidth": 0.04,
      "reliefSand": 1.0,
-     "reliefAmplitude": -0.55,
-     "reliefRound": 0.45
+     "sandNormalized": true,
+     "reliefAmplitude": -1.2,
+     "reliefRound": 0.4
     }
    }
   },
@@ -400,7 +402,7 @@
    "field": {
     "kind": "resonance",
     "reference": "cymatic",
-    "strength": 0.8,
+    "strength": 0.45,
     "falloff": {
      "kind": "none"
     },
@@ -528,7 +530,7 @@
       "alongNormal": false
      }
     ],
-    "normalStep": 0.16666666666666666
+    "normalStep": 0.19196428571428573
    }
   }
  ],
@@ -642,8 +644,8 @@
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.35,
-      1.1,
+      0.3,
+      1.0,
       0.0,
       0.0
      ]
@@ -670,8 +672,8 @@
      "dst": 4,
      "srcA": 4,
      "constant": [
-      0.08,
-      0.3,
+      0.02,
+      0.14,
       0.0,
       0.0
      ]
@@ -693,15 +695,15 @@
       0.0
      ],
      "constant2": [
-      0.25,
-      0.012425,
-      0.16112,
+      0.2,
+      0.00994,
+      0.128895,
       0.5
      ],
      "constant3": [
-      0.5,
-      0.02485,
-      0.32224,
+      0.4,
+      0.01988,
+      0.25779,
       1.0
      ]
     },
@@ -925,19 +927,19 @@
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    768,
+    896,
     1,
-    768
+    896
    ],
    "boundsMin": [
-    -64.0,
+    -86.0,
     -4.0,
-    -64.0
+    -86.0
    ],
    "boundsMax": [
-    64.0,
+    86.0,
     -2.0,
-    64.0
+    86.0
    ],
    "injectField": "shade-sand"
   },
@@ -947,19 +949,19 @@
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    768,
+    896,
     1,
-    768
+    896
    ],
    "boundsMin": [
-    -64.0,
+    -86.0,
     -4.0,
-    -64.0
+    -86.0
    ],
    "boundsMax": [
-    64.0,
+    86.0,
     -2.0,
-    64.0
+    86.0
    ],
    "injectField": "shade-crest"
   },
@@ -969,19 +971,19 @@
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    768,
+    896,
     1,
-    768
+    896
    ],
    "boundsMin": [
-    -64.0,
+    -86.0,
     -4.0,
-    -64.0
+    -86.0
    ],
    "boundsMax": [
-    64.0,
+    86.0,
     -2.0,
-    64.0
+    86.0
    ],
    "injectField": "shade-amp"
   },
@@ -991,19 +993,19 @@
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    768,
+    896,
     1,
-    768
+    896
    ],
    "boundsMin": [
-    -64.0,
+    -86.0,
     -4.0,
-    -64.0
+    -86.0
    ],
    "boundsMax": [
-    64.0,
+    86.0,
     -2.0,
-    64.0
+    86.0
    ],
    "injectField": "relief"
   }

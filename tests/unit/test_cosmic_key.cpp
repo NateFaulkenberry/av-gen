@@ -339,4 +339,12 @@ TEST_CASE("A scene may turn off ambient occlusion and contact shadows, and keeps
     auto again = build(writeScene("adr1406-again", saved));
     CHECK_FALSE(again->comp->scene().environment.ambientOcclusion);
     CHECK_FALSE(again->comp->scene().environment.contactShadows);
+    CHECK_FALSE(again->comp->scene().environment.depthPrepass);
+    // ... and may ask for the depth prepass (a deep, self-occluding surface): kept by a save only when asked for
+    json deep = oneKeyScene();
+    deep["environment"] = json{{"depthPrepass", true}};
+    auto withPrepass = build(writeScene("adr1406-prepass", deep));
+    CHECK(withPrepass->comp->scene().environment.depthPrepass);
+    const json savedDeep = withPrepass->comp->toJson();
+    CHECK(savedDeep.at("environment").at("depthPrepass").get<bool>());
 }

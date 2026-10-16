@@ -3956,6 +3956,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
     });
     const bool needsDepthPrepass = ao_->active() || (qualitySettings_.contactShadows && scene.environment.contactShadows) ||
+                                   scene.environment.depthPrepass || // ADR-1406
                                    shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth ||
                                    std::any_of(environments_.begin(), environments_.end(), // ADR-1200: the seam
                                                [&](const EnvironmentRenderer* e) { return e->wants(scene); });
