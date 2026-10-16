@@ -106,6 +106,7 @@ struct Simulation::Impl {
     wgpu::BindGroupLayout layout;
     wgpu::PipelineLayout pipelineLayout;
     wgpu::ComputePipeline injectPipeline;
+    wgpu::ComputePipeline bakePipeline; // ADR-1407
     wgpu::ComputePipeline advectPipeline;
     wgpu::ComputePipeline diffusePipeline;
     wgpu::ComputePipeline dissipatePipeline;
@@ -248,8 +249,9 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         }
         return pipeline;
     };
-    const std::array<std::pair<const char*, wgpu::ComputePipeline*>, 10> all{{
+    const std::array<std::pair<const char*, wgpu::ComputePipeline*>, 11> all{{
         {"cs_inject", &injectPipeline},
+        {"cs_bake", &bakePipeline},
         {"cs_advect", &advectPipeline},
         {"cs_diffuse", &diffusePipeline},
         {"cs_dissipate", &dissipatePipeline},
@@ -260,7 +262,7 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         {"cs_agents_resolve", &agentsResolvePipeline},
         {"cs_excite", &excitePipeline},
     }};
-    std::array<wgpu::ComputePipeline, 10> built{};
+    std::array<wgpu::ComputePipeline, all.size()> built{};
     for (std::size_t i = 0; i < all.size(); ++i) {
         auto p = make(all[i].first);
         if (!p) {
@@ -473,9 +475,13 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         }
         state.intervalSteps = std::max<std::uint64_t>(state.intervalSteps,
             static_cast<std::uint64_t>(std::llround(static_cast<double>(grid.checkpointInterval) * grid.simRate)));
+        if (grid.bake()) { // ADR-1407: stateless -- one bake a frame at the frame's clock; nothing to replay or keep
+            state.intervalSteps = 0;
+            state.checkpoints.clear();
+        }
         const auto target = static_cast<std::uint64_t>(
             std::max(0.0, std::floor(time.renderTime * static_cast<double>(grid.simRate))));
-        if (catchUp) {
+        if (catchUp && !grid.bake()) {
             // The newest usable checkpoint at or before the target, if it is better than what the grid
             // already holds (ahead of it, or the grid is past the target).
             const Impl::Checkpoint* best = nullptr;
@@ -498,16 +504,16 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
                 im.uploadInitialState(grids, i); // a seek backwards with nothing to restore: replay from 0
             }
         }
-        std::uint64_t backlog = target > state.stepsTaken ? target - state.stepsTaken : 0;
+        std::uint64_t backlog = grid.bake() ? 1u : (target > state.stepsTaken ? target - state.stepsTaken : 0);
         const std::uint64_t budget = catchUp ? kMaxCatchUpSteps : static_cast<std::uint64_t>(grid.maxSubSteps);
-        if (catchUp && backlog > budget) {
+        if (catchUp && backlog > budget && !grid.bake()) {
             // Beyond the ceiling the frame cannot be the played one, and says so.
             log::warn("grid '{}' is {} sub-steps behind, beyond the {}-step catch-up ceiling; skipping ahead",
                       grid.name, backlog, kMaxCatchUpSteps);
             state.stepsTaken = target - budget;
             backlog = budget;
         }
-        if (catchUp && backlog > 0) {
+        if (catchUp && backlog > 0 && !grid.bake()) {
             stats_.catchUpSteps += backlog;
         }
         const auto steps = static_cast<std::uint32_t>(std::min<std::uint64_t>(backlog, budget));
@@ -610,7 +616,9 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         im.blockStaging.resize(static_cast<std::size_t>(first + count) * kStepBlockStride);
         for (std::uint32_t k = 0; k < count; ++k) {
             const std::uint64_t step = state.stepsTaken + k + 1;
-            FieldBlock block = FieldUniforms::pack(scene.fields, static_cast<double>(step) / grid.simRate);
+            // ADR-1407: a bake reads the field at the frame's own clock, not at a quantised sub-step's
+            FieldBlock block = FieldUniforms::pack(scene.fields, grid.bake() ? time.renderTime
+                                                                               : static_cast<double>(step) / grid.simRate);
             block.pad[0] = static_cast<std::uint32_t>(step); // the step index the agents hash with
             std::memcpy(im.blockStaging.data() + (first + k) * kStepBlockStride, &block, sizeof(block));
         }
@@ -654,7 +662,9 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
         };
         for (std::uint32_t k = 0; k < count; ++k) {
             offsets[1] = static_cast<std::uint32_t>((firstBlock + k) * kStepBlockStride);
-            if (grid.excitable()) {
+            if (grid.bake()) {
+                dispatch(im.bakePipeline); // ADR-1407
+            } else if (grid.excitable()) {
                 // ADR-1201: one gather kernel is the whole step, one workgroup per 8 x 8 tile of the plane.
                 cp.SetPipeline(im.excitePipeline);
                 cp.SetBindGroup(0, state.currentIsA ? im.groupToB : im.groupToA, offsets.size(), offsets.data());

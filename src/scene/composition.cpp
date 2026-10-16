@@ -76,7 +76,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowRange", "ambientOcclusion", "contactShadows", "depthPrepass", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -9276,6 +9276,9 @@ void Composition::applyParameters() {
         env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
+        env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
+        env.contactShadows = volumeSetting_.contactShadows;
+        env.depthPrepass = volumeSetting_.depthPrepass;
         env.volumeMaxDistance = pick(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
         // ADR-573 (§27): picked, not copied. It used not to be assigned here at all.
         env.volumeLocalLights = pick(volumeLocalLights_, volumeSetting_.volumeLocalLights);
@@ -10299,6 +10302,16 @@ nlohmann::json Composition::toJson() const {
         const float range = shadowRange_ != nullptr ? shadowRange_->base() : volumeSetting_.shadowRange;
         if (range > 0.0f) {
             environment["shadowRange"] = range;
+        }
+        // ADR-1406: written only when the scene turned them off
+        if (!volumeSetting_.ambientOcclusion) {
+            environment["ambientOcclusion"] = false;
+        }
+        if (!volumeSetting_.contactShadows) {
+            environment["contactShadows"] = false;
+        }
+        if (volumeSetting_.depthPrepass) {
+            environment["depthPrepass"] = true;
         }
     }
     {
@@ -11561,6 +11574,15 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return std::unexpected(value.error());
                 }
                 *fk.target = *value;
+            }
+            for (const auto& [key, target] : {std::pair<const char*, bool*>{"ambientOcclusion", &v.ambientOcclusion},
+                                              std::pair<const char*, bool*>{"contactShadows", &v.contactShadows},
+                                              std::pair<const char*, bool*>{"depthPrepass", &v.depthPrepass}}) {
+                auto value = readBool(e, key, *target); // ADR-1406
+                if (!value) {
+                    return std::unexpected(value.error());
+                }
+                *target = *value;
             }
             if (e.contains("bands")) { // ADR-1151
                 auto bands = scene::readReflectionBands(e.at("bands"));

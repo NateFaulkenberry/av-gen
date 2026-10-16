@@ -315,3 +315,36 @@ TEST_CASE("The celestial key does not ride the island", "[scene][lights][cosmick
     const glm::vec3 rode4 = ridden->light("lantern")->direction;
     CHECK(glm::length(rode4 - rode0) > 0.5f);
 }
+
+// ADR-1406: an unlit, painted world can turn screen-space AO and contact shadows off (each costs the depth prepass:
+// the whole opaque geometry twice). Default on; kept by a save only when off.
+TEST_CASE("A scene may turn off ambient occlusion and contact shadows, and keeps them off across a save",
+          "[scene][environment][adr1406]") {
+    json plain = oneKeyScene();
+    auto def = build(writeScene("adr1406-default", plain));
+    CHECK(def->comp->scene().environment.ambientOcclusion);
+    CHECK(def->comp->scene().environment.contactShadows);
+    const json savedDefault = def->comp->toJson();
+    CHECK_FALSE((savedDefault.contains("environment") && savedDefault.at("environment").contains("ambientOcclusion")));
+
+    json body = oneKeyScene();
+    body["environment"] = json{{"ambientOcclusion", false}, {"contactShadows", false}};
+    auto off = build(writeScene("adr1406-off", body));
+    CHECK_FALSE(off->comp->scene().environment.ambientOcclusion);
+    CHECK_FALSE(off->comp->scene().environment.contactShadows);
+    const json saved = off->comp->toJson();
+    REQUIRE(saved.at("environment").contains("ambientOcclusion"));
+    CHECK(saved.at("environment").at("ambientOcclusion").get<bool>() == false);
+    CHECK(saved.at("environment").at("contactShadows").get<bool>() == false);
+    auto again = build(writeScene("adr1406-again", saved));
+    CHECK_FALSE(again->comp->scene().environment.ambientOcclusion);
+    CHECK_FALSE(again->comp->scene().environment.contactShadows);
+    CHECK_FALSE(again->comp->scene().environment.depthPrepass);
+    // ... and may ask for the depth prepass (a deep, self-occluding surface): kept by a save only when asked for
+    json deep = oneKeyScene();
+    deep["environment"] = json{{"depthPrepass", true}};
+    auto withPrepass = build(writeScene("adr1406-prepass", deep));
+    CHECK(withPrepass->comp->scene().environment.depthPrepass);
+    const json savedDeep = withPrepass->comp->toJson();
+    CHECK(savedDeep.at("environment").at("depthPrepass").get<bool>());
+}

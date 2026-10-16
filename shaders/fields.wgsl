@@ -546,7 +546,19 @@ fn resonanceSand(s: vec3<f32>, sharpness: f32) -> f32 {
     let k = max(sharpness, 1e-3);
     return sqrt(s.z) * exp(-s.y / (k * k * s.z));
 }
+
+// ADR-1405: the nodal ridge without its energy factor (a reader's normalised sand)
+fn resonanceSandNormalized(s: vec3<f32>, sharpness: f32) -> f32 {
+    if (!(s.z > 1e-12)) {
+        return 0.0;
+    }
+    let k = max(sharpness, 1e-3);
+    return exp(-s.y / (k * k * s.z));
+}
 const RES_PI: f32 = 3.14159265358979;
+// ADR-1406: a row whose every drive is below this contributes nothing visible and is skipped (spatial/resonance.cpp
+// kResonanceSilent, the same rule)
+const RES_SILENT: f32 = 1e-5;
 
 // phi of mode `row` at q (x) and its local mean square (y).
 fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
@@ -555,12 +567,25 @@ fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
     let k = shape.x;
     let m = shape.y;
     let d = q - place.xyz;
+    let geometry = shape.w - 4.0 * floor(shape.w * 0.25);
+    if (geometry > 1.5) {
+        // ADR-1403, a ripple: a travelling ring packet about its launch point (horizontal distance), radius shape.z
+        let rho = sqrt(d.x * d.x + d.z * d.z);
+        let x = rho - shape.z;
+        let wid = max(m, 1e-3);
+        let env = exp(-(x * x) / (wid * wid)) / sqrt(1.0 + rho * k / FIELD_TWO_PI);
+        var rw = 1.0;
+        if (place.w > 0.0) {
+            rw = 1.0 / (1.0 + (rho * rho) / (place.w * place.w));
+        }
+        return vec2<f32>(cos(k * x) * env * rw, 0.5 * env * env * rw * rw);
+    }
     var w = 1.0;
     if (place.w > 0.0) {
         w = 1.0 / (1.0 + dot(d, d) / (place.w * place.w));
     }
-    let lattice = shape.w - 2.0 * floor(shape.w * 0.5);
-    let depth = floor(shape.w * 0.5);
+    let lattice = geometry;
+    let depth = floor(shape.w * 0.25);
     if (depth > 0.0) {
         w = w * exp(-abs(d.y) / depth);
     }
@@ -593,7 +618,7 @@ fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
     let b0 = fieldBlock.fields[fi].gridBounds0;
     let b1 = fieldBlock.fields[fi].gridBounds1;
     let width = max(b1.z, 1e-4);
-    if (b0.w > 0.5) {
+    if ((u32(b0.w + 0.5) & 1u) == 1u) { // bit 0: listen along the axis (bit 1: normalised sand, ADR-1405)
         var axis = fieldBlock.fields[fi].axisRadius.xyz;
         if (length(axis) > 1e-6) {
             axis = normalize(axis);
@@ -611,17 +636,22 @@ fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
     return smoothstep(b1.x - width, b1.x, u) * (1.0 - smoothstep(b1.y, b1.y + width, u));
 }
 
-// (D, E, Ebar) at q; `memory`: E and Ebar from the slow envelope (drive.w, the sand's) instead of drive.y.
-fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
+// (D, E, Ebar, F) at q; `memory`: E, Ebar and F (the signed figure, ADR-1405) from the slow envelope (drive.w, the
+// sand's) instead of drive.y.
+fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec4<f32> {
     let first = u32(fieldBlock.fields[fi].gridBounds0.x + 0.5);
     let count = u32(fieldBlock.fields[fi].gridBounds0.y + 0.5);
-    var sums = vec3<f32>(0.0);
+    var sums = vec4<f32>(0.0);
     for (var i = 0u; i < count; i = i + 1u) {
         let row = first + i;
         if (row >= 48u) {
             break;
         }
         let drive = fieldBlock.resonance[row * 3u + 2u];
+        // ADR-1406: a silent row (a mode out of its focus, a faded ring) adds nothing -- skip its shape
+        if (max(max(abs(drive.x), abs(drive.y)), abs(drive.w)) < RES_SILENT) {
+            continue;
+        }
         let w = resonanceListen(fi, drive.z, q);
         if (w <= 0.0) {
             continue;
@@ -632,8 +662,17 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
         sums.y = sums.y + e * pe.x;
         sums.z = sums.z + e * e * pe.y;
     }
+    sums.w = sums.y;
     sums.y = sums.y * sums.y;
     return sums;
+}
+
+// ADR-1405: |x| with its cusp rounded over c (c = 0: exactly |x|)
+fn resonanceRoundAbs(x: f32, c: f32) -> f32 {
+    if (c > 0.0) {
+        return sqrt(x * x + c * c) - c;
+    }
+    return abs(x);
 }
 
 fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
@@ -641,7 +680,13 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     let s = resonanceSums(fi, q, channel == RES_CHANNEL_SAND || channel == RES_CHANNEL_RELIEF);
     if (channel == RES_CHANNEL_RELIEF) {
         let lanes = fieldBlock.fields[fi].gridRes;
-        return resonanceSand(s, fieldBlock.fields[fi].gridBounds1.w) + lanes.z * resonanceSand(s, lanes.y) + lanes.w * s.x;
+        let more = fieldBlock.fields[fi].wave0; // ADR-1405: (sand, signed figure, |figure|) weights
+        let normalized = (u32(fieldBlock.fields[fi].gridBounds0.w + 0.5) & 2u) == 2u;
+        let ridge = select(resonanceSand(s.xyz, fieldBlock.fields[fi].gridBounds1.w),
+                           resonanceSandNormalized(s.xyz, fieldBlock.fields[fi].gridBounds1.w), normalized);
+        let crest = select(resonanceSand(s.xyz, lanes.y), resonanceSandNormalized(s.xyz, lanes.y), normalized);
+        return more.x * ridge + lanes.z * crest +
+               lanes.w * s.x + more.y * s.w + more.z * resonanceRoundAbs(s.w, more.w * sqrt(max(s.z, 0.0)));
     }
     if (channel == RES_CHANNEL_DISPLACEMENT) {
         return s.x;
@@ -654,7 +699,9 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
             return 0.0;
         }
         let k = max(fieldBlock.fields[fi].gridBounds1.w, 1e-3);
-        return sqrt(s.z) * exp(-s.y / (k * k * s.z));
+        let line = exp(-s.y / (k * k * s.z));
+        // ADR-1405: bit 1 of gridBounds0.w -- the nodal mask without its energy factor
+        return select(sqrt(s.z) * line, line, (u32(fieldBlock.fields[fi].gridBounds0.w + 0.5) & 2u) == 2u);
     }
     return 0.0;
 }
@@ -677,6 +724,9 @@ fn resonanceShadingAt(fi: u32, q: vec3<f32>) -> vec3<f32> {
             break;
         }
         let drive = fieldBlock.resonance[row * 3u + 2u];
+        if (max(max(abs(drive.x), abs(drive.y)), abs(drive.w)) < RES_SILENT) { // ADR-1406
+            continue;
+        }
         let w = resonanceListen(fi, drive.z, q);
         if (w <= 0.0) {
             continue;

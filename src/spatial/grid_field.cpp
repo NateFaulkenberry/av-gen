@@ -45,13 +45,16 @@ const char* gridModeName(GridMode mode) {
         return "agents";
     case GridMode::Excitable:
         return "excitable";
+    case GridMode::Bake:
+        return "bake";
     }
     return "scalar";
 }
 
 std::optional<GridMode> gridModeFromName(std::string_view name) {
     for (const GridMode m :
-         {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion, GridMode::Agents, GridMode::Excitable}) {
+         {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion, GridMode::Agents, GridMode::Excitable,
+          GridMode::Bake}) {
         if (name == gridModeName(m)) {
             return m;
         }
@@ -84,6 +87,8 @@ int GridField::components() const {
     case GridMode::Agents:
     case GridMode::Excitable:
         return 4;
+    case GridMode::Bake:
+        return 1;
     }
     return 1;
 }
@@ -361,6 +366,18 @@ void GridField::step(float dt, double time, const FieldSet* set) {
         stepExcitable(*this, dt, time, set);
         return;
     }
+    if (mode == GridMode::Bake) { // ADR-1407: the source field itself, at every cell centre (signed, no rate)
+        const FieldSpec* source = (set != nullptr && !injectField.empty()) ? set->find(injectField) : nullptr;
+        for (int k = 0; k < resolution.z; ++k) {
+            for (int j = 0; j < resolution.y; ++j) {
+                for (int i = 0; i < resolution.x; ++i) {
+                    data[index(i, j, k)] =
+                        source != nullptr && source->enabled ? spatial::sampleScalar(*source, cellCenter(i, j, k), time, set) : 0.0f;
+                }
+            }
+        }
+        return;
+    }
     const int comps = components();
     const FieldSpec* inject = (set != nullptr && !injectField.empty()) ? set->find(injectField) : nullptr;
     const FieldSpec* velocity = (set != nullptr && !velocityField.empty()) ? set->find(velocityField) : nullptr;
@@ -525,6 +542,14 @@ Result<void> GridField::validate() const {
         }
         if (sensorDistance < 0.0f || stepSize < 0.0f || depositAmount < 0.0f || diffusion > 1.0f) {
             return fail("grid '{}': sensorDistance, stepSize and depositAmount must be >= 0, diffusion <= 1", name);
+        }
+    } else if (mode == GridMode::Bake) { // ADR-1407
+        if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': a bake grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
+                        kMaxAgentGridResolution);
+        }
+        if (injectField.empty()) {
+            return fail("grid '{}': a bake grid needs the field it bakes (injectField)", name);
         }
     } else if (resolution.x > kMaxGridResolution || resolution.y > kMaxGridResolution ||
                resolution.z > kMaxGridResolution) {
