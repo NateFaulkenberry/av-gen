@@ -439,15 +439,16 @@ PALETTES = {
     # A, ultraviolet resonance: ultramarine stone, violet grit, electric-blue key, violet fill, cyan-white light
     "A": {"stone": "#1a1d6b", "grit": "#5b3fd6", "key": "#8fb0ff", "fill": "#8a3dff", "rim": "#bff3ff",
           "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
-          "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
+          "sheen": "#e6f7ff", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
-    "B": {"stone": "#0b1640", "grit": "#106a7c", "key": "#5ff2ff", "fill": "#c13bff", "rim": "#ff8fe6",
-          "sky": "#170f45", "haze": "#160d40", "line": "#d4fffb", "hollow": "#ff3fd2",
-          "keyI": 2.1, "fillI": 0.988, "rimI": 0.56, "skyI": 0.122, "lineI": 2.4, "hollowI": 0.113},
+    "B": {"stone": "#081236", "grit": "#0f5f74", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
+          "sky": "#1a1250", "haze": "#1d1356", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
+          "sheenI": 1.6,
+          "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 2.4, "hollowI": 0.5},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
           "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
-          "keyI": 2.31, "fillI": 0.76, "rimI": 0.42, "skyI": 0.105, "lineI": 2.2, "hollowI": 0.1},
+          "sheen": "#fff1e0", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.76, "rimI": 0.42, "skyI": 0.105, "lineI": 2.2, "hollowI": 0.1},
 }
 PALETTE = os.environ.get("CW_PALETTE", "B")   # chosen in Pass B (plasma interference)
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
@@ -467,59 +468,60 @@ def ground_program():
     follow the resonance: a thin light on the nodal line where the ground rings, and a low glow in the hollows that
     ring hardest."""
     P_ = PALETTES[PALETTE]
+    dbg = os.environ.get("CW_DEBUG", "")
     g = Prog("cwGround")
     g.op("shade", "field", 0, field="shade")                       # r0 = (sand, crest, amplitude, w)
-    g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
     g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])                   # r2 = crest
     g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])                   # r3 = amplitude
-    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])
+    g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
+    g.op("gritMask", "smoothstep", 1, a=1, k=[0.06, 0.4])          # r1: where grit has settled
+    # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
+    g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
+    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
+    g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
+    g.op(None, "multiply", 2, a=2, b=7)
+    g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
+    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.5, 2.2])          # only where it rings hard
+    g.op(None, "multiply", 3, a=3, b=7)
+    g.op("hollow", "constant", 4, k=pc("hollow", P_["hollowI"]) + [1.0])
+    g.op(None, "multiply", 3, a=3, b=4)
+    g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
+    # ---- materials: scoured satin stone, matte settled grit ----
     g.op("stone", "constant", 4, k=pc("stone") + [1.0])
     g.op("grit", "constant", 5, k=pc("grit") + [1.0])
     g.op(None, "mixBy", 4, a=4, b=5, c=1)                          # r4: albedo
-    # ---- light, into r5 ----
+    # ---- light, into r5 (sheen into r1) ----
     g.op(None, "input", 6, inp="normal")
-    g.op("keyDot", "gradient", 7, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
+    g.op("keyDot", "gradient", 1, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
     g.op("key", "constant", 5, k=pc("key", P_["keyI"]) + [1.0])
-    g.op(None, "multiply", 5, a=5, b=7)                            # key
-    g.op("fillDot", "gradient", 7, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
-    g.op(None, "power", 7, a=7, f=1.5)
-    g.op("fill", "constant", 1, k=pc("fill", P_["fillI"]) + [1.0])
-    g.op(None, "multiply", 7, a=7, b=1)
-    g.op(None, "add", 5, a=5, b=7)                                 # + fill
-    g.op("skyDot", "gradient", 7, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
-    g.op("sky", "constant", 1, k=pc("sky", P_["skyI"]) + [1.0])
-    g.op(None, "multiply", 7, a=7, b=1)
-    g.op(None, "add", 5, a=5, b=7)                                 # + sky
-    g.op("rimMask", "fresnel", 7, f=3.0)
-    g.op("rim", "constant", 1, k=pc("rim", P_["rimI"]) + [1.0])
-    g.op(None, "multiply", 7, a=7, b=1)
-    g.op(None, "add", 5, a=5, b=7)                                 # + rim
-    dbg = os.environ.get("CW_DEBUG", "")
+    g.op(None, "multiply", 5, a=5, b=1)                            # the raking key
+    g.op("sheenLobe", "power", 1, a=1, f=14.0)                     # the key's sharp highlight ...
+    g.op(None, "multiply", 1, a=1, b=7)                            # ... on the smooth stone only
+    g.op("sheen", "constant", 3, k=pc("sheen", P_["sheenI"]) + [1.0])
+    g.op(None, "multiply", 1, a=1, b=3)                            # r1: sheen
+    g.op("fillDot", "gradient", 3, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
+    g.op(None, "power", 3, a=3, f=4.0)                             # the fill grazes: a narrow lobe on the far flanks
+    g.op("fill", "constant", 7, k=pc("fill", P_["fillI"]) + [1.0])
+    g.op(None, "multiply", 3, a=3, b=7)
+    g.op(None, "add", 5, a=5, b=3)                                 # + fill
+    g.op("skyDot", "gradient", 3, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
+    g.op("sky", "constant", 7, k=pc("sky", P_["skyI"]) + [1.0])
+    g.op(None, "multiply", 3, a=3, b=7)
+    g.op(None, "add", 5, a=5, b=3)                                 # + sky
+    g.op("rimMask", "fresnel", 3, f=3.0)
+    g.op("rim", "constant", 7, k=pc("rim", P_["rimI"]) + [1.0])
+    g.op(None, "multiply", 3, a=3, b=7)
+    g.op(None, "add", 5, a=5, b=3)                                 # + rim
     if dbg == "light":
-        g.op(None, "add", 4, a=5, b=7)                             # r4: the light alone (on white)
-        g.op(None, "add", 4, a=5, b=5)
-        g.op(None, "mix", 4, a=4, b=5, f=1.0)
+        g.op(None, "add", 4, a=5, b=1)                             # the light alone (on white)
     elif dbg != "albedo":
-        g.op(None, "multiply", 4, a=4, b=5)                        # r4: lit colour
-    # ---- distance haze ----
-    g.op(None, "input", 7, inp="cameraDistance")
-    g.op("hazeRamp", "remap", 7, a=7, k=[70.0, 700.0, 0.0, 0.85], f=1.0)
-    g.op("haze", "constant", 1, k=pc("haze", 1.0) + [1.0])
-    g.op(None, "mixBy", 4, a=4, b=1, c=7)
-    # ---- emission, into r2 ----
-    g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
-    g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing
-    g.op("line", "constant", 1, k=pc("line", P_["lineI"]) + [1.0])
-    g.op(None, "multiply", 2, a=2, b=1)
-    g.op(None, "swizzle", 6, a=0, k=[0, 0, 0, 0])
-    g.op(None, "smoothstep", 6, a=6, k=[0.04, 0.3])
-    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.0, 0.0], f=1.0)     # 1 where no sand: the antinodes
-    g.op(None, "multiply", 6, a=6, b=3)
-    g.op(None, "multiply", 6, a=6, b=3)                            # x amplitude^2: only the hardest-ringing hollows
-    g.op(None, "multiply", 6, a=6, b=3)                            # ^3: sparse
-    g.op("hollow", "constant", 1, k=pc("hollow", P_["hollowI"]) + [1.0])
-    g.op(None, "multiply", 6, a=6, b=1)
-    g.op(None, "add", 2, a=2, b=6)                                 # r2: emission
+        g.op(None, "multiply", 4, a=4, b=5)                        # lit colour
+        g.op(None, "add", 4, a=4, b=1)                             # + sheen
+    # ---- distance haze: the far ground and walls fade into the world's air ----
+    g.op(None, "input", 3, inp="cameraDistance")
+    g.op("hazeRamp", "remap", 3, a=3, k=[70.0, 700.0, 0.0, 0.85], f=1.0)
+    g.op("haze", "constant", 7, k=pc("haze", 1.0) + [1.0])
+    g.op(None, "mixBy", 4, a=4, b=7, c=3)
     if dbg in ("albedo", "light"):
         g.op(None, "constant", 2, k=[0, 0, 0, 1])
     elif dbg == "emission":

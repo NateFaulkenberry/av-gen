@@ -307,17 +307,6 @@
     },
     {
      "kind": "swizzle",
-     "dst": 1,
-     "srcA": 0,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "swizzle",
      "dst": 2,
      "srcA": 0,
      "constant": [
@@ -339,6 +328,17 @@
      ]
     },
     {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
      "kind": "smoothstep",
      "dst": 1,
      "srcA": 1,
@@ -348,207 +348,6 @@
       0.0,
       0.0
      ]
-    },
-    {
-     "kind": "constant",
-     "dst": 4,
-     "constant": [
-      0.00335,
-      0.00802,
-      0.05127,
-      1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.00518,
-      0.14413,
-      0.20156,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5,
-     "srcC": 1
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "normal"
-    },
-    {
-     "kind": "gradient",
-     "dst": 7,
-     "srcA": 6,
-     "constant": [
-      -0.932381,
-      0.200512,
-      0.300768,
-      0.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.24031,
-      1.86464,
-      2.1,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 7
-    },
-    {
-     "kind": "gradient",
-     "dst": 7,
-     "srcA": 6,
-     "constant": [
-      0.803057,
-      0.321223,
-      -0.501911,
-      0.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "power",
-     "dst": 7,
-     "srcA": 7,
-     "value": 1.5
-    },
-    {
-     "kind": "constant",
-     "dst": 1,
-     "constant": [
-      0.52688,
-      0.04321,
-      0.988,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 1
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 7
-    },
-    {
-     "kind": "gradient",
-     "dst": 7,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.5,
-      0.0,
-      0.5
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "constant",
-     "dst": 1,
-     "constant": [
-      0.00105,
-      0.00058,
-      0.00726,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 1
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 7
-    },
-    {
-     "kind": "fresnel",
-     "dst": 7,
-     "value": 3.0
-    },
-    {
-     "kind": "constant",
-     "dst": 1,
-     "constant": [
-      0.56,
-      0.15382,
-      0.44313,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 7,
-     "srcB": 1
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 7
-    },
-    {
-     "kind": "multiply",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 5
-    },
-    {
-     "kind": "input",
-     "dst": 7,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "remap",
-     "dst": 7,
-     "srcA": 7,
-     "constant": [
-      70.0,
-      700.0,
-      0.0,
-      0.85
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "constant",
-     "dst": 1,
-     "constant": [
-      0.00802,
-      0.00402,
-      0.05127,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 1,
-     "srcC": 7
     },
     {
      "kind": "smoothstep",
@@ -569,7 +368,7 @@
     },
     {
      "kind": "constant",
-     "dst": 1,
+     "dst": 7,
      "constant": [
       1.5801,
       2.4,
@@ -581,34 +380,12 @@
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
-     "srcB": 1
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 0,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.04,
-      0.3,
-      0.0,
-      0.0
-     ]
+     "srcB": 7
     },
     {
      "kind": "remap",
-     "dst": 6,
-     "srcA": 6,
+     "dst": 7,
+     "srcA": 1,
      "constant": [
       0.0,
       1.0,
@@ -618,44 +395,278 @@
      "value": 1.0
     },
     {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 3
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.5,
+      2.2,
+      0.0,
+      0.0
+     ]
     },
     {
      "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 3
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 3
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 7
     },
     {
      "kind": "constant",
-     "dst": 1,
+     "dst": 4,
      "constant": [
-      0.113,
-      0.00562,
-      0.07283,
+      0.5,
+      0.02485,
+      0.32224,
       1.0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 1
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 4
     },
     {
      "kind": "add",
      "dst": 2,
      "srcA": 2,
-     "srcB": 6
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
+      0.00243,
+      0.00605,
+      0.03689,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.00478,
+      0.11444,
+      0.17465,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5,
+     "srcC": 1
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "normal"
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 6,
+     "constant": [
+      -0.932381,
+      0.200512,
+      0.300768,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.28092,
+      1.92924,
+      2.3,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 1
+    },
+    {
+     "kind": "power",
+     "dst": 1,
+     "srcA": 1,
+     "value": 14.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 7
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      1.18066,
+      1.55751,
+      1.6,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 6,
+     "constant": [
+      0.803057,
+      0.321223,
+      -0.501911,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "power",
+     "dst": 3,
+     "srcA": 3,
+     "value": 4.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.47995,
+      0.03936,
+      0.9,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      0.5,
+      0.0,
+      0.5
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.00072,
+      0.00042,
+      0.00562,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "fresnel",
+     "dst": 3,
+     "value": 3.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.35,
+      0.09614,
+      0.27695,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 1
+    },
+    {
+     "kind": "input",
+     "dst": 3,
+     "input": "cameraDistance"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      70.0,
+      700.0,
+      0.0,
+      0.85
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.01229,
+      0.00651,
+      0.09306,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 7,
+     "srcC": 3
     }
    ],
    "baseColor": 4,
