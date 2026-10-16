@@ -35,6 +35,7 @@ OUT = os.path.join(REPO, "examples", "resonant-silk")
 CATEGORY = "Resonant Silk"
 
 COMPOSITION = "a"
+SAIL = float(os.environ.get("RS_SAIL", "-0.8"))  # look development: the sail's extra roll
 
 # ================================================================================================ palette (sRGB refs)
 P = {
@@ -229,31 +230,21 @@ def write_glb(path, pos, nrm, uv, idx, name):
 def sheets_for(comp):
     """The research board's compositions. Metres; the camera sits near +z looking toward -z."""
     if comp == "a":
-        # THE GATHER: one sheet enters as a broad fan from the lower-left foreground, is drawn through an invisible
-        # ring upper right of centre (the focal gather, where every pleat converges), and opens again into a second,
-        # wider fan that rises, turns over and falls away into the dark behind. A smaller second layer is gathered
-        # through the same ring (one object, not two ribbons).
-        g = (14.0, 10.0, -52.0)
+        # THE GATHER: one sheet enters as a broad wall of pleats from the left foreground, the pleats running away
+        # from the camera and converging on an invisible ring right of centre (the focal gather); beyond it the same
+        # cloth opens again into a tall sail that rises, billows and turns over into the dark above and behind. Not
+        # mirrored: a long low wall on one side of the gather, a tall turning sail on the other.
         main = SheetSpec(
             "silk",
-            points=[(-95, -50, 30), (-50, -22, 0), (-12, 0, -30), g, (40, 18, -70), (78, 34, -105),
-                    (92, 20, -150), (70, -14, -200)],
-            roll=[(0.0, 1.35), (0.3, 1.25), (0.46, 1.0), (0.62, 1.4), (0.8, 2.3), (1.0, 2.9)],
-            span=[(0.0, 26.0), (0.22, 30.0), (0.4, 7.0), (0.46, 2.8), (0.52, 7.0), (0.68, 34.0), (0.86, 30.0),
-                  (1.0, 12.0)],
-            cloth=[(0.0, 38.0), (1.0, 40.0)],
-            billow=[(0.0, 3.0), (0.22, 8.0), (0.42, 0.0), (0.5, 0.0), (0.7, -10.0), (0.9, -6.0), (1.0, 0.0)],
-            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=3, curl=0.1, edge_wave=0.02, nu=600, nv=128)
-        under = SheetSpec(
-            "silk2",
-            points=[(40, -70, -10), (26, -28, -36), g, (0, 30, -80), (-30, 44, -130), (-70, 30, -180)],
-            roll=[(0.0, 1.2), (0.45, 1.5), (1.0, 2.4)],
-            span=[(0.0, 14.0), (0.3, 8.0), (0.42, 2.2), (0.55, 8.0), (0.8, 22.0), (1.0, 10.0)],
-            cloth=[(0.0, 22.0), (1.0, 24.0)],
-            billow=[(0.0, 2.0), (0.3, 3.0), (0.42, 0.0), (0.75, 6.0), (1.0, 0.0)],
-            pleats=[(5.0, 0.8), (11.0, 0.3)], seed=11, nu=420, nv=80, curl=-0.1)
-        cam = {"position": [-4.0, 0.0, 58.0], "target": [10.0, 4.0, -60.0], "focal": 28.0}
-        return ([main, under] if os.environ.get('RS_LAYER2') else [main]), cam
+            points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 12, -180),
+                    (42, 26, -180), (64, 48, -188), (74, 76, -214)],
+            roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.72, 2.6 + SAIL), (0.86, 3.2 + SAIL), (1.0, 3.6 + SAIL)],
+            span=[(0.0, 30.0), (0.32, 26.0), (0.55, 10.0), (0.66, 2.5), (0.72, 10.0), (0.86, 40.0), (1.0, 46.0)],
+            cloth=[(0.0, 40.0), (0.66, 44.0), (1.0, 54.0)],
+            billow=[(0.0, 6.0), (0.35, 9.0), (0.6, 0.0), (0.68, 0.0), (0.84, -11.0), (1.0, -7.0)],
+            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=5, curl=0.1, edge_wave=0.03, nu=720, nv=128)
+        cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0}
+        return [main], cam
     if comp == "b":
         # THE PASSAGE: two broad sheets bow toward each other and form a curved corridor the eye travels down; they
         # touch far away, where the gathered crease is the focal light.
@@ -289,40 +280,124 @@ def sheets_for(comp):
     return [canopy], cam
 
 
+
+class Prog:
+    """A material program assembled by label (Cymatic World's pattern): `op(label, ...)` appends one op and remembers
+    its 1-based number, which is what a route's `material/<name>/op/<n>/...` path addresses."""
+
+    def __init__(self, name):
+        self.name = name
+        self.ops = []
+        self.at = {}
+
+    def op(self, label, kind, dst, a=None, b=None, c=None, k=None, f=None, inp=None, field=None, k2=None, k3=None,
+           k4=None):
+        o = {"kind": kind, "dst": dst}
+        if kind == "remap" and f is None:
+            f = 0.0
+        for key, v in (("srcA", a), ("srcB", b), ("srcC", c)):
+            if v is not None:
+                o[key] = v
+        for key, v in (("constant", k), ("constant2", k2), ("constant3", k3), ("constant4", k4)):
+            if v is not None:
+                o[key] = [round(float(x), 6) for x in (list(v) + [0.0] * 4)[:4]]
+        if f is not None:
+            o["value"] = float(f)
+        if inp is not None:
+            o["input"] = inp
+        if field is not None:
+            o["field"] = field
+        self.ops.append(o)
+        if label:
+            assert label not in self.at, label
+            self.at[label] = len(self.ops)
+        assert len(self.ops) <= 48, "%s: more than 48 ops" % self.name
+        return len(self.ops)
+
+    def __getitem__(self, label):
+        return self.at[label]
+
+    def doc(self, base=-1, emission=-1, roughness=-1, metallic=-1):
+        return {"name": self.name, "ops": self.ops, "baseColor": base, "metallic": metallic, "roughness": roughness,
+                "emission": emission, "emissionIntensity": 1.0, "opacity": -1}
+
+
+def silk_program():
+    """The silk's colour, on the lit path (the lights draw the satin highlights; the program sets what they land on and
+    adds the light the sheet gives off itself).
+    - Body: deep indigo facing the camera, turning violet toward grazing angles (a Fresnel sheen).
+    - Hems: the free edges carry a thin luminous line, its hue drifting along the length (teal -> cyan -> violet), so
+      the silhouette draws itself against the void even where no light falls."""
+    g = Prog("rsSilk")
+    g.op(None, "input", 0, inp="uv")                                   # r0 = (u, v)
+    g.op(None, "swizzle", 1, a=0, k=[1, 1, 1, 1])                      # r1 = v
+    g.op("hem", "palette", 1, a=1, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1, 1, 1, 0], k4=[0, 0, 0, 0])
+    g.op("hemWidth", "power", 1, a=1, f=400.0)                          # r1: 1 on the hems, falling fast inward
+    g.op(None, "swizzle", 2, a=0, k=[0, 0, 0, 0])                      # r2 = u
+    g.op("hemHue", "ramp", 3, a=2, k=C("teal") + [1], k2=C("cyan") + [1], k3=C("violet") + [1])
+    g.op(None, "multiply", 1, a=1, b=3)
+    g.op("hemGain", "constant", 3, k=[1.6, 1.6, 1.6, 1])
+    g.op(None, "multiply", 1, a=1, b=3)                                # r1: emission (the hems)
+    g.op("sheen", "fresnel", 4, f=3.0)
+    g.op("body", "constant", 5, k=C("indigo", 1.6) + [1])
+    g.op("bodyEdge", "constant", 6, k=C("violet", 0.55) + [1])
+    g.op(None, "mixBy", 5, a=5, b=6, c=4)                              # r5: albedo
+    g.base, g.emit = 5, 1
+    return g
+
+
 # ================================================================================================ world
 def environment(s):
     s.environment = {
         "intensity": 0.04, "background": C("abyss", 0.6), "fogColor": C("abyss", 0.8),
         "volumeDensity": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 200.0,
-        "sky": {"enabled": True, "zenithColor": C("abyss", 0.35), "horizonColor": C("indigo", 0.55),
-                "groundColor": C("abyss", 0.25), "haze": 0.6, "sunIntensity": 0.0, "intensity": 1.0,
+        "sky": {"enabled": True, "zenithColor": C("abyss", 0.3), "horizonColor": C("indigo", 0.22),
+                "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     # a narrow, cold, grazing key from high behind-right: strips of light across the folds
-    s.light("key", "directional", direction=[-0.55, -0.35, 0.75], color=C("pearl"), intensity=4.0,
+    s.light("key", "directional", direction=[-0.55, -0.35, 0.75], color=kit.mix(C("pearl"), C("cyan"), 0.55),
+            intensity=5.0,
             castsShadow=False, contactShadow=False, softness=0.2)
     # a violet counter-light from the lower left, behind the sheet: rims and the far side's colour
     s.light("rim", "directional", direction=[0.6, 0.45, 0.65], color=C("violet"), intensity=2.2,
             castsShadow=False, contactShadow=False)
+    # the sail's own light: a violet lamp in front of it, its range kept off the wall
+    s.light("sail", "point", position=[40.0, 55.0, -120.0], color=kit.mix(C("violet"), C("magenta"), 0.25),
+            intensity=12000.0, range=120.0, castsShadow=False)
     # broad cool fill from the camera side, low
     s.light("fill", "directional", direction=[0.1, -0.2, -1.0], color=C("teal"), intensity=0.35,
             castsShadow=False, contactShadow=False)
 
 
-def silk_material(name):
-    return {"baseColor": C("indigo", 1.0), "emissiveColor": C("cyan"), "emissiveIntensity": 0.0,
+def silk_material(name, program="rsSilk"):
+    return {"program": program, "baseColor": C("indigo", 2.0), "emissiveColor": C("cyan"), "emissiveIntensity": 0.0,
             "roughness": 0.28, "metallic": 0.35, "doubleSided": True,
             "thinFilm": {"thickness": 520.0, "ior": 1.45}}
 
 
 def sheets(s, specs, mesh_dir):
+    g = silk_program()
+    s.program(g.doc(base=g.base, emission=g.emit))
     for spec in specs:
         pos, nrm, uv, idx, length = sheet_mesh(spec)
         write_glb(os.path.join(mesh_dir, "rs-%s.glb" % spec.name), pos, nrm, uv, idx, spec.name)
         print("%s: %d vertices, %d triangles, %.0f m long" % (spec.name, len(pos), len(idx) // 3, length))
         s.proc(spec.name, {"kind": "mesh", "asset": "meshes/rs-%s.glb" % spec.name},
-               material=silk_material(spec.name), extra={"normalStep": 0.15})
+               material=silk_material(spec.name), extra={"normalStep": 0.15}, deformers=drift_deformers())
+
+
+def drift_deformers():
+    """The sculpture's own slow life, independent of the music (Stage A): a swell that travels along the wall toward
+    the gather, and a very slow, broad, coherent drift that keeps the silhouette evolving without ever repeating."""
+    along = [0.17, 0.0, -0.985]   # the wall's run, from the camera side toward the gather
+    return [
+        {"kind": "noise", "amount": 3.5, "space": "world", "scale": 0.011, "speed": 0.035, "seed": 11,
+         "axisMask": [1.0, 1.0, 0.6]},
+        {"kind": "sine", "amount": 1.4, "space": "world", "axis": along, "frequency": 2 * math.pi / 64.0,
+         "speed": -0.55, "displacementAxis": [0.85, 0.5, 0.15]},
+    ]
 
 
 def camera(s, cam):
@@ -358,7 +433,7 @@ def build(comp, mesh_dir):
     s.params_({
         "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.0, "post/output/vignette": 0.4,
         "post/output/grain": 0.008, "post/grade/contrast": 1.1, "post/lens/chromaticAberration": 0.0,
-        "camera/exposure/compensation": 0.0, "post/dof/enabled": False,
+        "camera/exposure/compensation": 0.8, "post/dof/enabled": False,
     })
     return s
 
