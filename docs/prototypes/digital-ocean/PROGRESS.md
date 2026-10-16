@@ -694,3 +694,38 @@ On the branch after merging main at ef94826a:
   rerun of the whole suite passed, so it is a load-sensitive flake outside this scene.
 - `gpu`: exit 0, 658 passed.
 - `review_examples --only "Digital Ocean"`: ok.
+
+## Pass 4 (art-direction reset)
+
+Brief: `10-brief-anime-art-direction-reset.md` (the owner's, verbatim; it supersedes 08's long strip: the island is
+now a small, recognisable one with one tree and a few rocks). Worktree `../av-gen-ocean3`, branch
+`art/digital-ocean-3` from main 4421568b. Review media: `~/Desktop/av-gen-review/57-digital-ocean-reset/`
+(look-development frames in `work/`). Report: `11-report-art-direction-reset.md`.
+
+### Pass 4.0: study
+
+- **Baseline** captured from the committed scene at 1080p, realtime tier, silent, t = 20 s (`00-baseline.png`).
+- **The Tree of Life** (`assets/treeisle/`, the manifest `assets/treeisle.manifest.json`): inspected by projecting
+  its vertices (`tree-glowmere-wood.glb`, 577 k triangles; `-foliage.glb`, 1.05 M): a broad spreading crown on a
+  gnarled trunk, 77 m tall and 116 m wide, every material a flat PBR factor (the Glowmere look did not survive the
+  export, ADR-338). Not reused: it is 3.16 M triangles for a silhouette that would be ~150 px tall, its licence is
+  not recorded, and it is gitignored -- a derived mesh would inherit both, and this live example must render on CI
+  without private assets. Its silhouette (a single spreading crown) was the alternative to the palm; the palm won
+  because the brief's "classic tiny-island composition" is a palm, and a spreading crown at this scale reads as a
+  park tree. The floating island (`floating-isle-bare.glb`, 32 k triangles) is a hovering rock with a cliff face:
+  the wrong shape for a low sand island.
+- **Rocks**: `assets/kenney/rock_*.glb` (CC0, tracked, 16-172 triangles each, ~1 m) are the right assets: low-poly
+  silhouettes with clean facets that read as cut-paper rocks when painted flat. Seven are placed, scaled 6-10x.
+  `assets/terrain/rocks/` (Poly Haven scans, 1k textures, gitignored) were ruled out for the same CI reason and
+  because a photoscanned rock fights the illustration.
+- **The water shader** (Pass 3): a 47-op material program on the displaced sea mesh; its bands were cut from a
+  height + orientation scalar, but the `crest` gradient saturated below the mean level, so the "centred" t was
+  never centred, the four regions were cut from a one-sided scalar, and the strokes were continuous lines along
+  every crest. The sun was a physically reflected ray (`r.l`) jittered into sparks -- the "shiny fragments" the
+  brief names. The clouds were ~320 spheres in rows, each with its own grazing rim: the "piles of blobs".
+- **Digital Alpine**: its generator builds terrain and a kit; its illustrated program (flat colour, two bands,
+  haze) is the ancestor of `doIllus` here, which the tree and rocks reuse. Nothing else transfers.
+- **The toon-water reference** (Roystan): depth-based colour gradient, a scrolling noise cut at a threshold into
+  hard foam, a distortion texture to break the slide, intersection foam by depth, smoothstep anti-aliasing. The
+  parts that transfer to an opaque sea seen from 14 m: colour by region, foam as a thresholded noise that follows
+  the surface, anti-aliased cuts. Depth-based colour has no seabed here; distance plays its role (`zone`).
