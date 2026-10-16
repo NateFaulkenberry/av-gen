@@ -23,7 +23,7 @@ The resonance samplers also evaluated every mode row, including modes that a foc
 ## Decision
 
 1. A scene's `environment` can say `"ambientOcclusion": false` and `"contactShadows": false`. The quality tier still decides when they are on otherwise. Both default on, and a scene that never sets them saves byte-identically.
-2. The shadow mask shades directional shadows. With no enabled directional light casting a shadow it is given no lights, so it neither encodes nor asks for the prepass. An unlit scene authors one dark, non-casting directional light in place of the default casting key.
+2. The shadow mask shades directional shadows. With no enabled directional light casting a shadow it is given no lights, so it neither encodes nor asks for the prepass. A requested shadow AOV export (ADR-255) keeps its lights: it is asked for on its own account, and the GPU suite's AOV test holds it. An unlit scene authors one dark, non-casting directional light in place of the default casting key.
 3. **The reverse case.** `"depthPrepass": true` asks for the prepass whatever else wants it. It is for a deep, self-occluding surface with a costly material, where early depth rejection (hidden fragments never shaded) saves more than the extra geometry pass costs. Cymatic World uses it after its correction round: the deep cells hide one another from the pulled-back camera, and with the deformation baked (ADR-1407) the prepass costs 6 ms and saves 11 (35.3 → 29.8 ms at High).
 4. A resonance row whose every drive is below 1e-5 is skipped by every sampler, CPU and GPU alike. A focus window's weight is exactly 0 beyond three widths (a step of e⁻⁹), so silenced modes cost nothing.
 

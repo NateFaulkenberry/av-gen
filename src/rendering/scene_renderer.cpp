@@ -3303,7 +3303,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             return l.enabled && l.type == scene::PunctualLight::Type::Directional && l.castsShadow;
         });
         shadowMask_->update(hdr_.width(), hdr_.height(), qualitySettings_, toggles_.shadowMask,
-                            directionalCasts ? static_cast<std::uint32_t>(frame.lightCounts.x + 0.5f) : 0u,
+                            // ... but an exported shadow AOV (ADR-255) is asked for on its own account: it keeps its lights
+                            directionalCasts || shadowMask_->exportRequested()
+                                ? static_cast<std::uint32_t>(frame.lightCounts.x + 0.5f)
+                                : 0u,
                             scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane,
                             scene.camera.farPlane);
         stats_.shadowMask = shadowMask_->stats();
