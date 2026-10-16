@@ -443,7 +443,7 @@ PALETTES = {
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
     "B": {"stone": "#081236", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#dffcff",
-          "sheenI": 1.4,
+          "sheenI": 1.1,
           "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.5},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
@@ -481,12 +481,12 @@ def ground_program():
     g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
     g.op(None, "multiply", 2, a=2, b=7)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
-    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.5, 2.2])          # only where it rings hard
+    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.8, 2.4])          # only where it rings hard
     g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
     # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
     g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
-    g.op("wallBand", "smoothstep", 4, a=4, k=[0.025, 0.1])
+    g.op("wallBand", "smoothstep", 4, a=4, k=[0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
     g.op("hollow", "constant", 4, k=pc("hollow", P_["hollowI"]) + [1.0])
     g.op(None, "multiply", 3, a=3, b=4)
@@ -500,7 +500,7 @@ def ground_program():
     g.op("keyDot", "gradient", 1, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=1.0)
     g.op("key", "constant", 5, k=pc("key", P_["keyI"]) + [1.0])
     g.op(None, "multiply", 5, a=5, b=1)                            # the raking key
-    g.op("sheenLobe", "power", 1, a=1, f=14.0)                     # the key's sharp highlight ...
+    g.op("sheenLobe", "power", 1, a=1, f=12.0)                      # the key's highlight ...
     g.op(None, "multiply", 1, a=1, b=7)                            # ... on the smooth stone only
     g.op("sheen", "constant", 3, k=pc("sheen", P_["sheenI"]) + [1.0])
     g.op(None, "multiply", 1, a=1, b=3)                            # r1: sheen
@@ -524,7 +524,7 @@ def ground_program():
         g.op(None, "add", 4, a=4, b=1)                             # + sheen
     # ---- distance haze: the far ground and walls fade into the world's air ----
     g.op(None, "input", 3, inp="cameraDistance")
-    g.op("hazeRamp", "remap", 3, a=3, k=[45.0, 320.0, 0.0, 0.8], f=1.0)
+    g.op("hazeRamp", "remap", 3, a=3, k=[35.0, 280.0, 0.0, 0.7], f=1.0)
     g.op("haze", "constant", 7, k=pc("haze", 1.0) + [1.0])
     g.op(None, "mixBy", 4, a=4, b=7, c=3)
     if dbg in ("albedo", "light"):
