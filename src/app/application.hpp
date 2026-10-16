@@ -23,6 +23,7 @@
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
 #include "app/live_scenes.hpp"
+#include "app/project_switch.hpp"
 #include "app/projection.hpp"
 #include "app/render_settings.hpp"
 #include "app/render_state.hpp"
@@ -212,6 +213,14 @@ struct AppOptions {
     // been a standing limitation of every agent that has worked on this repository.
     std::optional<std::filesystem::path> captureUi;
     int captureUiFrame = 90;      // which frame to grab; late enough for a layout to settle
+    // ADR-1392: `--open-sequence <a;b;...>` opens these one after another in this one process, every
+    // `--open-every <n>` frames, through the same handlers the menus call -- so a carry-over between
+    // projects, or memory that grows with every open, can be reproduced without a person clicking.
+    // `lab:<key>` is Engineering Labs > <lab> (its fixture *and* its overlays), `example:<name>` is
+    // File > Examples by its menu name, anything else is a path. The process memory is logged
+    // before each open and after the last one.
+    std::vector<std::string> openSequence;
+    int openEvery = 60;
     bool captureUiQuit = true;    // exit once it is written, so a script is one command
     // Panels to bring to the front before the capture, in order, so a docked panel that shares a tab
     // bar with five others can be photographed. Names are the panel titles exactly as the View menu
@@ -405,6 +414,9 @@ private:
     // `loadAny` past the unsaved-changes gate: remember the request and paint "Opening ..." first.
     void beginOpen(const std::filesystem::path& path);
     std::optional<std::filesystem::path> pendingOpen_;
+    // ADR-1392: `--open-sequence`, one item per `--open-every` frames, through the menus' own handlers.
+    void serviceOpenSequence(int framesRendered);
+    std::size_t openSequenceNext_ = 0;
 
     // ---- unsaved changes (ADR-440) --------------------------------------------------------------
     //
@@ -522,6 +534,12 @@ private:
     std::uint64_t liveCaptureFrames_ = 0;
     void captureLiveFrame(const FrameTime& time);
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
+    // ADR-1390: the one place the editor's per-project view state is reset. `projectSwitch_` notices that the engine
+    // opened a different project (however it was asked to) and says which overlays the new one opens with;
+    // `resetProjectViewState` applies them and resets everything else the editor holds about the project it replaced.
+    ProjectSwitch projectSwitch_;
+    void serviceProjectSwitch();
+    void resetProjectViewState(rendering::DebugViewOptions overlays, bool fromLab);
     void applyOutputsFromProject();
     void storeOutputsToProject();
     // ADR-1026: the Live panel's projection. Start/stop from the panel; serviceProjection once per frame before the

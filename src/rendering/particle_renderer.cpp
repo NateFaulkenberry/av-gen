@@ -888,9 +888,11 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
     if (!initialised_) {
         return;
     }
-    if (scene_ != &scene) {
+    // ADR-1394: a different scene at the same address (the next project) is a different scene.
+    if (scene_ != &scene || sceneIdentity_ != scene.identity) {
         resetAll();
         scene_ = &scene;
+        sceneIdentity_ = scene.identity;
     }
     if (!warming_) {
         collectTimings(); // the previous frame's measurement (its command buffer is submitted by now)

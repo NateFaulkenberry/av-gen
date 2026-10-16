@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -56,6 +57,13 @@ public:
     // Re-reads a file and replaces its cache entry (version + 1). Unknown paths load fresh.
     [[nodiscard]] Result<void> reload(const std::filesystem::path& path);
     void clear();
+    // ADR-1392: what one project used. The cache was never emptied, so an editor that had opened twenty projects held
+    // every glTF and image all twenty had decoded -- for the rest of the session, and the whole lot was freed at quit.
+    // `beginUse` starts a record of what is loaded from here on; `releaseUnused` drops every entry that was not, and
+    // returns how many. A project load brackets its composition with the two, so the cache holds the open project's
+    // assets (an asset still held elsewhere stays alive through its own shared_ptr; only the cache's claim goes).
+    void beginUse();
+    std::size_t releaseUnused();
 
     [[nodiscard]] std::size_t sceneCount() const { return scenes_.size(); }
     [[nodiscard]] std::size_t imageCount() const { return images_.size(); }
@@ -67,6 +75,8 @@ private:
     std::filesystem::path base_;
     std::map<std::string, std::shared_ptr<const SceneAsset>> scenes_;
     std::map<std::string, std::shared_ptr<const ImageAsset>> images_; // key: path + "|srgb"
+    std::set<std::string> used_; // ADR-1392: keys loaded or found since beginUse
+    bool tracking_ = false;
 };
 
 } // namespace avgen::assets
