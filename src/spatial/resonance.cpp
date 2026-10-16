@@ -272,6 +272,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     }
     h.u8(static_cast<std::uint8_t>(channel));
     h.boolean(listenAlongAxis);
+    h.boolean(sandNormalized);
     h.boolean(probe.has_value());
     if (probe) {
         h.v3(*probe);
@@ -384,6 +385,9 @@ json ResonanceSpec::toJson() const {
     j["listenHigh"] = listenHigh;
     j["listenWidth"] = listenWidth;
     j["listenAlongAxis"] = listenAlongAxis;
+    if (sandNormalized) {
+        j["sandNormalized"] = true; // ADR-1405
+    }
     j["sharpness"] = sharpness;
     if (derivativeStep > 0.0f) {
         j["derivativeStep"] = derivativeStep;
@@ -451,6 +455,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.listenHigh, "listenHigh", detail::readFloat);
     AVGEN_SPATIAL_READ(r.listenWidth, "listenWidth", detail::readFloat);
     AVGEN_SPATIAL_READ(r.listenAlongAxis, "listenAlongAxis", detail::readBool);
+    AVGEN_SPATIAL_READ(r.sandNormalized, "sandNormalized", detail::readBool);
     AVGEN_SPATIAL_READ(r.sharpness, "sharpness", detail::readFloat);
     AVGEN_SPATIAL_READ(r.derivativeStep, "derivativeStep", detail::readFloat);
     AVGEN_SPATIAL_READ(r.reliefLine, "reliefLine", detail::readFloat);
@@ -1123,7 +1128,8 @@ float scalarChannel(const ResonanceSums& s, const ResonanceSpec& r) {
             return 0.0f;
         }
         const float k = std::max(sharpness, 1e-3f);
-        return std::sqrt(s.meanEnergy) * std::exp(-s.energy / (k * k * s.meanEnergy));
+        const float line = std::exp(-s.energy / (k * k * s.meanEnergy));
+        return r.sandNormalized ? line : std::sqrt(s.meanEnergy) * line; // ADR-1405
     }
     case ResonanceChannel::Force:
     case ResonanceChannel::Gradient:

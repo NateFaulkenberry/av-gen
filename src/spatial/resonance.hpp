@@ -188,6 +188,9 @@ struct ResonanceSpec {
     float listenWidth = 0.08f;  // ... with soft edges this wide (along the axis: the Gaussian's width)
     bool listenAlongAxis = false; // the window's centre runs listenLow -> listenHigh along `axis` over `length`
     float sharpness = 0.35f;    // sand: the nodal line's width relative to the mean energy
+    // ADR-1405: the sand channel without its sqrt(Ebar) factor -- the nodal network as a 0..1 mask whatever the
+    // loudness (a material that marks the figure in a quiet passage too; the excitation is the amplitude channel's)
+    bool sandNormalized = false;
     float reliefLine = 0.0f;           // relief: the crest's weight (a second, narrower sand line) ...
     float reliefLineSharpness = 0.3f;  // ... and its width
     float reliefVibration = 0.0f;      // relief: the vibration's weight (D)

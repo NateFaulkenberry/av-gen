@@ -510,3 +510,29 @@ TEST_CASE("The relief's signed-figure and magnitude terms raise lobes, sink anti
     CHECK(plain.resonance.reliefSand == 1.0f);
     CHECK_FALSE(plain.toJson()["resonance"].contains("reliefFigure"));
 }
+
+TEST_CASE("A normalised sand reader marks the nodal network whatever the loudness", "[unit][resonance][shape]") {
+    spatial::ResonanceState st;
+    st.count = 1;
+    st.modeCount = 1;
+    st.modes[0].shape = glm::vec4(0.5f, 1.0f, 0.0f, 1.0f);
+    spatial::FieldSpec sand;
+    sand.kind = spatial::FieldKind::Resonance;
+    sand.resonance.channel = spatial::ResonanceChannel::Sand;
+    sand.resonance.sharpness = 0.5f;
+    const glm::vec3 node(0.5f * 3.14159265f / 0.5f, 0.0f, 0.0f);
+    float quiet = 0.0f, loud = 0.0f, quietN = 0.0f, loudN = 0.0f;
+    for (const float level : {0.05f, 2.0f}) {
+        st.modes[0].drive = glm::vec4(0.0f, level, 0.0f, level);
+        sand.resonance.sandNormalized = false;
+        (level < 1.0f ? quiet : loud) = spatial::resonanceScalar(st, sand, node);
+        sand.resonance.sandNormalized = true;
+        (level < 1.0f ? quietN : loudN) = spatial::resonanceScalar(st, sand, node);
+    }
+    CHECK(loud > 10.0f * quiet);              // the plain sand grows with the excitation
+    CHECK(quietN == Catch::Approx(1.0f));     // normalised: on the node it is 1, loud or quiet
+    CHECK(loudN == Catch::Approx(1.0f));
+    auto back = spatial::FieldSpec::fromJson(sand.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->resonance.sandNormalized);
+}

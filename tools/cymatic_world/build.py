@@ -381,8 +381,13 @@ def ground_readers(s):
     if BAKE:
         # ADR-1407: what the material reads -- the sand ridge, the crest line, the excitation -- baked too, so a pixel
         # samples three grids instead of evaluating every mode (the colour pass's `shade` colour field, split in three)
-        for name, channel, extra in (("shade-sand", "sand", {"sharpness": 0.9}), ("shade-crest", "sand", {"sharpness": 0.35}),
-                                     ("shade-amp", "amplitude", {})):
+        # the large and medium scales only (u < 0.7): colour follows the nodal network the geometry draws, not the
+        # fine carpet or the rings passing through it
+        win = {"listenLow": 0.0, "listenHigh": 0.7, "listenWidth": 0.04}
+        # the sand masks normalised (ADR-1405): the network is marked in a quiet passage too; loudness is |F|'s
+        for name, channel, extra in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **win}),
+                                     ("shade-crest", "sand", {"sharpness": 0.25, "sandNormalized": True, **win}),
+                                     ("shade-amp", "amplitude", dict(win))):
             reader(s, name, channel, extra)
             bake_grid(s, name)
     else:
@@ -515,19 +520,19 @@ def ground_program():
         g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])               # r2 = crest
         g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])               # r3 = amplitude
     g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
-    g.op("gritMask", "smoothstep", 1, a=1, k=[0.12, 0.5])          # r1: where grit has settled (the ridges)
+    g.op("gritMask", "smoothstep", 1, a=1, k=[0.5, 0.92] if BAKE else [0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
-    g.op("lineMask", "smoothstep", 2, a=2, k=[0.25, 0.7])
+    g.op("lineMask", "smoothstep", 2, a=2, k=[0.7, 0.96] if BAKE else [0.25, 0.7])
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
     g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
     g.op(None, "multiply", 2, a=2, b=7)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
-    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.8, 2.4])          # only where it rings hard
+    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.35, 1.1])          # only where it rings hard
     g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
     # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
     g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
-    g.op("wallBand", "smoothstep", 4, a=4, k=[0.035, 0.08])
+    g.op("wallBand", "smoothstep", 4, a=4, k=[0.08, 0.3] if BAKE else [0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
     tint("hollow", 3, 3, "hollow", P_["hollowI"])
     g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
@@ -548,19 +553,13 @@ def ground_program():
     g.op("skyDot", "gradient", 3, a=6, k=[0.0, 0.5, 0.0, 0.5], f=1.0)   # 0.5 + 0.5 N.y: the hemisphere
     tint("sky", 3, 3, "sky", P_["skyI"])
     g.op(None, "add", 5, a=5, b=3)                                 # + sky
-    g.op("rimMask", "fresnel", 3, f=3.0)
-    tint("rim", 3, 3, "rim", P_["rimI"])
-    g.op(None, "add", 5, a=5, b=3)                                 # + rim
+    # (the Fresnel rim and the distance haze went in the shape-language pass: seen from 35-70 m, straight down, the
+    # ground grazes almost nothing and hazes almost nothing -- 7 ops, ~2.5 ms of interpreter at High)
     if dbg == "light":
         g.op(None, "add", 4, a=5, b=1)                             # the light alone (on white)
     elif dbg != "albedo":
         g.op(None, "multiply", 4, a=4, b=5)                        # lit colour
         g.op(None, "add", 4, a=4, b=1)                             # + sheen
-    # ---- distance haze: the far ground and walls fade into the world's air ----
-    g.op(None, "input", 3, inp="cameraDistance")
-    g.op("hazeRamp", "remap", 3, a=3, k=[35.0, 280.0, 0.0, 0.7], f=1.0)
-    g.op("haze", "constant", 7, k=pc("haze", 1.0) + [1.0])
-    g.op(None, "mixBy", 4, a=4, b=7, c=3)
     if dbg in ("albedo", "light"):
         g.op(None, "constant", 2, k=[0, 0, 0, 1])
     g.base, g.emit = 4, 2

@@ -254,3 +254,28 @@ The root causes from §9 (evictions, strike steps, layout shifts) stay fixed by 
 | Square 0.3 m, baked | 36.9 ms |
 
 With the field baked, what remains is the bare mesh (about 40 ns a vertex) and the material interpreter: 40 ops at about 0.36 ms each at High, raised by quad overshading on small triangles. Stage 8 trims the material.
+
+## Stage 8: the plasma material on the new geometry
+
+The colour pass's palette, lighting, bloom and AgX settings, and every one of its colour routes, are kept:
+- the build turns the grit's hue;
+- held sound and kicks drive the hollow glow;
+- snares drive the nodal lines;
+- hats drive the sheen;
+- spectral flux drives the fuchsia counter-fill;
+- CC 8 drives the light.
+
+The routes find their ops by label, so they follow the program.
+
+What changed:
+- **The material reads the same network the geometry draws.** Its three inputs are baked grids (ADR-1407) of the large and medium scales only (u < 0.7): the sand ridge, the crest line and the excitation |F|.
+- **The sand masks are normalised** (`sandNormalized`, ADR-1405): the nodal network is a 0-1 mask whatever the loudness. In the shape language the old masks (scaled by the field's energy) left quiet passages black; 10 s was nearly black before this. Loudness drives only the emission: the crest line's brightness, the hollow glow's presence, and the routes.
+- **Thresholds on the new scales:**
+  - grit hugs the ridges (mask 0.5-0.92), so navy stone shows between them;
+  - the nodal line is a thin bright crest (crest reader sharpness 0.25, mask 0.7-0.96);
+  - the fuchsia glow rises on the inner walls of cells whose excitation passes 0.35-1.1.
+- **Seven ops removed** (40 → 33): the Fresnel rim and the distance haze. Seen from 35-70 m, nearly straight down, the ground grazes and hazes almost nothing. That is about 2.5 ms of interpreter at High.
+
+**Stills:** `stage8-art/plasma-stills-hyperborea-*.png` and `before-art-pass-same-times.png` (the same timestamps before this stage), plus `plasma-1080p-52s.png`. Quiet, dense and transitional passages are all coloured and legible, and the crispness the owner asked for now comes from the thin crest lines and the grit edges.
+
+**Cost:** live 1080p, High: GPU median 28.8 ms, 0 deadline misses. Auto holds High. The colour-pass baseline was 26.0 ms.

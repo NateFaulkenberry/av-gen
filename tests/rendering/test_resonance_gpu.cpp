@@ -341,6 +341,10 @@ TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (AD
     shaped.resonance.reliefRound = 0.3f;
     shaped.resonance.reliefVibration = 0.3f;
     fields.fields.push_back(shaped);
+    auto normal = reader("normsand", spatial::ResonanceChannel::Sand); // ADR-1405: the mask without its energy
+    normal.resonance.sandNormalized = true;
+    normal.resonance.sharpness = 0.5f;
+    fields.fields.push_back(normal);
     fields.audio = song(4000);
     spatial::ResonanceCache cache;
     std::vector<glm::vec4> samples;

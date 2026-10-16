@@ -252,7 +252,11 @@
     },
     "resonance": {
      "channel": "sand",
-     "sharpness": 0.9
+     "sharpness": 0.9,
+     "sandNormalized": true,
+     "listenLow": 0.0,
+     "listenHigh": 0.7,
+     "listenWidth": 0.04
     }
    }
   },
@@ -290,7 +294,11 @@
     },
     "resonance": {
      "channel": "sand",
-     "sharpness": 0.35
+     "sharpness": 0.25,
+     "sandNormalized": true,
+     "listenLow": 0.0,
+     "listenHigh": 0.7,
+     "listenWidth": 0.04
     }
    }
   },
@@ -327,7 +335,10 @@
      "kind": "none"
     },
     "resonance": {
-     "channel": "amplitude"
+     "channel": "amplitude",
+     "listenLow": 0.0,
+     "listenHigh": 0.7,
+     "listenWidth": 0.04
     }
    }
   },
@@ -575,8 +586,8 @@
      "dst": 1,
      "srcA": 1,
      "constant": [
-      0.12,
       0.5,
+      0.92,
       0.0,
       0.0
      ]
@@ -586,8 +597,8 @@
      "dst": 2,
      "srcA": 2,
      "constant": [
-      0.25,
       0.7,
+      0.96,
       0.0,
       0.0
      ]
@@ -631,8 +642,8 @@
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.8,
-      2.4,
+      0.35,
+      1.1,
       0.0,
       0.0
      ]
@@ -659,8 +670,8 @@
      "dst": 4,
      "srcA": 4,
      "constant": [
-      0.035,
       0.08,
+      0.3,
       0.0,
       0.0
      ]
@@ -887,40 +898,6 @@
      "srcB": 3
     },
     {
-     "kind": "fresnel",
-     "dst": 3,
-     "value": 3.0
-    },
-    {
-     "kind": "ramp",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ],
-     "constant2": [
-      0.175,
-      0.04807,
-      0.138475,
-      0.5
-     ],
-     "constant3": [
-      0.35,
-      0.09614,
-      0.27695,
-      1.0
-     ]
-    },
-    {
-     "kind": "add",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 3
-    },
-    {
      "kind": "multiply",
      "dst": 4,
      "srcA": 4,
@@ -931,40 +908,6 @@
      "dst": 4,
      "srcA": 4,
      "srcB": 1
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "cameraDistance"
-    },
-    {
-     "kind": "remap",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      35.0,
-      280.0,
-      0.0,
-      0.7
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.02315,
-      0.016,
-      0.17789,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 7,
-     "srcC": 3
     }
    ],
    "baseColor": 4,

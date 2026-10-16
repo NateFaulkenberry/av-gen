@@ -609,7 +609,7 @@ fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
     let b0 = fieldBlock.fields[fi].gridBounds0;
     let b1 = fieldBlock.fields[fi].gridBounds1;
     let width = max(b1.z, 1e-4);
-    if (b0.w > 0.5) {
+    if ((u32(b0.w + 0.5) & 1u) == 1u) { // bit 0: listen along the axis (bit 1: normalised sand, ADR-1405)
         var axis = fieldBlock.fields[fi].axisRadius.xyz;
         if (length(axis) > 1e-6) {
             axis = normalize(axis);
@@ -686,7 +686,9 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
             return 0.0;
         }
         let k = max(fieldBlock.fields[fi].gridBounds1.w, 1e-3);
-        return sqrt(s.z) * exp(-s.y / (k * k * s.z));
+        let line = exp(-s.y / (k * k * s.z));
+        // ADR-1405: bit 1 of gridBounds0.w -- the nodal mask without its energy factor
+        return select(sqrt(s.z) * line, line, (u32(fieldBlock.fields[fi].gridBounds0.w + 0.5) & 2u) == 2u);
     }
     return 0.0;
 }
