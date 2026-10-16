@@ -391,6 +391,11 @@ PALETTES = {
           "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
           "sheen": "#fff1e0", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.76, "rimI": 0.42, "skyI": 0.105, "lineI": 2.2, "hollowI": 0.1},
 }
+# G, GEOMETRY ONLY (a review aid, never shipped: CW_PALETTE=G): one neutral grey material, white light from the same
+# key and fill directions, no emission and no colour routes -- the world's shape with its colour ignored
+PALETTES["G"] = {"stone": "#5c5f66", "grit": "#5c5f66", "key": "#ffffff", "fill": "#c8ccd4", "rim": "#ffffff",
+                 "sky": "#9aa0aa", "haze": "#2c2f36", "line": "#000000", "hollow": "#000000", "sheen": "#ffffff",
+                 "sheenI": 0.35, "keyI": 1.5, "fillI": 0.55, "rimI": 0.12, "skyI": 0.18, "lineI": 0.0, "hollowI": 0.0}
 PALETTE = os.environ.get("CW_PALETTE", "B")   # chosen in Pass B (plasma interference)
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
@@ -618,13 +623,15 @@ def build_world():
     #     fuchsia counter-fill on the far flanks.
     tgt = hexrgb("#0f6b82")
     base = pc("grit")
-    s.route(*[R("intensity", path, round((tgt[c] - base[c]) * w, 5), comp=c, attackMs=4000, decayMs=9000)
-              for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5))])
-    s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
-            *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
-            R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
-            *[R("hatEnv", p_, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180) for p_ in sheen],
-            *[R("flux", p_, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500) for p_ in counter])
+    colour_routes = PALETTE != "G"
+    if colour_routes:
+        s.route(*[R("intensity", path, round((tgt[c] - base[c]) * w, 5), comp=c, attackMs=4000, decayMs=9000)
+                  for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5))])
+        s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
+                *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
+                R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
+                *[R("hatEnv", p_, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180) for p_ in sheen],
+                *[R("flux", p_, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500) for p_ in counter])
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     s.route(*[R("control.light", p_, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR) for p_ in counter],
