@@ -83,6 +83,13 @@ enum class ResonanceChannel : std::uint8_t { Displacement, Amplitude, Sand, Forc
 }
 
 enum class ResonanceSourceKind : std::uint8_t { Point, Lattice };
+// ADR-1409: which rows a reader sums -- every row (ADR-1400), the standing modes only, or the onset ripples only (a
+// light that travels with the rings and nothing else)
+enum class ResonanceRows : std::uint8_t { All, Modes, Ripples };
+[[nodiscard]] const char* resonanceRowsName(ResonanceRows rows);
+[[nodiscard]] std::optional<ResonanceRows> resonanceRowsFromName(std::string_view name);
+// true when a row of this geometry (mode.shape.w) is heard by a reader summing `rows`
+[[nodiscard]] bool resonanceRowHeard(ResonanceRows rows, float shapeW);
 [[nodiscard]] const char* resonanceSourceKindName(ResonanceSourceKind kind);
 [[nodiscard]] std::optional<ResonanceSourceKind> resonanceSourceKindFromName(std::string_view name);
 
@@ -191,6 +198,7 @@ struct ResonanceSpec {
     // ADR-1405: the sand channel without its sqrt(Ebar) factor -- the nodal network as a 0..1 mask whatever the
     // loudness (a material that marks the figure in a quiet passage too; the excitation is the amplitude channel's)
     bool sandNormalized = false;
+    ResonanceRows rows = ResonanceRows::All; // ADR-1409
     float reliefLine = 0.0f;           // relief: the crest's weight (a second, narrower sand line) ...
     float reliefLineSharpness = 0.3f;  // ... and its width
     float reliefVibration = 0.0f;      // relief: the vibration's weight (D)

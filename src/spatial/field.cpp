@@ -1390,7 +1390,7 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
         if (!(step > 0.0f)) {
             step = (state != nullptr ? state->lambdaMin : r.lambdaMin / std::max(r.scale, 1e-3f)) / 24.0f;
         }
-        g.gridBounds0 = glm::vec4(0.0f, 0.0f, static_cast<float>(static_cast<int>(r.channel)), (r.listenAlongAxis ? 1.0f : 0.0f) + (r.sandNormalized ? 2.0f : 0.0f)); // bit 0 axis, bit 1 (ADR-1405) normalised sand
+        g.gridBounds0 = glm::vec4(0.0f, 0.0f, static_cast<float>(static_cast<int>(r.channel)), (r.listenAlongAxis ? 1.0f : 0.0f) + (r.sandNormalized ? 2.0f : 0.0f) + 4.0f * static_cast<float>(static_cast<int>(r.rows))); // bit 0 axis, bit 1 (ADR-1405) normalised sand, bits 2-3 (ADR-1409) rows
         g.gridBounds1 = glm::vec4(r.listenLow, r.listenHigh, std::max(r.listenWidth, 1e-4f), std::max(r.sharpness, 1e-3f));
         g.gridRes = glm::vec4(std::max(step, 1e-4f), std::max(r.reliefLineSharpness, 1e-3f), r.reliefLine,
                               r.reliefVibration);

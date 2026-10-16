@@ -273,6 +273,7 @@ std::uint64_t ResonanceSpec::structuralHash() const {
     h.u8(static_cast<std::uint8_t>(channel));
     h.boolean(listenAlongAxis);
     h.boolean(sandNormalized);
+    h.u8(static_cast<std::uint8_t>(rows));
     h.boolean(probe.has_value());
     if (probe) {
         h.v3(*probe);
@@ -388,6 +389,9 @@ json ResonanceSpec::toJson() const {
     if (sandNormalized) {
         j["sandNormalized"] = true; // ADR-1405
     }
+    if (rows != ResonanceRows::All) {
+        j["rows"] = resonanceRowsName(rows); // ADR-1409
+    }
     j["sharpness"] = sharpness;
     if (derivativeStep > 0.0f) {
         j["derivativeStep"] = derivativeStep;
@@ -456,6 +460,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.listenWidth, "listenWidth", detail::readFloat);
     AVGEN_SPATIAL_READ(r.listenAlongAxis, "listenAlongAxis", detail::readBool);
     AVGEN_SPATIAL_READ(r.sandNormalized, "sandNormalized", detail::readBool);
+    AVGEN_SPATIAL_READ_ENUM(r.rows, "rows", &resonanceRowsFromName, "resonance rows");
     AVGEN_SPATIAL_READ(r.sharpness, "sharpness", detail::readFloat);
     AVGEN_SPATIAL_READ(r.derivativeStep, "derivativeStep", detail::readFloat);
     AVGEN_SPATIAL_READ(r.reliefLine, "reliefLine", detail::readFloat);
@@ -993,6 +998,39 @@ const ResonanceState* resonanceStateOf(const FieldSpec& field, const FieldSet* s
 // Sampling
 // ================================================================================================
 
+const char* resonanceRowsName(ResonanceRows rows) {
+    switch (rows) {
+    case ResonanceRows::Modes:
+        return "modes";
+    case ResonanceRows::Ripples:
+        return "ripples";
+    case ResonanceRows::All:
+        break;
+    }
+    return "all";
+}
+
+std::optional<ResonanceRows> resonanceRowsFromName(std::string_view name) {
+    if (name == "all") {
+        return ResonanceRows::All;
+    }
+    if (name == "modes") {
+        return ResonanceRows::Modes;
+    }
+    if (name == "ripples") {
+        return ResonanceRows::Ripples;
+    }
+    return std::nullopt;
+}
+
+bool resonanceRowHeard(ResonanceRows rows, float shapeW) {
+    if (rows == ResonanceRows::All) {
+        return true;
+    }
+    const bool ripple = std::fmod(shapeW, 4.0f) > 1.5f; // ADR-1403: geometry 2
+    return (rows == ResonanceRows::Ripples) == ripple;
+}
+
 float resonanceModeShape(const ResonanceMode& mode, const glm::vec3& q, float* env2) {
     const float k = mode.shape.x;
     const float m = mode.shape.y;
@@ -1078,6 +1116,9 @@ ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader
         const ResonanceMode& md = state.modes[static_cast<std::size_t>(i)];
         if (std::max({std::abs(md.drive.x), std::abs(md.drive.y), std::abs(md.drive.w)}) < kResonanceSilent) {
             continue; // ADR-1406: a silent row
+        }
+        if (!resonanceRowHeard(reader.resonance.rows, md.shape.w)) {
+            continue; // ADR-1409
         }
         const float w = resonanceListen(reader, md.drive.z, q);
         if (w <= 0.0f) {

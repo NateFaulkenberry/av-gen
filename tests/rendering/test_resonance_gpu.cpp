@@ -312,7 +312,7 @@ TEST_CASE("The resonance table holds 48 modes; a resonator that does not fit sam
     CHECK(gpu[4].x == 0.0f);
 }
 
-TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (ADR-1403)", "[gpu][resonance][motion]") {
+TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (ADR-1403, ADR-1409 rows)", "[gpu][resonance][motion]") {
     auto ctx = makeContext();
     Harness harness(*ctx);
     spatial::FieldSet fields = makeFields();
@@ -346,6 +346,12 @@ TEST_CASE("Moving modes and onset ripples match the CPU reference on the GPU (AD
     normal.resonance.sandNormalized = true;
     normal.resonance.sharpness = 0.5f;
     fields.fields.push_back(normal);
+    auto rings = reader("rings", spatial::ResonanceChannel::Displacement); // ADR-1409: the ripple rows only
+    rings.resonance.rows = spatial::ResonanceRows::Ripples;
+    fields.fields.push_back(rings);
+    auto standing = reader("standing", spatial::ResonanceChannel::Shading); // ADR-1409: the mode rows only
+    standing.resonance.rows = spatial::ResonanceRows::Modes;
+    fields.fields.push_back(standing);
     fields.audio = song(4000);
     spatial::ResonanceCache cache;
     std::vector<glm::vec4> samples;

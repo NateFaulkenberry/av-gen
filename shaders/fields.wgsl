@@ -614,6 +614,17 @@ fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
     return vec2<f32>(s * sqrt(2.0 / f32(n)) * w, w * w);
 }
 
+// ADR-1409: bits 2-3 of gridBounds0.w say which rows a reader sums (0 all, 1 the modes, 2 the ripples)
+fn resonanceRowHeard(fi: u32, row: u32) -> bool {
+    let rows = (u32(fieldBlock.fields[fi].gridBounds0.w + 0.5) >> 2u) & 3u;
+    if (rows == 0u) {
+        return true;
+    }
+    let w = fieldBlock.resonance[row * 3u].w;
+    let ripple = w - 4.0 * floor(w * 0.25) > 1.5;
+    return (rows == 2u) == ripple;
+}
+
 fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
     let b0 = fieldBlock.fields[fi].gridBounds0;
     let b1 = fieldBlock.fields[fi].gridBounds1;
@@ -650,6 +661,9 @@ fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec4<f32> {
         let drive = fieldBlock.resonance[row * 3u + 2u];
         // ADR-1406: a silent row (a mode out of its focus, a faded ring) adds nothing -- skip its shape
         if (max(max(abs(drive.x), abs(drive.y)), abs(drive.w)) < RES_SILENT) {
+            continue;
+        }
+        if (!resonanceRowHeard(fi, row)) { // ADR-1409
             continue;
         }
         let w = resonanceListen(fi, drive.z, q);
@@ -725,6 +739,9 @@ fn resonanceShadingAt(fi: u32, q: vec3<f32>) -> vec3<f32> {
         }
         let drive = fieldBlock.resonance[row * 3u + 2u];
         if (max(max(abs(drive.x), abs(drive.y)), abs(drive.w)) < RES_SILENT) { // ADR-1406
+            continue;
+        }
+        if (!resonanceRowHeard(fi, row)) { // ADR-1409
             continue;
         }
         let w = resonanceListen(fi, drive.z, q);

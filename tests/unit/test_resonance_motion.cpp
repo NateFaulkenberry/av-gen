@@ -536,3 +536,47 @@ TEST_CASE("A normalised sand reader marks the nodal network whatever the loudnes
     REQUIRE(back.has_value());
     CHECK(back->resonance.sandNormalized);
 }
+
+// ---- ADR-1409: a reader sums its modes only, or its ripples only --------------------------------------------------
+
+TEST_CASE("A reader's rows select the standing modes or the ripples, and the two add up to all", "[unit][resonance][motion]") {
+    std::vector<spatial::AudioOnset> kicks{{2.0, 0.9f}, {3.1, 0.8f}};
+    const auto h = history(8.0, 0.2f, {{kicks, {}, {}}});
+    auto f = moving();
+    f.resonance.ripple = 1.0f;
+    f.resonance.rippleCount = 2.0f;
+    const auto s = spatial::evaluateResonance(f, h, 3.6);
+    REQUIRE(s.count > s.modeCount); // a ring is alive
+    auto reader = f;
+    reader.resonance.channel = spatial::ResonanceChannel::Displacement;
+    int checked = 0;
+    float rippleMax = 0.0f;
+    for (float x = -30.0f; x <= 30.0f; x += 1.7f) {
+        for (float z = -30.0f; z <= 30.0f; z += 2.3f) {
+            const glm::vec3 q(x, 0.0f, z);
+            reader.resonance.rows = spatial::ResonanceRows::All;
+            const float all = spatial::resonanceScalar(s, reader, q);
+            reader.resonance.rows = spatial::ResonanceRows::Modes;
+            const float modes = spatial::resonanceScalar(s, reader, q);
+            reader.resonance.rows = spatial::ResonanceRows::Ripples;
+            const float ripples = spatial::resonanceScalar(s, reader, q);
+            CHECK(all == Approx(modes + ripples).margin(1e-4));
+            rippleMax = std::max(rippleMax, std::abs(ripples));
+            ++checked;
+        }
+    }
+    CHECK(checked > 100);
+    CHECK(rippleMax > 1e-3f); // the ripple rows alone draw something
+    // without onsets a ripples-only reader is exactly 0
+    const auto still = spatial::evaluateResonance(f, history(8.0, 0.2f), 3.6);
+    reader.resonance.rows = spatial::ResonanceRows::Ripples;
+    CHECK(spatial::resonanceScalar(still, reader, glm::vec3(1.0f, 0.0f, 2.0f)) == 0.0f);
+    // round trip; the default stays out of the JSON
+    const auto back = spatial::FieldSpec::fromJson(reader.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->resonance.rows == spatial::ResonanceRows::Ripples);
+    CHECK(back->structuralHash() == reader.structuralHash());
+    reader.resonance.rows = spatial::ResonanceRows::All;
+    CHECK_FALSE(reader.toJson()["resonance"].contains("rows"));
+    CHECK_FALSE(spatial::resonanceRowsFromName("waves").has_value());
+}

@@ -86,6 +86,7 @@ A tuned reader (each height hears its own band of modes): `"listenAlongAxis": tr
 | `source/<i>/focus`, `focusWidth`, `focusSweep`, `focusPeriod`, `focusFloor` | ADR-1405: a Gaussian window over u that lets one or two modes lead |
 | `reliefSand`, `reliefLine`, `reliefVibration`, `reliefFigure`, `reliefAmplitude`, `reliefRound` | ADR-1403/1405: a relief reader's terms (see below) |
 | `sandNormalized` | ADR-1405: the sand as a 0-1 mask whatever the loudness (also a relief reader's sand terms) |
+| `rows` | ADR-1409: `all` (default), `modes` (the standing figure only) or `ripples` (the onset rings only; 0 in silence) |
 
 ## Mode shapes
 
