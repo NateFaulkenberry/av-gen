@@ -29,7 +29,8 @@
 //     displacement  D
 //     amplitude     sqrt(E),  E = sum (e_i phi_i)^2 -- the local excitation
 //     sand          sqrt(Ebar) exp(-E / (s^2 Ebar)), Ebar = sum e_i^2 <phi_i^2> -- where Chladni sand
-//                   gathers: the nodal lines of the energised region (s = sharpness)
+//                   gathers: the nodal lines of the energised region (s = sharpness). Sand reads the SLOW
+//                   envelope (`memory`): it settles over a second or two instead of jumping with every hit.
 //     force         -grad E (vector): towards the nodes, the acoustic radiation force on a grain
 //     gradient      grad D (vector)
 // optionally through a listening window over u (a tuned structure hears only some modes; laid along
@@ -98,6 +99,8 @@ struct ResonanceSpec {
     float contrast = 0.5f;      // 0..0.95: how much of each row's mean level is subtracted (spectral contrast)
     float persistence = 2.5f;   // seconds the lowest mode takes to ring down by 1/e
     float buildup = 0.25f;      // a mode's rise time as a fraction of its ring-down
+    float memory = 1.5f;        // seconds: the slow envelope the sand channel reads rises over memory / 2 and
+                                // rings down over the mode's ring-down plus this (where sand settles, not where it jumps)
     float sustain = 1.0f;       // gain of the spectral drive
     float transient = 0.8f;     // gain of the onsets' strikes
     float idle = 0.12f;         // the lowest modes' level in silence
@@ -124,7 +127,8 @@ struct ResonanceSpec {
 struct ResonanceMode {
     glm::vec4 shape{0.0f}; // k (rad/m), m (angular order / lattice directions), theta (rad), geometry (0 point, 1 lattice)
     glm::vec4 place{0.0f}; // centre (field frame), reach (0 = unbounded)
-    glm::vec4 drive{0.0f}; // d = a cos(Omega t + psi) (displacement), e = a (envelope), u, weight (fade-in x source gain)
+    glm::vec4 drive{0.0f}; // d = a cos(Omega t + psi) (displacement), e = a (envelope), u, s (the slow envelope, the
+                           // sand's memory); d, e and s include the mode's weight (fade-in x source gain)
 };
 
 // What a resolver derives for one resonator at one clock: its modes, ready to sample.
@@ -133,6 +137,8 @@ struct ResonanceState {
     std::array<ResonanceMode, kMaxResonanceModes> modes{};
     std::array<float, kMaxResonanceModes> frequency{}; // Hz, per mode (diagnostics and tests)
     std::array<float, kMaxResonanceModes> envelope{};  // a_i before the limiter (diagnostics and tests)
+    std::array<float, kMaxResonanceModes> memory{};    // the slow envelope before its limiter
+    std::array<float, kMaxResonanceModes> weight{};    // fade-in x source gain
     double clock = 0.0;
     float limiterGain = 1.0f;
     float lambdaMin = 3.0f; // the shortest wavelength drawn (the vector channels' default step)
@@ -187,7 +193,9 @@ struct ResonanceSums {
     float energy = 0.0f;       // E
     float meanEnergy = 0.0f;   // Ebar
 };
-[[nodiscard]] ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q);
+// `memory`: E and Ebar from the slow envelope (the sand channel) instead of the fast one.
+[[nodiscard]] ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q,
+                                         bool memory = false);
 // The reader's scalar channel at q (displacement, amplitude, sand; the vector channels' length).
 [[nodiscard]] float resonanceScalar(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q);
 // The reader's vector channel at q, in the field frame (force, gradient; a scalar channel gives 0).

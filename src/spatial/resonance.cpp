@@ -25,6 +25,7 @@ constexpr float kTwoPi = 6.28318530717958f;
 constexpr float kOctavesPerBin = 8.96578428f / static_cast<float>(kAudioBins - 1); // log2(16000 / 32) / 63
 constexpr int kSelectivityTaps = 16; // the resonance curve is truncated at +-16 bins (2.3 octaves)
 constexpr float kStrikeRise = 0.03f; // seconds: an onset's strike reaches its peak this fast
+constexpr float kStrikeBurst = 0.25f; // seconds of full drive a strike is worth to the memory
 // Where each onset source strikes (Hz) and how widely (octaves): the analyser's low, mid and high bands.
 constexpr float kStrikeCentre[3] = {80.0f, 700.0f, 5000.0f};
 constexpr float kStrikeOctaves = 1.3f;
@@ -163,6 +164,9 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
     if (!(persistence > 0.0f && persistence <= 30.0f)) {
         return fail("field '{}': resonance.persistence must be in (0, 30] seconds", field);
     }
+    if (!(memory >= 0.0f && memory <= 30.0f)) {
+        return fail("field '{}': resonance.memory must be in [0, 30] seconds", field);
+    }
     if (!(buildup >= 0.0f && buildup <= 1.0f)) {
         return fail("field '{}': resonance.buildup must be in [0, 1]", field);
     }
@@ -199,7 +203,7 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
 std::uint64_t ResonanceSpec::structuralHash() const {
     detail::Fnv h;
     for (const float v : {modes, fLow, fHigh, lambdaMax, lambdaMin, scale, selectivity, contrast, persistence, buildup,
-                          sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
+                          memory, sustain, transient, idle, breath, limit, listenLow, listenHigh, listenWidth, sharpness,
                           derivativeStep}) {
         h.f32(v);
     }
@@ -230,6 +234,7 @@ json ResonanceSpec::toJson() const {
     j["contrast"] = contrast;
     j["persistence"] = persistence;
     j["buildup"] = buildup;
+    j["memory"] = memory;
     j["sustain"] = sustain;
     j["transient"] = transient;
     j["idle"] = idle;
@@ -273,6 +278,7 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(r.contrast, "contrast", detail::readFloat);
     AVGEN_SPATIAL_READ(r.persistence, "persistence", detail::readFloat);
     AVGEN_SPATIAL_READ(r.buildup, "buildup", detail::readFloat);
+    AVGEN_SPATIAL_READ(r.memory, "memory", detail::readFloat);
     AVGEN_SPATIAL_READ(r.sustain, "sustain", detail::readFloat);
     AVGEN_SPATIAL_READ(r.transient, "transient", detail::readFloat);
     AVGEN_SPATIAL_READ(r.idle, "idle", detail::readFloat);
@@ -391,7 +397,10 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
 
     std::array<float, kMaxResonanceModes> tauD{};
     std::array<float, kMaxResonanceModes> tauA{};
+    std::array<float, kMaxResonanceModes> slowD{}; // the memory's kernel: the ring-down plus `memory`
+    std::array<float, kMaxResonanceModes> slowA{};
     float maxTau = 0.0f;
+    const float memory = std::max(r.memory, 0.0f) * releaseScale;
     for (int i = 0; i < count; ++i) {
         const float u = count == 1 ? 0.0f : std::min(static_cast<float>(i) / span, 1.0f);
         const float f = r.fLow * std::pow(r.fHigh / r.fLow, u);
@@ -427,16 +436,21 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         ResonanceMode& md = st.modes[static_cast<std::size_t>(i)];
         md.shape = glm::vec4(k, m, theta, geometry);
         md.place = glm::vec4(src.position, src.reach);
-        md.drive = glm::vec4(0.0f, 0.0f, u, weight);
+        md.drive = glm::vec4(0.0f, 0.0f, u, 0.0f);
+        st.weight[static_cast<std::size_t>(i)] = weight;
         st.frequency[static_cast<std::size_t>(i)] = f;
         tauD[static_cast<std::size_t>(i)] = std::max(r.persistence * std::pow(r.fLow / f, 0.35f), 0.05f) * releaseScale;
         tauA[static_cast<std::size_t>(i)] =
             std::min(std::max(r.buildup * tauD[static_cast<std::size_t>(i)] / releaseScale * attackScale, 0.015f),
                      0.98f * tauD[static_cast<std::size_t>(i)]);
-        maxTau = std::max(maxTau, tauD[static_cast<std::size_t>(i)]);
+        slowD[static_cast<std::size_t>(i)] = tauD[static_cast<std::size_t>(i)] + memory;
+        slowA[static_cast<std::size_t>(i)] = std::min(std::max(0.5f * memory * attackScale, tauA[static_cast<std::size_t>(i)]),
+                                                      0.98f * slowD[static_cast<std::size_t>(i)]);
+        maxTau = std::max(maxTau, slowD[static_cast<std::size_t>(i)]);
     }
 
     std::array<float, kMaxResonanceModes> a{};
+    std::array<float, kMaxResonanceModes> slow{};
     if (audio) {
         const std::int64_t newest = audio->newestRow(clock);
         const double rate = audio->rowRate();
@@ -475,17 +489,31 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
                 const float md = std::exp(-dt / td);
                 const float ma = std::exp(-dt / ta);
                 const float inv = 1.0f / (td - ta);
+                // the memory's kernel, the same way
+                const float sd = slowD[si];
+                const float sa = slowA[si];
+                float sed = std::exp(-age0 / sd);
+                float sea = std::exp(-age0 / sa);
+                const float smd = std::exp(-dt / sd);
+                const float sma = std::exp(-dt / sa);
+                const float sinv = 1.0f / (sd - sa);
                 float sum = 0.0f;
+                float slowSum = 0.0f;
                 for (std::int64_t kRow = 0; kRow < nrows; ++kRow) {
                     const auto& row = (*rows)[static_cast<std::size_t>(nrows - 1 - kRow)];
                     const float s = row[static_cast<std::size_t>(b0)] + (row[static_cast<std::size_t>(b1)] - row[static_cast<std::size_t>(b0)]) * fb;
                     sum += s * (ed - ea);
+                    slowSum += s * (sed - sea);
                     ed *= md;
                     ea *= ma;
+                    sed *= smd;
+                    sea *= sma;
                 }
                 float level = r.sustain * sum * inv * dt;
+                float remembered = r.sustain * slowSum * sinv * dt;
                 // Strikes: every heard onset in the window, into the modes its band reaches.
                 float strikes = 0.0f;
+                float slowStrikes = 0.0f;
                 for (int src = 0; src < 3; ++src) {
                     const float oct = std::log2(f / kStrikeCentre[src]) / kStrikeOctaves;
                     const float reachW = std::exp(-oct * oct);
@@ -504,11 +532,15 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
                         const float heard = response.hit(it->strength);
                         if (heard > 0.0f) {
                             strikes += heard * reachW * std::exp(-age / td) * (1.0f - std::exp(-age / kStrikeRise));
+                            // the memory hears a strike as a short burst of drive
+                            slowStrikes += heard * reachW * kStrikeBurst * (std::exp(-age / sd) - std::exp(-age / sa)) * sinv;
                         }
                     }
                 }
                 level += r.transient * strikes;
+                remembered += r.transient * slowStrikes;
                 a[si] = level;
+                slow[si] = remembered;
             }
         }
     }
@@ -517,25 +549,32 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         const float fi = static_cast<float>(i);
         const float shape = (0.65f + 0.35f * std::sin(kTwoPi * t / (19.0f + 7.0f * fi) + 1.3f * fi)) / (1.0f + fi);
         a[static_cast<std::size_t>(i)] += r.idle * shape;
+        slow[static_cast<std::size_t>(i)] += r.idle * shape;
     }
-    // The soft limiter: dense music rings more modes, not louder ones.
+    // The soft limiter: dense music rings more modes, not louder ones (the memory has its own).
     float total = 0.0f;
+    float slowTotal = 0.0f;
     for (int i = 0; i < count; ++i) {
         const auto si = static_cast<std::size_t>(i);
         st.envelope[si] = a[si];
-        const float w = a[si] * st.modes[si].drive.w;
+        st.memory[si] = slow[si];
+        const float w = a[si] * st.weight[si];
+        const float ws = slow[si] * st.weight[si];
         total += w * w;
+        slowTotal += ws * ws;
     }
     st.limiterGain = 1.0f / std::sqrt(1.0f + total / (r.limit * r.limit));
+    const float slowGain = 1.0f / std::sqrt(1.0f + slowTotal / (r.limit * r.limit));
     for (int i = 0; i < count; ++i) {
         const auto si = static_cast<std::size_t>(i);
-        const float e = a[si] * st.limiterGain;
+        const float e = a[si] * st.limiterGain * st.weight[si];
         const float omega = kTwoPi * r.breath * std::pow(st.frequency[si] / r.fLow, 0.3f);
         const float psi = hash01(field.seed, i, 4u) * kTwoPi;
         // The phase in double: an evening's clock times Omega is far past float's exact range.
         const double phase = std::fmod(static_cast<double>(omega) * clock + static_cast<double>(psi), 6.283185307179586);
         st.modes[si].drive.x = e * static_cast<float>(std::cos(phase));
         st.modes[si].drive.y = e;
+        st.modes[si].drive.w = slow[si] * slowGain * st.weight[si];
     }
     return st;
 }
@@ -636,17 +675,17 @@ float resonanceListen(const FieldSpec& reader, float u, const glm::vec3& q) {
     return smoothstepf(r.listenLow - width, r.listenLow, u) * (1.0f - smoothstepf(r.listenHigh, r.listenHigh + width, u));
 }
 
-ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q) {
+ResonanceSums resonanceSums(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q, bool memory) {
     ResonanceSums s;
     for (int i = 0; i < state.count; ++i) {
         const ResonanceMode& md = state.modes[static_cast<std::size_t>(i)];
-        const float w = md.drive.w * resonanceListen(reader, md.drive.z, q);
+        const float w = resonanceListen(reader, md.drive.z, q);
         if (w <= 0.0f) {
             continue;
         }
         float e2 = 0.0f;
         const float phi = resonanceModeShape(md, q, &e2);
-        const float e = w * md.drive.y;
+        const float e = w * (memory ? md.drive.w : md.drive.y);
         s.displacement += w * md.drive.x * phi;
         s.energy += (e * phi) * (e * phi);
         s.meanEnergy += e * e * e2;
@@ -687,7 +726,8 @@ float resonanceScalar(const ResonanceState& state, const FieldSpec& reader, cons
     if (resonanceChannelIsVector(reader.resonance.channel)) {
         return glm::length(resonanceVector(state, reader, q));
     }
-    return scalarChannel(resonanceSums(state, reader, q), reader.resonance.channel, reader.resonance.sharpness);
+    const bool memory = reader.resonance.channel == ResonanceChannel::Sand;
+    return scalarChannel(resonanceSums(state, reader, q, memory), reader.resonance.channel, reader.resonance.sharpness);
 }
 
 glm::vec3 resonanceVector(const ResonanceState& state, const FieldSpec& reader, const glm::vec3& q) {
@@ -697,7 +737,7 @@ glm::vec3 resonanceVector(const ResonanceState& state, const FieldSpec& reader, 
     }
     const float h = derivativeStepOf(state, reader);
     const auto value = [&](const glm::vec3& p) {
-        const ResonanceSums s = resonanceSums(state, reader, p);
+        const ResonanceSums s = resonanceSums(state, reader, p, false);
         return c == ResonanceChannel::Force ? s.energy : s.displacement;
     };
     const glm::vec3 g((value(q + glm::vec3(h, 0, 0)) - value(q - glm::vec3(h, 0, 0))) / (2.0f * h),

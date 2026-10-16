@@ -136,8 +136,8 @@ TEST_CASE("Modes sit on the dispersion axis: low modes hear low notes and draw l
     // A fractional count fades the last mode in.
     const auto half = spatial::evaluateResonance(resonator(8.25f), nullptr, 0.0);
     REQUIRE(half.count == 9);
-    CHECK(half.modes[8].drive.w == Approx(0.25f));
-    CHECK(half.modes[7].drive.w == Approx(1.0f));
+    CHECK(half.weight[8] == Approx(0.25f));
+    CHECK(half.weight[7] == Approx(1.0f));
 }
 
 TEST_CASE("Frequency-selective excitation: a low tone rings the low modes, a high tone the high ones",
@@ -274,7 +274,7 @@ TEST_CASE("Resonance channels: sand gathers on the nodes and the force points at
     st.lambdaMin = 8.0f;
     const float k = 6.2831853f / 8.0f;
     st.modes[0].shape = glm::vec4(k, 1.0f, 0.0f, 1.0f);
-    st.modes[0].drive = glm::vec4(0.3f, 1.0f, 0.0f, 1.0f); // d, e, u, weight
+    st.modes[0].drive = glm::vec4(0.3f, 1.0f, 0.0f, 1.0f); // d, e, u, the memory (s)
     f.resonance.channel = spatial::ResonanceChannel::Sand;
     const float atNode = spatial::resonanceScalar(st, f, glm::vec3(2.0f, 0.0f, 0.0f));
     const float atAntinode = spatial::resonanceScalar(st, f, glm::vec3(0.0f, 0.0f, 0.0f));
@@ -391,4 +391,21 @@ TEST_CASE("Resonance parameters register for a resonator and a reader and apply 
     (void)scene::registerFieldParameters(ps2, reader, "field/reader/");
     CHECK(ps2.find("field/reader/resonance/modes") == nullptr); // a reader has no resonator to tune
     CHECK(ps2.find("field/reader/resonance/listenLow") != nullptr);
+}
+
+TEST_CASE("The sand's memory settles slower and remembers longer than the vibration", "[unit][resonance]") {
+    auto f = resonator(8.0f);
+    f.resonance.memory = 2.0f;
+    // A broad tone from 1 s to 2 s.
+    const auto h = history(14.0, [](double t, int) { return (t >= 1.0 && t < 2.0) ? 1.0f : 0.0f; });
+    const auto early = spatial::evaluateResonance(f, h, 1.3);
+    const auto late = spatial::evaluateResonance(f, h, 6.0);
+    // Early in the tone the vibration leads; long after it the memory holds more of what it reached.
+    CHECK(early.envelope[0] > early.memory[0]);
+    CHECK(late.memory[0] > late.envelope[0]);
+    CHECK(late.memory[0] > 0.0f);
+    // memory 0 is the vibration's own envelope (bar the rise floor): the two agree.
+    f.resonance.memory = 0.0f;
+    const auto same = spatial::evaluateResonance(f, h, 2.5);
+    CHECK(same.memory[0] == Approx(same.envelope[0]).epsilon(1e-4));
 }

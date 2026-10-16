@@ -596,8 +596,8 @@ fn resonanceListen(fi: u32, u: f32, q: vec3<f32>) -> f32 {
     return smoothstep(b1.x - width, b1.x, u) * (1.0 - smoothstep(b1.y, b1.y + width, u));
 }
 
-// (D, E, Ebar) at q.
-fn resonanceSums(fi: u32, q: vec3<f32>) -> vec3<f32> {
+// (D, E, Ebar) at q; `memory`: E and Ebar from the slow envelope (drive.w, the sand's) instead of drive.y.
+fn resonanceSums(fi: u32, q: vec3<f32>, memory: bool) -> vec3<f32> {
     let first = u32(fieldBlock.fields[fi].gridBounds0.x + 0.5);
     let count = u32(fieldBlock.fields[fi].gridBounds0.y + 0.5);
     var sums = vec3<f32>(0.0);
@@ -607,12 +607,12 @@ fn resonanceSums(fi: u32, q: vec3<f32>) -> vec3<f32> {
             break;
         }
         let drive = fieldBlock.resonance[row * 3u + 2u];
-        let w = drive.w * resonanceListen(fi, drive.z, q);
+        let w = resonanceListen(fi, drive.z, q);
         if (w <= 0.0) {
             continue;
         }
         let pe = resonanceModeShape(row, q);
-        let e = w * drive.y;
+        let e = w * select(drive.y, drive.w, memory);
         sums.x = sums.x + w * drive.x * pe.x;
         sums.y = sums.y + (e * pe.x) * (e * pe.x);
         sums.z = sums.z + e * e * pe.y;
@@ -622,7 +622,7 @@ fn resonanceSums(fi: u32, q: vec3<f32>) -> vec3<f32> {
 
 fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     let channel = u32(fieldBlock.fields[fi].gridBounds0.z + 0.5);
-    let s = resonanceSums(fi, q);
+    let s = resonanceSums(fi, q, channel == RES_CHANNEL_SAND);
     if (channel == RES_CHANNEL_DISPLACEMENT) {
         return s.x;
     }
@@ -640,7 +640,7 @@ fn resonanceScalarAt(fi: u32, q: vec3<f32>) -> f32 {
 }
 
 fn resonanceValueFor(fi: u32, q: vec3<f32>, force: bool) -> f32 {
-    let s = resonanceSums(fi, q);
+    let s = resonanceSums(fi, q, false);
     return select(s.x, s.y, force);
 }
 
