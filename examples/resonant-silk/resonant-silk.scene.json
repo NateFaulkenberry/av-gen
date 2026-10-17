@@ -1,0 +1,1034 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "resonant-silk",
+ "camera": {
+  "mode": 1,
+  "position": [
+   4.0,
+   2.0,
+   60.0
+  ],
+  "target": [
+   -16.0,
+   8.0,
+   -60.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.04,
+  "background": [
+   0.00146,
+   0.00201,
+   0.00867
+  ],
+  "fogColor": [
+   0.00194,
+   0.00268,
+   0.01156
+  ],
+  "volumeDensity": 0.0,
+  "fogHeight": 400.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 200.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00073,
+    0.001,
+    0.00433
+   ],
+   "horizonColor": [
+    0.00188,
+    0.0027,
+    0.01999
+   ],
+   "groundColor": [
+    0.00188,
+    0.0027,
+    0.01999
+   ],
+   "haze": 1.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "resonator",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "seed": 17,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "modes": 8.0,
+     "layout": 12.0,
+     "fLow": 40.0,
+     "fHigh": 4000.0,
+     "lambdaMax": 220.0,
+     "lambdaMin": 18.0,
+     "selectivity": 2.5,
+     "contrast": 0.5,
+     "memory": 2.0,
+     "competition": 1.5,
+     "sustain": 1.0,
+     "transient": 0.4,
+     "idle": 0.5,
+     "breath": 0.1,
+     "limit": 1.0,
+     "attack": [
+      0.8,
+      0.3,
+      0.12
+     ],
+     "release": [
+      4.0,
+      1.8,
+      0.7
+     ],
+     "sources": [
+      {
+       "kind": "point",
+       "position": [
+        -80.0,
+        -10.0,
+        -110.0
+       ],
+       "order": 2,
+       "bandLow": 0.0,
+       "bandHigh": 0.4,
+       "gain": 1.0,
+       "amplitude": 1.0
+      },
+      {
+       "kind": "point",
+       "position": [
+        -52.0,
+        -6.0,
+        -96.0
+       ],
+       "order": 3,
+       "bandLow": 0.4,
+       "bandHigh": 1.0,
+       "gain": 1.0,
+       "amplitude": 1.5,
+       "scale": 2.6,
+       "drift": 14.0,
+       "driftPeriod": 40.0,
+       "spin": 0.05
+      }
+     ],
+     "channel": "displacement"
+    }
+   }
+  },
+  {
+   "name": "wallSide",
+   "kind": "field",
+   "position": [
+    0.0,
+    4.0,
+    -170.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "plane",
+    "axis": [
+     -0.435,
+     0.03,
+     0.9
+    ],
+    "softness": 35.0
+   }
+  },
+  {
+   "name": "sailSide",
+   "kind": "field",
+   "position": [
+    0.0,
+    4.0,
+    -170.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "plane",
+    "axis": [
+     0.81,
+     0.57,
+     0.13
+    ],
+    "softness": 30.0
+   }
+  },
+  {
+   "name": "nearCalm",
+   "kind": "field",
+   "position": [
+    -70.0,
+    6.0,
+    4.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "distance",
+    "point": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "radius": 110.0
+   }
+  },
+  {
+   "name": "bassHistory",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "spectrum",
+    "audioBand": "range",
+    "bandLow": 0.0,
+    "bandHigh": 0.22,
+    "audioSpeed": 65.0,
+    "audioSmooth": 0.08,
+    "point": [
+     0.0,
+     4.0,
+     -170.0
+    ],
+    "waveGeometry": "spherical"
+   }
+  },
+  {
+   "name": "bassCarrier",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "wave",
+    "waveGeometry": "spherical",
+    "waveShape": "sine",
+    "point": [
+     0.0,
+     4.0,
+     -170.0
+    ],
+    "wavelength": 150.0,
+    "waveSpeed": 65.0,
+    "waveWidth": 0.0,
+    "amplitude": 1.0
+   }
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "onset",
+    "onsetSource": "low",
+    "point": [
+     0.0,
+     4.0,
+     -170.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 34.0,
+    "onsetWidth": 14.0,
+    "onsetDecay": 0.9
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "onset",
+    "onsetSource": "mid",
+    "point": [
+     -22.0,
+     3.0,
+     -80.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 55.0,
+    "onsetWidth": 5.0,
+    "onsetDecay": 2.2
+   }
+  },
+  {
+   "name": "wallRes",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "resonator",
+     "wallSide",
+     "nearCalm"
+    ]
+   }
+  },
+  {
+   "name": "wallKick",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "kickFront",
+     "wallSide",
+     "nearCalm"
+    ]
+   }
+  },
+  {
+   "name": "sailRes",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "resonator",
+     "sailSide"
+    ]
+   }
+  },
+  {
+   "name": "sailKick",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "kickFront",
+     "sailSide"
+    ]
+   }
+  },
+  {
+   "name": "wallSwell",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "compound",
+    "combine": "multiply",
+    "children": [
+     "bassHistory",
+     "bassCarrier",
+     "wallSide",
+     "nearCalm"
+    ]
+   }
+  },
+  {
+   "name": "silk",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rs-silk.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rsSilk",
+     "baseColor": [
+      0.01714,
+      0.02457,
+      0.18168
+     ],
+     "emissiveColor": [
+      0.04092,
+      0.7913,
+      0.88792
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.28,
+     "metallic": 0.35,
+     "doubleSided": true,
+     "thinFilm": {
+      "thickness": 400.0,
+      "ior": 1.6
+     }
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 7.0,
+      "space": "world",
+      "scale": 0.009,
+      "speed": 0.06,
+      "seed": 11,
+      "axisMask": [
+       1.0,
+       1.0,
+       0.6
+      ]
+     },
+     {
+      "kind": "sine",
+      "amount": 2.2,
+      "space": "world",
+      "axis": [
+       0.435,
+       -0.03,
+       -0.9
+      ],
+      "frequency": 0.08975979010256552,
+      "speed": -0.5,
+      "displacementAxis": [
+       -0.9073,
+       -0.0951,
+       -0.4095
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "wallRes",
+      "amount": 6.0,
+      "space": "world",
+      "alongNormal": false,
+      "axis": [
+       -0.9073,
+       -0.0951,
+       -0.4095
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "sailRes",
+      "amount": 6.0,
+      "space": "world",
+      "alongNormal": false,
+      "axis": [
+       0.6557,
+       -0.2939,
+       -0.6955
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "wallSwell",
+      "amount": 3.0,
+      "space": "world",
+      "alongNormal": false,
+      "axis": [
+       -0.9073,
+       -0.0951,
+       -0.4095
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "wallKick",
+      "amount": 3.0,
+      "space": "world",
+      "alongNormal": false,
+      "axis": [
+       -0.9073,
+       -0.0951,
+       -0.4095
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "sailKick",
+      "amount": 3.5,
+      "space": "world",
+      "alongNormal": false,
+      "axis": [
+       0.6557,
+       -0.2939,
+       -0.6955
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "snareFront",
+      "amount": 0.9,
+      "space": "world",
+      "alongNormal": false,
+      "axis": [
+       -0.9073,
+       -0.0951,
+       -0.4095
+      ]
+     }
+    ],
+    "normalStep": 0.15
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.55,
+    -0.35,
+    0.75
+   ],
+   "color": [
+    0.20416,
+    0.826,
+    0.91594
+   ],
+   "intensity": 5.0,
+   "castsShadow": false,
+   "contactShadow": false,
+   "softness": 0.2
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.6,
+    0.45,
+    0.65
+   ],
+   "color": [
+    0.18782,
+    0.09531,
+    0.9131
+   ],
+   "intensity": 2.2,
+   "castsShadow": false,
+   "contactShadow": false
+  },
+  {
+   "id": "sail",
+   "name": "sail",
+   "type": "point",
+   "position": [
+    7.0,
+    115.0,
+    -174.0
+   ],
+   "color": [
+    0.18782,
+    0.09531,
+    0.9131
+   ],
+   "intensity": 45000.0,
+   "range": 160.0,
+   "castsShadow": false
+  },
+  {
+   "id": "sailLow",
+   "name": "sailLow",
+   "type": "point",
+   "position": [
+    110.0,
+    -25.0,
+    -80.0
+   ],
+   "color": [
+    0.04092,
+    0.7913,
+    0.88792
+   ],
+   "intensity": 30000.0,
+   "range": 170.0,
+   "castsShadow": false
+  },
+  {
+   "id": "fill",
+   "name": "fill",
+   "type": "directional",
+   "direction": [
+    0.1,
+    -0.2,
+    -1.0
+   ],
+   "color": [
+    0.0648,
+    0.6105,
+    0.49693
+   ],
+   "intensity": 0.6,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "rsSilk",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "uv"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "palette",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant2": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant3": [
+      1.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 1,
+     "srcA": 1,
+     "value": 500.0
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.03682,
+      0.71217,
+      0.79913,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "fresnel",
+     "dst": 4,
+     "value": 2.6
+    },
+    {
+     "kind": "constant",
+     "dst": 5,
+     "constant": [
+      0.00857,
+      0.01229,
+      0.09084,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.07513,
+      0.03812,
+      0.36524,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.75,
+      0.75,
+      0.75,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 4,
+     "srcB": 7
+    },
+    {
+     "kind": "mixBy",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6,
+     "srcC": 7
+    },
+    {
+     "kind": "palette",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.5,
+      0.38,
+      0.5,
+      0.0
+     ],
+     "constant2": [
+      0.5,
+      0.3,
+      0.5,
+      0.0
+     ],
+     "constant3": [
+      1.4,
+      1.4,
+      1.4,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.33,
+      0.67,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 6
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      -0.0,
+      -4.0,
+      170.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 0.012345679012345678
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.34694,
+      0.46506,
+      0.5,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 6
+    },
+    {
+     "kind": "power",
+     "dst": 6,
+     "srcA": 4,
+     "value": 2.5
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "audio"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      3.0,
+      3.0,
+      3.0,
+      3.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.69387,
+      0.93011,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "field",
+     "dst": 2,
+     "field": "kickFront"
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.04092,
+      0.7913,
+      0.88792,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.4,
+      0.4,
+      0.4,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    }
+   ],
+   "baseColor": 5,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 1,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ]
+}

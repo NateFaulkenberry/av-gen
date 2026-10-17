@@ -1,0 +1,1326 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "resonant-silk.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.22,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.008,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.8,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 26.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.1,
+  "post/lens/chromaticAberration": 0.0,
+  "post/dof/enabled": false,
+  "post/motionBlur/amount": 0.0
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "response.intensity",
+   "target": "field/resonator/resonance/modes",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 8000
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/resonator/resonance/sustain",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 1500,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/rsSilk/op/7/fresnel/value",
+   "amount": -1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "audio.lowMid",
+   "target": "material/rsSilk/op/10/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.5,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "control.resonance",
+   "target": "field/resonator/resonance/sustain",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.resonance",
+   "target": "field/resonator/resonance/transient",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.foldDepth",
+   "target": "procedural/silk/deform/3/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.foldDepth",
+   "target": "procedural/silk/deform/4/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.waveTravel",
+   "target": "procedural/silk/deform/5/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.waveTravel",
+   "target": "procedural/silk/deform/6/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.waveTravel",
+   "target": "procedural/silk/deform/7/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.waveTravel",
+   "target": "procedural/silk/deform/8/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.detail",
+   "target": "field/resonator/resonance/source/1/amplitude",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.iridescence",
+   "target": "procedural/silk/material/thinFilm/thickness",
+   "amount": 320.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.iridescence",
+   "target": "material/rsSilk/op/16/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/rsSilk/op/34/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/rsSilk/op/41/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.colorDrift",
+   "target": "palette/hold",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.8,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.colorDrift",
+   "target": "palette/transition",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": -0.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.palette",
+   "target": "palette/select",
+   "amount": 7.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.paletteLock",
+   "target": "palette/lock",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.motion",
+   "target": "procedural/silk/deform/2/phase",
+   "amount": -0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 300,
+    "integrate": true
+   }
+  },
+  {
+   "source": "control.motion",
+   "target": "procedural/silk/deform/1/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.8,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0,
+       2.0,
+       57.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       7.0,
+       4.1651,
+       58.1699
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       9.1962,
+       4.1651,
+       60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       10.0,
+       2.0,
+       62.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       9.1962,
+       -0.1651,
+       65.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       7.0,
+       -0.1651,
+       66.8301
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       4.0,
+       2.0,
+       67.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       1.0,
+       4.1651,
+       66.8301
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -1.1962,
+       4.1651,
+       65.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -2.0,
+       2.0,
+       62.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       -1.1962,
+       -0.1651,
+       60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       1.0,
+       -0.1651,
+       58.1699
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       4.0,
+       2.0,
+       57.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -13.7414,
+       9.6829,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       -12.3933,
+       9.7773,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       -12.0117,
+       8.0944,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       -12.6987,
+       6.3171,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       -14.2702,
+       6.2227,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.0,
+      "value": [
+       -16.3053,
+       7.9056,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -18.2586,
+       9.6829,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -19.6067,
+       9.7773,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -19.9883,
+       8.0944,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -19.3013,
+       6.3171,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.0,
+      "value": [
+       -17.7298,
+       6.2227,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       -15.6947,
+       7.9056,
+       -60.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       -13.7414,
+       9.6829,
+       -60.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-resonant-silk.mp4"
+ },
+ "sonicScene": {
+  "category": "abstract",
+  "thesis": "One immense sheet of iridescent silk, gathered at invisible anchors and spreading broad between them, hangs in a dark void; the music excites it as a resonator: bass bows the sheet, mids crease it, highs run light along its folds, and onsets send wavefronts across it.",
+  "composition": {
+   "background": "designed darkness: a faint indigo depth behind the focal crease",
+   "midground": "the drape falling away and turning into the dark",
+   "foreground": "the broad sheet entering huge from the lower left",
+   "focal": "the gathered pinch, upper right of centre",
+   "camera": "a slow drift, never following the music"
+  },
+  "palette": {
+   "dominant": "#171D55",
+   "secondary": "#48CDBB",
+   "accent": "#39E6F2",
+   "highlight": "#F04CCF",
+   "background_value": "near black",
+   "saturation": "cool, with rare magenta"
+  },
+  "tier": "one sculpture, three ways of exciting it",
+  "id": "resonant-silk",
+  "title": "Resonant Silk"
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "Midnight Aurora",
+    "colors": {
+     "environment": [
+      0.00212,
+      0.00212,
+      0.00561
+     ],
+     "shadow": [
+      0.0075,
+      0.0075,
+      0.02519
+     ],
+     "base": [
+      0.02217,
+      0.01938,
+      0.07819
+     ],
+     "fold": [
+      0.08228,
+      0.06301,
+      0.21223
+     ],
+     "resonant": [
+      0.27468,
+      0.24228,
+      0.66539
+     ],
+     "grazing": [
+      0.55834,
+      0.55201,
+      0.89627
+     ],
+     "peak": [
+      0.87137,
+      0.84687,
+      1.0
+     ]
+    },
+    "scalars": {
+     "rough": 0.22,
+     "film": 1.0,
+     "key": 5.0,
+     "emit": 1.0,
+     "irid": 0.02,
+     "filmIor": 1.7,
+     "foldContrast": 0.75
+    }
+   },
+   {
+    "name": "Garnet Veil",
+    "colors": {
+     "environment": [
+      0.00273,
+      0.00152,
+      0.00368
+     ],
+     "shadow": [
+      0.01161,
+      0.00402,
+      0.01444
+     ],
+     "base": [
+      0.04374,
+      0.00857,
+      0.0356
+     ],
+     "fold": [
+      0.16513,
+      0.01764,
+      0.06301
+     ],
+     "resonant": [
+      0.47932,
+      0.04231,
+      0.11697
+     ],
+     "grazing": [
+      0.87137,
+      0.14703,
+      0.22697
+     ],
+     "peak": [
+      1.0,
+      0.52712,
+      0.5972
+     ]
+    },
+    "scalars": {
+     "rough": 0.19,
+     "film": 0.9,
+     "key": 4.6,
+     "emit": 0.9,
+     "irid": 0.0,
+     "filmIor": 1.5,
+     "foldContrast": 0.9
+    }
+   },
+   {
+    "name": "Liquid Champagne",
+    "colors": {
+     "environment": [
+      0.00368,
+      0.00273,
+      0.00243
+     ],
+     "shadow": [
+      0.01938,
+      0.01161,
+      0.00857
+     ],
+     "base": [
+      0.09531,
+      0.05127,
+      0.02843
+     ],
+     "fold": [
+      0.25415,
+      0.13014,
+      0.05781
+     ],
+     "resonant": [
+      0.56471,
+      0.32778,
+      0.13014
+     ],
+     "grazing": [
+      0.87137,
+      0.66539,
+      0.35153
+     ],
+     "peak": [
+      1.0,
+      0.90466,
+      0.68669
+     ]
+    },
+    "scalars": {
+     "rough": 0.26,
+     "film": 0.8,
+     "key": 3.6,
+     "emit": 0.7,
+     "irid": 0.0,
+     "filmIor": 1.5,
+     "foldContrast": 0.65
+    }
+   },
+   {
+    "name": "Opal Dream",
+    "colors": {
+     "environment": [
+      0.00335,
+      0.00212,
+      0.00518
+     ],
+     "shadow": [
+      0.01764,
+      0.00913,
+      0.02029
+     ],
+     "base": [
+      0.08228,
+      0.03689,
+      0.07819
+     ],
+     "fold": [
+      0.23074,
+      0.10462,
+      0.1912
+     ],
+     "resonant": [
+      0.55834,
+      0.25415,
+      0.39157
+     ],
+     "grazing": [
+      0.81485,
+      0.55201,
+      0.68669
+     ],
+     "peak": [
+      1.0,
+      0.87137,
+      0.89627
+     ]
+    },
+    "scalars": {
+     "rough": 0.23,
+     "film": 1.25,
+     "key": 3.8,
+     "emit": 0.8,
+     "irid": 0.18,
+     "filmIor": 2.0,
+     "foldContrast": 0.6
+    }
+   },
+   {
+    "name": "Deep Emerald Satin",
+    "colors": {
+     "environment": [
+      0.00152,
+      0.00304,
+      0.00243
+     ],
+     "shadow": [
+      0.00518,
+      0.016,
+      0.01033
+     ],
+     "base": [
+      0.01161,
+      0.05951,
+      0.0356
+     ],
+     "fold": [
+      0.02956,
+      0.17465,
+      0.09306
+     ],
+     "resonant": [
+      0.07036,
+      0.38643,
+      0.22697
+     ],
+     "grazing": [
+      0.28315,
+      0.67244,
+      0.43415
+     ],
+     "peak": [
+      0.73791,
+      1.0,
+      0.82279
+     ]
+    },
+    "scalars": {
+     "rough": 0.2,
+     "film": 0.9,
+     "key": 4.4,
+     "emit": 0.8,
+     "irid": 0.0,
+     "filmIor": 1.5,
+     "foldContrast": 0.8
+    }
+   },
+   {
+    "name": "Electric Cobalt",
+    "colors": {
+     "environment": [
+      0.00152,
+      0.00212,
+      0.00561
+     ],
+     "shadow": [
+      0.00518,
+      0.00802,
+      0.02624
+     ],
+     "base": [
+      0.01096,
+      0.03434,
+      0.16203
+     ],
+     "fold": [
+      0.02122,
+      0.09306,
+      0.35153
+     ],
+     "resonant": [
+      0.06301,
+      0.26225,
+      0.7454
+     ],
+     "grazing": [
+      0.26636,
+      0.57112,
+      1.0
+     ],
+     "peak": [
+      0.76052,
+      0.89627,
+      1.0
+     ]
+    },
+    "scalars": {
+     "rough": 0.17,
+     "film": 1.0,
+     "key": 5.2,
+     "emit": 1.1,
+     "irid": 0.02,
+     "filmIor": 1.6,
+     "foldContrast": 0.85
+    }
+   },
+   {
+    "name": "Burnished Copper",
+    "colors": {
+     "environment": [
+      0.00335,
+      0.00212,
+      0.00212
+     ],
+     "shadow": [
+      0.01938,
+      0.007,
+      0.00561
+     ],
+     "base": [
+      0.08228,
+      0.0185,
+      0.01229
+     ],
+     "fold": [
+      0.23074,
+      0.04519,
+      0.02416
+     ],
+     "resonant": [
+      0.55834,
+      0.12477,
+      0.05613
+     ],
+     "grazing": [
+      0.87137,
+      0.35153,
+      0.16513
+     ],
+     "peak": [
+      1.0,
+      0.69387,
+      0.49102
+     ]
+    },
+    "scalars": {
+     "rough": 0.24,
+     "film": 0.8,
+     "key": 4.0,
+     "emit": 0.7,
+     "irid": 0.0,
+     "filmIor": 1.5,
+     "foldContrast": 0.8
+    }
+   },
+   {
+    "name": "Oil-Slick Iridescence",
+    "colors": {
+     "environment": [
+      0.00152,
+      0.00152,
+      0.00304
+     ],
+     "shadow": [
+      0.00605,
+      0.00518,
+      0.01444
+     ],
+     "base": [
+      0.0185,
+      0.01444,
+      0.04519
+     ],
+     "fold": [
+      0.06663,
+      0.02956,
+      0.07819
+     ],
+     "resonant": [
+      0.21586,
+      0.05127,
+      0.10946
+     ],
+     "grazing": [
+      0.55201,
+      0.14996,
+      0.22697
+     ],
+     "peak": [
+      0.88792,
+      0.55201,
+      0.46778
+     ]
+    },
+    "scalars": {
+     "rough": 0.16,
+     "film": 0.95,
+     "key": 4.6,
+     "emit": 0.9,
+     "irid": 0.45,
+     "filmIor": 2.4,
+     "foldContrast": 0.9
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "environment",
+    "target": "env/sky/zenithColor",
+    "gain": 0.6
+   },
+   {
+    "role": "environment",
+    "target": "env/sky/groundColor",
+    "gain": 0.7
+   },
+   {
+    "role": "environment",
+    "target": "env/sky/horizonColor",
+    "gain": 1.0
+   },
+   {
+    "role": "environment",
+    "target": "scene/fogColor",
+    "gain": 1.0
+   },
+   {
+    "role": "shadow",
+    "target": "lights/fill/color"
+   },
+   {
+    "role": "base",
+    "target": "material/rsSilk/op/8/constant/constant"
+   },
+   {
+    "role": "fold",
+    "target": "material/rsSilk/op/9/constant/constant"
+   },
+   {
+    "role": "grazing",
+    "target": "lights/key/color"
+   },
+   {
+    "role": "grazing",
+    "target": "material/rsSilk/op/5/constant/constant",
+    "gain": 0.9
+   },
+   {
+    "role": "resonant",
+    "target": "lights/rim/color"
+   },
+   {
+    "role": "peak",
+    "target": "material/rsSilk/op/25/constant/constant",
+    "gain": 0.5
+   },
+   {
+    "role": "rough",
+    "target": "procedural/silk/material/roughness"
+   },
+   {
+    "role": "film",
+    "target": "procedural/silk/material/thinFilm/thickness",
+    "mode": "multiply"
+   },
+   {
+    "role": "key",
+    "target": "lights/key/intensity"
+   },
+   {
+    "role": "emit",
+    "target": "material/rsSilk/op/5/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "irid",
+    "target": "material/rsSilk/op/16/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "filmIor",
+    "target": "procedural/silk/material/thinFilm/ior"
+   },
+   {
+    "role": "resonant",
+    "target": "lights/sail/color"
+   },
+   {
+    "role": "grazing",
+    "target": "lights/sailLow/color"
+   },
+   {
+    "role": "emit",
+    "target": "material/rsSilk/op/25/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "foldContrast",
+    "target": "material/rsSilk/op/10/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "peak",
+    "target": "material/rsSilk/op/32/constant/constant"
+   },
+   {
+    "role": "resonant",
+    "target": "material/rsSilk/op/39/constant/constant"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0,
+  "selector": {
+   "select": 0,
+   "transition": 6.0,
+   "lock": false,
+   "hold": 40.0,
+   "advance": {
+    "signal": "beat.phrasePulse",
+    "threshold": 0.5,
+    "order": [
+     0,
+     5,
+     4,
+     2,
+     6,
+     1,
+     7,
+     3
+    ],
+    "change": {
+     "signals": [
+      "sonic.energy",
+      "sonic.brightness",
+      "sonic.density"
+     ],
+     "fast": 3.0,
+     "slow": 24.0,
+     "threshold": 0.06,
+     "rearm": 0.03,
+     "primaryTimeout": 30.0,
+     "maxHold": 90.0
+    }
+   }
+  }
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "resonance"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "foldDepth"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "waveTravel"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "detail"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "iridescence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "light"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 7,
+     "signal": "colorDrift"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 8,
+     "signal": "motion"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 9,
+     "signal": "palette"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 10,
+     "signal": "paletteLock"
+    }
+   ]
+  }
+ }
+}

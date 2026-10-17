@@ -625,6 +625,13 @@
       "live": true,
       "name": "Cymatic World",
       "project": "cymatic-world/cymatic-world.json"
+    },
+    {
+      "category": "Resonator",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 resonance, CC 2 fold depth, CC 3 wave travel, CC 4 surface detail, CC 5 iridescence, CC 6 light response, CC 7 color drift, CC 8 motion scale, CC 9 palette, CC 10 palette lock. One immense sheet of iridescent silk, gathered at invisible anchors and spreading broad between them, hangs in a dark void; the music excites it as a resonator: bass bows the sheet, mids crease it, highs run light along its folds, and onsets send wavefronts across it. See docs/prototypes/resonant-silk/02-report.md.",
+      "live": true,
+      "name": "Resonant Silk",
+      "project": "resonant-silk/resonant-silk.json"
     }
   ]
 }
