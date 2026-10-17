@@ -285,3 +285,54 @@ TEST_CASE("A reaction-diffusion plane with iterations and a regime field matches
     CHECK(patterned < 3800);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1452: a scalar plane is injected and advected on the GPU like a volume: dye from a spring in a 3 m/s current
+// is found downstream after 10 s, and none upstream.
+TEST_CASE("A scalar plane carries dye downstream on the GPU", "[simulation][gpu][rd]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    SimHarness harness(*ctx, shaders);
+    scene::Scene scene;
+    spatial::FieldSpec spring;
+    spring.name = "spring";
+    spring.kind = spatial::FieldKind::Sphere;
+    spring.position = {-60.0f, 2.4f, 0.0f};
+    spring.radius = 1.8f;
+    spring.softness = 0.8f;
+    scene.fields.fields.push_back(spring);
+    spatial::FieldSpec current;
+    current.name = "current";
+    current.kind = spatial::FieldKind::Direction;
+    current.axis = {1.0f, 0.0f, 0.0f};
+    current.strength = 3.0f;
+    scene.fields.fields.push_back(current);
+    spatial::GridField dye;
+    dye.name = "dye";
+    dye.mode = spatial::GridMode::Scalar;
+    dye.resolution = {512, 1, 512};
+    dye.boundsMin = {-80.0f, 1.4f, -80.0f};
+    dye.boundsMax = {80.0f, 3.4f, 80.0f};
+    dye.injectField = "spring";
+    dye.injectRate = 40.0f;
+    dye.velocityField = "current";
+    dye.ceiling = 1.0f;
+    dye.simRate = 10.0f;
+    dye.maxSubSteps = 4;
+    scene.fields.grids.push_back(dye);
+    for (int f = 1; f <= 300; ++f) {
+        harness.frame(scene, static_cast<double>(f) / 30.0, static_cast<std::uint64_t>(f));
+    }
+    const std::vector<float> d = harness.read(scene.fields, 0);
+    auto at = [&](float x, float z) {
+        const int i = static_cast<int>((x + 80.0f) / 160.0f * 512.0f);
+        const int k = static_cast<int>((z + 80.0f) / 160.0f * 512.0f);
+        return d[static_cast<std::size_t>(k * 512 + i)];
+    };
+    INFO("at spring " << at(-60, 0) << ", 15 m on " << at(-45, 0) << ", 27 m on " << at(-33, 0) << ", upstream "
+                      << at(-70, 0));
+    CHECK(at(-60.0f, 0.0f) > 0.5f);
+    CHECK(at(-45.0f, 0.0f) > 0.2f);
+    CHECK(at(-33.0f, 0.0f) > 0.05f);
+    CHECK(at(-70.0f, 0.0f) < 0.01f);
+    CHECK(ctx->errorCount() == 0);
+}

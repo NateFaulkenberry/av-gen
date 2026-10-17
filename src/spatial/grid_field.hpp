@@ -74,6 +74,8 @@ struct FieldSet;
 // ADR-1451: a ReactionDiffusion grid may also be a plane [x, 1, z] up to kMaxAgentGridResolution (isotropic 9-point
 // Laplacian), may step `iterations` times a sub-step at `speed`, and may blend its (feed, kill) toward (feedB, killB) by a
 // regime field.
+// ADR-1452: a Scalar or Vector grid with resolution.y == 1 is a plane, up to kMaxAgentGridResolution on x and z (a dye
+// or a wake that needs detail across a surface rather than depth).
 enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents, Excitable, Bake, Oscillator };
 [[nodiscard]] const char* gridModeName(GridMode mode);
 [[nodiscard]] std::optional<GridMode> gridModeFromName(std::string_view name);

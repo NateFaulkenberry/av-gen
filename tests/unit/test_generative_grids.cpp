@@ -464,3 +464,42 @@ TEST_CASE("A regime field of 1 is the B regime, and a plane pattern forms and st
     }
     CHECK(maxB - minB > 0.2f); // a pattern, not a uniform field
 }
+
+// ---- ADR-1452 --------------------------------------------------------------------------------------
+
+TEST_CASE("A scalar or vector grid one cell thick may be a plane up to 1024, and steps as before", "[grid][rd]") {
+    spatial::GridField g;
+    g.name = "dye";
+    g.mode = spatial::GridMode::Scalar;
+    g.resolution = {1024, 1, 512};
+    g.boundsMin = {-8.0f, -1.0f, -8.0f};
+    g.boundsMax = {8.0f, 1.0f, 8.0f};
+    CHECK(g.validate().has_value());
+    g.mode = spatial::GridMode::Vector; // 1024 x 512 x 4 floats: inside the table
+    CHECK(g.validate().has_value());
+    g.resolution = {1025, 1, 16};
+    CHECK_FALSE(g.validate().has_value());
+    g.resolution = {256, 2, 16}; // not a plane: the volume limit
+    CHECK_FALSE(g.validate().has_value());
+
+    // A plane diffuses in x and z only, conserving mass (y wraps or clamps onto itself).
+    spatial::GridField d;
+    d.name = "dye";
+    d.mode = spatial::GridMode::Scalar;
+    d.wrap = spatial::GridWrap::Wrap;
+    d.resolution = {200, 1, 200};
+    d.boundsMin = {0.0f, -1.0f, 0.0f};
+    d.boundsMax = {200.0f, 1.0f, 200.0f};
+    d.diffusion = 2.0f;
+    d.diffuseIterations = 4;
+    d.reset();
+    d.data[d.index(100, 0, 100)] = 1.0f;
+    d.step(1.0f / 60.0f, 0.0);
+    double mass = 0.0;
+    for (const float v : d.data) {
+        mass += v;
+    }
+    CHECK(mass == Approx(1.0).margin(1e-4));
+    CHECK(d.data[d.index(101, 0, 100)] > 0.0f);
+    CHECK(d.data[d.index(101, 0, 100)] == Approx(d.data[d.index(100, 0, 101)]));
+}

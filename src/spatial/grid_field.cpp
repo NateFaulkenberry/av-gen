@@ -785,6 +785,12 @@ Result<void> GridField::validate() const {
         if (injectField.empty()) {
             return fail("grid '{}': a bake grid needs the field it bakes (injectField)", name);
         }
+    } else if ((mode == GridMode::Scalar || mode == GridMode::Vector) && resolution.y == 1) {
+        // ADR-1452: a scalar or vector grid one cell thick is a plane, up to the plane limit
+        if (resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': a scalar or vector plane is [x, 1, z] with x, z <= {}", name,
+                        kMaxAgentGridResolution);
+        }
     } else if (reactionPlane()) { // ADR-1451: a plane, up to the plane limit
         if (resolution.x < 3 || resolution.z < 3 || resolution.x > kMaxAgentGridResolution ||
             resolution.z > kMaxAgentGridResolution) {

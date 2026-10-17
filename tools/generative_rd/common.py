@@ -48,9 +48,12 @@ class Scene(kit.Scene):
         return g
 
     def field(self, name, field, position=(0.0, 0.0, 0.0)):
-        f = {"strength": 1.0, "falloff": {"kind": "none"}}
+        # The position goes in the field's own frame (field/<name>/position, what a track moves); the node stays at
+        # the origin. A node position is folded on top of the field's frame, so a track writing absolute positions
+        # into a field whose node also sits there would double them.
+        f = {"strength": 1.0, "falloff": {"kind": "none"}, "position": [float(v) for v in position]}
         f.update(field)
-        n = {"name": name, "kind": "field", "position": [float(v) for v in position], "field": f}
+        n = {"name": name, "kind": "field", "position": [0.0, 0.0, 0.0], "field": f}
         self.nodes.append(n)
         return n
 

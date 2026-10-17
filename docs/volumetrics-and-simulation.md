@@ -189,6 +189,8 @@ populations, a coupling mask, a frequency field and onset kicks): see
 plane `[x, 1, z]` up to 1024 (isotropic 9-point Laplacian), take `iterations` steps of `speed / simRate / iterations`
 per sub-step, and blend its feed and kill per cell with a `regimeField`:
 [ADR-1451](decisions/ADR-1451-a-reaction-diffusion-grid-can-be-a-plane-at-speed-with-regions.md).
+A `scalar` or `vector` grid one cell thick is a plane too, up to 1024 on x and z
+([ADR-1452](decisions/ADR-1452-a-scalar-or-vector-grid-can-be-a-plane.md)).
 
 Sampling is trilinear over the cell centres (cell *i* is centred at
 `boundsMin + (i + 0.5) * cellSize`). Outside the bounds, `wrap` decides: `clamp` repeats the edge
