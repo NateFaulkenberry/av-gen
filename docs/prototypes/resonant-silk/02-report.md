@@ -5,7 +5,7 @@
 - **Briefs:** `00-brief.md` (the scene) and `03-brief-palettes.md` (the palette system, which supersedes 00 §4).
 - **Audit and log:** `01-resonance-audit.md`, `PROGRESS.md`.
 - **Review media:** `~/Desktop/av-gen-review/59-resonant-silk/`.
-- **Registration:** the live example **Resonant Silk** (`examples/resonant-silk/resonant-silk.json`, `"live": true`, a
+- **Registration:** the live example **Resonant Silk**, in the owner's **Resonator** live section (`examples/resonant-silk/resonant-silk.json`, `"live": true`, a
   `sonic.live` project, no audio track).
 - **Generator:** `tools/resonant_silk/build.py`.
 
@@ -151,6 +151,19 @@ There are no routes on global saturation or emission.
   Champagne, Copper, Garnet, Oil-Slick, Opal. Neighbours share a temperature, so a change turns the material rather
   than jumping across the wheel. `final/journey-trench-60-120s.mp4` shows it: Trench arrives at 60 s already in
   Cobalt, because the seek replayed the earlier advance, then blends to Emerald at about 100 s.
+- *No tempo* (ADR-1421, the Cymatic agent's extension of the selector, cherry-picked here): when no phrase has arrived
+  for 30 s, a large sustained change in the music advances instead. The change is the sum of |fast - slow| over
+  `sonic.energy`, `brightness` and `density`, with averages of 3 s and 24 s. It fires at 0.09 and re-arms below
+  0.04. After 90 s of sameness the palette evolves anyway. Hold, blend and lock still apply, and seeks replay it.
+  I checked this on 1 fps thumbnails of each whole track, classifying the palette on screen by colour. The
+  no-tempo case is the selector's phrase signal replaced by one that never fires.
+  - Trench: with tempo, a change about every 45-48 s (Cobalt 43 s, Emerald 92, Champagne 139, Copper 187). With no
+    tempo: Cobalt 92 s (maxHold), Emerald 148 and Champagne 202 (energy changes).
+  - Hyperborea, no tempo: 93 s and 154 s.
+  - Feline Footwear, no tempo: 94 s and 181 s.
+
+  Changes are never closer than the 40 s hold, and never rapid. At 0.09 the threshold fired on none of the three
+  tracks, so it was lowered to 0.06 (re-arm 0.03).
 - *Manual:* CC 9 selects a palette as a direct blend, and CC 10 locks it.
 
 **Media** (`palettes/`):
@@ -223,11 +236,12 @@ matter. Vertex count is the lever.
 - `examples/index.json`: the Resonant Silk entry;
 - `docs/prototypes/resonant-silk/`: the briefs, audit, progress and this report.
 
-**Engine** (separate commits, landed on main by the coordinator):
+**Engine** (separate commits; ADR-1420 is mine, ADR-1421 is the Cymatic agent's, cherry-picked):
 - `src/params/palette.{hpp,cpp}`;
 - `src/app/engine.cpp` (the step call, the seek replay, the attach order);
 - `tests/unit/test_palette_selector.cpp`, `tests/integration/test_palette_selector_seek.cpp`;
-- `docs/decisions/ADR-1420-...md` and its README row.
+- `docs/decisions/ADR-1420-...md` and its README row; ADR-1421 (`d20eada6` on proto/cymatic-split, cherry-picked as
+  `ddac5683`).
 
 ## 8. Remaining weaknesses and next steps
 

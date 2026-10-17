@@ -79,3 +79,27 @@ Branch `proto/resonant-silk`, worktree `../av-gen-silk`, from main `ef3774da`, w
    - Project `parameters` cannot set `palette/*`, because the palette registers after they are read. Variants
      write the selector block instead (`--set palette/select=k`).
    - `pal8.sh <tag>` (scratch) renders the eight locked palettes at Feline 50 s and composes a sheet.
+7. Stage C fixes from the coordinator's notes:
+   - The sail is now a thin, broad scarf. Its cloth follows its span, so no pleatless band crosses it. Its hem is
+     a curved, fluttering arc, and two lamps graze it.
+   - The near wall moved back 40 m, and the music's displacement fades near the camera (`nearCalm`), so the
+     pleats read crisp.
+   - Oil-Slick and Opal are told apart by a view-dependent spectral sheen at true grazing angles.
+   - The gather glow is a 9 m seam.
+8. Stage D: performance. 190 ms GPU at 1080p Ultra came down to 30.5 ms, by these changes:
+   - no AO or contact shadows, so no depth prepass;
+   - spectrum taps 32 to 8;
+   - treble as a uniform;
+   - no per-pixel resonance read;
+   - 52k vertices.
+
+   Live Auto settles at High, at 30 fps, with 0 misses. The bass swell travels at 65 m/s, so its history rows sit a
+   vertex apart and show no stepped ribbing. The bass/mid split is at 250 Hz, and the mid source sits beside the wall
+   at 2.6x wavenumber.
+9. Owner process: one merge of all three resonance scenes, done by the coordinator; the category is `Resonator`; no
+   more review clips.
+   - ADR-1421 (the Cymatic agent's energy-change advance) was cherry-picked as `ddac5683`.
+   - Silk enables it: sonic energy, brightness and density; averages of 3 s and 24 s; primaryTimeout 30 s;
+     maxHold 90 s.
+   - It was checked on 1 fps thumbnails, classified by colour (scratch `classify.py`), on Feline, Trench and
+     Hyperborea, with and without a phrase signal.

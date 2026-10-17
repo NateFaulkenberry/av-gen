@@ -32,7 +32,7 @@ from tools.sonic_vfx.kit import R, hexrgb  # noqa: E402
 ID = "resonant-silk"
 TITLE = "Resonant Silk"
 OUT = os.path.join(REPO, "examples", "resonant-silk")
-CATEGORY = "Resonant Silk"
+CATEGORY = "Resonator"
 
 COMPOSITION = "a"
 MUSIC = not os.environ.get("RS_NOMUSIC")
@@ -91,6 +91,10 @@ ROLES = ("environment", "shadow", "base", "fold", "resonant", "grazing", "peak")
 # rather than jumping across the wheel -- Aurora, Cobalt, Emerald, Champagne, Copper, Garnet, Oil-Slick, Opal.
 JOURNEY = [0, 5, 4, 2, 6, 1, 7, 3]
 START_PALETTE = int(os.environ.get("RS_PALETTE", "0"))
+# The live fallback (ADR-1421): fast/slow averages of three descriptors; fires at a sustained change of 0.09, re-arms
+# below 0.04, heard only after 30 s with no phrase, and evolves anyway after 90 s of sameness.
+CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0, "slow": 24.0,
+          "threshold": 0.06, "rearm": 0.03, "primaryTimeout": 30.0, "maxHold": 90.0}
 
 
 def palette_states():
@@ -491,7 +495,10 @@ def palette_block(g):
             x.pop("component", None)
     return {"states": states, "bindings": b, "position": 0.0, "saturation": 1.0, "value": 1.0,
             "selector": {"select": START_PALETTE, "transition": 6.0, "lock": False, "hold": 40.0,
-                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY}}}
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY,
+                                     # ADR-1421: with no tempo (no phrase for 30 s), a large sustained change in the
+                                     # music -- a build arriving, a drop, a breakdown -- advances instead
+                                     "change": CHANGE}}}
 
 
 # ================================================================================================ the music's fields
