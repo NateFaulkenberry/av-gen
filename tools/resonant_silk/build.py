@@ -526,10 +526,10 @@ def fields(s):
         "idle": 0.5, "breath": 0.1, "limit": 1.0,
         "attack": [0.8, 0.3, 0.12], "release": [4.0, 1.8, 0.7],
         "sources": [
-            {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.5,
+            {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.4,
              "gain": 1.0, "amplitude": 1.0},
-            {"kind": "point", "position": [20.0, -40.0, -70.0], "order": 3, "bandLow": 0.5, "bandHigh": 1.0,
-             "gain": 1.0, "amplitude": 0.45, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
+            {"kind": "point", "position": [-52.0, -6.0, -96.0], "order": 3, "bandLow": 0.4, "bandHigh": 1.0,
+             "gain": 1.0, "amplitude": 1.5, "scale": 2.6, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
         ],
         "channel": "displacement",
     }

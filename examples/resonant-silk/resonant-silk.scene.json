@@ -112,22 +112,23 @@
        ],
        "order": 2,
        "bandLow": 0.0,
-       "bandHigh": 0.5,
+       "bandHigh": 0.4,
        "gain": 1.0,
        "amplitude": 1.0
       },
       {
        "kind": "point",
        "position": [
-        20.0,
-        -40.0,
-        -70.0
+        -52.0,
+        -6.0,
+        -96.0
        ],
        "order": 3,
-       "bandLow": 0.5,
+       "bandLow": 0.4,
        "bandHigh": 1.0,
        "gain": 1.0,
-       "amplitude": 0.45,
+       "amplitude": 1.5,
+       "scale": 2.6,
        "drift": 14.0,
        "driftPeriod": 40.0,
        "spin": 0.05
