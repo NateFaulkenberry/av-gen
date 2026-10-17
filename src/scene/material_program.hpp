@@ -21,6 +21,9 @@
 //               a's square cell, in a's own units, and a uniform per-cell random (ADR-1162); f <= 0 passes a through
 //   Fresnel   : out = vec4(pow(1 - saturate(dot(normal, view)), f))         (uses the fragment's N/V)
 //   Ramp      : out = ramp(a.x) with 3 stops k0 (t=0), k1 (t=0.5), k2 (t=1)  (k0 = constant, k1 = constant2, k2 = constant3)
+//   OklabRamp : out.rgb = four stops k, k2, k3, k4 (linear RGB) blended in OKLab, out.w linear (ADR-1470): f >= 0
+//               (the default 1) clamps t = a.x to [0, 1], stops at 0, 1/3, 2/3, 1; f < 0 is cyclic, t = fract(a.x) with
+//               the stops at 0, 1/4, 1/2, 3/4 and k again at 1
 //   Remap     : out = (a - k.x) / (k.y - k.x) * (k.w - k.z) + k.z, clamped when f > 0.5
 //   Multiply  : out = a * b        Add: out = a + b        Mix: out = mix(a, b, f)  (MixBy: mix(a, b, reg[srcC].x))
 //   Power     : out = pow(max(a, 0), f)
@@ -85,6 +88,9 @@ enum class MaterialOpKind : std::uint8_t {
     // constant.xyz), out.w = a uniform random per cell. A `field`-free way to make anything blocky: quantise a
     // position, then sample noise there (constant per cell) or threshold the cell random against a mask.
     Quantize,
+    // ADR-1470, appended: a four-stop gradient blended in OKLab (no grey or dark midpoints between saturated stops),
+    // optionally cyclic, so a colour field can run through a palette's roles in one op.
+    OklabRamp,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
 [[nodiscard]] std::optional<MaterialOpKind> materialOpKindFromName(std::string_view name);

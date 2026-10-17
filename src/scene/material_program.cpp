@@ -118,6 +118,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::Swizzle, "swizzle"},
     {MaterialOpKind::VoronoiEdge, "voronoiEdge"},
     {MaterialOpKind::Quantize, "quantize"}, // ADR-1162
+    {MaterialOpKind::OklabRamp, "oklabRamp"}, // ADR-1470
 };
 
 struct InputName {
@@ -428,6 +429,27 @@ float saturate1(float x) {
     return std::clamp(x, 0.0f, 1.0f);
 }
 
+// ADR-1470: four stops blended in OKLab (rgb; w linear). Clamped: stops at 0, 1/3, 2/3, 1. Cyclic: t = fract(t),
+// stops at 0, 1/4, 1/2, 3/4 and the first again at 1.
+glm::vec4 oklabRamp4(const glm::vec4& c0, const glm::vec4& c1, const glm::vec4& c2, const glm::vec4& c3, float tIn,
+                     bool cyclic) {
+    const std::array<glm::vec4, 5> stops{c0, c1, c2, c3, c0};
+    float x = 0.0f;
+    int segments = 3;
+    if (cyclic) {
+        x = tIn - std::floor(tIn);
+        segments = 4;
+    } else {
+        x = std::clamp(tIn, 0.0f, 1.0f);
+    }
+    const float s = x * static_cast<float>(segments);
+    const int i = std::min(static_cast<int>(std::floor(s)), segments - 1);
+    const float u = s - static_cast<float>(i);
+    const glm::vec4& a = stops[static_cast<std::size_t>(i)];
+    const glm::vec4& b = stops[static_cast<std::size_t>(i + 1)];
+    return {color::mixOklab(glm::vec3(a), glm::vec3(b), u), a.w + (b.w - a.w) * u};
+}
+
 glm::vec4 mix4(const glm::vec4& a, const glm::vec4& b, float t) {
     return a * (1.0f - t) + b * t;
 }
@@ -676,6 +698,8 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         return {centre, noise::hash01(static_cast<std::int32_t>(cell.x), static_cast<std::int32_t>(cell.y),
                                       static_cast<std::int32_t>(cell.z), op.seed)};
     }
+    case MaterialOpKind::OklabRamp:
+        return oklabRamp4(op.constant, op.constant2, op.constant3, op.constant4, a.x, f < 0.0f);
     }
     return glm::vec4(0.0f);
 }
@@ -819,6 +843,7 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::Swizzle:
     case MaterialOpKind::VoronoiEdge:
     case MaterialOpKind::Quantize:
+    case MaterialOpKind::OklabRamp:
         return {true, false, false};
     case MaterialOpKind::Multiply:
     case MaterialOpKind::Add:

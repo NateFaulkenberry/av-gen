@@ -98,6 +98,7 @@ const MAT_OP_MICRO_DETAIL: u32 = 29u;
 const MAT_OP_SWIZZLE: u32 = 30u;
 const MAT_OP_VORONOI_EDGE: u32 = 31u; // ADR-1069
 const MAT_OP_QUANTIZE: u32 = 32u;     // ADR-1162
+const MAT_OP_OKLAB_RAMP: u32 = 33u;   // ADR-1470
 
 fn matPick(v: vec4<f32>, index: f32) -> f32 {
     return v[clamp(i32(index), 0, 3)];
@@ -331,6 +332,33 @@ fn matSmoothstep1(e0: f32, e1: f32, x: f32) -> f32 {
 fn matSmoothstep4(e0: f32, e1: f32, a: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(matSmoothstep1(e0, e1, a.x), matSmoothstep1(e0, e1, a.y), matSmoothstep1(e0, e1, a.z),
                      matSmoothstep1(e0, e1, a.w));
+}
+
+// ADR-1470, scene::oklabRamp4: four stops blended in OKLab (rgb; w linear). Clamped: stops at 0, 1/3, 2/3, 1.
+// Cyclic: t = fract(t), stops at 0, 1/4, 1/2, 3/4 and the first again at 1.
+fn matOklabRamp4(c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, tIn: f32, cyclic: bool) -> vec4<f32> {
+    var x = clamp(tIn, 0.0, 1.0);
+    var segments = 3.0;
+    if (cyclic) {
+        x = tIn - floor(tIn);
+        segments = 4.0;
+    }
+    let s = x * segments;
+    let i = min(floor(s), segments - 1.0);
+    let u = s - i;
+    var a = c0;
+    var b = c1;
+    if (i >= 3.0) {
+        a = c3;
+        b = c0;
+    } else if (i >= 2.0) {
+        a = c2;
+        b = c3;
+    } else if (i >= 1.0) {
+        a = c1;
+        b = c2;
+    }
+    return vec4<f32>(mixOklab(a.xyz, b.xyz, u), a.w + (b.w - a.w) * u);
 }
 
 fn matSafeNormalize(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
@@ -669,6 +697,9 @@ fn materialEvalOp(pi: u32, oi: u32, ctx: MaterialContext, regs: MatRegs, fields:
         }
         let cell = floor(a.xyz * f + k.xyz);
         return vec4<f32>((cell + vec3<f32>(0.5) - k.xyz) / f, hash01(vec3<i32>(cell), matOpSeed(pi, oi)));
+    }
+    if (kind == MAT_OP_OKLAB_RAMP) {
+        return matOklabRamp4(k, matOpConstant2(pi, oi), matOpConstant3(pi, oi), matOpConstant4(pi, oi), a.x, f < 0.0);
     }
     return vec4<f32>(0.0);
 }
