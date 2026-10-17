@@ -36,9 +36,8 @@ CATEGORY = "Resonator"
 
 COMPOSITION = "a"
 MUSIC = not os.environ.get("RS_NOMUSIC")
-SMOOTH = float(os.environ.get("RS_SMOOTH", "0.08"))   # spectrum fields' smoothing window (s); 32 taps at most
-MESH_SCALE = float(os.environ.get("RS_MESH", "1.0"))  # look development: the sheet's tessellation
-SAIL = float(os.environ.get("RS_SAIL", "-0.8"))  # look development: the sail's extra roll
+SMOOTH = 0.08   # the spectrum field's smoothing window (s): 8 taps (32 at most; wider aliases)
+SAIL = -0.8  # the sail's extra roll (turns its face to the camera)
 
 # ================================================================================================ palette (sRGB refs)
 P = {
@@ -186,7 +185,6 @@ class SheetSpec:
 
 
 def sheet_mesh(spec):
-    spec.nu, spec.nv = int(round(spec.nu * MESH_SCALE)), int(round(spec.nv * MESH_SCALE))
     """P(u, v) = C(u) + v w(u) W(u) + N(u) D(u, v): a centreline, a transported frame turned by an authored roll, a
     span profile, and a displacement along the frame normal made of a billow (the sail between two anchors) and pleats
     (the cloth the span cannot hold, gathered into folds that fan out from the anchors)."""
@@ -430,7 +428,7 @@ def silk_program():
     g.op("glowCol", "constant", 7, k=C("pearl", 0.5) + [1])            # role: peak (x 0.5, x palette emit)
     g.op(None, "multiply", 6, a=6, b=7)
     g.op(None, "add", 1, a=1, b=6)
-    if MUSIC and not os.environ.get("RS_NOMATMUSIC"):
+    if MUSIC:
         g.op(None, "power", 6, a=4, f=2.5)                             # r6: the folds' turning edges (narrow)
         # treble as a uniform (the analysis' treble band): a per-pixel field read cost 16 ms with the others at 1080p
         g.op("treble", "input", 2, inp="audio")
@@ -482,7 +480,7 @@ def palette_block(g):
         {"role": "emit", "target": op("glowCol"), "mode": "multiply"},
         {"role": "fold", "target": op("foldMix"), "mode": "multiply", "component": 0},
     ]
-    if MUSIC and not os.environ.get("RS_NOMATMUSIC"):
+    if MUSIC:
         b += [{"role": "peak", "target": op("trebleCol")},
               {"role": "resonant", "target": op("resCol")}]
     # 'fold' is both a colour role and a scalar role name in the tuning: the scalar is renamed to keep them apart
@@ -528,7 +526,7 @@ def fields(s):
     never along the pleated surface's normal (which pushes a pleat's two faces apart and inflates it into pillows).
     The two halves are told apart by plane masks through the gather, so the ring itself stays still."""
     res = {
-        "modes": float(os.environ.get("RS_MODES", "8")), "layout": float(os.environ.get("RS_LAYOUT", "12")), "fLow": 40.0, "fHigh": 4000.0, "lambdaMax": 220.0, "lambdaMin": 18.0,
+        "modes": 8.0, "layout": 12.0, "fLow": 40.0, "fHigh": 4000.0, "lambdaMax": 220.0, "lambdaMin": 18.0,
         "selectivity": 2.5, "contrast": 0.5, "memory": 2.0, "competition": 1.5, "sustain": 1.0, "transient": 0.4,
         "idle": 0.5, "breath": 0.1, "limit": 1.0,
         "attack": [0.8, 0.3, 0.12], "release": [4.0, 1.8, 0.7],
@@ -582,7 +580,7 @@ def music_deformers():
     return [fd("wallRes", 6.0, WALL_N), fd("sailRes", 6.0, SAIL_N),
             fd("wallSwell", 3.0, WALL_N),
             fd("wallKick", 3.0, WALL_N), fd("sailKick", 3.5, SAIL_N),
-            ] + ([] if os.environ.get("RS_NOSNARE") else [fd("snareFront", 0.9, WALL_N)])
+            fd("snareFront", 0.9, WALL_N)]
 
 # ================================================================================================ world
 def environment(s):
@@ -641,9 +639,9 @@ def sheets(s, specs, mesh_dir):
 def drift_deformers():
     """The sculpture's own slow life, independent of the music: a very slow, broad, coherent drift that keeps the
     silhouette evolving without ever repeating (the resonator's idle adds a breathing bow on top)."""
-    return ([] if os.environ.get("RS_NONOISE") else [
+    return [
         {"kind": "noise", "amount": 7.0, "space": "world", "scale": 0.009, "speed": 0.06, "seed": 11,
-         "axisMask": [1.0, 1.0, 0.6]}]) + [
+         "axisMask": [1.0, 1.0, 0.6]},
         # a long, slow swell travelling along the wall into the gather (its phase also takes the performer's
         # Motion Scale through an integrating route, ADR-1372, so the rate changes without a jump)
         {"kind": "sine", "amount": 2.2, "space": "world", "axis": [0.435, -0.03, -0.90],
@@ -706,7 +704,7 @@ def instrument(s, g):
     s.route(R("control.detail", F + "source/1/amplitude", 0.4, **CC))
     s.route(R("control.iridescence", "procedural/silk/material/thinFilm/thickness", 320.0, **CC),
             R("control.iridescence", op("irid") + "constant", 1.0, op="multiply", gain=2.0, offset=1.0, **CC))
-    for label in [x for x in ("trebleGain", "resGain") if x in g.at]:
+    for label in ("trebleGain", "resGain"):
         s.route(R("control.light", op(label) + "constant", 1.0, op="multiply", gain=2.0, offset=1.0, **CC))
     # Color Drift: the palette journey moves sooner and turns faster
     s.route(R("control.colorDrift", "palette/hold", 1.0, op="multiply", gain=-0.8, offset=1.0, **CC),

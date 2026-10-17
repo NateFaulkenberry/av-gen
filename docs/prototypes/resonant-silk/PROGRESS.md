@@ -9,14 +9,20 @@ Branch `proto/resonant-silk`, worktree `../av-gen-silk`, from main `ef3774da`, w
 ## How to resume
 
 - Build: `cmake --preset release -DCPM_SOURCE_CACHE=../av-gen/.cache/cpm && cmake --build --preset release`.
+- Status: the work is complete. The final checks and the report are in `02-report.md` §9. The coordinator does the
+  single merge.
 - Generate the scene: `python3 tools/resonant_silk/build.py`. This writes `examples/resonant-silk/`: the scene, the
   project and `meshes/rs-silk.glb`.
 - Research compositions: `--composition a|b|c --out-dir <dir>`. `a` is the chosen one, the Gather.
 - Review variant with audio: `--variant --wav <wav> --out <v.json>`. The live project carries no audio; the
   variant drops `sonic.live` and names the WAV.
-- Look-development switches:
+- Review switches:
   - `RS_NOMUSIC=1`: drift only, no music fields.
-  - `RS_SAIL=<radians>`: the sail's extra roll (default -0.8).
+  - `RS_GEOMETRY=1`: matte grey, no program, no palette.
+  - `RS_PALETTE=<n>`: the starting palette.
+
+  Variants take `--set palette/select=k --set palette/lock=1` (written into the selector block) and
+  `--track path=v@t,...` (stepped timeline keys).
 - Render every frame through `tools/gpu-lock.sh` with `AVGEN_GPU_LOCK_TIMEOUT=14400`, and sleep 15 s afterwards:
   `avgen --headless --project <v.json> --render <out.mp4|dir> --range a:b --fps 24 --size 640x360`.
 - Test audio:
