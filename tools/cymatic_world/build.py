@@ -363,6 +363,7 @@ LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 DEBUG = os.environ.get("CW_DEBUG", "")
 # ADR-1407: the relief is baked into a grid once a frame (CW_BAKE=0: every vertex evaluates the readers, for comparison)
 BAKE = os.environ.get("CW_BAKE", "1") != "0"
+WAVE = float(os.environ.get("CW_WAVE", "2.2"))  # Stage D: the travelling light's gain into its grid (0 = off)
 BAKE_RES = int(os.environ.get("CW_BAKE_RES", "896"))
 BAKE_HALF = 86.0   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
 # the camera (the correction round, owner: "pull back"): A the shape-language framing, B pulled back (chosen), C further
@@ -412,10 +413,14 @@ def ground_readers(s):
         # 10-brief Stage C, the SECONDARY light: the medium network's crests times the excitation, multiplied before
         # the bake (a compound), so the program spends one field slot on it and keeps the fourth for Stage D
         reader(s, "shade-sandm", "sand", {"sharpness": 0.6, "sandNormalized": True, **medium})
-        s.nodes.append({"name": "shade-mline", "kind": "field", "position": [0, 0, 0],
-                        "field": {"kind": "compound", "children": ["shade-sandm", "shade-amp"], "combine": "multiply",
-                                  "strength": 1.0, "falloff": {"kind": "none"}}})
-        bake_grid(s, "shade-mline", 768)
+        # Stage D, the TRAVELLING light (ADR-1409): the onset ripples alone (dark in silence); the program lays it on
+        # the large figure's ridges -- a pulse of light that runs along the crests from where a hit landed, and is
+        # gone. It shares the secondary light's grid with the opposite sign (a program samples at most four fields,
+        # and the GPU holds at most 16): > 0 is the medium crest, < 0 the wave; the excitation multiplies the medium
+        # crest in the program
+        reader(s, "shade-wave", "amplitude", {"rows": "ripples"}, frame={"strength": -WAVE})
+        compound(s, "shade-light", ["shade-sandm", "shade-wave"], "add")
+        bake_grid(s, "shade-light", 768)
     else:
         reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
     if DEBUG in ("signed", "nodal", "envelope"):
@@ -450,6 +455,12 @@ def ground_readers(s):
     return [("relief-grid", 1.0)]
 
 
+def compound(s, name, children, combine, strength=1.0):
+    s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "compound", "children": children, "combine": combine, "strength": strength,
+                              "falloff": {"kind": "none"}}})
+
+
 def bake_grid(s, source, res=None):
     """ADR-1407: a plane grid `<source>-bake` holding `source` sampled at its cells every frame, and the field
     `<source>-grid` that reads it."""
@@ -476,7 +487,7 @@ PALETTES = {
           "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
           "sheen": "#e6f7ff", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
-    "B": {"line2": "#7fb6ff", "line2I": 0.4, "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
+    "B": {"line2": "#7fb6ff", "line2I": 0.4, "wave": "#9ff0ff", "waveI": float(os.environ.get("CW_WAVE_I", "4.0")), "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#9fe6ff",
           "sheenI": 0.75,
           "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.4},
@@ -485,12 +496,91 @@ PALETTES = {
           "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
           "sheen": "#fff1e0", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.76, "rimI": 0.42, "skyI": 0.105, "lineI": 2.2, "hollowI": 0.1},
 }
+# M, the ten palettes' grey program: palette B's intensities with every colour white (the bindings colour it)
+PALETTES["M"] = {k: ("#ffffff" if isinstance(v, str) else v) for k, v in PALETTES["B"].items()}
 # G, GEOMETRY ONLY (a review aid, never shipped: CW_PALETTE=G): one neutral grey material, white light from the same
 # key and fill directions, no emission and no colour routes -- the world's shape with its colour ignored
 PALETTES["G"] = {"stone": "#5c5f66", "grit": "#5c5f66", "key": "#ffffff", "fill": "#c8ccd4", "rim": "#ffffff",
                  "sky": "#9aa0aa", "haze": "#2c2f36", "line": "#000000", "hollow": "#000000", "sheen": "#ffffff",
                  "sheenI": 0.35, "keyI": 1.5, "fillI": 0.55, "rimI": 0.12, "skyI": 0.18, "lineI": 0.0, "hollowI": 0.0}
-PALETTE = os.environ.get("CW_PALETTE", "B")   # chosen in Pass B (plasma interference)
+# ---- THE TEN PALETTES (12-brief-multi-palette.md) --------------------------------------------------------------------
+# The owner's artist-designed palettes, each seven named roles (sRGB hex, verbatim from the brief):
+#   background, deep shadow, primary surface, secondary surface, resonant, spectral highlight, rare peak.
+# They are ADR-1043 project-palette STATES: the ground's program is authored in grey (palette "M": every colour white,
+# every intensity B's), and role bindings MULTIPLY the program's colour constants by the active palette's colours each
+# frame -- so the routes that scale a term's brightness keep working, the colour work stays on the GPU (a few uniform
+# constants), and palette/position blends any two neighbouring states in OKLab.
+PALETTE_ROLES = ("background", "shadow", "primary", "secondary", "resonant", "spectral", "peak")
+MULTI_PALETTES = [
+    ("Abyssal Resonance",      ["#050711", "#10152B", "#202D59", "#354C88", "#527FE0", "#A3C8FF", "#E5EDFF"]),
+    ("Crimson Singularity",    ["#080612", "#180D29", "#301448", "#54205F", "#A52361", "#F04455", "#FF9AA5"]),
+    ("Molten Glass",           ["#0B0808", "#26110F", "#51201A", "#87351F", "#D9572B", "#FFAD45", "#FFE3A1"]),
+    ("Ultraviolet Bloom",      ["#080611", "#1A1033", "#30205A", "#58318A", "#8A45C6", "#D45AAE", "#F4C7FF"]),
+    ("Oxidized Metal",         ["#090B0D", "#1B2022", "#39413F", "#665044", "#AD6847", "#D8A76C", "#F5DDB0"]),
+    ("Glacial Spectral",       ["#050A12", "#101B2A", "#1D344C", "#315B79", "#65A9CE", "#B7DCEB", "#F1FCFF"]),
+    ("Chlorophyll After Dark", ["#050A08", "#102017", "#193D2A", "#286746", "#39A66A", "#A4D65E", "#E6F5A4"]),
+    ("Rose Quartz",            ["#0A0710", "#211522", "#47263F", "#75405E", "#B65D83", "#EAA0BA", "#FFE0EA"]),
+    ("Monochrome Silver",      ["#030405", "#101215", "#282C32", "#464D57", "#777F8C", "#C2C9D2", "#FFFFFF"]),
+    ("Prismatic Oil",          ["#05070D", "#101426", "#20203F", "#442447", "#813450", "#D77C88", "#F4D4C5"]),
+]
+
+
+def _oklab(c):
+    l = 0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]
+    m = 0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]
+    s_ = 0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]
+    l, m, s_ = (max(v, 0.0) ** (1.0 / 3.0) for v in (l, m, s_))
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s_,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s_,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s_]
+
+
+def _linear(lab):
+    l = lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2]
+    m = lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2]
+    s_ = lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2]
+    l, m, s_ = l ** 3, m ** 3, s_ ** 3
+    return [max(0.0, 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s_),
+            max(0.0, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s_),
+            max(0.0, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s_)]
+
+
+def _mix(a, b, t):  # OKLab, the space the engine blends palettes in (ADR-1043)
+    la, lb = _oklab(a), _oklab(b)
+    return _linear([x + (y - x) * t for x, y in zip(la, lb)])
+
+
+def _hue(c):  # a light's colour: the hue and saturation, at unit peak (its op's intensity carries the brightness)
+    m = max(max(c), 1e-6)
+    return [round(v / m, 5) for v in c]
+
+
+def palette_state(name, hexes):
+    """One palette as the program's colour roles. Albedo roles are the brief's colours as authored (linear); light and
+    emission roles are hues at unit peak, so each term keeps its brightness from the program (the hierarchy holds in
+    every palette: darks dark, the bright roles rare and on the ridges)."""
+    r = dict(zip(PALETTE_ROLES, (hexrgb(h) for h in hexes)))
+    white = [1.0, 1.0, 1.0]
+    colors = {
+        # the base field (Stage B's colour field): one sign of lobe primary, the other secondary, the nodes deep shadow
+        "surfaceA": r["primary"], "surfaceB": r["secondary"], "shadow": r["shadow"],
+        # the ridges' settled grit: the secondary surface leaning resonant
+        "grit": _mix(r["secondary"], r["resonant"], 0.3),
+        # the raking key: mostly white, tinted by the spectral highlight (a palette's light, not a colour wash); the
+        # ambient floor under it takes the primary surface's hue
+        "key": _hue(_mix(white, r["spectral"], 0.45)), "sky": _hue(r["primary"]),
+        "keymid": _hue(_mix(r["primary"], _mix(white, r["spectral"], 0.45), 0.5)),
+        "fill": _hue(r["resonant"]),            # the counter light on the far flanks
+        "hollow": _hue(r["resonant"]),          # the glow in the excited cells
+        "line": _hue(r["spectral"]),            # the large crest's light
+        "line2": _hue(_mix(r["secondary"], r["spectral"], 0.5)),   # the medium crest, restrained
+        "sheen": _hue(r["peak"]), "wave": _hue(r["peak"]),         # the rare peaks: glints, the travelling light
+    }
+    return {"name": name, "colors": {k: [round(v, 5) for v in c] for k, c in colors.items()}}
+
+
+PALETTE = os.environ.get("CW_PALETTE", "B")   # M: the ten palettes (12-brief); A-C the colour pass's, G grey
+PAL_INDEX = float(os.environ.get("CW_PAL", "0"))  # the palette shown (palette/position)
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
 
@@ -553,16 +643,24 @@ def ground_program():
     g.op("gritMask", "smoothstep", 1, a=1, k=[0.5, 0.92] if BAKE else [0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.7, 0.96] if BAKE else [0.25, 0.7])
+    if BAKE:
+        # Stage D, the travelling light: the ripples alone (< 0 in the shared grid), on the crest lines only -- dashes
+        # of light that run along the ridges from where a hit landed (the ring's carrier makes the dashes), then gone
+        g.op("light2", "field", 6, field="shade-light-grid")     # > 0 medium crest, < 0 the wave
+        g.op("waveMask", "remap", 7, a=6, k=[-0.04, -0.22, 0.0, 1.0], f=1.0)
+        g.op(None, "multiply", 7, a=7, b=2)                         # ... on the crest
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
-    g.op("line", "constant", 7, k=pc("line", P_["lineI"]) + [1.0])
-    g.op(None, "multiply", 2, a=2, b=7)
+    g.op("line", "constant", 4, k=pc("line", P_["lineI"]) + [1.0])
+    g.op(None, "multiply", 2, a=2, b=4)
     if BAKE:
         # Stage C, the SECONDARY light: the medium network's crests glow faintly, and only where the figure is excited
         # -- a restrained second tier under the large figure's lines, never an equal outline on every contour
-        g.op("sandM", "field", 6, field="shade-mline-grid")      # medium crest x excitation, baked
-        g.op("lineM", "smoothstep", 6, a=6, k=[0.45, 0.95])
-        tint("line2", 6, 6, "line2", P_["line2I"])
+        g.op("lineM", "smoothstep", 6, a=6, k=[0.75, 0.98])
+        g.op(None, "multiply", 6, a=6, b=3)                         # ... where the figure is excited
+        tint("line2", 6, 6, "line2", P_.get("line2I", 0.0))
         g.op(None, "add", 2, a=2, b=6)
+        tint("wave", 7, 7, "wave", P_.get("waveI", 0.0))
+        g.op(None, "add", 2, a=2, b=7)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
     g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.3, 1.0] if BAKE else [0.8, 2.4])          # only where it rings hard
     g.op(None, "multiply", 3, a=3, b=7)
@@ -830,9 +928,11 @@ def build_world():
     tgt = hexrgb("#0f6b82")
     base = pc("grit")
     colour_routes = PALETTE != "G"
-    if colour_routes:
+    if colour_routes and PALETTE != "M":  # (an absolute hue shift: the ten palettes own the hues instead)
         s.route(*[R("intensity", path, round((tgt[c] - base[c]) * w, 5), comp=c, attackMs=4000, decayMs=9000)
                   for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5)) if path is not None])
+    if PALETTE == "M" and BAKE:
+        s.palette = palette_block(g)
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
                 *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
                 R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
@@ -843,6 +943,23 @@ def build_world():
     return s, cc, pads
 
 
+def palette_block(g):
+    """ADR-1043: the ten palettes as states, and the bindings that multiply the grey program's colour constants by the
+    active palette's roles."""
+    M = "material/cwGround/op/%d/%s/%s"
+    binds = []
+    for label in ("line2", "wave", "hollow", "sheen", "fill"):    # tint ramps: the colour is constant2 and constant3
+        binds += [(label, M % (g[label], "ramp", "constant2")), (label, M % (g[label], "ramp", "constant3"))]
+    binds += [("line", M % (g["line"], "constant", "constant")), ("grit", M % (g["grit"], "constant", "constant")),
+              ("surfaceA", M % (g["tint"], "ramp", "constant")), ("shadow", M % (g["tint"], "ramp", "constant2")),
+              ("surfaceB", M % (g["tint"], "ramp", "constant3")),
+              ("sky", M % (g["key"], "ramp", "constant")), ("keymid", M % (g["key"], "ramp", "constant2")),
+              ("key", M % (g["key"], "ramp", "constant3"))]
+    return {"states": [palette_state(n, h) for n, h in MULTI_PALETTES],
+            "bindings": [{"role": r, "target": t, "mode": "multiply"} for r, t in binds],
+            "position": PAL_INDEX, "saturation": 1.0, "value": 1.0}
+
+
 BUILDERS = {"world": build_world}
 OUT_DIRS = {k: os.path.join(REPO, "examples", v["id"]) for k, v in SCENES.items()}
 DESCRIPTION_TAIL = {"world": "The ground's figure is drawn by one resonance field (ADR-1400, ADR-1403 to 1407); the scene carries no track of its own."}
@@ -851,6 +968,9 @@ DESCRIPTION_TAIL = {"world": "The ground's figure is drawn by one resonance fiel
 def write_scene(key):
     os.makedirs(OUT_DIRS[key], exist_ok=True)
     s, cc, pads = BUILDERS[key]()
+    nf = sum(1 for n in s.nodes if n.get("kind") == "field")
+    # the GPU uploads 16 fields (spatial::kMaxGpuFields); the rest sample 0 with one log line -- the relief went flat
+    assert nf <= 16, "%d fields: the GPU holds 16" % nf
     pp, sp = s.write(OUT_DIRS[key])
     if getattr(s, "grids", None):  # the kit has no grids; they go in the scene file's top level
         with open(sp) as f:

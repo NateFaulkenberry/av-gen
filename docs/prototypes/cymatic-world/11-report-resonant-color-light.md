@@ -55,3 +55,22 @@ The coordinator's Stage B review: the colour field reads lobe by lobe, but the f
 - **Fields:** sand, amp, tint and mline (four of four). Stage D's light has to share a grid through a compound. **Material:** 42 ops.
 
 **Evidence** (`stageC-geometry-light/`): `stageB-top-stageC-bottom-feline-six.png` and `stageC-feline-six.png` (Feline at 4, 18, 60, 125, 160 and 190 s).
+
+## Stage D: travelling illumination
+
+- **The mechanism (ADR-1409, engine).** A resonance reader's new `rows` setting is `all`, `modes` or `ripples`, so a reader can hear the onset ripples (ADR-1403's travelling ring packets) and nothing else. A ripples-only reader is exactly 0 with no ring alive. That makes it a light that exists only while a hit travels outward from where it landed. The change is additive: the default is unchanged and never written, CPU and GPU skip the rows a reader doesn't hear, and there is a unit test (all = modes + ripples) and GPU/CPU parity readers.
+- **The light.** The ripples' amplitude (`shade-wave`, gain 2.2) shares the secondary light's baked grid with the opposite sign: > 0 is Stage C's medium crest, < 0 the wave. The program then lays the wave only on the large crest lines, as dashes of pale light that run along the ridges for the ring's life, carried by the ring's own wavelength, and then go.
+  - It is localised: each ring has its own launch point, not a centred global ring.
+  - It is restrained: crest lines only, never the cell floors.
+  - It is dark in silence.
+- **Rejected on the way:**
+  - The wave on the whole sand mask (sand¹ and sand²). It painted pale zebra stripes across walls and floors: the carrier read as noise, not light.
+  - A wider threshold. It flooded the cells.
+- **A defect found and fixed: the scene had gone over the GPU's 16 field slots.**
+  - The first Stage D layout had 18 fields. Slots 17 and 18 (the relief compound and its bake grid) were silently not uploaded, so the ground's relief sampled 0 and the terrain went flat, with one log line.
+  - Stage D now fits 16 by folding the excitation multiply into the program and dropping a compound.
+  - The generator now asserts at most 16 fields.
+  - The engine's behaviour (fields past 16 sample 0 with one log line) is unchanged and noted here for the ADR follow-ups.
+- **Material:** 47 ops. **Fields:** 16 of 16.
+
+**Evidence** (`stageD-travelling-light/`): `travelling-light-off-left-on-right-feline-6-16s.mp4` (normal speed, with audio) and `travelling-light-frames-0.15s-apart.png`.

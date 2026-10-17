@@ -386,7 +386,28 @@
    }
   },
   {
-   "name": "shade-mline",
+   "name": "shade-wave",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "cymatic",
+    "strength": -2.2,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "amplitude",
+     "rows": "ripples"
+    }
+   }
+  },
+  {
+   "name": "shade-light",
    "kind": "field",
    "position": [
     0,
@@ -397,9 +418,9 @@
     "kind": "compound",
     "children": [
      "shade-sandm",
-     "shade-amp"
+     "shade-wave"
     ],
-    "combine": "multiply",
+    "combine": "add",
     "strength": 1.0,
     "falloff": {
      "kind": "none"
@@ -407,7 +428,7 @@
    }
   },
   {
-   "name": "shade-mline-grid",
+   "name": "shade-light-grid",
    "kind": "field",
    "position": [
     0,
@@ -416,7 +437,7 @@
    ],
    "field": {
     "kind": "grid",
-    "reference": "shade-mline-bake",
+    "reference": "shade-light-bake",
     "strength": 1.0,
     "falloff": {
      "kind": "none"
@@ -687,6 +708,29 @@
      ]
     },
     {
+     "kind": "field",
+     "dst": 6,
+     "field": "shade-light-grid"
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 6,
+     "constant": [
+      -0.04,
+      -0.22,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 2
+    },
+    {
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
@@ -694,7 +738,7 @@
     },
     {
      "kind": "constant",
-     "dst": 7,
+     "dst": 4,
      "constant": [
       1.25091,
       1.9,
@@ -706,23 +750,24 @@
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
-     "srcB": 7
-    },
-    {
-     "kind": "field",
-     "dst": 6,
-     "field": "shade-mline-grid"
+     "srcB": 4
     },
     {
      "kind": "smoothstep",
      "dst": 6,
      "srcA": 6,
      "constant": [
-      0.45,
-      0.95,
+      0.75,
+      0.98,
       0.0,
       0.0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 3
     },
     {
      "kind": "ramp",
@@ -752,6 +797,35 @@
      "dst": 2,
      "srcA": 2,
      "srcB": 6
+    },
+    {
+     "kind": "ramp",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.69341,
+      1.742735,
+      2.0,
+      0.5
+     ],
+     "constant3": [
+      1.38682,
+      3.48547,
+      4.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 7
     },
     {
      "kind": "remap",
@@ -1126,7 +1200,7 @@
    "injectField": "shade-tint"
   },
   {
-   "name": "shade-mline-bake",
+   "name": "shade-light-bake",
    "enabled": true,
    "mode": "bake",
    "wrap": "clamp",
@@ -1145,7 +1219,7 @@
     -2.0,
     86.0
    ],
-   "injectField": "shade-mline"
+   "injectField": "shade-light"
   },
   {
    "name": "relief-bake",
