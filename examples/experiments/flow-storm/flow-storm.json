@@ -1,0 +1,1288 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "flow-storm.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.25,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 28.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.06
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "influence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "control.influence",
+        "weight": 1.0
+       }
+      ],
+      "bias": 0.5,
+      "gain": 0.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.bass",
+   "target": "field/baseFlow/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 0.9,
+    "offset": 0.7,
+    "attackMs": 250,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "field/kickPush/strength",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 5,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "field/shedding/strength",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/gust/strength",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "field/chop/strength",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "control.strength",
+   "target": "field/baseFlow/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.persistence",
+   "target": "grid/wake/dissipation",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.flowType",
+   "target": "field/gust/strength",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.scale",
+   "target": "field/gust/frequency",
+   "amount": 0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.turbulence",
+   "target": "field/chop/strength",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.eddy0",
+   "target": "field/shed0/strength",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "control.eddy1",
+   "target": "field/shed1/strength",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "control.eddy2",
+   "target": "field/shed2/strength",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "field/shed0/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 7.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -23.92,
+       2.0,
+       -12.7736
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.2917,
+      "value": [
+       -22.66,
+       2.0,
+       -11.2517
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.5833,
+      "value": [
+       -21.7376,
+       2.0,
+       -9.8336
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.875,
+      "value": [
+       -21.4,
+       2.0,
+       -8.6158
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.1667,
+      "value": [
+       -21.7376,
+       2.0,
+       -7.6813
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.4583,
+      "value": [
+       -22.66,
+       2.0,
+       -7.0939
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.75,
+      "value": [
+       -23.92,
+       2.0,
+       -6.8936
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.0417,
+      "value": [
+       -25.18,
+       2.0,
+       -7.0939
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.3333,
+      "value": [
+       -26.1024,
+       2.0,
+       -7.6813
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.625,
+      "value": [
+       -26.44,
+       2.0,
+       -8.6158
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.9167,
+      "value": [
+       -26.1024,
+       2.0,
+       -9.8336
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.2083,
+      "value": [
+       -25.18,
+       2.0,
+       -11.2517
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.5,
+      "value": [
+       -23.92,
+       2.0,
+       -12.7736
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.7917,
+      "value": [
+       -22.66,
+       2.0,
+       -14.2954
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.0833,
+      "value": [
+       -21.7376,
+       2.0,
+       -15.7136
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.375,
+      "value": [
+       -21.4,
+       2.0,
+       -16.9313
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.6667,
+      "value": [
+       -21.7376,
+       2.0,
+       -17.8658
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.9583,
+      "value": [
+       -22.66,
+       2.0,
+       -18.4532
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.25,
+      "value": [
+       -23.92,
+       2.0,
+       -18.6536
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.5417,
+      "value": [
+       -25.18,
+       2.0,
+       -18.4532
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.8333,
+      "value": [
+       -26.1024,
+       2.0,
+       -17.8658
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.125,
+      "value": [
+       -26.44,
+       2.0,
+       -16.9313
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.4167,
+      "value": [
+       -26.1024,
+       2.0,
+       -15.7136
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.7083,
+      "value": [
+       -25.18,
+       2.0,
+       -14.2954
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.0,
+      "value": [
+       -23.92,
+       2.0,
+       -12.7736
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/shed1/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 9.3,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       11.2128,
+       2.0,
+       -5.0518
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.3875,
+      "value": [
+       12.151,
+       2.0,
+       -3.3126
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.775,
+      "value": [
+       12.3842,
+       2.0,
+       -1.6918
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.1625,
+      "value": [
+       11.85,
+       2.0,
+       -0.3001
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.55,
+      "value": [
+       10.6914,
+       2.0,
+       0.7678
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.9375,
+      "value": [
+       9.219,
+       2.0,
+       1.4392
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.325,
+      "value": [
+       7.8272,
+       2.0,
+       1.6682
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.7125,
+      "value": [
+       6.889,
+       2.0,
+       1.4392
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.1,
+      "value": [
+       6.6558,
+       2.0,
+       0.7678
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.4875,
+      "value": [
+       7.19,
+       2.0,
+       -0.3001
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.875,
+      "value": [
+       8.3486,
+       2.0,
+       -1.6918
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.2625,
+      "value": [
+       9.821,
+       2.0,
+       -3.3126
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.65,
+      "value": [
+       11.2128,
+       2.0,
+       -5.0518
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.0375,
+      "value": [
+       12.151,
+       2.0,
+       -6.7911
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.425,
+      "value": [
+       12.3842,
+       2.0,
+       -8.4118
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.8125,
+      "value": [
+       11.85,
+       2.0,
+       -9.8036
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.2,
+      "value": [
+       10.6914,
+       2.0,
+       -10.8715
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.5875,
+      "value": [
+       9.219,
+       2.0,
+       -11.5429
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.975,
+      "value": [
+       7.8272,
+       2.0,
+       -11.7718
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.3625,
+      "value": [
+       6.889,
+       2.0,
+       -11.5429
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.75,
+      "value": [
+       6.6558,
+       2.0,
+       -10.8715
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.1375,
+      "value": [
+       7.19,
+       2.0,
+       -9.8036
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.525,
+      "value": [
+       8.3486,
+       2.0,
+       -8.4118
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.9125,
+      "value": [
+       9.821,
+       2.0,
+       -6.7911
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.3,
+      "value": [
+       11.2128,
+       2.0,
+       -5.0518
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/shed2/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 11.6,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       41.2884,
+       2.0,
+       20.8168
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.4833,
+      "value": [
+       41.3502,
+       2.0,
+       22.1937
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 0.9667,
+      "value": [
+       40.8144,
+       2.0,
+       23.4768
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.45,
+      "value": [
+       39.8246,
+       2.0,
+       24.5786
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 1.9333,
+      "value": [
+       38.646,
+       2.0,
+       25.424
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.4167,
+      "value": [
+       37.5944,
+       2.0,
+       25.9555
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.9,
+      "value": [
+       36.9516,
+       2.0,
+       26.1368
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.3833,
+      "value": [
+       36.8898,
+       2.0,
+       25.9555
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.8667,
+      "value": [
+       37.4256,
+       2.0,
+       25.424
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.35,
+      "value": [
+       38.4154,
+       2.0,
+       24.5786
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.8333,
+      "value": [
+       39.594,
+       2.0,
+       23.4768
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.3167,
+      "value": [
+       40.6456,
+       2.0,
+       22.1937
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.8,
+      "value": [
+       41.2884,
+       2.0,
+       20.8168
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.2833,
+      "value": [
+       41.3502,
+       2.0,
+       19.4399
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.7667,
+      "value": [
+       40.8144,
+       2.0,
+       18.1568
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.25,
+      "value": [
+       39.8246,
+       2.0,
+       17.055
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.7333,
+      "value": [
+       38.646,
+       2.0,
+       16.2095
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.2167,
+      "value": [
+       37.5944,
+       2.0,
+       15.6781
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.7,
+      "value": [
+       36.9516,
+       2.0,
+       15.4968
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.1833,
+      "value": [
+       36.8898,
+       2.0,
+       15.6781
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.6667,
+      "value": [
+       37.4256,
+       2.0,
+       16.2095
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.15,
+      "value": [
+       38.4154,
+       2.0,
+       17.055
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.6333,
+      "value": [
+       39.594,
+       2.0,
+       18.1568
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.1167,
+      "value": [
+       40.6456,
+       2.0,
+       19.4399
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.6,
+      "value": [
+       41.2884,
+       2.0,
+       20.8168
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       54.0,
+       24.0,
+       43.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       55.4142,
+       24.8,
+       43.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       56.0,
+       24.0,
+       45.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       55.4142,
+       23.2,
+       46.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       54.0,
+       24.0,
+       47.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       52.5858,
+       24.8,
+       46.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       52.0,
+       24.0,
+       45.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       52.5858,
+       23.2,
+       43.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       54.0,
+       24.0,
+       43.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.3061,
+       0.4207,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       -3.0514,
+       0.2702,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -3.524,
+       -0.4207,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       -5.447,
+       -0.2702,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -7.6939,
+       0.4207,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       -8.9486,
+       0.2702,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       -8.476,
+       -0.4207,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       -6.553,
+       -0.2702,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -4.3061,
+       0.4207,
+       -2.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-flow-storm.mp4"
+ },
+ "sonicScene": {
+  "category": "experiment",
+  "thesis": "A meandering river seen from inside its channel: sixty thousand strands rooted in the bed are combed by one designed current, part round three boulders and swirl in the eddies the boulders shed, while warm motes ride the same current above them.",
+  "experiment": "B flow fields",
+  "id": "flow-storm",
+  "title": "Current Meadow, Storm"
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "flowType"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "strength"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "scale"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "influence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "persistence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "turbulence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 36,
+     "signal": "eddy0"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 37,
+     "signal": "eddy1"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 38,
+     "signal": "eddy2"
+    }
+   ]
+  }
+ }
+}

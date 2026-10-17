@@ -39,7 +39,7 @@ REGIMES = {
 
 PALETTES = {
     "bronze": {  # bronze crests over a teal-black ground; the disagreement lights in cold cyan
-        "trough": "#04100f", "crest": "#9c7a4e", "accent": "#5ff2e0", "accentGain": 1.2, "defect": "#ff7a3d",
+        "trough": "#04100f", "crest": "#9c7a4e", "accent": "#5ff2e0", "accentGain": 0.45, "defect": "#ff7a3d",
         "defectGain": 0.0, "sky": "#020506", "horizon": "#081614", "key": "#ffe0b8", "keyI": 5.0, "rim": "#3fa7b8",
         "rimI": 1.2, "rough": 0.34, "metal": 0.7,
     },
@@ -101,7 +101,11 @@ def pacemakers(s, centres, gain=0.22, radius=5.0, period=0.0):
         if period:
             common.lissajous_track(s, "field/%s/position" % n, c, (6.0, 5.0), period * (1 + 0.37 * i), ratio=(1, 1),
                                    phase=(0.13 * i, 0.25 + 0.21 * i))
-    s.field("tune", {"kind": "compound", "combine": "add", "children": names})
+    # a gentle tilt of the natural frequency across the field (0.02 Hz over 100 m): in unison the whole field still
+    # breathes as one long, slow wave instead of a blank sheet, and the pacemakers' rings ride on it
+    s.field("tilt", {"kind": "linearGradient", "axis": [0.8, 0.0, 0.6], "length": 100.0, "strength": 0.02})
+    names.append("tilt")
+    s.field("tune", {"kind": "compound", "combine": "add", "children": names[:4]})
     return "tune"
 
 
@@ -147,11 +151,8 @@ def common_palette(name):
 
 
 DESIGNS = {
-    "loom": ("Phase Loom",
-             "Nine long ribbons strung across two oscillator networks: one lifts them in travelling rings from two "
-             "pacemakers, the other sways them in slow spirals, and light gathers wherever the two fall into phase."),
     "flaps": ("Phase Wall",
-              "A kinetic wall of six thousand metal flaps, each turned by its own oscillator: when they fall into step "
+              "A kinetic wall of nearly ten thousand metal flaps, each turned by its own oscillator: when they fall into step "
               "the whole wall turns and flashes as one; as the coupling loosens it breaks into islands that turn "
               "against each other, and travelling waves sweep bands of light across it."),
     "membrane": ("Phase Membrane",
@@ -165,7 +166,57 @@ def design(key):
     return {"category": "experiment", "thesis": DESIGNS[key][1], "experiment": "A coupled oscillators"}
 
 
-def membrane(pal_name="bronze", regime="targets", autonomous=False):
+MIDI_CC = [
+    (1, "coupling", "COUPLING: pulls the network toward unison (more K)"),
+    (2, "complexity", "COMPLEXITY: widens the spread of natural frequencies (more islands, more defects)"),
+    (3, "motion", "MOTION INTENSITY: the relief's depth and the network's speed"),
+    (4, "influence", "AUDIO INFLUENCE: how hard the music drives the network (half at rest)"),
+    (5, "persistence", "PERSISTENCE: how long strain and coherence linger"),
+    (6, "mode", "VISUAL MODE: the Sakaguchi lag, from rings (0) toward spirals (full)"),
+]
+MIDI_NOTES = [(36, "pace0"), (37, "pace1"), (38, "pace2")]
+
+
+def music(s, grid, centre, relief_target=None, kick_rate=2.5, pace=True):
+    """Phase 5. The music changes the network's dynamics, not an object's size:
+      - onsets are phase kicks: a kick launches a ring of advanced phase from `centre`, a snare a faster, thinner one
+        from elsewhere (onset fields, ADR-1116, as the grid's injection) -- a new front the coupling then carries;
+      - sustained sound raises the coupling (held chords pull the field toward unison; a sparse passage lets it
+        loosen into islands);
+      - bass speeds the whole field (its natural frequency), hats add phase noise (fine-scale disorder);
+      - a section's intensity slowly turns the lag (rings toward spirals): a build reorganises the field;
+      - MIDI notes 36-38 hold pacemakers (velocity = how much faster; release = how long they linger)."""
+    G = "grid/%s/" % grid
+    s.field("kickFront", {"kind": "onset", "onsetSource": "low", "point": list(centre), "waveGeometry": "spherical",
+                          "audioSpeed": 16.0, "onsetWidth": 3.0, "onsetDecay": 1.0})
+    s.field("snareFront", {"kind": "onset", "onsetSource": "mid", "point": [centre[0] + 26.0, centre[1],
+                                                                             centre[2] - 14.0],
+                           "waveGeometry": "spherical", "audioSpeed": 24.0, "onsetWidth": 1.6, "onsetDecay": 1.8})
+    s.field("kicks", {"kind": "compound", "combine": "add", "children": ["kickFront", "snareFront"]})
+    for g in s.grids:
+        if g["name"] == grid:
+            g["injectField"] = "kicks"
+            g["injectRate"] = kick_rate
+    s.route(common.audio("response.sustain", G + "coupling", 6.0, attackMs=3000, decayMs=6000),
+            common.audio("response.bass", G + "frequency", 0.25, attackMs=300, decayMs=1500),
+            common.audio("response.hat", G + "noise", 0.5, attackMs=40, decayMs=400),
+            common.audio("response.intensity", G + "phaseLag", 0.35, attackMs=6000, decayMs=12000))
+    if relief_target:
+        s.route(common.audio("response.bass", relief_target, 0.6, attackMs=200, decayMs=900))
+    common.instrument(s, MIDI_CC, MIDI_NOTES if pace else ())
+    s.route(R("control.coupling", G + "coupling", 12.0, **common.CC),
+            R("control.complexity", G + "spread", 0.2, **common.CC),
+            R("control.motion", G + "speed", 1.5, **common.CC),
+            R("control.persistence", G + "persistence", 3.0, **common.CC),
+            R("control.mode", G + "phaseLag", 1.0, **common.CC))
+    if relief_target:
+        s.route(R("control.motion", relief_target, 1.2, **common.CC))
+    if pace:
+        for i in range(3):
+            s.route(R("control.pace%d" % i, "field/pace%d/strength" % i, 0.35, attackMs=80, decayMs=2500))
+
+
+def membrane(pal_name="bronze", regime="islands", autonomous=False):
     """A1, the phase-wave sculpture: sin theta raises the floor of a bowl; the fronts and the defects light."""
     pal = common_palette(pal_name)
     s = common.Scene("osc-membrane", DESIGNS["membrane"][0], design("membrane"))
@@ -174,7 +225,7 @@ def membrane(pal_name="bronze", regime="targets", autonomous=False):
     osc_grid(s, "net", 2 * radius, 384, regime, freq_field=tune, extra={"noise": 0.02})
     readers(s, "net")
     mesh_dir = os.path.join(common.EXAMPLES, "osc-membrane", "meshes")
-    pos, nrm, uv, idx = common.bowl_mesh(radius, height, 260, 420)
+    pos, nrm, uv, idx = common.bowl_mesh(radius, height, 220, 360)
     common.write_glb(os.path.join(mesh_dir, "osc-bowl.glb"), pos, nrm, uv, idx, "bowl")
     g = phase_program(pal, "oscMembrane")
     s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
@@ -183,25 +234,28 @@ def membrane(pal_name="bronze", regime="targets", autonomous=False):
                      "metallic": pal["metal"], "doubleSided": True},
            deformers=[{"kind": "field", "field": "phase", "amount": 1.1, "space": "world", "alongNormal": True}],
            extra={"normalStep": 0.1})
+    if not autonomous:
+        music(s, "net", (-6.0, 0.0, 4.0), relief_target="procedural/membrane/deform/1/amount")
     environment(s, pal, key_dir=[0.7, -0.45, -0.55])
     s.camera = {"mode": 1, "position": [6.0, 22.0, 32.0], "target": [-2.0, 0.0, -8.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(4.0, 1.0, 2.0), tamp=(2.0, 0.5, 0.0),
                    steps=8)
     s.params_({"camera/lens/focalLength": 24.0, "post/bloom/intensity": 0.2, "post/output/vignette": 0.45,
                "post/grade/contrast": 1.08})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
 def flaps(pal_name="bronze", regime="islands", autonomous=False):
-    """A2, the synchronisation sculpture: a kinetic wall of 6,000 metal flaps, each turned about its vertical axis by
+    """A2, the synchronisation sculpture: a kinetic wall of 9,600 metal flaps, each turned about its vertical axis by
     its oscillator's phase. In step, the wall turns as one and flashes; in islands, patches turn together and
     disagree at their seams; travelling waves sweep bands of light across it. Autonomously the coupling breathes
     (a slow timeline sweep) so the wall passes through disorder, islands, synchrony and back."""
     pal = common_palette(pal_name)
     s = common.Scene("osc-flaps", DESIGNS["flaps"][0], design("flaps"))
-    W, H, nx, ny = 120.0, 50.0, 120, 50
-    osc_grid(s, "net", (W, H), (240, 100), regime, seed=3, frequency=0.18, extra={"noise": 0.05})
+    W, H, nx, ny = 150.0, 64.0, 150, 64
+    osc_grid(s, "net", (W, H), (300, 128), regime, seed=3, frequency=0.18, extra={"noise": 0.05})
     # the readers turn the grid's XZ plane up into the wall's XY plane (world y = grid z), centred on the wall
     readers(s, "net", position=(0.0, H / 2, 0.0), rotation=(-90.0, 0.0, 0.0))
     g = phase_program(pal, "oscFlaps")
@@ -218,105 +272,37 @@ def flaps(pal_name="bronze", regime="islands", autonomous=False):
                                   {"time": 40.0, "value": [14.0], "interp": "smooth"},
                                   {"time": 56.0, "value": [14.0], "interp": "smooth"},
                                   {"time": 96.0, "value": [1.5], "interp": "smooth"}], loop=96.0)
+    if not autonomous:
+        # in the grid's frame (x, z) = the wall's (x, y - H/2): the kick from the lower centre
+        music(s, "net", (0.0, 0.0, -18.0), pace=False, kick_rate=2.0)
     environment(s, pal, key_dir=[0.35, -0.4, -0.85])
     s.environment["shadowRange"] = 160.0
-    s.camera = {"mode": 1, "position": [-14.0, 16.0, 36.0], "target": [6.0, 26.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
+    # inside the wall's span, close and looking up along it: the wall fills the frame and recedes to the right
+    s.camera = {"mode": 1, "position": [-30.0, 14.0, 30.0], "target": [10.0, 34.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=110.0, amp=(5.0, 1.5, 2.0), tamp=(3.0, 1.0, 0.0),
                    steps=8)
-    s.params_({"camera/lens/focalLength": 26.0, "post/bloom/intensity": 0.22, "post/output/vignette": 0.4,
+    s.params_({"camera/lens/focalLength": 24.0, "post/bloom/intensity": 0.22, "post/output/vignette": 0.4,
                "post/grade/contrast": 1.08})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
-def ribbon_mesh(n, length, width, nu=420, nv=10):
-    """`n` long ribbons across x, fanned in depth and height: a loom of strips, each a gentle catenary with a slow
-    roll, so the layers overlap in perspective and the phase waves read as travelling along and between them."""
-    meshes = []
-    for i in range(n):
-        f = i / max(n - 1, 1)
-        z0 = -30.0 + 60.0 * f
-        y0 = 6.0 + 7.0 * math.sin(math.pi * f) + 2.0 * f
-        u = np.linspace(-0.5, 0.5, nu)
-        x = u * length
-        y = y0 + 6.0 * (4 * u * u - 1.0) * (0.6 + 0.4 * math.cos(3.0 * f))
-        z = z0 + 5.0 * np.sin(2 * math.pi * (u * 0.8 + 0.3 * f))
-        roll = 0.5 * math.pi + 0.45 * np.sin(2 * math.pi * (u * 1.3 + 0.5 * f))  # upright curtains
-        v = np.linspace(-0.5, 0.5, nv) * width
-        U, V = np.meshgrid(np.arange(nu), v)
-        P = np.zeros((nv, nu, 3))
-        P[..., 0] = x[None, :]
-        P[..., 1] = y[None, :] + V * np.sin(roll)[None, :]
-        P[..., 2] = z[None, :] + V * np.cos(roll)[None, :]
-        pos = P.reshape(-1, 3)
-        nrm = np.stack([np.zeros(nu * nv), np.repeat(np.cos(roll)[None, :], nv, 0).ravel(),
-                        -np.repeat(np.sin(roll)[None, :], nv, 0).ravel()], axis=1)
-        uv = np.stack([np.tile(np.linspace(0, 1, nu), nv), np.repeat(np.linspace(0, 1, nv), nu)], axis=1)
-        idx = common.grid_indices(nu, nv)
-        meshes.append((pos, nrm, uv, idx))
-    return common.merge(*meshes)
+# The loom (two networks on nine ribbons, A3/A4) was tried and dropped after review: see A-oscillators.md.
+CONFIGS = {"membrane": membrane, "flaps": flaps}
 
 
-def interference_program(pal, name):
-    """Two networks on one strip: A's crest/trough sets the albedo; where A and B are in phase (sA sB near 1) the
-    strip lights -- constructive interference drawn as light, destructive as dark."""
-    g = common.Prog(name)
-    g.op("phaseA", "field", 0, field="aPhase")
-    g.op(None, "smoothstep", 1, a=0, k=[-0.7, 0.9, 0, 0])
-    g.op("trough", "constant", 2, k=C(pal, "trough") + [1])
-    g.op("crest", "constant", 3, k=C(pal, "crest") + [1])
-    g.op(None, "mixBy", 4, a=2, b=3, c=1)                                # albedo
-    g.op("phaseB", "field", 5, field="bPhase")
-    g.op(None, "multiply", 5, a=0, b=5)                                  # sA sB
-    g.op(None, "smoothstep", 5, a=5, k=[0.55, 0.95, 0, 0])               # in phase
-    g.op("accent", "constant", 6, k=C(pal, "accent", pal["accentGain"]) + [1])
-    g.op(None, "multiply", 6, a=5, b=6)
-    g.op("activity", "field", 5, field="aActivity")
-    g.op(None, "smoothstep", 5, a=5, k=[0.8, 3.0, 0, 0])
-    g.op("defect", "constant", 7, k=C(pal, "defect", max(pal["defectGain"], 0.8)) + [1])
-    g.op(None, "multiply", 5, a=5, b=7)
-    g.op(None, "add", 6, a=6, b=5)
-    g.op("rough", "constant", 7, k=[pal["rough"]] * 3 + [1])
-    g.base, g.emit, g.rough = 4, 6, 7
-    return g
+INDEX = {  # config -> (hidden?, notes): what the Examples > Live > Experiments menu lists
+    "membrane": (False, "MIDI notes 36-38 hold pacemakers."),
+    "flaps": (False, ""),
+}
 
 
-def loom(pal_name="nacre", regime="spirals", autonomous=False):
-    """A3 + A4, interference geometry and the Resonant Silk extension: nine long ribbons across two networks. Network A
-    (pacemakers, travelling rings) lifts them; network B (slower, coarser spirals) sways them sideways; light marks
-    where the two agree. Ribbons in one wave rise together; a seam between domains splits a ribbon's run."""
-    pal = common_palette(pal_name)
-    s = common.Scene("osc-loom", DESIGNS["loom"][0], design("loom"))
-    size = 140.0
-    tune = pacemakers(s, [(-30.0, 0.0, -10.0), (25.0, 0.0, 12.0)], gain=0.2, radius=6.0, period=80.0)
-    osc_grid(s, "netA", size, 320, regime, seed=5, frequency=0.22, freq_field=tune, extra={"noise": 0.02})
-    osc_grid(s, "netB", size, 160, "islands", seed=9, frequency=0.12, extra={"noise": 0.02})
-    readers(s, "netA", prefix="a")
-    readers(s, "netB", prefix="b")
-    mesh_dir = os.path.join(common.EXAMPLES, "osc-loom", "meshes")
-    pos, nrm, uv, idx = ribbon_mesh(9, size * 0.9, 5.0)
-    common.write_glb(os.path.join(mesh_dir, "osc-ribbons.glb"), pos, nrm, uv, idx, "ribbons")
-    g = interference_program(pal, "oscLoom")
-    s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
-    s.proc("ribbons", {"kind": "mesh", "asset": "meshes/osc-ribbons.glb"},
-           material={"program": g.name, "baseColor": [1, 1, 1], "roughness": pal["rough"], "metallic": pal["metal"],
-                     "doubleSided": True, "thinFilm": {"thickness": 380.0, "ior": 1.5}},
-           deformers=[{"kind": "field", "field": "aPhase", "amount": 2.6, "space": "world", "alongNormal": False,
-                       "axis": [0.0, 1.0, 0.0]},
-                      {"kind": "field", "field": "bPhase", "amount": 3.0, "space": "world", "alongNormal": False,
-                       "axis": [0.0, 0.0, 1.0]}],
-           extra={"normalStep": 0.12})
-    environment(s, pal, key_dir=[-0.45, -0.35, -0.82])
-    s.camera = {"mode": 1, "position": [26.0, 18.0, 58.0], "target": [-10.0, 6.0, -4.0], "fov": 40.0, "orbitSpeed": 0.0}
-    s.drift_camera(s.camera["position"], s.camera["target"], period=100.0, amp=(4.0, 1.5, 3.0), tamp=(3.0, 1.0, 0.0),
-                   steps=8)
-    s.params_({"camera/lens/focalLength": 30.0, "post/bloom/intensity": 0.3, "post/output/vignette": 0.45,
-               "post/grade/contrast": 1.08})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
-    return s
-
-
-CONFIGS = {"membrane": membrane, "flaps": flaps, "loom": loom}
+def register(s, name):
+    hidden, notes = INDEX[name]
+    text = ("Play live audio (any mix) and, optionally, a MIDI controller: " + common.describe_ccs(MIDI_CC, notes) +
+            ". " + s.design["thesis"] + " An R&D experiment: see docs/prototypes/generative-rd/A-oscillators.md.")
+    common.index_entry(s.title, "experiments/%s/%s.json" % (s.id, s.id), text, live=True, hidden=hidden)
 
 
 def main():
@@ -341,6 +327,8 @@ def main():
         s = CONFIGS[name](**kw)
         pp, sp = common.write_example(s, os.path.join(common.EXAMPLES, s.id))
         print(pp)
+        if not a.config and not a.autonomous and not a.palette and not getattr(a, "regime", None):
+            register(s, name)
         if a.variant:
             params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
             print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))

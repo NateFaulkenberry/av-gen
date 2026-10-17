@@ -126,6 +126,69 @@ DESIGNS = {
 }
 
 
+def valley(x, z):
+    """The relief's ground: a broad valley (y = 0 near the focus at (-4, -6)) whose sides rise quadratically to ~60 m
+    at the far rim, with low swells across it."""
+    r2 = (x + 4.0) ** 2 + 0.8 * (z + 6.0) ** 2
+    return 0.0032 * r2 + 1.4 * np.sin(x * 0.07 + 0.5) * np.sin(z * 0.05 + 1.1)
+
+
+MIDI_CC = [
+    (1, "regime", "PATTERN MODE: pushes the field toward cells (spots) from the labyrinth"),
+    (2, "growth", "GROWTH: how fast the pattern grows and heals"),
+    (3, "relief", "RELIEF: how high the pattern stands"),
+    (4, "influence", "AUDIO INFLUENCE: how hard the music seeds and shapes the pattern (half at rest)"),
+    (5, "erase", "ERASE: lets the pattern starve (feed falls): regions collapse and regrow when released"),
+    (6, "light", "BOUNDARY LIGHT: the light on the pattern's edges"),
+]
+MIDI_NOTES = [(36, "seed0"), (37, "seed1"), (38, "seed2"), (39, "seed3")]
+
+
+def rd_music(s, grid, focal, relief=None, prog=None, kick_speed=10.0, pool="regimePool", seed_at=None, seed_y=0.0):
+    """Phase 5. The music writes into the pattern's history rather than resetting it:
+      - kicks launch a ring of B from the focal point (an onset field as the grid's injection): new growth that
+        spreads outward and is absorbed into the existing pattern; snares seed a thinner, faster ring elsewhere;
+      - sustained sound widens the cell pool (regime toward cells: stable spots under held chords);
+      - bass lifts the relief (deformation depth); hats brighten the boundaries (light only, never the equations);
+      - MIDI notes 36-39 hold seed sources at four places (velocity = rate, release = how long they keep seeding).
+    Feed and kill are never driven by the music directly (the brief: no destabilising every parameter)."""
+    G = "grid/%s/" % grid
+    s.field("kickFront", {"kind": "onset", "onsetSource": "low", "point": list(focal), "waveGeometry": "spherical",
+                          "audioSpeed": kick_speed, "onsetWidth": 0.9, "onsetDecay": 0.5})
+    s.field("snareFront", {"kind": "onset", "onsetSource": "mid", "point": [focal[0] + 18.0, focal[1], focal[2] + 10.0],
+                           "waveGeometry": "spherical", "audioSpeed": 1.6 * kick_speed, "onsetWidth": 0.5,
+                           "onsetDecay": 0.9})
+    seeds = []
+    for i, p in enumerate(seed_at or ((-16.0, 0.0, -10.0), (10.0, 0.0, -18.0), (14.0, 0.0, 8.0), (-12.0, 0.0, 14.0))):
+        n = "seed%d" % i
+        s.field(n, {"kind": "sphere", "radius": 1.8, "softness": 0.8, "strength": 0.0}, position=p)
+        seeds.append(n)
+    s.field("seeds", {"kind": "compound", "combine": "add", "children": seeds})
+    g = [x for x in s.grids if x["name"] == grid][0]
+    old = g.get("injectField")
+    s.field("sources", {"kind": "compound", "combine": "add",
+                        "children": [c for c in (old, "kickFront", "snareFront", "seeds") if c]})
+    g["injectField"] = "sources"
+    g["injectRate"] = g.get("injectRate", 1.5) or 1.5
+    s.route(common.audio("response.sustain", "field/%s/strength" % pool, 0.5, attackMs=4000, decayMs=8000))
+    if relief:
+        s.route(common.audio("response.bass", relief, 0.9, attackMs=150, decayMs=800))
+    if prog is not None and "line" in prog.at:
+        s.route(common.audio("response.hat", prog.path("line"), 1.0, op="multiply", gain=3.0, offset=1.0,
+                             attackMs=30, decayMs=300))
+    common.instrument(s, MIDI_CC, MIDI_NOTES)
+    s.route(R("control.regime", "field/%s/strength" % pool, 1.0, **common.CC),
+            R("control.growth", G + "speed", 960.0, **common.CC),
+            R("control.erase", G + "feed", -0.025, **common.CC),
+            R("control.erase", G + "feedB", -0.02, **common.CC))
+    if relief:
+        s.route(R("control.relief", relief, 2.0, **common.CC))
+    if prog is not None and "line" in prog.at:
+        s.route(R("control.light", prog.path("line"), 1.0, op="multiply", gain=4.0, offset=1.0, **common.CC))
+    for i in range(4):
+        s.route(R("control.seed%d" % i, "field/seed%d/strength" % i, 1.0, attackMs=60, decayMs=3000))
+
+
 def relief(pal_name="ivory", autonomous=False):
     """C1: the pattern as relief on a plain seen from low, raked by one light; the regime frontier wanders."""
     pal = common_palette(pal_name)
@@ -144,32 +207,40 @@ def relief(pal_name="ivory", autonomous=False):
     common.lissajous_track(s, "field/brush/position", (-2.0, 0.0, 8.0), (16.0, 12.0), 61.0, ratio=(2, 3))
     rd_grid(s, "pattern", size, res, "coral", "cells", "regime", inject="brush", inject_rate=1.5)
     s.grid_reader("relief", "pattern")
-    # the mesh: an XZ sheet, denser near the camera (z > 0)
+    # the ground: a valley that rises on every side to a far rim higher than the camera, so the pattern fills the
+    # frame and no horizon or sky shows (the owner's rule: no flat plane, no world edge); its rows and columns are
+    # packed densest under the camera's view and sparse toward the rim. The grid wraps, so the pattern tiles over it.
     mesh_dir = os.path.join(common.EXAMPLES, "rd-relief", "meshes")
-    # an XZ sheet three tiles wide (the grid wraps, so the pattern tiles out to the fog), its rows and columns packed
-    # densest under the camera's view (about z = 0..30) and sparse toward the horizon
-    nx, nz = 400, 380
+    nx, nz = 330, 300
     half = 1.5 * size
     pos, nrm, uv, idx = common.plane_mesh(2.0, 2.0, nx, nz)
     u, w = pos[:, 0], pos[:, 2]
     pos[:, 0] = np.sign(u) * np.abs(u) ** 2.2 * half
     pos[:, 2] = 18.0 + np.sign(w) * np.abs(w) ** 2.2 * (half + 18.0)
+    pos[:, 1] = valley(pos[:, 0], pos[:, 2])
+    e = 0.05
+    hx = (valley(pos[:, 0] + e, pos[:, 2]) - valley(pos[:, 0] - e, pos[:, 2])) / (2 * e)
+    hz = (valley(pos[:, 0], pos[:, 2] + e) - valley(pos[:, 0], pos[:, 2] - e)) / (2 * e)
+    nrm = np.stack([-hx, np.ones_like(hx), -hz], axis=1)
+    nrm /= np.linalg.norm(nrm, axis=1, keepdims=True)
     common.write_glb(os.path.join(mesh_dir, "rd-plain.glb"), pos, nrm, uv, idx, "plain")
     g = relief_program(pal)
     s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
     s.proc("plain", {"kind": "mesh", "asset": "meshes/rd-plain.glb"},
            material={"program": g.name, "baseColor": [1, 1, 1], "roughness": pal["rough"],
                      "metallic": pal["metal"], "doubleSided": True},
-           deformers=[{"kind": "field", "field": "relief", "amount": 1.6, "space": "world", "alongNormal": False,
-                       "axis": [0.0, 1.0, 0.0]}],
+           deformers=[{"kind": "field", "field": "relief", "amount": 1.6, "space": "world", "alongNormal": True}],
            extra={"normalStep": 0.08})
-    lights(s, pal, key_dir=[0.82, -0.30, -0.48])
-    s.camera = {"mode": 1, "position": [8.0, 14.0, 44.0], "target": [-4.0, -2.0, -6.0], "fov": 40.0, "orbitSpeed": 0.0}
+    if not autonomous:
+        rd_music(s, "pattern", focal=(-6.0, 0.0, -2.0), relief="procedural/plain/deform/1/amount", prog=g)
+    lights(s, pal, key_dir=[0.75, -0.42, -0.5], fog=0.0008)
+    s.camera = {"mode": 1, "position": [8.0, 30.0, 50.0], "target": [-6.0, 8.0, -30.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(3.0, 0.6, 2.0), tamp=(2.0, 0.3, 0.0),
                    steps=8)
     s.params_({"camera/lens/focalLength": 32.0, "post/bloom/intensity": 0.12, "post/output/vignette": 0.45,
                "post/grade/contrast": 1.08, "camera/exposure/compensation": 0.3})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
@@ -251,13 +322,20 @@ def bloom(pal_name="garnet", autonomous=False):
                      "metallic": pal["metal"], "doubleSided": False},
            deformers=[{"kind": "field", "field": "relief", "amount": 3.2, "space": "world", "alongNormal": True}],
            extra={"normalStep": 0.06})
+    if not autonomous:
+        # kicks bloom from the pole facing the camera; the seeds sit on the surface
+        rd_music(s, "pattern", focal=(4.0, 3.0, 11.0), relief="procedural/form/deform/1/amount", prog=g,
+                 kick_speed=6.0, pool="regimeDrift",
+                 seed_at=((0.0, 12.0, 0.0), (11.0, 0.0, 4.0), (-8.0, -6.0, 7.0), (2.0, 5.0, 11.0)))
     lights(s, pal, key_dir=[0.75, -0.45, -0.48], fog=0.0)
-    s.camera = {"mode": 1, "position": [9.0, 7.0, 25.0], "target": [-2.5, 1.0, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
+    # close: the pod fills the frame and its curvature leaves the frame at three edges (no ball floating in a void)
+    s.camera = {"mode": 1, "position": [6.0, 4.0, 19.5], "target": [-1.0, 1.5, 0.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=80.0, amp=(3.0, 1.5, 1.0), tamp=(1.0, 0.6, 0.0),
                    steps=8)
     s.params_({"camera/lens/focalLength": 35.0, "post/bloom/intensity": 0.18, "post/output/vignette": 0.5,
-               "post/grade/contrast": 1.1})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+               "post/grade/contrast": 1.1, "post/output/grain": 0.02})
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
@@ -288,6 +366,8 @@ def pins(pal_name="ember", autonomous=False):
     common.write_glb(os.path.join(mesh_dir, "rd-floor.glb"), pos, nrm, uv, idx, "floor")
     s.proc("floor", {"kind": "mesh", "asset": "meshes/rd-floor.glb"},
            material={"program": gf.name, "baseColor": [1, 1, 1], "roughness": 0.8, "metallic": 0.0})
+    if not autonomous:
+        rd_music(s, "pattern", focal=(2.0, 0.0, -2.0), prog=g, kick_speed=9.0, pool="regimeDrift")
     lights(s, pal, key_dir=[0.55, -0.5, -0.67], fog=0.002)
     s.camera = {"mode": 1, "position": [-10.0, 24.0, 24.0], "target": [2.0, 0.0, -2.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
@@ -295,11 +375,26 @@ def pins(pal_name="ember", autonomous=False):
                    steps=8)
     s.params_({"camera/lens/focalLength": 35.0, "post/bloom/intensity": 0.3, "post/output/vignette": 0.45,
                "post/grade/contrast": 1.1})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
 CONFIGS = {"relief": relief, "bloom": bloom, "pins": pins}
+
+
+INDEX = {  # config -> (hidden?, notes): what the Examples > Live > Experiments menu lists
+    "relief": (False, "MIDI notes 36-39 hold seeds."),
+    "pins": (False, "MIDI notes 36-39 hold seeds."),
+    "bloom": (True, "MIDI notes 36-39 hold seeds."),
+}
+
+
+def register(s, name):
+    hidden, notes = INDEX[name]
+    text = ("Play live audio (any mix) and, optionally, a MIDI controller: " + common.describe_ccs(MIDI_CC, notes) +
+            ". " + s.design["thesis"] + " An R&D experiment: see docs/prototypes/generative-rd/C-reaction-diffusion.md.")
+    common.index_entry(s.title, "experiments/%s/%s.json" % (s.id, s.id), text, live=True, hidden=hidden)
 
 
 def main():
@@ -323,6 +418,8 @@ def main():
         out_dir = os.path.join(common.EXAMPLES, s.id)
         pp, sp = common.write_example(s, out_dir)
         print(pp)
+        if not a.config and not a.autonomous and not a.palette:
+            register(s, name)
         if a.variant:
             params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
             print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))

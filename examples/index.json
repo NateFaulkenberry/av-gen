@@ -639,6 +639,65 @@
       "live": true,
       "name": "Waveform Dimension",
       "project": "waveform-dimension/waveform-dimension.json"
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 coupling, CC 2 complexity, CC 3 motion intensity, CC 4 audio influence, CC 5 persistence, CC 6 visual mode, MIDI notes 36-38 hold pacemakers.. An amphitheatre whose floor is a living membrane of coupled oscillators: a few pacemakers send concentric waves across it, the waves meet in cusps and annihilate, and wherever neighbours disagree the surface lights. An R&D experiment: see docs/prototypes/generative-rd/A-oscillators.md.",
+      "live": true,
+      "name": "Phase Membrane",
+      "project": "experiments/osc-membrane/osc-membrane.json"
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 coupling, CC 2 complexity, CC 3 motion intensity, CC 4 audio influence, CC 5 persistence, CC 6 visual mode. A kinetic wall of nearly ten thousand metal flaps, each turned by its own oscillator: when they fall into step the whole wall turns and flashes as one; as the coupling loosens it breaks into islands that turn against each other, and travelling waves sweep bands of light across it. An R&D experiment: see docs/prototypes/generative-rd/A-oscillators.md.",
+      "live": true,
+      "name": "Phase Wall",
+      "project": "experiments/osc-flaps/osc-flaps.json"
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern mode, CC 2 growth, CC 3 relief, CC 4 audio influence, CC 5 erase, CC 6 boundary light, MIDI notes 36-39 hold seeds.. A vast mineral plain whose surface is grown, not carved: a reaction-diffusion pattern raises ridges and cells out of the stone, and the frontier between two pattern families wanders across it, rewriting the relief as it passes. An R&D experiment: see docs/prototypes/generative-rd/C-reaction-diffusion.md.",
+      "live": true,
+      "name": "RD Relief",
+      "project": "experiments/rd-relief/rd-relief.json"
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern mode, CC 2 growth, CC 3 relief, CC 4 audio influence, CC 5 erase, CC 6 boundary light, MIDI notes 36-39 hold seeds.. A single closed form, a seed-pod or a planet, whose skin is grown by a reaction-diffusion volume: cells on one cap, worms over the rest, and a frontier that creeps between them. An R&D experiment: see docs/prototypes/generative-rd/C-reaction-diffusion.md.",
+      "live": true,
+      "name": "RD Bloom",
+      "project": "experiments/rd-bloom/rd-bloom.json",
+      "hidden": true
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern mode, CC 2 growth, CC 3 relief, CC 4 audio influence, CC 5 erase, CC 6 boundary light, MIDI notes 36-39 hold seeds.. A dark floor of forty thousand pins; the pattern lifts them and lights only those on its boundary, so contour lines of a living maze hang in the air and wander as the pattern grows. An R&D experiment: see docs/prototypes/generative-rd/C-reaction-diffusion.md.",
+      "live": true,
+      "name": "RD Pins",
+      "project": "experiments/rd-pins/rd-pins.json"
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 flow type, CC 2 flow strength, CC 3 spatial scale, CC 4 audio influence, CC 5 persistence, CC 6 turbulence, MIDI notes 36-38 spin up the eddies.. A meandering river seen from inside its channel: sixty thousand strands rooted in the bed are combed by one designed current, part round three boulders and swirl in the eddies the boulders shed, while warm motes ride the same current above them. An R&D experiment: see docs/prototypes/generative-rd/B-flow.md.",
+      "live": true,
+      "name": "Current Meadow",
+      "project": "experiments/flow-meadow/flow-meadow.json",
+      "hidden": true
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 flow type, CC 2 flow strength, CC 3 spatial scale, CC 4 audio influence, CC 5 persistence, CC 6 turbulence, MIDI notes 36-38 spin up the eddies.. A meandering river seen from inside its channel: sixty thousand strands rooted in the bed are combed by one designed current, part round three boulders and swirl in the eddies the boulders shed, while warm motes ride the same current above them. An R&D experiment: see docs/prototypes/generative-rd/B-flow.md.",
+      "live": true,
+      "name": "Current Meadow, Storm",
+      "project": "experiments/flow-storm/flow-storm.json",
+      "hidden": true
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 flow type, CC 2 flow strength, CC 3 spatial scale, CC 4 audio influence, CC 5 persistence, CC 6 turbulence, MIDI notes 36-38 spin up the eddies.. A river drawn only by its current: rakes of long lines follow one designed flow downstream, bunch where it narrows, part round three boulders and curl in their wakes, while pulses of light travel along them with the water. An R&D experiment: see docs/prototypes/generative-rd/B-flow.md.",
+      "live": true,
+      "name": "Current Lines",
+      "project": "experiments/flow-streams/flow-streams.json"
     }
   ]
 }

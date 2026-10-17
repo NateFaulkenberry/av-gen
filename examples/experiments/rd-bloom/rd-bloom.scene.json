@@ -1,0 +1,627 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "rd-bloom",
+ "camera": {
+  "mode": 1,
+  "position": [
+   6.0,
+   4.0,
+   19.5
+  ],
+  "target": [
+   -1.0,
+   1.5,
+   0.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.05,
+  "background": [
+   0.00152,
+   0.00121,
+   0.00439
+  ],
+  "fogColor": [
+   0.00243,
+   0.0017,
+   0.01156
+  ],
+  "volumeDensity": 0.0,
+  "fogSky": 1.0,
+  "fogHeight": 400.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 120.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00152,
+    0.00121,
+    0.00439
+   ],
+   "horizonColor": [
+    0.00304,
+    0.00212,
+    0.01444
+   ],
+   "groundColor": [
+    0.00152,
+    0.00121,
+    0.00439
+   ],
+   "haze": 1.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "regimeCap",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "linearGradient",
+    "axis": [
+     0.3,
+     -1.0,
+     0.2
+    ],
+    "length": 30.0
+   }
+  },
+  {
+   "name": "regimeDrift",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.45,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "noise",
+    "frequency": 0.08,
+    "speed": 0.1,
+    "seed": 9
+   }
+  },
+  {
+   "name": "regime",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "regimeCap",
+     "regimeDrift"
+    ]
+   }
+  },
+  {
+   "name": "brush",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     12.0
+    ],
+    "kind": "sphere",
+    "radius": 1.4,
+    "softness": 0.7
+   }
+  },
+  {
+   "name": "relief",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "pattern"
+   }
+  },
+  {
+   "name": "form",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rd-sphere.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rdBloom",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.38,
+     "metallic": 0.0,
+     "doubleSided": false
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "relief",
+      "amount": 3.2,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 0.06
+   }
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "low",
+    "point": [
+     4.0,
+     3.0,
+     11.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 6.0,
+    "onsetWidth": 0.9,
+    "onsetDecay": 0.5
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "mid",
+    "point": [
+     22.0,
+     3.0,
+     21.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 9.600000000000001,
+    "onsetWidth": 0.5,
+    "onsetDecay": 0.9
+   }
+  },
+  {
+   "name": "seed0",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     12.0,
+     0.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed1",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     11.0,
+     0.0,
+     4.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed2",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -8.0,
+     -6.0,
+     7.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed3",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     2.0,
+     5.0,
+     11.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seeds",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "seed0",
+     "seed1",
+     "seed2",
+     "seed3"
+    ]
+   }
+  },
+  {
+   "name": "sources",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "brush",
+     "kickFront",
+     "snareFront",
+     "seeds"
+    ]
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.75,
+    -0.45,
+    -0.48
+   ],
+   "color": [
+    1.0,
+    0.64448,
+    0.55201
+   ],
+   "intensity": 3.2,
+   "castsShadow": true,
+   "contactShadow": false,
+   "softness": 0.3
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.6,
+    -0.3,
+    0.75
+   ],
+   "color": [
+    0.07227,
+    0.04519,
+    1.0
+   ],
+   "intensity": 1.4,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "rdBloom",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "relief"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.04,
+      0.2,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.00605,
+      0.00368,
+      0.02732,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.45079,
+      0.00605,
+      0.02732,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 0,
+     "constant": [
+      0.17,
+      0.27,
+      0.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "power",
+     "dst": 5,
+     "srcA": 5,
+     "value": 6.0
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.25,
+      0.02556,
+      0.0113,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.38,
+      0.38,
+      0.38,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": 7,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "pattern",
+   "mode": "reactionDiffusion",
+   "wrap": "clamp",
+   "resolution": [
+    100,
+    100,
+    100
+   ],
+   "boundsMin": [
+    -14.5,
+    -14.5,
+    -14.5
+   ],
+   "boundsMax": [
+    14.5,
+    14.5,
+    14.5
+   ],
+   "diffusionA": 0.16,
+   "diffusionB": 0.08,
+   "feed": 0.03,
+   "kill": 0.06,
+   "regimeField": "regime",
+   "feedB": 0.026,
+   "killB": 0.064,
+   "injectField": "sources",
+   "injectRate": 1.2,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "speed": 600.0,
+   "iterations": 20,
+   "seed": 13,
+   "seedAmount": 1.0,
+   "checkpointInterval": 5.0
+  }
+ ]
+}

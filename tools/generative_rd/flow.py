@@ -114,7 +114,16 @@ def channel_grid(res=(128, 1, 128)):
             "boundsMax": hi, "simRate": 60.0, "maxSubSteps": 4, "initial": [round(float(v), 2) for v in m.reshape(-1)]}
 
 
-def bed_mesh(n=300):
+# one riverbed mesh, written once and shared by every flow scene (relative to each scene's folder)
+BED_ASSET = "../flow-streams/meshes/flow-bed.glb"
+
+
+def write_bed():
+    pos, nrm, uv, idx = bed_mesh()
+    common.write_glb(os.path.join(common.EXAMPLES, "flow-streams", "meshes", "flow-bed.glb"), pos, nrm, uv, idx, "bed")
+
+
+def bed_mesh(n=220):
     pos, nrm, uv, idx = common.plane_mesh(2 * EXTENT, 2 * EXTENT, n, n)
     pos[:, 1] = bed_height(pos[:, 0], pos[:, 2])
     # normals by finite differences of the height function
@@ -183,6 +192,12 @@ def river(s, wake=True, vortices=True, turbulence=0.0):
             common.lissajous_track(s, "field/%s/position" % n, (cx + 2.4 * r, 2.0, cz), (0.6 * r, 1.4 * r),
                                    7.0 + 2.3 * i, ratio=(2, 1), phase=(0.1 * i, 0.0))
             names.append(n)
+        # a kick: a ring of sideways push from upstream mid-channel (an onset shell read as a vector along its axis),
+        # injected into the wake like the shedding -- a travelling disturbance the current then carries
+        s.field("kickPush", {"kind": "onset", "onsetSource": "low", "point": [-50.0, 2.0, float(centre(np.array(-50.0)))],
+                             "waveGeometry": "spherical", "audioSpeed": 14.0, "onsetWidth": 2.5, "onsetDecay": 0.8,
+                             "axis": [0.0, 0.0, 1.0], "strength": 0.0})
+        names.append("kickPush")
         s.field("shedding", {"kind": "compound", "combine": "add", "children": names})
         s.grid(name="wake", mode="vector", wrap="clamp", resolution=[256, 1, 256],  # a plane (ADR-1452)
                boundsMin=[-EXTENT, -1.0, -EXTENT], boundsMax=[EXTENT, 11.0, EXTENT],
@@ -222,10 +237,6 @@ DESIGNS = {
                 "A river drawn only by its current: rakes of long lines follow one designed flow downstream, bunch "
                 "where it narrows, part round three boulders and curl in their wakes, while pulses of light travel "
                 "along them with the water."),
-    "ink": ("Ink River",
-            "The same river seen from above its skin: ink from three springs is carried by the current, split by the "
-            "boulders and curled into marbling by the eddies they shed, while petals ride the surface and gather "
-            "where the eddies hold them."),
     "meadow": ("Current Meadow",
                "A meandering river seen from inside its channel: sixty thousand strands rooted in the bed are combed by "
                "one designed current, part round three boulders and swirl in the eddies the boulders shed, while warm "
@@ -241,10 +252,7 @@ def meadow(pal_name="jade", autonomous=False, turbulence=0.0, sid="flow-meadow",
     pal = dict(PALETTES[pal_name], name=pal_name)
     s = common.Scene(sid, title or DESIGNS["meadow"][0], design("meadow"))
     flow = river(s, turbulence=turbulence)
-    mesh_dir = os.path.join(common.EXAMPLES, sid, "meshes")
-    pos, nrm, uv, idx = bed_mesh()
-    common.write_glb(os.path.join(mesh_dir, "flow-bed.glb"), pos, nrm, uv, idx, "bed")
-    s.proc("bed", {"kind": "mesh", "asset": "meshes/flow-bed.glb"},
+    s.proc("bed", {"kind": "mesh", "asset": BED_ASSET},
            material={"baseColor": C(pal, "bank"), "roughness": 0.85, "metallic": 0.0})
     for i, (cx, cz, r) in enumerate(rock_centres()):
         s.proc("rock%d" % i, {"kind": "sphere", "radius": 1.0, "segments": 48, "rings": 24},
@@ -253,6 +261,8 @@ def meadow(pal_name="jade", autonomous=False, turbulence=0.0, sid="flow-meadow",
     # strands: a grid over the channel and its banks, lifted to the bed by the bed-height grid
     g = strands_program(pal)
     s.program(g.doc(base=g.base, emission=g.emit))
+    if not autonomous:
+        flow_music(s)
     nx, nz = 400, 160
     s.proc("strands", {"kind": "fiber", "fiberLength": 2.6, "fiberWidth": 0.03, "fiberTaper": 0.25,
                        "fiberSegments": 12, "fiberMinPixels": 0.8},
@@ -285,100 +295,56 @@ def meadow(pal_name="jade", autonomous=False, turbulence=0.0, sid="flow-meadow",
                    steps=8)
     s.params_({"camera/lens/focalLength": 28.0, "post/bloom/intensity": 0.25, "post/output/vignette": 0.45,
                "post/grade/contrast": 1.06})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
-WATER = 2.4  # the river's surface (m above the bed's lowest point)
-
-
-def ink(pal_name="jade", autonomous=False):
-    """B2 + B3: the river's skin. A dye grid is advected by the same current (semi-Lagrangian, a little diffusion, no
-    dissipation to speak of): three springs upstream feed it, the boulders split it, their eddies curl it into
-    marbling. Petals float on the surface and gather where the eddies hold them. The water is a sheet at WATER that
-    the banks rise through, so the frame has no edge."""
-    pal = dict(PALETTES[pal_name], name=pal_name)
-    s = common.Scene("flow-ink", DESIGNS["ink"][0], design("ink"))
-    flow = river(s)
-    # springs: three small spheres upstream, each wandering across a third of the channel
-    springs = []
-    for i, off in enumerate((ROCKS[0][1] - 1.0, ROCKS[0][1] + 4.0, -6.0)):  # two aimed at the first boulder
-        n = "spring%d" % i
-        x0 = -70.0
-        c = (x0, WATER, float(centre(np.array(x0))) + off)
-        s.field(n, {"kind": "sphere", "radius": 0.9, "softness": 0.4}, position=c)
-        common.lissajous_track(s, "field/%s/position" % n, c, (1.5, 2.5), 9.0 + 3.1 * i, ratio=(1, 1),
-                               phase=(0.2 * i, 0.0))
-        # each spring pulses (on 1.6 s, off 1.6 s, out of step with the others): ink in bands, so the current's
-        # shear and the eddies show as marbling rather than a uniform stain
-        per = 3.2 + 0.7 * i
-        s.track("field/%s/strength" % n, [{"time": 0.0, "value": [1.0], "interp": "smooth"},
-                                          {"time": per * 0.45, "value": [1.0], "interp": "smooth"},
-                                          {"time": per * 0.5, "value": [0.0], "interp": "smooth"},
-                                          {"time": per * 0.95, "value": [0.0], "interp": "smooth"},
-                                          {"time": per, "value": [1.0], "interp": "smooth"}], loop=per)
-        springs.append(n)
-    s.field("springs", {"kind": "compound", "combine": "add", "children": springs})
-    s.grid(name="dye", mode="scalar", wrap="clamp", resolution=[512, 1, 512],  # a plane (ADR-1452)
-           boundsMin=[-EXTENT, WATER - 1.0, -EXTENT], boundsMax=[EXTENT, WATER + 1.0, EXTENT],
-           injectField="springs", injectRate=40.0, velocityField=flow, advect=1.0, diffusion=0.0,
-           diffuseIterations=0, dissipation=0.0, ceiling=1.0, simRate=10.0, maxSubSteps=4, seed=1,
-           checkpointInterval=5.0)
-    s.grid_reader("ink", "dye")
-    mesh_dir = os.path.join(common.EXAMPLES, "flow-ink", "meshes")
-    pos, nrm, uv, idx = bed_mesh(200)
-    common.write_glb(os.path.join(mesh_dir, "flow-bed.glb"), pos, nrm, uv, idx, "bed")
-    s.proc("bed", {"kind": "mesh", "asset": "meshes/flow-bed.glb"},
-           material={"baseColor": C(pal, "bank"), "roughness": 0.85, "metallic": 0.0})
-    for i, (cx, cz, r) in enumerate(rock_centres()):
-        s.proc("rock%d" % i, {"kind": "sphere", "radius": 1.0, "segments": 48, "rings": 24},
-               position=(cx, WATER - 0.2 * r, cz), scale=(r, 0.9 * r, r),
-               material={"baseColor": C(pal, "bank", 1.6), "roughness": 0.45, "metallic": 0.0})
-    pw, nw, uw, iw = common.plane_mesh(2 * EXTENT, 2 * EXTENT, 320, 320, y=WATER)
-    common.write_glb(os.path.join(mesh_dir, "flow-water.glb"), pw, nw, uw, iw, "water")
-    g = common.Prog("flowInk")
-    g.op("ink", "field", 0, field="ink")
-    g.op(None, "smoothstep", 0, a=0, k=[0.004, 0.25, 0, 0])
-    g.op("water", "constant", 1, k=C(pal, "bed") + [1])
-    g.op("dye", "constant", 2, k=C(pal, "strand") + [1])
-    g.op(None, "mixBy", 3, a=1, b=2, c=0)
-    g.op(None, "field", 4, field="wakeFlow")                      # eddies: a faint sheen of their own
-    g.op(None, "multiply", 4, a=4, b=4)                           # a vector field reads (x, y, z, 0):
-    g.op(None, "gradient", 4, a=4, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / 25.0)  # |v|^2 / 25, saturated
-    g.op("eddy", "constant", 5, k=C(pal, "mote", 0.35) + [1])
-    g.op(None, "multiply", 5, a=4, b=5)
-    g.op(None, "multiply", 6, a=0, b=0)
-    g.op("inkGlow", "constant", 7, k=C(pal, "strandTip", 0.25) + [1])
-    g.op(None, "multiply", 6, a=6, b=7)
-    g.op(None, "add", 5, a=5, b=6)
-    g.base, g.emit = 3, 5
-    s.program(g.doc(base=g.base, emission=g.emit))
-    s.proc("water", {"kind": "mesh", "asset": "meshes/flow-water.glb"},
-           material={"program": g.name, "baseColor": C(pal, "bed"), "roughness": 0.12, "metallic": 0.0},
-           deformers=[{"kind": "field", "field": "wakeFlow", "amount": 0.06, "space": "world", "alongNormal": True}],
-           extra={"normalStep": 0.1})
-    s.particles("petals", capacity=6000, seed=9, spawnRate=260.0, shape="box", extent=[2.0, 0.0, 9.0],
-                position=[-72.0, WATER + 0.05, float(centre(np.array(-72.0)))],
-                lifetimeMin=18.0, lifetimeMax=24.0, spread=0.0, speedMin=0.0, speedMax=0.05, gravity=[0, 0, 0],
-                drag=0.2, turbulence=0.0, sizeStart=0.22, sizeEnd=0.18, blend="alpha", emissive=0.4, softness=0.3,
-                shape2d="leaf", colorStart=C(pal, "mote") + [1.0], colorEnd=C(pal, "mote") + [0.0],
-                fieldForces=[{"field": "baseFlow", "mode": "velocity", "strength": 1.0, "mix": 0.3},
-                             {"field": "wakeFlow", "mode": "force", "strength": 1.5}])
-    environment(s, pal, key_dir=[0.4, -0.6, -0.7])
-    s.camera = {"mode": 1, "position": [-14.0, 62.0, 34.0], "target": [-14.0, WATER, -4.0], "fov": 40.0,
-                "orbitSpeed": 0.0}
-    s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(3.0, 1.0, 2.0), tamp=(3.0, 0.5, 0.0),
-                   steps=8)
-    s.params_({"camera/lens/focalLength": 30.0, "post/bloom/intensity": 0.2, "post/output/vignette": 0.45,
-               "post/grade/contrast": 1.08})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
-    return s
-
-
-def storm(pal_name="ink", autonomous=False):
+def storm(pal_name="ink", autonomous=False):  # noqa: D401
     """B3: the same river under weather: a two-scale curl-noise turbulence over the designed current. The large scale
     keeps the channel legible; the fine scale ruffles the strands' tips."""
     return meadow(pal_name, autonomous, turbulence=1.6, sid="flow-storm", title="Current Meadow, Storm")
+
+
+MIDI_CC = [
+    (1, "flowType", "FLOW TYPE: from the designed river toward weather (the curl-noise gusts)"),
+    (2, "strength", "FLOW STRENGTH: the river's speed"),
+    (3, "scale", "SPATIAL SCALE: the gusts' size (large and slow to small and quick)"),
+    (4, "influence", "AUDIO INFLUENCE: how hard the music drives the current (half at rest)"),
+    (5, "persistence", "PERSISTENCE: how long eddies and impulses live in the wake"),
+    (6, "turbulence", "TURBULENCE: the fine chop"),
+]
+MIDI_NOTES = [(36, "eddy0"), (37, "eddy1"), (38, "eddy2")]
+
+
+def flow_music(s, prog=None):
+    """Phase 5. The music shapes the current, never a bank of effect knobs:
+      - bass is the river's strength (the designed current speeds and slows as one body);
+      - kicks push the water sideways in a ring that the current carries downstream (a travelling disturbance);
+      - snares strengthen the boulders' shedding (eddies spin up in the wakes);
+      - hats lift the fine chop where there is one, and brighten the light the lines carry;
+      - sustained sound raises the gusts (a held passage brings weather; a sparse one lets it settle);
+      - MIDI notes 36-38 spin up the eddy behind boulder 1, 2, 3 (velocity = strength, release = how long it lasts)."""
+    s.route(common.audio("response.bass", "field/baseFlow/strength", 1.0, op="multiply", gain=0.9, offset=0.7,
+                         attackMs=250, decayMs=1500),
+            common.audio("response.kick", "field/kickPush/strength", 1.5, attackMs=5, decayMs=200),
+            common.audio("response.snare", "field/shedding/strength", 0.6, attackMs=30, decayMs=1500))
+    names = {f["name"] for f in s.nodes if f.get("kind") == "field"}
+    if "gust" in names:
+        s.route(common.audio("response.sustain", "field/gust/strength", 1.2, attackMs=3000, decayMs=6000),
+                common.audio("response.hat", "field/chop/strength", 0.8, attackMs=40, decayMs=400))
+    if prog is not None and "pulse" in prog.at:
+        s.route(common.audio("response.hat", prog.path("pulse"), 1.0, op="multiply", gain=2.0, offset=1.0,
+                             attackMs=30, decayMs=300))
+    common.instrument(s, MIDI_CC, MIDI_NOTES)
+    s.route(R("control.strength", "field/baseFlow/strength", 1.0, **common.CC),
+            R("control.persistence", "grid/wake/dissipation", -0.3, **common.CC))
+    if "gust" in names:
+        s.route(R("control.flowType", "field/gust/strength", 2.5, **common.CC),
+                R("control.scale", "field/gust/frequency", 0.15, **common.CC),
+                R("control.turbulence", "field/chop/strength", 1.5, **common.CC))
+    for i in range(3):
+        s.route(R("control.eddy%d" % i, "field/shed%d/strength" % i, 6.0, attackMs=80, decayMs=2500))
 
 
 def streams_program(pal):
@@ -415,10 +381,7 @@ def streams(pal_name="ember", autonomous=False):
     pal = dict(PALETTES[pal_name], name=pal_name)
     s = common.Scene("flow-streams", DESIGNS["streams"][0], design("streams"))
     flow = river(s)
-    mesh_dir = os.path.join(common.EXAMPLES, "flow-streams", "meshes")
-    pos, nrm, uv, idx = bed_mesh()
-    common.write_glb(os.path.join(mesh_dir, "flow-bed.glb"), pos, nrm, uv, idx, "bed")
-    s.proc("bed", {"kind": "mesh", "asset": "meshes/flow-bed.glb"},
+    s.proc("bed", {"kind": "mesh", "asset": BED_ASSET},
            material={"baseColor": C(pal, "bank"), "roughness": 0.7, "metallic": 0.0})
     for i, (cx, cz, r) in enumerate(rock_centres()):
         s.proc("rock%d" % i, {"kind": "sphere", "radius": 1.0, "segments": 64, "rings": 32},
@@ -426,9 +389,11 @@ def streams(pal_name="ember", autonomous=False):
                material={"baseColor": C(pal, "bed"), "roughness": 0.35, "metallic": 0.3})
     g = streams_program(pal)
     s.program(g.doc(base=g.base, emission=g.emit))
-    for k, (x0, n_across) in enumerate(((-76.0, 90), (-56.0, 80), (-30.0, 80), (-6.0, 80))):
+    if not autonomous:
+        flow_music(s, g)
+    for k, (x0, n_across) in enumerate(((-76.0, 90), (-50.0, 70), (-20.0, 70), (12.0, 70), (40.0, 60))):
         zc = float(centre(np.array(x0)))
-        s.proc("rake%d" % k, {"kind": "fiber", "fiberLength": 70.0 - 6.0 * k, "fiberWidth": 0.05, "fiberTaper": 0.6,
+        s.proc("rake%d" % k, {"kind": "fiber", "fiberLength": 60.0 - 5.0 * k, "fiberWidth": 0.05, "fiberTaper": 0.6,
                               "fiberSegments": 64, "fiberMinPixels": 0.9},
                distribution={"kind": "grid", "gridCount": [1, 3, n_across], "gridSpacing": [1.0, 1.1, 22.0 / n_across]},
                transform={"position": [x0, 1.6, zc], "rotation": [0, 0, -90], "scale": [1, 1, 1]},
@@ -438,17 +403,32 @@ def streams(pal_name="ember", autonomous=False):
                            "tension": 0.0}],
                extra={"lod": {"cull": True, "maxDistance": 0.0, "count": 1}})
     environment(s, pal, key_dir=[0.5, -0.6, -0.62], fog=0.0006)
-    s.camera = {"mode": 1, "position": [-60.0, 26.0, 22.0], "target": [-14.0, 0.0, -8.0], "fov": 40.0,
+    s.camera = {"mode": 1, "position": [4.0, 54.0, 46.0], "target": [-24.0, 0.0, 2.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
-    s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(3.0, 1.0, 2.0), tamp=(2.0, 0.5, 0.0),
+    s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(2.0, 0.6, 1.5), tamp=(1.5, 0.3, 0.0),
                    steps=8)
     s.params_({"camera/lens/focalLength": 26.0, "post/bloom/intensity": 0.35, "post/output/vignette": 0.45,
                "post/grade/contrast": 1.12})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    if autonomous:
+        s.response = dict(common.RESPONSE)
     return s
 
 
 CONFIGS = {"meadow": meadow, "storm": storm, "streams": streams}
+
+
+INDEX = {  # config -> (hidden?, notes): what the Examples > Live > Experiments menu lists
+    "streams": (False, "MIDI notes 36-38 spin up the eddies."),
+    "meadow": (True, "MIDI notes 36-38 spin up the eddies."),
+    "storm": (True, "MIDI notes 36-38 spin up the eddies."),
+}
+
+
+def register(s, name):
+    hidden, notes = INDEX[name]
+    text = ("Play live audio (any mix) and, optionally, a MIDI controller: " + common.describe_ccs(MIDI_CC, notes) +
+            ". " + s.design["thesis"] + " An R&D experiment: see docs/prototypes/generative-rd/B-flow.md.")
+    common.index_entry(s.title, "experiments/%s/%s.json" % (s.id, s.id), text, live=True, hidden=hidden)
 
 
 def main():
@@ -463,6 +443,7 @@ def main():
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--track", action="append", default=[])
     a = ap.parse_args()
+    write_bed()
     for name in ([a.config] if a.config else list(CONFIGS)):
         kw = {"autonomous": a.autonomous}
         if a.palette:
@@ -470,6 +451,8 @@ def main():
         s = CONFIGS[name](**kw)
         pp, sp = common.write_example(s, os.path.join(common.EXAMPLES, s.id))
         print(pp)
+        if not a.config and not a.autonomous and not a.palette and not getattr(a, "regime", None):
+            register(s, name)
         if a.variant:
             params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
             print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))

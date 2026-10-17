@@ -1,0 +1,1060 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "rd-relief.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.12,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.3,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 32.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.08
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "influence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "control.influence",
+        "weight": 1.0
+       }
+      ],
+      "bias": 0.5,
+      "gain": 0.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.sustain",
+   "target": "field/regimePool/strength",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 4000,
+    "decayMs": 8000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/plain/deform/1/amount",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "material/rdRelief/op/10/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 3.0,
+    "offset": 1.0,
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "control.regime",
+   "target": "field/regimePool/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.growth",
+   "target": "grid/pattern/speed",
+   "amount": 960.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.erase",
+   "target": "grid/pattern/feed",
+   "amount": -0.025,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.erase",
+   "target": "grid/pattern/feedB",
+   "amount": -0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.relief",
+   "target": "procedural/plain/deform/1/amount",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/rdRelief/op/10/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 4.0,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.seed0",
+   "target": "field/seed0/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "control.seed1",
+   "target": "field/seed1/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "control.seed2",
+   "target": "field/seed2/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "control.seed3",
+   "target": "field/seed3/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "field/regimePool/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -6.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.0,
+      "value": [
+       -2.3765,
+       0.0,
+       -6.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       1.0,
+       0.0,
+       -9.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.0,
+      "value": [
+       3.8995,
+       0.0,
+       -11.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       6.1244,
+       0.0,
+       -9.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.0,
+      "value": [
+       7.523,
+       0.0,
+       -6.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       8.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.0,
+      "value": [
+       7.523,
+       0.0,
+       2.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0,
+      "value": [
+       6.1244,
+       0.0,
+       5.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.0,
+      "value": [
+       3.8995,
+       0.0,
+       7.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       1.0,
+       0.0,
+       5.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 44.0,
+      "value": [
+       -2.3765,
+       0.0,
+       2.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -6.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.0,
+      "value": [
+       -9.6235,
+       0.0,
+       -6.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       -13.0,
+       0.0,
+       -9.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -15.8995,
+       0.0,
+       -11.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.0,
+      "value": [
+       -18.1244,
+       0.0,
+       -9.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 68.0,
+      "value": [
+       -19.523,
+       0.0,
+       -6.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 72.0,
+      "value": [
+       -20.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 76.0,
+      "value": [
+       -19.523,
+       0.0,
+       2.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -18.1244,
+       0.0,
+       5.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 84.0,
+      "value": [
+       -15.8995,
+       0.0,
+       7.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 88.0,
+      "value": [
+       -13.0,
+       0.0,
+       5.7942
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 92.0,
+      "value": [
+       -9.6235,
+       0.0,
+       2.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       -6.0,
+       0.0,
+       -2.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/brush/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 61.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -2.0,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.5417,
+      "value": [
+       6.0,
+       0.0,
+       -0.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.0833,
+      "value": [
+       11.8564,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.625,
+      "value": [
+       14.0,
+       0.0,
+       -0.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.1667,
+      "value": [
+       11.8564,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 12.7083,
+      "value": [
+       6.0,
+       0.0,
+       16.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.25,
+      "value": [
+       -2.0,
+       0.0,
+       20.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 17.7917,
+      "value": [
+       -10.0,
+       0.0,
+       16.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.3333,
+      "value": [
+       -15.8564,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.875,
+      "value": [
+       -18.0,
+       0.0,
+       -0.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.4167,
+      "value": [
+       -15.8564,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.9583,
+      "value": [
+       -10.0,
+       0.0,
+       -0.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.5,
+      "value": [
+       -2.0,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.0417,
+      "value": [
+       6.0,
+       0.0,
+       16.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.5833,
+      "value": [
+       11.8564,
+       0.0,
+       20.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 38.125,
+      "value": [
+       14.0,
+       0.0,
+       16.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.6667,
+      "value": [
+       11.8564,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.2083,
+      "value": [
+       6.0,
+       0.0,
+       -0.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.75,
+      "value": [
+       -2.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.2917,
+      "value": [
+       -10.0,
+       0.0,
+       -0.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.8333,
+      "value": [
+       -15.8564,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 53.375,
+      "value": [
+       -18.0,
+       0.0,
+       16.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.9167,
+      "value": [
+       -15.8564,
+       0.0,
+       20.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 58.4583,
+      "value": [
+       -10.0,
+       0.0,
+       16.4853
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.0,
+      "value": [
+       -2.0,
+       0.0,
+       8.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       8.0,
+       30.0,
+       49.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       10.1213,
+       30.6,
+       49.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       11.0,
+       30.0,
+       51.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       10.1213,
+       29.4,
+       52.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       8.0,
+       30.0,
+       53.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       5.8787,
+       30.6,
+       52.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       5.0,
+       30.0,
+       51.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       5.8787,
+       29.4,
+       49.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       8.0,
+       30.0,
+       49.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -4.8707,
+       8.2524,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       -4.0343,
+       8.1621,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -4.3493,
+       7.7476,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       -5.6313,
+       7.8379,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -7.1293,
+       8.2524,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       -7.9657,
+       8.1621,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       -7.6507,
+       7.7476,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       -6.3687,
+       7.8379,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -4.8707,
+       8.2524,
+       -30.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-rd-relief.mp4"
+ },
+ "sonicScene": {
+  "category": "experiment",
+  "thesis": "A vast mineral plain whose surface is grown, not carved: a reaction-diffusion pattern raises ridges and cells out of the stone, and the frontier between two pattern families wanders across it, rewriting the relief as it passes.",
+  "experiment": "C reaction-diffusion",
+  "id": "rd-relief",
+  "title": "RD Relief"
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "regime"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "growth"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "relief"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "influence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "erase"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "light"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 36,
+     "signal": "seed0"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 37,
+     "signal": "seed1"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 38,
+     "signal": "seed2"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 39,
+     "signal": "seed3"
+    }
+   ]
+  }
+ }
+}

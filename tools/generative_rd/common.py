@@ -294,3 +294,29 @@ def bowl_mesh(radius, height, rings, segments, power=2.2, inner=0.0):
     if np.cross(b - a, c - a)[1] < 0:
         idx = idx.reshape(-1, 3)[:, [0, 2, 1]].ravel()
     return pos, n, uv, idx
+
+
+# ================================================================================================ the instrument
+RESPONSE = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+INFLUENCE = "visual.influence"  # the Audio Influence control, 0.5 at rest, 1 at CC full: the depth of every audio route
+CC = {"attackMs": 150, "decayMs": 150}
+
+
+def instrument(s, ccs, notes=()):
+    """The performer's surface, shared by the experiments: `ccs` is [(cc number, signal, description)], `notes` is
+    [(note number, signal)]. Writes the MIDI control map and the Audio Influence mapping (visual.influence)."""
+    s.response = dict(RESPONSE)
+    b = [{"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": name} for n, name, _ in ccs]
+    b += [{"source": "*", "channel": -1, "kind": "note", "number": n, "signal": name} for n, name in notes]
+    s.control = {"midi": {"enabled": True, "filter": "*", "bindings": b}}
+    s.mappings.append(kit.M("influence", [("control.influence", 1.0)], gain=0.5, bias=0.5))
+
+
+def audio(src, target, amount, **kw):
+    """A route the music drives, scaled by Audio Influence."""
+    return R(src, target, amount, depth=INFLUENCE, **kw)
+
+
+def describe_ccs(ccs, notes_text=""):
+    t = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in ccs)
+    return t + (", " + notes_text if notes_text else "")

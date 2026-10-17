@@ -1,0 +1,762 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "rd-pins",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -10.0,
+   24.0,
+   24.0
+  ],
+  "target": [
+   2.0,
+   0.0,
+   -2.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.05,
+  "background": [
+   0.00061,
+   0.00061,
+   0.00061
+  ],
+  "fogColor": [
+   0.00322,
+   0.00194,
+   0.00146
+  ],
+  "volumeDensity": 0.002,
+  "fogSky": 1.0,
+  "fogHeight": 400.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 120.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00061,
+    0.00061,
+    0.00061
+   ],
+   "horizonColor": [
+    0.00402,
+    0.00243,
+    0.00182
+   ],
+   "groundColor": [
+    0.00061,
+    0.00061,
+    0.00061
+   ],
+   "haze": 1.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "regimeDrift",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.2,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "noise",
+    "frequency": 0.06,
+    "speed": 0.1,
+    "seed": 21
+   }
+  },
+  {
+   "name": "brush",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "sphere",
+    "radius": 1.5,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "relief",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "pattern"
+   }
+  },
+  {
+   "name": "pins",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.128,
+      0.2,
+      0.128
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      200,
+      1,
+      200
+     ],
+     "gridSpacing": [
+      0.32,
+      1.0,
+      0.32
+     ]
+    },
+    "material": {
+     "program": "rdPins",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.5,
+     "metallic": 0.2
+    },
+    "effectors": [
+     {
+      "field": "relief",
+      "op": "scale",
+      "blend": "add",
+      "strength": 16.0,
+      "scaleAxis": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rd-floor.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rdFloor",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "low",
+    "point": [
+     2.0,
+     0.0,
+     -2.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 9.0,
+    "onsetWidth": 0.9,
+    "onsetDecay": 0.5
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "mid",
+    "point": [
+     20.0,
+     0.0,
+     8.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 14.4,
+    "onsetWidth": 0.5,
+    "onsetDecay": 0.9
+   }
+  },
+  {
+   "name": "seed0",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -16.0,
+     0.0,
+     -10.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed1",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     10.0,
+     0.0,
+     -18.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed2",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     14.0,
+     0.0,
+     8.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed3",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -12.0,
+     0.0,
+     14.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seeds",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "seed0",
+     "seed1",
+     "seed2",
+     "seed3"
+    ]
+   }
+  },
+  {
+   "name": "sources",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "brush",
+     "kickFront",
+     "snareFront",
+     "seeds"
+    ]
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.55,
+    -0.5,
+    -0.67
+   ],
+   "color": [
+    0.35153,
+    0.39157,
+    0.47932
+   ],
+   "intensity": 0.8,
+   "castsShadow": true,
+   "contactShadow": false,
+   "softness": 0.3
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.6,
+    -0.3,
+    0.75
+   ],
+   "color": [
+    1.0,
+    0.25415,
+    0.04231
+   ],
+   "intensity": 0.3,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "rdPins",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "relief"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.04,
+      0.2,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.00152,
+      0.00152,
+      0.00152,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.00439,
+      0.00402,
+      0.00402,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 0,
+     "constant": [
+      0.17,
+      0.27,
+      0.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "power",
+     "dst": 5,
+     "srcA": 5,
+     "value": 6.0
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.1,
+      0.15854,
+      0.01136,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "input",
+     "dst": 7,
+     "input": "localPosition"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.1,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": 7,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "rdFloor",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "relief"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.04,
+      0.2,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.00152,
+      0.00152,
+      0.00152,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.00439,
+      0.00402,
+      0.00402,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 0,
+     "constant": [
+      0.17,
+      0.27,
+      0.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "power",
+     "dst": 5,
+     "srcA": 5,
+     "value": 6.0
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.1,
+      0.15854,
+      0.01136,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": 7,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "pattern",
+   "mode": "reactionDiffusion",
+   "wrap": "wrap",
+   "resolution": [
+    384,
+    1,
+    384
+   ],
+   "boundsMin": [
+    -32.0,
+    -3.0,
+    -32.0
+   ],
+   "boundsMax": [
+    32.0,
+    3.0,
+    32.0
+   ],
+   "diffusionA": 0.3,
+   "diffusionB": 0.15,
+   "feed": 0.029,
+   "kill": 0.057,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "speed": 960.0,
+   "iterations": 16,
+   "seed": 17,
+   "seedAmount": 1.0,
+   "checkpointInterval": 5.0,
+   "regimeField": "regimeDrift",
+   "feedB": 0.03,
+   "killB": 0.062,
+   "injectField": "sources",
+   "injectRate": 1.5
+  }
+ ]
+}
