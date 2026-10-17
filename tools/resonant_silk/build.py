@@ -36,7 +36,7 @@ CATEGORY = "Resonant Silk"
 
 COMPOSITION = "a"
 MUSIC = not os.environ.get("RS_NOMUSIC")
-SMOOTH = float(os.environ.get("RS_SMOOTH", "0.05"))   # spectrum fields' smoothing window (s); 32 taps at most
+SMOOTH = float(os.environ.get("RS_SMOOTH", "0.08"))   # spectrum fields' smoothing window (s); 32 taps at most
 MESH_SCALE = float(os.environ.get("RS_MESH", "1.0"))  # look development: the sheet's tessellation
 SAIL = float(os.environ.get("RS_SAIL", "-0.8"))  # look development: the sail's extra roll
 
@@ -529,7 +529,7 @@ def fields(s):
             {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.5,
              "gain": 1.0, "amplitude": 1.0},
             {"kind": "point", "position": [20.0, -40.0, -70.0], "order": 3, "bandLow": 0.5, "bandHigh": 1.0,
-             "gain": 1.0, "amplitude": 0.16, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
+             "gain": 1.0, "amplitude": 0.26, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
         ],
         "channel": "displacement",
     }
@@ -549,10 +549,10 @@ def fields(s):
     # (displacement there, along the wall's mean normal, slides the cloth within itself and smears the pleats)
     fnode("nearCalm", {"kind": "distance", "point": [0.0, 0.0, 0.0], "radius": 110.0}, NEAR_CALM)
     fnode("bassHistory", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.22,
-                          "audioSpeed": 26.0, "audioSmooth": SMOOTH, "point": list(GATHER),
+                          "audioSpeed": 65.0, "audioSmooth": SMOOTH, "point": list(GATHER),
                           "waveGeometry": "spherical"})
     fnode("bassCarrier", {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine", "point": list(GATHER),
-                          "wavelength": 90.0, "waveSpeed": 26.0, "waveWidth": 0.0, "amplitude": 1.0})
+                          "wavelength": 150.0, "waveSpeed": 65.0, "waveWidth": 0.0, "amplitude": 1.0})
     fnode("kickFront", {"kind": "onset", "onsetSource": "low", "point": list(GATHER), "waveGeometry": "spherical",
                         "audioSpeed": 34.0, "onsetWidth": 14.0, "onsetDecay": 0.9})
     fnode("snareFront", {"kind": "onset", "onsetSource": "mid", "point": list(WALL_MID),
@@ -610,6 +610,10 @@ def environment(s):
 
 
 def silk_material(name, program="rsSilk"):
+    if os.environ.get("RS_GEOMETRY"):
+        # review only: the form alone, matte grey, no program, no film
+        return {"baseColor": [0.45, 0.45, 0.47], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
+                "roughness": 0.65, "metallic": 0.0, "doubleSided": True}
     return {"program": program, "baseColor": C("indigo", 2.0), "emissiveColor": C("cyan"), "emissiveIntensity": 0.0,
             "roughness": 0.28, "metallic": 0.35, "doubleSided": True,
             "thinFilm": {"thickness": 400.0, "ior": 1.6}}
@@ -752,7 +756,7 @@ def build(comp, mesh_dir):
     specs, cam = sheets_for(comp)
     sheets(s, specs, mesh_dir)
     camera(s, cam)
-    s.palette = palette_block(s.silk_program)
+    s.palette = None if os.environ.get("RS_GEOMETRY") else palette_block(s.silk_program)
     if MUSIC:
         instrument(s, s.silk_program)
     else:
