@@ -34,6 +34,8 @@
   "fogHeightFalloff": 0.0,
   "skyIntensity": 1.0,
   "shadowRange": 200.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -80,7 +82,7 @@
      "fLow": 40.0,
      "fHigh": 4000.0,
      "lambdaMax": 220.0,
-     "lambdaMin": 12.0,
+     "lambdaMin": 18.0,
      "selectivity": 2.5,
      "contrast": 0.5,
      "memory": 2.0,
@@ -125,7 +127,10 @@
        "bandLow": 0.5,
        "bandHigh": 1.0,
        "gain": 1.0,
-       "amplitude": 0.3
+       "amplitude": 0.16,
+       "drift": 14.0,
+       "driftPeriod": 40.0,
+       "spin": 0.05
       }
      ],
      "channel": "displacement"
@@ -147,9 +152,9 @@
     },
     "kind": "plane",
     "axis": [
-     -0.27,
+     -0.435,
      0.03,
-     0.96
+     0.9
     ],
     "softness": 35.0
    }
@@ -180,9 +185,9 @@
    "name": "nearCalm",
    "kind": "field",
    "position": [
-    -50.0,
+    -70.0,
     6.0,
-    40.0
+    4.0
    ],
    "field": {
     "strength": 1.0,
@@ -216,7 +221,7 @@
     "bandLow": 0.0,
     "bandHigh": 0.22,
     "audioSpeed": 26.0,
-    "audioSmooth": 0.33,
+    "audioSmooth": 0.05,
     "point": [
      0.0,
      4.0,
@@ -302,53 +307,6 @@
     "audioSpeed": 55.0,
     "onsetWidth": 5.0,
     "onsetDecay": 2.2
-   }
-  },
-  {
-   "name": "trebleTrace",
-   "kind": "field",
-   "position": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "field": {
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "kind": "spectrum",
-    "audioBand": "range",
-    "bandLow": 0.62,
-    "bandHigh": 1.0,
-    "audioSpeed": 30.0,
-    "audioSmooth": 0.33,
-    "point": [
-     0.0,
-     4.0,
-     -170.0
-    ],
-    "waveGeometry": "spherical"
-   }
-  },
-  {
-   "name": "silkAmp",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "resonator",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "resonance": {
-     "channel": "amplitude"
-    }
    }
   },
   {
@@ -511,16 +469,16 @@
       "amount": 2.2,
       "space": "world",
       "axis": [
-       0.27,
+       0.435,
        -0.03,
-       -0.96
+       -0.9
       ],
       "frequency": 0.08975979010256552,
       "speed": -0.5,
       "displacementAxis": [
-       -0.9642,
-       -0.0931,
-       -0.2482
+       -0.9073,
+       -0.0951,
+       -0.4095
       ]
      },
      {
@@ -530,9 +488,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9642,
-       -0.0931,
-       -0.2482
+       -0.9073,
+       -0.0951,
+       -0.4095
       ]
      },
      {
@@ -542,9 +500,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       0.6533,
-       -0.2923,
-       -0.6984
+       0.6557,
+       -0.2939,
+       -0.6955
       ]
      },
      {
@@ -554,9 +512,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9642,
-       -0.0931,
-       -0.2482
+       -0.9073,
+       -0.0951,
+       -0.4095
       ]
      },
      {
@@ -566,9 +524,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9642,
-       -0.0931,
-       -0.2482
+       -0.9073,
+       -0.0951,
+       -0.4095
       ]
      },
      {
@@ -578,9 +536,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       0.6533,
-       -0.2923,
-       -0.6984
+       0.6557,
+       -0.2939,
+       -0.6955
       ]
      },
      {
@@ -590,9 +548,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9642,
-       -0.0931,
-       -0.2482
+       -0.9073,
+       -0.0951,
+       -0.4095
       ]
      }
     ],
@@ -955,9 +913,20 @@
      "value": 2.5
     },
     {
-     "kind": "field",
+     "kind": "input",
      "dst": 2,
-     "field": "trebleTrace"
+     "input": "audio"
+    },
+    {
+     "kind": "swizzle",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      3.0,
+      3.0,
+      3.0,
+      3.0
+     ]
     },
     {
      "kind": "multiply",
@@ -1007,28 +976,6 @@
      "kind": "field",
      "dst": 2,
      "field": "kickFront"
-    },
-    {
-     "kind": "field",
-     "dst": 3,
-     "field": "silkAmp"
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
-     "srcA": 3,
-     "constant": [
-      0.9,
-      1.8,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "add",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
     },
     {
      "kind": "multiply",

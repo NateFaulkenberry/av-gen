@@ -320,7 +320,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/33/constant/constant",
+   "target": "material/rsSilk/op/34/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -333,7 +333,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/43/constant/constant",
+   "target": "material/rsSilk/op/41/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -1201,11 +1201,11 @@
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/31/constant/constant"
+    "target": "material/rsSilk/op/32/constant/constant"
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/41/constant/constant"
+    "target": "material/rsSilk/op/39/constant/constant"
    }
   ],
   "position": 0.0,

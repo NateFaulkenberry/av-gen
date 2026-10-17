@@ -36,6 +36,8 @@ CATEGORY = "Resonant Silk"
 
 COMPOSITION = "a"
 MUSIC = not os.environ.get("RS_NOMUSIC")
+SMOOTH = float(os.environ.get("RS_SMOOTH", "0.05"))   # spectrum fields' smoothing window (s); 32 taps at most
+MESH_SCALE = float(os.environ.get("RS_MESH", "1.0"))  # look development: the sheet's tessellation
 SAIL = float(os.environ.get("RS_SAIL", "-0.8"))  # look development: the sail's extra roll
 
 # ================================================================================================ palette (sRGB refs)
@@ -180,6 +182,7 @@ class SheetSpec:
 
 
 def sheet_mesh(spec):
+    spec.nu, spec.nv = int(round(spec.nu * MESH_SCALE)), int(round(spec.nv * MESH_SCALE))
     """P(u, v) = C(u) + v w(u) W(u) + N(u) D(u, v): a centreline, a transported frame turned by an authored roll, a
     span profile, and a displacement along the frame normal made of a billow (the sail between two anchors) and pleats
     (the cloth the span cannot hold, gathered into folds that fan out from the anchors)."""
@@ -294,13 +297,13 @@ def sheets_for(comp):
         # mirrored: a long low wall on one side of the gather, a tall turning sail on the other.
         main = SheetSpec(
             "silk",
-            points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 10, -174),
+            points=[(-84, 10, 4), (-48, 4, -28), (-24, 0, -66), (-10, 2, -115), (0, 4, -170), (18, 10, -174),
                     (42, 20, -164), (68, 34, -146), (90, 52, -134), (102, 74, -138)],
             roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.7, 2.6 + SAIL), (0.84, 3.2 + SAIL), (1.0, 3.5 + SAIL)],
             span=[(0.0, 30.0), (0.3, 26.0), (0.52, 10.0), (0.62, 2.5), (0.68, 12.0), (0.84, 48.0), (0.95, 58.0), (1.0, 50.0)],
             cloth=[(0.0, 40.0), (0.52, 44.0), (0.66, 30.0), (0.84, 60.0), (0.95, 72.0), (1.0, 64.0)],
             billow=[(0.0, 6.0), (0.33, 9.0), (0.56, 0.0), (0.64, 0.0), (0.82, -6.0), (1.0, -3.0)],
-            pleats=[(6.0, 0.8), (13.0, 0.35), (23.0, 0.3)], seed=5, curl=0.06, edge_wave=0.035, nu=760, nv=176,
+            pleats=[(6.0, 0.8), (13.0, 0.35), (17.0, 0.25)], seed=5, curl=0.06, edge_wave=0.035, nu=470, nv=110,
             end_round=0.4)
         cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0, "drift": True}
         return [main], cam
@@ -423,20 +426,19 @@ def silk_program():
     g.op("glowCol", "constant", 7, k=C("pearl", 0.5) + [1])            # role: peak (x 0.5, x palette emit)
     g.op(None, "multiply", 6, a=6, b=7)
     g.op(None, "add", 1, a=1, b=6)
-    if MUSIC:
+    if MUSIC and not os.environ.get("RS_NOMATMUSIC"):
         g.op(None, "power", 6, a=4, f=2.5)                             # r6: the folds' turning edges (narrow)
-        g.op("treble", "field", 2, field="trebleTrace")
+        # treble as a uniform (the analysis' treble band): a per-pixel field read cost 16 ms with the others at 1080p
+        g.op("treble", "input", 2, inp="audio")
+        g.op(None, "swizzle", 2, a=2, k=[3, 3, 3, 3])
         g.op(None, "multiply", 2, a=2, b=6)
         g.op("trebleCol", "constant", 3, k=C("pearl") + [1])           # role: peak
         g.op(None, "multiply", 2, a=2, b=3)
         g.op("trebleGain", "constant", 3, k=[0.5, 0.5, 0.5, 1])        # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
-        # resonant light: a kick's front travelling out across the cloth, and the hardest-ringing folds
+        # resonant light: a kick's front travelling out across the cloth
         g.op("kick", "field", 2, field="kickFront")
-        g.op("amp", "field", 3, field="silkAmp")
-        g.op("ampMask", "smoothstep", 3, a=3, k=[0.9, 1.8])
-        g.op(None, "add", 2, a=2, b=3)
         g.op(None, "multiply", 2, a=2, b=4)                            # on the turning faces only
         g.op("resCol", "constant", 3, k=C("cyan") + [1])               # role: resonant
         g.op(None, "multiply", 2, a=2, b=3)
@@ -476,7 +478,7 @@ def palette_block(g):
         {"role": "emit", "target": op("glowCol"), "mode": "multiply"},
         {"role": "fold", "target": op("foldMix"), "mode": "multiply", "component": 0},
     ]
-    if MUSIC:
+    if MUSIC and not os.environ.get("RS_NOMATMUSIC"):
         b += [{"role": "peak", "target": op("trebleCol")},
               {"role": "resonant", "target": op("resCol")}]
     # 'fold' is both a colour role and a scalar role name in the tuning: the scalar is renamed to keep them apart
@@ -495,9 +497,9 @@ def palette_block(g):
 # ================================================================================================ the music's fields
 GATHER = (0.0, 4.0, -170.0)     # the invisible ring: where everything converges, and where every wave starts
 WALL_MID = (-22.0, 3.0, -80.0)  # the middle of the wall (where the snare's fronts start)
-NEAR_CALM = (-50.0, 6.0, 40.0)  # the wall's near end, by the camera: the music's displacement is calm here
+NEAR_CALM = (-70.0, 6.0, 4.0)  # the wall's near end, by the camera: the music's displacement is calm here
 FIELD = "resonator"
-WALL_RUN = [-0.27, 0.03, 0.96]   # from the gather back along the wall, toward the camera
+WALL_RUN = [-0.435, 0.03, 0.90]   # from the gather back along the wall, toward the camera
 SAIL_RUN = [0.81, 0.57, 0.13]    # from the gather out along the sail
 WALL_N = [-0.96, -0.094, -0.263] # the wall's mean normal (of the unpleated sheet)
 SAIL_N = [0.536, -0.244, -0.809] # the sail's
@@ -519,7 +521,7 @@ def fields(s):
     never along the pleated surface's normal (which pushes a pleat's two faces apart and inflates it into pillows).
     The two halves are told apart by plane masks through the gather, so the ring itself stays still."""
     res = {
-        "modes": 8.0, "layout": 12.0, "fLow": 40.0, "fHigh": 4000.0, "lambdaMax": 220.0, "lambdaMin": 12.0,
+        "modes": float(os.environ.get("RS_MODES", "8")), "layout": float(os.environ.get("RS_LAYOUT", "12")), "fLow": 40.0, "fHigh": 4000.0, "lambdaMax": 220.0, "lambdaMin": 18.0,
         "selectivity": 2.5, "contrast": 0.5, "memory": 2.0, "competition": 1.5, "sustain": 1.0, "transient": 0.4,
         "idle": 0.5, "breath": 0.1, "limit": 1.0,
         "attack": [0.8, 0.3, 0.12], "release": [4.0, 1.8, 0.7],
@@ -527,7 +529,7 @@ def fields(s):
             {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.5,
              "gain": 1.0, "amplitude": 1.0},
             {"kind": "point", "position": [20.0, -40.0, -70.0], "order": 3, "bandLow": 0.5, "bandHigh": 1.0,
-             "gain": 1.0, "amplitude": 0.3},
+             "gain": 1.0, "amplitude": 0.16, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
         ],
         "channel": "displacement",
     }
@@ -547,7 +549,7 @@ def fields(s):
     # (displacement there, along the wall's mean normal, slides the cloth within itself and smears the pleats)
     fnode("nearCalm", {"kind": "distance", "point": [0.0, 0.0, 0.0], "radius": 110.0}, NEAR_CALM)
     fnode("bassHistory", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.22,
-                          "audioSpeed": 26.0, "audioSmooth": 0.33, "point": list(GATHER),
+                          "audioSpeed": 26.0, "audioSmooth": SMOOTH, "point": list(GATHER),
                           "waveGeometry": "spherical"})
     fnode("bassCarrier", {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine", "point": list(GATHER),
                           "wavelength": 90.0, "waveSpeed": 26.0, "waveWidth": 0.0, "amplitude": 1.0})
@@ -555,12 +557,6 @@ def fields(s):
                         "audioSpeed": 34.0, "onsetWidth": 14.0, "onsetDecay": 0.9})
     fnode("snareFront", {"kind": "onset", "onsetSource": "mid", "point": list(WALL_MID),
                          "waveGeometry": "spherical", "audioSpeed": 55.0, "onsetWidth": 5.0, "onsetDecay": 2.2})
-    fnode("trebleTrace", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.62, "bandHigh": 1.0,
-                          "audioSpeed": 30.0, "audioSmooth": 0.33, "point": list(GATHER),
-                          "waveGeometry": "spherical"})
-    s.nodes.append({"name": "silkAmp", "kind": "field", "position": [0, 0, 0],
-                    "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"},
-                              "resonance": {"channel": "amplitude"}}})
     for side in ("wall", "sail"):
         mask = side + "Side"
         calm = ["nearCalm"] if side == "wall" else []
@@ -579,7 +575,7 @@ def music_deformers():
     return [fd("wallRes", 6.0, WALL_N), fd("sailRes", 6.0, SAIL_N),
             fd("wallSwell", 3.0, WALL_N),
             fd("wallKick", 3.0, WALL_N), fd("sailKick", 3.5, SAIL_N),
-            fd("snareFront", 0.9, WALL_N)]
+            ] + ([] if os.environ.get("RS_NOSNARE") else [fd("snareFront", 0.9, WALL_N)])
 
 # ================================================================================================ world
 def environment(s):
@@ -587,6 +583,9 @@ def environment(s):
         "intensity": 0.04, "background": C("abyss", 0.6), "fogColor": C("abyss", 0.8),
         "volumeDensity": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 200.0,
+        # no screen-space AO or contact shadows: a thin sheet in a void gains nothing from them, and either would ask
+        # for a depth prepass that re-runs every deformer per vertex (ADR-1406; 39 ms measured)
+        "ambientOcclusion": False, "contactShadows": False,
         "sky": {"enabled": True, "zenithColor": C("abyss", 0.3), "horizonColor": C("indigo", 0.22),
                 "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -631,12 +630,12 @@ def sheets(s, specs, mesh_dir):
 def drift_deformers():
     """The sculpture's own slow life, independent of the music: a very slow, broad, coherent drift that keeps the
     silhouette evolving without ever repeating (the resonator's idle adds a breathing bow on top)."""
-    return [
+    return ([] if os.environ.get("RS_NONOISE") else [
         {"kind": "noise", "amount": 7.0, "space": "world", "scale": 0.009, "speed": 0.06, "seed": 11,
-         "axisMask": [1.0, 1.0, 0.6]},
+         "axisMask": [1.0, 1.0, 0.6]}]) + [
         # a long, slow swell travelling along the wall into the gather (its phase also takes the performer's
         # Motion Scale through an integrating route, ADR-1372, so the rate changes without a jump)
-        {"kind": "sine", "amount": 2.2, "space": "world", "axis": [0.27, -0.03, -0.96],
+        {"kind": "sine", "amount": 2.2, "space": "world", "axis": [0.435, -0.03, -0.90],
          "frequency": 2 * math.pi / 70.0, "speed": -0.5, "displacementAxis": WALL_N},
     ]
 
@@ -696,7 +695,7 @@ def instrument(s, g):
     s.route(R("control.detail", F + "source/1/amplitude", 0.4, **CC))
     s.route(R("control.iridescence", "procedural/silk/material/thinFilm/thickness", 320.0, **CC),
             R("control.iridescence", op("irid") + "constant", 1.0, op="multiply", gain=2.0, offset=1.0, **CC))
-    for label in ("trebleGain", "resGain"):
+    for label in [x for x in ("trebleGain", "resGain") if x in g.at]:
         s.route(R("control.light", op(label) + "constant", 1.0, op="multiply", gain=2.0, offset=1.0, **CC))
     # Color Drift: the palette journey moves sooner and turns faster
     s.route(R("control.colorDrift", "palette/hold", 1.0, op="multiply", gain=-0.8, offset=1.0, **CC),
