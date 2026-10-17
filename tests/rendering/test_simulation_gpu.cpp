@@ -442,3 +442,47 @@ TEST_CASE("A bake grid holds its source field at the frame's clock, and a seek n
     CHECK(harness.stats().checkpoints == 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1440: a bake grid may be a volume -- the GPU's bake is the CPU's at every cell of all three axes
+TEST_CASE("A volume bake grid holds a 3D field at every cell, as the CPU bakes it", "[simulation][gpu][bake]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    SimHarness harness(*ctx, shaders);
+
+    scene::Scene scene;
+    spatial::FieldSpec wave; // animated 3D noise: the value depends on all three coordinates and on the clock
+    wave.name = "wave";
+    wave.kind = spatial::FieldKind::Noise;
+    wave.frequency = 0.5f;
+    wave.speed = 1.2f;
+    scene.fields.fields.push_back(wave);
+    spatial::GridField grid;
+    grid.name = "volume";
+    grid.mode = spatial::GridMode::Bake;
+    grid.resolution = glm::ivec3(32, 24, 16);
+    grid.boundsMin = glm::vec3(-8.0f, -6.0f, -4.0f);
+    grid.boundsMax = glm::vec3(8.0f, 6.0f, 4.0f);
+    grid.injectField = "wave";
+    REQUIRE(grid.validate().has_value());
+    scene.fields.grids.push_back(grid);
+
+    spatial::GridField cpu = grid;
+    cpu.reset();
+    cpu.step(1.0f / 60.0f, 1.7, &scene.fields);
+    harness.frame(scene, 1.7, 0);
+    const std::vector<float> played = harness.read(scene.fields, 0);
+    REQUIRE(played.size() == cpu.data.size());
+    CHECK(maxAbsDifference(played, cpu.data) < 1e-3);
+    // the layers differ: the bake kept the vertical structure
+    const auto layer = [&](int j) {
+        double s = 0.0;
+        for (int k = 0; k < 16; ++k) {
+            for (int i = 0; i < 32; ++i) {
+                s += static_cast<double>(played[static_cast<std::size_t>(cpu.index(i, j, k))]);
+            }
+        }
+        return s;
+    };
+    CHECK(std::abs(layer(0) - layer(23)) > 1e-2);
+    CHECK(ctx->errorCount() == 0);
+}

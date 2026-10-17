@@ -57,6 +57,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1344-1349 | perf/rift-live-30fps (THE RIFT LIVE at 30 fps) |
 | 1350-1359 | art/sonic-vfx-pass (the Sonic VFX art pass) |
 | 1360-1369 | live performance follow-ups (2026-10-14) |
+| 1440-1449 | proto/waveform-dimension (Waveform Dimension) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -787,3 +788,4 @@ confirm the citation you are about to change is your own.
 | [1406](ADR-1406-an-unlit-scene-skips-the-depth-prepass.md) | An unlit scene skips the depth prepass (`environment.ambientOcclusion` / `contactShadows` false; the shadow mask counts directional lights only when one casts) and silent resonance rows are skipped by every sampler (`kResonanceSilent`; a focus window is exactly 0 past three widths). proto/cymatic-split | Accepted |
 | [1407](ADR-1407-a-bake-grid-holds-a-field-sampled-once-a-frame.md) | A bake grid holds a field sampled once a frame (`grids[].mode: "bake"`: a plane whose cells are `injectField` at the frame's clock -- stateless, no catch-up, no checkpoints; read by a `grid` field): a costly field evaluated once per cell instead of per vertex and per pixel. proto/cymatic-split | Accepted |
 | [1408](ADR-1408-a-command-line-audio-file-wins-over-the-saved-live-input.md) | A command-line audio file wins over the saved live input (`--audio <file>` with a `sonic.live` project: the file is the run's audio, the saved capture device is not opened): a live scene, which carries no track, is rendered and profiled against a test track from the command line. proto/cymatic-split | Accepted |
+| [1440](ADR-1440-a-bake-grid-may-be-a-volume.md) | A bake grid may be a volume (`grids[].mode: "bake"` accepts every axis up to 128 as well as a plane: a 3D field baked once a frame keeps its vertical structure; Waveform Dimension's sheets sample it per vertex and per pixel instead of every mode) | Accepted |

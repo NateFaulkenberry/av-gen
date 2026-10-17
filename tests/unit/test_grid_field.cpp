@@ -10,6 +10,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 
@@ -359,7 +360,7 @@ TEST_CASE("a grid can start from authored values, keep them, and round-trip them
 }
 
 // ADR-1407
-TEST_CASE("A bake grid is a plane that names its field, and a step bakes the field at the cell centres",
+TEST_CASE("A bake grid names its field, and a step bakes the field at the cell centres",
           "[grid][bake]") {
     spatial::FieldSet set;
     spatial::FieldSpec ramp;
@@ -378,9 +379,9 @@ TEST_CASE("A bake grid is a plane that names its field, and a step bakes the fie
     g.injectField = "ramp";
     REQUIRE(g.validate().has_value());
     CHECK(g.components() == 1);
-    auto thick = g;
-    thick.resolution.y = 2;
-    CHECK_FALSE(thick.validate().has_value()); // a plane
+    auto wide = g;
+    wide.resolution = glm::ivec3(129, 2, 4);
+    CHECK_FALSE(wide.validate().has_value()); // neither a plane nor a volume within the limits (ADR-1440)
     CHECK(spatial::gridModeFromName("bake") == spatial::GridMode::Bake);
     g.reset();
     g.step(0.016f, 3.0, &set);
@@ -391,4 +392,43 @@ TEST_CASE("A bake grid is a plane that names its field, and a step bakes the fie
     const auto back = spatial::GridField::fromJson(g.toJson());
     REQUIRE(back.has_value());
     CHECK(back->mode == spatial::GridMode::Bake);
+}
+
+// ADR-1440: a bake grid may be a volume (every axis up to kMaxGridResolution): a field with vertical structure keeps it
+TEST_CASE("A volume bake grid holds a 3D field at every cell centre", "[grid][bake]") {
+    spatial::FieldSet set;
+    spatial::FieldSpec ramp; // varies along y and x, so a plane bake would lose half of it
+    ramp.name = "ramp";
+    ramp.kind = spatial::FieldKind::LinearGradient;
+    ramp.axis = glm::normalize(glm::vec3(1.0f, 2.0f, 0.0f));
+    ramp.length = 30.0f;
+    set.fields.push_back(ramp);
+    spatial::GridField g;
+    g.name = "v";
+    g.mode = spatial::GridMode::Bake;
+    g.injectField = "ramp";
+    g.resolution = glm::ivec3(12, 8, 6);
+    g.boundsMin = glm::vec3(-6.0f, -4.0f, -3.0f);
+    g.boundsMax = glm::vec3(6.0f, 4.0f, 3.0f);
+    REQUIRE(g.validate().has_value());
+    auto big = g;
+    big.resolution = glm::ivec3(spatial::kMaxGridResolution, spatial::kMaxGridResolution / 2, spatial::kMaxGridResolution);
+    CHECK(big.validate().has_value());
+    big.resolution.y = spatial::kMaxGridResolution + 1;
+    CHECK_FALSE(big.validate().has_value());
+    g.reset();
+    g.step(0.016f, 1.0, &set);
+    float lo = 1e9f, hi = -1e9f;
+    for (int k = 0; k < 6; ++k) {
+        for (int j = 0; j < 8; ++j) {
+            for (int i = 0; i < 12; ++i) {
+                const float v = g.data[g.index(i, j, k)];
+                CHECK(v == Catch::Approx(spatial::sampleScalar(ramp, g.cellCenter(i, j, k), 1.0, &set)).margin(1e-6));
+                lo = std::min(lo, v);
+                hi = std::max(hi, v);
+            }
+        }
+    }
+    CHECK(hi - lo > 0.3f); // the cells span the ramp in 3D
+    CHECK(g.data[g.index(5, 0, 2)] < g.data[g.index(5, 7, 2)]); // up the y axis: the ramp rises
 }
