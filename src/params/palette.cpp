@@ -233,6 +233,19 @@ void Palette::step(double time, const signals::SignalBus& bus, bool bases) {
                 selectorState_.lastSignal = bus.value(*advanceId_);
             }
         }
+        if (selector.change.enabled) { // ADR-1421: the averages start at the landing's levels; the primary's quiet
+            resolveChange(bus);        // time counts from the landing too
+            PaletteSelectorState& ls = selectorState_;
+            ls.changeFast.assign(selector.change.signals.size(), 0.0f);
+            for (std::size_t i = 0; i < changeIds_.size(); ++i) {
+                if (changeIds_[i] && *changeIds_[i] < bus.size()) {
+                    ls.changeFast[i] = bus.value(*changeIds_[i]);
+                }
+            }
+            ls.changeSlow = ls.changeFast;
+            ls.changeArmed = true;
+            ls.lastPrimary = time;
+        }
         return;
     }
     const auto param = [&](Parameter<float>* p, float def) { return p == nullptr ? def : (bases ? p->base() : p->value()); };
@@ -259,25 +272,75 @@ void Palette::step(double time, const signals::SignalBus& bus, bool bases) {
             const bool fired = isEvent ? (bus.event(*advanceId_) && v >= selector.threshold)
                                        : (st.lastSignal < selector.threshold && v >= selector.threshold);
             st.lastSignal = v;
+            if (fired) {
+                st.lastPrimary = time; // ADR-1421: the primary is alive (whether or not the hold lets it change)
+            }
             if (fired && !locked && time - st.lastChange >= static_cast<double>(hold)) {
-                std::vector<int> order = selector.order;
-                if (order.empty()) {
-                    for (int i = 0; i < static_cast<int>(states.size()); ++i) {
-                        order.push_back(i);
-                    }
-                }
-                const auto at = std::find(order.begin(), order.end(), st.target);
-                const std::size_t i = at == order.end() ? 0 : static_cast<std::size_t>(at - order.begin()) + 1;
-                const int next = std::clamp(order[i % order.size()], 0, static_cast<int>(states.size()) - 1);
-                if (next != st.target) {
-                    retarget(next, time, transition);
-                } else {
-                    st.lastChange = time;
-                }
+                advanceNext(time, transition);
             }
         }
     }
+    // ADR-1421: the change trigger -- a large, sustained change in the music while the primary is quiet
+    if (selector.change.enabled) {
+        const PaletteChange& c = selector.change;
+        resolveChange(bus);
+        const double dt = std::max(time - st.lastTime, 0.0);
+        const float af = c.fast > 0.0f ? static_cast<float>(1.0 - std::exp(-dt / static_cast<double>(c.fast))) : 1.0f;
+        const float as = c.slow > 0.0f ? static_cast<float>(1.0 - std::exp(-dt / static_cast<double>(c.slow))) : 1.0f;
+        st.changeFast.resize(c.signals.size(), 0.0f);
+        st.changeSlow.resize(c.signals.size(), 0.0f);
+        float change = 0.0f;
+        for (std::size_t i = 0; i < c.signals.size(); ++i) {
+            if (!changeIds_[i] || *changeIds_[i] >= bus.size()) {
+                continue;
+            }
+            const float v = bus.value(*changeIds_[i]);
+            st.changeFast[i] += (v - st.changeFast[i]) * af;
+            st.changeSlow[i] += (v - st.changeSlow[i]) * as;
+            change += std::abs(st.changeFast[i] - st.changeSlow[i]);
+        }
+        bool fired = false;
+        if (st.changeArmed && change >= c.threshold) {
+            st.changeArmed = false;
+            fired = true;
+        } else if (!st.changeArmed && change < c.rearm) {
+            st.changeArmed = true;
+        }
+        const bool primaryQuiet = time - st.lastPrimary >= static_cast<double>(c.primaryTimeout);
+        const bool overdue = c.maxHold > 0.0f && time - st.lastChange >= static_cast<double>(c.maxHold);
+        if ((fired || overdue) && primaryQuiet && !locked && time - st.lastChange >= static_cast<double>(hold)) {
+            advanceNext(time, transition);
+        }
+    }
     st.lastTime = time;
+}
+
+void Palette::resolveChange(const signals::SignalBus& bus) {
+    if (changeIds_.size() != selector.change.signals.size() || changeBusSize_ != bus.size()) {
+        changeIds_.clear();
+        for (const std::string& name : selector.change.signals) {
+            changeIds_.push_back(bus.find(name));
+        }
+        changeBusSize_ = bus.size();
+    }
+}
+
+void Palette::advanceNext(double time, float transition) {
+    PaletteSelectorState& st = selectorState_;
+    std::vector<int> order = selector.order;
+    if (order.empty()) {
+        for (int i = 0; i < static_cast<int>(states.size()); ++i) {
+            order.push_back(i);
+        }
+    }
+    const auto at = std::find(order.begin(), order.end(), st.target);
+    const std::size_t i = at == order.end() ? 0 : static_cast<std::size_t>(at - order.begin()) + 1;
+    const int next = std::clamp(order[i % order.size()], 0, static_cast<int>(states.size()) - 1);
+    if (next != st.target) {
+        retarget(next, time, transition);
+    } else {
+        st.lastChange = time;
+    }
 }
 
 void Palette::attach(ParameterSet& params) {
@@ -412,6 +475,11 @@ nlohmann::json Palette::toJson() const {
             if (!selector.order.empty()) {
                 adv["order"] = selector.order;
             }
+            if (selector.change.enabled) { // ADR-1421
+                const PaletteChange& c = selector.change;
+                adv["change"] = {{"signals", c.signals}, {"fast", c.fast}, {"slow", c.slow}, {"threshold", c.threshold},
+                                 {"rearm", c.rearm}, {"primaryTimeout", c.primaryTimeout}, {"maxHold", c.maxHold}};
+            }
             sel["advance"] = std::move(adv);
         }
         j["selector"] = std::move(sel);
@@ -517,6 +585,38 @@ Result<Palette> Palette::fromJson(const nlohmann::json& j) {
                         return fail("palette selector: 'order' names a state that does not exist");
                     }
                     sel.order.push_back(o.get<int>());
+                }
+            }
+            if (aj.contains("change")) { // ADR-1421
+                const auto& cj = aj["change"];
+                if (!cj.is_object()) {
+                    return fail("palette selector: 'advance.change' must be an object");
+                }
+                PaletteChange& c = sel.change;
+                c.enabled = true;
+                if (cj.contains("signals") && cj["signals"].is_array()) {
+                    for (const auto& n : cj["signals"]) {
+                        if (!n.is_string()) {
+                            return fail("palette selector: 'advance.change.signals' must be signal names");
+                        }
+                        c.signals.push_back(n.get<std::string>());
+                    }
+                } else if (cj.contains("signal") && cj["signal"].is_string()) {
+                    c.signals.push_back(cj["signal"].get<std::string>());
+                }
+                if (c.signals.empty()) {
+                    return fail("palette selector: 'advance.change' needs 'signals' (or 'signal')");
+                }
+                c.fast = cj.value("fast", c.fast);
+                c.slow = cj.value("slow", c.slow);
+                c.threshold = cj.value("threshold", c.threshold);
+                c.rearm = cj.value("rearm", c.rearm);
+                c.primaryTimeout = cj.value("primaryTimeout", c.primaryTimeout);
+                c.maxHold = cj.value("maxHold", c.maxHold);
+                if (!(c.fast > 0.0f) || !(c.slow > c.fast) || !(c.rearm < c.threshold) || c.maxHold < 0.0f ||
+                    c.primaryTimeout < 0.0f) {
+                    return fail("palette selector: 'advance.change' needs 0 < fast < slow, rearm < threshold, "
+                                "maxHold >= 0 and primaryTimeout >= 0");
                 }
             }
         }

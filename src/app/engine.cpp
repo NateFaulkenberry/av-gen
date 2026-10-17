@@ -4601,8 +4601,13 @@ void Engine::seekSeconds(double seconds) {
     if (palette_.selector.enabled) {
         palette_.resetSelector();
         ReplaySignals probe(*this);
+        // ADR-1421: a change trigger's signals must be rebuilt by the replay too
+        const auto& changeSignals = palette_.changeSignals();
         const bool replayable = seekReplaysSignals() && !palette_.advanceSignal().empty() &&
-                                probe.bus().find(palette_.advanceSignal()).has_value();
+                                probe.bus().find(palette_.advanceSignal()).has_value() &&
+                                std::all_of(changeSignals.begin(), changeSignals.end(), [&](const std::string& n) {
+                                    return probe.bus().find(n).has_value();
+                                });
         if (replayable) {
             const double fps = renderSettings().fps > 0.0 ? renderSettings().fps : 60.0;
             probe.begin(isPlaying(), durationSeconds());

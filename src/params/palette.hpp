@@ -66,6 +66,23 @@ struct PaletteBinding {
     PaletteMode mode = PaletteMode::Replace;
 };
 
+// ADR-1421: a second advance trigger -- a large, sustained change in the music. Fast and slow exponential averages of
+// each signal; the change is the sum over the signals of |fast - slow|. It fires when the change reaches `threshold`
+// and re-arms only once it has fallen below `rearm` (hysteresis), and it is heard only while the primary advance
+// signal has been quiet for `primaryTimeout` seconds (so phrases win wherever a tempo exists). `maxHold` > 0 also
+// advances after that many seconds without any change while the primary is quiet (a long uniform passage still
+// evolves). The selector's hold, blend and lock apply as for the primary.
+struct PaletteChange {
+    bool enabled = false;              // an `advance.change` block was authored
+    std::vector<std::string> signals;  // e.g. sonic.energy, sonic.brightness, sonic.density
+    float fast = 3.0f;                 // seconds (time constants)
+    float slow = 24.0f;
+    float threshold = 0.08f;
+    float rearm = 0.04f;
+    float primaryTimeout = 30.0f;      // seconds
+    float maxHold = 0.0f;              // seconds, 0 = none
+};
+
 // ADR-1420: the selector's authored settings (the parameters' defaults and the advance rule).
 struct PaletteSelector {
     bool enabled = false;      // a `selector` block was authored
@@ -76,6 +93,7 @@ struct PaletteSelector {
     std::string advanceSignal; // empty: no automatic advance
     float threshold = 0.5f;
     std::vector<int> order;    // empty: 0..n-1
+    PaletteChange change;      // ADR-1421 (disabled unless authored)
 };
 
 // ADR-1420: what the selector carries between frames (captured and restored by a seek's replay).
@@ -89,6 +107,11 @@ struct PaletteSelectorState {
     double lastTime = -1.0; // the last stepped instant (< 0: never stepped)
     float lastSignal = 0.0f;
     int lastSelect = -1;    // the palette/select value last seen
+    // ADR-1421: the change trigger's averages, its arming, and when the primary signal last fired
+    std::vector<float> changeFast;
+    std::vector<float> changeSlow;
+    bool changeArmed = true;
+    double lastPrimary = -1.0e9;
 };
 
 class Palette {
@@ -121,6 +144,8 @@ public:
     [[nodiscard]] float selectorScalar(const std::string& role, double time) const;
     // ADR-1420: whether the selector's advance signal is `name`'s (a replay asks whether it can rebuild it).
     [[nodiscard]] const std::string& advanceSignal() const { return selector.advanceSignal; }
+    // ADR-1421: the change trigger's signals (empty without one)
+    [[nodiscard]] const std::vector<std::string>& changeSignals() const { return selector.change.signals; }
 
     // Registers palette/position, palette/saturation, palette/value (idempotent); removes them.
     void attach(ParameterSet& params);
@@ -158,6 +183,10 @@ private:
     double applyTime_ = 0.0; // the instant `step` last saw (what `apply` blends at)
     std::optional<signals::SignalId> advanceId_;
     std::size_t advanceBusSize_ = 0;
+    std::vector<std::optional<signals::SignalId>> changeIds_; // ADR-1421, resolved with advanceId_
+    std::size_t changeBusSize_ = 0;
+    void resolveChange(const signals::SignalBus& bus);
+    void advanceNext(double time, float transition);
 };
 
 } // namespace avgen::params
