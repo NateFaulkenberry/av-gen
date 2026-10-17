@@ -479,6 +479,7 @@ private:
     static constexpr int kAttributeFrames = 5;
     static constexpr double kGpuFull = 1.0;
     static constexpr double kGpuStall = 2.0;
+    static constexpr double kStretched = 1.02; // ADR-1363: interval and median span this far past the period
     // ADR-1362: paced, a probe is the only way to learn that a level holds, so a failed one backs off further than
     // ADR-1104's 8x: 16x the hold, about a minute at 30 fps, before the same raise is tried again.
     static constexpr int kPacedMaxHoldScale = 16;

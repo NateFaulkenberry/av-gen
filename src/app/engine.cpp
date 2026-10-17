@@ -1529,6 +1529,10 @@ void Engine::detachSceneParameters() {
     palette_.positionParam = nullptr;
     palette_.saturationParam = nullptr;
     palette_.valueParam = nullptr;
+    palette_.selectParam = nullptr; // ADR-1420
+    palette_.transitionParam = nullptr;
+    palette_.lockParam = nullptr;
+    palette_.holdParam = nullptr;
     if (auto* comp = composition()) {
         comp->detach();
     }
@@ -3178,6 +3182,22 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     layers_.attach(params_);
     syncResponseControls(); // ADR-1062: a scene load clears the parameters; the response's must exist for the file's values
+    // ADR-1043: the palette, attached BEFORE the parameter block below so its values land on the first pass (ADR-1420:
+    // with a selector there are seven palette parameters; attached after, every load warned that each was unknown
+    // before the second pass quietly applied it), and before the timeline so its tracks find them.
+    if (!palette_.empty()) {
+        palette_.detach(params_);
+    }
+    palette_ = params::Palette{};
+    paletteReported_ = 0;
+    if (doc.contains("palette")) {
+        auto palette = params::Palette::fromJson(doc["palette"]);
+        if (!palette) {
+            return std::unexpected(palette.error());
+        }
+        palette_ = std::move(*palette);
+        palette_.attach(params_);
+    }
 
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
@@ -3386,20 +3406,6 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     cueState_ = {};
     cueApplied_ = false;
-    // ADR-1043: the palette, attached now so the project's parameter values and the timeline find it.
-    if (!palette_.empty()) {
-        palette_.detach(params_);
-    }
-    palette_ = params::Palette{};
-    paletteReported_ = 0;
-    if (doc.contains("palette")) {
-        auto palette = params::Palette::fromJson(doc["palette"]);
-        if (!palette) {
-            return std::unexpected(palette.error());
-        }
-        palette_ = std::move(*palette);
-        palette_.attach(params_);
-    }
     states_ = StateMachine{};
     if (doc.contains("states")) {
         if (auto r = states_.fromJson(doc["states"]); !r) {
@@ -4587,6 +4593,28 @@ void Engine::seekSeconds(double seconds) {
     static const bool noControlReplay = std::getenv("AVGEN_NO_CONTROL_REPLAY") != nullptr; // A/B arm (bench)
     if (seekReplaysSignals() && !states_.states.empty() && !noControlReplay) {
         replayControl(seconds);
+    }
+    // ADR-1420: the palette selector carries state (the blend, the hold, the advance's last level). Offline with an
+    // analysed track and an advance signal the replay rebuilds, its steps from zero are replayed on the play's frame
+    // grid, so a render started mid-track lands on the palette and blend a play from zero shows. Otherwise it
+    // restarts at the selected state on the landing frame.
+    if (palette_.selector.enabled) {
+        palette_.resetSelector();
+        ReplaySignals probe(*this);
+        const bool replayable = seekReplaysSignals() && !palette_.advanceSignal().empty() &&
+                                probe.bus().find(palette_.advanceSignal()).has_value();
+        if (replayable) {
+            const double fps = renderSettings().fps > 0.0 ? renderSettings().fps : 60.0;
+            probe.begin(isPlaying(), durationSeconds());
+            probe.withoutRoutes();
+            probe.reset();
+            const auto frames = static_cast<std::uint64_t>(std::floor(std::max(seconds, 0.0) * fps + 1e-6));
+            for (std::uint64_t k = 0; k <= frames; ++k) {
+                const double now = static_cast<double>(k) / fps;
+                probe.build(now, k == 0 ? 0.0 : 1.0 / fps);
+                palette_.step(now, probe.bus(), true);
+            }
+        }
     }
     // ADR-912: nothing to scan for a keyed cut across a jump; the renderer drops its history for the
     // jump itself.
@@ -6302,6 +6330,7 @@ void Engine::update(const FrameTime& time) {
     // ADR-1043: the palette, after the timeline and the routes that may move its three parameters, and
     // before anything reads the colours it writes.
     if (!palette_.empty()) {
+        palette_.step(time.renderTime, bus_); // ADR-1420: the selector (a no-op without one)
         palette_.apply(params_);
         if (palette_.unresolved().size() > paletteReported_) {
             for (std::size_t i = paletteReported_; i < palette_.unresolved().size(); ++i) {

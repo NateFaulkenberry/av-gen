@@ -127,17 +127,189 @@ float Palette::scalar(const std::string& role, float pos) const {
     return *a + (*b - *a) * p.f;
 }
 
+
+// ---- ADR-1420: the selector -------------------------------------------------------------------
+
+glm::vec3 Palette::stateLab(int state, const std::string& role) const {
+    if (states.empty()) {
+        return glm::vec3(0.0f);
+    }
+    const auto i = static_cast<std::size_t>(std::clamp(state, 0, static_cast<int>(states.size()) - 1));
+    const glm::vec3* c = nearest(states, i, role, &PaletteState::colors);
+    return c != nullptr ? toOklab(glm::max(*c, glm::vec3(0.0f))) : toOklab(glm::vec3(0.0f));
+}
+
+float Palette::stateScalar(int state, const std::string& role) const {
+    if (states.empty()) {
+        return 0.0f;
+    }
+    const auto i = static_cast<std::size_t>(std::clamp(state, 0, static_cast<int>(states.size()) - 1));
+    const float* v = nearest(states, i, role, &PaletteState::scalars);
+    return v != nullptr ? *v : 0.0f;
+}
+
+float Palette::selectorProgress(double time) const {
+    const PaletteSelectorState& st = selectorState_;
+    if (st.duration <= 0.0f) {
+        return 1.0f;
+    }
+    const float x = std::clamp(static_cast<float>((time - st.start) / static_cast<double>(st.duration)), 0.0f, 1.0f);
+    return x * x * (3.0f - 2.0f * x); // eased: no kink at either end
+}
+
+glm::vec3 Palette::selectorColor(const std::string& role, double time, float sat, float val) const {
+    const glm::vec3 to = stateLab(selectorState_.target, role);
+    const auto it = selectorState_.fromLab.find(role);
+    glm::vec3 lab = it != selectorState_.fromLab.end() ? glm::mix(it->second, to, selectorProgress(time)) : to;
+    lab.x *= std::max(val, 0.0f);
+    lab.y *= std::max(sat, 0.0f);
+    lab.z *= std::max(sat, 0.0f);
+    return glm::max(fromOklab(lab), glm::vec3(0.0f));
+}
+
+float Palette::selectorScalar(const std::string& role, double time) const {
+    const float to = stateScalar(selectorState_.target, role);
+    const auto it = selectorState_.fromScalar.find(role);
+    return it != selectorState_.fromScalar.end() ? it->second + (to - it->second) * selectorProgress(time) : to;
+}
+
+int Palette::selectValue(bool bases) const {
+    const float v = selectParam == nullptr ? static_cast<float>(selector.select)
+                                           : (bases ? selectParam->base() : selectParam->value());
+    const int n = std::max(1, static_cast<int>(states.size()));
+    return std::clamp(static_cast<int>(std::lround(std::isfinite(v) ? v : 0.0f)), 0, n - 1);
+}
+
+void Palette::retarget(int target, double time, float duration) {
+    // The blend starts from wherever the palette stands now, so a retarget mid-blend never jumps.
+    PaletteSelectorState& st = selectorState_;
+    std::map<std::string, glm::vec3> lab;
+    std::map<std::string, float> scalars;
+    for (const PaletteState& s : states) {
+        for (const auto& [role, c] : s.colors) {
+            if (lab.count(role) == 0) {
+                lab[role] = toOklab(selectorColor(role, time, 1.0f, 1.0f));
+            }
+        }
+        for (const auto& [role, v] : s.scalars) {
+            if (scalars.count(role) == 0) {
+                scalars[role] = selectorScalar(role, time);
+            }
+        }
+    }
+    st.fromLab = std::move(lab);
+    st.fromScalar = std::move(scalars);
+    st.target = target;
+    st.start = time;
+    st.duration = std::max(duration, 0.0f);
+    st.lastChange = time;
+}
+
+void Palette::resetSelector() {
+    PaletteSelectorState st;
+    st.target = selectValue(true);
+    st.lastSelect = st.target;
+    selectorState_ = std::move(st);
+}
+
+void Palette::step(double time, const signals::SignalBus& bus, bool bases) {
+    applyTime_ = time;
+    if (!selector.enabled || states.empty()) {
+        return;
+    }
+    PaletteSelectorState& st = selectorState_;
+    // A jump in time (a seek nothing replayed, a reload): restart at the selected state.
+    if (st.lastTime < 0.0 || time < st.lastTime - 1e-6 || time - st.lastTime > 1.0) {
+        resetSelector();
+        selectorState_.lastChange = time; // the hold counts from the landing
+        selectorState_.lastTime = time;
+        // the advance signal's level at the landing is not an edge
+        if (!selector.advanceSignal.empty()) {
+            if (!advanceId_ || advanceBusSize_ != bus.size()) {
+                advanceId_ = bus.find(selector.advanceSignal);
+                advanceBusSize_ = bus.size();
+            }
+            if (advanceId_ && *advanceId_ < bus.size()) {
+                selectorState_.lastSignal = bus.value(*advanceId_);
+            }
+        }
+        return;
+    }
+    const auto param = [&](Parameter<float>* p, float def) { return p == nullptr ? def : (bases ? p->base() : p->value()); };
+    const float transition = std::max(param(transitionParam, selector.transition), 0.0f);
+    const bool locked = param(lockParam, selector.lock ? 1.0f : 0.0f) > 0.5f;
+    const float hold = std::max(param(holdParam, selector.hold), 0.0f);
+    // A manual selection wins at once (and starts the hold).
+    const int sel = selectValue(bases);
+    if (sel != st.lastSelect) {
+        st.lastSelect = sel;
+        if (sel != st.target) {
+            retarget(sel, time, transition);
+        }
+    }
+    // The automatic advance: the signal reaches its threshold (an event fires, or a level crosses it upward).
+    if (!selector.advanceSignal.empty()) {
+        if (!advanceId_ || advanceBusSize_ != bus.size()) {
+            advanceId_ = bus.find(selector.advanceSignal);
+            advanceBusSize_ = bus.size();
+        }
+        if (advanceId_ && *advanceId_ < bus.size()) {
+            const float v = bus.value(*advanceId_);
+            const bool isEvent = bus.info(*advanceId_).isEvent;
+            const bool fired = isEvent ? (bus.event(*advanceId_) && v >= selector.threshold)
+                                       : (st.lastSignal < selector.threshold && v >= selector.threshold);
+            st.lastSignal = v;
+            if (fired && !locked && time - st.lastChange >= static_cast<double>(hold)) {
+                std::vector<int> order = selector.order;
+                if (order.empty()) {
+                    for (int i = 0; i < static_cast<int>(states.size()); ++i) {
+                        order.push_back(i);
+                    }
+                }
+                const auto at = std::find(order.begin(), order.end(), st.target);
+                const std::size_t i = at == order.end() ? 0 : static_cast<std::size_t>(at - order.begin()) + 1;
+                const int next = std::clamp(order[i % order.size()], 0, static_cast<int>(states.size()) - 1);
+                if (next != st.target) {
+                    retarget(next, time, transition);
+                } else {
+                    st.lastChange = time;
+                }
+            }
+        }
+    }
+    st.lastTime = time;
+}
+
 void Palette::attach(ParameterSet& params) {
     positionParam = &params.add(desc("palette/position", position, -1.0f, 1000.0f, 0.0f,
                                      std::max(1.0f, static_cast<float>(states.size()) - 1.0f), "palette/position"));
     saturationParam = &params.add(desc("palette/saturation", saturation, 0.0f, 4.0f, 0.0f, 2.0f, "palette/saturation"));
     valueParam = &params.add(desc("palette/value", value, 0.0f, 4.0f, 0.0f, 2.0f, "palette/value"));
+    if (selector.enabled) { // ADR-1420: only with a selector, so a palette without one is exactly ADR-1043's
+        const float top = std::max(1.0f, static_cast<float>(states.size()) - 1.0f);
+        selectParam = &params.add(desc("palette/select", static_cast<float>(selector.select), 0.0f, top, 0.0f, top,
+                                       "palette/select"));
+        transitionParam = &params.add(desc("palette/transition", selector.transition, 0.0f, 600.0f, 0.0f, 30.0f,
+                                           "palette/transition"));
+        lockParam = &params.add(desc("palette/lock", selector.lock ? 1.0f : 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, "palette/lock"));
+        holdParam = &params.add(desc("palette/hold", selector.hold, 0.0f, 3600.0f, 0.0f, 120.0f, "palette/hold"));
+    }
 }
 
 void Palette::detach(ParameterSet& params) {
     params.remove("palette/position");
     params.remove("palette/saturation");
     params.remove("palette/value");
+    if (selector.enabled) {
+        params.remove("palette/select");
+        params.remove("palette/transition");
+        params.remove("palette/lock");
+        params.remove("palette/hold");
+    }
+    selectParam = nullptr;
+    transitionParam = nullptr;
+    lockParam = nullptr;
+    holdParam = nullptr;
     positionParam = nullptr;
     saturationParam = nullptr;
     valueParam = nullptr;
@@ -162,7 +334,8 @@ void Palette::apply(ParameterSet& params) {
                                          [&](const PaletteState& s) { return s.colors.count(b.role) != 0; });
         const std::size_t n = target->componentCount();
         if (isColor) {
-            const glm::vec3 c = color(b.role, pos, sat, val) * b.gain;
+            const glm::vec3 c =
+                (selector.enabled ? selectorColor(b.role, applyTime_, sat, val) : color(b.role, pos, sat, val)) * b.gain;
             const auto write = [&](std::size_t i, float v) {
                 target->setFinalComponent(i, b.mode == PaletteMode::Multiply ? target->finalComponent(i) * v : v);
             };
@@ -178,7 +351,7 @@ void Palette::apply(ParameterSet& params) {
                 }
             }
         } else {
-            const float v = scalar(b.role, pos) * b.gain;
+            const float v = (selector.enabled ? selectorScalar(b.role, applyTime_) : scalar(b.role, pos)) * b.gain;
             for (std::size_t i = 0; i < n; ++i) {
                 if (b.component >= 0 && static_cast<std::size_t>(b.component) != i) {
                     continue;
@@ -228,6 +401,21 @@ nlohmann::json Palette::toJson() const {
     j["position"] = positionParam != nullptr ? positionParam->base() : position;
     j["saturation"] = saturationParam != nullptr ? saturationParam->base() : saturation;
     j["value"] = valueParam != nullptr ? valueParam->base() : value;
+    if (selector.enabled) { // ADR-1420
+        nlohmann::json sel;
+        sel["select"] = selectParam != nullptr ? static_cast<int>(std::lround(selectParam->base())) : selector.select;
+        sel["transition"] = transitionParam != nullptr ? transitionParam->base() : selector.transition;
+        sel["lock"] = lockParam != nullptr ? lockParam->base() > 0.5f : selector.lock;
+        sel["hold"] = holdParam != nullptr ? holdParam->base() : selector.hold;
+        if (!selector.advanceSignal.empty()) {
+            nlohmann::json adv{{"signal", selector.advanceSignal}, {"threshold", selector.threshold}};
+            if (!selector.order.empty()) {
+                adv["order"] = selector.order;
+            }
+            sel["advance"] = std::move(adv);
+        }
+        j["selector"] = std::move(sel);
+    }
     return j;
 }
 
@@ -296,6 +484,45 @@ Result<Palette> Palette::fromJson(const nlohmann::json& j) {
     p.position = j.value("position", 0.0f);
     p.saturation = j.value("saturation", 1.0f);
     p.value = j.value("value", 1.0f);
+    if (j.contains("selector")) { // ADR-1420
+        const auto& sj = j["selector"];
+        if (!sj.is_object()) {
+            return fail("palette: 'selector' must be an object");
+        }
+        PaletteSelector& sel = p.selector;
+        sel.enabled = true;
+        sel.select = sj.value("select", 0);
+        sel.transition = sj.value("transition", 4.0f);
+        sel.lock = sj.value("lock", false);
+        sel.hold = sj.value("hold", 16.0f);
+        if (sel.select < 0 || sel.select >= static_cast<int>(p.states.size())) {
+            return fail("palette selector: 'select' {} is not a state (0..{})", sel.select, p.states.size() - 1);
+        }
+        if (sj.contains("advance")) {
+            const auto& aj = sj["advance"];
+            if (!aj.is_object() || !aj.contains("signal") || !aj["signal"].is_string()) {
+                return fail("palette selector: 'advance' needs a 'signal'");
+            }
+            sel.advanceSignal = aj["signal"].get<std::string>();
+            sel.threshold = aj.value("threshold", 0.5f);
+            if (aj.contains("hold")) {
+                sel.hold = aj["hold"].get<float>();
+            }
+            if (aj.contains("order")) {
+                if (!aj["order"].is_array() || aj["order"].empty()) {
+                    return fail("palette selector: 'order' must be a non-empty array of states");
+                }
+                for (const auto& o : aj["order"]) {
+                    if (!o.is_number_integer() || o.get<int>() < 0 || o.get<int>() >= static_cast<int>(p.states.size())) {
+                        return fail("palette selector: 'order' names a state that does not exist");
+                    }
+                    sel.order.push_back(o.get<int>());
+                }
+            }
+        }
+        p.selectorState_.target = sel.select;
+        p.selectorState_.lastSelect = sel.select;
+    }
     return p;
 }
 
