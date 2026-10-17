@@ -222,3 +222,15 @@ The image's interest stays where the brief puts it: geometry, shading and negati
 - **Frame intervals:** a median of 33.3 ms at both levels. About a third of intervals land a little over 34 ms at either level, which is the cap's wake-up jitter: the same share at Medium, with 7 ms of GPU headroom.
 
 **Regression:** see the checks at the end of this report.
+
+## Stage H: final art pass
+
+- **Every palette holds its character on the final program** (43 ops, no medium-crest light, no prepass):
+  - darks are dark and the bright roles sit on the ridges;
+  - A and F differ in temperature and darkness;
+  - B, H and J are three different worlds;
+  - I carries the form alone.
+- **The palette journey was recomposed after validation.** The first order put complementary palettes next to each other: blue → orange, magenta → green, green → rose. A straight OKLab blend between opposite hues passes through grey, and in the validation clips green → rose read as silver mid-blend, the "muddy intermediate" the brief forbids. The order is now a temperature arc around the wheel with no neighbour across it: Abyssal → Chlorophyll → Glacial → Silver → Oxidized → Molten → Crimson → Rose → Oil → Ultraviolet → Abyssal. Silver sits where a grey midpoint is its own identity.
+- **The layer views** (`CW_DEBUG=albedo`, `light`, `emission`; documented beside the shape-language views in `build.py`) show each shading layer alone on the real program and palette.
+
+**Evidence** (`stageH-final/`): `all-10-palettes-final-feline-60s.png` and `layer-views-crimson-feline-18s-full-albedo-light-emission.png`. A transition clip in the final order is `palettes/phrase-transitions-final-order-feline-40-110s.mp4`.

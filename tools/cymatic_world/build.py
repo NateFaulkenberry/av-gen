@@ -360,6 +360,10 @@ LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 #   signed          the material shows the signed standing figure F (blue down, red up) over the real geometry
 #   nodal           the material shows the nodal lines (sand) of the whole figure, white on black
 #   envelope        the material shows the excitation |F| (the fast figure's amplitude), black to orange
+# the light pass's LAYER views (10-brief), on the real program and palette:
+#   albedo          the base colour field and the grit alone, unlit (layers 1-2: base + resonant colour variation)
+#   light           the painted light alone, on white (the key, its ambient floor, the fill, the glints)
+#   emission        the crest lines, the travelling light and the hollow glow alone (layers 3-4)
 DEBUG = os.environ.get("CW_DEBUG", "")
 # ADR-1407: the relief is baked into a grid once a frame (CW_BAKE=0: every vertex evaluates the readers, for comparison)
 BAKE = os.environ.get("CW_BAKE", "1") != "0"
@@ -645,7 +649,10 @@ PAL_ALBEDO = float(os.environ.get("CW_PAL_ALBEDO", "0.28"))     # albedo = the b
 PAL_TRANSITION = float(os.environ.get("CW_PAL_TRANSITION", "6.0"))  # seconds of OKLab blend
 PAL_HOLD = float(os.environ.get("CW_PAL_HOLD", "24.0"))         # the least time a palette is held
 PAL_LOCK = os.environ.get("CW_PAL_LOCK", "0") == "1"            # a review still: hold the selected palette
-PAL_ORDER = [0, 2, 5, 1, 6, 7, 4, 3, 8, 9]
+# the journey: neighbours never complementary (a straight OKLab line between opposite hues passes through grey -- the
+# first order's green -> rose read as silver mid-blend in validation), a temperature arc around the wheel instead:
+# abyssal blue -> chlorophyll -> glacial -> silver -> oxidized -> molten -> crimson -> rose -> oil -> ultraviolet -> blue
+PAL_ORDER = [0, 6, 5, 8, 4, 2, 1, 7, 9, 3]
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
 
@@ -792,6 +799,8 @@ def ground_program():
         g.op(None, "add", 4, a=4, b=1)                             # + sheen
     if dbg in ("albedo", "light"):
         g.op(None, "constant", 2, k=[0, 0, 0, 1])
+    if dbg == "emission":  # the light pass's layer view: the crest lines, the travelling light and the glow alone
+        g.op(None, "constant", 4, k=[0, 0, 0, 1])
     g.base, g.emit = 4, 2
     return g
 
@@ -1054,8 +1063,7 @@ def palette_block(g):
               ("view0", M % (g["view"], "ramp", "constant")), ("view1", M % (g["view"], "ramp", "constant2")),
               ("view2", M % (g["view"], "ramp", "constant3"))]
     # ADR-1420: the selector -- the palette changes at phrase scale, on a phrase boundary at least PAL_HOLD seconds
-    # after the last change, to the next palette of a COMPOSED order (each step a contrast of temperature and
-    # darkness: deep blue -> molten -> glacial -> crimson -> green -> rose -> metal -> ultraviolet -> silver -> oil),
+    # after the last change, to the next palette of a COMPOSED order (PAL_ORDER: a temperature arc, never across),
     # blended straight in OKLab over PAL_TRANSITION seconds; CC 9 selects, CC 10 locks
     return {"states": [palette_state(n, h) for n, h in MULTI_PALETTES],
             "bindings": [{"role": r, "target": t, "mode": "multiply"} for r, t in binds],
