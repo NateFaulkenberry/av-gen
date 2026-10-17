@@ -29,7 +29,7 @@
    0.00212,
    0.00304
   ],
-  "volumeDensity": 0.0006,
+  "volumeDensity": 0.0,
   "fogSky": 1.0,
   "fogHeight": 400.0,
   "fogHeightFalloff": 0.0,
@@ -457,7 +457,7 @@
      "fiberLength": 60.0,
      "fiberWidth": 0.05,
      "fiberTaper": 0.6,
-     "fiberSegments": 64,
+     "fiberSegments": 40,
      "fiberMinPixels": 0.9
     },
     "distribution": {
@@ -534,7 +534,7 @@
      "fiberLength": 55.0,
      "fiberWidth": 0.05,
      "fiberTaper": 0.6,
-     "fiberSegments": 64,
+     "fiberSegments": 40,
      "fiberMinPixels": 0.9
     },
     "distribution": {
@@ -611,7 +611,7 @@
      "fiberLength": 50.0,
      "fiberWidth": 0.05,
      "fiberTaper": 0.6,
-     "fiberSegments": 64,
+     "fiberSegments": 40,
      "fiberMinPixels": 0.9
     },
     "distribution": {
@@ -688,7 +688,7 @@
      "fiberLength": 45.0,
      "fiberWidth": 0.05,
      "fiberTaper": 0.6,
-     "fiberSegments": 64,
+     "fiberSegments": 40,
      "fiberMinPixels": 0.9
     },
     "distribution": {
@@ -765,7 +765,7 @@
      "fiberLength": 40.0,
      "fiberWidth": 0.05,
      "fiberTaper": 0.6,
-     "fiberSegments": 64,
+     "fiberSegments": 40,
      "fiberMinPixels": 0.9
     },
     "distribution": {

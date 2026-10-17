@@ -163,6 +163,28 @@
    }
   },
   {
+   "name": "regimeMap",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "regimeBake"
+   }
+  },
+  {
    "name": "relief",
    "kind": "field",
    "position": [
@@ -588,6 +610,27 @@
  ],
  "grids": [
   {
+   "name": "regimeBake",
+   "mode": "bake",
+   "wrap": "clamp",
+   "resolution": [
+    24,
+    24,
+    24
+   ],
+   "boundsMin": [
+    -14.5,
+    -14.5,
+    -14.5
+   ],
+   "boundsMax": [
+    14.5,
+    14.5,
+    14.5
+   ],
+   "injectField": "regime"
+  },
+  {
    "name": "pattern",
    "mode": "reactionDiffusion",
    "wrap": "clamp",
@@ -610,7 +653,7 @@
    "diffusionB": 0.08,
    "feed": 0.03,
    "kill": 0.06,
-   "regimeField": "regime",
+   "regimeField": "regimeMap",
    "feedB": 0.026,
    "killB": 0.064,
    "injectField": "sources",

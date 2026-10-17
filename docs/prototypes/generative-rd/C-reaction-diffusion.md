@@ -10,11 +10,11 @@ Gray-Scott, two fields A (U) and B (V), explicit Euler:
 
     A' = A + (D_A ∇²A − AB² + f(1 − A)) dt,    B' = B + (D_B ∇²B + AB² − (k + f) B) dt
 
-- **Grid and stencil.** A plane of 384²-512² on the GPU, using the isotropic 9-point Laplacian
+- **Grid and stencil.** A plane of 320²-384² on the GPU (512² measured first, see performance), using the isotropic 9-point Laplacian
   `(4Σadjacent + Σdiagonal − 20c)/6`. The 5-point stencil draws patterns that align to the axes.
 - **Constants.** D_A = 0.3, D_B = 0.15 in cell units; these are Sims' Da = 1, Db = 0.5 in this stencil's units.
-- **Step size.** One model unit per iteration: `speed = 60 × iterations`, with 16 iterations per sub-step, so 960
-  model steps a second. A pattern forms in 5-15 s. dt·D_A = 0.3 is under the plane's stability limit (0.375).
+- **Step size.** One model unit per iteration: `speed = 60 × iterations`, with 12 iterations per sub-step, so 720
+  model steps a second. A pattern forms in about 10-20 s. dt·D_A = 0.3 is under the plane's stability limit (0.375).
 - **Volume.** The closed form uses a 100³ volume with the 6-neighbour stencil, D_A = 0.16 and dt = 0.5 (10 model
   units in 20 iterations a sub-step).
   - At dt = 1 the volume sits at its stability edge, D·dt·12 = 1.92, and grew a fine checkerboard. That was
@@ -102,8 +102,8 @@ The music writes into the pattern's history; it never resets it. Feed and kill a
 
 ## 5. Cost
 
-See `performance.md`. A 512² plane at 16 iterations, and the 100³ volume at 20 iterations, are the expensive grids
-of the whole investigation.
+See `performance.md`. Measured by A/B: the relief's 384² plane at 12 iterations costs 7.5 ms of GPU (11.5 ms at
+512² × 16), the pins' 320² plane 6.2 ms, and the bloom's 100³ volume at 20 iterations 32.7 ms (offline only).
 
 ## 6. Known issues
 

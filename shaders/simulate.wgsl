@@ -714,13 +714,18 @@ fn cs_oscillate(@builtin(global_invocation_id) gid: vec3<u32>) {
     let inv2s2 = 1.0 / (2.0 * sigma * sigma);
     let pop = oscPopulation(cell);
     var acc = OscSum(0.0, 0.0, 0.0, 0.0);
+    // exp(-(dx^2 + dz^2) / 2s^2) = g[|dx|] g[|dz|]: five exponentials a cell instead of one per neighbour
+    var g: array<f32, 5>;
+    for (var k = 0; k <= r; k = k + 1) {
+        g[k] = exp(-f32(k * k) * inv2s2);
+    }
     for (var dz = -r; dz <= r; dz = dz + 1) {
         for (var dx = -r; dx <= r; dx = dx + 1) {
             let d2 = dx * dx + dz * dz;
             if (d2 == 0 || d2 > r * r + r) {
                 continue;
             }
-            acc = oscGather(acc, c.x + dx, c.z + dz, exp(-f32(d2) * inv2s2), pop);
+            acc = oscGather(acc, c.x + dx, c.z + dz, g[abs(dx)] * g[abs(dz)], pop);
         }
     }
     let range = max(1, i32(sim.excite1.x));

@@ -98,7 +98,12 @@ def rd_grid(s, name, size, res, regime_a, regime_b, regime_field, seed=11, speed
         "checkpointInterval": 5.0,
     }
     if regime_field:
-        g.update({"regimeField": regime_field, "feedB": fb, "killB": kb})
+        # the regime is baked once a frame into a coarse plane (ADR-1407) and the RD reads that: evaluating a compound
+        # with fbm in it per cell per iteration cost ~8 ms of the 9 ms simulation (performance.md)
+        s.grid(name=name + "Regime", mode="bake", wrap=wrap, resolution=[128, 1, 128],
+               boundsMin=[-size / 2, y[0], -size / 2], boundsMax=[size / 2, y[1], size / 2], injectField=regime_field)
+        s.grid_reader(name + "RegimeMap", name + "Regime")
+        g.update({"regimeField": name + "RegimeMap", "feedB": fb, "killB": kb})
     if inject:
         g.update({"injectField": inject, "injectRate": inject_rate})
     s.grid(**g)
@@ -193,7 +198,7 @@ def relief(pal_name="ivory", autonomous=False):
     """C1: the pattern as relief on a plain seen from low, raked by one light; the regime frontier wanders."""
     pal = common_palette(pal_name)
     s = common.Scene("rd-relief", DESIGNS["relief"]["title"], design("relief"))
-    size, res = 96.0, 512
+    size, res = 96.0, 384  # 512^2 at 16 iterations cost 11.5 ms of GPU (performance.md); 384^2 at 12 costs ~5
     # the regime map: a slow fbm drifting across the plain (coral where it is low, cells where it is high)
     # the regime map: a pool of cells in the middle distance (a radial field), its shore made irregular and kept
     # wandering by a slow fbm: coral outside, cells inside, and the frontier between them never still
@@ -205,7 +210,7 @@ def relief(pal_name="ivory", autonomous=False):
     # autonomous disturbance; the music adds its own)
     s.field("brush", {"kind": "sphere", "radius": 1.6, "softness": 0.8}, position=(0.0, 0.0, 6.0))
     common.lissajous_track(s, "field/brush/position", (-2.0, 0.0, 8.0), (16.0, 12.0), 61.0, ratio=(2, 3))
-    rd_grid(s, "pattern", size, res, "coral", "cells", "regime", inject="brush", inject_rate=1.5)
+    rd_grid(s, "pattern", size, res, "coral", "cells", "regime", inject="brush", inject_rate=1.5, speed_iters=12)
     s.grid_reader("relief", "pattern")
     # the ground: a valley that rises on every side to a far rim higher than the camera, so the pattern fills the
     # frame and no horizon or sky shows (the owner's rule: no flat plane, no world edge); its rows and columns are
@@ -233,7 +238,7 @@ def relief(pal_name="ivory", autonomous=False):
            extra={"normalStep": 0.08})
     if not autonomous:
         rd_music(s, "pattern", focal=(-6.0, 0.0, -2.0), relief="procedural/plain/deform/1/amount", prog=g)
-    lights(s, pal, key_dir=[0.75, -0.42, -0.5], fog=0.0008)
+    lights(s, pal, key_dir=[0.75, -0.42, -0.5], fog=0.0)  # the march cost 7 ms; the valley needs no air
     s.camera = {"mode": 1, "position": [8.0, 30.0, 50.0], "target": [-6.0, 8.0, -30.0], "fov": 40.0, "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(3.0, 0.6, 2.0), tamp=(2.0, 0.3, 0.0),
                    steps=8)
@@ -305,9 +310,12 @@ def bloom(pal_name="garnet", autonomous=False):
     s.field("brush", {"kind": "sphere", "radius": 1.4, "softness": 0.7}, position=(0.0, 0.0, R0))
     common.lissajous_track(s, "field/brush/position", (0.0, 0.0, 0.0), (R0, R0), 53.0, ratio=(1, 1),
                            phase=(0.0, 0.25))
+    s.grid(name="regimeBake", mode="bake", wrap="clamp", resolution=[24, 24, 24], boundsMin=[-half] * 3,
+           boundsMax=[half] * 3, injectField="regime")
+    s.grid_reader("regimeMap", "regimeBake")
     s.grid(name="pattern", mode="reactionDiffusion", wrap="clamp", resolution=[100, 100, 100],
            boundsMin=[-half] * 3, boundsMax=[half] * 3, diffusionA=0.16, diffusionB=0.08,
-           feed=REGIMES3["worms"][0], kill=REGIMES3["worms"][1], regimeField="regime",
+           feed=REGIMES3["worms"][0], kill=REGIMES3["worms"][1], regimeField="regimeMap",
            feedB=REGIMES3["cells"][0], killB=REGIMES3["cells"][1], injectField="brush", injectRate=1.2,
            simRate=60.0, maxSubSteps=4, speed=60.0 * 10, iterations=20, seed=13, seedAmount=1.0,
            checkpointInterval=5.0)
@@ -345,11 +353,12 @@ def pins(pal_name="ember", autonomous=False):
     by the pins' tips."""
     pal = common_palette(pal_name)
     s = common.Scene("rd-pins", DESIGNS["pins"]["title"], design("pins"))
-    size, res, n = 64.0, 384, 200
+    size, res, n = 64.0, 320, 200
     s.field("regimeDrift", {"kind": "noise", "frequency": 0.06, "speed": 0.1, "seed": 21, "strength": 1.2})
     s.field("brush", {"kind": "sphere", "radius": 1.5, "softness": 0.8}, position=(0.0, 0.0, 0.0))
     common.lissajous_track(s, "field/brush/position", (0.0, 0.0, 2.0), (18.0, 14.0), 57.0, ratio=(2, 1))
-    rd_grid(s, "pattern", size, res, "maze", "spots", "regimeDrift", inject="brush", inject_rate=1.5, seed=17)
+    rd_grid(s, "pattern", size, res, "maze", "spots", "regimeDrift", inject="brush", inject_rate=1.5, seed=17,
+            speed_iters=12)
     s.grid_reader("relief", "pattern")
     g = relief_program(pal, "rdPins", tip=True)
     s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
@@ -368,7 +377,7 @@ def pins(pal_name="ember", autonomous=False):
            material={"program": gf.name, "baseColor": [1, 1, 1], "roughness": 0.8, "metallic": 0.0})
     if not autonomous:
         rd_music(s, "pattern", focal=(2.0, 0.0, -2.0), prog=g, kick_speed=9.0, pool="regimeDrift")
-    lights(s, pal, key_dir=[0.55, -0.5, -0.67], fog=0.002)
+    lights(s, pal, key_dir=[0.55, -0.5, -0.67], fog=0.0)
     s.camera = {"mode": 1, "position": [-10.0, 24.0, 24.0], "target": [2.0, 0.0, -2.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=80.0, amp=(4.0, 1.0, 2.0), tamp=(2.0, 0.3, 0.0),

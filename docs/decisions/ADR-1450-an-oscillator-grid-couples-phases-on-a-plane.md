@@ -80,8 +80,10 @@ so a run is bit-exact and a seek replays exactly.
 
 - **Readers need nothing new.** A `grid` field with `channel` 0-3 reads it everywhere (ADR-1201's channel
   selector). `shaders/fields.wgsl` is unchanged.
-- **Cost.** About 50 neighbour reads per cell per coupling pass at radius 3: ~0.1-0.2 ms for 256² on an M2 Max
-  (measured in `docs/prototypes/generative-rd/performance.md`).
+- **Cost.** About 50 neighbour reads per cell per coupling pass at radius 4. The Gaussian weights are separable,
+  `g[|dx|] g[|dz|]`, which is five exponentials per cell instead of one per neighbour. Measured on an M2 Max by A/B
+  (the grid on versus off): 2.6 ms of GPU for a 384² lattice at r = 4 (6.3 ms before the separable weights), and
+  0.2 ms for 300 × 128. See `docs/prototypes/generative-rd/performance.md`.
 - **Local coupling freezes phase vortices.** On a lattice started from random phases, local coupling leaves vortices,
   the 2D XY model's topological defects. Their global order stalls near 0.7. They are a visual feature (R marks
   them), and links or an ordered start remove them.

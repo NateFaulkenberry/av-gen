@@ -394,7 +394,7 @@ def streams(pal_name="ember", autonomous=False):
     for k, (x0, n_across) in enumerate(((-76.0, 90), (-50.0, 70), (-20.0, 70), (12.0, 70), (40.0, 60))):
         zc = float(centre(np.array(x0)))
         s.proc("rake%d" % k, {"kind": "fiber", "fiberLength": 60.0 - 5.0 * k, "fiberWidth": 0.05, "fiberTaper": 0.6,
-                              "fiberSegments": 64, "fiberMinPixels": 0.9},
+                              "fiberSegments": 40, "fiberMinPixels": 0.9},
                distribution={"kind": "grid", "gridCount": [1, 3, n_across], "gridSpacing": [1.0, 1.1, 22.0 / n_across]},
                transform={"position": [x0, 1.6, zc], "rotation": [0, 0, -90], "scale": [1, 1, 1]},
                variation={"seed": 3 + k, "position": [0.4, 0.3, 0.15]},
@@ -402,7 +402,7 @@ def streams(pal_name="ember", autonomous=False):
                deformers=[{"kind": "streamline", "space": "world", "field": flow, "amount": 2.5, "falloff": 0.0,
                            "tension": 0.0}],
                extra={"lod": {"cull": True, "maxDistance": 0.0, "count": 1}})
-    environment(s, pal, key_dir=[0.5, -0.6, -0.62], fog=0.0006)
+    environment(s, pal, key_dir=[0.5, -0.6, -0.62], fog=0.0)
     s.camera = {"mode": 1, "position": [4.0, 54.0, 46.0], "target": [-24.0, 0.0, 2.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(2.0, 0.6, 1.5), tamp=(1.5, 0.3, 0.0),

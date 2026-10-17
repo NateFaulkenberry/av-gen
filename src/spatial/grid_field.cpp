@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace avgen::spatial {
@@ -478,13 +479,19 @@ void oscCouple(GridField& g, const GridField& previous, float dtIt, double time,
                 sumW += w;
                 sumWX += w * x;
             };
+            // exp(-(dx^2 + dz^2) / 2s^2) = gauss[|dx|] gauss[|dz|], as cs_oscillate computes it
+            std::array<float, 5> gauss{};
+            for (int q = 0; q <= r; ++q) {
+                gauss[static_cast<std::size_t>(q)] = std::exp(-static_cast<float>(q * q) * inv2s2);
+            }
             for (int dz = -r; dz <= r; ++dz) {
                 for (int dx = -r; dx <= r; ++dx) {
                     const int d2 = dx * dx + dz * dz;
                     if (d2 == 0 || d2 > r * r + r) {
                         continue;
                     }
-                    add(i + dx, k + dz, std::exp(-static_cast<float>(d2) * inv2s2));
+                    add(i + dx, k + dz, gauss[static_cast<std::size_t>(std::abs(dx))] *
+                                            gauss[static_cast<std::size_t>(std::abs(dz))]);
                 }
             }
             for (int l = 0; l < links; ++l) {

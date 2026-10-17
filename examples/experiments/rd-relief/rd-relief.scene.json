@@ -29,7 +29,7 @@
    0.01411,
    0.01156
   ],
-  "volumeDensity": 0.0008,
+  "volumeDensity": 0.0,
   "fogSky": 1.0,
   "fogHeight": 400.0,
   "fogHeightFalloff": 0.0,
@@ -155,6 +155,28 @@
     "kind": "sphere",
     "radius": 1.6,
     "softness": 0.8
+   }
+  },
+  {
+   "name": "patternRegimeMap",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "patternRegime"
    }
   },
   {
@@ -583,13 +605,34 @@
  ],
  "grids": [
   {
+   "name": "patternRegime",
+   "mode": "bake",
+   "wrap": "wrap",
+   "resolution": [
+    128,
+    1,
+    128
+   ],
+   "boundsMin": [
+    -48.0,
+    -3.0,
+    -48.0
+   ],
+   "boundsMax": [
+    48.0,
+    3.0,
+    48.0
+   ],
+   "injectField": "regime"
+  },
+  {
    "name": "pattern",
    "mode": "reactionDiffusion",
    "wrap": "wrap",
    "resolution": [
-    512,
+    384,
     1,
-    512
+    384
    ],
    "boundsMin": [
     -48.0,
@@ -607,12 +650,12 @@
    "kill": 0.062,
    "simRate": 60.0,
    "maxSubSteps": 4,
-   "speed": 960.0,
-   "iterations": 16,
+   "speed": 720.0,
+   "iterations": 12,
    "seed": 11,
    "seedAmount": 1.0,
    "checkpointInterval": 5.0,
-   "regimeField": "regime",
+   "regimeField": "patternRegimeMap",
    "feedB": 0.0367,
    "killB": 0.0649,
    "injectField": "sources",
