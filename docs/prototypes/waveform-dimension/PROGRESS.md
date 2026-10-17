@@ -156,3 +156,33 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
      - Thin film (320 nm) was tried: no visible gain, so it was not kept.
    - Media: `stage-d/`, including the capture clips (idle, standing wave, travelling, dense, Hyperborea) and the
      neutral probe clip showing the large-scale motion.
+10. **Stage D review and the owner's colour direction** ("way more colourful, colour shifting").
+    - **The glow** is now a contour band of the reinforcement field (|D| 3-6 m), with accent cores only above 9 m: rings
+      along the folds instead of round blobs.
+      - Tried: crests by screen-space convexity. Blocky.
+    - **Every sheet's edge** carries a dim contour line, and the outer sheets' a crimson one.
+    - **The lit faces carry colour:** a grazing key, a rim from behind, and albedos about twice as bright.
+    - **Eight designed palettes**, bound by role (`palette_block`): Indigo Crimson (the owner's), Ultramarine Gold,
+      Ember Rose, Teal Amber, Magenta Lime, Glacier Violet, Jade Coral, Cyan Fuchsia. Each binds bg, shadow,
+      secondary, primary, key, rim, fill, band, highlight, contour, edge and peak to the fog, the sky, the lights and
+      the program's ramps.
+    - **The selector (ADR-1420):** phrase advance, a 24 s hold, a 5 s OKLab blend and a composed order. ADR-1421
+      (cherry-picked from proto/cymatic-split, `d20eada6`) adds the energy-change fallback for live input with no
+      tempo: `sonic.energy`, `sonic.brightness` and `sonic.density`, fast 3 s, slow 24 s, maxHold 75 s.
+    - **MIDI:** CC 10 selects a palette and CC 11 locks it.
+    - **The glow's and edges' brightness** moved to their own constants, because the palette's replace bindings own
+      the ramps.
+11. **Stage E.**
+    - Merged origin/main (6cedd14c: ADR-1363 and ADR-1420).
+    - The scene is registered in `examples/index.json`: category "Resonator", `live: true`, `sonic.live`, the MIDI map
+      in the description.
+    - The prototype and profiling code is removed from the generator.
+    - The surface-nets cell is 1.8 m, because vertex cost dominated the live profile.
+    - Live profile at Auto: High (0.85) with 0 deadline misses on Feline, Trench and Hyperborea. Per-level figures are
+      in `02-report.md`.
+
+## Resume
+
+Everything requested is done; see `02-report.md`. To change the look, edit `tools/waveform_dimension/build.py` (the
+carrier and the openings are in `levelsets.py`) and re-run it. It rewrites the scene, the project, the meshes and
+the index entry. `WD_NEUTRAL=1 WD_OUT=<dir>` writes the grey review variant.
