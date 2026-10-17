@@ -323,7 +323,7 @@ The scenarios were rendered from the shipped project, with palettes advancing on
 | 8 sustained mid, 9 loud → quiet | `08-09-...-186-208s` | Oxidized Metal: grazing copper-gold on the walls, settling dark as the track quietens |
 | 10 second tracks | `10a-...-trench-50-60s`, `10b-...-hyperborea-110-120s` | The same hierarchy on other music |
 
-## Checks (head `810fa734` plus this report)
+## Checks (head `810fa734` plus this report; re-run at `762ccab0` after the ADR-1421 fallback: cpu-assets 4307 passed, gpu 665 passed, review ok 2, integrity 0)
 
 - `tools/ci/run-suite.sh cpu-assets`: **PASS**, 4301 passed, 0 failed, 19 skipped, 1 expected failure (ran 4321/4321).
 - `tools/ci/run-suite.sh gpu`: **PASS**, 665 passed, 0 failed, 1 skipped (ran 666/666).
