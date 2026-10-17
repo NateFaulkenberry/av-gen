@@ -251,3 +251,141 @@ TEST_CASE("Palette selector: a jump in time restarts at the selected state, dete
     bad["selector"]["select"] = 7;
     CHECK_FALSE(params::Palette::fromJson(bad).has_value());
 }
+
+// ---- ADR-1421: the change trigger (a large, sustained change in the music while the primary is quiet) -------------
+
+namespace {
+
+nlohmann::json withChange(nlohmann::json j, float maxHold = 0.0f, float threshold = 0.2f) {
+    j["selector"]["advance"]["change"] = {{"signals", {"test.level"}}, {"fast", 1.0}, {"slow", 8.0},
+                                          {"threshold", threshold}, {"rearm", 0.08}, {"primaryTimeout", 12.0},
+                                          {"maxHold", maxHold}};
+    return j;
+}
+
+// Steps the rig every 0.1 s from `from` to `to` with the level at `level` (and a primary pulse at the times listed).
+void hold(Rig& rig, double from, double to, float level, std::initializer_list<double> pulses = {}) {
+    rig.bus.set(rig.level, level);
+    for (double t = from; t < to - 1e-9; t += 0.1) {
+        bool pulse = false;
+        for (double p : pulses) {
+            pulse = pulse || std::abs(p - t) < 0.05;
+        }
+        rig.frame(t, pulse ? 1.0f : 0.0f);
+    }
+}
+
+} // namespace
+
+TEST_CASE("Palette change trigger: with no primary pulse an energy change advances, the hold and the lock still apply",
+          "[palette][adr1421]") {
+    Rig rig(withChange(paletteJson(true, "test.pulse")));
+    hold(rig, 0.0, 20.0, 0.2); // steady: the primary has been quiet 12 s, but nothing has changed
+    CHECK(rig.palette.selectedState() == 0);
+    hold(rig, 20.0, 24.0, 0.9); // a build arrives: fast pulls away from slow -> advance (order 0, 2, 1)
+    CHECK(rig.palette.selectedState() == 2);
+    // Still loud: the change stays above the re-arm level for a while, and the hold (5 s) is running -- no re-fire
+    hold(rig, 24.0, 27.0, 0.9);
+    CHECK(rig.palette.selectedState() == 2);
+    // It settles (the averages meet, re-arming), then a breakdown: one more advance, after the hold
+    hold(rig, 27.0, 60.0, 0.9);
+    CHECK(rig.palette.selectedState() == 2);
+    hold(rig, 60.0, 64.0, 0.1);
+    CHECK(rig.palette.selectedState() == 1);
+    // Locked: a change does nothing
+    rig.palette.lockParam->setBase(1.0f);
+    hold(rig, 64.0, 100.0, 0.1);
+    hold(rig, 100.0, 104.0, 0.9);
+    CHECK(rig.palette.selectedState() == 1);
+}
+
+TEST_CASE("Palette change trigger: two changes within the hold advance once", "[palette][adr1421]") {
+    nlohmann::json j = withChange(paletteJson(true, "test.pulse"));
+    j["selector"]["hold"] = 24.0;
+    Rig rig(j);
+    hold(rig, 0.0, 30.0, 0.2);
+    hold(rig, 30.0, 34.0, 0.9); // advance 0 -> 2
+    REQUIRE(rig.palette.selectedState() == 2);
+    hold(rig, 34.0, 45.0, 0.9); // settle and re-arm
+    hold(rig, 45.0, 50.0, 0.1); // a second change 15 s later: inside the 24 s hold
+    CHECK(rig.palette.selectedState() == 2);
+}
+
+TEST_CASE("Palette change trigger: while the primary pulses, energy changes are not heard", "[palette][adr1421]") {
+    Rig rig(withChange(paletteJson(true, "test.pulse")));
+    // a phrase every 8 s; the hold is 5 s, so each pulse advances (0 -> 2 -> 1 -> 0 ...)
+    hold(rig, 0.0, 20.0, 0.2, {7.0, 15.0});
+    const int afterPulses = rig.palette.selectedState();
+    CHECK(afterPulses == 1);
+    // a big energy change between pulses: ignored (the primary fired 5 s ago, inside its 12 s timeout)
+    hold(rig, 20.0, 22.5, 0.9);
+    CHECK(rig.palette.selectedState() == afterPulses);
+    // the primary goes quiet: 12 s after its last pulse the change trigger takes over
+    hold(rig, 22.5, 40.0, 0.9);
+    hold(rig, 40.0, 44.0, 0.1);
+    CHECK(rig.palette.selectedState() != afterPulses);
+}
+
+TEST_CASE("Palette change trigger: maxHold advances a long uniform passage", "[palette][adr1421]") {
+    Rig rig(withChange(paletteJson(true, "test.pulse"), 30.0f));
+    hold(rig, 0.0, 29.0, 0.4);
+    CHECK(rig.palette.selectedState() == 0);
+    hold(rig, 29.0, 31.0, 0.4);
+    CHECK(rig.palette.selectedState() == 2);
+}
+
+TEST_CASE("Palette change trigger: a selector without one (ADR-1420 as authored) is unchanged", "[palette][adr1421]") {
+    // The JSON: no `change` key appears, and the round trip is exact.
+    const nlohmann::json plain = paletteJson(true, "test.pulse");
+    auto parsed = params::Palette::fromJson(plain);
+    REQUIRE(parsed.has_value());
+    CHECK_FALSE(parsed->selector.change.enabled);
+    const nlohmann::json out = parsed->toJson();
+    CHECK_FALSE(out["selector"]["advance"].contains("change"));
+    CHECK(out["selector"] == params::Palette::fromJson(out)->toJson()["selector"]);
+    // The behaviour: a scripted run (pulses, levels, a lock, a manual select) is bit-identical to the same run with a
+    // change block that can never fire -- the primary path is untouched by the new code.
+    const auto script = [](Rig& rig) {
+        std::vector<glm::vec3> colours;
+        for (int k = 0; k <= 600; ++k) {
+            const double t = 0.1 * k;
+            rig.bus.set(rig.level, 0.5f + 0.4f * static_cast<float>(std::sin(t * 0.7)));
+            if (k == 300) {
+                rig.palette.lockParam->setBase(1.0f);
+            }
+            if (k == 420) {
+                rig.select(1.0f);
+            }
+            const bool pulse = k % 70 == 35;
+            colours.push_back(rig.frame(t, pulse ? 1.0f : 0.0f));
+        }
+        return colours;
+    };
+    Rig a(plain);
+    Rig b(withChange(plain, 0.0f, 1.0e6f));
+    const auto ca = script(a);
+    const auto cb = script(b);
+    REQUIRE(ca.size() == cb.size());
+    bool identical = true;
+    for (std::size_t i = 0; i < ca.size(); ++i) {
+        identical = identical && ca[i] == cb[i];
+    }
+    CHECK(identical);
+    CHECK(a.palette.selectedState() == b.palette.selectedState());
+}
+
+TEST_CASE("Palette change trigger: JSON round trip and validation", "[palette][adr1421]") {
+    auto p = params::Palette::fromJson(withChange(paletteJson(true, "test.pulse"), 75.0f));
+    REQUIRE(p.has_value());
+    CHECK(p->selector.change.enabled);
+    CHECK(p->changeSignals() == std::vector<std::string>{"test.level"});
+    const auto back = params::Palette::fromJson(p->toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->toJson() == p->toJson());
+    nlohmann::json bad = withChange(paletteJson(true, "test.pulse"));
+    bad["selector"]["advance"]["change"]["rearm"] = 0.5; // above the threshold: no hysteresis
+    CHECK_FALSE(params::Palette::fromJson(bad).has_value());
+    bad = withChange(paletteJson(true, "test.pulse"));
+    bad["selector"]["advance"]["change"].erase("signals");
+    CHECK_FALSE(params::Palette::fromJson(bad).has_value());
+}
