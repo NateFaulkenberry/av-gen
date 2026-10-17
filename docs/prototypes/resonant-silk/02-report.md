@@ -98,9 +98,9 @@ The music reaches the sheet through these readers:
 
 | Input | Field | What the cloth does |
 |---|---|---|
-| Sub and bass, held | Resonator, point source behind the wall, modes 40-~400 Hz, lambda 220-60 m, attack 0.8 s / release 4 s | broad bows build, hold and ring down (`final/sustained-55hz-drone.png`) |
+| Sub and bass, held | Resonator, point source behind the wall, modes 40-250 Hz, lambda 220-80 m, attack 0.8 s / release 4 s | broad bows build, hold and ring down (`final/sustained-55hz-drone.png`) |
 | Bass, moving | `spectrum` 0-0.22 band x a 150 m carrier, travelling out from the gather at 65 m/s | a swell runs along the wall over several beats |
-| Middle band | the resonator's second source, below the sheet (order 3, drifting) | curved creases across the pleats (`mids-330hz-creases.png`) |
+| Middle band | the resonator's second source, beside the wall (250 Hz-4 kHz, order 3, 2.6x wavenumber: lambda 27-7 m, drifting) | creases a few tens of metres long across the pleats (`mids-330hz-creases.png`) |
 | Kick | `onset` low, from the gather, 34 m/s, 14 m wide, decay 0.9/s | a front leaves the ring across both halves and dies away, lit in the resonant colour (`transient-kick-front.png`) |
 | Snare | `onset` mid, from mid-wall, 55 m/s, 5 m wide, decay 2.2/s | a quick local front on the wall |
 | Treble | the analysis treble, uniform | a fine sheen on the folds' turning edges only (`highs-hats-sheen.png`) |
@@ -260,9 +260,21 @@ matter. Vertex count is the lever.
 - **The geometry-only view** is lit by the authored default light colours (teal and violet), not neutral grey light.
 - **No silk anisotropy.** The anisotropy tangent on procedural geometry is the object's +Y, not the UV direction.
   With UV tangents, the highlight could stretch along the fibres.
+- **The middle band's creases are subtle on a pure tone.** At 330 Hz the probe shows them only faintly: the
+  low modes' idle and the limiter share the energy, and a crease along the wall's mean normal reads mostly as
+  shading. In real music they add up with the strikes. A material term for "resonant colour bands", which was
+  dropped for its per-pixel cost, would make them read.
 - **Dense, broadband passages** still crowd the wall with creases and fronts at once. A route of
   `response.intensity` onto the fronts' gain, opposite to the modes, would thin them when the mix is full.
 
 ## 9. Final checks
 
-CHECKS_TABLE
+Run once at the end, on `1c4772b7`. That commit is the scene and generator; ADR-1420 and its fix, and ADR-1421
+cherry-picked, are all included. Each figure is the binary's own exit code.
+
+| Check | Result | Exit |
+|---|---|---|
+| `tools/ci/run-suite.sh cpu-assets` (under the GPU lock) | PASS: 4306 passed, 0 failed, 19 skipped, 1 expected failure, 4326/4326 ran | 0 |
+| `tools/ci/run-suite.sh gpu` | PASS: 665 passed, 0 failed, 1 skipped, 666/666 ran | 0 |
+| `python3 tools/review_examples.py --only "Resonant Silk"` | ok (the scene opens through the Examples menu and renders) | 0 |
+| `python3 tools/check_project_integrity.py` | 0 problems | 0 |
