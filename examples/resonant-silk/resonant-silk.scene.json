@@ -127,7 +127,7 @@
        "bandLow": 0.5,
        "bandHigh": 1.0,
        "gain": 1.0,
-       "amplitude": 0.26,
+       "amplitude": 0.45,
        "drift": 14.0,
        "driftPeriod": 40.0,
        "spin": 0.05

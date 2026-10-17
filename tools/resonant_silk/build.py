@@ -529,7 +529,7 @@ def fields(s):
             {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.5,
              "gain": 1.0, "amplitude": 1.0},
             {"kind": "point", "position": [20.0, -40.0, -70.0], "order": 3, "bandLow": 0.5, "bandHigh": 1.0,
-             "gain": 1.0, "amplitude": 0.26, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
+             "gain": 1.0, "amplitude": 0.45, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
         ],
         "channel": "displacement",
     }
