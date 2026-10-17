@@ -6,13 +6,19 @@
     then: avgen --headless --project <project.json> --audio assets/audio/feline-footwear.wav --render ...
 
 Writes examples/waveform-dimension/{waveform-dimension.json, waveform-dimension.scene.json, meshes/*.glb} and the
-scene's entry in examples/index.json.
+scene's entry in examples/index.json (WD_OUT=<dir> writes a look-development copy there instead, with no index entry).
 
-A live scene: one three-dimensional resonance field (FieldKind::Resonance, ADR-1400) excited by the audio history,
-turned into a sculpture of curved surfaces. Stage A prototypes (WD_PROTO, build-time):
-    A  nested isosurfaces  -- the field's level sets, sphere-traced (SDF displaceField over the field)
-    B  contour sheets      -- designed curved sheets displaced along their normals by the field
-    C  hybrid              -- the designed sheets, plus iso-membranes where the field is strongest
+A live scene: one three-dimensional field turned into a sculpture of nested curved sheets. The field has two parts:
+  - the CARRIER (levelsets.py): the standing interference of three long spherical waves from far outside the frame.
+    Its level sets are the sculpture's large, nested, curved sheets; a second, shorter interference (the APERTURE)
+    opens them. Static: the sculpture's identity.
+  - the RESONANCE (FieldKind::Resonance, ADR-1400): one resonator excited by the audio history, whose modes move the
+    sheets (bass lobes, low-mid folds, mid bands, treble ridges) and light them.
+Stage A prototypes (WD_PROTO, build-time):
+  A  nested isosurfaces  -- the level sets of carrier + resonance, sphere-traced (SDF), true topology changes
+  B  contour sheets      -- designed parametric sheets displaced along their normals by the resonance
+  C  hybrid              -- the carrier's level sets extracted as meshes, opened by the aperture, displaced by the
+                            resonance on the GPU (fixed topology)
 """
 from __future__ import annotations
 
@@ -30,18 +36,16 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, REPO)
 from tools.sonic_vfx import kit  # noqa: E402
 from tools.sonic_vfx.kit import R, hexrgb  # noqa: E402
+from tools.waveform_dimension import levelsets  # noqa: E402
 
 SID = "waveform-dimension"
 TITLE = "Waveform Dimension"
-# WD_OUT: write a look-development copy elsewhere (its own meshes; no index entry)
 OUT = os.environ.get("WD_OUT") or os.path.join(REPO, "examples", SID)
 MESH_DIR = os.path.join(OUT, "meshes")
 
-PROTO = os.environ.get("WD_PROTO", "A")
-ISO = os.environ.get("WD_ISO", "membrane")   # prototype A's level-set family: membrane | lobes | shells
-ISO_C = float(os.environ.get("WD_C", "0.2"))
+PROTO = os.environ.get("WD_PROTO", "C")
 NEUTRAL = os.environ.get("WD_NEUTRAL", "0") == "1"   # grey material, white light, no emission, no post
-DEBUG = os.environ.get("WD_DEBUG", "")      # slice: a vertical plane through the field coloured by F (blue -, red +)
+DEBUG = os.environ.get("WD_DEBUG", "")               # slice: planes through the field coloured by the resonance
 
 # ================================================================================================ palette
 # The owner's corrected palette (00-brief.md, appended): red spectral energy trapped inside a vast indigo-violet
@@ -61,18 +65,17 @@ def C(key, scale=1.0):
     return hexrgb(P[key], scale)
 
 
-# ================================================================================================ the field
-# ONE RESONATOR, FOUR FAMILIES (a source each, so each keeps its own energy budget: competition and the limiter act per
-# source). The dispersion axis gives every band its scale:
-#   L   bass       u 0-0.2     point modes, 100-62 m: broad lobes about the chamber's middle -- they move the level
-#   A   low mids   u 0.25-0.45 plane waves, 53-38 m   } three families of plane waves, each read in its own turned
-#   B   mids       u 0.45-0.68 plane waves, 33-20 m   } frame: their sum is a curved, aperiodic relative of the
-#   C   highs      u 0.7-1     plane waves, 17-9 m    } triply periodic minimal surfaces (three wavelengths, three
-#                                                        directions, never a cubic grid), and its nodal surface F = 0
-#                                                        is one continuous membrane weaving through space
+# ================================================================================================ the resonance
+# One resonator, four families (a source each, so each keeps its own energy budget). The dispersion axis gives every
+# band its scale:
+#   L  bass      u 0-0.2      point modes, 70-44 m: broad lobes about the sculpture's middle
+#   A  low mids  u 0.25-0.45  plane waves, 39-25 m: heard THREE times, in three frames 66-69 degrees apart -- the
+#                             readers share A's modes (wavelength and phase), so their sum is a coherent, aperiodic
+#                             relative of the triply periodic minimal surfaces: folds in every direction, never a grid
+#   B  mids      u 0.45-0.68  plane waves, 24-15 m: travelling interference bands (they drift)
+#   C  highs     u 0.7-1      plane waves, 13-7 m: fine ridges and highlights
 # A lattice source's modes share one orientation, so a family keeps its direction while the music moves its weight
-# between wavelengths. `drive` keeps every family faintly ringing in silence (idle reaches only the three lowest
-# modes); `spin` turns each family's direction slowly, so the sculpture evolves over a phrase.
+# between wavelengths. `drive` keeps every family faintly ringing in silence (idle reaches only the lowest modes).
 FIELD = "wave"
 LAYOUT = 16.0
 SOURCES = [
@@ -85,37 +88,27 @@ SOURCES = [
      "orders": [1], "focus": 0.33, "focusWidth": 0.07, "focusSweep": 0.06, "focusPeriod": 61.0, "focusFloor": 0.3,
      "drive": 0.35},
     {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 1, "bandLow": 0.45, "bandHigh": 0.68, "reach": 0.0,
-     "gain": 1.0, "amplitude": 0.45, "breath": 0.35, "drift": 7.0, "driftPeriod": 83.0, "spin": -0.002,
+     "gain": 1.0, "amplitude": 0.6, "breath": 0.35, "drift": 14.0, "driftPeriod": 53.0, "spin": -0.002,
      "orders": [1], "focus": 0.53, "focusWidth": 0.07, "focusSweep": 0.07, "focusPeriod": 47.0, "focusFloor": 0.3,
      "drive": 0.3},
     {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 1, "bandLow": 0.7, "bandHigh": 1.0, "reach": 0.0,
-     "gain": 1.0, "amplitude": 0.18, "breath": 0.6, "drift": 4.0, "driftPeriod": 59.0, "spin": 0.003,
+     "gain": 1.0, "amplitude": 0.25, "breath": 0.6, "drift": 4.0, "driftPeriod": 59.0, "spin": 0.003,
      "orders": [1, 2], "focus": 0.8, "focusWidth": 0.08, "focusSweep": 0.1, "focusPeriod": 37.0, "focusFloor": 0.2,
      "drive": 0.2},
 ]
-# The readers. F (one compound) = the low-mid family A heard THREE times, in three frames whose wave directions lie
-# 66-69 degrees apart (seed 11's lattice orientation), plus the bass lobes. Because the three readers share A's modes
-# -- the same wavelength, the same phase -- their sum is coherent: the curved, aperiodic relative of a triply periodic
-# minimal surface, whose nodal surface F = 0 is one membrane weaving through space with tunnels, saddles and openings.
-# Fd (a second compound) = the mids family B (travelling interference bands, one direction, between the triple's), the
-# highs family C (fine ridges), the transient front and the chamber.
-# (name, listen band, frame rotation (degrees), strength, position)
-CHAMBER = [0.0, 0.0, 0.0]
-READERS = [
-    ("f-a1", (0.25, 0.45), [0.0, 0.0, 0.0], 1.0, [0.0, 0.0, 0.0]),
-    ("f-a2", (0.25, 0.45), [-60.0, 0.0, 30.0], 1.0, [0.0, 0.0, 0.0]),
-    ("f-a3", (0.25, 0.45), [50.0, 0.0, -60.0], 1.0, [0.0, 0.0, 0.0]),
-    ("f-l", (0.0, 0.2), [0.0, 0.0, 0.0], 1.0, CHAMBER),
-]
-DETAIL = [
-    ("f-b", (0.45, 0.68), [40.0, 0.0, -30.0], 1.0, [0.0, 0.0, 0.0]),
-    ("f-c", (0.7, 1.0), [20.0, 0.0, 50.0], 1.0, [0.0, 0.0, 0.0]),
-]
+# name -> (listen band, frame rotation in degrees)
+READERS = {
+    "a1": ((0.25, 0.45), [0.0, 0.0, 0.0]),
+    "a2": ((0.25, 0.45), [-60.0, 0.0, 30.0]),
+    "a3": ((0.25, 0.45), [50.0, 0.0, -60.0]),
+    "l": ((0.0, 0.2), [0.0, 0.0, 0.0]),
+    "b": ((0.45, 1.0), [40.0, 0.0, -30.0]),
+}
 
 
 def resonator(s):
     res = {
-        "modes": LAYOUT, "layout": LAYOUT, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 100.0, "lambdaMin": 9.0,
+        "modes": LAYOUT, "layout": LAYOUT, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 70.0, "lambdaMin": 7.0,
         "scale": 1.0, "selectivity": 3.0, "contrast": 0.55, "persistence": 3.0, "buildup": 0.3, "memory": 2.0,
         "sustain": 1.0, "transient": 0.7, "idle": 0.5, "breath": 0.1, "limit": 1.0, "competition": 1.2,
         "attack": [0.3, 0.12, 0.05], "release": [4.0, 2.0, 0.8],
@@ -126,50 +119,54 @@ def resonator(s):
                               "resonance": res}})
 
 
-def reader(s, name, channel, extra=None, rotation=None, strength=1.0, position=(0.0, 0.0, 0.0)):
-    r = {"channel": channel}
-    r.update(extra or {})
-    n = {"name": name, "kind": "field", "position": [float(v) for v in position],
-         "field": {"kind": "resonance", "reference": FIELD, "strength": float(strength), "falloff": {"kind": "none"},
-                   "resonance": r}}
+def field(s, name, spec, position=(0.0, 0.0, 0.0), rotation=None, scale=None):
+    n = {"name": name, "kind": "field", "position": [float(v) for v in position], "field": spec}
     if rotation:
         n["rotation"] = [float(v) for v in rotation]
+    if scale:
+        n["scale"] = [float(v) for v in scale]
     s.nodes.append(n)
 
 
-FAMILIES = os.environ.get("WD_FAMILIES", "")  # comma list of reader names to keep (empty = all)
-CHAMBER_SIZE = (38.0, 30.0, 3.2)              # radius, softness (m), strength (units of F)
+def reader(s, name, channel, extra=None, rotation=None, strength=1.0, position=(0.0, 0.0, 0.0)):
+    r = {"channel": channel}
+    r.update(extra or {})
+    field(s, name, {"kind": "resonance", "reference": FIELD, "strength": float(strength), "falloff": {"kind": "none"},
+                    "resonance": r}, position, rotation)
 
 
-def field_readers(s):
-    """F = the triple and the bass (the signed slow figure plus a little vibration). Fd = the mids and highs families,
-    the transient front and the chamber, a designed bias that keeps the middle open (the membrane cannot exist where
-    |F| is lifted past c)."""
-    keep = (lambda r: not FAMILIES or r[0][2:] in FAMILIES.split(","))
-    readers = [r for r in READERS if keep(r)]
-    detail = [r for r in DETAIL if keep(r)]
-    for name, (lo, hi), rot, k, pos in readers + detail:
-        reader(s, name, "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.2,
-                                   "listenLow": lo, "listenHigh": hi, "listenWidth": 0.03}, rotation=rot, strength=k,
-               position=pos)
-    s.nodes.append({"name": "F", "kind": "field", "position": [0, 0, 0],
-                    "field": {"kind": "compound", "children": [r[0] for r in readers], "combine": "add",
-                              "strength": 1.0, "falloff": {"kind": "none"}}})
-    # a transient's wavefront: a spherical shell launched by each low onset from the chamber's middle, travelling out
-    # through the membranes and decaying (ADR-1116; exact under seek)
-    s.nodes.append({"name": "front", "kind": "field", "position": [0, 0, 0],
-                    "field": {"kind": "onset", "falloff": {"kind": "none"}, "onsetSource": "low", "audioSpeed": 30.0,
-                              "onsetWidth": 6.0, "onsetDecay": 1.2, "waveGeometry": "spherical",
-                              "point": CHAMBER, "strength": 0.6}})
-    r_, soft, k = CHAMBER_SIZE
-    s.nodes.append({"name": "chamber", "kind": "field", "position": CHAMBER, "scale": [1.5, 0.8, 1.1],
-                    "field": {"kind": "sphere", "radius": r_, "softness": soft, "strength": k,
-                              "falloff": {"kind": "none"}}})
-    s.nodes.append({"name": "Fd", "kind": "field", "position": [0, 0, 0],
-                    "field": {"kind": "compound", "children": [r[0] for r in detail] + ["front", "chamber"],
-                              "combine": "add", "strength": 1.0, "falloff": {"kind": "none"}}})
-    # the excitation (|fast figure|) of the plane-wave families, for the material's energy
-    reader(s, "F-amp", "amplitude", {"listenLow": 0.25, "listenHigh": 1.0, "listenWidth": 0.03})
+def compound(s, name, children, strength=1.0):
+    assert 1 <= len(children) <= 4, name   # a compound holds four children, one level deep (fields.wgsl)
+    field(s, name, {"kind": "compound", "children": list(children), "combine": "add", "strength": float(strength),
+                    "falloff": {"kind": "none"}})
+
+
+def resonance_fields(s, only=None):
+    """f-a1..a3, f-l, f-b: the families as signed slow figures (plus a little vibration); M = the low-mid triple; en =
+    the excitation of the mids and highs (|fast figure|), for light; front = a transient's spherical wavefront.
+    `only`: the readers to make (the SDF prototype has no room for the rest within the GPU's 16 fields)."""
+    for name, ((lo, hi), rot) in READERS.items():
+        if only and name not in only:
+            continue
+        reader(s, "f-" + name, "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.2,
+                                          "listenLow": lo, "listenHigh": hi, "listenWidth": 0.03}, rotation=rot)
+    compound(s, "M", ["f-a1", "f-a2", "f-a3"])
+    reader(s, "en", "amplitude", {"listenLow": 0.45, "listenHigh": 1.0, "listenWidth": 0.03})
+    # each low onset launches a spherical shell from the sculpture's middle, travelling out through the sheets and
+    # decaying (ADR-1116; exact under seek)
+    field(s, "front", {"kind": "onset", "falloff": {"kind": "none"}, "onsetSource": "low", "audioSpeed": 32.0,
+                       "onsetWidth": 7.0, "onsetDecay": 1.1, "waveGeometry": "spherical", "point": [0.0, 0.0, 0.0],
+                       "strength": 1.0})
+
+
+# ================================================================================================ the carrier (engine)
+def carrier_fields(s):
+    """The carrier and aperture as engine `wave` fields (exactly levelsets.py's functions), for the SDF prototype."""
+    for prefix, waves in (("w", levelsets.CARRIER), ("o", levelsets.APERTURE)):
+        for i, (c, lam, a) in enumerate(waves):
+            field(s, "%s%d" % (prefix, i), {"kind": "wave", "waveGeometry": "spherical", "point": list(c),
+                                             "wavelength": lam, "amplitude": a, "speed": 0.0, "strength": 1.0,
+                                             "falloff": {"kind": "none"}})
 
 
 # ================================================================================================ meshes
@@ -211,8 +208,9 @@ def write_glb(path, pos, nrm, uv, idx, name):
         f.write(struct.pack("<II", len(blob), 0x004E4942) + blob)
 
 
-def sheet(fn, nu, nv):
-    """A parametric sheet P = fn(u, v) over [0, 1]^2 on an nu x nv grid: positions, vertex normals, uvs, indices."""
+def sheet(fn, nu, nv, level=0.0):
+    """A parametric sheet P = fn(u, v) over [0, 1]^2 on an nu x nv grid. UV.x is the distance to the sheet's edge in
+    metres-ish units (the same convention as the level sheets: the material fades the rim), UV.y the sheet's index."""
     u, v = np.meshgrid(np.linspace(0.0, 1.0, nu), np.linspace(0.0, 1.0, nv), indexing="xy")
     pos = np.stack(fn(u, v), axis=-1).reshape(-1, 3)
     j, i = np.meshgrid(np.arange(nv - 1), np.arange(nu - 1), indexing="ij")
@@ -227,7 +225,8 @@ def sheet(fn, nu, nv):
     for k in range(3):
         np.add.at(nrm, tri[:, k], fnrm)
     nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-12
-    uv = np.stack([u.ravel(), v.ravel()], axis=1)
+    edge = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v)).ravel() * 120.0
+    uv = np.stack([edge, np.full(len(edge), level)], axis=1)
     return (pos.astype(np.float32), nrm.astype(np.float32), uv.astype(np.float32),
             tri.reshape(-1).astype(np.uint32))
 
@@ -237,7 +236,7 @@ def _wing(u, v):
     x = (u - 0.5) * 190.0
     z = (v - 0.5) * 150.0 - 10.0
     y = 0.0022 * (x * x - 1.3 * z * z) + 9.0 * np.sin(0.035 * x + 0.6) - 4.0
-    y = y + 26.0 * np.clip((-z - 30.0) / 45.0, 0.0, 1.0) ** 2   # the far edge curls up
+    y = y + 26.0 * np.clip((-z - 30.0) / 45.0, 0.0, 1.0) ** 2
     return x, y, z
 
 
@@ -245,7 +244,7 @@ def _arch(u, v):
     """The arch: a tall curved sheet sweeping 150 degrees round the sculpture's west side, leaning in at the top."""
     th = math.radians(100.0) + (u - 0.5) * math.radians(150.0)
     y = (v - 0.5) * 110.0
-    r = 62.0 - 0.0016 * y * y * 1.0 + 7.0 * np.sin(2.3 * th + 0.02 * y)
+    r = 62.0 - 0.0016 * y * y + 7.0 * np.sin(2.3 * th + 0.02 * y)
     return r * np.cos(th) - 10.0, y + 4.0, r * np.sin(th) - 6.0
 
 
@@ -261,12 +260,22 @@ def _veil(u, v):
 
 
 SHEETS = [("wing", _wing, 380, 300), ("arch", _arch, 360, 260), ("veil", _veil, 340, 240)]
+CELL = float(os.environ.get("WD_CELL", "1.0"))   # the level sheets' surface-nets cell (m)
 
 
-def write_meshes():
-    for name, fn, nu, nv in SHEETS:
-        pos, nrm, uv, idx = sheet(fn, nu, nv)
+def write_parametric_meshes():
+    for k, (name, fn, nu, nv) in enumerate(SHEETS):
+        pos, nrm, uv, idx = sheet(fn, nu, nv, float(k))
         write_glb(os.path.join(MESH_DIR, "wd-%s.glb" % name), pos, nrm, uv, idx, name)
+
+
+def write_level_meshes():
+    sizes = []
+    for i, c in enumerate(levelsets.LEVELS):
+        pos, nrm, uv, idx = levelsets.level_sheet(c, i, cell=CELL)
+        write_glb(os.path.join(MESH_DIR, "wd-level%d.glb" % i), pos, nrm, uv, idx, "level%d" % i)
+        sizes.append(len(pos))
+    return sizes
 
 
 # ================================================================================================ programs
@@ -308,100 +317,139 @@ class Prog:
     def __getitem__(self, label):
         return self.at[label]
 
-    def doc(self, base=-1, emission=-1, roughness=-1):
+    def doc(self, base=-1, emission=-1, roughness=-1, opacity=-1):
         return {"name": self.name, "ops": self.ops, "baseColor": base, "metallic": -1, "roughness": roughness,
-                "emission": emission, "emissionIntensity": 1.0, "opacity": -1}
+                "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
-def surface_program():
-    """Stage A's shared surface: dark indigo where the field is quiet, royal violet as it rises; electric purple light
-    where it rings, crimson only where it rings hardest. Lit by the scene's lights (the grazing key and the rim)."""
-    g = Prog("wdSurface")
-    g.op("amp", "field", 0, field="F-amp")                       # r0 = |F| (excitation)
+def surface_program(name, energy, cut):
+    """The shared surface (one program for all three prototypes): blackened indigo, a step lighter on each nested
+    sheet (related hues, different light); electric purple where the mids and highs ring hard, crimson where they ring
+    hardest; a crimson wavefront when a kick's shell passes; a thin royal rim. `cut`: the sheet's UV.x is its
+    distance to its cut edge -- the edge is cut there with sub-cell precision (opacity, masked) and traced with a
+    crimson line that the resonance brightens. Lit by the scene's lights."""
+    g = Prog(name)   # eight registers, r0..r7
+    g.op(None, "input", 7, inp="uv")                              # r7 = (edge distance, sheet index)
+    g.op("energy", "field", 0, field=energy)                     # r0 = excitation
+    g.op("front", "field", 6, field="front")                     # r6 = the travelling shell
     if NEUTRAL:
         g.op(None, "constant", 4, k=[0.18, 0.18, 0.19, 1.0])
         g.op(None, "constant", 2, k=[0.0, 0.0, 0.0, 1.0])
-        g.base, g.emit = 4, 2
+        if cut:
+            g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])
+            g.op(None, "smoothstep", 5, a=5, k=[0.0, 0.6])
+        g.base, g.emit, g.opacity = 4, 2, (5 if cut else -1)
         return g
-    g.op("albedo", "ramp", 4, a=0, k=C("indigo") + [1.0], k2=C("royal") + [1.0], k3=C("purple") + [1.0])
-    g.op("bandMask", "smoothstep", 1, a=0, k=[0.55, 1.1])       # r1: where it rings
-    g.op("hotMask", "smoothstep", 3, a=0, k=[1.0, 1.6])         # r3: where it rings hardest
-    g.op("band", "ramp", 2, a=1, k=[0, 0, 0, 0], k2=C("purple", 0.25) + [0.5], k3=C("purple", 0.5) + [1.0])
-    g.op("hot", "ramp", 5, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.4) + [0.5], k3=C("red", 0.9) + [1.0])
-    g.op(None, "add", 2, a=2, b=5)                                # r2: emission
+    g.op(None, "swizzle", 1, a=7, k=[1, 1, 1, 1])
+    g.op("sheetTone", "remap", 1, a=1, k=[0.0, 4.0, 0.0, 1.0], f=1.0)
+    g.op("albedo", "ramp", 4, a=1, k=C("indigo") + [1.0], k2=C("indigo", 1.5) + [1.0], k3=C("royal", 0.9) + [1.0])
+    g.op("bandMask", "smoothstep", 1, a=0, k=[0.6, 1.1])       # where it rings hard
+    g.op("band", "ramp", 2, a=1, k=[0, 0, 0, 0], k2=C("purple", 0.05) + [0.5], k3=C("purple", 0.12) + [1.0])
+    g.op("hotMask", "smoothstep", 3, a=0, k=[1.1, 1.6])         # where it rings hardest
+    g.op("hot", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.15) + [0.5], k3=C("red", 0.45) + [1.0])
+    g.op(None, "add", 2, a=2, b=3)
+    g.op("frontMask", "smoothstep", 3, a=6, k=[0.15, 0.9])
+    g.op("frontTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.25) + [0.5], k3=C("crimson", 0.6) + [1.0])
+    g.op(None, "add", 2, a=2, b=3)                                # r2: emission
+    if cut:
+        g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])             # r5 = edge distance
+        g.op("edgeLine", "smoothstep", 3, a=5, k=[2.6, 0.7])      # a narrow band inside the cut ...
+        g.op(None, "smoothstep", 1, a=0, k=[0.1, 0.8])
+        g.op(None, "add", 1, a=1, b=6)
+        g.op(None, "multiply", 3, a=3, b=1)                       # ... brightened by the excitation and the shell
+        g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.35) + [0.5], k3=C("rose", 0.9) + [1.0])
+        g.op(None, "add", 2, a=2, b=3)
+        g.op("cut", "smoothstep", 5, a=5, k=[0.0, 0.6])           # r5: opacity (masked)
     g.op(None, "input", 6, inp="normal")
     g.op(None, "input", 7, inp="viewDirection")
-    g.op("rim", "fresnel", 5, a=6, b=7, f=4.0)
-    g.op("rimTint", "ramp", 5, a=5, k=[0, 0, 0, 0], k2=C("royal", 0.12) + [0.5], k3=C("royal", 0.25) + [1.0])
-    g.op(None, "add", 2, a=2, b=5)
-    g.base, g.emit = 4, 2
+    g.op("rim", "fresnel", 1, a=6, b=7, f=5.0)
+    g.op("rimTint", "ramp", 1, a=1, k=[0, 0, 0, 0], k2=C("royal", 0.03) + [0.5], k3=C("royal", 0.07) + [1.0])
+    g.op(None, "add", 2, a=2, b=1)
+    g.base, g.emit, g.opacity = 4, 2, (5 if cut else -1)
     return g
 
 
-def material(prog):
-    return {"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 0.42,
-            "metallic": 0.0, "doubleSided": True, "program": prog}
+def material(prog, cut=False):
+    m = {"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 0.38,
+         "metallic": 0.0, "doubleSided": True, "program": prog}
+    if cut:
+        m["alphaMode"] = "mask"
+        m["alphaCutoff"] = 0.5
+    return m
 
 
 # ================================================================================================ geometry, per prototype
-BOUND = 130.0
-KAPPA = float(os.environ.get("WD_KAPPA", "2.5"))
-STEP = float(os.environ.get("WD_STEP", "0.7"))
+RELIEF = {"M": 2.6, "f-l": 3.5, "f-b": 0.9}   # metres of normal displacement per unit figure
 
 
-def iso_sdf(s, name, c, family, bounds=BOUND, clip=None):
-    """The field's level sets as a sphere-traced SDF. d0 = KAPPA (F + Fd), by the plane trick: a plane y + 500, plus
-    the fields, plus `lin` = -y - 500 (linear_y). Then
-        membrane  |d0| - c        solid about the nodal surface F = 0: one thin membrane weaving through space
-        lobes     c - |d0|        solid where the figure is strong (antinode lobes, bounded by F = +-c)
-        shells    ||d0| - c| - t  thin shells on the level sets F = +-c
-    KAPPA scales F toward a unit gradient so the march's steps are near the true distance; c is in F's units."""
-    base = {"kind": "plane", "axis": [0.0, 1.0, 0.0], "offset": -500.0}
-    d0 = kit._unary("displaceField", base, amount=KAPPA, reference="F")
-    d0 = kit._unary("displaceField", d0, amount=KAPPA, reference="Fd")
-    d0 = kit._unary("displaceField", d0, amount=1.0, reference="lin")
-    c = c * KAPPA
-    if family == "lobes":
-        tree = kit.sd_diff(kit.sd_sphere(1.0e4), kit.sd_shell(2.0 * c, d0))
-    elif family == "membrane":
-        tree = kit.sd_shell(2.0 * c, d0)
-    else:
-        tree = kit.sd_shell(0.6, kit.sd_shell(2.0 * c, d0))
-    if clip is not None:
-        tree = kit.sd_inter(tree, clip)
-    s.sdf(name, tree, [-bounds] * 3, [bounds] * 3, material=material("wdSurface"), max_steps=200,
-          epsilon=0.001, step_scale=STEP, normal_epsilon=0.08)
+def deformers():
+    return [{"kind": "field", "field": name, "amount": amount, "space": "world", "alongNormal": True}
+            for name, amount in RELIEF.items()]
 
 
-def linear_y(s):
-    """lin = -y - 500 for |y| < 500: a linear gradient of length 1000 and strength -1000 (strength (y / L + 0.5); both
-    at their parameters' limits). It cancels the SDF plane's own y (iso_sdf)."""
-    s.nodes.append({"name": "lin", "kind": "field", "position": [0, 0, 0],
-                    "field": {"kind": "linearGradient", "axis": [0.0, 1.0, 0.0], "length": 1000.0,
-                              "strength": -1000.0, "falloff": {"kind": "none"}}})
-
-
-SHEET_RELIEF = (4.0, 2.5)   # metres per unit: the triple and bass (F), the mids family (f-b)
-
-
-def sheets(s, names=None):
+def parametric_sheets(s, prog):
     for name, _, _, _ in SHEETS:
-        if names and name not in names:
-            continue
-        s.proc(name, {"kind": "mesh", "asset": "meshes/wd-%s.glb" % name}, material=material("wdSurface"),
-               extra={"normalStep": 0.35},
-               deformers=[{"kind": "field", "field": "F", "amount": SHEET_RELIEF[0], "space": "world",
-                           "alongNormal": True},
-                          {"kind": "field", "field": "f-b", "amount": SHEET_RELIEF[1], "space": "world",
-                           "alongNormal": True}])
+        s.proc(name, {"kind": "mesh", "asset": "meshes/wd-%s.glb" % name}, material=material(prog, cut=True),
+               extra={"normalStep": 0.5}, deformers=deformers())
+
+
+def level_sheets(s, prog):
+    for i, _ in enumerate(levelsets.LEVELS):
+        s.proc("level%d" % i, {"kind": "mesh", "asset": "meshes/wd-level%d.glb" % i}, material=material(prog, cut=True),
+               extra={"normalStep": 0.5}, deformers=deformers())
+
+
+# A: the SDF. H = carrier + KAPPA_M M, its level sets sphere-traced; each level is plane + KAPPA (H - c) + lin (the
+# plane trick: `lin` = -y - 500 cancels the plane's own y), shelled thin; the aperture cuts them and an outer sphere
+# bounds them. The resonance is baked once a frame into a volume grid (ADR-1440) that every level samples (a direct
+# march evaluated every mode at every step: 550 ms a frame at 1080p).
+KAPPA = 12.0
+KAPPA_M = 0.18
+SDF_LEVELS = [-0.45, 0.25, 0.95]
+BAKE_BOUNDS = ([-130.0, -80.0, -130.0], [130.0, 80.0, 130.0])
+BAKE_RES = [128, 64, 128]
+
+
+def bake_grid(s, source, res, strength=1.0):
+    """A volume bake `<source>-bake` holding `source` at its cells every frame, and the field `<source>-grid` that reads
+    it (ADR-1407, ADR-1440)."""
+    if not hasattr(s, "grids"):
+        s.grids = []
+    s.grids.append({"name": source + "-bake", "enabled": True, "mode": "bake", "wrap": "clamp",
+                    "resolution": list(res), "boundsMin": BAKE_BOUNDS[0], "boundsMax": BAKE_BOUNDS[1],
+                    "injectField": source})
+    field(s, source + "-grid", {"kind": "grid", "reference": source + "-bake", "strength": float(strength),
+                                "falloff": {"kind": "none"}})
+
+
+def iso_sdf(s, prog):
+    field(s, "lin", {"kind": "linearGradient", "axis": [0.0, 1.0, 0.0], "length": 1000.0, "strength": -1000.0,
+                     "falloff": {"kind": "none"}})
+    bake_grid(s, "M", BAKE_RES, strength=KAPPA_M)
+    carrier_fields(s)
+    compound(s, "H", ["w0", "w1", "w2", "M-grid"])
+    compound(s, "Ap", ["o0", "o1"])
+
+    def plane_trick(ref, amount, const):
+        """amount * ref + const, exactly (plane y - o, + amount ref, + lin = -y - 500; o = -500 - const)."""
+        d = {"kind": "plane", "axis": [0.0, 1.0, 0.0], "offset": -500.0 - const}
+        d = kit._unary("displaceField", d, amount=amount, reference=ref)
+        return kit._unary("displaceField", d, amount=1.0, reference="lin")
+
+    levels = [kit.sd_shell(1.0, plane_trick("H", KAPPA, -KAPPA * c)) for c in SDF_LEVELS]
+    k_a = 12.0
+    cut = plane_trick("Ap", -k_a, k_a * levelsets.APERTURE_THRESHOLD)
+    tree = kit.sd_inter(kit.sd_union(*levels), cut, kit.sd_sphere(118.0))
+    s.sdf("iso", tree, BAKE_BOUNDS[0], BAKE_BOUNDS[1], material=material(prog), max_steps=200, epsilon=0.001,
+          step_scale=0.7, normal_epsilon=0.6, max_distance=320.0)
 
 
 # ================================================================================================ the scene
 def environment(s):
     s.environment = {
         "intensity": 0.03, "background": C("obsidian"), "fogColor": C("obsidian"),
-        "volumeDensity": 0.0, "skyIntensity": 1.0, "shadowRange": 200.0,
-        "ambientOcclusion": False, "contactShadows": False,
+        "volumeDensity": 0.0, "volumeMaxDistance": 0.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
+        "shadowRange": 200.0, "ambientOcclusion": False, "contactShadows": False,
         "sky": {"enabled": True, "zenithColor": C("obsidian", 0.6), "horizonColor": C("indigo", 0.5),
                 "groundColor": C("obsidian", 0.5), "haze": 0.3, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -410,11 +458,11 @@ def environment(s):
         s.light("key", "directional", direction=[0.55, -0.45, -0.7], color=[1, 1, 1], intensity=2.4, castsShadow=False)
         s.light("fill", "directional", direction=[-0.6, 0.2, 0.5], color=[1, 1, 1], intensity=0.5, castsShadow=False)
         return
-    # the key grazes from high left (a pale violet light), the rim comes from behind (crimson), a low fill from below
-    s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#c9b8ff"), intensity=2.6,
+    # the key grazes from high left (a pale violet light), the rim comes from behind (crimson), a low royal fill
+    s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#b9a6ff"), intensity=1.8,
             castsShadow=False)
-    s.light("rim", "directional", direction=[-0.3, -0.15, 0.95], color=C("crimson"), intensity=1.6, castsShadow=False)
-    s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=0.5, castsShadow=False)
+    s.light("rim", "directional", direction=[-0.3, -0.15, 0.95], color=C("crimson"), intensity=0.25, castsShadow=False)
+    s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=0.3, castsShadow=False)
 
 
 POST = {
@@ -422,38 +470,35 @@ POST = {
     "post/tonemap/chroma-retention": 0.85, "post/bloom/radius": 0.7, "post/bloom/intensity": 0.25,
     "post/bloom/threshold": 1.1, "post/output/vignette": 0.4, "post/output/grain": 0.01,
     "post/grade/contrast": 1.15, "post/lens/chromaticAberration": 0.0, "camera/exposure/compensation": 0.0,
-    "scene/fogDensity": 0.006, "scene/fogColor": C("obsidian"),
+    "scene/volumeDensity": 0.0045, "scene/fogColor": C("obsidian"),
 }
 
 
 def design():
     return {
         "category": "abstract",
-        "thesis": "A vast indigo-violet sculpture of curved surfaces drawn by one three-dimensional resonance field: "
-                  "the music excites its modes, and red spectral energy gathers where they reinforce.",
-        "composition": {"background": "obsidian violet depth", "midground": "nested curved surfaces",
-                        "foreground": "the nearest surface's grazing edge", "focal": "the strongest interference",
+        "thesis": "A vast indigo-violet sculpture of nested curved sheets -- the level sets of one standing "
+                  "interference field -- that the music bends, folds and lights: red spectral energy gathers where "
+                  "its modes reinforce.",
+        "composition": {"background": "obsidian violet depth", "midground": "nested curved sheets",
+                        "foreground": "the nearest sheet's grazing edge", "focal": "the strongest interference",
                         "camera": "a slow arc through the sculpture"},
         "palette": {"dominant": P["indigo"], "secondary": P["royal"], "accent": P["purple"], "highlight": P["red"],
                     "background_value": "near black", "saturation": "low, red only where modes reinforce"},
-        "tier": "one resonance field (ADR-1400)",
+        "tier": "one resonance field (ADR-1400) over a static carrier",
     }
 
 
 def debug_slice(s):
-    """A review aid: three orthogonal planes through the field's middle, unlit, coloured by F (blue negative, white
-    zero, red positive; saturating at +-SLICE), so the figure's level structure can be read directly."""
-    lim = float(os.environ.get("WD_SLICE", "1.5"))
+    """A review aid: three orthogonal planes through the middle, unlit, coloured by the low-mid triple M (blue
+    negative, red positive)."""
     g = Prog("wdSlice")
-    g.op(None, "field", 0, field="F")
-    g.op(None, "remap", 1, a=0, k=[-lim, lim, 0.0, 1.0], f=1.0)
+    g.op(None, "field", 0, field="M")
+    g.op(None, "remap", 1, a=0, k=[-2.0, 2.0, 0.0, 1.0], f=1.0)
     g.op(None, "ramp", 4, a=1, k=[0.05, 0.2, 1.0, 1.0], k2=[0.02, 0.02, 0.02, 1.0], k3=[1.0, 0.25, 0.05, 1.0])
-    g.op(None, "palette", 5, a=0, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1.0 / 0.25] * 3, k4=[0, 0, 0, 0])
-    g.op(None, "power", 5, a=5, f=40.0)
-    g.op(None, "add", 4, a=4, b=5)
     g.op(None, "constant", 2, k=[0, 0, 0, 1])
     s.program(g.doc(base=4, emission=2))
-    pos, nrm, uv, idx = sheet(lambda u, v: ((u - 0.5) * 180.0, (v - 0.5) * 180.0, 0.0 * u), 360, 360)
+    pos, nrm, uv, idx = sheet(lambda u, v: ((u - 0.5) * 240.0, (v - 0.5) * 240.0, 0.0 * u), 360, 360)
     write_glb(os.path.join(MESH_DIR, "wd-slice.glb"), pos, nrm, uv, idx, "slice")
     for name, rot in (("sliceXY", [0, 0, 0]), ("sliceZY", [0, 90, 0]), ("sliceXZ", [90, 0, 0])):
         s.proc(name, {"kind": "mesh", "asset": "meshes/wd-slice.glb"}, rotation=rot,
@@ -465,33 +510,30 @@ def build():
     s = kit.Scene(SID, TITLE, design())
     environment(s)
     resonator(s)
-    field_readers(s)
+    resonance_fields(s, only=("a1", "a2", "a3") if PROTO == "A" and DEBUG != "slice" else None)
     if DEBUG == "slice":
         debug_slice(s)
-        s.camera = {"mode": 1, "position": [70.0, 60.0, 130.0], "target": [0.0, 0.0, 0.0], "fov": 40.0,
+        s.camera = {"mode": 1, "position": [90.0, 80.0, 170.0], "target": [0.0, 0.0, 0.0], "fov": 40.0,
                     "orbitSpeed": 0.0}
         s.params_({"camera/lens/focalLength": 24.0, "post/bloom/enabled": False})
         return s
-    g = surface_program()
-    s.program(g.doc(base=g.base, emission=g.emit))
+    g = surface_program("wdSurface", "en", cut=PROTO != "A")
+    s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
     if PROTO == "A":
-        linear_y(s)
-        iso_sdf(s, "iso", ISO_C, ISO)
+        iso_sdf(s, g.name)
     elif PROTO == "B":
-        write_meshes()
-        sheets(s)
+        write_parametric_meshes()
+        parametric_sheets(s, g.name)
     else:
-        write_meshes()
-        sheets(s, ("wing", "arch"))
-        linear_y(s)
-        iso_sdf(s, "iso", ISO_C, "membrane")
-    s.camera = {"mode": 1, "position": [0.0, 12.0, 92.0], "target": [-4.0, 0.0, 0.0], "fov": 40.0,
+        write_level_meshes()
+        level_sheets(s, g.name)
+    s.camera = {"mode": 1, "position": [40.0, 10.0, 150.0], "target": [-10.0, -5.0, 0.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
-    s.arc_camera([-4.0, 0.0, 0.0], 92.0, 12.0, period=150.0, centre_deg=10.0, sweep_deg=70.0, steps=24, side=0.0,
+    s.arc_camera([-10.0, -5.0, 0.0], 150.0, 10.0, period=150.0, centre_deg=15.0, sweep_deg=60.0, steps=24, side=0.0,
                  lift=0.0, height_bob=4.0)
     s.params_({"camera/lens/focalLength": 28.0})
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
-    s.params_(POST if not NEUTRAL else {"scene/fogDensity": 0.004, "scene/fogColor": [0.02, 0.02, 0.02],
+    s.params_(POST if not NEUTRAL else {"scene/volumeDensity": 0.003, "scene/fogColor": [0.02, 0.02, 0.02],
                                         "post/bloom/enabled": False, "post/output/vignette": 0.0})
     return s
 
@@ -500,6 +542,15 @@ def write_scene():
     os.makedirs(OUT, exist_ok=True)
     s = build()
     pp, sp = s.write(OUT)
+    if getattr(s, "grids", None):  # the kit has no grids; they go in the scene file's top level
+        with open(sp) as f:
+            doc = json.load(f)
+        doc["grids"] = s.grids
+        with open(sp, "w") as f:
+            json.dump(doc, f, indent=1)
+            f.write("\n")
+    n_fields = sum(1 for n in s.nodes if n["kind"] == "field")
+    assert n_fields <= 16, "%d fields: the GPU holds 16" % n_fields
     if os.environ.get("WD_OUT"):
         return pp
     kit.upsert_index_entry({

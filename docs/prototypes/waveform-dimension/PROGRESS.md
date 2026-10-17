@@ -21,3 +21,41 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
 1. Audit (`01-resonance-audit.md`). Fields are 3D. Rotated readers give oriented families. Level sets can be
    sphere-traced through SDF `displaceField` using the plane trick. A volume bake (ADR-1440) is approved in
    principle and waits on the Stage A cost.
+2. Field design, on a CPU mirror of the mode shapes (scratchpad, look-dev only). This let field designs be compared
+   without waiting on the GPU lock.
+   - **Point sources make onions.** The radial part of a point mode is concentric shells, which read as a target
+     or tunnel.
+   - **Several unrelated families make noise.** Different centres, orders and wavelengths gave blobs.
+   - **One family of plane waves heard by three rotated readers works.** The readers share wavelength and phase, so
+     the result is coherent: a curved, aperiodic relative of the triply periodic minimal surfaces, with tunnels,
+     saddles and openings. The rotations put the three wave directions 66-69 degrees apart, for seed 11's lattice
+     orientation.
+   - **Families with different wavelengths do not mix this way.** The longest family dominates and the result
+     reads as stacked sheets.
+3. Engine findings:
+   - Field `strength` is clamped to +-1000 and `length` to 1000, so the plane trick's helper is `-y - 500`.
+   - A compiled SDF tree with displaceField took 25 s to compile on first sight.
+   - The SDF march ends after one step (hit 0%) when the distance is wrong by a constant. `--frames` prints
+     `sdf march` step statistics, which diagnose this.
+4. **Stage A, the three prototypes.** All three use the same palette, the same material program, the same lights,
+   the same camera and the same moment (Feline Footwear, 44 s). Media is in `stage-a/`.
+   - **A, nested isosurfaces (SDF).** The level sets of carrier + resonance are sphere-traced, so topology changes
+     are real.
+     - First version: the coherent rotated-triple field's nodal membrane, a TPMS relative. It read as sponge or coral:
+       every cell the same size, no hierarchy (`earlier-A-tpms-sponge-variants.png`).
+     - Final version: the carrier's level sets. Busy, blobby lobes in the frame.
+     - Cost at 1080p on the M2 Max: 550 ms with direct evaluation; 209-165 ms with a volume bake (ADR-1440, uncommitted
+       patch); 620 ms for the final version (three levels, each sampling the field). Not viable live.
+   - **B, designed contour sheets.** Three parametric sheets (a saddle, an arch, a veil) displaced by the resonance.
+     Cheap and controllable, but it reads as generic animated drapery. The silhouette has no identity of its own.
+   - **C, hybrid.**
+     - The large form is a static CARRIER: the standing interference of three long spherical waves from far outside the
+       frame. Its level sets are extracted offline by surface nets into five nested sheets at uneven levels. A second,
+       shorter interference, the APERTURE, opens them; the material cuts each sheet at the aperture with sub-cell
+       precision and traces the cut.
+     - The resonance displaces the sheets along their normals on the GPU. Topology is fixed.
+     - It has the strongest silhouette and spatial structure: vast curved sheets passing through one another, nested,
+       with openings that show the next sheet behind. It reads in neutral grey too.
+     - Cost: 121 ms GPU at 1080p, almost all in the scene pass. That is per-pixel field evaluation (the `en` reader)
+       times five layered, masked sheets. It is the Stage E bottleneck to fix; bake or simplify.
+   - **Choice: C.** A volume-baked variant of A is shelved: three times the GPU of C for blobbier forms.
