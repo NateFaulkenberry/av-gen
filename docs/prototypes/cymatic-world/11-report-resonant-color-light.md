@@ -80,7 +80,7 @@ The coordinator's Stage B review: the colour field reads lobe by lobe, but the f
 The owner's correction: modulating colour means moving between distinct palettes, so the scene now shifts palettes as well as shapes. The brief's ten artist-designed palettes (A Abyssal Resonance to J Prismatic Oil) are now the scene's colour. The four shading layers from Stages B-D stay, and every layer's colour now comes from the active palette.
 
 **Architecture (no new engine code in this scene).** The palettes are ADR-1043 project-palette states. ADR-1420's selector, built by the Resonant Silk agent and merged from main, does the choosing and blending.
-- **The program is authored in grey.** Palette `M` is palette B's intensities with every colour white. Role bindings in `multiply` mode scale the program's colour constants by the active palette's roles each frame: 24 bindings onto 9 ops' vec4 constants.
+- **The program is authored in grey.** Palette `M` is palette B's intensities with every colour white. Role bindings in `multiply` mode scale the program's colour constants by the active palette's roles each frame: 21 bindings onto 9 ops' vec4 constants.
 - **Routes keep working.** Every route that scales a term's brightness (kick, snare, hats, sustain, flux, CC 8) still does, because the palette multiplies after them.
 - **Colour stays on the GPU.** The CPU writes a few uniform constants per frame. There is no per-vertex colour work and no allocation in a transition.
 
@@ -134,7 +134,7 @@ Silence keeps the slowly evolving figure (the focus sweeps and drifts) in a dark
 | palette off | 35.52 / 36.04 ms | 4.28 / 5.75 ms |
 | palette on | 35.65 / 36.11 ms | 4.40 / 6.14 ms |
 
-The palette costs nothing measurable on the GPU (the same 48 ops; the constants change, the work does not) and about 0.1-0.4 ms of CPU for 24 bindings and the selector. **Note:** High at this loud passage is now about 2 ms over the Stage A baseline (Stages C-D: a fourth bake grid and 9 more ops). Stage G owns bringing it back.
+The palette costs nothing measurable on the GPU (the same 48 ops; the constants change, the work does not) and about 0.1-0.4 ms of CPU for 21 bindings and the selector. **Note:** High at this loud passage is now about 2 ms over the Stage A baseline (Stages C-D: a fourth bake grid and 9 more ops). Stage G owns bringing it back.
 
 **Material:** 48 ops, the interpreter's cap. Two swizzles were folded (a scalar op reads its source's x), which paid for the view layer. **Fields:** 16 of 16.
 
@@ -145,3 +145,20 @@ The palette costs nothing measurable on the GPU (the same 48 ops; the constants 
 - `monochrome-silver-alone-feline-60s.png` / `-125s.png`;
 - `phrase-transitions-molten-glacial-crimson-feline-30-90s.mp4` (normal speed, with audio; Molten → Glacial → toward Crimson on phrase boundaries);
 - `manual-select-locked-chlorophyll-ultraviolet-silver-feline-40-80s.mp4` (locked; picks at 40, 52 and 66 s keyed on the timeline as a performer's CC would).
+
+## Stage E: emission and optical finish (each effect on its own)
+
+Each candidate was rendered alone against the baseline on two locked palettes: Abyssal at Feline 18 s (dim, cool) and Molten Glass at 125 s (hot highlights). Each was judged full-frame and in native-resolution crops.
+
+| Candidate | Setting | Verdict |
+|---|---|---|
+| Bloom, tuned | intensity 0.30-0.32, threshold 0.9-1.0 (from 0.22 / 1.2) | **Rejected**: indistinguishable. The crests are thin lines, not sources, so bloom has little to spread; the existing tight bloom stays |
+| Glare (anamorphic streaks) | intensity 0.18 and 0.4 | **Rejected**: no visible effect. Nothing in the frame is a point source bright enough to streak, and forcing it would be glare for its own sake |
+| Halation | intensity 0.3 and 0.5 | **Rejected**: imperceptible on cool palettes and a faint warm haze on hot ones; adds nothing to the geometry |
+| Chromatic aberration | 0.15 and 0.04 | **Rejected**: 0.04 is invisible, and 0.15 puts red/cyan fringes along the frame's bottom edge, which reads as a lens fault, not light |
+| Iridescence | the palette view layer (Stage P) | **Kept**, restrained, and only where a palette calls for it: J's oil sheen, E's grazing metal |
+| Vignette, motion blur, trails | | Stay off (brief) |
+
+The image's interest stays where the brief puts it: geometry, shading and negative space. No new full-screen effect, and nothing added to the frame cost.
+
+**Evidence** (`stageE-optics/`): `optics-candidates-abyssal-feline-18s.png`, `optics-candidates-molten-feline-125s.png`, and their `-crops-native.png`.
