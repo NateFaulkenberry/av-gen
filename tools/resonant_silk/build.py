@@ -54,6 +54,52 @@ def C(key, scale=1.0):
     return hexrgb(P[key], scale)
 
 
+# ================================================================================================ the palettes
+# The owner's eight Silk palettes (03-brief-palettes.md), sRGB references, seven roles each. Converted to linear light
+# here; the engine's project palette (ADR-1043) blends them in OKLab and its selector (ADR-1420) chooses, locks and
+# advances them. Roles land on geometry and light, never as a painted gradient:
+#   environment  the void: the sky dome's zenith and ground, the fog
+#   shadow       what the unlit side and the horizon sink to: the fill light, the sky's horizon band
+#   base         the silk's albedo where it faces the eye
+#   fold         its albedo where it turns away (the pleats' flanks, a fold's inner wall: Fresnel-masked)
+#   resonant     light the music puts on it: the counter light, the fronts, the hardest-ringing folds
+#   grazing      the key light (the satin highlights that slide along the pleats) and the hems
+#   peak         narrow, rare: the gather's seam, the treble's sheen on the folds' turning edges
+PALETTES = [
+    # name, environment, shadow, base, fold, resonant, grazing, peak, tuning
+    ("Midnight Aurora", "#070711", "#15152C", "#29264F", "#51477F", "#8F87D5", "#C5C4F3", "#F0EDFF",
+     {"rough": 0.30, "film": 1.0, "key": 5.0, "emit": 1.0, "fold": 0.75}),
+    ("Garnet Veil", "#09050C", "#1C0D20", "#3B1735", "#712447", "#B83A60", "#F06B83", "#FFC0CB",
+     {"rough": 0.26, "film": 0.6, "key": 4.6, "emit": 0.9, "fold": 0.9}),
+    ("Liquid Champagne", "#0C0908", "#261C17", "#57402F", "#8A6544", "#C69B65", "#F0D5A0", "#FFF4D8",
+     {"rough": 0.36, "film": 0.4, "key": 3.6, "emit": 0.7, "fold": 0.65}),
+    ("Opal Dream", "#0B0710", "#241827", "#51364F", "#845B79", "#C58AA8", "#E9C4D8", "#FFF0F3",
+     {"rough": 0.32, "film": 1.4, "key": 3.8, "emit": 0.8, "fold": 0.6}),
+    ("Deep Emerald Satin", "#050A08", "#10221A", "#1C4535", "#307456", "#4BA783", "#91D6B0", "#DFFFEA",
+     {"rough": 0.28, "film": 0.5, "key": 4.4, "emit": 0.8, "fold": 0.8}),
+    ("Electric Cobalt", "#050711", "#10162D", "#1B3470", "#2856A0", "#478CE0", "#8DC7FF", "#E2F3FF",
+     {"rough": 0.24, "film": 0.8, "key": 5.2, "emit": 1.1, "fold": 0.85}),
+    ("Burnished Copper", "#0B0707", "#261411", "#51251D", "#843C2B", "#C56343", "#F0A071", "#FFD9BA",
+     {"rough": 0.34, "film": 0.5, "key": 4.0, "emit": 0.7, "fold": 0.8}),
+    ("Oil-Slick Iridescence", "#05050A", "#121020", "#25203C", "#49304F", "#80405D", "#C46C83", "#F2C4B6",
+     {"rough": 0.22, "film": 1.9, "key": 4.6, "emit": 0.9, "fold": 0.9}),
+]
+ROLES = ("environment", "shadow", "base", "fold", "resonant", "grazing", "peak")
+# The automatic journey (ADR-1420 advance order): neighbours share a temperature, so a phrase change turns the material
+# rather than jumping across the wheel -- Aurora, Cobalt, Emerald, Champagne, Copper, Garnet, Oil-Slick, Opal.
+JOURNEY = [0, 5, 4, 2, 6, 1, 7, 3]
+START_PALETTE = int(os.environ.get("RS_PALETTE", "0"))
+
+
+def palette_states():
+    out = []
+    for row in PALETTES:
+        name, cols, tune = row[0], row[1:8], row[8]
+        out.append({"name": name, "colors": {r: hexrgb(h) for r, h in zip(ROLES, cols)},
+                    "scalars": {k: float(v) for k, v in tune.items()}})
+    return out
+
+
 # ================================================================================================ curve helpers
 def catmull(points, n):
     """A centripetal Catmull-Rom curve through `points` (k x 3), sampled at n points evenly in parameter."""
@@ -248,13 +294,13 @@ def sheets_for(comp):
         # mirrored: a long low wall on one side of the gather, a tall turning sail on the other.
         main = SheetSpec(
             "silk",
-            points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 12, -176),
-                    (44, 24, -162), (70, 42, -150), (86, 64, -156)],
-            roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.72, 2.6 + SAIL), (0.86, 3.2 + SAIL), (1.0, 3.6 + SAIL)],
-            span=[(0.0, 30.0), (0.32, 26.0), (0.55, 10.0), (0.66, 2.5), (0.72, 10.0), (0.86, 40.0), (1.0, 50.0)],
-            cloth=[(0.0, 40.0), (0.66, 44.0), (1.0, 54.0)],
-            billow=[(0.0, 6.0), (0.35, 9.0), (0.6, 0.0), (0.68, 0.0), (0.84, -11.0), (1.0, -7.0)],
-            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=5, curl=0.1, edge_wave=0.03, nu=720, nv=128, end_round=0.12)
+            points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 10, -174),
+                    (42, 20, -164), (68, 34, -146), (90, 52, -134), (102, 74, -138)],
+            roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.7, 2.6 + SAIL), (0.84, 3.2 + SAIL), (1.0, 3.5 + SAIL)],
+            span=[(0.0, 30.0), (0.3, 26.0), (0.52, 10.0), (0.62, 2.5), (0.68, 12.0), (0.84, 48.0), (1.0, 62.0)],
+            cloth=[(0.0, 40.0), (0.52, 44.0), (0.66, 30.0), (1.0, 66.0)],
+            billow=[(0.0, 6.0), (0.33, 9.0), (0.56, 0.0), (0.64, 0.0), (0.82, -6.0), (1.0, -3.0)],
+            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=5, curl=0.06, edge_wave=0.035, nu=760, nv=128, end_round=0.14)
         cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0, "drift": True}
         return [main], cam
     if comp == "b":
@@ -335,60 +381,114 @@ class Prog:
 
 
 def silk_program():
-    """The silk's colour, on the lit path (the lights draw the satin highlights; the program sets what they land on and
-    adds the light the sheet gives off itself).
-    - Body: deep indigo facing the camera, turning violet toward grazing angles (a Fresnel sheen).
-    - Hems: the free edges carry a thin luminous line, its hue drifting along the length (teal -> cyan -> violet), so
-      the silhouette draws itself against the void even where no light falls."""
+    """The silk's colour, on the lit path: the lights draw the satin highlights (the key in the palette's grazing
+    colour, the counter light in its resonant colour); the program sets what they land on and adds the little light
+    the sheet gives off. Every colour constant here is a palette role (bound in `palette()`), every gain a route's.
+    - Albedo: base facing the eye, fold where the cloth turns away (Fresnel, so the pleats' flanks and the folds'
+      inner walls carry it); bass broadens that band (the exponent), low mids deepen the separation (the mix).
+    - Hems: a thin line of the grazing colour on the free edges, so the silhouette draws itself in the void.
+    - The gather: a narrow seam of peak light at the ring (a few metres, not a blob).
+    - Music: treble as a fine peak sheen on the folds' turning edges; a kick's front as a travelling band of resonant
+      light; the hardest-ringing folds (resonance amplitude) in the resonant colour."""
     g = Prog("rsSilk")
     g.op(None, "input", 0, inp="uv")                                   # r0 = (u, v)
     g.op(None, "swizzle", 1, a=0, k=[1, 1, 1, 1])                      # r1 = v
     g.op("hem", "palette", 1, a=1, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1, 1, 1, 0], k4=[0, 0, 0, 0])
-    g.op("hemWidth", "power", 1, a=1, f=400.0)                          # r1: 1 on the hems, falling fast inward
-    g.op(None, "swizzle", 2, a=0, k=[0, 0, 0, 0])                      # r2 = u
-    g.op("hemHue", "ramp", 3, a=2, k=C("teal") + [1], k2=C("cyan") + [1], k3=C("violet") + [1])
-    g.op(None, "input", 4, inp="time")
-    g.op("drift", "palette", 4, a=4, k=[0, 0, 0, 0], k2=[0.06, 0.06, 0.06, 0], k3=[1 / 96.0] * 3 + [0],
-         k4=[0, 0, 0, 0])                                              # r4: +-0.06 turns, a 96 s cycle
-    g.op("hue", "hueShift", 3, a=3, b=4, f=0.0)                        # value: the performer's Color Drift
+    g.op("hemWidth", "power", 1, a=1, f=500.0)                          # r1: 1 on the hems, falling fast inward
+    g.op("hemCol", "constant", 3, k=C("cyan") + [1])                    # role: grazing
     g.op(None, "multiply", 1, a=1, b=3)
-    g.op("hemGain", "constant", 3, k=[1.6, 1.6, 1.6, 1])
+    g.op("hemGain", "constant", 3, k=[0.9, 0.9, 0.9, 1])                # x palette emit
     g.op(None, "multiply", 1, a=1, b=3)                                # r1: emission (the hems)
-    g.op("sheen", "fresnel", 4, f=3.0)
-    g.op("body", "constant", 5, k=C("indigo", 1.6) + [1])
-    g.op("bodyEdge", "constant", 6, k=C("violet", 0.55) + [1])
-    g.op(None, "mixBy", 5, a=5, b=6, c=4)                              # r5: albedo
+    g.op("foldMask", "fresnel", 4, f=2.6)                               # r4: turned away (bass lowers the exponent)
+    g.op("body", "constant", 5, k=C("indigo") + [1])                    # role: base
+    g.op("foldCol", "constant", 6, k=C("violet", 0.4) + [1])            # role: fold
+    g.op("foldMix", "constant", 7, k=[0.75, 0.75, 0.75, 1])             # x palette fold, low mids
+    g.op(None, "multiply", 7, a=4, b=7)
+    g.op(None, "mixBy", 5, a=5, b=6, c=7)                              # r5: albedo
+    # the gather's seam: peak light within a few metres of the ring
+    g.op(None, "input", 6, inp="worldPosition")
+    g.op(None, "constant", 7, k=[-GATHER[0], -GATHER[1], -GATHER[2], 0.0])
+    g.op(None, "add", 6, a=6, b=7)
+    g.op(None, "multiply", 6, a=6, b=6)
+    g.op(None, "gradient", 6, a=6, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / (9.0 * 9.0))     # |d|^2 / R^2, saturated
+    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.0, 0.0], f=1.0)                     # 1 at the ring, 0 at 9 m
+    g.op("glowCol", "constant", 7, k=C("pearl", 0.5) + [1])            # role: peak (x 0.5, x palette emit)
+    g.op(None, "multiply", 6, a=6, b=7)
+    g.op(None, "add", 1, a=1, b=6)
     if MUSIC:
-        # the music's light, each on a geometry it belongs to (registers 0, 2, 3, 6, 7 are free here)
-        g.op(None, "power", 6, a=4, f=2.0)                             # r6: the folds' turning edges (narrow)
-        g.op("treble", "field", 2, field="trebleTrace")                 # the treble of the last moments, out from the gather
+        g.op(None, "power", 6, a=4, f=2.5)                             # r6: the folds' turning edges (narrow)
+        g.op("treble", "field", 2, field="trebleTrace")
         g.op(None, "multiply", 2, a=2, b=6)
-        g.op("trebleCol", "constant", 3, k=C("cyan", 1.6) + [1])
+        g.op("trebleCol", "constant", 3, k=C("pearl") + [1])           # role: peak
         g.op(None, "multiply", 2, a=2, b=3)
-        g.op(None, "add", 1, a=1, b=2)                                  # + shimmer on the folds
-        g.op("kick", "field", 2, field="kickFront")                     # a kick's front, riding out across the cloth
-        g.op("kickCol", "constant", 3, k=kit.mix(C("pearl"), C("cyan"), 0.5) + [1])
-        g.op(None, "multiply", 2, a=2, b=3)
-        g.op(None, "multiply", 2, a=2, b=4)                             # on the folds' turning faces only
-        g.op("kickGain", "constant", 3, k=[0.5, 0.5, 0.5, 1])
+        g.op("trebleGain", "constant", 3, k=[0.5, 0.5, 0.5, 1])        # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
-        g.op("amp", "field", 2, field="silkAmp")                        # where the modes ring hardest ...
+        g.op("kick", "field", 2, field="kickFront")
+        g.op(None, "multiply", 2, a=2, b=4)                            # on the turning faces only
+        g.op("kickCol", "constant", 3, k=C("cyan") + [1])              # role: resonant
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op("kickGain", "constant", 3, k=[0.45, 0.45, 0.45, 1])       # x Light Response
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op(None, "add", 1, a=1, b=2)
+        g.op("amp", "field", 2, field="silkAmp")
         g.op("ampMask", "smoothstep", 2, a=2, k=[0.9, 1.8])
-        g.op(None, "multiply", 2, a=2, b=4)                             # ... and the cloth turns away: magenta
         g.op(None, "multiply", 2, a=2, b=4)
-        g.op("ampCol", "constant", 3, k=C("magenta", 1.4) + [1])
+        g.op("ampCol", "constant", 3, k=C("magenta") + [1])            # role: resonant
+        g.op(None, "multiply", 2, a=2, b=3)
+        g.op("ampGain", "constant", 3, k=[0.35, 0.35, 0.35, 1])        # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
     g.base, g.emit = 5, 1
     return g
 
 
+def palette_block(g):
+    """The project palette (ADR-1043) with its selector (ADR-1420): the eight states, the role bindings, and the
+    automatic journey on phrase boundaries (at most one change in a `hold`)."""
+    def op(label, field="constant"):
+        return "material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], field)
+    b = [
+        {"role": "environment", "target": "env/sky/zenithColor", "gain": 0.6},
+        {"role": "environment", "target": "env/sky/groundColor", "gain": 0.8},
+        {"role": "shadow", "target": "env/sky/horizonColor", "gain": 0.55},
+        {"role": "environment", "target": "scene/fogColor", "gain": 1.0},
+        {"role": "shadow", "target": "lights/fill/color"},
+        {"role": "base", "target": op("body")},
+        {"role": "fold", "target": op("foldCol")},
+        {"role": "grazing", "target": "lights/key/color"},
+        {"role": "grazing", "target": op("hemCol")},
+        {"role": "resonant", "target": "lights/rim/color"},
+        {"role": "peak", "target": op("glowCol"), "gain": 0.5},
+        # tuning: highlight width (roughness), iridescence (the film), highlight intensity, emission, fold contrast
+        {"role": "rough", "target": "procedural/silk/material/roughness"},
+        {"role": "film", "target": "procedural/silk/material/thinFilm/thickness", "mode": "multiply"},
+        {"role": "key", "target": "lights/key/intensity"},
+        {"role": "emit", "target": op("hemGain"), "mode": "multiply"},
+        {"role": "emit", "target": op("glowCol"), "mode": "multiply"},
+        {"role": "fold", "target": op("foldMix"), "mode": "multiply", "component": 0},
+    ]
+    if MUSIC:
+        b += [{"role": "peak", "target": op("trebleCol")},
+              {"role": "resonant", "target": op("kickCol")},
+              {"role": "resonant", "target": op("ampCol")}]
+    # 'fold' is both a colour role and a scalar role name in the tuning: the scalar is renamed to keep them apart
+    states = palette_states()
+    for st in states:
+        st["scalars"]["foldContrast"] = st["scalars"].pop("fold")
+    for x in b:
+        if x["target"] == op("foldMix"):
+            x["role"] = "foldContrast"
+            x.pop("component", None)
+    return {"states": states, "bindings": b, "position": 0.0, "saturation": 1.0, "value": 1.0,
+            "selector": {"select": START_PALETTE, "transition": 6.0, "lock": False, "hold": 40.0,
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY}}}
+
 
 # ================================================================================================ the music's fields
 GATHER = (0.0, 4.0, -170.0)     # the invisible ring: where everything converges, and where every wave starts
 WALL_MID = (-28.0, 4.0, -40.0)  # the middle of the near wall (where the snare's fronts start)
-FIELD = "silk"
+FIELD = "resonator"
 WALL_RUN = [-0.27, 0.03, 0.96]   # from the gather back along the wall, toward the camera
 SAIL_RUN = [0.81, 0.57, 0.13]    # from the gather out along the sail
 WALL_N = [-0.96, -0.094, -0.263] # the wall's mean normal (of the unpleated sheet)
@@ -436,7 +536,7 @@ def fields(s):
     fnode("wallSide", {"kind": "plane", "axis": WALL_RUN, "softness": 35.0}, GATHER)
     fnode("sailSide", {"kind": "plane", "axis": SAIL_RUN, "softness": 30.0}, GATHER)
     fnode("bassHistory", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.22,
-                          "audioSpeed": 26.0, "audioSmooth": 0.6, "point": list(GATHER),
+                          "audioSpeed": 26.0, "audioSmooth": 0.33, "point": list(GATHER),
                           "waveGeometry": "spherical"})
     fnode("bassCarrier", {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine", "point": list(GATHER),
                           "wavelength": 90.0, "waveSpeed": 26.0, "waveWidth": 0.0, "amplitude": 1.0})
@@ -445,7 +545,7 @@ def fields(s):
     fnode("snareFront", {"kind": "onset", "onsetSource": "mid", "point": list(WALL_MID),
                          "waveGeometry": "spherical", "audioSpeed": 55.0, "onsetWidth": 5.0, "onsetDecay": 2.2})
     fnode("trebleTrace", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.62, "bandHigh": 1.0,
-                          "audioSpeed": 30.0, "audioSmooth": 0.35, "point": list(GATHER),
+                          "audioSpeed": 30.0, "audioSmooth": 0.33, "point": list(GATHER),
                           "waveGeometry": "spherical"})
     s.nodes.append({"name": "silkAmp", "kind": "field", "position": [0, 0, 0],
                     "field": {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"},
@@ -480,17 +580,14 @@ def environment(s):
                 "background": True, "useKeyLight": False},
     }
     # a narrow, cold, grazing key from high behind-right: strips of light across the folds
-    s.light("key", "directional", direction=[-0.55, -0.35, 0.75], color=kit.mix(C("pearl"), C("cyan"), 0.55),
+    s.light("key", "directional", direction=[-0.55, -0.35, 0.75], color=kit.mix(C("pearl"), C("cyan"), 0.75),
             intensity=5.0,
             castsShadow=False, contactShadow=False, softness=0.2)
     # a violet counter-light from the lower left, behind the sheet: rims and the far side's colour
     s.light("rim", "directional", direction=[0.6, 0.45, 0.65], color=C("violet"), intensity=2.2,
             castsShadow=False, contactShadow=False)
-    # the sail's own light: a violet lamp in front of it, its range kept off the wall
-    s.light("sail", "point", position=[40.0, 55.0, -120.0], color=kit.mix(C("violet"), C("magenta"), 0.25),
-            intensity=12000.0, range=120.0, castsShadow=False)
     # broad cool fill from the camera side, low
-    s.light("fill", "directional", direction=[0.1, -0.2, -1.0], color=C("teal"), intensity=0.35,
+    s.light("fill", "directional", direction=[0.1, -0.2, -1.0], color=C("teal"), intensity=0.6,
             castsShadow=False, contactShadow=False)
 
 
@@ -541,8 +638,10 @@ MIDI_CC = [
     (4, "detail", "SURFACE DETAIL: the middle band's fine creases"),
     (5, "iridescence", "IRIDESCENCE: the thin film thickens and the violet sheen widens"),
     (6, "light", "LIGHT RESPONSE: the shimmer, the fronts' light and the magenta in the hardest-ringing folds"),
-    (7, "colorDrift", "COLOR DRIFT: the hems' hue turns (teal toward violet)"),
+    (7, "colorDrift", "COLOR DRIFT: the palette journey changes sooner and turns faster"),
     (8, "motion", "MOTION SCALE: the travelling swell quickens and the drift widens"),
+    (9, "palette", "PALETTE: choose one of the eight (a direct blend to it)"),
+    (10, "paletteLock", "PALETTE LOCK: hold the chosen palette (no automatic changes)"),
 ]
 
 
@@ -558,12 +657,15 @@ def instrument(s, g):
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
     F = "field/%s/resonance/" % FIELD
     D = "procedural/silk/deform/%d/"
-    op = lambda label: "material/%s/op/%d/" % (g.name, g[label])  # noqa: E731
-    # music -> instrument (slow, never a strobe)
+    def op(label):
+        return "material/%s/op/%d/%s/" % (g.name, g[label], g.ops[g[label] - 1]["kind"])
+    # music -> instrument (slow, never a strobe; no route flashes a whole surface)
     s.route(R("intensity", F + "modes", 4.0, attackMs=4000, decayMs=8000))      # 8 modes at rest, 12 in a build
     s.route(R("sustain", F + "sustain", 0.6, attackMs=1500, decayMs=4000))
-    s.route(R("level", "lights/sail/intensity", 9000.0, attackMs=300, decayMs=1600),
-            R("kickEnv", "lights/key/intensity", 1.2, attackMs=0, decayMs=400))
+    # bass broadens the fold band (a lower Fresnel exponent), low mids deepen the base/fold separation
+    s.route(R("bass", op("foldMask") + "value", -1.1, attackMs=200, decayMs=900))
+    s.route(R("audio.lowMid", op("foldMix") + "constant", 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=300,
+              decayMs=1200))
     # MIDI
     s.control = control_map()
     CC = {"attackMs": 150, "decayMs": 150}
@@ -572,17 +674,20 @@ def instrument(s, g):
         s.route(R("control.foldDepth", D % i + "amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC))
     for i in (5, 6, 7, 8):
         s.route(R("control.waveTravel", D % i + "amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC))
-    s.route(R("control.detail", F + "source/1/amplitude", 0.7, **CC))
-    s.route(R("control.iridescence", "procedural/silk/material/thinFilm/thickness", 260.0, **CC),
-            R("control.iridescence", op("bodyEdge") + "constant", 1.0, op="multiply", gain=1.4, offset=1.0, **CC))
-    for label in ("trebleCol", "kickGain", "ampCol"):
+    s.route(R("control.detail", F + "source/1/amplitude", 0.4, **CC))
+    s.route(R("control.iridescence", "procedural/silk/material/thinFilm/thickness", 320.0, **CC))
+    for label in ("trebleGain", "kickGain", "ampGain"):
         s.route(R("control.light", op(label) + "constant", 1.0, op="multiply", gain=2.0, offset=1.0, **CC))
-    s.route(R("control.colorDrift", op("hue") + "value", 0.22, **CC))
+    # Color Drift: the palette journey moves sooner and turns faster
+    s.route(R("control.colorDrift", "palette/hold", 1.0, op="multiply", gain=-0.8, offset=1.0, **CC),
+            R("control.colorDrift", "palette/transition", 1.0, op="multiply", gain=-0.5, offset=1.0, **CC))
+    # the palette, chosen by hand (CC 9 sweeps the eight; each step a direct blend) and locked (CC 10)
+    s.route(R("control.palette", "palette/select", float(len(PALETTES) - 1), **CC))
+    s.route(R("control.paletteLock", "palette/lock", 1.0, **CC))
     # Motion Scale: the swell's phase integrates the control (ADR-1372: a rate change never jumps) ...
     s.route(R("control.motion", D % 2 + "phase", -0.9, attackMs=300, decayMs=300, integrate=True))
     # ... and the drift widens
     s.route(R("control.motion", D % 1 + "amount", 1.0, op="multiply", gain=0.8, offset=1.0, **CC))
-
 
 DESIGN = {
     "category": "abstract",
@@ -602,14 +707,33 @@ DESIGN = {
 }
 
 
+def mean_normals(spec, gather_u):
+    """The unpleated sheet's mean normal over the wall (u < gather) and over the sail (u > gather)."""
+    curve = catmull(spec.points, 4000)
+    c, _ = resample_arclength(curve, spec.nu)
+    u = np.linspace(0.0, 1.0, spec.nu)
+    t, n, b = transported_frame(c)
+    roll = smooth_profile(spec.roll, u)
+    N = -b * np.sin(roll)[:, None] + n * np.cos(roll)[:, None]
+    out = []
+    for m in ((u > 0.05) & (u < gather_u - 0.08), (u > gather_u + 0.12)):
+        v = N[m].mean(axis=0)
+        out.append([round(float(x), 4) for x in v / np.linalg.norm(v)])
+    return out
+
+
 def build(comp, mesh_dir):
+    global WALL_N, SAIL_N
     s = kit.Scene(ID, TITLE, DESIGN)
+    if comp == "a":
+        WALL_N, SAIL_N = mean_normals(sheets_for("a")[0][0], 0.63)
     environment(s)
     if MUSIC:
         fields(s)
     specs, cam = sheets_for(comp)
     sheets(s, specs, mesh_dir)
     camera(s, cam)
+    s.palette = palette_block(s.silk_program)
     if MUSIC:
         instrument(s, s.silk_program)
     else:
@@ -633,6 +757,12 @@ def variant(project, out, wav=None, camera=None, params=None):
         doc["parameters"]["camera/position"] = [float(v) for v in p.split(",")]
         doc["parameters"]["camera/target"] = [float(v) for v in t.split(",")]
     for k, v in (params or {}).items():
+        # the palette's own parameters are registered after a project's parameter values are read, so the selector's
+        # authored values go in its block (palette/select, palette/lock, palette/transition, palette/hold)
+        if k.startswith("palette/") and "selector" in doc.get("palette", {}):
+            key = k.split("/", 1)[1]
+            doc["palette"]["selector"][key] = bool(v) if key == "lock" else (int(v) if key == "select" else v)
+            continue
         doc["parameters"][k] = v
     base = os.path.dirname(os.path.abspath(project))
     doc["assets"]["scene"] = {"kind": "composition", "path": os.path.join(base, doc["assets"]["scene"]["path"])}

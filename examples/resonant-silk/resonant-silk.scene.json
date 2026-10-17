@@ -60,7 +60,7 @@
  },
  "nodes": [
   {
-   "name": "silk",
+   "name": "resonator",
    "kind": "field",
    "position": [
     0,
@@ -194,7 +194,7 @@
     "bandLow": 0.0,
     "bandHigh": 0.22,
     "audioSpeed": 26.0,
-    "audioSmooth": 0.6,
+    "audioSmooth": 0.33,
     "point": [
      0.0,
      4.0,
@@ -300,7 +300,7 @@
     "bandLow": 0.62,
     "bandHigh": 1.0,
     "audioSpeed": 30.0,
-    "audioSmooth": 0.35,
+    "audioSmooth": 0.33,
     "point": [
      0.0,
      4.0,
@@ -319,7 +319,7 @@
    ],
    "field": {
     "kind": "resonance",
-    "reference": "silk",
+    "reference": "resonator",
     "strength": 1.0,
     "falloff": {
      "kind": "none"
@@ -345,7 +345,7 @@
     "kind": "compound",
     "combine": "multiply",
     "children": [
-     "silk",
+     "resonator",
      "wallSide"
     ]
    }
@@ -387,7 +387,7 @@
     "kind": "compound",
     "combine": "multiply",
     "children": [
-     "silk",
+     "resonator",
      "sailSide"
     ]
    }
@@ -493,9 +493,9 @@
       "frequency": 0.08975979010256552,
       "speed": -0.5,
       "displacementAxis": [
-       -0.96,
-       -0.094,
-       -0.263
+       -0.9642,
+       -0.0931,
+       -0.2482
       ]
      },
      {
@@ -505,9 +505,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.96,
-       -0.094,
-       -0.263
+       -0.9642,
+       -0.0931,
+       -0.2482
       ]
      },
      {
@@ -517,9 +517,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       0.536,
-       -0.244,
-       -0.809
+       0.6533,
+       -0.2923,
+       -0.6984
       ]
      },
      {
@@ -529,9 +529,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.96,
-       -0.094,
-       -0.263
+       -0.9642,
+       -0.0931,
+       -0.2482
       ]
      },
      {
@@ -541,9 +541,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.96,
-       -0.094,
-       -0.263
+       -0.9642,
+       -0.0931,
+       -0.2482
       ]
      },
      {
@@ -553,9 +553,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       0.536,
-       -0.244,
-       -0.809
+       0.6533,
+       -0.2923,
+       -0.6984
       ]
      },
      {
@@ -565,9 +565,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.96,
-       -0.094,
-       -0.263
+       -0.9642,
+       -0.0931,
+       -0.2482
       ]
      }
     ],
@@ -586,9 +586,9 @@
     0.75
    ],
    "color": [
-    0.33475,
-    0.85376,
-    0.93836
+    0.20416,
+    0.826,
+    0.91594
    ],
    "intensity": 5.0,
    "castsShadow": false,
@@ -614,24 +614,6 @@
    "contactShadow": false
   },
   {
-   "id": "sail",
-   "name": "sail",
-   "type": "point",
-   "position": [
-    40.0,
-    55.0,
-    -120.0
-   ],
-   "color": [
-    0.35871,
-    0.08955,
-    0.84081
-   ],
-   "intensity": 12000.0,
-   "range": 120.0,
-   "castsShadow": false
-  },
-  {
    "id": "fill",
    "name": "fill",
    "type": "directional",
@@ -645,7 +627,7 @@
     0.6105,
     0.49693
    ],
-   "intensity": 0.35,
+   "intensity": 0.6,
    "castsShadow": false,
    "contactShadow": false
   }
@@ -703,82 +685,17 @@
      "kind": "power",
      "dst": 1,
      "srcA": 1,
-     "value": 400.0
+     "value": 500.0
     },
     {
-     "kind": "swizzle",
-     "dst": 2,
-     "srcA": 0,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "ramp",
+     "kind": "constant",
      "dst": 3,
-     "srcA": 2,
      "constant": [
-      0.0648,
-      0.6105,
-      0.49693,
-      1.0
-     ],
-     "constant2": [
       0.04092,
       0.7913,
       0.88792,
       1.0
-     ],
-     "constant3": [
-      0.18782,
-      0.09531,
-      0.9131,
-      1.0
      ]
-    },
-    {
-     "kind": "input",
-     "dst": 4,
-     "input": "time"
-    },
-    {
-     "kind": "palette",
-     "dst": 4,
-     "srcA": 4,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ],
-     "constant2": [
-      0.06,
-      0.06,
-      0.06,
-      0.0
-     ],
-     "constant3": [
-      0.010417,
-      0.010417,
-      0.010417,
-      0.0
-     ],
-     "constant4": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "hueShift",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4,
-     "value": 0.0
     },
     {
      "kind": "multiply",
@@ -790,9 +707,9 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      1.6,
-      1.6,
-      1.6,
+      0.9,
+      0.9,
+      0.9,
       1.0
      ]
     },
@@ -805,15 +722,15 @@
     {
      "kind": "fresnel",
      "dst": 4,
-     "value": 3.0
+     "value": 2.6
     },
     {
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.01371,
-      0.01966,
-      0.14535,
+      0.00857,
+      0.01229,
+      0.09084,
       1.0
      ]
     },
@@ -821,24 +738,113 @@
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.1033,
-      0.05242,
-      0.5022,
+      0.07513,
+      0.03812,
+      0.36524,
       1.0
      ]
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.75,
+      0.75,
+      0.75,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 4,
+     "srcB": 7
     },
     {
      "kind": "mixBy",
      "dst": 5,
      "srcA": 5,
      "srcB": 6,
-     "srcC": 4
+     "srcC": 7
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      -0.0,
+      -4.0,
+      170.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 0.012345679012345678
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.34694,
+      0.46506,
+      0.5,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 6
     },
     {
      "kind": "power",
      "dst": 6,
      "srcA": 4,
-     "value": 2.0
+     "value": 2.5
     },
     {
      "kind": "field",
@@ -855,9 +861,25 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.06546,
-      1.26608,
-      1.42068,
+      0.69387,
+      0.93011,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
       1.0
      ]
     },
@@ -879,12 +901,18 @@
      "field": "kickFront"
     },
     {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.36739,
-      0.86071,
-      0.94396,
+      0.04092,
+      0.7913,
+      0.88792,
       1.0
      ]
     },
@@ -895,18 +923,12 @@
      "srcB": 3
     },
     {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.5,
-      0.5,
-      0.5,
+      0.45,
+      0.45,
+      0.45,
       1.0
      ]
     },
@@ -945,18 +967,28 @@
      "srcB": 4
     },
     {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.87137,
+      0.07227,
+      0.62396,
+      1.0
+     ]
+    },
+    {
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
-     "srcB": 4
+     "srcB": 3
     },
     {
      "kind": "constant",
      "dst": 3,
      "constant": [
-      1.21991,
-      0.10118,
-      0.87354,
+      0.35,
+      0.35,
+      0.35,
       1.0
      ]
     },
