@@ -98,12 +98,12 @@ SOURCES = [
 ]
 # name -> (listen band, frame rotation in degrees)
 READERS = {
-    "a1": ((0.25, 0.45), [0.0, 0.0, 0.0]),
+    "a1": ((0.25, 1.0), [0.0, 0.0, 0.0]),     # also hears B and C (the mids' bands, the highs' ridges)
     "a2": ((0.25, 0.45), [-60.0, 0.0, 30.0]),
     "a3": ((0.25, 0.45), [50.0, 0.0, -60.0]),
     "l": ((0.0, 0.2), [0.0, 0.0, 0.0]),
-    "b": ((0.45, 1.0), [40.0, 0.0, -30.0]),
 }
+RELIEF = {"f-a1": 1.1, "f-a2": 0.9, "f-a3": 0.9, "f-l": 3.0}   # metres of normal displacement per unit figure
 
 
 def resonator(s):
@@ -150,8 +150,15 @@ def resonance_fields(s, only=None):
             continue
         reader(s, "f-" + name, "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.2,
                                           "listenLow": lo, "listenHigh": hi, "listenWidth": 0.03}, rotation=rot)
-    compound(s, "M", ["f-a1", "f-a2", "f-a3"])
+    # D: the sheets' displacement, the families summed with their relief as strengths, baked once a frame into a
+    # volume (ADR-1440) that the single deformer samples (per vertex, four times with the finite-difference normal)
+    compound(s, "D", list(RELIEF), strength=1.0)
+    for n in s.nodes:
+        if n["name"] in RELIEF:
+            n["field"]["strength"] = RELIEF[n["name"]]
+    bake_grid(s, "D", D_RES)
     reader(s, "en", "amplitude", {"listenLow": 0.45, "listenHigh": 1.0, "listenWidth": 0.03})
+    bake_grid(s, "en", EN_RES)
     # each low onset launches a spherical shell from the sculpture's middle, travelling out through the sheets and
     # decaying (ADR-1116; exact under seek)
     field(s, "front", {"kind": "onset", "falloff": {"kind": "none"}, "onsetSource": "low", "audioSpeed": 32.0,
@@ -260,7 +267,7 @@ def _veil(u, v):
 
 
 SHEETS = [("wing", _wing, 380, 300), ("arch", _arch, 360, 260), ("veil", _veil, 340, 240)]
-CELL = float(os.environ.get("WD_CELL", "1.0"))   # the level sheets' surface-nets cell (m)
+CELL = float(os.environ.get("WD_CELL", "1.4"))   # the level sheets' surface-nets cell (m): 130k vertices in all
 
 
 def write_parametric_meshes():
@@ -323,68 +330,52 @@ class Prog:
 
 
 def surface_program(name, energy, cut):
-    """The shared surface (one program for all three prototypes): blackened indigo, a step lighter on each nested
-    sheet (related hues, different light); electric purple where the mids and highs ring hard, crimson where they ring
-    hardest; a crimson wavefront when a kick's shell passes; a thin royal rim. `cut`: the sheet's UV.x is its
-    distance to its cut edge -- the edge is cut there with sub-cell precision (opacity, masked) and traced with a
-    crimson line that the resonance brightens. Lit by the scene's lights."""
+    """The sheets' surface, fourteen ops (the interpreter costs about 0.7 ms an op at 1080p, Stage B profile).
+    Blackened indigo, a step lighter on each nested sheet (related hues, different light); emission only where the
+    mids and highs ring hard or a kick's shell passes -- electric purple rising to spectral red; the sheets' cut edges
+    traced by a crimson-to-rose line that the same excitation brightens. Lit by the scene's lights."""
     g = Prog(name)   # eight registers, r0..r7
     g.op(None, "input", 7, inp="uv")                              # r7 = (edge distance, sheet index)
-    g.op("energy", "field", 0, field=energy)                     # r0 = excitation
-    g.op("front", "field", 6, field="front")                     # r6 = the travelling shell
+    if os.environ.get("WD_NOEN"):   # (a profiling switch: no per-pixel field reads)
+        g.op("energy", "constant", 0, k=[0.3, 0.3, 0.3, 0.3])
+        g.op("front", "constant", 6, k=[0, 0, 0, 0])
+    else:
+        g.op("energy", "field", 0, field=energy)                 # r0 = excitation (baked)
+        g.op("front", "field", 6, field="front")                 # r6 = the travelling shell
+    g.op("sheetTone", "gradient", 1, a=7, k=[0.0, 0.25, 0.0, 0.0], f=1.0)   # r1 = sheet index / 4
     if NEUTRAL:
         g.op(None, "constant", 4, k=[0.18, 0.18, 0.19, 1.0])
         g.op(None, "constant", 2, k=[0.0, 0.0, 0.0, 1.0])
-        if cut:
-            g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])
-            g.op(None, "smoothstep", 5, a=5, k=[0.0, 0.6])
-        g.base, g.emit, g.opacity = 4, 2, (5 if cut else -1)
+        g.base, g.emit, g.opacity = 4, 2, -1
         return g
-    g.op(None, "swizzle", 1, a=7, k=[1, 1, 1, 1])
-    g.op("sheetTone", "remap", 1, a=1, k=[0.0, 4.0, 0.0, 1.0], f=1.0)
     g.op("albedo", "ramp", 4, a=1, k=C("indigo") + [1.0], k2=C("indigo", 1.5) + [1.0], k3=C("royal", 0.9) + [1.0])
-    g.op("bandMask", "smoothstep", 1, a=0, k=[0.6, 1.1])       # where it rings hard
-    g.op("band", "ramp", 2, a=1, k=[0, 0, 0, 0], k2=C("purple", 0.05) + [0.5], k3=C("purple", 0.12) + [1.0])
-    g.op("hotMask", "smoothstep", 3, a=0, k=[1.1, 1.6])         # where it rings hardest
-    g.op("hot", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.15) + [0.5], k3=C("red", 0.45) + [1.0])
-    g.op(None, "add", 2, a=2, b=3)
-    g.op("frontMask", "smoothstep", 3, a=6, k=[0.15, 0.9])
-    g.op("frontTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.25) + [0.5], k3=C("crimson", 0.6) + [1.0])
-    g.op(None, "add", 2, a=2, b=3)                                # r2: emission
+    g.op(None, "add", 3, a=0, b=6)                                # r3 = excitation + shell
+    g.op("glowMask", "smoothstep", 1, a=3, k=[0.7, 1.6])
+    g.op("glow", "ramp", 2, a=1, k=[0, 0, 0, 0], k2=C("purple", 0.1) + [0.5], k3=C("red", 0.5) + [1.0])
     if cut:
-        g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])             # r5 = edge distance
-        g.op("edgeLine", "smoothstep", 3, a=5, k=[2.6, 0.7])      # a narrow band inside the cut ...
-        g.op(None, "smoothstep", 1, a=0, k=[0.1, 0.8])
-        g.op(None, "add", 1, a=1, b=6)
-        g.op(None, "multiply", 3, a=3, b=1)                       # ... brightened by the excitation and the shell
-        g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.35) + [0.5], k3=C("rose", 0.9) + [1.0])
-        g.op(None, "add", 2, a=2, b=3)
-        g.op("cut", "smoothstep", 5, a=5, k=[0.0, 0.6])           # r5: opacity (masked)
-    g.op(None, "input", 6, inp="normal")
-    g.op(None, "input", 7, inp="viewDirection")
-    g.op("rim", "fresnel", 1, a=6, b=7, f=5.0)
-    g.op("rimTint", "ramp", 1, a=1, k=[0, 0, 0, 0], k2=C("royal", 0.03) + [0.5], k3=C("royal", 0.07) + [1.0])
-    g.op(None, "add", 2, a=2, b=1)
-    g.base, g.emit, g.opacity = 4, 2, (5 if cut else -1)
+        g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])             # r5 = distance to the cut edge
+        g.op("edgeLine", "smoothstep", 5, a=5, k=[2.6, 0.7])      # a narrow band inside the cut ...
+        g.op("edgeGain", "smoothstep", 1, a=3, k=[0.2, 1.0])
+        g.op(None, "multiply", 5, a=5, b=1)                       # ... brightened by the excitation and the shell
+        g.op("edgeTint", "ramp", 5, a=5, k=[0, 0, 0, 0], k2=C("crimson", 0.35) + [0.5], k3=C("rose", 0.9) + [1.0])
+        g.op(None, "add", 2, a=2, b=5)
+    g.base, g.emit, g.opacity = 4, 2, -1
     return g
 
 
 def material(prog, cut=False):
     m = {"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 0.38,
-         "metallic": 0.0, "doubleSided": True, "program": prog}
-    if cut:
-        m["alphaMode"] = "mask"
-        m["alphaCutoff"] = 0.5
-    return m
+         "metallic": 0.0, "doubleSided": True, "program": "" if os.environ.get("WD_NOPROG") else prog}
+    if os.environ.get("WD_UNLIT"):   # (profiling switches)
+        m["unlit"] = True
+    return m   # opaque: the sheets are cut as geometry (levelsets.clip_mesh), never by a masked discard
 
 
 # ================================================================================================ geometry, per prototype
-RELIEF = {"M": 2.6, "f-l": 3.5, "f-b": 0.9}   # metres of normal displacement per unit figure
-
-
 def deformers():
-    return [{"kind": "field", "field": name, "amount": amount, "space": "world", "alongNormal": True}
-            for name, amount in RELIEF.items()]
+    if os.environ.get("WD_NODEFORM"):   # (a profiling switch: the bare meshes)
+        return []
+    return [{"kind": "field", "field": "D-grid", "amount": 1.0, "space": "world", "alongNormal": True}]
 
 
 def parametric_sheets(s, prog):
@@ -395,8 +386,10 @@ def parametric_sheets(s, prog):
 
 def level_sheets(s, prog):
     for i, _ in enumerate(levelsets.LEVELS):
+        if os.environ.get("WD_SHEETS") and str(i) not in os.environ["WD_SHEETS"].split(","):
+            continue
         s.proc("level%d" % i, {"kind": "mesh", "asset": "meshes/wd-level%d.glb" % i}, material=material(prog, cut=True),
-               extra={"normalStep": 0.5}, deformers=deformers())
+               extra={"normalStep": 2.0}, deformers=deformers())   # one bake cell: smooth normals across cells
 
 
 # A: the SDF. H = carrier + KAPPA_M M, its level sets sphere-traced; each level is plane + KAPPA (H - c) + lin (the
@@ -406,8 +399,10 @@ def level_sheets(s, prog):
 KAPPA = 12.0
 KAPPA_M = 0.18
 SDF_LEVELS = [-0.45, 0.25, 0.95]
-BAKE_BOUNDS = ([-130.0, -80.0, -130.0], [130.0, 80.0, 130.0])
+BAKE_BOUNDS = ([-128.0, -80.0, -128.0], [128.0, 80.0, 128.0])
 BAKE_RES = [128, 64, 128]
+D_RES = [128, 80, 128]     # 2 m cells
+EN_RES = [96, 60, 96]
 
 
 def bake_grid(s, source, res, strength=1.0):
@@ -450,18 +445,21 @@ def environment(s):
         "intensity": 0.03, "background": C("obsidian"), "fogColor": C("obsidian"),
         "volumeDensity": 0.0, "volumeMaxDistance": 0.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 200.0, "ambientOcclusion": False, "contactShadows": False,
+        # the depth prepass, asked for (ADR-1406): five nested opaque sheets overdraw each other, and with the deformation
+        # baked (ADR-1440) a second geometry pass costs ~3 ms and saves ~20 of shading (Stage B profile)
+        "depthPrepass": os.environ.get("WD_PREPASS", "1") == "1",
         "sky": {"enabled": True, "zenithColor": C("obsidian", 0.6), "horizonColor": C("indigo", 0.5),
                 "groundColor": C("obsidian", 0.5), "haze": 0.3, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     if NEUTRAL:
-        s.light("key", "directional", direction=[0.55, -0.45, -0.7], color=[1, 1, 1], intensity=2.4, castsShadow=False)
-        s.light("fill", "directional", direction=[-0.6, 0.2, 0.5], color=[1, 1, 1], intensity=0.5, castsShadow=False)
+        s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=[1, 1, 1], intensity=2.2, castsShadow=False)
+        s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=[1, 1, 1], intensity=0.25, castsShadow=False)
         return
     # the key grazes from high left (a pale violet light), the rim comes from behind (crimson), a low royal fill
     s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#b9a6ff"), intensity=1.8,
             castsShadow=False)
-    s.light("rim", "directional", direction=[-0.3, -0.15, 0.95], color=C("crimson"), intensity=0.25, castsShadow=False)
+    s.light("rim", "directional", direction=[-0.3, -0.15, 0.95], color=C("crimson"), intensity=0.15, castsShadow=False)
     s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=0.3, castsShadow=False)
 
 
@@ -493,7 +491,7 @@ def debug_slice(s):
     """A review aid: three orthogonal planes through the middle, unlit, coloured by the low-mid triple M (blue
     negative, red positive)."""
     g = Prog("wdSlice")
-    g.op(None, "field", 0, field="M")
+    g.op(None, "field", 0, field="D-grid")
     g.op(None, "remap", 1, a=0, k=[-2.0, 2.0, 0.0, 1.0], f=1.0)
     g.op(None, "ramp", 4, a=1, k=[0.05, 0.2, 1.0, 1.0], k2=[0.02, 0.02, 0.02, 1.0], k3=[1.0, 0.25, 0.05, 1.0])
     g.op(None, "constant", 2, k=[0, 0, 0, 1])
@@ -504,6 +502,69 @@ def debug_slice(s):
         s.proc(name, {"kind": "mesh", "asset": "meshes/wd-slice.glb"}, rotation=rot,
                material={"baseColor": [1, 1, 1], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
                          "roughness": 1.0, "metallic": 0.0, "unlit": True, "doubleSided": True, "program": "wdSlice"})
+
+
+# ================================================================================================ the instrument
+# The music's hand on the sculpture (brief §7): audio excites the resonance's persistent modes (ADR-1400: the field hears
+# the audio history itself, through the Response controls, ADR-1361); the routes below only choose WHICH figure leads
+# and how strongly each family moves the sheets -- bounded, smoothed gains, never a raw level on a vertex.
+CC = [  # brief §10: the performer's controls, MIDI CC 1-9 through `control.*`
+    (1, "resonance", "RESONANCE: how hard the music drives the field (its sustained and struck excitation)"),
+    (2, "scale", "FIELD SCALE: every wavelength shrinks -- finer folds and bands for the same music"),
+    (3, "density", "CONTOUR DENSITY: the low-mid folds lead with their shorter wavelengths -- tighter nested folds"),
+    (4, "interference", "INTERFERENCE: the two turned low-mid frames grow against the first -- more crossing folds"),
+    (5, "relief", "SURFACE RELIEF: how far the field moves the sheets"),
+    (6, "detail", "DETAIL: the highs' fine ridges"),
+    (7, "spectral", "SPECTRAL COLOUR: the purple-to-red glow where the field rings"),
+    (8, "light", "LIGHT RESPONSE: the cut edges' crimson line and the key light"),
+    (9, "motion", "MOTION SCALE: the modes' visible oscillation and the families' drift"),
+]
+CCR = {"attackMs": 120, "decayMs": 120}
+
+
+def control_map():
+    b = [{"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": name} for n, name, _ in CC]
+    return {"midi": {"enabled": True, "filter": "*", "bindings": b}}
+
+
+def instrument(s, g):
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    F = "field/%s/resonance/" % FIELD
+    st = lambda name: "field/%s/strength" % name
+    # bass swells the broad lobes; held sound lets the standing figure accumulate (a longer memory) and deepens the
+    # turned folds; the sound's brightness moves the low-mid focus (modal exchange: one wavelength leads, then
+    # another); spectral change sets the mids' bands travelling further; the song's build lifts the whole relief
+    s.route(R("response.bass", st("f-l"), 1.0, op="multiply", gain=0.6, offset=1.0, attackMs=90, decayMs=1100),
+            R("response.sustain", F + "memory", 1.5, attackMs=2000, decayMs=5000),
+            R("response.sustain", st("f-a2"), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500, decayMs=4000),
+            R("response.sustain", st("f-a3"), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500, decayMs=4000),
+            R("sonic.brightness.slow", F + "source/1/focus", 0.07, attackMs=2500, decayMs=5000),
+            R("response.flux", F + "source/2/drift", 8.0, attackMs=600, decayMs=2500),
+            R("response.intensity", st("D-grid"), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=4000,
+              decayMs=8000))
+    s.control = control_map()
+    s.route(R("control.resonance", F + "sustain", 1.5, **CCR), R("control.resonance", F + "transient", 1.2, **CCR),
+            R("control.scale", F + "scale", 1.2, **CCR),
+            R("control.density", F + "source/1/focus", 0.1, **CCR),
+            R("control.interference", st("f-a2"), 1.0, op="multiply", gain=1.0, offset=1.0, **CCR),
+            R("control.interference", st("f-a3"), 1.0, op="multiply", gain=1.0, offset=1.0, **CCR),
+            R("control.relief", st("D-grid"), 1.0, op="multiply", gain=1.5, offset=1.0, **CCR),
+            R("control.detail", F + "source/3/amplitude", 0.6, **CCR),
+            R("control.motion", F + "breath", 0.3, **CCR))
+    if NEUTRAL or not g.at.get("glow"):
+        return
+    RP = "material/%s/op/%%d/ramp/%%s" % g.name
+    for label, cc, gain in (("glow", "control.spectral", 2.0), ("edgeTint", "control.light", 1.5)):
+        if label in g.at:
+            for k in ("constant2", "constant3"):
+                s.route(R(cc, RP % (g[label], k), 1.0, op="multiply", gain=gain, offset=1.0, **CCR))
+
+
+# THE CAMERA: an elevated three-quarter arc outside the sculpture's densest part, looking down into the nested sheets,
+# so they fill the frame and recede (Stage B): never inside one opening looking down it (no portal), never so close
+# that one blank sheet fills the frame
+CAM_FOCUS = [0.0, -10.0, -10.0]
+CAM_R, CAM_H, CAM_AZ, CAM_SWEEP, CAM_FOCAL = 125.0, 85.0, 30.0, 70.0, 24.0
 
 
 def build():
@@ -517,7 +578,7 @@ def build():
                     "orbitSpeed": 0.0}
         s.params_({"camera/lens/focalLength": 24.0, "post/bloom/enabled": False})
         return s
-    g = surface_program("wdSurface", "en", cut=PROTO != "A")
+    g = surface_program("wdSurface", "en-grid", cut=PROTO != "A")
     s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
     if PROTO == "A":
         iso_sdf(s, g.name)
@@ -527,13 +588,12 @@ def build():
     else:
         write_level_meshes()
         level_sheets(s, g.name)
-    s.camera = {"mode": 1, "position": [40.0, 10.0, 150.0], "target": [-10.0, -5.0, 0.0], "fov": 40.0,
-                "orbitSpeed": 0.0}
-    s.arc_camera([-10.0, -5.0, 0.0], 150.0, 10.0, period=150.0, centre_deg=15.0, sweep_deg=60.0, steps=24, side=0.0,
-                 lift=0.0, height_bob=4.0)
-    s.params_({"camera/lens/focalLength": 28.0})
-    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
-    s.params_(POST if not NEUTRAL else {"scene/volumeDensity": 0.003, "scene/fogColor": [0.02, 0.02, 0.02],
+    s.camera = {"mode": 1, "position": [60.0, 90.0, 110.0], "target": CAM_FOCUS, "fov": 40.0, "orbitSpeed": 0.0}
+    s.arc_camera(CAM_FOCUS, CAM_R, CAM_H, period=160.0, centre_deg=CAM_AZ, sweep_deg=CAM_SWEEP, steps=24, side=0.0,
+                 lift=0.0, height_bob=6.0)
+    s.params_({"camera/lens/focalLength": CAM_FOCAL})
+    instrument(s, g)
+    s.params_(POST if not NEUTRAL else {"scene/volumeDensity": 0.0045, "scene/fogColor": [0.02, 0.02, 0.02],
                                         "post/bloom/enabled": False, "post/output/vignette": 0.0})
     return s
 

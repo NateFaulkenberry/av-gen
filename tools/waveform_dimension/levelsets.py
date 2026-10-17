@@ -22,13 +22,15 @@ CARRIER = [
     ((220.0, -60.0, -240.0), 128.0, 0.9),
     ((30.0, 200.0, 240.0), 172.0, 0.8),
 ]
-# the aperture's two shorter waves, from nearer points: where they cancel, the sheets open
+# the aperture's three shorter waves, from nearer points placed off-centre: where they cancel, the sheets open --
+# many partial openings of different sizes across the sculpture, never one centred portal (Stage B)
 APERTURE = [
-    ((-60.0, -30.0, 70.0), 64.0, 1.0),
-    ((80.0, 50.0, -40.0), 52.0, 0.8),
+    ((-60.0, -30.0, 70.0), 46.0, 1.0),
+    ((80.0, 50.0, -40.0), 39.0, 0.8),
+    ((-20.0, 70.0, -90.0), 57.0, 0.7),
 ]
 LEVELS = [-1.25, -0.45, 0.25, 0.95, 1.6]   # uneven: the nested sheets bunch and part
-APERTURE_THRESHOLD = -0.3                  # a sheet exists where A > this
+APERTURE_THRESHOLD = -0.15                 # a sheet exists where A > this (about 45% of the volume is open)
 BOUND_RADII = (118.0, 72.0, 118.0)         # the sculpture's soft outer ellipsoid (m)
 
 
@@ -150,5 +152,61 @@ def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0
     flip = (fn * nrm[tri[:, 0]]).sum(1) < 0
     tri[flip] = tri[flip][:, [0, 2, 1]]
     uv = np.stack([q, np.full(len(q), float(index))], 1)
+    verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
     return (verts.astype(np.float32), nrm.astype(np.float32), uv.astype(np.float32),
             tri.reshape(-1).astype(np.uint32))
+
+
+def clip_mesh(verts, nrm, uv, tri):
+    """Cuts the mesh exactly along q = 0 (q = uv.x): triangles wholly inside are kept, wholly outside dropped, and a
+    crossing triangle is split at the interpolated crossings. The cut is geometry, so the sheets stay OPAQUE (a masked
+    material's discard defeats the GPU's hidden-surface removal: five layered masked sheets cost 56 ms at 1080p with
+    no field evaluated at all, Stage B profile)."""
+    q = uv[:, 0]
+    qt = q[tri]
+    inside = qt >= 0.0
+    n_in = inside.sum(1)
+    out_tris = [tri[n_in == 3]]
+    new_v, new_n, new_uv = [verts], [nrm], [uv]
+    base = len(verts)
+
+    def crossing(a, b):
+        t = (q[a] / (q[a] - q[b]))[:, None]
+        p = verts[a] + (verts[b] - verts[a]) * t
+        n = nrm[a] + (nrm[b] - nrm[a]) * t
+        n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-12
+        w = uv[a] + (uv[b] - uv[a]) * t
+        w[:, 0] = 0.0
+        return p, n, w
+
+    for count in (1, 2):
+        sel = tri[n_in == count]
+        if len(sel) == 0:
+            continue
+        ins = inside[n_in == count]
+        # rotate each triangle so that its odd vertex (the lone inside one for count 1, the lone outside one for
+        # count 2) comes first, keeping the winding
+        odd = np.argmax(ins if count == 1 else ~ins, axis=1)
+        r = np.stack([sel[np.arange(len(sel)), (odd + k) % 3] for k in range(3)], 1)
+        a, b, c = r[:, 0], r[:, 1], r[:, 2]
+        pab, nab, wab = crossing(a, b)
+        pac, nac, wac = crossing(a, c)
+        i_ab = base + np.arange(len(sel))
+        i_ac = base + len(sel) + np.arange(len(sel))
+        base += 2 * len(sel)
+        new_v += [pab, pac]
+        new_n += [nab, nac]
+        new_uv += [wab, wac]
+        if count == 1:   # a inside: one triangle a, ab, ac
+            out_tris.append(np.stack([a, i_ab, i_ac], 1))
+        else:            # a outside: the quad ab, b, c, ac
+            out_tris.append(np.stack([i_ab, b, c], 1))
+            out_tris.append(np.stack([i_ab, c, i_ac], 1))
+    verts = np.concatenate(new_v, 0)
+    nrm = np.concatenate(new_n, 0)
+    uv = np.concatenate(new_uv, 0)
+    tri = np.concatenate(out_tris, 0)
+    used = np.unique(tri)
+    remap = -np.ones(len(verts), dtype=np.int64)
+    remap[used] = np.arange(len(used))
+    return verts[used], nrm[used], uv[used], remap[tri]
