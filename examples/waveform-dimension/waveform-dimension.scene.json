@@ -824,18 +824,47 @@
      "srcA": 3,
      "constant": [
       9.0,
-      36.0,
+      25.0,
       0.0,
       0.0
      ]
     },
     {
      "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 3,
+     "constant": [
+      36.0,
+      64.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 0
+    },
+    {
+     "kind": "smoothstep",
      "dst": 3,
      "srcA": 3,
      "constant": [
-      49.0,
-      100.0,
+      81.0,
+      144.0,
       0.0,
       0.0
      ]
@@ -847,34 +876,12 @@
      "srcB": 3
     },
     {
-     "kind": "input",
-     "dst": 0,
-     "input": "convexity"
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 0,
-     "srcA": 0,
-     "constant": [
-      0.01,
-      0.06,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 0
-    },
-    {
      "kind": "smoothstep",
      "dst": 5,
      "srcA": 5,
      "constant": [
       0.0,
-      1.6,
+      1.8,
       0.0,
       0.0
      ]
@@ -896,17 +903,33 @@
       0.0
      ],
      "constant2": [
-      0.02629,
-      0.00324,
-      0.04589,
+      0.03381,
+      0.00417,
+      0.059,
       0.5
      ],
      "constant3": [
-      0.39212,
-      0.02601,
-      0.04088,
+      0.47925,
+      0.03179,
+      0.04996,
       1.0
      ]
+    },
+    {
+     "kind": "constant",
+     "dst": 0,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 0
     },
     {
      "kind": "swizzle",
@@ -929,6 +952,35 @@
       0.0,
       0.0
      ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 0,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.00454,
+      0.00101,
+      0.01511,
+      0.5
+     ],
+     "constant3": [
+      0.00907,
+      0.00202,
+      0.03022,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 0
     },
     {
      "kind": "remap",
@@ -987,6 +1039,22 @@
       0.27467,
       1.0
      ]
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 1
     },
     {
      "kind": "add",

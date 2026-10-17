@@ -199,7 +199,7 @@ def write_glb(path, pos, nrm, uv, idx, name):
         f.write(struct.pack("<II", len(blob), 0x004E4942) + blob)
 
 
-CELL = 1.4   # the level sheets' surface-nets cell (m): 130k vertices in all
+CELL = 1.8   # the level sheets' surface-nets cell (m): ~80k vertices in all (1.4 m cost ~7 ms more per pass live)
 
 
 def write_level_meshes():
@@ -274,30 +274,42 @@ def surface_program(name):
     # albedo: each nested sheet its own value of the same indigo-violet (related hues, different light); the
     # outermost the lightest royal, the inner ones sinking to blackened indigo
     g.op("albedo", "ramp", 4, a=1, k=C("royal", 0.95) + [1.0], k2=C("indigo", 1.6) + [1.0], k3=C("indigo", 1.1) + [1.0])
-    # the glow follows the form, never painted spots: electric purple rising to spectral red on the CRESTS of the folds
-    # (convexity, 1/m) where the families' displacement reinforces (|D| large: constructive interference) -- bands
-    # along the sheets' curvature; a kick's shell adds its crimson band as it passes. How bright it is follows the
-    # music's level (a route on the ramp)
+    # the glow follows the field's contours, never painted spots: electric purple in a BAND where the families'
+    # displacement reaches a given strength (|D| 3-6 m: a contour of the reinforcement, so it rings each lobe and runs
+    # along the folds), spectral red only in the cores where it reinforces hardest (|D| > 9 m); a kick's shell adds its
+    # crimson band as it passes. How bright it is follows the music's level (a route on the ramp). (Tried first: the
+    # glow on the fold crests by screen-space convexity -- blocky; and |D| as a fill -- round blobs.)
     g.op("reinf", "field", 3, field="D-grid")
     g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2
-    g.op("purpleMask", "smoothstep", 5, a=3, k=[9.0, 36.0])
-    g.op("redMask", "smoothstep", 3, a=3, k=[49.0, 100.0])
+    g.op("bandIn", "smoothstep", 5, a=3, k=[9.0, 25.0])
+    g.op("bandOut", "smoothstep", 0, a=3, k=[36.0, 64.0])
+    g.op(None, "remap", 0, a=0, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
+    g.op(None, "multiply", 5, a=5, b=0)                           # r5 = the purple contour band
+    g.op("redCore", "smoothstep", 3, a=3, k=[81.0, 144.0])
     g.op(None, "add", 5, a=5, b=3)                                # r5 in 0..2
-    g.op(None, "input", 0, inp="convexity")
-    g.op("crest", "smoothstep", 0, a=0, k=[0.01, 0.06])
-    g.op(None, "multiply", 5, a=5, b=0)                           # only on the folds' crests
-    g.op("glowT", "smoothstep", 5, a=5, k=[0.0, 1.6])
+    g.op("glowT", "smoothstep", 5, a=5, k=[0.0, 1.8])
     g.op(None, "add", 5, a=5, b=6)
-    g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", 0.14) + [0.5], k3=C("red", 0.45) + [1.0])
+    g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", GLOW_GAIN[0]) + [0.5], k3=C("red", GLOW_GAIN[1]) + [1.0])
+    # its brightness: a constant the music's level scales (routes), apart from the colours (the palette owns those)
+    g.op("glowGain", "constant", 0, k=[1.0, 1.0, 1.0, 1.0])
+    g.op(None, "multiply", 2, a=2, b=0)
     # the cut edges: a line on the outer sheets only, fading inward, lit by the glow; rose-white only where a primary
     # edge rings hardest (restrained: the line is narrow and dim at rest)
     g.op(None, "swizzle", 3, a=7, k=[0, 0, 0, 0])
     g.op("edgeLine", "smoothstep", 3, a=3, k=[2.2, 0.5])
+    # every sheet's edge carries a dim royal-violet line, so the nesting reads in colour as it does in grey ...
+    g.op("edgeBase", "ramp", 0, a=3, k=[0, 0, 0, 0], k2=C("royal", CONTOUR_GAIN[0]) + [0.5],
+         k3=C("royal", CONTOUR_GAIN[1]) + [1.0])
+    g.op(None, "add", 2, a=2, b=0)
+    # ... and the outer sheets' a crimson one over it
     g.op("edgeWeight", "remap", 1, a=1, k=[0.0, 0.85, 1.0, 0.0], f=1.0)   # the outer sheets only
     g.op(None, "multiply", 3, a=3, b=1)
     g.op("edgeGain", "smoothstep", 1, a=5, k=[-0.3, 1.0])
     g.op(None, "multiply", 3, a=3, b=1)
-    g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.2) + [0.5], k3=C("rose", 0.85) + [1.0])
+    g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", EDGE_GAIN[0]) + [0.5],
+         k3=C("rose", EDGE_GAIN[1]) + [1.0])
+    g.op("edgeLevel", "constant", 1, k=[1.0, 1.0, 1.0, 1.0])     # the edges' brightness (hats, snares, CC 8)
+    g.op(None, "multiply", 3, a=3, b=1)
     g.op(None, "add", 2, a=2, b=3)
     g.base, g.emit, g.opacity = 4, 2, -1
     return g
@@ -398,6 +410,70 @@ def design():
     }
 
 
+# ================================================================================================ the palettes
+# Eight designed palettes (ADR-1043 states, ADR-1420 selector): each names the same roles, so a palette is data and
+# the program is one. The owner's indigo-violet with crimson is the first, brighter than the Stage D look; the
+# others are vivid and clearly different, each a dominant hue family with one contrasting accent for the resonance.
+# The selector moves between them on the music's phrases (beat.phrasePulse), never through the states between, in a
+# composed order that alternates cool and warm, with a minimum hold and a several-second OKLab blend.
+#   bg       background, fog, the sky's zenith         shadow    the inner sheets (and the sky's horizon)
+#   secondary the middle sheets                         primary   the outer sheets' lit faces
+#   key / rim / fill  the lights                        band      the resonant glow's contour band
+#   highlight the glow's reinforced cores               contour   every sheet's dim edge line
+#   edge      the outer sheets' edge line               peak      the rarest accent, where a primary edge rings hardest
+PALETTES = [
+    ("Indigo Crimson", dict(bg="#0B0918", shadow="#2A1450", secondary="#46238A", primary="#6A35C2", key="#C4B2FF",
+                            rim="#8A3AC0", fill="#482080", band="#9A3AD0", highlight="#F04455", contour="#7A52D8",
+                            edge="#C32965", peak="#FF8B9A")),
+    ("Ultramarine Gold", dict(bg="#060B20", shadow="#102266", secondary="#1C3CB0", primary="#3466FF", key="#D2DCFF",
+                              rim="#5A86FF", fill="#1B2A70", band="#3D8BFF", highlight="#FFC63D", contour="#6E96FF",
+                              edge="#F2A61C", peak="#FFF1C2")),
+    ("Ember Rose", dict(bg="#150706", shadow="#44140E", secondary="#842A18", primary="#C94A24", key="#FFD0B0",
+                        rim="#FF7444", fill="#5A1A2E", band="#FF5A36", highlight="#FFD166", contour="#E07A52",
+                        edge="#FF9F5A", peak="#FFF0D6")),
+    ("Teal Amber", dict(bg="#031515", shadow="#09342F", secondary="#0F5E57", primary="#169282", key="#B6FFEC",
+                        rim="#2BD8C4", fill="#0E4A6B", band="#1FCDB8", highlight="#FFB347", contour="#3AB8A8",
+                        edge="#E8873A", peak="#FFE2A8")),
+    ("Magenta Lime", dict(bg="#13051B", shadow="#3F0C4A", secondary="#801A8A", primary="#C734BC", key="#FFC0F4",
+                          rim="#FF55DC", fill="#4B1660", band="#E648CE", highlight="#B6FF3D", contour="#D070D8",
+                          edge="#8CE62A", peak="#F2FFD0")),
+    ("Glacier Violet", dict(bg="#0B0D1C", shadow="#20284E", secondary="#41569C", primary="#7590E0", key="#EEF3FF",
+                            rim="#B094FF", fill="#2A2F66", band="#A585FF", highlight="#FF7AC6", contour="#9AB0F0",
+                            edge="#C48BFF", peak="#FFE0F4")),
+    ("Jade Coral", dict(bg="#04130D", shadow="#0C3826", secondary="#156B47", primary="#22AA6E", key="#D0FFE8",
+                        rim="#45FFB6", fill="#0D3D3A", band="#32E8A4", highlight="#FF6F61", contour="#4CC690",
+                        edge="#FF8F7A", peak="#FFE3DC")),
+    ("Cyan Fuchsia", dict(bg="#06111B", shadow="#0C304A", secondary="#11618F", primary="#1BA8DC", key="#D4F7FF",
+                          rim="#3FE6FF", fill="#2A1B5A", band="#26D6F0", highlight="#FF44A8", contour="#4AB8E0",
+                          edge="#FF68B8", peak="#FFD8EE")),
+]
+PALETTE_ORDER = [0, 1, 2, 3, 4, 5, 6, 7]   # cool and warm alternate; the owner's palette opens
+GLOW_GAIN = (0.18, 0.55)                   # the glow ramp's middle and end, as fractions of band and highlight
+CONTOUR_GAIN = (0.07, 0.14)
+EDGE_GAIN = (0.2, 0.85)
+
+
+def palette_block(g):
+    """The project palette (ADR-1043) with its selector (ADR-1420): the roles bound to the lights, the sky, the fog and
+    the surface program's colour constants."""
+    op = lambda label, k: "material/%s/op/%d/ramp/%s" % (g.name, g[label], k)
+    bindings = [
+        ("bg", "scene/fogColor", 1.0), ("bg", "env/sky/zenithColor", 0.6), ("shadow", "env/sky/horizonColor", 0.45),
+        ("primary", op("albedo", "constant"), 1.0), ("secondary", op("albedo", "constant2"), 1.0),
+        ("shadow", op("albedo", "constant3"), 1.0),
+        ("key", "lights/key/color", 1.0), ("rim", "lights/rim/color", 1.0), ("fill", "lights/fill/color", 1.0),
+        ("band", op("glow", "constant2"), GLOW_GAIN[0]), ("highlight", op("glow", "constant3"), GLOW_GAIN[1]),
+        ("contour", op("edgeBase", "constant2"), CONTOUR_GAIN[0]), ("contour", op("edgeBase", "constant3"), CONTOUR_GAIN[1]),
+        ("edge", op("edgeTint", "constant2"), EDGE_GAIN[0]), ("peak", op("edgeTint", "constant3"), EDGE_GAIN[1]),
+    ]
+    states = [{"name": name, "colors": {role: hexrgb(h) for role, h in roles.items()}} for name, roles in PALETTES]
+    return {"states": states,
+            "bindings": [{"role": r, "target": t, "gain": gn, "mode": "replace"} for r, t, gn in bindings],
+            "saturation": 1.0, "value": 1.0,
+            "selector": {"select": PALETTE_ORDER[0], "transition": 5.0, "lock": False, "hold": 24.0,
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PALETTE_ORDER}}}
+
+
 # ================================================================================================ the instrument
 # The music's hand on the sculpture (brief §7): audio excites the resonance's persistent modes (ADR-1400: the field hears
 # the audio history itself, through the Response controls, ADR-1361); the routes below only choose WHICH figure leads
@@ -412,6 +488,8 @@ CC = [  # brief §10: the performer's controls, MIDI CC 1-9 through `control.*`
     (7, "spectral", "SPECTRAL COLOUR: the purple-to-red glow where the field rings"),
     (8, "light", "LIGHT RESPONSE: the outer sheets' crimson edge line"),
     (9, "motion", "MOTION SCALE: the modes' visible oscillation and the families' drift"),
+    (10, "palette", "PALETTE: choose one of the eight palettes"),
+    (11, "paletteLock", "PALETTE LOCK: hold the chosen palette (no change on the phrase)"),
 ]
 CCR = {"attackMs": 120, "decayMs": 120}
 
@@ -458,17 +536,16 @@ def instrument(s, g):
         return
     # light follows the music, on separate time scales: the glow's brightness the level (dim in a quiet passage,
     # never off), the edges' the hats and snares (treble: fine highlights only)
-    for prog in (g,):
-        RP = "material/%s/op/%%d/ramp/%%s" % prog.name
-        for k in ("constant2", "constant3"):
-            s.route(R("response.level", RP % (prog["glow"], k), 1.0, op="multiply", gain=1.6, offset=0.4,
-                      attackMs=150, decayMs=900),
-                    R("response.hatEnv", RP % (prog["edgeTint"], k), 1.0, op="multiply", gain=1.0, offset=1.0,
-                      attackMs=0, decayMs=200),
-                    R("response.snareEnv", RP % (prog["edgeTint"], k), 1.0, op="multiply", gain=0.8, offset=1.0,
-                      attackMs=0, decayMs=260),
-                    R("control.spectral", RP % (prog["glow"], k), 1.0, op="multiply", gain=2.0, offset=1.0, **CCR),
-                    R("control.light", RP % (prog["edgeTint"], k), 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
+    CP = "material/%s/op/%%d/constant/constant" % g.name
+    glow, edge = CP % g["glowGain"], CP % g["edgeLevel"]
+    s.route(R("response.level", glow, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=150, decayMs=900),
+            R("control.spectral", glow, 1.0, op="multiply", gain=2.0, offset=1.0, **CCR),
+            R("response.hatEnv", edge, 1.0, op="multiply", gain=1.0, offset=1.0, attackMs=0, decayMs=200),
+            R("response.snareEnv", edge, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=0, decayMs=260),
+            R("control.light", edge, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
+    # the palette: CC 10 selects one (0..1 across the states), CC 11 locks it (no automatic change)
+    s.route(R("control.palette", "palette/select", float(len(PALETTES) - 1), **CCR),
+            R("control.paletteLock", "palette/lock", 1.0, **CCR))
 
 
 # THE CAMERA: an elevated three-quarter arc outside the sculpture's densest part, looking down into the nested sheets,
@@ -493,6 +570,8 @@ def build():
                  lift=0.0, height_bob=6.0)
     s.params_({"camera/lens/focalLength": CAM_FOCAL})
     instrument(s, g)
+    if not NEUTRAL:
+        s.palette = palette_block(g)
     s.params_({"scene/volumeDensity": FOG})
     s.params_(POST if not NEUTRAL else {"scene/fogColor": [0.02, 0.02, 0.02],
                                         "post/bloom/enabled": False, "post/output/vignette": 0.0})
@@ -515,7 +594,7 @@ def write_scene():
     if os.environ.get("WD_OUT"):
         return pp
     kit.upsert_index_entry({
-        "category": TITLE,
+        "category": "Resonator",
         "description": "Play live audio (any mix) and, optionally, a MIDI controller: "
                        + ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in CC) + ". "
                        + s.design["thesis"] + " See docs/prototypes/waveform-dimension/.",

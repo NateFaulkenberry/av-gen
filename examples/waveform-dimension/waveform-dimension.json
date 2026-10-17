@@ -438,7 +438,7 @@
   },
   {
    "source": "response.level",
-   "target": "material/wdSurface/op/15/ramp/constant2",
+   "target": "material/wdSurface/op/16/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -450,8 +450,21 @@
    }
   },
   {
+   "source": "control.spectral",
+   "target": "material/wdSurface/op/16/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 1.0,
+    "attackMs": 120,
+    "decayMs": 120
+   }
+  },
+  {
    "source": "response.hatEnv",
-   "target": "material/wdSurface/op/22/ramp/constant2",
+   "target": "material/wdSurface/op/27/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -464,7 +477,7 @@
   },
   {
    "source": "response.snareEnv",
-   "target": "material/wdSurface/op/22/ramp/constant2",
+   "target": "material/wdSurface/op/27/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -476,21 +489,8 @@
    }
   },
   {
-   "source": "control.spectral",
-   "target": "material/wdSurface/op/15/ramp/constant2",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 2.0,
-    "offset": 1.0,
-    "attackMs": 120,
-    "decayMs": 120
-   }
-  },
-  {
    "source": "control.light",
-   "target": "material/wdSurface/op/22/ramp/constant2",
+   "target": "material/wdSurface/op/27/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -502,66 +502,23 @@
    }
   },
   {
-   "source": "response.level",
-   "target": "material/wdSurface/op/15/ramp/constant3",
-   "amount": 1.0,
-   "op": "multiply",
+   "source": "control.palette",
+   "target": "palette/select",
+   "amount": 7.0,
+   "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.6,
-    "offset": 0.4,
-    "attackMs": 150,
-    "decayMs": 900
-   }
-  },
-  {
-   "source": "response.hatEnv",
-   "target": "material/wdSurface/op/22/ramp/constant3",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.0,
-    "offset": 1.0,
-    "attackMs": 0,
-    "decayMs": 200
-   }
-  },
-  {
-   "source": "response.snareEnv",
-   "target": "material/wdSurface/op/22/ramp/constant3",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 0.8,
-    "offset": 1.0,
-    "attackMs": 0,
-    "decayMs": 260
-   }
-  },
-  {
-   "source": "control.spectral",
-   "target": "material/wdSurface/op/15/ramp/constant3",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 2.0,
-    "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
    }
   },
   {
-   "source": "control.light",
-   "target": "material/wdSurface/op/22/ramp/constant3",
+   "source": "control.paletteLock",
+   "target": "palette/lock",
    "amount": 1.0,
-   "op": "multiply",
+   "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "gain": 1.5,
-    "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
    }
@@ -1073,6 +1030,644 @@
   "id": "waveform-dimension",
   "title": "Waveform Dimension"
  },
+ "palette": {
+  "states": [
+   {
+    "name": "Indigo Crimson",
+    "colors": {
+     "bg": [
+      0.00335,
+      0.00273,
+      0.00913
+     ],
+     "shadow": [
+      0.02315,
+      0.007,
+      0.08022
+     ],
+     "secondary": [
+      0.06125,
+      0.01681,
+      0.25415
+     ],
+     "primary": [
+      0.14413,
+      0.0356,
+      0.53948
+     ],
+     "key": [
+      0.55201,
+      0.4452,
+      1.0
+     ],
+     "rim": [
+      0.25415,
+      0.04231,
+      0.52712
+     ],
+     "fill": [
+      0.0648,
+      0.01444,
+      0.21586
+     ],
+     "band": [
+      0.32314,
+      0.04231,
+      0.63076
+     ],
+     "highlight": [
+      0.87137,
+      0.05781,
+      0.09084
+     ],
+     "contour": [
+      0.19462,
+      0.08438,
+      0.68669
+     ],
+     "edge": [
+      0.54572,
+      0.02217,
+      0.13014
+     ],
+     "peak": [
+      1.0,
+      0.25818,
+      0.32314
+     ]
+    }
+   },
+   {
+    "name": "Ultramarine Gold",
+    "colors": {
+     "bg": [
+      0.00182,
+      0.00335,
+      0.01444
+     ],
+     "shadow": [
+      0.00518,
+      0.016,
+      0.13287
+     ],
+     "secondary": [
+      0.01161,
+      0.04519,
+      0.43415
+     ],
+     "primary": [
+      0.03434,
+      0.13287,
+      1.0
+     ],
+     "key": [
+      0.64448,
+      0.71569,
+      1.0
+     ],
+     "rim": [
+      0.10224,
+      0.2384,
+      1.0
+     ],
+     "fill": [
+      0.01096,
+      0.02315,
+      0.16203
+     ],
+     "band": [
+      0.04667,
+      0.25818,
+      1.0
+     ],
+     "highlight": [
+      1.0,
+      0.56471,
+      0.04667
+     ],
+     "contour": [
+      0.15593,
+      0.30499,
+      1.0
+     ],
+     "edge": [
+      0.88792,
+      0.38133,
+      0.01161
+     ],
+     "peak": [
+      1.0,
+      0.87962,
+      0.53948
+     ]
+    }
+   },
+   {
+    "name": "Ember Rose",
+    "colors": {
+     "bg": [
+      0.0075,
+      0.00212,
+      0.00182
+     ],
+     "shadow": [
+      0.05781,
+      0.007,
+      0.00439
+     ],
+     "secondary": [
+      0.23074,
+      0.02315,
+      0.00913
+     ],
+     "primary": [
+      0.58408,
+      0.06848,
+      0.01764
+     ],
+     "key": [
+      1.0,
+      0.63076,
+      0.43415
+     ],
+     "rim": [
+      1.0,
+      0.17465,
+      0.05781
+     ],
+     "fill": [
+      0.10224,
+      0.01033,
+      0.02732
+     ],
+     "band": [
+      1.0,
+      0.10224,
+      0.03689
+     ],
+     "highlight": [
+      1.0,
+      0.6376,
+      0.13287
+     ],
+     "contour": [
+      0.7454,
+      0.19462,
+      0.08438
+     ],
+     "edge": [
+      1.0,
+      0.3467,
+      0.10224
+     ],
+     "peak": [
+      1.0,
+      0.87137,
+      0.67244
+     ]
+    }
+   },
+   {
+    "name": "Teal Amber",
+    "colors": {
+     "bg": [
+      0.00091,
+      0.0075,
+      0.0075
+     ],
+     "shadow": [
+      0.00273,
+      0.03434,
+      0.02843
+     ],
+     "secondary": [
+      0.00478,
+      0.11193,
+      0.09531
+     ],
+     "primary": [
+      0.00802,
+      0.28744,
+      0.22323
+     ],
+     "key": [
+      0.46778,
+      1.0,
+      0.8388
+     ],
+     "rim": [
+      0.02416,
+      0.68669,
+      0.55201
+     ],
+     "fill": [
+      0.00439,
+      0.06848,
+      0.14703
+     ],
+     "band": [
+      0.0137,
+      0.6105,
+      0.47932
+     ],
+     "highlight": [
+      1.0,
+      0.45079,
+      0.06301
+     ],
+     "contour": [
+      0.04231,
+      0.47932,
+      0.39157
+     ],
+     "edge": [
+      0.80695,
+      0.24228,
+      0.04231
+     ],
+     "peak": [
+      1.0,
+      0.76052,
+      0.39157
+     ]
+    }
+   },
+   {
+    "name": "Magenta Lime",
+    "colors": {
+     "bg": [
+      0.00651,
+      0.00152,
+      0.01096
+     ],
+     "shadow": [
+      0.04971,
+      0.00368,
+      0.06848
+     ],
+     "secondary": [
+      0.21586,
+      0.01033,
+      0.25415
+     ],
+     "primary": [
+      0.57112,
+      0.03434,
+      0.50289
+     ],
+     "key": [
+      1.0,
+      0.52712,
+      0.90466
+     ],
+     "rim": [
+      1.0,
+      0.09084,
+      0.71569
+     ],
+     "fill": [
+      0.07036,
+      0.00802,
+      0.11697
+     ],
+     "band": [
+      0.7913,
+      0.0648,
+      0.61721
+     ],
+     "highlight": [
+      0.46778,
+      1.0,
+      0.04667
+     ],
+     "contour": [
+      0.63076,
+      0.16203,
+      0.68669
+     ],
+     "edge": [
+      0.26225,
+      0.7913,
+      0.02315
+     ],
+     "peak": [
+      0.88792,
+      1.0,
+      0.63076
+     ]
+    }
+   },
+   {
+    "name": "Glacier Violet",
+    "colors": {
+     "bg": [
+      0.00335,
+      0.00402,
+      0.01161
+     ],
+     "shadow": [
+      0.01444,
+      0.02122,
+      0.07619
+     ],
+     "secondary": [
+      0.05286,
+      0.09306,
+      0.33245
+     ],
+     "primary": [
+      0.17789,
+      0.27889,
+      0.7454
+     ],
+     "key": [
+      0.85499,
+      0.89627,
+      1.0
+     ],
+     "rim": [
+      0.43415,
+      0.29614,
+      1.0
+     ],
+     "fill": [
+      0.02315,
+      0.02843,
+      0.13287
+     ],
+     "band": [
+      0.37626,
+      0.23455,
+      1.0
+     ],
+     "highlight": [
+      1.0,
+      0.19462,
+      0.56471
+     ],
+     "contour": [
+      0.32314,
+      0.43415,
+      0.87137
+     ],
+     "edge": [
+      0.55201,
+      0.25818,
+      1.0
+     ],
+     "peak": [
+      1.0,
+      0.7454,
+      0.90466
+     ]
+    }
+   },
+   {
+    "name": "Jade Coral",
+    "colors": {
+     "bg": [
+      0.00121,
+      0.00651,
+      0.00402
+     ],
+     "shadow": [
+      0.00368,
+      0.03955,
+      0.01938
+     ],
+     "secondary": [
+      0.0075,
+      0.14703,
+      0.06301
+     ],
+     "primary": [
+      0.016,
+      0.40198,
+      0.15593
+     ],
+     "key": [
+      0.63076,
+      1.0,
+      0.80695
+     ],
+     "rim": [
+      0.05951,
+      1.0,
+      0.46778
+     ],
+     "fill": [
+      0.00402,
+      0.04667,
+      0.04231
+     ],
+     "band": [
+      0.0319,
+      0.80695,
+      0.37124
+     ],
+     "highlight": [
+      1.0,
+      0.15896,
+      0.11954
+     ],
+     "contour": [
+      0.07227,
+      0.56471,
+      0.27889
+     ],
+     "edge": [
+      1.0,
+      0.27468,
+      0.19462
+     ],
+     "peak": [
+      1.0,
+      0.76815,
+      0.71569
+     ]
+    }
+   },
+   {
+    "name": "Cyan Fuchsia",
+    "colors": {
+     "bg": [
+      0.00182,
+      0.00561,
+      0.01096
+     ],
+     "shadow": [
+      0.00368,
+      0.02956,
+      0.06848
+     ],
+     "secondary": [
+      0.00561,
+      0.11954,
+      0.27468
+     ],
+     "primary": [
+      0.01096,
+      0.39157,
+      0.71569
+     ],
+     "key": [
+      0.65837,
+      0.93011,
+      1.0
+     ],
+     "rim": [
+      0.04971,
+      0.7913,
+      1.0
+     ],
+     "fill": [
+      0.02315,
+      0.01096,
+      0.10224
+     ],
+     "band": [
+      0.01938,
+      0.67244,
+      0.87137
+     ],
+     "highlight": [
+      1.0,
+      0.05781,
+      0.39157
+     ],
+     "contour": [
+      0.06848,
+      0.47932,
+      0.7454
+     ],
+     "edge": [
+      1.0,
+      0.13843,
+      0.47932
+     ],
+     "peak": [
+      1.0,
+      0.68669,
+      0.85499
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "bg",
+    "target": "scene/fogColor",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "bg",
+    "target": "env/sky/zenithColor",
+    "gain": 0.6,
+    "mode": "replace"
+   },
+   {
+    "role": "shadow",
+    "target": "env/sky/horizonColor",
+    "gain": 0.45,
+    "mode": "replace"
+   },
+   {
+    "role": "primary",
+    "target": "material/wdSurface/op/4/ramp/constant",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "secondary",
+    "target": "material/wdSurface/op/4/ramp/constant2",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "shadow",
+    "target": "material/wdSurface/op/4/ramp/constant3",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "key",
+    "target": "lights/key/color",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "rim",
+    "target": "lights/rim/color",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "fill",
+    "target": "lights/fill/color",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "band",
+    "target": "material/wdSurface/op/15/ramp/constant2",
+    "gain": 0.18,
+    "mode": "replace"
+   },
+   {
+    "role": "highlight",
+    "target": "material/wdSurface/op/15/ramp/constant3",
+    "gain": 0.55,
+    "mode": "replace"
+   },
+   {
+    "role": "contour",
+    "target": "material/wdSurface/op/20/ramp/constant2",
+    "gain": 0.07,
+    "mode": "replace"
+   },
+   {
+    "role": "contour",
+    "target": "material/wdSurface/op/20/ramp/constant3",
+    "gain": 0.14,
+    "mode": "replace"
+   },
+   {
+    "role": "edge",
+    "target": "material/wdSurface/op/26/ramp/constant2",
+    "gain": 0.2,
+    "mode": "replace"
+   },
+   {
+    "role": "peak",
+    "target": "material/wdSurface/op/26/ramp/constant3",
+    "gain": 0.85,
+    "mode": "replace"
+   }
+  ],
+  "saturation": 1.0,
+  "value": 1.0,
+  "selector": {
+   "select": 0,
+   "transition": 5.0,
+   "lock": false,
+   "hold": 24.0,
+   "advance": {
+    "signal": "beat.phrasePulse",
+    "threshold": 0.5,
+    "order": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ]
+   }
+  }
+ },
  "control": {
   "midi": {
    "enabled": true,
@@ -1140,6 +1735,20 @@
      "kind": "cc",
      "number": 9,
      "signal": "motion"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 10,
+     "signal": "palette"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 11,
+     "signal": "paletteLock"
     }
    ]
   }
