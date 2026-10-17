@@ -177,11 +177,18 @@ Scene::fields.fields ─── FieldSpec { kind: "grid", reference: "smoke" }
 | `vector` | 4 (xyz + pad) | the length | the vector, rotated by the field's frame |
 | `reactionDiffusion` | 2 (A, B) | **B**, the pattern channel | B × the field's axis |
 | `excitable` (ADR-1201) | 4 (u, r, e, w), a plane `[x, 1, z]` | **u**, the excitation | u × the field's axis |
+| `oscillator` (ADR-1450) | 4 (cos θ, sin θ, R, activity), a plane `[x, 1, z]` | **cos θ** | cos θ × the field's axis |
 
 A Grid field's `"channel": 0..3` reads that component of the cells as a scalar instead, for any mode
 (ADR-1201; e.g. the wake `w` of an excitable grid). An `excitable` grid is a propagating medium with a
 calibrated front speed in m/s, refractoriness and energy / wake accumulators; its model, parameters and
 cost are in [ADR-1201](decisions/ADR-1201-excitable-propagation-grid.md).
+An `oscillator` grid is a lattice of coupled phase oscillators (Kuramoto-Sakaguchi, with long-range links, two
+populations, a coupling mask, a frequency field and onset kicks): see
+[ADR-1450](decisions/ADR-1450-an-oscillator-grid-couples-phases-on-a-plane.md). A `reactionDiffusion` grid may be a
+plane `[x, 1, z]` up to 1024 (isotropic 9-point Laplacian), take `iterations` steps of `speed / simRate / iterations`
+per sub-step, and blend its feed and kill per cell with a `regimeField`:
+[ADR-1451](decisions/ADR-1451-a-reaction-diffusion-grid-can-be-a-plane-at-speed-with-regions.md).
 
 Sampling is trilinear over the cell centres (cell *i* is centred at
 `boundsMin + (i + 0.5) * cellSize`). Outside the bounds, `wrap` decides: `clamp` repeats the edge

@@ -47,6 +47,8 @@ const char* gridModeName(GridMode mode) {
         return "excitable";
     case GridMode::Bake:
         return "bake";
+    case GridMode::Oscillator:
+        return "oscillator";
     }
     return "scalar";
 }
@@ -54,7 +56,7 @@ const char* gridModeName(GridMode mode) {
 std::optional<GridMode> gridModeFromName(std::string_view name) {
     for (const GridMode m :
          {GridMode::Scalar, GridMode::Vector, GridMode::ReactionDiffusion, GridMode::Agents, GridMode::Excitable,
-          GridMode::Bake}) {
+          GridMode::Bake, GridMode::Oscillator}) {
         if (name == gridModeName(m)) {
             return m;
         }
@@ -86,6 +88,7 @@ int GridField::components() const {
         return 2;
     case GridMode::Agents:
     case GridMode::Excitable:
+    case GridMode::Oscillator:
         return 4;
     case GridMode::Bake:
         return 1;
@@ -120,6 +123,11 @@ std::size_t GridField::index(int i, int j, int k) const {
            static_cast<std::size_t>(components());
 }
 
+namespace {
+std::uint32_t simHashFwd(std::uint32_t a, std::uint32_t b, std::uint32_t c);
+float simUnitFwd(std::uint32_t h);
+} // namespace
+
 void GridField::reset() {
     const std::size_t floats = floatCount();
     data.assign(floats, 0.0f);
@@ -136,6 +144,17 @@ void GridField::reset() {
             for (int i = 0; i < resolution.x; ++i) {
                 const std::size_t base = index(i, j, k);
                 const glm::vec3 c = cellCenter(i, j, k);
+                if (mode == GridMode::Oscillator) {
+                    // ADR-1450: a hashed phase per cell, spread over seedAmount of the circle; R and activity start at 0.
+                    const auto cell = static_cast<std::uint32_t>(k * resolution.x + i);
+                    const float theta = 6.283185307179586f * std::clamp(seedAmount, 0.0f, 1.0f) *
+                                        simUnitFwd(simHashFwd(cell, 0x696e6974u, seed));
+                    data[base] = std::cos(theta);
+                    data[base + 1] = std::sin(theta);
+                    data[base + 2] = 0.0f;
+                    data[base + 3] = 0.0f;
+                    continue;
+                }
                 if (mode == GridMode::ReactionDiffusion) {
                     // The canonical Gray-Scott seed: A = 1 everywhere, and blobs of
                     // (A, B) = (0.5, 0.25) where a low-frequency fBM crosses 0.6.
@@ -356,6 +375,158 @@ void stepExcitable(GridField& g, float dt, double time, const FieldSet* set) {
     }
 }
 
+// ---- ADR-1450: the oscillator grid. Transliterated by cs_osc_kick and cs_oscillate in shaders/simulate.wgsl. ----
+
+constexpr float kTwoPi = 6.283185307179586f;
+constexpr std::uint32_t kOscOmegaA = 0x6f736331u; // "osc1"
+constexpr std::uint32_t kOscOmegaB = 0x6f736332u; // "osc2"
+constexpr std::uint32_t kOscPopulation = 0x706f7031u;
+constexpr std::uint32_t kOscLink = 0x6c6e6b00u;
+constexpr std::uint32_t kOscNoise = 0x9e3779b9u;
+
+bool oscPopulation(const GridField& g, std::uint32_t cell) {
+    return g.populationMix > 0.0f && simUnit(simHash(cell, kOscPopulation, g.seed)) < g.populationMix;
+}
+
+// A cell's natural frequency (Hz), without the frequency field (that is applied in the kick pass).
+float oscOmega(const GridField& g, std::uint32_t cell) {
+    const float u = simUnit(simHash(cell, kOscOmegaA, g.seed)) + simUnit(simHash(cell, kOscOmegaB, g.seed)) - 1.0f;
+    return g.frequency + g.spread * u + (oscPopulation(g, cell) ? g.detune : 0.0f);
+}
+
+// Link l's offset (cells) for a cell: uniform in [-range, range]^2 on x and z.
+glm::ivec2 oscLinkOffset(const GridField& g, std::uint32_t cell, int l) {
+    const int range = std::max(1, static_cast<int>(g.linkRange));
+    const auto span = static_cast<float>(2 * range + 1);
+    const auto lu = static_cast<std::uint32_t>(l);
+    const int dx = std::min(static_cast<int>(simUnit(simHash(cell, kOscLink + 2u * lu, g.seed)) * span), 2 * range) - range;
+    const int dz =
+        std::min(static_cast<int>(simUnit(simHash(cell, kOscLink + 2u * lu + 1u, g.seed)) * span), 2 * range) - range;
+    return {dx, dz};
+}
+
+float oscSigma(const GridField& g) { return 0.6f * static_cast<float>(std::clamp(g.couplingRadius, 1, 4)); }
+
+// The kick pass: injection kicks, the frequency field's phase advance and phase noise, over one sub-step.
+void oscKick(GridField& g, float dtSub, std::uint32_t stepIndex, double time, const FieldSet* set) {
+    const FieldSpec* inject = (set != nullptr && !g.injectField.empty()) ? set->find(g.injectField) : nullptr;
+    const FieldSpec* freq = (set != nullptr && !g.frequencyField.empty()) ? set->find(g.frequencyField) : nullptr;
+    const bool kicked = inject != nullptr && inject->enabled && g.injectRate != 0.0f;
+    const bool tuned = freq != nullptr && freq->enabled;
+    const int nx = g.resolution.x;
+    const int nz = g.resolution.z;
+    const float noiseAmp = g.noise * std::sqrt(dtSub) * 1.7320508f;
+    for (int k = 0; k < nz; ++k) {
+        for (int i = 0; i < nx; ++i) {
+            const std::size_t base = g.index(i, 0, k);
+            const auto cell = static_cast<std::uint32_t>(k * nx + i);
+            const glm::vec3 p = g.cellCenter(i, 0, k);
+            const float kick =
+                kicked ? g.injectRate * std::max(0.0f, spatial::sampleScalar(*inject, p, time, set)) * dtSub : 0.0f;
+            const float advance = tuned ? kTwoPi * spatial::sampleScalar(*freq, p, time, set) * dtSub : 0.0f;
+            const float jitter =
+                g.noise > 0.0f ? noiseAmp * (simUnit(simHash(cell, stepIndex, g.seed ^ kOscNoise)) * 2.0f - 1.0f) : 0.0f;
+            const float d = kick + advance + jitter;
+            if (d == 0.0f) {
+                continue;
+            }
+            const float theta = std::atan2(g.data[base + 1], g.data[base]) + d;
+            g.data[base] = std::cos(theta);
+            g.data[base + 1] = std::sin(theta);
+            g.data[base + 3] = std::min(g.data[base + 3] + std::abs(kick), 4.0f);
+        }
+    }
+}
+
+// One coupling pass of dtIt seconds (gather; reads `previous`, writes g).
+void oscCouple(GridField& g, const GridField& previous, float dtIt, double time, const FieldSet* set) {
+    const FieldSpec* mask =
+        (set != nullptr && !g.conductivityField.empty()) ? set->find(g.conductivityField) : nullptr;
+    const bool masked = mask != nullptr && mask->enabled;
+    const int nx = g.resolution.x;
+    const int nz = g.resolution.z;
+    const int r = std::clamp(g.couplingRadius, 1, 4);
+    const float sigma = oscSigma(g);
+    const float inv2s2 = 1.0f / (2.0f * sigma * sigma);
+    const float linkW = g.linkWeight * std::exp(-inv2s2);
+    const int links = std::clamp(g.links, 0, 4);
+    const float gain = 1.0f - std::exp(-dtIt / g.persistence);
+    const bool wraps = g.wrap == GridWrap::Wrap;
+    for (int k = 0; k < nz; ++k) {
+        for (int i = 0; i < nx; ++i) {
+            const std::size_t base = g.index(i, 0, k);
+            const auto cell = static_cast<std::uint32_t>(k * nx + i);
+            const float ci = previous.data[base];
+            const float si = previous.data[base + 1];
+            const bool pop = oscPopulation(g, cell);
+            float sumC = 0.0f;
+            float sumS = 0.0f;
+            float sumW = 0.0f;  // base weights (normalises the torque)
+            float sumWX = 0.0f; // weights x the cross factor (normalises R)
+            auto add = [&](int ii, int kk, float w) {
+                if (wraps) {
+                    ii = wrapIndex(ii, nx, GridWrap::Wrap);
+                    kk = wrapIndex(kk, nz, GridWrap::Wrap);
+                } else if (ii < 0 || ii >= nx || kk < 0 || kk >= nz) {
+                    return;
+                }
+                const auto other = static_cast<std::uint32_t>(kk * nx + ii);
+                const float x = oscPopulation(g, other) == pop ? 1.0f : g.crossCoupling;
+                const std::size_t ob = g.index(ii, 0, kk);
+                sumC += w * x * previous.data[ob];
+                sumS += w * x * previous.data[ob + 1];
+                sumW += w;
+                sumWX += w * x;
+            };
+            for (int dz = -r; dz <= r; ++dz) {
+                for (int dx = -r; dx <= r; ++dx) {
+                    const int d2 = dx * dx + dz * dz;
+                    if (d2 == 0 || d2 > r * r + r) {
+                        continue;
+                    }
+                    add(i + dx, k + dz, std::exp(-static_cast<float>(d2) * inv2s2));
+                }
+            }
+            for (int l = 0; l < links; ++l) {
+                const glm::ivec2 o = oscLinkOffset(g, cell, l);
+                if (o.x == 0 && o.y == 0) {
+                    continue;
+                }
+                add(i + o.x, k + o.y, linkW);
+            }
+            const float m = masked ? std::max(0.0f, spatial::sampleScalar(*mask, g.cellCenter(i, 0, k), time, set)) : 1.0f;
+            const float theta = std::atan2(si, ci);
+            const float ca = std::cos(theta + g.phaseLag);
+            const float sa = std::sin(theta + g.phaseLag);
+            const float torque = sumW > 0.0f ? g.coupling * m * (sumS * ca - sumC * sa) / sumW : 0.0f;
+            const float next = theta + dtIt * (kTwoPi * oscOmega(g, cell) + torque);
+            const float rLocal = sumWX > 0.0f ? std::sqrt(sumC * sumC + sumS * sumS) / sumWX : 0.0f;
+            const float activity = std::abs(torque) / std::max(g.coupling, 1e-3f);
+            const float rOld = previous.data[base + 2];
+            const float aOld = previous.data[base + 3];
+            g.data[base] = std::cos(next);
+            g.data[base + 1] = std::sin(next);
+            g.data[base + 2] = rOld + (std::min(rLocal, 1.0f) - rOld) * gain;
+            g.data[base + 3] = aOld + (std::min(activity, 4.0f) - aOld) * gain;
+        }
+    }
+}
+
+void stepOscillator(GridField& g, float dt, double time, const FieldSet* set) {
+    const auto stepIndex = static_cast<std::uint32_t>(std::llround(time * static_cast<double>(g.simRate)));
+    const float dtSub = dt * g.speed;
+    oscKick(g, dtSub, stepIndex, time, set);
+    const int iterations = std::max(1, g.iterations);
+    const float dtIt = dtSub / static_cast<float>(iterations);
+    for (int it = 0; it < iterations; ++it) {
+        const GridField previous = g;
+        oscCouple(g, previous, dtIt, time, set);
+    }
+}
+
+std::uint32_t simHashFwd(std::uint32_t a, std::uint32_t b, std::uint32_t c) { return simHash(a, b, c); }
+float simUnitFwd(std::uint32_t h) { return simUnit(h); }
+
 } // namespace
 
 void GridField::step(float dt, double time, const FieldSet* set) {
@@ -364,6 +535,10 @@ void GridField::step(float dt, double time, const FieldSet* set) {
     }
     if (mode == GridMode::Excitable) {
         stepExcitable(*this, dt, time, set);
+        return;
+    }
+    if (mode == GridMode::Oscillator) { // ADR-1450
+        stepOscillator(*this, dt, time, set);
         return;
     }
     if (mode == GridMode::Bake) { // ADR-1407: the source field itself, at every cell centre (signed, no rate)
@@ -427,24 +602,56 @@ void GridField::step(float dt, double time, const FieldSet* set) {
     }
 
     if (mode == GridMode::ReactionDiffusion) {
-        // ---- Gray-Scott, explicit Euler with the 6-neighbour Laplacian ----
-        const GridField previous = *this;
-        for (int k = 0; k < resolution.z; ++k) {
-            for (int j = 0; j < resolution.y; ++j) {
-                for (int i = 0; i < resolution.x; ++i) {
-                    const float a = previous.at(i, j, k, 0);
-                    const float b = previous.at(i, j, k, 1);
-                    const float la = previous.at(i - 1, j, k, 0) + previous.at(i + 1, j, k, 0) +
-                                     previous.at(i, j - 1, k, 0) + previous.at(i, j + 1, k, 0) +
-                                     previous.at(i, j, k - 1, 0) + previous.at(i, j, k + 1, 0) - 6.0f * a;
-                    const float lb = previous.at(i - 1, j, k, 1) + previous.at(i + 1, j, k, 1) +
-                                     previous.at(i, j - 1, k, 1) + previous.at(i, j + 1, k, 1) +
-                                     previous.at(i, j, k - 1, 1) + previous.at(i, j, k + 1, 1) - 6.0f * b;
-                    const float reaction = a * b * b;
-                    const std::size_t base = index(i, j, k);
-                    data[base] = std::clamp(a + (diffusionA * la - reaction + feed * (1.0f - a)) * dt, 0.0f, 1.0f);
-                    data[base + 1] =
-                        std::clamp(b + (diffusionB * lb + reaction - (kill + feed) * b) * dt, 0.0f, 1.0f);
+        // ---- Gray-Scott, explicit Euler: the 6-neighbour Laplacian in a volume, the isotropic 9-point one on a
+        // plane (ADR-1451); `iterations` steps of dt * speed / iterations; (feed, kill) blended per cell by the
+        // regime field toward (feedB, killB). ----
+        const FieldSpec* regime = (set != nullptr && !regimeField.empty()) ? set->find(regimeField) : nullptr;
+        const bool regimed = regime != nullptr && regime->enabled;
+        const bool flat = reactionPlane();
+        const int its = std::max(1, iterations);
+        const float dtIt = dt * speed / static_cast<float>(its);
+        for (int it = 0; it < its; ++it) {
+            const GridField previous = *this;
+            for (int k = 0; k < resolution.z; ++k) {
+                for (int j = 0; j < resolution.y; ++j) {
+                    for (int i = 0; i < resolution.x; ++i) {
+                        const float a = previous.at(i, j, k, 0);
+                        const float b = previous.at(i, j, k, 1);
+                        float la = 0.0f;
+                        float lb = 0.0f;
+                        if (flat) {
+                            const float aa = previous.at(i - 1, j, k, 0) + previous.at(i + 1, j, k, 0) +
+                                             previous.at(i, j, k - 1, 0) + previous.at(i, j, k + 1, 0);
+                            const float ad = previous.at(i - 1, j, k - 1, 0) + previous.at(i + 1, j, k - 1, 0) +
+                                             previous.at(i - 1, j, k + 1, 0) + previous.at(i + 1, j, k + 1, 0);
+                            const float ba = previous.at(i - 1, j, k, 1) + previous.at(i + 1, j, k, 1) +
+                                             previous.at(i, j, k - 1, 1) + previous.at(i, j, k + 1, 1);
+                            const float bd = previous.at(i - 1, j, k - 1, 1) + previous.at(i + 1, j, k - 1, 1) +
+                                             previous.at(i - 1, j, k + 1, 1) + previous.at(i + 1, j, k + 1, 1);
+                            la = (4.0f * aa + ad - 20.0f * a) * (1.0f / 6.0f);
+                            lb = (4.0f * ba + bd - 20.0f * b) * (1.0f / 6.0f);
+                        } else {
+                            la = previous.at(i - 1, j, k, 0) + previous.at(i + 1, j, k, 0) +
+                                 previous.at(i, j - 1, k, 0) + previous.at(i, j + 1, k, 0) +
+                                 previous.at(i, j, k - 1, 0) + previous.at(i, j, k + 1, 0) - 6.0f * a;
+                            lb = previous.at(i - 1, j, k, 1) + previous.at(i + 1, j, k, 1) +
+                                 previous.at(i, j - 1, k, 1) + previous.at(i, j + 1, k, 1) +
+                                 previous.at(i, j, k - 1, 1) + previous.at(i, j, k + 1, 1) - 6.0f * b;
+                        }
+                        float f = feed;
+                        float kk = kill;
+                        if (regimed) {
+                            const float w =
+                                std::clamp(spatial::sampleScalar(*regime, cellCenter(i, j, k), time, set), 0.0f, 1.0f);
+                            f = feed + (feedB - feed) * w;
+                            kk = kill + (killB - kill) * w;
+                        }
+                        const float reaction = a * b * b;
+                        const std::size_t base = index(i, j, k);
+                        data[base] = std::clamp(a + (diffusionA * la - reaction + f * (1.0f - a)) * dtIt, 0.0f, 1.0f);
+                        data[base + 1] =
+                            std::clamp(b + (diffusionB * lb + reaction - (kk + f) * b) * dtIt, 0.0f, 1.0f);
+                    }
                 }
             }
         }
@@ -529,6 +736,26 @@ Result<void> GridField::validate() const {
             // r is the medium's clock: noise in it would be fronts that fired at random moments.
             return fail("grid '{}': an excitable grid starts at rest; seedAmount must be 0", name);
         }
+    } else if (mode == GridMode::Oscillator) { // ADR-1450
+        if (resolution.y != 1 || resolution.x < 2 || resolution.z < 2 || resolution.x > kMaxAgentGridResolution ||
+            resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': an oscillator grid is a plane: resolution [x, 1, z] with 2 <= x, z <= {}", name,
+                        kMaxAgentGridResolution);
+        }
+        if (couplingRadius < 1 || couplingRadius > 4 || links < 0 || links > 4) {
+            return fail("grid '{}': couplingRadius must be in [1, 4] and links in [0, 4]", name);
+        }
+        if (!(linkRange >= 1.0f) || linkWeight < 0.0f || spread < 0.0f || coupling < 0.0f || crossCoupling < 0.0f ||
+            noise < 0.0f) {
+            return fail("grid '{}': linkRange must be >= 1; linkWeight, spread, coupling, crossCoupling and noise >= 0",
+                        name);
+        }
+        if (!(populationMix >= 0.0f && populationMix <= 1.0f) || !(seedAmount >= 0.0f && seedAmount <= 1.0f)) {
+            return fail("grid '{}': populationMix and seedAmount must be in [0, 1]", name);
+        }
+        if (!(persistence > 0.0f) || !std::isfinite(frequency) || !std::isfinite(detune) || !std::isfinite(phaseLag)) {
+            return fail("grid '{}': persistence must be > 0 and frequency, detune and phaseLag finite", name);
+        }
     } else if (mode == GridMode::Agents) {
         if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
             return fail("grid '{}': an agents grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
@@ -556,9 +783,20 @@ Result<void> GridField::validate() const {
         if (injectField.empty()) {
             return fail("grid '{}': a bake grid needs the field it bakes (injectField)", name);
         }
+    } else if (reactionPlane()) { // ADR-1451: a plane, up to the plane limit
+        if (resolution.x < 3 || resolution.z < 3 || resolution.x > kMaxAgentGridResolution ||
+            resolution.z > kMaxAgentGridResolution) {
+            return fail("grid '{}': a reaction-diffusion plane is [x, 1, z] with 3 <= x, z <= {}", name,
+                        kMaxAgentGridResolution);
+        }
     } else if (resolution.x > kMaxGridResolution || resolution.y > kMaxGridResolution ||
                resolution.z > kMaxGridResolution) {
         return fail("grid '{}': resolution must be <= {} on every axis", name, kMaxGridResolution);
+    }
+    if (mode == GridMode::ReactionDiffusion || mode == GridMode::Oscillator) { // ADR-1450/1451
+        if (!(speed > 0.0f) || !std::isfinite(speed) || iterations < 1 || iterations > 64) {
+            return fail("grid '{}': speed must be > 0 and iterations in [1, 64]", name);
+        }
     }
     if (checkpointInterval < 0.0f) {
         return fail("grid '{}': checkpointInterval must be >= 0", name);
@@ -616,6 +854,13 @@ std::uint64_t GridField::layoutHash() const {
     }
     if (mode == GridMode::Excitable) {
         h.str(conductivityField);
+    }
+    if (mode == GridMode::Oscillator) { // ADR-1450
+        h.str(conductivityField);
+        h.str(frequencyField);
+    }
+    if (mode == GridMode::ReactionDiffusion && !regimeField.empty()) { // ADR-1451: only when set
+        h.str(regimeField);
     }
     return h.value();
 }
@@ -679,6 +924,36 @@ std::uint64_t GridField::structuralHash() const {
         h.f32(wakeTime);
         h.f32(noise);
     }
+    if (mode == GridMode::ReactionDiffusion) { // ADR-1451: hashed only when not the defaults
+        if (speed != 1.0f || iterations != 1) {
+            h.f32(speed);
+            h.i32(iterations);
+        }
+        if (!regimeField.empty()) {
+            h.str(regimeField);
+            h.f32(feedB);
+            h.f32(killB);
+        }
+    }
+    if (mode == GridMode::Oscillator) { // ADR-1450
+        h.f32(speed);
+        h.i32(iterations);
+        h.str(conductivityField);
+        h.str(frequencyField);
+        h.f32(coupling);
+        h.f32(noise);
+        h.f32(frequency);
+        h.f32(spread);
+        h.f32(phaseLag);
+        h.i32(couplingRadius);
+        h.i32(links);
+        h.f32(linkRange);
+        h.f32(linkWeight);
+        h.f32(populationMix);
+        h.f32(detune);
+        h.f32(crossCoupling);
+        h.f32(persistence);
+    }
     return h.value();
 }
 
@@ -738,6 +1013,36 @@ json GridField::toJson() const {
         j["energyTime"] = energyTime;
         j["wakeTime"] = wakeTime;
         j["noise"] = noise;
+    }
+    if (mode == GridMode::ReactionDiffusion) { // ADR-1451: written only when not the defaults
+        if (speed != 1.0f || iterations != 1) {
+            j["speed"] = speed;
+            j["iterations"] = iterations;
+        }
+        if (!regimeField.empty()) {
+            j["regimeField"] = regimeField;
+            j["feedB"] = feedB;
+            j["killB"] = killB;
+        }
+    }
+    if (mode == GridMode::Oscillator) { // ADR-1450: written only for oscillator grids
+        j["speed"] = speed;
+        j["iterations"] = iterations;
+        j["conductivityField"] = conductivityField;
+        j["frequencyField"] = frequencyField;
+        j["coupling"] = coupling;
+        j["noise"] = noise;
+        j["frequency"] = frequency;
+        j["spread"] = spread;
+        j["phaseLag"] = phaseLag;
+        j["couplingRadius"] = couplingRadius;
+        j["links"] = links;
+        j["linkRange"] = linkRange;
+        j["linkWeight"] = linkWeight;
+        j["populationMix"] = populationMix;
+        j["detune"] = detune;
+        j["crossCoupling"] = crossCoupling;
+        j["persistence"] = persistence;
     }
     return j;
 }
@@ -802,6 +1107,23 @@ Result<GridField> GridField::fromJson(const json& root) {
     AVGEN_SPATIAL_READ(g.energyTime, "energyTime", detail::readFloat);
     AVGEN_SPATIAL_READ(g.wakeTime, "wakeTime", detail::readFloat);
     AVGEN_SPATIAL_READ(g.noise, "noise", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.speed, "speed", detail::readFloat);            // ADR-1450/1451
+    AVGEN_SPATIAL_READ(g.iterations, "iterations", detail::readInt);
+    AVGEN_SPATIAL_READ(g.regimeField, "regimeField", detail::readString); // ADR-1451
+    AVGEN_SPATIAL_READ(g.feedB, "feedB", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.killB, "killB", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.frequencyField, "frequencyField", detail::readString); // ADR-1450
+    AVGEN_SPATIAL_READ(g.frequency, "frequency", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.spread, "spread", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.phaseLag, "phaseLag", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.couplingRadius, "couplingRadius", detail::readInt);
+    AVGEN_SPATIAL_READ(g.links, "links", detail::readInt);
+    AVGEN_SPATIAL_READ(g.linkRange, "linkRange", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.linkWeight, "linkWeight", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.populationMix, "populationMix", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.detune, "detune", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.crossCoupling, "crossCoupling", detail::readFloat);
+    AVGEN_SPATIAL_READ(g.persistence, "persistence", detail::readFloat);
     if (root.contains("initial")) { // ADR-1282
         const json& a = root.at("initial");
         if (!a.is_array()) {

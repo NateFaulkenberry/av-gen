@@ -1,0 +1,287 @@
+// Generative R&D (docs/prototypes/generative-rd/): the GPU kernels of the two grid modes it added, against their CPU
+// references in spatial::GridField::step().
+//   ADR-1450: cs_osc_kick + cs_oscillate -- every coupling feature on at once (disk, links, populations, lag, mask,
+//   frequency field, kicks) within 2e-3 of the CPU over two seconds; with noise, bit-identical across two runs, unit
+//   phases; and a synchronisation transition on the GPU.
+//   ADR-1451: cs_reaction on a plane with iterations, speed and a regime field within 1e-3 of the CPU, and a pattern
+//   that forms in seconds.
+
+#include "core/log.hpp"
+#include "gpu/context.hpp"
+#include "gpu/shader_library.hpp"
+#include "rendering/field_uniforms.hpp"
+#include "rendering/simulation.hpp"
+#include "scene/scene.hpp"
+#include "spatial/field.hpp"
+#include "spatial/grid_field.hpp"
+
+#include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <complex>
+#include <filesystem>
+#include <memory>
+#include <vector>
+
+using namespace avgen;
+
+namespace {
+
+std::unique_ptr<gpu::Context> makeContext() {
+    static bool logInit = false;
+    if (!logInit) {
+        log::init(log::Level::Warn);
+        logInit = true;
+    }
+    auto ctx = gpu::Context::create(gpu::ContextDesc{});
+    if (!ctx) {
+        SKIP("no GPU adapter available: " << ctx.error().message);
+    }
+    return std::move(*ctx);
+}
+
+class SimHarness {
+public:
+    SimHarness(gpu::Context& ctx, gpu::ShaderLibrary& shaders) : ctx_(ctx), fields_(ctx), simulation_(ctx, shaders) {
+        auto ok = simulation_.init(fields_.gridBuffer());
+        if (!ok) {
+            FAIL(ok.error().message);
+        }
+    }
+    void frame(const scene::Scene& scene, double renderTime, std::uint64_t frameIndex) {
+        fields_.update(scene.fields, renderTime);
+        FrameTime time{};
+        time.renderTime = renderTime;
+        time.deltaTime = 1.0 / 60.0;
+        time.frameIndex = frameIndex;
+        wgpu::CommandEncoder encoder = ctx_.device().CreateCommandEncoder();
+        simulation_.update(encoder, scene, time, &fields_);
+        wgpu::CommandBuffer commands = encoder.Finish();
+        ctx_.queue().Submit(1, &commands);
+        ctx_.waitForQueue();
+    }
+    std::vector<float> read(const spatial::FieldSet& fields, std::size_t index) {
+        auto data = simulation_.readGrid(fields, index);
+        REQUIRE(data.has_value());
+        return std::move(*data);
+    }
+    [[nodiscard]] const rendering::SimulationStats& stats() const { return simulation_.stats(); }
+
+private:
+    gpu::Context& ctx_;
+    rendering::FieldUniforms fields_;
+    rendering::Simulation simulation_;
+};
+
+double maxAbsDifference(const std::vector<float>& a, const std::vector<float>& b) {
+    REQUIRE(a.size() == b.size());
+    double worst = 0.0;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        worst = std::max(worst, static_cast<double>(std::abs(a[i] - b[i])));
+    }
+    return worst;
+}
+
+// Plays `frames` frames of `perFrame` sub-steps on the GPU and the same sub-steps (each at its own second) on the CPU.
+void playBoth(SimHarness& h, const scene::Scene& scene, spatial::GridField& reference, int frames, int perFrame) {
+    reference.reset();
+    long step = 0;
+    for (int f = 0; f < frames; ++f) {
+        const double t = static_cast<double>((f + 1) * perFrame) / reference.simRate;
+        h.frame(scene, t, static_cast<std::uint64_t>(f));
+        for (int i = 0; i < perFrame; ++i) {
+            ++step;
+            reference.step(1.0f / reference.simRate, static_cast<double>(step) / reference.simRate, &scene.fields);
+        }
+    }
+}
+
+spatial::GridField oscillators(int n) {
+    spatial::GridField g;
+    g.name = "osc";
+    g.mode = spatial::GridMode::Oscillator;
+    g.wrap = spatial::GridWrap::Wrap;
+    g.resolution = {n, 1, n};
+    g.boundsMin = {-8.0f, -1.0f, -8.0f};
+    g.boundsMax = {8.0f, 1.0f, 8.0f};
+    g.simRate = 60.0f;
+    g.maxSubSteps = 8;
+    return g;
+}
+
+float order(const std::vector<float>& d) {
+    std::complex<double> sum = 0.0;
+    for (std::size_t c = 0; c < d.size(); c += 4) {
+        sum += std::complex<double>(d[c], d[c + 1]);
+    }
+    return static_cast<float>(std::abs(sum) / static_cast<double>(d.size() / 4));
+}
+
+} // namespace
+
+TEST_CASE("The oscillator kernels match the CPU reference with every coupling feature on",
+          "[simulation][gpu][oscillator]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    SimHarness harness(*ctx, shaders);
+
+    scene::Scene scene;
+    spatial::FieldSpec kick;
+    kick.name = "kick";
+    kick.kind = spatial::FieldKind::Sphere;
+    kick.position = {-3.0f, 0.0f, 2.0f};
+    kick.radius = 2.0f;
+    kick.softness = 1.0f;
+    scene.fields.fields.push_back(kick);
+    spatial::FieldSpec guide;
+    guide.name = "guide";
+    guide.kind = spatial::FieldKind::LinearGradient;
+    guide.axis = {1.0f, 0.0f, 0.0f};
+    guide.length = 16.0f;
+    scene.fields.fields.push_back(guide);
+    spatial::FieldSpec tune;
+    tune.name = "tune";
+    tune.kind = spatial::FieldKind::Radial;
+    tune.radius = 8.0f;
+    tune.strength = 0.3f;
+    scene.fields.fields.push_back(tune);
+
+    spatial::GridField grid = oscillators(48);
+    grid.seedAmount = 1.0f;
+    grid.coupling = 6.0f;
+    grid.phaseLag = 0.9f;
+    grid.couplingRadius = 3;
+    grid.links = 3;
+    grid.linkRange = 20.0f;
+    grid.linkWeight = 0.8f;
+    grid.populationMix = 0.3f;
+    grid.detune = 0.1f;
+    grid.crossCoupling = 0.4f;
+    grid.persistence = 0.5f;
+    grid.iterations = 2;
+    grid.speed = 1.5f;
+    grid.injectField = "kick";
+    grid.injectRate = 4.0f;
+    grid.conductivityField = "guide";
+    grid.frequencyField = "tune";
+    scene.fields.grids.push_back(grid);
+
+    spatial::GridField reference = grid;
+    playBoth(harness, scene, reference, 4, 8); // 32 sub-steps
+    const std::vector<float> gpu = harness.read(scene.fields, 0);
+    INFO("max |gpu - cpu| = " << maxAbsDifference(gpu, reference.data));
+    CHECK(maxAbsDifference(gpu, reference.data) < 2e-3);
+    CHECK(harness.stats().steps == 8);
+    // it did something: phases moved away from the seed, and the kicked disk is active
+    spatial::GridField seed = grid;
+    seed.reset();
+    CHECK(maxAbsDifference(gpu, seed.data) > 0.5);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A noisy oscillator grid repeats bit for bit, keeps unit phases, and synchronises under coupling",
+          "[simulation][gpu][oscillator]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    scene::Scene scene;
+    spatial::GridField grid = oscillators(64);
+    grid.seedAmount = 0.5f;
+    grid.spread = 0.06f;
+    grid.coupling = 10.0f;
+    grid.couplingRadius = 2;
+    grid.links = 2;
+    grid.noise = 0.2f;
+    scene.fields.grids.push_back(grid);
+
+    auto run = [&](double seconds) {
+        SimHarness harness(*ctx, shaders);
+        const int frames = static_cast<int>(seconds * 60.0 / 8.0);
+        for (int f = 1; f <= frames; ++f) {
+            harness.frame(scene, static_cast<double>(f * 8) / 60.0, static_cast<std::uint64_t>(f));
+        }
+        return harness.read(scene.fields, 0);
+    };
+    const std::vector<float> a = run(12.0);
+    const std::vector<float> b = run(12.0);
+    CHECK(a == b);
+    for (std::size_t c = 0; c < a.size(); c += 4) {
+        REQUIRE(std::isfinite(a[c]));
+        CHECK(a[c] * a[c] + a[c + 1] * a[c + 1] == Catch::Approx(1.0f).margin(1e-3));
+    }
+    spatial::GridField seed = grid;
+    seed.reset();
+    INFO("order " << order(seed.data) << " -> " << order(a));
+    CHECK(order(seed.data) < 0.7f);
+    CHECK(order(a) > 0.9f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A reaction-diffusion plane with iterations and a regime field matches the CPU and forms a pattern",
+          "[simulation][gpu][rd]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    SimHarness harness(*ctx, shaders);
+
+    scene::Scene scene;
+    spatial::FieldSpec regime;
+    regime.name = "regime";
+    regime.kind = spatial::FieldKind::LinearGradient;
+    regime.axis = {1.0f, 0.0f, 0.0f};
+    regime.length = 64.0f;
+    regime.position = {32.0f, 0.0f, 32.0f};
+    scene.fields.fields.push_back(regime);
+    spatial::FieldSpec seedField;
+    seedField.name = "seed";
+    seedField.kind = spatial::FieldKind::Sphere;
+    seedField.position = {32.0f, 0.0f, 32.0f};
+    seedField.radius = 6.0f;
+    seedField.softness = 0.5f;
+    scene.fields.fields.push_back(seedField);
+
+    spatial::GridField grid;
+    grid.name = "rd";
+    grid.mode = spatial::GridMode::ReactionDiffusion;
+    grid.wrap = spatial::GridWrap::Wrap;
+    grid.resolution = {64, 1, 64};
+    grid.boundsMin = {0.0f, -1.0f, 0.0f};
+    grid.boundsMax = {64.0f, 1.0f, 64.0f};
+    grid.diffusionA = 0.3f;
+    grid.diffusionB = 0.15f;
+    grid.feed = 0.04f;
+    grid.kill = 0.06f;
+    grid.feedB = 0.029f;
+    grid.killB = 0.057f;
+    grid.regimeField = "regime";
+    grid.injectField = "seed";
+    grid.injectRate = 3.0f;
+    grid.simRate = 60.0f;
+    grid.speed = 60.0f * 12.0f;
+    grid.iterations = 12; // one model unit per iteration
+    grid.maxSubSteps = 8;
+    scene.fields.grids.push_back(grid);
+
+    spatial::GridField reference = grid;
+    playBoth(harness, scene, reference, 4, 8);
+    const std::vector<float> gpu = harness.read(scene.fields, 0);
+    INFO("max |gpu - cpu| = " << maxAbsDifference(gpu, reference.data));
+    CHECK(maxAbsDifference(gpu, reference.data) < 1e-3);
+
+    // Keep playing on the GPU alone: ~5800 model steps form a pattern across the plane.
+    for (int f = 5; f <= 60; ++f) {
+        harness.frame(scene, static_cast<double>(f * 8) / 60.0, static_cast<std::uint64_t>(f));
+    }
+    const std::vector<float> later = harness.read(scene.fields, 0);
+    int patterned = 0;
+    for (std::size_t c = 0; c < later.size(); c += 2) {
+        REQUIRE(std::isfinite(later[c + 1]));
+        CHECK(later[c] >= 0.0f);
+        CHECK(later[c] <= 1.0f);
+        patterned += later[c + 1] > 0.2f ? 1 : 0;
+    }
+    INFO("cells with B > 0.2: " << patterned << " of 4096");
+    CHECK(patterned > 400);
+    CHECK(patterned < 3800);
+    CHECK(ctx->errorCount() == 0);
+}

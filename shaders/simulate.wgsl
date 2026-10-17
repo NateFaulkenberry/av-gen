@@ -39,6 +39,11 @@ struct SimUniforms {
     excite1: vec4<f32>,      // excitationDecay, refractoryTime, refractoryStrength, energyTime
     excite2: vec4<f32>,      // wakeTime, noise, ceiling (0 = none), pad
     exciteSlots: vec4<u32>,  // conductivity field slot (i32 bits, -1 none), noise epoch (steps), seed, pad
+    // ADR-1451, reaction-diffusion grids reuse the excite lanes: excite0 = (feedB, killB, speed, iterations),
+    // exciteSlots.x = the regime field slot (i32 bits, -1 none).
+    // ADR-1450, oscillator grids: excite0 = (frequency, spread, phaseLag, coupling), excite1 = (linkRange, linkWeight,
+    // populationMix, detune), excite2 = (crossCoupling, noise, persistence, speed), exciteSlots = (coupling-mask slot,
+    // frequency-field slot (both i32 bits, -1 none), seed, couplingRadius | links << 8 | iterations << 16).
 };
 
 const SIM_MODE_SCALAR: i32 = 0;
@@ -47,6 +52,7 @@ const SIM_MODE_REACTION: i32 = 2;
 const SIM_MODE_AGENTS: i32 = 3;
 const SIM_MODE_EXCITABLE: i32 = 4;
 const SIM_MODE_BAKE: i32 = 5; // ADR-1407
+const SIM_MODE_OSCILLATOR: i32 = 6; // ADR-1450
 const SIM_TWO_PI: f32 = 6.283185307179586;
 
 @group(0) @binding(0) var<uniform> sim: SimUniforms;
@@ -262,7 +268,9 @@ fn cs_dissipate(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 }
 
-// Gray-Scott, explicit Euler with the 6-neighbour Laplacian (Pearson 1993).
+// Gray-Scott, explicit Euler (Pearson 1993): the 6-neighbour Laplacian in a volume, the isotropic 9-point one on a
+// plane (ADR-1451). One dispatch is one of the sub-step's `iterations` steps of dt * speed / iterations; the regime field
+// blends (feed, kill) toward (feedB, killB) per cell.
 @compute @workgroup_size(64)
 fn cs_reaction(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
@@ -271,19 +279,42 @@ fn cs_reaction(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
     let c = simCoords(i);
     let base = simBase(c);
-    let dt = sim.bounds0.w;
+    let speed = select(1.0, sim.excite0.z, sim.excite0.z > 0.0);
+    let dt = sim.bounds0.w * speed / max(sim.excite0.w, 1.0);
     let a = simRead(c.x, c.y, c.z, 0);
     let b = simRead(c.x, c.y, c.z, 1);
-    let la = simRead(c.x - 1, c.y, c.z, 0) + simRead(c.x + 1, c.y, c.z, 0) + simRead(c.x, c.y - 1, c.z, 0) +
+    var la: f32;
+    var lb: f32;
+    if (sim.res.y == 1u) {
+        let aa = simRead(c.x - 1, c.y, c.z, 0) + simRead(c.x + 1, c.y, c.z, 0) + simRead(c.x, c.y, c.z - 1, 0) +
+                 simRead(c.x, c.y, c.z + 1, 0);
+        let ad = simRead(c.x - 1, c.y, c.z - 1, 0) + simRead(c.x + 1, c.y, c.z - 1, 0) +
+                 simRead(c.x - 1, c.y, c.z + 1, 0) + simRead(c.x + 1, c.y, c.z + 1, 0);
+        let ba = simRead(c.x - 1, c.y, c.z, 1) + simRead(c.x + 1, c.y, c.z, 1) + simRead(c.x, c.y, c.z - 1, 1) +
+                 simRead(c.x, c.y, c.z + 1, 1);
+        let bd = simRead(c.x - 1, c.y, c.z - 1, 1) + simRead(c.x + 1, c.y, c.z - 1, 1) +
+                 simRead(c.x - 1, c.y, c.z + 1, 1) + simRead(c.x + 1, c.y, c.z + 1, 1);
+        la = (4.0 * aa + ad - 20.0 * a) * (1.0 / 6.0);
+        lb = (4.0 * ba + bd - 20.0 * b) * (1.0 / 6.0);
+    } else {
+        la = simRead(c.x - 1, c.y, c.z, 0) + simRead(c.x + 1, c.y, c.z, 0) + simRead(c.x, c.y - 1, c.z, 0) +
              simRead(c.x, c.y + 1, c.z, 0) + simRead(c.x, c.y, c.z - 1, 0) + simRead(c.x, c.y, c.z + 1, 0) -
              6.0 * a;
-    let lb = simRead(c.x - 1, c.y, c.z, 1) + simRead(c.x + 1, c.y, c.z, 1) + simRead(c.x, c.y - 1, c.z, 1) +
+        lb = simRead(c.x - 1, c.y, c.z, 1) + simRead(c.x + 1, c.y, c.z, 1) + simRead(c.x, c.y - 1, c.z, 1) +
              simRead(c.x, c.y + 1, c.z, 1) + simRead(c.x, c.y, c.z - 1, 1) + simRead(c.x, c.y, c.z + 1, 1) -
              6.0 * b;
+    }
+    var feed = sim.params1.x;
+    var kill = sim.params1.y;
+    let regime = bitcast<i32>(sim.exciteSlots.x);
+    if (regime >= 0) {
+        let w = clamp(fieldScalar(regime, simCellCenter(c)), 0.0, 1.0);
+        feed = feed + (sim.excite0.x - feed) * w;
+        kill = kill + (sim.excite0.y - kill) * w;
+    }
     let reaction = a * b * b;
-    dst[base] = clamp(a + (sim.params1.z * la - reaction + sim.params1.x * (1.0 - a)) * dt, 0.0, 1.0);
-    dst[base + 1u] =
-        clamp(b + (sim.params1.w * lb + reaction - (sim.params1.y + sim.params1.x) * b) * dt, 0.0, 1.0);
+    dst[base] = clamp(a + (sim.params1.z * la - reaction + feed * (1.0 - a)) * dt, 0.0, 1.0);
+    dst[base + 1u] = clamp(b + (sim.params1.w * lb + reaction - (kill + feed) * b) * dt, 0.0, 1.0);
 }
 
 // ---- agents (ADR-1120) ---------------------------------------------------------------------------
@@ -568,4 +599,168 @@ fn cs_excite(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_ind
     dst[base + 1u] = exciteFlush(rNew);
     dst[base + 2u] = exciteFlush(eNew);
     dst[base + 3u] = exciteFlush(wNew);
+}
+
+// ---- oscillators (ADR-1450) ----------------------------------------------------------------------
+// A plane of coupled phase oscillators; a cell is (cos theta, sin theta, R, activity). The CPU twin is
+// oscKick / oscCouple in spatial/grid_field.cpp, operation for operation.
+
+const OSC_OMEGA_A: u32 = 0x6f736331u;
+const OSC_OMEGA_B: u32 = 0x6f736332u;
+const OSC_POPULATION: u32 = 0x706f7031u;
+const OSC_LINK: u32 = 0x6c6e6b00u;
+const OSC_NOISE: u32 = 0x9e3779b9u;
+
+fn oscPopulation(cell: u32) -> bool {
+    return sim.excite1.z > 0.0 && simUnit(simHash(cell, OSC_POPULATION, sim.exciteSlots.z)) < sim.excite1.z;
+}
+
+fn oscOmega(cell: u32) -> f32 {
+    let u = simUnit(simHash(cell, OSC_OMEGA_A, sim.exciteSlots.z)) + simUnit(simHash(cell, OSC_OMEGA_B, sim.exciteSlots.z)) - 1.0;
+    return sim.excite0.x + sim.excite0.y * u + select(0.0, sim.excite1.w, oscPopulation(cell));
+}
+
+fn oscSubDt() -> f32 {
+    return sim.bounds0.w * sim.excite2.w;
+}
+
+// Injection kicks, the frequency field's phase advance and phase noise, once per sub-step.
+@compute @workgroup_size(64)
+fn cs_osc_kick(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let i = gid.x;
+    if (i >= simCells()) {
+        return;
+    }
+    let c = simCoords(i);
+    let base = simBase(c);
+    let cell = u32(c.z) * sim.res.x + u32(c.x);
+    let p = simCellCenter(c);
+    let dtSub = oscSubDt();
+    var kick = 0.0;
+    if (sim.slots.x >= 0) {
+        kick = sim.params0.x * max(0.0, fieldScalar(sim.slots.x, p)) * dtSub;
+    }
+    var advance = 0.0;
+    let freqSlot = bitcast<i32>(sim.exciteSlots.y);
+    if (freqSlot >= 0) {
+        advance = SIM_TWO_PI * fieldScalar(freqSlot, p) * dtSub;
+    }
+    var jitter = 0.0;
+    if (sim.excite2.y > 0.0) {
+        let amp = sim.excite2.y * sqrt(dtSub) * 1.7320508;
+        jitter = amp * (simUnit(simHash(cell, fieldBlock.pad0, sim.exciteSlots.z ^ OSC_NOISE)) * 2.0 - 1.0);
+    }
+    let d = kick + advance + jitter;
+    let cs = src[base];
+    let sn = src[base + 1u];
+    dst[base + 2u] = src[base + 2u];
+    if (d == 0.0) {
+        dst[base] = cs;
+        dst[base + 1u] = sn;
+        dst[base + 3u] = src[base + 3u];
+        return;
+    }
+    let theta = atan2(sn, cs) + d;
+    dst[base] = cos(theta);
+    dst[base + 1u] = sin(theta);
+    dst[base + 3u] = min(src[base + 3u] + abs(kick), 4.0);
+}
+
+struct OscSum {
+    c: f32,
+    s: f32,
+    w: f32,
+    wx: f32,
+};
+
+fn oscGather(acc: OscSum, ii: i32, kk: i32, w: f32, pop: bool) -> OscSum {
+    var out = acc;
+    let nx = i32(sim.res.x);
+    let nz = i32(sim.res.z);
+    var a = ii;
+    var b = kk;
+    if (sim.layout0.z == 1u) {
+        a = simWrapAxis(a, nx);
+        b = simWrapAxis(b, nz);
+    } else if (a < 0 || a >= nx || b < 0 || b >= nz) {
+        return out;
+    }
+    let other = u32(b) * sim.res.x + u32(a);
+    let x = select(sim.excite2.x, 1.0, oscPopulation(other) == pop);
+    let ob = simBase(vec3<i32>(a, 0, b));
+    out.c = out.c + w * x * src[ob];
+    out.s = out.s + w * x * src[ob + 1u];
+    out.w = out.w + w;
+    out.wx = out.wx + w * x;
+    return out;
+}
+
+// One of the sub-step's `iterations` coupling passes (Kuramoto-Sakaguchi over the disk and the links).
+@compute @workgroup_size(64)
+fn cs_oscillate(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let i = gid.x;
+    if (i >= simCells()) {
+        return;
+    }
+    let c = simCoords(i);
+    let base = simBase(c);
+    let cell = u32(c.z) * sim.res.x + u32(c.x);
+    let packed = sim.exciteSlots.w;
+    let r = clamp(i32(packed & 0xffu), 1, 4);
+    let links = clamp(i32((packed >> 8u) & 0xffu), 0, 4);
+    let iterations = max(i32((packed >> 16u) & 0xffu), 1);
+    let dtIt = oscSubDt() / f32(iterations);
+    let sigma = 0.6 * f32(r);
+    let inv2s2 = 1.0 / (2.0 * sigma * sigma);
+    let pop = oscPopulation(cell);
+    var acc = OscSum(0.0, 0.0, 0.0, 0.0);
+    for (var dz = -r; dz <= r; dz = dz + 1) {
+        for (var dx = -r; dx <= r; dx = dx + 1) {
+            let d2 = dx * dx + dz * dz;
+            if (d2 == 0 || d2 > r * r + r) {
+                continue;
+            }
+            acc = oscGather(acc, c.x + dx, c.z + dz, exp(-f32(d2) * inv2s2), pop);
+        }
+    }
+    let range = max(1, i32(sim.excite1.x));
+    let span = f32(2 * range + 1);
+    let linkW = sim.excite1.y * exp(-inv2s2);
+    for (var l = 0; l < links; l = l + 1) {
+        let lu = u32(l);
+        let ox = min(i32(simUnit(simHash(cell, OSC_LINK + 2u * lu, sim.exciteSlots.z)) * span), 2 * range) - range;
+        let oz = min(i32(simUnit(simHash(cell, OSC_LINK + 2u * lu + 1u, sim.exciteSlots.z)) * span), 2 * range) - range;
+        if (ox == 0 && oz == 0) {
+            continue;
+        }
+        acc = oscGather(acc, c.x + ox, c.z + oz, linkW, pop);
+    }
+    var m = 1.0;
+    let maskSlot = bitcast<i32>(sim.exciteSlots.x);
+    if (maskSlot >= 0) {
+        m = max(0.0, fieldScalar(maskSlot, simCellCenter(c)));
+    }
+    let ci = src[base];
+    let si = src[base + 1u];
+    let theta = atan2(si, ci);
+    let ca = cos(theta + sim.excite0.z);
+    let sa = sin(theta + sim.excite0.z);
+    let k = sim.excite0.w;
+    var torque = 0.0;
+    if (acc.w > 0.0) {
+        torque = k * m * (acc.s * ca - acc.c * sa) / acc.w;
+    }
+    let next = theta + dtIt * (SIM_TWO_PI * oscOmega(cell) + torque);
+    var rLocal = 0.0;
+    if (acc.wx > 0.0) {
+        rLocal = sqrt(acc.c * acc.c + acc.s * acc.s) / acc.wx;
+    }
+    let activity = abs(torque) / max(k, 1e-3);
+    let gain = 1.0 - exp(-dtIt / sim.excite2.z);
+    let rOld = src[base + 2u];
+    let aOld = src[base + 3u];
+    dst[base] = cos(next);
+    dst[base + 1u] = sin(next);
+    dst[base + 2u] = rOld + (min(rLocal, 1.0) - rOld) * gain;
+    dst[base + 3u] = aOld + (min(activity, 4.0) - aOld) * gain;
 }

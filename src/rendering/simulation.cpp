@@ -116,6 +116,8 @@ struct Simulation::Impl {
     wgpu::ComputePipeline agentsMovePipeline;
     wgpu::ComputePipeline agentsResolvePipeline;
     wgpu::ComputePipeline excitePipeline; // ADR-1201
+    wgpu::ComputePipeline oscKickPipeline;   // ADR-1450
+    wgpu::ComputePipeline oscillatePipeline; // ADR-1450
     wgpu::BindGroup groupToA;      // dst = A, src = B, initial = C
     wgpu::BindGroup groupToB;      // dst = B, src = A, initial = C
     wgpu::BindGroup groupToCFromA; // dst = C, src = A (the diffusion snapshot)
@@ -249,7 +251,7 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         }
         return pipeline;
     };
-    const std::array<std::pair<const char*, wgpu::ComputePipeline*>, 11> all{{
+    const std::array<std::pair<const char*, wgpu::ComputePipeline*>, 13> all{{
         {"cs_inject", &injectPipeline},
         {"cs_bake", &bakePipeline},
         {"cs_advect", &advectPipeline},
@@ -261,6 +263,8 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         {"cs_agents_move", &agentsMovePipeline},
         {"cs_agents_resolve", &agentsResolvePipeline},
         {"cs_excite", &excitePipeline},
+        {"cs_osc_kick", &oscKickPipeline},
+        {"cs_oscillate", &oscillatePipeline},
     }};
     std::array<wgpu::ComputePipeline, all.size()> built{};
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -556,6 +560,26 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
                 u.slots.x = -1;
             }
         }
+        if (grid.mode == spatial::GridMode::ReactionDiffusion) { // ADR-1451
+            const int regimeSlot = grid.regimeField.empty() ? -1 : scene.fields.indexOf(grid.regimeField);
+            u.excite0 = glm::vec4(grid.feedB, grid.killB, grid.speed, static_cast<float>(std::max(grid.iterations, 1)));
+            u.exciteSlots = glm::uvec4(static_cast<std::uint32_t>(regimeSlot), 0u, 0u, 0u);
+        }
+        if (grid.oscillator()) { // ADR-1450
+            const int maskSlot = grid.conductivityField.empty() ? -1 : scene.fields.indexOf(grid.conductivityField);
+            const int freqSlot = grid.frequencyField.empty() ? -1 : scene.fields.indexOf(grid.frequencyField);
+            u.excite0 = glm::vec4(grid.frequency, grid.spread, grid.phaseLag, grid.coupling);
+            u.excite1 = glm::vec4(grid.linkRange, grid.linkWeight, grid.populationMix, grid.detune);
+            u.excite2 = glm::vec4(grid.crossCoupling, grid.noise, grid.persistence, grid.speed);
+            const auto packed = static_cast<std::uint32_t>(std::clamp(grid.couplingRadius, 1, 4)) |
+                                (static_cast<std::uint32_t>(std::clamp(grid.links, 0, 4)) << 8u) |
+                                (static_cast<std::uint32_t>(std::clamp(grid.iterations, 1, 64)) << 16u);
+            u.exciteSlots = glm::uvec4(static_cast<std::uint32_t>(maskSlot), static_cast<std::uint32_t>(freqSlot),
+                                       grid.seed, packed);
+            if (grid.injectRate == 0.0f) {
+                u.slots.x = -1;
+            }
+        }
         const std::uint32_t offset = slot * kUniformStride;
         std::memcpy(im.uniformStaging.data() + offset, &u, sizeof(u));
         work.push_back(Work{i, offset, steps});
@@ -664,6 +688,12 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
             offsets[1] = static_cast<std::uint32_t>((firstBlock + k) * kStepBlockStride);
             if (grid.bake()) {
                 dispatch(im.bakePipeline); // ADR-1407
+            } else if (grid.oscillator()) {
+                // ADR-1450: the kick pass, then the sub-step's coupling passes.
+                dispatch(im.oscKickPipeline);
+                for (int it = 0; it < std::max(grid.iterations, 1); ++it) {
+                    dispatch(im.oscillatePipeline);
+                }
             } else if (grid.excitable()) {
                 // ADR-1201: one gather kernel is the whole step, one workgroup per 8 x 8 tile of the plane.
                 cp.SetPipeline(im.excitePipeline);
@@ -691,7 +721,9 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
                     dispatch(im.advectPipeline);
                 }
                 if (reaction) {
-                    dispatch(im.reactionPipeline);
+                    for (int it = 0; it < std::max(grid.iterations, 1); ++it) { // ADR-1451
+                        dispatch(im.reactionPipeline);
+                    }
                 } else {
                     if (grid.diffusion > 0.0f && grid.diffuseIterations > 0) {
                         snapshot(); // the Jacobi sweeps all relax towards the state they started from
