@@ -23,7 +23,7 @@
 //   Ramp      : out = ramp(a.x) with 3 stops k0 (t=0), k1 (t=0.5), k2 (t=1)  (k0 = constant, k1 = constant2, k2 = constant3)
 //   OklabRamp : out.rgb = four stops k, k2, k3, k4 (linear RGB) blended in OKLab, out.w linear (ADR-1470): f >= 0
 //               (the default 1) clamps t = a.x to [0, 1], stops at 0, 1/3, 2/3, 1; f < 0 is cyclic, t = fract(a.x) with
-//               the stops at 0, 1/4, 1/2, 3/4 and k again at 1
+//               the stops at 0, 1/4, 1/2, 3/4 and k again at 1. The packer uploads the stops converted to OKLab
 //   Remap     : out = (a - k.x) / (k.y - k.x) * (k.w - k.z) + k.z, clamped when f > 0.5
 //   Multiply  : out = a * b        Add: out = a + b        Mix: out = mix(a, b, f)  (MixBy: mix(a, b, reg[srcC].x))
 //   Power     : out = pow(max(a, 0), f)

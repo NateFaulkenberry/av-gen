@@ -1338,6 +1338,13 @@ MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
             g.constant2 = op.constant2;
             g.constant3 = op.constant3;
             g.constant4 = op.constant4;
+            if (op.kind == MaterialOpKind::OklabRamp) {
+                // ADR-1470: the stops go to the GPU already in OKLab (they are constants per frame), so a fragment
+                // mixes two Lab colours and converts once instead of taking six cube roots.
+                for (glm::vec4* c : {&g.constant, &g.constant2, &g.constant3, &g.constant4}) {
+                    *c = glm::vec4(color::rgbToOklab(glm::max(glm::vec3(*c), glm::vec3(0.0f))), c->w);
+                }
+            }
             ++count;
         }
     };

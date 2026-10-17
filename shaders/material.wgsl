@@ -335,7 +335,8 @@ fn matSmoothstep4(e0: f32, e1: f32, a: vec4<f32>) -> vec4<f32> {
 }
 
 // ADR-1470, scene::oklabRamp4: four stops blended in OKLab (rgb; w linear). Clamped: stops at 0, 1/3, 2/3, 1.
-// Cyclic: t = fract(t), stops at 0, 1/4, 1/2, 3/4 and the first again at 1.
+// Cyclic: t = fract(t), stops at 0, 1/4, 1/2, 3/4 and the first again at 1. The packer has already converted the
+// stops to OKLab (packMaterialProgram), so this mixes Lab and converts back once: mixOklab's result, no cube roots.
 fn matOklabRamp4(c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, tIn: f32, cyclic: bool) -> vec4<f32> {
     var x = clamp(tIn, 0.0, 1.0);
     var segments = 3.0;
@@ -358,7 +359,7 @@ fn matOklabRamp4(c0: vec4<f32>, c1: vec4<f32>, c2: vec4<f32>, c3: vec4<f32>, tIn
         a = c1;
         b = c2;
     }
-    return vec4<f32>(mixOklab(a.xyz, b.xyz, u), a.w + (b.w - a.w) * u);
+    return vec4<f32>(clampPositive(oklabToRgb(a.xyz * (1.0 - u) + b.xyz * u)), a.w + (b.w - a.w) * u);
 }
 
 fn matSafeNormalize(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {

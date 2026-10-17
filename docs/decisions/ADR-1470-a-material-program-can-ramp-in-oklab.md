@@ -26,6 +26,10 @@ out.rgb = mixOklab(stop[i], stop[i+1], u)  // color.wgsl / core::color, the same
 out.w   = linear mix of the stops' w
 ```
 
+The packer (`packMaterialProgram`) uploads this op's stops already converted to OKLab, so a fragment mixes two Lab
+colours and converts back once (no cube roots per pixel); the CPU reference converts on the fly and the GPU parity
+probes compare the two. Measured on Cymatic World at live High, converting per fragment cost about 2 ms at 1632x918.
+
 It reads only `a`. The stops stay in linear RGB, so a project palette's role bindings (ADR-1043, ADR-1420) write them
 exactly as they write a `ramp`'s or a `constant`'s colour, and palette shifting, the selector and its locks keep
 working: the palette owns the colours, the program owns where each one falls.
