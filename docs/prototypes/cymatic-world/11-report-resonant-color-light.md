@@ -162,3 +162,27 @@ Each candidate was rendered alone against the baseline on two locked palettes: A
 The image's interest stays where the brief puts it: geometry, shading and negative space. No new full-screen effect, and nothing added to the frame cost.
 
 **Evidence** (`stageE-optics/`): `optics-candidates-abyssal-feline-18s.png`, `optics-candidates-molten-feline-125s.png`, and their `-crops-native.png`.
+
+## Stage F: audio integration
+
+**Each layer answers on its own time scale.** None of these routes touches a hue (the palette owns hues), and each moves a regional or localised term:
+
+| Layer | Signal | Attack / decay | Where it shows |
+|---|---|---|---|
+| base field: extent of the broad regions | bass | 120 ms / 1.2 s | the colour field's span narrows, so lobes reach further |
+| base field: dominant surface | held sound (sustain) | 2.5 s / 5 s | the colour coordinate leans from primary toward secondary |
+| ridge light: large crest | snare | 0 / 260 ms | crest lines only |
+| emission: hollow glow | sustain (×1.2), kick (×1.6) | 1.5 s / 4 s; 0 / 380 ms | only in cells that already ring, on their inner walls, in one lobe sign |
+| optical: glints | hats | 0 / 180 ms | sheen lobes on the smooth stone |
+| light: counter fill | spectral flux | 300 ms / 1.5 s | the far flanks |
+| travelling light (Stage D) | each onset's ring | the band's attack; the ring's life, with displaced rings fading over 0.35 s | dashes along the crests near the hit |
+| palette | phrase boundary | 24 s hold, 6 s blend | the whole palette, at phrase scale only |
+
+- **No whole-screen kick flash.** Measured over the phrase-transition clip (Feline 30-90 s, 1800 frames) with `flash.py`:
+  - the frame's mean luma moves a median 0.13 points per frame (p99 2.1, max 2.7);
+  - the share of pixels changing by more than 15% per frame is a median 0.8% (p99 4.8%).
+- **The largest steps are not flashes.** They recur about once a second and do not decay within 0.3 s. Their frame difference shows edge motion over the whole frame, not a brightness lift: it is the bass relief pump (brief 08, approved geometry), which the light pass leaves alone.
+- **No band-to-RGB mapping.** Bands move extents, terms and intensities; the palette chooses the colours.
+- **Persistent state under sustained energy.** Held sound shifts the surface colour and builds the glow over seconds and lets them settle back over five. The resonance memory keeps the figure (ADR-1400 / 1404), so a sustained passage holds a coherent, settled colour state instead of pumping.
+
+**Evidence** (`stageF-audio/`): `largest-luma-step-is-the-relief-pump-before-after-diff-43.4s.png` and `flash.py` (the measurement).
