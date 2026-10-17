@@ -297,11 +297,11 @@ def sheets_for(comp):
             points=[(-60, 10, 40), (-34, 4, 0), (-20, 0, -50), (-10, 2, -110), (0, 4, -170), (18, 10, -174),
                     (42, 20, -164), (68, 34, -146), (90, 52, -134), (102, 74, -138)],
             roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.7, 2.6 + SAIL), (0.84, 3.2 + SAIL), (1.0, 3.5 + SAIL)],
-            span=[(0.0, 30.0), (0.3, 26.0), (0.52, 10.0), (0.62, 2.5), (0.68, 12.0), (0.84, 48.0), (1.0, 62.0)],
-            cloth=[(0.0, 40.0), (0.52, 44.0), (0.66, 30.0), (1.0, 66.0)],
+            span=[(0.0, 30.0), (0.3, 26.0), (0.52, 10.0), (0.62, 2.5), (0.68, 12.0), (0.84, 48.0), (0.95, 58.0), (1.0, 50.0)],
+            cloth=[(0.0, 40.0), (0.52, 44.0), (0.66, 30.0), (0.84, 60.0), (0.95, 72.0), (1.0, 64.0)],
             billow=[(0.0, 6.0), (0.33, 9.0), (0.56, 0.0), (0.64, 0.0), (0.82, -6.0), (1.0, -3.0)],
             pleats=[(6.0, 0.8), (13.0, 0.35), (23.0, 0.3)], seed=5, curl=0.06, edge_wave=0.035, nu=760, nv=176,
-            end_round=0.14)
+            end_round=0.4)
         cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0, "drift": True}
         return [main], cam
     if comp == "b":
@@ -406,7 +406,7 @@ def silk_program():
     g.op(None, "mixBy", 5, a=5, b=6, c=7)                              # r5: albedo
     # view-dependent colour (the palette's iridescence): a thin spectral sheen that cycles with the grazing angle,
     # only where the cloth turns away -- strong in Oil-Slick, a pastel shimmer in Opal, a trace elsewhere
-    g.op("spectrum", "palette", 6, a=4, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1.4, 1.4, 1.4, 0],
+    g.op("spectrum", "palette", 6, a=4, k=[0.5, 0.38, 0.5, 0], k2=[0.5, 0.3, 0.5, 0], k3=[1.4, 1.4, 1.4, 0],
          k4=[0.0, 0.33, 0.67, 0])
     g.op(None, "multiply", 6, a=6, b=4)
     g.op(None, "multiply", 6, a=6, b=4)                                # only near true grazing
