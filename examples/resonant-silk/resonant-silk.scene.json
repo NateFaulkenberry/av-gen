@@ -6,13 +6,13 @@
   "mode": 1,
   "position": [
    4.0,
-   2.0,
-   60.0
+   14.0,
+   -14.0
   ],
   "target": [
-   -16.0,
-   8.0,
-   -60.0
+   -4.0,
+   4.0,
+   -130.0
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
@@ -127,8 +127,8 @@
        "bandLow": 0.4,
        "bandHigh": 1.0,
        "gain": 1.0,
-       "amplitude": 1.5,
-       "scale": 2.6,
+       "amplitude": 0.9,
+       "scale": 1.9,
        "drift": 14.0,
        "driftPeriod": 40.0,
        "spin": 0.05
@@ -157,7 +157,7 @@
      0.03,
      0.9
     ],
-    "softness": 35.0
+    "softness": 70.0
    }
   },
   {
@@ -179,7 +179,7 @@
      0.57,
      0.13
     ],
-    "softness": 30.0
+    "softness": 50.0
    }
   },
   {
@@ -444,7 +444,7 @@
      ],
      "emissiveIntensity": 0.0,
      "roughness": 0.28,
-     "metallic": 0.35,
+     "metallic": 0.15,
      "doubleSided": true,
      "thinFilm": {
       "thickness": 400.0,
@@ -477,9 +477,9 @@
       "frequency": 0.08975979010256552,
       "speed": -0.5,
       "displacementAxis": [
-       -0.9073,
-       -0.0951,
-       -0.4095
+       -0.9087,
+       -0.0952,
+       -0.4065
       ]
      },
      {
@@ -489,9 +489,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9073,
-       -0.0951,
-       -0.4095
+       -0.9087,
+       -0.0952,
+       -0.4065
       ]
      },
      {
@@ -501,9 +501,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       0.6557,
-       -0.2939,
-       -0.6955
+       0.804,
+       -0.4091,
+       -0.4316
       ]
      },
      {
@@ -513,9 +513,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9073,
-       -0.0951,
-       -0.4095
+       -0.9087,
+       -0.0952,
+       -0.4065
       ]
      },
      {
@@ -525,9 +525,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9073,
-       -0.0951,
-       -0.4095
+       -0.9087,
+       -0.0952,
+       -0.4065
       ]
      },
      {
@@ -537,9 +537,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       0.6557,
-       -0.2939,
-       -0.6955
+       0.804,
+       -0.4091,
+       -0.4316
       ]
      },
      {
@@ -549,9 +549,9 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
-       -0.9073,
-       -0.0951,
-       -0.4095
+       -0.9087,
+       -0.0952,
+       -0.4065
       ]
      }
     ],
@@ -647,7 +647,7 @@
     0.6105,
     0.49693
    ],
-   "intensity": 0.6,
+   "intensity": 1.1,
    "castsShadow": false,
    "contactShadow": false
   }
@@ -729,47 +729,117 @@
      "value": 2.6
     },
     {
-     "kind": "constant",
+     "kind": "remap",
      "dst": 5,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      1.6
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.62,
+      0.62,
+      0.48,
+      0.5
+     ],
+     "value": 0.002380952380952381
+    },
+    {
+     "kind": "palette",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.22,
+      0.22,
+      0.22,
+      0.0
+     ],
+     "constant3": [
+      1.4,
+      1.4,
+      1.4,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.18
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "oklabRamp",
+     "dst": 5,
+     "srcA": 5,
      "constant": [
       0.00857,
       0.01229,
       0.09084,
       1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 6,
-     "constant": [
-      0.07513,
-      0.03812,
-      0.36524,
+     ],
+     "constant2": [
+      0.09391,
+      0.04765,
+      0.45655,
       1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 7,
-     "constant": [
-      0.75,
-      0.75,
-      0.75,
+     ],
+     "constant3": [
+      0.34855,
+      0.02891,
+      0.24958,
       1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 7,
-     "srcA": 4,
-     "srcB": 7
-    },
-    {
-     "kind": "mixBy",
-     "dst": 5,
-     "srcA": 5,
-     "srcB": 6,
-     "srcC": 7
+     ],
+     "constant4": [
+      0.01227,
+      0.23739,
+      0.26638,
+      1.0
+     ],
+     "value": -1.0
     },
     {
      "kind": "palette",

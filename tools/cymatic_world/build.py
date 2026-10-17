@@ -31,7 +31,7 @@ sys.path.insert(0, REPO)
 from tools.sonic_vfx import kit, meshes  # noqa: E402
 from tools.sonic_vfx.kit import R, hexrgb  # noqa: E402
 
-OUT = os.path.join(REPO, "examples", "cymatic-world")
+OUT = os.environ.get("CW_OUT") or os.path.join(REPO, "examples", "cymatic-world")   # CW_OUT: a look-dev copy
 MESH_DIR = os.path.join(OUT, "meshes")   # the ground
 
 # ================================================================================================ palette
@@ -146,11 +146,17 @@ def world_heights(points):
 FINE_STEP = float(os.environ.get("CW_MESH_STEP", "0.36"))   # 08-brief Stage 7: the visible ground's cell size (m)
 
 
-def grid_axis(core=36.0, half=88.0, step=None, extent=2600.0, mid=1.025, growth=1.12):
+MESH_CORE = float(os.environ.get("CW_MESH_CORE", "36"))
+MESH_MID = float(os.environ.get("CW_MESH_MID", "1.025"))
+
+
+def grid_axis(core=None, half=88.0, step=None, extent=2600.0, mid=None, growth=1.12):
     """One axis of the ground's tensor grid: `step` apart within +-core (the figure's middle, the nearest ground the
     camera sees), then each step `mid` times the last out to +-half (the far ground, at the top of the frame, needs
     fewer vertices for the same pixels), then `growth` times out to +-extent (never in frame: it closes the world)."""
     step = step if step is not None else FINE_STEP
+    core = core if core is not None else MESH_CORE
+    mid = mid if mid is not None else MESH_MID
     n = int(round(core / step))
     inner = [i * core / n for i in range(-n, n + 1)]
     outer = []
@@ -162,7 +168,73 @@ def grid_axis(core=36.0, half=88.0, step=None, extent=2600.0, mid=1.025, growth=
     return np.array([-v for v in reversed(outer)] + inner + outer)
 
 
+MESH_HEX = os.environ.get("CW_MESH_HEX", "1") == "1"
+
+
+def hex_ground_mesh():
+    """resonator-quality, Phase D: an offset-lattice triangulation of the same graded grid. Rows run along x; every
+    other row's vertices sit at the midpoints of the row below's (an offset, "hexagonal" lattice), so no triangle
+    pair forms a quad with a diagonal. The square grid's alternating diagonals put a two-cell
+    zigzag along any steep lip that crosses them at an angle (the "serrated crest" of the earlier reports: it shows
+    through every xz-dependent mask on a near-vertical wall); the offset lattice has no preferred diagonal, and its
+    triangles are near-isotropic."""
+    xs = grid_axis()
+    zs = grid_axis()   # rows a full cell apart: the same vertex count as the square grid (rows sqrt(3)/2 apart
+    # made the triangles equilateral but cost 3 ms more at High for 9% more vertices; at a full cell they are
+    # isosceles, still with no alternating diagonal, and cost ~1 ms)
+    mids = 0.5 * (xs[:-1] + xs[1:])
+    rows, index = [], []
+    pts = []
+    for j, z in enumerate(zs):
+        row = xs if j % 2 == 0 else mids
+        index.append(len(pts))
+        pts.extend((x, z) for x in row)
+        rows.append(len(row))
+    pts = np.array(pts, dtype=np.float64)
+    hs = world_heights(pts)
+    pos = np.stack([pts[:, 0], hs, pts[:, 1]], axis=1)
+    tris, strip = [], []
+    n = len(xs)
+    for j in range(len(zs) - 1):
+        a0, b0 = index[j], index[j + 1]
+        if j % 2 == 0:   # full row below (n), midpoint row above (n - 1)
+            i = np.arange(n - 1)
+            tris.append(np.stack([a0 + i, b0 + i, a0 + i + 1], 1))
+            i = np.arange(n - 2)
+            tris.append(np.stack([a0 + i + 1, b0 + i, b0 + i + 1], 1))
+        else:            # midpoint row below (n - 1), full row above (n)
+            i = np.arange(n - 1)
+            tris.append(np.stack([a0 + i, b0 + i, b0 + i + 1], 1))
+            i = np.arange(n - 2)
+            tris.append(np.stack([a0 + i, b0 + i + 1, a0 + i + 1], 1))
+        strip.append(np.full(2 * n - 3, 0.5 * (zs[j] + zs[j + 1])))
+    tri = np.concatenate(tris, 0).astype(np.int64)
+    # front to back by STRIP, each strip's triangles left to right in the order built: sorting by each triangle's own
+    # centroid split every strip into its up- and its down-pointing triangles, which halved the vertex cache's reuse
+    # (measured: +3 ms at High for 9% more vertices)
+    return _finish_ground(pos, tri, np.concatenate(strip))
+
+
+def _finish_ground(pos, tri, order_z=None):
+    """Front-to-back order, upward winding, area-weighted vertex normals (shared by both triangulations)."""
+    centroid_z = pos[tri, 2].mean(axis=1) if order_z is None else order_z
+    tri = tri[np.argsort(-centroid_z, kind="stable")]
+    e1 = pos[tri[:, 1]] - pos[tri[:, 0]]
+    e2 = pos[tri[:, 2]] - pos[tri[:, 0]]
+    fn = np.cross(e1, e2)
+    flip = fn[:, 1] < 0.0
+    tri[flip] = tri[flip][:, [0, 2, 1]]
+    fn[flip] = -fn[flip]
+    nrm = np.zeros_like(pos)
+    for k in range(3):
+        np.add.at(nrm, tri[:, k], fn)
+    nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-12
+    return pos.astype(np.float32), nrm.astype(np.float32), tri.reshape(-1).astype(np.uint32)
+
+
 def ground_mesh():
+    if MESH_HEX:
+        return hex_ground_mesh()
     """08-brief Stage 7: a tensor-product grid -- square cells of FINE_STEP over the ground the camera sees, alternate
     diagonals (no preferred direction for a crest to stair-step along), no stitched seams. Heights from the WorldMap.
     (It replaces a polar mesh whose ring-count rule had carried the horizon's 256 vertices to every ring: cells
@@ -364,17 +436,24 @@ LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 #   albedo          the base colour field and the grit alone, unlit (layers 1-2: base + resonant colour variation)
 #   light           the painted light alone, on white (the key, its ambient floor, the fill, the glints)
 #   emission        the crest lines, the travelling light and the hollow glow alone (layers 3-4)
+# the quality pass's geometry views (resonator-quality, Phase C):
+#   normals         the deformed surface normal as colour (0.5 + 0.5 n), unlit
+#   wire            the mesh's square grid (the core's FINE_STEP cells) in red over grey lit by the key alone
 DEBUG = os.environ.get("CW_DEBUG", "")
 # ADR-1407: the relief is baked into a grid once a frame (CW_BAKE=0: every vertex evaluates the readers, for comparison)
 BAKE = os.environ.get("CW_BAKE", "1") != "0"
 LINE2 = os.environ.get("CW_LINE2", "0") == "1"  # Stage C's medium crest light (off since Stage G: 4 ops)
 WAVE = float(os.environ.get("CW_WAVE", "2.2"))  # Stage D: the travelling light's gain into its grid (0 = off)
 BAKE_RES = int(os.environ.get("CW_BAKE_RES", "896"))
+NORMAL_CELLS = float(os.environ.get("CW_NORMAL_CELLS", "1"))   # the normal's finite-difference step, in bake cells
 BAKE_HALF = 86.0   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
 # the camera (the correction round, owner: "pull back"): A the shape-language framing, B pulled back (chosen), C further
 CAMERAS = {"A": (30.0, 32.0, 30.0), "B": (36.0, 42.0, 28.0), "C": (40.0, 48.0, 26.0)}
 CAMERA = CAMERAS[os.environ.get("CW_CAM", "B")]
 PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
+LARGE_SHARP = float(os.environ.get("CW_LARGE_SHARP", "0.9"))
+LARGE_ROUND = float(os.environ.get("CW_LARGE_ROUND", "0.4"))
+MEDIUM_ROUND = float(os.environ.get("CW_MEDIUM_ROUND", "0.5"))
 SHAPES = {
     "P1": {"large": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.35}, 3.2),
            "medium": ({"reliefSand": 0.0, "reliefFigure": 1.0, "reliefVibration": 0.3}, 1.3),
@@ -385,9 +464,9 @@ SHAPES = {
     # loudness (normalised sand, ADR-1405) so the quiet state has a deliberate form; the antinodes sink into deep
     # basins with the excitation (-1.2 |F|, crease rounded half as much -- the square grid carries it); the medium net
     # at about half its height so the large lobes, rings and petals lead
-    "P2": {"large": ({"reliefSand": 1.0, "sandNormalized": True, "sharpness": 0.75, "reliefAmplitude": -1.2,
-                     "reliefRound": 0.4, "reliefVibration": 0.25}, 2.8),
-           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": 0.5}, 0.45),
+    "P2": {"large": ({"reliefSand": 1.0, "sandNormalized": True, "sharpness": LARGE_SHARP, "reliefAmplitude": -1.2,
+                     "reliefRound": LARGE_ROUND, "reliefVibration": 0.25}, 2.8),
+           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": MEDIUM_ROUND}, 0.45),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
     "P3": {"large": ({"reliefSand": 0.55, "sharpness": 0.7, "reliefFigure": 0.8, "reliefVibration": 0.25}, 3.2),
            "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.3}, 1.2),
@@ -413,7 +492,8 @@ def ground_readers(s):
                                           # 10-brief Stage B, the colour field: the large figure's signed standing
                                           # pattern F -- each lobe a broad colour region, anchored to the geometry
                                           ("shade-tint", "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, **large}, 640)):
-            reader(s, name, channel, extra)
+            reader(s, name, channel, extra,
+                   frame={"strength": TINT_GAIN} if name == "shade-tint" and PALETTE == "M" else None)
             bake_grid(s, name, res)
         # 10-brief Stage C, the SECONDARY light: the medium network's crests times the excitation, multiplied before
         # the bake (a compound), so the program spends one field slot on it and keeps the fourth for Stage D
@@ -496,10 +576,12 @@ PALETTES = {
           "sky": "#22206e", "haze": "#1d1757", "line": "#bdf6ff", "hollow": "#ff3dc8",
           "sheen": "#e6f7ff", "sheenI": 1.4, "keyI": 2.31, "fillI": 0.836, "rimI": 0.49, "skyI": 0.122, "lineI": 2.2, "hollowI": 0.087},
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
-    "B": {"line2": "#7fb6ff", "line2I": 0.4, "wave": "#9ff0ff", "waveI": float(os.environ.get("CW_WAVE_I", "4.0")), "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
+    "B": {"line2": "#7fb6ff", "line2I": 0.4, "wave": "#9ff0ff", "waveI": float(os.environ.get("CW_WAVE_I", "2.5")), "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#9fe6ff",
-          "sheenI": 0.75,
-          "keyI": 2.3, "fillI": 0.9, "rimI": 0.35, "skyI": 0.07, "lineI": 1.9, "hollowI": 0.4},
+          "sheenI": float(os.environ.get("CW_SHEEN_I", "0.3")),
+          "keyI": float(os.environ.get("CW_KEY_I", "1.6")), "fillI": 0.9, "rimI": 0.35, "skyI": float(os.environ.get("CW_SKY_I", "0.6")),
+          "lineI": float(os.environ.get("CW_LINE_I", "0.35")),
+          "hollowI": 0.4},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
           "sky": "#1c1048", "haze": "#24114c", "line": "#a8f2ff", "hollow": "#ff6a3d",
@@ -534,33 +616,7 @@ MULTI_PALETTES = [
 ]
 
 
-# the view layer's colours (facing -> half -> grazing), display colours like the roles; palettes not listed have none
-VIEW_LAYERS = {
-    # J: oil on petrol -- facing walls barely tinted, turning violet, then burgundy-rose at grazing
-    "Prismatic Oil": ["#06141c", "#5a2c9a", "#d06a5a"],
-    # E: metal -- no colour facing the camera, copper on the turn, pale gold where the wall grazes the view
-    "Oxidized Metal": ["#000000", "#5a3020", "#c89a60"],
-}
-
-
-def _oklab(c):
-    l = 0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]
-    m = 0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]
-    s_ = 0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]
-    l, m, s_ = (max(v, 0.0) ** (1.0 / 3.0) for v in (l, m, s_))
-    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s_,
-            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s_,
-            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s_]
-
-
-def _linear(lab):
-    l = lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2]
-    m = lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2]
-    s_ = lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2]
-    l, m, s_ = l ** 3, m ** 3, s_ ** 3
-    return [max(0.0, 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s_),
-            max(0.0, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s_),
-            max(0.0, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s_)]
+_oklab, _linear = kit.oklab, kit.oklab_linear   # OKLab (kit), the space the engine blends palettes in (ADR-1043)
 
 
 def _mix(a, b, t):  # OKLab, the space the engine blends palettes in (ADR-1043)
@@ -593,18 +649,49 @@ PALETTE_TUNE = {
     # tactile metal: a warm grazing view layer, sharp bright glints, little glow
     "Oxidized Metal": {"keyMix": 0.55, "hollow": 0.4, "sheen": 1.8, "gritMix": 0.2},
     # crystalline, cold, spacious: an icy near-white key, crisp glints, edges catching light, almost no glow
-    "Glacial Spectral": {"alb": 1.5, "keySrc": "peak", "keyMix": 0.9, "key": 1.1, "sky": 1.4, "hollow": 0.25,
+    "Glacial Spectral": {"alb": 1.15, "keySrc": "peak", "keyMix": 0.9, "key": 1.1, "sky": 0.9, "hollow": 0.25,
                          "sheen": 2.0, "line": 1.0, "gritMix": 0.6, "fillSrc": "spectral"},
     # green emerging from darkness, chartreuse only on resonant peaks
     "Chlorophyll After Dark": {"alb": 0.8, "keySrc": "resonant", "keyMix": 0.5, "gritMix": 0.1, "line": 0.9},
-    # soft, smoky, low contrast, pearl: a pearly key, a higher ambient floor, softer crests and glow
-    "Rose Quartz": {"alb": 1.0, "keySrc": "peak", "keyMix": 0.6, "key": 0.7, "sky": 2.2, "line": 0.55,
+    # soft, smoky, low contrast, pearl: a pearly key, a higher ambient floor, softer crests and glow (the quality pass's
+    # brighter floor made the old 2.2 milky: 1.25)
+    "Rose Quartz": {"alb": 0.9, "keySrc": "peak", "keyMix": 0.6, "key": 0.7, "sky": 1.25, "line": 0.55,
                     "line2": 0.6, "hollow": 0.45, "sheen": 0.7, "gritMix": 0.1},
     # pure form: the geometry alone carries it
     "Monochrome Silver": {"keyMix": 1.0, "hollow": 0.5},
     # petrol and oil: a cool neutral key, the view layer carries the colour, crests rose-gold but low, little glow
     "Prismatic Oil": {"alb": 0.9, "keySrc": "secondary", "keyMix": 0.7, "hollow": 0.35, "line": 0.7, "gritMix": 0.0},
 }
+
+
+# THE CHROMATIC FIELD'S GRADIENTS (resonator-quality): four OKLCH stops (L, C, hue in degrees) per palette, the gradient
+# the surface runs through (ADR-1470 blends them in OKLab). Each keeps its palette's family and widens it into a
+# multi-hue journey of related colours: lighter and more chromatic than the old surface roles, so the body of a cell
+# carries colour between the light and the dark. A ridge sits one step along (RIDGE_SHIFT), so g3 is where ridges and
+# the strongest lobes end up. Display colours, scaled to albedo like the roles (PAL_ALBEDO).
+GRADIENTS = {
+    # indigo -> cobalt -> violet -> a narrow fuchsia (the crest lines keep the icy cyan)
+    "Abyssal Resonance":      [(0.40, 0.14, 276), (0.50, 0.17, 258), (0.52, 0.19, 300), (0.60, 0.19, 334)],
+    # indigo-violet sculpture, plum, and the red only where the gradient ends (ridges, the hottest lobes)
+    "Crimson Singularity":    [(0.32, 0.13, 300), (0.38, 0.16, 322), (0.44, 0.18, 350), (0.54, 0.20, 18)],
+    "Molten Glass":           [(0.40, 0.12, 26), (0.50, 0.15, 38), (0.60, 0.17, 52), (0.72, 0.15, 74)],
+    # violet foundation turning to fuchsia and magenta
+    "Ultraviolet Bloom":      [(0.40, 0.14, 288), (0.48, 0.18, 305), (0.54, 0.21, 330), (0.64, 0.18, 352)],
+    # verdigris grey into copper and brass
+    "Oxidized Metal":         [(0.42, 0.04, 190), (0.48, 0.07, 62), (0.56, 0.10, 48), (0.68, 0.10, 76)],
+    "Glacial Spectral":       [(0.48, 0.07, 258), (0.58, 0.09, 238), (0.67, 0.10, 214), (0.78, 0.07, 198)],
+    "Chlorophyll After Dark": [(0.40, 0.08, 168), (0.50, 0.11, 155), (0.58, 0.14, 140), (0.72, 0.16, 120)],
+    "Rose Quartz":            [(0.44, 0.07, 330), (0.52, 0.09, 346), (0.60, 0.11, 2), (0.72, 0.08, 22)],
+    # pure form: a whisper of cool-to-warm, never a hue
+    "Monochrome Silver":      [(0.30, 0.012, 255), (0.40, 0.015, 248), (0.50, 0.012, 236), (0.64, 0.010, 70)],
+    # petrol into violet, burgundy and rose
+    "Prismatic Oil":          [(0.36, 0.07, 248), (0.42, 0.10, 300), (0.50, 0.13, 345), (0.64, 0.12, 22)],
+}
+
+
+def _oklch(L, C, h):
+    a = math.radians(h)
+    return _linear([L, C * math.cos(a), C * math.sin(a)])
 
 
 def palette_state(name, hexes):
@@ -621,6 +708,11 @@ def palette_state(name, hexes):
     light = lambda c, term: [v * t.get(term, 1.0) for v in _hue(c)]
     src = lambda term, default: r[t.get(term + "Src", default)]
     key = _mix(white, src("key", "spectral"), 1.0 - t.get("keyMix", 0.55))
+    # resonator-quality: the light complements the chromatic field instead of re-tinting it -- a palette-coloured key
+    # and ambient floor multiplied every hue of the gradient back into the palette's one hue (the albedo view showed
+    # indigo, violet and fuchsia; the lit frame was all ultramarine). Both lean toward white by LIGHT_WHITE
+    key = _mix(key, white, LIGHT_WHITE)
+    sky_hue = _mix(r["primary"], white, LIGHT_WHITE)
     colors = {
         # the base field (Stage B's colour field): one sign of lobe primary, the other secondary, the nodes deep shadow
         "surfaceA": alb(r["primary"]), "surfaceB": alb(r["secondary"]), "shadow": alb(r["shadow"]),
@@ -628,24 +720,27 @@ def palette_state(name, hexes):
         "grit": alb(_mix(r["secondary"], r["resonant"], t.get("gritMix", 0.3))),
         # the raking key: white tinted by a role (a palette's light, not a colour wash); the ambient floor under it
         # takes the primary surface's hue
-        "key": light(key, "key"), "sky": light(r["primary"], "sky"),
-        "keymid": [0.5 * (x + y) for x, y in zip(light(key, "key"), light(r["primary"], "sky"))],
+        "key": light(key, "key"), "sky": light(sky_hue, "sky"),
+        "keymid": [0.5 * (x + y) for x, y in zip(light(key, "key"), light(sky_hue, "sky"))],
         "fill": light(src("fill", "resonant"), "fill"),         # the counter light on the far flanks
         "hollow": light(src("hollow", "resonant"), "hollow"),   # the glow in the excited cells
         "line": light(r["spectral"], "line"),                   # the large crest's light
         "line2": light(_mix(src("line2", "secondary"), r["spectral"], 0.5), "line2"),   # the medium crest
         "sheen": light(r["peak"], "sheen"),                     # the rare peaks: glints ...
-        "wave": light(src("wave", "peak"), "wave"),             # ... and the travelling light
+        # ... and the travelling light (the quality pass: the spectral hue, not the near-white peak -- in a loud
+        # passage the dashes covered the whole ridge network and read as a white outline)
+        "wave": light(src("wave", "spectral"), "wave"),
     }
-    black = [0.0, 0.0, 0.0]
-    view = VIEW_LAYERS.get(name)
-    colors["view0"], colors["view1"], colors["view2"] = (alb(hexrgb(h)) for h in view) if view else (black,) * 3
+    for i, (L, C_, h) in enumerate(GRADIENTS[name]):
+        colors["g%d" % i] = [v * a_ * GRAD_ALBEDO for v in _oklch(L, C_, h)]
     return {"name": name, "colors": {k: [round(v, 5) for v in c] for k, c in colors.items()}}
 
 
 PALETTE = os.environ.get("CW_PALETTE", "M")   # M: the ten palettes (12-brief); A-C the colour pass's, G grey
 PAL_INDEX = float(os.environ.get("CW_PAL", "0"))               # the palette shown (palette/position)
 PAL_ALBEDO = float(os.environ.get("CW_PAL_ALBEDO", "0.28"))     # albedo = the brief's display colour x this
+GRAD_ALBEDO = float(os.environ.get("CW_GRAD_ALBEDO", "1.0"))    # the chromatic field's stops, relative to it
+LIGHT_WHITE = float(os.environ.get("CW_LIGHT_WHITE", "0.45"))    # how far the key and ambient floor lean to white
 PAL_TRANSITION = float(os.environ.get("CW_PAL_TRANSITION", "6.0"))  # seconds of OKLab blend
 PAL_HOLD = float(os.environ.get("CW_PAL_HOLD", "24.0"))         # the least time a palette is held
 PAL_LOCK = os.environ.get("CW_PAL_LOCK", "0") == "1"            # a review still: hold the selected palette
@@ -664,6 +759,17 @@ PAL_PRIMARY = os.environ.get("CW_PAL_PRIMARY", "beat.phrasePulse")
 # Chosen from Feline, Trench and Hyperborea traces (11-report, the fallback).
 PAL_CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0, "slow": 24.0,
               "threshold": 0.08, "rearm": 0.04, "primaryTimeout": 30.0, "maxHold": 75.0}
+# the chromatic field's layers (resonator-quality): B's band (cycles across the bake, its weight), D's ridge shift,
+# and how much colour the hollow floors keep (Stage C's 0.1 crushed them to black)
+BAND_N = float(os.environ.get("CW_BAND_N", "1.3"))
+BAND_W = float(os.environ.get("CW_BAND_W", "0.45"))
+RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "0.1"))
+# the crest line's width: sand^13 drew a line ~0.25 m wide, thinner than a mesh cell, which zigzagged along every
+# steep lip (resonator-quality Phase C); sand^7 is ~0.35 m and softer-edged
+CREST_POWER = float(os.environ.get("CW_CREST_POWER", "7"))
+TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "0.9"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
+BAND_RATE = float(os.environ.get("CW_BAND_RATE", "1.6"))   # the band's phase, metres a second per unit of the integral
+FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.35"))
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
 
@@ -684,6 +790,27 @@ def ground_program():
     P_ = PALETTES[PALETTE]
     dbg = os.environ.get("CW_DEBUG", "")
     g = Prog("cwGround")
+    if dbg in ("normals", "wire"):  # the quality pass's geometry views: the deformed normal as colour; the mesh's square
+        # grid (the 0.36 m core only: beyond +-36 m the cells grow) drawn over a grey surface lit by the key alone
+        g.op(None, "input", 6, inp="normal")
+        if dbg == "normals":
+            g.op(None, "remap", 4, a=6, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
+        else:
+            g.op(None, "input", 0, inp="worldPosition")
+            g.op(None, "quantize", 1, a=0, f=1.0 / FINE_STEP)                 # the cell's centre
+            g.op(None, "remap", 0, a=0, k=[0.0, 1.0, 0.0, -1.0])              # -p
+            g.op(None, "add", 1, a=1, b=0)                                    # centre - p, +-step/2
+            g.op(None, "multiply", 1, a=1, b=1)
+            g.op(None, "smoothstep", 1, a=1, k=[(0.36 * FINE_STEP) ** 2, (0.46 * FINE_STEP) ** 2])
+            g.op(None, "swizzle", 3, a=1, k=[2, 2, 2, 2])
+            g.op(None, "add", 1, a=1, b=3)                                    # x or z edge
+            g.op(None, "gradient", 5, a=6, k=_unit([-x for x in KEY_DIR]) + [0.0], f=0.7)
+            g.op(None, "remap", 5, a=5, k=[0.0, 1.0, 0.25, 0.95], f=1.0)
+            g.op(None, "ramp", 4, a=1, k=[0.5, 0.5, 0.52, 1.0], k2=[0.9, 0.2, 0.1, 1.0], k3=[1.0, 0.1, 0.05, 1.0])
+            g.op(None, "multiply", 4, a=4, b=5)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit = 4, 2
+        return g
     if dbg in ("signed", "nodal", "envelope"):  # the debug views' material (08-brief §16): the field, lit by the key
         g.op("view", "field", 0, field="dbgview")
         if dbg == "signed":
@@ -713,17 +840,19 @@ def ground_program():
 
     if BAKE:  # ADR-1407: baked grids, sampled (cheap) -- r0 = sand, r2 = crest (sand^13), r3 = amplitude
         g.op("shade", "field", 0, field="shade-sand-grid")
-        g.op(None, "power", 2, a=0, f=13.0)
+        g.op(None, "power", 2, a=0, f=CREST_POWER)
         g.op(None, "field", 3, field="shade-amp-grid")
         # the colour field (Stage B): the large figure's signed F
         g.op("tintField", "field", 5, field="shade-tint-grid")
-        g.op(None, "remap", 5, a=5, k=[-0.55, 0.55, 0.0, 1.0], f=1.0)   # r5: the colour coordinate, 0 .. 1
+        if PALETTE != "M":   # (the chromatic field reads F itself: its baked strength is the gain, its ramp is cyclic)
+            g.op("tintMap", "remap", 5, a=5, k=[-0.55, 0.55, 0.0, 1.0], f=1.0)   # r5: the colour coordinate, 0 .. 1
     else:
         g.op("shade", "field", 0, field="shade")                   # r0 = (sand, crest, amplitude, w)
         g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])               # r2 = crest
         g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])               # r3 = amplitude
     # (a scalar op reads its source's x: r0.x is the sand, so no swizzle)
-    g.op("gritMask", "smoothstep", 1, a=0, k=[0.5, 0.92] if BAKE else [0.12, 0.5])          # r1: where grit has settled (the ridges)
+    if not (BAKE and PALETTE == "M"):   # (the chromatic field has no grit: the stone mask below reads the sand itself)
+        g.op("gritMask", "smoothstep", 1, a=0, k=[0.5, 0.92] if BAKE else [0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.7, 0.96] if BAKE else [0.25, 0.7])
     if BAKE:
@@ -745,7 +874,10 @@ def ground_program():
             g.op(None, "add", 2, a=2, b=6)
         tint("wave", 7, 7, "wave", P_.get("waveI", 0.0))
         g.op(None, "add", 2, a=2, b=7)
-    g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
+    if BAKE and PALETTE == "M":
+        g.op("stoneMask", "remap", 7, a=0, k=[0.5, 0.92, 1.0, 0.0], f=1.0)   # r7: scoured stone (off the ridges)
+    else:
+        g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
     g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.3, 1.0] if BAKE else [0.8, 2.4])          # only where it rings hard
     if not BAKE:  # (baked: the wall band below is all stone already -- sand < 0.14 never carries grit)
         g.op(None, "multiply", 3, a=3, b=7)
@@ -754,7 +886,8 @@ def ground_program():
     g.op("wallBand", "smoothstep", 4, a=0, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
     if BAKE:  # the fuchsia glow belongs to the violet lobes: the colour field chooses which cells glow
-        g.op("violetLobes", "remap", 4, a=5, k=[0.45, 0.15, 0.0, 1.0], f=1.0)
+        g.op("violetLobes", "remap", 4, a=5, k=[-0.05 * TINT_GAIN, -0.35 * TINT_GAIN, 0.0, 1.0] if PALETTE == "M"
+             else [0.45, 0.15, 0.0, 1.0], f=1.0)
         g.op(None, "multiply", 3, a=3, b=4)
     tint("hollow", 3, 3, "hollow", P_["hollowI"])
     g.op(None, "add", 2, a=2, b=3)                                 # r2: emission
@@ -764,21 +897,37 @@ def ground_program():
         # THE COLOUR FIELD (10-brief Stage B): the stone takes its colour from the large figure's signed pattern F --
         # deep violet on one sign of lobe, the navy stone at the nodes, deep blue on the other -- so broad regions of
         # colour fill the lobes and change as the figure changes; quiet music (small F) settles them toward navy
-        g.op("tint", "ramp", 4, a=5, k=pc("violet") + [1.0], k2=st + [1.0], k3=pc("blue") + [1.0])
-        g.op("grit", "constant", 6, k=gr + [1.0])
-        g.op("albedo", "mixBy", 4, a=4, b=6, c=1)                  # r4: the coloured stone, the grit on the ridges
+        if PALETTE == "M":
+            # THE CHROMATIC FIELD (resonator-quality, the addendum): the surface carries a continuous four-colour
+            # gradient between the active palette's gradient roles (g0..g3, OKLab stops, ADR-1470), on a coordinate
+            # built from three layers --
+            #   A  the large figure's signed F (r5, baked at TINT_GAIN) about the gradient's middle (the band's
+            #      constant 0.5): one sign of lobe runs toward g0, the other toward g3, the nodes sit between g1 and
+            #      g2 -- broad regions that follow the lobes and re-form with the figure
+            #   B  a broad travelling band across the basin (a cosine of the position along x, its phase a persistent
+            #      integral of the music, never reset): it crosses the cells, so colour boundaries do not all sit on
+            #      the geometry, and the regions stretch, bend and migrate
+            #   D  the nodal ridges (sand) push the colour a step along the gradient: a ridge reads as the next hue,
+            #      not as a white or cyan outline
+            # (Eight ops at the interpreter's ~0.8 ms an op at High: they replaced the tint remap, the grit's three and
+            # the view layer's three, so the program is two ops SHORTER than before the pass; J's oil and E's metal
+            # now live in their own gradients)
+            g.op(None, "input", 6, inp="worldPosition")
+            g.op("band", "palette", 4, a=6, k=[0.5, 0.5, 0.5, 0], k2=[BAND_W] * 3 + [0], k3=[BAND_N / (2.0 * BAKE_HALF)] * 3
+                 + [0], k4=[0, 0, 0, 0], f=0.0)
+            g.op(None, "add", 5, a=5, b=4)
+            g.op("ridgeShift", "remap", 4, a=0, k=[0.0, 1.0, 0.0, RIDGE_SHIFT])
+            g.op(None, "add", 5, a=5, b=4)
+            g.op("tint", "oklabRamp", 4, a=5, k=[1, 1, 1, 1], k2=[1, 1, 1, 1], k3=[1, 1, 1, 1], k4=[1, 1, 1, 1])
+        else:
+            g.op("tint", "ramp", 4, a=5, k=pc("violet") + [1.0], k2=st + [1.0], k3=pc("blue") + [1.0])
+            g.op("grit", "constant", 6, k=gr + [1.0])
+            g.op("albedo", "mixBy", 4, a=4, b=6, c=1)                  # r4: the coloured stone, the grit on the ridges
         # Stage C (coordinator, after B): the hollow FLOORS fall back toward black -- the deepest sand (the cell floor
         # inside the walls) keeps a fifth of its colour, so the lobes' violet and blue live on the walls and the frame
         # has real negative space for the light to stand out against
-        if PALETTE == "M":
-            # THE VIEW LAYER (12-brief, palettes J and E): a colour that turns with the angle a wall shows the camera
-            # -- an oil slick's violet-to-burgundy-to-rose sheen (J), copper going gold at grazing (E). One ramp on
-            # the Fresnel term whose three colours are palette roles: black in the palettes without one, so the same
-            # program serves all ten and a transition fades it in or out
-            g.op("viewTerm", "fresnel", 6, f=1.3)
-            g.op("view", "ramp", 6, a=6, k=[1, 1, 1, 1], k2=[1, 1, 1, 1], k3=[1, 1, 1, 1])
-            g.op(None, "add", 4, a=4, b=6)
-        g.op("floorDark", "remap", 6, a=0, k=[0.0, 0.4, 0.1, 1.0], f=1.0)
+        g.op("floorDark", "remap", 6, a=0, k=[0.0, 0.6, FLOOR_MIN, 1.0] if PALETTE == "M" else [0.0, 0.4, 0.1, 1.0],
+             f=1.0)
         g.op(None, "multiply", 4, a=4, b=6)
     else:
         g.op("albedo", "ramp", 4, a=1, k=st + [1.0], k2=[(x + y) * 0.5 for x, y in zip(st, gr)] + [1.0], k3=gr + [1.0])
@@ -790,7 +939,8 @@ def ground_program():
         g.op("key", "ramp", 5, a=1, k=sc + [1.0], k2=[(a + b) * 0.5 for a, b in zip(sc, kc)] + [1.0], k3=kc + [1.0])
     else:
         tint("key", 5, 1, "key", P_["keyI"])                       # the raking key
-    g.op("sheenLobe", "power", 1, a=1, f=12.0)                     # the key's highlight ...
+    g.op("sheenLobe", "power", 1, a=1, f=18.0 if PALETTE == "M" else 12.0)   # the key's highlight (narrower: white
+    # sheen must not swallow the chromatic field) ...
     g.op(None, "multiply", 1, a=1, b=7)                            # ... on the smooth stone only
     tint("sheen", 1, 1, "sheen", P_["sheenI"])                     # r1: sheen
     g.op("fillDot", "gradient", 3, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
@@ -853,7 +1003,7 @@ def ground(s, layers, write_mesh=False):
                      "program": "" if os.environ.get("CW_NOPROG") else g.name},
            # ADR-1401: the mesh is 5 km wide; its auto step would be 3.7 m. Baked (ADR-1407): one grid cell, so the
            # normal's differences span neighbouring cells instead of reading one bilinear cell's flat facet
-           extra={"normalStep": (2.0 * BAKE_HALF / BAKE_RES) if BAKE else 0.12},
+           extra={"normalStep": (NORMAL_CELLS * 2.0 * BAKE_HALF / BAKE_RES) if BAKE else 0.12},
            deformers=[] if os.environ.get("CW_NODEFORM") else  # (a profiling switch: the bare mesh)
            [{"kind": "field", "field": name, "amount": amount, "axis": [0.0, 1.0, 0.0], "space": "world",
              "alongNormal": False} for name, amount in layers])
@@ -1004,7 +1154,7 @@ def build_world():
         s.route(R("control.palette", "palette/select", 9.0, attackMs=0, decayMs=0),
                 R("control.paletteLock", "palette/lock", 1.0, attackMs=0, decayMs=0))
     s.params_(POST)
-    if DEBUG in ("signed", "nodal", "envelope"):  # a debug material: none of the colour routes' targets exist
+    if DEBUG in ("signed", "nodal", "envelope", "normals", "wire"):  # a debug material: none of the colour routes' targets exist
         return s, cc, pads
     # a ramp-tinted term's colour is its constant2 (half) and constant3 (whole); a route scales both
     RP = "material/cwGround/op/%d/ramp/%s"
@@ -1012,7 +1162,9 @@ def build_world():
         return [RP % (g[label], "constant2"), RP % (g[label], "constant3")]
     counter, hollow, sheen = ramp_paths("fill"), ramp_paths("hollow"), ramp_paths("sheen")
     line = "material/cwGround/op/%d/constant/constant" % g["line"]
-    if BAKE:  # the grit is a constant of its own beside the colour field (light pass): the build turns it, whole
+    if BAKE and "grit" not in g.at:  # the chromatic field (palette M): the ridges take the gradient's next hue
+        grit, grit_mid = None, None
+    elif BAKE:  # the grit is a constant of its own beside the colour field (light pass): the build turns it, whole
         grit, grit_mid = "material/cwGround/op/%d/constant/constant" % g["grit"], None
     else:
         grit_mid, grit = RP % (g["albedo"], "constant2"), RP % (g["albedo"], "constant3")
@@ -1036,19 +1188,24 @@ def build_world():
         s.palette = palette_block(g)
         # THE MUSIC WITHIN A PALETTE (12-brief §3, intents, not channel mappings): every route moves a LOCALISED or
         # REGIONAL term, never the frame's brightness, and none of them touches a hue -- the palette owns the hues
-        tf = "material/cwGround/op/%d/remap/constant" % g["tintField"]
+        band = "material/cwGround/op/%d/palette/value" % g["band"]
         s.route(
-            # bass: the extent of the broad colour regions -- the colour field's span narrows, so a lobe's colour
-            # reaches further from its centre toward the nodes
-            *[R("response.bass", tf, 1.0, comp=c, op="multiply", gain=-0.45, offset=1.0, attackMs=120, decayMs=1200)
-              for c in (0, 1)],
-            # held sound (the low-mid body of a mix): the dominant surface shifts -- the colour coordinate leans from
-            # the primary surface toward the secondary over seconds
-            *[R("response.sustain", tf, 0.22, comp=c, attackMs=2500, decayMs=5000) for c in (2, 3)],
+            # bass: the extent of the broad colour regions -- the colour field's gain rises, so a lobe's colour
+            # reaches further from its centre toward the nodes (these routes named the field op, not its remap,
+            # before the quality pass: they never bound, and the log said so)
+            R("response.bass", "field/shade-tint/strength", 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=120,
+              decayMs=1200),
+            # held sound (the low-mid body of a mix): the dominant surface shifts -- the band's phase leans over
+            # seconds, so the whole field slides a step along the gradient and settles back
+            R("response.sustain", band, 20.0, attackMs=2500, decayMs=5000),
             # mids (snares, the body of the beat): the medium folds' light (with LINE2; otherwise the snare's route
             # onto the crest lines, above, carries the mids)
             *[R("snareEnv", p_, 1.0, op="multiply", gain=1.4, offset=1.0, attackMs=0, decayMs=420)
               for p_ in ([RP % (g["line2"], "constant2"), RP % (g["line2"], "constant3")] if LINE2 else [])])
+        # the chromatic field's band (layer B) migrates across the basin: its phase is the integral of the music's
+        # energy plus a slow floor (ADR-1041), so it never resets, quickens in loud passages and still drifts in
+        # silence -- about one band in 60-90 s
+        s.route(R("sonic.energy", band, BAND_RATE, gain=1.0, offset=0.4, integrate=True))
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
                 *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
                 R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
@@ -1066,13 +1223,11 @@ def palette_block(g):
     binds = []
     for label in (("line2",) if LINE2 else ()) + ("wave", "hollow", "sheen", "fill"):    # tint ramps: the colour is constant2 and constant3
         binds += [(label, M % (g[label], "ramp", "constant2")), (label, M % (g[label], "ramp", "constant3"))]
-    binds += [("line", M % (g["line"], "constant", "constant")), ("grit", M % (g["grit"], "constant", "constant")),
-              ("surfaceA", M % (g["tint"], "ramp", "constant")), ("shadow", M % (g["tint"], "ramp", "constant2")),
-              ("surfaceB", M % (g["tint"], "ramp", "constant3")),
+    binds += [("line", M % (g["line"], "constant", "constant")),
+              ("g0", M % (g["tint"], "oklabRamp", "constant")), ("g1", M % (g["tint"], "oklabRamp", "constant2")),
+              ("g2", M % (g["tint"], "oklabRamp", "constant3")), ("g3", M % (g["tint"], "oklabRamp", "constant4")),
               ("sky", M % (g["key"], "ramp", "constant")), ("keymid", M % (g["key"], "ramp", "constant2")),
-              ("key", M % (g["key"], "ramp", "constant3")),
-              ("view0", M % (g["view"], "ramp", "constant")), ("view1", M % (g["view"], "ramp", "constant2")),
-              ("view2", M % (g["view"], "ramp", "constant3"))]
+              ("key", M % (g["key"], "ramp", "constant3"))]
     # ADR-1420: the selector -- the palette changes at phrase scale, on a phrase boundary at least PAL_HOLD seconds
     # after the last change, to the next palette of a COMPOSED order (PAL_ORDER: a temperature arc, never across),
     # blended straight in OKLab over PAL_TRANSITION seconds; CC 9 selects, CC 10 locks
@@ -1085,7 +1240,7 @@ def palette_block(g):
 
 
 BUILDERS = {"world": build_world}
-OUT_DIRS = {k: os.path.join(REPO, "examples", v["id"]) for k, v in SCENES.items()}
+OUT_DIRS = {k: (OUT if os.environ.get("CW_OUT") else os.path.join(REPO, "examples", v["id"])) for k, v in SCENES.items()}
 DESCRIPTION_TAIL = {"world": "Ten artist palettes take turns at phrase boundaries (or on a big change in the music when there is no tempo), blended in OKLab; CC 9 picks one, CC 10 holds it. The ground's figure is drawn by one resonance field (ADR-1400, ADR-1403 to 1409); the scene carries no track of its own."}
 
 
@@ -1105,6 +1260,8 @@ def write_scene(key):
             f.write("\n")
     ccs = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in cc)
     pds = ", ".join("pad %d %s" % (n, d.split(":")[0].lower()) for n, _, d in pads)
+    if os.environ.get("CW_OUT"):   # a look-development copy: no index entry
+        return pp
     kit.upsert_index_entry({
         "category": "Resonator",
         "description": "Play live audio (any mix) and, optionally, a MIDI controller: " + ccs + "; " + pds + ". "

@@ -329,7 +329,7 @@
    "field": {
     "kind": "resonance",
     "reference": "cymatic",
-    "strength": 1.0,
+    "strength": 0.9,
     "falloff": {
      "kind": "none"
     },
@@ -415,7 +415,7 @@
     },
     "resonance": {
      "channel": "relief",
-     "sharpness": 0.75,
+     "sharpness": 0.9,
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
      "reliefVibration": 0.25,
@@ -604,7 +604,7 @@
      "kind": "power",
      "dst": 2,
      "srcA": 0,
-     "value": 13.0
+     "value": 7.0
     },
     {
      "kind": "field",
@@ -615,29 +615,6 @@
      "kind": "field",
      "dst": 5,
      "field": "shade-tint-grid"
-    },
-    {
-     "kind": "remap",
-     "dst": 5,
-     "srcA": 5,
-     "constant": [
-      -0.55,
-      0.55,
-      0.0,
-      1.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 1,
-     "srcA": 0,
-     "constant": [
-      0.5,
-      0.92,
-      0.0,
-      0.0
-     ]
     },
     {
      "kind": "smoothstep",
@@ -683,9 +660,9 @@
      "kind": "constant",
      "dst": 4,
      "constant": [
-      1.9,
-      1.9,
-      1.9,
+      0.35,
+      0.35,
+      0.35,
       1.0
      ]
     },
@@ -706,15 +683,15 @@
       0.0
      ],
      "constant2": [
-      2.0,
-      2.0,
-      2.0,
+      1.25,
+      1.25,
+      1.25,
       0.5
      ],
      "constant3": [
-      4.0,
-      4.0,
-      4.0,
+      2.5,
+      2.5,
+      2.5,
       1.0
      ]
     },
@@ -727,10 +704,10 @@
     {
      "kind": "remap",
      "dst": 7,
-     "srcA": 1,
+     "srcA": 0,
      "constant": [
-      0.0,
-      1.0,
+      0.5,
+      0.92,
       1.0,
       0.0
      ],
@@ -769,8 +746,8 @@
      "dst": 4,
      "srcA": 5,
      "constant": [
-      0.45,
-      0.15,
+      -0.045,
+      -0.315,
       0.0,
       1.0
      ],
@@ -812,7 +789,66 @@
      "srcB": 3
     },
     {
-     "kind": "ramp",
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "palette",
+     "dst": 4,
+     "srcA": 6,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant2": [
+      0.45,
+      0.45,
+      0.45,
+      0.0
+     ],
+     "constant3": [
+      0.007558,
+      0.007558,
+      0.007558,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.1
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "oklabRamp",
      "dst": 4,
      "srcA": 5,
      "constant": [
@@ -832,58 +868,13 @@
       1.0,
       1.0,
       1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 6,
-     "srcC": 1
-    },
-    {
-     "kind": "fresnel",
-     "dst": 6,
-     "value": 1.3
-    },
-    {
-     "kind": "ramp",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
      ],
-     "constant2": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ],
-     "constant3": [
+     "constant4": [
       1.0,
       1.0,
       1.0,
       1.0
      ]
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 6
     },
     {
      "kind": "remap",
@@ -891,8 +882,8 @@
      "srcA": 0,
      "constant": [
       0.0,
-      0.4,
-      0.1,
+      0.6,
+      0.35,
       1.0
      ],
      "value": 1.0
@@ -925,21 +916,21 @@
      "dst": 5,
      "srcA": 1,
      "constant": [
-      0.07,
-      0.07,
-      0.07,
+      0.6,
+      0.6,
+      0.6,
       1.0
      ],
      "constant2": [
-      1.185,
-      1.185,
-      1.185,
+      1.1,
+      1.1,
+      1.1,
       1.0
      ],
      "constant3": [
-      2.3,
-      2.3,
-      2.3,
+      1.6,
+      1.6,
+      1.6,
       1.0
      ]
     },
@@ -947,7 +938,7 @@
      "kind": "power",
      "dst": 1,
      "srcA": 1,
-     "value": 12.0
+     "value": 18.0
     },
     {
      "kind": "multiply",
@@ -966,15 +957,15 @@
       0.0
      ],
      "constant2": [
-      0.375,
-      0.375,
-      0.375,
+      0.15,
+      0.15,
+      0.15,
       0.5
      ],
      "constant3": [
-      0.75,
-      0.75,
-      0.75,
+      0.3,
+      0.3,
+      0.3,
       1.0
      ]
     },

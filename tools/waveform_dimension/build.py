@@ -42,7 +42,8 @@ TITLE = "Waveform Dimension"
 OUT = os.environ.get("WD_OUT") or os.path.join(REPO, "examples", SID)
 MESH_DIR = os.path.join(OUT, "meshes")
 
-NEUTRAL = os.environ.get("WD_NEUTRAL", "0") == "1"   # a review aid: grey material, white light, no emission, no post
+NEUTRAL = os.environ.get("WD_NEUTRAL", "0") == "1"
+DEBUG = os.environ.get("WD_DEBUG", "")   # review aids: albedo (the chromatic waves alone), normals   # a review aid: grey material, white light, no emission, no post
 
 # ================================================================================================ palette
 # The owner's corrected palette (00-brief.md, appended): red spectral energy trapped inside a vast indigo-violet
@@ -271,23 +272,43 @@ def surface_program(name):
         g.op(None, "ramp", 2, a=5, k=[0, 0, 0, 1], k2=[0.05, 0.05, 0.05, 1], k3=[0.12, 0.12, 0.12, 1])
         g.base, g.emit, g.opacity = 4, 2, -1
         return g
-    # albedo: each nested sheet its own value of the same indigo-violet (related hues, different light); the
-    # outermost the lightest royal, the inner ones sinking to blackened indigo
-    g.op("albedo", "ramp", 4, a=1, k=C("royal", 0.95) + [1.0], k2=C("indigo", 1.6) + [1.0], k3=C("indigo", 1.1) + [1.0])
+    # THE CHROMATIC WAVES (resonator-quality, the owner's colour-field addendum): the surface runs through the palette's
+    # four gradient roles (g0..g3, a CYCLIC OKLab ramp, ADR-1470) along a coordinate of three layers --
+    #   A  travelling bands: the position along WAVE_DIR, WAVE_N cycles across the sculpture, the phase a persistent
+    #      integral of the music (it never resets; it drifts in silence) -- long chromatic waves through every sheet
+    #   B  the families' signed displacement D: the bands bend and part where the field moves the sheets, so the colour
+    #      shares the geometry's rhythm without its crests sitting on the colour boundaries (a phase offset)
+    #   D  the sheet's place in the nest: each nested sheet a step along the gradient, so the nesting reads in colour
+    g.op(None, "input", 0, inp="worldPosition")
+    g.op("waveAxis", "gradient", 4, a=0, k=list(WAVE_DIR) + [0.5], f=1.0 / 300.0)   # 0 .. 1 across the sculpture
+    g.op("wavePhase", "remap", 4, a=4, k=[0.0, 1.0, 0.0, WAVE_N])                 # cycles; the phase rides k.z/k.w
+    g.op("waveBend", "field", 3, field="D-grid")
+    g.op(None, "remap", 5, a=3, k=[0.0, 1.0, 0.0, WAVE_BEND])                       # metres -> cycles
+    g.op(None, "add", 4, a=4, b=5)
+    g.op(None, "remap", 5, a=1, k=[0.0, 1.0, 0.0, SHEET_STEP])                      # sheet index / 3 -> cycles
+    g.op(None, "add", 4, a=4, b=5)
+    g.op("albedo", "oklabRamp", 4, a=4, k=C("royal") + [1.0], k2=C("purple") + [1.0], k3=C("crimson") + [1.0],
+         k4=C("indigo", 1.6) + [1.0], f=-1.0)
+    if DEBUG == "normals":  # review aid (resonator-quality Phase C): the deformed normal as colour, unlit
+        g.op(None, "input", 5, inp="normal")
+        g.op(None, "remap", 4, a=5, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit, g.opacity = 2, 4, -1
+        return g
+    if DEBUG == "albedo":   # review aid (resonator-quality §9): the chromatic waves alone, unlit, as emission
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit, g.opacity = 2, 4, -1
+        return g
     # the glow follows the field's contours, never painted spots: electric purple in a BAND where the families'
     # displacement reaches a given strength (|D| 3-6 m: a contour of the reinforcement, so it rings each lobe and runs
     # along the folds), spectral red only in the cores where it reinforces hardest (|D| > 9 m); a kick's shell adds its
     # crimson band as it passes. How bright it is follows the music's level (a route on the ramp). (Tried first: the
     # glow on the fold crests by screen-space convexity -- blocky; and |D| as a fill -- round blobs.)
-    g.op("reinf", "field", 3, field="D-grid")
-    g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2
-    g.op("bandIn", "smoothstep", 5, a=3, k=[9.0, 25.0])
-    g.op("bandOut", "smoothstep", 0, a=3, k=[36.0, 64.0])
-    g.op(None, "remap", 0, a=0, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
-    g.op(None, "multiply", 5, a=5, b=0)                           # r5 = the purple contour band
-    g.op("redCore", "smoothstep", 3, a=3, k=[81.0, 144.0])
-    g.op(None, "add", 5, a=5, b=3)                                # r5 in 0..2
-    g.op("glowT", "smoothstep", 5, a=5, k=[0.0, 1.8])
+    g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2 (r3 = D, read above)
+    # resonator-quality: the glow is a SMOOTH rise with the reinforcement (|D| from ~3.5 m to ~10 m), not the old
+    # contour band (|D| 3-6 m, in and out) with separate cores, whose flat-edged rings read as colour banding beside
+    # the chromatic waves; the accent still comes only where the families reinforce hardest (the ramp's top)
+    g.op("glowT", "smoothstep", 5, a=3, k=[GLOW_IN ** 2, GLOW_OUT ** 2])
     g.op(None, "add", 5, a=5, b=6)
     g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", GLOW_GAIN[0]) + [0.5], k3=C("red", GLOW_GAIN[1]) + [1.0])
     # its brightness: a constant the music's level scales (routes), apart from the colours (the palette owns those)
@@ -383,13 +404,19 @@ def environment(s):
     s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#a68bff"), intensity=3.0,
             castsShadow=False)
     s.light("rim", "directional", direction=[-0.35, -0.25, 0.9], color=C("purple"), intensity=1.6, castsShadow=False)
-    s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=0.35, castsShadow=False)
+    # resonator-quality: the fill is a real second light now (0.35 left every face turned from the key near black):
+    # from below and behind the key, in the palette's fill colour, so a turned-away face keeps its own colour
+    s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=FILL_I, castsShadow=False)
+    # ... and a broad, soft light from the camera's side of the sculpture (along the arc's mean view): every face the
+    # camera sees takes some diffuse light, so the chromatic waves read on the faces the key leaves (a restrained
+    # fill, white leaning to the palette's key; the key, rim and fill keep the modelling)
+    s.light("front", "directional", direction=FRONT_DIR, color=hexrgb("#d8d0ff"), intensity=FRONT_I, castsShadow=False)
 
 
 POST = {
     "post/motionBlur/amount": 0.0, "post/dof/enabled": False, "post/dof/physical": False,
     "post/tonemap/chroma-retention": 0.95, "post/bloom/radius": 0.7, "post/bloom/intensity": 0.25,
-    "post/bloom/threshold": 1.1, "post/output/vignette": 0.4, "post/output/grain": 0.01,
+    "post/bloom/threshold": 1.1, "post/output/vignette": float(os.environ.get("WD_VIGNETTE", "0.2")), "post/output/grain": 0.01,
     "post/grade/contrast": 1.15, "post/lens/chromaticAberration": 0.0, "camera/exposure/compensation": 0.0,
     "scene/fogColor": C("obsidian"),
 }
@@ -449,27 +476,55 @@ PALETTES = [
                           edge="#FF68B8", peak="#FFD8EE")),
 ]
 PALETTE_ORDER = [0, 1, 2, 3, 4, 5, 6, 7]   # cool and warm alternate; the owner's palette opens
-GLOW_GAIN = (0.12, 0.4)                   # the glow ramp's middle and end, as fractions of band and highlight
+GLOW_GAIN = (float(os.environ.get("WD_GLOW0", "0.04")), float(os.environ.get("WD_GLOW1", "0.2")))                   # the glow ramp's middle and end, as fractions of band and highlight
 CONTOUR_GAIN = (0.07, 0.14)
 EDGE_GAIN = (0.2, 0.85)
+
+
+# the chromatic waves' four stops per palette, from its own roles (the family stays the palette's): the middle sheets'
+# colour, the outer sheets' lit colour, the glow band's hue, and a step toward the accent -- lifted to a common
+# lightness and chroma so the body of every sheet carries colour between the light and the dark, blended in OKLab
+# (kit.mix_oklab) and cycled by the ramp (g3 returns to g0 through the palette's own neighbours)
+WAVE_L = (0.44, 0.54, 0.62, 0.5)      # the stops' OKLab lightness
+WAVE_CHROMA = 1.2                      # chroma, relative to the roles'
+WAVE_TURN = (-18.0, 0.0, None, 42.0)  # hue offsets (degrees) from the primary's hue; g2 keeps the band's own hue
+
+
+def gradient_roles(roles):
+    """Analogous stops only: the accent (highlight) stays in the glow -- a complementary accent in the ramp gave an
+    olive-grey midpoint (Ultramarine Gold), the muddy intermediate the addendum forbids."""
+    lin = {k: hexrgb(v) for k, v in roles.items()}
+    _, cp, hp = kit.lch_of(lin["primary"])
+    _, cs, _ = kit.lch_of(lin["secondary"])
+    _, cb, hb = kit.lch_of(lin["band"])
+    stops = [(cs, hp + WAVE_TURN[0]), (cp, hp), (cb, hb), (cp, hp + WAVE_TURN[3])]
+    out = {}
+    for i, (c, h) in enumerate(stops):
+        out["g%d" % i] = [round(v, 5) for v in kit.oklch(WAVE_L[i], min(c * WAVE_CHROMA, 0.25), h)]
+    # the front light: white leaning a quarter toward the palette's key
+    out["front"] = [round(v, 5) for v in kit.mix_oklab([1.0, 1.0, 1.0], lin["key"], 0.35)]
+    return out
 
 
 def palette_block(g):
     """The project palette (ADR-1043) with its selector (ADR-1420): the roles bound to the lights, the sky, the fog and
     the surface program's colour constants."""
-    op = lambda label, k: "material/%s/op/%d/ramp/%s" % (g.name, g[label], k)
+    op = lambda label, k: ("material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], k)
+                           if label in g.at else None)   # (a debug program lacks the light ops)
     bindings = [
         ("bg", "scene/fogColor", 1.0), ("bg", "env/sky/zenithColor", 0.6), ("shadow", "env/sky/horizonColor", 0.45),
-        ("primary", op("albedo", "constant"), 1.0), ("secondary", op("albedo", "constant2"), 1.0),
-        ("shadow", op("albedo", "constant3"), 1.0),
+        ("g0", op("albedo", "constant"), 1.0), ("g1", op("albedo", "constant2"), 1.0),
+        ("g2", op("albedo", "constant3"), 1.0), ("g3", op("albedo", "constant4"), 1.0),
         ("key", "lights/key/color", 1.0), ("rim", "lights/rim/color", 1.0), ("fill", "lights/fill/color", 1.0),
+        ("front", "lights/front/color", 1.0),
         ("band", op("glow", "constant2"), GLOW_GAIN[0]), ("highlight", op("glow", "constant3"), GLOW_GAIN[1]),
         ("contour", op("edgeBase", "constant2"), CONTOUR_GAIN[0]), ("contour", op("edgeBase", "constant3"), CONTOUR_GAIN[1]),
         ("edge", op("edgeTint", "constant2"), EDGE_GAIN[0]), ("peak", op("edgeTint", "constant3"), EDGE_GAIN[1]),
     ]
-    states = [{"name": name, "colors": {role: hexrgb(h) for role, h in roles.items()}} for name, roles in PALETTES]
+    states = [{"name": name, "colors": dict({role: hexrgb(h) for role, h in roles.items()}, **gradient_roles(roles))}
+              for name, roles in PALETTES]
     return {"states": states,
-            "bindings": [{"role": r, "target": t, "gain": gn, "mode": "replace"} for r, t, gn in bindings],
+            "bindings": [{"role": r, "target": t, "gain": gn, "mode": "replace"} for r, t, gn in bindings if t],
             "saturation": 1.0, "value": 1.0,
             "selector": {"select": PALETTE_ORDER[0], "transition": 5.0, "lock": False, "hold": 24.0,
                          "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PALETTE_ORDER,
@@ -550,6 +605,10 @@ def instrument(s, g):
             R("response.hatEnv", edge, 1.0, op="multiply", gain=1.0, offset=1.0, attackMs=0, decayMs=200),
             R("response.snareEnv", edge, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=0, decayMs=260),
             R("control.light", edge, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
+    # the chromatic waves travel: their phase integrates the music's energy over a floor (ADR-1041) -- never reset,
+    # quicker in loud passages, still moving in silence (k.z and k.w of the phase remap move together)
+    wp = "material/%s/op/%d/remap/constant" % (g.name, g["wavePhase"])
+    s.route(*[R("sonic.energy", wp, WAVE_RATE, comp=c, gain=1.0, offset=0.35, integrate=True) for c in (2, 3)])
     # the palette: CC 9 selects one (0..1 across the states), CC 10 locks it (no automatic change), as in every Resonator scene
     s.route(R("control.palette", "palette/select", float(len(PALETTES) - 1), **CCR),
             R("control.paletteLock", "palette/lock", 1.0, **CCR))
@@ -558,6 +617,18 @@ def instrument(s, g):
 # THE CAMERA: an elevated three-quarter arc outside the sculpture's densest part, looking down into the nested sheets,
 # so they fill the frame and recede (Stage B): never inside one opening looking down it (no portal), never so close
 # that one blank sheet fills the frame
+# the chromatic waves (surface_program): their direction, cycles across the sculpture, how far the displacement bends
+# them (cycles per metre of D), the step between nested sheets, and the phase's drift (cycles per second per unit of
+# the integrated energy + floor)
+FILL_I = float(os.environ.get("WD_FILL_I", "1.2"))
+GLOW_IN, GLOW_OUT = 3.5, 10.0   # metres of |D| over which the glow rises
+FRONT_I = float(os.environ.get("WD_FRONT_I", "1.2"))
+FRONT_DIR = [-0.4, -0.58, -0.71]   # from the arc's middle (azimuth 30 degrees, 92 m up) toward the focus
+WAVE_DIR = (0.55, 0.35, -0.76)
+WAVE_N = float(os.environ.get("WD_WAVE_N", "4.0"))
+WAVE_BEND = float(os.environ.get("WD_WAVE_BEND", "0.08"))
+SHEET_STEP = float(os.environ.get("WD_SHEET_STEP", "0.3"))
+WAVE_RATE = float(os.environ.get("WD_WAVE_RATE", "0.02"))
 CAM_FOCUS = [0.0, -10.0, -10.0]
 CAM_R, CAM_H, CAM_FOCAL, CAM_AZ, CAM_SWEEP = 140.0, 92.0, 24.0, 30.0, 70.0
 FOG = 0.0045

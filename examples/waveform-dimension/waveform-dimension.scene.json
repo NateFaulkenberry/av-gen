@@ -754,7 +754,24 @@
     0.01444,
     0.21586
    ],
-   "intensity": 0.35,
+   "intensity": 1.2,
+   "castsShadow": false
+  },
+  {
+   "id": "front",
+   "name": "front",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -0.58,
+    -0.71
+   ],
+   "color": [
+    0.68669,
+    0.63076,
+    1.0
+   ],
+   "intensity": 1.2,
    "castsShadow": false
   }
  ],
@@ -785,27 +802,33 @@
      "value": 1.0
     },
     {
-     "kind": "ramp",
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
      "dst": 4,
-     "srcA": 1,
+     "srcA": 0,
      "constant": [
-      0.06156,
-      0.01372,
-      0.20507,
-      1.0
+      0.55,
+      0.35,
+      -0.76,
+      0.5
      ],
-     "constant2": [
-      0.02433,
-      0.00829,
-      0.07466,
-      1.0
+     "value": 0.0033333333333333335
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      4.0
      ],
-     "constant3": [
-      0.01673,
-      0.0057,
-      0.05133,
-      1.0
-     ]
+     "value": 0.0
     },
     {
      "kind": "field",
@@ -813,75 +836,84 @@
      "field": "D-grid"
     },
     {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 3
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 5,
-     "srcA": 3,
-     "constant": [
-      9.0,
-      25.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 0,
-     "srcA": 3,
-     "constant": [
-      36.0,
-      64.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
      "kind": "remap",
-     "dst": 0,
-     "srcA": 0,
-     "constant": [
-      0.0,
-      1.0,
-      1.0,
-      0.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "multiply",
      "dst": 5,
-     "srcA": 5,
-     "srcB": 0
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 3,
      "srcA": 3,
      "constant": [
-      81.0,
-      144.0,
       0.0,
-      0.0
-     ]
+      1.0,
+      0.0,
+      0.08
+     ],
+     "value": 0.0
     },
     {
      "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "remap",
      "dst": 5,
-     "srcA": 5,
+     "srcA": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.3
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "oklabRamp",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0648,
+      0.01444,
+      0.21586,
+      1.0
+     ],
+     "constant2": [
+      0.18782,
+      0.02315,
+      0.32778,
+      1.0
+     ],
+     "constant3": [
+      0.54572,
+      0.02217,
+      0.13014,
+      1.0
+     ],
+     "constant4": [
+      0.02433,
+      0.00829,
+      0.07466,
+      1.0
+     ],
+     "value": -1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
      "srcB": 3
     },
     {
      "kind": "smoothstep",
      "dst": 5,
-     "srcA": 5,
+     "srcA": 3,
      "constant": [
-      0.0,
-      1.8,
+      12.25,
+      100.0,
       0.0,
       0.0
      ]
@@ -903,15 +935,15 @@
       0.0
      ],
      "constant2": [
-      0.02254,
-      0.00278,
-      0.03933,
+      0.00751,
+      0.00093,
+      0.01311,
       0.5
      ],
      "constant3": [
-      0.34855,
-      0.02312,
-      0.03634,
+      0.17427,
+      0.01156,
+      0.01817,
       1.0
      ]
     },
