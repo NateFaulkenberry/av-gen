@@ -177,6 +177,28 @@
    }
   },
   {
+   "name": "nearCalm",
+   "kind": "field",
+   "position": [
+    -50.0,
+    6.0,
+    40.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "distance",
+    "point": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "radius": 110.0
+   }
+  },
+  {
    "name": "bassHistory",
    "kind": "field",
    "position": [
@@ -272,9 +294,9 @@
     "kind": "onset",
     "onsetSource": "mid",
     "point": [
-     -28.0,
-     4.0,
-     -40.0
+     -22.0,
+     3.0,
+     -80.0
     ],
     "waveGeometry": "spherical",
     "audioSpeed": 55.0,
@@ -346,7 +368,8 @@
     "combine": "multiply",
     "children": [
      "resonator",
-     "wallSide"
+     "wallSide",
+     "nearCalm"
     ]
    }
   },
@@ -367,7 +390,8 @@
     "combine": "multiply",
     "children": [
      "kickFront",
-     "wallSide"
+     "wallSide",
+     "nearCalm"
     ]
    }
   },
@@ -431,7 +455,8 @@
     "children": [
      "bassHistory",
      "bassCarrier",
-     "wallSide"
+     "wallSide",
+     "nearCalm"
     ]
    }
   },
@@ -627,8 +652,26 @@
     0.09531,
     0.9131
    ],
-   "intensity": 22000.0,
-   "range": 150.0,
+   "intensity": 45000.0,
+   "range": 160.0,
+   "castsShadow": false
+  },
+  {
+   "id": "sailLow",
+   "name": "sailLow",
+   "type": "point",
+   "position": [
+    110.0,
+    -25.0,
+    -80.0
+   ],
+   "color": [
+    0.04092,
+    0.7913,
+    0.88792
+   ],
+   "intensity": 30000.0,
+   "range": 170.0,
    "castsShadow": false
   },
   {

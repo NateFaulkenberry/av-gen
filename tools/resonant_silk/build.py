@@ -300,7 +300,8 @@ def sheets_for(comp):
             span=[(0.0, 30.0), (0.3, 26.0), (0.52, 10.0), (0.62, 2.5), (0.68, 12.0), (0.84, 48.0), (1.0, 62.0)],
             cloth=[(0.0, 40.0), (0.52, 44.0), (0.66, 30.0), (1.0, 66.0)],
             billow=[(0.0, 6.0), (0.33, 9.0), (0.56, 0.0), (0.64, 0.0), (0.82, -6.0), (1.0, -3.0)],
-            pleats=[(6.0, 0.8), (13.0, 0.25)], seed=5, curl=0.06, edge_wave=0.035, nu=760, nv=128, end_round=0.14)
+            pleats=[(6.0, 0.8), (13.0, 0.35), (23.0, 0.3)], seed=5, curl=0.06, edge_wave=0.035, nu=760, nv=176,
+            end_round=0.14)
         cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0, "drift": True}
         return [main], cam
     if comp == "b":
@@ -471,6 +472,7 @@ def palette_block(g):
         {"role": "irid", "target": op("irid"), "mode": "multiply"},
         {"role": "filmIor", "target": "procedural/silk/material/thinFilm/ior"},
         {"role": "resonant", "target": "lights/sail/color"},
+        {"role": "grazing", "target": "lights/sailLow/color"},
         {"role": "emit", "target": op("glowCol"), "mode": "multiply"},
         {"role": "fold", "target": op("foldMix"), "mode": "multiply", "component": 0},
     ]
@@ -492,7 +494,8 @@ def palette_block(g):
 
 # ================================================================================================ the music's fields
 GATHER = (0.0, 4.0, -170.0)     # the invisible ring: where everything converges, and where every wave starts
-WALL_MID = (-28.0, 4.0, -40.0)  # the middle of the near wall (where the snare's fronts start)
+WALL_MID = (-22.0, 3.0, -80.0)  # the middle of the wall (where the snare's fronts start)
+NEAR_CALM = (-50.0, 6.0, 40.0)  # the wall's near end, by the camera: the music's displacement is calm here
 FIELD = "resonator"
 WALL_RUN = [-0.27, 0.03, 0.96]   # from the gather back along the wall, toward the camera
 SAIL_RUN = [0.81, 0.57, 0.13]    # from the gather out along the sail
@@ -540,6 +543,9 @@ def fields(s):
     # the halves: 0 at the gather, 1 thirty metres out along each fan
     fnode("wallSide", {"kind": "plane", "axis": WALL_RUN, "softness": 35.0}, GATHER)
     fnode("sailSide", {"kind": "plane", "axis": SAIL_RUN, "softness": 30.0}, GATHER)
+    # the near wall keeps its pleats crisp: the music's displacement fades out over the 110 m nearest the camera
+    # (displacement there, along the wall's mean normal, slides the cloth within itself and smears the pleats)
+    fnode("nearCalm", {"kind": "distance", "point": [0.0, 0.0, 0.0], "radius": 110.0}, NEAR_CALM)
     fnode("bassHistory", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.22,
                           "audioSpeed": 26.0, "audioSmooth": 0.33, "point": list(GATHER),
                           "waveGeometry": "spherical"})
@@ -557,11 +563,12 @@ def fields(s):
                               "resonance": {"channel": "amplitude"}}})
     for side in ("wall", "sail"):
         mask = side + "Side"
-        fnode(side + "Res", {"kind": "compound", "combine": "multiply", "children": [FIELD, mask]})
-        fnode(side + "Kick", {"kind": "compound", "combine": "multiply", "children": ["kickFront", mask]})
+        calm = ["nearCalm"] if side == "wall" else []
+        fnode(side + "Res", {"kind": "compound", "combine": "multiply", "children": [FIELD, mask] + calm})
+        fnode(side + "Kick", {"kind": "compound", "combine": "multiply", "children": ["kickFront", mask] + calm})
     # the swell runs along the wall only (the sail answers the gather's fronts and its own modes)
     fnode("wallSwell", {"kind": "compound", "combine": "multiply", "children": ["bassHistory", "bassCarrier",
-                                                                               "wallSide"]})
+                                                                               "wallSide", "nearCalm"]})
 
 
 def music_deformers():
@@ -593,7 +600,10 @@ def environment(s):
             castsShadow=False, contactShadow=False)
     # the sail's grazing lamp: high above the gather, almost in the sail's plane, so its billows and hem catch strips
     # of light (the wall's top edge is out of its range)
-    s.light("sail", "point", position=[7.0, 115.0, -174.0], color=C("violet"), intensity=22000.0, range=150.0,
+    s.light("sail", "point", position=[7.0, 115.0, -174.0], color=C("violet"), intensity=45000.0, range=160.0,
+            castsShadow=False)
+    # and a second, low on the other side of its plane: the billows' undersides and the lower hem
+    s.light("sailLow", "point", position=[110.0, -25.0, -80.0], color=C("cyan"), intensity=30000.0, range=170.0,
             castsShadow=False)
     # broad cool fill from the camera side, low
     s.light("fill", "directional", direction=[0.1, -0.2, -1.0], color=C("teal"), intensity=0.6,
@@ -766,6 +776,8 @@ def variant(project, out, wav=None, camera=None, params=None, tracks=None):
         p, t = camera.split(":")
         doc["parameters"]["camera/position"] = [float(v) for v in p.split(",")]
         doc["parameters"]["camera/target"] = [float(v) for v in t.split(",")]
+        tl = doc.get("timeline", {})
+        tl["tracks"] = [tr for tr in tl.get("tracks", []) if not tr["target"].startswith("camera/")]
     for k, v in (params or {}).items():
         # the palette's own parameters are registered after a project's parameter values are read, so the selector's
         # authored values go in its block (palette/select, palette/lock, palette/transition, palette/hold)

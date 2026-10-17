@@ -1186,6 +1186,10 @@
     "target": "lights/sail/color"
    },
    {
+    "role": "grazing",
+    "target": "lights/sailLow/color"
+   },
+   {
     "role": "emit",
     "target": "material/rsSilk/op/25/constant/constant",
     "mode": "multiply"
