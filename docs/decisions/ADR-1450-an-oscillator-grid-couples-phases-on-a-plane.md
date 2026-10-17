@@ -43,7 +43,7 @@ An oscillator network is one more such plane.
 | 0 | cos θ (the default scalar reading) |
 | 1 | sin θ |
 | 2 | R, the local order parameter: \|Σ w e^{iθ_j}\| / Σ w over the coupling disk. 0 means the neighbours disagree (a defect, a front); 1 means they are in step. Low-passed by `persistence`. |
-| 3 | activity: \|the coupling torque\| / K, plus the kicks. It shows how hard the cell is being pulled. Low-passed by `persistence`, capped at 4. |
+| 3 | activity: the strain 4 (1 − Σ w cos(θ_j − θ_i) / Σ w), plus the kicks. It is 0 in step, small across a smooth wave, and near 4 at a defect or a fresh kick. Low-passed by `persistence`, capped at 4. (Not the torque: with a phase lag the torque is K sin α everywhere, even in perfect step.) |
 
 The phase is stored as a unit vector, so every reader (Field deformer, effector, material `field` op) interpolates
 it smoothly across cells. There is no wrap seam to cross.

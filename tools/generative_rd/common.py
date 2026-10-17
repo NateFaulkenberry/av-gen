@@ -266,3 +266,28 @@ def lissajous_track(s, target, centre, amp, period, ratio=(1.0, 1.0), phase=(0.0
         z = centre[2] + amp[1] * math.sin(2 * math.pi * (ratio[1] * t / period + phase[1]))
         keys.append({"time": round(t, 4), "value": [round(x, 4), float(centre[1]), round(z, 4)], "interp": "smooth"})
     s.track(target, keys, loop=period)
+
+
+def bowl_mesh(radius, height, rings, segments, power=2.2, inner=0.0):
+    """A dish of `radius` whose floor rises to `height` at the rim (y = height (r / radius)^power): an amphitheatre
+    the camera can stand inside, so the far wall closes the view and no horizon or sky shows. Rings are packed
+    toward the centre-near side less than toward the rim (uniform in r)."""
+    rs = np.linspace(inner, radius, rings)
+    th = np.linspace(0, 2 * math.pi, segments, endpoint=False)
+    T, Rr = np.meshgrid(th, rs)
+    x, z = Rr * np.cos(T), Rr * np.sin(T)
+    y = height * (Rr / radius) ** power
+    pos = np.stack([x.ravel(), y.ravel(), z.ravel()], axis=1)
+    # normal of y = h (r/R)^p: (-dy/dr cos, 1, -dy/dr sin) normalised
+    dydr = height * power * np.maximum(Rr, 1e-6) ** (power - 1) / radius ** power
+    n = np.stack([(-dydr * np.cos(T)).ravel(), np.ones(T.size), (-dydr * np.sin(T)).ravel()], axis=1)
+    n /= np.linalg.norm(n, axis=1, keepdims=True)
+    U, V = np.meshgrid(np.arange(segments) / segments, np.linspace(0, 1, rings))
+    uv = np.stack([U.ravel(), V.ravel()], axis=1)
+    idx = grid_indices(segments, rings, wrap_u=True)
+    # (theta, r) grid: check the winding against +Y and flip if needed
+    k = (len(idx) // 6) * 3  # a triangle half way out (the centre ring is degenerate)
+    a, b, c = pos[idx[k]], pos[idx[k + 1]], pos[idx[k + 2]]
+    if np.cross(b - a, c - a)[1] < 0:
+        idx = idx.reshape(-1, 3)[:, [0, 2, 1]].ravel()
+    return pos, n, uv, idx

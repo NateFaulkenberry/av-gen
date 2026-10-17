@@ -67,7 +67,7 @@ struct FieldSet;
 // ADR-1450: Oscillator -- a plane [x, 1, z] of coupled phase oscillators (Kuramoto-Sakaguchi), 4 floats per cell:
 //   cos(theta), sin(theta)   the phase, as a unit vector so that every reader interpolates it smoothly
 //   R                        the local order parameter (0 = neighbours disagree, 1 = in step), low-passed by persistence
-//   activity                 how hard the cell is being pulled or kicked, low-passed by persistence
+//   activity                 strain, 4 (1 - mean cos(theta_j - theta_i)), plus kicks; low-passed by persistence
 // Each sub-step is a kick pass (injection kicks, the frequency field's phase advance, phase noise) then `iterations`
 // coupling passes: dtheta/dt = 2 pi omega_i + K m_i sum_j w_ij sin(theta_j - theta_i - phaseLag) / sum_j w_ij, over a
 // Gaussian disk of `couplingRadius` cells plus `links` hashed long-range partners. Sampled as a scalar it reads cos(theta).

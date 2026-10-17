@@ -501,7 +501,9 @@ void oscCouple(GridField& g, const GridField& previous, float dtIt, double time,
             const float torque = sumW > 0.0f ? g.coupling * m * (sumS * ca - sumC * sa) / sumW : 0.0f;
             const float next = theta + dtIt * (kTwoPi * oscOmega(g, cell) + torque);
             const float rLocal = sumWX > 0.0f ? std::sqrt(sumC * sumC + sumS * sumS) / sumWX : 0.0f;
-            const float activity = std::abs(torque) / std::max(g.coupling, 1e-3f);
+            // strain: 1 - the mean of cos(theta_j - theta_i) over the weighted neighbours, x4 (0 in step, 4 opposed)
+            const float strain = sumWX > 0.0f ? 4.0f * (1.0f - (sumC * ci + sumS * si) / sumWX) : 0.0f;
+            const float activity = std::max(strain, 0.0f);
             const float rOld = previous.data[base + 2];
             const float aOld = previous.data[base + 3];
             g.data[base] = std::cos(next);

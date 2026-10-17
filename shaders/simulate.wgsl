@@ -755,7 +755,10 @@ fn cs_oscillate(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (acc.wx > 0.0) {
         rLocal = sqrt(acc.c * acc.c + acc.s * acc.s) / acc.wx;
     }
-    let activity = abs(torque) / max(k, 1e-3);
+    var activity = 0.0;
+    if (acc.wx > 0.0) {
+        activity = max(4.0 * (1.0 - (acc.c * ci + acc.s * si) / acc.wx), 0.0);
+    }
     let gain = 1.0 - exp(-dtIt / sim.excite2.z);
     let rOld = src[base + 2u];
     let aOld = src[base + 3u];
