@@ -653,6 +653,17 @@ PAL_LOCK = os.environ.get("CW_PAL_LOCK", "0") == "1"            # a review still
 # first order's green -> rose read as silver mid-blend in validation), a temperature arc around the wheel instead:
 # abyssal blue -> chlorophyll -> glacial -> silver -> oxidized -> molten -> crimson -> rose -> oil -> ultraviolet -> blue
 PAL_ORDER = [0, 6, 5, 8, 4, 2, 1, 7, 9, 3]
+# the primary advance: phrase boundaries (CW_PAL_PRIMARY=section.change stands in for "no tempo" in a review render:
+# a replayable signal that never fires without authored sections)
+PAL_PRIMARY = os.environ.get("CW_PAL_PRIMARY", "beat.phrasePulse")
+# ADR-1421, the fallback when no phrase arrives (live with no tempo): a large, sustained change in the music. The sum
+# of |fast - slow| (3 s vs 24 s averages) over three Sonic descriptors -- energy alone is nearly flat on mastered
+# tracks (0.71-0.78 for most of Feline), so brightness and density carry the builds, drops and breakdowns -- fires at
+# 0.08 and re-arms below 0.04; heard once the phrases have been quiet 30 s; and at the latest every 75 s, so a long
+# uniform groove still evolves. sonic.* is in the seek replay's prefix, so a render still lands where a play does.
+# Chosen from Feline, Trench and Hyperborea traces (11-report, the fallback).
+PAL_CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0, "slow": 24.0,
+              "threshold": 0.08, "rearm": 0.04, "primaryTimeout": 30.0, "maxHold": 75.0}
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
 
@@ -1069,7 +1080,8 @@ def palette_block(g):
             "bindings": [{"role": r, "target": t, "mode": "multiply"} for r, t in binds],
             "position": PAL_INDEX, "saturation": 1.0, "value": 1.0,
             "selector": {"select": int(PAL_INDEX), "transition": PAL_TRANSITION, "lock": PAL_LOCK, "hold": PAL_HOLD,
-                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PAL_ORDER}}}
+                         "advance": {"signal": PAL_PRIMARY, "threshold": 0.5, "order": PAL_ORDER,
+                                     "change": PAL_CHANGE}}}
 
 
 BUILDERS = {"world": build_world}
@@ -1094,7 +1106,7 @@ def write_scene(key):
     ccs = ", ".join("CC %d %s" % (n, d.split(":")[0].lower()) for n, _, d in cc)
     pds = ", ".join("pad %d %s" % (n, d.split(":")[0].lower()) for n, _, d in pads)
     kit.upsert_index_entry({
-        "category": "Cymatic World",
+        "category": "Resonator",
         "description": "Play live audio (any mix) and, optionally, a MIDI controller: " + ccs + "; " + pds + ". "
                        + s.design["thesis"] + " " + DESCRIPTION_TAIL[key] + " See docs/prototypes/cymatic-world/.",
         "live": True,

@@ -2041,7 +2041,20 @@
      7,
      9,
      3
-    ]
+    ],
+    "change": {
+     "signals": [
+      "sonic.energy",
+      "sonic.brightness",
+      "sonic.density"
+     ],
+     "fast": 3.0,
+     "slow": 24.0,
+     "threshold": 0.08,
+     "rearm": 0.04,
+     "primaryTimeout": 30.0,
+     "maxHold": 75.0
+    }
    }
   }
  },

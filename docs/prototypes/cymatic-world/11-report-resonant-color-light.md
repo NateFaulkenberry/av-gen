@@ -277,6 +277,39 @@ The image's interest stays where the brief puts it: geometry, shading and negati
 
 **Evidence** (`stageH-final/`): `all-10-palettes-final-feline-60s.png` and `layer-views-crimson-feline-18s-full-albedo-light-emission.png`. A transition clip in the final order is `palettes/phrase-transitions-final-order-feline-40-110s.mp4`.
 
+## The no-tempo fallback (owner request, ADR-1421)
+
+Live, with no tempo, `beat.phrasePulse` never fires, so the palette would never change on its own. The selector now also advances on a large, sustained change in the music. That is a second trigger added to ADR-1420 as ADR-1421 (d20eada6, self-contained, shared with Silk).
+
+- **The signal, and why.** The trigger is the sum of |fast − slow| over `sonic.energy`, `sonic.brightness` and `sonic.density`, with 3 s and 24 s exponential averages. It fires at 0.08 and re-arms below 0.04 (hysteresis).
+  - It is a slow-versus-fast novelty measure, not a level threshold, so a build, a drop or a breakdown fires it once.
+  - Energy alone is nearly flat on mastered tracks (0.71-0.78 for most of Feline), so brightness and density carry the section changes.
+  - `sonic.*` exists live and is in the seek replay's prefix, so a render still lands where a play does.
+- **Gating.**
+  - The fallback is heard only after the phrases have been quiet for 30 s, so the phrases win wherever a tempo exists.
+  - `maxHold` 75 s advances a long uniform groove that never changes.
+  - The 24 s hold, the 6 s OKLab blend, CC 10's lock (stops both triggers) and CC 9's select (wins at once) are unchanged.
+- **Tuning.** Simulated from Sonic traces of the three tracks with the phrases absent:
+
+  | Track | Advances | Driven by |
+  |---|---|---|
+  | Feline | 75, 114, 179 s | timer; the rise near 110 s; the drop at 170-180 s |
+  | Trench | 75, 109, 184 s | timer; the return after the 80-100 s breakdown; timer |
+  | Hyperborea | 64, 110, 135, 201 s | the dip at 60 s; section changes; the ending |
+
+  None are seconds apart, and no track goes without an advance.
+- **Proof.** Tests in `tests/unit/test_palette_selector.cpp` `[palette][adr1421]`:
+  - no primary pulse plus an energy change advances;
+  - the hold and the lock are respected;
+  - a sustained level fires once;
+  - phrases suppress the fallback until they go quiet;
+  - maxHold advances a uniform passage;
+  - a selector without the block is bit-identical (JSON and a scripted run);
+  - validation.
+
+  The owner asked for no more clips, so there are no review renders for this.
+- **Example list:** Cymatic World now sits in the shared "Resonator" live section, with Silk and Waveform.
+
 ## Validation (the ten scenarios, normal speed, with audio)
 
 The scenarios were rendered from the shipped project, with palettes advancing on their own, into `validation/` (960×540, 30 fps). Clips 01-10b were rendered before the palette order was recomposed in Stage H; the final order's transitions are in `palettes/phrase-transitions-final-order-feline-40-110s.mp4`.
@@ -300,7 +333,7 @@ The scenarios were rendered from the shipped project, with palettes advancing on
 **Known limitations:**
 - The fine serrated edge on some large crests (the coordinator's earlier note) is the mesh carrying a sharp crest. It is geometry, which this pass leaves alone.
 - The hollow glow is still soft-edged inside its wall band at some moments.
-- The palette advance listens to `beat.phrasePulse`. Live, with no tempo, phrases may not fire, and the palette then holds until CC 9 / CC 10 or a tempo exists (ADR-1420's report on tempo-less live scenes applies).
+- The palette advance listens to `beat.phrasePulse`, with the ADR-1421 fallback (energy, brightness and density change; a 75 s maximum hold) where no phrase arrives.
 - The material is at 43 of 48 ops and 16 of 16 GPU fields: there is little room left for another layer without removing one.
 
 ## Doc edits waiting for owner approval (not made)
