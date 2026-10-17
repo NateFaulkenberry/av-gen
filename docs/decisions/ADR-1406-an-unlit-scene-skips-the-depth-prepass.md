@@ -32,3 +32,9 @@ The resonance samplers also evaluated every mode row, including modes that a foc
 - Cymatic World: the prepass is gone (−8 ms on the old mesh, −34 ms on a 548k-vertex one). AO and the mask are 0.
 - Scenes that light anything are unchanged: their lights cast, and they never set the flags.
 - A scene that turns AO off and then lights a surface loses AO on it. That is its declared choice.
+
+## Note (2026-10-17, Cymatic World's light pass)
+
+Cymatic World has since turned its depth prepass off (`"depthPrepass": false`; `CW_PREPASS=1` in its generator asks for
+it again). Re-measured on loud Feline at High after the light pass: with the material at 43 ops, the prepass cost
+5.8 ms and saved 3.4 (GPU median 34.2 ms with it, 31.8 without). The switch and its default are unchanged.

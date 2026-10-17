@@ -235,8 +235,24 @@ Each step has its own brief and report in this folder.
 6. **No audio in the project.** The scene is `sonic.live` and carries no track; review renders feed a file with
    `avgen --audio`, which ADR-1408 makes win over the saved live capture device.
 7. **Performance.** Live 1080p at 30 fps under Auto (quality ladder), measured on Feline Footwear; see `09-report`.
-8. The colour, lighting and optics pass (`10-brief-resonant-color-light-optics.md`,
-   `11-report-resonant-color-light.md`) is in progress on `proto/cymatic-split` and not yet merged.
+8. **Colour, lighting and optics** (`10-brief-resonant-color-light-optics.md`, `11-report-resonant-color-light.md`):
+   - a colour field from the large figure's signed pattern, with hollow floors falling to near-black;
+   - the crest line as the brightest term;
+   - a travelling light along the crests from each hit (ADR-1409, ripples-only readers);
+   - optics tried one at a time, and rejected.
+9. **The ten palettes** (`12-brief-multi-palette.md`, in `11-report`): the owner's artist palettes.
+   - They are ADR-1043 project-palette states bound to a grey program, with a Fresnel view layer for Prismatic Oil
+     and Oxidized Metal.
+   - ADR-1420's selector changes palette on phrase boundaries: a 24 s hold, a 6 s OKLab blend, and a composed order
+     that is a temperature arc. CC 9 selects, CC 10 locks.
+   - ADR-1421 is the live fallback when no phrase arrives: a change in Sonic energy, brightness and density, and at
+     the latest every 75 s.
+   - `tools/cymatic_world/palette_sheet.py` compares the ten palettes.
+10. **Performance at the light pass.** Loud High is back under budget (GPU median 31.8 ms) with 43 material ops and
+    the depth prepass off. Auto, with ADR-1363's stretched-frame rule, holds High and then drops to Medium on the
+    loudest passage.
+11. Listed with Silk and Waveform in the shared "Resonator" live section.
 
-Decision records added since section 8: ADR-1403 to ADR-1408. `docs/resonance-field.md` documents the new members.
+Decision records added since section 8: ADR-1403 to ADR-1409 and ADR-1421 (with ADR-1420 and ADR-1363 from the
+shared work). `docs/resonance-field.md` documents the new members.
 

@@ -61,11 +61,21 @@ the passes after it. Approved by the owner and on main at `74edc063` (2026-10-16
     (unlit-scene prepass/shadow switches, silent rows), ADR-1407 (bake grids); a correction round; camera B; the full
     Feline Footwear render in `shape-language/final/`.
 16. The project's audio track removed (live scene); ADR-1408. Merged to main by the coordinator at `74edc063`.
-17. Colour, lighting and optics pass (`10-brief`, `11-report`) in progress on `proto/cymatic-split`.
+17. Colour, lighting and optics pass (`10-brief`, `11-report`), Stages A-H:
+    - colour field, darkness and crest hierarchy;
+    - the travelling light (ADR-1409);
+    - optics rejected;
+    - per-layer audio;
+    - performance: 43 ops, prepass off, loud High 31.8 ms;
+    - layer debug views `CW_DEBUG=albedo|light|emission`.
+18. The ten palettes (`12-brief`): ADR-1043 states with role bindings, ADR-1420's phrase-driven selector (24 s hold,
+    6 s OKLab blend, temperature-arc order), CC 9 select / CC 10 lock, `palette_sheet.py`. Build switches:
+    `CW_PALETTE` (M = the ten palettes, the default), `CW_PAL`, `CW_PAL_LOCK`, `CW_LINE2`, `CW_PREPASS`.
+19. ADR-1421, the no-tempo fallback: the palette also advances on a sustained change in Sonic energy, brightness and
+    density, and at the latest every 75 s. The scene is listed under "Resonator" with Silk and Waveform.
 
 ## Open items
 
-- The colour, lighting and optics pass (`11-report-resonant-color-light.md`) is not merged.
-- Auto holds High with ~6% missed frames on loud Feline passages (the light pass's Stage G investigates).
-- A few large crests show a fine serrated edge in the upper right of the frame at some moments.
+- A few large crests show a fine serrated edge at some moments (geometry: the mesh carrying a sharp crest).
+- The material is at 43 of 48 ops and the scene at 16 of 16 GPU fields: little room for another layer.
 - `examples/cymatic-world/meshes/cw-ground.glb` is committed like Digital Ocean's meshes.

@@ -1086,7 +1086,7 @@ def palette_block(g):
 
 BUILDERS = {"world": build_world}
 OUT_DIRS = {k: os.path.join(REPO, "examples", v["id"]) for k, v in SCENES.items()}
-DESCRIPTION_TAIL = {"world": "The ground's figure is drawn by one resonance field (ADR-1400, ADR-1403 to 1407); the scene carries no track of its own."}
+DESCRIPTION_TAIL = {"world": "Ten artist palettes take turns at phrase boundaries (or on a big change in the music when there is no tempo), blended in OKLab; CC 9 picks one, CC 10 holds it. The ground's figure is drawn by one resonance field (ADR-1400, ADR-1403 to 1409); the scene carries no track of its own."}
 
 
 def write_scene(key):

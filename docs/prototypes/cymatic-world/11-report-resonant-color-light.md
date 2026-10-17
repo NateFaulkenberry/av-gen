@@ -336,8 +336,7 @@ The scenarios were rendered from the shipped project, with palettes advancing on
 - The palette advance listens to `beat.phrasePulse`, with the ADR-1421 fallback (energy, brightness and density change; a 75 s maximum hold) where no phrase arrives.
 - The material is at 43 of 48 ops and 16 of 16 GPU fields: there is little room left for another layer without removing one.
 
-## Doc edits waiting for owner approval (not made)
+## Doc edits (made 2026-10-17, after the owner's "finish the work and merge")
 
-- **02-report.md / PROGRESS.md:** the light pass and the ten palettes (this report). Mention the scene's palette controls (CC 9, CC 10) and the layer debug views.
-- **ADR-1406:** a note that Cymatic World has since turned its depth prepass off, re-measured at the light pass (the switch is unchanged).
-- **README / examples row:** the Cymatic World description could name the ten palettes and the CC 9 / CC 10 controls. The generator rewrites `examples/index.json` from `DESCRIPTION_TAIL` and the CC list, which already includes CC 9 / CC 10.
+02-report §10 and PROGRESS (the light pass, the palettes, the fallback, the build switches), an ADR-1406 note (this
+scene's prepass is now off), and the examples row (the ten palettes, CC 9 / CC 10).
