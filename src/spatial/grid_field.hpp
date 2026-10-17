@@ -60,7 +60,8 @@ struct FieldSet;
 // the cell size or simRate (stepStencil in grid_field.cpp; docs/decisions/ADR-1201). Sampled as a scalar
 // it reads u; a Grid field's `channel` reads any of the four.
 // ADR-1407: Bake -- no simulation: every frame the grid is the scalar field `injectField` sampled at its cell centres
-// (a plane, [x, 1, z]), at the frame's own clock. A field too costly to evaluate per vertex (and per vertex again for a
+// (a plane, [x, 1, z] up to kMaxAgentGridResolution; ADR-1440: or a volume, every axis up to kMaxGridResolution), at
+// the frame's own clock. A field too costly to evaluate per vertex (and per vertex again for a
 // finite-difference normal) is evaluated once per cell instead, and everything that reads it samples the grid. Stateless,
 // so a seek lands where a play does with no catch-up and nothing to checkpoint.
 enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents, Excitable, Bake };

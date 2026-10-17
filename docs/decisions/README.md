@@ -57,6 +57,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1344-1349 | perf/rift-live-30fps (THE RIFT LIVE at 30 fps) |
 | 1350-1359 | art/sonic-vfx-pass (the Sonic VFX art pass) |
 | 1360-1369 | live performance follow-ups (2026-10-14) |
+| 1440-1449 | proto/waveform-dimension (Waveform Dimension) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -791,3 +792,4 @@ confirm the citation you are about to change is your own.
 | [1409](ADR-1409-a-resonance-reader-can-sum-its-modes-or-its-ripples-only.md) | A resonance reader can sum its modes only, or its ripples only (`resonance.rows`: `all` (default), `modes`, `ripples`; bits 2-3 of `gridBounds0.w`; CPU and GPU skip the rows not heard): a light that travels with the onset rings and is dark in silence. Cymatic World light pass, Stage D. proto/cymatic-split | Accepted |
 | [1420](ADR-1420-a-palette-selector-blends-directly-and-advances-on-the-music.md) | A palette selector blends directly to a chosen state and advances on the music (`palette.selector`: `palette/select` retargets from the current blend with no jump, straight in OKLab and never through the states between; `palette/transition`, `palette/lock`, `palette/hold`; `advance` steps an authored order on a bus signal with a threshold and a hold; replayed from zero by an offline seek when the signal is in the deterministic prefix, else restarted at the selected state; a palette without a selector is exactly ADR-1043). proto/resonant-silk | Accepted |
 | [1421](ADR-1421-a-palette-advances-on-a-change-in-the-music-when-no-phrase-arrives.md) | A palette advances on a change in the music when no phrase arrives (`selector.advance.change`: fast/slow averages of signals, the sum of |fast - slow| against a threshold with re-arm hysteresis, heard only after the primary has been quiet `primaryTimeout` s, optional `maxHold`; the hold, blend and lock apply; replayed on seek when its signals are in the prefix; absent = ADR-1420 exactly). proto/cymatic-split | Accepted |
+| [1440](ADR-1440-a-bake-grid-may-be-a-volume.md) | A bake grid may be a volume (`grids[].mode: "bake"` accepts every axis up to 128 as well as a plane: a 3D field baked once a frame keeps its vertical structure; Waveform Dimension's sheets sample it per vertex and per pixel instead of every mode) | Accepted |

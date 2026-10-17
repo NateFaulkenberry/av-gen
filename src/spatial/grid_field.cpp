@@ -543,10 +543,15 @@ Result<void> GridField::validate() const {
         if (sensorDistance < 0.0f || stepSize < 0.0f || depositAmount < 0.0f || diffusion > 1.0f) {
             return fail("grid '{}': sensorDistance, stepSize and depositAmount must be >= 0, diffusion <= 1", name);
         }
-    } else if (mode == GridMode::Bake) { // ADR-1407
-        if (resolution.y != 1 || resolution.x > kMaxAgentGridResolution || resolution.z > kMaxAgentGridResolution) {
-            return fail("grid '{}': a bake grid is a plane: resolution [x, 1, z] with x, z <= {}", name,
-                        kMaxAgentGridResolution);
+    } else if (mode == GridMode::Bake) { // ADR-1407; ADR-1440: or a volume
+        const bool planeOk = resolution.y == 1 && resolution.x <= kMaxAgentGridResolution &&
+                             resolution.z <= kMaxAgentGridResolution;
+        const bool volumeOk = resolution.x <= kMaxGridResolution && resolution.y <= kMaxGridResolution &&
+                              resolution.z <= kMaxGridResolution;
+        if (!planeOk && !volumeOk) {
+            return fail("grid '{}': a bake grid is a plane, resolution [x, 1, z] with x, z <= {}, or a volume with every "
+                        "axis <= {}",
+                        name, kMaxAgentGridResolution, kMaxGridResolution);
         }
         if (injectField.empty()) {
             return fail("grid '{}': a bake grid needs the field it bakes (injectField)", name);
