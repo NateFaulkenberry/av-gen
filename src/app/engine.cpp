@@ -3182,6 +3182,22 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     layers_.attach(params_);
     syncResponseControls(); // ADR-1062: a scene load clears the parameters; the response's must exist for the file's values
+    // ADR-1043: the palette, attached BEFORE the parameter block below so its values land on the first pass (ADR-1420:
+    // with a selector there are seven palette parameters; attached after, every load warned that each was unknown
+    // before the second pass quietly applied it), and before the timeline so its tracks find them.
+    if (!palette_.empty()) {
+        palette_.detach(params_);
+    }
+    palette_ = params::Palette{};
+    paletteReported_ = 0;
+    if (doc.contains("palette")) {
+        auto palette = params::Palette::fromJson(doc["palette"]);
+        if (!palette) {
+            return std::unexpected(palette.error());
+        }
+        palette_ = std::move(*palette);
+        palette_.attach(params_);
+    }
 
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
@@ -3390,20 +3406,6 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     cueState_ = {};
     cueApplied_ = false;
-    // ADR-1043: the palette, attached now so the project's parameter values and the timeline find it.
-    if (!palette_.empty()) {
-        palette_.detach(params_);
-    }
-    palette_ = params::Palette{};
-    paletteReported_ = 0;
-    if (doc.contains("palette")) {
-        auto palette = params::Palette::fromJson(doc["palette"]);
-        if (!palette) {
-            return std::unexpected(palette.error());
-        }
-        palette_ = std::move(*palette);
-        palette_.attach(params_);
-    }
     states_ = StateMachine{};
     if (doc.contains("states")) {
         if (auto r = states_.fromJson(doc["states"]); !r) {
