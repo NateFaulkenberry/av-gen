@@ -363,6 +363,7 @@ LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYO
 DEBUG = os.environ.get("CW_DEBUG", "")
 # ADR-1407: the relief is baked into a grid once a frame (CW_BAKE=0: every vertex evaluates the readers, for comparison)
 BAKE = os.environ.get("CW_BAKE", "1") != "0"
+LINE2 = os.environ.get("CW_LINE2", "0") == "1"  # Stage C's medium crest light (off since Stage G: 4 ops)
 WAVE = float(os.environ.get("CW_WAVE", "2.2"))  # Stage D: the travelling light's gain into its grid (0 = off)
 BAKE_RES = int(os.environ.get("CW_BAKE_RES", "896"))
 BAKE_HALF = 86.0   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
@@ -412,15 +413,19 @@ def ground_readers(s):
             bake_grid(s, name, res)
         # 10-brief Stage C, the SECONDARY light: the medium network's crests times the excitation, multiplied before
         # the bake (a compound), so the program spends one field slot on it and keeps the fourth for Stage D
-        reader(s, "shade-sandm", "sand", {"sharpness": 0.6, "sandNormalized": True, **medium})
+        if LINE2:
+            reader(s, "shade-sandm", "sand", {"sharpness": 0.6, "sandNormalized": True, **medium})
         # Stage D, the TRAVELLING light (ADR-1409): the onset ripples alone (dark in silence); the program lays it on
         # the large figure's ridges -- a pulse of light that runs along the crests from where a hit landed, and is
         # gone. It shares the secondary light's grid with the opposite sign (a program samples at most four fields,
         # and the GPU holds at most 16): > 0 is the medium crest, < 0 the wave; the excitation multiplies the medium
         # crest in the program
         reader(s, "shade-wave", "amplitude", {"rows": "ripples"}, frame={"strength": -WAVE})
-        compound(s, "shade-light", ["shade-sandm", "shade-wave"], "add")
-        bake_grid(s, "shade-light", 768)
+        if LINE2:
+            compound(s, "shade-light", ["shade-sandm", "shade-wave"], "add")
+            bake_grid(s, "shade-light", 768)
+        else:  # Stage G: the travelling light alone (the medium crest light off -- 4 ops at ~0.36 ms each)
+            bake_grid(s, "shade-wave", 768)
     else:
         reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
     if DEBUG in ("signed", "nodal", "envelope"):
@@ -706,7 +711,7 @@ def ground_program():
     if BAKE:
         # Stage D, the travelling light: the ripples alone (< 0 in the shared grid), on the crest lines only -- dashes
         # of light that run along the ridges from where a hit landed (the ring's carrier makes the dashes), then gone
-        g.op("light2", "field", 6, field="shade-light-grid")     # > 0 medium crest, < 0 the wave
+        g.op("light2", "field", 6, field="shade-light-grid" if LINE2 else "shade-wave-grid")  # > 0 medium, < 0 wave
         g.op("waveMask", "remap", 7, a=6, k=[-0.04, -0.22, 0.0, 1.0], f=1.0)
         g.op(None, "multiply", 7, a=7, b=2)                         # ... on the crest
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
@@ -715,15 +720,17 @@ def ground_program():
     if BAKE:
         # Stage C, the SECONDARY light: the medium network's crests glow faintly, and only where the figure is excited
         # -- a restrained second tier under the large figure's lines, never an equal outline on every contour
-        g.op("lineM", "smoothstep", 6, a=6, k=[0.75, 0.98])
-        g.op(None, "multiply", 6, a=6, b=3)                         # ... where the figure is excited
-        tint("line2", 6, 6, "line2", P_.get("line2I", 0.0))
-        g.op(None, "add", 2, a=2, b=6)
+        if LINE2:
+            g.op("lineM", "smoothstep", 6, a=6, k=[0.75, 0.98])
+            g.op(None, "multiply", 6, a=6, b=3)                     # ... where the figure is excited
+            tint("line2", 6, 6, "line2", P_.get("line2I", 0.0))
+            g.op(None, "add", 2, a=2, b=6)
         tint("wave", 7, 7, "wave", P_.get("waveI", 0.0))
         g.op(None, "add", 2, a=2, b=7)
     g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
     g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.3, 1.0] if BAKE else [0.8, 2.4])          # only where it rings hard
-    g.op(None, "multiply", 3, a=3, b=7)
+    if not BAKE:  # (baked: the wall band below is all stone already -- sand < 0.14 never carries grit)
+        g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
     # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
     g.op("wallBand", "smoothstep", 4, a=0, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
@@ -797,9 +804,10 @@ def environment(s):
         # ADR-1406: the ground is unlit and painted -- screen-space AO and contact shadows add nothing to it and cost the
         # depth prepass (every deformer re-run per vertex for a second pass)
         "ambientOcclusion": False, "contactShadows": False,
-        # ... but the depth prepass, asked for (ADR-1406): the deep cells hide one another from the pulled-back camera,
-        # and early depth rejection saves more material shading than the (baked, cheap) extra geometry pass costs
-        "depthPrepass": os.environ.get("CW_PREPASS", "1") != "0",
+        # ... and no depth prepass either (ADR-1406's switch). It won at the correction round (35.3 -> 29.8 ms at High),
+        # but the light pass re-measured it on loud Feline: with the program at 43 ops the prepass costs 5.8 ms and
+        # saves only 3.4 (High 34.2 ms median with it, 31.8 without); CW_PREPASS=1 asks for it again
+        "depthPrepass": os.environ.get("CW_PREPASS", "0") == "1",
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -1017,9 +1025,10 @@ def build_world():
             # held sound (the low-mid body of a mix): the dominant surface shifts -- the colour coordinate leans from
             # the primary surface toward the secondary over seconds
             *[R("response.sustain", tf, 0.22, comp=c, attackMs=2500, decayMs=5000) for c in (2, 3)],
-            # mids (snares, the body of the beat): the medium folds' light
+            # mids (snares, the body of the beat): the medium folds' light (with LINE2; otherwise the snare's route
+            # onto the crest lines, above, carries the mids)
             *[R("snareEnv", p_, 1.0, op="multiply", gain=1.4, offset=1.0, attackMs=0, decayMs=420)
-              for p_ in [RP % (g["line2"], "constant2"), RP % (g["line2"], "constant3")]])
+              for p_ in ([RP % (g["line2"], "constant2"), RP % (g["line2"], "constant3")] if LINE2 else [])])
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
                 *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
                 R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
@@ -1035,7 +1044,7 @@ def palette_block(g):
     active palette's roles."""
     M = "material/cwGround/op/%d/%s/%s"
     binds = []
-    for label in ("line2", "wave", "hollow", "sheen", "fill"):    # tint ramps: the colour is constant2 and constant3
+    for label in (("line2",) if LINE2 else ()) + ("wave", "hollow", "sheen", "fill"):    # tint ramps: the colour is constant2 and constant3
         binds += [(label, M % (g[label], "ramp", "constant2")), (label, M % (g[label], "ramp", "constant3"))]
     binds += [("line", M % (g["line"], "constant", "constant")), ("grit", M % (g["grit"], "constant", "constant")),
               ("surfaceA", M % (g["tint"], "ramp", "constant")), ("shadow", M % (g["tint"], "ramp", "constant2")),

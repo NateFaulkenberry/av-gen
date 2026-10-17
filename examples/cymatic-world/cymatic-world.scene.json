@@ -36,7 +36,7 @@
   "shadowRange": 180.0,
   "ambientOcclusion": false,
   "contactShadows": false,
-  "depthPrepass": true,
+  "depthPrepass": false,
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -361,31 +361,6 @@
    }
   },
   {
-   "name": "shade-sandm",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    },
-    "resonance": {
-     "channel": "sand",
-     "sharpness": 0.6,
-     "sandNormalized": true,
-     "listenLow": 0.28,
-     "listenHigh": 0.7,
-     "listenWidth": 0.04
-    }
-   }
-  },
-  {
    "name": "shade-wave",
    "kind": "field",
    "position": [
@@ -407,28 +382,7 @@
    }
   },
   {
-   "name": "shade-light",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "compound",
-    "children": [
-     "shade-sandm",
-     "shade-wave"
-    ],
-    "combine": "add",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "shade-light-grid",
+   "name": "shade-wave-grid",
    "kind": "field",
    "position": [
     0,
@@ -437,7 +391,7 @@
    ],
    "field": {
     "kind": "grid",
-    "reference": "shade-light-bake",
+    "reference": "shade-wave-bake",
     "strength": 1.0,
     "falloff": {
      "kind": "none"
@@ -699,7 +653,7 @@
     {
      "kind": "field",
      "dst": 6,
-     "field": "shade-light-grid"
+     "field": "shade-wave-grid"
     },
     {
      "kind": "remap",
@@ -740,52 +694,6 @@
      "dst": 2,
      "srcA": 2,
      "srcB": 4
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.75,
-      0.98,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 3
-    },
-    {
-     "kind": "ramp",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ],
-     "constant2": [
-      0.2,
-      0.2,
-      0.2,
-      0.5
-     ],
-     "constant3": [
-      0.4,
-      0.4,
-      0.4,
-      1.0
-     ]
-    },
-    {
-     "kind": "add",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
     },
     {
      "kind": "ramp",
@@ -838,12 +746,6 @@
       0.0,
       0.0
      ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 7
     },
     {
      "kind": "smoothstep",
@@ -1212,7 +1114,7 @@
    "injectField": "shade-tint"
   },
   {
-   "name": "shade-light-bake",
+   "name": "shade-wave-bake",
    "enabled": true,
    "mode": "bake",
    "wrap": "clamp",
@@ -1231,7 +1133,7 @@
     -2.0,
     86.0
    ],
-   "injectField": "shade-light"
+   "injectField": "shade-wave"
   },
   {
    "name": "relief-bake",

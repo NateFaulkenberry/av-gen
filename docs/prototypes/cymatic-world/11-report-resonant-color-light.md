@@ -186,3 +186,39 @@ The image's interest stays where the brief puts it: geometry, shading and negati
 - **Persistent state under sustained energy.** Held sound shifts the surface colour and builds the glow over seconds and lets them settle back over five. The resonance memory keeps the figure (ADR-1400 / 1404), so a sustained passage holds a coherent, settled colour state instead of pumping.
 
 **Evidence** (`stageF-audio/`): `largest-luma-step-is-the-relief-pump-before-after-diff-43.4s.png` and `flash.py` (the measurement).
+
+## Stage G: performance and regression
+
+**Why Auto held High at "6% misses": a controller blind spot, now fixed by the coordinator (ADR-1363, merged from main).**
+- **The measurement.** Live profile, Auto, 30 fps, 1080p, Feline 95-135 s, 40 s measured with `--trace`. All 1126 frames ran at High with a GPU span at or over the period: median 34.8 ms, p95 36.0. Yet every presented interval was a steady ~35.5 ms (34-38.6 ms), never quantised onto a later vsync.
+- **Why nothing counted.** ADR-1362 counts a frame as late only above period + max(period/4, refresh/2) = 41.7 ms. So nothing counted: 0 late, 0 main-thread late, and the backoff never engaged. The scene ran at ~28 fps at High indefinitely.
+- **Not the CPU or the main thread.** CPU work median ~4.4 ms; the main thread sat in GPU waits.
+- **Not the earlier figure.** The "6%" came from a 5 s default measure; it is not the mechanism.
+- **The fix.** The coordinator's ADR-1363 also counts a paced frame as the GPU's miss when its interval is more than 2% past the period, the window's median span is more than 2% past the period, and its own span reached the period.
+
+**Scene side: loud High brought back to budget.**
+
+| Loud Feline (100 s), High fixed | GPU median / p95 |
+|---|---|
+| Stage A baseline (shape-language head) | ~33.3 ms (median) |
+| after Stages C-D, palette (48 ops, prepass) | 35.65 / 36.11 ms |
+| 43 ops, prepass on | 34.21 / 34.73 ms |
+| **43 ops, prepass off (the scene now)** | **31.78 / 33.29 ms** |
+
+- **Ops 48 → 43.**
+  - Stage C's medium-crest light is off (4 ops, `CW_LINE2=1` restores it). That tier was the faintest; the medium relief still reads through the shading. **This is the trade:** the light hierarchy is now large crest > glints, with the medium carried by geometry.
+  - A redundant stone multiply in the hollow glow is gone: its wall band is stone already.
+- **The depth prepass is off.** ADR-1406's per-scene switch; `CW_PREPASS=1` restores it.
+  - It won at the correction round (35.3 → 29.8 ms) because of the costly per-pixel program and the deep cells.
+  - Re-measured now (43 ops, baked fields, the near-to-far mesh order doing the early rejection), it costs 5.8 ms and saves only 3.4 ms.
+- **Palette on/off** is GPU-neutral (Stage P table).
+- **A measurement gotcha.** A `--variant` build regenerates the example scene file with the build's environment, so variants built back to back share the last one's scene. One profile in this stage was mislabelled that way and re-run.
+
+**Auto after ADR-1363 and the trims** (Feline 95-135 s, 40 s, `--trace` `autoG2.csv`):
+- **Where it settles:** Auto holds High for 37 s, then drops to Medium at 38 s, when the stretched-frame rule sees the loudest passage's spans.
+  - High (1038 frames): GPU median 32.3 ms, p95 33.3.
+  - Medium (163 frames): GPU median 26.3 ms, p95 27.0.
+- **Missed-frame rate:** 5 deadline misses in 1201 frames (0.4%).
+- **Frame intervals:** a median of 33.3 ms at both levels. About a third of intervals land a little over 34 ms at either level, which is the cap's wake-up jitter: the same share at Medium, with 7 ms of GPU headroom.
+
+**Regression:** see the checks at the end of this report.
