@@ -98,12 +98,12 @@ SOURCES = [
 ]
 # name -> (listen band, frame rotation in degrees)
 READERS = {
-    "a1": ((0.25, 1.0), [0.0, 0.0, 0.0]),     # also hears B and C (the mids' bands, the highs' ridges)
+    "a1": ((0.25, 0.68), [0.0, 0.0, 0.0]),    # also hears B (the mids' travelling bands)
     "a2": ((0.25, 0.45), [-60.0, 0.0, 30.0]),
     "a3": ((0.25, 0.45), [50.0, 0.0, -60.0]),
     "l": ((0.0, 0.2), [0.0, 0.0, 0.0]),
 }
-RELIEF = {"f-a1": 1.1, "f-a2": 0.9, "f-a3": 0.9, "f-l": 3.0}   # metres of normal displacement per unit figure
+RELIEF = {"f-a1": 0.55, "f-a2": 0.4, "f-a3": 0.4, "f-l": 2.5}   # metres of normal displacement per unit figure
 
 
 def resonator(s):
@@ -343,9 +343,11 @@ def surface_program(name, energy, cut):
         g.op("energy", "field", 0, field=energy)                 # r0 = excitation (baked)
         g.op("front", "field", 6, field="front")                 # r6 = the travelling shell
     g.op("sheetTone", "gradient", 1, a=7, k=[0.0, 0.25, 0.0, 0.0], f=1.0)   # r1 = sheet index / 4
-    if NEUTRAL:
-        g.op(None, "constant", 4, k=[0.18, 0.18, 0.19, 1.0])
-        g.op(None, "constant", 2, k=[0.0, 0.0, 0.0, 1.0])
+    if NEUTRAL:   # grey, one step lighter per nested sheet, and the cut edges drawn as a pale line (shading, no colour)
+        g.op(None, "ramp", 4, a=1, k=[0.14, 0.14, 0.15, 1.0], k2=[0.19, 0.19, 0.2, 1.0], k3=[0.25, 0.25, 0.26, 1.0])
+        g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])
+        g.op(None, "smoothstep", 5, a=5, k=[1.8, 0.4])
+        g.op(None, "ramp", 2, a=5, k=[0, 0, 0, 1], k2=[0.05, 0.05, 0.05, 1], k3=[0.12, 0.12, 0.12, 1])
         g.base, g.emit, g.opacity = 4, 2, -1
         return g
     g.op("albedo", "ramp", 4, a=1, k=C("indigo") + [1.0], k2=C("indigo", 1.5) + [1.0], k3=C("royal", 0.9) + [1.0])
@@ -372,10 +374,15 @@ def material(prog, cut=False):
 
 
 # ================================================================================================ geometry, per prototype
+FRONT_RELIEF = 4.0   # metres a kick's shell lifts the sheets it passes through
+
+
 def deformers():
     if os.environ.get("WD_NODEFORM"):   # (a profiling switch: the bare meshes)
         return []
-    return [{"kind": "field", "field": "D-grid", "amount": 1.0, "space": "world", "alongNormal": True}]
+    # the baked families, and a kick's travelling shell (the onset field, live: eight onsets a vertex is cheap)
+    return [{"kind": "field", "field": "D-grid", "amount": 1.0, "space": "world", "alongNormal": True},
+            {"kind": "field", "field": "front", "amount": FRONT_RELIEF, "space": "world", "alongNormal": True}]
 
 
 def parametric_sheets(s, prog):
@@ -453,8 +460,8 @@ def environment(s):
                 "background": True, "useKeyLight": False},
     }
     if NEUTRAL:
-        s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=[1, 1, 1], intensity=2.2, castsShadow=False)
-        s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=[1, 1, 1], intensity=0.25, castsShadow=False)
+        s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=[1, 1, 1], intensity=3.2, castsShadow=False)
+        s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=[1, 1, 1], intensity=0.45, castsShadow=False)
         return
     # the key grazes from high left (a pale violet light), the rim comes from behind (crimson), a low royal fill
     s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#b9a6ff"), intensity=1.8,
@@ -468,7 +475,7 @@ POST = {
     "post/tonemap/chroma-retention": 0.85, "post/bloom/radius": 0.7, "post/bloom/intensity": 0.25,
     "post/bloom/threshold": 1.1, "post/output/vignette": 0.4, "post/output/grain": 0.01,
     "post/grade/contrast": 1.15, "post/lens/chromaticAberration": 0.0, "camera/exposure/compensation": 0.0,
-    "scene/volumeDensity": 0.0045, "scene/fogColor": C("obsidian"),
+    "scene/fogColor": C("obsidian"),
 }
 
 
@@ -564,7 +571,11 @@ def instrument(s, g):
 # so they fill the frame and recede (Stage B): never inside one opening looking down it (no portal), never so close
 # that one blank sheet fills the frame
 CAM_FOCUS = [0.0, -10.0, -10.0]
-CAM_R, CAM_H, CAM_AZ, CAM_SWEEP, CAM_FOCAL = 125.0, 85.0, 30.0, 70.0, 24.0
+CAM_R = float(os.environ.get("WD_CAM_R", "140"))
+CAM_H = float(os.environ.get("WD_CAM_H", "92"))
+CAM_FOCAL = float(os.environ.get("WD_FOCAL", "24"))
+CAM_AZ, CAM_SWEEP = 30.0, 70.0
+FOG = float(os.environ.get("WD_FOG", "0.0045"))
 
 
 def build():
@@ -593,7 +604,8 @@ def build():
                  lift=0.0, height_bob=6.0)
     s.params_({"camera/lens/focalLength": CAM_FOCAL})
     instrument(s, g)
-    s.params_(POST if not NEUTRAL else {"scene/volumeDensity": 0.0045, "scene/fogColor": [0.02, 0.02, 0.02],
+    s.params_({"scene/volumeDensity": FOG})
+    s.params_(POST if not NEUTRAL else {"scene/fogColor": [0.02, 0.02, 0.02],
                                         "post/bloom/enabled": False, "post/output/vignette": 0.0})
     return s
 

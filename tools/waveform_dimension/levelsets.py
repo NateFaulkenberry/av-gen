@@ -16,22 +16,24 @@ import math
 
 import numpy as np
 
-# (point, wavelength m, amplitude): the carrier's three long waves, from far outside the frame
+# (point, wavelength m, amplitude): the carrier's three long waves, from far outside the frame. One leads (its shells
+# are the sculpture's large sheets, nested and roughly offset from one another); the other two are weaker, so they
+# bend the shells into saddles and press neighbouring sheets together or apart -- uneven, legible spacing, the family
+# relationship visible (Stage B, second pass: with three equal waves the sheets read as unrelated petals)
 CARRIER = [
     ((-260.0, 40.0, -180.0), 150.0, 1.0),
-    ((220.0, -60.0, -240.0), 128.0, 0.9),
-    ((30.0, 200.0, 240.0), 172.0, 0.8),
+    ((220.0, -60.0, -240.0), 128.0, 0.6),
+    ((30.0, 200.0, 240.0), 172.0, 0.4),
 ]
-# the aperture's three shorter waves, from nearer points placed off-centre: where they cancel, the sheets open --
-# many partial openings of different sizes across the sculpture, never one centred portal (Stage B)
+# the aperture's two longer waves: where they cancel, a few large, smooth openings show the next sheet behind --
+# deliberate openings off the frame's middle, never ragged holes everywhere, never one centred portal
 APERTURE = [
-    ((-60.0, -30.0, 70.0), 46.0, 1.0),
-    ((80.0, 50.0, -40.0), 39.0, 0.8),
-    ((-20.0, 70.0, -90.0), 57.0, 0.7),
+    ((-60.0, -30.0, 70.0), 74.0, 1.0),
+    ((80.0, 50.0, -40.0), 63.0, 0.7),
 ]
-LEVELS = [-1.25, -0.45, 0.25, 0.95, 1.6]   # uneven: the nested sheets bunch and part
-APERTURE_THRESHOLD = -0.15                 # a sheet exists where A > this (about 45% of the volume is open)
-BOUND_RADII = (118.0, 72.0, 118.0)         # the sculpture's soft outer ellipsoid (m)
+LEVELS = [-0.6, 0.0, 0.45, 0.9]            # four nested sheets, unevenly spaced
+APERTURE_THRESHOLD = -0.65                 # a sheet exists where A > this (about 15% of the volume is open)
+BOUND_RADII = (124.0, 76.0, 124.0)         # the sculpture's soft outer ellipsoid (m)
 
 
 def wave_sum(p, waves):
@@ -153,8 +155,50 @@ def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0
     tri[flip] = tri[flip][:, [0, 2, 1]]
     uv = np.stack([q, np.full(len(q), float(index))], 1)
     verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
+    if THICKNESS > 0.0:
+        verts, nrm, uv, tri = thicken(verts, nrm, uv, tri, THICKNESS)
     return (verts.astype(np.float32), nrm.astype(np.float32), uv.astype(np.float32),
             tri.reshape(-1).astype(np.uint32))
+
+
+# metres: a slab instead of a sheet (tried in Stage B; off -- the deformer moves each face along its own normal, so a
+# slab's faces would part and meet with the music, and it doubled the vertices)
+THICKNESS = 0.0
+
+
+def thicken(verts, nrm, uv, tri, t):
+    """A sheet as a thin slab: the surface offset +-t/2 along its normal (the back face wound the other way, its normal
+    reversed) and a rim of quads along the boundary edges (edges used by one triangle), facing outward. The rim's
+    uv.x is 0: it IS the cut edge."""
+    n = len(verts)
+    front = verts + nrm * (0.5 * t)
+    back = verts - nrm * (0.5 * t)
+    e = np.concatenate([tri[:, [0, 1]], tri[:, [1, 2]], tri[:, [2, 0]]], 0)
+    key = np.sort(e, 1)
+    _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
+    bnd = e[cnt[inv.ravel()] == 1]   # boundary edges, in the triangle's winding
+    a, b = bnd[:, 0], bnd[:, 1]
+    # rim vertices: own copies (sharp normals)
+    d = verts[b] - verts[a]
+    out = np.cross(d, nrm[a] + nrm[b])
+    out /= np.linalg.norm(out, axis=1, keepdims=True) + 1e-12
+    k = len(bnd)
+    rim_v = np.concatenate([front[a], front[b], back[b], back[a]], 0)
+    rim_n = np.concatenate([out, out, out, out], 0)
+    rim_uv = np.concatenate([uv[a], uv[b], uv[b], uv[a]], 0)
+    rim_uv[:, 0] = 0.0
+    i0 = 2 * n + np.arange(k)
+    i1, i2, i3 = i0 + k, i0 + 2 * k, i0 + 3 * k
+    rim_t = np.concatenate([np.stack([i0, i2, i1], 1), np.stack([i0, i3, i2], 1)], 0)
+    V = np.concatenate([front, back, rim_v], 0)
+    N = np.concatenate([nrm, -nrm, rim_n], 0)
+    U = np.concatenate([uv, uv, rim_uv], 0)
+    T = np.concatenate([tri, tri[:, [0, 2, 1]] + n, rim_t], 0)
+    # the rim's winding follows its outward normal
+    fn = np.cross(V[T[:, 1]] - V[T[:, 0]], V[T[:, 2]] - V[T[:, 0]])
+    flip = (fn * N[T[:, 0]]).sum(1) < 0
+    T[flip] = T[flip][:, [0, 2, 1]]
+    return V, N, U, T
 
 
 def clip_mesh(verts, nrm, uv, tri):

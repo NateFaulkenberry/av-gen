@@ -87,3 +87,17 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
    - Media: `stage-b/`.
    - Weaknesses: mid-arc frames are busy (many sheets of similar size), and the hierarchy of large over small could
      be stronger.
+7. **Stage B, second pass** (coordinator: the grey form read as a pile of crumpled sheets).
+   - **The carrier now has one leading wave** (amplitudes 1, 0.6, 0.4). Its shells are the large sheets: nested and
+     roughly offset from one another, with uneven spacing where the weaker waves bend them into saddles.
+   - **Four levels.**
+   - **Two longer aperture waves** at threshold -0.65 (about 15% open): a few large, smooth, off-centre openings.
+   - **Resonance relief calmed** to 0.4-0.55 m on the folds and 2.5 m on the bass lobes. It moves the sculpture; it no
+     longer is the sculpture.
+   - **The cut edges are drawn** as a pale line in the neutral program (and as the crimson line in colour). Without
+     them, neighbouring zero-thickness sheets merged into one grey.
+   - **Lighting and fog:** a stronger grazing key (3.2) and fog 0.0045.
+   - **Tried and set aside:**
+     - thick slabs with lit rims (the deformer moves each face along its own normal, and it doubled the vertices);
+     - a steeper camera arc.
+   - Media: `stage-b/stageB-pass2-*.png`.
