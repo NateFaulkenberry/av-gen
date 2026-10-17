@@ -418,7 +418,7 @@ CONFIGS = {"meadow": meadow, "storm": storm, "streams": streams}
 
 
 INDEX = {  # config -> (hidden?, notes): what the Examples > Live > Experiments menu lists
-    "streams": (False, "MIDI notes 36-38 spin up the eddies."),
+    "streams": (True, "MIDI notes 36-38 spin up the eddies."),  # a tool, not a scene (owner, 2026-10-17)
     "meadow": (True, "MIDI notes 36-38 spin up the eddies."),
     "storm": (True, "MIDI notes 36-38 spin up the eddies."),
 }

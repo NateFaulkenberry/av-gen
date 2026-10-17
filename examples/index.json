@@ -697,7 +697,8 @@
       "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 flow type, CC 2 flow strength, CC 3 spatial scale, CC 4 audio influence, CC 5 persistence, CC 6 turbulence, MIDI notes 36-38 spin up the eddies.. A river drawn only by its current: rakes of long lines follow one designed flow downstream, bunch where it narrows, part round three boulders and curl in their wakes, while pulses of light travel along them with the water. An R&D experiment: see docs/prototypes/generative-rd/B-flow.md.",
       "live": true,
       "name": "Current Lines",
-      "project": "experiments/flow-streams/flow-streams.json"
+      "project": "experiments/flow-streams/flow-streams.json",
+      "hidden": true
     }
   ]
 }
