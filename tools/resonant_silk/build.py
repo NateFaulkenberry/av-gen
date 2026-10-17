@@ -432,8 +432,10 @@ def silk_program():
     g.op(None, "swizzle", 1, a=0, k=[1, 1, 1, 1])                      # r1 = v
     g.op("hem", "palette", 1, a=1, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1, 1, 1, 0], k4=[0, 0, 0, 0])
     g.op("hemWidth", "power", 1, a=1, f=500.0)                          # r1: 1 on the hems, falling fast inward
-    g.op("hemCol", "constant", 3, k=C("cyan", 0.9) + [1])              # role: grazing (x 0.9, x palette emit)
-    g.op(None, "multiply", 1, a=1, b=3)                                # r1: emission (the hems)
+    # (resonator-quality: a colour times a scalar is one ramp -- black, half, whole -- not a constant and a multiply;
+    # with the gather's seam read from a distance field, nine ops went, which paid for the gradient and more)
+    g.op("hemCol", "ramp", 1, a=1, k=[0, 0, 0, 0], k2=C("cyan", 0.45) + [0.5], k3=C("cyan", 0.9) + [1])
+    # r1: emission (the hems), role: grazing (x 0.9, x palette emit)
     g.op("foldMask", "fresnel", 4, f=2.6)                               # r4: turned away (bass lowers the exponent)
     # THE IRIDESCENT GRADIENT (resonator-quality, the owner's colour-field addendum): the cloth's pigment runs through
     # the palette's four gradient roles (g0..g3, a cyclic OKLab ramp, ADR-1470) on a coordinate of three layers --
@@ -462,15 +464,10 @@ def silk_program():
     g.op("irid", "constant", 7, k=[0.6, 0.6, 0.6, 1])                   # x palette irid
     g.op(None, "multiply", 6, a=6, b=7)
     g.op(None, "add", 1, a=1, b=6)                                     # + the sheen (emission)
-    # the gather's seam: peak light within a few metres of the ring
-    g.op(None, "input", 6, inp="worldPosition")
-    g.op(None, "constant", 7, k=[-GATHER[0], -GATHER[1], -GATHER[2], 0.0])
-    g.op(None, "add", 6, a=6, b=7)
-    g.op(None, "multiply", 6, a=6, b=6)
-    g.op(None, "gradient", 6, a=6, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / (9.0 * 9.0))     # |d|^2 / R^2, saturated
-    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.0, 0.0], f=1.0)                     # 1 at the ring, 0 at 9 m
-    g.op("glowCol", "constant", 7, k=C("pearl", 0.5) + [1])            # role: peak (x 0.5, x palette emit)
-    g.op(None, "multiply", 6, a=6, b=7)
+    # the gather's seam: peak light within a few metres of the ring (a distance field: 0 at the ring, 1 at 9 m; the
+    # ramp's middle stop at three quarters keeps the old 1 - (d/R)^2 shape)
+    g.op(None, "field", 6, field="gatherSeam")
+    g.op("glowCol", "ramp", 6, a=6, k=C("pearl", 0.5) + [1], k2=C("pearl", 0.375) + [1], k3=[0, 0, 0, 1])
     g.op(None, "add", 1, a=1, b=6)
     if MUSIC:
         g.op(None, "power", 6, a=4, f=2.5)                             # r6: the folds' turning edges (narrow)
@@ -478,16 +475,14 @@ def silk_program():
         g.op("treble", "input", 2, inp="audio")
         g.op(None, "swizzle", 2, a=2, k=[3, 3, 3, 3])
         g.op(None, "multiply", 2, a=2, b=6)
-        g.op("trebleCol", "constant", 3, k=C("pearl") + [1])           # role: peak
-        g.op(None, "multiply", 2, a=2, b=3)
+        g.op("trebleCol", "ramp", 2, a=2, k=[0, 0, 0, 0], k2=C("pearl", 0.5) + [0.5], k3=C("pearl") + [1])   # peak
         g.op("trebleGain", "constant", 3, k=[0.5, 0.5, 0.5, 1])        # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
         # resonant light: a kick's front travelling out across the cloth
         g.op("kick", "field", 2, field="kickFront")
         g.op(None, "multiply", 2, a=2, b=4)                            # on the turning faces only
-        g.op("resCol", "constant", 3, k=C("cyan") + [1])               # role: resonant
-        g.op(None, "multiply", 2, a=2, b=3)
+        g.op("resCol", "ramp", 2, a=2, k=[0, 0, 0, 0], k2=C("cyan", 0.5) + [0.5], k3=C("cyan") + [1])   # resonant
         g.op("resGain", "constant", 3, k=[0.4, 0.4, 0.4, 1])           # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
@@ -509,23 +504,29 @@ def palette_block(g):
         {"role": "g0", "target": op("body", "constant")}, {"role": "g1", "target": op("body", "constant2")},
         {"role": "g2", "target": op("body", "constant3")}, {"role": "g3", "target": op("body", "constant4")},
         {"role": "grazing", "target": "lights/key/color"},
-        {"role": "grazing", "target": op("hemCol"), "gain": 0.9},
+        {"role": "grazing", "target": op("hemCol", "constant2"), "gain": 0.45},
+        {"role": "grazing", "target": op("hemCol", "constant3"), "gain": 0.9},
         {"role": "resonant", "target": "lights/rim/color"},
-        {"role": "peak", "target": op("glowCol"), "gain": 0.5},
+        {"role": "peak", "target": op("glowCol", "constant"), "gain": 0.5},
+        {"role": "peak", "target": op("glowCol", "constant2"), "gain": 0.375},
         # tuning: highlight width (roughness), iridescence (the film), highlight intensity, emission, fold contrast
         {"role": "rough", "target": "procedural/silk/material/roughness"},
         {"role": "film", "target": "procedural/silk/material/thinFilm/thickness", "mode": "multiply"},
         {"role": "key", "target": "lights/key/intensity"},
-        {"role": "emit", "target": op("hemCol"), "mode": "multiply"},
+        {"role": "emit", "target": op("hemCol", "constant2"), "mode": "multiply"},
+        {"role": "emit", "target": op("hemCol", "constant3"), "mode": "multiply"},
         {"role": "irid", "target": op("irid"), "mode": "multiply"},
         {"role": "filmIor", "target": "procedural/silk/material/thinFilm/ior"},
         {"role": "resonant", "target": "lights/sail/color"},
         {"role": "grazing", "target": "lights/sailLow/color"},
-        {"role": "emit", "target": op("glowCol"), "mode": "multiply"},
+        {"role": "emit", "target": op("glowCol", "constant"), "mode": "multiply"},
+        {"role": "emit", "target": op("glowCol", "constant2"), "mode": "multiply"},
     ]
     if MUSIC:
-        b += [{"role": "peak", "target": op("trebleCol")},
-              {"role": "resonant", "target": op("resCol")}]
+        b += [{"role": "peak", "target": op("trebleCol", "constant2"), "gain": 0.5},
+              {"role": "peak", "target": op("trebleCol", "constant3")},
+              {"role": "resonant", "target": op("resCol", "constant2"), "gain": 0.5},
+              {"role": "resonant", "target": op("resCol", "constant3")}]
     # 'fold' is both a colour role and a scalar role name in the tuning: the scalar is renamed to keep them apart
     states = palette_states()
     for st in states:
@@ -820,6 +821,10 @@ def build(comp, mesh_dir):
     if comp == "a":
         WALL_N, SAIL_N = mean_normals(sheets_for("a")[0][0], 0.63)
     environment(s)
+    # the gather's seam light (silk_program): 0 at the ring, 1 nine metres out
+    s.nodes.append({"name": "gatherSeam", "kind": "field", "position": list(GATHER),
+                    "field": {"kind": "distance", "point": [0.0, 0.0, 0.0], "radius": 9.0, "strength": 1.0,
+                              "falloff": {"kind": "none"}}})
     if MUSIC:
         fields(s)
     specs, cam = sheets_for(comp)

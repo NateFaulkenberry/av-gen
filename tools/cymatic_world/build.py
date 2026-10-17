@@ -197,16 +197,20 @@ def hex_ground_mesh():
     n = len(xs)
     for j in range(len(zs) - 1):
         a0, b0 = index[j], index[j + 1]
+        i = np.arange(n - 1)
+        k = np.arange(n - 2)
         if j % 2 == 0:   # full row below (n), midpoint row above (n - 1)
-            i = np.arange(n - 1)
-            tris.append(np.stack([a0 + i, b0 + i, a0 + i + 1], 1))
-            i = np.arange(n - 2)
-            tris.append(np.stack([a0 + i + 1, b0 + i, b0 + i + 1], 1))
+            up = np.stack([a0 + i, b0 + i, a0 + i + 1], 1)
+            down = np.stack([a0 + k + 1, b0 + k, b0 + k + 1], 1)
         else:            # midpoint row below (n - 1), full row above (n)
-            i = np.arange(n - 1)
-            tris.append(np.stack([a0 + i, b0 + i, b0 + i + 1], 1))
-            i = np.arange(n - 2)
-            tris.append(np.stack([a0 + i, b0 + i + 1, a0 + i + 1], 1))
+            up = np.stack([a0 + i, b0 + i, b0 + i + 1], 1)
+            down = np.stack([a0 + k, b0 + k + 1, a0 + k + 1], 1)
+        # left to right, the two kinds interleaved, so each vertex is reused while it is still in the post-transform
+        # cache (all of one kind then all of the other cost ~1 ms at High)
+        both = np.empty((2 * n - 3, 3), dtype=np.int64)
+        both[0::2] = up
+        both[1::2] = down
+        tris.append(both)
         strip.append(np.full(2 * n - 3, 0.5 * (zs[j] + zs[j + 1])))
     tri = np.concatenate(tris, 0).astype(np.int64)
     # front to back by STRIP, each strip's triangles left to right in the order built: sorting by each triangle's own

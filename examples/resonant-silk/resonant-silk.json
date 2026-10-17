@@ -161,7 +161,7 @@
   },
   {
    "source": "response.bass",
-   "target": "material/rsSilk/op/7/fresnel/value",
+   "target": "material/rsSilk/op/6/fresnel/value",
    "amount": -1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -172,7 +172,7 @@
   },
   {
    "source": "audio.lowMid",
-   "target": "material/rsSilk/op/13/remap/constant",
+   "target": "material/rsSilk/op/12/remap/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -186,7 +186,7 @@
   },
   {
    "source": "sonic.energy",
-   "target": "material/rsSilk/op/8/remap/constant",
+   "target": "material/rsSilk/op/7/remap/constant",
    "amount": 0.008,
    "op": "add",
    "polarity": "unipolar",
@@ -199,7 +199,7 @@
   },
   {
    "source": "sonic.energy",
-   "target": "material/rsSilk/op/8/remap/constant",
+   "target": "material/rsSilk/op/7/remap/constant",
    "amount": 0.008,
    "op": "add",
    "polarity": "unipolar",
@@ -334,7 +334,7 @@
   },
   {
    "source": "control.iridescence",
-   "target": "material/rsSilk/op/19/constant/constant",
+   "target": "material/rsSilk/op/18/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -347,7 +347,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/37/constant/constant",
+   "target": "material/rsSilk/op/29/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -360,7 +360,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/44/constant/constant",
+   "target": "material/rsSilk/op/35/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -1357,19 +1357,19 @@
    },
    {
     "role": "g0",
-    "target": "material/rsSilk/op/15/oklabRamp/constant"
+    "target": "material/rsSilk/op/14/oklabRamp/constant"
    },
    {
     "role": "g1",
-    "target": "material/rsSilk/op/15/oklabRamp/constant2"
+    "target": "material/rsSilk/op/14/oklabRamp/constant2"
    },
    {
     "role": "g2",
-    "target": "material/rsSilk/op/15/oklabRamp/constant3"
+    "target": "material/rsSilk/op/14/oklabRamp/constant3"
    },
    {
     "role": "g3",
-    "target": "material/rsSilk/op/15/oklabRamp/constant4"
+    "target": "material/rsSilk/op/14/oklabRamp/constant4"
    },
    {
     "role": "grazing",
@@ -1377,7 +1377,12 @@
    },
    {
     "role": "grazing",
-    "target": "material/rsSilk/op/5/constant/constant",
+    "target": "material/rsSilk/op/5/ramp/constant2",
+    "gain": 0.45
+   },
+   {
+    "role": "grazing",
+    "target": "material/rsSilk/op/5/ramp/constant3",
     "gain": 0.9
    },
    {
@@ -1386,8 +1391,13 @@
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/28/constant/constant",
+    "target": "material/rsSilk/op/22/ramp/constant",
     "gain": 0.5
+   },
+   {
+    "role": "peak",
+    "target": "material/rsSilk/op/22/ramp/constant2",
+    "gain": 0.375
    },
    {
     "role": "rough",
@@ -1404,12 +1414,17 @@
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/5/constant/constant",
+    "target": "material/rsSilk/op/5/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "emit",
+    "target": "material/rsSilk/op/5/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "irid",
-    "target": "material/rsSilk/op/19/constant/constant",
+    "target": "material/rsSilk/op/18/constant/constant",
     "mode": "multiply"
    },
    {
@@ -1426,16 +1441,31 @@
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/28/constant/constant",
+    "target": "material/rsSilk/op/22/ramp/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "emit",
+    "target": "material/rsSilk/op/22/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/35/constant/constant"
+    "target": "material/rsSilk/op/28/ramp/constant2",
+    "gain": 0.5
+   },
+   {
+    "role": "peak",
+    "target": "material/rsSilk/op/28/ramp/constant3"
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/42/constant/constant"
+    "target": "material/rsSilk/op/34/ramp/constant2",
+    "gain": 0.5
+   },
+   {
+    "role": "resonant",
+    "target": "material/rsSilk/op/34/ramp/constant3"
    }
   ],
   "position": 0.0,
