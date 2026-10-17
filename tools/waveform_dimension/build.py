@@ -388,7 +388,7 @@ def environment(s):
 
 POST = {
     "post/motionBlur/amount": 0.0, "post/dof/enabled": False, "post/dof/physical": False,
-    "post/tonemap/chroma-retention": 0.85, "post/bloom/radius": 0.7, "post/bloom/intensity": 0.25,
+    "post/tonemap/chroma-retention": 0.95, "post/bloom/radius": 0.7, "post/bloom/intensity": 0.25,
     "post/bloom/threshold": 1.1, "post/output/vignette": 0.4, "post/output/grain": 0.01,
     "post/grade/contrast": 1.15, "post/lens/chromaticAberration": 0.0, "camera/exposure/compensation": 0.0,
     "scene/fogColor": C("obsidian"),
@@ -415,7 +415,8 @@ def design():
 # the program is one. The owner's indigo-violet with crimson is the first, brighter than the Stage D look; the
 # others are vivid and clearly different, each a dominant hue family with one contrasting accent for the resonance.
 # The selector moves between them on the music's phrases (beat.phrasePulse), never through the states between, in a
-# composed order that alternates cool and warm, with a minimum hold and a several-second OKLab blend.
+# composed order that alternates cool and warm, with a minimum hold and a several-second OKLab blend; with no tempo
+# (live input) a large sustained change in the music advances it instead (ADR-1421).
 #   bg       background, fog, the sky's zenith         shadow    the inner sheets (and the sky's horizon)
 #   secondary the middle sheets                         primary   the outer sheets' lit faces
 #   key / rim / fill  the lights                        band      the resonant glow's contour band
@@ -448,7 +449,7 @@ PALETTES = [
                           edge="#FF68B8", peak="#FFD8EE")),
 ]
 PALETTE_ORDER = [0, 1, 2, 3, 4, 5, 6, 7]   # cool and warm alternate; the owner's palette opens
-GLOW_GAIN = (0.18, 0.55)                   # the glow ramp's middle and end, as fractions of band and highlight
+GLOW_GAIN = (0.12, 0.4)                   # the glow ramp's middle and end, as fractions of band and highlight
 CONTOUR_GAIN = (0.07, 0.14)
 EDGE_GAIN = (0.2, 0.85)
 
@@ -471,7 +472,12 @@ def palette_block(g):
             "bindings": [{"role": r, "target": t, "gain": gn, "mode": "replace"} for r, t, gn in bindings],
             "saturation": 1.0, "value": 1.0,
             "selector": {"select": PALETTE_ORDER[0], "transition": 5.0, "lock": False, "hold": 24.0,
-                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PALETTE_ORDER}}}
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PALETTE_ORDER,
+                                     # ADR-1421: with no tempo (live input), a large sustained change in the music
+                                     # advances instead, and a long uniform passage still evolves (maxHold)
+                                     "change": {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"],
+                                                "fast": 3.0, "slow": 24.0, "threshold": 0.08, "rearm": 0.04,
+                                                "primaryTimeout": 30.0, "maxHold": 75.0}}}}
 
 
 # ================================================================================================ the instrument
