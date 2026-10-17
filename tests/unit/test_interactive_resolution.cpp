@@ -694,6 +694,39 @@ TEST_CASE("a paced deadline is missed by a frame that lands a refresh late, not 
     CHECK(e.stats().missedDeadlines == 0);
 }
 
+TEST_CASE("paced: a level a little over the frame on a fine refresh grid counts its stretched frames as the GPU's misses",
+          "[unit][resolution][live-quality][adr1363]") {
+    // ADR-1363. 30 on 120 Hz: High costs 34.8 ms of GPU, every frame arrives at ~35.5 ms -- never a quarter period late,
+    // so ADR-1362's rule alone counted nothing and the level held at ~28 fps (Cymatic World, Feline Footwear, measured).
+    const double period = 1000.0 / 30.0;
+    app::InteractiveResolution c;
+    c.configure(live(30));
+    for (int i = 0; i < 600 && c.rung() == 0; ++i) {
+        c.setPacing(period, 120.0);
+        c.note(34.8 + 0.4 * (i % 3), 35.2 + 0.3 * (i % 4));
+    }
+    CHECK(c.stats().missedDeadlines > 0);
+    CHECK(c.rung() >= 1);
+    // Frames on time with the span at the period: no miss (the governor's fill, or a level exactly at the edge).
+    app::InteractiveResolution onTime;
+    onTime.configure(live(30));
+    for (int i = 0; i < 600; ++i) {
+        onTime.setPacing(period, 120.0);
+        onTime.note(34.0, period + 0.3);
+    }
+    CHECK(onTime.stats().missedDeadlines == 0);
+    CHECK(onTime.rung() == 0);
+    // Stretched intervals with the GPU well inside the period: the cap's wake-up or the main thread, not the level.
+    app::InteractiveResolution jitter;
+    jitter.configure(live(30));
+    for (int i = 0; i < 600; ++i) {
+        jitter.setPacing(period, 120.0);
+        jitter.note(29.0, 36.5);
+    }
+    CHECK(jitter.stats().missedDeadlines == 0);
+    CHECK(jitter.rung() == 0);
+}
+
 TEST_CASE("paced: a span the clock governor inflates to the budget does not move the ladder when frames are on time",
           "[unit][resolution][live-quality][adr1362]") {
     // Every level holds; the span reads 86-92% of the period (28.7-30.7 ms: over the 29.3 ms budget about a third of

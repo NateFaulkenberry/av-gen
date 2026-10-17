@@ -397,7 +397,17 @@ void InteractiveResolution::noteDeadline(double gpuMs, double wallMs) {
     const bool gpuFull = period > 0.0 && gpuMs >= period * kGpuFull &&
                          (gpuMs <= period * kGpuStall || medianGpu() >= period);
     bool miss = false;
-    if (missedDeadline(wallMs)) {
+    // ADR-1363: a frame stretched past the period while the GPU's median span is past it too. On a display whose
+    // refresh is a fine grid against the period (30 on 120 Hz), a level a few milliseconds over the frame never lands a
+    // quarter period late: measured on Cymatic World at High, every interval was 34-38.6 ms (none at 41.7) with every
+    // span at 34-36 ms, so `missedDeadline` counted nothing and High held at ~28 fps. The median keeps the cap's
+    // wake-up jitter out (its spans read 0.80-0.92 of the period) and so does `gpuFull` for this frame.
+    const bool stretched = period > 0.0 && wallMs > period * kStretched && medianGpu() >= period * kStretched;
+    if (gpuFull && stretched && !missedDeadline(wallMs)) {
+        ++stats_.missedDeadlines;
+        miss = true;
+        lateWaiting_ = 0;
+    } else if (missedDeadline(wallMs)) {
         ++stats_.missedDeadlines;
         if (gpuFull || gpuFullAge_ <= 1) {
             miss = true;
