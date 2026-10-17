@@ -55,11 +55,11 @@ def region(p):
     """> 0 inside the sculpture: the aperture's margin and the outer ellipsoid's, in comparable units (~metres)."""
     a = (aperture(p) - APERTURE_THRESHOLD) * 12.0
     r = np.linalg.norm(p / np.array(BOUND_RADII), axis=-1)
-    b = (1.0 - r) * 240.0   # steep: the outer edge is a narrow band (only the openings breathe)
+    b = (1.0 - r) * 240.0   # steep, so the outer edge's traced line stays as narrow as the openings'
     return np.minimum(a, b)
 
 
-def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0), cell=1.0, margin=8.0, band=None):
+def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0), cell=1.0, margin=2.5):
     """One level set of the carrier as (positions, normals, uvs, indices) float32/uint32, clipped to `region`."""
     lo, hi = np.array(lo), np.array(hi)
     n = np.ceil((hi - lo) / cell).astype(int)
@@ -154,72 +154,9 @@ def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0
     flip = (fn * nrm[tri[:, 0]]).sum(1) < 0
     tri[flip] = tri[flip][:, [0, 2, 1]]
     uv = np.stack([q, np.full(len(q), float(index))], 1)
-    if band is None:
-        verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
-        if THICKNESS > 0.0:
-            verts, nrm, uv, tri = thicken(verts, nrm, uv, tri, THICKNESS)
-        return pack(verts, nrm, uv, tri)
-    # with a band: the sheet reaches out to q = band[0] (< 0, beyond its rest edge), and is split at q = band[1] into
-    # an opaque interior and an edge band the material cuts live (the openings grow and shrink inside the band)
-    lo, hi = band
-
-    def shifted(c, sign, mesh):
-        v, n_, w, t = mesh
-        w = w.copy()
-        w[:, 0] = sign * (w[:, 0] - c)
-        v, n_, w, t = clip_mesh(v, n_, w, t)
-        w[:, 0] = sign * w[:, 0] + c
-        return v, n_, w, t
-
-    full = shifted(lo, 1.0, (verts, nrm, uv, tri))
-    interior = shifted(hi, 1.0, full)
-    edge = shifted(hi, -1.0, full)
-    return pack(*interior), pack(*edge)
-
-
-def pack(verts, nrm, uv, tri):
+    verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
     return (verts.astype(np.float32), nrm.astype(np.float32), uv.astype(np.float32),
             tri.reshape(-1).astype(np.uint32))
-
-
-# metres: a slab instead of a sheet (tried in Stage B; off -- the deformer moves each face along its own normal, so a
-# slab's faces would part and meet with the music, and it doubled the vertices)
-THICKNESS = 0.0
-
-
-def thicken(verts, nrm, uv, tri, t):
-    """A sheet as a thin slab: the surface offset +-t/2 along its normal (the back face wound the other way, its normal
-    reversed) and a rim of quads along the boundary edges (edges used by one triangle), facing outward. The rim's
-    uv.x is 0: it IS the cut edge."""
-    n = len(verts)
-    front = verts + nrm * (0.5 * t)
-    back = verts - nrm * (0.5 * t)
-    e = np.concatenate([tri[:, [0, 1]], tri[:, [1, 2]], tri[:, [2, 0]]], 0)
-    key = np.sort(e, 1)
-    _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
-    bnd = e[cnt[inv.ravel()] == 1]   # boundary edges, in the triangle's winding
-    a, b = bnd[:, 0], bnd[:, 1]
-    # rim vertices: own copies (sharp normals)
-    d = verts[b] - verts[a]
-    out = np.cross(d, nrm[a] + nrm[b])
-    out /= np.linalg.norm(out, axis=1, keepdims=True) + 1e-12
-    k = len(bnd)
-    rim_v = np.concatenate([front[a], front[b], back[b], back[a]], 0)
-    rim_n = np.concatenate([out, out, out, out], 0)
-    rim_uv = np.concatenate([uv[a], uv[b], uv[b], uv[a]], 0)
-    rim_uv[:, 0] = 0.0
-    i0 = 2 * n + np.arange(k)
-    i1, i2, i3 = i0 + k, i0 + 2 * k, i0 + 3 * k
-    rim_t = np.concatenate([np.stack([i0, i2, i1], 1), np.stack([i0, i3, i2], 1)], 0)
-    V = np.concatenate([front, back, rim_v], 0)
-    N = np.concatenate([nrm, -nrm, rim_n], 0)
-    U = np.concatenate([uv, uv, rim_uv], 0)
-    T = np.concatenate([tri, tri[:, [0, 2, 1]] + n, rim_t], 0)
-    # the rim's winding follows its outward normal
-    fn = np.cross(V[T[:, 1]] - V[T[:, 0]], V[T[:, 2]] - V[T[:, 0]])
-    flip = (fn * N[T[:, 0]]).sum(1) < 0
-    T[flip] = T[flip][:, [0, 2, 1]]
-    return V, N, U, T
 
 
 def clip_mesh(verts, nrm, uv, tri):

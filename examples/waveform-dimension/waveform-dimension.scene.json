@@ -1,0 +1,1030 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "waveform-dimension",
+ "camera": {
+  "mode": 1,
+  "position": [
+   70.0,
+   92.0,
+   111.2436
+  ],
+  "target": [
+   0.0,
+   -10.0,
+   -10.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.03,
+  "background": [
+   0.00243,
+   0.00212,
+   0.00651
+  ],
+  "fogColor": [
+   0.00243,
+   0.00212,
+   0.00651
+  ],
+  "volumeDensity": 0.0,
+  "volumeMaxDistance": 0.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 200.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "depthPrepass": true,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00146,
+    0.00127,
+    0.00391
+   ],
+   "horizonColor": [
+    0.0076,
+    0.00259,
+    0.02333
+   ],
+   "groundColor": [
+    0.00121,
+    0.00106,
+    0.00326
+   ],
+   "haze": 0.3,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "wave",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "seed": 11,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "modes": 16.0,
+     "layout": 16.0,
+     "fLow": 40.0,
+     "fHigh": 6000.0,
+     "lambdaMax": 70.0,
+     "lambdaMin": 7.0,
+     "scale": 1.0,
+     "selectivity": 3.0,
+     "contrast": 0.55,
+     "persistence": 3.0,
+     "buildup": 0.3,
+     "memory": 2.0,
+     "sustain": 1.0,
+     "transient": 0.7,
+     "idle": 0.5,
+     "breath": 0.1,
+     "limit": 1.0,
+     "competition": 1.2,
+     "attack": [
+      0.3,
+      0.12,
+      0.05
+     ],
+     "release": [
+      4.0,
+      2.0,
+      0.8
+     ],
+     "sources": [
+      {
+       "kind": "point",
+       "position": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "order": 3,
+       "bandLow": 0.0,
+       "bandHigh": 0.2,
+       "reach": 0.0,
+       "gain": 1.0,
+       "amplitude": 0.8,
+       "breath": 0.3,
+       "drift": 6.0,
+       "driftPeriod": 120.0,
+       "spin": 0.01,
+       "orders": [
+        0,
+        2,
+        3,
+        0
+       ],
+       "focus": 0.1,
+       "focusWidth": 0.06,
+       "focusSweep": 0.08,
+       "focusPeriod": 71.0,
+       "focusFloor": 0.25
+      },
+      {
+       "kind": "lattice",
+       "position": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "order": 1,
+       "bandLow": 0.25,
+       "bandHigh": 0.45,
+       "reach": 0.0,
+       "gain": 1.0,
+       "amplitude": 1.0,
+       "breath": 0.25,
+       "drift": 9.0,
+       "driftPeriod": 97.0,
+       "spin": 0.002,
+       "orders": [
+        1
+       ],
+       "focus": 0.33,
+       "focusWidth": 0.07,
+       "focusSweep": 0.06,
+       "focusPeriod": 61.0,
+       "focusFloor": 0.3,
+       "drive": 0.35
+      },
+      {
+       "kind": "lattice",
+       "position": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "order": 1,
+       "bandLow": 0.45,
+       "bandHigh": 0.68,
+       "reach": 0.0,
+       "gain": 1.0,
+       "amplitude": 0.85,
+       "breath": 0.35,
+       "drift": 14.0,
+       "driftPeriod": 53.0,
+       "spin": -0.002,
+       "orders": [
+        1
+       ],
+       "focus": 0.53,
+       "focusWidth": 0.07,
+       "focusSweep": 0.07,
+       "focusPeriod": 47.0,
+       "focusFloor": 0.3,
+       "drive": 0.3
+      },
+      {
+       "kind": "lattice",
+       "position": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "order": 1,
+       "bandLow": 0.7,
+       "bandHigh": 1.0,
+       "reach": 0.0,
+       "gain": 1.0,
+       "amplitude": 0.25,
+       "breath": 0.6,
+       "drift": 4.0,
+       "driftPeriod": 59.0,
+       "spin": 0.003,
+       "orders": [
+        1,
+        2
+       ],
+       "focus": 0.8,
+       "focusWidth": 0.08,
+       "focusSweep": 0.1,
+       "focusPeriod": 37.0,
+       "focusFloor": 0.2,
+       "drive": 0.2
+      }
+     ],
+     "channel": "displacement"
+    }
+   }
+  },
+  {
+   "name": "f-a1",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "wave",
+    "strength": 0.55,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "relief",
+     "reliefSand": 0.0,
+     "reliefFigure": 1.0,
+     "reliefVibration": 0.2,
+     "listenLow": 0.25,
+     "listenHigh": 0.45,
+     "listenWidth": 0.03
+    }
+   },
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "f-a2",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "wave",
+    "strength": 0.4,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "relief",
+     "reliefSand": 0.0,
+     "reliefFigure": 1.0,
+     "reliefVibration": 0.2,
+     "listenLow": 0.25,
+     "listenHigh": 0.45,
+     "listenWidth": 0.03
+    }
+   },
+   "rotation": [
+    -60.0,
+    0.0,
+    30.0
+   ]
+  },
+  {
+   "name": "f-a3",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "wave",
+    "strength": 0.4,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "relief",
+     "reliefSand": 0.0,
+     "reliefFigure": 1.0,
+     "reliefVibration": 0.2,
+     "listenLow": 0.25,
+     "listenHigh": 0.45,
+     "listenWidth": 0.03
+    }
+   },
+   "rotation": [
+    50.0,
+    0.0,
+    -60.0
+   ]
+  },
+  {
+   "name": "f-l",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "wave",
+    "strength": 5.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "relief",
+     "reliefSand": 0.0,
+     "reliefFigure": 1.0,
+     "reliefVibration": 0.2,
+     "listenLow": 0.0,
+     "listenHigh": 0.2,
+     "listenWidth": 0.03
+    }
+   },
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "f-b",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "resonance",
+    "reference": "wave",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "channel": "relief",
+     "reliefSand": 0.0,
+     "reliefFigure": 1.0,
+     "reliefVibration": 0.2,
+     "listenLow": 0.45,
+     "listenHigh": 0.68,
+     "listenWidth": 0.03
+    }
+   },
+   "rotation": [
+    40.0,
+    0.0,
+    -30.0
+   ]
+  },
+  {
+   "name": "D",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "compound",
+    "children": [
+     "f-a1",
+     "f-a2",
+     "f-a3",
+     "f-l"
+    ],
+    "combine": "add",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "D-grid",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "grid",
+    "reference": "D-bake",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "one",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "constant",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "front",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "kind": "onset",
+    "falloff": {
+     "kind": "none"
+    },
+    "onsetSource": "low",
+    "audioSpeed": 32.0,
+    "onsetWidth": 7.0,
+    "onsetDecay": 1.1,
+    "waveGeometry": "spherical",
+    "point": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "strength": 1.0
+   }
+  },
+  {
+   "name": "level0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/wd-level0.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.38,
+     "metallic": 0.0,
+     "doubleSided": true,
+     "program": "wdSurface"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "D-grid",
+      "amount": 1.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "front",
+      "amount": 7.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "f-b",
+      "amount": 0.6,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "one",
+      "amount": 0.0,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 3.0
+   }
+  },
+  {
+   "name": "level1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/wd-level1.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.38,
+     "metallic": 0.0,
+     "doubleSided": true,
+     "program": "wdSurface"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "D-grid",
+      "amount": 1.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "front",
+      "amount": 7.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "f-b",
+      "amount": 0.6,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "one",
+      "amount": 0.0,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 3.0
+   }
+  },
+  {
+   "name": "level2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/wd-level2.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.38,
+     "metallic": 0.0,
+     "doubleSided": true,
+     "program": "wdSurface"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "D-grid",
+      "amount": 1.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "front",
+      "amount": 7.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "f-b",
+      "amount": 0.6,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "one",
+      "amount": 0.0,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 3.0
+   }
+  },
+  {
+   "name": "level3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/wd-level3.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 0.38,
+     "metallic": 0.0,
+     "doubleSided": true,
+     "program": "wdSurface"
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "D-grid",
+      "amount": 1.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "front",
+      "amount": 7.0,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "f-b",
+      "amount": 0.6,
+      "space": "world",
+      "alongNormal": true
+     },
+     {
+      "kind": "field",
+      "field": "one",
+      "amount": 0.0,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 3.0
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.62,
+    -0.35,
+    -0.7
+   ],
+   "color": [
+    0.38133,
+    0.25818,
+    1.0
+   ],
+   "intensity": 3.0,
+   "castsShadow": false
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    -0.35,
+    -0.25,
+    0.9
+   ],
+   "color": [
+    0.18782,
+    0.02315,
+    0.32778
+   ],
+   "intensity": 1.6,
+   "castsShadow": false
+  },
+  {
+   "id": "fill",
+   "name": "fill",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    0.8,
+    0.3
+   ],
+   "color": [
+    0.0648,
+    0.01444,
+    0.21586
+   ],
+   "intensity": 0.35,
+   "castsShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "wdSurface",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 7,
+     "input": "uv"
+    },
+    {
+     "kind": "field",
+     "dst": 6,
+     "field": "front"
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.333333,
+      0.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "ramp",
+     "dst": 4,
+     "srcA": 1,
+     "constant": [
+      0.06156,
+      0.01372,
+      0.20507,
+      1.0
+     ],
+     "constant2": [
+      0.02433,
+      0.00829,
+      0.07466,
+      1.0
+     ],
+     "constant3": [
+      0.01673,
+      0.0057,
+      0.05133,
+      1.0
+     ]
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "D-grid"
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      9.0,
+      36.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      49.0,
+      100.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "convexity"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.01,
+      0.06,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.6,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "ramp",
+     "dst": 2,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.02629,
+      0.00324,
+      0.04589,
+      0.5
+     ],
+     "constant3": [
+      0.39212,
+      0.02601,
+      0.04088,
+      1.0
+     ]
+    },
+    {
+     "kind": "swizzle",
+     "dst": 3,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      2.2,
+      0.5,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.0,
+      0.85,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 1
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 5,
+     "constant": [
+      -0.3,
+      1.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 1
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.10914,
+      0.00443,
+      0.02603,
+      0.5
+     ],
+     "constant3": [
+      0.85,
+      0.21946,
+      0.27467,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "D-bake",
+   "enabled": true,
+   "mode": "bake",
+   "wrap": "clamp",
+   "resolution": [
+    128,
+    80,
+    128
+   ],
+   "boundsMin": [
+    -128.0,
+    -80.0,
+    -128.0
+   ],
+   "boundsMax": [
+    128.0,
+    80.0,
+    128.0
+   ],
+   "injectField": "D"
+  }
+ ]
+}
