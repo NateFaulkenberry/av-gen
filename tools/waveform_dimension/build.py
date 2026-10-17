@@ -88,7 +88,7 @@ SOURCES = [
      "orders": [1], "focus": 0.33, "focusWidth": 0.07, "focusSweep": 0.06, "focusPeriod": 61.0, "focusFloor": 0.3,
      "drive": 0.35},
     {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 1, "bandLow": 0.45, "bandHigh": 0.68, "reach": 0.0,
-     "gain": 1.0, "amplitude": 0.6, "breath": 0.35, "drift": 14.0, "driftPeriod": 53.0, "spin": -0.002,
+     "gain": 1.0, "amplitude": 0.85, "breath": 0.35, "drift": 14.0, "driftPeriod": 53.0, "spin": -0.002,
      "orders": [1], "focus": 0.53, "focusWidth": 0.07, "focusSweep": 0.07, "focusPeriod": 47.0, "focusFloor": 0.3,
      "drive": 0.3},
     {"kind": "lattice", "position": [0.0, 0.0, 0.0], "order": 1, "bandLow": 0.7, "bandHigh": 1.0, "reach": 0.0,
@@ -157,8 +157,6 @@ def resonance_fields(s, only=None):
         if n["name"] in RELIEF:
             n["field"]["strength"] = RELIEF[n["name"]]
     bake_grid(s, "D", D_RES)
-    reader(s, "en", "amplitude", {"listenLow": 0.45, "listenHigh": 1.0, "listenWidth": 0.03})
-    bake_grid(s, "en", EN_RES)
     # each low onset launches a spherical shell from the sculpture's middle, travelling out through the sheets and
     # decaying (ADR-1116; exact under seek)
     field(s, "front", {"kind": "onset", "falloff": {"kind": "none"}, "onsetSource": "low", "audioSpeed": 32.0,
@@ -336,13 +334,8 @@ def surface_program(name, energy, cut):
     traced by a crimson-to-rose line that the same excitation brightens. Lit by the scene's lights."""
     g = Prog(name)   # eight registers, r0..r7
     g.op(None, "input", 7, inp="uv")                              # r7 = (edge distance, sheet index)
-    if os.environ.get("WD_NOEN"):   # (a profiling switch: no per-pixel field reads)
-        g.op("energy", "constant", 0, k=[0.3, 0.3, 0.3, 0.3])
-        g.op("front", "constant", 6, k=[0, 0, 0, 0])
-    else:
-        g.op("energy", "field", 0, field=energy)                 # r0 = excitation (baked)
-        g.op("front", "field", 6, field="front")                 # r6 = the travelling shell
-    g.op("sheetTone", "gradient", 1, a=7, k=[0.0, 0.25, 0.0, 0.0], f=1.0)   # r1 = sheet index / 4
+    g.op("front", "field", 6, field="front")                     # r6 = the travelling shell
+    g.op("sheetTone", "gradient", 1, a=7, k=[0.0, 1.0 / 3.0, 0.0, 0.0], f=1.0)   # r1 = sheet index / 3
     if NEUTRAL:   # grey, one step lighter per nested sheet, and the cut edges drawn as a pale line (shading, no colour)
         g.op(None, "ramp", 4, a=1, k=[0.14, 0.14, 0.15, 1.0], k2=[0.19, 0.19, 0.2, 1.0], k3=[0.25, 0.25, 0.26, 1.0])
         g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])
@@ -350,17 +343,31 @@ def surface_program(name, energy, cut):
         g.op(None, "ramp", 2, a=5, k=[0, 0, 0, 1], k2=[0.05, 0.05, 0.05, 1], k3=[0.12, 0.12, 0.12, 1])
         g.base, g.emit, g.opacity = 4, 2, -1
         return g
-    g.op("albedo", "ramp", 4, a=1, k=C("indigo") + [1.0], k2=C("indigo", 1.5) + [1.0], k3=C("royal", 0.9) + [1.0])
-    g.op(None, "add", 3, a=0, b=6)                                # r3 = excitation + shell
-    g.op("glowMask", "smoothstep", 1, a=3, k=[0.7, 1.6])
-    g.op("glow", "ramp", 2, a=1, k=[0, 0, 0, 0], k2=C("purple", 0.1) + [0.5], k3=C("red", 0.5) + [1.0])
+    # albedo: each nested sheet its own value of the same indigo-violet (related hues, different light); the
+    # outermost the lightest royal, the inner ones sinking to blackened indigo
+    g.op("albedo", "ramp", 4, a=1, k=C("royal", 0.6) + [1.0], k2=C("indigo", 1.25) + [1.0], k3=C("indigo", 0.85) + [1.0])
+    # the glow follows the field's own 3D structure, never a family's stripes: electric purple where the families'
+    # displacement reinforces (|D| large: constructive interference), spectral red only where it reinforces hardest;
+    # a kick's shell adds as it passes. How bright it is follows the music's level (a route on the ramp)
+    g.op("reinf", "field", 3, field="D-grid")
+    g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2
+    g.op("purpleMask", "smoothstep", 5, a=3, k=[3.0, 10.0])
+    g.op("redMask", "smoothstep", 3, a=3, k=[9.0, 25.0])
+    g.op(None, "add", 5, a=5, b=3)                                # r5 in 0..2
+    g.op("glowT", "smoothstep", 5, a=5, k=[0.0, 2.0])
+    g.op(None, "add", 5, a=5, b=6)
+    g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", 0.1) + [0.5], k3=C("red", 0.5) + [1.0])
     if cut:
-        g.op(None, "swizzle", 5, a=7, k=[0, 0, 0, 0])             # r5 = distance to the cut edge
-        g.op("edgeLine", "smoothstep", 5, a=5, k=[2.6, 0.7])      # a narrow band inside the cut ...
-        g.op("edgeGain", "smoothstep", 1, a=3, k=[0.2, 1.0])
-        g.op(None, "multiply", 5, a=5, b=1)                       # ... brightened by the excitation and the shell
-        g.op("edgeTint", "ramp", 5, a=5, k=[0, 0, 0, 0], k2=C("crimson", 0.35) + [0.5], k3=C("rose", 0.9) + [1.0])
-        g.op(None, "add", 2, a=2, b=5)
+        # the cut edges: a line strongest on the outer sheets and fading inward, lit by the excitation; rose-white only
+        # where a primary edge rings hardest
+        g.op(None, "swizzle", 3, a=7, k=[0, 0, 0, 0])
+        g.op("edgeLine", "smoothstep", 3, a=3, k=[2.2, 0.5])
+        g.op("edgeWeight", "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.15], f=1.0)
+        g.op(None, "multiply", 3, a=3, b=1)
+        g.op("edgeGain", "smoothstep", 1, a=5, k=[-0.6, 1.0])
+        g.op(None, "multiply", 3, a=3, b=1)
+        g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.3) + [0.5], k3=C("rose", 0.85) + [1.0])
+        g.op(None, "add", 2, a=2, b=3)
     g.base, g.emit, g.opacity = 4, 2, -1
     return g
 
@@ -466,7 +473,7 @@ def environment(s):
     # the key grazes from high left (a pale violet light), the rim comes from behind (crimson), a low royal fill
     s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#b9a6ff"), intensity=1.8,
             castsShadow=False)
-    s.light("rim", "directional", direction=[-0.3, -0.15, 0.95], color=C("crimson"), intensity=0.15, castsShadow=False)
+    s.light("rim", "directional", direction=[-0.3, -0.15, 0.95], color=C("crimson"), intensity=0.08, castsShadow=False)
     s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=0.3, castsShadow=False)
 
 
@@ -541,10 +548,11 @@ def instrument(s, g):
     # bass swells the broad lobes; held sound lets the standing figure accumulate (a longer memory) and deepens the
     # turned folds; the sound's brightness moves the low-mid focus (modal exchange: one wavelength leads, then
     # another); spectral change sets the mids' bands travelling further; the song's build lifts the whole relief
-    s.route(R("response.bass", st("f-l"), 1.0, op="multiply", gain=0.6, offset=1.0, attackMs=90, decayMs=1100),
+    s.route(R("response.bass", st("f-l"), 1.0, op="multiply", gain=1.3, offset=1.0, attackMs=90, decayMs=1100),
             R("response.sustain", F + "memory", 1.5, attackMs=2000, decayMs=5000),
-            R("response.sustain", st("f-a2"), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500, decayMs=4000),
-            R("response.sustain", st("f-a3"), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=1500, decayMs=4000),
+            R("response.sustain", st("f-a2"), 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000),
+            R("response.sustain", st("f-a3"), 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000),
+            R("response.sustain", st("f-a1"), 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=1500, decayMs=4000),
             R("sonic.brightness.slow", F + "source/1/focus", 0.07, attackMs=2500, decayMs=5000),
             R("response.flux", F + "source/2/drift", 8.0, attackMs=600, decayMs=2500),
             R("response.intensity", st("D-grid"), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=4000,
@@ -561,6 +569,16 @@ def instrument(s, g):
     if NEUTRAL or not g.at.get("glow"):
         return
     RP = "material/%s/op/%%d/ramp/%%s" % g.name
+    # light follows the music, on separate time scales: the glow's brightness the level (dim in a quiet passage,
+    # never off), the edges' the hats and snares (treble: fine highlights only)
+    for k in ("constant2", "constant3"):
+        s.route(R("response.level", RP % (g["glow"], k), 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=150,
+                  decayMs=900))
+        if "edgeTint" in g.at:
+            s.route(R("response.hatEnv", RP % (g["edgeTint"], k), 1.0, op="multiply", gain=1.0, offset=1.0,
+                      attackMs=0, decayMs=200),
+                    R("response.snareEnv", RP % (g["edgeTint"], k), 1.0, op="multiply", gain=0.8, offset=1.0,
+                      attackMs=0, decayMs=260))
     for label, cc, gain in (("glow", "control.spectral", 2.0), ("edgeTint", "control.light", 1.5)):
         if label in g.at:
             for k in ("constant2", "constant3"):
@@ -589,7 +607,7 @@ def build():
                     "orbitSpeed": 0.0}
         s.params_({"camera/lens/focalLength": 24.0, "post/bloom/enabled": False})
         return s
-    g = surface_program("wdSurface", "en-grid", cut=PROTO != "A")
+    g = surface_program("wdSurface", None, cut=PROTO != "A")
     s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
     if PROTO == "A":
         iso_sdf(s, g.name)

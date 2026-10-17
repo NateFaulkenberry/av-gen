@@ -101,3 +101,31 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
      - thick slabs with lit rims (the deformer moves each face along its own normal, and it doubled the vertices);
      - a steeper camera arc.
    - Media: `stage-b/stageB-pass2-*.png`.
+8. **Stage C, resonant animation.**
+   - The instrument (`instrument()`):
+     - bass multiplies the bass lobes' relief (1 + 1.3 bass);
+     - held sound lengthens the memory and grows all three low-mid frames (standing patterns accumulate);
+     - the sound's brightness moves the low-mid focus (modal exchange between wavelengths);
+     - spectral change widens the mids' drift (travelling bands);
+     - the song's build lifts the whole relief;
+     - a kick launches a spherical shell (onset field, 32 m/s) that lifts the sheets it passes, 4 m.
+   - Phrase-scale evolution comes from the focus sweeps (37-71 s periods), the slow drift and the families' spin.
+     Silence keeps every family faintly ringing (`drive`).
+   - MIDI CC 1-9 cover the brief's nine controls (§10).
+   - **Synthetic probe** (`mkprobe.py` in the scratchpad): silence 0-8 s; a 110/165/220 Hz chord 8-22; a 900 Hz
+     tone 22-32; kicks every 0.6 s 32-44; dense (kicks, hats, a chord) 44-58; silence 58-70.
+   - Neutral, fixed camera, mean absolute luminance change (0-255) per 0.5 s, and versus the 7 s silent frame:
+
+     | Section | Per 0.5 s | Versus silence |
+     |---|---|---|
+     | silence | 1.2 | 3.8 |
+     | low chord | 2.1 | 13.0 |
+     | mid tone | 1.8 | 12.9 |
+     | kicks | 2.7 | 10.7 |
+     | dense | 3.4 | 17.6 |
+     | silence after | 2.0 | 11.9 (decaying back) |
+
+   - What each condition looks like: the sustained chord accumulates crossing standing folds; the tone gives finer
+     bands; kicks give broad lobes and travelling shells (`stageC-kick-front-difference.png`); dense gives the
+     strongest folding. The silhouette holds throughout.
+   - Weakness: the geometric front is subtle on its own. Stage D lights it.
