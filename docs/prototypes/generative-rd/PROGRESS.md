@@ -67,4 +67,4 @@ assets/audio/feline-footwear.wav --mode live --target-fps 30 --size 1920x1080 --
 6. **Audio and MIDI** for all three (`music()`, `rd_music()`, `flow_music()`; `common.instrument`). Six CCs each,
    with Audio Influence as the depth of every audio route, plus MIDI notes. Amounts were tuned on Feline Footwear
    40-60 s.
-7. **Media, performance, docs, final checks:** see the end of `recommendation.md`.
+7. **Media** (`compare/` folders), **performance** (`performance.md`: live profiles plus a grid-on/off A/B; the oscillator weights were made separable, 6.3 to 2.6 ms; the RD planes went to 384² and 320² at 12 iterations, 11.5 to 7.5 ms; the fog march was dropped, 7 ms), **docs**, and **final checks**, all exit 0 (`recommendation.md`, end). Status: complete; the coordinator merges.

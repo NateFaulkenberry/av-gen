@@ -104,3 +104,12 @@ shared by the flow scenes). Under the index category **Experiments**:
 - **hidden** (harnesses kept for comparison and measurement): RD Bloom, Current Meadow, Current Meadow Storm.
 
 No Resonator scene was modified.
+
+## Final checks (2026-10-17, commit after `a314418f`, a clean reconfigure and rebuild)
+
+| check | result | exit |
+|---|---|---|
+| `tools/ci/run-suite.sh cpu-assets` (under the GPU lock) | PASS: 4318 passed, 0 failed, 19 skipped, 1 expected failure, 4338/4338 ran | 0 |
+| `tools/ci/run-suite.sh gpu` | PASS: 670 passed, 0 failed, 1 skipped, 671/671 ran | 0 |
+| `tools/review_examples.py --only <name>` for Phase Membrane, Phase Wall, RD Relief, RD Pins, RD Bloom, Current Lines and Current Meadow (+ Storm) | ok for every one | 0 each |
+| `tools/check_project_integrity.py` | 0 problems | 0 |
