@@ -129,3 +129,30 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
      bands; kicks give broad lobes and travelling shells (`stageC-kick-front-difference.png`); dense gives the
      strongest folding. The silhouette holds throughout.
    - Weakness: the geometric front is subtle on its own. Stage D lights it.
+9. **Stage D, materials and light, and the Stage C review's two concerns.**
+   - **Large-scale motion** (the review: the response was mostly surface dimpling):
+     - The nest breathes. Each sheet has a constant-field deformer whose amount is routed in proportion to its place in
+       the nest: bass parts the sheets, keeping their order and spacing ratio, and the song's build holds them a little
+       further apart. The contours shift relative to each other.
+     - The bass lobes' relief rose 2.5 -> 5 m, times (1 + 1.3 bass): broad curvature changes.
+     - The kick shell's lift rose 4 -> 7 m.
+     - Live openings were built with a masked edge band cut at a routed threshold (`WD_LIVE_OPENINGS=1`) and measured:
+       the band runs the whole program in the depth prepass for its alpha test, 10-12 ms at 1080p even when narrowed.
+       Off. The openings keep their designed shapes, and the gaps between the sheets open and close instead.
+   - **The vertical striations were the bake.** The mids family (15-24 m wavelengths) baked into 2 m cells gave
+     trilinear normals that kinked at the grid planes. Fix: that family is now a live per-vertex deformer (`f-b`), the
+     bake holds only the 25-70 m families, and the normal step is 3 m (1.5 cells). Gone in the dense and sustained
+     probe frames.
+   - **Colour** (the owner's palette):
+     - Each nested sheet is its own value of indigo-violet, the outermost a dim royal violet.
+     - The glow follows the field's own 3D structure, never a family's stripes. Electric purple where the families'
+       displacement reinforces (|D| 4-7 m), spectral red only where it reinforces hardest (8-11 m). Its brightness
+       follows the music's level.
+       - Tried and rejected first: the mids' excitation as the glow. It painted the families' plane-wave stripes.
+     - A kick's shell adds crimson as it passes.
+     - The cut edges carry a crimson line, strong only on the outer sheets and fading to nothing on the inner ones. It is
+       lit by the glow, brightened by hats and snares, and turns rose-white only where a primary edge rings hardest.
+     - Lights: a grazing pale-violet key, a royal fill, a faint crimson rim (0.08).
+     - Thin film (320 nm) was tried: no visible gain, so it was not kept.
+   - Media: `stage-d/`, including the capture clips (idle, standing wave, travelling, dense, Hyperborea) and the
+     neutral probe clip showing the large-scale motion.

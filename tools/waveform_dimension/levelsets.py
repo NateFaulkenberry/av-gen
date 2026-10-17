@@ -55,11 +55,11 @@ def region(p):
     """> 0 inside the sculpture: the aperture's margin and the outer ellipsoid's, in comparable units (~metres)."""
     a = (aperture(p) - APERTURE_THRESHOLD) * 12.0
     r = np.linalg.norm(p / np.array(BOUND_RADII), axis=-1)
-    b = (1.0 - r) * 60.0
+    b = (1.0 - r) * 240.0   # steep: the outer edge is a narrow band (only the openings breathe)
     return np.minimum(a, b)
 
 
-def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0), cell=1.0, margin=2.5):
+def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0), cell=1.0, margin=8.0, band=None):
     """One level set of the carrier as (positions, normals, uvs, indices) float32/uint32, clipped to `region`."""
     lo, hi = np.array(lo), np.array(hi)
     n = np.ceil((hi - lo) / cell).astype(int)
@@ -154,9 +154,30 @@ def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0
     flip = (fn * nrm[tri[:, 0]]).sum(1) < 0
     tri[flip] = tri[flip][:, [0, 2, 1]]
     uv = np.stack([q, np.full(len(q), float(index))], 1)
-    verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
-    if THICKNESS > 0.0:
-        verts, nrm, uv, tri = thicken(verts, nrm, uv, tri, THICKNESS)
+    if band is None:
+        verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
+        if THICKNESS > 0.0:
+            verts, nrm, uv, tri = thicken(verts, nrm, uv, tri, THICKNESS)
+        return pack(verts, nrm, uv, tri)
+    # with a band: the sheet reaches out to q = band[0] (< 0, beyond its rest edge), and is split at q = band[1] into
+    # an opaque interior and an edge band the material cuts live (the openings grow and shrink inside the band)
+    lo, hi = band
+
+    def shifted(c, sign, mesh):
+        v, n_, w, t = mesh
+        w = w.copy()
+        w[:, 0] = sign * (w[:, 0] - c)
+        v, n_, w, t = clip_mesh(v, n_, w, t)
+        w[:, 0] = sign * w[:, 0] + c
+        return v, n_, w, t
+
+    full = shifted(lo, 1.0, (verts, nrm, uv, tri))
+    interior = shifted(hi, 1.0, full)
+    edge = shifted(hi, -1.0, full)
+    return pack(*interior), pack(*edge)
+
+
+def pack(verts, nrm, uv, tri):
     return (verts.astype(np.float32), nrm.astype(np.float32), uv.astype(np.float32),
             tri.reshape(-1).astype(np.uint32))
 

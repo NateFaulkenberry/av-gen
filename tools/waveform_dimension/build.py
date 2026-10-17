@@ -98,12 +98,13 @@ SOURCES = [
 ]
 # name -> (listen band, frame rotation in degrees)
 READERS = {
-    "a1": ((0.25, 0.68), [0.0, 0.0, 0.0]),    # also hears B (the mids' travelling bands)
+    "a1": ((0.25, 0.45), [0.0, 0.0, 0.0]),
     "a2": ((0.25, 0.45), [-60.0, 0.0, 30.0]),
     "a3": ((0.25, 0.45), [50.0, 0.0, -60.0]),
     "l": ((0.0, 0.2), [0.0, 0.0, 0.0]),
+    "b": ((0.45, 0.68), [40.0, 0.0, -30.0]),   # the mids' bands: a live deformer, never baked (see deformers())
 }
-RELIEF = {"f-a1": 0.55, "f-a2": 0.4, "f-a3": 0.4, "f-l": 2.5}   # metres of normal displacement per unit figure
+RELIEF = {"f-a1": 0.55, "f-a2": 0.4, "f-a3": 0.4, "f-l": 5.0}   # metres of normal displacement per unit figure
 
 
 def resonator(s):
@@ -157,6 +158,7 @@ def resonance_fields(s, only=None):
         if n["name"] in RELIEF:
             n["field"]["strength"] = RELIEF[n["name"]]
     bake_grid(s, "D", D_RES)
+    field(s, "one", {"kind": "constant", "strength": 1.0, "falloff": {"kind": "none"}})
     # each low onset launches a spherical shell from the sculpture's middle, travelling out through the sheets and
     # decaying (ADR-1116; exact under seek)
     field(s, "front", {"kind": "onset", "falloff": {"kind": "none"}, "onsetSource": "low", "audioSpeed": 32.0,
@@ -265,6 +267,10 @@ def _veil(u, v):
 
 
 SHEETS = [("wing", _wing, 380, 300), ("arch", _arch, 360, 260), ("veil", _veil, 340, 240)]
+# the openings breathing by a live masked cut (WD_LIVE_OPENINGS=1) was built and measured: its edge band runs the
+# whole program in the depth prepass for the alpha test, 10-12 ms at 1080p (Stage D profile) -- off; the openings
+# keep their designed shapes and the gaps between the sheets open and close instead (the spacing routes)
+LIVE_OPENINGS = os.environ.get("WD_LIVE_OPENINGS", "0") == "1"
 CELL = float(os.environ.get("WD_CELL", "1.4"))   # the level sheets' surface-nets cell (m): 130k vertices in all
 
 
@@ -274,12 +280,24 @@ def write_parametric_meshes():
         write_glb(os.path.join(MESH_DIR, "wd-%s.glb" % name), pos, nrm, uv, idx, name)
 
 
+# the openings breathe: each sheet reaches 4 units beyond its rest edge and its last 5 units inside are a separate
+# edge band, cut live by its material (masked) at a threshold the music moves -- openings grow, shrink and merge;
+# the interior stays opaque (a masked discard defeats hidden-surface removal, so it is kept to the band)
+BAND = tuple(float(v) for v in os.environ.get("WD_BAND", "-2.5,3.0").split(","))
+
+
 def write_level_meshes():
     sizes = []
     for i, c in enumerate(levelsets.LEVELS):
-        pos, nrm, uv, idx = levelsets.level_sheet(c, i, cell=CELL)
-        write_glb(os.path.join(MESH_DIR, "wd-level%d.glb" % i), pos, nrm, uv, idx, "level%d" % i)
-        sizes.append(len(pos))
+        if LIVE_OPENINGS:
+            inner, edge = levelsets.level_sheet(c, i, cell=CELL, band=BAND)
+            write_glb(os.path.join(MESH_DIR, "wd-level%d.glb" % i), *inner, "level%d" % i)
+            write_glb(os.path.join(MESH_DIR, "wd-level%d-edge.glb" % i), *edge, "level%d-edge" % i)
+            sizes.append(len(inner[0]) + len(edge[0]))
+        else:
+            pos, nrm, uv, idx = levelsets.level_sheet(c, i, cell=CELL)
+            write_glb(os.path.join(MESH_DIR, "wd-level%d.glb" % i), pos, nrm, uv, idx, "level%d" % i)
+            sizes.append(len(pos))
     return sizes
 
 
@@ -327,13 +345,16 @@ class Prog:
                 "emission": emission, "emissionIntensity": 1.0, "opacity": opacity}
 
 
-def surface_program(name, energy, cut):
+def surface_program(name, energy, cut, band=False):
     """The sheets' surface, fourteen ops (the interpreter costs about 0.7 ms an op at 1080p, Stage B profile).
     Blackened indigo, a step lighter on each nested sheet (related hues, different light); emission only where the
     mids and highs ring hard or a kick's shell passes -- electric purple rising to spectral red; the sheets' cut edges
     traced by a crimson-to-rose line that the same excitation brightens. Lit by the scene's lights."""
     g = Prog(name)   # eight registers, r0..r7
     g.op(None, "input", 7, inp="uv")                              # r7 = (edge distance, sheet index)
+    # the openings' live threshold (a route moves it): the edge distance is measured from it
+    g.op("openAt", "constant", 0, k=[0.0, 0.0, 0.0, 0.0])
+    g.op(None, "add", 7, a=7, b=0)
     g.op("front", "field", 6, field="front")                     # r6 = the travelling shell
     g.op("sheetTone", "gradient", 1, a=7, k=[0.0, 1.0 / 3.0, 0.0, 0.0], f=1.0)   # r1 = sheet index / 3
     if NEUTRAL:   # grey, one step lighter per nested sheet, and the cut edges drawn as a pale line (shading, no colour)
@@ -342,6 +363,10 @@ def surface_program(name, energy, cut):
         g.op(None, "smoothstep", 5, a=5, k=[1.8, 0.4])
         g.op(None, "ramp", 2, a=5, k=[0, 0, 0, 1], k2=[0.05, 0.05, 0.05, 1], k3=[0.12, 0.12, 0.12, 1])
         g.base, g.emit, g.opacity = 4, 2, -1
+        if band:
+            g.op(None, "swizzle", 0, a=7, k=[0, 0, 0, 0])
+            g.op("cut", "smoothstep", 0, a=0, k=[-0.3, 0.3])
+            g.opacity = 0
         return g
     # albedo: each nested sheet its own value of the same indigo-violet (related hues, different light); the
     # outermost the lightest royal, the inner ones sinking to blackened indigo
@@ -351,24 +376,28 @@ def surface_program(name, energy, cut):
     # a kick's shell adds as it passes. How bright it is follows the music's level (a route on the ramp)
     g.op("reinf", "field", 3, field="D-grid")
     g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2
-    g.op("purpleMask", "smoothstep", 5, a=3, k=[3.0, 10.0])
-    g.op("redMask", "smoothstep", 3, a=3, k=[9.0, 25.0])
+    g.op("purpleMask", "smoothstep", 5, a=3, k=[16.0, 49.0])
+    g.op("redMask", "smoothstep", 3, a=3, k=[64.0, 121.0])
     g.op(None, "add", 5, a=5, b=3)                                # r5 in 0..2
     g.op("glowT", "smoothstep", 5, a=5, k=[0.0, 2.0])
     g.op(None, "add", 5, a=5, b=6)
-    g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", 0.1) + [0.5], k3=C("red", 0.5) + [1.0])
+    g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", 0.09) + [0.5], k3=C("red", 0.35) + [1.0])
     if cut:
         # the cut edges: a line strongest on the outer sheets and fading inward, lit by the excitation; rose-white only
         # where a primary edge rings hardest
         g.op(None, "swizzle", 3, a=7, k=[0, 0, 0, 0])
         g.op("edgeLine", "smoothstep", 3, a=3, k=[2.2, 0.5])
-        g.op("edgeWeight", "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.15], f=1.0)
+        g.op("edgeWeight", "remap", 1, a=1, k=[0.0, 0.85, 1.0, 0.0], f=1.0)   # the outer sheets only
         g.op(None, "multiply", 3, a=3, b=1)
-        g.op("edgeGain", "smoothstep", 1, a=5, k=[-0.6, 1.0])
+        g.op("edgeGain", "smoothstep", 1, a=5, k=[-0.3, 1.0])
         g.op(None, "multiply", 3, a=3, b=1)
-        g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.3) + [0.5], k3=C("rose", 0.85) + [1.0])
+        g.op("edgeTint", "ramp", 3, a=3, k=[0, 0, 0, 0], k2=C("crimson", 0.22) + [0.5], k3=C("rose", 0.85) + [1.0])
         g.op(None, "add", 2, a=2, b=3)
     g.base, g.emit, g.opacity = 4, 2, -1
+    if band:   # the edge band's cut: opaque past the live threshold (masked)
+        g.op(None, "swizzle", 0, a=7, k=[0, 0, 0, 0])
+        g.op("cut", "smoothstep", 0, a=0, k=[-0.3, 0.3])
+        g.opacity = 0
     return g
 
 
@@ -381,15 +410,23 @@ def material(prog, cut=False):
 
 
 # ================================================================================================ geometry, per prototype
-FRONT_RELIEF = 4.0   # metres a kick's shell lifts the sheets it passes through
+FRONT_RELIEF = 7.0   # metres a kick's shell lifts the sheets it passes through
+B_RELIEF = float(os.environ.get("WD_B_RELIEF", "0.6"))   # metres per unit of the mids' bands
+SPREAD = 3.2         # metres per unit of bass that each sheet moves away from the nest's middle sheet (spacing)
 
 
 def deformers():
     if os.environ.get("WD_NODEFORM"):   # (a profiling switch: the bare meshes)
         return []
     # the baked families, and a kick's travelling shell (the onset field, live: eight onsets a vertex is cheap)
+    # the mids' bands (15-24 m) evaluated live: baked into 2 m cells their trilinear normals striated the sheets
+    # along the grid planes (Stage C review); the spacing term: a constant field, its amount per sheet routed (the
+    # nested sheets part and close, keeping their order: the contours shift relative to each other)
     return [{"kind": "field", "field": "D-grid", "amount": 1.0, "space": "world", "alongNormal": True},
-            {"kind": "field", "field": "front", "amount": FRONT_RELIEF, "space": "world", "alongNormal": True}]
+            {"kind": "field", "field": "front", "amount": FRONT_RELIEF, "space": "world", "alongNormal": True},
+            {"kind": "field", "field": "f-b" if B_RELIEF > 0 else "one", "amount": B_RELIEF, "space": "world",
+             "alongNormal": True},
+            {"kind": "field", "field": "one", "amount": 0.0, "space": "world", "alongNormal": True}]
 
 
 def parametric_sheets(s, prog):
@@ -403,7 +440,13 @@ def level_sheets(s, prog):
         if os.environ.get("WD_SHEETS") and str(i) not in os.environ["WD_SHEETS"].split(","):
             continue
         s.proc("level%d" % i, {"kind": "mesh", "asset": "meshes/wd-level%d.glb" % i}, material=material(prog, cut=True),
-               extra={"normalStep": 2.0}, deformers=deformers())   # one bake cell: smooth normals across cells
+               extra={"normalStep": 3.0}, deformers=deformers())   # 1.5 bake cells: smooth normals across cells
+        if LIVE_OPENINGS:
+            m = material(prog + "Edge", cut=True)
+            m["alphaMode"] = "mask"
+            m["alphaCutoff"] = 0.5
+            s.proc("level%d-edge" % i, {"kind": "mesh", "asset": "meshes/wd-level%d-edge.glb" % i}, material=m,
+                   extra={"normalStep": 3.0}, deformers=deformers())
 
 
 # A: the SDF. H = carrier + KAPPA_M M, its level sets sphere-traced; each level is plane + KAPPA (H - c) + lin (the
@@ -557,6 +600,15 @@ def instrument(s, g):
             R("response.flux", F + "source/2/drift", 8.0, attackMs=600, decayMs=2500),
             R("response.intensity", st("D-grid"), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=4000,
               decayMs=8000))
+    # the nest breathes: bass parts the sheets (each moves along its normal in proportion to its place in the nest,
+    # so they keep their order and spacing ratio) and the song's build holds them a little further apart
+    n = len(levelsets.LEVELS)
+    for i in range(n):
+        k = i - 0.5 * (n - 1)
+        for node in ("level%d" % i, "level%d-edge" % i) if LIVE_OPENINGS else ("level%d" % i,):
+            path = "procedural/%s/deform/4/amount" % node
+            s.route(R("response.bass", path, round(SPREAD * k, 3), attackMs=120, decayMs=1400),
+                    R("response.intensity", path, round(1.5 * k, 3), attackMs=5000, decayMs=9000))
     s.control = control_map()
     s.route(R("control.resonance", F + "sustain", 1.5, **CCR), R("control.resonance", F + "transient", 1.2, **CCR),
             R("control.scale", F + "scale", 1.2, **CCR),
@@ -566,23 +618,32 @@ def instrument(s, g):
             R("control.relief", st("D-grid"), 1.0, op="multiply", gain=1.5, offset=1.0, **CCR),
             R("control.detail", F + "source/3/amplitude", 0.6, **CCR),
             R("control.motion", F + "breath", 0.3, **CCR))
+    # the openings breathe: held sound encloses them (the sheets reach past their rest edges -- standing pockets close
+    # up), bass flares them open for a moment; both bounded by the edge band (BAND)
+    for prog in (g, getattr(s, "edge_program", None)):
+        if prog is None:
+            continue
+        p_ = "material/%s/op/%d/constant/constant" % (prog.name, prog["openAt"])
+        s.route(R("response.sustain", p_, 3.5, comp=0, attackMs=3000, decayMs=6000),
+                R("response.bass", p_, -3.0, comp=0, attackMs=150, decayMs=1200))
     if NEUTRAL or not g.at.get("glow"):
         return
-    RP = "material/%s/op/%%d/ramp/%%s" % g.name
     # light follows the music, on separate time scales: the glow's brightness the level (dim in a quiet passage,
-    # never off), the edges' the hats and snares (treble: fine highlights only)
-    for k in ("constant2", "constant3"):
-        s.route(R("response.level", RP % (g["glow"], k), 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=150,
-                  decayMs=900))
-        if "edgeTint" in g.at:
-            s.route(R("response.hatEnv", RP % (g["edgeTint"], k), 1.0, op="multiply", gain=1.0, offset=1.0,
+    # never off), the edges' the hats and snares (treble: fine highlights only). The same routes on both programs
+    # (the opaque interior and the live edge band), so the two never differ
+    for prog in (g, getattr(s, "edge_program", None)):
+        if prog is None:
+            continue
+        RP = "material/%s/op/%%d/ramp/%%s" % prog.name
+        for k in ("constant2", "constant3"):
+            s.route(R("response.level", RP % (prog["glow"], k), 1.0, op="multiply", gain=1.6, offset=0.4,
+                      attackMs=150, decayMs=900),
+                    R("response.hatEnv", RP % (prog["edgeTint"], k), 1.0, op="multiply", gain=1.0, offset=1.0,
                       attackMs=0, decayMs=200),
-                    R("response.snareEnv", RP % (g["edgeTint"], k), 1.0, op="multiply", gain=0.8, offset=1.0,
-                      attackMs=0, decayMs=260))
-    for label, cc, gain in (("glow", "control.spectral", 2.0), ("edgeTint", "control.light", 1.5)):
-        if label in g.at:
-            for k in ("constant2", "constant3"):
-                s.route(R(cc, RP % (g[label], k), 1.0, op="multiply", gain=gain, offset=1.0, **CCR))
+                    R("response.snareEnv", RP % (prog["edgeTint"], k), 1.0, op="multiply", gain=0.8, offset=1.0,
+                      attackMs=0, decayMs=260),
+                    R("control.spectral", RP % (prog["glow"], k), 1.0, op="multiply", gain=2.0, offset=1.0, **CCR),
+                    R("control.light", RP % (prog["edgeTint"], k), 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
 
 
 # THE CAMERA: an elevated three-quarter arc outside the sculpture's densest part, looking down into the nested sheets,
@@ -609,6 +670,9 @@ def build():
         return s
     g = surface_program("wdSurface", None, cut=PROTO != "A")
     s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
+    ge = surface_program("wdSurfaceEdge", None, cut=True, band=True)
+    s.program(ge.doc(base=ge.base, emission=ge.emit, opacity=ge.opacity))
+    s.edge_program = ge
     if PROTO == "A":
         iso_sdf(s, g.name)
     elif PROTO == "B":
