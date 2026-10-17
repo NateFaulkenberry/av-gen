@@ -10,6 +10,8 @@
 #include "support/temp_dir.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <spdlog/sinks/ringbuffer_sink.h>
+#include <spdlog/spdlog.h>
 
 #include <nlohmann/json.hpp>
 
@@ -97,4 +99,37 @@ TEST_CASE("Palette selector in the engine: onsets advance it, and a seek lands w
     reset.update(FrameTime{static_cast<double>(t) / 60.0, 0.0, 0});
     CHECK(reset.palette().selectedState() == 0);
     CHECK(glm::length(wall(reset) - playedWall) > 0.05f);
+}
+
+TEST_CASE("Palette selector: a project's palette parameters land on load, without an unknown-parameter warning, "
+          "on every load", "[palette][adr1420]") {
+    const auto plain = projectWithClicks();
+    nlohmann::json doc = nlohmann::json::parse(std::ifstream(plain));
+    doc["parameters"] = {{"palette/select", 2.0}, {"palette/lock", 1.0}, {"palette/hold", 9.0},
+                         {"palette/transition", 3.0}, {"palette/saturation", 0.8}};
+    const auto project = plain.parent_path() / "palette_params.json";
+    std::ofstream(project) << doc.dump(1);
+
+    auto sink = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(1024);
+    auto logger = spdlog::default_logger();
+    logger->sinks().push_back(sink);
+    app::Engine engine{app::EngineMode::Offline};
+    for (int load = 0; load < 2; ++load) {
+        INFO("load " << load);
+        REQUIRE(engine.loadProject(project).has_value());
+        CHECK(engine.params().findAs<float>("palette/select")->base() == 2.0f);
+        CHECK(engine.params().findAs<float>("palette/lock")->base() == 1.0f);
+        CHECK(engine.params().findAs<float>("palette/hold")->base() == 9.0f);
+        CHECK(engine.params().findAs<float>("palette/transition")->base() == 3.0f);
+        CHECK(engine.params().findAs<float>("palette/saturation")->base() == 0.8f);
+        engine.update(FrameTime{0.0, 0.0, 0});
+        CHECK(engine.palette().selectedState() == 2); // the loaded selection, arrived (no blend from the default)
+        CHECK(engine.palette().selectorProgress(0.0) == 1.0f);
+    }
+    logger->sinks().pop_back();
+    int unknown = 0;
+    for (const std::string& line : sink->last_formatted()) {
+        unknown += line.find("unknown parameter 'palette/") != std::string::npos ? 1 : 0;
+    }
+    CHECK(unknown == 0);
 }
