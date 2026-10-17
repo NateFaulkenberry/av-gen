@@ -74,8 +74,15 @@ the passes after it. Approved by the owner and on main at `74edc063` (2026-10-16
 19. ADR-1421, the no-tempo fallback: the palette also advances on a sustained change in Sonic energy, brightness and
     density, and at the latest every 75 s. The scene is listed under "Resonator" with Silk and Waveform.
 
+20. Quality pass (`docs/prototypes/resonator-quality/`, 02-report §11):
+    - the chromatic field (ADR-1470);
+    - brighter, less tinted light;
+    - the dead colour routes fixed;
+    - the offset-lattice ground, which removes the serrated lips.
+
 ## Open items
 
-- A few large crests show a fine serrated edge at some moments (geometry: the mesh carrying a sharp crest).
-- The material is at 43 of 48 ops and the scene at 16 of 16 GPU fields: little room for another layer.
+- A faint roughness remains on the steepest lips in extreme close-up. The outer cells (60-85 m) are coarser than the
+  middle.
+- The material is at 41 of 48 ops and the scene at 16 of 16 GPU fields.
 - `examples/cymatic-world/meshes/cw-ground.glb` is committed like Digital Ocean's meshes.

@@ -278,3 +278,21 @@ cherry-picked, are all included. Each figure is the binary's own exit code.
 | `tools/ci/run-suite.sh gpu` | PASS: 665 passed, 0 failed, 1 skipped, 666/666 ran | 0 |
 | `python3 tools/review_examples.py --only "Resonant Silk"` | ok (the scene opens through the Examples menu and renders) | 0 |
 | `python3 tools/check_project_integrity.py` | 0 problems | 0 |
+
+## 10. Quality pass (2026-10-17, `art/resonator-quality`)
+
+The owner's quality brief and colour-field addendum: `docs/prototypes/resonator-quality/` (report `01-report.md`).
+
+- **Composition.** The sheet now covers about 74% of the frame, from about 44%:
+  - the camera moved 74 m nearer the gather and a little above the wall, at 24 mm;
+  - the sail comes round toward the camera and down;
+  - the wall is broader;
+  - the waist opens from 2.5 m to 12 m, with a longer taper and less cloth through it.
+- **Colour and light:**
+  - an iridescent cyclic OKLab gradient (ADR-1470) along the cloth and across the pleats, with a fold-angle shift;
+  - the fill is a lifted fold colour (`fillLight`), where it was the near-black `shadow` role;
+  - metallic 0.35 → 0.15.
+- **The waist's stepped terraces** were the mids' resonance creases sliding the twisting cloth along the wall's mean
+  normal. Mid amplitude 1.5 → 0.9 and scale 2.6 → 1.9; the halves' masks rise over 70 / 50 m.
+- **Program:** 37 ops (from 43). Colour × scalar is one ramp, and the gather's seam is read from a distance field
+  (`gatherSeam`).

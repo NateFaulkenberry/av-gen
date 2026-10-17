@@ -181,6 +181,12 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
     - Live profile at Auto: High (0.85) with 0 deadline misses on Feline, Trench and Hyperborea. Per-level figures are
       in `02-report.md`.
 
+12. Quality pass (`docs/prototypes/resonator-quality/`, 02-report "Quality pass"):
+    - chromatic waves;
+    - front and fill light;
+    - a smooth glow;
+    - exact cut edges with no shards.
+
 ## Resume
 
 Everything requested is done; see `02-report.md`. To change the look, edit `tools/waveform_dimension/build.py` (the
