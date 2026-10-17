@@ -635,7 +635,7 @@
     },
     {
       "category": "Resonator",
-      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 resonance, CC 2 field scale, CC 3 contour density, CC 4 interference, CC 5 surface relief, CC 6 detail, CC 7 spectral colour, CC 8 light response, CC 9 motion scale, CC 10 palette, CC 11 palette lock. A vast indigo-violet sculpture of nested curved sheets -- the level sets of one standing interference field -- that the music bends, folds and lights: red spectral energy gathers where its modes reinforce. See docs/prototypes/waveform-dimension/.",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 resonance, CC 2 field scale, CC 3 contour density, CC 4 interference, CC 5 surface relief, CC 6 detail, CC 7 spectral colour, CC 8 light response, CC 9 palette, CC 10 palette lock, CC 11 motion scale. A vast indigo-violet sculpture of nested curved sheets -- the level sets of one standing interference field -- that the music bends, folds and lights: red spectral energy gathers where its modes reinforce. See docs/prototypes/waveform-dimension/.",
       "live": true,
       "name": "Waveform Dimension",
       "project": "waveform-dimension/waveform-dimension.json"

@@ -1747,21 +1747,21 @@
      "channel": -1,
      "kind": "cc",
      "number": 9,
-     "signal": "motion"
-    },
-    {
-     "source": "*",
-     "channel": -1,
-     "kind": "cc",
-     "number": 10,
      "signal": "palette"
     },
     {
      "source": "*",
      "channel": -1,
      "kind": "cc",
-     "number": 11,
+     "number": 10,
      "signal": "paletteLock"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 11,
+     "signal": "motion"
     }
    ]
   }

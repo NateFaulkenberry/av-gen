@@ -169,7 +169,7 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
     - **The selector (ADR-1420):** phrase advance, a 24 s hold, a 5 s OKLab blend and a composed order. ADR-1421
       (cherry-picked from proto/cymatic-split, `d20eada6`) adds the energy-change fallback for live input with no
       tempo: `sonic.energy`, `sonic.brightness` and `sonic.density`, fast 3 s, slow 24 s, maxHold 75 s.
-    - **MIDI:** CC 10 selects a palette and CC 11 locks it.
+    - **MIDI:** CC 9 selects a palette and CC 10 locks it, as in every Resonator scene; motion scale moved to CC 11.
     - **The glow's and edges' brightness** moved to their own constants, because the palette's replace bindings own
       the ramps.
 11. **Stage E.**

@@ -484,7 +484,8 @@ def palette_block(g):
 # The music's hand on the sculpture (brief §7): audio excites the resonance's persistent modes (ADR-1400: the field hears
 # the audio history itself, through the Response controls, ADR-1361); the routes below only choose WHICH figure leads
 # and how strongly each family moves the sheets -- bounded, smoothed gains, never a raw level on a vertex.
-CC = [  # brief §10: the performer's controls, MIDI CC 1-9 through `control.*`
+CC = [  # brief §10: the performer's controls through `control.*`; CC 9 / 10 pick and lock the palette, as in every
+    # Resonator scene, so motion scale sits on CC 11
     (1, "resonance", "RESONANCE: how hard the music drives the field (its sustained and struck excitation)"),
     (2, "scale", "FIELD SCALE: every wavelength shrinks -- finer folds and bands for the same music"),
     (3, "density", "CONTOUR DENSITY: the low-mid folds lead with their shorter wavelengths -- tighter nested folds"),
@@ -493,9 +494,9 @@ CC = [  # brief §10: the performer's controls, MIDI CC 1-9 through `control.*`
     (6, "detail", "DETAIL: the highs' fine ridges"),
     (7, "spectral", "SPECTRAL COLOUR: the purple-to-red glow where the field rings"),
     (8, "light", "LIGHT RESPONSE: the outer sheets' crimson edge line"),
-    (9, "motion", "MOTION SCALE: the modes' visible oscillation and the families' drift"),
-    (10, "palette", "PALETTE: choose one of the eight palettes"),
-    (11, "paletteLock", "PALETTE LOCK: hold the chosen palette (no change on the phrase)"),
+    (9, "palette", "PALETTE: choose one of the eight palettes"),
+    (10, "paletteLock", "PALETTE LOCK: hold the chosen palette (no change on the phrase)"),
+    (11, "motion", "MOTION SCALE: the modes' visible oscillation and the families' drift"),
 ]
 CCR = {"attackMs": 120, "decayMs": 120}
 
@@ -549,7 +550,7 @@ def instrument(s, g):
             R("response.hatEnv", edge, 1.0, op="multiply", gain=1.0, offset=1.0, attackMs=0, decayMs=200),
             R("response.snareEnv", edge, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=0, decayMs=260),
             R("control.light", edge, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
-    # the palette: CC 10 selects one (0..1 across the states), CC 11 locks it (no automatic change)
+    # the palette: CC 9 selects one (0..1 across the states), CC 10 locks it (no automatic change), as in every Resonator scene
     s.route(R("control.palette", "palette/select", float(len(PALETTES) - 1), **CCR),
             R("control.paletteLock", "palette/lock", 1.0, **CCR))
 
