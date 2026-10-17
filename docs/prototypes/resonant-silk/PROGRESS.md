@@ -52,3 +52,30 @@ Branch `proto/resonant-silk`, worktree `../av-gen-silk`, from main `ef3774da`, w
    - Amounts were lowered.
    - The probe WAV: drone 55 Hz 0-8 s, kicks 12-20, 330 Hz 20-28, snares 28-36, hats with 7 kHz 36-44, then
      silence.
+5. Stage B fixes:
+   - A spectrum `audioSmooth` above about 0.34 s exceeds the 32-tap cap, and the sparse taps alias into
+     stripes. It is now 0.33.
+   - The resonator field was renamed `resonator`. A field and a procedural node sharing the name `silk` had left
+     every `procedural/silk/*` parameter unregistered.
+   - Material op paths are `material/<prog>/op/<n>/<kind>/<field>`.
+
+   Gate 2 passed. Dense music (Feline 40-70 s) was over-lit; that is fixed in Stage C.
+6. The palette brief (`03-brief-palettes.md`, owner) supersedes the single palette.
+   - The engine gap was a direct blend, select, lock and advance. Approved by the coordinator as ADR-1420, the
+     shared mechanism for Silk and Cymatic World: `src/params/palette.*`, the step call and the seek replay in
+     `src/app/engine.cpp`, and tests. Commit `b8dc088a`, kept separate from the scene commits.
+   - The eight palettes, roles bound to geometry and light:
+     - environment: the sky and the fog;
+     - shadow: the fill light;
+     - base and fold: the albedo, Fresnel-masked;
+     - grazing: the key light and the hems;
+     - resonant: the rim light, the sail lamp, and the fronts and ringing folds;
+     - peak: the gather seam and the treble sheen.
+
+     Per palette, the tuning sets roughness, film thickness and ior, key intensity, emission, fold contrast and a
+     spectral sheen (`irid`).
+   - The journey on `beat.phrasePulse` has a 40 s hold, in the order A F E C G B H D.
+   - Palette select on CC 9, lock on CC 10.
+   - Project `parameters` cannot set `palette/*`, because the palette registers after they are read. Variants
+     write the selector block instead (`--set palette/select=k`).
+   - `pal8.sh <tag>` (scratch) renders the eight locked palettes at Feline 50 s and composes a sheet.

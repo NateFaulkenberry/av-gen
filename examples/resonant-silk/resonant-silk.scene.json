@@ -463,8 +463,8 @@
      "metallic": 0.35,
      "doubleSided": true,
      "thinFilm": {
-      "thickness": 520.0,
-      "ior": 1.45
+      "thickness": 400.0,
+      "ior": 1.6
      }
     },
     "deformers": [
@@ -614,6 +614,24 @@
    "contactShadow": false
   },
   {
+   "id": "sail",
+   "name": "sail",
+   "type": "point",
+   "position": [
+    7.0,
+    115.0,
+    -174.0
+   ],
+   "color": [
+    0.18782,
+    0.09531,
+    0.9131
+   ],
+   "intensity": 22000.0,
+   "range": 150.0,
+   "castsShadow": false
+  },
+  {
    "id": "fill",
    "name": "fill",
    "type": "directional",
@@ -691,25 +709,9 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.04092,
-      0.7913,
-      0.88792,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 3
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.9,
-      0.9,
-      0.9,
+      0.03682,
+      0.71217,
+      0.79913,
       1.0
      ]
     },
@@ -766,6 +768,69 @@
      "srcA": 5,
      "srcB": 6,
      "srcC": 7
+    },
+    {
+     "kind": "palette",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant2": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant3": [
+      1.4,
+      1.4,
+      1.4,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.33,
+      0.67,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.6,
+      0.6,
+      0.6,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 6
     },
     {
      "kind": "input",
@@ -901,6 +966,28 @@
      "field": "kickFront"
     },
     {
+     "kind": "field",
+     "dst": 3,
+     "field": "silkAmp"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.9,
+      1.8,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
@@ -926,69 +1013,9 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.45,
-      0.45,
-      0.45,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "field",
-     "dst": 2,
-     "field": "silkAmp"
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 2,
-     "srcA": 2,
-     "constant": [
-      0.9,
-      1.8,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.87137,
-      0.07227,
-      0.62396,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 3
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.35,
-      0.35,
-      0.35,
+      0.4,
+      0.4,
+      0.4,
       1.0
      ]
     },
