@@ -8,6 +8,48 @@ The brief is [10-brief-resonant-color-light-optics.md](10-brief-resonant-color-l
 
 **Performance target.** Live 1080p, 30 fps, Auto.
 
+## Summary (the brief's §17)
+
+The light pass ran Stages A-H. Mid-way, the owner's multi-palette brief ([12](12-brief-multi-palette.md)) replaced its single-palette framing, so the scene now shifts palettes as well as shapes. Geometry and motion are untouched.
+
+1. **The original limitations (Stage A).**
+   - One fixed hue scheme.
+   - Colour mostly from lighting, not from the resonant state.
+   - Every contour outlined alike.
+   - Fuchsia in soft patches.
+   - After Stage B, the frame lost its darkness.
+2. **The colour-field approach (Stage B).** The large figure's signed standing pattern F is baked once a frame and maps one lobe sign to the primary surface, the nodes to deep shadow, and the other sign to the secondary surface. Colour regions are the figure's own lobes, bounded by its nodal lines, and evolve with it.
+3. **Colour tied to geometry and resonant state.**
+   - Hollow floors fall to near-black through the sand; the lobe colours live on the cell walls.
+   - The grit marks the ridges.
+   - The glow lives only in excited cells, on their inner walls, in one lobe sign.
+   - All colours are palette roles (Stage P), so the hierarchy holds in all ten palettes.
+4. **Ridge and nodal illumination (Stage C).**
+   - The large crest line (sand¹³ × excitation) is the brightest thing in the frame.
+   - Glints are the fine tier.
+   - The medium-crest light was built and then turned off for budget (Stage G, `CW_LINE2=1`), which leaves large > fine with the medium carried by the relief.
+5. **Travelling and optical effects.**
+   - *Kept:* the travelling light (Stage D, ADR-1409: ripples-only readers, as dashes along the crests from each hit, dark in silence) and the palette view layer (J's oil sheen, E's grazing metal).
+   - *Rejected* (Stage E, each judged alone): tuned bloom, anamorphic glare, halation and chromatic aberration.
+6. **Audio (Stage F).** Each layer has its own signal and time scale (table in Stage F). Bass sets region extent, held sound shifts the surface, snares light the crests, hats the glints, kicks the glow in ringing cells, onsets the travelling light, and phrase boundaries the palette. No hue routes, and no whole-screen flash (measured).
+7. **Post-processing.** The vignette went to 0 in Stage B, and the depth prepass was turned off in Stage G (re-measured). Bloom, AgX, grain and contrast are unchanged. Motion blur and trails stay off.
+8. **Evidence.** One folder per stage under `light-pass/`. The ten validation scenarios are clips in `validation/`, at normal speed with audio. The palette evidence (sheets, Silver alone, phrase transitions, manual lock) is in `palettes/`.
+9. **Cost at live 1080p / 30 fps** (loud Feline):
+   - High: GPU median 31.8 ms, p95 33.3 (from 35.7 / 36.1 before Stage G).
+   - The palette system is GPU-neutral and costs +0.1-0.4 ms CPU.
+   - Auto with ADR-1363 holds High, then drops to Medium on the loudest passage, with 0.4% missed frames.
+10. **Build, tests and limitations.** See "Checks" at the end.
+
+**Implemented and tested:**
+- ADR-1409, with unit and GPU parity tests;
+- the palette system, on ADR-1043 and ADR-1420 (whose tests are theirs);
+- the generator's 16-field assert;
+- every stage's look, verified in renders.
+
+**Not tested by an automated test:** the scene's look and the palettes' character (judged in stills and clips).
+
+**Experimental, not shipped:** the medium-crest light (`CW_LINE2=1`) and the depth prepass for this scene (`CW_PREPASS=1`).
+
 ## Stage A: baseline and diagnosis
 
 **Captures** (`stageA-baseline/`):
@@ -234,3 +276,35 @@ The image's interest stays where the brief puts it: geometry, shading and negati
 - **The layer views** (`CW_DEBUG=albedo`, `light`, `emission`; documented beside the shape-language views in `build.py`) show each shading layer alone on the real program and palette.
 
 **Evidence** (`stageH-final/`): `all-10-palettes-final-feline-60s.png` and `layer-views-crimson-feline-18s-full-albedo-light-emission.png`. A transition clip in the final order is `palettes/phrase-transitions-final-order-feline-40-110s.mp4`.
+
+## Validation (the ten scenarios, normal speed, with audio)
+
+The scenarios were rendered from the shipped project, with palettes advancing on their own, into `validation/` (960×540, 30 fps). Clips 01-10b were rendered before the palette order was recomposed in Stage H; the final order's transitions are in `palettes/phrase-transitions-final-order-feline-40-110s.mp4`.
+
+| Scenario | Clip | Observed |
+|---|---|---|
+| 1 near silence, 2 quiet → loud, 3 kick, 4 snare | `01-04-...-feline-0-24s` | Dark Abyssal, with the figure slowly evolving in silence. The crests brighten with snares, the glow flares only in ringing cells on kicks, and the travelling light runs along the crests from each hit. No whole-frame flash |
+| 5 sustained bass + mid | `05-...-54-64s` | A held, settled colour field. A palette transition passes on a phrase boundary over 6 s, with no jump |
+| 6 dense | `06-...-120-130s` | An intricate figure. The bright roles stay on the ridges, and the darks hold through the busiest passage |
+| 7 high frequency | `07-...-154-164s` | Fine glints on the stone; no extra colour wash |
+| 8 sustained mid, 9 loud → quiet | `08-09-...-186-208s` | Oxidized Metal: grazing copper-gold on the walls, settling dark as the track quietens |
+| 10 second tracks | `10a-...-trench-50-60s`, `10b-...-hyperborea-110-120s` | The same hierarchy on other music |
+
+## Checks (head `810fa734` plus this report)
+
+- `tools/ci/run-suite.sh cpu-assets`: **PASS**, 4301 passed, 0 failed, 19 skipped, 1 expected failure (ran 4321/4321).
+- `tools/ci/run-suite.sh gpu`: **PASS**, 665 passed, 0 failed, 1 skipped (ran 666/666).
+- `tools/review_examples.py --only Cymatic`: **ok 2**. Sonic VFX - Cymatic Plate is ok and unaffected: the branch changes no Cymatic Plate file, and the engine changes are additive (ADR-1409's default is unchanged and unwritten). Cymatic World is ok.
+- `tools/check_project_integrity.py`: **0 problems**.
+
+**Known limitations:**
+- The fine serrated edge on some large crests (the coordinator's earlier note) is the mesh carrying a sharp crest. It is geometry, which this pass leaves alone.
+- The hollow glow is still soft-edged inside its wall band at some moments.
+- The palette advance listens to `beat.phrasePulse`. Live, with no tempo, phrases may not fire, and the palette then holds until CC 9 / CC 10 or a tempo exists (ADR-1420's report on tempo-less live scenes applies).
+- The material is at 43 of 48 ops and 16 of 16 GPU fields: there is little room left for another layer without removing one.
+
+## Doc edits waiting for owner approval (not made)
+
+- **02-report.md / PROGRESS.md:** the light pass and the ten palettes (this report). Mention the scene's palette controls (CC 9, CC 10) and the layer debug views.
+- **ADR-1406:** a note that Cymatic World has since turned its depth prepass off, re-measured at the light pass (the switch is unchanged).
+- **README / examples row:** the Cymatic World description could name the ten palettes and the CC 9 / CC 10 controls. The generator rewrites `examples/index.json` from `DESCRIPTION_TAIL` and the CC list, which already includes CC 9 / CC 10.
