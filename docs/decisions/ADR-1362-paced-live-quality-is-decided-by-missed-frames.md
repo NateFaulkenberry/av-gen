@@ -1,6 +1,7 @@
 # ADR-1362: Paced to the target, the live quality level is decided by missed frames, not the GPU time
 
 **Status:** Accepted (live performance follow-ups; the owner's "fix it" on the 30 fps report's first risk).
+**Amended by:** ADR-1363 (a stretched frame with the GPU past the period is a miss too).
 **Date:** 2026-10-15
 
 ## Context
