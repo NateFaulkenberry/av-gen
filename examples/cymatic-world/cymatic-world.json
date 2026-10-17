@@ -333,44 +333,225 @@
    }
   },
   {
-   "source": "response.intensity",
-   "target": "material/cwGround/op/32/constant/constant",
-   "amount": 0.00143,
+   "source": "control.palette",
+   "target": "palette/select",
+   "amount": 9.0,
    "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.paletteLock",
+   "target": "palette/lock",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/cwGround/op/4/remap/constant",
+   "amount": 1.0,
+   "op": "multiply",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
-    "attackMs": 4000,
-    "decayMs": 9000
+    "gain": -0.45,
+    "offset": 1.0,
+    "attackMs": 120,
+    "decayMs": 1200
    }
   },
   {
-   "source": "response.intensity",
-   "target": "material/cwGround/op/32/constant/constant",
-   "amount": 0.08922,
-   "op": "add",
+   "source": "response.bass",
+   "target": "material/cwGround/op/4/remap/constant",
+   "amount": 1.0,
+   "op": "multiply",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
-    "attackMs": 4000,
-    "decayMs": 9000
+    "gain": -0.45,
+    "offset": 1.0,
+    "attackMs": 120,
+    "decayMs": 1200
    }
   },
   {
-   "source": "response.intensity",
-   "target": "material/cwGround/op/32/constant/constant",
-   "amount": 0.12564,
+   "source": "response.sustain",
+   "target": "material/cwGround/op/4/remap/constant",
+   "amount": 0.22,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
    "chain": {
-    "attackMs": 4000,
-    "decayMs": 9000
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/cwGround/op/4/remap/constant",
+   "amount": 0.22,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "material/cwGround/op/16/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.4,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "material/cwGround/op/16/ramp/constant3",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.4,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 420
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/cwGround/op/27/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 1500,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "material/cwGround/op/27/ramp/constant3",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.2,
+    "offset": 1.0,
+    "attackMs": 1500,
+    "decayMs": 4000
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/cwGround/op/27/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.6,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/cwGround/op/27/ramp/constant3",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.6,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 380
+   }
+  },
+  {
+   "source": "response.snareEnv",
+   "target": "material/cwGround/op/12/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.9,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hatEnv",
+   "target": "material/cwGround/op/42/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.5,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "response.hatEnv",
+   "target": "material/cwGround/op/42/ramp/constant3",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.5,
+    "offset": 1.0,
+    "attackMs": 0,
+    "decayMs": 180
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "material/cwGround/op/45/ramp/constant2",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.8,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.flux",
+   "target": "material/cwGround/op/45/ramp/constant3",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.8,
+    "offset": 1.0,
+    "attackMs": 300,
+    "decayMs": 1500
    }
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/44/ramp/constant2",
+   "target": "material/cwGround/op/45/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -383,7 +564,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/44/ramp/constant3",
+   "target": "material/cwGround/op/45/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -396,7 +577,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/13/constant/constant",
+   "target": "material/cwGround/op/12/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -914,6 +1095,992 @@
   "id": "cymatic-world",
   "title": "Cymatic World"
  },
+ "palette": {
+  "states": [
+   {
+    "name": "Abyssal Resonance",
+    "colors": {
+     "surfaceA": [
+      0.00243,
+      0.00441,
+      0.01678
+     ],
+     "surfaceB": [
+      0.00598,
+      0.01214,
+      0.04136
+     ],
+     "shadow": [
+      0.00087,
+      0.00126,
+      0.00406
+     ],
+     "grit": [
+      0.00952,
+      0.02183,
+      0.07572
+     ],
+     "key": [
+      0.13837,
+      0.27553,
+      0.75
+     ],
+     "sky": [
+      0.08672,
+      0.1576,
+      0.6
+     ],
+     "keymid": [
+      0.11255,
+      0.21657,
+      0.675
+     ],
+     "fill": [
+      0.1132,
+      0.28472,
+      1.0
+     ],
+     "hollow": [
+      0.09056,
+      0.22778,
+      0.8
+     ],
+     "line": [
+      0.40288,
+      0.63534,
+      1.1
+     ],
+     "line2": [
+      0.26225,
+      0.45512,
+      1.0
+     ],
+     "sheen": [
+      0.78354,
+      0.84687,
+      1.0
+     ],
+     "wave": [
+      0.78354,
+      0.84687,
+      1.0
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Crimson Singularity",
+    "colors": {
+     "surfaceA": [
+      0.00993,
+      0.00235,
+      0.02177
+     ],
+     "surfaceB": [
+      0.02979,
+      0.00485,
+      0.03845
+     ],
+     "shadow": [
+      0.00307,
+      0.00135,
+      0.00745
+     ],
+     "grit": [
+      0.02979,
+      0.00485,
+      0.03845
+     ],
+     "key": [
+      0.71318,
+      0.386,
+      0.8
+     ],
+     "sky": [
+      0.45617,
+      0.10802,
+      1.0
+     ],
+     "keymid": [
+      0.58467,
+      0.24701,
+      0.9
+     ],
+     "fill": [
+      0.77473,
+      0.12618,
+      1.0
+     ],
+     "hollow": [
+      0.5,
+      0.02234,
+      0.15885
+     ],
+     "line": [
+      1.3,
+      0.08624,
+      0.13553
+     ],
+     "line2": [
+      1.0,
+      0.11011,
+      0.33861
+     ],
+     "sheen": [
+      1.0,
+      0.32314,
+      0.37626
+     ],
+     "wave": [
+      1.0,
+      0.06634,
+      0.10425
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Molten Glass",
+    "colors": {
+     "surfaceA": [
+      0.01843,
+      0.00323,
+      0.00231
+     ],
+     "surfaceB": [
+      0.05427,
+      0.00797,
+      0.00307
+     ],
+     "shadow": [
+      0.00434,
+      0.00126,
+      0.00107
+     ],
+     "grit": [
+      0.06519,
+      0.00945,
+      0.00339
+     ],
+     "key": [
+      1.0,
+      0.61332,
+      0.31041
+     ],
+     "sky": [
+      1.0,
+      0.1755,
+      0.12555
+     ],
+     "keymid": [
+      1.0,
+      0.39441,
+      0.21798
+     ],
+     "fill": [
+      1.0,
+      0.13736,
+      0.03482
+     ],
+     "hollow": [
+      0.8,
+      0.10989,
+      0.02786
+     ],
+     "line": [
+      1.0,
+      0.41789,
+      0.05951
+     ],
+     "line2": [
+      1.0,
+      0.29815,
+      0.05845
+     ],
+     "sheen": [
+      1.0,
+      0.76815,
+      0.3564
+     ],
+     "wave": [
+      1.0,
+      0.76815,
+      0.3564
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Ultraviolet Bloom",
+    "colors": {
+     "surfaceA": [
+      0.00828,
+      0.00404,
+      0.02863
+     ],
+     "surfaceB": [
+      0.02733,
+      0.0086,
+      0.07116
+     ],
+     "shadow": [
+      0.00289,
+      0.00145,
+      0.00927
+     ],
+     "grit": [
+      0.03223,
+      0.0096,
+      0.08138
+     ],
+     "key": [
+      0.66072,
+      0.42826,
+      1.0
+     ],
+     "sky": [
+      0.28912,
+      0.14124,
+      1.0
+     ],
+     "keymid": [
+      0.47492,
+      0.28475,
+      1.0
+     ],
+     "fill": [
+      0.45005,
+      0.10538,
+      1.0
+     ],
+     "hollow": [
+      1.0,
+      0.15529,
+      0.64291
+     ],
+     "line": [
+      1.0,
+      0.15529,
+      0.64291
+     ],
+     "line2": [
+      0.88069,
+      0.19031,
+      1.0
+     ],
+     "sheen": [
+      0.90466,
+      0.57112,
+      1.0
+     ],
+     "wave": [
+      0.90466,
+      0.57112,
+      1.0
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Oxidized Metal",
+    "colors": {
+     "surfaceA": [
+      0.01146,
+      0.0148,
+      0.01392
+     ],
+     "surfaceB": [
+      0.0372,
+      0.02246,
+      0.01619
+     ],
+     "shadow": [
+      0.00307,
+      0.00404,
+      0.00448
+     ],
+     "grit": [
+      0.04885,
+      0.02542,
+      0.01671
+     ],
+     "key": [
+      1.0,
+      0.7959,
+      0.59653
+     ],
+     "sky": [
+      0.77412,
+      1.0,
+      0.94041
+     ],
+     "keymid": [
+      0.88706,
+      0.89795,
+      0.76847
+     ],
+     "fill": [
+      1.0,
+      0.33126,
+      0.15078
+     ],
+     "hollow": [
+      0.4,
+      0.1325,
+      0.06031
+     ],
+     "line": [
+      1.0,
+      0.56274,
+      0.21838
+     ],
+     "line2": [
+      1.0,
+      0.57852,
+      0.29176
+     ],
+     "sheen": [
+      1.8,
+      1.42537,
+      0.85585
+     ],
+     "wave": [
+      1.0,
+      0.79187,
+      0.47547
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.02863,
+      0.00828,
+      0.00404
+     ],
+     "view2": [
+      0.16172,
+      0.09048,
+      0.03275
+     ]
+    }
+   },
+   {
+    "name": "Glacial Spectral",
+    "colors": {
+     "surfaceA": [
+      0.00516,
+      0.01442,
+      0.03035
+     ],
+     "surfaceB": [
+      0.0129,
+      0.04394,
+      0.0803
+     ],
+     "shadow": [
+      0.00218,
+      0.0046,
+      0.00972
+     ],
+     "grit": [
+      0.03324,
+      0.10474,
+      0.17115
+     ],
+     "key": [
+      1.08637,
+      1.09706,
+      1.1
+     ],
+     "sky": [
+      0.23808,
+      0.66522,
+      1.4
+     ],
+     "keymid": [
+      0.66223,
+      0.88114,
+      1.25
+     ],
+     "fill": [
+      0.56999,
+      0.86148,
+      1.0
+     ],
+     "hollow": [
+      0.05271,
+      0.16071,
+      0.25
+     ],
+     "line": [
+      0.56999,
+      0.86148,
+      1.0
+     ],
+     "line2": [
+      0.38335,
+      0.73037,
+      1.0
+     ],
+     "sheen": [
+      1.75924,
+      1.9469,
+      2.0
+     ],
+     "wave": [
+      0.87962,
+      0.97345,
+      1.0
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Chlorophyll After Dark",
+    "colors": {
+     "surfaceA": [
+      0.00218,
+      0.01045,
+      0.00519
+     ],
+     "surfaceB": [
+      0.00475,
+      0.03038,
+      0.01372
+     ],
+     "shadow": [
+      0.00116,
+      0.00323,
+      0.00192
+     ],
+     "grit": [
+      0.00513,
+      0.03429,
+      0.01513
+     ],
+     "key": [
+      0.56439,
+      1.0,
+      0.69229
+     ],
+     "sky": [
+      0.20827,
+      1.0,
+      0.49604
+     ],
+     "keymid": [
+      0.38633,
+      1.0,
+      0.59416
+     ],
+     "fill": [
+      0.10731,
+      1.0,
+      0.37797
+     ],
+     "hollow": [
+      0.10731,
+      1.0,
+      0.37797
+     ],
+     "line": [
+      0.49687,
+      0.9,
+      0.1498
+     ],
+     "line2": [
+      0.39459,
+      1.0,
+      0.26566
+     ],
+     "sheen": [
+      0.86661,
+      1.0,
+      0.40657
+     ],
+     "wave": [
+      0.86661,
+      1.0,
+      0.40657
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Rose Quartz",
+    "colors": {
+     "surfaceA": [
+      0.01764,
+      0.00543,
+      0.01392
+     ],
+     "surfaceB": [
+      0.04981,
+      0.01436,
+      0.03134
+     ],
+     "shadow": [
+      0.00426,
+      0.0021,
+      0.00448
+     ],
+     "grit": [
+      0.05572,
+      0.01564,
+      0.03391
+     ],
+     "key": [
+      0.7,
+      0.62335,
+      0.64669
+     ],
+     "sky": [
+      2.2,
+      0.67665,
+      1.73562
+     ],
+     "keymid": [
+      1.45,
+      0.65,
+      1.19116
+     ],
+     "fill": [
+      1.0,
+      0.234,
+      0.48521
+     ],
+     "hollow": [
+      0.45,
+      0.1053,
+      0.21834
+     ],
+     "line": [
+      0.55,
+      0.23498,
+      0.32822
+     ],
+     "line2": [
+      0.6,
+      0.22328,
+      0.36531
+     ],
+     "sheen": [
+      0.7,
+      0.52178,
+      0.57595
+     ],
+     "wave": [
+      1.0,
+      0.7454,
+      0.82279
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Monochrome Silver",
+    "colors": {
+     "surfaceA": [
+      0.00594,
+      0.00705,
+      0.00893
+     ],
+     "surfaceB": [
+      0.01715,
+      0.02078,
+      0.02669
+     ],
+     "shadow": [
+      0.00145,
+      0.00169,
+      0.0021
+     ],
+     "grit": [
+      0.02496,
+      0.02965,
+      0.03753
+     ],
+     "key": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "sky": [
+      0.6652,
+      0.78966,
+      1.0
+     ],
+     "keymid": [
+      0.8326,
+      0.89483,
+      1.0
+     ],
+     "fill": [
+      0.70341,
+      0.80927,
+      1.0
+     ],
+     "hollow": [
+      0.3517,
+      0.40464,
+      0.5
+     ],
+     "line": [
+      0.83708,
+      0.90628,
+      1.0
+     ],
+     "line2": [
+      0.76572,
+      0.86039,
+      1.0
+     ],
+     "sheen": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "wave": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "view0": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view1": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "view2": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "name": "Prismatic Oil",
+    "colors": {
+     "surfaceA": [
+      0.00364,
+      0.00364,
+      0.01253
+     ],
+     "surfaceB": [
+      0.01457,
+      0.00445,
+      0.01588
+     ],
+     "shadow": [
+      0.00131,
+      0.00176,
+      0.00488
+     ],
+     "grit": [
+      0.01457,
+      0.00445,
+      0.01588
+     ],
+     "key": [
+      0.99128,
+      0.86219,
+      1.0
+     ],
+     "sky": [
+      0.29048,
+      0.29048,
+      1.0
+     ],
+     "keymid": [
+      0.64088,
+      0.57634,
+      1.0
+     ],
+     "fill": [
+      1.0,
+      0.15643,
+      0.36542
+     ],
+     "hollow": [
+      0.35,
+      0.05475,
+      0.1279
+     ],
+     "line": [
+      0.7,
+      0.20763,
+      0.25361
+     ],
+     "line2": [
+      1.0,
+      0.3061,
+      0.54549
+     ],
+     "sheen": [
+      1.0,
+      0.72775,
+      0.61718
+     ],
+     "wave": [
+      1.0,
+      0.72775,
+      0.61718
+     ],
+     "view0": [
+      0.00046,
+      0.00176,
+      0.00293
+     ],
+     "view1": [
+      0.02576,
+      0.00635,
+      0.08143
+     ],
+     "view2": [
+      0.15895,
+      0.03632,
+      0.02576
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "line2",
+    "target": "material/cwGround/op/16/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "line2",
+    "target": "material/cwGround/op/16/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "wave",
+    "target": "material/cwGround/op/18/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "wave",
+    "target": "material/cwGround/op/18/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "hollow",
+    "target": "material/cwGround/op/27/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "hollow",
+    "target": "material/cwGround/op/27/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "sheen",
+    "target": "material/cwGround/op/42/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "sheen",
+    "target": "material/cwGround/op/42/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "fill",
+    "target": "material/cwGround/op/45/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "fill",
+    "target": "material/cwGround/op/45/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "line",
+    "target": "material/cwGround/op/12/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "grit",
+    "target": "material/cwGround/op/30/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "surfaceA",
+    "target": "material/cwGround/op/29/ramp/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "shadow",
+    "target": "material/cwGround/op/29/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "surfaceB",
+    "target": "material/cwGround/op/29/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "sky",
+    "target": "material/cwGround/op/39/ramp/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "keymid",
+    "target": "material/cwGround/op/39/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "key",
+    "target": "material/cwGround/op/39/ramp/constant3",
+    "mode": "multiply"
+   },
+   {
+    "role": "view0",
+    "target": "material/cwGround/op/33/ramp/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "view1",
+    "target": "material/cwGround/op/33/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "view2",
+    "target": "material/cwGround/op/33/ramp/constant3",
+    "mode": "multiply"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0,
+  "selector": {
+   "select": 0,
+   "transition": 6.0,
+   "lock": false,
+   "hold": 24.0,
+   "advance": {
+    "signal": "beat.phrasePulse",
+    "threshold": 0.5,
+    "order": [
+     0,
+     2,
+     5,
+     1,
+     6,
+     7,
+     4,
+     3,
+     8,
+     9
+    ]
+   }
+  }
+ },
  "control": {
   "midi": {
    "enabled": true,
@@ -960,6 +2127,20 @@
      "kind": "cc",
      "number": 8,
      "signal": "light"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 9,
+     "signal": "palette"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 10,
+     "signal": "paletteLock"
     },
     {
      "source": "*",

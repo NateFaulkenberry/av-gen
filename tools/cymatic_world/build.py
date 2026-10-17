@@ -525,6 +525,15 @@ MULTI_PALETTES = [
 ]
 
 
+# the view layer's colours (facing -> half -> grazing), display colours like the roles; palettes not listed have none
+VIEW_LAYERS = {
+    # J: oil on petrol -- facing walls barely tinted, turning violet, then burgundy-rose at grazing
+    "Prismatic Oil": ["#06141c", "#5a2c9a", "#d06a5a"],
+    # E: metal -- no colour facing the camera, copper on the turn, pale gold where the wall grazes the view
+    "Oxidized Metal": ["#000000", "#5a3020", "#c89a60"],
+}
+
+
 def _oklab(c):
     l = 0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]
     m = 0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]
@@ -555,32 +564,83 @@ def _hue(c):  # a light's colour: the hue and saturation, at unit peak (its op's
     return [round(v / m, 5) for v in c]
 
 
+# Each palette's CHARACTER (the brief's prose, and the coordinator's review of the first sheet): how much of its
+# surface colour shows (alb, x PAL_ALBEDO), how white its raking key is (keyMix: 0 = the source role's hue, 1 =
+# white) and from which role, how bright each light term is, and which role the grit and the counter-light take.
+# The defaults suit most; the entries make A and F differ in temperature and darkness, and B, H and J three different
+# worlds rather than three pinks.
+PALETTE_TUNE = {
+    # enormous dark forms, cool spectral highlights: the darkest, an ultramarine-tinted key, crests bright
+    "Abyssal Resonance": {"alb": 0.6, "keySrc": "resonant", "keyMix": 0.15, "key": 0.75, "sky": 0.6, "hollow": 0.8,
+                          "line": 1.1, "gritMix": 0.5},
+    # dark indigo-violet sculpture; red ONLY on the ridges: a violet key and fill, violet grit, the red in the
+    # crest lines and the travelling light, the magenta glow held low
+    "Crimson Singularity": {"alb": 1.2, "keySrc": "secondary", "keyMix": 0.35, "key": 0.8, "fillSrc": "secondary",
+                            "gritMix": 0.0, "hollow": 0.5, "line": 1.3, "waveSrc": "spectral", "line2Src": "secondary"},
+    # hot colours concentrated in folds and ridges; dark regions rich
+    "Molten Glass": {"alb": 0.8, "keyMix": 0.4, "gritMix": 0.15, "hollow": 0.8},
+    # violet foundation, fuchsia only as a response: the glow carries the fuchsia, the key stays violet-white
+    "Ultraviolet Bloom": {"keySrc": "resonant", "keyMix": 0.45, "hollowSrc": "spectral", "gritMix": 0.15},
+    # tactile metal: a warm grazing view layer, sharp bright glints, little glow
+    "Oxidized Metal": {"keyMix": 0.55, "hollow": 0.4, "sheen": 1.8, "gritMix": 0.2},
+    # crystalline, cold, spacious: an icy near-white key, crisp glints, edges catching light, almost no glow
+    "Glacial Spectral": {"alb": 1.5, "keySrc": "peak", "keyMix": 0.9, "key": 1.1, "sky": 1.4, "hollow": 0.25,
+                         "sheen": 2.0, "line": 1.0, "gritMix": 0.6, "fillSrc": "spectral"},
+    # green emerging from darkness, chartreuse only on resonant peaks
+    "Chlorophyll After Dark": {"alb": 0.8, "keySrc": "resonant", "keyMix": 0.5, "gritMix": 0.1, "line": 0.9},
+    # soft, smoky, low contrast, pearl: a pearly key, a higher ambient floor, softer crests and glow
+    "Rose Quartz": {"alb": 1.0, "keySrc": "peak", "keyMix": 0.6, "key": 0.7, "sky": 2.2, "line": 0.55,
+                    "line2": 0.6, "hollow": 0.45, "sheen": 0.7, "gritMix": 0.1},
+    # pure form: the geometry alone carries it
+    "Monochrome Silver": {"keyMix": 1.0, "hollow": 0.5},
+    # petrol and oil: a cool neutral key, the view layer carries the colour, crests rose-gold but low, little glow
+    "Prismatic Oil": {"alb": 0.9, "keySrc": "secondary", "keyMix": 0.7, "hollow": 0.35, "line": 0.7, "gritMix": 0.0},
+}
+
+
 def palette_state(name, hexes):
-    """One palette as the program's colour roles. Albedo roles are the brief's colours as authored (linear); light and
-    emission roles are hues at unit peak, so each term keeps its brightness from the program (the hierarchy holds in
-    every palette: darks dark, the bright roles rare and on the ridges)."""
+    """One palette as the program's colour roles. Albedo roles are the brief's colours scaled to albedo; light and
+    emission roles are hues at unit peak times the palette's gain for that term, so each term keeps its brightness
+    from the program (the hierarchy holds in every palette: darks dark, the bright roles rare and on the ridges)."""
     r = dict(zip(PALETTE_ROLES, (hexrgb(h) for h in hexes)))
+    t = PALETTE_TUNE.get(name, {})
     white = [1.0, 1.0, 1.0]
+    # the brief's colours are what the eye should SEE; the ground shows albedo x (key 2.3 + fill) through AgX with
+    # +0.2 exposure, about 4x in linear on a lit flank -- so an albedo role is its display colour over that
+    a_ = PAL_ALBEDO * t.get("alb", 1.0)
+    alb = lambda c: [v * a_ for v in c]
+    light = lambda c, term: [v * t.get(term, 1.0) for v in _hue(c)]
+    src = lambda term, default: r[t.get(term + "Src", default)]
+    key = _mix(white, src("key", "spectral"), 1.0 - t.get("keyMix", 0.55))
     colors = {
         # the base field (Stage B's colour field): one sign of lobe primary, the other secondary, the nodes deep shadow
-        "surfaceA": r["primary"], "surfaceB": r["secondary"], "shadow": r["shadow"],
-        # the ridges' settled grit: the secondary surface leaning resonant
-        "grit": _mix(r["secondary"], r["resonant"], 0.3),
-        # the raking key: mostly white, tinted by the spectral highlight (a palette's light, not a colour wash); the
-        # ambient floor under it takes the primary surface's hue
-        "key": _hue(_mix(white, r["spectral"], 0.45)), "sky": _hue(r["primary"]),
-        "keymid": _hue(_mix(r["primary"], _mix(white, r["spectral"], 0.45), 0.5)),
-        "fill": _hue(r["resonant"]),            # the counter light on the far flanks
-        "hollow": _hue(r["resonant"]),          # the glow in the excited cells
-        "line": _hue(r["spectral"]),            # the large crest's light
-        "line2": _hue(_mix(r["secondary"], r["spectral"], 0.5)),   # the medium crest, restrained
-        "sheen": _hue(r["peak"]), "wave": _hue(r["peak"]),         # the rare peaks: glints, the travelling light
+        "surfaceA": alb(r["primary"]), "surfaceB": alb(r["secondary"]), "shadow": alb(r["shadow"]),
+        # the ridges' settled grit: the secondary surface, leaning resonant
+        "grit": alb(_mix(r["secondary"], r["resonant"], t.get("gritMix", 0.3))),
+        # the raking key: white tinted by a role (a palette's light, not a colour wash); the ambient floor under it
+        # takes the primary surface's hue
+        "key": light(key, "key"), "sky": light(r["primary"], "sky"),
+        "keymid": [0.5 * (x + y) for x, y in zip(light(key, "key"), light(r["primary"], "sky"))],
+        "fill": light(src("fill", "resonant"), "fill"),         # the counter light on the far flanks
+        "hollow": light(src("hollow", "resonant"), "hollow"),   # the glow in the excited cells
+        "line": light(r["spectral"], "line"),                   # the large crest's light
+        "line2": light(_mix(src("line2", "secondary"), r["spectral"], 0.5), "line2"),   # the medium crest
+        "sheen": light(r["peak"], "sheen"),                     # the rare peaks: glints ...
+        "wave": light(src("wave", "peak"), "wave"),             # ... and the travelling light
     }
+    black = [0.0, 0.0, 0.0]
+    view = VIEW_LAYERS.get(name)
+    colors["view0"], colors["view1"], colors["view2"] = (alb(hexrgb(h)) for h in view) if view else (black,) * 3
     return {"name": name, "colors": {k: [round(v, 5) for v in c] for k, c in colors.items()}}
 
 
-PALETTE = os.environ.get("CW_PALETTE", "B")   # M: the ten palettes (12-brief); A-C the colour pass's, G grey
-PAL_INDEX = float(os.environ.get("CW_PAL", "0"))  # the palette shown (palette/position)
+PALETTE = os.environ.get("CW_PALETTE", "M")   # M: the ten palettes (12-brief); A-C the colour pass's, G grey
+PAL_INDEX = float(os.environ.get("CW_PAL", "0"))               # the palette shown (palette/position)
+PAL_ALBEDO = float(os.environ.get("CW_PAL_ALBEDO", "0.28"))     # albedo = the brief's display colour x this
+PAL_TRANSITION = float(os.environ.get("CW_PAL_TRANSITION", "6.0"))  # seconds of OKLab blend
+PAL_HOLD = float(os.environ.get("CW_PAL_HOLD", "24.0"))         # the least time a palette is held
+PAL_LOCK = os.environ.get("CW_PAL_LOCK", "0") == "1"            # a review still: hold the selected palette
+PAL_ORDER = [0, 2, 5, 1, 6, 7, 4, 3, 8, 9]
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
 
@@ -639,8 +699,8 @@ def ground_program():
         g.op("shade", "field", 0, field="shade")                   # r0 = (sand, crest, amplitude, w)
         g.op(None, "swizzle", 2, a=0, k=[1, 1, 1, 1])               # r2 = crest
         g.op(None, "swizzle", 3, a=0, k=[2, 2, 2, 2])               # r3 = amplitude
-    g.op(None, "swizzle", 1, a=0, k=[0, 0, 0, 0])                   # r1 = sand
-    g.op("gritMask", "smoothstep", 1, a=1, k=[0.5, 0.92] if BAKE else [0.12, 0.5])          # r1: where grit has settled (the ridges)
+    # (a scalar op reads its source's x: r0.x is the sand, so no swizzle)
+    g.op("gritMask", "smoothstep", 1, a=0, k=[0.5, 0.92] if BAKE else [0.12, 0.5])          # r1: where grit has settled (the ridges)
     # ---- emission, into r2: the nodal line's light where the ground rings, and a glow in the hardest-ringing hollows
     g.op("lineMask", "smoothstep", 2, a=2, k=[0.7, 0.96] if BAKE else [0.25, 0.7])
     if BAKE:
@@ -666,8 +726,7 @@ def ground_program():
     g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
     # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
-    g.op(None, "swizzle", 4, a=0, k=[0, 0, 0, 0])
-    g.op("wallBand", "smoothstep", 4, a=4, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
+    g.op("wallBand", "smoothstep", 4, a=0, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
     if BAKE:  # the fuchsia glow belongs to the violet lobes: the colour field chooses which cells glow
         g.op("violetLobes", "remap", 4, a=5, k=[0.45, 0.15, 0.0, 1.0], f=1.0)
@@ -686,6 +745,14 @@ def ground_program():
         # Stage C (coordinator, after B): the hollow FLOORS fall back toward black -- the deepest sand (the cell floor
         # inside the walls) keeps a fifth of its colour, so the lobes' violet and blue live on the walls and the frame
         # has real negative space for the light to stand out against
+        if PALETTE == "M":
+            # THE VIEW LAYER (12-brief, palettes J and E): a colour that turns with the angle a wall shows the camera
+            # -- an oil slick's violet-to-burgundy-to-rose sheen (J), copper going gold at grazing (E). One ramp on
+            # the Fresnel term whose three colours are palette roles: black in the palettes without one, so the same
+            # program serves all ten and a transition fades it in or out
+            g.op("viewTerm", "fresnel", 6, f=1.3)
+            g.op("view", "ramp", 6, a=6, k=[1, 1, 1, 1], k2=[1, 1, 1, 1], k3=[1, 1, 1, 1])
+            g.op(None, "add", 4, a=4, b=6)
         g.op("floorDark", "remap", 6, a=0, k=[0.0, 0.4, 0.1, 1.0], f=1.0)
         g.op(None, "multiply", 4, a=4, b=6)
     else:
@@ -826,7 +893,10 @@ def build_world():
     light is painted in its program -- a raking cyan key and a fuchsia counter-fill from the opposite quarter, so
     every ridge reads on both flanks -- and the nodal lines and the hardest-ringing hollows carry the emission."""
     cc = CC_FIELD + [(5, "relief", "TERRAIN: how deeply the ground's sand relief is carved"),
-                     (8, "light", "LIGHT: the fuchsia counter light over the ridges, and the nodal lines' glow")]
+                     (8, "light", "LIGHT: the counter light over the ridges, and the nodal lines' glow")]
+    if PALETTE == "M":
+        cc += [(9, "palette", "PALETTE: choose one of the ten palettes (the knob's range in ten steps)"),
+               (10, "paletteLock", "LOCK: above half way the palette holds; the phrases stop changing it")]
     pads = [PAD_STRIKE]
     s = kit.Scene("cymatic-world", "Cymatic World", design(
         "A night basin whose ground is a resonating plate: the music excites one designed bank of standing waves, and "
@@ -902,6 +972,9 @@ def build_world():
             R("response.hat", D(3), 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
+    if PALETTE == "M" and BAKE:
+        s.route(R("control.palette", "palette/select", 9.0, attackMs=0, decayMs=0),
+                R("control.paletteLock", "palette/lock", 1.0, attackMs=0, decayMs=0))
     s.params_(POST)
     if DEBUG in ("signed", "nodal", "envelope"):  # a debug material: none of the colour routes' targets exist
         return s, cc, pads
@@ -933,6 +1006,20 @@ def build_world():
                   for c in range(3) for path, w in ((grit, 1.0), (grit_mid, 0.5)) if path is not None])
     if PALETTE == "M" and BAKE:
         s.palette = palette_block(g)
+        # THE MUSIC WITHIN A PALETTE (12-brief §3, intents, not channel mappings): every route moves a LOCALISED or
+        # REGIONAL term, never the frame's brightness, and none of them touches a hue -- the palette owns the hues
+        tf = "material/cwGround/op/%d/remap/constant" % g["tintField"]
+        s.route(
+            # bass: the extent of the broad colour regions -- the colour field's span narrows, so a lobe's colour
+            # reaches further from its centre toward the nodes
+            *[R("response.bass", tf, 1.0, comp=c, op="multiply", gain=-0.45, offset=1.0, attackMs=120, decayMs=1200)
+              for c in (0, 1)],
+            # held sound (the low-mid body of a mix): the dominant surface shifts -- the colour coordinate leans from
+            # the primary surface toward the secondary over seconds
+            *[R("response.sustain", tf, 0.22, comp=c, attackMs=2500, decayMs=5000) for c in (2, 3)],
+            # mids (snares, the body of the beat): the medium folds' light
+            *[R("snareEnv", p_, 1.0, op="multiply", gain=1.4, offset=1.0, attackMs=0, decayMs=420)
+              for p_ in [RP % (g["line2"], "constant2"), RP % (g["line2"], "constant3")]])
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
                 *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
                 R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
@@ -954,10 +1041,18 @@ def palette_block(g):
               ("surfaceA", M % (g["tint"], "ramp", "constant")), ("shadow", M % (g["tint"], "ramp", "constant2")),
               ("surfaceB", M % (g["tint"], "ramp", "constant3")),
               ("sky", M % (g["key"], "ramp", "constant")), ("keymid", M % (g["key"], "ramp", "constant2")),
-              ("key", M % (g["key"], "ramp", "constant3"))]
+              ("key", M % (g["key"], "ramp", "constant3")),
+              ("view0", M % (g["view"], "ramp", "constant")), ("view1", M % (g["view"], "ramp", "constant2")),
+              ("view2", M % (g["view"], "ramp", "constant3"))]
+    # ADR-1420: the selector -- the palette changes at phrase scale, on a phrase boundary at least PAL_HOLD seconds
+    # after the last change, to the next palette of a COMPOSED order (each step a contrast of temperature and
+    # darkness: deep blue -> molten -> glacial -> crimson -> green -> rose -> metal -> ultraviolet -> silver -> oil),
+    # blended straight in OKLab over PAL_TRANSITION seconds; CC 9 selects, CC 10 locks
     return {"states": [palette_state(n, h) for n, h in MULTI_PALETTES],
             "bindings": [{"role": r, "target": t, "mode": "multiply"} for r, t in binds],
-            "position": PAL_INDEX, "saturation": 1.0, "value": 1.0}
+            "position": PAL_INDEX, "saturation": 1.0, "value": 1.0,
+            "selector": {"select": int(PAL_INDEX), "transition": PAL_TRANSITION, "lock": PAL_LOCK, "hold": PAL_HOLD,
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PAL_ORDER}}}
 
 
 BUILDERS = {"world": build_world}

@@ -74,3 +74,74 @@ The coordinator's Stage B review: the colour field reads lobe by lobe, but the f
 - **Material:** 47 ops. **Fields:** 16 of 16.
 
 **Evidence** (`stageD-travelling-light/`): `travelling-light-off-left-on-right-feline-6-16s.mp4` (normal speed, with audio) and `travelling-light-frames-0.15s-apart.png`.
+
+## Stage P: the ten palettes (12-brief-multi-palette.md, replacing brief 10's single palette)
+
+The owner's correction: modulating colour means moving between distinct palettes, so the scene now shifts palettes as well as shapes. The brief's ten artist-designed palettes (A Abyssal Resonance to J Prismatic Oil) are now the scene's colour. The four shading layers from Stages B-D stay, and every layer's colour now comes from the active palette.
+
+**Architecture (no new engine code in this scene).** The palettes are ADR-1043 project-palette states. ADR-1420's selector, built by the Resonant Silk agent and merged from main, does the choosing and blending.
+- **The program is authored in grey.** Palette `M` is palette B's intensities with every colour white. Role bindings in `multiply` mode scale the program's colour constants by the active palette's roles each frame: 24 bindings onto 9 ops' vec4 constants.
+- **Routes keep working.** Every route that scales a term's brightness (kick, snare, hats, sustain, flux, CC 8) still does, because the palette multiplies after them.
+- **Colour stays on the GPU.** The CPU writes a few uniform constants per frame. There is no per-vertex colour work and no allocation in a transition.
+
+**The roles.** Each of the brief's seven roles maps onto the existing layers, so the hierarchy holds in every palette:
+
+| Layer | Program term | Palette role |
+|---|---|---|
+| base field (Stage B) | colour field: one lobe sign, the nodes, the other sign | primary surface, deep shadow, secondary surface |
+| base field | grit on the ridges | secondary, leaning resonant (per palette) |
+| light | raking key / ambient floor / counter fill | white tinted by a chosen role / primary hue / resonant |
+| ridge illumination (Stage C) | large crest / medium crest | spectral highlight / secondary + spectral |
+| emission | hollow glow in excited cells | resonant |
+| optical finish | sheen glints, travelling light (Stage D) | rare peak |
+| view layer (new) | Fresnel ramp, facing → grazing | J: petrol → violet → rose; E: none → copper → pale gold; others none |
+
+- **Albedo vs light roles.** Albedo roles are the brief's display colours × 0.28 × a per-palette factor: the ground shows albedo × key through AgX, about 4× on a lit flank. Light and emission roles are hues at unit peak × a per-palette gain, so a term's brightness stays the program's.
+- **Character.** Each palette has its own small tuning (`PALETTE_TUNE`), shaped by the coordinator's review of the first sheet:
+  - A is the darkest, with an ultramarine key; F is icy, lighter and crisp. They now differ in temperature and darkness.
+  - B is dark indigo-violet with a violet key, fill and grit, and red only in the crest lines and the travelling light.
+  - H is smoky and low-contrast: a pearl key, a high ambient floor, soft crests.
+  - J's colour lives in its view layer: an oil sheen that turns with each wall's angle to the camera.
+  - E's view layer gives grazing copper-gold and bright glints, which read as metal without reflections.
+  - I proves the geometry stands on its own.
+
+**The view layer** (Fresnel, ramp, add; three ops) is shared by all ten palettes. Its three colours are palette roles that are black where a palette has none, so a transition fades it in and out.
+
+**Transition logic (ADR-1420 selector).**
+- **Phrase-driven.** On `beat.phrasePulse` (a phrase boundary), the target moves to the next palette of a composed order: A → C → F → B → G → H → E → D → I → J, each step a contrast of temperature and darkness.
+- **Hold.** A change happens only if 24 s have passed since the last one, so palettes change at phrase scale (in practice every second or third phrase), never per frame.
+- **Blend.** The blend runs straight in OKLab, from wherever the palette stands, over 6 s, eased with a smoothstep. It never passes through the palettes in between, and a retarget mid-blend starts from the mid-blend colours, so nothing jumps.
+- **No hue rotation.** Every intermediate is a direct OKLab line between two authored palettes.
+- **Manual control.** CC 9 selects a palette (the knob in ten steps) and CC 10 locks (above half way, the phrases stop changing it). Both are plain routes onto `palette/select` / `palette/lock`, so the timeline can key them too.
+- **Seek = play.** With the track analysed, an offline render started mid-track replays the selector from zero. The transition clip starting at 30 s opens on Molten Glass, the palette a play from 0 reaches.
+
+**Music within a palette (brief §3: intents, not channel mappings).** Every route moves a regional or localised term and never a hue:
+- bass narrows the colour field's span, so the lobes' colours reach further (the extent of broad regions);
+- held sound shifts the colour coordinate from the primary toward the secondary surface over seconds (the dominant surface shift);
+- snares lift the medium folds' light;
+- hats sharpen the glints;
+- kicks flare the glow only in cells that already ring;
+- transients launch the travelling light on the crests.
+
+Silence keeps the slowly evolving figure (the focus sweeps and drifts) in a dark palette.
+
+**Comparison mode.** `tools/cymatic_world/palette_sheet.py --time <t> --out <png> [--only <i>]` renders the ten palettes locked on the same frame: the same geometry, light, camera and exposure.
+
+**Performance** (live 1080p, High fixed, Feline 100 s; palette off = the single palette B, on = the ten-palette system):
+
+| | GPU median / p95 | CPU work median / p95 |
+|---|---|---|
+| palette off | 35.52 / 36.04 ms | 4.28 / 5.75 ms |
+| palette on | 35.65 / 36.11 ms | 4.40 / 6.14 ms |
+
+The palette costs nothing measurable on the GPU (the same 48 ops; the constants change, the work does not) and about 0.1-0.4 ms of CPU for 24 bindings and the selector. **Note:** High at this loud passage is now about 2 ms over the Stage A baseline (Stages C-D: a fourth bake grid and 9 more ops). Stage G owns bringing it back.
+
+**Material:** 48 ops, the interpreter's cap. Two swizzles were folded (a scalar op reads its source's x), which paid for the view layer. **Fields:** 16 of 16.
+
+**Found on the way:** a render logs `project references unknown parameter 'palette/select'` (and lock, hold, position and so on) on its second project load. The parameters work, as the transitions and the lock show. It looks like an ordering issue where the project's parameters are applied before the palette registers its own, and it is reported to the coordinator, not fixed here (shared files).
+
+**Evidence** (`palettes/`):
+- `all-10-palettes-first-pass-feline-60s.png` (the first pass) and `all-10-palettes-tuned-feline-60s.png` / `-125s.png`;
+- `monochrome-silver-alone-feline-60s.png` / `-125s.png`;
+- `phrase-transitions-molten-glacial-crimson-feline-30-90s.mp4` (normal speed, with audio; Molten → Glacial → toward Crimson on phrase boundaries);
+- `manual-select-locked-chlorophyll-ultraviolet-silver-feline-40-80s.mp4` (locked; picks at 40, 52 and 66 s keyed on the timeline as a performer's CC would).
