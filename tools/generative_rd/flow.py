@@ -33,7 +33,7 @@ EXTENT = 80.0             # the domain is [-80, 80] on x and z
 AMP, WAVE = 18.0, 110.0   # the channel's meander: z_c(x) = AMP sin(2 pi x / WAVE)
 HALF = 13.0               # half the channel's width
 BANK = 9.0                # the banks' height above the bed
-ROCKS = [(-34.0, 6.5, 2.6), (-2.0, -3.0, 3.2), (30.0, 4.0, 2.4)]  # (x, offset from the centreline, radius)
+ROCKS = [(-34.0, 4.0, 4.2), (-2.0, -3.0, 4.8), (30.0, 3.0, 3.8)]  # (x, offset from the centreline, radius)
 U = 3.0                   # mid-stream speed, m/s
 
 
@@ -127,6 +127,10 @@ def bed_mesh(n=300):
 
 
 PALETTES = {
+    "ember": {  # black basalt; amber current lines; a cold rim
+        "bed": "#08090b", "bank": "#0d0e10", "strand": "#3a2a18", "strandTip": "#ffd59a", "mote": "#ffb45a",
+        "sky": "#010101", "horizon": "#06070a", "key": "#c8d2e8", "keyI": 1.6, "rim": "#4a6cff", "rimI": 1.0,
+    },
     "jade": {  # a dark jade river: dark bed, pale-gold strands, warm motes
         "bed": "#050a09", "bank": "#2a2e2a", "strand": "#c9b98a", "strandTip": "#e8f0d0", "mote": "#ffd9a0",
         "sky": "#020605", "horizon": "#0d1d1a", "key": "#fff0d8", "keyI": 4.0, "rim": "#4fb3a0", "rimI": 1.4,
@@ -214,6 +218,10 @@ def strands_program(pal):
 
 
 DESIGNS = {
+    "streams": ("Current Lines",
+                "A river drawn only by its current: rakes of long lines follow one designed flow downstream, bunch "
+                "where it narrows, part round three boulders and curl in their wakes, while pulses of light travel "
+                "along them with the water."),
     "ink": ("Ink River",
             "The same river seen from above its skin: ink from three springs is carried by the current, split by the "
             "boulders and curled into marbling by the eddies they shed, while petals ride the surface and gather "
@@ -373,7 +381,74 @@ def storm(pal_name="ink", autonomous=False):
     return meadow(pal_name, autonomous, turbulence=1.6, sid="flow-storm", title="Current Meadow, Storm")
 
 
-CONFIGS = {"meadow": meadow, "ink": ink, "storm": storm}
+def streams_program(pal):
+    """Streamlines lit by pulses that travel along them, downstream (the flow's direction carried as light)."""
+    g = common.Prog("flowStreams")
+    g.op(None, "input", 0, inp="uv")
+    g.op(None, "swizzle", 0, a=0, k=[1, 1, 1, 1])                       # 0 at the rake .. 1 at the far end
+    g.op(None, "input", 1, inp="time")
+    g.op("pace", "constant", 2, k=[-0.06, -0.06, -0.06, 0])             # pulses move along at ~5 m/s
+    g.op(None, "multiply", 1, a=1, b=2)
+    g.op("count", "constant", 2, k=[7.0, 7.0, 7.0, 0])                  # seven pulses along a line
+    g.op(None, "multiply", 3, a=0, b=2)
+    g.op(None, "add", 3, a=3, b=1)
+    g.op(None, "palette", 3, a=3, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1, 1, 1, 0], k4=[0, 0, 0, 0])
+    g.op(None, "power", 3, a=3, f=10.0)                                 # narrow pulses
+    g.op(None, "field", 4, field="wakeFlow")                            # brighter where the eddies run fast
+    g.op(None, "multiply", 4, a=4, b=4)
+    g.op(None, "gradient", 4, a=4, k=[1.0, 1.0, 1.0, 0.6], f=1.0 / 9.0)
+    g.op(None, "multiply", 3, a=3, b=4)
+    g.op(None, "remap", 5, a=0, k=[0.0, 0.08, 0.0, 1.0], f=1.0)         # fade in from the rake
+    g.op(None, "multiply", 3, a=3, b=5)
+    g.op(None, "add", 3, a=3, b=5)                                      # + the line itself, steady
+    g.op("pulse", "constant", 6, k=C(pal, "mote", 1.2) + [1])
+    g.op(None, "multiply", 6, a=3, b=6)
+    g.op("line", "constant", 7, k=C(pal, "strand") + [1])
+    g.base, g.emit = 7, 6
+    return g
+
+
+def streams(pal_name="ember", autonomous=False):
+    """B (revised): the current drawn as streamlines. Rakes of long fibres seeded across the channel follow the
+    designed current (base + shed eddies) for 70 m: they bunch where the river narrows, part round the boulders, and
+    curl in the wakes; light pulses travel along them downstream."""
+    pal = dict(PALETTES[pal_name], name=pal_name)
+    s = common.Scene("flow-streams", DESIGNS["streams"][0], design("streams"))
+    flow = river(s)
+    mesh_dir = os.path.join(common.EXAMPLES, "flow-streams", "meshes")
+    pos, nrm, uv, idx = bed_mesh()
+    common.write_glb(os.path.join(mesh_dir, "flow-bed.glb"), pos, nrm, uv, idx, "bed")
+    s.proc("bed", {"kind": "mesh", "asset": "meshes/flow-bed.glb"},
+           material={"baseColor": C(pal, "bank"), "roughness": 0.7, "metallic": 0.0})
+    for i, (cx, cz, r) in enumerate(rock_centres()):
+        s.proc("rock%d" % i, {"kind": "sphere", "radius": 1.0, "segments": 64, "rings": 32},
+               position=(cx, 0.6 * r, cz), scale=(r, 1.1 * r, r),
+               material={"baseColor": C(pal, "bed"), "roughness": 0.35, "metallic": 0.3})
+    g = streams_program(pal)
+    s.program(g.doc(base=g.base, emission=g.emit))
+    for k, (x0, n_across) in enumerate(((-76.0, 90), (-56.0, 80), (-30.0, 80), (-6.0, 80))):
+        zc = float(centre(np.array(x0)))
+        s.proc("rake%d" % k, {"kind": "fiber", "fiberLength": 70.0 - 6.0 * k, "fiberWidth": 0.05, "fiberTaper": 0.6,
+                              "fiberSegments": 64, "fiberMinPixels": 0.9},
+               distribution={"kind": "grid", "gridCount": [1, 3, n_across], "gridSpacing": [1.0, 1.1, 22.0 / n_across]},
+               transform={"position": [x0, 1.6, zc], "rotation": [0, 0, -90], "scale": [1, 1, 1]},
+               variation={"seed": 3 + k, "position": [0.4, 0.3, 0.15]},
+               material={"program": g.name, "baseColor": C(pal, "strand"), "roughness": 0.3, "metallic": 0.4},
+               deformers=[{"kind": "streamline", "space": "world", "field": flow, "amount": 2.5, "falloff": 0.0,
+                           "tension": 0.0}],
+               extra={"lod": {"cull": True, "maxDistance": 0.0, "count": 1}})
+    environment(s, pal, key_dir=[0.5, -0.6, -0.62], fog=0.0006)
+    s.camera = {"mode": 1, "position": [-60.0, 26.0, 22.0], "target": [-14.0, 0.0, -8.0], "fov": 40.0,
+                "orbitSpeed": 0.0}
+    s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(3.0, 1.0, 2.0), tamp=(2.0, 0.5, 0.0),
+                   steps=8)
+    s.params_({"camera/lens/focalLength": 26.0, "post/bloom/intensity": 0.35, "post/output/vignette": 0.45,
+               "post/grade/contrast": 1.12})
+    s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
+    return s
+
+
+CONFIGS = {"meadow": meadow, "storm": storm, "streams": streams}
 
 
 def main():
