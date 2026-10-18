@@ -511,10 +511,10 @@
    "field": {
     "kind": "spectrum",
     "audioBand": "range",
-    "bandLow": 0.0,
-    "bandHigh": 0.22,
+    "bandLow": 0.02,
+    "bandHigh": 0.12,
     "audioSpeed": 30.0,
-    "audioSmooth": 0.12,
+    "audioSmooth": 0.0,
     "point": [
      -170.0,
      30.0,
@@ -586,10 +586,10 @@
    "field": {
     "kind": "spectrum",
     "audioBand": "range",
-    "bandLow": 0.25,
-    "bandHigh": 0.55,
+    "bandLow": 0.3,
+    "bandHigh": 0.4,
     "audioSpeed": 40.0,
-    "audioSmooth": 0.08,
+    "audioSmooth": 0.0,
     "point": [
      160.0,
      -30.0,

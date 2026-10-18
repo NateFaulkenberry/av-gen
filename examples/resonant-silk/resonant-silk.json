@@ -1381,6 +1381,16 @@
     "target": "lights/key/color"
    },
    {
+    "role": "g1",
+    "target": "procedural/drapeAbove/material/baseColor",
+    "gain": 0.8
+   },
+   {
+    "role": "g2",
+    "target": "procedural/drapeBelow/material/baseColor",
+    "gain": 0.8
+   },
+   {
     "role": "fold",
     "target": "material/rsSilk/op/16/ramp/constant2",
     "gain": 0.175

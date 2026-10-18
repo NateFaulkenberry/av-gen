@@ -627,25 +627,20 @@
      "kind": "single"
     },
     "material": {
-     "program": "rsSilk",
      "baseColor": [
-      0.01714,
-      0.02457,
-      0.18168
+      0.09391,
+      0.04765,
+      0.45655
      ],
      "emissiveColor": [
-      0.04092,
-      0.7913,
-      0.88792
+      0,
+      0,
+      0
      ],
      "emissiveIntensity": 0.0,
-     "roughness": 0.28,
-     "metallic": 0.05,
-     "doubleSided": true,
-     "thinFilm": {
-      "thickness": 400.0,
-      "ior": 1.6
-     }
+     "roughness": 0.4,
+     "metallic": 0.0,
+     "doubleSided": true
     },
     "deformers": [
      {
@@ -694,25 +689,20 @@
      "kind": "single"
     },
     "material": {
-     "program": "rsSilk",
      "baseColor": [
-      0.01714,
-      0.02457,
-      0.18168
+      0.09391,
+      0.04765,
+      0.45655
      ],
      "emissiveColor": [
-      0.04092,
-      0.7913,
-      0.88792
+      0,
+      0,
+      0
      ],
      "emissiveIntensity": 0.0,
-     "roughness": 0.28,
-     "metallic": 0.05,
-     "doubleSided": true,
-     "thinFilm": {
-      "thickness": 400.0,
-      "ior": 1.6
-     }
+     "roughness": 0.4,
+     "metallic": 0.0,
+     "doubleSided": true
     },
     "deformers": [
      {

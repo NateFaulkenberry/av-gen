@@ -533,6 +533,8 @@ def palette_block(g):
         {"role": "g0", "target": op("body", "constant")}, {"role": "g1", "target": op("body", "constant2")},
         {"role": "g2", "target": op("body", "constant3")}, {"role": "g3", "target": op("body", "constant4")},
         {"role": "grazing", "target": "lights/key/color"},
+        {"role": "g1", "target": "procedural/drapeAbove/material/baseColor", "gain": 0.8},
+        {"role": "g2", "target": "procedural/drapeBelow/material/baseColor", "gain": 0.8},
         {"role": "fold", "target": op("sheenCol", "constant2"), "gain": SHEEN * 0.5},
         {"role": "fold", "target": op("sheenCol", "constant3"), "gain": SHEEN},
         {"role": "grazing", "target": op("hemCol", "constant2"), "gain": 0.45},
@@ -727,6 +729,15 @@ def environment(s):
             castsShadow=False, contactShadow=False)
 
 
+def drape_material():
+    """The far drapes (stage E): no program, no thin film -- a plain satin in the palette's fold colour (bound by role).
+    They cover much of the frame behind the hero, and the hero's 37-op program on them doubled the pixel cost."""
+    if os.environ.get("RS_GEOMETRY"):
+        return silk_material("drape")
+    return {"baseColor": C("violet", 0.5), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 0.4,
+            "metallic": 0.0, "doubleSided": True}
+
+
 def silk_material(name, program="rsSilk"):
     if os.environ.get("RS_GEOMETRY"):
         # review only: the form alone, matte grey, no program, no film
@@ -746,7 +757,7 @@ def sheets(s, specs, mesh_dir):
         write_glb(os.path.join(mesh_dir, "rs-%s.glb" % spec.name), pos, nrm, uv, idx, spec.name)
         print("%s: %d vertices, %d triangles, %.0f m long" % (spec.name, len(pos), len(idx) // 3, length))
         s.proc(spec.name, {"kind": "mesh", "asset": "meshes/rs-%s.glb" % spec.name},
-               material=silk_material(spec.name), extra={"normalStep": 0.15},
+               material=silk_material(spec.name) if spec.music else drape_material(), extra={"normalStep": 0.15},
                deformers=drift_deformers() + (music_deformers() if MUSIC and spec.music else []))
 
 

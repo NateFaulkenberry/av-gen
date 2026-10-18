@@ -1054,7 +1054,9 @@ def environment(s):
         # ... and no depth prepass either (ADR-1406's switch). It won at the correction round (35.3 -> 29.8 ms at High),
         # but the light pass re-measured it on loud Feline: with the program at 43 ops the prepass costs 5.8 ms and
         # saves only 3.4 (High 34.2 ms median with it, 31.8 without); CW_PREPASS=1 asks for it again
-        "depthPrepass": os.environ.get("CW_PREPASS", "0") == "1",
+        # (the overhaul, stage E: the oblique camera sees ridges behind ridges, so the prepass wins again -- 53 -> 43 ms
+        # at High, measured; CW_PREPASS=0 turns it off)
+        "depthPrepass": os.environ.get("CW_PREPASS", "1") == "1",
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": SUN_GLOW, "intensity": 1.0,
                 "sunSize": 0.015, "sunGlow": 0.16, "sunDirection": [-0.55, 0.12, -0.83],
