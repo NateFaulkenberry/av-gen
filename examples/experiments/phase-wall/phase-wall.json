@@ -139,8 +139,231 @@
    0.015
   ]
  },
- "sources": [],
- "routes": [],
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "influence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "control.influence",
+        "weight": 1.0
+       }
+      ],
+      "bias": 0.5,
+      "gain": 0.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.sustain",
+   "target": "grid/net/coupling",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "grid/net/frequency",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "grid/net/noise",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "grid/net/phaseLag",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 6000,
+    "decayMs": 12000
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "scene/bands/rotation",
+   "amount": 0.15,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "control.coupling",
+   "target": "grid/net/coupling",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.complexity",
+   "target": "grid/net/spread",
+   "amount": 0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.motion",
+   "target": "grid/net/speed",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.lag",
+   "target": "grid/net/phaseLag",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "scene/bands/gain",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.palette",
+   "target": "palette/select",
+   "amount": 7.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.paletteLock",
+   "target": "palette/lock",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.pace",
+   "target": "field/pace/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "procedural/back_west/material/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "procedural/back_north/material/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "procedural/back_east/material/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "procedural/back_south/material/emissive",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  }
+ ],
  "presets": [],
  "timeline": {
   "enabled": true,
@@ -211,6 +434,468 @@
       "interp": "smooth"
      }
     ]
+   },
+   {
+    "target": "material/blade_west/op/26/constant/constant",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 86.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "material/blade_north/op/26/constant/constant",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 86.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "material/blade_east/op/26/constant/constant",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 86.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "material/blade_south/op/26/constant/constant",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.0,
+      "value": [
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 86.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       0.12,
+       0.12,
+       0.12,
+       1.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -15.0,
+       6.0,
+       42.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       -8.0,
+       8.0,
+       22.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       4.0,
+       10.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       12.0,
+       6.0,
+       -30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       6.0,
+       4.0,
+       -46.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       -12.0,
+       9.0,
+       -36.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -6.0,
+       12.0,
+       -6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.0,
+      "value": [
+       8.0,
+       7.0,
+       24.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       -15.0,
+       6.0,
+       42.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 120.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       24.0,
+       13.0,
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.0,
+      "value": [
+       24.0,
+       14.0,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.0,
+      "value": [
+       24.0,
+       16.0,
+       -34.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -24.0,
+       18.0,
+       -56.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.0,
+      "value": [
+       -10.0,
+       14.0,
+       -64.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.0,
+      "value": [
+       -24.0,
+       15.0,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -24.0,
+       17.0,
+       30.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.0,
+      "value": [
+       -20.0,
+       12.0,
+       56.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 120.0,
+      "value": [
+       24.0,
+       13.0,
+       4.0
+      ],
+      "interp": "smooth"
+     }
+    ]
    }
   ]
  },
@@ -226,7 +911,7 @@
   "experiment": "A coupled oscillators",
   "thesis": "A hall whose four walls are one kinetic installation: eight thousand metal blades, each swung by its own oscillator, falling into step and breaking apart round the room.",
   "id": "phase-wall",
-  "title": "Phase Wall"
+  "title": "Phase Hall"
  },
  "palette": {
   "states": [
@@ -694,12 +1379,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_west/op/23/constant/constant",
+    "target": "material/blade_west/op/24/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_west/op/26/constant/constant",
+    "target": "material/blade_west/op/29/constant/constant",
     "gain": 2.5
    },
    {
@@ -721,12 +1406,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_north/op/23/constant/constant",
+    "target": "material/blade_north/op/24/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_north/op/26/constant/constant",
+    "target": "material/blade_north/op/29/constant/constant",
     "gain": 2.5
    },
    {
@@ -748,12 +1433,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_east/op/23/constant/constant",
+    "target": "material/blade_east/op/24/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_east/op/26/constant/constant",
+    "target": "material/blade_east/op/29/constant/constant",
     "gain": 2.5
    },
    {
@@ -775,12 +1460,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_south/op/23/constant/constant",
+    "target": "material/blade_south/op/24/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_south/op/26/constant/constant",
+    "target": "material/blade_south/op/29/constant/constant",
     "gain": 2.5
    },
    {
@@ -1005,6 +1690,77 @@
      "maxHold": 90.0
     }
    }
+  }
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "coupling"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "complexity"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "motion"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "influence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "lag"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "light"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 9,
+     "signal": "palette"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 10,
+     "signal": "paletteLock"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 36,
+     "signal": "pace"
+    }
+   ]
   }
  }
 }

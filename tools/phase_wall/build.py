@@ -29,7 +29,9 @@ sys.path.insert(0, REPO)
 from tools.generative_rd import common  # noqa: E402
 from tools.generative_rd.common import R, hexrgb  # noqa: E402
 
-SID, TITLE = "phase-wall", "Phase Wall"
+# The R&D's osc-flaps example is already "Phase Wall" in the index (proto/generative-rd); this scene is listed as
+# "Phase Hall" so the two never share a name. The coordinator settles the final name at the merge.
+SID, TITLE = "phase-wall", "Phase Hall"
 OUT = os.path.join(REPO, "examples", "experiments", SID)
 
 # ================================================================================================ the hall
@@ -39,7 +41,7 @@ PIER = 3.2                        # corner piers (square)
 BASE = 0.6                        # the blades start this high (a dark plinth below)
 PX, PY = 0.75, 1.6                # blade pitch: across, up
 BLADE = (0.745, 1.585, 0.04)      # blade size: width, height, thickness (closed, the screen has no see-through gaps)
-CELL = 1.2                        # network cell (m): an island spans 8-15 blades
+CELL = float(os.environ.get("PW_CELL", "1.6"))                        # network cell (m): with radius 3, a few large 2D islands per wall
 SWING = 1.0                       # blade swing (rad) at |sin theta| = 1
 
 
@@ -142,13 +144,13 @@ def network(s):
          "resolution": [int(round(PERIM / CELL)), 1, int(round(H / CELL))],
          "boundsMin": [-PERIM / 2, -40.0, -H / 2], "boundsMax": [PERIM / 2, 40.0, H / 2],
          "frequency": 0.18, "simRate": 60.0, "maxSubSteps": 4, "seed": 3, "persistence": 0.6, "links": 0,
-         "linkRange": 48.0, "checkpointInterval": 5.0, "coupling": 4.0, "phaseLag": 0.3, "couplingRadius": 3,
-         "spread": 0.28, "seedAmount": 1.0, "noise": 0.05}
+         "linkRange": 48.0, "checkpointInterval": 5.0, "coupling": 4.0, "phaseLag": 0.3, "couplingRadius": int(os.environ.get("PW_RADIUS", "3")),
+         "spread": 0.17, "seedAmount": 1.0, "noise": 0.02}
     s.grid(**g)
     # a periodic frequency tilt (one sine round the hall, no seam at the wrap): unison still rolls as a slow wave
     s.field("tilt", {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine", "axis": [1.0, 0.0, 0.0],
                      "point": [0.0, 0.0, 0.0], "wavelength": PERIM, "waveSpeed": 0.0, "waveWidth": 0.0,
-                     "amplitude": 1.0, "strength": 0.02})
+                     "amplitude": 1.0, "strength": float(os.environ.get("PW_TILT", "0.006"))})
     g["frequencyField"] = "tilt"
     # the breath (96 s): disorder -> islands (K ~4.5, held 16-34 s) -> unison (K 12, 44-56 s) -> islands -> disorder.
     # On the 1.2 m lattice K 10 already locks the room, so the islands band is held on purpose
@@ -158,8 +160,8 @@ def network(s):
 
 
 # ================================================================================================ the blades
-ACT = (0.5, 1.9)      # activity -> front glow (the coarse lattice's strain is lower than the R&D's)
-ACT_PEAK = (1.6, 3.2)  # activity -> the defect core
+ACT = tuple(float(v) for v in os.environ.get("PW_ACT", "0.2,0.5").split(","))      # activity -> front glow (the coarse lattice's strain is lower than the R&D's)
+ACT_PEAK = tuple(float(v) for v in os.environ.get("PW_PEAK", "0.5,1.4").split(","))  # activity -> the defect core
 
 
 def blade_program(wall):
@@ -194,8 +196,11 @@ def blade_program(wall):
     g.op(None, "multiply", 1, a=1, b=5)                             # r1 = base
     g.op(None, "input", 4, inp="instanceEmissive")                  # r4 = activity, one value per blade (effector)
     g.op(None, "smoothstep", 2, a=4, k=[ACT[0], ACT[1], 0, 0])
+    g.op(None, "multiply", 2, a=2, b=2)                             # squared: the seam's core, not its shoulders
     g.op("front", "constant", 6, k=C("front", 1.4) + [1])
     g.op(None, "multiply", 2, a=2, b=6)                             # r2 = front glow
+    g.op("frontGain", "constant", 6, k=[1.0, 1.0, 1.0, 1.0])        # the breath's glow gain (timeline, below)
+    g.op(None, "multiply", 2, a=2, b=6)
     g.op(None, "smoothstep", 4, a=4, k=[ACT_PEAK[0], ACT_PEAK[1], 0, 0])
     g.op("peak", "constant", 6, k=C("peak", 2.5) + [1])
     g.op(None, "multiply", 4, a=4, b=6)
@@ -219,6 +224,11 @@ def walls(s):
         bind(s, "crest", op_path(g, "tone", "constant3"))
         bind(s, "front", op_path(g, "front"), 1.4)
         bind(s, "peak", op_path(g, "peak"), 2.5)
+        # disorder strains the whole wall, so the seams only read once there are islands to sit between: the front
+        # glow follows the breath (an eighth of it in disorder, all of it from the islands on)
+        gk = [(0, 0.12), (10, 0.12), (18, 1.0), (78, 1.0), (86, 0.12), (96, 0.12)]
+        s.track(op_path(g, "frontGain"), [{"time": float(tt), "value": [v, v, v, 1.0], "interp": "smooth"}
+                                           for tt, v in gk], loop=96.0)
         inset = PIER / 2 + 0.2
         nx = int((n - 2 * inset) // PX)
         ny = int((H - BASE - 0.4) // PY)
@@ -388,6 +398,61 @@ def light(s):
     bind(s, "back", "lights/bounce/color")
 
 
+# ================================================================================================ the music
+# (02-plan.md §5) The music writes into the network, not into the image: onsets are phase kicks, held sound is
+# coupling, a build is the lag. Every audio route's depth is Audio Influence (CC 4, half at rest).
+KICK_FROM = ("north", W / 2, 9.0)     # the end wall's centre, low: a kick's ring runs round both corners
+SNARE_FROM = ("east", L / 2, 20.0)    # the east wall's middle, high: a second, quicker source
+MIDI_CC = [
+    (1, "coupling", "COUPLING: pulls the hall toward unison"),
+    (2, "complexity", "COMPLEXITY: widens the spread of natural frequencies (more islands, more seams)"),
+    (3, "motion", "MOTION: the network's speed"),
+    (4, "influence", "AUDIO INFLUENCE: how hard the music drives the network (half at rest)"),
+    (5, "lag", "LAG: the Sakaguchi phase lag, rings toward spirals"),
+    (6, "light", "LIGHT: the reflected strips and the backplanes"),
+    (9, "palette", "PALETTE: choose one of the eight (a direct blend to it)"),
+    (10, "paletteLock", "PALETTE LOCK: hold the chosen palette (no automatic changes)"),
+]
+MIDI_NOTES = [(36, "pace")]
+
+
+def music(s, net):
+    G = "grid/net/"
+    for name, (wall, t_, y) in (("kickFront", KICK_FROM), ("snareFront", SNARE_FROM)):
+        pt = list(unrolled(wall, t_, y))
+        f = ({"kind": "onset", "onsetSource": "low", "audioSpeed": 14.0, "onsetWidth": 3.5, "onsetDecay": 0.9}
+             if name == "kickFront" else
+             {"kind": "onset", "onsetSource": "mid", "audioSpeed": 22.0, "onsetWidth": 2.0, "onsetDecay": 1.6})
+        f.update({"point": pt, "waveGeometry": "spherical"})
+        s.field(name, f)
+    s.field("kicks", {"kind": "compound", "combine": "add", "children": ["kickFront", "snareFront"]})
+    net["injectField"], net["injectRate"] = "kicks", 2.0
+    # MIDI note 36 holds a pacemaker on the end wall: a cell tuned faster sends target waves while the note is held
+    s.field("pace", {"kind": "radial", "radius": 6.0, "strength": 0.0}, position=unrolled("north", W / 2 - 10.0, 18.0))
+    s.field("tune", {"kind": "compound", "combine": "add", "children": ["tilt", "pace"]})
+    net["frequencyField"] = "tune"
+    A = common.audio
+    s.route(A("response.sustain", G + "coupling", 6.0, attackMs=3000, decayMs=6000),
+            A("response.bass", G + "frequency", 0.25, attackMs=300, decayMs=1500),
+            A("response.hat", G + "noise", 0.12, attackMs=40, decayMs=400),
+            A("response.intensity", G + "phaseLag", 0.35, attackMs=6000, decayMs=12000),
+            # loud passages turn the reflection rig: even a locked hall's flashes travel round the room
+            A("response.level", "scene/bands/rotation", 0.15, integrate=True))
+    common.instrument(s, MIDI_CC, MIDI_NOTES)
+    CC = common.CC
+    s.route(R("control.coupling", G + "coupling", 12.0, **CC),
+            R("control.complexity", G + "spread", 0.2, **CC),
+            R("control.motion", G + "speed", 1.5, **CC),
+            R("control.lag", G + "phaseLag", 1.0, **CC),
+            R("control.light", "scene/bands/gain", 1.0, op="multiply", gain=2.0, offset=1.0, **CC),
+            R("control.palette", "palette/select", float(len(PALETTES) - 1), **CC),
+            R("control.paletteLock", "palette/lock", 1.0, **CC),
+            R("control.pace", "field/pace/strength", 0.35, attackMs=80, decayMs=2500))
+    for name, *_ in WALLS:
+        s.route(R("control.light", "procedural/back_%s/material/emissive" % name, 1.0, op="multiply", gain=1.5,
+                  offset=1.0, **CC))
+
+
 # ================================================================================================ camera
 CAMERAS = {  # review framings: oblique and off-axis (the walls are the hero; never a dead-centre corridor)
     "nave": ("-15,6,42", "17,13,-30"),
@@ -398,10 +463,30 @@ CAMERAS = {  # review framings: oblique and off-axis (the walls are the hero; ne
 }
 
 
+# The promenade (02-plan.md §4, coordinator's note 3): a visitor's walk round the hall, 120 s a loop, every framing
+# oblique or off-axis. It never looks straight down the axis for long; the end wall is met close and at an angle,
+# as a wall, not a vanishing point. (position, target) every 15 s, smooth; the loop closes on its first key.
+PROMENADE = [
+    ((-15.0, 6.0, 42.0), (24.0, 13.0, 4.0)),      # the nave, oblique: the east wall at 45 degrees, receding
+    ((-8.0, 8.0, 22.0), (24.0, 14.0, 0.0)),       # turning to the east wall
+    ((4.0, 10.0, -4.0), (24.0, 16.0, -34.0)),     # along the east wall toward the north-east corner
+    ((12.0, 6.0, -30.0), (-24.0, 18.0, -56.0)),   # across to the north-west corner, low and looking up
+    ((6.0, 4.0, -46.0), (-10.0, 14.0, -64.0)),    # the end wall, close and at an angle
+    ((-12.0, 9.0, -36.0), (-24.0, 15.0, -8.0)),   # the west wall, near-frontal
+    ((-6.0, 12.0, -6.0), (-24.0, 17.0, 30.0)),    # the west wall receding toward the entrance
+    ((8.0, 7.0, 24.0), (-20.0, 12.0, 56.0)),      # the south-west corner and the entrance wall
+]
+LOOP = 120.0
+
+
 def camera(s):
-    p, t = CAMERAS["nave"]
-    s.camera = {"mode": 1, "position": [float(v) for v in p.split(",")],
-                "target": [float(v) for v in t.split(",")], "fov": 40.0, "orbitSpeed": 0.0}
+    n = len(PROMENADE)
+    kp = [{"time": LOOP * i / n, "value": list(PROMENADE[i % n][0]), "interp": "smooth"} for i in range(n + 1)]
+    kt = [{"time": LOOP * i / n, "value": list(PROMENADE[i % n][1]), "interp": "smooth"} for i in range(n + 1)]
+    s.track("camera/position", kp, loop=LOOP)
+    s.track("camera/target", kt, loop=LOOP)
+    s.camera = {"mode": 1, "position": list(PROMENADE[0][0]), "target": list(PROMENADE[0][1]), "fov": 40.0,
+                "orbitSpeed": 0.0}
     s.params_({"camera/lens/focalLength": 24.0, "post/bloom/intensity": 0.28, "post/output/vignette": 0.3,
                "post/grade/contrast": 1.08, "post/look/atmospheric": 0.12, "post/look/atmosphericDistance": 140.0,
                "post/look/atmosphericTint": C("environment", 2.0)})
@@ -409,20 +494,33 @@ def camera(s):
 
 
 # ================================================================================================ build
-def build(autonomous=True):
+def build(autonomous=False):
     s = common.Scene(SID, TITLE, {"category": "experiment", "experiment": "A coupled oscillators",
                                   "thesis": "A hall whose four walls are one kinetic installation: eight thousand "
                                             "metal blades, each swung by its own oscillator, falling into step and "
                                             "breaking apart round the room."})
     s.binds = []
-    network(s)
+    net = network(s)
     walls(s)
     room(s)
     light(s)
     camera(s)
-    s.response = dict(common.RESPONSE)
+    if autonomous:
+        s.response = dict(common.RESPONSE)
+    else:
+        music(s, net)
     s.palette = palette_block(s)
     return s
+
+
+def register(s):
+    """The Examples > Live > Experiments entry (live: the project carries sonic.live and no audio file)."""
+    cc = common.describe_ccs(MIDI_CC, "note 36 holds a pacemaker on the end wall")
+    text = ("Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". " + s.design["thesis"] +
+            " Held sound pulls the hall into unison, kicks launch fronts from the end wall that run round both "
+            "corners, a build turns the lag; eight palettes take turns at phrase boundaries (or on a big change in the "
+            "music when there is no tempo). See docs/prototypes/phase-wall/.")
+    common.index_entry(s.title, "experiments/%s/%s.json" % (SID, SID), text, live=True)
 
 
 def write_variant(pp, out, wav=None, cam=None, sets=(), tracks=(), palette=None):
@@ -451,14 +549,17 @@ def main():
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--track", action="append", default=[])
     ap.add_argument("--palette", type=int)
+    ap.add_argument("--autonomous", action="store_true", help="no audio fields or routes (review harness)")
     a = ap.parse_args()
-    s = build()
+    s = build(a.autonomous)
     pp, sp = s.write(OUT)
     nf = sum(1 for n in s.nodes if n["kind"] == "field")
     blades = sum(n["procedural"]["distribution"]["gridCount"][0] * n["procedural"]["distribution"]["gridCount"][1]
                  for n in s.nodes if n["name"].startswith("blades_"))
     assert nf <= 16, "%d GPU fields (16 at most)" % nf
     print(pp, "fields=%d blades=%d grid=%s" % (nf, blades, s.grids[0]["resolution"]))
+    if not a.variant and not a.autonomous:
+        register(s)
     if a.variant:
         print(write_variant(pp, a.out, a.wav, a.camera, a.set, a.track, a.palette))
 

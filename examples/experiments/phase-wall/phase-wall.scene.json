@@ -10,9 +10,9 @@
    42.0
   ],
   "target": [
-   17.0,
+   24.0,
    13.0,
-   -30.0
+   4.0
   ],
   "fov": 40.0,
   "orbitSpeed": 0.0
@@ -137,7 +137,7 @@
     0.0
    ],
    "field": {
-    "strength": 0.02,
+    "strength": 0.006,
     "falloff": {
      "kind": "none"
     },
@@ -1550,6 +1550,142 @@
     0.005,
     0.0
    ]
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "low",
+    "audioSpeed": 14.0,
+    "onsetWidth": 3.5,
+    "onsetDecay": 0.9,
+    "point": [
+     -24.0,
+     0.0,
+     -6.0
+    ],
+    "waveGeometry": "spherical"
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "mid",
+    "audioSpeed": 22.0,
+    "onsetWidth": 2.0,
+    "onsetDecay": 1.6,
+    "point": [
+     64.0,
+     0.0,
+     5.0
+    ],
+    "waveGeometry": "spherical"
+   }
+  },
+  {
+   "name": "kicks",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "kickFront",
+     "snareFront"
+    ]
+   }
+  },
+  {
+   "name": "pace",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -34.0,
+     0.0,
+     3.0
+    ],
+    "kind": "radial",
+    "radius": 6.0
+   }
+  },
+  {
+   "name": "tune",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "tilt",
+     "pace"
+    ]
+   }
   }
  ],
  "lights": [
@@ -1886,11 +2022,17 @@
      "dst": 2,
      "srcA": 4,
      "constant": [
+      0.2,
       0.5,
-      1.9,
       0.0,
       0.0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
     },
     {
      "kind": "constant",
@@ -1909,12 +2051,28 @@
      "srcB": 6
     },
     {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
      "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
-      1.6,
-      3.2,
+      0.5,
+      1.4,
       0.0,
       0.0
      ]
@@ -2181,11 +2339,17 @@
      "dst": 2,
      "srcA": 4,
      "constant": [
+      0.2,
       0.5,
-      1.9,
       0.0,
       0.0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
     },
     {
      "kind": "constant",
@@ -2204,12 +2368,28 @@
      "srcB": 6
     },
     {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
      "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
-      1.6,
-      3.2,
+      0.5,
+      1.4,
       0.0,
       0.0
      ]
@@ -2476,11 +2656,17 @@
      "dst": 2,
      "srcA": 4,
      "constant": [
+      0.2,
       0.5,
-      1.9,
       0.0,
       0.0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
     },
     {
      "kind": "constant",
@@ -2499,12 +2685,28 @@
      "srcB": 6
     },
     {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
      "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
-      1.6,
-      3.2,
+      0.5,
+      1.4,
       0.0,
       0.0
      ]
@@ -2771,11 +2973,17 @@
      "dst": 2,
      "srcA": 4,
      "constant": [
+      0.2,
       0.5,
-      1.9,
       0.0,
       0.0
      ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
     },
     {
      "kind": "constant",
@@ -2794,12 +3002,28 @@
      "srcB": 6
     },
     {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
      "kind": "smoothstep",
      "dst": 4,
      "srcA": 4,
      "constant": [
-      1.6,
-      3.2,
+      0.5,
+      1.4,
       0.0,
       0.0
      ]
@@ -3253,9 +3477,9 @@
    "mode": "oscillator",
    "wrap": "wrap",
    "resolution": [
-    293,
+    220,
     1,
-    25
+    19
    ],
    "boundsMin": [
     -176.0,
@@ -3278,9 +3502,9 @@
    "coupling": 4.0,
    "phaseLag": 0.3,
    "couplingRadius": 3,
-   "spread": 0.28,
+   "spread": 0.17,
    "seedAmount": 1.0,
-   "noise": 0.05
+   "noise": 0.02
   }
  ]
 }

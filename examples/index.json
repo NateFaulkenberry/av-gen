@@ -698,6 +698,13 @@
       "live": true,
       "name": "Current Lines",
       "project": "experiments/flow-streams/flow-streams.json"
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 coupling, CC 2 complexity, CC 3 motion, CC 4 audio influence, CC 5 lag, CC 6 light, CC 9 palette, CC 10 palette lock, note 36 holds a pacemaker on the end wall. A hall whose four walls are one kinetic installation: eight thousand metal blades, each swung by its own oscillator, falling into step and breaking apart round the room. Held sound pulls the hall into unison, kicks launch fronts from the end wall that run round both corners, a build turns the lag; eight palettes take turns at phrase boundaries (or on a big change in the music when there is no tempo). See docs/prototypes/phase-wall/.",
+      "live": true,
+      "name": "Phase Hall",
+      "project": "experiments/phase-wall/phase-wall.json"
     }
   ]
 }
