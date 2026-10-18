@@ -216,7 +216,28 @@ def merge(*meshes):
 # ================================================================================================ files
 def write_example(s, out_dir):
     pp, sp = s.write(out_dir)
+    compact_initial(sp)
     return pp, sp
+
+
+def compact_initial(scene_path):
+    """Rewrites a scene file's grids' authored values (ADR-1282/1453) on one line each: indent=1 puts every number on
+    its own line, which more than doubles a large authored grid."""
+    with open(scene_path) as f:
+        doc = json.load(f)
+    blobs = {}
+    for i, g in enumerate(doc.get("grids", [])):
+        if "initial" in g:
+            key = "@@INITIAL%d@@" % i
+            blobs[key] = json.dumps(g["initial"], separators=(",", ":"))
+            g["initial"] = key
+    if not blobs:
+        return
+    text = json.dumps(doc, indent=1)
+    for key, blob in blobs.items():
+        text = text.replace('"%s"' % key, blob)
+    with open(scene_path, "w") as f:
+        f.write(text + "\n")
 
 
 def index_entry(name, project, description, live=True, hidden=False):
@@ -238,6 +259,12 @@ def variant(project, out, wav=None, camera=None, params=None, tracks=None):
         tl = doc.get("timeline", {})
         tl["tracks"] = [tr for tr in tl.get("tracks", []) if not tr["target"].startswith("camera/")]
     for k, v in (params or {}).items():
+        # the palette's own parameters are registered after a project's parameter values are read, so the selector's
+        # authored values go in its block (as Resonant Silk's variant does)
+        if k.startswith("palette/") and "selector" in doc.get("palette", {}):
+            key = k.split("/", 1)[1]
+            doc["palette"]["selector"][key] = bool(v) if key == "lock" else (int(v) if key == "select" else v)
+            continue
         doc["parameters"][k] = v
     base = os.path.dirname(os.path.abspath(project))
     doc["assets"]["scene"] = {"kind": "composition", "path": os.path.join(base, doc["assets"]["scene"]["path"])}

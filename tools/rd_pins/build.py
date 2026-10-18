@@ -55,6 +55,10 @@ PIN_H = 0.25           # a pin's rest height (m); the pattern scales it
 
 # ================================================================================================ regimes
 REGIMES = {"maze": (0.029, 0.057), "spots": (0.030, 0.062), "coral": (0.055, 0.062), "cells": (0.0367, 0.0649)}
+# the labyrinth family: coral, not maze. Maze and spots differ by kill only, and spots survive in maze territory, so
+# once the front had passed, the spots stayed and the frame went to one field of rings (measured over 96 s); coral
+# stripes invade spots, so the two families trade ground both ways as the front sweeps.
+LABYRINTH = os.environ.get("RP_LAB", "coral")
 DA, DB = 0.3, 0.15
 
 
@@ -93,13 +97,68 @@ def palette_states():
 
 
 # ================================================================================================ the pattern
+PREROLL = os.environ.get("RP_PREROLL", "1") != "0"
+
+
+def preroll(front_at, steps=3000, seed=17):
+    """The pattern the scene opens on (ADR-1453): the same Gray-Scott model (9-point plane stencil, D 0.3 / 0.15, unit
+    steps, wrap) run in numpy from seeded blobs under the regime at t = 0 (the front where its track starts; the pool
+    and fbm left out). About 3000 steps: what the live scene would show after ~4 s of its own growth past formation.
+    Deterministic in `seed`; written to 3 decimals (about 1.3 MB)."""
+    n = RES_RD
+    xs = (np.arange(n) + 0.5) / n * SIZE - SIZE / 2
+    X, Z = np.meshgrid(xs, xs)  # rows are z (k), columns x (i): the grid's storage order for a plane
+    ax = np.array([0.8, 0.0, 0.6])
+    d = (X - front_at[0]) * ax[0] + (Z - front_at[2]) * ax[2]
+    w = np.clip(d / 30.0 + 0.5, 0.0, 1.0)
+    fa, ka = REGIMES[LABYRINTH]
+    fb, kb = REGIMES["spots"]
+    F = fa + (fb - fa) * w
+    K = ka + (kb - ka) * w
+    rng = np.random.default_rng(seed)
+    A = np.ones((n, n))
+    B = np.zeros((n, n))
+    for _ in range(120):
+        i, k = rng.integers(0, n, 2)
+        A[np.ix_((np.arange(k - 6, k + 6)) % n, (np.arange(i - 6, i + 6)) % n)] = 0.5
+        B[np.ix_((np.arange(k - 6, k + 6)) % n, (np.arange(i - 6, i + 6)) % n)] = 0.25
+
+    def lap(x):
+        a = np.roll(x, 1, 0) + np.roll(x, -1, 0) + np.roll(x, 1, 1) + np.roll(x, -1, 1)
+        dg = (np.roll(np.roll(x, 1, 0), 1, 1) + np.roll(np.roll(x, 1, 0), -1, 1) + np.roll(np.roll(x, -1, 0), 1, 1)
+              + np.roll(np.roll(x, -1, 0), -1, 1))
+        return (4 * a + dg - 20 * x) / 6
+
+    for _ in range(steps):
+        r = A * B * B
+        A, B = (np.clip(A + (DA * lap(A) - r + F * (1 - A)), 0, 1),
+                np.clip(B + (DB * lap(B) + r - (K + F) * B), 0, 1))
+    return [round(float(v), 3) for v in np.stack([A, B], axis=-1).reshape(-1)]
+
+
 def pattern(s):
     """The RD plane and its regime map (baked once a frame, ADR-1407)."""
-    # the regime: a slow wandering pool of spots inside the labyrinth, its shore kept moving by a drifting fbm
-    s.field("pool", {"kind": "radial", "radius": 22.0, "strength": 0.9}, position=(6.0, 0.0, -6.0))
-    common.lissajous_track(s, "field/pool/position", (4.0, 0.0, -4.0), (14.0, 10.0), 110.0, ratio=(1, 2))
-    s.field("drift", {"kind": "noise", "frequency": 0.05, "speed": 0.1, "seed": 21, "strength": 0.7})
-    children = ["pool", "drift"]
+    # the regime (0 labyrinth .. 1 spots): the boundary between the two families is the interesting part, so it is
+    # designed to stay in frame and keep moving (coordinator, 2026-10-17):
+    #   front  a soft linear front (30 m wide) that sweeps back and forth across the bowl's middle over 96 s, so
+    #          labyrinth and spot territory trade places every phrase or two
+    #   pool   an island of spots orbiting through the labyrinth side (and of labyrinth through the spot side, where
+    #          it adds past 1 and clamps: it reads only on the labyrinth side)
+    #   drift  a slow fbm that keeps the front's line irregular
+    ax = (0.8, 0.0, 0.6)
+    s.field("front", {"kind": "linearGradient", "axis": list(ax), "length": 30.0, "strength": 1.0},
+            position=(0.0, 0.0, 0.0))
+    keys = []
+    for i in range(13):
+        t = 96.0 * i / 12
+        d = 20.0 * math.sin(2 * math.pi * t / 96.0) + 4.0 * math.sin(2 * math.pi * 3 * t / 96.0)
+        keys.append({"time": round(t, 3), "value": [round(-3.0 + d * ax[0], 3), 0.0, round(-6.0 + d * ax[2], 3)],
+                     "interp": "smooth"})
+    s.track("field/front/position", keys, loop=96.0)
+    s.field("pool", {"kind": "radial", "radius": 12.0, "strength": 0.7}, position=(0.0, 0.0, 0.0))
+    common.lissajous_track(s, "field/pool/position", (-2.0, 0.0, -4.0), (18.0, 14.0), 70.0, ratio=(1, 2))
+    s.field("drift", {"kind": "noise", "frequency": 0.06, "speed": 0.12, "seed": 21, "strength": 0.4})
+    children = ["front", "pool", "drift"]
     if KICK == "regime":
         # a kick's ring flips the regime it passes toward spots for as long as it lasts: spots spread in rings
         s.field("kickRegime", {"kind": "onset", "onsetSource": "low", "point": [0.0, 0.0, 0.0],
@@ -142,7 +201,7 @@ def pattern(s):
     if len(seeds) > 4:
         s.field("sources2", {"kind": "compound", "combine": "add", "children": seeds[4:]})
         s.field("sourcesAll", {"kind": "compound", "combine": "add", "children": ["sources", "sources2"]})
-    fa, ka = REGIMES["maze"]
+    fa, ka = REGIMES[LABYRINTH]
     fb, kb = REGIMES["spots"]
     s.grid(name="pattern", mode="reactionDiffusion", wrap="wrap", resolution=[RES_RD, 1, RES_RD],
            boundsMin=[-SIZE / 2, -2.0, -SIZE / 2], boundsMax=[SIZE / 2, 2.0, SIZE / 2],
@@ -150,6 +209,8 @@ def pattern(s):
            injectField="sourcesAll" if len(seeds) > 4 else "sources", injectRate=1.5,
            simRate=60.0, maxSubSteps=4, speed=60.0 * 12, iterations=12, seed=17, seedAmount=1.0,
            checkpointInterval=5.0)
+    if PREROLL:
+        s.grids[-1]["initial"] = preroll(keys[0]["value"])  # ADR-1453: open on a formed pattern
     s.grid_reader("vee", "pattern")
     # the bowl's height for the pins (an authored plane grid, ADR-1282/1452)
     n = 256
@@ -183,10 +244,9 @@ def pin_program():
     g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
     g.op(None, "multiply", 1, a=1, b=1)
     g.op(None, "multiply", 1, a=1, b=6)                                  # on the head
-    g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])
+    g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])  # palette: ring x ringGain
     g.op(None, "multiply", 1, a=1, b=2)                                  # r1 = emission
-    g.op("rough", "constant", 7, k=[P0["rough"]] * 3 + [1])
-    g.base, g.emit, g.rough = 4, 1, 7
+    g.base, g.emit, g.rough = 4, 1, -1                                   # roughness: the material's (palette)
     return g
 
 
@@ -233,11 +293,42 @@ def environment(s):
             castsShadow=False, contactShadow=False)
 
 
+def palette_block(g, gf):
+    """The project palette (ADR-1043) and its selector (ADR-1420), with the change fallback (ADR-1421). Roles land on
+    geometry and light: the pins' program, the floor's, the two lights, the sky and the material's finish."""
+    def op(prog, label):
+        return prog.path(label)
+    b = [
+        {"role": "environment", "target": "env/sky/zenithColor", "gain": 1.5},
+        {"role": "environment", "target": "env/sky/groundColor", "gain": 1.0},
+        {"role": "shadow", "target": "env/sky/horizonColor", "gain": 1.2},
+        {"role": "environment", "target": "scene/fogColor"},
+        {"role": "environment", "target": op(gf, "env"), "gain": 1.6},
+        {"role": "base", "target": op(gf, "tint")},
+        {"role": "ring", "target": op(gf, "glow"), "gain": 0.03},
+        {"role": "base", "target": op(g, "base")},
+        {"role": "pattern", "target": op(g, "pattern")},
+        {"role": "shadow", "target": op(g, "shadow")},
+        {"role": "ring", "target": op(g, "ring")},
+        {"role": "ringGain", "target": op(g, "ring"), "mode": "multiply"},
+        {"role": "key", "target": "lights/key/color"},
+        {"role": "rim", "target": "lights/rim/color"},
+        {"role": "keyI", "target": "lights/key/intensity"},
+        {"role": "rimI", "target": "lights/rim/intensity"},
+        {"role": "metal", "target": "procedural/pins/material/metallic"},
+        {"role": "rough", "target": "procedural/pins/material/roughness"},
+    ]
+    return {"states": palette_states(), "bindings": b, "position": 0.0, "saturation": 1.0, "value": 1.0,
+            "selector": {"select": START_PALETTE, "transition": 6.0, "lock": False, "hold": 40.0,
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY,
+                                     "change": CHANGE}}}
+
+
 def build():
     s = common.Scene(ID, TITLE, DESIGN)
     pattern(s)
     g = pin_program()
-    s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
+    s.program(g.doc(base=g.base, emission=g.emit))
     s.pin_program = g
     sp = SIZE / N_PINS
     if PIN == "round":
@@ -252,7 +343,7 @@ def build():
                                  "axis": [0.0, 1.0, 0.0]},
                                 {"field": "vee", "op": "scale", "blend": "add", "strength": 6.0,
                                  "scaleAxis": [0.0, 1.0, 0.0]}]})
-    gf = floor_program()
+    s.floor_program = gf = floor_program()
     s.program(gf.doc(base=gf.base, emission=gf.emit))
     pos, nrm, uv, idx = common.bowl_mesh(BOWL_R * 1.45, BOWL_H * 1.45 ** BOWL_P, 160, 240, power=BOWL_P)
     common.write_glb(os.path.join(OUT, "meshes", "rp-bowl.glb"), pos, nrm, uv, idx, "bowl")
@@ -262,6 +353,7 @@ def build():
     if not FLOOR:
         s.nodes[-1]["procedural"]["material"].pop("program")
     environment(s)
+    s.palette = palette_block(g, gf)
     # on the rim, looking across and down: the far wall rises above the eye line, so the frame is all pins
     s.camera = {"mode": 1, "position": [10.0, 31.0, 31.0], "target": [-1.0, 0.0, -5.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
@@ -283,7 +375,7 @@ def main():
     ap.add_argument("--track", action="append", default=[])
     a = ap.parse_args()
     s = build()
-    pp, sp = s.write(OUT)
+    pp, sp = common.write_example(s, OUT)
     print(pp)
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}

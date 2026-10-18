@@ -140,233 +140,360 @@
   "cues": [],
   "tracks": [
    {
+    "target": "field/front/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -3.0,
+       0.0,
+       -6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.0,
+      "value": [
+       8.2,
+       0.0,
+       2.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       10.856,
+       0.0,
+       4.392
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.0,
+      "value": [
+       9.8,
+       0.0,
+       3.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0,
+      "value": [
+       10.856,
+       0.0,
+       4.392
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       8.2,
+       0.0,
+       2.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.0,
+      "value": [
+       -3.0,
+       0.0,
+       -6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       -14.2,
+       0.0,
+       -14.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.0,
+      "value": [
+       -16.856,
+       0.0,
+       -16.392
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 72.0,
+      "value": [
+       -15.8,
+       0.0,
+       -15.6
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       -16.856,
+       0.0,
+       -16.392
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 88.0,
+      "value": [
+       -14.2,
+       0.0,
+       -14.4
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       -3.0,
+       0.0,
+       -6.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
     "target": "field/pool/position",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
     "mode": "replace",
-    "loopLength": 110.0,
+    "loopLength": 70.0,
     "keys": [
      {
       "time": 0.0,
       "value": [
-       4.0,
+       -2.0,
        0.0,
        -4.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 4.5833,
+      "time": 2.9167,
       "value": [
-       7.6235,
+       2.6587,
        0.0,
-       -9.0
+       -11.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 9.1667,
+      "time": 5.8333,
       "value": [
-       11.0,
+       7.0,
        0.0,
-       -12.6603
+       -16.1244
       ],
       "interp": "smooth"
      },
      {
-      "time": 13.75,
+      "time": 8.75,
       "value": [
-       13.8995,
+       10.7279,
        0.0,
-       -14.0
+       -18.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 18.3333,
+      "time": 11.6667,
       "value": [
-       16.1244,
+       13.5885,
        0.0,
-       -12.6603
+       -16.1244
       ],
       "interp": "smooth"
      },
      {
-      "time": 22.9167,
+      "time": 14.5833,
       "value": [
-       17.523,
+       15.3867,
        0.0,
-       -9.0
+       -11.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 27.5,
+      "time": 17.5,
       "value": [
-       18.0,
+       16.0,
        0.0,
        -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.4167,
+      "value": [
+       15.3867,
+       0.0,
+       3.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 23.3333,
+      "value": [
+       13.5885,
+       0.0,
+       8.1244
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 26.25,
+      "value": [
+       10.7279,
+       0.0,
+       10.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 29.1667,
+      "value": [
+       7.0,
+       0.0,
+       8.1244
       ],
       "interp": "smooth"
      },
      {
       "time": 32.0833,
       "value": [
-       17.523,
+       2.6587,
        0.0,
-       1.0
+       3.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 36.6667,
+      "time": 35.0,
       "value": [
-       16.1244,
-       0.0,
-       4.6603
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 41.25,
-      "value": [
-       13.8995,
-       0.0,
-       6.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 45.8333,
-      "value": [
-       11.0,
-       0.0,
-       4.6603
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 50.4167,
-      "value": [
-       7.6235,
-       0.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 55.0,
-      "value": [
-       4.0,
+       -2.0,
        0.0,
        -4.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 59.5833,
+      "time": 37.9167,
       "value": [
-       0.3765,
+       -6.6587,
        0.0,
-       -9.0
+       -11.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.8333,
+      "value": [
+       -11.0,
+       0.0,
+       -16.1244
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.75,
+      "value": [
+       -14.7279,
+       0.0,
+       -18.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.6667,
+      "value": [
+       -17.5885,
+       0.0,
+       -16.1244
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 49.5833,
+      "value": [
+       -19.3867,
+       0.0,
+       -11.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.5,
+      "value": [
+       -20.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.4167,
+      "value": [
+       -19.3867,
+       0.0,
+       3.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 58.3333,
+      "value": [
+       -17.5885,
+       0.0,
+       8.1244
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.25,
+      "value": [
+       -14.7279,
+       0.0,
+       10.0
       ],
       "interp": "smooth"
      },
      {
       "time": 64.1667,
       "value": [
-       -3.0,
+       -11.0,
        0.0,
-       -12.6603
+       8.1244
       ],
       "interp": "smooth"
      },
      {
-      "time": 68.75,
+      "time": 67.0833,
       "value": [
-       -5.8995,
+       -6.6587,
        0.0,
-       -14.0
+       3.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 73.3333,
+      "time": 70.0,
       "value": [
-       -8.1244,
-       0.0,
-       -12.6603
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 77.9167,
-      "value": [
-       -9.523,
-       0.0,
-       -9.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 82.5,
-      "value": [
-       -10.0,
-       0.0,
-       -4.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 87.0833,
-      "value": [
-       -9.523,
-       0.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 91.6667,
-      "value": [
-       -8.1244,
-       0.0,
-       4.6603
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 96.25,
-      "value": [
-       -5.8995,
-       0.0,
-       6.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 100.8333,
-      "value": [
-       -3.0,
-       0.0,
-       4.6603
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 105.4167,
-      "value": [
-       0.3765,
-       0.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 110.0,
-      "value": [
-       4.0,
+       -2.0,
        0.0,
        -4.0
       ],
@@ -806,5 +933,405 @@
   "experiment": "C reaction-diffusion (production)",
   "id": "rd-pins",
   "title": "RD Pins"
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "Copper Night",
+    "colors": {
+     "environment": [
+      0.02732,
+      0.00439,
+      0.00802
+     ],
+     "shadow": [
+      0.05448,
+      0.007,
+      0.01161
+     ],
+     "base": [
+      0.10224,
+      0.01764,
+      0.01444
+     ],
+     "pattern": [
+      0.19462,
+      0.04231,
+      0.01444
+     ],
+     "ring": [
+      1.0,
+      0.32314,
+      0.05127
+     ],
+     "key": [
+      1.0,
+      0.76052,
+      0.55201
+     ],
+     "rim": [
+      0.19462,
+      0.07227,
+      1.0
+     ]
+    },
+    "scalars": {
+     "metal": 0.55,
+     "rough": 0.3,
+     "ringGain": 2.4,
+     "keyI": 5.0,
+     "rimI": 1.6
+    }
+   },
+   {
+    "name": "Verdigris Reef",
+    "colors": {
+     "environment": [
+      0.00091,
+      0.01938,
+      0.02315
+     ],
+     "shadow": [
+      0.00152,
+      0.03689,
+      0.04231
+     ],
+     "base": [
+      0.00304,
+      0.06848,
+      0.0648
+     ],
+     "pattern": [
+      0.00802,
+      0.19462,
+      0.14413
+     ],
+     "ring": [
+      0.26636,
+      1.0,
+      0.7454
+     ],
+     "key": [
+      0.77582,
+      1.0,
+      0.92158
+     ],
+     "rim": [
+      1.0,
+      0.14413,
+      0.25415
+     ]
+    },
+    "scalars": {
+     "metal": 0.45,
+     "rough": 0.34,
+     "ringGain": 2.0,
+     "keyI": 4.6,
+     "rimI": 1.8
+    }
+   },
+   {
+    "name": "Garnet and Indigo",
+    "colors": {
+     "environment": [
+      0.00518,
+      0.00304,
+      0.05127
+     ],
+     "shadow": [
+      0.00913,
+      0.00439,
+      0.09759
+     ],
+     "base": [
+      0.01764,
+      0.00605,
+      0.19462
+     ],
+     "pattern": [
+      0.25415,
+      0.00605,
+      0.03434
+     ],
+     "ring": [
+      1.0,
+      0.06848,
+      0.14413
+     ],
+     "key": [
+      1.0,
+      0.68669,
+      0.77582
+     ],
+     "rim": [
+      0.04231,
+      0.20156,
+      1.0
+     ]
+    },
+    "scalars": {
+     "metal": 0.5,
+     "rough": 0.3,
+     "ringGain": 2.2,
+     "keyI": 4.4,
+     "rimI": 2.0
+    }
+   },
+   {
+    "name": "Violet and Gold",
+    "colors": {
+     "environment": [
+      0.016,
+      0.00243,
+      0.04519
+     ],
+     "shadow": [
+      0.02956,
+      0.00368,
+      0.09306
+     ],
+     "base": [
+      0.04817,
+      0.00802,
+      0.16827
+     ],
+     "pattern": [
+      0.14413,
+      0.02732,
+      0.35153
+     ],
+     "ring": [
+      1.0,
+      0.63076,
+      0.11697
+     ],
+     "key": [
+      0.92158,
+      0.8388,
+      1.0
+     ],
+     "rim": [
+      1.0,
+      0.43415,
+      0.05127
+     ]
+    },
+    "scalars": {
+     "metal": 0.6,
+     "rough": 0.28,
+     "ringGain": 2.0,
+     "keyI": 4.2,
+     "rimI": 1.6
+    }
+   },
+   {
+    "name": "Electric Lagoon",
+    "colors": {
+     "environment": [
+      0.00061,
+      0.01161,
+      0.03955
+     ],
+     "shadow": [
+      0.00091,
+      0.02956,
+      0.07619
+     ],
+     "base": [
+      0.00121,
+      0.05781,
+      0.16203
+     ],
+     "pattern": [
+      0.00304,
+      0.14413,
+      0.39157
+     ],
+     "ring": [
+      0.80695,
+      1.0,
+      0.10224
+     ],
+     "key": [
+      0.7913,
+      0.92158,
+      1.0
+     ],
+     "rim": [
+      1.0,
+      0.04231,
+      0.63076
+     ]
+    },
+    "scalars": {
+     "metal": 0.4,
+     "rough": 0.32,
+     "ringGain": 2.2,
+     "keyI": 4.6,
+     "rimI": 2.0
+    }
+   },
+   {
+    "name": "Rose Quartz",
+    "colors": {
+     "environment": [
+      0.03434,
+      0.00518,
+      0.01764
+     ],
+     "shadow": [
+      0.06848,
+      0.01033,
+      0.03689
+     ],
+     "base": [
+      0.11193,
+      0.01764,
+      0.06125
+     ],
+     "pattern": [
+      0.43415,
+      0.09759,
+      0.19462
+     ],
+     "ring": [
+      1.0,
+      0.87137,
+      0.57758
+     ],
+     "key": [
+      1.0,
+      0.87137,
+      0.90466
+     ],
+     "rim": [
+      0.10224,
+      0.57758,
+      1.0
+     ]
+    },
+    "scalars": {
+     "metal": 0.3,
+     "rough": 0.4,
+     "ringGain": 1.8,
+     "keyI": 4.8,
+     "rimI": 1.8
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "environment",
+    "target": "env/sky/zenithColor",
+    "gain": 1.5
+   },
+   {
+    "role": "environment",
+    "target": "env/sky/groundColor",
+    "gain": 1.0
+   },
+   {
+    "role": "shadow",
+    "target": "env/sky/horizonColor",
+    "gain": 1.2
+   },
+   {
+    "role": "environment",
+    "target": "scene/fogColor"
+   },
+   {
+    "role": "environment",
+    "target": "material/rpFloor/op/3/constant/constant",
+    "gain": 1.6
+   },
+   {
+    "role": "base",
+    "target": "material/rpFloor/op/4/constant/constant"
+   },
+   {
+    "role": "ring",
+    "target": "material/rpFloor/op/6/constant/constant",
+    "gain": 0.03
+   },
+   {
+    "role": "base",
+    "target": "material/rpPin/op/3/constant/constant"
+   },
+   {
+    "role": "pattern",
+    "target": "material/rpPin/op/4/constant/constant"
+   },
+   {
+    "role": "shadow",
+    "target": "material/rpPin/op/9/constant/constant"
+   },
+   {
+    "role": "ring",
+    "target": "material/rpPin/op/16/constant/constant"
+   },
+   {
+    "role": "ringGain",
+    "target": "material/rpPin/op/16/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "key",
+    "target": "lights/key/color"
+   },
+   {
+    "role": "rim",
+    "target": "lights/rim/color"
+   },
+   {
+    "role": "keyI",
+    "target": "lights/key/intensity"
+   },
+   {
+    "role": "rimI",
+    "target": "lights/rim/intensity"
+   },
+   {
+    "role": "metal",
+    "target": "procedural/pins/material/metallic"
+   },
+   {
+    "role": "rough",
+    "target": "procedural/pins/material/roughness"
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0,
+  "selector": {
+   "select": 0,
+   "transition": 6.0,
+   "lock": false,
+   "hold": 40.0,
+   "advance": {
+    "signal": "beat.phrasePulse",
+    "threshold": 0.5,
+    "order": [
+     0,
+     4,
+     3,
+     1,
+     5,
+     2
+    ],
+    "change": {
+     "signals": [
+      "sonic.energy",
+      "sonic.brightness",
+      "sonic.density"
+     ],
+     "fast": 3.0,
+     "slow": 24.0,
+     "threshold": 0.06,
+     "rearm": 0.03,
+     "primaryTimeout": 30.0,
+     "maxHold": 90.0
+    }
+   }
+  }
  }
 }
