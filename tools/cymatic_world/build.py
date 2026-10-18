@@ -68,34 +68,42 @@ def _ring(r, n=24, level=0.0, jitter=0.0, seed=1):
     return pts
 
 
+# the overhaul (stage A review): the oblique camera frames the floor out to ~90 m, and the terraces, gullies and
+# outcrops there read as lumpy blobs competing with the figure -- the amphitheatre is widened by BASIN (the floor a
+# clean plate to ~95 m, the terraces and rim behind it as the frame's middle distance) and the floor's outcrops go
+BASIN = float(os.environ.get("CW_BASIN", "1.35"))
+
+
 def _features():
     f = []
     # an amphitheatre of terraces stepping down to the floor: each a flat ring at its own level, irregular so the
     # steps read as worn stone, not a stadium
-    for k, (r, level, width) in enumerate([(0.0, -7.0, 72.0), (52.0, -2.5, 12.0), (68.0, 2.0, 10.0), (84.0, 7.0, 10.0)]):
+    for k, (r, level, width) in enumerate([(0.0, -7.0, 72.0 * BASIN), (52.0 * BASIN, -2.5, 12.0), (68.0 * BASIN, 2.0, 10.0),
+                                           (84.0 * BASIN, 7.0, 10.0)]):
         path = [[0.0, level, 0.0]] if r == 0.0 else _ring(r, 28, level, 0.06, k)
         f.append({"name": "terrace%d" % k, "kind": "flat", "path": path, "width": width, "amplitude": 0.0,
                   "falloff": 2.2 if r == 0.0 else 1.6, "flatten": 0.97 if r == 0.0 else 0.85,
                   "roughness": 0.05 if r == 0.0 else 0.2, "smoothing": 2 if r else 0})
     # the rim: a broken ring of ridges 105 m out, high behind the basin and low toward the camera's gap
-    f.append({"name": "rim", "kind": "ridge", "path": _ring(105.0, 30, 0.0, 0.08, 4), "width": 30.0,
+    f.append({"name": "rim", "kind": "ridge", "path": _ring(105.0 * BASIN, 30, 0.0, 0.08, 4), "width": 30.0,
               "amplitude": 16.0, "falloff": 1.4, "flatten": 0.0, "roughness": 1.4, "smoothing": 2})
-    f.append({"name": "rimBack", "kind": "ridge", "path": [[-90.0, 0.0, -80.0], [-20.0, 0.0, -125.0], [70.0, 0.0, -95.0]],
+    f.append({"name": "rimBack", "kind": "ridge", "path": [[-90.0 * BASIN, 0.0, -80.0 * BASIN], [-20.0 * BASIN, 0.0, -125.0 * BASIN],
+                                                      [70.0 * BASIN, 0.0, -95.0 * BASIN]],
               "width": 36.0, "amplitude": 18.0, "falloff": 1.1, "flatten": 0.0, "roughness": 1.8, "smoothing": 3})
     # radial gullies cut through the terraces (folds that break the rings)
     for k, a in enumerate([0.9, 2.3, 3.6, 4.4, 5.6]):
         d = (math.cos(a), math.sin(a))
         f.append({"name": "gully%d" % k, "kind": "valley",
-                  "path": [[d[0] * 38.0, 0.0, d[1] * 38.0], [d[0] * 80.0, 0.0, d[1] * 80.0],
-                           [d[0] * 125.0, 0.0, d[1] * 125.0]],
+                  "path": [[d[0] * 38.0 * BASIN, 0.0, d[1] * 38.0 * BASIN], [d[0] * 80.0 * BASIN, 0.0, d[1] * 80.0 * BASIN],
+                           [d[0] * 125.0 * BASIN, 0.0, d[1] * 125.0 * BASIN]],
                   "width": 9.0 + 2.0 * k % 5, "amplitude": 4.5, "falloff": 1.3, "flatten": 0.0, "roughness": 0.8,
                   "smoothing": 2})
     # outcrops on the floor: low basalt shoulders the figure has to flow around
-    for k, (x, z, h) in enumerate([(-24.0, -30.0, 3.0), (33.0, -14.0, 2.5)]):
+    for k, (x, z, h) in enumerate([] if BASIN > 1.0 else [(-24.0, -30.0, 3.0), (33.0, -14.0, 2.5)]):
         f.append({"name": "outcrop%d" % k, "kind": "ridge", "path": [[x, 0.0, z]], "width": 9.0, "amplitude": h,
                   "falloff": 1.8, "flatten": 0.0, "roughness": 2.0, "smoothing": 0})
     # the gap in the rim toward the camera (+z): the way in, and a long view out
-    f.append({"name": "gap", "kind": "valley", "path": [[0.0, 0.0, 70.0], [6.0, 0.0, 115.0], [18.0, 0.0, 170.0]],
+    f.append({"name": "gap", "kind": "valley", "path": [[0.0, 0.0, 70.0 * BASIN], [6.0, 0.0, 115.0 * BASIN], [18.0, 0.0, 170.0 * BASIN]],
               "width": 34.0, "amplitude": 12.0, "falloff": 0.9, "flatten": 0.0, "roughness": 0.6, "smoothing": 2})
     # the plateau beyond the rim breaks into a ring of mountains 500-1100 m out: layered silhouettes, every direction
     f.append({"name": "rangeNear", "kind": "ridge", "path": _ring(520.0, 18, 0.0, 0.18, 7), "width": 200.0,
@@ -416,10 +424,21 @@ def resonator(s, sources, name=None, **over):
                               "resonance": res}})
 
 
+# the figure's extent (the overhaul, stage A review): the relief and its shading fade out between FIGURE_INNER and
+# FIGURE_OUTER metres from the basin's middle, so the far ground the oblique camera sees at a grazing angle -- in cells
+# too coarse to carry a ridge -- holds the plain basin, not a serrated figure (a normalised sand ridge ignores a
+# source's reach, so the fade has to be the reader's)
+FIGURE_INNER = float(os.environ.get("CW_FIG_INNER", "55"))
+FIGURE_OUTER = float(os.environ.get("CW_FIG_OUTER", "95"))
+FIGURE_FALLOFF = {"kind": "smoothstep", "inner": FIGURE_INNER, "outer": FIGURE_OUTER}
+
+
 def reader(s, name, channel, extra=None, frame=None, ref=None):
     r = {"channel": channel}
     r.update(extra or {})
-    f = {"kind": "resonance", "reference": ref or FIELD, "strength": 1.0, "falloff": {"kind": "none"}, "resonance": r}
+    faded = name.startswith("relief-") or name.startswith("shade-")
+    f = {"kind": "resonance", "reference": ref or FIELD, "strength": 1.0,
+         "falloff": dict(FIGURE_FALLOFF) if faded else {"kind": "none"}, "resonance": r}
     f.update(frame or {})
     s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0], "field": f})
 
@@ -440,6 +459,9 @@ LAMBDA_MAX = float(os.environ.get("CW_LAMBDA_MAX", "26.0"))
 # base amplitude, its LFO (name, period s, phase) and the LFO's reach
 PLATES = [[3, 2], [5, 1], [4, 3], [6, 1], [5, 2]]
 FAM_BASE = [0.35, 0.0, 0.0, 0.0]
+# the families' reach (m): the figure fills the basin floor and calms toward the walls, where the oblique camera sees
+# the ground at a grazing angle in cells too coarse to carry it (the far teeth of stage A) -- the air takes over there
+FAM_REACH = float(os.environ.get("CW_FAM_REACH", "62"))
 FAM_GAIN = [0.85, 0.9, 0.8, 0.9]
 FAM_ONLY = os.environ.get("CW_FAM_ONLY")   # look development: one family alone at full amplitude, no director
 if FAM_ONLY is not None:
@@ -471,13 +493,16 @@ BAKE_HALF = float(os.environ.get("CW_BAKE_HALF", "130"))   # metres (86 before t
 CAMERAS = {"A": (30.0, 32.0, 30.0), "B": (36.0, 42.0, 28.0), "C": (40.0, 48.0, 26.0),
            # the overhaul's C2: an oblique view, ~30 degrees down, the plate in the lower two thirds and the basin's
            # walls, the ranges and the sky above (05-plan §1.1)
-           "D": (80.0, 34.0, 24.0)}
+           "D": (78.0, 44.0, 26.0)}
 CAMERA = CAMERAS[os.environ.get("CW_CAM", "D")]
 PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
-LARGE_SHARP = float(os.environ.get("CW_LARGE_SHARP", "0.9"))
+LARGE_SHARP = float(os.environ.get("CW_LARGE_SHARP", "0.45"))
 # how deep the antinodes sink under the large figure (-1.2 before the overhaul: a field of deep pits that hid the
 # nodal network; shallower basins let the plate's crossing lines read as the figure)
-LARGE_CREASE = float(os.environ.get("CW_LARGE_CREASE", "-0.6"))
+LARGE_CREASE = float(os.environ.get("CW_LARGE_CREASE", "0.0"))
+GEOM_RIPPLES = os.environ.get("CW_GEOM_RIPPLES", "0") == "1"
+LARGE_FIGURE = float(os.environ.get("CW_LARGE_FIGURE", "0.15"))   # the signed lobes (domes and dips), per unit relief
+LARGE_HEIGHT = float(os.environ.get("CW_LARGE_HEIGHT", "1.5"))    # metres per unit (2.8 before)
 LARGE_ROUND = float(os.environ.get("CW_LARGE_ROUND", "0.4"))
 MEDIUM_ROUND = float(os.environ.get("CW_MEDIUM_ROUND", "0.5"))
 SHAPES = {
@@ -490,10 +515,13 @@ SHAPES = {
     # loudness (normalised sand, ADR-1405) so the quiet state has a deliberate form; the antinodes sink into deep
     # basins with the excitation (-1.2 |F|, crease rounded half as much -- the square grid carries it); the medium net
     # at about half its height so the large lobes, rings and petals lead
+    # (the overhaul, stage A review: the families' signatures must read in grey -- the nodal lines as THIN ridges over
+    # broad, shallow, signed lobes, the Chladni plate's look, instead of 2.8 m walls between pits: a lower, narrower
+    # sand line, the figure's own sign as gentle domes and dips, and no antinode pits)
     "P2": {"large": ({"reliefSand": 1.0, "sandNormalized": True, "sharpness": LARGE_SHARP, "reliefAmplitude": LARGE_CREASE,
-                     "reliefRound": LARGE_ROUND, "reliefVibration": 0.25}, 2.8),
-           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": MEDIUM_ROUND}, 0.45),
-           "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
+                     "reliefRound": LARGE_ROUND, "reliefFigure": LARGE_FIGURE, "reliefVibration": 0.15}, LARGE_HEIGHT),
+           "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": 0.0, "reliefRound": MEDIUM_ROUND}, 0.22),
+           "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.15)},
     "P3": {"large": ({"reliefSand": 0.55, "sharpness": 0.7, "reliefFigure": 0.8, "reliefVibration": 0.25}, 3.2),
            "medium": ({"reliefSand": 1.0, "sharpness": 0.45, "reliefAmplitude": -0.3}, 1.2),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
@@ -557,6 +585,10 @@ def ground_readers(s):
         r = {"sharpness": 0.9, "reliefLine": 0.0, "reliefLineSharpness": 0.5, "reliefVibration": 0.0,
              "listenLow": lo, "listenHigh": hi, "listenWidth": 0.04 if only_mode is None else 0.005}
         r.update(extra)
+        if name == "large" and not GEOM_RIPPLES:
+            # (the overhaul, stage A: the onset ripples' rings drew concentric circles over EVERY family, so a plate
+            # or a hex figure read as radial; the rings now live in the light -- the travelling light -- not the relief)
+            r["rows"] = "modes"
         reader(s, "relief-" + name, "relief", r, frame={"strength": amount} if BAKE else None,
                ref=FIELD if name == "large" else FIELD_FINE)
         layers.append(("relief-" + name, amount))
@@ -805,7 +837,7 @@ RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "0.1"))
 CREST_POWER = float(os.environ.get("CW_CREST_POWER", "7"))
 # where the hollow glow starts and saturates in the excitation (the overhaul's four families ring harder: 0.3..1.0 lit
 # every hollow)
-HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "0.8,2.0").split(",")]
+HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "1.4,3.2").split(",")]
 TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "0.9"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
 BAND_RATE = float(os.environ.get("CW_BAND_RATE", "1.6"))   # the band's phase, metres a second per unit of the integral
 FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.35"))
@@ -1014,7 +1046,7 @@ def environment(s):
         "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
         # the overhaul's air (05-plan §1.1): a thin coloured fog (palette-bound below), so the far plate, the basin's
         # walls and the ranges dissolve into the sky's colour -- distance, not a void
-        "volumeDensity": FOG_DENSITY, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
+        "volumeMaxDistance": 0.0, "volumeDensity": FOG_DENSITY, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
         "shadowRange": 180.0,
         # ADR-1406: the ground is unlit and painted -- screen-space AO and contact shadows add nothing to it and cost the
         # depth prepass (every deformer re-run per vertex for a second pass)
@@ -1025,7 +1057,7 @@ def environment(s):
         "depthPrepass": os.environ.get("CW_PREPASS", "0") == "1",
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
                 "groundColor": C("fog"), "haze": 0.45, "sunIntensity": SUN_GLOW, "intensity": 1.0,
-                "sunSize": 0.02, "sunGlow": 0.6, "sunDirection": [-0.55, 0.12, -0.83],
+                "sunSize": 0.015, "sunGlow": 0.16, "sunDirection": [-0.55, 0.12, -0.83],
                 "background": True, "useKeyLight": False},
     }
     # the ground is unlit: its key, fill, sky and rim are painted in its program (ground_program). One authored light,
@@ -1142,14 +1174,14 @@ def build_world():
         # P, the hero: square-plate figures (ADR-1471) -- Chladni networks of crossing curves, loops and lobes; the focus
         # sweeps its (n, m) list, so neighbouring figures crossfade into compound, asymmetric ones
         {"kind": "plate", "position": [6.0, 0.0, -6.0], "plates": PLATES, "bandLow": 0.0, "bandHigh": 0.135,
-         "reach": 85.0, "gain": 1.0, "amplitude": FAM_BASE[0], "breath": 0.35, "drift": 8.0, "driftPeriod": 110.0,
+         "reach": FAM_REACH, "gain": 1.0, "amplitude": FAM_BASE[0], "breath": 0.35, "drift": 8.0, "driftPeriod": 110.0,
          "spin": 0.008, "focus": 0.065, "focusWidth": 0.035, "focusSweep": 0.065, "focusPeriod": 53.0, "focusFloor": 0.0},
         # H, hexagonal cells: three plane waves (a lattice of order 3), its own orientation and turn
         {"kind": "lattice", "position": [-10.0, 0.0, 8.0], "order": 3, "orders": [3], "bandLow": 0.15, "bandHigh": 0.2,
-         "reach": 75.0, "gain": 1.0, "amplitude": FAM_BASE[1], "breath": 0.4, "drift": 6.0, "driftPeriod": 90.0,
+         "reach": FAM_REACH, "gain": 1.0, "amplitude": FAM_BASE[1], "breath": 0.4, "drift": 6.0, "driftPeriod": 90.0,
          "spin": -0.01},
         # R, radial: the earlier figure (rings, stars, lobes about an off-centre point) -- now one family of four
-        {"kind": "point", "position": [7.0, 3.0, -7.0], "order": 6, "bandLow": 0.2, "bandHigh": 0.28, "reach": 90.0,
+        {"kind": "point", "position": [7.0, 3.0, -7.0], "order": 6, "bandLow": 0.2, "bandHigh": 0.28, "reach": FAM_REACH,
          "gain": 1.0, "amplitude": FAM_BASE[2], "breath": 0.4, "drift": 12.0, "driftPeriod": 100.0, "spin": 0.03,
          "orders": [3, 4, 2, 6]},
         # A, arcs: a low-order point source far off the frame, so its rings cross the basin as broad sweeping arcs;

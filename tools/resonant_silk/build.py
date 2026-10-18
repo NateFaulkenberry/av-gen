@@ -562,8 +562,13 @@ def palette_block(g):
 # the iridescent gradient (silk_program): cycles along the cloth's length, the cross band (direction, cycles over
 # 420 m, weight), how far a fold's turn shifts it, and its phase drift (cycles per second per unit of the integral)
 FILL_I = float(os.environ.get("RS_FILL_I", "1.1"))
-SILK_FOG = float(os.environ.get("RS_FOG", "0.0022"))
-SILK_GLOW = float(os.environ.get("RS_GLOW", "2.0"))
+BANDS_ON = os.environ.get("RS_BANDS", "1") == "1"
+BANDS = {"phase": 0.0, "rotation": 0.0, "gain": float(os.environ.get("RS_BANDS_GAIN", "0.6")),
+         "softbox": {"intensity": 0.5, "azimuth": 2.6, "elevation": 0.55, "falloff": 2.2, "skyFill": 0.04},
+         "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.05, "intensity": 3.0, "segments": 0,
+                     "warmth": 0.3, "rate": 0.0}]}
+SILK_FOG = float(os.environ.get("RS_FOG", "0.0013"))
+SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
 METALLIC = float(os.environ.get("RS_METALLIC", "0.15"))   # was 0.35: a metal's diffuse loss darkened the pigment
 SILK_LEN = float(os.environ.get("RS_SILK_LEN", "1.6"))
 SILK_BAND_DIR = (0.62, 0.62, 0.48)
@@ -668,18 +673,24 @@ def environment(s):
         "intensity": 0.04, "background": C("abyss", 0.6), "fogColor": C("abyss", 0.8),
         # the overhaul's air (05-plan §1.2): a thin fog in the palette's environment colour, so the far drapes sit in
         # coloured depth behind the gather instead of floating
-        "volumeDensity": SILK_FOG, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
+        "volumeMaxDistance": 0.0, "volumeDensity": SILK_FOG, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 200.0,
         # no screen-space AO or contact shadows: a thin sheet in a void gains nothing from them, and either would ask
         # for a depth prepass that re-runs every deformer per vertex (ADR-1406; 39 ms measured)
         "ambientOcclusion": False, "contactShadows": False,
+        # the satin's highlights (05-plan §1.2, M1): reflection-only bands (ADR-1151) -- a broad soft box behind and
+        # above, and one long strip -- seen only in the cloth's reflections, so the sheen slides along the pleats as
+        # soft bands instead of a hard white key's dots; the key's own intensity comes down to make room
+        "bands": BANDS if BANDS_ON else None,
         "sky": {"enabled": True, "zenithColor": C("abyss", 0.3), "horizonColor": C("indigo", 0.22),
                 "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": SILK_GLOW, "intensity": 1.0,
                 # a soft glow in the sky behind the gather (its colour the palette's resonant role): the far drapes
                 # are backlit by it, and the void has a light in it
-                "sunSize": 0.02, "sunGlow": 0.7, "sunDirection": [-0.03, -0.02, -1.0],
+                "sunSize": 0.015, "sunGlow": 0.16, "sunDirection": [-0.03, -0.02, -1.0],
                 "background": True, "useKeyLight": False},
     }
+    if s.environment.get("bands") is None:
+        s.environment.pop("bands", None)
     # a narrow, cold, grazing key from high behind-right: strips of light across the folds
     s.light("key", "directional", direction=[-0.55, -0.35, 0.75], color=kit.mix(C("pearl"), C("cyan"), 0.75),
             intensity=5.0,

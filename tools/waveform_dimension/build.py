@@ -352,8 +352,10 @@ def material(prog):
 # ================================================================================================ geometry
 FRONT_RELIEF = 7.0
 # the travelling fronts: name -> (source point, band, speed m/s, carrier wavelength m, smoothing s) and their relief
-FRONTS = {"swell": ((-320.0, 60.0, -240.0), (0.0, 0.22), 24.0, 52.0, 0.12),
-          "cross": ((280.0, -40.0, 260.0), (0.25, 0.55), 34.0, 30.0, 0.08)}
+# (sources just beyond the sheets' bound: the GPU's audio ring holds 16 s, so the far side of the sculpture must be
+# reached in less -- at 300 m / 30 m/s a source 320 m out sampled history the ring no longer had: a constant)
+FRONTS = {"swell": ((-170.0, 30.0, -110.0), (0.0, 0.22), 30.0, 52.0, 0.12),
+          "cross": ((160.0, -30.0, 120.0), (0.25, 0.55), 40.0, 30.0, 0.08)}
 SWELL_RELIEF = float(os.environ.get("WD_SWELL", "5.0"))
 CROSS_RELIEF = float(os.environ.get("WD_CROSS", "2.5"))   # metres a kick's shell lifts the sheets it passes through
 B_RELIEF = 0.6       # metres per unit of the mids' bands
