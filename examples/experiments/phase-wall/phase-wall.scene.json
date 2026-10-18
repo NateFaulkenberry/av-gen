@@ -20,14 +20,14 @@
  "environment": {
   "intensity": 0.05,
   "background": [
-   0.00212,
-   0.00605,
-   0.007
+   0.00182,
+   0.00651,
+   0.0075
   ],
   "fogColor": [
-   0.00212,
-   0.00605,
-   0.007
+   0.00182,
+   0.00651,
+   0.0075
   ],
   "volumeDensity": 0.0,
   "fogSky": 0.0,
@@ -40,19 +40,19 @@
   "sky": {
    "enabled": true,
    "zenithColor": [
-    0.00212,
-    0.00605,
-    0.007
+    0.00182,
+    0.00651,
+    0.0075
    ],
    "horizonColor": [
-    0.00212,
-    0.00605,
-    0.007
+    0.00182,
+    0.00651,
+    0.0075
    ],
    "groundColor": [
-    0.00212,
-    0.00605,
-    0.007
+    0.00182,
+    0.00651,
+    0.0075
    ],
    "haze": 1.0,
    "sunIntensity": 0.0,
@@ -80,7 +80,7 @@
      ],
      "offset": 0.0,
      "width": 0.12,
-     "intensity": 2.5,
+     "intensity": 2.0,
      "segments": 0,
      "warmth": 0.7,
      "rate": 0.0
@@ -93,7 +93,7 @@
      ],
      "offset": 0.0,
      "width": 0.12,
-     "intensity": 2.5,
+     "intensity": 2.0,
      "segments": 0,
      "warmth": 0.5499999999999999,
      "rate": 0.0
@@ -106,7 +106,7 @@
      ],
      "offset": 0.0,
      "width": 0.12,
-     "intensity": 2.5,
+     "intensity": 2.0,
      "segments": 0,
      "warmth": 0.39999999999999997,
      "rate": 0.0
@@ -119,7 +119,7 @@
      ],
      "offset": 0.0,
      "width": 0.12,
-     "intensity": 2.5,
+     "intensity": 2.0,
      "segments": 0,
      "warmth": 0.25,
      "rate": 0.0
@@ -231,7 +231,9 @@
       0.745,
       1.585,
       0.04
-     ]
+     ],
+     "bevel": 0.018,
+     "bevelSegments": 1
     },
     "distribution": {
      "kind": "grid",
@@ -253,8 +255,8 @@
       1,
       1
      ],
-     "roughness": 0.38,
-     "metallic": 0.6
+     "roughness": 0.36,
+     "metallic": 0.55
     },
     "effectors": [
      {
@@ -315,16 +317,16 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.0,
+      0.0,
+      0.0
      ],
      "roughness": 0.9,
      "metallic": 0.0,
      "emissiveColor": [
-      0.00263,
-      0.02327,
-      0.02996
+      0.00334,
+      0.06359,
+      0.08188
      ],
      "emissiveIntensity": 1.0
     }
@@ -406,7 +408,9 @@
       0.745,
       1.585,
       0.04
-     ]
+     ],
+     "bevel": 0.018,
+     "bevelSegments": 1
     },
     "distribution": {
      "kind": "grid",
@@ -428,8 +432,8 @@
       1,
       1
      ],
-     "roughness": 0.38,
-     "metallic": 0.6
+     "roughness": 0.36,
+     "metallic": 0.55
     },
     "effectors": [
      {
@@ -490,16 +494,16 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.0,
+      0.0,
+      0.0
      ],
      "roughness": 0.9,
      "metallic": 0.0,
      "emissiveColor": [
-      0.00263,
-      0.02327,
-      0.02996
+      0.00334,
+      0.06359,
+      0.08188
      ],
      "emissiveIntensity": 1.0
     }
@@ -581,7 +585,9 @@
       0.745,
       1.585,
       0.04
-     ]
+     ],
+     "bevel": 0.018,
+     "bevelSegments": 1
     },
     "distribution": {
      "kind": "grid",
@@ -603,8 +609,8 @@
       1,
       1
      ],
-     "roughness": 0.38,
-     "metallic": 0.6
+     "roughness": 0.36,
+     "metallic": 0.55
     },
     "effectors": [
      {
@@ -665,16 +671,16 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.0,
+      0.0,
+      0.0
      ],
      "roughness": 0.9,
      "metallic": 0.0,
      "emissiveColor": [
-      0.00263,
-      0.02327,
-      0.02996
+      0.00334,
+      0.06359,
+      0.08188
      ],
      "emissiveIntensity": 1.0
     }
@@ -756,7 +762,9 @@
       0.745,
       1.585,
       0.04
-     ]
+     ],
+     "bevel": 0.018,
+     "bevelSegments": 1
     },
     "distribution": {
      "kind": "grid",
@@ -778,8 +786,8 @@
       1,
       1
      ],
-     "roughness": 0.38,
-     "metallic": 0.6
+     "roughness": 0.36,
+     "metallic": 0.55
     },
     "effectors": [
      {
@@ -840,16 +848,16 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.0,
+      0.0,
+      0.0
      ],
      "roughness": 0.9,
      "metallic": 0.0,
      "emissiveColor": [
-      0.00263,
-      0.02327,
-      0.02996
+      0.00334,
+      0.06359,
+      0.08188
      ],
      "emissiveIntensity": 1.0
     }
@@ -882,11 +890,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -913,11 +921,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -944,11 +952,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -975,11 +983,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1016,11 +1024,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1104,11 +1112,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1182,11 +1190,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1218,11 +1226,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1254,11 +1262,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1290,11 +1298,11 @@
     },
     "material": {
      "baseColor": [
-      0.00304,
-      0.00478,
-      0.00518
+      0.00287,
+      0.01389,
+      0.01639
      ],
-     "roughness": 0.55,
+     "roughness": 0.5,
      "metallic": 0.0
     }
    },
@@ -1336,11 +1344,11 @@
     },
     "material": {
      "baseColor": [
-      0.0017,
-      0.00484,
-      0.0056
+      0.00546,
+      0.01954,
+      0.0225
      ],
-     "roughness": 0.8,
+     "roughness": 0.85,
      "metallic": 0.0
     }
    },
@@ -1377,11 +1385,11 @@
     },
     "material": {
      "baseColor": [
-      0.0017,
-      0.00484,
-      0.0056
+      0.00546,
+      0.01954,
+      0.0225
      ],
-     "roughness": 0.8,
+     "roughness": 0.85,
      "metallic": 0.0
     }
    },
@@ -1408,16 +1416,16 @@
     },
     "material": {
      "baseColor": [
-      0.00106,
-      0.00302,
-      0.0035
+      0.00091,
+      0.00326,
+      0.00375
      ],
      "roughness": 0.9,
      "metallic": 0.0,
      "emissiveColor": [
-      0.00127,
-      0.00363,
-      0.0042
+      0.00546,
+      0.01954,
+      0.0225
      ],
      "emissiveIntensity": 1.0
     }
@@ -1444,14 +1452,15 @@
      "kind": "single"
     },
     "material": {
-     "program": "floorStone",
+     "program": "floorLacquer",
      "baseColor": [
-      0.007,
-      0.02122,
-      0.02416
+      0.00478,
+      0.02315,
+      0.02732
      ],
-     "roughness": 0.22,
-     "metallic": 1.0
+     "roughness": 0.5,
+     "metallic": 0.0,
+     "unlit": true
     }
    },
    "position": [
@@ -1487,11 +1496,11 @@
     },
     "material": {
      "baseColor": [
-      0.26356,
-      0.12708,
-      0.04219
+      0.15,
+      0.09359,
+      0.04847
      ],
-     "roughness": 0.35,
+     "roughness": 0.4,
      "metallic": 1.0
     }
    },
@@ -1528,11 +1537,11 @@
     },
     "material": {
      "baseColor": [
-      0.26356,
-      0.12708,
-      0.04219
+      0.15,
+      0.09359,
+      0.04847
      ],
-     "roughness": 0.35,
+     "roughness": 0.4,
      "metallic": 1.0
     }
    },
@@ -1558,18 +1567,19 @@
     0.69387,
     0.43415
    ],
-   "intensity": 1.2,
-   "castsShadow": true,
+   "intensity": 1.0,
+   "castsShadow": false,
    "contactShadow": false,
-   "softness": 0.35
+   "softness": 0.35,
+   "diffuseOnly": true
   },
   {
    "id": "wash_west",
    "name": "wash_west",
    "type": "directional",
    "direction": [
-    -0.9393727128473789,
-    -0.34289780745545134,
+    -0.6216099682706644,
+    -0.7833269096274834,
     -0.0
    ],
    "color": [
@@ -1577,9 +1587,10 @@
     0.69387,
     0.43415
    ],
-   "intensity": 1.8,
+   "intensity": 2.6,
    "castsShadow": false,
-   "contactShadow": false
+   "contactShadow": false,
+   "diffuseOnly": true
   },
   {
    "id": "wash_north",
@@ -1587,25 +1598,26 @@
    "type": "directional",
    "direction": [
     0.0,
-    -0.34289780745545134,
-    -0.9393727128473789
+    -0.7833269096274834,
+    -0.6216099682706644
    ],
    "color": [
     1.0,
     0.69387,
     0.43415
    ],
-   "intensity": 1.8,
+   "intensity": 2.6,
    "castsShadow": false,
-   "contactShadow": false
+   "contactShadow": false,
+   "diffuseOnly": true
   },
   {
    "id": "wash_east",
    "name": "wash_east",
    "type": "directional",
    "direction": [
-    0.9393727128473789,
-    -0.34289780745545134,
+    0.6216099682706644,
+    -0.7833269096274834,
     -0.0
    ],
    "color": [
@@ -1613,9 +1625,10 @@
     0.69387,
     0.43415
    ],
-   "intensity": 1.8,
+   "intensity": 2.6,
    "castsShadow": false,
-   "contactShadow": false
+   "contactShadow": false,
+   "diffuseOnly": true
   },
   {
    "id": "wash_south",
@@ -1623,17 +1636,37 @@
    "type": "directional",
    "direction": [
     0.0,
-    -0.34289780745545134,
-    0.9393727128473789
+    -0.7833269096274834,
+    0.6216099682706644
    ],
    "color": [
     1.0,
     0.69387,
     0.43415
    ],
-   "intensity": 1.8,
+   "intensity": 2.6,
    "castsShadow": false,
-   "contactShadow": false
+   "contactShadow": false,
+   "diffuseOnly": true
+  },
+  {
+   "id": "bounce",
+   "name": "bounce",
+   "type": "directional",
+   "direction": [
+    0.15,
+    1.0,
+    0.1
+   ],
+   "color": [
+    0.00478,
+    0.09084,
+    0.11697
+   ],
+   "intensity": 2.5,
+   "castsShadow": false,
+   "contactShadow": false,
+   "diffuseOnly": true
   }
  ],
  "materialPrograms": [
@@ -1662,38 +1695,186 @@
      "dst": 0,
      "srcA": 0,
      "constant": [
-      0.15,
-      0.85,
+      0.08,
+      0.92,
       0.0,
       0.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "ramp",
      "dst": 1,
+     "srcA": 0,
      "constant": [
-      0.00182,
-      0.00518,
-      0.00478,
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
       1.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "input",
      "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
      "constant": [
-      0.52712,
-      0.25415,
-      0.08438,
-      1.0
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
      ]
     },
     {
-     "kind": "mixBy",
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "remap",
      "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
      "srcA": 1,
-     "srcB": 2,
-     "srcC": 0
+     "srcB": 5
     },
     {
      "kind": "input",
@@ -1702,7 +1883,7 @@
     },
     {
      "kind": "smoothstep",
-     "dst": 5,
+     "dst": 2,
      "srcA": 4,
      "constant": [
       0.5,
@@ -1715,16 +1896,16 @@
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.10164,
-      1.13278,
-      0.9304,
+      0.10946,
+      1.21991,
+      1.00197,
       1.0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 6
     },
     {
@@ -1756,17 +1937,17 @@
     },
     {
      "kind": "add",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 4
     },
     {
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.38,
-      0.38,
-      0.38,
+      0.36,
+      0.36,
+      0.36,
       1.0
      ]
     },
@@ -1777,10 +1958,10 @@
      "value": 1.0
     }
    ],
-   "baseColor": 3,
+   "baseColor": 1,
    "metallic": -1,
    "roughness": 6,
-   "emission": 5,
+   "emission": 2,
    "emissionIntensity": 1.0,
    "opacity": -1
   },
@@ -1809,38 +1990,186 @@
      "dst": 0,
      "srcA": 0,
      "constant": [
-      0.15,
-      0.85,
+      0.08,
+      0.92,
       0.0,
       0.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "ramp",
      "dst": 1,
+     "srcA": 0,
      "constant": [
-      0.00182,
-      0.00518,
-      0.00478,
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
       1.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "input",
      "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
      "constant": [
-      0.52712,
-      0.25415,
-      0.08438,
-      1.0
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
      ]
     },
     {
-     "kind": "mixBy",
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "remap",
      "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
      "srcA": 1,
-     "srcB": 2,
-     "srcC": 0
+     "srcB": 5
     },
     {
      "kind": "input",
@@ -1849,7 +2178,7 @@
     },
     {
      "kind": "smoothstep",
-     "dst": 5,
+     "dst": 2,
      "srcA": 4,
      "constant": [
       0.5,
@@ -1862,16 +2191,16 @@
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.10164,
-      1.13278,
-      0.9304,
+      0.10946,
+      1.21991,
+      1.00197,
       1.0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 6
     },
     {
@@ -1903,17 +2232,17 @@
     },
     {
      "kind": "add",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 4
     },
     {
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.38,
-      0.38,
-      0.38,
+      0.36,
+      0.36,
+      0.36,
       1.0
      ]
     },
@@ -1924,10 +2253,10 @@
      "value": 1.0
     }
    ],
-   "baseColor": 3,
+   "baseColor": 1,
    "metallic": -1,
    "roughness": 6,
-   "emission": 5,
+   "emission": 2,
    "emissionIntensity": 1.0,
    "opacity": -1
   },
@@ -1956,38 +2285,186 @@
      "dst": 0,
      "srcA": 0,
      "constant": [
-      0.15,
-      0.85,
+      0.08,
+      0.92,
       0.0,
       0.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "ramp",
      "dst": 1,
+     "srcA": 0,
      "constant": [
-      0.00182,
-      0.00518,
-      0.00478,
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
       1.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "input",
      "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
      "constant": [
-      0.52712,
-      0.25415,
-      0.08438,
-      1.0
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
      ]
     },
     {
-     "kind": "mixBy",
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "remap",
      "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
      "srcA": 1,
-     "srcB": 2,
-     "srcC": 0
+     "srcB": 5
     },
     {
      "kind": "input",
@@ -1996,7 +2473,7 @@
     },
     {
      "kind": "smoothstep",
-     "dst": 5,
+     "dst": 2,
      "srcA": 4,
      "constant": [
       0.5,
@@ -2009,16 +2486,16 @@
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.10164,
-      1.13278,
-      0.9304,
+      0.10946,
+      1.21991,
+      1.00197,
       1.0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 6
     },
     {
@@ -2050,17 +2527,17 @@
     },
     {
      "kind": "add",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 4
     },
     {
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.38,
-      0.38,
-      0.38,
+      0.36,
+      0.36,
+      0.36,
       1.0
      ]
     },
@@ -2071,10 +2548,10 @@
      "value": 1.0
     }
    ],
-   "baseColor": 3,
+   "baseColor": 1,
    "metallic": -1,
    "roughness": 6,
-   "emission": 5,
+   "emission": 2,
    "emissionIntensity": 1.0,
    "opacity": -1
   },
@@ -2103,38 +2580,186 @@
      "dst": 0,
      "srcA": 0,
      "constant": [
-      0.15,
-      0.85,
+      0.08,
+      0.92,
       0.0,
       0.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "ramp",
      "dst": 1,
+     "srcA": 0,
      "constant": [
-      0.00182,
-      0.00518,
-      0.00478,
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
       1.0
      ]
     },
     {
-     "kind": "constant",
+     "kind": "input",
      "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
      "constant": [
-      0.52712,
-      0.25415,
-      0.08438,
-      1.0
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
      ]
     },
     {
-     "kind": "mixBy",
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "remap",
      "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
      "srcA": 1,
-     "srcB": 2,
-     "srcC": 0
+     "srcB": 5
     },
     {
      "kind": "input",
@@ -2143,7 +2768,7 @@
     },
     {
      "kind": "smoothstep",
-     "dst": 5,
+     "dst": 2,
      "srcA": 4,
      "constant": [
       0.5,
@@ -2156,16 +2781,16 @@
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.10164,
-      1.13278,
-      0.9304,
+      0.10946,
+      1.21991,
+      1.00197,
       1.0
      ]
     },
     {
      "kind": "multiply",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 6
     },
     {
@@ -2197,17 +2822,17 @@
     },
     {
      "kind": "add",
-     "dst": 5,
-     "srcA": 5,
+     "dst": 2,
+     "srcA": 2,
      "srcB": 4
     },
     {
      "kind": "constant",
      "dst": 6,
      "constant": [
-      0.38,
-      0.38,
-      0.38,
+      0.36,
+      0.36,
+      0.36,
       1.0
      ]
     },
@@ -2218,15 +2843,15 @@
      "value": 1.0
     }
    ],
-   "baseColor": 3,
+   "baseColor": 1,
    "metallic": -1,
    "roughness": 6,
-   "emission": 5,
+   "emission": 2,
    "emissionIntensity": 1.0,
    "opacity": -1
   },
   {
-   "name": "floorStone",
+   "name": "floorLacquer",
    "ops": [
     {
      "kind": "input",
@@ -2235,83 +2860,335 @@
     },
     {
      "kind": "gradient",
-     "dst": 1,
+     "dst": 2,
      "srcA": 0,
      "constant": [
       -1.0,
       0.0,
-      0.0,
-      -2.428571
+      -0.0,
+      -0.5
      ],
-     "value": 0.14285714285714285
-    },
-    {
-     "kind": "gradient",
-     "dst": 2,
-     "srcA": 0,
-     "constant": [
-      1.0,
-      0.0,
-      0.0,
-      -2.428571
-     ],
-     "value": 0.14285714285714285
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "gradient",
-     "dst": 2,
-     "srcA": 0,
-     "constant": [
-      0.0,
-      0.0,
-      -1.0,
-      -8.142857
-     ],
-     "value": 0.14285714285714285
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "gradient",
-     "dst": 2,
-     "srcA": 0,
-     "constant": [
-      0.0,
-      0.0,
-      1.0,
-      -8.142857
-     ],
-     "value": 0.14285714285714285
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
+     "value": 0.0625
     },
     {
      "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_west"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
      "dst": 1,
      "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      -1.0,
+      -3.0
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
      "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_north"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      0.0,
+      -0.0,
+      -0.5
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_east"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      1.0,
+      -3.0
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_south"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
     },
     {
      "kind": "constant",
      "dst": 2,
      "constant": [
-      0.00105,
-      0.00931,
-      0.01199,
+      0.35,
+      0.35,
+      0.35,
       1.0
      ]
     },
@@ -2323,16 +3200,46 @@
     },
     {
      "kind": "constant",
-     "dst": 3,
+     "dst": 4,
      "constant": [
-      0.007,
-      0.02122,
-      0.02416,
+      0.01242,
+      0.0602,
+      0.07103,
       1.0
      ]
+    },
+    {
+     "kind": "noise",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "value": 0.09
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.2,
+      0.8,
+      0.45,
+      1.6
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2
     }
    ],
-   "baseColor": 3,
+   "baseColor": 4,
    "metallic": -1,
    "roughness": -1,
    "emission": 1,
@@ -2371,7 +3278,7 @@
    "coupling": 4.0,
    "phaseLag": 0.3,
    "couplingRadius": 3,
-   "spread": 0.15,
+   "spread": 0.28,
    "seedAmount": 1.0,
    "noise": 0.05
   }

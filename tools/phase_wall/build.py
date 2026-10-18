@@ -78,25 +78,61 @@ def unrolled(wall, t, y):
     raise KeyError(wall)
 
 
-# ================================================================================================ palette (sRGB refs)
-# Roles (02-plan.md §6). Stage 1 carries one state, Bronze Tide (the R&D A3 look); Stage 5 adds the rest.
-P = {
-    "environment": "#071214",   # haze, ceiling, the air in the darks
-    "back": "#0f3a42",          # the backplane: the colour between and behind the blades
-    "trough": "#06100f",        # a blade's face turned from the light (sin theta < 0)
-    "metal": "#c08a52",         # a blade's face at its crest (sin theta > 0)
-    "key": "#ffd9b0",           # the key light
-    "front": "#4ff0dc",         # strain: fronts and defects
-    "peak": "#ffb35c",          # the hottest defect cores
-    "trim": "#ffcf9a",          # pier strips
-    "stone": "#0a0f10",         # piers, plinth
-    "floor": "#14282b",         # the floor: dark lacquered metal, so what it reflects takes its tint
-}
-TUNE = {"rough": 0.38, "key": 1.2, "wash": 1.8, "back": 0.55, "emit": 1.0, "bands": 2.5, "metallic": 0.6}
+# ================================================================================================ palettes (sRGB refs)
+# Role-based (02-plan.md §6). Every colour in the hall is a role of the active palette; the project palette (ADR-1043)
+# blends states in OKLab and its selector (ADR-1420) chooses, locks (CC 9 / CC 10) and advances them, with the
+# ADR-1421 change fallback when no phrase arrives. Roles:
+#   environment  the air: haze, ceiling, the darks
+#   back         the backplane: the colour between and behind the blades, poured through as they turn edge-on
+#   trough       a blade face turned away (sin theta = -1): dark, but coloured
+#   mid          the face between (sin theta = 0): the palette's body colour
+#   crest        the face at its crest (sin theta = +1): the bright
+#   wash         the light: the key and the four wall washes
+#   front        strain: fronts and defect seams
+#   peak         the hottest defect cores
+#   trim         pier strips (the light the bands stand for) and the brass inlay
+#   floor        the floor's lacquer: what it reflects takes this tint
+ROLES = ("environment", "back", "trough", "mid", "crest", "wash", "front", "peak", "trim", "floor")
+PALETTES = [
+    # name           environment back      trough     mid        crest      wash       front      peak       trim       floor
+    ("Bronze Tide",   "#061315", "#0f5560", "#0e2a2c", "#7a3f1e", "#f0a860", "#ffd9b0", "#4ff0dc", "#ffb35c", "#ffcf9a", "#0f2a2e"),
+    ("Ember",         "#140605", "#7a1a0a", "#2e0c08", "#9a2c10", "#ff9a40", "#ffc890", "#ffd23c", "#fff4d0", "#ff9a50", "#2c0d07"),
+    ("Gilt Orchid",   "#0d0513", "#561070", "#24092e", "#8a2a7a", "#ffd36a", "#fff0d8", "#ff3ab0", "#ffe0f4", "#ffcf7a", "#200a2a"),
+    ("Coral Lagoon",  "#041211", "#087070", "#0c2626", "#c0484a", "#ffb48c", "#fff0e0", "#40ffe0", "#ffffff", "#ffb0a0", "#0b2c2c"),
+    ("Verdigris",     "#041310", "#0c6a50", "#0c2a1e", "#2f8a60", "#a6f0b8", "#eaffdc", "#ff7a5c", "#fff0a0", "#9fffd0", "#0a2a1e"),
+    ("Aurora",        "#030c12", "#0a5a48", "#0d1630", "#4430a0", "#60ffb0", "#e0f0ff", "#ff60c0", "#fff6a0", "#80ffc0", "#081c28"),
+    ("Cobalt Ice",    "#040a1a", "#1032a0", "#0a1840", "#2050b8", "#a0d8ff", "#d8ecff", "#6af0ff", "#ffffff", "#8ac8ff", "#0a1840"),
+    ("Nocturne",      "#0a0616", "#40188a", "#1c0e34", "#5a2aa0", "#d0a8ff", "#d8c8ff", "#ff5ad8", "#ffd27a", "#b48cff", "#180e30"),
+]
+# the automatic journey (ADR-1420 order): round the colour wheel by neighbours -- warm to cool and back
+JOURNEY = list(range(len(PALETTES)))
+START = int(os.environ.get("PW_PALETTE", "0"))
+CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0, "slow": 24.0,
+          "threshold": 0.06, "rearm": 0.03, "primaryTimeout": 30.0, "maxHold": 90.0}
+P = dict(zip(ROLES, PALETTES[START][1:]))
+TUNE = {"rough": 0.36, "key": 1.0, "wash": 2.6, "back": 0.7, "bands": 2.0, "metallic": 0.55, "bounce": 2.5}
 
 
 def C(key, s=1.0):
     return hexrgb(P[key], s)
+
+
+def bind(s, role, target, gain=1.0):
+    """Record a palette binding: `target` (a colour parameter) is the active palette's `role` times `gain`."""
+    s.binds.append({"role": role, "target": target, "gain": gain} if gain != 1.0 else {"role": role, "target": target})
+
+
+def palette_block(s):
+    states = [{"name": row[0], "colors": {r: hexrgb(h) for r, h in zip(ROLES, row[1:])}, "scalars": {}}
+              for row in PALETTES]
+    return {"states": states, "bindings": s.binds, "position": float(START), "saturation": 1.0, "value": 1.0,
+            "selector": {"select": START, "transition": 6.0, "lock": False, "hold": 40.0,
+                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY,
+                                     "change": CHANGE}}}
+
+
+def op_path(g, label, field="constant"):
+    return "material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], field)
 
 
 # ================================================================================================ the network
@@ -107,7 +143,7 @@ def network(s):
          "boundsMin": [-PERIM / 2, -40.0, -H / 2], "boundsMax": [PERIM / 2, 40.0, H / 2],
          "frequency": 0.18, "simRate": 60.0, "maxSubSteps": 4, "seed": 3, "persistence": 0.6, "links": 0,
          "linkRange": 48.0, "checkpointInterval": 5.0, "coupling": 4.0, "phaseLag": 0.3, "couplingRadius": 3,
-         "spread": 0.15, "seedAmount": 1.0, "noise": 0.05}
+         "spread": 0.28, "seedAmount": 1.0, "noise": 0.05}
     s.grid(**g)
     # a periodic frequency tilt (one sine round the hall, no seam at the wrap): unison still rolls as a slow wave
     s.field("tilt", {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine", "axis": [1.0, 0.0, 0.0],
@@ -127,26 +163,46 @@ ACT_PEAK = (1.6, 3.2)  # activity -> the defect core
 
 
 def blade_program(wall):
-    """One wall's blades. The face's tone is the phase (trough -> metal across sin theta, the full range); the
-    reflection bands and the key add the moving light; strain glows `front`, its cores `peak`."""
+    """One wall's blades.
+    - Tone: the phase, over the full sin theta range, through a three-stop ramp (trough, mid, crest): dark, body, bright.
+    - The blade as a blade: a shading profile across its width (a louvre is slightly dished, one edge catching the
+      wash and the other falling off), a lift toward its top (the washes come from above), and soft shadow lines at
+      its four edges, all in the blade's own frame (localPosition). With the bevel's edge highlights, each blade
+      reads as a turning plate, not a flat pixel.
+    - Light: the wall washes and the reflection bands; strain lights whole blades `front`, the cores `peak`."""
     g = common.Prog("blade_" + wall)
+    bw, bh = BLADE[0], BLADE[1]
     g.op(None, "field", 0, field="ph_" + wall)                      # r0 = sin theta
     g.op(None, "remap", 0, a=0, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)    # -> 0..1
-    g.op(None, "smoothstep", 0, a=0, k=[0.15, 0.85, 0, 0])
-    g.op("trough", "constant", 1, k=C("trough") + [1])
-    g.op("metal", "constant", 2, k=C("metal") + [1])
-    g.op(None, "mixBy", 3, a=1, b=2, c=0)                           # r3 = base
+    g.op(None, "smoothstep", 0, a=0, k=[0.08, 0.92, 0, 0])
+    g.op("tone", "ramp", 1, a=0, k=C("trough") + [1], k2=C("mid") + [1], k3=C("crest") + [1])   # r1 = colour
+    g.op(None, "input", 2, inp="localPosition")                     # r2 = blade frame
+    g.op(None, "gradient", 3, a=2, k=[1, 0, 0, 0.5], f=1.0 / bw)    # r3 = u across (0..1)
+    g.op(None, "gradient", 4, a=2, k=[-1, 0, 0, 0.5], f=1.0 / bw)   # r4 = 1 - u
+    g.op(None, "smoothstep", 5, a=3, k=[0.0, 0.16, 0, 0])
+    g.op(None, "smoothstep", 6, a=4, k=[0.0, 0.16, 0, 0])
+    g.op(None, "multiply", 5, a=5, b=6)                             # r5 = side shadow lines
+    g.op(None, "gradient", 6, a=2, k=[0, 1, 0, 0.5], f=1.0 / bh)    # r6 = v up (0..1)
+    g.op(None, "gradient", 7, a=2, k=[0, -1, 0, 0.5], f=1.0 / bh)   # r7 = 1 - v
+    g.op(None, "smoothstep", 7, a=7, k=[0.0, 0.07, 0, 0])
+    g.op(None, "multiply", 5, a=5, b=7)                             # x top/bottom shadow lines
+    g.op(None, "remap", 5, a=5, k=[0.0, 1.0, 0.3, 1.0], f=1.0)      # lines sink to 30%, never black
+    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 0.72, 1.12], f=1.0)    # lift toward the top
+    g.op(None, "multiply", 5, a=5, b=6)
+    g.op(None, "remap", 3, a=3, k=[0.0, 1.0, 1.15, 0.7], f=1.0)     # the dish: one edge bright, the other falling off
+    g.op(None, "multiply", 5, a=5, b=3)
+    g.op(None, "multiply", 1, a=1, b=5)                             # r1 = base
     g.op(None, "input", 4, inp="instanceEmissive")                  # r4 = activity, one value per blade (effector)
-    g.op(None, "smoothstep", 5, a=4, k=[ACT[0], ACT[1], 0, 0])
-    g.op("front", "constant", 6, k=C("front", 1.3) + [1])
-    g.op(None, "multiply", 5, a=5, b=6)                             # r5 = front glow
+    g.op(None, "smoothstep", 2, a=4, k=[ACT[0], ACT[1], 0, 0])
+    g.op("front", "constant", 6, k=C("front", 1.4) + [1])
+    g.op(None, "multiply", 2, a=2, b=6)                             # r2 = front glow
     g.op(None, "smoothstep", 4, a=4, k=[ACT_PEAK[0], ACT_PEAK[1], 0, 0])
     g.op("peak", "constant", 6, k=C("peak", 2.5) + [1])
     g.op(None, "multiply", 4, a=4, b=6)
-    g.op(None, "add", 5, a=5, b=4)                                  # r5 = emission
+    g.op(None, "add", 2, a=2, b=4)                                  # r2 = emission
     g.op("rough", "constant", 6, k=[TUNE["rough"]] * 3 + [1])
     g.op(None, "roughnessFilter", 6, a=6, f=1.0)
-    g.base, g.emit, g.rough = 3, 5, 6
+    g.base, g.emit, g.rough = 1, 2, 6
     return g
 
 
@@ -158,17 +214,22 @@ def walls(s):
                                 "rotation": rot}, position=pos)
         g = blade_program(name)
         s.program(g.doc(base=g.base, emission=g.emit, roughness=g.rough))
-        s.blade_programs.append(g)
+        bind(s, "trough", op_path(g, "tone", "constant"))
+        bind(s, "mid", op_path(g, "tone", "constant2"))
+        bind(s, "crest", op_path(g, "tone", "constant3"))
+        bind(s, "front", op_path(g, "front"), 1.4)
+        bind(s, "peak", op_path(g, "peak"), 2.5)
         inset = PIER / 2 + 0.2
         nx = int((n - 2 * inset) // PX)
         ny = int((H - BASE - 0.4) // PY)
         cx, cz = st[0] + d[0] * n / 2, st[1] + d[2] * n / 2
         nrm = (-d[2], 0.0, d[0])
         yaw = yaw_of(d)
-        s.proc("blades_" + name, {"kind": "box", "size": list(BLADE)},
+        s.proc("blades_" + name, {"kind": "box", "size": list(BLADE), "bevel": 0.018, "bevelSegments": 1},
                distribution={"kind": "grid", "gridCount": [nx, ny, 1], "gridSpacing": [PX, PY, 1.0]},
                position=(cx, BASE + ny * PY / 2, cz), rotation=(0.0, yaw, 0.0),
-               material={"program": g.name, "baseColor": [1, 1, 1], "roughness": TUNE["rough"], "metallic": TUNE["metallic"]},
+               material={"program": g.name, "baseColor": [1, 1, 1], "roughness": TUNE["rough"],
+                         "metallic": TUNE["metallic"]},
                extra={"effectors": [{"field": "ph_" + name, "op": "rotation", "blend": "add", "strength": SWING,
                                      "axis": [0, 1, 0]},
                                     # strain lights whole blades (a blade is one oscillator): crisp, never a cloud
@@ -179,53 +240,77 @@ def walls(s):
         # the backplane, set back behind the blades: the colour that pours through as they turn edge-on
         s.proc("back_" + name, {"kind": "box", "size": [n, H + 2.0, 0.4]},
                position=(cx - nrm[0] * 0.9, H / 2, cz - nrm[2] * 0.9), rotation=(0.0, yaw, 0.0),
-               material={"baseColor": C("stone"), "roughness": 0.9, "metallic": 0.0,
+               material={"baseColor": [0.0, 0.0, 0.0], "roughness": 0.9, "metallic": 0.0,
                          "emissiveColor": C("back", TUNE["back"]), "emissiveIntensity": 1.0})
+        bind(s, "back", "procedural/back_%s/material/emissiveColor" % name, TUNE["back"])
 
 
 # ================================================================================================ the room
-def bounce_program():
-    """The floor: dark polished stone that picks up the walls' colour -- a spill of `back` within ~7 m of each wall
-    (four axis gradients of the world position, summed, squared) -- since the engine has no planar reflection."""
-    g = common.Prog("floorStone")
+REACH = 16.0  # how far out from a wall the floor carries its colour
+CEIL_GLOW = 3.0     # the ceiling's panels glow faintly in the air's colour: the dark coffers read against them
+FLOOR_ALBEDO = 2.6   # the lacquer's own (unlit) colour: dark, in the palette's floor role
+
+
+def floor_program():
+    """The floor: dark lacquer that carries the walls' colour, since the engine has no planar reflection. Near each
+    wall the floor shows that wall's own tone -- its phase sampled through the wall's reader at the floor (the reader's
+    frame maps a floor point to the wall's bottom row at the same place along it), through the same three-stop ramp --
+    fading out over REACH metres. As the islands turn, their colour moves across the floor beneath them."""
+    g = common.Prog("floorLacquer")
     g.op(None, "input", 0, inp="worldPosition")
-    reach = 7.0
-    for i, (ax, half) in enumerate(((( -1, 0, 0), W / 2), ((1, 0, 0), W / 2), ((0, 0, -1), L / 2), ((0, 0, 1), L / 2))):
-        g.op(None, "gradient", 1 if i == 0 else 2, a=0, k=list(ax) + [1.0 - half / reach], f=1.0 / reach)
-        if i:
-            g.op(None, "add", 1, a=1, b=2)
-    g.op(None, "power", 1, a=1, f=2.0)
-    g.op("spill", "constant", 2, k=C("back", 0.22) + [1])
-    g.op(None, "multiply", 1, a=1, b=2)
-    g.op("stone", "constant", 3, k=C("floor") + [1])
-    g.base, g.emit = 3, 1
+    for i, (name, st, d, n, u0) in enumerate(WALLS):
+        nrm = (-d[2], 0.0, d[0])                                     # inward
+        half = abs(st[0]) if abs(nrm[0]) > 0.5 else abs(st[1])
+        # proximity: 1 at the wall, 0 at REACH (gradient along the outward normal), squared
+        g.op(None, "gradient", 2, a=0, k=[-nrm[0], 0.0, -nrm[2], 1.0 - half / REACH], f=1.0 / REACH)
+        g.op(None, "power", 2, a=2, f=2.0)
+        g.op(None, "field", 3, field="ph_" + name)
+        g.op(None, "remap", 3, a=3, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
+        g.op(None, "smoothstep", 3, a=3, k=[0.08, 0.92, 0, 0])
+        g.op("tone_" + name, "ramp", 3, a=3, k=C("trough") + [1], k2=C("mid") + [1], k3=C("crest") + [1])
+        g.op(None, "multiply", 3, a=3, b=2)
+        g.op(None, "add", 1, a=1, b=3)                               # r1 accumulates (registers start at zero)
+    g.op("gain", "constant", 2, k=[0.35, 0.35, 0.35, 1])
+    g.op(None, "multiply", 1, a=1, b=2)                              # r1 = emission (the walls' colour)
+    g.op("lacquer", "constant", 4, k=C("floor", FLOOR_ALBEDO) + [1])
+    # the stone is mottled (low-frequency fbm in the floor plane), so even its darkest stretch has structure
+    g.op(None, "noise", 2, a=0, k=[0.0, 0.0, 0.0, 0.0], f=0.09)
+    g.op(None, "remap", 2, a=2, k=[0.2, 0.8, 0.45, 1.6], f=1.0)
+    g.op(None, "multiply", 4, a=4, b=2)
+    g.base, g.emit = 4, 1
     return g
 
 
 def room(s):
     nb = int(round(L / BAY))
-    stone = {"baseColor": C("stone"), "roughness": 0.55, "metallic": 0.0}
+    stone = {"baseColor": C("floor", 0.6), "roughness": 0.5, "metallic": 0.0}
+    piers = []
     for i, (cx, cz) in enumerate(((-W / 2, L / 2), (-W / 2, -L / 2), (W / 2, -L / 2), (W / 2, L / 2))):
         s.proc("pier%d" % i, {"kind": "box", "size": [PIER, H + 2.0, PIER]}, position=(cx, H / 2, cz), material=stone)
+        piers.append("pier%d" % i)
     for side, x in (("w", -W / 2), ("e", W / 2)):
         inward = 1.0 if side == "w" else -1.0
         s.proc("bays_" + side, {"kind": "box", "size": [1.6, H + 2.0, 1.4]},
                distribution={"kind": "grid", "gridCount": [1, 1, nb - 1], "gridSpacing": [1.0, 1.0, L / nb]},
                position=(x + inward * 0.5, H / 2, 0.0), material=stone)
+        piers.append("bays_" + side)
         s.proc("strips_" + side, {"kind": "box", "size": [0.1, H - 4.0, 0.2]},
                distribution={"kind": "grid", "gridCount": [1, 1, nb - 1], "gridSpacing": [1.0, 1.0, L / nb]},
                position=(x + inward * 1.32, H / 2, 0.0),
                material={"baseColor": [0, 0, 0], "roughness": 0.5, "metallic": 0.0,
                          "emissiveColor": C("trim"), "emissiveIntensity": 1.6})
-    # plinth under the blades
-    for name, st, d, n, u0 in WALLS:
+        bind(s, "trim", "procedural/strips_%s/material/emissiveColor" % side)
+    for name, st, d, n, u0 in WALLS:  # the plinth under the blades
         cx, cz = st[0] + d[0] * n / 2, st[1] + d[2] * n / 2
         nrm = (-d[2], 0.0, d[0])
         s.proc("plinth_" + name, {"kind": "box", "size": [n, BASE, 0.8]},
                position=(cx + nrm[0] * 0.1, BASE / 2, cz + nrm[2] * 0.1), rotation=(0.0, yaw_of(d), 0.0),
                material=stone)
-    # the ceiling: deep coffers, mostly in shadow; a faint wash of the haze
-    dark = {"baseColor": C("environment", 0.8), "roughness": 0.8, "metallic": 0.0}
+        piers.append("plinth_" + name)
+    for pn in piers:
+        bind(s, "floor", "procedural/%s/material/baseColor" % pn, 0.6)
+    # the ceiling: deep coffers, mostly in shadow, in the air's colour
+    dark = {"baseColor": C("environment", 3.0), "roughness": 0.85, "metallic": 0.0}
     s.proc("beams_x", {"kind": "box", "size": [W + 4, 2.4, 0.8]},
            distribution={"kind": "grid", "gridCount": [1, 1, nb * 2 + 1], "gridSpacing": [1, 1, L / (nb * 2)]},
            position=(0.0, H - 0.2, 0.0), material=dark)
@@ -234,20 +319,32 @@ def room(s):
            position=(0.0, H - 0.2, 0.0), material=dark)
     s.proc("ceiling", {"kind": "box", "size": [W + 4, 1.0, L + 4]}, position=(0.0, H + 1.5, 0.0),
            material={"baseColor": C("environment", 0.5), "roughness": 0.9, "metallic": 0.0,
-                     "emissiveColor": C("environment", 0.6), "emissiveIntensity": 1.0})
-    # the floor and its brass inlay (leading lines down the hall, joints across it)
-    fp = bounce_program()
+                     "emissiveColor": C("environment", CEIL_GLOW), "emissiveIntensity": 1.0})
+    for bn in ("beams_x", "beams_z"):
+        bind(s, "environment", "procedural/%s/material/baseColor" % bn, 3.0)
+    bind(s, "environment", "procedural/ceiling/material/emissiveColor", CEIL_GLOW)
+    # the floor (lacquer carrying the walls' colour) and its inlay
+    fp = floor_program()
     s.program(fp.doc(base=fp.base, emission=fp.emit))
-    s.floor_program = fp
+    for name, *_ in WALLS:
+        bind(s, "trough", op_path(fp, "tone_" + name, "constant"))
+        bind(s, "mid", op_path(fp, "tone_" + name, "constant2"))
+        bind(s, "crest", op_path(fp, "tone_" + name, "constant3"))
+    bind(s, "floor", op_path(fp, "lacquer"), FLOOR_ALBEDO)
     s.proc("floor", {"kind": "box", "size": [W + 8, 1.0, L + 8]}, position=(0.0, -0.5, 0.0),
-           material={"program": fp.name, "baseColor": C("floor"), "roughness": 0.22, "metallic": 1.0})
-    brass = {"baseColor": C("metal", 0.5), "roughness": 0.35, "metallic": 1.0}
+           material={"program": fp.name, "baseColor": C("floor"), "roughness": 0.5, "metallic": 0.0,
+                     # unlit: no light reaches it, so no sheen of the bands or the washes; its colour is the
+                     # lacquer plus the walls' colour pooled beneath them (the program)
+                     "unlit": True})
+    brass = {"baseColor": C("trim", 0.15), "roughness": 0.4, "metallic": 1.0}
     s.proc("inlay_z", {"kind": "box", "size": [0.12, 0.02, L]},
            distribution={"kind": "grid", "gridCount": [5, 1, 1], "gridSpacing": [W / 6, 1, 1]},
            position=(0.0, 0.005, 0.0), material=brass)
     s.proc("inlay_x", {"kind": "box", "size": [W, 0.02, 0.12]},
            distribution={"kind": "grid", "gridCount": [1, 1, nb - 1], "gridSpacing": [1, 1, L / nb]},
            position=(0.0, 0.005, 0.0), material=brass)
+    for nn in ("inlay_z", "inlay_x"):
+        bind(s, "trim", "procedural/%s/material/baseColor" % nn, 0.15)
 
 
 def light(s):
@@ -259,23 +356,36 @@ def light(s):
         "sky": {"enabled": True, "zenithColor": env, "horizonColor": env, "groundColor": env, "haze": 1.0,
                 "sunIntensity": 0.0, "intensity": 1.0, "background": True, "useKeyLight": False},
         # the flash: vertical great circles (the opposite piers' strips, in direction space). A blade turning
-        # about y sweeps its reflection across them; 0.12 wide on 0.38-rough metal passes the strobe gate
+        # about y sweeps its reflection across them; 0.12 wide on 0.36-rough metal passes the strobe gate
         "bands": {"phase": 0.0, "rotation": 0.0, "gain": 1.0,
                   "softbox": {"intensity": 0.0, "azimuth": 0.6, "elevation": 0.7, "falloff": 2.6, "skyFill": 0.0},
                   "strips": [{"axis": [math.cos(k * math.pi / 4), 0.0, math.sin(k * math.pi / 4)], "offset": 0.0,
                               "width": 0.12, "intensity": TUNE["bands"], "segments": 0, "warmth": 0.7 - 0.15 * k,
                               "rate": 0.0} for k in range(4)]},
     }
+    for k in ("env/sky/zenithColor", "env/sky/horizonColor", "env/sky/groundColor", "scene/fogColor"):
+        bind(s, "environment", k)
     # the key: high, raking the floor and the piers through an implied clerestory
-    s.light("key", "directional", direction=[0.45, -0.8, -0.4], color=C("key"), intensity=TUNE["key"],
-            castsShadow=True, contactShadow=False, softness=0.35)
+    s.light("key", "directional", direction=[0.45, -0.8, -0.4], color=C("wash"), intensity=TUNE["key"],
+            # no shadows: the key is diffuse-only fill for the floor and piers, and 8k bevelled blades in a shadow map
+            # cost 6 ms live for shading nobody could see
+            castsShadow=False, contactShadow=False, softness=0.35, diffuseOnly=True)
+    bind(s, "wash", "lights/key/color")
     # four washes, one per wall, from high in front of it (Rozin's lamps above the tiles): a wall is lit only by its
     # own wash (the opposite wall faces away; the side walls take it at grazing), so a blade's value reads its angle
     for name, st, d, n, u0 in WALLS:
         nrm = (-d[2], 0.0, d[0])
-        el = 0.35
+        el = 0.9   # steep: the floor mirrors a wash only when looking well down, out of every review framing
         s.light("wash_" + name, "directional", direction=[-nrm[0] * math.cos(el), -math.sin(el), -nrm[2] * math.cos(el)],
-                color=C("key"), intensity=TUNE["wash"], castsShadow=False, contactShadow=False)
+                color=C("wash"), intensity=TUNE["wash"], castsShadow=False, contactShadow=False,
+                # diffuse only: four warm suns in a polished floor are a white sheen across every frame; the
+                # blades' specular light is the bands' job
+                diffuseOnly=True)
+        bind(s, "wash", "lights/wash_%s/color" % name)
+    # the bounce: the lit walls and the backplanes throw their colour up under the coffers and the beams' soffits
+    s.light("bounce", "directional", direction=[0.15, 1.0, 0.1], color=C("back"), intensity=TUNE["bounce"],
+            castsShadow=False, contactShadow=False, diffuseOnly=True)
+    bind(s, "back", "lights/bounce/color")
 
 
 # ================================================================================================ camera
@@ -295,6 +405,7 @@ def camera(s):
     s.params_({"camera/lens/focalLength": 24.0, "post/bloom/intensity": 0.28, "post/output/vignette": 0.3,
                "post/grade/contrast": 1.08, "post/look/atmospheric": 0.12, "post/look/atmosphericDistance": 140.0,
                "post/look/atmosphericTint": C("environment", 2.0)})
+    bind(s, "environment", "post/look/atmosphericTint", 2.0)
 
 
 # ================================================================================================ build
@@ -303,21 +414,32 @@ def build(autonomous=True):
                                   "thesis": "A hall whose four walls are one kinetic installation: eight thousand "
                                             "metal blades, each swung by its own oscillator, falling into step and "
                                             "breaking apart round the room."})
-    s.blade_programs = []
+    s.binds = []
     network(s)
     walls(s)
     room(s)
     light(s)
     camera(s)
     s.response = dict(common.RESPONSE)
+    s.palette = palette_block(s)
     return s
 
 
-def write_variant(pp, out, wav=None, cam=None, sets=(), tracks=()):
+def write_variant(pp, out, wav=None, cam=None, sets=(), tracks=(), palette=None):
+    """A review project. `palette` (an index) selects and locks one state: the selector's values live in the palette
+    block, since its parameters register after a project's parameter values are read (Resonant Silk's note)."""
     if cam and cam in CAMERAS:
         cam = "%s:%s" % CAMERAS[cam]
     params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in sets}
-    return common.variant(pp, out, wav, cam, params, list(tracks))
+    out = common.variant(pp, out, wav, cam, params, list(tracks))
+    if palette is not None:
+        with open(out) as f:
+            doc = json.load(f)
+        doc["palette"]["selector"].update({"select": int(palette), "lock": True})
+        doc["palette"]["position"] = float(palette)
+        with open(out, "w") as f:
+            json.dump(doc, f, indent=1)
+    return out
 
 
 def main():
@@ -328,6 +450,7 @@ def main():
     ap.add_argument("--camera")
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--track", action="append", default=[])
+    ap.add_argument("--palette", type=int)
     a = ap.parse_args()
     s = build()
     pp, sp = s.write(OUT)
@@ -337,7 +460,7 @@ def main():
     assert nf <= 16, "%d GPU fields (16 at most)" % nf
     print(pp, "fields=%d blades=%d grid=%s" % (nf, blades, s.grids[0]["resolution"]))
     if a.variant:
-        print(write_variant(pp, a.out, a.wav, a.camera, a.set, a.track))
+        print(write_variant(pp, a.out, a.wav, a.camera, a.set, a.track, a.palette))
 
 
 if __name__ == "__main__":

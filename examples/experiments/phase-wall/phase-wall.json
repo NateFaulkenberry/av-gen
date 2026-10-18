@@ -134,9 +134,9 @@
   "post/look/atmospheric": 0.12,
   "post/look/atmosphericDistance": 140.0,
   "post/look/atmosphericTint": [
-   0.00425,
-   0.0121,
-   0.01399
+   0.00364,
+   0.01302,
+   0.015
   ]
  },
  "sources": [],
@@ -227,5 +227,784 @@
   "thesis": "A hall whose four walls are one kinetic installation: eight thousand metal blades, each swung by its own oscillator, falling into step and breaking apart round the room.",
   "id": "phase-wall",
   "title": "Phase Wall"
+ },
+ "palette": {
+  "states": [
+   {
+    "name": "Bronze Tide",
+    "colors": {
+     "environment": [
+      0.00182,
+      0.00651,
+      0.0075
+     ],
+     "back": [
+      0.00478,
+      0.09084,
+      0.11697
+     ],
+     "trough": [
+      0.00439,
+      0.02315,
+      0.02519
+     ],
+     "mid": [
+      0.19462,
+      0.04971,
+      0.01298
+     ],
+     "crest": [
+      0.87137,
+      0.39157,
+      0.11697
+     ],
+     "wash": [
+      1.0,
+      0.69387,
+      0.43415
+     ],
+     "front": [
+      0.07819,
+      0.87137,
+      0.71569
+     ],
+     "peak": [
+      1.0,
+      0.45079,
+      0.10702
+     ],
+     "trim": [
+      1.0,
+      0.62396,
+      0.32314
+     ],
+     "floor": [
+      0.00478,
+      0.02315,
+      0.02732
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Ember",
+    "colors": {
+     "environment": [
+      0.007,
+      0.00182,
+      0.00152
+     ],
+     "back": [
+      0.19462,
+      0.01033,
+      0.00304
+     ],
+     "trough": [
+      0.02732,
+      0.00368,
+      0.00243
+     ],
+     "mid": [
+      0.32314,
+      0.02519,
+      0.00518
+     ],
+     "crest": [
+      1.0,
+      0.32314,
+      0.05127
+     ],
+     "wash": [
+      1.0,
+      0.57758,
+      0.27889
+     ],
+     "front": [
+      1.0,
+      0.64448,
+      0.04519
+     ],
+     "peak": [
+      1.0,
+      0.90466,
+      0.63076
+     ],
+     "trim": [
+      1.0,
+      0.32314,
+      0.08022
+     ],
+     "floor": [
+      0.02519,
+      0.00402,
+      0.00212
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Gilt Orchid",
+    "colors": {
+     "environment": [
+      0.00402,
+      0.00152,
+      0.00651
+     ],
+     "back": [
+      0.09306,
+      0.00518,
+      0.16203
+     ],
+     "trough": [
+      0.01764,
+      0.00273,
+      0.02732
+     ],
+     "mid": [
+      0.25415,
+      0.02315,
+      0.19462
+     ],
+     "crest": [
+      1.0,
+      0.65141,
+      0.14413
+     ],
+     "wash": [
+      1.0,
+      0.87137,
+      0.68669
+     ],
+     "front": [
+      1.0,
+      0.04231,
+      0.43415
+     ],
+     "peak": [
+      1.0,
+      0.7454,
+      0.90466
+     ],
+     "trim": [
+      1.0,
+      0.62396,
+      0.19462
+     ],
+     "floor": [
+      0.01444,
+      0.00304,
+      0.02315
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Coral Lagoon",
+    "colors": {
+     "environment": [
+      0.00121,
+      0.00605,
+      0.00561
+     ],
+     "back": [
+      0.00243,
+      0.16203,
+      0.16203
+     ],
+     "trough": [
+      0.00368,
+      0.01938,
+      0.01938
+     ],
+     "mid": [
+      0.52712,
+      0.0648,
+      0.06848
+     ],
+     "crest": [
+      1.0,
+      0.45641,
+      0.26225
+     ],
+     "wash": [
+      1.0,
+      0.87137,
+      0.7454
+     ],
+     "front": [
+      0.05127,
+      1.0,
+      0.7454
+     ],
+     "peak": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "trim": [
+      1.0,
+      0.43415,
+      0.35153
+     ],
+     "floor": [
+      0.00335,
+      0.02519,
+      0.02519
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Verdigris",
+    "colors": {
+     "environment": [
+      0.00121,
+      0.00651,
+      0.00518
+     ],
+     "back": [
+      0.00368,
+      0.14413,
+      0.08022
+     ],
+     "trough": [
+      0.00368,
+      0.02315,
+      0.01298
+     ],
+     "mid": [
+      0.02843,
+      0.25415,
+      0.11697
+     ],
+     "crest": [
+      0.38133,
+      0.87137,
+      0.47932
+     ],
+     "wash": [
+      0.82279,
+      1.0,
+      0.71569
+     ],
+     "front": [
+      1.0,
+      0.19462,
+      0.10702
+     ],
+     "peak": [
+      1.0,
+      0.87137,
+      0.35153
+     ],
+     "trim": [
+      0.3467,
+      1.0,
+      0.63076
+     ],
+     "floor": [
+      0.00304,
+      0.02315,
+      0.01298
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Aurora",
+    "colors": {
+     "environment": [
+      0.00091,
+      0.00368,
+      0.00605
+     ],
+     "back": [
+      0.00304,
+      0.10224,
+      0.0648
+     ],
+     "trough": [
+      0.00402,
+      0.00802,
+      0.02956
+     ],
+     "mid": [
+      0.05781,
+      0.02956,
+      0.35153
+     ],
+     "crest": [
+      0.11697,
+      1.0,
+      0.43415
+     ],
+     "wash": [
+      0.7454,
+      0.87137,
+      1.0
+     ],
+     "front": [
+      1.0,
+      0.11697,
+      0.52712
+     ],
+     "peak": [
+      1.0,
+      0.92158,
+      0.35153
+     ],
+     "trim": [
+      0.21586,
+      1.0,
+      0.52712
+     ],
+     "floor": [
+      0.00243,
+      0.01161,
+      0.02122
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Cobalt Ice",
+    "colors": {
+     "environment": [
+      0.00121,
+      0.00304,
+      0.01033
+     ],
+     "back": [
+      0.00518,
+      0.0319,
+      0.35153
+     ],
+     "trough": [
+      0.00304,
+      0.00913,
+      0.05127
+     ],
+     "mid": [
+      0.01444,
+      0.08022,
+      0.47932
+     ],
+     "crest": [
+      0.35153,
+      0.68669,
+      1.0
+     ],
+     "wash": [
+      0.68669,
+      0.8388,
+      1.0
+     ],
+     "front": [
+      0.14413,
+      0.87137,
+      1.0
+     ],
+     "peak": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "trim": [
+      0.25415,
+      0.57758,
+      1.0
+     ],
+     "floor": [
+      0.00304,
+      0.00913,
+      0.05127
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Nocturne",
+    "colors": {
+     "environment": [
+      0.00304,
+      0.00182,
+      0.00802
+     ],
+     "back": [
+      0.05127,
+      0.00913,
+      0.25415
+     ],
+     "trough": [
+      0.01161,
+      0.00439,
+      0.03434
+     ],
+     "mid": [
+      0.10224,
+      0.02315,
+      0.35153
+     ],
+     "crest": [
+      0.63076,
+      0.39157,
+      1.0
+     ],
+     "wash": [
+      0.68669,
+      0.57758,
+      1.0
+     ],
+     "front": [
+      1.0,
+      0.10224,
+      0.68669
+     ],
+     "peak": [
+      1.0,
+      0.64448,
+      0.19462
+     ],
+     "trim": [
+      0.45641,
+      0.26225,
+      1.0
+     ],
+     "floor": [
+      0.00913,
+      0.00439,
+      0.02956
+     ]
+    },
+    "scalars": {}
+   }
+  ],
+  "bindings": [
+   {
+    "role": "trough",
+    "target": "material/blade_west/op/4/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/blade_west/op/4/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/blade_west/op/4/ramp/constant3"
+   },
+   {
+    "role": "front",
+    "target": "material/blade_west/op/23/constant/constant",
+    "gain": 1.4
+   },
+   {
+    "role": "peak",
+    "target": "material/blade_west/op/26/constant/constant",
+    "gain": 2.5
+   },
+   {
+    "role": "back",
+    "target": "procedural/back_west/material/emissiveColor",
+    "gain": 0.7
+   },
+   {
+    "role": "trough",
+    "target": "material/blade_north/op/4/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/blade_north/op/4/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/blade_north/op/4/ramp/constant3"
+   },
+   {
+    "role": "front",
+    "target": "material/blade_north/op/23/constant/constant",
+    "gain": 1.4
+   },
+   {
+    "role": "peak",
+    "target": "material/blade_north/op/26/constant/constant",
+    "gain": 2.5
+   },
+   {
+    "role": "back",
+    "target": "procedural/back_north/material/emissiveColor",
+    "gain": 0.7
+   },
+   {
+    "role": "trough",
+    "target": "material/blade_east/op/4/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/blade_east/op/4/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/blade_east/op/4/ramp/constant3"
+   },
+   {
+    "role": "front",
+    "target": "material/blade_east/op/23/constant/constant",
+    "gain": 1.4
+   },
+   {
+    "role": "peak",
+    "target": "material/blade_east/op/26/constant/constant",
+    "gain": 2.5
+   },
+   {
+    "role": "back",
+    "target": "procedural/back_east/material/emissiveColor",
+    "gain": 0.7
+   },
+   {
+    "role": "trough",
+    "target": "material/blade_south/op/4/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/blade_south/op/4/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/blade_south/op/4/ramp/constant3"
+   },
+   {
+    "role": "front",
+    "target": "material/blade_south/op/23/constant/constant",
+    "gain": 1.4
+   },
+   {
+    "role": "peak",
+    "target": "material/blade_south/op/26/constant/constant",
+    "gain": 2.5
+   },
+   {
+    "role": "back",
+    "target": "procedural/back_south/material/emissiveColor",
+    "gain": 0.7
+   },
+   {
+    "role": "trim",
+    "target": "procedural/strips_w/material/emissiveColor"
+   },
+   {
+    "role": "trim",
+    "target": "procedural/strips_e/material/emissiveColor"
+   },
+   {
+    "role": "floor",
+    "target": "procedural/pier0/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/pier1/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/pier2/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/pier3/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/bays_w/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/bays_e/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/plinth_west/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/plinth_north/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/plinth_east/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "floor",
+    "target": "procedural/plinth_south/material/baseColor",
+    "gain": 0.6
+   },
+   {
+    "role": "environment",
+    "target": "procedural/beams_x/material/baseColor",
+    "gain": 3.0
+   },
+   {
+    "role": "environment",
+    "target": "procedural/beams_z/material/baseColor",
+    "gain": 3.0
+   },
+   {
+    "role": "environment",
+    "target": "procedural/ceiling/material/emissiveColor",
+    "gain": 3.0
+   },
+   {
+    "role": "trough",
+    "target": "material/floorLacquer/op/7/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/floorLacquer/op/7/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/floorLacquer/op/7/ramp/constant3"
+   },
+   {
+    "role": "trough",
+    "target": "material/floorLacquer/op/15/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/floorLacquer/op/15/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/floorLacquer/op/15/ramp/constant3"
+   },
+   {
+    "role": "trough",
+    "target": "material/floorLacquer/op/23/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/floorLacquer/op/23/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/floorLacquer/op/23/ramp/constant3"
+   },
+   {
+    "role": "trough",
+    "target": "material/floorLacquer/op/31/ramp/constant"
+   },
+   {
+    "role": "mid",
+    "target": "material/floorLacquer/op/31/ramp/constant2"
+   },
+   {
+    "role": "crest",
+    "target": "material/floorLacquer/op/31/ramp/constant3"
+   },
+   {
+    "role": "floor",
+    "target": "material/floorLacquer/op/36/constant/constant",
+    "gain": 2.6
+   },
+   {
+    "role": "trim",
+    "target": "procedural/inlay_z/material/baseColor",
+    "gain": 0.15
+   },
+   {
+    "role": "trim",
+    "target": "procedural/inlay_x/material/baseColor",
+    "gain": 0.15
+   },
+   {
+    "role": "environment",
+    "target": "env/sky/zenithColor"
+   },
+   {
+    "role": "environment",
+    "target": "env/sky/horizonColor"
+   },
+   {
+    "role": "environment",
+    "target": "env/sky/groundColor"
+   },
+   {
+    "role": "environment",
+    "target": "scene/fogColor"
+   },
+   {
+    "role": "wash",
+    "target": "lights/key/color"
+   },
+   {
+    "role": "wash",
+    "target": "lights/wash_west/color"
+   },
+   {
+    "role": "wash",
+    "target": "lights/wash_north/color"
+   },
+   {
+    "role": "wash",
+    "target": "lights/wash_east/color"
+   },
+   {
+    "role": "wash",
+    "target": "lights/wash_south/color"
+   },
+   {
+    "role": "back",
+    "target": "lights/bounce/color"
+   },
+   {
+    "role": "environment",
+    "target": "post/look/atmosphericTint",
+    "gain": 2.0
+   }
+  ],
+  "position": 0.0,
+  "saturation": 1.0,
+  "value": 1.0,
+  "selector": {
+   "select": 0,
+   "transition": 6.0,
+   "lock": false,
+   "hold": 40.0,
+   "advance": {
+    "signal": "beat.phrasePulse",
+    "threshold": 0.5,
+    "order": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "change": {
+     "signals": [
+      "sonic.energy",
+      "sonic.brightness",
+      "sonic.density"
+     ],
+     "fast": 3.0,
+     "slow": 24.0,
+     "threshold": 0.06,
+     "rearm": 0.03,
+     "primaryTimeout": 30.0,
+     "maxHold": 90.0
+    }
+   }
+  }
  }
 }
