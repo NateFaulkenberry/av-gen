@@ -165,7 +165,7 @@
   {
    "source": "response.sustain",
    "target": "grid/net/coupling",
-   "amount": 6.0,
+   "amount": 3.0,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",

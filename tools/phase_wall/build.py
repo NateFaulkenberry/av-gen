@@ -438,7 +438,9 @@ def music(s, net):
     s.field("tune", {"kind": "compound", "combine": "add", "children": ["tilt", "pace"]})
     net["frequencyField"] = "tune"
     A = common.audio
-    s.route(A("response.sustain", G + "coupling", 6.0, attackMs=3000, decayMs=6000),
+    s.route(# held sound pulls toward unison by +3 K: enough to calm and merge islands, not to lock the room (at +6,
+            # a dense mix such as Feline Footwear held the hall in unison and the islands, the scene's identity, went)
+            A("response.sustain", G + "coupling", 3.0, attackMs=3000, decayMs=6000),
             A("response.bass", G + "frequency", 0.25, attackMs=300, decayMs=1500),
             A("response.hat", G + "noise", 0.12, attackMs=40, decayMs=400),
             A("response.intensity", G + "phaseLag", 0.35, attackMs=6000, decayMs=12000),
