@@ -334,7 +334,7 @@
   },
   {
    "source": "control.iridescence",
-   "target": "material/rsSilk/op/18/constant/constant",
+   "target": "material/rsSilk/op/21/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -347,7 +347,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/29/constant/constant",
+   "target": "material/rsSilk/op/32/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -360,7 +360,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/35/constant/constant",
+   "target": "material/rsSilk/op/38/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -802,9 +802,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.22,
+     "rough": 0.32,
      "film": 1.0,
-     "key": 5.0,
+     "key": 3.5,
      "emit": 1.0,
      "irid": 0.02,
      "filmIor": 1.7,
@@ -876,9 +876,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.19,
+     "rough": 0.29,
      "film": 0.9,
-     "key": 4.6,
+     "key": 3.22,
      "emit": 0.9,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -950,9 +950,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.26,
+     "rough": 0.36,
      "film": 0.8,
-     "key": 3.6,
+     "key": 2.52,
      "emit": 0.7,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1024,9 +1024,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.23,
+     "rough": 0.33,
      "film": 1.25,
-     "key": 3.8,
+     "key": 2.66,
      "emit": 0.8,
      "irid": 0.18,
      "filmIor": 2.0,
@@ -1098,9 +1098,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.2,
+     "rough": 0.3,
      "film": 0.9,
-     "key": 4.4,
+     "key": 3.08,
      "emit": 0.8,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1172,9 +1172,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.17,
+     "rough": 0.27,
      "film": 1.0,
-     "key": 5.2,
+     "key": 3.64,
      "emit": 1.1,
      "irid": 0.02,
      "filmIor": 1.6,
@@ -1246,9 +1246,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.24,
+     "rough": 0.34,
      "film": 0.8,
-     "key": 4.0,
+     "key": 2.8,
      "emit": 0.7,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1320,9 +1320,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.16,
+     "rough": 0.26,
      "film": 0.95,
-     "key": 4.6,
+     "key": 3.22,
      "emit": 0.9,
      "irid": 0.45,
      "filmIor": 2.4,
@@ -1334,21 +1334,26 @@
    {
     "role": "environment",
     "target": "env/sky/zenithColor",
-    "gain": 0.6
-   },
-   {
-    "role": "environment",
-    "target": "env/sky/groundColor",
-    "gain": 0.7
-   },
-   {
-    "role": "environment",
-    "target": "env/sky/horizonColor",
     "gain": 1.0
+   },
+   {
+    "role": "shadow",
+    "target": "env/sky/groundColor",
+    "gain": 1.5
+   },
+   {
+    "role": "shadow",
+    "target": "env/sky/horizonColor",
+    "gain": 2.2
    },
    {
     "role": "environment",
     "target": "scene/fogColor",
+    "gain": 1.6
+   },
+   {
+    "role": "resonant",
+    "target": "env/sky/sunColor",
     "gain": 1.0
    },
    {
@@ -1376,6 +1381,16 @@
     "target": "lights/key/color"
    },
    {
+    "role": "fold",
+    "target": "material/rsSilk/op/16/ramp/constant2",
+    "gain": 0.25
+   },
+   {
+    "role": "fold",
+    "target": "material/rsSilk/op/16/ramp/constant3",
+    "gain": 0.5
+   },
+   {
     "role": "grazing",
     "target": "material/rsSilk/op/5/ramp/constant2",
     "gain": 0.45
@@ -1391,12 +1406,12 @@
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/22/ramp/constant",
+    "target": "material/rsSilk/op/25/ramp/constant",
     "gain": 0.5
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/22/ramp/constant2",
+    "target": "material/rsSilk/op/25/ramp/constant2",
     "gain": 0.375
    },
    {
@@ -1424,7 +1439,7 @@
    },
    {
     "role": "irid",
-    "target": "material/rsSilk/op/18/constant/constant",
+    "target": "material/rsSilk/op/21/constant/constant",
     "mode": "multiply"
    },
    {
@@ -1441,31 +1456,31 @@
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/22/ramp/constant",
+    "target": "material/rsSilk/op/25/ramp/constant",
     "mode": "multiply"
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/22/ramp/constant2",
+    "target": "material/rsSilk/op/25/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/28/ramp/constant2",
+    "target": "material/rsSilk/op/31/ramp/constant2",
     "gain": 0.5
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/28/ramp/constant3"
+    "target": "material/rsSilk/op/31/ramp/constant3"
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/34/ramp/constant2",
+    "target": "material/rsSilk/op/37/ramp/constant2",
     "gain": 0.5
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/34/ramp/constant3"
+    "target": "material/rsSilk/op/37/ramp/constant3"
    }
   ],
   "position": 0.0,

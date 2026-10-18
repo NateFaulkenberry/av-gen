@@ -125,11 +125,19 @@
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.2,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 28.0,
+  "camera/lens/focalLength": 26.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
+  "sources/famPlate/rate": 0.010309,
+  "sources/famPlate/phase": 0.0,
+  "sources/famHex/rate": 0.007634,
+  "sources/famHex/phase": 0.45,
+  "sources/famRadial/rate": 0.006623,
+  "sources/famRadial/phase": 0.7,
+  "sources/famArcs/rate": 0.00578,
+  "sources/famArcs/phase": 0.2,
   "post/motionBlur/amount": 0.0,
   "post/dof/physical": false,
   "post/bloom/radius": 0.6,
@@ -137,7 +145,36 @@
   "post/lens/chromaticAberration": 0.0,
   "post/dof/enabled": false
  },
- "sources": [],
+ "sources": [
+  {
+   "kind": "lfo",
+   "name": "famPlate",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "famHex",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "famRadial",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "famArcs",
+   "settings": {
+    "shape": "sine"
+   }
+  }
+ ],
  "routes": [
   {
    "source": "response.intensity",
@@ -239,9 +276,48 @@
    }
   },
   {
+   "source": "lfo.famPlate",
+   "target": "field/cymatic/resonance/source/0/amplitude",
+   "amount": 0.85,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.famHex",
+   "target": "field/cymatic/resonance/source/1/amplitude",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.famRadial",
+   "target": "field/cymatic/resonance/source/2/amplitude",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.famArcs",
+   "target": "field/cymatic/resonance/source/3/amplitude",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "response.bass",
+   "target": "field/cymatic/resonance/source/0/amplitude",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 1500
+   }
+  },
+  {
    "source": "sonic.brightness.slow",
    "target": "field/cymatic/resonance/source/0/focus",
-   "amount": 0.08,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -250,19 +326,8 @@
    }
   },
   {
-   "source": "sonic.brightness.slow",
-   "target": "field/cymatic/resonance/source/1/focus",
-   "amount": 0.06,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 2500,
-    "decayMs": 5000
-   }
-  },
-  {
    "source": "sonic.brightness",
-   "target": "field/cymatic/resonance/source/2/focus",
+   "target": "field/cymaticFine/resonance/source/0/focus",
    "amount": 0.14,
    "op": "add",
    "polarity": "unipolar",
@@ -273,7 +338,7 @@
   },
   {
    "source": "sonic.roughness.slow",
-   "target": "field/cymatic/resonance/source/1/amplitude",
+   "target": "field/cymatic/resonance/source/3/amplitude",
    "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
@@ -563,225 +628,225 @@
      {
       "time": 0.0,
       "value": [
-       3.0102,
-       42.0,
-       35.6497
+       8.8555,
+       44.0,
+       77.2409
       ],
       "interp": "smooth"
      },
      {
       "time": 6.6667,
       "value": [
-       9.3352,
-       43.0,
-       34.1689
+       22.5596,
+       45.0,
+       74.0326
       ],
       "interp": "smooth"
      },
      {
       "time": 13.3333,
       "value": [
-       14.901,
-       43.7321,
-       31.7861
+       34.6188,
+       45.7321,
+       68.8699
       ],
       "interp": "smooth"
      },
      {
       "time": 20.0,
       "value": [
-       19.3045,
-       44.0,
-       29.0193
+       44.1598,
+       46.0,
+       62.8751
       ],
       "interp": "smooth"
      },
      {
       "time": 26.6667,
       "value": [
-       22.3865,
-       43.7321,
-       26.482
+       50.8374,
+       45.7321,
+       57.3778
       ],
       "interp": "smooth"
      },
      {
       "time": 33.3333,
       "value": [
-       24.1727,
-       43.0,
-       24.7182
+       54.7075,
+       45.0,
+       53.5562
       ],
       "interp": "smooth"
      },
      {
       "time": 40.0,
       "value": [
-       24.7532,
-       42.0,
-       24.0887
+       55.9653,
+       44.0,
+       52.1922
       ],
       "interp": "smooth"
      },
      {
       "time": 46.6667,
       "value": [
-       24.1727,
-       41.0,
-       24.7182
+       54.7075,
+       43.0,
+       53.5562
       ],
       "interp": "smooth"
      },
      {
       "time": 53.3333,
       "value": [
-       22.3865,
-       40.2679,
-       26.482
+       50.8374,
+       42.2679,
+       57.3778
       ],
       "interp": "smooth"
      },
      {
       "time": 60.0,
       "value": [
-       19.3045,
-       40.0,
-       29.0193
+       44.1598,
+       42.0,
+       62.8751
       ],
       "interp": "smooth"
      },
      {
       "time": 66.6667,
       "value": [
-       14.901,
-       40.2679,
-       31.7861
+       34.6188,
+       42.2679,
+       68.8699
       ],
       "interp": "smooth"
      },
      {
       "time": 73.3333,
       "value": [
-       9.3352,
-       41.0,
-       34.1689
+       22.5596,
+       43.0,
+       74.0326
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       3.0102,
-       42.0,
-       35.6497
+       8.8555,
+       44.0,
+       77.2409
       ],
       "interp": "smooth"
      },
      {
       "time": 86.6667,
       "value": [
-       -3.4779,
-       43.0,
-       35.9697
+       -5.202,
+       45.0,
+       77.9342
       ],
       "interp": "smooth"
      },
      {
       "time": 93.3333,
       "value": [
-       -9.4848,
-       43.7321,
-       35.2133
+       -18.2171,
+       45.7321,
+       76.2955
       ],
       "interp": "smooth"
      },
      {
       "time": 100.0,
       "value": [
-       -14.4804,
-       44.0,
-       33.7674
+       -29.0409,
+       46.0,
+       73.1628
       ],
       "interp": "smooth"
      },
      {
       "time": 106.6667,
       "value": [
-       -18.1424,
-       43.7321,
-       32.178
+       -36.9751,
+       45.7321,
+       69.719
       ],
       "interp": "smooth"
      },
      {
       "time": 113.3333,
       "value": [
-       -20.3455,
-       43.0,
-       30.9749
+       -41.7486,
+       45.0,
+       67.1122
       ],
       "interp": "smooth"
      },
      {
       "time": 120.0,
       "value": [
-       -21.0771,
-       42.0,
-       30.5297
+       -43.3337,
+       44.0,
+       66.1478
       ],
       "interp": "smooth"
      },
      {
       "time": 126.6667,
       "value": [
-       -20.3455,
-       41.0,
-       30.9749
+       -41.7486,
+       43.0,
+       67.1122
       ],
       "interp": "smooth"
      },
      {
       "time": 133.3333,
       "value": [
-       -18.1424,
-       40.2679,
-       32.178
+       -36.9751,
+       42.2679,
+       69.719
       ],
       "interp": "smooth"
      },
      {
       "time": 140.0,
       "value": [
-       -14.4804,
-       40.0,
-       33.7674
+       -29.0409,
+       42.0,
+       73.1628
       ],
       "interp": "smooth"
      },
      {
       "time": 146.6667,
       "value": [
-       -9.4848,
-       40.2679,
-       35.2133
+       -18.2171,
+       42.2679,
+       76.2955
       ],
       "interp": "smooth"
      },
      {
       "time": 153.3333,
       "value": [
-       -3.4779,
-       41.0,
-       35.9697
+       -5.202,
+       43.0,
+       77.9342
       ],
       "interp": "smooth"
      },
      {
       "time": 160.0,
       "value": [
-       3.0102,
-       42.0,
-       35.6497
+       8.8555,
+       44.0,
+       77.2409
       ],
       "interp": "smooth"
      }
@@ -1124,24 +1189,49 @@
       1.0
      ],
      "g0": [
-      0.00629,
-      0.00723,
-      0.04752
+      0.00319,
+      0.00469,
+      0.04259
      ],
      "g1": [
-      0.0012,
-      0.01901,
-      0.09001
+      0.0,
+      0.02089,
+      0.09243
      ],
      "g2": [
-      0.03387,
-      0.00972,
-      0.09211
+      0.04837,
+      0.01037,
+      0.11099
      ],
      "g3": [
-      0.08815,
-      0.01134,
-      0.07105
+      0.1319,
+      0.0129,
+      0.07202
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00106,
+      0.00281
+     ],
+     "skyHorizon": [
+      0.02118,
+      0.03838,
+      0.1744
+     ],
+     "skyGround": [
+      0.00372,
+      0.00719,
+      0.05387
+     ],
+     "fogC": [
+      0.02144,
+      0.04095,
+      0.24407
+     ],
+     "sunC": [
+      0.1132,
+      0.28472,
+      1.0
      ]
     }
    },
@@ -1232,6 +1322,31 @@
       0.19452,
       0.00455,
       0.01712
+     ],
+     "skyZenith": [
+      0.00121,
+      0.00091,
+      0.00302
+     ],
+     "skyHorizon": [
+      0.07205,
+      0.01949,
+      0.16617
+     ],
+     "skyGround": [
+      0.01869,
+      0.00186,
+      0.0497
+     ],
+     "fogC": [
+      0.08961,
+      0.01736,
+      0.22068
+     ],
+     "sunC": [
+      1.0,
+      0.04468,
+      0.31771
      ]
     }
    },
@@ -1322,6 +1437,31 @@
       0.15936,
       0.06624,
       0.001
+     ],
+     "skyZenith": [
+      0.00168,
+      0.00121,
+      0.00121
+     ],
+     "skyHorizon": [
+      0.13253,
+      0.01869,
+      0.01352
+     ],
+     "skyGround": [
+      0.03763,
+      0.00179,
+      0.00127
+     ],
+     "fogC": [
+      0.17684,
+      0.01496,
+      0.01046
+     ],
+     "sunC": [
+      1.0,
+      0.13736,
+      0.03482
      ]
     }
    },
@@ -1412,6 +1552,31 @@
       0.19496,
       0.0249,
       0.08724
+     ],
+     "skyZenith": [
+      0.00121,
+      0.00091,
+      0.00281
+     ],
+     "skyHorizon": [
+      0.05436,
+      0.02053,
+      0.20666
+     ],
+     "skyGround": [
+      0.01317,
+      0.00294,
+      0.05712
+     ],
+     "fogC": [
+      0.06452,
+      0.02277,
+      0.25094
+     ],
+     "sunC": [
+      0.45005,
+      0.10538,
+      1.0
      ]
     }
    },
@@ -1502,6 +1667,31 @@
       0.14025,
       0.07749,
       0.02066
+     ],
+     "skyZenith": [
+      0.00136,
+      0.00168,
+      0.00201
+     ],
+     "skyHorizon": [
+      0.0348,
+      0.05081,
+      0.05011
+     ],
+     "skyGround": [
+      0.00707,
+      0.0119,
+      0.0117
+     ],
+     "fogC": [
+      0.0384,
+      0.06064,
+      0.0597
+     ],
+     "sunC": [
+      1.0,
+      0.33126,
+      0.15078
      ]
     }
    },
@@ -1592,6 +1782,31 @@
       0.0696,
       0.18098,
       0.18488
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00152,
+      0.00302
+     ],
+     "skyHorizon": [
+      0.01369,
+      0.04909,
+      0.12071
+     ],
+     "skyGround": [
+      0.0011,
+      0.01097,
+      0.0349
+     ],
+     "fogC": [
+      0.01011,
+      0.05721,
+      0.16252
+     ],
+     "sunC": [
+      0.21085,
+      0.64283,
+      1.0
      ]
     }
    },
@@ -1682,6 +1897,31 @@
       0.07073,
       0.09998,
       0.00396
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00152,
+      0.00121
+     ],
+     "skyHorizon": [
+      0.00732,
+      0.06481,
+      0.02834
+     ],
+     "skyGround": [
+      0.0,
+      0.01609,
+      0.00522
+     ],
+     "fogC": [
+      0.00054,
+      0.07998,
+      0.02969
+     ],
+     "sunC": [
+      0.10731,
+      1.0,
+      0.37797
      ]
     }
    },
@@ -1772,6 +2012,31 @@
       0.16287,
       0.07119,
       0.06817
+     ],
+     "skyZenith": [
+      0.00152,
+      0.00106,
+      0.00259
+     ],
+     "skyHorizon": [
+      0.09151,
+      0.02494,
+      0.07715
+     ],
+     "skyGround": [
+      0.02448,
+      0.00395,
+      0.02021
+     ],
+     "fogC": [
+      0.11791,
+      0.02434,
+      0.09813
+     ],
+     "sunC": [
+      1.0,
+      0.234,
+      0.48521
      ]
     }
    },
@@ -1862,6 +2127,31 @@
       0.07829,
       0.07249,
       0.06646
+     ],
+     "skyZenith": [
+      0.00046,
+      0.0006,
+      0.00076
+     ],
+     "skyHorizon": [
+      0.03945,
+      0.04742,
+      0.06098
+     ],
+     "skyGround": [
+      0.00848,
+      0.01086,
+      0.01508
+     ],
+     "fogC": [
+      0.04489,
+      0.05589,
+      0.07504
+     ],
+     "sunC": [
+      0.70341,
+      0.80927,
+      1.0
      ]
     }
    },
@@ -1952,6 +2242,31 @@
       0.15011,
       0.03801,
       0.03682
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00106,
+      0.00201
+     ],
+     "skyHorizon": [
+      0.0354,
+      0.03897,
+      0.13086
+     ],
+     "skyGround": [
+      0.00758,
+      0.00786,
+      0.03838
+     ],
+     "fogC": [
+      0.04009,
+      0.04302,
+      0.17768
+     ],
+     "sunC": [
+      1.0,
+      0.15643,
+      0.36542
      ]
     }
    }
@@ -2036,6 +2351,31 @@
     "role": "key",
     "target": "material/cwGround/op/32/ramp/constant3",
     "mode": "multiply"
+   },
+   {
+    "role": "skyZenith",
+    "target": "env/sky/zenithColor",
+    "mode": "replace"
+   },
+   {
+    "role": "skyHorizon",
+    "target": "env/sky/horizonColor",
+    "mode": "replace"
+   },
+   {
+    "role": "skyGround",
+    "target": "env/sky/groundColor",
+    "mode": "replace"
+   },
+   {
+    "role": "fogC",
+    "target": "scene/fogColor",
+    "mode": "replace"
+   },
+   {
+    "role": "sunC",
+    "target": "env/sky/sunColor",
+    "mode": "replace"
    }
   ],
   "position": 0.0,

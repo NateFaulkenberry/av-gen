@@ -29,13 +29,41 @@
    0.00268,
    0.01156
   ],
-  "volumeDensity": 0.0,
+  "volumeMaxDistance": 0.0,
+  "volumeDensity": 0.0013,
   "fogHeight": 400.0,
   "fogHeightFalloff": 0.0,
   "skyIntensity": 1.0,
   "shadowRange": 200.0,
   "ambientOcclusion": false,
   "contactShadows": false,
+  "bands": {
+   "phase": 0.0,
+   "rotation": 0.0,
+   "gain": 0.6,
+   "softbox": {
+    "intensity": 0.5,
+    "azimuth": 2.6,
+    "elevation": 0.55,
+    "falloff": 2.2,
+    "skyFill": 0.04
+   },
+   "strips": [
+    {
+     "axis": [
+      0.2,
+      1.0,
+      0.1
+     ],
+     "offset": 0.35,
+     "width": 0.09,
+     "intensity": 1.0,
+     "segments": 0,
+     "warmth": 0.3,
+     "rate": 0.0
+    }
+   ]
+  },
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -54,8 +82,15 @@
     0.01999
    ],
    "haze": 1.0,
-   "sunIntensity": 0.0,
+   "sunIntensity": 1.2,
    "intensity": 1.0,
+   "sunSize": 0.015,
+   "sunGlow": 0.45,
+   "sunDirection": [
+    -0.03,
+    -0.02,
+    -1.0
+   ],
    "background": true,
    "useKeyLight": false
   }
@@ -466,7 +501,7 @@
      ],
      "emissiveIntensity": 0.0,
      "roughness": 0.28,
-     "metallic": 0.15,
+     "metallic": 0.05,
      "doubleSided": true,
      "thinFilm": {
       "thickness": 400.0,
@@ -571,6 +606,140 @@
       "space": "world",
       "alongNormal": false,
       "axis": [
+       -0.9087,
+       -0.0952,
+       -0.4065
+      ]
+     }
+    ],
+    "normalStep": 0.15
+   }
+  },
+  {
+   "name": "drapeAbove",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rs-drapeAbove.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rsSilk",
+     "baseColor": [
+      0.01714,
+      0.02457,
+      0.18168
+     ],
+     "emissiveColor": [
+      0.04092,
+      0.7913,
+      0.88792
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.28,
+     "metallic": 0.05,
+     "doubleSided": true,
+     "thinFilm": {
+      "thickness": 400.0,
+      "ior": 1.6
+     }
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 7.0,
+      "space": "world",
+      "scale": 0.009,
+      "speed": 0.06,
+      "seed": 11,
+      "axisMask": [
+       1.0,
+       1.0,
+       0.6
+      ]
+     },
+     {
+      "kind": "sine",
+      "amount": 2.2,
+      "space": "world",
+      "axis": [
+       0.435,
+       -0.03,
+       -0.9
+      ],
+      "frequency": 0.08975979010256552,
+      "speed": -0.5,
+      "displacementAxis": [
+       -0.9087,
+       -0.0952,
+       -0.4065
+      ]
+     }
+    ],
+    "normalStep": 0.15
+   }
+  },
+  {
+   "name": "drapeBelow",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rs-drapeBelow.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rsSilk",
+     "baseColor": [
+      0.01714,
+      0.02457,
+      0.18168
+     ],
+     "emissiveColor": [
+      0.04092,
+      0.7913,
+      0.88792
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 0.28,
+     "metallic": 0.05,
+     "doubleSided": true,
+     "thinFilm": {
+      "thickness": 400.0,
+      "ior": 1.6
+     }
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 7.0,
+      "space": "world",
+      "scale": 0.009,
+      "speed": 0.06,
+      "seed": 11,
+      "axisMask": [
+       1.0,
+       1.0,
+       0.6
+      ]
+     },
+     {
+      "kind": "sine",
+      "amount": 2.2,
+      "space": "world",
+      "axis": [
+       0.435,
+       -0.03,
+       -0.9
+      ],
+      "frequency": 0.08975979010256552,
+      "speed": -0.5,
+      "displacementAxis": [
        -0.9087,
        -0.0952,
        -0.4065
@@ -869,6 +1038,41 @@
       1.0
      ],
      "value": -1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 4,
+     "srcB": 4
+    },
+    {
+     "kind": "ramp",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.04696,
+      0.02383,
+      0.22827,
+      0.5
+     ],
+     "constant3": [
+      0.09391,
+      0.04765,
+      0.45655,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 6
     },
     {
      "kind": "palette",
