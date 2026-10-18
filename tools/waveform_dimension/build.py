@@ -289,6 +289,13 @@ def surface_program(name):
     g.op(None, "add", 4, a=4, b=5)
     g.op("albedo", "oklabRamp", 4, a=4, k=C("royal") + [1.0], k2=C("purple") + [1.0], k3=C("crimson") + [1.0],
          k4=C("indigo", 1.6) + [1.0], f=-1.0)
+    if DEBUG == "fronts":  # review aid (overhaul stage A): the travelling fronts' displacement as grey bands, unlit
+        g.op(None, "field", 3, field=os.environ.get("WD_FRONT_FIELD", "swell"))
+        g.op(None, "remap", 4, a=3, k=[-float(os.environ.get("WD_FRONT_RANGE", "1.2")),
+                                     float(os.environ.get("WD_FRONT_RANGE", "1.2")), 0.02, 0.9], f=1.0)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit, g.opacity = 2, 4, -1
+        return g
     if DEBUG == "normals":  # review aid (resonator-quality Phase C): the deformed normal as colour, unlit
         g.op(None, "input", 5, inp="normal")
         g.op(None, "remap", 4, a=5, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
@@ -343,7 +350,12 @@ def material(prog):
 
 
 # ================================================================================================ geometry
-FRONT_RELIEF = 7.0   # metres a kick's shell lifts the sheets it passes through
+FRONT_RELIEF = 7.0
+# the travelling fronts: name -> (source point, band, speed m/s, carrier wavelength m, smoothing s) and their relief
+FRONTS = {"swell": ((-320.0, 60.0, -240.0), (0.0, 0.22), 24.0, 52.0, 0.12),
+          "cross": ((280.0, -40.0, 260.0), (0.25, 0.55), 34.0, 30.0, 0.08)}
+SWELL_RELIEF = float(os.environ.get("WD_SWELL", "5.0"))
+CROSS_RELIEF = float(os.environ.get("WD_CROSS", "2.5"))   # metres a kick's shell lifts the sheets it passes through
 B_RELIEF = 0.6       # metres per unit of the mids' bands
 SPREAD = 3.2         # metres per unit of bass that each sheet moves away from the nest's middle sheet (spacing)
 
@@ -356,7 +368,59 @@ def deformers():
     return [{"kind": "field", "field": "D-grid", "amount": 1.0, "space": "world", "alongNormal": True},
             {"kind": "field", "field": "front", "amount": FRONT_RELIEF, "space": "world", "alongNormal": True},
             {"kind": "field", "field": "f-b", "amount": B_RELIEF, "space": "world", "alongNormal": True},
-            {"kind": "field", "field": "one", "amount": 0.0, "space": "world", "alongNormal": True}]
+            {"kind": "field", "field": "one", "amount": 0.0, "space": "world", "alongNormal": True},
+            # THE TRAVELLING FRONTS (Resonant Visual Worlds, 05-plan §1.3, W1): the music of the last seconds laid out
+            # in space as two families of spherical swells from sources far outside the sculpture, crossing it from
+            # different sides -- a broad bass swell and a quicker mid one -- so the primary event is propagation
+            {"kind": "field", "field": "swell", "amount": SWELL_RELIEF, "space": "world", "alongNormal": True},
+            {"kind": "field", "field": "cross", "amount": CROSS_RELIEF, "space": "world", "alongNormal": True}]
+
+
+# THE DOME (Resonant Visual Worlds, 05-plan §1.3, E1): the world beyond the sculpture is the same wave logic at a larger
+# scale and a slower rate -- an inward-facing sphere about the sculpture whose own unlit program runs long chromatic
+# bands (a cyclic OKLab ramp of the palette's dome roles) and carries the bass swell's fronts as they pass, dimmed and
+# softened by the coloured air. Never a flat backdrop: it has the sculpture's colours, moves with the music, and the
+# fronts sweep across it.
+DOME_R = float(os.environ.get("WD_DOME_R", "330"))
+DOME_ON = os.environ.get("WD_DOME", "1") == "1"
+DOME_GAIN = float(os.environ.get("WD_DOME_GAIN", "0.22"))
+DOME_DIR = (0.25, 0.9, 0.35)
+
+
+def dome_mesh(radius, nu=64, nv=32):
+    th = np.linspace(0.0, 2.0 * math.pi, nu + 1)
+    ph = np.linspace(0.02, math.pi - 0.02, nv)
+    T, Pp = np.meshgrid(th, ph, indexing="ij")
+    d = np.stack([np.sin(Pp) * np.cos(T), np.cos(Pp), np.sin(Pp) * np.sin(T)], -1).reshape(-1, 3)
+    pos = (d * radius + np.array(CAM_FOCUS)).astype(np.float32)
+    nrm = (-d).astype(np.float32)                       # inward: the camera is inside
+    uv = np.zeros((len(pos), 2), dtype=np.float32)
+    idx = []
+    for i in range(nu):
+        for j in range(nv - 1):
+            a, b, c, e = i * nv + j, (i + 1) * nv + j, (i + 1) * nv + j + 1, i * nv + j + 1
+            idx += [a, c, b, a, e, c]                   # wound to face inward
+    return pos, nrm, uv, np.array(idx, dtype=np.uint32)
+
+
+def dome_program():
+    g = Prog("wdDome")
+    g.op(None, "input", 0, inp="worldPosition")
+    g.op(None, "gradient", 1, a=0, k=list(_unit3(DOME_DIR)) + [0.5], f=0.5 / DOME_R)   # 0 .. 1 over the dome
+    g.op("domePhase", "remap", 1, a=1, k=[0.0, 1.0, 0.0, 2.5])                        # 2.5 bands; phase on k.z/k.w
+    g.op(None, "field", 2, field="swell")                                            # the bass fronts passing
+    g.op(None, "remap", 2, a=2, k=[0.0, 1.0, 0.0, 0.18])
+    g.op(None, "add", 1, a=1, b=2)
+    g.op("dome", "oklabRamp", 3, a=1, k=C("indigo") + [1], k2=C("royal") + [1], k3=C("purple") + [1],
+         k4=C("indigo", 1.5) + [1], f=-1.0)
+    g.op(None, "constant", 4, k=[0, 0, 0, 1])
+    g.base, g.emit, g.opacity = 4, 3, -1
+    return g
+
+
+def _unit3(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v]
 
 
 def level_sheets(s, prog):
@@ -368,6 +432,21 @@ def level_sheets(s, prog):
 # ADR-1440: the slow families are baked once a frame into a volume grid that the deformer samples (2 m cells)
 BAKE_BOUNDS = ([-128.0, -80.0, -128.0], [128.0, 80.0, 128.0])
 D_RES = [128, 80, 128]
+
+
+def travelling_fronts(s):
+    """Each front family: a spectrum field (the band's level over the last seconds, laid out outward from its
+    source at the travel speed: ADR-1116, exact under seek) times a spherical carrier moving at the same speed, so a
+    loud moment becomes a crest that sweeps through the sheets and keeps going (05-plan §1.3)."""
+    for name, (point, band, speed, wavelength, smooth) in FRONTS.items():
+        field(s, name + "Hist", {"kind": "spectrum", "audioBand": "range", "bandLow": band[0], "bandHigh": band[1],
+                                  "audioSpeed": speed, "audioSmooth": smooth, "point": list(point),
+                                  "waveGeometry": "spherical", "strength": 1.0, "falloff": {"kind": "none"}})
+        field(s, name + "Carrier", {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine",
+                                     "point": list(point), "wavelength": wavelength, "waveSpeed": speed,
+                                     "waveWidth": 0.0, "amplitude": 1.0, "strength": 1.0, "falloff": {"kind": "none"}})
+        field(s, name, {"kind": "compound", "children": [name + "Hist", name + "Carrier"], "combine": "multiply",
+                        "strength": 1.0, "falloff": {"kind": "none"}})
 
 
 def bake_grid(s, source, res, strength=1.0):
@@ -503,10 +582,13 @@ def gradient_roles(roles):
         out["g%d" % i] = [round(v, 5) for v in kit.oklch(WAVE_L[i], min(c * WAVE_CHROMA, 0.25), h)]
     # the front light: white leaning a quarter toward the palette's key
     out["front"] = [round(v, 5) for v in kit.mix_oklab([1.0, 1.0, 1.0], lin["key"], 0.35)]
+    # the dome's bands: the same four hues, dimmed (it is the distance, and the air covers half of it)
+    for i in range(4):
+        out["d%d" % i] = [round(v * DOME_GAIN, 5) for v in out["g%d" % i]]
     return out
 
 
-def palette_block(g):
+def palette_block(g, dg=None):
     """The project palette (ADR-1043) with its selector (ADR-1420): the roles bound to the lights, the sky, the fog and
     the surface program's colour constants."""
     op = lambda label, k: ("material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], k)
@@ -521,6 +603,9 @@ def palette_block(g):
         ("contour", op("edgeBase", "constant2"), CONTOUR_GAIN[0]), ("contour", op("edgeBase", "constant3"), CONTOUR_GAIN[1]),
         ("edge", op("edgeTint", "constant2"), EDGE_GAIN[0]), ("peak", op("edgeTint", "constant3"), EDGE_GAIN[1]),
     ]
+    if dg is not None:   # the dome's four dimmed stops
+        bindings += [("d%d" % i, "material/%s/op/%d/oklabRamp/%s" % (dg.name, dg["dome"], k), 1.0)
+                     for i, k in enumerate(("constant", "constant2", "constant3", "constant4"))]
     states = [{"name": name, "colors": dict({role: hexrgb(h) for role, h in roles.items()}, **gradient_roles(roles))}
               for name, roles in PALETTES]
     return {"states": states,
@@ -632,6 +717,7 @@ WAVE_RATE = float(os.environ.get("WD_WAVE_RATE", "0.02"))
 CAM_FOCUS = [0.0, -10.0, -10.0]
 CAM_R, CAM_H, CAM_FOCAL, CAM_AZ, CAM_SWEEP = 140.0, 92.0, 24.0, 30.0, 70.0
 FOG = 0.0045
+FOG_DOME = float(os.environ.get("WD_FOG", "0.0028"))   # thinner with the dome: the air softens it, never hides it
 
 
 def build():
@@ -639,18 +725,31 @@ def build():
     environment(s)
     resonator(s)
     resonance_fields(s)
+    travelling_fronts(s)
     g = surface_program("wdSurface")
     s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
     write_level_meshes()
     level_sheets(s, g.name)
+    if DOME_ON and not NEUTRAL and not DEBUG:
+        dg = dome_program()
+        s.program(dg.doc(base=dg.base, emission=dg.emit, opacity=dg.opacity))
+        s.dome_program = dg
+        dpos, dnrm, duv, didx = dome_mesh(DOME_R)
+        write_glb(os.path.join(MESH_DIR, "wd-dome.glb"), dpos, dnrm, duv, didx, "dome")
+        s.proc("dome", {"kind": "mesh", "asset": "meshes/wd-dome.glb"},
+               material={"baseColor": [0, 0, 0], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 1.0,
+                         "metallic": 0.0, "unlit": True, "doubleSided": True, "program": dg.name})
     s.camera = {"mode": 1, "position": [60.0, 90.0, 110.0], "target": CAM_FOCUS, "fov": 40.0, "orbitSpeed": 0.0}
     s.arc_camera(CAM_FOCUS, CAM_R, CAM_H, period=160.0, centre_deg=CAM_AZ, sweep_deg=CAM_SWEEP, steps=24, side=0.0,
                  lift=0.0, height_bob=6.0)
     s.params_({"camera/lens/focalLength": CAM_FOCAL})
     instrument(s, g)
     if not NEUTRAL:
-        s.palette = palette_block(g)
-    s.params_({"scene/volumeDensity": FOG})
+        s.palette = palette_block(g, getattr(s, "dome_program", None))
+    s.params_({"scene/volumeDensity": FOG if not (DOME_ON and not NEUTRAL) else FOG_DOME})
+    if getattr(s, "dome_program", None) is not None:   # the dome's bands drift slower than the sheets' waves
+        dp = "material/wdDome/op/%d/remap/constant" % s.dome_program["domePhase"]
+        s.route(*[R("sonic.energy", dp, WAVE_RATE * 0.35, comp=c, gain=1.0, offset=0.35, integrate=True) for c in (2, 3)])
     s.params_(POST if not NEUTRAL else {"scene/fogColor": [0.02, 0.02, 0.02],
                                         "post/bloom/enabled": False, "post/output/vignette": 0.0})
     return s

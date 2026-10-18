@@ -386,6 +386,7 @@ def variant(project, out, camera=None, params=None):
 # by the audio history. (The table keeps the generator open to more scenes on the same subsystem.)
 SCENES = {"world": {"id": "cymatic-world", "title": "Cymatic World"}}
 FIELD = "cymatic"
+FIELD_FINE = "cymaticFine"   # the medium and fine scales' resonator (the overhaul: the large one holds the four families)
 HEART = (0.0, 12.0, 0.0)          # the basin's voice: the low modes' centre, above the floor's middle
 SECOND = (-23.0, 0.0, 9.0)        # the world's second centre (interference with the first)
 GROUND_REL = "meshes/cw-ground.glb"
@@ -400,8 +401,9 @@ def ground_y(x, z):
     return float(world_heights(np.array([[x, z]], dtype=np.float64))[0])
 
 
-def resonator(s, sources, **over):
-    """The scene's resonator: shared defaults, the scene's sources and overrides."""
+def resonator(s, sources, name=None, **over):
+    """A resonator: shared defaults, its sources and overrides (the scene has two: the large families, and the medium
+    and fine scales -- a resonator holds at most four sources)."""
     res = {
         "modes": 14.0, "fLow": 40.0, "fHigh": 6000.0, "lambdaMax": 34.0, "lambdaMin": 5.0, "scale": 1.0,
         "selectivity": 3.0, "contrast": 0.7, "persistence": 2.8, "buildup": 0.3, "memory": 1.6,
@@ -409,15 +411,15 @@ def resonator(s, sources, **over):
         "sources": sources, "channel": "displacement",
     }
     res.update(over)
-    s.nodes.append({"name": FIELD, "kind": "field", "position": [0, 0, 0],
+    s.nodes.append({"name": name or FIELD, "kind": "field", "position": [0, 0, 0],
                     "field": {"kind": "resonance", "seed": 7, "strength": 1.0, "falloff": {"kind": "none"},
                               "resonance": res}})
 
 
-def reader(s, name, channel, extra=None, frame=None):
+def reader(s, name, channel, extra=None, frame=None, ref=None):
     r = {"channel": channel}
     r.update(extra or {})
-    f = {"kind": "resonance", "reference": FIELD, "strength": 1.0, "falloff": {"kind": "none"}, "resonance": r}
+    f = {"kind": "resonance", "reference": ref or FIELD, "strength": 1.0, "falloff": {"kind": "none"}, "resonance": r}
     f.update(frame or {})
     s.nodes.append({"name": name, "kind": "field", "position": [0, 0, 0], "field": f})
 
@@ -428,8 +430,22 @@ def reader(s, name, channel, extra=None, frame=None):
 #   P1 structured modal field -- the signed standing figure F is the height (lobes up, opposite lobes down)
 #   P2 nodal boundaries       -- the nodal lines stand as ridges (sand) between antinode basins (-|F|); medium: creases
 #   P3 hybrid                 -- large: signed lobes with their nodal ridges; medium: nodal creases; fine: vibration
-SCALES = {"large": (0.0, 0.3), "medium": (0.28, 0.7), "fine": (0.68, 1.0)}
-LAYOUT = 22.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / (LAYOUT - 1)
+SCALES = {"large": (0.0, 0.32), "medium": (0.3, 0.7), "fine": (0.68, 1.0)}
+LAYOUT = 24.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / 23 (24, the most a resonator holds: room for
+# four large families, the overhaul; 22 before) -- the large band's modes at u = 0, .043, .087, .13 (plate), .174
+# (hexagonal), .217, .261 (radial) and .304 (arcs)
+MODES = 22.0
+LAMBDA_MAX = float(os.environ.get("CW_LAMBDA_MAX", "26.0"))
+# the families (05-plan §1.1): P plate, H hexagonal, R radial, A arcs -- the plate's (n, m) list (ADR-1471), each family's
+# base amplitude, its LFO (name, period s, phase) and the LFO's reach
+PLATES = [[3, 2], [5, 1], [4, 3], [6, 1], [5, 2]]
+FAM_BASE = [0.35, 0.0, 0.0, 0.0]
+FAM_GAIN = [0.85, 0.9, 0.8, 0.9]
+FAM_ONLY = os.environ.get("CW_FAM_ONLY")   # look development: one family alone at full amplitude, no director
+if FAM_ONLY is not None:
+    FAM_BASE = [1.0 if i == int(FAM_ONLY) else 0.0 for i in range(4)]
+    FAM_GAIN = [0.0] * 4
+FAM_LFO = [("famPlate", 97.0, 0.0), ("famHex", 131.0, 0.45), ("famRadial", 151.0, 0.7), ("famArcs", 173.0, 0.2)]
 # DEBUG VIEWS (08-brief §16), build-time like the palettes: CW_DEBUG=
 #   mode:<i>        the geometry of ONE mode (its nodal figure), every scale's reader listening to it alone
 #   scale:<name>    only that scale's deformer (large, medium, fine)
@@ -448,14 +464,20 @@ DEBUG = os.environ.get("CW_DEBUG", "")
 BAKE = os.environ.get("CW_BAKE", "1") != "0"
 LINE2 = os.environ.get("CW_LINE2", "0") == "1"  # Stage C's medium crest light (off since Stage G: 4 ops)
 WAVE = float(os.environ.get("CW_WAVE", "2.2"))  # Stage D: the travelling light's gain into its grid (0 = off)
-BAKE_RES = int(os.environ.get("CW_BAKE_RES", "896"))
+BAKE_RES = int(os.environ.get("CW_BAKE_RES", "1024"))
 NORMAL_CELLS = float(os.environ.get("CW_NORMAL_CELLS", "1"))   # the normal's finite-difference step, in bake cells
-BAKE_HALF = 86.0   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
+BAKE_HALF = float(os.environ.get("CW_BAKE_HALF", "130"))   # metres (86 before the oblique camera)   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
 # the camera (the correction round, owner: "pull back"): A the shape-language framing, B pulled back (chosen), C further
-CAMERAS = {"A": (30.0, 32.0, 30.0), "B": (36.0, 42.0, 28.0), "C": (40.0, 48.0, 26.0)}
-CAMERA = CAMERAS[os.environ.get("CW_CAM", "B")]
+CAMERAS = {"A": (30.0, 32.0, 30.0), "B": (36.0, 42.0, 28.0), "C": (40.0, 48.0, 26.0),
+           # the overhaul's C2: an oblique view, ~30 degrees down, the plate in the lower two thirds and the basin's
+           # walls, the ranges and the sky above (05-plan §1.1)
+           "D": (80.0, 34.0, 24.0)}
+CAMERA = CAMERAS[os.environ.get("CW_CAM", "D")]
 PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
 LARGE_SHARP = float(os.environ.get("CW_LARGE_SHARP", "0.9"))
+# how deep the antinodes sink under the large figure (-1.2 before the overhaul: a field of deep pits that hid the
+# nodal network; shallower basins let the plate's crossing lines read as the figure)
+LARGE_CREASE = float(os.environ.get("CW_LARGE_CREASE", "-0.6"))
 LARGE_ROUND = float(os.environ.get("CW_LARGE_ROUND", "0.4"))
 MEDIUM_ROUND = float(os.environ.get("CW_MEDIUM_ROUND", "0.5"))
 SHAPES = {
@@ -468,7 +490,7 @@ SHAPES = {
     # loudness (normalised sand, ADR-1405) so the quiet state has a deliberate form; the antinodes sink into deep
     # basins with the excitation (-1.2 |F|, crease rounded half as much -- the square grid carries it); the medium net
     # at about half its height so the large lobes, rings and petals lead
-    "P2": {"large": ({"reliefSand": 1.0, "sandNormalized": True, "sharpness": LARGE_SHARP, "reliefAmplitude": -1.2,
+    "P2": {"large": ({"reliefSand": 1.0, "sandNormalized": True, "sharpness": LARGE_SHARP, "reliefAmplitude": LARGE_CREASE,
                      "reliefRound": LARGE_ROUND, "reliefVibration": 0.25}, 2.8),
            "medium": ({"reliefSand": 1.0, "sharpness": 1.0, "reliefAmplitude": -0.35, "reliefRound": MEDIUM_ROUND}, 0.45),
            "fine": ({"reliefSand": 0.0, "reliefVibration": 1.0}, 0.25)},
@@ -535,7 +557,8 @@ def ground_readers(s):
         r = {"sharpness": 0.9, "reliefLine": 0.0, "reliefLineSharpness": 0.5, "reliefVibration": 0.0,
              "listenLow": lo, "listenHigh": hi, "listenWidth": 0.04 if only_mode is None else 0.005}
         r.update(extra)
-        reader(s, "relief-" + name, "relief", r, frame={"strength": amount} if BAKE else None)
+        reader(s, "relief-" + name, "relief", r, frame={"strength": amount} if BAKE else None,
+               ref=FIELD if name == "large" else FIELD_FINE)
         layers.append(("relief-" + name, amount))
     if not BAKE:
         return layers
@@ -737,6 +760,15 @@ def palette_state(name, hexes):
     }
     for i, (L, C_, h) in enumerate(GRADIENTS[name]):
         colors["g%d" % i] = [v * a_ * GRAD_ALBEDO for v in _oklch(L, C_, h)]
+    # the environment (the overhaul, stage B): the sky's zenith deep in the palette's background hue, its horizon a
+    # lifted, saturated mix of shadow and primary (so the distance glows with the palette, never grey), the fog the
+    # horizon's colour a step darker, and the sky's glow the palette's resonant hue
+    _, cg, hg = kit.lch_of(_mix(r["shadow"], r["primary"], 0.6))
+    colors["skyZenith"] = [v * 0.5 for v in r["background"]]
+    colors["skyHorizon"] = kit.oklch(0.36, min(cg * 1.6, 0.14), hg)
+    colors["skyGround"] = kit.oklch(0.22, min(cg * 1.3, 0.1), hg)
+    colors["fogC"] = kit.oklch(0.3, min(cg * 1.5, 0.12), hg)
+    colors["sunC"] = _hue(r["resonant"])
     return {"name": name, "colors": {k: [round(v, 5) for v in c] for k, c in colors.items()}}
 
 
@@ -771,6 +803,9 @@ RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "0.1"))
 # the crest line's width: sand^13 drew a line ~0.25 m wide, thinner than a mesh cell, which zigzagged along every
 # steep lip (resonator-quality Phase C); sand^7 is ~0.35 m and softer-edged
 CREST_POWER = float(os.environ.get("CW_CREST_POWER", "7"))
+# where the hollow glow starts and saturates in the excitation (the overhaul's four families ring harder: 0.3..1.0 lit
+# every hollow)
+HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "0.8,2.0").split(",")]
 TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "0.9"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
 BAND_RATE = float(os.environ.get("CW_BAND_RATE", "1.6"))   # the band's phase, metres a second per unit of the integral
 FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.35"))
@@ -882,7 +917,7 @@ def ground_program():
         g.op("stoneMask", "remap", 7, a=0, k=[0.5, 0.92, 1.0, 0.0], f=1.0)   # r7: scoured stone (off the ridges)
     else:
         g.op("stoneMask", "remap", 7, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)   # r7: scoured stone (no grit)
-    g.op("hollowRamp", "smoothstep", 3, a=3, k=[0.3, 1.0] if BAKE else [0.8, 2.4])          # only where it rings hard
+    g.op("hollowRamp", "smoothstep", 3, a=3, k=HOLLOW_RAMP if BAKE else [0.8, 2.4])          # only where it rings hard
     if not BAKE:  # (baked: the wall band below is all stone already -- sand < 0.14 never carries grit)
         g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
@@ -970,10 +1005,16 @@ def ground_program():
     return g
 
 
+FOG_DENSITY = float(os.environ.get("CW_FOG", "0.006"))
+SUN_GLOW = float(os.environ.get("CW_SUN", "1.5"))   # the sky's soft glow behind the basin (its colour a palette role)
+
+
 def environment(s):
     s.environment = {
         "intensity": 0.05, "background": C("zenith"), "fogColor": C("fog"),
-        "volumeDensity": 0.0, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
+        # the overhaul's air (05-plan §1.1): a thin coloured fog (palette-bound below), so the far plate, the basin's
+        # walls and the ranges dissolve into the sky's colour -- distance, not a void
+        "volumeDensity": FOG_DENSITY, "fogHeight": 12.0, "fogHeightFalloff": 0.04, "skyIntensity": 1.0,
         "shadowRange": 180.0,
         # ADR-1406: the ground is unlit and painted -- screen-space AO and contact shadows add nothing to it and cost the
         # depth prepass (every deformer re-run per vertex for a second pass)
@@ -983,7 +1024,8 @@ def environment(s):
         # saves only 3.4 (High 34.2 ms median with it, 31.8 without); CW_PREPASS=1 asks for it again
         "depthPrepass": os.environ.get("CW_PREPASS", "0") == "1",
         "sky": {"enabled": True, "zenithColor": C("zenith"), "horizonColor": C("horizon"),
-                "groundColor": C("fog"), "haze": 0.45, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": C("fog"), "haze": 0.45, "sunIntensity": SUN_GLOW, "intensity": 1.0,
+                "sunSize": 0.02, "sunGlow": 0.6, "sunDirection": [-0.55, 0.12, -0.83],
                 "background": True, "useKeyLight": False},
     }
     # the ground is unlit: its key, fill, sky and rim are painted in its program (ground_program). One authored light,
@@ -1094,35 +1136,47 @@ def build_world():
     # one or two lead a scale, so its figure is legible), petals turn slowly (some against the others) and the centres
     # wander a little: the figure transforms instead of sliding apart.
     resonator(s, [
-        # A, the large figure about an off-centre point (bass): frame-filling rings, stars and lobes; its focus leads one
-        # or two modes and sweeps the bank. The centre sits off the frame's middle and wanders, so the frame is never one
-        # centred target
-        {"kind": "point", "position": [7.0, 3.0, -7.0], "order": 6, "bandLow": 0.0, "bandHigh": 0.15, "reach": 90.0,
-         "gain": 1.0, "amplitude": 1.0, "breath": 0.4, "drift": 12.0, "driftPeriod": 100.0, "spin": 0.03,
-         "orders": [3, 4, 2, 6],
-         "focus": 0.07, "focusWidth": 0.032, "focusSweep": 0.09, "focusPeriod": 47.0, "focusFloor": 0.0},
-        # B, a second large figure about a centre off to the south-west. At rest silent: its amplitude follows the
-        # sound's roughness (a route), so interference is an EVENT -- a rough, turbulent passage bends A's clean figure
-        # into crossing, hyperbolic nodal lines; a clean or sustained passage shows A's figure itself
-        {"kind": "point", "position": [-20.0, 2.0, 15.0], "order": 6, "bandLow": 0.15, "bandHigh": 0.3, "reach": 90.0,
-         "gain": 1.0, "amplitude": 0.0, "breath": 0.5, "drift": 9.0, "driftPeriod": 80.0, "spin": -0.04,
-         "orders": [3, 2, 5],
-         "focus": 0.23, "focusWidth": 0.032, "focusSweep": 0.09, "focusPeriod": 61.0, "focusFloor": 0.0},
-        # M, the medium figure: finer rings and petals about a centre a few metres from A's -- nested inside the large
-        # lobes, but eccentric, so the frame is never a bullseye (rings live here, not in the large figure)
-        {"kind": "point", "position": [3.0, 3.0, -3.5], "order": 8, "bandLow": 0.3, "bandHigh": 0.66, "reach": 80.0,
-         "gain": 0.9, "amplitude": 0.5, "breath": 0.7, "drift": 6.0, "driftPeriod": 100.0, "spin": 0.045,
-         "orders": [0, 8, 4, 6, 3, 5],
+        # THE MODE FAMILIES (Resonant Visual Worlds, 05-plan §1.1): the large scale is four families, each a source over
+        # its own stretch of the large band, so the figure's TOPOLOGY changes when a different family leads -- not only
+        # its amplitude. Their amplitudes are set by the family director (slow LFOs, routes below) and the music.
+        # P, the hero: square-plate figures (ADR-1471) -- Chladni networks of crossing curves, loops and lobes; the focus
+        # sweeps its (n, m) list, so neighbouring figures crossfade into compound, asymmetric ones
+        {"kind": "plate", "position": [6.0, 0.0, -6.0], "plates": PLATES, "bandLow": 0.0, "bandHigh": 0.135,
+         "reach": 85.0, "gain": 1.0, "amplitude": FAM_BASE[0], "breath": 0.35, "drift": 8.0, "driftPeriod": 110.0,
+         "spin": 0.008, "focus": 0.065, "focusWidth": 0.035, "focusSweep": 0.065, "focusPeriod": 53.0, "focusFloor": 0.0},
+        # H, hexagonal cells: three plane waves (a lattice of order 3), its own orientation and turn
+        {"kind": "lattice", "position": [-10.0, 0.0, 8.0], "order": 3, "orders": [3], "bandLow": 0.15, "bandHigh": 0.2,
+         "reach": 75.0, "gain": 1.0, "amplitude": FAM_BASE[1], "breath": 0.4, "drift": 6.0, "driftPeriod": 90.0,
+         "spin": -0.01},
+        # R, radial: the earlier figure (rings, stars, lobes about an off-centre point) -- now one family of four
+        {"kind": "point", "position": [7.0, 3.0, -7.0], "order": 6, "bandLow": 0.2, "bandHigh": 0.28, "reach": 90.0,
+         "gain": 1.0, "amplitude": FAM_BASE[2], "breath": 0.4, "drift": 12.0, "driftPeriod": 100.0, "spin": 0.03,
+         "orders": [3, 4, 2, 6]},
+        # A, arcs: a low-order point source far off the frame, so its rings cross the basin as broad sweeping arcs;
+        # it also carries the sound's roughness (interference as an event, a route)
+        {"kind": "point", "position": [-150.0, 0.0, 70.0], "order": 2, "bandLow": 0.28, "bandHigh": 0.32, "reach": 0.0,
+         "gain": 1.0, "amplitude": FAM_BASE[3], "breath": 0.5, "drift": 15.0, "driftPeriod": 80.0, "spin": -0.01,
+         "orders": [1, 2]},
+    ], modes=MODES, lambdaMax=LAMBDA_MAX, lambdaMin=2.6, competition=1.5, selectivity=4.0, limit=1.5, breath=0.15,
+       # E, transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
+       ripple=0.5, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35, rippleU=[0.36, 0.5, 0.85],
+       # ADR-1404: fixed mode places (a route on `modes` adds modes, it never re-places them), and per-band response
+       layout=LAYOUT, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
+    # the medium and fine scales' own resonator (same bank, so their wavelengths sit where they did), no ripples
+    resonator(s, [
+        # M, the medium scale: an IRREGULAR family at low relief (the coordinator's review of the proofs: a regular
+        # medium grid read as a woven mat over the figure) -- point modes about a centre far off the other side, whose
+        # arcs cross the large figure at their own angle
+        {"kind": "point", "position": [130.0, 0.0, -100.0], "order": 3, "bandLow": 0.3, "bandHigh": 0.66, "reach": 0.0,
+         "gain": 0.9, "amplitude": 0.5, "breath": 0.7, "drift": 10.0, "driftPeriod": 100.0, "spin": 0.02,
+         "orders": [1, 2, 3, 1, 2],
          "focus": 0.48, "focusWidth": 0.04, "focusSweep": 0.16, "focusPeriod": 29.0, "focusFloor": 0.0},
         # F, the fine layer: standing bands, squares and hexagons, faint and local
         {"kind": "lattice", "position": [0.0, -6.0, 0.0], "order": 3, "bandLow": 0.66, "bandHigh": 1.0,
          "reach": 46.0, "gain": 0.55, "amplitude": 0.1, "breath": 1.5, "depth": 9.0, "drift": 2.0,
          "driftPeriod": 60.0, "spin": 0.02, "orders": [2, 1, 3]},
-    ], modes=17.0, lambdaMax=16.0, lambdaMin=2.6, competition=1.5, selectivity=4.0, limit=1.5, breath=0.15,
-       # E, transients: every onset launches a travelling ring (kick broad and slow, snare sharp and local)
-       ripple=0.5, rippleSpeed=9.0, rippleLife=1.6, rippleWidth=0.9, rippleArea=30.0, rippleCount=2.0, rippleFade=0.35, rippleU=[0.36, 0.5, 0.85],
-       # ADR-1404: fixed mode places (a route on `modes` adds modes, it never re-places them), and per-band response
-       layout=LAYOUT, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
+    ], name=FIELD_FINE, modes=MODES, lambdaMax=LAMBDA_MAX, lambdaMin=2.6, competition=1.5, selectivity=4.0,
+       limit=1.5, breath=0.15, layout=LAYOUT, attack=[0.18, 0.08, 0.04], release=[3.0, 1.4, 0.6])
     layers = ground_readers(s)
     g = ground(s, layers, write_mesh=True)
     # LOOKING INTO THE GROUND: high and steep (about 47 degrees down) on a 30 mm lens, so the frame's top edge meets
@@ -1145,10 +1199,19 @@ def build_world():
     def D(n):
         return ("field/relief-%s/strength" % ["large", "medium", "fine"][n - 1]) if BAKE else \
             "procedural/ground/deform/%d/amount" % n
-    s.route(R("sonic.brightness.slow", F + "source/0/focus", 0.08, attackMs=2000, decayMs=4000),
-            R("sonic.brightness.slow", F + "source/1/focus", 0.06, attackMs=2500, decayMs=5000),
-            R("sonic.brightness", F + "source/2/focus", 0.14, attackMs=400, decayMs=1200),
-            R("sonic.roughness.slow", F + "source/1/amplitude", 0.45, attackMs=1500, decayMs=3000),
+    # THE FAMILY DIRECTOR: each large family's amplitude rises and falls on its own slow LFO (incommensurate periods,
+    # pure functions of the clock, so a seek lands where a play does): one or two families lead at a time and the
+    # leader changes over phrases. Bass lifts the hero plate; the sound's roughness brings the arcs in (interference
+    # as an event); the brightness moves the plate's focus (which (n, m) leads) and the medium's
+    for i, (name, period, phase) in enumerate(FAM_LFO):
+        s.sources.append({"kind": "lfo", "name": name, "settings": {"shape": "sine"}})
+        s.params_({"sources/%s/rate" % name: round(1.0 / period, 6), "sources/%s/phase" % name: phase})
+        s.route(R("lfo." + name, F + "source/%d/amplitude" % i, FAM_GAIN[i]))
+    s.route(R("response.bass", F + "source/0/amplitude", 0.35, attackMs=150, decayMs=1500),
+            R("sonic.brightness.slow", F + "source/0/focus", 0.06, attackMs=2000, decayMs=4000),
+            R("sonic.brightness", "field/%s/resonance/source/0/focus" % FIELD_FINE, 0.14, attackMs=400,
+              decayMs=1200),
+            R("sonic.roughness.slow", F + "source/3/amplitude", 0.45, attackMs=1500, decayMs=3000),
             R("response.bass", D(1), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
             R("response.sustain", D(2), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
             R("response.hat", D(3), 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
@@ -1236,11 +1299,15 @@ def palette_block(g):
     # after the last change, to the next palette of a COMPOSED order (PAL_ORDER: a temperature arc, never across),
     # blended straight in OKLab over PAL_TRANSITION seconds; CC 9 selects, CC 10 locks
     return {"states": [palette_state(n, h) for n, h in MULTI_PALETTES],
-            "bindings": [{"role": r, "target": t, "mode": "multiply"} for r, t in binds],
+            "bindings": [{"role": r, "target": t, "mode": "multiply"} for r, t in binds] + [
+                {"role": r, "target": t, "mode": "replace"} for r, t in (
+                    ("skyZenith", "env/sky/zenithColor"), ("skyHorizon", "env/sky/horizonColor"),
+                    ("skyGround", "env/sky/groundColor"), ("fogC", "scene/fogColor"), ("sunC", "env/sky/sunColor"))],
             "position": PAL_INDEX, "saturation": 1.0, "value": 1.0,
             "selector": {"select": int(PAL_INDEX), "transition": PAL_TRANSITION, "lock": PAL_LOCK, "hold": PAL_HOLD,
                          "advance": {"signal": PAL_PRIMARY, "threshold": 0.5, "order": PAL_ORDER,
                                      "change": PAL_CHANGE}}}
+
 
 
 BUILDERS = {"world": build_world}

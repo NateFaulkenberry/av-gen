@@ -199,11 +199,12 @@ class SheetSpec:
     stretched across), the cloth's own width (the excess gathers into pleats), billow and pleat counts."""
 
     def __init__(self, name, points, roll, span, cloth, billow, pleats, nu=520, nv=112, pleat_wander=0.6, seed=1,
-                 curl=0.0, edge_wave=0.0, end_round=0.0):
+                 curl=0.0, edge_wave=0.0, end_round=0.0, music=True):
         self.name, self.points, self.roll, self.span, self.cloth = name, points, roll, span, cloth
         self.billow, self.pleats, self.nu, self.nv = billow, pleats, nu, nv
         self.pleat_wander, self.seed, self.curl, self.edge_wave = pleat_wander, seed, curl, edge_wave
         self.end_round = end_round
+        self.music = music   # the music's deformers (the hero); a far drape drifts only (cheap: no resonance per vertex)
 
 
 def sheet_mesh(spec):
@@ -338,8 +339,25 @@ def sheets_for(comp):
             end_round=0.4)
         # the camera 74 m nearer the gather and a little above the wall (the sheet covers ~74% of the frame, from ~44%;
         # the dark wedges above and below the gather are the negative space left)
+        # THE FAR DRAPES (Resonant Visual Worlds, 05-plan §1.2, S2): the same cloth language far behind the gather --
+        # long, soft S-curves with few broad pleats, one rising above the gather and one sweeping below it, seen
+        # through the negative space either side of the waist and softened by the coloured air. The hero's wall is the
+        # foreground, the gather and sail the middle ground, these the background. They drift with the hero but carry
+        # none of the music's per-vertex deformers (about 3k vertices each)
+        far_above = SheetSpec(
+            "drapeAbove",
+            points=[(-320, 10, -380), (-160, 70, -470), (0, 95, -520), (150, 130, -500), (300, 200, -430)],
+            roll=[(0.0, 1.1), (0.5, 1.45), (1.0, 1.9)], span=[(0.0, 60.0), (0.5, 105.0), (1.0, 75.0)],
+            cloth=[(0.0, 85.0), (0.5, 140.0), (1.0, 100.0)], billow=[(0.0, 10.0), (0.5, 28.0), (1.0, 14.0)],
+            pleats=[(3.0, 0.9), (7.0, 0.2)], pleat_wander=1.0, nu=110, nv=30, seed=31, music=False)
+        far_below = SheetSpec(
+            "drapeBelow",
+            points=[(-300, -190, -360), (-150, -130, -440), (10, -105, -490), (170, -60, -470), (320, 10, -400)],
+            roll=[(0.0, 1.6), (0.5, 1.3), (1.0, 1.0)], span=[(0.0, 55.0), (0.5, 95.0), (1.0, 70.0)],
+            cloth=[(0.0, 80.0), (0.5, 128.0), (1.0, 95.0)], billow=[(0.0, -12.0), (0.5, -24.0), (1.0, -10.0)],
+            pleats=[(3.0, 0.9), (6.0, 0.25)], pleat_wander=1.1, nu=110, nv=30, seed=37, music=False)
         cam = {"position": [4.0, 14.0, -14.0], "target": [-4.0, 4.0, -130.0], "focal": 24.0, "drift": True}
-        return [main], cam
+        return [main, far_above, far_below], cam
     if comp == "b":
         # THE PASSAGE: two broad sheets bow toward each other and form a curved corridor the eye travels down; they
         # touch far away, where the gathered crease is the focal light.
@@ -499,7 +517,8 @@ def palette_block(g):
         {"role": "environment", "target": "env/sky/zenithColor", "gain": 0.6},
         {"role": "environment", "target": "env/sky/groundColor", "gain": 0.7},
         {"role": "environment", "target": "env/sky/horizonColor", "gain": 1.0},
-        {"role": "environment", "target": "scene/fogColor", "gain": 1.0},
+        {"role": "environment", "target": "scene/fogColor", "gain": 1.6},
+        {"role": "resonant", "target": "env/sky/sunColor", "gain": 1.0},
         {"role": "fillLight", "target": "lights/fill/color"},
         {"role": "g0", "target": op("body", "constant")}, {"role": "g1", "target": op("body", "constant2")},
         {"role": "g2", "target": op("body", "constant3")}, {"role": "g3", "target": op("body", "constant4")},
@@ -543,6 +562,8 @@ def palette_block(g):
 # the iridescent gradient (silk_program): cycles along the cloth's length, the cross band (direction, cycles over
 # 420 m, weight), how far a fold's turn shifts it, and its phase drift (cycles per second per unit of the integral)
 FILL_I = float(os.environ.get("RS_FILL_I", "1.1"))
+SILK_FOG = float(os.environ.get("RS_FOG", "0.0022"))
+SILK_GLOW = float(os.environ.get("RS_GLOW", "2.0"))
 METALLIC = float(os.environ.get("RS_METALLIC", "0.15"))   # was 0.35: a metal's diffuse loss darkened the pigment
 SILK_LEN = float(os.environ.get("RS_SILK_LEN", "1.6"))
 SILK_BAND_DIR = (0.62, 0.62, 0.48)
@@ -645,13 +666,18 @@ def music_deformers():
 def environment(s):
     s.environment = {
         "intensity": 0.04, "background": C("abyss", 0.6), "fogColor": C("abyss", 0.8),
-        "volumeDensity": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
+        # the overhaul's air (05-plan §1.2): a thin fog in the palette's environment colour, so the far drapes sit in
+        # coloured depth behind the gather instead of floating
+        "volumeDensity": SILK_FOG, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 200.0,
         # no screen-space AO or contact shadows: a thin sheet in a void gains nothing from them, and either would ask
         # for a depth prepass that re-runs every deformer per vertex (ADR-1406; 39 ms measured)
         "ambientOcclusion": False, "contactShadows": False,
         "sky": {"enabled": True, "zenithColor": C("abyss", 0.3), "horizonColor": C("indigo", 0.22),
-                "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": SILK_GLOW, "intensity": 1.0,
+                # a soft glow in the sky behind the gather (its colour the palette's resonant role): the far drapes
+                # are backlit by it, and the void has a light in it
+                "sunSize": 0.02, "sunGlow": 0.7, "sunDirection": [-0.03, -0.02, -1.0],
                 "background": True, "useKeyLight": False},
     }
     # a narrow, cold, grazing key from high behind-right: strips of light across the folds
@@ -694,7 +720,8 @@ def sheets(s, specs, mesh_dir):
         write_glb(os.path.join(mesh_dir, "rs-%s.glb" % spec.name), pos, nrm, uv, idx, spec.name)
         print("%s: %d vertices, %d triangles, %.0f m long" % (spec.name, len(pos), len(idx) // 3, length))
         s.proc(spec.name, {"kind": "mesh", "asset": "meshes/rs-%s.glb" % spec.name},
-               material=silk_material(spec.name), extra={"normalStep": 0.15}, deformers=drift_deformers() + (music_deformers() if MUSIC else []))
+               material=silk_material(spec.name), extra={"normalStep": 0.15},
+               deformers=drift_deformers() + (music_deformers() if MUSIC and spec.music else []))
 
 
 def drift_deformers():
