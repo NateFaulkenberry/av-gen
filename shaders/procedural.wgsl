@@ -692,6 +692,9 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
 
     let eps = proc.timeInfo.z;
     let now = proc.timeInfo.x;
+    // ADR-1492: read before the chain (see the handedness note above): no velocity in a depth-only pass, nor in a lit
+    // pass whose velocity target nothing reads this frame (frame.styledGround.w, the live editor only).
+    let skipVelocity = depthOnly || frame.styledGround.w > 0.5;
     var p0 = deformChain(srcPos, n, nRef, inst, now, object.model);
     // A depth-only draw needs the normal only for a masked material (fs_proc_depth's cutout program reads it).
     let needNormal = !depthOnly || (object.flags.x > 0.5 && object.flags.x < 1.5);
@@ -774,8 +777,8 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     out.clip = frame.viewProj * vec4<f32>(p0, 1.0);
     out.worldPos = p0;
     out.normal = nw;
-    if (depthOnly) {
-        out.prevClip = out.clip; // no velocity target in a depth-only pass
+    if (skipVelocity) {
+        out.prevClip = out.clip; // zero motion: no velocity target, or one nothing reads
         return out;
     }
     // Velocity covers camera, object, instance and deformation motion: the same chain evaluated

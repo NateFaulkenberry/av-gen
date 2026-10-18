@@ -282,7 +282,7 @@ struct FrameUniforms {
     glm::vec4 fogHeight;      // ADR-058: x = layer top (m), y = falloff per metre above it,
                               // z = how much of that layer the surface fog sees, w = 0
     glm::vec4 styledSky;      // ADR-058: rgb = styled ambient towards +Y, w = the AO floor
-    glm::vec4 styledGround;   // ADR-058: rgb = styled ambient towards -Y, w = 0
+    glm::vec4 styledGround;   // ADR-058: rgb = styled ambient towards -Y; ADR-1492: w = 1 when the velocity target is unread
     glm::vec4 audio;          // ADR-030 material inputs: rms, bass, mid, treble
     glm::vec4 audioBands;     // lowMid, highMid, spectral centroid, flux
     glm::vec4 beat;           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
@@ -770,6 +770,14 @@ public:
     [[nodiscard]] ShadowMaskRenderer& shadowMask() { return *shadowMask_; } // ADR-087
     // Displays one auxiliary target full-screen instead of the shaded frame (ADR-035).
     void setAuxDebugView(AuxDebugView view) { auxDebugView_ = view; }
+    // ADR-1492: the live editor's renderer computes the velocity target only when something reads it this frame --
+    // motion blur open on the live level, or an aux debug view. Otherwise procedural draws skip the previous-frame
+    // deformer chain (a quarter of their vertex work) and write zero motion. Off (the default) for every other
+    // renderer: an offline render, a render job's AOVs and the tests read the target whatever post does.
+    void setVelocityOnDemand(bool on) { velocityOnDemand_ = on; }
+    [[nodiscard]] bool velocityOnDemand() const { return velocityOnDemand_; }
+    // True when the last frame's velocity target was left unwritten (zero motion), for the tests and the profile.
+    [[nodiscard]] bool velocitySkipped() const { return velocitySkipped_; }
     [[nodiscard]] AuxDebugView auxDebugView() const { return auxDebugView_; }
     // How hard the view's own ramp is driven; zero means the view's default. It exists because a
     // far plane is not a scene: RendererQA's camera sees three kilometres and its geometry is
@@ -1024,6 +1032,8 @@ private:
     // read off the subsystems in collectFrameTimings(), which runs more than once per frame.
     std::uint32_t clusterDispatches_ = 0;
     AuxDebugView auxDebugView_ = AuxDebugView::None;
+    bool velocityOnDemand_ = false; // ADR-1492
+    bool velocitySkipped_ = false;
     float auxDebugScale_ = 0.0f;
     bool warnedOverdrawScope_ = false; // the overdraw view's partial-coverage warning, once per run
     gpu::RenderTarget post_[2];      // ping-pong HDR colour targets for post layers

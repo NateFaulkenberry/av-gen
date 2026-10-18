@@ -4796,6 +4796,9 @@ int Application::runLive() {
     // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
     // never calls this, so an offline render rebuilds whenever the hash moves, as it always did.
     renderer_->setInteractiveEnvironmentBudget(2.0);
+    // ADR-1492, live only as well: the velocity target is computed only on frames something reads it (motion blur
+    // open on the live level, an aux debug view). A render job has its own renderer and keeps it whatever.
+    renderer_->setVelocityOnDemand(true);
     // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
     // and rebuilds its lighting at a capped rate, spread across frames.
     renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});

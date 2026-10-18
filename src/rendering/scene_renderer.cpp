@@ -3239,7 +3239,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // needs to say how dark the side facing away from the sky is allowed to get.
     frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,
                                 std::clamp(scene.environment.styledAmbientFloor, 0.0f, 1.0f));
-    frame.styledGround = glm::vec4(scene.environment.styledGroundAmbient, 0.0f);
+    // ADR-1492: w = 1 when nothing reads the velocity target this frame (the live editor only, see
+    // setVelocityOnDemand): the motion-blur gate below closed or its shutter at zero, and no aux debug view.
+    {
+        const float shutter = std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
+        const bool blurReads = toggles_.post && qualitySettings_.motionBlur && scene.post.motionBlurAmount * shutter > 1e-4f;
+        velocitySkipped_ = velocityOnDemand_ && !blurReads && auxDebugView_ == AuxDebugView::None;
+    }
+    frame.styledGround = glm::vec4(scene.environment.styledGroundAmbient, velocitySkipped_ ? 1.0f : 0.0f);
     // ADR-055: the wind, packed once per frame. Wavenumbers are pre-divided here so no vertex ever
     // spends a divide on them, and the shadow views inherit the block verbatim.
     frame.wind = wind::packWind(scene.environment.wind);

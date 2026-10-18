@@ -85,7 +85,7 @@ struct FrameUniforms {
                                // z = how much of that layer the surface fog integrates,
                                // w = ADR-705: how far the march carries the air (0 = it does not run)
     styledSky: vec4<f32>,      // ADR-058: rgb = styled ambient towards +Y, w = the AO floor
-    styledGround: vec4<f32>,   // ADR-058: rgb = styled ambient towards -Y, w = 0
+    styledGround: vec4<f32>,   // ADR-058: rgb = styled ambient towards -Y; ADR-1492: w = 1 when the velocity target is unread
     audio: vec4<f32>,          // ADR-030 material inputs: rms, bass, mid, treble
     audioBands: vec4<f32>,     // lowMid, highMid, spectral centroid, flux
     beat: vec4<f32>,           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase

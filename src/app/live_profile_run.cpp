@@ -401,6 +401,7 @@ int Application::runLiveProfileHeadless() {
     if (!options_.liveAntialias.has_value()) {
         base.antialiasFloor = rendering::kLiveAntialiasFloor;
     }
+    renderer_->setVelocityOnDemand(true); // ADR-1492: as the live editor renders
     if (const auto profile = liveQualityProfile()) {
         base = applyQualityProfile(base, *profile);
     }
