@@ -490,6 +490,16 @@ def silk_program():
     g.op("irid", "constant", 7, k=[0.6, 0.6, 0.6, 1])                   # x palette irid
     g.op(None, "multiply", 6, a=6, b=7)
     g.op(None, "add", 1, a=1, b=6)                                     # + the sheen (emission)
+    if TRANS:
+        # TRANSLUCENCY (art pass II): the glow behind the gather passes through the sheet -- strongest where the cloth
+        # faces the eye (the light's path through it is shortest), falling away where it turns (the fold mask: a long
+        # path, the colour deepens) -- emitted in the cloth's own colour, never white. The gain rides the remap's ends
+        g.op(None, "input", 6, inp="normal")
+        g.op("trans", "gradient", 6, a=6, k=list(_unit(BACK_DIR)) + [0.0], f=1.0)
+        g.op("transFold", "remap", 7, a=4, k=[0.0, 1.0, TRANS_GAIN, TRANS_GAIN * 0.15], f=1.0)
+        g.op(None, "multiply", 6, a=6, b=7)
+        g.op(None, "multiply", 6, a=6, b=5)
+        g.op(None, "add", 1, a=1, b=6)
     # the gather's seam: peak light within a few metres of the ring (a distance field: 0 at the ring, 1 at 9 m; the
     # ramp's middle stop at three quarters keeps the old 1 - (d/R)^2 shape)
     g.op(None, "field", 6, field="gatherSeam")
@@ -555,6 +565,15 @@ def palette_block(g):
         {"role": "emit", "target": op("glowCol", "constant"), "mode": "multiply"},
         {"role": "emit", "target": op("glowCol", "constant2"), "mode": "multiply"},
     ]
+    vg = getattr(palette_block, "veil", None)
+    if vg is not None:
+        def vop(label, field):
+            return "material/%s/op/%d/%s/%s" % (vg.name, vg[label], vg.ops[vg[label] - 1]["kind"], field)
+        b += [{"role": "g%d" % i, "target": vop("veilBody", f), "gain": VEIL_GAIN}
+              for i, f in enumerate(("constant", "constant2", "constant3", "constant4"))]
+        b += [{"role": "resonant", "target": vop("veilGlow", "constant2"), "gain": 0.5 * VEIL_GLOW},
+              {"role": "resonant", "target": vop("veilGlow", "constant3"), "gain": VEIL_GLOW}]
+        b = [x for x in b if not x["target"].startswith("procedural/drape")]
     if MUSIC:
         b += [{"role": "peak", "target": op("trebleCol", "constant2"), "gain": 0.5},
               {"role": "peak", "target": op("trebleCol", "constant3")},
@@ -582,6 +601,26 @@ BANDS = {"phase": 0.0, "rotation": 0.0, "gain": float(os.environ.get("RS_BANDS_G
          "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.09, "intensity": 1.0, "segments": 0,
                      "warmth": 0.3, "rate": 0.0}]}
 SILK_FOG = float(os.environ.get("RS_FOG", "0.0013"))
+# ART PASS II (docs/prototypes/resonator-quality/08-plan-art-pass-2.md §3): the environment is THE VEIL -- one enveloping
+# shell of the same cloth around the whole scene (no edge in any frame), its folds travelling in the silk's flow
+# direction and lifted by the same bass swell that runs out from the gather, lit by a glow behind the gather that also
+# backlights the hero; and the hero's material gains TRANSLUCENCY (that glow passing through the sheet: faces that
+# turn to the eye glow in their own colour, folds turned away stay deep)
+VEIL = os.environ.get("RS_VEIL", "0") == "1"
+VEIL_C = (0.0, 30.0, -210.0)    # the shell's centre: behind the gather, so the frame's far side is ~450 m away
+VEIL_R = float(os.environ.get("RS_VEIL_R", "520"))
+VEIL_GAIN = float(os.environ.get("RS_VEIL_GAIN", "0.32"))      # the veil's colour, relative to the hero's gradient
+VEIL_GLOW = float(os.environ.get("RS_VEIL_GLOW", "1.6"))       # the glow behind the gather (resonant role)
+VEIL_GLOW_IN = float(os.environ.get("RS_VEIL_GLOW_IN", "0.55"))  # where the glow begins (1 = behind the gather only)
+# the veil's crests run WITH the cloth's flow (rising bands, lower left to upper right) and drift slowly across it:
+# crests across the flow met the sphere like meridians and converged on the gather as rays (S3, a tunnel read)
+VEIL_FLOW = tuple(float(v) for v in os.environ.get("RS_VEIL_AXIS", "-0.35,0.94,0.0").split(","))
+VEIL_FOLD = float(os.environ.get("RS_VEIL_FOLD", "16"))        # metres: the travelling folds' depth
+VEIL_SWELL = float(os.environ.get("RS_VEIL_SWELL", "22"))      # metres: the bass swell's lift on the veil
+VEIL_LIGHT = (0.55, 0.5, 0.67)                                 # the painted light across the veil's folds
+TRANS = os.environ.get("RS_TRANS", "0") == "1"
+TRANS_GAIN = float(os.environ.get("RS_TRANS_GAIN", "0.9"))
+BACK_DIR = (0.03, 0.02, 1.0)    # from the glow behind the gather toward the camera: the light passing through
 SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
 METALLIC = float(os.environ.get("RS_METALLIC", "0.05"))
 SHEEN = float(os.environ.get("RS_SHEEN", "0.35"))
@@ -729,6 +768,83 @@ def environment(s):
             castsShadow=False, contactShadow=False)
 
 
+def _unit(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v]
+
+
+def veil_mesh(nu=192, nv=96):
+    """THE VEIL (art pass II): a sphere about VEIL_C, normals inward (the camera is inside), uv = (azimuth, polar)."""
+    th = np.linspace(0.0, 2.0 * math.pi, nu + 1)
+    ph = np.linspace(0.01, math.pi - 0.01, nv)
+    T, Pp = np.meshgrid(th, ph, indexing="ij")
+    d = np.stack([np.sin(Pp) * np.cos(T), np.cos(Pp), np.sin(Pp) * np.sin(T)], -1).reshape(-1, 3)
+    pos = (d * VEIL_R + np.array(VEIL_C)).astype(np.float32)
+    nrm = (-d).astype(np.float32)
+    uv = np.stack([T / (2.0 * math.pi), Pp / math.pi], -1).reshape(-1, 2).astype(np.float32)
+    idx = []
+    for i in range(nu):
+        for j in range(nv - 1):
+            a, b, c, e = i * nv + j, (i + 1) * nv + j, (i + 1) * nv + j + 1, i * nv + j + 1
+            idx += [a, c, b, a, e, c]
+    return pos, nrm, uv, np.array(idx, dtype=np.uint32)
+
+
+def veil_program():
+    """The veil's colour, unlit and painted (it covers most of the frame behind the hero, so it is cheap): the hero's
+    own gradient roles along the same world band, dimmed (VEIL_GAIN, by the bindings); a raking painted light so its
+    folds read as cloth; and the glow behind the gather (the scene's light source, which backlights the hero) as a
+    soft region of the resonant colour in the shell itself."""
+    g = Prog("rsVeil")
+    g.op(None, "input", 0, inp="worldPosition")
+    g.op(None, "gradient", 1, a=0, k=list(SILK_BAND_DIR) + [0.5], f=1.0 / (2.2 * VEIL_R))
+    g.op("veilPhase", "remap", 1, a=1, k=[0.0, 1.0, 0.0, 1.6])                  # cycles; the phase rides k.z/k.w
+    g.op("veilBody", "oklabRamp", 4, a=1, k=C("indigo") + [1], k2=C("violet", 0.5) + [1], k3=C("magenta", 0.4) + [1],
+         k4=C("cyan", 0.3) + [1], f=-1.0)
+    g.op(None, "input", 2, inp="normal")
+    g.op("veilLight", "gradient", 3, a=2, k=[x * 0.5 for x in _unit(VEIL_LIGHT)] + [0.5], f=1.0)
+    g.op(None, "multiply", 3, a=3, b=3)                                          # a deeper fold shadow
+    g.op(None, "multiply", 4, a=4, b=3)
+    g.op(None, "input", 5, inp="worldPosition")
+    g.op("glowAxis", "gradient", 5, a=5, k=[0.03, 0.02, -1.0, -(0.03 * VEIL_C[0] + 0.02 * VEIL_C[1] - VEIL_C[2]) / VEIL_R], f=1.0 / VEIL_R)
+    g.op(None, "smoothstep", 5, a=5, k=[VEIL_GLOW_IN, 1.05])
+    g.op("veilGlow", "ramp", 5, a=5, k=[0, 0, 0, 0], k2=C("violet", 0.5 * VEIL_GLOW) + [0.5],
+         k3=C("violet", VEIL_GLOW) + [1])
+    g.op(None, "add", 4, a=4, b=5)
+    g.op(None, "constant", 6, k=[0, 0, 0, 1])
+    g.base, g.emit = 6, 4
+    return g
+
+
+def veil_fields(s):
+    """The veil's motion: folds that travel in the cloth's flow direction, and the bass swell from the gather."""
+    s.nodes.append({"name": "veilFolds", "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine", "axis": _unit(VEIL_FLOW),
+                              "wavelength": 150.0, "waveSpeed": 6.0, "waveWidth": 0.0, "amplitude": 1.0,
+                              "strength": 1.0, "falloff": {"kind": "none"}}})
+    s.nodes.append({"name": "veilSwell", "kind": "field", "position": [0, 0, 0],
+                    "field": {"kind": "compound", "combine": "multiply", "children": ["bassHistory", "bassCarrier"],
+                              "strength": 1.0, "falloff": {"kind": "none"}}})
+
+
+def veil(s, mesh_dir):
+    g = veil_program()
+    s.program(g.doc(base=g.base, emission=g.emit))
+    s.veil_program = g
+    pos, nrm, uv, idx = veil_mesh()
+    write_glb(os.path.join(mesh_dir, "rs-veil.glb"), pos, nrm, uv, idx, "veil")
+    print("veil: %d vertices" % len(pos))
+    s.proc("veil", {"kind": "mesh", "asset": "meshes/rs-veil.glb"},
+           material={"program": g.name, "baseColor": [0, 0, 0], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "doubleSided": True},
+           extra={"normalStep": 4.0},
+           deformers=[
+               {"kind": "displacement", "amount": 26.0, "scale": 0.005, "speed": 0.015, "space": "world"},
+               {"kind": "field", "field": "veilFolds", "amount": VEIL_FOLD, "space": "world", "alongNormal": True},
+           ] + ([{"kind": "field", "field": "veilSwell", "amount": VEIL_SWELL, "space": "world", "alongNormal": True}]
+                if MUSIC else []))
+
+
 def drape_material():
     """The far drapes (stage E): no program, no thin film -- a plain satin in the palette's fold colour (bound by role).
     They cover much of the frame behind the hero, and the hero's 37-op program on them doubled the pixel cost."""
@@ -824,6 +940,10 @@ def instrument(s, g):
     # reset, quicker in loud passages, still moving in silence
     s.route(*[R("sonic.energy", op("silkPhase") + "constant", SILK_RATE, comp=c, gain=1.0, offset=0.35,
                 integrate=True) for c in (2, 3)])
+    vg = getattr(s, "veil_program", None)
+    if vg is not None:   # the veil's colour flows with the cloth's, at half the rate (the far world moves slower)
+        vp = "material/%s/op/%d/remap/constant" % (vg.name, vg["veilPhase"])
+        s.route(*[R("sonic.energy", vp, SILK_RATE * 0.5, comp=c, gain=1.0, offset=0.35, integrate=True) for c in (2, 3)])
     # MIDI
     s.control = control_map()
     CC = {"attackMs": 150, "decayMs": 150}
@@ -894,8 +1014,14 @@ def build(comp, mesh_dir):
     if MUSIC:
         fields(s)
     specs, cam = sheets_for(comp)
+    if VEIL and comp == "a":
+        specs = [sp for sp in specs if sp.music]   # the far drapes give way to the veil
+        if MUSIC:
+            veil_fields(s)
+        veil(s, mesh_dir)
     sheets(s, specs, mesh_dir)
     camera(s, cam)
+    palette_block.veil = getattr(s, "veil_program", None)
     s.palette = None if os.environ.get("RS_GEOMETRY") else palette_block(s.silk_program)
     if MUSIC:
         instrument(s, s.silk_program)

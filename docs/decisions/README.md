@@ -60,6 +60,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1440-1449 | proto/waveform-dimension (Waveform Dimension) |
 | 1450-1469 | proto/generative-rd (generative R&D: oscillators, flow, reaction-diffusion) |
 | 1470-1479 | art/resonator-quality (the Resonator scenes' quality pass) |
+| 1480-1489 | art/resonator-pass-2 (the Resonator scenes' targeted art pass II) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the

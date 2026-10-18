@@ -487,6 +487,23 @@ BAKE = os.environ.get("CW_BAKE", "1") != "0"
 LINE2 = os.environ.get("CW_LINE2", "0") == "1"  # Stage C's medium crest light (off since Stage G: 4 ops)
 WAVE = float(os.environ.get("CW_WAVE", "2.2"))  # Stage D: the travelling light's gain into its grid (0 = off)
 BAKE_RES = int(os.environ.get("CW_BAKE_RES", "1024"))
+# ART PASS II (08-plan §2.3-2.4): the excitation from the colour field (frees a reader, its grid and a program slot),
+# a travelling SCAN of light on each kick, onset RIPPLES back in the geometry (riding the figure, low), and a BASS
+# WAVEFRONT: the bass of the last seconds laid out outward from the basin's heart, in the relief
+AMP_FROM_TINT = os.environ.get("CW_AMP_FROM_TINT", "0") == "1"
+AMP_GAIN = float(os.environ.get("CW_AMP_GAIN", "2.2"))         # tint^2 x this ~ the old excitation's scale
+SCAN = float(os.environ.get("CW_SCAN", "0"))                    # the scan's light gain (0 = off)
+SCAN_SPEED = float(os.environ.get("CW_SCAN_SPEED", "45"))       # m/s across the basin
+SCAN_WIDTH = float(os.environ.get("CW_SCAN_WIDTH", "4"))        # m, the band's half width
+SCAN_DECAY = float(os.environ.get("CW_SCAN_DECAY", "1.1"))      # 1/s
+SCAN_FROM = (-95.0, 0.0, 30.0)                                  # upstream of the frame's left edge
+SCAN_AXIS = (0.96, 0.0, -0.28)                                  # across the frame, a little away from the camera
+RIPPLE_RELIEF = float(os.environ.get("CW_RIPPLE_RELIEF", "0"))  # metres of the onset rings in the geometry (0 = off)
+# the snare's flash on every nodal line at once (a frame-wide event, brief §4.2 "not the same full-screen flash"): the
+# snare's energy now travels (the ripples, the scan's glimmer); its flash on the lines comes down
+SNARE_LINE = float(os.environ.get("CW_SNARE_LINE", "0.9"))
+BASS_FRONT = float(os.environ.get("CW_BASS_FRONT", "0"))        # metres of the bass wavefront (0 = off)
+BASS_SPEED = float(os.environ.get("CW_BASS_SPEED", "18"))       # m/s outward from the heart
 NORMAL_CELLS = float(os.environ.get("CW_NORMAL_CELLS", "1"))   # the normal's finite-difference step, in bake cells
 BAKE_HALF = float(os.environ.get("CW_BAKE_HALF", "130"))   # metres (86 before the oblique camera)   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
 # the camera (the correction round, owner: "pull back"): A the shape-language framing, B pulled back (chosen), C further
@@ -542,7 +559,7 @@ def ground_readers(s):
         # value to the power 13 -- which frees a field slot: a program samples at most four fields)
         medium = {"listenLow": 0.28, "listenHigh": 0.7, "listenWidth": 0.04}
         for name, channel, extra, res in (("shade-sand", "sand", {"sharpness": 0.9, "sandNormalized": True, **large}, BAKE_RES),
-                                          ("shade-amp", "amplitude", dict(win), 512),
+                                          *([] if AMP_FROM_TINT else [("shade-amp", "amplitude", dict(win), 512)]),
                                           # 10-brief Stage B, the colour field: the large figure's signed standing
                                           # pattern F -- each lobe a broad colour region, anchored to the geometry
                                           ("shade-tint", "relief", {"reliefSand": 0.0, "reliefFigure": 1.0, **large}, 640)):
@@ -566,6 +583,13 @@ def ground_readers(s):
             bake_grid(s, "shade-wave", 768)
     else:
         reader(s, "shade", "shading", {"sharpness": 0.9, "reliefLineSharpness": 0.35})
+    if BAKE and SCAN > 0.0:
+        # the SCAN (art pass II, layer C): every kick launches a narrow band of light that crosses the basin at
+        # SCAN_SPEED and fades (an Onset field, planar: exact under seek, ADR-1116); the program lays it on the ridges
+        s.nodes.append({"name": "scan", "kind": "field", "position": list(SCAN_FROM),   # (planar: from the node)
+                        "field": {"kind": "onset", "onsetSource": "low", "axis": _unit(SCAN_AXIS),
+                                  "waveGeometry": "planar", "audioSpeed": SCAN_SPEED, "onsetWidth": SCAN_WIDTH,
+                                  "onsetDecay": SCAN_DECAY, "strength": 1.0, "falloff": {"kind": "none"}}})
     if DEBUG in ("signed", "nodal", "envelope"):
         reader(s, "dbgview", {"signed": "relief", "nodal": "sand", "envelope": "amplitude"}[DEBUG],
                {"reliefSand": 0.0, "reliefFigure": 1.0, "sharpness": 0.45} if DEBUG != "envelope" else {})
@@ -594,6 +618,18 @@ def ground_readers(s):
         layers.append(("relief-" + name, amount))
     if not BAKE:
         return layers
+    if RIPPLE_RELIEF > 0.0 and only_mode is None and only_scale is None:
+        # layer B (art pass II): the onset rings ride the figure as low travelling ripples (ADR-1409 ripples only)
+        reader(s, "relief-ripple", "displacement", {"rows": "ripples"}, frame={"strength": RIPPLE_RELIEF})
+        layers.append(("relief-ripple", RIPPLE_RELIEF))
+    if BASS_FRONT > 0.0 and only_mode is None and only_scale is None:
+        # layer A (art pass II): the bass history laid out outward from the heart (ADR-1116, smoothed, ADR-1370): a
+        # loud low moment becomes a broad ring that lifts the figure as it travels out, and is gone
+        s.nodes.append({"name": "relief-bass", "kind": "field", "position": [0, 0, 0],
+                        "field": {"kind": "spectrum", "audioBand": "range", "bandLow": 0.02, "bandHigh": 0.12,
+                                  "audioSpeed": BASS_SPEED, "audioSmooth": 0.05, "point": [HEART[0], -7.0, HEART[2]],
+                                  "waveGeometry": "radial", "strength": BASS_FRONT, "falloff": {"kind": "none"}}})
+        layers.append(("relief-bass", BASS_FRONT))
     # ADR-1407: the scales' sum, baked once a frame into a plane grid that the ground's single deformer samples --
     # the per-vertex cost (three readers, three samples each for the normal) becomes one evaluation per grid cell
     s.nodes.append({"name": "relief", "kind": "field", "position": [0, 0, 0],
@@ -792,6 +828,15 @@ def palette_state(name, hexes):
     }
     for i, (L, C_, h) in enumerate(GRADIENTS[name]):
         colors["g%d" % i] = [v * a_ * GRAD_ALBEDO for v in _oklch(L, C_, h)]
+    if LIGHT_PAIR:
+        # art pass II (the gradient restored, 08-plan §2.1): the colour pass's gradient was LIGHT, not albedo -- a
+        # saturated key on one flank of every ridge and a complementary grazing fill on the other, over dark floors.
+        # Each palette now lights its ground with a pair from its own gradient: the counter light and the hollow glow
+        # take the gradient's far end (g3's hue, at full chroma), the key stays the palette's spectral hue
+        _, c3, h3 = GRADIENTS[name][3]
+        warm = _hue(_oklch(0.72, max(c3, 0.012) * LIGHT_PAIR_CHROMA, h3))
+        colors["fill"] = [v * t.get("fill", 1.0) for v in warm]
+        colors["hollow"] = [v * t.get("hollow", 1.0) for v in warm]
     # the environment (the overhaul, stage B): the sky's zenith deep in the palette's background hue, its horizon a
     # lifted, saturated mix of shadow and primary (so the distance glows with the palette, never grey), the fog the
     # horizon's colour a step darker, and the sky's glow the palette's resonant hue
@@ -809,6 +854,8 @@ PAL_INDEX = float(os.environ.get("CW_PAL", "0"))               # the palette sho
 PAL_ALBEDO = float(os.environ.get("CW_PAL_ALBEDO", "0.28"))     # albedo = the brief's display colour x this
 GRAD_ALBEDO = float(os.environ.get("CW_GRAD_ALBEDO", "1.0"))    # the chromatic field's stops, relative to it
 LIGHT_WHITE = float(os.environ.get("CW_LIGHT_WHITE", "0.45"))    # how far the key and ambient floor lean to white
+LIGHT_PAIR = os.environ.get("CW_LIGHT_PAIR", "0") == "1"           # art pass II: fill + glow from the gradient's end
+LIGHT_PAIR_CHROMA = float(os.environ.get("CW_LIGHT_PAIR_CHROMA", "1.6"))
 PAL_TRANSITION = float(os.environ.get("CW_PAL_TRANSITION", "6.0"))  # seconds of OKLab blend
 PAL_HOLD = float(os.environ.get("CW_PAL_HOLD", "24.0"))         # the least time a palette is held
 PAL_LOCK = os.environ.get("CW_PAL_LOCK", "0") == "1"            # a review still: hold the selected palette
@@ -912,9 +959,13 @@ def ground_program():
     if BAKE:  # ADR-1407: baked grids, sampled (cheap) -- r0 = sand, r2 = crest (sand^13), r3 = amplitude
         g.op("shade", "field", 0, field="shade-sand-grid")
         g.op(None, "power", 2, a=0, f=CREST_POWER)
-        g.op(None, "field", 3, field="shade-amp-grid")
         # the colour field (Stage B): the large figure's signed F
         g.op("tintField", "field", 5, field="shade-tint-grid")
+        if AMP_FROM_TINT:   # art pass II: the excitation is the large figure's |F|^2 (the colour field squared)
+            g.op("ampFromTint", "multiply", 3, a=5, b=5)
+            g.op(None, "remap", 3, a=3, k=[0.0, 1.0, 0.0, AMP_GAIN])
+        else:
+            g.op(None, "field", 3, field="shade-amp-grid")
         if PALETTE != "M":   # (the chromatic field reads F itself: its baked strength is the gain, its ramp is cyclic)
             g.op("tintMap", "remap", 5, a=5, k=[-0.55, 0.55, 0.0, 1.0], f=1.0)   # r5: the colour coordinate, 0 .. 1
     else:
@@ -932,6 +983,13 @@ def ground_program():
         g.op("light2", "field", 6, field="shade-light-grid" if LINE2 else "shade-wave-grid")  # > 0 medium, < 0 wave
         g.op("waveMask", "remap", 7, a=6, k=[-0.04, -0.22, 0.0, 1.0], f=1.0)
         g.op(None, "multiply", 7, a=7, b=2)                         # ... on the crest
+        if SCAN > 0.0:
+            # the scan (layer C): a band crossing the basin, lighting the whole ridge it passes (the sand mask, wider
+            # than the crest) in the travelling light's colour, the crest hottest
+            g.op("scan", "field", 6, field="scan")
+            g.op(None, "multiply", 6, a=6, b=0)
+            g.op("scanGain", "remap", 6, a=6, k=[0.0, 1.0, 0.0, SCAN], f=0.0)
+            g.op(None, "add", 7, a=7, b=6)
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
     g.op("line", "constant", 4, k=pc("line", P_["lineI"]) + [1.0])
     g.op(None, "multiply", 2, a=2, b=4)
@@ -1309,7 +1367,7 @@ def build_world():
         s.route(R("sonic.energy", band, BAND_RATE, gain=1.0, offset=0.4, integrate=True))
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
                 *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
-                R("snareEnv", line, 1.0, op="multiply", gain=0.9, offset=1.0, attackMs=0, decayMs=260),
+                R("snareEnv", line, 1.0, op="multiply", gain=SNARE_LINE, offset=1.0, attackMs=0, decayMs=260),
                 *[R("hatEnv", p_, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180) for p_ in sheen],
                 *[R("flux", p_, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500) for p_ in counter])
     s.route(*[R("control.light", p_, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR) for p_ in counter],
