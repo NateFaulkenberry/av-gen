@@ -240,8 +240,8 @@ def compact_initial(scene_path):
         f.write(text + "\n")
 
 
-def index_entry(name, project, description, live=True, hidden=False):
-    e = {"category": CATEGORY, "description": description, "live": live, "name": name, "project": project}
+def index_entry(name, project, description, live=True, hidden=False, category=CATEGORY):
+    e = {"category": category, "description": description, "live": live, "name": name, "project": project}
     if hidden:
         e["hidden"] = True
     kit.upsert_index_entry(e)

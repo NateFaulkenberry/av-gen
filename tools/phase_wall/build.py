@@ -522,13 +522,13 @@ def build(autonomous=False):
 
 
 def register(s):
-    """The Examples > Live > Experiments entry (live: the project carries sonic.live and no audio file)."""
+    """The Examples > Live > Generative entry (live: the project carries sonic.live and no audio file)."""
     cc = common.describe_ccs(MIDI_CC, "note 36 holds a pacemaker on the end wall")
     text = ("Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". " + s.design["thesis"] +
             " Held sound pulls the hall into unison, kicks launch fronts from the end wall that run round both "
             "corners, a build turns the lag; eight palettes take turns at phrase boundaries (or on a big change in the "
             "music when there is no tempo). See docs/prototypes/phase-wall/.")
-    common.index_entry(s.title, "experiments/%s/%s.json" % (SID, SID), text, live=True)
+    common.index_entry(s.title, "experiments/%s/%s.json" % (SID, SID), text, live=True, category="Generative")
 
 
 def write_variant(pp, out, wav=None, cam=None, sets=(), tracks=(), palette=None):

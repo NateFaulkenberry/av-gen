@@ -424,7 +424,7 @@ def main():
     cc = common.describe_ccs(MIDI_CC, "notes 36-38 hold seeds")
     common.index_entry(TITLE, "rd-pins/rd-pins.json",
                        "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". " + DESIGN["thesis"]
-                       + " See docs/prototypes/generative-rd/C-scene-plan.md.", live=True)
+                       + " See docs/prototypes/generative-rd/C-scene-plan.md.", live=True, category="Generative")
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))
