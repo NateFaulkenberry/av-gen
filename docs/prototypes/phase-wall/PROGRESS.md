@@ -32,3 +32,11 @@ Owner's ask: "oscillator A3-flaps looks good too - build this into a full scene,
 - **2026-10-17. Stage 0** (research, debate, proofs, plan). The research is written. Proof generator: one wrapped
   network read by four walls of a closed hall, with the reader frames checked numerically (corner continuity exact).
   Status: see the end of `02-plan.md`. **Paused for the coordinator's review before any building.**
+- **2026-10-17. Stage 0 done.**
+  - Proofs P1-P7 in `66-phase-wall-scene/00-proofs/`.
+  - Chosen: the closed hall, blades, the painted face plus soft bands, the promenade camera.
+  - Flicker gate (frame-diff p50 ≤ 6 / p95 ≤ 12) set against the R&D clip (5.4 / 7.4).
+  - Live: the proof hall at full 1080p, GPU 13.4 ms, 0 misses.
+  - Flicker measure: `scratchpad fdiff.py` logic. Reproduce with ffmpeg frames plus the mean |Δ| at 960 px wide; to
+    be folded into `tools/phase_wall/` in Stage 1.
+  - **Next: Stage 1 after the coordinator's review.**

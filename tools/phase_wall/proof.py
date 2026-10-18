@@ -46,7 +46,7 @@ def hall_walls(length, width):
 
 
 PAL = {
-    "metal": "#b08a5a", "back": "#0d2a33", "backGain": 0.5, "front": "#5ff2e0", "frontGain": 2.2,
+    "metal": "#b08a5a", "trough": "#0b1a1c", "back": "#0d2a33", "backGain": 0.5, "front": "#5ff2e0", "frontGain": 2.2,
     "floor": "#07090b", "ceiling": "#06080a", "pier": "#0b0d10", "fog": "#0a1a1e", "key": "#ffe2c0",
 }
 
@@ -82,7 +82,14 @@ def build(a):
     pr.op(None, "smoothstep", 1, a=0, k=[0.8, 3.0, 0, 0])
     pr.op("front", "constant", 2, k=C("front", PAL["frontGain"]) + [1])
     pr.op(None, "multiply", 3, a=1, b=2)
-    pr.op("metal", "constant", 4, k=C("metal") + [1])
+    if a.paint:  # the face: value from the phase (instance colour = saturate(sin theta), written by a colour effector)
+        pr.op(None, "input", 6, inp="instanceColor")
+        pr.op(None, "smoothstep", 6, a=6, k=[0.0, 0.9, 0, 0])
+        pr.op("trough", "constant", 7, k=C("trough") + [1])
+        pr.op("metalc", "constant", 4, k=C("metal") + [1])
+        pr.op(None, "mixBy", 4, a=7, b=4, c=6)
+    else:
+        pr.op("metal", "constant", 4, k=C("metal") + [1])
     pr.op(None, "constant", 5, k=[a.rough] * 3 + [1])
     pr.op(None, "roughnessFilter", 5, a=5, f=1.0)
     s.program(pr.doc(base=4, emission=3, roughness=5))
@@ -104,6 +111,7 @@ def build(a):
         T = [st[0] - d[0] * (u0 - P / 2), H / 2, st[1] - d[2] * (u0 - P / 2)]
         for ch, fn in ((1, "ph"), (3, "act")):
             s.field(fn + name, {"kind": "grid", "reference": "net", "channel": ch, "strength": 1.0,
+                                "colorA": [0.0, 0.0, 0.0, 1.0], "colorB": [1.0, 1.0, 1.0, 1.0],
                                 "rotation": euler_deg(d)}, position=T)
         yaw = math.degrees(math.atan2(-d[2], d[0]))
         s.proc("flaps" + name, {"kind": "box", "size": size},
@@ -112,7 +120,8 @@ def build(a):
                material={"program": "flap", "baseColor": [1, 1, 1], "roughness": a.rough, "metallic": 0.85},
                extra={"effectors": [
                    {"field": "ph" + name, "op": "rotation", "blend": "add", "strength": a.swing, "axis": [0, 1, 0]},
-                   {"field": "act" + name, "op": "emission", "blend": "replace", "strength": 1.0}],
+                   {"field": "act" + name, "op": "emission", "blend": "replace", "strength": 1.0}] + ([
+                   {"field": "ph" + name, "op": "color", "blend": "replace", "strength": 1.0}] if a.paint else []),
                    "variation": {"seed": 11, "randomRotation": [0.0, 0.05, 0.0]},
                    "materialVariation": {"valueRandom": 0.10}})
         # the backplane: the colour behind the louvres
@@ -156,7 +165,7 @@ def build(a):
                distribution={"kind": "grid", "gridCount": [1, 1, int(L / 8) - 1], "gridSpacing": [1, 1, 8.0]},
                position=(0.0, 0.005, 0.0), material={"baseColor": C("metal"), "roughness": 0.25, "metallic": 1.0})
     s.proc("floor", {"kind": "box", "size": [W + 400, 1.0, L + 400]}, position=(0.0, -0.5, 0.0),
-           material={"baseColor": C("floor"), "roughness": 0.18, "metallic": 0.0})
+           material={"baseColor": C("floor"), "roughness": a.floor_rough, "metallic": 0.0})
     s.environment = {
         "intensity": 0.05, "background": C("fog", 0.3), "fogColor": C("fog"), "volumeDensity": 0.0,
         "fogSky": 1.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0, "shadowRange": 160.0,
@@ -164,11 +173,10 @@ def build(a):
         "sky": {"enabled": True, "zenithColor": C("fog", 0.3), "horizonColor": C("fog"), "groundColor": C("fog", 0.3),
                 "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0, "background": True, "useKeyLight": False},
         "bands": {"phase": 0.0, "rotation": 0.0, "gain": 1.0,
-                  "softbox": {"intensity": 0.25, "azimuth": 0.6, "elevation": 0.7, "falloff": 2.6, "skyFill": 0.04},
-                  "strips": [{"axis": [1, 0, 0], "offset": 0.0, "width": 0.02, "intensity": 7.0, "segments": 0,
-                              "warmth": 0.6, "rate": 0.0},
-                             {"axis": [0, 0, 1], "offset": 0.0, "width": 0.02, "intensity": 7.0, "segments": 0,
-                              "warmth": 0.3, "rate": 0.0}]},
+                  "softbox": {"intensity": a.softbox, "azimuth": 0.6, "elevation": 0.7, "falloff": 2.6, "skyFill": 0.04},
+                  "strips": [{"axis": [math.cos(k * 0.785), 0.0, math.sin(k * 0.785)], "offset": 0.0,
+                              "width": a.band_width, "intensity": a.band_i, "segments": 0,
+                              "warmth": 0.25 * k, "rate": 0.0} for k in range(4)]},
     }
     s.light("key", "directional", direction=[0.3, -0.75, -0.55], color=C("key"), intensity=3.0, castsShadow=True,
             contactShadow=False, softness=0.3)
@@ -179,7 +187,9 @@ def build(a):
     s.camera = {"mode": 1, "position": [0.0, 7.0, L / 2 - 8.0], "target": [0.0, 12.0, -L / 2], "fov": 40.0,
                 "orbitSpeed": 0.0}
     s.params_({"camera/lens/focalLength": 24.0, "post/bloom/intensity": 0.25, "post/output/vignette": 0.3,
-               "post/grade/contrast": 1.06})
+               "post/grade/contrast": 1.06,
+               "post/look/atmospheric": a.atmos, "post/look/atmosphericDistance": 150.0,
+               "post/look/atmosphericTint": C("fog", 3.0)})
     s.response = dict(common.RESPONSE)
     return s
 
@@ -198,6 +208,12 @@ def main():
     ap.add_argument("--height", type=float, default=30.0)
     ap.add_argument("--bay", type=float, default=16.0)
     ap.add_argument("--inlay", action="store_true")
+    ap.add_argument("--paint", action="store_true")
+    ap.add_argument("--band-width", type=float, default=0.02)
+    ap.add_argument("--band-i", type=float, default=7.0)
+    ap.add_argument("--softbox", type=float, default=0.25)
+    ap.add_argument("--floor-rough", type=float, default=0.18)
+    ap.add_argument("--atmos", type=float, default=0.0)
     ap.add_argument("--single", dest="hall", action="store_false")
     a = ap.parse_args()
     s = build(a)

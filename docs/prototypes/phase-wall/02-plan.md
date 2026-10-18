@@ -59,7 +59,18 @@ rectangle becomes the room. B, D and E all leave a sky or an edge to manage. C f
 the palette's `metal` role, a hashed per-flap value jitter (±10%) and hinge play (±3°). Light comes from the key and
 the **vertical** reflection bands. Emission is strain only (the defects and fronts), via the instance emissive.
 
-**Choice:** decided by proof P2 (square against blade, same frame). See §8.
+**Choice: B, vertical blades** (0.68 × 1.5 m on a 0.75 × 1.6 m pitch, about 8,100 in the hall). P2 showed the two
+nearly alike in a still, so the deciding argument is the brief's: blades read as an architectural louvre screen;
+squares read as a pixel display, which is the look the review called flat.
+
+**The proofs changed the material** (P5, P6):
+- **The face carries a tone from the phase.** A colour effector writes saturate(sin θ) per flap, and the program
+  mixes `trough` to `metal`. Without it, a wall the key does not rake is black, and the islands are illegible
+  (P5, top row).
+- **The metal is soft** (roughness about 0.45, with the reflection bands 0.12 wide). Sharp metal under bands strobes.
+
+The physical reading is a two-tone flap (a Rozin tile lit from above, or a BREAKFAST disc): the field shows as value
+and the bands add the moving light.
 
 ## 3. Environment and light
 
@@ -169,8 +180,163 @@ running system (Phase Wall, and the R&D agent's reaction-diffusion scene). The c
 
 ## 7. Proof renders (what paper could not settle)
 
-(Filled in below as each proof lands.)
+**Setup.** Generator `tools/phase_wall/proof.py` (throwaway). Renders went through the GPU lock at 960×540 (one at
+1080p), autonomous, on the R&D's 96 s coupling breath. Stills are in
+`~/Desktop/av-gen-review/66-phase-wall-scene/00-proofs/`.
+
+**The flicker metric.** The mean absolute grey-level change between consecutive frames, at 960 px wide:
+- the R&D A3 clip the owner liked: p50 5.4, p95 7.4;
+- the gate below is set against it.
+
+| proof | question | result |
+|---|---|---|
+| **P1** hall, axis and corner (`P1-*`) | Does one wrapped network across four walls hold together, and does the hall fill the frame? | **Yes.** No void from any of the five camera positions tried (axis, oblique, frontal, corner looking up, low looking up). Islands cross the corners: the reader frames are numerically exact. Faults: the floor's lower 40% was a flat dark plane with a hard key hotspot, fixed in round 2 by brass inlay lines and a rougher stone (P4 still). |
+| **P2** square against blade (`P2-*`) | Which flap? | Nearly alike in a still. Blades read as a louvre facade; squares as a pixel display. **Blades.** |
+| **P3** unison (`P3-*`) | Is unison dead? | Unpainted, unison reads as **brickwork**: every flap at one angle and one value. Two fixes, both proven in P6. (1) Local coupling never reaches perfect unison (frozen vortices survive at K = 14; the order stalls near 0.7, ADR-1450), so islands persist. (2) The periodic tilt plus the reflection bands make whole bays brighten and darken in turn: the slow wave rolls round the room (`P6-chosen-unison-4s-sheet.png`). |
+| **P4** aliasing at 1080p (`P4-*`) | Does the grid moiré? | At 1 m pitch, with the lit backplane behind the gaps, the axis view shows **no moiré** down to the end wall at 128 m (flaps about 9 px there). The far side walls at the grazing angle compress, but the gaps are low contrast because the backplane is lit. The real problem was **temporal**: see P5. |
+| **P5** flicker (`P5-*`) | Does the per-flap shading strobe? | Sharp metal (roughness 0.2) under narrow bands strobes **badly**: p50 14.6-30.3, p95 up to 65. A flap passes through a 0.04 rad highlight in one frame. Without bands it does not flicker (p50 0.8), but the walls the key does not reach go **black**. Roughness 0.5 with 0.15-wide bands: p50 5.1, at the R&D level, but the field turns illegible (a uniform sheen). |
+| **P6** chosen (`P6-*`) | Painted face plus soft bands | Roughness 0.45, bands 0.12 wide, the phase tone on the face, swing ±1.1 rad. **Islands legible; flicker p50 2.9 / p95 4.2 (oblique, islands) and p50 5.4 / p95 10.9 (frontal, unison at K = 14).** |
+| **P7** live (`avgen --live-profile --mode live --audio assets/audio/feline-footwear.wav`, 1080p Auto) | Budget | The P6 hall (9,744 flaps, four walls, 293 × 25 network, shadows) at **full 1920×1080: GPU median 13.4 ms, p95 15.0, 0 misses.** That leaves about 15 ms for the environment pass at 30 fps. |
+
+**Also found:**
+- **At a 1.2 m cell** (the network one cell per flap, so islands span 8-15 flaps instead of 3-5) the defect glow
+  vanished. The strain per cell is lower on a coarser lattice, so the activity thresholds (0.8-3.0) must come down.
+  This is Stage 1's first tuning job.
+- **The post `atmospheric` term at 0.5 with a light tint washes the hall grey** (P1 round 2, not kept). The haze
+  must be dark and in the palette: about 0.1-0.15 with a tint near `environment`.
+- **The key cannot rake all four walls** of a closed hall, by geometry. So the bands and the painted face carry the
+  walls, and the key is for the floor, the piers and the shadows.
 
 ## 8. The plan: stages, gates and fallbacks
 
-(Written after the proofs.)
+**Where it goes:**
+- the scene: `examples/experiments/phase-wall/` (one project and its scene);
+- the generator: `tools/phase_wall/build.py`, which supersedes `proof.py` (deleted at the end);
+- the index category: "Experiments" unless the coordinator takes "Generative" (§6).
+
+**Engine:** **no engine change planned**; the hall needs none. If a stage needs one, I stop and ask first. ADRs
+1460-1469 are reserved for anything that arises; for example, a field-space warp for curved walls is out of scope
+and only noted.
+
+**Media:** `66-phase-wall-scene/<stage>/`.
+
+### Stage 1: foundation (autonomous)
+
+**Build:**
+- `build.py`;
+- the hall at 128 × 48 × 30 m with blades at about 8k;
+- the wrapped network (cell 1.2 m) and the four reader pairs;
+- the painted face plus the soft bands;
+- the lit backplane;
+- the corner and bay piers;
+- the defect glow re-tuned to the coarser lattice.
+
+**Gate:**
+- stills from 4 cameras × 3 states (disorder t 8, islands t 28, unison t 50);
+- defects glow in the islands state;
+- no void;
+- flicker p50 ≤ 6 and p95 ≤ 12 on a 4 s clip of every state;
+- corners continuous.
+
+**Fallbacks:**
+- glow unreadable at 1.2 m → a 0.9 m cell;
+- islands too blocky → a 0.9 m pitch.
+
+### Stage 2: environment and light (the art pass)
+
+**Build:**
+- the coffered ceiling with a soft clerestory glow;
+- polished stone with brass inlay;
+- pier strips in the `trim` role;
+- the vertical bands justified by the strips;
+- a dark tinted haze (post atmospheric, no volumetric march);
+- a key that rakes the floor and the piers;
+- per-flap hinge play and value jitter.
+
+**Gate: the "no dead space" sweep.** A 360° yaw at 3 pitches from 5 positions, as a contact sheet of 45 frames.
+- No frame has a region of 5% or more of the frame that is near-black (below 2% luminance) and featureless (local
+  standard deviation under 1%).
+- The darks carry hue.
+- 1080p stills at the grazing angle show no moiré.
+
+**Fallbacks:**
+- the ceiling reads empty → a second, finer coffer level or light slots;
+- the floor reads empty → a central reflecting runner (glossier stone) on the axis.
+
+### Stage 3: camera
+
+**Build:** the promenade: a loop of about 120 s (§4), with flaps at 8 px or more everywhere on it.
+
+**Gate:**
+- a 30 s clip;
+- the flicker gate along the path;
+- no frame without the field in view.
+
+**Fallback:** if the frontal pass strobes, keep it further out.
+
+### Stage 4: audio and MIDI
+
+**Build:**
+- the routes of §5;
+- the kick front from the end wall;
+- the snare front from the east wall;
+- the MIDI map, with note 36 as the pacemaker;
+- Audio Influence;
+- `sonic.live`, `response.*` (ADR-1361);
+- no audio file;
+- no `live.targetFps` (ADR-1360).
+
+**Gate:** clips of Feline Footwear 40-60 s, Trench 60-80 s and Hyperborea 20-40 s against autonomous, from the same
+camera:
+- the kick fronts visibly cross a corner;
+- sustain visibly unifies the room;
+- the field-slot count stays at 16 or fewer.
+
+**Fallback:** if the slots run out, drop the snare's compound (route it as a second injection) or the pacemaker.
+
+### Stage 5: palettes
+
+**Build:**
+- the 8 role-based states (§6) with the ADR-1420 selector and the ADR-1421 change fallback;
+- CC 9 select and CC 10 lock;
+- the journey order;
+- every colour constant bound to a role (none hard-coded).
+
+**Gate:**
+- a palette contact sheet (8 states × 2 cameras);
+- each state reads in the darks (no neutral black).
+
+### Stage 6: performance, integration and tests
+
+**Build:**
+- the index entry (live);
+- the project-integrity pass.
+
+**Gate:** live `avgen --live-profile --mode live --audio assets/audio/feline-footwear.wav` holds 30 fps at 1080p on
+Auto, with 0-2 misses in about 150 frames, on Feline Footwear (plus a check on Trench and Hyperborea).
+
+**Fallbacks:**
+- the shadow atlas at 1k;
+- the pitch at 0.9 → 1.0;
+- the coffers simplified.
+
+### Stage 7: final
+
+**Build:**
+- the final clip (about 30 s, Feline Footwear) and stills;
+- `03-report.md`;
+- `proof.py` removed.
+
+**Checks, once and all exit 0:**
+- `tools/ci/run-suite.sh cpu-assets`;
+- `gpu`;
+- `tools/review_examples.py --only "Phase Wall"`;
+- `tools/check_project_integrity.py`.
+
+**Name:** "Phase Wall" is the R&D's example (`osc-flaps`). The new scene **replaces** it in the index, rather than
+adding a second "Phase Wall". The R&D's `osc-flaps` entry goes hidden as a harness, unless the coordinator prefers it
+removed. Coordinate at merge, since `proto/generative-rd` owns that entry.
+
+## Status
+
+**Stage 0 complete. Paused for the coordinator's review before Stage 1.**
