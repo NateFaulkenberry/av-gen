@@ -171,3 +171,18 @@ No changes to `fields.wgsl`, the resonance files or `field_uniforms`.
 3. **Cheaper vertices.** A combined single deformer (the front and the spacing folded into the bake) would cut the
    four-times chain evaluation. That could give Ultra.
 4. **Tune ADR-1421's change thresholds** on live input for this scene's signals.
+
+## Quality pass (2026-10-17, `art/resonator-quality`)
+
+The owner's quality brief and colour-field addendum: `docs/prototypes/resonator-quality/` (report `01-report.md`).
+
+- **Colour.** Travelling chromatic waves replace the one colour per sheet. A cyclic OKLab ramp (ADR-1470) runs
+  through four analogous per-palette roles, along a world axis, bent by D, a step per nested sheet, with the phase
+  integrated from the music.
+- **Light.** A broad light from the camera's side (`front`, 1.2), and the fill raised from 0.35 to 1.2. Vignette
+  0.4 → 0.2.
+- **Glow.** A smooth rise with |D| replaces the 3-6 m contour band, whose flat-edged rings read as banding. 30 ops.
+- **Geometry** (`levelsets.py`). The cut's crossings are found by bisection on the cut and put back on the sheet,
+  the opening/bound corner is a smooth minimum, and fragments under 400 m^2 are dropped. That removes the shards,
+  notches and horns at the edges.
+- **Build switch:** `WD_DEBUG=albedo|normals` (review views).

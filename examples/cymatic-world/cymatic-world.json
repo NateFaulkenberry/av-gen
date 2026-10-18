@@ -125,11 +125,19 @@
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.2,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 28.0,
+  "camera/lens/focalLength": 26.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
+  "sources/famPlate/rate": 0.010309,
+  "sources/famPlate/phase": 0.0,
+  "sources/famHex/rate": 0.007634,
+  "sources/famHex/phase": 0.45,
+  "sources/famRadial/rate": 0.006623,
+  "sources/famRadial/phase": 0.7,
+  "sources/famArcs/rate": 0.00578,
+  "sources/famArcs/phase": 0.2,
   "post/motionBlur/amount": 0.0,
   "post/dof/physical": false,
   "post/bloom/radius": 0.6,
@@ -137,7 +145,36 @@
   "post/lens/chromaticAberration": 0.0,
   "post/dof/enabled": false
  },
- "sources": [],
+ "sources": [
+  {
+   "kind": "lfo",
+   "name": "famPlate",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "famHex",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "famRadial",
+   "settings": {
+    "shape": "sine"
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "famArcs",
+   "settings": {
+    "shape": "sine"
+   }
+  }
+ ],
  "routes": [
   {
    "source": "response.intensity",
@@ -239,9 +276,48 @@
    }
   },
   {
+   "source": "lfo.famPlate",
+   "target": "field/cymatic/resonance/source/0/amplitude",
+   "amount": 0.85,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.famHex",
+   "target": "field/cymatic/resonance/source/1/amplitude",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.famRadial",
+   "target": "field/cymatic/resonance/source/2/amplitude",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.famArcs",
+   "target": "field/cymatic/resonance/source/3/amplitude",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "response.bass",
+   "target": "field/cymatic/resonance/source/0/amplitude",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 1500
+   }
+  },
+  {
    "source": "sonic.brightness.slow",
    "target": "field/cymatic/resonance/source/0/focus",
-   "amount": 0.08,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -250,19 +326,8 @@
    }
   },
   {
-   "source": "sonic.brightness.slow",
-   "target": "field/cymatic/resonance/source/1/focus",
-   "amount": 0.06,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 2500,
-    "decayMs": 5000
-   }
-  },
-  {
    "source": "sonic.brightness",
-   "target": "field/cymatic/resonance/source/2/focus",
+   "target": "field/cymaticFine/resonance/source/0/focus",
    "amount": 0.14,
    "op": "add",
    "polarity": "unipolar",
@@ -273,7 +338,7 @@
   },
   {
    "source": "sonic.roughness.slow",
-   "target": "field/cymatic/resonance/source/1/amplitude",
+   "target": "field/cymatic/resonance/source/3/amplitude",
    "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
@@ -356,27 +421,12 @@
   },
   {
    "source": "response.bass",
-   "target": "material/cwGround/op/4/remap/constant",
+   "target": "field/shade-tint/strength",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
-    "gain": -0.45,
-    "offset": 1.0,
-    "attackMs": 120,
-    "decayMs": 1200
-   }
-  },
-  {
-   "source": "response.bass",
-   "target": "material/cwGround/op/4/remap/constant",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "gain": -0.45,
+    "gain": 0.8,
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 1200
@@ -384,31 +434,30 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/4/remap/constant",
-   "amount": 0.22,
+   "target": "material/cwGround/op/23/palette/value",
+   "amount": 20.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
    "chain": {
     "attackMs": 2500,
     "decayMs": 5000
    }
   },
   {
-   "source": "response.sustain",
-   "target": "material/cwGround/op/4/remap/constant",
-   "amount": 0.22,
+   "source": "sonic.energy",
+   "target": "material/cwGround/op/23/palette/value",
+   "amount": 1.6,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
    "chain": {
-    "attackMs": 2500,
-    "decayMs": 5000
+    "gain": 1.0,
+    "offset": 0.4,
+    "integrate": true
    }
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/22/ramp/constant2",
+   "target": "material/cwGround/op/20/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -421,7 +470,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/22/ramp/constant3",
+   "target": "material/cwGround/op/20/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -434,7 +483,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/22/ramp/constant2",
+   "target": "material/cwGround/op/20/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -447,7 +496,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/22/ramp/constant3",
+   "target": "material/cwGround/op/20/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -460,7 +509,7 @@
   },
   {
    "source": "response.snareEnv",
-   "target": "material/cwGround/op/12/constant/constant",
+   "target": "material/cwGround/op/10/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -473,7 +522,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/37/ramp/constant2",
+   "target": "material/cwGround/op/35/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -486,7 +535,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/37/ramp/constant3",
+   "target": "material/cwGround/op/35/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -499,7 +548,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/40/ramp/constant2",
+   "target": "material/cwGround/op/38/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -512,7 +561,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/40/ramp/constant3",
+   "target": "material/cwGround/op/38/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -525,7 +574,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/40/ramp/constant2",
+   "target": "material/cwGround/op/38/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -538,7 +587,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/40/ramp/constant3",
+   "target": "material/cwGround/op/38/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -551,7 +600,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/12/constant/constant",
+   "target": "material/cwGround/op/10/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -579,225 +628,225 @@
      {
       "time": 0.0,
       "value": [
-       3.0102,
-       42.0,
-       35.6497
+       8.8555,
+       44.0,
+       77.2409
       ],
       "interp": "smooth"
      },
      {
       "time": 6.6667,
       "value": [
-       9.3352,
-       43.0,
-       34.1689
+       22.5596,
+       45.0,
+       74.0326
       ],
       "interp": "smooth"
      },
      {
       "time": 13.3333,
       "value": [
-       14.901,
-       43.7321,
-       31.7861
+       34.6188,
+       45.7321,
+       68.8699
       ],
       "interp": "smooth"
      },
      {
       "time": 20.0,
       "value": [
-       19.3045,
-       44.0,
-       29.0193
+       44.1598,
+       46.0,
+       62.8751
       ],
       "interp": "smooth"
      },
      {
       "time": 26.6667,
       "value": [
-       22.3865,
-       43.7321,
-       26.482
+       50.8374,
+       45.7321,
+       57.3778
       ],
       "interp": "smooth"
      },
      {
       "time": 33.3333,
       "value": [
-       24.1727,
-       43.0,
-       24.7182
+       54.7075,
+       45.0,
+       53.5562
       ],
       "interp": "smooth"
      },
      {
       "time": 40.0,
       "value": [
-       24.7532,
-       42.0,
-       24.0887
+       55.9653,
+       44.0,
+       52.1922
       ],
       "interp": "smooth"
      },
      {
       "time": 46.6667,
       "value": [
-       24.1727,
-       41.0,
-       24.7182
+       54.7075,
+       43.0,
+       53.5562
       ],
       "interp": "smooth"
      },
      {
       "time": 53.3333,
       "value": [
-       22.3865,
-       40.2679,
-       26.482
+       50.8374,
+       42.2679,
+       57.3778
       ],
       "interp": "smooth"
      },
      {
       "time": 60.0,
       "value": [
-       19.3045,
-       40.0,
-       29.0193
+       44.1598,
+       42.0,
+       62.8751
       ],
       "interp": "smooth"
      },
      {
       "time": 66.6667,
       "value": [
-       14.901,
-       40.2679,
-       31.7861
+       34.6188,
+       42.2679,
+       68.8699
       ],
       "interp": "smooth"
      },
      {
       "time": 73.3333,
       "value": [
-       9.3352,
-       41.0,
-       34.1689
+       22.5596,
+       43.0,
+       74.0326
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       3.0102,
-       42.0,
-       35.6497
+       8.8555,
+       44.0,
+       77.2409
       ],
       "interp": "smooth"
      },
      {
       "time": 86.6667,
       "value": [
-       -3.4779,
-       43.0,
-       35.9697
+       -5.202,
+       45.0,
+       77.9342
       ],
       "interp": "smooth"
      },
      {
       "time": 93.3333,
       "value": [
-       -9.4848,
-       43.7321,
-       35.2133
+       -18.2171,
+       45.7321,
+       76.2955
       ],
       "interp": "smooth"
      },
      {
       "time": 100.0,
       "value": [
-       -14.4804,
-       44.0,
-       33.7674
+       -29.0409,
+       46.0,
+       73.1628
       ],
       "interp": "smooth"
      },
      {
       "time": 106.6667,
       "value": [
-       -18.1424,
-       43.7321,
-       32.178
+       -36.9751,
+       45.7321,
+       69.719
       ],
       "interp": "smooth"
      },
      {
       "time": 113.3333,
       "value": [
-       -20.3455,
-       43.0,
-       30.9749
+       -41.7486,
+       45.0,
+       67.1122
       ],
       "interp": "smooth"
      },
      {
       "time": 120.0,
       "value": [
-       -21.0771,
-       42.0,
-       30.5297
+       -43.3337,
+       44.0,
+       66.1478
       ],
       "interp": "smooth"
      },
      {
       "time": 126.6667,
       "value": [
-       -20.3455,
-       41.0,
-       30.9749
+       -41.7486,
+       43.0,
+       67.1122
       ],
       "interp": "smooth"
      },
      {
       "time": 133.3333,
       "value": [
-       -18.1424,
-       40.2679,
-       32.178
+       -36.9751,
+       42.2679,
+       69.719
       ],
       "interp": "smooth"
      },
      {
       "time": 140.0,
       "value": [
-       -14.4804,
-       40.0,
-       33.7674
+       -29.0409,
+       42.0,
+       73.1628
       ],
       "interp": "smooth"
      },
      {
       "time": 146.6667,
       "value": [
-       -9.4848,
-       40.2679,
-       35.2133
+       -18.2171,
+       42.2679,
+       76.2955
       ],
       "interp": "smooth"
      },
      {
       "time": 153.3333,
       "value": [
-       -3.4779,
-       41.0,
-       35.9697
+       -5.202,
+       43.0,
+       77.9342
       ],
       "interp": "smooth"
      },
      {
       "time": 160.0,
       "value": [
-       3.0102,
-       42.0,
-       35.6497
+       8.8555,
+       44.0,
+       77.2409
       ],
       "interp": "smooth"
      }
@@ -1075,39 +1124,39 @@
     "name": "Abyssal Resonance",
     "colors": {
      "surfaceA": [
-      0.00243,
-      0.00441,
-      0.01678
+      0.00425,
+      0.00771,
+      0.02937
      ],
      "surfaceB": [
-      0.00598,
-      0.01214,
-      0.04136
+      0.01047,
+      0.02125,
+      0.07238
      ],
      "shadow": [
-      0.00087,
-      0.00126,
-      0.00406
+      0.00152,
+      0.00221,
+      0.0071
      ],
      "grit": [
-      0.00952,
-      0.02183,
-      0.07572
+      0.01667,
+      0.03821,
+      0.13252
      ],
      "key": [
-      0.13837,
-      0.27553,
-      0.75
+      0.52402,
+      0.70381,
+      1.15
      ],
      "sky": [
-      0.08672,
-      0.1576,
-      0.6
+      0.44117,
+      0.52678,
+      0.8
      ],
      "keymid": [
-      0.11255,
-      0.21657,
-      0.675
+      0.48259,
+      0.61529,
+      0.975
      ],
      "fill": [
       0.1132,
@@ -1135,24 +1184,54 @@
       1.0
      ],
      "wave": [
-      0.78354,
-      0.84687,
+      0.36625,
+      0.57758,
       1.0
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.00559,
+      0.00821,
+      0.07453
      ],
-     "view1": [
+     "g1": [
       0.0,
-      0.0,
-      0.0
+      0.03656,
+      0.16176
      ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
+     "g2": [
+      0.10121,
+      0.01835,
+      0.20925
+     ],
+     "g3": [
+      0.28755,
+      0.0124,
+      0.13217
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00106,
+      0.00281
+     ],
+     "skyHorizon": [
+      0.02118,
+      0.03838,
+      0.1744
+     ],
+     "skyGround": [
+      0.00372,
+      0.00719,
+      0.05387
+     ],
+     "fogC": [
+      0.02144,
+      0.04095,
+      0.24407
+     ],
+     "sunC": [
+      0.1132,
+      0.28472,
+      1.0
      ]
     }
    },
@@ -1180,18 +1259,18 @@
       0.03845
      ],
      "key": [
-      0.71318,
-      0.386,
+      0.76023,
+      0.59023,
       0.8
      ],
      "sky": [
-      0.45617,
-      0.10802,
+      0.76232,
+      0.59102,
       1.0
      ],
      "keymid": [
-      0.58467,
-      0.24701,
+      0.76128,
+      0.59063,
       0.9
      ],
      "fill": [
@@ -1224,20 +1303,50 @@
       0.06634,
       0.10425
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.01651,
+      0.00353,
+      0.04788
      ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
+     "g1": [
+      0.04532,
+      0.00241,
+      0.05763
      ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
+     "g2": [
+      0.09835,
+      0.0006,
+      0.0394
+     ],
+     "g3": [
+      0.19452,
+      0.00455,
+      0.01712
+     ],
+     "skyZenith": [
+      0.00121,
+      0.00091,
+      0.00302
+     ],
+     "skyHorizon": [
+      0.07205,
+      0.01949,
+      0.16617
+     ],
+     "skyGround": [
+      0.01869,
+      0.00186,
+      0.0497
+     ],
+     "fogC": [
+      0.08961,
+      0.01736,
+      0.22068
+     ],
+     "sunC": [
+      1.0,
+      0.04468,
+      0.31771
      ]
     }
    },
@@ -1266,18 +1375,18 @@
      ],
      "key": [
       1.0,
-      0.61332,
-      0.31041
+      0.77051,
+      0.56474
      ],
      "sky": [
       1.0,
-      0.1755,
-      0.12555
+      0.60637,
+      0.55255
      ],
      "keymid": [
       1.0,
-      0.39441,
-      0.21798
+      0.68844,
+      0.55865
      ],
      "fill": [
       1.0,
@@ -1306,23 +1415,53 @@
      ],
      "wave": [
       1.0,
-      0.76815,
-      0.3564
+      0.41789,
+      0.05951
      ],
-     "view0": [
-      0.0,
-      0.0,
+     "g0": [
+      0.04488,
+      0.00426,
+      0.00372
+     ],
+     "g1": [
+      0.08611,
+      0.0097,
+      0.00163
+     ],
+     "g2": [
+      0.13404,
+      0.02312,
       0.0
      ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
+     "g3": [
+      0.15936,
+      0.06624,
+      0.001
      ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
+     "skyZenith": [
+      0.00168,
+      0.00121,
+      0.00121
+     ],
+     "skyHorizon": [
+      0.13253,
+      0.01869,
+      0.01352
+     ],
+     "skyGround": [
+      0.03763,
+      0.00179,
+      0.00127
+     ],
+     "fogC": [
+      0.17684,
+      0.01496,
+      0.01046
+     ],
+     "sunC": [
+      1.0,
+      0.13736,
+      0.03482
      ]
     }
    },
@@ -1350,18 +1489,18 @@
       0.08138
      ],
      "key": [
-      0.66072,
-      0.42826,
+      0.80024,
+      0.65835,
       1.0
      ],
      "sky": [
-      0.28912,
-      0.14124,
+      0.63441,
+      0.57621,
       1.0
      ],
      "keymid": [
-      0.47492,
-      0.28475,
+      0.71732,
+      0.61728,
       1.0
      ],
      "fill": [
@@ -1390,24 +1529,54 @@
       1.0
      ],
      "wave": [
-      0.90466,
-      0.57112,
+      1.0,
+      0.15529,
+      0.64291
+     ],
+     "g0": [
+      0.0177,
+      0.00983,
+      0.07461
+     ],
+     "g1": [
+      0.05077,
+      0.01089,
+      0.11649
+     ],
+     "g2": [
+      0.11634,
+      0.00714,
+      0.10789
+     ],
+     "g3": [
+      0.19496,
+      0.0249,
+      0.08724
+     ],
+     "skyZenith": [
+      0.00121,
+      0.00091,
+      0.00281
+     ],
+     "skyHorizon": [
+      0.05436,
+      0.02053,
+      0.20666
+     ],
+     "skyGround": [
+      0.01317,
+      0.00294,
+      0.05712
+     ],
+     "fogC": [
+      0.06452,
+      0.02277,
+      0.25094
+     ],
+     "sunC": [
+      0.45005,
+      0.10538,
       1.0
-     ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
      ]
     }
    },
@@ -1436,18 +1605,18 @@
      ],
      "key": [
       1.0,
-      0.7959,
-      0.59653
+      0.88612,
+      0.76768
      ],
      "sky": [
-      0.77412,
+      0.92641,
       1.0,
-      0.94041
+      0.9806
      ],
      "keymid": [
-      0.88706,
-      0.89795,
-      0.76847
+      0.9632,
+      0.94306,
+      0.87414
      ],
      "fill": [
       1.0,
@@ -1476,23 +1645,53 @@
      ],
      "wave": [
       1.0,
-      0.79187,
-      0.47547
+      0.56274,
+      0.21838
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.00898,
+      0.02498,
+      0.02353
      ],
-     "view1": [
-      0.02863,
-      0.00828,
-      0.00404
+     "g1": [
+      0.05451,
+      0.02502,
+      0.00903
      ],
-     "view2": [
-      0.16172,
-      0.09048,
-      0.03275
+     "g2": [
+      0.10337,
+      0.0335,
+      0.01324
+     ],
+     "g3": [
+      0.14025,
+      0.07749,
+      0.02066
+     ],
+     "skyZenith": [
+      0.00136,
+      0.00168,
+      0.00201
+     ],
+     "skyHorizon": [
+      0.0348,
+      0.05081,
+      0.05011
+     ],
+     "skyGround": [
+      0.00707,
+      0.0119,
+      0.0117
+     ],
+     "fogC": [
+      0.0384,
+      0.06064,
+      0.0597
+     ],
+     "sunC": [
+      1.0,
+      0.33126,
+      0.15078
      ]
     }
    },
@@ -1500,39 +1699,39 @@
     "name": "Glacial Spectral",
     "colors": {
      "surfaceA": [
-      0.00516,
-      0.01442,
-      0.03035
+      0.00396,
+      0.01106,
+      0.02327
      ],
      "surfaceB": [
-      0.0129,
-      0.04394,
-      0.0803
+      0.00989,
+      0.03369,
+      0.06157
      ],
      "shadow": [
-      0.00218,
-      0.0046,
-      0.00972
+      0.00167,
+      0.00353,
+      0.00745
      ],
      "grit": [
-      0.03324,
-      0.10474,
-      0.17115
+      0.02548,
+      0.0803,
+      0.13122
      ],
      "key": [
-      1.08637,
-      1.09706,
+      1.0925,
+      1.09838,
       1.1
      ],
      "sky": [
-      0.23808,
-      0.66522,
-      1.4
+      0.56277,
+      0.71215,
+      0.9
      ],
      "keymid": [
-      0.66223,
-      0.88114,
-      1.25
+      0.82763,
+      0.90527,
+      1.0
      ],
      "fill": [
       0.56999,
@@ -1560,24 +1759,54 @@
       2.0
      ],
      "wave": [
-      0.87962,
-      0.97345,
+      0.56999,
+      0.86148,
       1.0
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.01888,
+      0.03647,
+      0.07557
      ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
+     "g1": [
+      0.0171,
+      0.07153,
+      0.12835
      ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
+     "g2": [
+      0.01359,
+      0.1209,
+      0.15935
+     ],
+     "g3": [
+      0.0696,
+      0.18098,
+      0.18488
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00152,
+      0.00302
+     ],
+     "skyHorizon": [
+      0.01369,
+      0.04909,
+      0.12071
+     ],
+     "skyGround": [
+      0.0011,
+      0.01097,
+      0.0349
+     ],
+     "fogC": [
+      0.01011,
+      0.05721,
+      0.16252
+     ],
+     "sunC": [
+      0.21085,
+      0.64283,
+      1.0
      ]
     }
    },
@@ -1605,19 +1834,19 @@
       0.01513
      ],
      "key": [
-      0.56439,
+      0.76304,
       1.0,
-      0.69229
+      0.83188
      ],
      "sky": [
-      0.20827,
+      0.71783,
       1.0,
-      0.49604
+      0.81912
      ],
      "keymid": [
-      0.38633,
+      0.74043,
       1.0,
-      0.59416
+      0.8255
      ],
      "fill": [
       0.10731,
@@ -1645,24 +1874,54 @@
       0.40657
      ],
      "wave": [
-      0.86661,
+      0.55208,
       1.0,
-      0.40657
+      0.16645
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.00017,
+      0.02039,
+      0.01123
      ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
+     "g1": [
+      0.00293,
+      0.03992,
+      0.0139
      ],
-     "view2": [
+     "g2": [
+      0.01445,
+      0.06019,
+      0.00877
+     ],
+     "g3": [
+      0.07073,
+      0.09998,
+      0.00396
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00152,
+      0.00121
+     ],
+     "skyHorizon": [
+      0.00732,
+      0.06481,
+      0.02834
+     ],
+     "skyGround": [
       0.0,
-      0.0,
-      0.0
+      0.01609,
+      0.00522
+     ],
+     "fogC": [
+      0.00054,
+      0.07998,
+      0.02969
+     ],
+     "sunC": [
+      0.10731,
+      1.0,
+      0.37797
      ]
     }
    },
@@ -1670,39 +1929,39 @@
     "name": "Rose Quartz",
     "colors": {
      "surfaceA": [
-      0.01764,
-      0.00543,
-      0.01392
+      0.01588,
+      0.00488,
+      0.01253
      ],
      "surfaceB": [
-      0.04981,
-      0.01436,
-      0.03134
+      0.04483,
+      0.01292,
+      0.02821
      ],
      "shadow": [
-      0.00426,
-      0.0021,
-      0.00448
+      0.00383,
+      0.00189,
+      0.00403
      ],
      "grit": [
-      0.05572,
-      0.01564,
-      0.03391
+      0.05015,
+      0.01408,
+      0.03052
      ],
      "key": [
       0.7,
-      0.62335,
-      0.64669
+      0.65687,
+      0.67001
      ],
      "sky": [
-      2.2,
-      0.67665,
-      1.73562
+      1.25,
+      0.88971,
+      1.13719
      ],
      "keymid": [
-      1.45,
-      0.65,
-      1.19116
+      0.975,
+      0.77329,
+      0.9036
      ],
      "fill": [
       1.0,
@@ -1731,23 +1990,53 @@
      ],
      "wave": [
       1.0,
-      0.7454,
-      0.82279
+      0.42724,
+      0.59677
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.03514,
+      0.01454,
+      0.03275
      ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
+     "g1": [
+      0.06803,
+      0.02164,
+      0.04388
      ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
+     "g2": [
+      0.11698,
+      0.03103,
+      0.04989
+     ],
+     "g3": [
+      0.16287,
+      0.07119,
+      0.06817
+     ],
+     "skyZenith": [
+      0.00152,
+      0.00106,
+      0.00259
+     ],
+     "skyHorizon": [
+      0.09151,
+      0.02494,
+      0.07715
+     ],
+     "skyGround": [
+      0.02448,
+      0.00395,
+      0.02021
+     ],
+     "fogC": [
+      0.11791,
+      0.02434,
+      0.09813
+     ],
+     "sunC": [
+      1.0,
+      0.234,
+      0.48521
      ]
     }
    },
@@ -1780,13 +2069,13 @@
       1.0
      ],
      "sky": [
-      0.6652,
-      0.78966,
+      0.89657,
+      0.93713,
       1.0
      ],
      "keymid": [
-      0.8326,
-      0.89483,
+      0.94829,
+      0.96857,
       1.0
      ],
      "fill": [
@@ -1815,24 +2104,54 @@
       1.0
      ],
      "wave": [
-      1.0,
-      1.0,
+      0.83708,
+      0.90628,
       1.0
      ],
-     "view0": [
-      0.0,
-      0.0,
-      0.0
+     "g0": [
+      0.00644,
+      0.00771,
+      0.00957
      ],
-     "view1": [
-      0.0,
-      0.0,
-      0.0
+     "g1": [
+      0.01503,
+      0.01843,
+      0.02222
      ],
-     "view2": [
-      0.0,
-      0.0,
-      0.0
+     "g2": [
+      0.03066,
+      0.03602,
+      0.03976
+     ],
+     "g3": [
+      0.07829,
+      0.07249,
+      0.06646
+     ],
+     "skyZenith": [
+      0.00046,
+      0.0006,
+      0.00076
+     ],
+     "skyHorizon": [
+      0.03945,
+      0.04742,
+      0.06098
+     ],
+     "skyGround": [
+      0.00848,
+      0.01086,
+      0.01508
+     ],
+     "fogC": [
+      0.04489,
+      0.05589,
+      0.07504
+     ],
+     "sunC": [
+      0.70341,
+      0.80927,
+      1.0
      ]
     }
    },
@@ -1860,18 +2179,18 @@
       0.01588
      ],
      "key": [
-      0.99128,
-      0.86219,
+      0.99579,
+      0.92927,
       1.0
      ],
      "sky": [
-      0.29048,
-      0.29048,
+      0.69458,
+      0.71549,
       1.0
      ],
      "keymid": [
-      0.64088,
-      0.57634,
+      0.84518,
+      0.82238,
       1.0
      ],
      "fill": [
@@ -1901,23 +2220,53 @@
      ],
      "wave": [
       1.0,
-      0.72775,
-      0.61718
+      0.29661,
+      0.3623
      ],
-     "view0": [
-      0.00046,
-      0.00176,
-      0.00293
+     "g0": [
+      0.00283,
+      0.01276,
+      0.02942
      ],
-     "view1": [
-      0.02576,
-      0.00635,
-      0.08143
+     "g1": [
+      0.0234,
+      0.01232,
+      0.04988
      ],
-     "view2": [
-      0.15895,
-      0.03632,
-      0.02576
+     "g2": [
+      0.0754,
+      0.01285,
+      0.04399
+     ],
+     "g3": [
+      0.15011,
+      0.03801,
+      0.03682
+     ],
+     "skyZenith": [
+      0.00076,
+      0.00106,
+      0.00201
+     ],
+     "skyHorizon": [
+      0.0354,
+      0.03897,
+      0.13086
+     ],
+     "skyGround": [
+      0.00758,
+      0.00786,
+      0.03838
+     ],
+     "fogC": [
+      0.04009,
+      0.04302,
+      0.17768
+     ],
+     "sunC": [
+      1.0,
+      0.15643,
+      0.36542
      ]
     }
    }
@@ -1925,98 +2274,108 @@
   "bindings": [
    {
     "role": "wave",
-    "target": "material/cwGround/op/14/ramp/constant2",
+    "target": "material/cwGround/op/12/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "wave",
-    "target": "material/cwGround/op/14/ramp/constant3",
+    "target": "material/cwGround/op/12/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "hollow",
-    "target": "material/cwGround/op/22/ramp/constant2",
+    "target": "material/cwGround/op/20/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "hollow",
-    "target": "material/cwGround/op/22/ramp/constant3",
+    "target": "material/cwGround/op/20/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "sheen",
-    "target": "material/cwGround/op/37/ramp/constant2",
+    "target": "material/cwGround/op/35/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "sheen",
-    "target": "material/cwGround/op/37/ramp/constant3",
+    "target": "material/cwGround/op/35/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "fill",
-    "target": "material/cwGround/op/40/ramp/constant2",
+    "target": "material/cwGround/op/38/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "fill",
-    "target": "material/cwGround/op/40/ramp/constant3",
+    "target": "material/cwGround/op/38/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "line",
-    "target": "material/cwGround/op/12/constant/constant",
+    "target": "material/cwGround/op/10/constant/constant",
     "mode": "multiply"
    },
    {
-    "role": "grit",
-    "target": "material/cwGround/op/25/constant/constant",
+    "role": "g0",
+    "target": "material/cwGround/op/27/oklabRamp/constant",
     "mode": "multiply"
    },
    {
-    "role": "surfaceA",
-    "target": "material/cwGround/op/24/ramp/constant",
+    "role": "g1",
+    "target": "material/cwGround/op/27/oklabRamp/constant2",
     "mode": "multiply"
    },
    {
-    "role": "shadow",
-    "target": "material/cwGround/op/24/ramp/constant2",
+    "role": "g2",
+    "target": "material/cwGround/op/27/oklabRamp/constant3",
     "mode": "multiply"
    },
    {
-    "role": "surfaceB",
-    "target": "material/cwGround/op/24/ramp/constant3",
+    "role": "g3",
+    "target": "material/cwGround/op/27/oklabRamp/constant4",
     "mode": "multiply"
    },
    {
     "role": "sky",
-    "target": "material/cwGround/op/34/ramp/constant",
+    "target": "material/cwGround/op/32/ramp/constant",
     "mode": "multiply"
    },
    {
     "role": "keymid",
-    "target": "material/cwGround/op/34/ramp/constant2",
+    "target": "material/cwGround/op/32/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "key",
-    "target": "material/cwGround/op/34/ramp/constant3",
+    "target": "material/cwGround/op/32/ramp/constant3",
     "mode": "multiply"
    },
    {
-    "role": "view0",
-    "target": "material/cwGround/op/28/ramp/constant",
-    "mode": "multiply"
+    "role": "skyZenith",
+    "target": "env/sky/zenithColor",
+    "mode": "replace"
    },
    {
-    "role": "view1",
-    "target": "material/cwGround/op/28/ramp/constant2",
-    "mode": "multiply"
+    "role": "skyHorizon",
+    "target": "env/sky/horizonColor",
+    "mode": "replace"
    },
    {
-    "role": "view2",
-    "target": "material/cwGround/op/28/ramp/constant3",
-    "mode": "multiply"
+    "role": "skyGround",
+    "target": "env/sky/groundColor",
+    "mode": "replace"
+   },
+   {
+    "role": "fogC",
+    "target": "scene/fogColor",
+    "mode": "replace"
+   },
+   {
+    "role": "sunC",
+    "target": "env/sky/sunColor",
+    "mode": "replace"
    }
   ],
   "position": 0.0,

@@ -96,12 +96,37 @@ CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fas
           "threshold": 0.06, "rearm": 0.03, "primaryTimeout": 30.0, "maxHold": 90.0}
 
 
+# the iridescent gradient's four stops per palette (resonator-quality): analogous hues around the palette's base and
+# fold (offsets in degrees), at a common lightness and a stronger chroma than the roles' -- the silk's pigment shows
+# between its highlights -- and blended in OKLab by the ramp. The accent stays in the light, never in the ramp.
+SILK_L = (0.42, 0.5, 0.56, 0.47)
+SILK_CHROMA = 2.0
+SILK_TURN = (-16.0, 0.0, 28.0, -40.0)
+
+
+def gradient_roles(cols):
+    lin = dict(zip(ROLES, (hexrgb(h) for h in cols)))
+    _, cb, hb = kit.lch_of(lin["base"])
+    _, cf, hf = kit.lch_of(lin["fold"])
+    _, cr, hr = kit.lch_of(lin["resonant"])
+    stops = [(cb, hb + SILK_TURN[0]), (cf, hf), (cr, hr + SILK_TURN[2]), (max(cb, cf), hb + SILK_TURN[3])]
+    out = {"g%d" % i: [round(v, 5) for v in kit.oklch(SILK_L[i], min(c * SILK_CHROMA, 0.26), h)]
+           for i, (c, h) in enumerate(stops)}
+    # the camera-side fill: the base colour lifted halfway to white (the shadow role was near black: no fill at all)
+    out["fillLight"] = [round(v, 5) for v in kit.mix_oklab(lin["fold"], [1.0, 1.0, 1.0], 0.2)]
+    return out
+
+
 def palette_states():
     out = []
     for row in PALETTES:
         name, cols, tune = row[0], row[1:8], row[8]
-        out.append({"name": name, "colors": {r: hexrgb(h) for r, h in zip(ROLES, cols)},
-                    "scalars": {k: float(v) for k, v in tune.items()}})
+        colors = {r: hexrgb(h) for r, h in zip(ROLES, cols)}
+        colors.update(gradient_roles(cols))
+        scal = {k: float(v) for k, v in tune.items()}
+        scal["rough"] = round(scal["rough"] + ROUGH_ADD, 4)
+        scal["key"] = round(scal["key"] * KEY_SCALE, 4)
+        out.append({"name": name, "colors": colors, "scalars": scal})
     return out
 
 
@@ -177,11 +202,12 @@ class SheetSpec:
     stretched across), the cloth's own width (the excess gathers into pleats), billow and pleat counts."""
 
     def __init__(self, name, points, roll, span, cloth, billow, pleats, nu=520, nv=112, pleat_wander=0.6, seed=1,
-                 curl=0.0, edge_wave=0.0, end_round=0.0):
+                 curl=0.0, edge_wave=0.0, end_round=0.0, music=True):
         self.name, self.points, self.roll, self.span, self.cloth = name, points, roll, span, cloth
         self.billow, self.pleats, self.nu, self.nv = billow, pleats, nu, nv
         self.pleat_wander, self.seed, self.curl, self.edge_wave = pleat_wander, seed, curl, edge_wave
         self.end_round = end_round
+        self.music = music   # the music's deformers (the hero); a far drape drifts only (cheap: no resonance per vertex)
 
 
 def sheet_mesh(spec):
@@ -299,16 +325,42 @@ def sheets_for(comp):
         # mirrored: a long low wall on one side of the gather, a tall turning sail on the other.
         main = SheetSpec(
             "silk",
-            points=[(-84, 10, 4), (-48, 4, -28), (-24, 0, -66), (-10, 2, -115), (0, 4, -170), (18, 10, -174),
-                    (42, 20, -164), (68, 34, -146), (90, 52, -134), (102, 74, -138)],
+            # resonator-quality (Phase E, the owner: "too much empty space"): the sail comes round toward the camera and
+            # down (its free end now fills the right of the frame to the bottom edge), the wall is broader, and the gather
+            # opens from a 2.5 m pinch to a 12 m waist with a longer taper either side -- one cloth drawn through a ring,
+            # not two pieces joined by a thread
+            points=[(-84, 10, 4), (-48, 4, -28), (-24, 0, -66), (-10, 2, -115), (0, 4, -170), (18, 8, -170),
+                    (40, 12, -150), (62, 18, -122), (82, 30, -100), (96, 48, -92)],
             roll=[(0.0, 1.45), (0.3, 1.65), (0.62, 2.1), (0.7, 2.6 + SAIL), (0.84, 3.2 + SAIL), (1.0, 3.5 + SAIL)],
-            span=[(0.0, 30.0), (0.3, 26.0), (0.52, 10.0), (0.62, 2.5), (0.68, 12.0), (0.84, 48.0), (0.95, 58.0), (1.0, 50.0)],
-            cloth=[(0.0, 40.0), (0.52, 44.0), (0.66, 30.0), (0.84, 60.0), (0.95, 72.0), (1.0, 64.0)],
+            span=[(0.0, 36.0), (0.3, 36.0), (0.5, 26.0), (0.62, 12.0), (0.7, 30.0), (0.84, 64.0), (0.95, 76.0),
+                  (1.0, 68.0)],
+            # (the cloth closes in on the span through the waist: 40 m of cloth on a 12 m span folded the pleats over
+            # themselves into stepped terraces either side of the gather)
+            cloth=[(0.0, 48.0), (0.5, 52.0), (0.6, 20.0), (0.66, 34.0), (0.84, 76.0), (0.95, 88.0), (1.0, 80.0)],
             billow=[(0.0, 6.0), (0.33, 9.0), (0.56, 0.0), (0.64, 0.0), (0.82, -6.0), (1.0, -3.0)],
             pleats=[(6.0, 0.8), (13.0, 0.35), (17.0, 0.25)], seed=5, curl=0.06, edge_wave=0.035, nu=470, nv=110,
             end_round=0.4)
-        cam = {"position": [4.0, 2.0, 60.0], "target": [-16.0, 8.0, -60.0], "focal": 26.0, "drift": True}
-        return [main], cam
+        # the camera 74 m nearer the gather and a little above the wall (the sheet covers ~74% of the frame, from ~44%;
+        # the dark wedges above and below the gather are the negative space left)
+        # THE FAR DRAPES (Resonant Visual Worlds, 05-plan §1.2, S2): the same cloth language far behind the gather --
+        # long, soft S-curves with few broad pleats, one rising above the gather and one sweeping below it, seen
+        # through the negative space either side of the waist and softened by the coloured air. The hero's wall is the
+        # foreground, the gather and sail the middle ground, these the background. They drift with the hero but carry
+        # none of the music's per-vertex deformers (about 3k vertices each)
+        far_above = SheetSpec(
+            "drapeAbove",
+            points=[(-320, 10, -380), (-160, 70, -470), (0, 95, -520), (150, 130, -500), (300, 200, -430)],
+            roll=[(0.0, 1.1), (0.5, 1.45), (1.0, 1.9)], span=[(0.0, 60.0), (0.5, 105.0), (1.0, 75.0)],
+            cloth=[(0.0, 85.0), (0.5, 140.0), (1.0, 100.0)], billow=[(0.0, 10.0), (0.5, 28.0), (1.0, 14.0)],
+            pleats=[(3.0, 0.9), (7.0, 0.2)], pleat_wander=1.0, nu=64, nv=16, seed=31, music=False)
+        far_below = SheetSpec(
+            "drapeBelow",
+            points=[(-300, -190, -360), (-150, -130, -440), (10, -105, -490), (170, -60, -470), (320, 10, -400)],
+            roll=[(0.0, 1.6), (0.5, 1.3), (1.0, 1.0)], span=[(0.0, 55.0), (0.5, 95.0), (1.0, 70.0)],
+            cloth=[(0.0, 80.0), (0.5, 128.0), (1.0, 95.0)], billow=[(0.0, -12.0), (0.5, -24.0), (1.0, -10.0)],
+            pleats=[(3.0, 0.9), (6.0, 0.25)], pleat_wander=1.1, nu=64, nv=16, seed=37, music=False)
+        cam = {"position": [4.0, 14.0, -14.0], "target": [-4.0, 4.0, -130.0], "focal": 24.0, "drift": True}
+        return ([main, far_above, far_below] if os.environ.get("RS_DRAPES", "1") == "1" else [main]), cam
     if comp == "b":
         # THE PASSAGE: two broad sheets bow toward each other and form a curved corridor the eye travels down; they
         # touch far away, where the gathered crease is the focal light.
@@ -401,14 +453,34 @@ def silk_program():
     g.op(None, "swizzle", 1, a=0, k=[1, 1, 1, 1])                      # r1 = v
     g.op("hem", "palette", 1, a=1, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[1, 1, 1, 0], k4=[0, 0, 0, 0])
     g.op("hemWidth", "power", 1, a=1, f=500.0)                          # r1: 1 on the hems, falling fast inward
-    g.op("hemCol", "constant", 3, k=C("cyan", 0.9) + [1])              # role: grazing (x 0.9, x palette emit)
-    g.op(None, "multiply", 1, a=1, b=3)                                # r1: emission (the hems)
+    # (resonator-quality: a colour times a scalar is one ramp -- black, half, whole -- not a constant and a multiply;
+    # with the gather's seam read from a distance field, nine ops went, which paid for the gradient and more)
+    g.op("hemCol", "ramp", 1, a=1, k=[0, 0, 0, 0], k2=C("cyan", 0.45) + [0.5], k3=C("cyan", 0.9) + [1])
+    # r1: emission (the hems), role: grazing (x 0.9, x palette emit)
     g.op("foldMask", "fresnel", 4, f=2.6)                               # r4: turned away (bass lowers the exponent)
-    g.op("body", "constant", 5, k=C("indigo") + [1])                    # role: base
-    g.op("foldCol", "constant", 6, k=C("violet", 0.4) + [1])            # role: fold
-    g.op("foldMix", "constant", 7, k=[0.75, 0.75, 0.75, 1])             # x palette fold, low mids
-    g.op(None, "multiply", 7, a=4, b=7)
-    g.op(None, "mixBy", 5, a=5, b=6, c=7)                              # r5: albedo
+    # THE IRIDESCENT GRADIENT (resonator-quality, the owner's colour-field addendum): the cloth's pigment runs through
+    # the palette's four gradient roles (g0..g3, a cyclic OKLab ramp, ADR-1470) on a coordinate of three layers --
+    #   A  the length of the cloth (u): the wall, the gather and the sail each in their own stretch of the gradient,
+    #      its phase a persistent integral of the music (never reset), so the colour flows along the cloth
+    #   B  a broad band across the world (a cosine along SILK_BAND_DIR): colour crosses the pleats at an angle instead
+    #      of following them, so no pleat or strip has a colour of its own
+    #   D  where the cloth turns from the eye (the fold mask) it leans a little further along the gradient: the folds'
+    #      flanks shift hue, the satin's own iridescence (low mids widen it)
+    g.op("silkPhase", "remap", 5, a=0, k=[0.0, 1.0, 0.0, SILK_LEN])           # u -> cycles; the phase on k.z/k.w
+    g.op(None, "input", 6, inp="worldPosition")
+    g.op(None, "gradient", 6, a=6, k=list(SILK_BAND_DIR) + [0.5], f=1.0 / 420.0)
+    g.op("silkBand", "palette", 6, a=6, k=[0, 0, 0, 0], k2=[SILK_BAND_W] * 3 + [0], k3=[SILK_BAND_N] * 3 + [0],
+         k4=[0, 0, 0, 0], f=0.0)
+    g.op(None, "add", 5, a=5, b=6)
+    g.op("foldMix", "remap", 7, a=4, k=[0.0, 1.0, 0.0, SILK_FOLD])          # turning away -> a step along
+    g.op(None, "add", 5, a=5, b=7)
+    g.op("body", "oklabRamp", 5, a=5, k=C("indigo") + [1], k2=C("violet", 0.5) + [1], k3=C("magenta", 0.4) + [1],
+         k4=C("cyan", 0.3) + [1], f=-1.0)                                # r5: albedo (roles g0..g3)
+    # the satin's sheen (the overhaul, stage C, M1): a soft glow of the fold colour where the cloth turns from the eye
+    # (Fresnel squared), the back-scatter that makes satin luminous at its folds instead of shining in a dot
+    g.op(None, "multiply", 6, a=4, b=4)
+    g.op("sheenCol", "ramp", 6, a=6, k=[0, 0, 0, 0], k2=C("violet", SHEEN * 0.5) + [0.5], k3=C("violet", SHEEN) + [1])
+    g.op(None, "add", 1, a=1, b=6)
     # view-dependent colour (the palette's iridescence): a thin spectral sheen that cycles with the grazing angle,
     # only where the cloth turns away -- strong in Oil-Slick, a pastel shimmer in Opal, a trace elsewhere
     g.op("spectrum", "palette", 6, a=4, k=[0.5, 0.38, 0.5, 0], k2=[0.5, 0.3, 0.5, 0], k3=[1.4, 1.4, 1.4, 0],
@@ -418,15 +490,10 @@ def silk_program():
     g.op("irid", "constant", 7, k=[0.6, 0.6, 0.6, 1])                   # x palette irid
     g.op(None, "multiply", 6, a=6, b=7)
     g.op(None, "add", 1, a=1, b=6)                                     # + the sheen (emission)
-    # the gather's seam: peak light within a few metres of the ring
-    g.op(None, "input", 6, inp="worldPosition")
-    g.op(None, "constant", 7, k=[-GATHER[0], -GATHER[1], -GATHER[2], 0.0])
-    g.op(None, "add", 6, a=6, b=7)
-    g.op(None, "multiply", 6, a=6, b=6)
-    g.op(None, "gradient", 6, a=6, k=[1.0, 1.0, 1.0, 0.0], f=1.0 / (9.0 * 9.0))     # |d|^2 / R^2, saturated
-    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 1.0, 0.0], f=1.0)                     # 1 at the ring, 0 at 9 m
-    g.op("glowCol", "constant", 7, k=C("pearl", 0.5) + [1])            # role: peak (x 0.5, x palette emit)
-    g.op(None, "multiply", 6, a=6, b=7)
+    # the gather's seam: peak light within a few metres of the ring (a distance field: 0 at the ring, 1 at 9 m; the
+    # ramp's middle stop at three quarters keeps the old 1 - (d/R)^2 shape)
+    g.op(None, "field", 6, field="gatherSeam")
+    g.op("glowCol", "ramp", 6, a=6, k=C("pearl", 0.5) + [1], k2=C("pearl", 0.375) + [1], k3=[0, 0, 0, 1])
     g.op(None, "add", 1, a=1, b=6)
     if MUSIC:
         g.op(None, "power", 6, a=4, f=2.5)                             # r6: the folds' turning edges (narrow)
@@ -434,16 +501,14 @@ def silk_program():
         g.op("treble", "input", 2, inp="audio")
         g.op(None, "swizzle", 2, a=2, k=[3, 3, 3, 3])
         g.op(None, "multiply", 2, a=2, b=6)
-        g.op("trebleCol", "constant", 3, k=C("pearl") + [1])           # role: peak
-        g.op(None, "multiply", 2, a=2, b=3)
+        g.op("trebleCol", "ramp", 2, a=2, k=[0, 0, 0, 0], k2=C("pearl", 0.5) + [0.5], k3=C("pearl") + [1])   # peak
         g.op("trebleGain", "constant", 3, k=[0.5, 0.5, 0.5, 1])        # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
         # resonant light: a kick's front travelling out across the cloth
         g.op("kick", "field", 2, field="kickFront")
         g.op(None, "multiply", 2, a=2, b=4)                            # on the turning faces only
-        g.op("resCol", "constant", 3, k=C("cyan") + [1])               # role: resonant
-        g.op(None, "multiply", 2, a=2, b=3)
+        g.op("resCol", "ramp", 2, a=2, k=[0, 0, 0, 0], k2=C("cyan", 0.5) + [0.5], k3=C("cyan") + [1])   # resonant
         g.op("resGain", "constant", 3, k=[0.4, 0.4, 0.4, 1])           # x Light Response
         g.op(None, "multiply", 2, a=2, b=3)
         g.op(None, "add", 1, a=1, b=2)
@@ -457,40 +522,48 @@ def palette_block(g):
     def op(label, field="constant"):
         return "material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], field)
     b = [
-        {"role": "environment", "target": "env/sky/zenithColor", "gain": 0.6},
-        {"role": "environment", "target": "env/sky/groundColor", "gain": 0.7},
-        {"role": "environment", "target": "env/sky/horizonColor", "gain": 1.0},
-        {"role": "environment", "target": "scene/fogColor", "gain": 1.0},
-        {"role": "shadow", "target": "lights/fill/color"},
-        {"role": "base", "target": op("body")},
-        {"role": "fold", "target": op("foldCol")},
+        # the void has colour (the overhaul, stage B): the sky's horizon in the shadow role, lifted, so the space behind
+        # the drapes is a deep coloured gradient, never black
+        {"role": "environment", "target": "env/sky/zenithColor", "gain": 1.0},
+        {"role": "shadow", "target": "env/sky/groundColor", "gain": 1.0},
+        {"role": "shadow", "target": "env/sky/horizonColor", "gain": 2.8},
+        {"role": "environment", "target": "scene/fogColor", "gain": 1.6},
+        {"role": "resonant", "target": "env/sky/sunColor", "gain": 1.0},
+        {"role": "fillLight", "target": "lights/fill/color"},
+        {"role": "g0", "target": op("body", "constant")}, {"role": "g1", "target": op("body", "constant2")},
+        {"role": "g2", "target": op("body", "constant3")}, {"role": "g3", "target": op("body", "constant4")},
         {"role": "grazing", "target": "lights/key/color"},
-        {"role": "grazing", "target": op("hemCol"), "gain": 0.9},
+        {"role": "g1", "target": "procedural/drapeAbove/material/baseColor", "gain": 0.8},
+        {"role": "g2", "target": "procedural/drapeBelow/material/baseColor", "gain": 0.8},
+        {"role": "fold", "target": op("sheenCol", "constant2"), "gain": SHEEN * 0.5},
+        {"role": "fold", "target": op("sheenCol", "constant3"), "gain": SHEEN},
+        {"role": "grazing", "target": op("hemCol", "constant2"), "gain": 0.45},
+        {"role": "grazing", "target": op("hemCol", "constant3"), "gain": 0.9},
         {"role": "resonant", "target": "lights/rim/color"},
-        {"role": "peak", "target": op("glowCol"), "gain": 0.5},
+        {"role": "peak", "target": op("glowCol", "constant"), "gain": 0.5},
+        {"role": "peak", "target": op("glowCol", "constant2"), "gain": 0.375},
         # tuning: highlight width (roughness), iridescence (the film), highlight intensity, emission, fold contrast
         {"role": "rough", "target": "procedural/silk/material/roughness"},
         {"role": "film", "target": "procedural/silk/material/thinFilm/thickness", "mode": "multiply"},
         {"role": "key", "target": "lights/key/intensity"},
-        {"role": "emit", "target": op("hemCol"), "mode": "multiply"},
+        {"role": "emit", "target": op("hemCol", "constant2"), "mode": "multiply"},
+        {"role": "emit", "target": op("hemCol", "constant3"), "mode": "multiply"},
         {"role": "irid", "target": op("irid"), "mode": "multiply"},
         {"role": "filmIor", "target": "procedural/silk/material/thinFilm/ior"},
         {"role": "resonant", "target": "lights/sail/color"},
         {"role": "grazing", "target": "lights/sailLow/color"},
-        {"role": "emit", "target": op("glowCol"), "mode": "multiply"},
-        {"role": "fold", "target": op("foldMix"), "mode": "multiply", "component": 0},
+        {"role": "emit", "target": op("glowCol", "constant"), "mode": "multiply"},
+        {"role": "emit", "target": op("glowCol", "constant2"), "mode": "multiply"},
     ]
     if MUSIC:
-        b += [{"role": "peak", "target": op("trebleCol")},
-              {"role": "resonant", "target": op("resCol")}]
+        b += [{"role": "peak", "target": op("trebleCol", "constant2"), "gain": 0.5},
+              {"role": "peak", "target": op("trebleCol", "constant3")},
+              {"role": "resonant", "target": op("resCol", "constant2"), "gain": 0.5},
+              {"role": "resonant", "target": op("resCol", "constant3")}]
     # 'fold' is both a colour role and a scalar role name in the tuning: the scalar is renamed to keep them apart
     states = palette_states()
     for st in states:
-        st["scalars"]["foldContrast"] = st["scalars"].pop("fold")
-    for x in b:
-        if x["target"] == op("foldMix"):
-            x["role"] = "foldContrast"
-            x.pop("component", None)
+        st["scalars"]["foldContrast"] = st["scalars"].pop("fold")   # (kept in the states; the gradient replaced it)
     return {"states": states, "bindings": b, "position": 0.0, "saturation": 1.0, "value": 1.0,
             "selector": {"select": START_PALETTE, "transition": 6.0, "lock": False, "hold": 40.0,
                          "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY,
@@ -500,7 +573,31 @@ def palette_block(g):
 
 
 # ================================================================================================ the music's fields
+# the iridescent gradient (silk_program): cycles along the cloth's length, the cross band (direction, cycles over
+# 420 m, weight), how far a fold's turn shifts it, and its phase drift (cycles per second per unit of the integral)
+FILL_I = float(os.environ.get("RS_FILL_I", "1.1"))
+BANDS_ON = os.environ.get("RS_BANDS", "1") == "1"
+BANDS = {"phase": 0.0, "rotation": 0.0, "gain": float(os.environ.get("RS_BANDS_GAIN", "0.6")),
+         "softbox": {"intensity": 0.5, "azimuth": 2.6, "elevation": 0.55, "falloff": 2.2, "skyFill": 0.04},
+         "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.09, "intensity": 1.0, "segments": 0,
+                     "warmth": 0.3, "rate": 0.0}]}
+SILK_FOG = float(os.environ.get("RS_FOG", "0.0013"))
+SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
+METALLIC = float(os.environ.get("RS_METALLIC", "0.05"))
+SHEEN = float(os.environ.get("RS_SHEEN", "0.35"))
+KEY_SCALE = float(os.environ.get("RS_KEY_SCALE", "0.7"))   # stage C: the narrow key's streaks back, the fill and sheen carry
+ROUGH_ADD = float(os.environ.get("RS_ROUGH_ADD", "0.1"))   # stage C: broader, softer highlights (satin, not chrome)   # was 0.35: a metal's diffuse loss darkened the pigment
+SILK_LEN = float(os.environ.get("RS_SILK_LEN", "1.6"))
+SILK_BAND_DIR = (0.62, 0.62, 0.48)
+SILK_BAND_N = float(os.environ.get("RS_SILK_BAND_N", "1.4"))
+SILK_BAND_W = float(os.environ.get("RS_SILK_BAND_W", "0.22"))
+SILK_FOLD = float(os.environ.get("RS_SILK_FOLD", "0.18"))
+SILK_RATE = float(os.environ.get("RS_SILK_RATE", "0.008"))
 GATHER = (0.0, 4.0, -170.0)     # the invisible ring: where everything converges, and where every wave starts
+MID_AMP = float(os.environ.get("RS_MID_AMP", "0.9"))
+MID_SCALE = float(os.environ.get("RS_MID_SCALE", "1.9"))
+WALL_SOFT = float(os.environ.get("RS_WALL_SOFT", "70"))
+SAIL_SOFT = float(os.environ.get("RS_SAIL_SOFT", "50"))
 WALL_MID = (-22.0, 3.0, -80.0)  # the middle of the wall (where the snare's fronts start)
 NEAR_CALM = (-70.0, 6.0, 4.0)  # the wall's near end, by the camera: the music's displacement is calm here
 FIELD = "resonator"
@@ -533,8 +630,10 @@ def fields(s):
         "sources": [
             {"kind": "point", "position": [-80.0, -10.0, -110.0], "order": 2, "bandLow": 0.0, "bandHigh": 0.4,
              "gain": 1.0, "amplitude": 1.0},
+            # (resonator-quality: from the nearer camera the mids' rings, 7-27 m at 1.5, read as stepped terraces
+            # down the wall into the gather -- MID_AMP and a longer MID_SCALE keep them creases, not stairs)
             {"kind": "point", "position": [-52.0, -6.0, -96.0], "order": 3, "bandLow": 0.4, "bandHigh": 1.0,
-             "gain": 1.0, "amplitude": 1.5, "scale": 2.6, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
+             "gain": 1.0, "amplitude": MID_AMP, "scale": MID_SCALE, "drift": 14.0, "driftPeriod": 40.0, "spin": 0.05},
         ],
         "channel": "displacement",
     }
@@ -548,8 +647,11 @@ def fields(s):
         s.nodes.append({"name": name, "kind": "field", "position": list(position), "field": f})
 
     # the halves: 0 at the gather, 1 thirty metres out along each fan
-    fnode("wallSide", {"kind": "plane", "axis": WALL_RUN, "softness": 35.0}, GATHER)
-    fnode("sailSide", {"kind": "plane", "axis": SAIL_RUN, "softness": 30.0}, GATHER)
+    # (resonator-quality: the waist is now a 12 m span the camera sees from much nearer, and there the cloth twists
+    # fastest -- displacement along a half's MEAN normal slid the twisting cloth within itself into stepped terraces
+    # either side of the gather; the halves' masks now rise over WALL_SOFT / SAIL_SOFT m instead of 35 / 30)
+    fnode("wallSide", {"kind": "plane", "axis": WALL_RUN, "softness": WALL_SOFT}, GATHER)
+    fnode("sailSide", {"kind": "plane", "axis": SAIL_RUN, "softness": SAIL_SOFT}, GATHER)
     # the near wall keeps its pleats crisp: the music's displacement fades out over the 110 m nearest the camera
     # (displacement there, along the wall's mean normal, slides the cloth within itself and smears the pleats)
     fnode("nearCalm", {"kind": "distance", "point": [0.0, 0.0, 0.0], "radius": 110.0}, NEAR_CALM)
@@ -586,15 +688,26 @@ def music_deformers():
 def environment(s):
     s.environment = {
         "intensity": 0.04, "background": C("abyss", 0.6), "fogColor": C("abyss", 0.8),
-        "volumeDensity": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
+        # the overhaul's air (05-plan §1.2): a thin fog in the palette's environment colour, so the far drapes sit in
+        # coloured depth behind the gather instead of floating
+        "volumeMaxDistance": 0.0, "volumeDensity": SILK_FOG, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 200.0,
         # no screen-space AO or contact shadows: a thin sheet in a void gains nothing from them, and either would ask
         # for a depth prepass that re-runs every deformer per vertex (ADR-1406; 39 ms measured)
         "ambientOcclusion": False, "contactShadows": False,
+        # the satin's highlights (05-plan §1.2, M1): reflection-only bands (ADR-1151) -- a broad soft box behind and
+        # above, and one long strip -- seen only in the cloth's reflections, so the sheen slides along the pleats as
+        # soft bands instead of a hard white key's dots; the key's own intensity comes down to make room
+        "bands": BANDS if BANDS_ON else None,
         "sky": {"enabled": True, "zenithColor": C("abyss", 0.3), "horizonColor": C("indigo", 0.22),
-                "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": SILK_GLOW, "intensity": 1.0,
+                # a soft glow in the sky behind the gather (its colour the palette's resonant role): the far drapes
+                # are backlit by it, and the void has a light in it
+                "sunSize": 0.015, "sunGlow": 0.45, "sunDirection": [-0.03, -0.02, -1.0],
                 "background": True, "useKeyLight": False},
     }
+    if s.environment.get("bands") is None:
+        s.environment.pop("bands", None)
     # a narrow, cold, grazing key from high behind-right: strips of light across the folds
     s.light("key", "directional", direction=[-0.55, -0.35, 0.75], color=kit.mix(C("pearl"), C("cyan"), 0.75),
             intensity=5.0,
@@ -610,8 +723,19 @@ def environment(s):
     s.light("sailLow", "point", position=[110.0, -25.0, -80.0], color=C("cyan"), intensity=30000.0, range=170.0,
             castsShadow=False)
     # broad cool fill from the camera side, low
-    s.light("fill", "directional", direction=[0.1, -0.2, -1.0], color=C("teal"), intensity=0.6,
+    # (resonator-quality: 0.6 of the palette's near-black shadow colour was no fill at all; now a soft light of the
+    # fold colour lifted toward white, so the pigment reads on the faces the key leaves)
+    s.light("fill", "directional", direction=[0.1, -0.2, -1.0], color=C("teal"), intensity=FILL_I,
             castsShadow=False, contactShadow=False)
+
+
+def drape_material():
+    """The far drapes (stage E): no program, no thin film -- a plain satin in the palette's fold colour (bound by role).
+    They cover much of the frame behind the hero, and the hero's 37-op program on them doubled the pixel cost."""
+    if os.environ.get("RS_GEOMETRY"):
+        return silk_material("drape")
+    return {"baseColor": C("violet", 0.5), "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0, "roughness": 0.4,
+            "metallic": 0.0, "doubleSided": True}
 
 
 def silk_material(name, program="rsSilk"):
@@ -620,7 +744,7 @@ def silk_material(name, program="rsSilk"):
         return {"baseColor": [0.45, 0.45, 0.47], "emissiveColor": [0, 0, 0], "emissiveIntensity": 0.0,
                 "roughness": 0.65, "metallic": 0.0, "doubleSided": True}
     return {"program": program, "baseColor": C("indigo", 2.0), "emissiveColor": C("cyan"), "emissiveIntensity": 0.0,
-            "roughness": 0.28, "metallic": 0.35, "doubleSided": True,
+            "roughness": 0.28, "metallic": METALLIC, "doubleSided": True,
             "thinFilm": {"thickness": 400.0, "ior": 1.6}}
 
 
@@ -633,7 +757,10 @@ def sheets(s, specs, mesh_dir):
         write_glb(os.path.join(mesh_dir, "rs-%s.glb" % spec.name), pos, nrm, uv, idx, spec.name)
         print("%s: %d vertices, %d triangles, %.0f m long" % (spec.name, len(pos), len(idx) // 3, length))
         s.proc(spec.name, {"kind": "mesh", "asset": "meshes/rs-%s.glb" % spec.name},
-               material=silk_material(spec.name), extra={"normalStep": 0.15}, deformers=drift_deformers() + (music_deformers() if MUSIC else []))
+               material=silk_material(spec.name) if spec.music else drape_material(), extra={"normalStep": 0.15},
+               # (the far drapes keep only the slow noise drift: their own frame of reference, at about a quarter of the
+               # hero's cost per vertex)
+               deformers=(drift_deformers() + (music_deformers() if MUSIC else [])) if spec.music else drift_deformers()[:1])
 
 
 def drift_deformers():
@@ -691,8 +818,12 @@ def instrument(s, g):
     s.route(R("sustain", F + "sustain", 0.6, attackMs=1500, decayMs=4000))
     # bass broadens the fold band (a lower Fresnel exponent), low mids deepen the base/fold separation
     s.route(R("bass", op("foldMask") + "value", -1.1, attackMs=200, decayMs=900))
-    s.route(R("audio.lowMid", op("foldMix") + "constant", 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=300,
-              decayMs=1200))
+    s.route(R("audio.lowMid", op("foldMix") + "constant", 1.0, comp=3, op="multiply", gain=0.8, offset=1.0,
+              attackMs=300, decayMs=1200))
+    # the gradient flows along the cloth: its phase integrates the music's energy over a floor (ADR-1041) -- never
+    # reset, quicker in loud passages, still moving in silence
+    s.route(*[R("sonic.energy", op("silkPhase") + "constant", SILK_RATE, comp=c, gain=1.0, offset=0.35,
+                integrate=True) for c in (2, 3)])
     # MIDI
     s.control = control_map()
     CC = {"attackMs": 150, "decayMs": 150}
@@ -756,6 +887,10 @@ def build(comp, mesh_dir):
     if comp == "a":
         WALL_N, SAIL_N = mean_normals(sheets_for("a")[0][0], 0.63)
     environment(s)
+    # the gather's seam light (silk_program): 0 at the ring, 1 nine metres out
+    s.nodes.append({"name": "gatherSeam", "kind": "field", "position": list(GATHER),
+                    "field": {"kind": "distance", "point": [0.0, 0.0, 0.0], "radius": 9.0, "strength": 1.0,
+                              "falloff": {"kind": "none"}}})
     if MUSIC:
         fields(s)
     specs, cam = sheets_for(comp)
@@ -767,7 +902,7 @@ def build(comp, mesh_dir):
     else:
         s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
     s.params_({
-        "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.0, "post/output/vignette": 0.4,
+        "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.0, "post/output/vignette": float(os.environ.get("RS_VIGNETTE", "0.2")),
         "post/output/grain": 0.008, "post/grade/contrast": 1.1, "post/lens/chromaticAberration": 0.0,
         "camera/exposure/compensation": 0.8, "post/dof/enabled": False,
         "post/motionBlur/amount": 0.0,

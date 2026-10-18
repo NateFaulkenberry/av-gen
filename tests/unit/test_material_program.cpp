@@ -1819,6 +1819,61 @@ TEST_CASE("The Glowmere projects leave both tissue programs their own emission",
     }
 }
 
+// ADR-1470: oklabRamp runs a value through four colour stops blended in OKLab, so the midpoint between two saturated
+// colours stays saturated (a linear-RGB blend greys or darkens it); clamped or cyclic.
+TEST_CASE("oklabRamp blends four stops in OKLab, clamped or cyclic", "[material][adr1470]") {
+    REQUIRE(materialOpKindFromName("oklabRamp").has_value());
+    CHECK(std::string(materialOpKindName(MaterialOpKind::OklabRamp)) == "oklabRamp");
+    const glm::vec4 c0{0.02f, 0.03f, 0.35f, 1.0f};   // ultramarine
+    const glm::vec4 c1{0.25f, 0.02f, 0.60f, 0.5f};   // violet
+    const glm::vec4 c2{0.90f, 0.05f, 0.40f, 0.0f};   // fuchsia
+    const glm::vec4 c3{0.05f, 0.80f, 0.90f, 1.0f};   // cyan
+    MaterialOp r = makeOp(MaterialOpKind::OklabRamp, 1, 0);
+    r.constant = c0;
+    r.constant2 = c1;
+    r.constant3 = c2;
+    r.constant4 = c3;
+    const auto at = [&](const MaterialOp& o, float t) { return evalOp({constantOp(0, glm::vec4(t))}, o); };
+    // The stops themselves, and the clamp past either end.
+    checkVec4(at(r, 0.0f), c0, 1e-5f);
+    checkVec4(at(r, 1.0f / 3.0f), c1, 1e-5f);
+    checkVec4(at(r, 2.0f / 3.0f), c2, 1e-5f);
+    checkVec4(at(r, 1.0f), c3, 1e-5f);
+    checkVec4(at(r, -2.0f), c0, 1e-5f);
+    checkVec4(at(r, 7.0f), c3, 1e-5f);
+    // Between two stops: the OKLab mix of the two (rgb), the linear mix of w.
+    const glm::vec4 mid = at(r, 0.5f);
+    checkVec4(glm::vec4(glm::vec3(mid), 0.0f), glm::vec4(color::mixOklab(glm::vec3(c1), glm::vec3(c2), 0.5f), 0.0f),
+              1e-5f);
+    CHECK_THAT(d(mid.w), WithinAbs(0.25, 1e-6));
+    // The point of it: violet to cyan through OKLab keeps more chroma than the linear-RGB midpoint does.
+    MaterialOp across = r;
+    across.constant2 = c3; // violet .. cyan in one segment
+    across.constant = c1;
+    const glm::vec3 perceptual = glm::vec3(at(across, 1.0f / 6.0f));
+    const glm::vec3 linear = 0.5f * (glm::vec3(c1) + glm::vec3(c3));
+    const glm::vec3 lchP = color::oklabToOklch(color::rgbToOklab(perceptual));
+    const glm::vec3 lchL = color::oklabToOklch(color::rgbToOklab(linear));
+    CHECK(lchP.y > lchL.y);
+    // Cyclic: t wraps, the stops sit at quarters and the first returns at 1 (no seam).
+    MaterialOp cyc = r;
+    cyc.value = -1.0f;
+    checkVec4(at(cyc, 0.25f), c1, 1e-5f);
+    checkVec4(at(cyc, 0.75f), c3, 1e-5f);
+    checkVec4(at(cyc, 0.999999f), c0, 1e-3f);
+    checkVec4(at(cyc, 1.0f), c0, 1e-5f);
+    checkVec4(at(cyc, 2.375f), at(cyc, 0.375f), 1e-5f);
+    checkVec4(at(cyc, -0.625f), at(cyc, 0.375f), 1e-5f);
+    // It reads a, so validation and the structural hash see one source.
+    MaterialProgram p;
+    p.ops = {constantOp(0, glm::vec4(0.5f)), r};
+    p.baseColorRegister = 1;
+    CHECK(p.validate().has_value());
+    const auto back = MaterialProgram::fromJson(p.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->toJson() == p.toJson());
+}
+
 // ADR-1162: quantize snaps a value to the centre of its square cell, in the value's own units, and gives every cell
 // one uniform random -- the same cell, the same random; a neighbouring cell, an unrelated one.
 TEST_CASE("quantize gives the cell centre and a per-cell random", "[material][adr1162]") {

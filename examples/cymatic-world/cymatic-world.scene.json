@@ -5,9 +5,9 @@
  "camera": {
   "mode": 1,
   "position": [
-   3.0102,
-   42.0,
-   35.6497
+   8.8555,
+   44.0,
+   77.2409
   ],
   "target": [
    -2.0,
@@ -29,14 +29,15 @@
    0.00335,
    0.0137
   ],
-  "volumeDensity": 0.0,
+  "volumeMaxDistance": 0.0,
+  "volumeDensity": 0.0035,
   "fogHeight": 12.0,
   "fogHeightFalloff": 0.04,
   "skyIntensity": 1.0,
   "shadowRange": 180.0,
   "ambientOcclusion": false,
   "contactShadows": false,
-  "depthPrepass": false,
+  "depthPrepass": true,
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -55,8 +56,15 @@
     0.0137
    ],
    "haze": 0.45,
-   "sunIntensity": 0.0,
+   "sunIntensity": 1.5,
    "intensity": 1.0,
+   "sunSize": 0.015,
+   "sunGlow": 0.16,
+   "sunDirection": [
+    -0.55,
+    0.12,
+    -0.83
+   ],
    "background": true,
    "useKeyLight": false
   }
@@ -78,10 +86,183 @@
      "kind": "none"
     },
     "resonance": {
-     "modes": 17.0,
+     "modes": 22.0,
      "fLow": 40.0,
      "fHigh": 6000.0,
-     "lambdaMax": 16.0,
+     "lambdaMax": 26.0,
+     "lambdaMin": 2.6,
+     "scale": 1.0,
+     "selectivity": 4.0,
+     "contrast": 0.7,
+     "persistence": 2.8,
+     "buildup": 0.3,
+     "memory": 1.6,
+     "sustain": 1.0,
+     "transient": 0.9,
+     "idle": 0.5,
+     "breath": 0.15,
+     "limit": 1.5,
+     "competition": 1.5,
+     "sources": [
+      {
+       "kind": "plate",
+       "position": [
+        6.0,
+        0.0,
+        -6.0
+       ],
+       "plates": [
+        [
+         3,
+         2
+        ],
+        [
+         5,
+         1
+        ],
+        [
+         4,
+         3
+        ],
+        [
+         6,
+         1
+        ],
+        [
+         5,
+         2
+        ]
+       ],
+       "bandLow": 0.0,
+       "bandHigh": 0.135,
+       "reach": 62.0,
+       "gain": 1.0,
+       "amplitude": 0.35,
+       "breath": 0.35,
+       "drift": 8.0,
+       "driftPeriod": 110.0,
+       "spin": 0.008,
+       "focus": 0.065,
+       "focusWidth": 0.035,
+       "focusSweep": 0.065,
+       "focusPeriod": 53.0,
+       "focusFloor": 0.0
+      },
+      {
+       "kind": "lattice",
+       "position": [
+        -10.0,
+        0.0,
+        8.0
+       ],
+       "order": 3,
+       "orders": [
+        3
+       ],
+       "bandLow": 0.15,
+       "bandHigh": 0.2,
+       "reach": 62.0,
+       "gain": 1.0,
+       "amplitude": 0.0,
+       "breath": 0.4,
+       "drift": 6.0,
+       "driftPeriod": 90.0,
+       "spin": -0.01
+      },
+      {
+       "kind": "point",
+       "position": [
+        7.0,
+        3.0,
+        -7.0
+       ],
+       "order": 6,
+       "bandLow": 0.2,
+       "bandHigh": 0.28,
+       "reach": 62.0,
+       "gain": 1.0,
+       "amplitude": 0.0,
+       "breath": 0.4,
+       "drift": 12.0,
+       "driftPeriod": 100.0,
+       "spin": 0.03,
+       "orders": [
+        3,
+        4,
+        2,
+        6
+       ]
+      },
+      {
+       "kind": "point",
+       "position": [
+        -150.0,
+        0.0,
+        70.0
+       ],
+       "order": 2,
+       "bandLow": 0.28,
+       "bandHigh": 0.32,
+       "reach": 0.0,
+       "gain": 1.0,
+       "amplitude": 0.0,
+       "breath": 0.5,
+       "drift": 15.0,
+       "driftPeriod": 80.0,
+       "spin": -0.01,
+       "orders": [
+        1,
+        2
+       ]
+      }
+     ],
+     "channel": "displacement",
+     "ripple": 0.5,
+     "rippleSpeed": 9.0,
+     "rippleLife": 1.6,
+     "rippleWidth": 0.9,
+     "rippleArea": 30.0,
+     "rippleCount": 2.0,
+     "rippleFade": 0.35,
+     "rippleU": [
+      0.36,
+      0.5,
+      0.85
+     ],
+     "layout": 24.0,
+     "attack": [
+      0.18,
+      0.08,
+      0.04
+     ],
+     "release": [
+      3.0,
+      1.4,
+      0.6
+     ]
+    }
+   }
+  },
+  {
+   "name": "cymaticFine",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "resonance",
+    "seed": 7,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "resonance": {
+     "modes": 22.0,
+     "fLow": 40.0,
+     "fHigh": 6000.0,
+     "lambdaMax": 26.0,
      "lambdaMin": 2.6,
      "scale": 1.0,
      "selectivity": 4.0,
@@ -99,84 +280,26 @@
       {
        "kind": "point",
        "position": [
-        7.0,
-        3.0,
-        -7.0
+        130.0,
+        0.0,
+        -100.0
        ],
-       "order": 6,
-       "bandLow": 0.0,
-       "bandHigh": 0.15,
-       "reach": 90.0,
-       "gain": 1.0,
-       "amplitude": 1.0,
-       "breath": 0.4,
-       "drift": 12.0,
-       "driftPeriod": 100.0,
-       "spin": 0.03,
-       "orders": [
-        3,
-        4,
-        2,
-        6
-       ],
-       "focus": 0.07,
-       "focusWidth": 0.032,
-       "focusSweep": 0.09,
-       "focusPeriod": 47.0,
-       "focusFloor": 0.0
-      },
-      {
-       "kind": "point",
-       "position": [
-        -20.0,
-        2.0,
-        15.0
-       ],
-       "order": 6,
-       "bandLow": 0.15,
-       "bandHigh": 0.3,
-       "reach": 90.0,
-       "gain": 1.0,
-       "amplitude": 0.0,
-       "breath": 0.5,
-       "drift": 9.0,
-       "driftPeriod": 80.0,
-       "spin": -0.04,
-       "orders": [
-        3,
-        2,
-        5
-       ],
-       "focus": 0.23,
-       "focusWidth": 0.032,
-       "focusSweep": 0.09,
-       "focusPeriod": 61.0,
-       "focusFloor": 0.0
-      },
-      {
-       "kind": "point",
-       "position": [
-        3.0,
-        3.0,
-        -3.5
-       ],
-       "order": 8,
+       "order": 3,
        "bandLow": 0.3,
        "bandHigh": 0.66,
-       "reach": 80.0,
+       "reach": 0.0,
        "gain": 0.9,
        "amplitude": 0.5,
        "breath": 0.7,
-       "drift": 6.0,
+       "drift": 10.0,
        "driftPeriod": 100.0,
-       "spin": 0.045,
+       "spin": 0.02,
        "orders": [
-        0,
-        8,
-        4,
-        6,
+        1,
+        2,
         3,
-        5
+        1,
+        2
        ],
        "focus": 0.48,
        "focusWidth": 0.04,
@@ -210,19 +333,7 @@
       }
      ],
      "channel": "displacement",
-     "ripple": 0.5,
-     "rippleSpeed": 9.0,
-     "rippleLife": 1.6,
-     "rippleWidth": 0.9,
-     "rippleArea": 30.0,
-     "rippleCount": 2.0,
-     "rippleFade": 0.35,
-     "rippleU": [
-      0.36,
-      0.5,
-      0.85
-     ],
-     "layout": 22.0,
+     "layout": 24.0,
      "attack": [
       0.18,
       0.08,
@@ -249,7 +360,9 @@
     "reference": "cymatic",
     "strength": 1.0,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "sand",
@@ -291,7 +404,9 @@
     "reference": "cymatic",
     "strength": 1.0,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "amplitude",
@@ -329,9 +444,11 @@
    "field": {
     "kind": "resonance",
     "reference": "cymatic",
-    "strength": 1.0,
+    "strength": 1.6,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "relief",
@@ -373,7 +490,9 @@
     "reference": "cymatic",
     "strength": -2.2,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "amplitude",
@@ -409,23 +528,27 @@
    "field": {
     "kind": "resonance",
     "reference": "cymatic",
-    "strength": 2.8,
+    "strength": 1.5,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "relief",
-     "sharpness": 0.75,
+     "sharpness": 0.45,
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
-     "reliefVibration": 0.25,
+     "reliefVibration": 0.15,
      "listenLow": 0.0,
-     "listenHigh": 0.3,
+     "listenHigh": 0.32,
      "listenWidth": 0.04,
      "reliefSand": 1.0,
      "sandNormalized": true,
-     "reliefAmplitude": -1.2,
-     "reliefRound": 0.4
+     "reliefAmplitude": 0.0,
+     "reliefRound": 0.4,
+     "reliefFigure": 0.15,
+     "rows": "modes"
     }
    }
   },
@@ -439,10 +562,12 @@
    ],
    "field": {
     "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 0.45,
+    "reference": "cymaticFine",
+    "strength": 0.22,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "relief",
@@ -450,11 +575,11 @@
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
      "reliefVibration": 0.0,
-     "listenLow": 0.28,
+     "listenLow": 0.3,
      "listenHigh": 0.7,
      "listenWidth": 0.04,
      "reliefSand": 1.0,
-     "reliefAmplitude": -0.35,
+     "reliefAmplitude": 0.0,
      "reliefRound": 0.5
     }
    }
@@ -469,10 +594,12 @@
    ],
    "field": {
     "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 0.25,
+    "reference": "cymaticFine",
+    "strength": 0.15,
     "falloff": {
-     "kind": "none"
+     "kind": "smoothstep",
+     "inner": 55.0,
+     "outer": 95.0
     },
     "resonance": {
      "channel": "relief",
@@ -568,7 +695,7 @@
       "alongNormal": false
      }
     ],
-    "normalStep": 0.19196428571428573
+    "normalStep": 0.25390625
    }
   }
  ],
@@ -604,7 +731,7 @@
      "kind": "power",
      "dst": 2,
      "srcA": 0,
-     "value": 13.0
+     "value": 7.0
     },
     {
      "kind": "field",
@@ -615,29 +742,6 @@
      "kind": "field",
      "dst": 5,
      "field": "shade-tint-grid"
-    },
-    {
-     "kind": "remap",
-     "dst": 5,
-     "srcA": 5,
-     "constant": [
-      -0.55,
-      0.55,
-      0.0,
-      1.0
-     ],
-     "value": 1.0
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 1,
-     "srcA": 0,
-     "constant": [
-      0.5,
-      0.92,
-      0.0,
-      0.0
-     ]
     },
     {
      "kind": "smoothstep",
@@ -683,9 +787,9 @@
      "kind": "constant",
      "dst": 4,
      "constant": [
-      1.9,
-      1.9,
-      1.9,
+      0.7,
+      0.7,
+      0.7,
       1.0
      ]
     },
@@ -706,15 +810,15 @@
       0.0
      ],
      "constant2": [
-      2.0,
-      2.0,
-      2.0,
+      1.25,
+      1.25,
+      1.25,
       0.5
      ],
      "constant3": [
-      4.0,
-      4.0,
-      4.0,
+      2.5,
+      2.5,
+      2.5,
       1.0
      ]
     },
@@ -727,10 +831,10 @@
     {
      "kind": "remap",
      "dst": 7,
-     "srcA": 1,
+     "srcA": 0,
      "constant": [
-      0.0,
-      1.0,
+      0.5,
+      0.92,
       1.0,
       0.0
      ],
@@ -741,8 +845,8 @@
      "dst": 3,
      "srcA": 3,
      "constant": [
-      0.3,
-      1.0,
+      1.4,
+      3.2,
       0.0,
       0.0
      ]
@@ -769,8 +873,8 @@
      "dst": 4,
      "srcA": 5,
      "constant": [
-      0.45,
-      0.15,
+      -0.08,
+      -0.56,
       0.0,
       1.0
      ],
@@ -812,7 +916,66 @@
      "srcB": 3
     },
     {
-     "kind": "ramp",
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "palette",
+     "dst": 4,
+     "srcA": 6,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant2": [
+      0.45,
+      0.45,
+      0.45,
+      0.0
+     ],
+     "constant3": [
+      0.005,
+      0.005,
+      0.005,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.18
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "oklabRamp",
      "dst": 4,
      "srcA": 5,
      "constant": [
@@ -832,58 +995,13 @@
       1.0,
       1.0,
       1.0
-     ]
-    },
-    {
-     "kind": "constant",
-     "dst": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "mixBy",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 6,
-     "srcC": 1
-    },
-    {
-     "kind": "fresnel",
-     "dst": 6,
-     "value": 1.3
-    },
-    {
-     "kind": "ramp",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
      ],
-     "constant2": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ],
-     "constant3": [
+     "constant4": [
       1.0,
       1.0,
       1.0,
       1.0
      ]
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 6
     },
     {
      "kind": "remap",
@@ -891,8 +1009,8 @@
      "srcA": 0,
      "constant": [
       0.0,
-      0.4,
-      0.1,
+      0.6,
+      0.35,
       1.0
      ],
      "value": 1.0
@@ -925,21 +1043,21 @@
      "dst": 5,
      "srcA": 1,
      "constant": [
-      0.07,
-      0.07,
-      0.07,
+      0.6,
+      0.6,
+      0.6,
       1.0
      ],
      "constant2": [
-      1.185,
-      1.185,
-      1.185,
+      1.3,
+      1.3,
+      1.3,
       1.0
      ],
      "constant3": [
-      2.3,
-      2.3,
-      2.3,
+      2.0,
+      2.0,
+      2.0,
       1.0
      ]
     },
@@ -947,7 +1065,7 @@
      "kind": "power",
      "dst": 1,
      "srcA": 1,
-     "value": 12.0
+     "value": 18.0
     },
     {
      "kind": "multiply",
@@ -966,15 +1084,15 @@
       0.0
      ],
      "constant2": [
-      0.375,
-      0.375,
-      0.375,
+      0.15,
+      0.15,
+      0.15,
       0.5
      ],
      "constant3": [
-      0.75,
-      0.75,
-      0.75,
+      0.3,
+      0.3,
+      0.3,
       1.0
      ]
     },
@@ -1053,19 +1171,19 @@
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    896,
+    1024,
     1,
-    896
+    1024
    ],
    "boundsMin": [
-    -86.0,
+    -130.0,
     -4.0,
-    -86.0
+    -130.0
    ],
    "boundsMax": [
-    86.0,
+    130.0,
     -2.0,
-    86.0
+    130.0
    ],
    "injectField": "shade-sand"
   },
@@ -1080,14 +1198,14 @@
     512
    ],
    "boundsMin": [
-    -86.0,
+    -130.0,
     -4.0,
-    -86.0
+    -130.0
    ],
    "boundsMax": [
-    86.0,
+    130.0,
     -2.0,
-    86.0
+    130.0
    ],
    "injectField": "shade-amp"
   },
@@ -1102,14 +1220,14 @@
     640
    ],
    "boundsMin": [
-    -86.0,
+    -130.0,
     -4.0,
-    -86.0
+    -130.0
    ],
    "boundsMax": [
-    86.0,
+    130.0,
     -2.0,
-    86.0
+    130.0
    ],
    "injectField": "shade-tint"
   },
@@ -1124,14 +1242,14 @@
     768
    ],
    "boundsMin": [
-    -86.0,
+    -130.0,
     -4.0,
-    -86.0
+    -130.0
    ],
    "boundsMax": [
-    86.0,
+    130.0,
     -2.0,
-    86.0
+    130.0
    ],
    "injectField": "shade-wave"
   },
@@ -1141,19 +1259,19 @@
    "mode": "bake",
    "wrap": "clamp",
    "resolution": [
-    896,
+    1024,
     1,
-    896
+    1024
    ],
    "boundsMin": [
-    -86.0,
+    -130.0,
     -4.0,
-    -86.0
+    -130.0
    ],
    "boundsMax": [
-    86.0,
+    130.0,
     -2.0,
-    86.0
+    130.0
    ],
    "injectField": "relief"
   }

@@ -34,6 +34,10 @@ APERTURE = [
 LEVELS = [-0.6, 0.0, 0.45, 0.9]            # four nested sheets, unevenly spaced
 APERTURE_THRESHOLD = -0.65                 # a sheet exists where A > this (about 15% of the volume is open)
 BOUND_RADII = (124.0, 76.0, 124.0)         # the sculpture's soft outer ellipsoid (m)
+# the cut's quality (resonator-quality, Phase D): the corner rounding of region()'s smooth min, and the smallest piece
+# of a sheet kept (m^2): smaller fragments are shards the cut left floating in an opening
+CORNER = 8.0
+MIN_PIECE = 400.0
 
 
 def wave_sum(p, waves):
@@ -56,7 +60,11 @@ def region(p):
     a = (aperture(p) - APERTURE_THRESHOLD) * 12.0
     r = np.linalg.norm(p / np.array(BOUND_RADII), axis=-1)
     b = (1.0 - r) * 240.0   # steep, so the outer edge's traced line stays as narrow as the openings'
-    return np.minimum(a, b)
+    # a smooth minimum (resonator-quality): where an opening meets the outer bound, min() made a cusp -- a horn or a
+    # torn flap at the sheet's edge; the polynomial smooth min rounds that corner over CORNER units and is min()
+    # everywhere else
+    h = np.maximum(CORNER - np.abs(a - b), 0.0) / CORNER
+    return np.minimum(a, b) - h * h * CORNER * 0.25
 
 
 def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0), cell=1.0, margin=2.5):
@@ -154,14 +162,53 @@ def level_sheet(level, index, lo=(-125.0, -78.0, -125.0), hi=(125.0, 78.0, 125.0
     flip = (fn * nrm[tri[:, 0]]).sum(1) < 0
     tri[flip] = tri[flip][:, [0, 2, 1]]
     uv = np.stack([q, np.full(len(q), float(index))], 1)
-    verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri)
+    verts, nrm, uv, tri = clip_mesh(verts, nrm, uv, tri, region, level)
+    verts, nrm, uv, tri = drop_fragments(verts, nrm, uv, tri)
     return (verts.astype(np.float32), nrm.astype(np.float32), uv.astype(np.float32),
             tri.reshape(-1).astype(np.uint32))
 
 
-def clip_mesh(verts, nrm, uv, tri):
+def _onto_surface(p, level, iters=3):
+    """Newton steps along the carrier's gradient onto C(p) = level (the sheet itself)."""
+    e = 0.05
+    for _ in range(iters):
+        g = np.stack([carrier(p + np.array(d)) - carrier(p - np.array(d)) for d in
+                      ([e, 0, 0], [0, e, 0], [0, 0, e])], -1) / (2 * e)
+        f = carrier(p) - level
+        p = p - (f / np.maximum((g * g).sum(1), 1e-12))[:, None] * g
+    return p
+
+
+def drop_fragments(verts, nrm, uv, tri):
+    """Drops connected pieces smaller than MIN_PIECE m^2: shards the cut left floating in an opening."""
+    t = tri
+    parent = np.arange(len(verts))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    for a, b, c in t:
+        ra = find(a)
+        parent[find(b)] = ra
+        parent[find(c)] = ra
+    lab = np.array([find(i) for i in range(len(verts))])
+    area = np.linalg.norm(np.cross(verts[t[:, 1]] - verts[t[:, 0]], verts[t[:, 2]] - verts[t[:, 0]]), axis=1) * 0.5
+    ids, inv = np.unique(lab[t[:, 0]], return_inverse=True)
+    keep = np.bincount(inv, weights=area)[inv] >= MIN_PIECE
+    t = t[keep]
+    used = np.unique(t)
+    remap = -np.ones(len(verts), dtype=np.int64)
+    remap[used] = np.arange(len(used))
+    return verts[used], nrm[used], uv[used], remap[t]
+
+
+def clip_mesh(verts, nrm, uv, tri, cut=None, level=None):
     """Cuts the mesh exactly along q = 0 (q = uv.x): triangles wholly inside are kept, wholly outside dropped, and a
-    crossing triangle is split at the interpolated crossings. The cut is geometry, so the sheets stay OPAQUE (a masked
+    crossing triangle is split where its edges cross the cut -- found by bisection on `cut` itself and put back on the
+    sheet (resonator-quality: linear interpolation of q put the crossings off the curve, a kinked, notched edge),
+    or at the interpolated crossings when no `cut` is given. The cut is geometry, so the sheets stay OPAQUE (a masked
     material's discard defeats the GPU's hidden-surface removal: five layered masked sheets cost 56 ms at 1080p with
     no field evaluated at all, Stage B profile)."""
     q = uv[:, 0]
@@ -174,7 +221,19 @@ def clip_mesh(verts, nrm, uv, tri):
 
     def crossing(a, b):
         t = (q[a] / (q[a] - q[b]))[:, None]
+        if cut is not None:
+            # bisection on the cut along the edge (its sign is known at both ends), then onto the sheet
+            lo, hi = np.zeros(len(a)), np.ones(len(a))
+            side_a = q[a] >= 0.0
+            for _ in range(12):
+                mid = 0.5 * (lo + hi)
+                same = (cut(verts[a] + (verts[b] - verts[a]) * mid[:, None]) >= 0.0) == side_a
+                lo = np.where(same, mid, lo)
+                hi = np.where(same, hi, mid)
+            t = (0.5 * (lo + hi))[:, None]
         p = verts[a] + (verts[b] - verts[a]) * t
+        if cut is not None:
+            p = _onto_surface(p, level, 2)
         n = nrm[a] + (nrm[b] - nrm[a]) * t
         n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-12
         w = uv[a] + (uv[b] - uv[a]) * t

@@ -109,3 +109,14 @@ Branch `proto/resonant-silk`, worktree `../av-gen-silk`, from main `ef3774da`, w
      maxHold 90 s.
    - It was checked on 1 fps thumbnails, classified by colour (scratch `classify.py`), on Feline, Trench and
      Hyperborea, with and without a phrase signal.
+10. Quality pass (`docs/prototypes/resonator-quality/`, 02-report §10):
+    - the composition fills the frame (camera, sail, waist);
+    - the iridescent gradient;
+    - a real fill;
+    - the waist's terraces calmed;
+    - 37 ops.
+11. The Resonant Visual Worlds overhaul (`docs/prototypes/resonator-quality/03-06`):
+    - two far drapes, as a layered background;
+    - a palette sky gradient, glow and analytic fog (no black);
+    - satin reflection bands and a painted sheen;
+    - a saturated body.

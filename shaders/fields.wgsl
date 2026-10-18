@@ -568,7 +568,7 @@ fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
     let m = shape.y;
     let d = q - place.xyz;
     let geometry = shape.w - 4.0 * floor(shape.w * 0.25);
-    if (geometry > 1.5) {
+    if (geometry > 1.5 && geometry < 2.5) {
         // ADR-1403, a ripple: a travelling ring packet about its launch point (horizontal distance), radius shape.z
         let rho = sqrt(d.x * d.x + d.z * d.z);
         let x = rho - shape.z;
@@ -605,6 +605,24 @@ fn resonanceModeShape(row: u32, q: vec3<f32>) -> vec2<f32> {
         let e = amp * core * w;
         return vec2<f32>(phi, 0.5 * e * e);
     }
+    if (lattice > 2.5) {
+        // ADR-1471, a plate mode (n, m): m holds a = atan2(m, n); four signed plane waves (resonance.cpp)
+        let h = 0.5 * RES_PI;
+        var sp = 0.0;
+        for (var j = 0; j < 4; j = j + 1) {
+            var b = m;
+            if (j == 1) {
+                b = -m;
+            } else if (j == 2) {
+                b = h - m;
+            } else if (j == 3) {
+                b = m - h;
+            }
+            let sign = select(-1.0, 1.0, j < 2);
+            sp = sp + sign * cos(k * (d.x * cos(shape.z + b) + d.z * sin(shape.z + b)));
+        }
+        return vec2<f32>(sp * 0.70710678 * w, w * w);
+    }
     let n = clamp(i32(m + 0.5), 1, 8);
     var s = 0.0;
     for (var j = 0; j < n; j = j + 1) {
@@ -621,7 +639,8 @@ fn resonanceRowHeard(fi: u32, row: u32) -> bool {
         return true;
     }
     let w = fieldBlock.resonance[row * 3u].w;
-    let ripple = w - 4.0 * floor(w * 0.25) > 1.5;
+    let g = w - 4.0 * floor(w * 0.25);
+    let ripple = g > 1.5 && g < 2.5; // geometry 2 (3 is a plate, ADR-1471)
     return (rows == 2u) == ripple;
 }
 

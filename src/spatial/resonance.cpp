@@ -142,6 +142,9 @@ std::optional<ResonanceChannel> resonanceChannelFromName(std::string_view name) 
 }
 
 const char* resonanceSourceKindName(ResonanceSourceKind kind) {
+    if (kind == ResonanceSourceKind::Plate) {
+        return "plate"; // ADR-1471
+    }
     return kind == ResonanceSourceKind::Lattice ? "lattice" : "point";
 }
 
@@ -151,6 +154,9 @@ std::optional<ResonanceSourceKind> resonanceSourceKindFromName(std::string_view 
     }
     if (name == "lattice") {
         return ResonanceSourceKind::Lattice;
+    }
+    if (name == "plate") {
+        return ResonanceSourceKind::Plate; // ADR-1471
     }
     return std::nullopt;
 }
@@ -231,6 +237,15 @@ Result<void> ResonanceSpec::validate(std::string_view field) const {
                 return fail("field '{}': a resonance source's orders must be 0..8 (a lattice's at least 1)", field);
             }
         }
+        if (s.kind == ResonanceSourceKind::Plate && s.plates.empty()) { // ADR-1471
+            return fail("field '{}': a plate source lists its modes' (n, m) pairs in 'plates'", field);
+        }
+        for (const auto& nm : s.plates) {
+            if (nm[0] < 1 || nm[0] > 8 || nm[1] < 1 || nm[1] > 8 || nm[0] == nm[1]) {
+                // (n, n) is zero; (n, 0) has coincident waves (another normalisation): neither is a plate figure here
+                return fail("field '{}': a plate mode's (n, m) are 1..8 and differ", field);
+            }
+        }
         if (!(finite(s.focus) && s.focus <= 1.0f && s.focusWidth > 0.0f && s.focusWidth <= 1.0f && finite(s.focusSweep) &&
               std::abs(s.focusSweep) <= 1.0f && s.focusPeriod >= 0.5f && s.focusPeriod <= 3600.0f && s.focusFloor >= 0.0f &&
               s.focusFloor <= 1.0f)) {
@@ -299,6 +314,13 @@ std::uint64_t ResonanceSpec::structuralHash() const {
         for (const int o : s.orders) {
             h.i32(o);
         }
+        if (!s.plates.empty()) { // ADR-1471 (absent: the hash an older source had)
+            h.u64(s.plates.size());
+            for (const auto& nm : s.plates) {
+                h.i32(nm[0]);
+                h.i32(nm[1]);
+            }
+        }
         h.f32(s.drift);
         h.f32(s.driftPeriod);
         h.f32(s.spin);
@@ -365,6 +387,13 @@ json ResonanceSpec::toJson() const {
         }
         if (!s.orders.empty()) { // ADR-1405
             src.back()["orders"] = s.orders;
+        }
+        if (!s.plates.empty()) { // ADR-1471
+            json pl = json::array();
+            for (const auto& nm : s.plates) {
+                pl.push_back(json::array({nm[0], nm[1]}));
+            }
+            src.back()["plates"] = std::move(pl);
         }
         if (s.focus >= 0.0f) {
             src.back()["focus"] = s.focus;
@@ -516,6 +545,18 @@ Result<ResonanceSpec> ResonanceSpec::fromJson(const json& j) {
                         s.orders.push_back(v.get<int>());
                     }
                 }
+                if (sj.contains("plates")) { // ADR-1471
+                    const json& pl = sj.at("plates");
+                    if (!pl.is_array()) {
+                        return fail("'resonance.sources[].plates' must be an array of [n, m] integer pairs");
+                    }
+                    for (const json& v : pl) {
+                        if (!v.is_array() || v.size() != 2 || !v[0].is_number_integer() || !v[1].is_number_integer()) {
+                            return fail("'resonance.sources[].plates' must be an array of [n, m] integer pairs");
+                        }
+                        s.plates.push_back({v[0].get<int>(), v[1].get<int>()});
+                    }
+                }
                 AVGEN_SPATIAL_READ(s.drift, "drift", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.driftPeriod, "driftPeriod", detail::readFloat);
                 AVGEN_SPATIAL_READ(s.spin, "spin", detail::readFloat);
@@ -639,7 +680,12 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         for (int jj = 0; jj < i; ++jj) {
             nth += st.source[static_cast<std::size_t>(jj)] == si ? 1 : 0;
         }
-        if (!src.orders.empty()) {
+        if (src.kind == ResonanceSourceKind::Plate) {
+            // ADR-1471: shape.y holds the plate mode's angle a = atan2(m, n), geometry 3
+            const auto& nm = src.plates[static_cast<std::size_t>(nth) % src.plates.size()];
+            m = std::atan2(static_cast<float>(nm[1]), static_cast<float>(nm[0]));
+            geometry = 3.0f;
+        } else if (!src.orders.empty()) {
             const int o = src.orders[static_cast<std::size_t>(nth) % src.orders.size()];
             m = static_cast<float>(src.kind == ResonanceSourceKind::Lattice ? std::clamp(o, 1, 8) : std::clamp(o, 0, 8));
             geometry = src.kind == ResonanceSourceKind::Lattice ? 1.0f : 0.0f;
@@ -654,7 +700,7 @@ ResonanceState evaluateResonance(const FieldSpec& field, const std::shared_ptr<c
         }
         // A lattice's modes share their source's orientation, so lattices of different wavelengths nest (a crystal)
         // instead of crossing into a moire; a point source's modes each turn their petals their own way.
-        const float theta = src.kind == ResonanceSourceKind::Lattice
+        const float theta = src.kind != ResonanceSourceKind::Point
                                 ? hash01(field.seed, 1000 + si, 3u) * kTwoPi
                                 : hash01(field.seed, i, 3u) * kTwoPi;
         float weight = src.gain;
@@ -1027,7 +1073,8 @@ bool resonanceRowHeard(ResonanceRows rows, float shapeW) {
     if (rows == ResonanceRows::All) {
         return true;
     }
-    const bool ripple = std::fmod(shapeW, 4.0f) > 1.5f; // ADR-1403: geometry 2
+    const float geometry = std::fmod(shapeW, 4.0f);
+    const bool ripple = geometry > 1.5f && geometry < 2.5f; // ADR-1403: geometry 2 (3 is a plate, ADR-1471)
     return (rows == ResonanceRows::Ripples) == ripple;
 }
 
@@ -1039,7 +1086,7 @@ float resonanceModeShape(const ResonanceMode& mode, const glm::vec3& q, float* e
     const float reach = mode.place.w;
     const float geometry = std::fmod(mode.shape.w, 4.0f);
     const float depth = std::floor(mode.shape.w * 0.25f);
-    if (geometry > 1.5f) {
+    if (geometry > 1.5f && geometry < 2.5f) {
         // ADR-1403, a ripple: a travelling ring packet about its launch point (horizontal distance), radius shape.z
         const float rho = std::sqrt(d.x * d.x + d.z * d.z);
         const float x = rho - mode.shape.z;
@@ -1077,6 +1124,19 @@ float resonanceModeShape(const ResonanceMode& mode, const glm::vec3& q, float* e
             phi = 1.41421356f * std::cos(kr - (2.0f * m + 1.0f) * 0.25f * kPi) * amp * core * std::cos(m * (alpha - theta)) * w;
             e2 = 0.5f * (amp * core * w) * (amp * core * w);
         }
+    } else if (lattice > 2.5f) {
+        // ADR-1471, a plate mode (n, m), m holding a = atan2(m, n): cos(n pi u) cos(m pi v) - cos(m pi u) cos(n pi v) is
+        // (c(+a) + c(-a) - c(90 - a) - c(a - 90)) / 2 with c(b) = cos(k x.(cos(theta + b), sin(theta + b))); x sqrt(2) for
+        // a mean square of 1, like the other geometries
+        const float h = 0.5f * kPi;
+        float s = 0.0f;
+        for (int j = 0; j < 4; ++j) {
+            const float b = j == 0 ? m : (j == 1 ? -m : (j == 2 ? h - m : m - h));
+            const float sign = j < 2 ? 1.0f : -1.0f;
+            s += sign * std::cos(k * (d.x * std::cos(theta + b) + d.z * std::sin(theta + b)));
+        }
+        phi = s * 0.70710678f * w;
+        e2 = w * w;
     } else {
         // lattice: n^-1/2 sum_j cos(k x.d_j), n directions half a turn apart (mean square 1)
         const int n = std::clamp(static_cast<int>(m + 0.5f), 1, 8);

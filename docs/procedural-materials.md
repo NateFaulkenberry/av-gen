@@ -138,6 +138,7 @@ the fragment's normal and view direction.
 | `roughnessFilter` | a | Specular anti-aliasing (Kaplanyan et al. 2016): `α = a.x²`, `κ = min(2·max(f,0)·normalVariance, 0.18)`, `vec4(sqrt(min(α + κ, 1)))`. Put it last, on whatever register feeds `roughness` |
 | `microDetail` | a | `fade = saturate(1 - footprint·|f|·2)`; `vec4(0.5 + (fbm3(p, seed) - 0.5) · fade)`. Noise that fades to its own mean as one pixel grows to cover a period, so micro detail can never alias or shimmer |
 | `quantize` | a | ADR-1162: `c = floor(a.xyz * f + k.xyz)`; `vec4((c + 0.5 - k.xyz) / f, hash01(c, seed))` — the centre of a's square cell in a's own units, and a uniform random per cell. `f <= 0` passes `a` through. Squares and macroblock masks: noise at the centre is constant per cell; `step(out.w, mask)` fails cells one at a time |
+| `oklabRamp` | a | ADR-1470: four stops `constant`, `constant2`, `constant3`, `constant4` (linear RGB) blended in OKLab (`mixOklab`), w linear. `f >= 0` (the default 1): `t = clamp(a.x, 0, 1)`, stops at 0, 1/3, 2/3, 1. `f < 0`: cyclic, `t = fract(a.x)`, stops at 0, 1/4, 1/2, 3/4 and the first again at 1. A palette's roles as a gradient with no grey midpoints; the bindings still write the stops |
 
 Notes for the shader transliteration:
 

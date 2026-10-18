@@ -42,7 +42,8 @@ TITLE = "Waveform Dimension"
 OUT = os.environ.get("WD_OUT") or os.path.join(REPO, "examples", SID)
 MESH_DIR = os.path.join(OUT, "meshes")
 
-NEUTRAL = os.environ.get("WD_NEUTRAL", "0") == "1"   # a review aid: grey material, white light, no emission, no post
+NEUTRAL = os.environ.get("WD_NEUTRAL", "0") == "1"
+DEBUG = os.environ.get("WD_DEBUG", "")   # review aids: albedo (the chromatic waves alone), normals   # a review aid: grey material, white light, no emission, no post
 
 # ================================================================================================ palette
 # The owner's corrected palette (00-brief.md, appended): red spectral energy trapped inside a vast indigo-violet
@@ -271,23 +272,50 @@ def surface_program(name):
         g.op(None, "ramp", 2, a=5, k=[0, 0, 0, 1], k2=[0.05, 0.05, 0.05, 1], k3=[0.12, 0.12, 0.12, 1])
         g.base, g.emit, g.opacity = 4, 2, -1
         return g
-    # albedo: each nested sheet its own value of the same indigo-violet (related hues, different light); the
-    # outermost the lightest royal, the inner ones sinking to blackened indigo
-    g.op("albedo", "ramp", 4, a=1, k=C("royal", 0.95) + [1.0], k2=C("indigo", 1.6) + [1.0], k3=C("indigo", 1.1) + [1.0])
+    # THE CHROMATIC WAVES (resonator-quality, the owner's colour-field addendum): the surface runs through the palette's
+    # four gradient roles (g0..g3, a CYCLIC OKLab ramp, ADR-1470) along a coordinate of three layers --
+    #   A  travelling bands: the position along WAVE_DIR, WAVE_N cycles across the sculpture, the phase a persistent
+    #      integral of the music (it never resets; it drifts in silence) -- long chromatic waves through every sheet
+    #   B  the families' signed displacement D: the bands bend and part where the field moves the sheets, so the colour
+    #      shares the geometry's rhythm without its crests sitting on the colour boundaries (a phase offset)
+    #   D  the sheet's place in the nest: each nested sheet a step along the gradient, so the nesting reads in colour
+    g.op(None, "input", 0, inp="worldPosition")
+    g.op("waveAxis", "gradient", 4, a=0, k=list(WAVE_DIR) + [0.5], f=1.0 / 300.0)   # 0 .. 1 across the sculpture
+    g.op("wavePhase", "remap", 4, a=4, k=[0.0, 1.0, 0.0, WAVE_N])                 # cycles; the phase rides k.z/k.w
+    g.op("waveBend", "field", 3, field="D-grid")
+    g.op(None, "remap", 5, a=3, k=[0.0, 1.0, 0.0, WAVE_BEND])                       # metres -> cycles
+    g.op(None, "add", 4, a=4, b=5)
+    g.op(None, "remap", 5, a=1, k=[0.0, 1.0, 0.0, SHEET_STEP])                      # sheet index / 3 -> cycles
+    g.op(None, "add", 4, a=4, b=5)
+    g.op("albedo", "oklabRamp", 4, a=4, k=C("royal") + [1.0], k2=C("purple") + [1.0], k3=C("crimson") + [1.0],
+         k4=C("indigo", 1.6) + [1.0], f=-1.0)
+    if DEBUG == "fronts":  # review aid (overhaul stage A): the travelling fronts' displacement as grey bands, unlit
+        g.op(None, "field", 3, field=os.environ.get("WD_FRONT_FIELD", "swell"))
+        g.op(None, "remap", 4, a=3, k=[-float(os.environ.get("WD_FRONT_RANGE", "1.2")),
+                                     float(os.environ.get("WD_FRONT_RANGE", "1.2")), 0.02, 0.9], f=1.0)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit, g.opacity = 2, 4, -1
+        return g
+    if DEBUG == "normals":  # review aid (resonator-quality Phase C): the deformed normal as colour, unlit
+        g.op(None, "input", 5, inp="normal")
+        g.op(None, "remap", 4, a=5, k=[-1.0, 1.0, 0.0, 1.0], f=1.0)
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit, g.opacity = 2, 4, -1
+        return g
+    if DEBUG == "albedo":   # review aid (resonator-quality §9): the chromatic waves alone, unlit, as emission
+        g.op(None, "constant", 2, k=[0, 0, 0, 1])
+        g.base, g.emit, g.opacity = 2, 4, -1
+        return g
     # the glow follows the field's contours, never painted spots: electric purple in a BAND where the families'
     # displacement reaches a given strength (|D| 3-6 m: a contour of the reinforcement, so it rings each lobe and runs
     # along the folds), spectral red only in the cores where it reinforces hardest (|D| > 9 m); a kick's shell adds its
     # crimson band as it passes. How bright it is follows the music's level (a route on the ramp). (Tried first: the
     # glow on the fold crests by screen-space convexity -- blocky; and |D| as a fill -- round blobs.)
-    g.op("reinf", "field", 3, field="D-grid")
-    g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2
-    g.op("bandIn", "smoothstep", 5, a=3, k=[9.0, 25.0])
-    g.op("bandOut", "smoothstep", 0, a=3, k=[36.0, 64.0])
-    g.op(None, "remap", 0, a=0, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
-    g.op(None, "multiply", 5, a=5, b=0)                           # r5 = the purple contour band
-    g.op("redCore", "smoothstep", 3, a=3, k=[81.0, 144.0])
-    g.op(None, "add", 5, a=5, b=3)                                # r5 in 0..2
-    g.op("glowT", "smoothstep", 5, a=5, k=[0.0, 1.8])
+    g.op(None, "multiply", 3, a=3, b=3)                           # r3 = |D|^2 (r3 = D, read above)
+    # resonator-quality: the glow is a SMOOTH rise with the reinforcement (|D| from ~3.5 m to ~10 m), not the old
+    # contour band (|D| 3-6 m, in and out) with separate cores, whose flat-edged rings read as colour banding beside
+    # the chromatic waves; the accent still comes only where the families reinforce hardest (the ramp's top)
+    g.op("glowT", "smoothstep", 5, a=3, k=[GLOW_IN ** 2, GLOW_OUT ** 2])
     g.op(None, "add", 5, a=5, b=6)
     g.op("glow", "ramp", 2, a=5, k=[0, 0, 0, 0], k2=C("purple", GLOW_GAIN[0]) + [0.5], k3=C("red", GLOW_GAIN[1]) + [1.0])
     # its brightness: a constant the music's level scales (routes), apart from the colours (the palette owns those)
@@ -311,7 +339,10 @@ def surface_program(name):
     g.op("edgeLevel", "constant", 1, k=[1.0, 1.0, 1.0, 1.0])     # the edges' brightness (hats, snares, CC 8)
     g.op(None, "multiply", 3, a=3, b=1)
     g.op(None, "add", 2, a=2, b=3)
-    g.base, g.emit, g.opacity = 4, 2, -1
+    # roughness follows the field (stage C): where the families reinforce (the glow's rise, r5) the sheet is glossier,
+    # elsewhere broad and soft -- gloss sits on the crests, not uniformly
+    g.op("roughField", "remap", 0, a=5, k=[0.0, 1.0, 0.55, 0.25], f=1.0)
+    g.base, g.emit, g.opacity, g.rough = 4, 2, -1, 0
     return g
 
 
@@ -322,7 +353,16 @@ def material(prog):
 
 
 # ================================================================================================ geometry
-FRONT_RELIEF = 7.0   # metres a kick's shell lifts the sheets it passes through
+FRONT_RELIEF = 7.0
+# the travelling fronts: name -> (source point, band, speed m/s, carrier wavelength m, smoothing s) and their relief
+# (sources just beyond the sheets' bound: the GPU's audio ring holds 16 s, so the far side of the sculpture must be
+# reached in less -- at 300 m / 30 m/s a source 320 m out sampled history the ring no longer had: a constant)
+# (few smoothing taps and narrow bands: the spectrum is read per vertex, in both geometry passes and at four points for
+# the normal -- 12 taps over 14 bins cost ~35 ms at High; with none, the history's row jitter crumpled the sheets)
+FRONTS = {"swell": ((-170.0, 30.0, -110.0), (0.02, 0.12), 30.0, 52.0, 0.06),
+          }   # (a second, mid-band front from the other side was cut for the live budget: ~6 ms per front at High)
+SWELL_RELIEF = float(os.environ.get("WD_SWELL", "3.5"))
+CROSS_RELIEF = float(os.environ.get("WD_CROSS", "1.2"))   # metres a kick's shell lifts the sheets it passes through
 B_RELIEF = 0.6       # metres per unit of the mids' bands
 SPREAD = 3.2         # metres per unit of bass that each sheet moves away from the nest's middle sheet (spacing)
 
@@ -335,7 +375,58 @@ def deformers():
     return [{"kind": "field", "field": "D-grid", "amount": 1.0, "space": "world", "alongNormal": True},
             {"kind": "field", "field": "front", "amount": FRONT_RELIEF, "space": "world", "alongNormal": True},
             {"kind": "field", "field": "f-b", "amount": B_RELIEF, "space": "world", "alongNormal": True},
-            {"kind": "field", "field": "one", "amount": 0.0, "space": "world", "alongNormal": True}]
+            {"kind": "field", "field": "one", "amount": 0.0, "space": "world", "alongNormal": True},
+            # THE TRAVELLING FRONTS (Resonant Visual Worlds, 05-plan §1.3, W1): the music of the last seconds laid out
+            # in space as two families of spherical swells from sources far outside the sculpture, crossing it from
+            # different sides -- a broad bass swell and a quicker mid one -- so the primary event is propagation
+            {"kind": "field", "field": "swell", "amount": SWELL_RELIEF, "space": "world", "alongNormal": True}]
+
+
+# THE DOME (Resonant Visual Worlds, 05-plan §1.3, E1): the world beyond the sculpture is the same wave logic at a larger
+# scale and a slower rate -- an inward-facing sphere about the sculpture whose own unlit program runs long chromatic
+# bands (a cyclic OKLab ramp of the palette's dome roles) and carries the bass swell's fronts as they pass, dimmed and
+# softened by the coloured air. Never a flat backdrop: it has the sculpture's colours, moves with the music, and the
+# fronts sweep across it.
+DOME_R = float(os.environ.get("WD_DOME_R", "330"))
+DOME_ON = os.environ.get("WD_DOME", "1") == "1"
+DOME_GAIN = float(os.environ.get("WD_DOME_GAIN", "0.22"))
+DOME_DIR = (0.25, 0.9, 0.35)
+
+
+def dome_mesh(radius, nu=64, nv=32):
+    th = np.linspace(0.0, 2.0 * math.pi, nu + 1)
+    ph = np.linspace(0.02, math.pi - 0.02, nv)
+    T, Pp = np.meshgrid(th, ph, indexing="ij")
+    d = np.stack([np.sin(Pp) * np.cos(T), np.cos(Pp), np.sin(Pp) * np.sin(T)], -1).reshape(-1, 3)
+    pos = (d * radius + np.array(CAM_FOCUS)).astype(np.float32)
+    nrm = (-d).astype(np.float32)                       # inward: the camera is inside
+    uv = np.zeros((len(pos), 2), dtype=np.float32)
+    idx = []
+    for i in range(nu):
+        for j in range(nv - 1):
+            a, b, c, e = i * nv + j, (i + 1) * nv + j, (i + 1) * nv + j + 1, i * nv + j + 1
+            idx += [a, c, b, a, e, c]                   # wound to face inward
+    return pos, nrm, uv, np.array(idx, dtype=np.uint32)
+
+
+def dome_program():
+    g = Prog("wdDome")
+    g.op(None, "input", 0, inp="worldPosition")
+    g.op(None, "gradient", 1, a=0, k=list(_unit3(DOME_DIR)) + [0.5], f=0.5 / DOME_R)   # 0 .. 1 over the dome
+    g.op("domePhase", "remap", 1, a=1, k=[0.0, 1.0, 0.0, 2.5])                        # 2.5 bands; phase on k.z/k.w
+    g.op(None, "field", 2, field="swell")                                            # the bass fronts passing
+    g.op(None, "remap", 2, a=2, k=[0.0, 1.0, 0.0, 0.18])
+    g.op(None, "add", 1, a=1, b=2)
+    g.op("dome", "oklabRamp", 3, a=1, k=C("indigo") + [1], k2=C("royal") + [1], k3=C("purple") + [1],
+         k4=C("indigo", 1.5) + [1], f=-1.0)
+    g.op(None, "constant", 4, k=[0, 0, 0, 1])
+    g.base, g.emit, g.opacity = 4, 3, -1
+    return g
+
+
+def _unit3(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v]
 
 
 def level_sheets(s, prog):
@@ -347,6 +438,21 @@ def level_sheets(s, prog):
 # ADR-1440: the slow families are baked once a frame into a volume grid that the deformer samples (2 m cells)
 BAKE_BOUNDS = ([-128.0, -80.0, -128.0], [128.0, 80.0, 128.0])
 D_RES = [128, 80, 128]
+
+
+def travelling_fronts(s):
+    """Each front family: a spectrum field (the band's level over the last seconds, laid out outward from its
+    source at the travel speed: ADR-1116, exact under seek) times a spherical carrier moving at the same speed, so a
+    loud moment becomes a crest that sweeps through the sheets and keeps going (05-plan §1.3)."""
+    for name, (point, band, speed, wavelength, smooth) in FRONTS.items():
+        field(s, name + "Hist", {"kind": "spectrum", "audioBand": "range", "bandLow": band[0], "bandHigh": band[1],
+                                  "audioSpeed": speed, "audioSmooth": smooth, "point": list(point),
+                                  "waveGeometry": "spherical", "strength": 1.0, "falloff": {"kind": "none"}})
+        field(s, name + "Carrier", {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine",
+                                     "point": list(point), "wavelength": wavelength, "waveSpeed": speed,
+                                     "waveWidth": 0.0, "amplitude": 1.0, "strength": 1.0, "falloff": {"kind": "none"}})
+        field(s, name, {"kind": "compound", "children": [name + "Hist", name + "Carrier"], "combine": "multiply",
+                        "strength": 1.0, "falloff": {"kind": "none"}})
 
 
 def bake_grid(s, source, res, strength=1.0):
@@ -370,6 +476,14 @@ def environment(s):
         # the depth prepass, asked for (ADR-1406): five nested opaque sheets overdraw each other, and with the deformation
         # baked (ADR-1440) a second geometry pass costs ~3 ms and saves ~20 of shading (Stage B profile)
         "depthPrepass": True,
+        # stage C (05-plan §1.3): narrow, cool reflection-only bands (ADR-1151) -- crisp lines that run along the
+        # sheets' curvature like light on a wave, cooler and finer than Silk's soft satin box
+        "bands": {"phase": 0.0, "rotation": 0.0, "gain": WD_BANDS_GAIN,
+                  "softbox": {"intensity": 0.25, "azimuth": 0.9, "elevation": 0.6, "falloff": 3.0, "skyFill": 0.0},
+                  "strips": [{"axis": [0.0, 1.0, 0.0], "offset": 0.25, "width": 0.03, "intensity": 2.0, "segments": 0,
+                              "warmth": 0.0, "rate": 0.0},
+                             {"axis": [0.6, 0.2, -0.77], "offset": 0.0, "width": 0.025, "intensity": 1.4, "segments": 0,
+                              "warmth": 0.0, "rate": 0.0}]},
         "sky": {"enabled": True, "zenithColor": C("obsidian", 0.6), "horizonColor": C("indigo", 0.5),
                 "groundColor": C("obsidian", 0.5), "haze": 0.3, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -383,13 +497,19 @@ def environment(s):
     s.light("key", "directional", direction=[0.62, -0.35, -0.7], color=hexrgb("#a68bff"), intensity=3.0,
             castsShadow=False)
     s.light("rim", "directional", direction=[-0.35, -0.25, 0.9], color=C("purple"), intensity=1.6, castsShadow=False)
-    s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=0.35, castsShadow=False)
+    # resonator-quality: the fill is a real second light now (0.35 left every face turned from the key near black):
+    # from below and behind the key, in the palette's fill colour, so a turned-away face keeps its own colour
+    s.light("fill", "directional", direction=[-0.4, 0.8, 0.3], color=C("royal"), intensity=FILL_I, castsShadow=False)
+    # ... and a broad, soft light from the camera's side of the sculpture (along the arc's mean view): every face the
+    # camera sees takes some diffuse light, so the chromatic waves read on the faces the key leaves (a restrained
+    # fill, white leaning to the palette's key; the key, rim and fill keep the modelling)
+    s.light("front", "directional", direction=FRONT_DIR, color=hexrgb("#d8d0ff"), intensity=FRONT_I, castsShadow=False)
 
 
 POST = {
     "post/motionBlur/amount": 0.0, "post/dof/enabled": False, "post/dof/physical": False,
     "post/tonemap/chroma-retention": 0.95, "post/bloom/radius": 0.7, "post/bloom/intensity": 0.25,
-    "post/bloom/threshold": 1.1, "post/output/vignette": 0.4, "post/output/grain": 0.01,
+    "post/bloom/threshold": 1.1, "post/output/vignette": float(os.environ.get("WD_VIGNETTE", "0.2")), "post/output/grain": 0.01,
     "post/grade/contrast": 1.15, "post/lens/chromaticAberration": 0.0, "camera/exposure/compensation": 0.0,
     "scene/fogColor": C("obsidian"),
 }
@@ -449,27 +569,61 @@ PALETTES = [
                           edge="#FF68B8", peak="#FFD8EE")),
 ]
 PALETTE_ORDER = [0, 1, 2, 3, 4, 5, 6, 7]   # cool and warm alternate; the owner's palette opens
-GLOW_GAIN = (0.12, 0.4)                   # the glow ramp's middle and end, as fractions of band and highlight
+GLOW_GAIN = (float(os.environ.get("WD_GLOW0", "0.04")), float(os.environ.get("WD_GLOW1", "0.2")))                   # the glow ramp's middle and end, as fractions of band and highlight
 CONTOUR_GAIN = (0.07, 0.14)
 EDGE_GAIN = (0.2, 0.85)
 
 
-def palette_block(g):
+# the chromatic waves' four stops per palette, from its own roles (the family stays the palette's): the middle sheets'
+# colour, the outer sheets' lit colour, the glow band's hue, and a step toward the accent -- lifted to a common
+# lightness and chroma so the body of every sheet carries colour between the light and the dark, blended in OKLab
+# (kit.mix_oklab) and cycled by the ramp (g3 returns to g0 through the palette's own neighbours)
+WAVE_L = (0.44, 0.54, 0.62, 0.5)      # the stops' OKLab lightness
+WAVE_CHROMA = 1.2                      # chroma, relative to the roles'
+WAVE_TURN = (-18.0, 0.0, None, 42.0)  # hue offsets (degrees) from the primary's hue; g2 keeps the band's own hue
+
+
+def gradient_roles(roles):
+    """Analogous stops only: the accent (highlight) stays in the glow -- a complementary accent in the ramp gave an
+    olive-grey midpoint (Ultramarine Gold), the muddy intermediate the addendum forbids."""
+    lin = {k: hexrgb(v) for k, v in roles.items()}
+    _, cp, hp = kit.lch_of(lin["primary"])
+    _, cs, _ = kit.lch_of(lin["secondary"])
+    _, cb, hb = kit.lch_of(lin["band"])
+    stops = [(cs, hp + WAVE_TURN[0]), (cp, hp), (cb, hb), (cp, hp + WAVE_TURN[3])]
+    out = {}
+    for i, (c, h) in enumerate(stops):
+        out["g%d" % i] = [round(v, 5) for v in kit.oklch(WAVE_L[i], min(c * WAVE_CHROMA, 0.25), h)]
+    # the front light: white leaning a quarter toward the palette's key
+    out["front"] = [round(v, 5) for v in kit.mix_oklab([1.0, 1.0, 1.0], lin["key"], 0.35)]
+    # the dome's bands: the same four hues, dimmed (it is the distance, and the air covers half of it)
+    for i in range(4):
+        out["d%d" % i] = [round(v * DOME_GAIN, 5) for v in out["g%d" % i]]
+    return out
+
+
+def palette_block(g, dg=None):
     """The project palette (ADR-1043) with its selector (ADR-1420): the roles bound to the lights, the sky, the fog and
     the surface program's colour constants."""
-    op = lambda label, k: "material/%s/op/%d/ramp/%s" % (g.name, g[label], k)
+    op = lambda label, k: ("material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], k)
+                           if label in g.at else None)   # (a debug program lacks the light ops)
     bindings = [
         ("bg", "scene/fogColor", 1.0), ("bg", "env/sky/zenithColor", 0.6), ("shadow", "env/sky/horizonColor", 0.45),
-        ("primary", op("albedo", "constant"), 1.0), ("secondary", op("albedo", "constant2"), 1.0),
-        ("shadow", op("albedo", "constant3"), 1.0),
+        ("g0", op("albedo", "constant"), 1.0), ("g1", op("albedo", "constant2"), 1.0),
+        ("g2", op("albedo", "constant3"), 1.0), ("g3", op("albedo", "constant4"), 1.0),
         ("key", "lights/key/color", 1.0), ("rim", "lights/rim/color", 1.0), ("fill", "lights/fill/color", 1.0),
+        ("front", "lights/front/color", 1.0),
         ("band", op("glow", "constant2"), GLOW_GAIN[0]), ("highlight", op("glow", "constant3"), GLOW_GAIN[1]),
         ("contour", op("edgeBase", "constant2"), CONTOUR_GAIN[0]), ("contour", op("edgeBase", "constant3"), CONTOUR_GAIN[1]),
         ("edge", op("edgeTint", "constant2"), EDGE_GAIN[0]), ("peak", op("edgeTint", "constant3"), EDGE_GAIN[1]),
     ]
-    states = [{"name": name, "colors": {role: hexrgb(h) for role, h in roles.items()}} for name, roles in PALETTES]
+    if dg is not None:   # the dome's four dimmed stops
+        bindings += [("d%d" % i, "material/%s/op/%d/oklabRamp/%s" % (dg.name, dg["dome"], k), 1.0)
+                     for i, k in enumerate(("constant", "constant2", "constant3", "constant4"))]
+    states = [{"name": name, "colors": dict({role: hexrgb(h) for role, h in roles.items()}, **gradient_roles(roles))}
+              for name, roles in PALETTES]
     return {"states": states,
-            "bindings": [{"role": r, "target": t, "gain": gn, "mode": "replace"} for r, t, gn in bindings],
+            "bindings": [{"role": r, "target": t, "gain": gn, "mode": "replace"} for r, t, gn in bindings if t],
             "saturation": 1.0, "value": 1.0,
             "selector": {"select": PALETTE_ORDER[0], "transition": 5.0, "lock": False, "hold": 24.0,
                          "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": PALETTE_ORDER,
@@ -550,6 +704,10 @@ def instrument(s, g):
             R("response.hatEnv", edge, 1.0, op="multiply", gain=1.0, offset=1.0, attackMs=0, decayMs=200),
             R("response.snareEnv", edge, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=0, decayMs=260),
             R("control.light", edge, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
+    # the chromatic waves travel: their phase integrates the music's energy over a floor (ADR-1041) -- never reset,
+    # quicker in loud passages, still moving in silence (k.z and k.w of the phase remap move together)
+    wp = "material/%s/op/%d/remap/constant" % (g.name, g["wavePhase"])
+    s.route(*[R("sonic.energy", wp, WAVE_RATE, comp=c, gain=1.0, offset=0.35, integrate=True) for c in (2, 3)])
     # the palette: CC 9 selects one (0..1 across the states), CC 10 locks it (no automatic change), as in every Resonator scene
     s.route(R("control.palette", "palette/select", float(len(PALETTES) - 1), **CCR),
             R("control.paletteLock", "palette/lock", 1.0, **CCR))
@@ -558,9 +716,23 @@ def instrument(s, g):
 # THE CAMERA: an elevated three-quarter arc outside the sculpture's densest part, looking down into the nested sheets,
 # so they fill the frame and recede (Stage B): never inside one opening looking down it (no portal), never so close
 # that one blank sheet fills the frame
+# the chromatic waves (surface_program): their direction, cycles across the sculpture, how far the displacement bends
+# them (cycles per metre of D), the step between nested sheets, and the phase's drift (cycles per second per unit of
+# the integrated energy + floor)
+FILL_I = float(os.environ.get("WD_FILL_I", "1.2"))
+WD_BANDS_GAIN = float(os.environ.get("WD_BANDS", "0.5"))
+GLOW_IN, GLOW_OUT = 3.5, 10.0   # metres of |D| over which the glow rises
+FRONT_I = float(os.environ.get("WD_FRONT_I", "1.2"))
+FRONT_DIR = [-0.4, -0.58, -0.71]   # from the arc's middle (azimuth 30 degrees, 92 m up) toward the focus
+WAVE_DIR = (0.55, 0.35, -0.76)
+WAVE_N = float(os.environ.get("WD_WAVE_N", "4.0"))
+WAVE_BEND = float(os.environ.get("WD_WAVE_BEND", "0.08"))
+SHEET_STEP = float(os.environ.get("WD_SHEET_STEP", "0.3"))
+WAVE_RATE = float(os.environ.get("WD_WAVE_RATE", "0.02"))
 CAM_FOCUS = [0.0, -10.0, -10.0]
 CAM_R, CAM_H, CAM_FOCAL, CAM_AZ, CAM_SWEEP = 140.0, 92.0, 24.0, 30.0, 70.0
 FOG = 0.0045
+FOG_DOME = float(os.environ.get("WD_FOG", "0.0028"))   # thinner with the dome: the air softens it, never hides it
 
 
 def build():
@@ -568,18 +740,31 @@ def build():
     environment(s)
     resonator(s)
     resonance_fields(s)
+    travelling_fronts(s)
     g = surface_program("wdSurface")
-    s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
+    s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity, roughness=getattr(g, "rough", -1)))
     write_level_meshes()
     level_sheets(s, g.name)
+    if DOME_ON and not NEUTRAL and not DEBUG:
+        dg = dome_program()
+        s.program(dg.doc(base=dg.base, emission=dg.emit, opacity=dg.opacity))
+        s.dome_program = dg
+        dpos, dnrm, duv, didx = dome_mesh(DOME_R)
+        write_glb(os.path.join(MESH_DIR, "wd-dome.glb"), dpos, dnrm, duv, didx, "dome")
+        s.proc("dome", {"kind": "mesh", "asset": "meshes/wd-dome.glb"},
+               material={"baseColor": [0, 0, 0], "emissiveColor": [1, 1, 1], "emissiveIntensity": 1.0, "roughness": 1.0,
+                         "metallic": 0.0, "unlit": True, "doubleSided": True, "program": dg.name})
     s.camera = {"mode": 1, "position": [60.0, 90.0, 110.0], "target": CAM_FOCUS, "fov": 40.0, "orbitSpeed": 0.0}
     s.arc_camera(CAM_FOCUS, CAM_R, CAM_H, period=160.0, centre_deg=CAM_AZ, sweep_deg=CAM_SWEEP, steps=24, side=0.0,
                  lift=0.0, height_bob=6.0)
     s.params_({"camera/lens/focalLength": CAM_FOCAL})
     instrument(s, g)
     if not NEUTRAL:
-        s.palette = palette_block(g)
-    s.params_({"scene/volumeDensity": FOG})
+        s.palette = palette_block(g, getattr(s, "dome_program", None))
+    s.params_({"scene/volumeDensity": FOG if not (DOME_ON and not NEUTRAL) else FOG_DOME})
+    if getattr(s, "dome_program", None) is not None:   # the dome's bands drift slower than the sheets' waves
+        dp = "material/wdDome/op/%d/remap/constant" % s.dome_program["domePhase"]
+        s.route(*[R("sonic.energy", dp, WAVE_RATE * 0.35, comp=c, gain=1.0, offset=0.35, integrate=True) for c in (2, 3)])
     s.params_(POST if not NEUTRAL else {"scene/fogColor": [0.02, 0.02, 0.02],
                                         "post/bloom/enabled": False, "post/output/vignette": 0.0})
     return s

@@ -120,7 +120,7 @@
   "post/bloom/threshold": 1.1,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.95,
-  "post/output/vignette": 0.4,
+  "post/output/vignette": 0.2,
   "post/output/grain": 0.01,
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.0,
@@ -130,7 +130,7 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "scene/volumeDensity": 0.0045,
+  "scene/volumeDensity": 0.0028,
   "post/motionBlur/amount": 0.0,
   "post/dof/enabled": false,
   "post/dof/physical": false,
@@ -438,7 +438,7 @@
   },
   {
    "source": "response.level",
-   "target": "material/wdSurface/op/16/constant/constant",
+   "target": "material/wdSurface/op/17/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -451,7 +451,7 @@
   },
   {
    "source": "control.spectral",
-   "target": "material/wdSurface/op/16/constant/constant",
+   "target": "material/wdSurface/op/17/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -464,7 +464,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/wdSurface/op/27/constant/constant",
+   "target": "material/wdSurface/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -477,7 +477,7 @@
   },
   {
    "source": "response.snareEnv",
-   "target": "material/wdSurface/op/27/constant/constant",
+   "target": "material/wdSurface/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -490,7 +490,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/wdSurface/op/27/constant/constant",
+   "target": "material/wdSurface/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -499,6 +499,32 @@
     "offset": 1.0,
     "attackMs": 120,
     "decayMs": 120
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/wdSurface/op/6/remap/constant",
+   "amount": 0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/wdSurface/op/6/remap/constant",
+   "amount": 0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
    }
   },
   {
@@ -521,6 +547,32 @@
    "chain": {
     "attackMs": 120,
     "decayMs": 120
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/wdDome/op/3/remap/constant",
+   "amount": 0.006999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/wdDome/op/3/remap/constant",
+   "amount": 0.006999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
    }
   }
  ],
@@ -1094,6 +1146,51 @@
       1.0,
       0.25818,
       0.32314
+     ],
+     "g0": [
+      0.04881,
+      0.0428,
+      0.47988
+     ],
+     "g1": [
+      0.2107,
+      0.03987,
+      0.82644
+     ],
+     "g2": [
+      0.45613,
+      0.05937,
+      0.89088
+     ],
+     "g3": [
+      0.42802,
+      0.0,
+      0.30055
+     ],
+     "front": [
+      0.82011,
+      0.77753,
+      1.01073
+     ],
+     "d0": [
+      0.01074,
+      0.00942,
+      0.10557
+     ],
+     "d1": [
+      0.04635,
+      0.00877,
+      0.18182
+     ],
+     "d2": [
+      0.10035,
+      0.01306,
+      0.19599
+     ],
+     "d3": [
+      0.09416,
+      0.0,
+      0.06612
      ]
     }
    },
@@ -1159,6 +1256,51 @@
       1.0,
       0.87962,
       0.53948
+     ],
+     "g0": [
+      0.0,
+      0.07306,
+      0.5567
+     ],
+     "g1": [
+      0.02029,
+      0.09475,
+      0.97727
+     ],
+     "g2": [
+      0.00567,
+      0.20691,
+      1.10615
+     ],
+     "g3": [
+      0.25418,
+      0.00411,
+      0.61293
+     ],
+     "front": [
+      0.86356,
+      0.89437,
+      1.00283
+     ],
+     "d0": [
+      0.0,
+      0.01607,
+      0.12247
+     ],
+     "d1": [
+      0.00446,
+      0.02084,
+      0.215
+     ],
+     "d2": [
+      0.00125,
+      0.04552,
+      0.24335
+     ],
+     "d3": [
+      0.05592,
+      0.0009,
+      0.13484
      ]
     }
    },
@@ -1224,6 +1366,51 @@
       1.0,
       0.87137,
       0.67244
+     ],
+     "g0": [
+      0.29707,
+      0.01304,
+      0.02913
+     ],
+     "g1": [
+      0.58332,
+      0.02093,
+      0.0
+     ],
+     "g2": [
+      0.93644,
+      0.01189,
+      0.0
+     ],
+     "g3": [
+      0.34206,
+      0.06804,
+      0.0
+     ],
+     "front": [
+      1.00625,
+      0.8606,
+      0.77131
+     ],
+     "d0": [
+      0.06536,
+      0.00287,
+      0.00641
+     ],
+     "d1": [
+      0.12833,
+      0.0046,
+      0.0
+     ],
+     "d2": [
+      0.20602,
+      0.00262,
+      0.0
+     ],
+     "d3": [
+      0.07525,
+      0.01497,
+      0.0
      ]
     }
    },
@@ -1289,6 +1476,51 @@
       1.0,
       0.76052,
       0.39157
+     ],
+     "g0": [
+      0.00737,
+      0.11971,
+      0.05898
+     ],
+     "g1": [
+      0.0,
+      0.23376,
+      0.17115
+     ],
+     "g2": [
+      0.0,
+      0.36713,
+      0.26612
+     ],
+     "g3": [
+      0.0,
+      0.16338,
+      0.30436
+     ],
+     "front": [
+      0.79962,
+      1.0027,
+      0.94147
+     ],
+     "d0": [
+      0.00162,
+      0.02634,
+      0.01298
+     ],
+     "d1": [
+      0.0,
+      0.05143,
+      0.03765
+     ],
+     "d2": [
+      0.0,
+      0.08077,
+      0.05855
+     ],
+     "d3": [
+      0.0,
+      0.03594,
+      0.06696
      ]
     }
    },
@@ -1354,6 +1586,51 @@
       0.88792,
       1.0,
       0.63076
+     ],
+     "g0": [
+      0.19954,
+      0.0,
+      0.37831
+     ],
+     "g1": [
+      0.47926,
+      0.0,
+      0.42306
+     ],
+     "g2": [
+      0.68649,
+      0.02465,
+      0.53055
+     ],
+     "g3": [
+      0.59058,
+      0.0,
+      0.03802
+     ],
+     "front": [
+      1.00904,
+      0.8164,
+      0.96844
+     ],
+     "d0": [
+      0.0439,
+      0.0,
+      0.08323
+     ],
+     "d1": [
+      0.10544,
+      0.0,
+      0.09307
+     ],
+     "d2": [
+      0.15103,
+      0.00542,
+      0.11672
+     ],
+     "d3": [
+      0.12993,
+      0.0,
+      0.00836
      ]
     }
    },
@@ -1419,6 +1696,51 @@
       1.0,
       0.7454,
       0.90466
+     ],
+     "g0": [
+      0.0,
+      0.08677,
+      0.32892
+     ],
+     "g1": [
+      0.0715,
+      0.13509,
+      0.54989
+     ],
+     "g2": [
+      0.27819,
+      0.12479,
+      0.91669
+     ],
+     "g3": [
+      0.20737,
+      0.06018,
+      0.3522
+     ],
+     "front": [
+      0.94755,
+      0.96296,
+      1.00035
+     ],
+     "d0": [
+      0.0,
+      0.01909,
+      0.07236
+     ],
+     "d1": [
+      0.01573,
+      0.02972,
+      0.12098
+     ],
+     "d2": [
+      0.0612,
+      0.02745,
+      0.20167
+     ],
+     "d3": [
+      0.04562,
+      0.01324,
+      0.07748
      ]
     }
    },
@@ -1484,6 +1806,51 @@
       1.0,
       0.76815,
       0.71569
+     ],
+     "g0": [
+      0.02202,
+      0.12056,
+      0.01143
+     ],
+     "g1": [
+      0.0,
+      0.2553,
+      0.05979
+     ],
+     "g2": [
+      0.0,
+      0.39598,
+      0.11095
+     ],
+     "g3": [
+      0.0,
+      0.20214,
+      0.25283
+     ],
+     "front": [
+      0.86402,
+      1.00139,
+      0.92964
+     ],
+     "d0": [
+      0.00484,
+      0.02652,
+      0.00251
+     ],
+     "d1": [
+      0.0,
+      0.05617,
+      0.01315
+     ],
+     "d2": [
+      0.0,
+      0.08712,
+      0.02441
+     ],
+     "d3": [
+      0.0,
+      0.04447,
+      0.05562
      ]
     }
    },
@@ -1549,6 +1916,51 @@
       1.0,
       0.68669,
       0.85499
+     ],
+     "g0": [
+      0.0,
+      0.12201,
+      0.19432
+     ],
+     "g1": [
+      0.0,
+      0.19944,
+      0.47953
+     ],
+     "g2": [
+      0.0,
+      0.33787,
+      0.50393
+     ],
+     "g3": [
+      0.06214,
+      0.09563,
+      0.50231
+     ],
+     "front": [
+      0.87338,
+      0.97594,
+      1.0005
+     ],
+     "d0": [
+      0.0,
+      0.02684,
+      0.04275
+     ],
+     "d1": [
+      0.0,
+      0.04388,
+      0.1055
+     ],
+     "d2": [
+      0.0,
+      0.07433,
+      0.11086
+     ],
+     "d3": [
+      0.01367,
+      0.02104,
+      0.11051
      ]
     }
    }
@@ -1573,20 +1985,26 @@
     "mode": "replace"
    },
    {
-    "role": "primary",
-    "target": "material/wdSurface/op/4/ramp/constant",
+    "role": "g0",
+    "target": "material/wdSurface/op/12/oklabRamp/constant",
     "gain": 1.0,
     "mode": "replace"
    },
    {
-    "role": "secondary",
-    "target": "material/wdSurface/op/4/ramp/constant2",
+    "role": "g1",
+    "target": "material/wdSurface/op/12/oklabRamp/constant2",
     "gain": 1.0,
     "mode": "replace"
    },
    {
-    "role": "shadow",
-    "target": "material/wdSurface/op/4/ramp/constant3",
+    "role": "g2",
+    "target": "material/wdSurface/op/12/oklabRamp/constant3",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "g3",
+    "target": "material/wdSurface/op/12/oklabRamp/constant4",
     "gain": 1.0,
     "mode": "replace"
    },
@@ -1609,39 +2027,69 @@
     "mode": "replace"
    },
    {
+    "role": "front",
+    "target": "lights/front/color",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
     "role": "band",
-    "target": "material/wdSurface/op/15/ramp/constant2",
-    "gain": 0.12,
+    "target": "material/wdSurface/op/16/ramp/constant2",
+    "gain": 0.04,
     "mode": "replace"
    },
    {
     "role": "highlight",
-    "target": "material/wdSurface/op/15/ramp/constant3",
-    "gain": 0.4,
+    "target": "material/wdSurface/op/16/ramp/constant3",
+    "gain": 0.2,
     "mode": "replace"
    },
    {
     "role": "contour",
-    "target": "material/wdSurface/op/20/ramp/constant2",
+    "target": "material/wdSurface/op/21/ramp/constant2",
     "gain": 0.07,
     "mode": "replace"
    },
    {
     "role": "contour",
-    "target": "material/wdSurface/op/20/ramp/constant3",
+    "target": "material/wdSurface/op/21/ramp/constant3",
     "gain": 0.14,
     "mode": "replace"
    },
    {
     "role": "edge",
-    "target": "material/wdSurface/op/26/ramp/constant2",
+    "target": "material/wdSurface/op/27/ramp/constant2",
     "gain": 0.2,
     "mode": "replace"
    },
    {
     "role": "peak",
-    "target": "material/wdSurface/op/26/ramp/constant3",
+    "target": "material/wdSurface/op/27/ramp/constant3",
     "gain": 0.85,
+    "mode": "replace"
+   },
+   {
+    "role": "d0",
+    "target": "material/wdDome/op/7/oklabRamp/constant",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "d1",
+    "target": "material/wdDome/op/7/oklabRamp/constant2",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "d2",
+    "target": "material/wdDome/op/7/oklabRamp/constant3",
+    "gain": 1.0,
+    "mode": "replace"
+   },
+   {
+    "role": "d3",
+    "target": "material/wdDome/op/7/oklabRamp/constant4",
+    "gain": 1.0,
     "mode": "replace"
    }
   ],

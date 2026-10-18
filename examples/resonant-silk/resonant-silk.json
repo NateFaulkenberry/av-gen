@@ -120,12 +120,12 @@
   "post/bloom/threshold": 1.0,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
-  "post/output/vignette": 0.4,
+  "post/output/vignette": 0.2,
   "post/output/grain": 0.008,
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.8,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 26.0,
+  "camera/lens/focalLength": 24.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
@@ -161,7 +161,7 @@
   },
   {
    "source": "response.bass",
-   "target": "material/rsSilk/op/7/fresnel/value",
+   "target": "material/rsSilk/op/6/fresnel/value",
    "amount": -1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -172,15 +172,42 @@
   },
   {
    "source": "audio.lowMid",
-   "target": "material/rsSilk/op/10/constant/constant",
+   "target": "material/rsSilk/op/12/remap/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
+   "component": 3,
    "chain": {
-    "gain": 0.5,
+    "gain": 0.8,
     "offset": 1.0,
     "attackMs": 300,
     "decayMs": 1200
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/rsSilk/op/7/remap/constant",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/rsSilk/op/7/remap/constant",
+   "amount": 0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
    }
   },
   {
@@ -307,7 +334,7 @@
   },
   {
    "source": "control.iridescence",
-   "target": "material/rsSilk/op/16/constant/constant",
+   "target": "material/rsSilk/op/21/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -320,7 +347,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/34/constant/constant",
+   "target": "material/rsSilk/op/32/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -333,7 +360,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/41/constant/constant",
+   "target": "material/rsSilk/op/38/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -435,8 +462,8 @@
       "time": 0.0,
       "value": [
        4.0,
-       2.0,
-       57.5
+       14.0,
+       -16.5
       ],
       "interp": "smooth"
      },
@@ -444,8 +471,8 @@
       "time": 10.0,
       "value": [
        7.0,
-       4.1651,
-       58.1699
+       16.1651,
+       -15.8301
       ],
       "interp": "smooth"
      },
@@ -453,8 +480,8 @@
       "time": 20.0,
       "value": [
        9.1962,
-       4.1651,
-       60.0
+       16.1651,
+       -14.0
       ],
       "interp": "smooth"
      },
@@ -462,8 +489,8 @@
       "time": 30.0,
       "value": [
        10.0,
-       2.0,
-       62.5
+       14.0,
+       -11.5
       ],
       "interp": "smooth"
      },
@@ -471,8 +498,8 @@
       "time": 40.0,
       "value": [
        9.1962,
-       -0.1651,
-       65.0
+       11.8349,
+       -9.0
       ],
       "interp": "smooth"
      },
@@ -480,8 +507,8 @@
       "time": 50.0,
       "value": [
        7.0,
-       -0.1651,
-       66.8301
+       11.8349,
+       -7.1699
       ],
       "interp": "smooth"
      },
@@ -489,8 +516,8 @@
       "time": 60.0,
       "value": [
        4.0,
-       2.0,
-       67.5
+       14.0,
+       -6.5
       ],
       "interp": "smooth"
      },
@@ -498,8 +525,8 @@
       "time": 70.0,
       "value": [
        1.0,
-       4.1651,
-       66.8301
+       16.1651,
+       -7.1699
       ],
       "interp": "smooth"
      },
@@ -507,8 +534,8 @@
       "time": 80.0,
       "value": [
        -1.1962,
-       4.1651,
-       65.0
+       16.1651,
+       -9.0
       ],
       "interp": "smooth"
      },
@@ -516,8 +543,8 @@
       "time": 90.0,
       "value": [
        -2.0,
-       2.0,
-       62.5
+       14.0,
+       -11.5
       ],
       "interp": "smooth"
      },
@@ -525,8 +552,8 @@
       "time": 100.0,
       "value": [
        -1.1962,
-       -0.1651,
-       60.0
+       11.8349,
+       -14.0
       ],
       "interp": "smooth"
      },
@@ -534,8 +561,8 @@
       "time": 110.0,
       "value": [
        1.0,
-       -0.1651,
-       58.1699
+       11.8349,
+       -15.8301
       ],
       "interp": "smooth"
      },
@@ -543,8 +570,8 @@
       "time": 120.0,
       "value": [
        4.0,
-       2.0,
-       57.5
+       14.0,
+       -16.5
       ],
       "interp": "smooth"
      }
@@ -561,117 +588,117 @@
      {
       "time": 0.0,
       "value": [
-       -13.7414,
-       9.6829,
-       -60.0
+       -1.7414,
+       5.6829,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 10.0,
       "value": [
-       -12.3933,
-       9.7773,
-       -60.0
+       -0.3933,
+       5.7773,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 20.0,
       "value": [
-       -12.0117,
-       8.0944,
-       -60.0
+       -0.0117,
+       4.0944,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 30.0,
       "value": [
-       -12.6987,
-       6.3171,
-       -60.0
+       -0.6987,
+       2.3171,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 40.0,
       "value": [
-       -14.2702,
-       6.2227,
-       -60.0
+       -2.2702,
+       2.2227,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 50.0,
       "value": [
-       -16.3053,
-       7.9056,
-       -60.0
+       -4.3053,
+       3.9056,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 60.0,
       "value": [
-       -18.2586,
-       9.6829,
-       -60.0
+       -6.2586,
+       5.6829,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 70.0,
       "value": [
-       -19.6067,
-       9.7773,
-       -60.0
+       -7.6067,
+       5.7773,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       -19.9883,
-       8.0944,
-       -60.0
+       -7.9883,
+       4.0944,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 90.0,
       "value": [
-       -19.3013,
-       6.3171,
-       -60.0
+       -7.3013,
+       2.3171,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 100.0,
       "value": [
-       -17.7298,
-       6.2227,
-       -60.0
+       -5.7298,
+       2.2227,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 110.0,
       "value": [
-       -15.6947,
-       7.9056,
-       -60.0
+       -3.6947,
+       3.9056,
+       -130.0
       ],
       "interp": "smooth"
      },
      {
       "time": 120.0,
       "value": [
-       -13.7414,
-       9.6829,
-       -60.0
+       -1.7414,
+       5.6829,
+       -130.0
       ],
       "interp": "smooth"
      }
@@ -747,12 +774,37 @@
       0.87137,
       0.84687,
       1.0
+     ],
+     "g0": [
+      0.02562,
+      0.05687,
+      0.32795
+     ],
+     "g1": [
+      0.13454,
+      0.06258,
+      0.53155
+     ],
+     "g2": [
+      0.37689,
+      0.03528,
+      0.60732
+     ],
+     "g3": [
+      0.0,
+      0.11004,
+      0.47449
+     ],
+     "fillLight": [
+      0.16263,
+      0.14274,
+      0.31626
      ]
     },
     "scalars": {
-     "rough": 0.22,
+     "rough": 0.32,
      "film": 1.0,
-     "key": 5.0,
+     "key": 3.5,
      "emit": 1.0,
      "irid": 0.02,
      "filmIor": 1.7,
@@ -796,12 +848,37 @@
       1.0,
       0.52712,
       0.5972
+     ],
+     "g0": [
+      0.15082,
+      0.02468,
+      0.21059
+     ],
+     "g1": [
+      0.49346,
+      0.0,
+      0.13861
+     ],
+     "g2": [
+      0.78698,
+      0.0,
+      0.0
+     ],
+     "g3": [
+      0.14132,
+      0.01841,
+      0.59269
+     ],
+     "fillLight": [
+      0.27558,
+      0.07801,
+      0.13938
      ]
     },
     "scalars": {
-     "rough": 0.19,
+     "rough": 0.29,
      "film": 0.9,
-     "key": 4.6,
+     "key": 3.22,
      "emit": 0.9,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -845,12 +922,37 @@
       1.0,
       0.90466,
       0.68669
+     ],
+     "g0": [
+      0.1707,
+      0.04486,
+      0.01963
+     ],
+     "g1": [
+      0.3097,
+      0.07422,
+      0.0
+     ],
+     "g2": [
+      0.26878,
+      0.17192,
+      0.0
+     ],
+     "g3": [
+      0.31162,
+      0.03279,
+      0.0479
+     ],
+     "fillLight": [
+      0.35663,
+      0.2239,
+      0.13726
      ]
     },
     "scalars": {
-     "rough": 0.26,
+     "rough": 0.36,
      "film": 0.8,
-     "key": 3.6,
+     "key": 2.52,
      "emit": 0.7,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -894,12 +996,37 @@
       1.0,
       0.87137,
       0.89627
+     ],
+     "g0": [
+      0.12141,
+      0.03984,
+      0.18405
+     ],
+     "g1": [
+      0.28642,
+      0.05004,
+      0.21424
+     ],
+     "g2": [
+      0.53293,
+      0.05229,
+      0.088
+     ],
+     "g3": [
+      0.10396,
+      0.06705,
+      0.35852
+     ],
+     "fillLight": [
+      0.33339,
+      0.19401,
+      0.28936
      ]
     },
     "scalars": {
-     "rough": 0.23,
+     "rough": 0.33,
      "film": 1.25,
-     "key": 3.8,
+     "key": 2.66,
      "emit": 0.8,
      "irid": 0.18,
      "filmIor": 2.0,
@@ -943,12 +1070,37 @@
       0.73791,
       1.0,
       0.82279
+     ],
+     "g0": [
+      0.00512,
+      0.10867,
+      0.02275
+     ],
+     "g1": [
+      0.0,
+      0.20959,
+      0.05667
+     ],
+     "g2": [
+      0.0,
+      0.30051,
+      0.30448
+     ],
+     "g3": [
+      0.05881,
+      0.1401,
+      0.0
+     ],
+     "fillLight": [
+      0.10542,
+      0.27329,
+      0.17888
      ]
     },
     "scalars": {
-     "rough": 0.2,
+     "rough": 0.3,
      "film": 0.9,
-     "key": 4.4,
+     "key": 3.08,
      "emit": 0.8,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -992,12 +1144,37 @@
       0.76052,
       0.89627,
       1.0
+     ],
+     "g0": [
+      0.0,
+      0.06132,
+      0.49498
+     ],
+     "g1": [
+      0.0,
+      0.07328,
+      0.89214
+     ],
+     "g2": [
+      0.14565,
+      0.06248,
+      1.04229
+     ],
+     "g3": [
+      0.0,
+      0.14271,
+      0.55242
+     ],
+     "fillLight": [
+      0.08315,
+      0.18566,
+      0.45838
      ]
     },
     "scalars": {
-     "rough": 0.17,
+     "rough": 0.27,
      "film": 1.0,
-     "key": 5.2,
+     "key": 3.64,
      "emit": 1.1,
      "irid": 0.02,
      "filmIor": 1.6,
@@ -1041,12 +1218,37 @@
       1.0,
       0.69387,
       0.49102
+     ],
+     "g0": [
+      0.24316,
+      0.01579,
+      0.03344
+     ],
+     "g1": [
+      0.50462,
+      0.0019,
+      0.0
+     ],
+     "g2": [
+      0.63187,
+      0.04007,
+      0.0
+     ],
+     "g3": [
+      0.38401,
+      0.0,
+      0.13633
+     ],
+     "fillLight": [
+      0.34314,
+      0.12125,
+      0.08603
      ]
     },
     "scalars": {
-     "rough": 0.24,
+     "rough": 0.34,
      "film": 0.8,
-     "key": 4.0,
+     "key": 2.8,
      "emit": 0.7,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1090,12 +1292,37 @@
       0.88792,
       0.55201,
       0.46778
+     ],
+     "g0": [
+      0.0468,
+      0.06204,
+      0.23269
+     ],
+     "g1": [
+      0.22004,
+      0.06691,
+      0.27235
+     ],
+     "g2": [
+      0.60362,
+      0.03124,
+      0.05241
+     ],
+     "g3": [
+      0.00771,
+      0.109,
+      0.33466
+     ],
+     "fillLight": [
+      0.14557,
+      0.09125,
+      0.16084
      ]
     },
     "scalars": {
-     "rough": 0.16,
+     "rough": 0.26,
      "film": 0.95,
-     "key": 4.6,
+     "key": 3.22,
      "emit": 0.9,
      "irid": 0.45,
      "filmIor": 2.4,
@@ -1107,42 +1334,80 @@
    {
     "role": "environment",
     "target": "env/sky/zenithColor",
-    "gain": 0.6
-   },
-   {
-    "role": "environment",
-    "target": "env/sky/groundColor",
-    "gain": 0.7
-   },
-   {
-    "role": "environment",
-    "target": "env/sky/horizonColor",
-    "gain": 1.0
-   },
-   {
-    "role": "environment",
-    "target": "scene/fogColor",
     "gain": 1.0
    },
    {
     "role": "shadow",
+    "target": "env/sky/groundColor",
+    "gain": 1.0
+   },
+   {
+    "role": "shadow",
+    "target": "env/sky/horizonColor",
+    "gain": 2.8
+   },
+   {
+    "role": "environment",
+    "target": "scene/fogColor",
+    "gain": 1.6
+   },
+   {
+    "role": "resonant",
+    "target": "env/sky/sunColor",
+    "gain": 1.0
+   },
+   {
+    "role": "fillLight",
     "target": "lights/fill/color"
    },
    {
-    "role": "base",
-    "target": "material/rsSilk/op/8/constant/constant"
+    "role": "g0",
+    "target": "material/rsSilk/op/14/oklabRamp/constant"
    },
    {
-    "role": "fold",
-    "target": "material/rsSilk/op/9/constant/constant"
+    "role": "g1",
+    "target": "material/rsSilk/op/14/oklabRamp/constant2"
+   },
+   {
+    "role": "g2",
+    "target": "material/rsSilk/op/14/oklabRamp/constant3"
+   },
+   {
+    "role": "g3",
+    "target": "material/rsSilk/op/14/oklabRamp/constant4"
    },
    {
     "role": "grazing",
     "target": "lights/key/color"
    },
    {
+    "role": "g1",
+    "target": "procedural/drapeAbove/material/baseColor",
+    "gain": 0.8
+   },
+   {
+    "role": "g2",
+    "target": "procedural/drapeBelow/material/baseColor",
+    "gain": 0.8
+   },
+   {
+    "role": "fold",
+    "target": "material/rsSilk/op/16/ramp/constant2",
+    "gain": 0.175
+   },
+   {
+    "role": "fold",
+    "target": "material/rsSilk/op/16/ramp/constant3",
+    "gain": 0.35
+   },
+   {
     "role": "grazing",
-    "target": "material/rsSilk/op/5/constant/constant",
+    "target": "material/rsSilk/op/5/ramp/constant2",
+    "gain": 0.45
+   },
+   {
+    "role": "grazing",
+    "target": "material/rsSilk/op/5/ramp/constant3",
     "gain": 0.9
    },
    {
@@ -1151,8 +1416,13 @@
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/25/constant/constant",
+    "target": "material/rsSilk/op/25/ramp/constant",
     "gain": 0.5
+   },
+   {
+    "role": "peak",
+    "target": "material/rsSilk/op/25/ramp/constant2",
+    "gain": 0.375
    },
    {
     "role": "rough",
@@ -1169,12 +1439,17 @@
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/5/constant/constant",
+    "target": "material/rsSilk/op/5/ramp/constant2",
+    "mode": "multiply"
+   },
+   {
+    "role": "emit",
+    "target": "material/rsSilk/op/5/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "irid",
-    "target": "material/rsSilk/op/16/constant/constant",
+    "target": "material/rsSilk/op/21/constant/constant",
     "mode": "multiply"
    },
    {
@@ -1191,21 +1466,31 @@
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/25/constant/constant",
+    "target": "material/rsSilk/op/25/ramp/constant",
     "mode": "multiply"
    },
    {
-    "role": "foldContrast",
-    "target": "material/rsSilk/op/10/constant/constant",
+    "role": "emit",
+    "target": "material/rsSilk/op/25/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/32/constant/constant"
+    "target": "material/rsSilk/op/31/ramp/constant2",
+    "gain": 0.5
+   },
+   {
+    "role": "peak",
+    "target": "material/rsSilk/op/31/ramp/constant3"
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/39/constant/constant"
+    "target": "material/rsSilk/op/37/ramp/constant2",
+    "gain": 0.5
+   },
+   {
+    "role": "resonant",
+    "target": "material/rsSilk/op/37/ramp/constant3"
    }
   ],
   "position": 0.0,

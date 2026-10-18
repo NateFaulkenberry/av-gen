@@ -776,6 +776,20 @@ TEST_CASE("ADR-036 ops match the CPU interpreter", "[material][gpu]") {
         o.constant = {0.25f, 0.0f, -0.5f, 0.0f};
         batch.push_back(probe("quantize", {inputOp(MaterialInput::WorldPosition, 0), o}));
     }
+    {
+        // ADR-1470: four stops in OKLab, clamped and cyclic, driven across and past [0, 1] by the world position's x
+        // (the contexts span about -3.5 .. 3.5 m), against the CPU twin. The stops are saturated and far apart in
+        // hue so a linear-RGB shortcut on either side would show.
+        MaterialOp o = op(MaterialOpKind::OklabRamp, 7, 0);
+        o.constant = {0.02f, 0.03f, 0.35f, 1.0f};
+        o.constant2 = {0.25f, 0.02f, 0.60f, 0.8f};
+        o.constant3 = {0.90f, 0.05f, 0.40f, 0.6f};
+        o.constant4 = {0.05f, 0.80f, 0.90f, 0.2f};
+        batch.push_back(probe("oklabRamp", {inputOp(MaterialInput::WorldPosition, 0), o}));
+        MaterialOp cyclic = o;
+        cyclic.value = -1.0f;
+        batch.push_back(probe("oklabRampCyclic", {inputOp(MaterialInput::WorldPosition, 0), cyclic}));
+    }
     checkParity(harness, batch, noFields, 0.0, 1e-3f);
     CHECK(ctx->errorCount() == 0);
 }

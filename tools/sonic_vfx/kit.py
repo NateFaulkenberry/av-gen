@@ -52,6 +52,46 @@ def mix(a, b, t):
     return [round(x + (y - x) * t, 5) for x, y in zip(a, b)]
 
 
+# OKLab (Ottosson), linear RGB in and out: the space the engine blends palettes (ADR-1043) and gradients (ADR-1470) in
+def oklab(c):
+    l = 0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]
+    m = 0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]
+    s_ = 0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]
+    l, m, s_ = (max(v, 0.0) ** (1.0 / 3.0) for v in (l, m, s_))
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s_,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s_,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s_]
+
+
+def oklab_linear(lab):
+    l = lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2]
+    m = lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2]
+    s_ = lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2]
+    l, m, s_ = l ** 3, m ** 3, s_ ** 3
+    return [max(0.0, 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s_),
+            max(0.0, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s_),
+            max(0.0, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s_)]
+
+
+def mix_oklab(a, b, t):
+    la, lb = oklab(a), oklab(b)
+    return oklab_linear([x + (y - x) * t for x, y in zip(la, lb)])
+
+
+def oklch(L, C, hue_deg):
+    """An OKLCH colour (lightness, chroma, hue in degrees) as linear RGB."""
+    import math
+    a = math.radians(hue_deg)
+    return oklab_linear([L, C * math.cos(a), C * math.sin(a)])
+
+
+def lch_of(c):
+    """Linear RGB -> (L, C, hue in degrees)."""
+    import math
+    L, a, b = oklab(c)
+    return L, math.hypot(a, b), math.degrees(math.atan2(b, a)) % 360.0
+
+
 def scale3(a, s):
     return [round(x * s, 5) for x in a]
 

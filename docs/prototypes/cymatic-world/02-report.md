@@ -256,3 +256,27 @@ Each step has its own brief and report in this folder.
 Decision records added since section 8: ADR-1403 to ADR-1409 and ADR-1421 (with ADR-1420 and ADR-1363 from the
 shared work). `docs/resonance-field.md` documents the new members.
 
+## 11. The quality pass (2026-10-17, `art/resonator-quality`)
+
+The owner's quality brief and colour-field addendum: `docs/prototypes/resonator-quality/` (`00-brief.md`,
+`02-addendum-procedural-color-fields.md`, report `01-report.md`).
+
+- **Colour.**
+  - The ground's pigment is a four-stop OKLab gradient (ADR-1470, `oklabRamp`) between ten per-palette gradient
+    roles (`GRADIENTS`, OKLCH stops).
+  - Its coordinate: the large figure's signed F, a broad world band whose phase integrates the music (never
+    resets), and a ridge shift.
+  - The key and ambient floor lean to white so they no longer re-tint every hue. The floor goes from 0.07 to 0.6,
+    the key from 2.3 to 1.6, and the hollow floors keep 35%.
+  - The crest line, sheen and travelling light are calmer.
+  - The view layer (J, E) is gone; those palettes carry oil and metal in their gradients.
+  - 41 ops (from 43).
+- **Routes.** The bass and sustain colour routes named the field op instead of its remap and never bound. They now
+  drive the field's gain and the band's phase, and the scene loads with 0 warnings.
+- **Geometry.** The serrated lips were the square grid's alternating diagonals on near-vertical walls, seen through
+  the sand masks; not the field, the bake or the normals. The ground is now an offset-lattice triangulation at the
+  same vertex count (`hex_ground_mesh`, `CW_MESH_HEX=0` for the old grid).
+- **Build switches added:**
+  - `CW_OUT` (a look-development copy, no index entry);
+  - `CW_DEBUG=normals|wire` (geometry views);
+  - the colour-field knobs (`CW_BAND_*`, `CW_RIDGE_SHIFT`, `CW_FLOOR_MIN`, `CW_TINT_GAIN`, `CW_LIGHT_WHITE`).

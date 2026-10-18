@@ -564,3 +564,87 @@ TEST_CASE("A source's drive rings its own modes without the music (a coupling's 
         }
     }
 }
+
+// ADR-1471: a plate source's mode is a square plate's figure, cos(n pi u) cos(m pi v) - cos(m pi u) cos(n pi v), drawn as
+// four signed plane waves of the bank's wavenumber; the source kind, its `plates`, validation and the JSON; and a spec
+// with no plate writes and hashes exactly as before.
+TEST_CASE("A plate mode is the square plate's (n, m) figure, normalised; plates round-trip", "[unit][resonance][adr1471]") {
+    const float pi = 3.14159265f;
+    const float L = 20.0f;
+    for (const auto nm : {std::array<int, 2>{3, 2}, std::array<int, 2>{5, 1}, std::array<int, 2>{2, 1}}) {
+        const float n = static_cast<float>(nm[0]);
+        const float m = static_cast<float>(nm[1]);
+        spatial::ResonanceMode plate;
+        const float theta = 0.3f;
+        plate.shape = glm::vec4(pi * std::sqrt(n * n + m * m) / L, std::atan2(m, n), theta, 3.0f);
+        double sum2 = 0.0;
+        int count = 0;
+        for (int i = 0; i < 160; ++i) {
+            for (int j = 0; j < 160; ++j) {
+                const glm::vec3 q(0.53f * i - 40.0f, 2.0f, 0.47f * j - 37.0f);
+                const float u = q.x * std::cos(theta) + q.z * std::sin(theta);
+                const float v = -q.x * std::sin(theta) + q.z * std::cos(theta);
+                const float want = 1.41421356f * (std::cos(n * pi * u / L) * std::cos(m * pi * v / L) -
+                                                  std::cos(m * pi * u / L) * std::cos(n * pi * v / L));
+                float e2 = -1.0f;
+                const float got = spatial::resonanceModeShape(plate, q, &e2);
+                REQUIRE(std::abs(got - want) < 2e-4f);
+                CHECK(e2 == 1.0f);
+                sum2 += static_cast<double>(got) * got;
+                ++count;
+            }
+        }
+        CHECK(sum2 / count == Approx(1.0).margin(0.15)); // mean square ~1, as the sand normalisation assumes
+    }
+    // A plate is not a ripple: a reader of the ripples alone does not hear it (ADR-1409 rows).
+    CHECK_FALSE(spatial::resonanceRowHeard(spatial::ResonanceRows::Ripples, 3.0f));
+    CHECK(spatial::resonanceRowHeard(spatial::ResonanceRows::Modes, 3.0f));
+    CHECK(spatial::resonanceRowHeard(spatial::ResonanceRows::Ripples, 2.0f));
+
+    // The source: its modes take their (n, m) from `plates`, cycled along u; JSON, hash and validation.
+    auto f = resonator(6.0f);
+    spatial::ResonanceSource src;
+    src.kind = spatial::ResonanceSourceKind::Plate;
+    src.plates = {{3, 2}, {5, 1}};
+    f.resonance.sources = {src};
+    REQUIRE(f.validate().has_value());
+    const nlohmann::json j = f.toJson();
+    CHECK(j["resonance"]["sources"][0]["kind"] == "plate");
+    CHECK(j["resonance"]["sources"][0]["plates"] == nlohmann::json::array({nlohmann::json::array({3, 2}),
+                                                                           nlohmann::json::array({5, 1})}));
+    auto back = spatial::FieldSpec::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->resonance.sources == f.resonance.sources);
+    CHECK(back->structuralHash() == f.structuralHash());
+    auto other = f;
+    other.resonance.sources[0].plates = {{4, 3}};
+    CHECK(other.structuralHash() != f.structuralHash());
+    auto bad = f;
+    bad.resonance.sources[0].plates = {{2, 2}}; // (n, n) is zero
+    CHECK_FALSE(bad.validate().has_value());
+    bad.resonance.sources[0].plates = {};
+    CHECK_FALSE(bad.validate().has_value());
+    bad.resonance.sources[0].plates = {{9, 1}};
+    CHECK_FALSE(bad.validate().has_value());
+    bad.resonance.sources[0].plates = {{3, 0}};
+    CHECK_FALSE(bad.validate().has_value());
+    nlohmann::json malformed = j;
+    malformed["resonance"]["sources"][0]["plates"] = nlohmann::json::array({3, 2});
+    CHECK_FALSE(spatial::FieldSpec::fromJson(malformed).has_value());
+
+    spatial::FieldSet set;
+    set.fields.push_back(f);
+    spatial::ResonanceCache cache;
+    spatial::resolveResonance(set, cache, 1.0);
+    const auto& state = *set.fields[0].resonanceState;
+    REQUIRE(state.count >= 2);
+    CHECK(std::fmod(state.modes[0].shape.w, 4.0f) == 3.0f);
+    CHECK(state.modes[0].shape.y == Approx(std::atan2(2.0f, 3.0f)));
+    CHECK(state.modes[1].shape.y == Approx(std::atan2(1.0f, 5.0f)));
+    CHECK(state.modes[0].shape.z == state.modes[1].shape.z); // one orientation per source (a plate turns as one)
+
+    // A source without plates writes no "plates" key, so an existing scene's JSON and hash are unchanged.
+    auto plain = resonator(6.0f);
+    plain.resonance.sources = {spatial::ResonanceSource{spatial::ResonanceSourceKind::Lattice, {0.0f, 0.0f, 0.0f}, 3}};
+    CHECK_FALSE(plain.toJson()["resonance"]["sources"][0].contains("plates"));
+}
