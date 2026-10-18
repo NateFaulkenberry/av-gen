@@ -100,7 +100,7 @@ CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fas
 # fold (offsets in degrees), at a common lightness and a stronger chroma than the roles' -- the silk's pigment shows
 # between its highlights -- and blended in OKLab by the ramp. The accent stays in the light, never in the ramp.
 SILK_L = (0.42, 0.5, 0.56, 0.47)
-SILK_CHROMA = 1.5
+SILK_CHROMA = 2.0
 SILK_TURN = (-16.0, 0.0, 28.0, -40.0)
 
 
@@ -110,10 +110,10 @@ def gradient_roles(cols):
     _, cf, hf = kit.lch_of(lin["fold"])
     _, cr, hr = kit.lch_of(lin["resonant"])
     stops = [(cb, hb + SILK_TURN[0]), (cf, hf), (cr, hr + SILK_TURN[2]), (max(cb, cf), hb + SILK_TURN[3])]
-    out = {"g%d" % i: [round(v, 5) for v in kit.oklch(SILK_L[i], min(c * SILK_CHROMA, 0.2), h)]
+    out = {"g%d" % i: [round(v, 5) for v in kit.oklch(SILK_L[i], min(c * SILK_CHROMA, 0.26), h)]
            for i, (c, h) in enumerate(stops)}
     # the camera-side fill: the base colour lifted halfway to white (the shadow role was near black: no fill at all)
-    out["fillLight"] = [round(v, 5) for v in kit.mix_oklab(lin["fold"], [1.0, 1.0, 1.0], 0.45)]
+    out["fillLight"] = [round(v, 5) for v in kit.mix_oklab(lin["fold"], [1.0, 1.0, 1.0], 0.2)]
     return out
 
 
@@ -525,8 +525,8 @@ def palette_block(g):
         # the void has colour (the overhaul, stage B): the sky's horizon in the shadow role, lifted, so the space behind
         # the drapes is a deep coloured gradient, never black
         {"role": "environment", "target": "env/sky/zenithColor", "gain": 1.0},
-        {"role": "shadow", "target": "env/sky/groundColor", "gain": 1.5},
-        {"role": "shadow", "target": "env/sky/horizonColor", "gain": 2.2},
+        {"role": "shadow", "target": "env/sky/groundColor", "gain": 1.0},
+        {"role": "shadow", "target": "env/sky/horizonColor", "gain": 2.8},
         {"role": "environment", "target": "scene/fogColor", "gain": 1.6},
         {"role": "resonant", "target": "env/sky/sunColor", "gain": 1.0},
         {"role": "fillLight", "target": "lights/fill/color"},
@@ -582,7 +582,7 @@ BANDS = {"phase": 0.0, "rotation": 0.0, "gain": float(os.environ.get("RS_BANDS_G
 SILK_FOG = float(os.environ.get("RS_FOG", "0.0013"))
 SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
 METALLIC = float(os.environ.get("RS_METALLIC", "0.05"))
-SHEEN = float(os.environ.get("RS_SHEEN", "0.5"))
+SHEEN = float(os.environ.get("RS_SHEEN", "0.35"))
 KEY_SCALE = float(os.environ.get("RS_KEY_SCALE", "0.7"))   # stage C: the narrow key's streaks back, the fill and sheen carry
 ROUGH_ADD = float(os.environ.get("RS_ROUGH_ADD", "0.1"))   # stage C: broader, softer highlights (satin, not chrome)   # was 0.35: a metal's diffuse loss darkened the pigment
 SILK_LEN = float(os.environ.get("RS_SILK_LEN", "1.6"))

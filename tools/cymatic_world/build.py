@@ -695,7 +695,7 @@ def _hue(c):  # a light's colour: the hue and saturation, at unit peak (its op's
 # worlds rather than three pinks.
 PALETTE_TUNE = {
     # enormous dark forms, cool spectral highlights: the darkest, an ultramarine-tinted key, crests bright
-    "Abyssal Resonance": {"alb": 0.6, "keySrc": "resonant", "keyMix": 0.15, "key": 0.75, "sky": 0.6, "hollow": 0.8,
+    "Abyssal Resonance": {"alb": 1.05, "keySrc": "resonant", "keyMix": 0.15, "key": 1.15, "sky": 0.8, "hollow": 0.8,
                           "line": 1.1, "gritMix": 0.5},
     # dark indigo-violet sculpture; red ONLY on the ridges: a violet key and fill, violet grit, the red in the
     # crest lines and the travelling light, the magenta glow held low
@@ -730,7 +730,7 @@ PALETTE_TUNE = {
 # the strongest lobes end up. Display colours, scaled to albedo like the roles (PAL_ALBEDO).
 GRADIENTS = {
     # indigo -> cobalt -> violet -> a narrow fuchsia (the crest lines keep the icy cyan)
-    "Abyssal Resonance":      [(0.36, 0.15, 272), (0.50, 0.18, 250), (0.56, 0.21, 305), (0.66, 0.21, 345)],
+    "Abyssal Resonance":      [(0.36, 0.15, 272), (0.50, 0.18, 250), (0.58, 0.22, 308), (0.68, 0.25, 348)],
     # indigo-violet sculpture, plum, and the red only where the gradient ends (ridges, the hottest lobes)
     "Crimson Singularity":    [(0.32, 0.13, 300), (0.38, 0.16, 322), (0.44, 0.18, 350), (0.54, 0.20, 18)],
     "Molten Glass":           [(0.40, 0.12, 26), (0.50, 0.15, 38), (0.60, 0.17, 52), (0.72, 0.15, 74)],
