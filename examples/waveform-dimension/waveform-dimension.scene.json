@@ -514,7 +514,7 @@
     "bandLow": 0.02,
     "bandHigh": 0.12,
     "audioSpeed": 30.0,
-    "audioSmooth": 0.0,
+    "audioSmooth": 0.06,
     "point": [
      -170.0,
      30.0,
@@ -567,81 +567,6 @@
     "children": [
      "swellHist",
      "swellCarrier"
-    ],
-    "combine": "multiply",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "crossHist",
-   "kind": "field",
-   "position": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "field": {
-    "kind": "spectrum",
-    "audioBand": "range",
-    "bandLow": 0.3,
-    "bandHigh": 0.4,
-    "audioSpeed": 40.0,
-    "audioSmooth": 0.0,
-    "point": [
-     160.0,
-     -30.0,
-     120.0
-    ],
-    "waveGeometry": "spherical",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "crossCarrier",
-   "kind": "field",
-   "position": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "field": {
-    "kind": "wave",
-    "waveGeometry": "spherical",
-    "waveShape": "sine",
-    "point": [
-     160.0,
-     -30.0,
-     120.0
-    ],
-    "wavelength": 30.0,
-    "waveSpeed": 40.0,
-    "waveWidth": 0.0,
-    "amplitude": 1.0,
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
-   "name": "cross",
-   "kind": "field",
-   "position": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "field": {
-    "kind": "compound",
-    "children": [
-     "crossHist",
-     "crossCarrier"
     ],
     "combine": "multiply",
     "strength": 1.0,
@@ -710,14 +635,7 @@
      {
       "kind": "field",
       "field": "swell",
-      "amount": 5.0,
-      "space": "world",
-      "alongNormal": true
-     },
-     {
-      "kind": "field",
-      "field": "cross",
-      "amount": 2.5,
+      "amount": 3.5,
       "space": "world",
       "alongNormal": true
      }
@@ -785,14 +703,7 @@
      {
       "kind": "field",
       "field": "swell",
-      "amount": 5.0,
-      "space": "world",
-      "alongNormal": true
-     },
-     {
-      "kind": "field",
-      "field": "cross",
-      "amount": 2.5,
+      "amount": 3.5,
       "space": "world",
       "alongNormal": true
      }
@@ -860,14 +771,7 @@
      {
       "kind": "field",
       "field": "swell",
-      "amount": 5.0,
-      "space": "world",
-      "alongNormal": true
-     },
-     {
-      "kind": "field",
-      "field": "cross",
-      "amount": 2.5,
+      "amount": 3.5,
       "space": "world",
       "alongNormal": true
      }
@@ -935,14 +839,7 @@
      {
       "kind": "field",
       "field": "swell",
-      "amount": 5.0,
-      "space": "world",
-      "alongNormal": true
-     },
-     {
-      "kind": "field",
-      "field": "cross",
-      "amount": 2.5,
+      "amount": 3.5,
       "space": "world",
       "alongNormal": true
      }

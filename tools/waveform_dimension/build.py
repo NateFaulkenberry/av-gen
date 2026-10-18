@@ -357,12 +357,12 @@ FRONT_RELIEF = 7.0
 # the travelling fronts: name -> (source point, band, speed m/s, carrier wavelength m, smoothing s) and their relief
 # (sources just beyond the sheets' bound: the GPU's audio ring holds 16 s, so the far side of the sculpture must be
 # reached in less -- at 300 m / 30 m/s a source 320 m out sampled history the ring no longer had: a constant)
-# (no smoothing taps and narrow bands: the spectrum is read per vertex, in both geometry passes and at four points for
-# the normal -- 12 taps over 14 bins cost ~35 ms at High; the carrier's own shape is smooth enough)
-FRONTS = {"swell": ((-170.0, 30.0, -110.0), (0.02, 0.12), 30.0, 52.0, 0.0),
-          "cross": ((160.0, -30.0, 120.0), (0.3, 0.4), 40.0, 30.0, 0.0)}
-SWELL_RELIEF = float(os.environ.get("WD_SWELL", "5.0"))
-CROSS_RELIEF = float(os.environ.get("WD_CROSS", "2.5"))   # metres a kick's shell lifts the sheets it passes through
+# (few smoothing taps and narrow bands: the spectrum is read per vertex, in both geometry passes and at four points for
+# the normal -- 12 taps over 14 bins cost ~35 ms at High; with none, the history's row jitter crumpled the sheets)
+FRONTS = {"swell": ((-170.0, 30.0, -110.0), (0.02, 0.12), 30.0, 52.0, 0.06),
+          }   # (a second, mid-band front from the other side was cut for the live budget: ~6 ms per front at High)
+SWELL_RELIEF = float(os.environ.get("WD_SWELL", "3.5"))
+CROSS_RELIEF = float(os.environ.get("WD_CROSS", "1.2"))   # metres a kick's shell lifts the sheets it passes through
 B_RELIEF = 0.6       # metres per unit of the mids' bands
 SPREAD = 3.2         # metres per unit of bass that each sheet moves away from the nest's middle sheet (spacing)
 
@@ -379,8 +379,7 @@ def deformers():
             # THE TRAVELLING FRONTS (Resonant Visual Worlds, 05-plan §1.3, W1): the music of the last seconds laid out
             # in space as two families of spherical swells from sources far outside the sculpture, crossing it from
             # different sides -- a broad bass swell and a quicker mid one -- so the primary event is propagation
-            {"kind": "field", "field": "swell", "amount": SWELL_RELIEF, "space": "world", "alongNormal": True},
-            {"kind": "field", "field": "cross", "amount": CROSS_RELIEF, "space": "world", "alongNormal": True}]
+            {"kind": "field", "field": "swell", "amount": SWELL_RELIEF, "space": "world", "alongNormal": True}]
 
 
 # THE DOME (Resonant Visual Worlds, 05-plan §1.3, E1): the world beyond the sculpture is the same wave logic at a larger
