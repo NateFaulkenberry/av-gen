@@ -352,15 +352,15 @@ def sheets_for(comp):
             points=[(-320, 10, -380), (-160, 70, -470), (0, 95, -520), (150, 130, -500), (300, 200, -430)],
             roll=[(0.0, 1.1), (0.5, 1.45), (1.0, 1.9)], span=[(0.0, 60.0), (0.5, 105.0), (1.0, 75.0)],
             cloth=[(0.0, 85.0), (0.5, 140.0), (1.0, 100.0)], billow=[(0.0, 10.0), (0.5, 28.0), (1.0, 14.0)],
-            pleats=[(3.0, 0.9), (7.0, 0.2)], pleat_wander=1.0, nu=110, nv=30, seed=31, music=False)
+            pleats=[(3.0, 0.9), (7.0, 0.2)], pleat_wander=1.0, nu=64, nv=16, seed=31, music=False)
         far_below = SheetSpec(
             "drapeBelow",
             points=[(-300, -190, -360), (-150, -130, -440), (10, -105, -490), (170, -60, -470), (320, 10, -400)],
             roll=[(0.0, 1.6), (0.5, 1.3), (1.0, 1.0)], span=[(0.0, 55.0), (0.5, 95.0), (1.0, 70.0)],
             cloth=[(0.0, 80.0), (0.5, 128.0), (1.0, 95.0)], billow=[(0.0, -12.0), (0.5, -24.0), (1.0, -10.0)],
-            pleats=[(3.0, 0.9), (6.0, 0.25)], pleat_wander=1.1, nu=110, nv=30, seed=37, music=False)
+            pleats=[(3.0, 0.9), (6.0, 0.25)], pleat_wander=1.1, nu=64, nv=16, seed=37, music=False)
         cam = {"position": [4.0, 14.0, -14.0], "target": [-4.0, 4.0, -130.0], "focal": 24.0, "drift": True}
-        return [main, far_above, far_below], cam
+        return ([main, far_above, far_below] if os.environ.get("RS_DRAPES", "1") == "1" else [main]), cam
     if comp == "b":
         # THE PASSAGE: two broad sheets bow toward each other and form a curved corridor the eye travels down; they
         # touch far away, where the gathered crease is the focal light.
@@ -758,7 +758,9 @@ def sheets(s, specs, mesh_dir):
         print("%s: %d vertices, %d triangles, %.0f m long" % (spec.name, len(pos), len(idx) // 3, length))
         s.proc(spec.name, {"kind": "mesh", "asset": "meshes/rs-%s.glb" % spec.name},
                material=silk_material(spec.name) if spec.music else drape_material(), extra={"normalStep": 0.15},
-               deformers=drift_deformers() + (music_deformers() if MUSIC and spec.music else []))
+               # (the far drapes keep only the slow noise drift: their own frame of reference, at about a quarter of the
+               # hero's cost per vertex)
+               deformers=(drift_deformers() + (music_deformers() if MUSIC else [])) if spec.music else drift_deformers()[:1])
 
 
 def drift_deformers():
