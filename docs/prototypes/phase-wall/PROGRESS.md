@@ -105,3 +105,31 @@ Owner's ask: "oscillator A3-flaps looks good too - build this into a full scene,
     - Key shadows were removed (6 ms, invisible).
     - Without `--target-fps 30`, Auto targets the 60 Hz display and drops to Emergency. Stage 6 should look at this.
   - **Media:** `66-phase-wall-scene/02-colour/`.
+- **2026-10-18. Stages 3-7.** The coordinator's colour-stage notes were: islands read as mottled noise; a bright
+  blob; floor as stone is fine.
+  - **Islands:** a 1.6 m cell, coupling radius 3, spread 0.17, noise 0.02, tilt 0.006, after A/B matrices of cell,
+    radius, spread and tilt.
+    - Radius 4 on 19 rows coupled the whole height and drew vertical stripes.
+    - Spread 0.12 locked the room.
+  - **Seams:**
+    - activity 0.2-0.5, squared;
+    - the front glow is gated by a breath track (0.12 in disorder, 1.0 from the islands on), so disorder no longer
+      floods the walls;
+    - the "blob" was the defect core and peak glow, which is now narrower.
+  - **Camera:** the promenade, 8 oblique and off-axis keys over 120 s.
+  - **Audio and MIDI:** the routes in `03-report.md`; held sound is +3 K (+6 locked the hall on Feline).
+  - **Index:** "Phase Hall" (Experiments, live).
+  - **Performance:**
+    - depth prepass, 30.0 → 23.2 ms headless Ultra;
+    - the bevel swapped for a program edge highlight (live misses 7 → 1);
+    - live at High: GPU 16-17 ms; misses 1 (Feline), 1 (Trench), 5 (Hyperborea).
+  - **Sweep:** 0 fails on Aurora.
+  - **Media:** `03-final/`.
+  - **Removed:** `tools/phase_wall/proof.py`.
+- **2026-10-18. Final checks on a4973dce, all exit 0:**
+  - cpu-assets 4318 passed / 4338;
+  - gpu 670 passed / 671;
+  - review_examples "Phase Hall" ok;
+  - integrity 0 problems.
+
+  Status: **complete; the coordinator merges.** Report: `03-report.md`.

@@ -339,4 +339,8 @@ removed. Coordinate at merge, since `proto/generative-rd` owns that entry.
 
 ## Status
 
-**Stage 0 complete. Paused for the coordinator's review before Stage 1.**
+Stages 0-7 complete (2026-10-18). The outcome and its weaknesses are in `03-report.md`. Departures from this plan, made during the build:
+- **cell:** 1.6 m with radius 3, spread 0.17 and tilt 0.006, after the coordinator's "mottled" note;
+- **bevel:** replaced by a program edge highlight, for performance;
+- **floor:** unlit, carrying the walls' colour;
+- **index name:** "Phase Hall".
