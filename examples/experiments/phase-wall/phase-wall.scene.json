@@ -1,0 +1,3619 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "phase-wall",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -15.0,
+   6.0,
+   42.0
+  ],
+  "target": [
+   24.0,
+   13.0,
+   4.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.05,
+  "background": [
+   0.00182,
+   0.00651,
+   0.0075
+  ],
+  "fogColor": [
+   0.00182,
+   0.00651,
+   0.0075
+  ],
+  "volumeDensity": 0.0,
+  "fogSky": 0.0,
+  "fogHeight": 400.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 160.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "depthPrepass": true,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00182,
+    0.00651,
+    0.0075
+   ],
+   "horizonColor": [
+    0.00182,
+    0.00651,
+    0.0075
+   ],
+   "groundColor": [
+    0.00182,
+    0.00651,
+    0.0075
+   ],
+   "haze": 1.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  },
+  "bands": {
+   "phase": 0.0,
+   "rotation": 0.0,
+   "gain": 1.0,
+   "softbox": {
+    "intensity": 0.0,
+    "azimuth": 0.6,
+    "elevation": 0.7,
+    "falloff": 2.6,
+    "skyFill": 0.0
+   },
+   "strips": [
+    {
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "offset": 0.0,
+     "width": 0.12,
+     "intensity": 2.0,
+     "segments": 0,
+     "warmth": 0.7,
+     "rate": 0.0
+    },
+    {
+     "axis": [
+      0.7071067811865476,
+      0.0,
+      0.7071067811865475
+     ],
+     "offset": 0.0,
+     "width": 0.12,
+     "intensity": 2.0,
+     "segments": 0,
+     "warmth": 0.5499999999999999,
+     "rate": 0.0
+    },
+    {
+     "axis": [
+      6.123233995736766e-17,
+      0.0,
+      1.0
+     ],
+     "offset": 0.0,
+     "width": 0.12,
+     "intensity": 2.0,
+     "segments": 0,
+     "warmth": 0.39999999999999997,
+     "rate": 0.0
+    },
+    {
+     "axis": [
+      -0.7071067811865475,
+      0.0,
+      0.7071067811865476
+     ],
+     "offset": 0.0,
+     "width": 0.12,
+     "intensity": 2.0,
+     "segments": 0,
+     "warmth": 0.25,
+     "rate": 0.0
+    }
+   ]
+  }
+ },
+ "nodes": [
+  {
+   "name": "tilt",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.006,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "wave",
+    "waveGeometry": "planar",
+    "waveShape": "sine",
+    "axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "point": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "wavelength": 352.0,
+    "waveSpeed": 0.0,
+    "waveWidth": 0.0,
+    "amplitude": 1.0
+   }
+  },
+  {
+   "name": "ph_west",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -24.0,
+     15.0,
+     -112.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 1,
+    "rotation": [
+     -90.0,
+     90.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "act_west",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -24.0,
+     15.0,
+     -112.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 3,
+    "rotation": [
+     -90.0,
+     90.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "blades_west",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.745,
+      1.585,
+      0.04
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      165,
+      18,
+      1
+     ],
+     "gridSpacing": [
+      0.75,
+      1.6,
+      1.0
+     ]
+    },
+    "material": {
+     "program": "blade_west",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.36,
+     "metallic": 0.55
+    },
+    "effectors": [
+     {
+      "field": "ph_west",
+      "op": "rotation",
+      "blend": "add",
+      "strength": 1.0,
+      "axis": [
+       0,
+       1,
+       0
+      ]
+     },
+     {
+      "field": "act_west",
+      "op": "emission",
+      "blend": "replace",
+      "strength": 1.0
+     }
+    ],
+    "variation": {
+     "seed": 11,
+     "randomRotation": [
+      0.0,
+      0.05,
+      0.0
+     ]
+    },
+    "materialVariation": {
+     "valueRandom": 0.08
+    }
+   },
+   "position": [
+    -24.0,
+    15.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ]
+  },
+  {
+   "name": "back_west",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      128.0,
+      32.0,
+      0.4
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.00334,
+      0.06359,
+      0.08188
+     ],
+     "emissiveIntensity": 1.0
+    }
+   },
+   "position": [
+    -24.9,
+    15.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ]
+  },
+  {
+   "name": "ph_north",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     24.0,
+     15.0,
+     -64.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 1,
+    "rotation": [
+     -90.0,
+     -0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "act_north",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     24.0,
+     15.0,
+     -64.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 3,
+    "rotation": [
+     -90.0,
+     -0.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "blades_north",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.745,
+      1.585,
+      0.04
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      59,
+      18,
+      1
+     ],
+     "gridSpacing": [
+      0.75,
+      1.6,
+      1.0
+     ]
+    },
+    "material": {
+     "program": "blade_north",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.36,
+     "metallic": 0.55
+    },
+    "effectors": [
+     {
+      "field": "ph_north",
+      "op": "rotation",
+      "blend": "add",
+      "strength": 1.0,
+      "axis": [
+       0,
+       1,
+       0
+      ]
+     },
+     {
+      "field": "act_north",
+      "op": "emission",
+      "blend": "replace",
+      "strength": 1.0
+     }
+    ],
+    "variation": {
+     "seed": 11,
+     "randomRotation": [
+      0.0,
+      0.05,
+      0.0
+     ]
+    },
+    "materialVariation": {
+     "valueRandom": 0.08
+    }
+   },
+   "position": [
+    0.0,
+    15.0,
+    -64.0
+   ],
+   "rotation": [
+    0.0,
+    -0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "back_north",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      48.0,
+      32.0,
+      0.4
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.00334,
+      0.06359,
+      0.08188
+     ],
+     "emissiveIntensity": 1.0
+    }
+   },
+   "position": [
+    0.0,
+    15.0,
+    -64.9
+   ],
+   "rotation": [
+    0.0,
+    -0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "ph_east",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     24.0,
+     15.0,
+     -64.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 1,
+    "rotation": [
+     -90.0,
+     -90.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "act_east",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     24.0,
+     15.0,
+     -64.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 3,
+    "rotation": [
+     -90.0,
+     -90.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "blades_east",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.745,
+      1.585,
+      0.04
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      165,
+      18,
+      1
+     ],
+     "gridSpacing": [
+      0.75,
+      1.6,
+      1.0
+     ]
+    },
+    "material": {
+     "program": "blade_east",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.36,
+     "metallic": 0.55
+    },
+    "effectors": [
+     {
+      "field": "ph_east",
+      "op": "rotation",
+      "blend": "add",
+      "strength": 1.0,
+      "axis": [
+       0,
+       1,
+       0
+      ]
+     },
+     {
+      "field": "act_east",
+      "op": "emission",
+      "blend": "replace",
+      "strength": 1.0
+     }
+    ],
+    "variation": {
+     "seed": 11,
+     "randomRotation": [
+      0.0,
+      0.05,
+      0.0
+     ]
+    },
+    "materialVariation": {
+     "valueRandom": 0.08
+    }
+   },
+   "position": [
+    24.0,
+    15.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ]
+  },
+  {
+   "name": "back_east",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      128.0,
+      32.0,
+      0.4
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.00334,
+      0.06359,
+      0.08188
+     ],
+     "emissiveIntensity": 1.0
+    }
+   },
+   "position": [
+    24.9,
+    15.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ]
+  },
+  {
+   "name": "ph_south",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     152.0,
+     15.0,
+     64.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 1,
+    "rotation": [
+     -90.0,
+     -180.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "act_south",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     152.0,
+     15.0,
+     64.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 3,
+    "rotation": [
+     -90.0,
+     -180.0,
+     0.0
+    ]
+   }
+  },
+  {
+   "name": "blades_south",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.745,
+      1.585,
+      0.04
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      59,
+      18,
+      1
+     ],
+     "gridSpacing": [
+      0.75,
+      1.6,
+      1.0
+     ]
+    },
+    "material": {
+     "program": "blade_south",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.36,
+     "metallic": 0.55
+    },
+    "effectors": [
+     {
+      "field": "ph_south",
+      "op": "rotation",
+      "blend": "add",
+      "strength": 1.0,
+      "axis": [
+       0,
+       1,
+       0
+      ]
+     },
+     {
+      "field": "act_south",
+      "op": "emission",
+      "blend": "replace",
+      "strength": 1.0
+     }
+    ],
+    "variation": {
+     "seed": 11,
+     "randomRotation": [
+      0.0,
+      0.05,
+      0.0
+     ]
+    },
+    "materialVariation": {
+     "valueRandom": 0.08
+    }
+   },
+   "position": [
+    0.0,
+    15.0,
+    64.0
+   ],
+   "rotation": [
+    0.0,
+    -180.0,
+    0.0
+   ]
+  },
+  {
+   "name": "back_south",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      48.0,
+      32.0,
+      0.4
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.00334,
+      0.06359,
+      0.08188
+     ],
+     "emissiveIntensity": 1.0
+    }
+   },
+   "position": [
+    0.0,
+    15.0,
+    64.9
+   ],
+   "rotation": [
+    0.0,
+    -180.0,
+    0.0
+   ]
+  },
+  {
+   "name": "pier0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.2,
+      32.0,
+      3.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    -24.0,
+    15.0,
+    64.0
+   ]
+  },
+  {
+   "name": "pier1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.2,
+      32.0,
+      3.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    -24.0,
+    15.0,
+    -64.0
+   ]
+  },
+  {
+   "name": "pier2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.2,
+      32.0,
+      3.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    24.0,
+    15.0,
+    -64.0
+   ]
+  },
+  {
+   "name": "pier3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      3.2,
+      32.0,
+      3.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    24.0,
+    15.0,
+    64.0
+   ]
+  },
+  {
+   "name": "bays_w",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      32.0,
+      1.4
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      7
+     ],
+     "gridSpacing": [
+      1.0,
+      1.0,
+      16.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    -23.5,
+    15.0,
+    0.0
+   ]
+  },
+  {
+   "name": "strips_w",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.1,
+      26.0,
+      0.2
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      7
+     ],
+     "gridSpacing": [
+      1.0,
+      1.0,
+      16.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62396,
+      0.32314
+     ],
+     "emissiveIntensity": 1.6
+    }
+   },
+   "position": [
+    -22.68,
+    15.0,
+    0.0
+   ]
+  },
+  {
+   "name": "bays_e",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      32.0,
+      1.4
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      7
+     ],
+     "gridSpacing": [
+      1.0,
+      1.0,
+      16.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    23.5,
+    15.0,
+    0.0
+   ]
+  },
+  {
+   "name": "strips_e",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.1,
+      26.0,
+      0.2
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      7
+     ],
+     "gridSpacing": [
+      1.0,
+      1.0,
+      16.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0,
+     "emissiveColor": [
+      1.0,
+      0.62396,
+      0.32314
+     ],
+     "emissiveIntensity": 1.6
+    }
+   },
+   "position": [
+    22.68,
+    15.0,
+    0.0
+   ]
+  },
+  {
+   "name": "plinth_west",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      128.0,
+      0.6,
+      0.8
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    -23.9,
+    0.3,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ]
+  },
+  {
+   "name": "plinth_north",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      48.0,
+      0.6,
+      0.8
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    0.0,
+    0.3,
+    -63.9
+   ],
+   "rotation": [
+    0.0,
+    -0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "plinth_east",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      128.0,
+      0.6,
+      0.8
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    23.9,
+    0.3,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ]
+  },
+  {
+   "name": "plinth_south",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      48.0,
+      0.6,
+      0.8
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00287,
+      0.01389,
+      0.01639
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    0.0,
+    0.3,
+    63.9
+   ],
+   "rotation": [
+    0.0,
+    -180.0,
+    0.0
+   ]
+  },
+  {
+   "name": "beams_x",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      52.0,
+      2.4,
+      0.8
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      17
+     ],
+     "gridSpacing": [
+      1,
+      1,
+      8.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00546,
+      0.01954,
+      0.0225
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    0.0,
+    29.8,
+    0.0
+   ]
+  },
+  {
+   "name": "beams_z",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8,
+      2.4,
+      132.0
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      5,
+      1,
+      1
+     ],
+     "gridSpacing": [
+      12.0,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.00546,
+      0.01954,
+      0.0225
+     ],
+     "roughness": 0.85,
+     "metallic": 0.0
+    }
+   },
+   "position": [
+    0.0,
+    29.8,
+    0.0
+   ]
+  },
+  {
+   "name": "ceiling",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      52.0,
+      1.0,
+      132.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.00091,
+      0.00326,
+      0.00375
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "emissiveColor": [
+      0.00546,
+      0.01954,
+      0.0225
+     ],
+     "emissiveIntensity": 1.0
+    }
+   },
+   "position": [
+    0.0,
+    31.5,
+    0.0
+   ]
+  },
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      56.0,
+      1.0,
+      136.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "floorLacquer",
+     "baseColor": [
+      0.00478,
+      0.02315,
+      0.02732
+     ],
+     "roughness": 0.5,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   },
+   "position": [
+    0.0,
+    -0.5,
+    0.0
+   ]
+  },
+  {
+   "name": "inlay_z",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.12,
+      0.02,
+      128.0
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      5,
+      1,
+      1
+     ],
+     "gridSpacing": [
+      8.0,
+      1,
+      1
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.15,
+      0.09359,
+      0.04847
+     ],
+     "roughness": 0.4,
+     "metallic": 1.0
+    }
+   },
+   "position": [
+    0.0,
+    0.005,
+    0.0
+   ]
+  },
+  {
+   "name": "inlay_x",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      48.0,
+      0.02,
+      0.12
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      1,
+      1,
+      7
+     ],
+     "gridSpacing": [
+      1,
+      1,
+      16.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0.15,
+      0.09359,
+      0.04847
+     ],
+     "roughness": 0.4,
+     "metallic": 1.0
+    }
+   },
+   "position": [
+    0.0,
+    0.005,
+    0.0
+   ]
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "low",
+    "audioSpeed": 14.0,
+    "onsetWidth": 3.5,
+    "onsetDecay": 0.9,
+    "point": [
+     -24.0,
+     0.0,
+     -6.0
+    ],
+    "waveGeometry": "spherical"
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "mid",
+    "audioSpeed": 22.0,
+    "onsetWidth": 2.0,
+    "onsetDecay": 1.6,
+    "point": [
+     64.0,
+     0.0,
+     5.0
+    ],
+    "waveGeometry": "spherical"
+   }
+  },
+  {
+   "name": "kicks",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "kickFront",
+     "snareFront"
+    ]
+   }
+  },
+  {
+   "name": "pace",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -34.0,
+     0.0,
+     3.0
+    ],
+    "kind": "radial",
+    "radius": 6.0
+   }
+  },
+  {
+   "name": "tune",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "tilt",
+     "pace"
+    ]
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.45,
+    -0.8,
+    -0.4
+   ],
+   "color": [
+    1.0,
+    0.69387,
+    0.43415
+   ],
+   "intensity": 1.0,
+   "castsShadow": false,
+   "contactShadow": false,
+   "softness": 0.35,
+   "diffuseOnly": true
+  },
+  {
+   "id": "wash_west",
+   "name": "wash_west",
+   "type": "directional",
+   "direction": [
+    -0.6216099682706644,
+    -0.7833269096274834,
+    -0.0
+   ],
+   "color": [
+    1.0,
+    0.69387,
+    0.43415
+   ],
+   "intensity": 2.6,
+   "castsShadow": false,
+   "contactShadow": false,
+   "diffuseOnly": true
+  },
+  {
+   "id": "wash_north",
+   "name": "wash_north",
+   "type": "directional",
+   "direction": [
+    0.0,
+    -0.7833269096274834,
+    -0.6216099682706644
+   ],
+   "color": [
+    1.0,
+    0.69387,
+    0.43415
+   ],
+   "intensity": 2.6,
+   "castsShadow": false,
+   "contactShadow": false,
+   "diffuseOnly": true
+  },
+  {
+   "id": "wash_east",
+   "name": "wash_east",
+   "type": "directional",
+   "direction": [
+    0.6216099682706644,
+    -0.7833269096274834,
+    -0.0
+   ],
+   "color": [
+    1.0,
+    0.69387,
+    0.43415
+   ],
+   "intensity": 2.6,
+   "castsShadow": false,
+   "contactShadow": false,
+   "diffuseOnly": true
+  },
+  {
+   "id": "wash_south",
+   "name": "wash_south",
+   "type": "directional",
+   "direction": [
+    0.0,
+    -0.7833269096274834,
+    0.6216099682706644
+   ],
+   "color": [
+    1.0,
+    0.69387,
+    0.43415
+   ],
+   "intensity": 2.6,
+   "castsShadow": false,
+   "contactShadow": false,
+   "diffuseOnly": true
+  },
+  {
+   "id": "bounce",
+   "name": "bounce",
+   "type": "directional",
+   "direction": [
+    0.15,
+    1.0,
+    0.1
+   ],
+   "color": [
+    0.00478,
+    0.09084,
+    0.11697
+   ],
+   "intensity": 2.5,
+   "castsShadow": false,
+   "contactShadow": false,
+   "diffuseOnly": true
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "blade_west",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "ph_west"
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
+     "constant": [
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 4,
+     "input": "instanceEmissive"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 4,
+     "constant": [
+      0.2,
+      0.5,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.10946,
+      1.21991,
+      1.00197,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.5,
+      1.4,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      2.5,
+      1.12696,
+      0.26756,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.36,
+      0.36,
+      0.36,
+      1.0
+     ]
+    },
+    {
+     "kind": "roughnessFilter",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1.0
+    }
+   ],
+   "baseColor": 1,
+   "metallic": -1,
+   "roughness": 6,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "blade_north",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "ph_north"
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
+     "constant": [
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 4,
+     "input": "instanceEmissive"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 4,
+     "constant": [
+      0.2,
+      0.5,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.10946,
+      1.21991,
+      1.00197,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.5,
+      1.4,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      2.5,
+      1.12696,
+      0.26756,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.36,
+      0.36,
+      0.36,
+      1.0
+     ]
+    },
+    {
+     "kind": "roughnessFilter",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1.0
+    }
+   ],
+   "baseColor": 1,
+   "metallic": -1,
+   "roughness": 6,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "blade_east",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "ph_east"
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
+     "constant": [
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 4,
+     "input": "instanceEmissive"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 4,
+     "constant": [
+      0.2,
+      0.5,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.10946,
+      1.21991,
+      1.00197,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.5,
+      1.4,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      2.5,
+      1.12696,
+      0.26756,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.36,
+      0.36,
+      0.36,
+      1.0
+     ]
+    },
+    {
+     "kind": "roughnessFilter",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1.0
+    }
+   ],
+   "baseColor": 1,
+   "metallic": -1,
+   "roughness": 6,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "blade_south",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "ph_south"
+    },
+    {
+     "kind": "remap",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 0,
+     "srcA": 0,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "localPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
+     "constant": [
+      1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "gradient",
+     "dst": 4,
+     "srcA": 2,
+     "constant": [
+      -1.0,
+      0.0,
+      0.0,
+      0.5
+     ],
+     "value": 1.342281879194631
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 6,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.16,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 2,
+     "constant": [
+      0.0,
+      -1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.6309148264984227
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 7,
+     "srcA": 7,
+     "constant": [
+      0.0,
+      0.07,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      0.3,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.72,
+      1.12
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      1.15,
+      0.7
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 4,
+     "input": "instanceEmissive"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 4,
+     "constant": [
+      0.2,
+      0.5,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.10946,
+      1.21991,
+      1.00197,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.5,
+      1.4,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      2.5,
+      1.12696,
+      0.26756,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 4
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.36,
+      0.36,
+      0.36,
+      1.0
+     ]
+    },
+    {
+     "kind": "roughnessFilter",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1.0
+    }
+   ],
+   "baseColor": 1,
+   "metallic": -1,
+   "roughness": 6,
+   "emission": 2,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "floorLacquer",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      -1.0,
+      0.0,
+      -0.0,
+      -0.5
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_west"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      -1.0,
+      -3.0
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_north"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      1.0,
+      0.0,
+      -0.0,
+      -0.5
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_east"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      1.0,
+      -3.0
+     ],
+     "value": 0.0625
+    },
+    {
+     "kind": "power",
+     "dst": 2,
+     "srcA": 2,
+     "value": 2.0
+    },
+    {
+     "kind": "field",
+     "dst": 3,
+     "field": "ph_south"
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      -1.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.08,
+      0.92,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.00439,
+      0.02315,
+      0.02519,
+      1.0
+     ],
+     "constant2": [
+      0.19462,
+      0.04971,
+      0.01298,
+      1.0
+     ],
+     "constant3": [
+      0.87137,
+      0.39157,
+      0.11697,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 2
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.35,
+      0.35,
+      0.35,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "constant",
+     "dst": 4,
+     "constant": [
+      0.01242,
+      0.0602,
+      0.07103,
+      1.0
+     ]
+    },
+    {
+     "kind": "noise",
+     "dst": 2,
+     "srcA": 0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "value": 0.09
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 2,
+     "constant": [
+      0.2,
+      0.8,
+      0.45,
+      1.6
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 1,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "net",
+   "mode": "oscillator",
+   "wrap": "wrap",
+   "resolution": [
+    220,
+    1,
+    19
+   ],
+   "boundsMin": [
+    -176.0,
+    -40.0,
+    -15.0
+   ],
+   "boundsMax": [
+    176.0,
+    40.0,
+    15.0
+   ],
+   "frequency": 0.18,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "seed": 3,
+   "persistence": 0.6,
+   "links": 0,
+   "linkRange": 48.0,
+   "checkpointInterval": 5.0,
+   "coupling": 4.0,
+   "phaseLag": 0.3,
+   "couplingRadius": 3,
+   "spread": 0.17,
+   "seedAmount": 1.0,
+   "noise": 0.02
+  }
+ ]
+}

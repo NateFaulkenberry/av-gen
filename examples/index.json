@@ -670,7 +670,7 @@
       "hidden": true
     },
     {
-      "category": "Experiments",
+      "category": "Generative",
       "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern, CC 2 seeding, CC 3 pin height, CC 4 audio influence, CC 5 erase, CC 6 ring light, CC 9 palette, CC 10 palette lock, notes 36-38 hold seeds. A bowl of copper pins in the dark. A reaction-diffusion pattern grows over it and lifts every pin it touches; a labyrinth wanders into spots and back; a thin ring of light runs along the pattern's edges. The music never draws on it directly: kicks send rings that turn the labyrinth to spots, held sound widens the spots, bass lifts the field. See docs/prototypes/generative-rd/C-scene-plan.md.",
       "live": true,
       "name": "RD Pins",
@@ -707,6 +707,13 @@
       "name": "RD Pins (R&D)",
       "project": "experiments/rd-pins/rd-pins.json",
       "hidden": true
+    },
+    {
+      "category": "Generative",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 coupling, CC 2 complexity, CC 3 motion, CC 4 audio influence, CC 5 lag, CC 6 light, CC 9 palette, CC 10 palette lock, note 36 holds a pacemaker on the end wall. A hall whose four walls are one kinetic installation: eight thousand metal blades, each swung by its own oscillator, falling into step and breaking apart round the room. Held sound pulls the hall into unison, kicks launch fronts from the end wall that run round both corners, a build turns the lag; eight palettes take turns at phrase boundaries (or on a big change in the music when there is no tempo). See docs/prototypes/phase-wall/.",
+      "live": true,
+      "name": "Phase Hall",
+      "project": "experiments/phase-wall/phase-wall.json"
     }
   ]
 }
