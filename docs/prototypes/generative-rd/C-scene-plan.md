@@ -129,3 +129,49 @@ touching any shared file. ADRs would take numbers from 1453-1459.
 | Rose Quartz | 6.1% | 0.3% |
 
 The remainder under 3% are the slots between pins at grazing angles, coloured, not black.
+
+**Stage 2 (audio and MIDI), done.**
+- **The instrument** (`instrument()` in `tools/rd_pins/build.py`). The music edits the regime map and the light, never
+  B:
+
+  | input | target | effect |
+  |---|---|---|
+  | kick | the onset ring in the baked regime (depth = Audio Influence) | Spots spread outward in rings from the centre, and the labyrinth heals behind them |
+  | held sound | the spot pool +0.6 (3 s attack, 6 s release) | The spot region widens |
+  | bass | pin height (effector 2) +3 | A slow swell of the field |
+  | hats | ring light ×(1 + 1.5·hat) | The rings brighten |
+  | snare | the wandering brush +2 | A burst of new growth where the brush is |
+
+- **MIDI:**
+
+  | input | control |
+  |---|---|
+  | CC 1 | pattern (toward spots) |
+  | CC 2 | seeding |
+  | CC 3 | pin height |
+  | CC 4 | audio influence |
+  | CC 5 | erase (feed falls; the pattern collapses and regrows on release) |
+  | CC 6 | ring light |
+  | CC 9 | palette (select one of six) |
+  | CC 10 | lock |
+  | notes 36-38 | seeds (velocity is the rate; the release sets how long they keep seeding) |
+
+  As before, the controller routes are wired but untested with hardware; renders flag them live-only.
+- **Media:** `~/Desktop/av-gen-review/65-rd-pins-scene/stage2/`, the same camera throughout: silent, Feline 40-60 s,
+  Trench 60-80 s, Hyperborea 20-40 s. Kicks visibly spread the spot field (Feline against silent), and the palette
+  journey advances on Trench (to Electric Lagoon).
+- **Live** (`--mode live`, Auto, 30 fps, 1920 × 1080):
+
+  | track and start | window | Auto level | GPU p50 / p95 | misses |
+  |---|---|---|---|---|
+  | Feline 40 s | 10 s | Medium | 28.1 / 49.2 ms | 5 / 300 (1.7%) |
+  | Feline 40 s, rerun | 20 s | High | 29.3 / 32.1 ms | 0 / 601 |
+  | Feline 40 s, second rerun | 20 s | High | 28.6 / 31.5 ms | 0 / 602 |
+  | Feline 95 s | 10 s | High | 30.3 / 32.6 ms | 0 / 301 |
+  | Trench 60 s | 10 s | High | 28.7 / 32.8 ms | 1 / 301 |
+  | Hyperborea 20 s | 10 s | High | 29.4 / 32.2 ms | 0 / 301 |
+
+  The first Feline run's misses did not reproduce in either rerun; it is likely Auto settling, under contention from
+  other agents' GPU work between runs. CPU work is about 6 ms.
+- **The index.** "RD Pins" (`examples/rd-pins/`) is in Experiments, live. The R&D harness it grew from is renamed
+  "RD Pins (R&D)" and hidden.
