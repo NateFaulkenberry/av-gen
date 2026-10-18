@@ -239,10 +239,11 @@ bool close(float gpu, float cpu, float scale) {
 
 } // namespace
 
-TEST_CASE("Resonance fields on the GPU match the CPU reference in every channel", "[gpu][resonance]") {
-    auto ctx = makeContext();
-    Harness harness(*ctx);
-    spatial::FieldSet fields = makeFields();
+namespace {
+
+// Samples every field of `fields` at 64 points each, at four clocks of the synthetic song, and compares the GPU with the
+// CPU reference in every channel.
+void compareEveryChannel(Harness& harness, spatial::FieldSet& fields) {
     fields.audio = song(4000);
     spatial::ResonanceCache cache;
     std::vector<glm::vec4> samples;
@@ -285,6 +286,36 @@ TEST_CASE("Resonance fields on the GPU match the CPU reference in every channel"
         }
         CHECK(checked == static_cast<int>(samples.size()));
     }
+}
+
+} // namespace
+
+TEST_CASE("Resonance fields on the GPU match the CPU reference in every channel", "[gpu][resonance]") {
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    spatial::FieldSet fields = makeFields();
+    compareEveryChannel(harness, fields);
+}
+
+// ADR-1471: plate sources -- the square plate's (n, m) figures as four signed plane waves -- beside a point source and a
+// lattice, in every channel, against the CPU reference.
+TEST_CASE("Plate sources on the GPU match the CPU reference in every channel", "[gpu][resonance][adr1471]") {
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    spatial::FieldSet fields = makeFields();
+    auto& sources = fields.fields[0].resonance.sources;
+    spatial::ResonanceSource plate;
+    plate.kind = spatial::ResonanceSourceKind::Plate;
+    plate.position = {4.0f, 0.0f, -6.0f};
+    plate.bandLow = 0.0f;
+    plate.bandHigh = 0.6f;
+    plate.reach = 60.0f;
+    plate.plates = {{3, 2}, {5, 1}, {4, 1}};
+    plate.spin = 0.05f;
+    plate.drift = 3.0f;
+    sources[0] = plate;
+    REQUIRE(fields.fields[0].validate().has_value());
+    compareEveryChannel(harness, fields);
 }
 
 TEST_CASE("The resonance table holds 48 modes; a resonator that does not fit samples 0 on the GPU", "[gpu][resonance]") {

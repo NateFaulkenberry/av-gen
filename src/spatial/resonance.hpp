@@ -82,7 +82,9 @@ enum class ResonanceChannel : std::uint8_t { Displacement, Amplitude, Sand, Forc
     return c == ResonanceChannel::Force || c == ResonanceChannel::Gradient;
 }
 
-enum class ResonanceSourceKind : std::uint8_t { Point, Lattice };
+// ADR-1471, appended: Plate -- a square plate's mode (n, m): cos(n pi u) cos(m pi v) - cos(m pi u) cos(n pi v), the
+// Chladni figure family, as four signed plane waves of one wavenumber (see `plates`).
+enum class ResonanceSourceKind : std::uint8_t { Point, Lattice, Plate };
 // ADR-1409: which rows a reader sums -- every row (ADR-1400), the standing modes only, or the onset ripples only (a
 // light that travels with the rings and nothing else)
 enum class ResonanceRows : std::uint8_t { All, Modes, Ripples };
@@ -126,6 +128,11 @@ struct ResonanceSource {
     // lattice mode's number of directions (1 bands, 2 squares, 3 hexagons, 1..8). Empty = ADR-1400 (a seeded order up
     // to `order`, growing with u). A designed bank -- rings, then 4 lobes, 6, 3, ... -- instead of a hashed one.
     std::vector<int> orders;
+    // ADR-1471, a plate source's modes, in their order along u (cycled): (n, m) pairs, 1..8 each, n != m. Mode (n, m) is
+    // the square plate's figure cos(n pi u) cos(m pi v) - cos(m pi u) cos(n pi v) at the bank's wavenumber k = pi
+    // sqrt(n^2 + m^2) / L: four plane waves at +-a and +-(90 deg - a) about the source's orientation, tan a = m / n,
+    // signs (+, +, -, -), mean square 1. Near-degenerate pairs crossfading give the compound (asymmetric) figures.
+    std::vector<std::array<int, 2>> plates;
     // ADR-1405, focus: which of the source's modes lead. A Gaussian window over u, e^{-((u - f) / focusWidth)^2}, on
     // the modes' weights (both envelopes, so every reader -- geometry and colour -- sees the same figure), at
     // f = focus + focusSweep sin(2 pi t / focusPeriod + phase) clamped to the source's band. One or two adjacent modes

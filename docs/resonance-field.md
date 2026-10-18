@@ -99,6 +99,12 @@ A tuned reader (each height hears its own band of modes): `"listenAlongAxis": tr
   a quasicrystal), and a source's `depth` (whole metres) gives any source a layer: `e^(-|y - y0| / depth)` (a
   surface wave fading away from its height, so a raised body does not hear the ground's carpet). A source's lattice modes share one orientation, so lattices of different
   wavelengths nest.
+- `plate` (ADR-1471): a square plate's mode `(n, m)` from the source's `plates` list (`[[3, 2], [5, 1], ...]`, 1..8
+  each, n != m, cycled along u like `orders`): `cos(n pi u) cos(m pi v) - cos(m pi u) cos(n pi v)` in the source's
+  turned frame, at the bank's wavenumber `k = pi sqrt(n^2 + m^2) / L`, drawn as four signed plane waves at `+-a` and
+  `+-(90 - a)` degrees (`tan a = m / n`), times sqrt(2) for a mean square of 1. This is the Chladni family: curved,
+  crossing nodal networks, loops and lobes instead of rings. Near-degenerate pairs crossfading (by `focus`) give the
+  compound, asymmetric figures. A plate source turns as one, like a lattice.
 - `reach > 0` multiplies a mode by `1 / (1 + (r / reach)^2)`: fine modes stay local and the far ground stays calm.
 
 ## Moving figures (ADR-1403, ADR-1404)
