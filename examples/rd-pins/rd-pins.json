@@ -1,0 +1,810 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "rd-pins.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.28,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 28.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.06
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "field/pool/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 110.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       4.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.5833,
+      "value": [
+       7.6235,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 9.1667,
+      "value": [
+       11.0,
+       0.0,
+       -12.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.75,
+      "value": [
+       13.8995,
+       0.0,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 18.3333,
+      "value": [
+       16.1244,
+       0.0,
+       -12.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.9167,
+      "value": [
+       17.523,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.5,
+      "value": [
+       18.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0833,
+      "value": [
+       17.523,
+       0.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.6667,
+      "value": [
+       16.1244,
+       0.0,
+       4.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.25,
+      "value": [
+       13.8995,
+       0.0,
+       6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.8333,
+      "value": [
+       11.0,
+       0.0,
+       4.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.4167,
+      "value": [
+       7.6235,
+       0.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.0,
+      "value": [
+       4.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 59.5833,
+      "value": [
+       0.3765,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.1667,
+      "value": [
+       -3.0,
+       0.0,
+       -12.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 68.75,
+      "value": [
+       -5.8995,
+       0.0,
+       -14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 73.3333,
+      "value": [
+       -8.1244,
+       0.0,
+       -12.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 77.9167,
+      "value": [
+       -9.523,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       -10.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 87.0833,
+      "value": [
+       -9.523,
+       0.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 91.6667,
+      "value": [
+       -8.1244,
+       0.0,
+       4.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.25,
+      "value": [
+       -5.8995,
+       0.0,
+       6.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 100.8333,
+      "value": [
+       -3.0,
+       0.0,
+       4.6603
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 105.4167,
+      "value": [
+       0.3765,
+       0.0,
+       1.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       4.0,
+       0.0,
+       -4.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/brush/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 67.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.7917,
+      "value": [
+       12.0,
+       0.0,
+       -4.6587
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.5833,
+      "value": [
+       20.7846,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.375,
+      "value": [
+       24.0,
+       0.0,
+       -12.7279
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.1667,
+      "value": [
+       20.7846,
+       0.0,
+       -15.5885
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.9583,
+      "value": [
+       12.0,
+       0.0,
+       -17.3867
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.75,
+      "value": [
+       0.0,
+       0.0,
+       -18.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 19.5417,
+      "value": [
+       -12.0,
+       0.0,
+       -17.3867
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.3333,
+      "value": [
+       -20.7846,
+       0.0,
+       -15.5885
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.125,
+      "value": [
+       -24.0,
+       0.0,
+       -12.7279
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.9167,
+      "value": [
+       -20.7846,
+       0.0,
+       -9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.7083,
+      "value": [
+       -12.0,
+       0.0,
+       -4.6587
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.5,
+      "value": [
+       -0.0,
+       0.0,
+       -0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 36.2917,
+      "value": [
+       12.0,
+       0.0,
+       4.6587
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.0833,
+      "value": [
+       20.7846,
+       0.0,
+       9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.875,
+      "value": [
+       24.0,
+       0.0,
+       12.7279
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 44.6667,
+      "value": [
+       20.7846,
+       0.0,
+       15.5885
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 47.4583,
+      "value": [
+       12.0,
+       0.0,
+       17.3867
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.25,
+      "value": [
+       0.0,
+       0.0,
+       18.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 53.0417,
+      "value": [
+       -12.0,
+       0.0,
+       17.3867
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.8333,
+      "value": [
+       -20.7846,
+       0.0,
+       15.5885
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 58.625,
+      "value": [
+       -24.0,
+       0.0,
+       12.7279
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.4167,
+      "value": [
+       -20.7846,
+       0.0,
+       9.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.2083,
+      "value": [
+       -12.0,
+       0.0,
+       4.6587
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.0,
+      "value": [
+       -0.0,
+       0.0,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       8.0,
+       34.0,
+       39.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       10.8284,
+       35.0,
+       39.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       12.0,
+       34.0,
+       41.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       10.8284,
+       33.0,
+       42.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       8.0,
+       34.0,
+       43.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       5.1716,
+       35.0,
+       42.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       4.0,
+       34.0,
+       41.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       5.1716,
+       33.0,
+       39.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       8.0,
+       34.0,
+       39.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -2.8707,
+       2.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       -2.0343,
+       2.2702,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -2.3493,
+       1.5793,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       -3.6313,
+       1.7298,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -5.1293,
+       2.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       -5.9657,
+       2.2702,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       -5.6507,
+       1.5793,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       -4.3687,
+       1.7298,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -2.8707,
+       2.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-rd-pins.mp4"
+ },
+ "sonicScene": {
+  "category": "experiment",
+  "thesis": "A bowl of copper pins in the dark. A reaction-diffusion pattern grows over it and lifts every pin it touches; a labyrinth wanders into spots and back; a thin ring of light runs along the pattern's edges. The music never draws on it directly: kicks send rings that turn the labyrinth to spots, held sound widens the spots, bass lifts the field.",
+  "experiment": "C reaction-diffusion (production)",
+  "id": "rd-pins",
+  "title": "RD Pins"
+ }
+}
