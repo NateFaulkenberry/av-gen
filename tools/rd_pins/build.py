@@ -293,6 +293,50 @@ def environment(s):
             castsShadow=False, contactShadow=False)
 
 
+MIDI_CC = [
+    (1, "pattern", "PATTERN: pushes the field toward spots (the spot pool widens over the labyrinth)"),
+    (2, "seeding", "SEEDING: the wandering brush seeds new growth harder"),
+    (3, "height", "PIN HEIGHT: how far the pattern lifts the pins"),
+    (4, "influence", "AUDIO INFLUENCE: how hard the music drives the field (half at rest)"),
+    (5, "erase", "ERASE: starves the pattern (feed falls): regions collapse, and regrow on release"),
+    (6, "light", "RING LIGHT: the light on the pattern's edges"),
+    (9, "palette", "PALETTE: choose one of the six (a direct blend to it)"),
+    (10, "paletteLock", "PALETTE LOCK: hold the chosen palette"),
+]
+MIDI_NOTES = [(36, "seed0"), (37, "seed1"), (38, "seed2")]
+
+
+def instrument(s, g):
+    """The music edits the regime map and the light, never B directly (plan, Q4: B rings made the void):
+      - a kick (low onset) is a ring travelling out from the bowl's centre that flips the labyrinth to spots as it
+        passes (the onset field inside the baked regime); its depth is Audio Influence
+      - held sound widens the spot pool; bass lifts the pins (a slow swell); hats brighten the rings
+      - a snare pulses the wandering brush (a burst of new growth where it is)
+      - MIDI: six handles, the palette pair, three seed notes"""
+    s.response = dict(common.RESPONSE)
+    common.instrument(s, [(n, sig, d) for n, sig, d in MIDI_CC], MIDI_NOTES)
+    E = "procedural/pins/effector/2/strength"
+    G = "grid/pattern/"
+    ring = g.path("ring")
+    s.route(R(common.INFLUENCE, "field/kickRegime/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
+              attackMs=200, decayMs=200),
+            common.audio("response.sustain", "field/pool/strength", 0.6, attackMs=3000, decayMs=6000),
+            common.audio("response.bass", E, 3.0, attackMs=250, decayMs=1200),
+            common.audio("response.hat", ring, 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=30, decayMs=300),
+            common.audio("response.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
+    CC = common.CC
+    s.route(R("control.pattern", "field/pool/strength", 1.2, **CC),
+            R("control.seeding", "field/brush/strength", 3.0, **CC),
+            R("control.height", E, 6.0, **CC),
+            R("control.erase", G + "feed", -0.03, **CC),
+            R("control.erase", G + "feedB", -0.02, **CC),
+            R("control.light", ring, 1.0, op="multiply", gain=2.0, offset=1.0, **CC),
+            R("control.palette", "palette/select", float(len(PALETTES) - 1), **CC),
+            R("control.paletteLock", "palette/lock", 1.0, **CC))
+    for i in range(3):
+        s.route(R("control.seed%d" % i, "field/seed%d/strength" % i, 1.0, attackMs=60, decayMs=3000))
+
+
 def palette_block(g, gf):
     """The project palette (ADR-1043) and its selector (ADR-1420), with the change fallback (ADR-1421). Roles land on
     geometry and light: the pins' program, the floor's, the two lights, the sky and the material's finish."""
@@ -361,7 +405,7 @@ def build():
                    steps=8)
     s.params_({"camera/lens/focalLength": 28.0, "post/bloom/intensity": 0.28, "post/output/vignette": 0.4,
                "post/grade/contrast": 1.06, "post/output/grain": 0.01})
-    s.response = dict(common.RESPONSE)
+    instrument(s, g)
     return s
 
 
@@ -377,6 +421,10 @@ def main():
     s = build()
     pp, sp = common.write_example(s, OUT)
     print(pp)
+    cc = common.describe_ccs(MIDI_CC, "notes 36-38 hold seeds")
+    common.index_entry(TITLE, "rd-pins/rd-pins.json",
+                       "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". " + DESIGN["thesis"]
+                       + " See docs/prototypes/generative-rd/C-scene-plan.md.", live=True)
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))

@@ -719,7 +719,7 @@
   "thesis": "A dark floor of forty thousand pins; the pattern lifts them and lights only those on its boundary, so contour lines of a living maze hang in the air and wander as the pattern grows.",
   "experiment": "C reaction-diffusion",
   "id": "rd-pins",
-  "title": "RD Pins"
+  "title": "RD Pins (R&D)"
  },
  "control": {
   "midi": {

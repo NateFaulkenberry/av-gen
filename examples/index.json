@@ -671,10 +671,10 @@
     },
     {
       "category": "Experiments",
-      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern mode, CC 2 growth, CC 3 relief, CC 4 audio influence, CC 5 erase, CC 6 boundary light, MIDI notes 36-39 hold seeds.. A dark floor of forty thousand pins; the pattern lifts them and lights only those on its boundary, so contour lines of a living maze hang in the air and wander as the pattern grows. An R&D experiment: see docs/prototypes/generative-rd/C-reaction-diffusion.md.",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern, CC 2 seeding, CC 3 pin height, CC 4 audio influence, CC 5 erase, CC 6 ring light, CC 9 palette, CC 10 palette lock, notes 36-38 hold seeds. A bowl of copper pins in the dark. A reaction-diffusion pattern grows over it and lifts every pin it touches; a labyrinth wanders into spots and back; a thin ring of light runs along the pattern's edges. The music never draws on it directly: kicks send rings that turn the labyrinth to spots, held sound widens the spots, bass lifts the field. See docs/prototypes/generative-rd/C-scene-plan.md.",
       "live": true,
       "name": "RD Pins",
-      "project": "experiments/rd-pins/rd-pins.json"
+      "project": "rd-pins/rd-pins.json"
     },
     {
       "category": "Experiments",
@@ -698,6 +698,14 @@
       "live": true,
       "name": "Current Lines",
       "project": "experiments/flow-streams/flow-streams.json",
+      "hidden": true
+    },
+    {
+      "category": "Experiments",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 pattern mode, CC 2 growth, CC 3 relief, CC 4 audio influence, CC 5 erase, CC 6 boundary light, MIDI notes 36-39 hold seeds.. A dark floor of forty thousand pins; the pattern lifts them and lights only those on its boundary, so contour lines of a living maze hang in the air and wander as the pattern grows. An R&D experiment: see docs/prototypes/generative-rd/C-reaction-diffusion.md.",
+      "live": true,
+      "name": "RD Pins (R&D)",
+      "project": "experiments/rd-pins/rd-pins.json",
       "hidden": true
     }
   ]

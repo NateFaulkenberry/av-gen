@@ -113,7 +113,7 @@ def rd_grid(s, name, size, res, regime_a, regime_b, regime_field, seed=11, speed
 # ================================================================================================ configurations
 DESIGNS = {
     "pins": {
-        "title": "RD Pins",
+        "title": "RD Pins (R&D)",  # the R&D harness; the live scene "RD Pins" is tools/rd_pins (2026-10-17)
         "thesis": "A dark floor of forty thousand pins; the pattern lifts them and lights only those on its boundary, "
                   "so contour lines of a living maze hang in the air and wander as the pattern grows.",
     },
@@ -394,7 +394,7 @@ CONFIGS = {"relief": relief, "bloom": bloom, "pins": pins}
 
 INDEX = {  # config -> (hidden?, notes): what the Examples > Live > Experiments menu lists
     "relief": (False, "MIDI notes 36-39 hold seeds."),
-    "pins": (False, "MIDI notes 36-39 hold seeds."),
+    "pins": (True, "MIDI notes 36-39 hold seeds."),  # superseded by the RD Pins live scene: a harness now
     "bloom": (True, "MIDI notes 36-39 hold seeds."),
 }
 

@@ -132,8 +132,216 @@
   "temporal/mosh/enabled": false,
   "post/grade/contrast": 1.06
  },
- "sources": [],
- "routes": [],
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "influence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "control.influence",
+        "weight": 1.0
+       }
+      ],
+      "bias": 0.5,
+      "gain": 0.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "visual.influence",
+   "target": "field/kickRegime/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 0.0,
+    "attackMs": 200,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/pool/strength",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/pins/effector/2/strength",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 250,
+    "decayMs": 1200
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "material/rpPin/op/16/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 30,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "response.snare",
+   "target": "field/brush/strength",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 10,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "control.pattern",
+   "target": "field/pool/strength",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.seeding",
+   "target": "field/brush/strength",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.height",
+   "target": "procedural/pins/effector/2/strength",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.erase",
+   "target": "grid/pattern/feed",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.erase",
+   "target": "grid/pattern/feedB",
+   "amount": -0.02,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/rpPin/op/16/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.palette",
+   "target": "palette/select",
+   "amount": 5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.paletteLock",
+   "target": "palette/lock",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.seed0",
+   "target": "field/seed0/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "control.seed1",
+   "target": "field/seed1/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "control.seed2",
+   "target": "field/seed2/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 60,
+    "decayMs": 3000
+   }
+  }
+ ],
  "presets": [],
  "timeline": {
   "enabled": true,
@@ -1332,6 +1540,91 @@
      "maxHold": 90.0
     }
    }
+  }
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "pattern"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "seeding"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "height"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "influence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "erase"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "light"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 9,
+     "signal": "palette"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 10,
+     "signal": "paletteLock"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 36,
+     "signal": "seed0"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 37,
+     "signal": "seed1"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 38,
+     "signal": "seed2"
+    }
+   ]
   }
  }
 }
