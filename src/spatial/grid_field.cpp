@@ -708,8 +708,10 @@ Result<void> GridField::validate() const {
         return fail("grid '{}': resolution must be >= 1 on every axis", name);
     }
     if (!initial.empty()) { // ADR-1282
-        if (mode != GridMode::Scalar && mode != GridMode::Vector) {
-            return fail("grid '{}': only a scalar or vector grid can start from authored values", name);
+        // ADR-1453: and a reaction-diffusion grid (A, B per cell), so a scene can open on a formed pattern
+        if (mode != GridMode::Scalar && mode != GridMode::Vector && mode != GridMode::ReactionDiffusion) {
+            return fail("grid '{}': only a scalar, vector or reaction-diffusion grid can start from authored values",
+                        name);
         }
         if (initial.size() != floatCount()) {
             return fail("grid '{}': 'initial' has {} values; the grid holds {}", name, initial.size(), floatCount());

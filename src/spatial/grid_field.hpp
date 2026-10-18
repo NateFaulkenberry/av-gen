@@ -172,7 +172,8 @@ struct GridField {
     // Cell values, `components()` floats per cell; empty until reset() (the GPU keeps its own
     // copy in the shared table and never fills this).
     // ADR-1282: authored starting values, components() floats per cell in the storage order above (JSON
-    // "initial": [...]). Empty = zero plus `seedAmount` noise, as before. Scalar and vector grids only. A grid
+    // "initial": [...]). Empty = zero plus `seedAmount` noise, as before. Scalar and vector grids, and (ADR-1453) reaction-
+// diffusion grids (A, B per cell). A reset, and a seek with no checkpoint to restore, return to these values exactly. A grid
     // with no injection, diffusion or dissipation keeps them for ever: a static, authored field (a glow map).
     std::vector<float> initial;
     std::vector<float> data;

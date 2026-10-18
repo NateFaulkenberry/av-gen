@@ -503,3 +503,50 @@ TEST_CASE("A scalar or vector grid one cell thick may be a plane up to 1024, and
     CHECK(d.data[d.index(101, 0, 100)] > 0.0f);
     CHECK(d.data[d.index(101, 0, 100)] == Approx(d.data[d.index(100, 0, 101)]));
 }
+
+// ---- ADR-1453 --------------------------------------------------------------------------------------
+
+TEST_CASE("A reaction-diffusion grid may start from authored values; without them it starts as before", "[grid][rd]") {
+    // Without authored values: the canonical seed, unchanged (A = 1 outside the fbm blobs, B = 0 there) and the same
+    // hashes as a grid that never had the key.
+    spatial::GridField plain = rdPlane(32);
+    plain.seedAmount = 1.0f;
+    plain.reset();
+    int blobs = 0;
+    for (std::size_t c = 0; c < plain.data.size(); c += 2) {
+        const bool blob = plain.data[c + 1] > 0.0f;
+        blobs += blob ? 1 : 0;
+        CHECK(plain.data[c] == Approx(blob ? 0.5f : 1.0f));
+        CHECK(plain.data[c + 1] == Approx(blob ? 0.25f : 0.0f));
+    }
+    CHECK(blobs > 0);
+    CHECK_FALSE(plain.toJson().contains("initial"));
+
+    // With them: a reset is exactly the authored state, before and after stepping, and the JSON round-trips.
+    spatial::GridField authored = rdPlane(16);
+    authored.initial.resize(authored.floatCount());
+    for (std::size_t c = 0; c < authored.initial.size(); c += 2) {
+        authored.initial[c] = 0.4f + 0.001f * static_cast<float>(c % 97);
+        authored.initial[c + 1] = 0.3f - 0.001f * static_cast<float>(c % 89);
+    }
+    REQUIRE(authored.validate().has_value());
+    authored.reset();
+    CHECK(authored.data == authored.initial);
+    for (int s = 0; s < 20; ++s) {
+        authored.step(1.0f, 1.0);
+    }
+    CHECK(authored.data != authored.initial);
+    authored.reset(); // what a seek with nothing to restore does (rendering::Simulation uploads reset())
+    CHECK(authored.data == authored.initial);
+    auto back = spatial::GridField::fromJson(authored.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->initial == authored.initial);
+    CHECK(back->layoutHash() == authored.layoutHash());
+    spatial::GridField other = authored;
+    other.initial.clear();
+    CHECK(other.layoutHash() != authored.layoutHash()); // a changed start re-seeds the grid
+
+    // The wrong length is refused.
+    authored.initial.pop_back();
+    CHECK_FALSE(authored.validate().has_value());
+}
