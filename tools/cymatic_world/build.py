@@ -638,8 +638,8 @@ PALETTES = {
     "B": {"line2": "#7fb6ff", "line2I": 0.4, "wave": "#9ff0ff", "waveI": float(os.environ.get("CW_WAVE_I", "2.5")), "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#9fe6ff",
           "sheenI": float(os.environ.get("CW_SHEEN_I", "0.3")),
-          "keyI": float(os.environ.get("CW_KEY_I", "1.6")), "fillI": 0.9, "rimI": 0.35, "skyI": float(os.environ.get("CW_SKY_I", "0.6")),
-          "lineI": float(os.environ.get("CW_LINE_I", "0.35")),
+          "keyI": float(os.environ.get("CW_KEY_I", "2.0")), "fillI": 0.9, "rimI": 0.35, "skyI": float(os.environ.get("CW_SKY_I", "0.6")),
+          "lineI": float(os.environ.get("CW_LINE_I", "0.7")),
           "hollowI": 0.4},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
@@ -730,7 +730,7 @@ PALETTE_TUNE = {
 # the strongest lobes end up. Display colours, scaled to albedo like the roles (PAL_ALBEDO).
 GRADIENTS = {
     # indigo -> cobalt -> violet -> a narrow fuchsia (the crest lines keep the icy cyan)
-    "Abyssal Resonance":      [(0.40, 0.14, 276), (0.50, 0.17, 258), (0.52, 0.19, 300), (0.60, 0.19, 334)],
+    "Abyssal Resonance":      [(0.36, 0.15, 272), (0.50, 0.18, 250), (0.56, 0.21, 305), (0.66, 0.21, 345)],
     # indigo-violet sculpture, plum, and the red only where the gradient ends (ridges, the hottest lobes)
     "Crimson Singularity":    [(0.32, 0.13, 300), (0.38, 0.16, 322), (0.44, 0.18, 350), (0.54, 0.20, 18)],
     "Molten Glass":           [(0.40, 0.12, 26), (0.50, 0.15, 38), (0.60, 0.17, 52), (0.72, 0.15, 74)],
@@ -799,7 +799,7 @@ def palette_state(name, hexes):
     colors["skyZenith"] = [v * 0.5 for v in r["background"]]
     colors["skyHorizon"] = kit.oklch(0.36, min(cg * 1.6, 0.14), hg)
     colors["skyGround"] = kit.oklch(0.22, min(cg * 1.3, 0.1), hg)
-    colors["fogC"] = kit.oklch(0.3, min(cg * 1.5, 0.12), hg)
+    colors["fogC"] = kit.oklch(0.38, min(cg * 2.0, 0.15), hg)
     colors["sunC"] = _hue(r["resonant"])
     return {"name": name, "colors": {k: [round(v, 5) for v in c] for k, c in colors.items()}}
 
@@ -831,14 +831,14 @@ PAL_CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], 
 # and how much colour the hollow floors keep (Stage C's 0.1 crushed them to black)
 BAND_N = float(os.environ.get("CW_BAND_N", "1.3"))
 BAND_W = float(os.environ.get("CW_BAND_W", "0.45"))
-RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "0.1"))
+RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "0.18"))
 # the crest line's width: sand^13 drew a line ~0.25 m wide, thinner than a mesh cell, which zigzagged along every
 # steep lip (resonator-quality Phase C); sand^7 is ~0.35 m and softer-edged
 CREST_POWER = float(os.environ.get("CW_CREST_POWER", "7"))
 # where the hollow glow starts and saturates in the excitation (the overhaul's four families ring harder: 0.3..1.0 lit
 # every hollow)
 HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "1.4,3.2").split(",")]
-TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "0.9"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
+TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "1.6"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
 BAND_RATE = float(os.environ.get("CW_BAND_RATE", "1.6"))   # the band's phase, metres a second per unit of the integral
 FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.35"))
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
@@ -978,8 +978,8 @@ def ground_program():
             #   B  a broad travelling band across the basin (a cosine of the position along x, its phase a persistent
             #      integral of the music, never reset): it crosses the cells, so colour boundaries do not all sit on
             #      the geometry, and the regions stretch, bend and migrate
-            #   D  the nodal ridges (sand) push the colour a step along the gradient: a ridge reads as the next hue,
-            #      not as a white or cyan outline
+            #   D  the nodal ridges (sand) push the colour a step BACK along the gradient (the overhaul, stage C: nodal
+            #      boundaries darker and differently hued, never a white or cyan outline, brief §5.7)
             # (Eight ops at the interpreter's ~0.8 ms an op at High: they replaced the tint remap, the grit's three and
             # the view layer's three, so the program is two ops SHORTER than before the pass; J's oil and E's metal
             # now live in their own gradients)
@@ -1037,7 +1037,7 @@ def ground_program():
     return g
 
 
-FOG_DENSITY = float(os.environ.get("CW_FOG", "0.006"))
+FOG_DENSITY = float(os.environ.get("CW_FOG", "0.0035"))
 SUN_GLOW = float(os.environ.get("CW_SUN", "1.5"))   # the sky's soft glow behind the basin (its colour a palette role)
 
 

@@ -339,7 +339,10 @@ def surface_program(name):
     g.op("edgeLevel", "constant", 1, k=[1.0, 1.0, 1.0, 1.0])     # the edges' brightness (hats, snares, CC 8)
     g.op(None, "multiply", 3, a=3, b=1)
     g.op(None, "add", 2, a=2, b=3)
-    g.base, g.emit, g.opacity = 4, 2, -1
+    # roughness follows the field (stage C): where the families reinforce (the glow's rise, r5) the sheet is glossier,
+    # elsewhere broad and soft -- gloss sits on the crests, not uniformly
+    g.op("roughField", "remap", 0, a=5, k=[0.0, 1.0, 0.55, 0.25], f=1.0)
+    g.base, g.emit, g.opacity, g.rough = 4, 2, -1, 0
     return g
 
 
@@ -472,6 +475,14 @@ def environment(s):
         # the depth prepass, asked for (ADR-1406): five nested opaque sheets overdraw each other, and with the deformation
         # baked (ADR-1440) a second geometry pass costs ~3 ms and saves ~20 of shading (Stage B profile)
         "depthPrepass": True,
+        # stage C (05-plan §1.3): narrow, cool reflection-only bands (ADR-1151) -- crisp lines that run along the
+        # sheets' curvature like light on a wave, cooler and finer than Silk's soft satin box
+        "bands": {"phase": 0.0, "rotation": 0.0, "gain": WD_BANDS_GAIN,
+                  "softbox": {"intensity": 0.25, "azimuth": 0.9, "elevation": 0.6, "falloff": 3.0, "skyFill": 0.0},
+                  "strips": [{"axis": [0.0, 1.0, 0.0], "offset": 0.25, "width": 0.03, "intensity": 2.0, "segments": 0,
+                              "warmth": 0.0, "rate": 0.0},
+                             {"axis": [0.6, 0.2, -0.77], "offset": 0.0, "width": 0.025, "intensity": 1.4, "segments": 0,
+                              "warmth": 0.0, "rate": 0.0}]},
         "sky": {"enabled": True, "zenithColor": C("obsidian", 0.6), "horizonColor": C("indigo", 0.5),
                 "groundColor": C("obsidian", 0.5), "haze": 0.3, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -708,6 +719,7 @@ def instrument(s, g):
 # them (cycles per metre of D), the step between nested sheets, and the phase's drift (cycles per second per unit of
 # the integrated energy + floor)
 FILL_I = float(os.environ.get("WD_FILL_I", "1.2"))
+WD_BANDS_GAIN = float(os.environ.get("WD_BANDS", "0.5"))
 GLOW_IN, GLOW_OUT = 3.5, 10.0   # metres of |D| over which the glow rises
 FRONT_I = float(os.environ.get("WD_FRONT_I", "1.2"))
 FRONT_DIR = [-0.4, -0.58, -0.71]   # from the arc's middle (azimuth 30 degrees, 92 m up) toward the focus
@@ -729,7 +741,7 @@ def build():
     resonance_fields(s)
     travelling_fronts(s)
     g = surface_program("wdSurface")
-    s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity))
+    s.program(g.doc(base=g.base, emission=g.emit, opacity=g.opacity, roughness=getattr(g, "rough", -1)))
     write_level_meshes()
     level_sheets(s, g.name)
     if DOME_ON and not NEUTRAL and not DEBUG:

@@ -123,7 +123,10 @@ def palette_states():
         name, cols, tune = row[0], row[1:8], row[8]
         colors = {r: hexrgb(h) for r, h in zip(ROLES, cols)}
         colors.update(gradient_roles(cols))
-        out.append({"name": name, "colors": colors, "scalars": {k: float(v) for k, v in tune.items()}})
+        scal = {k: float(v) for k, v in tune.items()}
+        scal["rough"] = round(scal["rough"] + ROUGH_ADD, 4)
+        scal["key"] = round(scal["key"] * KEY_SCALE, 4)
+        out.append({"name": name, "colors": colors, "scalars": scal})
     return out
 
 
@@ -473,6 +476,11 @@ def silk_program():
     g.op(None, "add", 5, a=5, b=7)
     g.op("body", "oklabRamp", 5, a=5, k=C("indigo") + [1], k2=C("violet", 0.5) + [1], k3=C("magenta", 0.4) + [1],
          k4=C("cyan", 0.3) + [1], f=-1.0)                                # r5: albedo (roles g0..g3)
+    # the satin's sheen (the overhaul, stage C, M1): a soft glow of the fold colour where the cloth turns from the eye
+    # (Fresnel squared), the back-scatter that makes satin luminous at its folds instead of shining in a dot
+    g.op(None, "multiply", 6, a=4, b=4)
+    g.op("sheenCol", "ramp", 6, a=6, k=[0, 0, 0, 0], k2=C("violet", SHEEN * 0.5) + [0.5], k3=C("violet", SHEEN) + [1])
+    g.op(None, "add", 1, a=1, b=6)
     # view-dependent colour (the palette's iridescence): a thin spectral sheen that cycles with the grazing angle,
     # only where the cloth turns away -- strong in Oil-Slick, a pastel shimmer in Opal, a trace elsewhere
     g.op("spectrum", "palette", 6, a=4, k=[0.5, 0.38, 0.5, 0], k2=[0.5, 0.3, 0.5, 0], k3=[1.4, 1.4, 1.4, 0],
@@ -517,7 +525,7 @@ def palette_block(g):
         # the void has colour (the overhaul, stage B): the sky's horizon in the shadow role, lifted, so the space behind
         # the drapes is a deep coloured gradient, never black
         {"role": "environment", "target": "env/sky/zenithColor", "gain": 1.0},
-        {"role": "shadow", "target": "env/sky/groundColor", "gain": 1.2},
+        {"role": "shadow", "target": "env/sky/groundColor", "gain": 1.5},
         {"role": "shadow", "target": "env/sky/horizonColor", "gain": 2.2},
         {"role": "environment", "target": "scene/fogColor", "gain": 1.6},
         {"role": "resonant", "target": "env/sky/sunColor", "gain": 1.0},
@@ -525,6 +533,8 @@ def palette_block(g):
         {"role": "g0", "target": op("body", "constant")}, {"role": "g1", "target": op("body", "constant2")},
         {"role": "g2", "target": op("body", "constant3")}, {"role": "g3", "target": op("body", "constant4")},
         {"role": "grazing", "target": "lights/key/color"},
+        {"role": "fold", "target": op("sheenCol", "constant2"), "gain": SHEEN * 0.5},
+        {"role": "fold", "target": op("sheenCol", "constant3"), "gain": SHEEN},
         {"role": "grazing", "target": op("hemCol", "constant2"), "gain": 0.45},
         {"role": "grazing", "target": op("hemCol", "constant3"), "gain": 0.9},
         {"role": "resonant", "target": "lights/rim/color"},
@@ -567,11 +577,14 @@ FILL_I = float(os.environ.get("RS_FILL_I", "1.1"))
 BANDS_ON = os.environ.get("RS_BANDS", "1") == "1"
 BANDS = {"phase": 0.0, "rotation": 0.0, "gain": float(os.environ.get("RS_BANDS_GAIN", "0.6")),
          "softbox": {"intensity": 0.5, "azimuth": 2.6, "elevation": 0.55, "falloff": 2.2, "skyFill": 0.04},
-         "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.09, "intensity": 1.6, "segments": 0,
+         "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.09, "intensity": 1.0, "segments": 0,
                      "warmth": 0.3, "rate": 0.0}]}
 SILK_FOG = float(os.environ.get("RS_FOG", "0.0013"))
 SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
-METALLIC = float(os.environ.get("RS_METALLIC", "0.15"))   # was 0.35: a metal's diffuse loss darkened the pigment
+METALLIC = float(os.environ.get("RS_METALLIC", "0.05"))
+SHEEN = float(os.environ.get("RS_SHEEN", "0.5"))
+KEY_SCALE = float(os.environ.get("RS_KEY_SCALE", "0.7"))   # stage C: the narrow key's streaks back, the fill and sheen carry
+ROUGH_ADD = float(os.environ.get("RS_ROUGH_ADD", "0.1"))   # stage C: broader, softer highlights (satin, not chrome)   # was 0.35: a metal's diffuse loss darkened the pigment
 SILK_LEN = float(os.environ.get("RS_SILK_LEN", "1.6"))
 SILK_BAND_DIR = (0.62, 0.62, 0.48)
 SILK_BAND_N = float(os.environ.get("RS_SILK_BAND_N", "1.4"))
@@ -688,7 +701,7 @@ def environment(s):
                 "groundColor": C("indigo", 0.22), "haze": 1.0, "sunIntensity": SILK_GLOW, "intensity": 1.0,
                 # a soft glow in the sky behind the gather (its colour the palette's resonant role): the far drapes
                 # are backlit by it, and the void has a light in it
-                "sunSize": 0.015, "sunGlow": 0.16, "sunDirection": [-0.03, -0.02, -1.0],
+                "sunSize": 0.015, "sunGlow": 0.45, "sunDirection": [-0.03, -0.02, -1.0],
                 "background": True, "useKeyLight": False},
     }
     if s.environment.get("bands") is None:
