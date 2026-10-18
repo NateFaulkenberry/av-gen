@@ -168,9 +168,9 @@ def blade_program(wall):
     """One wall's blades.
     - Tone: the phase, over the full sin theta range, through a three-stop ramp (trough, mid, crest): dark, body, bright.
     - The blade as a blade: a shading profile across its width (a louvre is slightly dished, one edge catching the
-      wash and the other falling off), a lift toward its top (the washes come from above), and soft shadow lines at
-      its four edges, all in the blade's own frame (localPosition). With the bevel's edge highlights, each blade
-      reads as a turning plate, not a flat pixel.
+      wash and the other falling off, with a thin highlight on the leading edge), a lift toward its top (the washes
+      come from above), and soft shadow lines at its four edges, all in the blade's own frame (localPosition), so
+      each blade reads as a turning plate, not a flat pixel.
     - Light: the wall washes and the reflection bands; strain lights whole blades `front`, the cores `peak`."""
     g = common.Prog("blade_" + wall)
     bw, bh = BLADE[0], BLADE[1]
@@ -191,6 +191,9 @@ def blade_program(wall):
     g.op(None, "remap", 5, a=5, k=[0.0, 1.0, 0.3, 1.0], f=1.0)      # lines sink to 30%, never black
     g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 0.72, 1.12], f=1.0)    # lift toward the top
     g.op(None, "multiply", 5, a=5, b=6)
+    g.op(None, "smoothstep", 4, a=3, k=[0.84, 0.95, 0, 0])          # the leading edge catches the light: a thin
+    g.op(None, "remap", 4, a=4, k=[0.0, 1.0, 1.0, 1.45], f=1.0)     # highlight in place of a bevel (a bevel on 8k
+    g.op(None, "multiply", 5, a=5, b=4)                             # blades cost 5 ms live, 7 misses -> 1-2)
     g.op(None, "remap", 3, a=3, k=[0.0, 1.0, 1.15, 0.7], f=1.0)     # the dish: one edge bright, the other falling off
     g.op(None, "multiply", 5, a=5, b=3)
     g.op(None, "multiply", 1, a=1, b=5)                             # r1 = base
@@ -235,7 +238,7 @@ def walls(s):
         cx, cz = st[0] + d[0] * n / 2, st[1] + d[2] * n / 2
         nrm = (-d[2], 0.0, d[0])
         yaw = yaw_of(d)
-        s.proc("blades_" + name, {"kind": "box", "size": list(BLADE), "bevel": 0.018, "bevelSegments": 1},
+        s.proc("blades_" + name, {"kind": "box", "size": list(BLADE)},
                distribution={"kind": "grid", "gridCount": [nx, ny, 1], "gridSpacing": [PX, PY, 1.0]},
                position=(cx, BASE + ny * PY / 2, cz), rotation=(0.0, yaw, 0.0),
                material={"program": g.name, "baseColor": [1, 1, 1], "roughness": TUNE["rough"],
@@ -363,6 +366,9 @@ def light(s):
         "intensity": 0.05, "background": env, "fogColor": env, "volumeDensity": 0.0,
         "fogSky": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0, "shadowRange": 160.0,
         "ambientOcclusion": False, "contactShadows": False,
+        # ADR-1406: early depth rejection. Four walls of programmed blades behind each other (and the floor's
+        # program) shade many hidden fragments; measured headless Ultra 1080p: 30.0 -> 23.2 ms
+        "depthPrepass": True,
         "sky": {"enabled": True, "zenithColor": env, "horizonColor": env, "groundColor": env, "haze": 1.0,
                 "sunIntensity": 0.0, "intensity": 1.0, "background": True, "useKeyLight": False},
         # the flash: vertical great circles (the opposite piers' strips, in direction space). A blade turning

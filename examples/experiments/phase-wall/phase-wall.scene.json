@@ -37,6 +37,7 @@
   "shadowRange": 160.0,
   "ambientOcclusion": false,
   "contactShadows": false,
+  "depthPrepass": true,
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -231,9 +232,7 @@
       0.745,
       1.585,
       0.04
-     ],
-     "bevel": 0.018,
-     "bevelSegments": 1
+     ]
     },
     "distribution": {
      "kind": "grid",
@@ -408,9 +407,7 @@
       0.745,
       1.585,
       0.04
-     ],
-     "bevel": 0.018,
-     "bevelSegments": 1
+     ]
     },
     "distribution": {
      "kind": "grid",
@@ -585,9 +582,7 @@
       0.745,
       1.585,
       0.04
-     ],
-     "bevel": 0.018,
-     "bevelSegments": 1
+     ]
     },
     "distribution": {
      "kind": "grid",
@@ -762,9 +757,7 @@
       0.745,
       1.585,
       0.04
-     ],
-     "bevel": 0.018,
-     "bevelSegments": 1
+     ]
     },
     "distribution": {
      "kind": "grid",
@@ -1989,6 +1982,35 @@
      "srcB": 6
     },
     {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
      "kind": "remap",
      "dst": 3,
      "srcA": 3,
@@ -2304,6 +2326,35 @@
      "dst": 5,
      "srcA": 5,
      "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
     },
     {
      "kind": "remap",
@@ -2623,6 +2674,35 @@
      "srcB": 6
     },
     {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
+    },
+    {
      "kind": "remap",
      "dst": 3,
      "srcA": 3,
@@ -2938,6 +3018,35 @@
      "dst": 5,
      "srcA": 5,
      "srcB": 6
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 4,
+     "srcA": 3,
+     "constant": [
+      0.84,
+      0.95,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      1.45
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 4
     },
     {
      "kind": "remap",

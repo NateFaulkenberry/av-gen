@@ -436,7 +436,7 @@
     ]
    },
    {
-    "target": "material/blade_west/op/26/constant/constant",
+    "target": "material/blade_west/op/29/constant/constant",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
@@ -506,7 +506,7 @@
     ]
    },
    {
-    "target": "material/blade_north/op/26/constant/constant",
+    "target": "material/blade_north/op/29/constant/constant",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
@@ -576,7 +576,7 @@
     ]
    },
    {
-    "target": "material/blade_east/op/26/constant/constant",
+    "target": "material/blade_east/op/29/constant/constant",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
@@ -646,7 +646,7 @@
     ]
    },
    {
-    "target": "material/blade_south/op/26/constant/constant",
+    "target": "material/blade_south/op/29/constant/constant",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
@@ -1379,12 +1379,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_west/op/24/constant/constant",
+    "target": "material/blade_west/op/27/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_west/op/29/constant/constant",
+    "target": "material/blade_west/op/32/constant/constant",
     "gain": 2.5
    },
    {
@@ -1406,12 +1406,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_north/op/24/constant/constant",
+    "target": "material/blade_north/op/27/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_north/op/29/constant/constant",
+    "target": "material/blade_north/op/32/constant/constant",
     "gain": 2.5
    },
    {
@@ -1433,12 +1433,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_east/op/24/constant/constant",
+    "target": "material/blade_east/op/27/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_east/op/29/constant/constant",
+    "target": "material/blade_east/op/32/constant/constant",
     "gain": 2.5
    },
    {
@@ -1460,12 +1460,12 @@
    },
    {
     "role": "front",
-    "target": "material/blade_south/op/24/constant/constant",
+    "target": "material/blade_south/op/27/constant/constant",
     "gain": 1.4
    },
    {
     "role": "peak",
-    "target": "material/blade_south/op/29/constant/constant",
+    "target": "material/blade_south/op/32/constant/constant",
     "gain": 2.5
    },
    {
