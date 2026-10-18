@@ -37,6 +37,7 @@
   "shadowRange": 120.0,
   "ambientOcclusion": false,
   "contactShadows": false,
+  "depthPrepass": false,
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -117,7 +118,7 @@
     0.0
    ],
    "field": {
-    "strength": 0.0,
+    "strength": 1.0,
     "falloff": {
      "kind": "none"
     },

@@ -35,11 +35,13 @@ PIN = os.environ.get("RP_PIN", "round")
 KICK = os.environ.get("RP_KICK", "regime")
 RES = bool(os.environ.get("RP_RES"))
 FLOOR = os.environ.get("RP_FLOOR", "1") != "0"
+KICK_GAIN = float(os.environ.get("RP_KICKGAIN", "1.0"))  # proofs; Stage 2 routes it through Audio Influence
+RING = float(os.environ.get("RP_RING", "1.0"))            # proofs: x the palette's ring gain
 
 # ================================================================================================ the world (metres)
 SIZE = 88.0            # the pattern's square domain, centred on the bowl
 RES_RD = 320           # RD cells across (0.275 m)
-N_PINS = 220           # pins across (0.4 m pitch)
+N_PINS = int(os.environ.get("RP_N", "220"))  # pins across (0.4 m pitch at 220)
 BOWL_R, BOWL_H, BOWL_P = 44.0, 18.0, 2.4   # y = H (r / R)^P: flat floor, walls rising to the rim
 CENTRE = (0.0, 0.0, 0.0)
 
@@ -101,7 +103,7 @@ def pattern(s):
         # a kick's ring flips the regime it passes toward spots for as long as it lasts: spots spread in rings
         s.field("kickRegime", {"kind": "onset", "onsetSource": "low", "point": [0.0, 0.0, 0.0],
                                "waveGeometry": "spherical", "audioSpeed": 7.0, "onsetWidth": 3.0,
-                               "onsetDecay": 0.35, "strength": 0.0})
+                               "onsetDecay": 0.35, "strength": KICK_GAIN})
         children.append("kickRegime")
     if RES:
         # option (proof Q5): the resonance field's settled figure (sand, ADR-1405) as a slower regime layer, so the
@@ -132,7 +134,7 @@ def pattern(s):
     if KICK == "growth":
         s.field("kickGrowth", {"kind": "onset", "onsetSource": "low", "point": [0.0, 0.0, 0.0],
                                "waveGeometry": "spherical", "audioSpeed": 10.0, "onsetWidth": 0.9,
-                               "onsetDecay": 0.5, "strength": 0.0})
+                               "onsetDecay": 0.5, "strength": KICK_GAIN})
         seeds.append("kickGrowth")
     s.field("sources", {"kind": "compound", "combine": "add", "children": seeds[:4]})
     if len(seeds) > 4:
@@ -178,9 +180,9 @@ def pin_program():
     g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
     g.op(None, "power", 1, a=1, f=6.0)
     g.op(None, "multiply", 1, a=1, b=6)
-    g.op("ring", "constant", 2, k=C("ring", P0["ringGain"]) + [1])
+    g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])
     g.op(None, "multiply", 1, a=1, b=2)                                  # r1 = emission
-    if KICK == "regime":
+    if KICK == "regime" and os.environ.get("RP_GLINT", "1") != "0":
         g.op("kick", "field", 2, field="kickRegime")                    # the passing ring: a glint on the heads
         g.op(None, "multiply", 2, a=2, b=6)
         g.op("kickCol", "constant", 3, k=C("ring", 0.35) + [1])
@@ -222,6 +224,7 @@ def environment(s):
         "intensity": 0.08, "background": C("environment"), "fogColor": C("environment"),
         "volumeDensity": 0.0, "fogSky": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 120.0, "ambientOcclusion": False, "contactShadows": False,
+        "depthPrepass": os.environ.get("RP_PREPASS", "0") == "1",
         "sky": {"enabled": True, "zenithColor": C("environment", 1.5), "horizonColor": C("shadow", 1.2),
                 "groundColor": C("environment"), "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},

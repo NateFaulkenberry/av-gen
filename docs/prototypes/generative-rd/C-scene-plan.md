@@ -13,12 +13,12 @@ The research and the per-axis debate are in `C-scene-research.md`.
 | axis | pick | why, in one line |
 |---|---|---|
 | World and composition | **A bowl of pins:** 220 × 220 pins at 0.4 m on a dish 88 m across, its walls rising to 18 m. The camera sits on the rim with a slow 90 s drift | The far wall rises above the eye line, so the frame is all pins: no horizon, no void, no flat plane |
-| Pins | **Round pins:** 10-sided cylinders with a bevelled head (box as the fallback if the cost proof fails) | Round heads catch a point highlight from every direction, which is the pin-art look; rings read as rings, not steps |
+| Pins | **Square pins** (boxes), 180-200 across, with a depth prepass. Changed by proof Q2 | Round pins cost 2.2 times as much (90.5 ms against 40.7) and look the same at the scene's distance |
 | Pin material | **Oxidised shafts, copper heads.** Head colour runs from base to pattern with B; a thin emissive ring at the head on the B ≈ 0.2 isoline | A solid region reads as a plateau of bright heads, an empty one as a low oxidised field. Neither is a void |
 | Environment | **The bowl's floor reads the pattern dimly (environment to base tint), plus a coloured dim sky for reflections.** No fog, no shadows | Designed darks at about 3-8%, coloured. The fog march (7 ms) and shadows (9 ms) bought nothing here |
 | Pattern | **Labyrinth (0.029, 0.057) to spots (0.030, 0.062)** through a baked regime map: a wandering pool plus fbm drift. 320² cells, 12 iterations | The owner's chosen look: "labyrinth turning to spots" is the frontier itself |
 | Audio | **The music edits the regime, not B.** A kick sends a ring that flips the labyrinth to spots where it passes, with a faint glint on the heads as it passes. Held sound widens the spot pool. Bass makes a slow lift of the field. Hats brighten the rings | No saturation, so no void (the C3 void came from kick rings of B). The pattern's own growth is the animation |
-| Resonance | **Decided by proof Q5 (§3)** | Welcome if it reads; not at the price of the clarity of the kick gesture |
+| Resonance | **Not in Stage 1-2.** A Stage 3 option only if a field slot is free (proof Q5) | The scene already fills 15 of the GPU's 16 field slots; with the resonator and its reader the pins' own fields fell off the end and the pins vanished |
 | MIDI | CC 1 pattern (to spots), CC 2 growth, CC 3 pin height, CC 4 audio influence, CC 5 erase or starve, CC 6 ring light; CC 9 palette, CC 10 lock; notes 36-39 hold seeds | The Resonator scenes' pattern: six handles, a palette pair, a few gestures |
 | Palettes | **Six role-based states** (Copper Night, Verdigris, Garnet and Indigo, Violet and Gold, Bone and Basalt, Ember). ADR-1420 selector on the phrase pulse, ADR-1421 change fallback | Roles bind to the pin, floor, sky and light constants. Pattern generation and palette are separate |
 | Index | **A new category, "Generative"**, starting with RD Pins. Phase Wall can join it; the R&D harnesses stay in Experiments | A real live scene is not an experiment. Proposal: the coordinator decides. Until then it is in Experiments |
@@ -29,7 +29,7 @@ The research and the per-axis debate are in `C-scene-research.md`.
 - Gate: the coordinator reviews this plan and the proof stills.
 
 **Stage 1. World and look.**
-- The bowl, round pins, materials, floor, light, camera and the six palettes as states.
+- The bowl, box pins with a prepass, materials (Q6, the rings), floor, light, camera and the six palettes as states.
 - Media: one still per palette and a 20 s autonomous clip.
 - Gate: no void anywhere (darks ≥ 3% luminance, coloured), the ring legible, live ≥ Medium at 30 fps.
   The owner's "copper rings on black" reads in Copper Night.
@@ -53,7 +53,20 @@ The research and the per-axis debate are in `C-scene-research.md`.
 
 ## 3. Proofs (Stage 0)
 
-These are filled in below as the proof renders land. They live in `~/Desktop/av-gen-review/65-rd-pins-scene/proofs/`.
+Media: `~/Desktop/av-gen-review/65-rd-pins-scene/proofs/`. Feline Footwear, 30-50 s, stills at 40 s.
+
+| # | question | result | decision |
+|---|---|---|---|
+| Q1 | Does the bowl fill the frame? | **Yes.** From the rim the frame is pins edge to edge, labyrinth meeting spots in the middle. A sliver of the bowl's outer floor shows at the top edge, outside the pin square (tinted by the pattern, so not a void) | Keep the bowl. Stage 1 widens the pin square or tilts the camera so the sliver goes |
+| Q2 | Round against square pins, cost and look | Round 5.9M triangles. Without a prepass: 104 ms round, 75 ms box (headless Ultra GPU median). With a prepass and no per-pixel onset read: **90.5 ms round, 40.7 ms box; box at 160 across, 32.4 ms**. They are indistinguishable at the scene's distance | **Box pins, depth prepass**, 180-200 across. Stage 1 gate: live at High or better |
+| Q3 | Do the darks hold colour? | **Yes.** No pixel is black: oxidised shafts and oxblood floor between the heads. The floor tint barely shows under the pins (the pins cover it); it matters at the bowl's edge | Keep the floor tint (cheap). Stage 1 checks the ≥ 3% luminance gate numerically |
+| Q4 | Kick as a regime ring against kick as a ring of B: is there still a void? | **The regime ring works and makes no void:** kicks spread the spot region outward in rings from the centre, and the labyrinth heals behind them. The growth variant did not inject at all: the field budget (Q5) pushed its fields past slot 16 | **Kick edits the regime.** The faint per-pixel glint costs about 10 ms (an onset field per pixel), so it is dropped; the regime ring itself is the visible gesture |
+| Q5 | Resonance sand as a regime layer | **Failed for a structural reason:** with a resonator plus its reader the scene has 17+ fields, and fields past the 16th are not uploaded. The pins' height and colour fields were dropped and the pins vanished | Not in this scene unless Stage 2 frees slots. The resonator idea stays in `recommendation.md` for a scene built around it |
+| Q6 | The C3 "copper rings" | The ring band (B 0.17-0.27) is about one pin wide at 0.4 m pitch. At ×3 gain it only brightens the spots' outlines; it does not read as rings yet | **Stage 1's main art task:** heads on the pattern go darker copper, and boundary pins go bright and emissive (a wider band, 0.12-0.3). That is the C3 look, on the lit bowl |
+
+**The field budget** is now a design constraint: 16 GPU field slots, 4 per material program.
+- Stage 2 must fit the music into the slots left.
+- It can replace the four MIDI seed spheres with two, and fold the brush into the seeds' compound.
 
 ## Engine
 
