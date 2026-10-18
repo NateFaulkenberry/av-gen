@@ -1,0 +1,231 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "phase-wall.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.28,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.3,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 24.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.08,
+  "post/look/atmospheric": 0.12,
+  "post/look/atmosphericDistance": 140.0,
+  "post/look/atmosphericTint": [
+   0.00425,
+   0.0121,
+   0.01399
+  ]
+ },
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "grid/net/coupling",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 16.0,
+      "value": [
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 34.0,
+      "value": [
+       5.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 44.0,
+      "value": [
+       12.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       12.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 66.0,
+      "value": [
+       5.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 80.0,
+      "value": [
+       4.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       1.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-phase-wall.mp4"
+ },
+ "sonicScene": {
+  "category": "experiment",
+  "experiment": "A coupled oscillators",
+  "thesis": "A hall whose four walls are one kinetic installation: eight thousand metal blades, each swung by its own oscillator, falling into step and breaking apart round the room.",
+  "id": "phase-wall",
+  "title": "Phase Wall"
+ }
+}
