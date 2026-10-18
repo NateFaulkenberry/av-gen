@@ -80,6 +80,14 @@ the passes after it. Approved by the owner and on main at `74edc063` (2026-10-16
     - the dead colour routes fixed;
     - the offset-lattice ground, which removes the serrated lips.
 
+21. The Resonant Visual Worlds overhaul (`docs/prototypes/resonator-quality/03-06`):
+    - four mode families with an LFO director: plate (ADR-1471), hexagonal, radial and arcs;
+    - a second resonator for the medium and fine scales;
+    - thin ridges over shallow lobes, with the ripples out of the relief;
+    - an oblique camera over a widened basin, with a palette sky and fog;
+    - multi-hue palettes;
+    - the depth prepass back on.
+
 ## Open items
 
 - A faint roughness remains on the steepest lips in extreme close-up. The outer cells (60-85 m) are coarser than the

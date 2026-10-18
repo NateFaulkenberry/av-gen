@@ -51,7 +51,7 @@
 ### Resonant Silk: a layered material world
 
 - **Composition.**
-  - Two long far drapes (about 700 m of cloth each, about 3k vertices, drift only, no music deformers) behind
+  - Two long far drapes (about 700 m of cloth each, 1k vertices, a plain role-bound material, noise drift only) behind
     the gather, one rising above it and one sweeping below. The hero's wall is the foreground, the gather and sail
     the middle ground, the drapes the background.
   - Analytic fog (no volumetric scatter, which had washed the frame out) in the palette's environment colour.
@@ -69,7 +69,8 @@
 - **Primary event: travelling fronts.** Two families sweep through all four sheets:
   - a bass swell, the low band's history laid out as spherical crests from a source just outside the sculpture,
     × a 52 m carrier at 30 m/s;
-  - a quicker mid front from the other side.
+  - a second, mid-band front was built and then cut in stage E for the live budget (about 6 ms at High each).
+  - The swell keeps a few smoothing taps: with none, the history's row jitter crumpled the sheets.
   - **The GPU audio ring holds 16 s,** so the sources sit within about 300 m (a source 400 m out read history the
     ring no longer had).
 - **Environment.**
@@ -121,9 +122,47 @@ The review loop changed these, in order:
 
 ## Performance and checks
 
-**PERF**
+All runs are live 1080p (`avgen --live-profile --mode live --target-fps 30 --size 1920x1080`), Feline from 95 s, through
+the GPU lock.
+- **The machine was heavily loaded all day** by other agents' suites and the owner's apps. The quality-pass head's
+  own numbers drifted by up to 50% (Silk at High: 35.7 ms yesterday, 53 ms today).
+- So only back-to-back pairs against the quality-pass head (`623900f8`) are compared, and Auto (the live target) is
+  what decides.
 
-**CHECKS**
+| Scene | Quality-pass head, Auto | Overhaul, Auto | Overhaul vs head at fixed High (GPU p50) |
+|---|---|---|---|
+| Cymatic World | High/Medium earlier in the day (frame p50 33.3) | **Low, frame p50 33.3 ms, 0.3% misses** | 38.0 → 43.3 ms |
+| Waveform Dimension | High, 33.3 ms, 1.5% misses | **Low, frame p50 33.3 ms, 0 misses** | 33.0 → 39.2 ms |
+| Resonant Silk | Emergency, 33.3 ms, 3% misses | **Emergency, frame p50 35.1 ms, 26% misses** | 53.3 → 50.9 ms (High); 32.5 → 33.6 ms (Emergency) |
+
+**Cymatic World and Waveform Dimension hold 30 fps on Auto,** one or two levels lower than before.
+
+**Resonant Silk does not hold 30 fps today.** Neither does its quality-pass head, which sat at the edge (3–9%
+misses) under the same load.
+- The overhaul adds about 1–2.5 ms at Emergency, where the scene is vertex-bound: the hero's 52k vertices × 8
+  deformers, plus the two drapes.
+- Measured A/B at Emergency: the drapes cost about 2.6 ms before they were lightened (now 1k vertices each, noise
+  drift only); the reflection bands cost about 0.6 ms.
+- On an unloaded machine Silk held High at about 36 ms yesterday, so it should hold Auto there. On this machine
+  today it needs a re-check before the merge.
+
+Where the overhaul's cost went, and what was done about it:
+- **Waveform Dimension:** the fronts' spectrum read per vertex (12 smoothing taps × 14 bins, in both geometry passes
+  and at four points for the normal) cost about 35 ms at High.
+  - Fixed with narrow bands, 5 taps and one front, at 39 ms.
+  - The dome costs little.
+- **Cymatic World:** the oblique view sees ridges behind ridges. The depth prepass, off since the light pass, wins
+  again (53 → 43 ms at High). The rest is more ground and the second resonator's bake.
+- **Silk:** the drapes took the hero's 37-op program and are now on a plain material.
+
+Run once at the end on head `7aaad85f` (the scenes as shipped). Each process's own exit code:
+- `tools/ci/run-suite.sh cpu-assets` (under the GPU lock): **PASS**, exit 0. 4310 passed, 0 failed, 19 skipped,
+  1 expected failure; ran 4330/4330.
+- `tools/ci/run-suite.sh gpu`: **PASS**, exit 0. 667 passed, 0 failed, 1 skipped; ran 668/668. This includes the
+  new `[adr1471]` plate parity case.
+- `tools/review_examples.py --only` for Cymatic World, Waveform Dimension, Resonant Silk and Cymatic Plate: `ok 1`
+  each, exit 0.
+- `tools/check_project_integrity.py`: **0 problems**, exit 0.
 
 ## Remaining shortcomings
 

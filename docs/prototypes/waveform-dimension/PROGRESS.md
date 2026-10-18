@@ -187,6 +187,9 @@ the owner's corrected palette appended at its end. Audit `01-resonance-audit.md`
     - a smooth glow;
     - exact cut edges with no shards.
 
+13. The Resonant Visual Worlds overhaul (`docs/prototypes/resonator-quality/03-06`): a travelling bass swell front
+    through the sheets, a far dome of palette wave bands, cool reflection bands, and roughness from the field.
+
 ## Resume
 
 Everything requested is done; see `02-report.md`. To change the look, edit `tools/waveform_dimension/build.py` (the

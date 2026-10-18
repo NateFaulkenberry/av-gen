@@ -115,3 +115,8 @@ Branch `proto/resonant-silk`, worktree `../av-gen-silk`, from main `ef3774da`, w
     - a real fill;
     - the waist's terraces calmed;
     - 37 ops.
+11. The Resonant Visual Worlds overhaul (`docs/prototypes/resonator-quality/03-06`):
+    - two far drapes, as a layered background;
+    - a palette sky gradient, glow and analytic fog (no black);
+    - satin reflection bands and a painted sheen;
+    - a saturated body.
