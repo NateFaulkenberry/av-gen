@@ -554,6 +554,52 @@ TEST_CASE("Procedural rendering is deterministic across renderers and animates w
     CHECK(ctx2->errorCount() == 0);
 }
 
+namespace {
+// A column field under a deformer stack that moves every vertex (sine, bend, noise), seen at a grazing angle so
+// columns overlap: the depth test decides most of the frame.
+scene::Scene deformedColumns() {
+    scene::Scene s = columnScene(48);
+    s.camera.position = {0.0f, 2.0f, 12.0f};
+    scene::Deformer sine;
+    sine.kind = scene::DeformerKind::Sine;
+    sine.space = scene::DeformSpace::World;
+    sine.amount = 0.6f;
+    sine.axis = {1.0f, 0.0f, 0.0f};
+    sine.frequency = 1.5f;
+    sine.speed = 2.0f;
+    sine.displacementAxis = {0.0f, 1.0f, 0.0f};
+    s.procedurals[0].deformers.push_back(sine);
+    scene::Deformer bend;
+    bend.kind = scene::DeformerKind::Bend;
+    bend.amount = 0.3f;
+    bend.falloff = 1.0f;
+    s.procedurals[0].deformers.push_back(bend);
+    scene::Deformer noise;
+    noise.kind = scene::DeformerKind::Noise;
+    noise.amount = 0.05f;
+    noise.scale = 2.0f;
+    noise.speed = 0.5f;
+    s.procedurals[0].deformers.push_back(noise);
+    return s;
+}
+} // namespace
+
+TEST_CASE("The depth-only procedural vertex stage lands on the lit pass's depth (ADR-1491)",
+          "[gpu][procedural][depth][adr1491]") {
+    // The prepass draws through vs_proc_depth (no normal, no velocity chain), the lit pass through vs_proc and tests
+    // LessEqual against it. Were the two positions to differ by a bit, the lit pass would fail its test on the
+    // surfaces it should draw and the frame would differ from the one rendered without a prepass.
+    auto ctx = makeContext();
+    scene::Scene s = deformedColumns();
+    s.environment.depthPrepass = false;
+    const auto without = renderOnce(*ctx, s, 1.0);
+    s.environment.depthPrepass = true;
+    const auto with = renderOnce(*ctx, s, 1.0);
+    CHECK(coverage(with).pixels > 2000);
+    CHECK(gpu::hashImage(with) == gpu::hashImage(without));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("4096 procedural instances render without GPU errors and re-upload only on structural change",
           "[gpu][procedural]") {
     auto ctx = makeContext();

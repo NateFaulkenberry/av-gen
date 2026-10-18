@@ -1160,7 +1160,8 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     desc.label = label;
     desc.layout = pipelineLayout;
     desc.vertex.module = module;
-    desc.vertex.entryPoint = "vs_proc";
+    // ADR-1491: the depth prepass and shadow passes skip the normal's and the velocity's extra chain evaluations.
+    desc.vertex.entryPoint = depthOnly ? "vs_proc_depth" : "vs_proc";
     desc.vertex.bufferCount = 1;
     desc.vertex.buffers = &vertex.layout;
     desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
