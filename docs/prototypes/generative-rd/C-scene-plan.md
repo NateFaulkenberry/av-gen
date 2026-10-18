@@ -98,3 +98,34 @@ touching any shared file. ADRs would take numbers from 1453-1459.
 - **Known:** the first ~10 s after a cold start show the seed blobs before the pattern forms (a pre-roll is a
   Stage 2 item).
 - **Media:** `~/Desktop/av-gen-review/65-rd-pins-scene/stage1/`.
+
+**After Stage 1 (the coordinator's notes, done):**
+- **The regime keeps moving.** A soft 30 m linear front sweeps back and forth across the bowl over 96 s, with an
+  orbiting pool of spots and an fbm wiggle on the line.
+- **The labyrinth family is coral, not maze.** Spots survive in maze territory, so the frame had gone to one field of
+  rings and stayed there. Coral stripes invade spots, so the two families trade ground both ways. In silence, over
+  96 s, the labyrinth grows to about half the frame by 36 s and the spots reclaim it by 60-96 s; the boundary is in
+  frame throughout.
+- **Pre-roll.** The scene opens on a formed pattern: 3000 numpy steps of the same model, written as authored
+  values (ADR-1453, 1.6 MB with compact arrays).
+
+**The palettes stage, done.**
+- Six role-based states (ADR-1043), bound to:
+  - the pin and floor programs;
+  - the key and rim lights (colour and intensity);
+  - the sky and fog;
+  - the pins' metal and roughness.
+- The ADR-1420 selector advances on the phrase pulse in the order 0-4-3-1-5-2, with the ADR-1421 change fallback;
+  CC 9 selects and CC 10 locks (Stage 2).
+- Stills: `palettes/contact-sheet.png`.
+
+| palette | darkest 5% (sRGB luminance) | pixels under 3% |
+|---|---|---|
+| Copper Night | 2.8% | 6.0% |
+| Verdigris Reef | 4.8% | 1.6% |
+| Garnet and Indigo | 3.2% | 4.1% |
+| Violet and Gold | 4.0% | 2.2% |
+| Electric Lagoon | 5.7% | 0.7% |
+| Rose Quartz | 6.1% | 0.3% |
+
+The remainder under 3% are the slots between pins at grazing angles, coloured, not black.

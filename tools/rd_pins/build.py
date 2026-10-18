@@ -67,13 +67,13 @@ ROLES = ["environment", "shadow", "base", "pattern", "ring", "key", "rim"]
 PALETTES = [
     # name, environment, shadow, base, pattern, ring, key, rim, tuning. Six worlds, not six browns: each has its own
     # hue for the darks (never black), the field, the rings and the two lights.
-    ("Copper Night", "#2e0e16", "#42141c", "#5a2420", "#7a3a20", "#ff9a40", "#ffe2c4", "#7a4cff",
+    ("Copper Night", "#3a1420", "#561e26", "#5a2420", "#7a3a20", "#ff9a40", "#ffe2c4", "#7a4cff",
      {"metal": 0.55, "rough": 0.3, "ringGain": 2.4, "keyI": 5.0, "rimI": 1.6}),
     ("Verdigris Reef", "#03262a", "#05363a", "#0a4a48", "#167a6a", "#8dffe0", "#e4fff6", "#ff6a8a",
      {"metal": 0.45, "rough": 0.34, "ringGain": 2.0, "keyI": 4.6, "rimI": 1.8}),
-    ("Garnet and Indigo", "#100a40", "#180e58", "#24127a", "#8a1234", "#ff4a6a", "#ffd8e4", "#3a7cff",
+    ("Garnet and Indigo", "#1a1258", "#241872", "#24127a", "#8a1234", "#ff4a6a", "#ffd8e4", "#3a7cff",
      {"metal": 0.5, "rough": 0.3, "ringGain": 2.2, "keyI": 4.4, "rimI": 2.0}),
-    ("Violet and Gold", "#22083c", "#300c56", "#3e1672", "#6a2ea0", "#ffd060", "#f6ecff", "#ffb040",
+    ("Violet and Gold", "#2a0c48", "#3c1468", "#3e1672", "#6a2ea0", "#ffd060", "#f6ecff", "#ffb040",
      {"metal": 0.6, "rough": 0.28, "ringGain": 2.0, "keyI": 4.2, "rimI": 1.6}),
     ("Electric Lagoon", "#021c38", "#03304e", "#044470", "#0a6aa8", "#e8ff5a", "#e6f6ff", "#ff3ad0",
      {"metal": 0.4, "rough": 0.32, "ringGain": 2.2, "keyI": 4.6, "rimI": 2.0}),
