@@ -5,9 +5,9 @@
  "camera": {
   "mode": 1,
   "position": [
-   8.8555,
-   44.0,
-   77.2409
+   3.0102,
+   42.0,
+   35.6497
   ],
   "target": [
    -2.0,
@@ -89,7 +89,7 @@
      "modes": 22.0,
      "fLow": 40.0,
      "fHigh": 6000.0,
-     "lambdaMax": 26.0,
+     "lambdaMax": 14.0,
      "lambdaMin": 2.6,
      "scale": 1.0,
      "selectivity": 4.0,
@@ -262,7 +262,7 @@
      "modes": 22.0,
      "fLow": 40.0,
      "fHigh": 6000.0,
-     "lambdaMax": 26.0,
+     "lambdaMax": 14.0,
      "lambdaMin": 2.6,
      "scale": 1.0,
      "selectivity": 4.0,
@@ -392,48 +392,6 @@
    }
   },
   {
-   "name": "shade-amp",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "resonance",
-    "reference": "cymatic",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "smoothstep",
-     "inner": 55.0,
-     "outer": 95.0
-    },
-    "resonance": {
-     "channel": "amplitude",
-     "listenLow": 0.0,
-     "listenHigh": 0.7,
-     "listenWidth": 0.04
-    }
-   }
-  },
-  {
-   "name": "shade-amp-grid",
-   "kind": "field",
-   "position": [
-    0,
-    0,
-    0
-   ],
-   "field": {
-    "kind": "grid",
-    "reference": "shade-amp-bake",
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
-  {
    "name": "shade-tint",
    "kind": "field",
    "position": [
@@ -518,6 +476,32 @@
    }
   },
   {
+   "name": "scan",
+   "kind": "field",
+   "position": [
+    -95.0,
+    0.0,
+    30.0
+   ],
+   "field": {
+    "kind": "onset",
+    "onsetSource": "low",
+    "axis": [
+     0.96,
+     0.0,
+     -0.28
+    ],
+    "waveGeometry": "planar",
+    "audioSpeed": 45.0,
+    "onsetWidth": 4.0,
+    "onsetDecay": 1.1,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
    "name": "relief-large",
    "kind": "field",
    "position": [
@@ -528,7 +512,7 @@
    "field": {
     "kind": "resonance",
     "reference": "cymatic",
-    "strength": 1.5,
+    "strength": 3.0,
     "falloff": {
      "kind": "smoothstep",
      "inner": 55.0,
@@ -536,7 +520,7 @@
     },
     "resonance": {
      "channel": "relief",
-     "sharpness": 0.45,
+     "sharpness": 1.2,
      "reliefLine": 0.0,
      "reliefLineSharpness": 0.5,
      "reliefVibration": 0.15,
@@ -547,7 +531,7 @@
      "sandNormalized": true,
      "reliefAmplitude": 0.0,
      "reliefRound": 0.4,
-     "reliefFigure": 0.15,
+     "reliefFigure": 0.0,
      "rows": "modes"
     }
    }
@@ -576,7 +560,7 @@
      "reliefLineSharpness": 0.5,
      "reliefVibration": 0.0,
      "listenLow": 0.3,
-     "listenHigh": 0.7,
+     "listenHigh": 1.0,
      "listenWidth": 0.04,
      "reliefSand": 1.0,
      "reliefAmplitude": 0.0,
@@ -585,7 +569,7 @@
    }
   },
   {
-   "name": "relief-fine",
+   "name": "relief-ripple",
    "kind": "field",
    "position": [
     0,
@@ -594,23 +578,43 @@
    ],
    "field": {
     "kind": "resonance",
-    "reference": "cymaticFine",
-    "strength": 0.15,
+    "reference": "cymatic",
+    "strength": 0.35,
     "falloff": {
      "kind": "smoothstep",
      "inner": 55.0,
      "outer": 95.0
     },
     "resonance": {
-     "channel": "relief",
-     "sharpness": 0.9,
-     "reliefLine": 0.0,
-     "reliefLineSharpness": 0.5,
-     "reliefVibration": 1.0,
-     "listenLow": 0.68,
-     "listenHigh": 1.0,
-     "listenWidth": 0.04,
-     "reliefSand": 0.0
+     "channel": "displacement",
+     "rows": "ripples"
+    }
+   }
+  },
+  {
+   "name": "relief-bass",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "spectrum",
+    "audioBand": "range",
+    "bandLow": 0.02,
+    "bandHigh": 0.12,
+    "audioSpeed": 18.0,
+    "audioSmooth": 0.05,
+    "point": [
+     0.0,
+     -7.0,
+     0.0
+    ],
+    "waveGeometry": "radial",
+    "strength": 0.6,
+    "falloff": {
+     "kind": "none"
     }
    }
   },
@@ -627,7 +631,8 @@
     "children": [
      "relief-large",
      "relief-medium",
-     "relief-fine"
+     "relief-ripple",
+     "relief-bass"
     ],
     "combine": "add",
     "strength": 1.0,
@@ -695,7 +700,7 @@
       "alongNormal": false
      }
     ],
-    "normalStep": 0.25390625
+    "normalStep": 0.1875
    }
   }
  ],
@@ -731,17 +736,30 @@
      "kind": "power",
      "dst": 2,
      "srcA": 0,
-     "value": 7.0
-    },
-    {
-     "kind": "field",
-     "dst": 3,
-     "field": "shade-amp-grid"
+     "value": 4.0
     },
     {
      "kind": "field",
      "dst": 5,
      "field": "shade-tint-grid"
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 5,
+     "srcB": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 3,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      1.0
+     ],
+     "value": 0.0
     },
     {
      "kind": "smoothstep",
@@ -778,6 +796,35 @@
      "srcB": 2
     },
     {
+     "kind": "field",
+     "dst": 6,
+     "field": "scan"
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      2.5
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "add",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 6
+    },
+    {
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
@@ -787,9 +834,9 @@
      "kind": "constant",
      "dst": 4,
      "constant": [
-      0.7,
-      0.7,
-      0.7,
+      1.4,
+      1.4,
+      1.4,
       1.0
      ]
     },
@@ -845,19 +892,43 @@
      "dst": 3,
      "srcA": 3,
      "constant": [
-      1.4,
+      1.6,
       3.2,
       0.0,
       0.0
      ]
     },
     {
-     "kind": "smoothstep",
+     "kind": "remap",
      "dst": 4,
      "srcA": 0,
      "constant": [
-      0.02,
-      0.14,
+      0.08,
+      0.6,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "ramp",
+     "dst": 4,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "constant3": [
+      0.0,
+      0.0,
       0.0,
       0.0
      ]
@@ -937,9 +1008,9 @@
       0.0
      ],
      "constant3": [
-      0.005,
-      0.005,
-      0.005,
+      0.006771,
+      0.006771,
+      0.006771,
       0.0
      ],
      "constant4": [
@@ -964,7 +1035,7 @@
       0.0,
       1.0,
       0.0,
-      0.18
+      -0.25
      ],
      "value": 0.0
     },
@@ -1008,9 +1079,9 @@
      "dst": 6,
      "srcA": 0,
      "constant": [
-      0.0,
-      0.6,
-      0.35,
+      0.25,
+      0.85,
+      0.06,
       1.0
      ],
      "value": 1.0
@@ -1043,21 +1114,21 @@
      "dst": 5,
      "srcA": 1,
      "constant": [
-      0.6,
-      0.6,
-      0.6,
+      0.12,
+      0.12,
+      0.12,
       1.0
      ],
      "constant2": [
-      1.3,
-      1.3,
-      1.3,
+      1.76,
+      1.76,
+      1.76,
       1.0
      ],
      "constant3": [
-      2.0,
-      2.0,
-      2.0,
+      3.4,
+      3.4,
+      3.4,
       1.0
      ]
     },
@@ -1071,7 +1142,7 @@
      "kind": "multiply",
      "dst": 1,
      "srcA": 1,
-     "srcB": 7
+     "srcB": 0
     },
     {
      "kind": "ramp",
@@ -1084,15 +1155,15 @@
       0.0
      ],
      "constant2": [
-      0.15,
-      0.15,
-      0.15,
+      0.45,
+      0.45,
+      0.45,
       0.5
      ],
      "constant3": [
-      0.3,
-      0.3,
-      0.3,
+      0.9,
+      0.9,
+      0.9,
       1.0
      ]
     },
@@ -1125,15 +1196,15 @@
       0.0
      ],
      "constant2": [
-      0.45,
-      0.45,
-      0.45,
+      0.275,
+      0.275,
+      0.275,
       0.5
      ],
      "constant3": [
-      0.9,
-      0.9,
-      0.9,
+      0.55,
+      0.55,
+      0.55,
       1.0
      ]
     },
@@ -1176,38 +1247,16 @@
     1024
    ],
    "boundsMin": [
-    -130.0,
+    -96.0,
     -4.0,
-    -130.0
+    -96.0
    ],
    "boundsMax": [
-    130.0,
+    96.0,
     -2.0,
-    130.0
+    96.0
    ],
    "injectField": "shade-sand"
-  },
-  {
-   "name": "shade-amp-bake",
-   "enabled": true,
-   "mode": "bake",
-   "wrap": "clamp",
-   "resolution": [
-    512,
-    1,
-    512
-   ],
-   "boundsMin": [
-    -130.0,
-    -4.0,
-    -130.0
-   ],
-   "boundsMax": [
-    130.0,
-    -2.0,
-    130.0
-   ],
-   "injectField": "shade-amp"
   },
   {
    "name": "shade-tint-bake",
@@ -1220,14 +1269,14 @@
     640
    ],
    "boundsMin": [
-    -130.0,
+    -96.0,
     -4.0,
-    -130.0
+    -96.0
    ],
    "boundsMax": [
-    130.0,
+    96.0,
     -2.0,
-    130.0
+    96.0
    ],
    "injectField": "shade-tint"
   },
@@ -1242,14 +1291,14 @@
     768
    ],
    "boundsMin": [
-    -130.0,
+    -96.0,
     -4.0,
-    -130.0
+    -96.0
    ],
    "boundsMax": [
-    130.0,
+    96.0,
     -2.0,
-    130.0
+    96.0
    ],
    "injectField": "shade-wave"
   },
@@ -1264,14 +1313,14 @@
     1024
    ],
    "boundsMin": [
-    -130.0,
+    -96.0,
     -4.0,
-    -130.0
+    -96.0
    ],
    "boundsMax": [
-    130.0,
+    96.0,
     -2.0,
-    130.0
+    96.0
    ],
    "injectField": "relief"
   }

@@ -454,7 +454,7 @@ LAYOUT = 24.0   # the bank's fixed size (ADR-1404): mode i sits at u = i / 23 (2
 # four large families, the overhaul; 22 before) -- the large band's modes at u = 0, .043, .087, .13 (plate), .174
 # (hexagonal), .217, .261 (radial) and .304 (arcs)
 MODES = 22.0
-LAMBDA_MAX = float(os.environ.get("CW_LAMBDA_MAX", "26.0"))
+LAMBDA_MAX = float(os.environ.get("CW_LAMBDA_MAX", "14.0"))
 # the families (05-plan §1.1): P plate, H hexagonal, R radial, A arcs -- the plate's (n, m) list (ADR-1471), each family's
 # base amplitude, its LFO (name, period s, phase) and the LFO's reach
 PLATES = [[3, 2], [5, 1], [4, 3], [6, 1], [5, 2]]
@@ -490,36 +490,39 @@ BAKE_RES = int(os.environ.get("CW_BAKE_RES", "1024"))
 # ART PASS II (08-plan §2.3-2.4): the excitation from the colour field (frees a reader, its grid and a program slot),
 # a travelling SCAN of light on each kick, onset RIPPLES back in the geometry (riding the figure, low), and a BASS
 # WAVEFRONT: the bass of the last seconds laid out outward from the basin's heart, in the relief
-AMP_FROM_TINT = os.environ.get("CW_AMP_FROM_TINT", "0") == "1"
-AMP_GAIN = float(os.environ.get("CW_AMP_GAIN", "2.2"))         # tint^2 x this ~ the old excitation's scale
-SCAN = float(os.environ.get("CW_SCAN", "0"))                    # the scan's light gain (0 = off)
+AMP_FROM_TINT = os.environ.get("CW_AMP_FROM_TINT", "1") == "1"
+AMP_GAIN = float(os.environ.get("CW_AMP_GAIN", "1.0"))         # tint^2 x this ~ the old excitation's scale
+SCAN = float(os.environ.get("CW_SCAN", "2.5"))                    # the scan's light gain (0 = off)
 SCAN_SPEED = float(os.environ.get("CW_SCAN_SPEED", "45"))       # m/s across the basin
 SCAN_WIDTH = float(os.environ.get("CW_SCAN_WIDTH", "4"))        # m, the band's half width
 SCAN_DECAY = float(os.environ.get("CW_SCAN_DECAY", "1.1"))      # 1/s
+SCAN_ON_CREST = os.environ.get("CW_SCAN_CREST", "1") == "1"
 SCAN_FROM = (-95.0, 0.0, 30.0)                                  # upstream of the frame's left edge
 SCAN_AXIS = (0.96, 0.0, -0.28)                                  # across the frame, a little away from the camera
-RIPPLE_RELIEF = float(os.environ.get("CW_RIPPLE_RELIEF", "0"))  # metres of the onset rings in the geometry (0 = off)
+RIPPLE_RELIEF = float(os.environ.get("CW_RIPPLE_RELIEF", "0.35"))  # metres of the onset rings in the geometry (0 = off)
 # the snare's flash on every nodal line at once (a frame-wide event, brief §4.2 "not the same full-screen flash"): the
 # snare's energy now travels (the ripples, the scan's glimmer); its flash on the lines comes down
-SNARE_LINE = float(os.environ.get("CW_SNARE_LINE", "0.9"))
-BASS_FRONT = float(os.environ.get("CW_BASS_FRONT", "0"))        # metres of the bass wavefront (0 = off)
+SNARE_LINE = float(os.environ.get("CW_SNARE_LINE", "0.3"))
+MERGE_FINE = os.environ.get("CW_MERGE_FINE", "1") == "1"
+MERGE_VIB = float(os.environ.get("CW_MERGE_VIB", "0"))   # art pass II: medium + fine in one relief reader
+BASS_FRONT = float(os.environ.get("CW_BASS_FRONT", "0.6"))        # metres of the bass wavefront (0 = off)
 BASS_SPEED = float(os.environ.get("CW_BASS_SPEED", "18"))       # m/s outward from the heart
 NORMAL_CELLS = float(os.environ.get("CW_NORMAL_CELLS", "1"))   # the normal's finite-difference step, in bake cells
-BAKE_HALF = float(os.environ.get("CW_BAKE_HALF", "130"))   # metres (86 before the oblique camera)   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
+BAKE_HALF = float(os.environ.get("CW_BAKE_HALF", "96"))   # metres (86 before the oblique camera)   # metres: the frame's top edge meets the ground inside ~80 m (camera B, 21:9)
 # the camera (the correction round, owner: "pull back"): A the shape-language framing, B pulled back (chosen), C further
 CAMERAS = {"A": (30.0, 32.0, 30.0), "B": (36.0, 42.0, 28.0), "C": (40.0, 48.0, 26.0),
            # the overhaul's C2: an oblique view, ~30 degrees down, the plate in the lower two thirds and the basin's
            # walls, the ranges and the sky above (05-plan §1.1)
            "D": (78.0, 44.0, 26.0)}
-CAMERA = CAMERAS[os.environ.get("CW_CAM", "D")]
+CAMERA = CAMERAS[os.environ.get("CW_CAM", "B")]
 PROTO = os.environ.get("CW_PROTO", "P2")   # Stage 2: P2 (nodal boundaries) chosen
-LARGE_SHARP = float(os.environ.get("CW_LARGE_SHARP", "0.45"))
+LARGE_SHARP = float(os.environ.get("CW_LARGE_SHARP", "1.2"))
 # how deep the antinodes sink under the large figure (-1.2 before the overhaul: a field of deep pits that hid the
 # nodal network; shallower basins let the plate's crossing lines read as the figure)
 LARGE_CREASE = float(os.environ.get("CW_LARGE_CREASE", "0.0"))
 GEOM_RIPPLES = os.environ.get("CW_GEOM_RIPPLES", "0") == "1"
-LARGE_FIGURE = float(os.environ.get("CW_LARGE_FIGURE", "0.15"))   # the signed lobes (domes and dips), per unit relief
-LARGE_HEIGHT = float(os.environ.get("CW_LARGE_HEIGHT", "1.5"))    # metres per unit (2.8 before)
+LARGE_FIGURE = float(os.environ.get("CW_LARGE_FIGURE", "0.0"))   # the signed lobes (domes and dips), per unit relief
+LARGE_HEIGHT = float(os.environ.get("CW_LARGE_HEIGHT", "3.0"))    # metres per unit (2.8 before)
 LARGE_ROUND = float(os.environ.get("CW_LARGE_ROUND", "0.4"))
 MEDIUM_ROUND = float(os.environ.get("CW_MEDIUM_ROUND", "0.5"))
 SHAPES = {
@@ -606,6 +609,18 @@ def ground_readers(s):
                 continue
         if only_scale is not None and name != only_scale:
             continue
+        if MERGE_FINE and name == "fine" and only_mode is None:
+            continue   # (art pass II: the fine vibration is a term of the medium reader -- see below)
+        if MERGE_FINE and name == "medium" and only_mode is None:
+            # art pass II: ONE reader over the second resonator's whole band (medium sand ridges + the fine vibration as
+            # its own term), so the relief compound has room for the ripples and the bass front (a compound sums at most
+            # four children) and a field is freed; the fine lattice's amplitude carries the hats instead of its height
+            hi = SCALES["fine"][1]
+            fextra, famount = SHAPES[PROTO]["fine"]
+            # (no vibration term: over the whole band it shook the medium net at its own rate -- 5x the frame-to-frame
+            # change of the baseline, a vibrating mesh; the hats raise the fine lattice's amplitude, so its sand ridges
+            # rise and fall inside the medium net instead)
+            extra = dict(extra, reliefVibration=MERGE_VIB * famount / amount)
         r = {"sharpness": 0.9, "reliefLine": 0.0, "reliefLineSharpness": 0.5, "reliefVibration": 0.0,
              "listenLow": lo, "listenHigh": hi, "listenWidth": 0.04 if only_mode is None else 0.005}
         r.update(extra)
@@ -673,9 +688,9 @@ PALETTES = {
     # B, plasma interference: navy stone, teal grit, cyan key, violet-fuchsia fill, pink-white accents
     "B": {"line2": "#7fb6ff", "line2I": 0.4, "wave": "#9ff0ff", "waveI": float(os.environ.get("CW_WAVE_I", "2.5")), "violet": "#2c0c6e", "blue": "#0a2c84", "stone": "#050a22", "grit": "#0b4458", "key": "#62ecff", "fill": "#c13bff", "rim": "#ff8fe6",
           "sky": "#1a1250", "haze": "#2a2275", "line": "#d4fffb", "hollow": "#ff3fd2", "sheen": "#9fe6ff",
-          "sheenI": float(os.environ.get("CW_SHEEN_I", "0.3")),
-          "keyI": float(os.environ.get("CW_KEY_I", "2.0")), "fillI": 0.9, "rimI": 0.35, "skyI": float(os.environ.get("CW_SKY_I", "0.6")),
-          "lineI": float(os.environ.get("CW_LINE_I", "0.7")),
+          "sheenI": float(os.environ.get("CW_SHEEN_I", "0.9")),
+          "keyI": float(os.environ.get("CW_KEY_I", "3.4")), "fillI": float(os.environ.get("CW_FILL_I", "0.55")), "rimI": 0.35, "skyI": float(os.environ.get("CW_SKY_I", "0.12")),
+          "lineI": float(os.environ.get("CW_LINE_I", "1.4")),
           "hollowI": 0.4},
     # C, spectral heat: violet stone, indigo grit, electric-blue key, hot-pink fill, amber rim, coral hollows
     "C": {"stone": "#1d1150", "grit": "#3c2a9a", "key": "#6aa8ff", "fill": "#ff3f8f", "rim": "#ffb46b",
@@ -853,8 +868,8 @@ PALETTE = os.environ.get("CW_PALETTE", "M")   # M: the ten palettes (12-brief); 
 PAL_INDEX = float(os.environ.get("CW_PAL", "0"))               # the palette shown (palette/position)
 PAL_ALBEDO = float(os.environ.get("CW_PAL_ALBEDO", "0.28"))     # albedo = the brief's display colour x this
 GRAD_ALBEDO = float(os.environ.get("CW_GRAD_ALBEDO", "1.0"))    # the chromatic field's stops, relative to it
-LIGHT_WHITE = float(os.environ.get("CW_LIGHT_WHITE", "0.45"))    # how far the key and ambient floor lean to white
-LIGHT_PAIR = os.environ.get("CW_LIGHT_PAIR", "0") == "1"           # art pass II: fill + glow from the gradient's end
+LIGHT_WHITE = float(os.environ.get("CW_LIGHT_WHITE", "0.2"))    # how far the key and ambient floor lean to white
+LIGHT_PAIR = os.environ.get("CW_LIGHT_PAIR", "1") == "1"           # art pass II: fill + glow from the gradient's end
 LIGHT_PAIR_CHROMA = float(os.environ.get("CW_LIGHT_PAIR_CHROMA", "1.6"))
 PAL_TRANSITION = float(os.environ.get("CW_PAL_TRANSITION", "6.0"))  # seconds of OKLab blend
 PAL_HOLD = float(os.environ.get("CW_PAL_HOLD", "24.0"))         # the least time a palette is held
@@ -878,16 +893,19 @@ PAL_CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], 
 # and how much colour the hollow floors keep (Stage C's 0.1 crushed them to black)
 BAND_N = float(os.environ.get("CW_BAND_N", "1.3"))
 BAND_W = float(os.environ.get("CW_BAND_W", "0.45"))
-RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "0.18"))
+RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "-0.25"))
 # the crest line's width: sand^13 drew a line ~0.25 m wide, thinner than a mesh cell, which zigzagged along every
 # steep lip (resonator-quality Phase C); sand^7 is ~0.35 m and softer-edged
-CREST_POWER = float(os.environ.get("CW_CREST_POWER", "7"))
+CREST_POWER = float(os.environ.get("CW_CREST_POWER", "4"))
 # where the hollow glow starts and saturates in the excitation (the overhaul's four families ring harder: 0.3..1.0 lit
 # every hollow)
-HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "1.4,3.2").split(",")]
+HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "1.6,3.2").split(",")]
 TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "1.6"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
 BAND_RATE = float(os.environ.get("CW_BAND_RATE", "1.6"))   # the band's phase, metres a second per unit of the integral
-FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.35"))
+FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.06"))
+FLOOR_RANGE = [float(v) for v in os.environ.get("CW_FLOOR_RANGE", "0.25,0.85").split(",")]   # sand -> floor darkening
+SHEEN_RIDGE = os.environ.get("CW_SHEEN_RIDGE", "1") == "1"
+WALL_BAND = [float(v) for v in os.environ.get("CW_WALL_BAND", "0.08,0.6").split(",")] if os.environ.get("CW_WALL_BAND", "0.08,0.6") else None
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
 FILL_DIR = (-0.8, -0.32, 0.5)       # the fill travels the other way: lights the flanks the key leaves dark
 
@@ -987,7 +1005,9 @@ def ground_program():
             # the scan (layer C): a band crossing the basin, lighting the whole ridge it passes (the sand mask, wider
             # than the crest) in the travelling light's colour, the crest hottest
             g.op("scan", "field", 6, field="scan")
-            g.op(None, "multiply", 6, a=6, b=0)
+            # on the crest line (r2, before the excitation multiplies it), not the whole sand ridge: P4's band over the
+            # wide ridges read as a white haze crossing the basin, not light running along the network
+            g.op(None, "multiply", 6, a=6, b=2 if SCAN_ON_CREST else 0)
             g.op("scanGain", "remap", 6, a=6, k=[0.0, 1.0, 0.0, SCAN], f=0.0)
             g.op(None, "add", 7, a=7, b=6)
     g.op(None, "multiply", 2, a=2, b=3)                            # crest x ringing (unbounded: a pair, not a ramp)
@@ -1012,7 +1032,14 @@ def ground_program():
         g.op(None, "multiply", 3, a=3, b=7)
     # ... and only on the inner walls of a cell: a band of the sand field just inside the grit, so the glow's edges
     # follow the relief (the sand's contours ARE the cell walls), never an unshaped wash over flat ground
-    g.op("wallBand", "smoothstep", 4, a=0, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
+    if WALL_BAND:
+        # art pass II: a BAND of the sand (the cell's inner wall, between its floor and its ridge), peaked mid-slope --
+        # the one-sided step below became "everywhere but the antinode cores" once the ridges widened (P4/P5: the
+        # glow flooded whole lobes)
+        g.op("wallBand", "remap", 4, a=0, k=[WALL_BAND[0], WALL_BAND[1], 0.0, 1.0], f=1.0)
+        g.op(None, "ramp", 4, a=4, k=[0, 0, 0, 0], k2=[1, 1, 1, 1], k3=[0, 0, 0, 0])
+    else:
+        g.op("wallBand", "smoothstep", 4, a=0, k=[0.02, 0.14] if BAKE else [0.035, 0.08])
     g.op(None, "multiply", 3, a=3, b=4)
     if BAKE:  # the fuchsia glow belongs to the violet lobes: the colour field chooses which cells glow
         g.op("violetLobes", "remap", 4, a=5, k=[-0.05 * TINT_GAIN, -0.35 * TINT_GAIN, 0.0, 1.0] if PALETTE == "M"
@@ -1055,7 +1082,7 @@ def ground_program():
         # Stage C (coordinator, after B): the hollow FLOORS fall back toward black -- the deepest sand (the cell floor
         # inside the walls) keeps a fifth of its colour, so the lobes' violet and blue live on the walls and the frame
         # has real negative space for the light to stand out against
-        g.op("floorDark", "remap", 6, a=0, k=[0.0, 0.6, FLOOR_MIN, 1.0] if PALETTE == "M" else [0.0, 0.4, 0.1, 1.0],
+        g.op("floorDark", "remap", 6, a=0, k=[FLOOR_RANGE[0], FLOOR_RANGE[1], FLOOR_MIN, 1.0] if PALETTE == "M" else [0.0, 0.4, 0.1, 1.0],
              f=1.0)
         g.op(None, "multiply", 4, a=4, b=6)
     else:
@@ -1070,7 +1097,8 @@ def ground_program():
         tint("key", 5, 1, "key", P_["keyI"])                       # the raking key
     g.op("sheenLobe", "power", 1, a=1, f=18.0 if PALETTE == "M" else 12.0)   # the key's highlight (narrower: white
     # sheen must not swallow the chromatic field) ...
-    g.op(None, "multiply", 1, a=1, b=7)                            # ... on the smooth stone only
+    # ... on the smooth stone only (art pass II, SHEEN_RIDGE: on the ridge network instead -- the reference's lit tubes)
+    g.op(None, "multiply", 1, a=1, b=0 if (SHEEN_RIDGE and BAKE and PALETTE == "M") else 7)
     tint("sheen", 1, 1, "sheen", P_["sheenI"])                     # r1: sheen
     g.op("fillDot", "gradient", 3, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
     g.op(None, "power", 3, a=3, f=4.0)                             # the fill grazes: a narrow lobe on the far flanks
@@ -1306,7 +1334,8 @@ def build_world():
             R("sonic.roughness.slow", F + "source/3/amplitude", 0.45, attackMs=1500, decayMs=3000),
             R("response.bass", D(1), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
             R("response.sustain", D(2), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
-            R("response.hat", D(3), 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
+            R("response.hat", ("field/%s/resonance/source/1/amplitude" % FIELD_FINE) if MERGE_FINE else D(3), 1.0,
+              op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     if PALETTE == "M" and BAKE:

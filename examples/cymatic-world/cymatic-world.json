@@ -125,7 +125,7 @@
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.2,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 26.0,
+  "camera/lens/focalLength": 28.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
@@ -375,7 +375,7 @@
   },
   {
    "source": "response.hat",
-   "target": "field/relief-fine/strength",
+   "target": "field/cymaticFine/resonance/source/1/amplitude",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -434,7 +434,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/23/palette/value",
+   "target": "material/cwGround/op/29/palette/value",
    "amount": 20.0,
    "op": "add",
    "polarity": "unipolar",
@@ -445,7 +445,7 @@
   },
   {
    "source": "sonic.energy",
-   "target": "material/cwGround/op/23/palette/value",
+   "target": "material/cwGround/op/29/palette/value",
    "amount": 1.6,
    "op": "add",
    "polarity": "unipolar",
@@ -457,7 +457,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/20/ramp/constant2",
+   "target": "material/cwGround/op/26/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -470,7 +470,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "material/cwGround/op/20/ramp/constant3",
+   "target": "material/cwGround/op/26/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -483,7 +483,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/20/ramp/constant2",
+   "target": "material/cwGround/op/26/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -496,7 +496,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/cwGround/op/20/ramp/constant3",
+   "target": "material/cwGround/op/26/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -509,12 +509,12 @@
   },
   {
    "source": "response.snareEnv",
-   "target": "material/cwGround/op/10/constant/constant",
+   "target": "material/cwGround/op/15/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 0.9,
+    "gain": 0.3,
     "offset": 1.0,
     "attackMs": 0,
     "decayMs": 260
@@ -522,7 +522,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/35/ramp/constant2",
+   "target": "material/cwGround/op/41/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -535,7 +535,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/cwGround/op/35/ramp/constant3",
+   "target": "material/cwGround/op/41/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -548,7 +548,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/38/ramp/constant2",
+   "target": "material/cwGround/op/44/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -561,7 +561,7 @@
   },
   {
    "source": "response.flux",
-   "target": "material/cwGround/op/38/ramp/constant3",
+   "target": "material/cwGround/op/44/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -574,7 +574,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/38/ramp/constant2",
+   "target": "material/cwGround/op/44/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -587,7 +587,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/38/ramp/constant3",
+   "target": "material/cwGround/op/44/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -600,7 +600,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/cwGround/op/10/constant/constant",
+   "target": "material/cwGround/op/15/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -628,225 +628,225 @@
      {
       "time": 0.0,
       "value": [
-       8.8555,
-       44.0,
-       77.2409
+       3.0102,
+       42.0,
+       35.6497
       ],
       "interp": "smooth"
      },
      {
       "time": 6.6667,
       "value": [
-       22.5596,
-       45.0,
-       74.0326
+       9.3352,
+       43.0,
+       34.1689
       ],
       "interp": "smooth"
      },
      {
       "time": 13.3333,
       "value": [
-       34.6188,
-       45.7321,
-       68.8699
+       14.901,
+       43.7321,
+       31.7861
       ],
       "interp": "smooth"
      },
      {
       "time": 20.0,
       "value": [
-       44.1598,
-       46.0,
-       62.8751
+       19.3045,
+       44.0,
+       29.0193
       ],
       "interp": "smooth"
      },
      {
       "time": 26.6667,
       "value": [
-       50.8374,
-       45.7321,
-       57.3778
+       22.3865,
+       43.7321,
+       26.482
       ],
       "interp": "smooth"
      },
      {
       "time": 33.3333,
       "value": [
-       54.7075,
-       45.0,
-       53.5562
+       24.1727,
+       43.0,
+       24.7182
       ],
       "interp": "smooth"
      },
      {
       "time": 40.0,
       "value": [
-       55.9653,
-       44.0,
-       52.1922
+       24.7532,
+       42.0,
+       24.0887
       ],
       "interp": "smooth"
      },
      {
       "time": 46.6667,
       "value": [
-       54.7075,
-       43.0,
-       53.5562
+       24.1727,
+       41.0,
+       24.7182
       ],
       "interp": "smooth"
      },
      {
       "time": 53.3333,
       "value": [
-       50.8374,
-       42.2679,
-       57.3778
+       22.3865,
+       40.2679,
+       26.482
       ],
       "interp": "smooth"
      },
      {
       "time": 60.0,
       "value": [
-       44.1598,
-       42.0,
-       62.8751
+       19.3045,
+       40.0,
+       29.0193
       ],
       "interp": "smooth"
      },
      {
       "time": 66.6667,
       "value": [
-       34.6188,
-       42.2679,
-       68.8699
+       14.901,
+       40.2679,
+       31.7861
       ],
       "interp": "smooth"
      },
      {
       "time": 73.3333,
       "value": [
-       22.5596,
-       43.0,
-       74.0326
+       9.3352,
+       41.0,
+       34.1689
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       8.8555,
-       44.0,
-       77.2409
+       3.0102,
+       42.0,
+       35.6497
       ],
       "interp": "smooth"
      },
      {
       "time": 86.6667,
       "value": [
-       -5.202,
-       45.0,
-       77.9342
+       -3.4779,
+       43.0,
+       35.9697
       ],
       "interp": "smooth"
      },
      {
       "time": 93.3333,
       "value": [
-       -18.2171,
-       45.7321,
-       76.2955
+       -9.4848,
+       43.7321,
+       35.2133
       ],
       "interp": "smooth"
      },
      {
       "time": 100.0,
       "value": [
-       -29.0409,
-       46.0,
-       73.1628
+       -14.4804,
+       44.0,
+       33.7674
       ],
       "interp": "smooth"
      },
      {
       "time": 106.6667,
       "value": [
-       -36.9751,
-       45.7321,
-       69.719
+       -18.1424,
+       43.7321,
+       32.178
       ],
       "interp": "smooth"
      },
      {
       "time": 113.3333,
       "value": [
-       -41.7486,
-       45.0,
-       67.1122
+       -20.3455,
+       43.0,
+       30.9749
       ],
       "interp": "smooth"
      },
      {
       "time": 120.0,
       "value": [
-       -43.3337,
-       44.0,
-       66.1478
+       -21.0771,
+       42.0,
+       30.5297
       ],
       "interp": "smooth"
      },
      {
       "time": 126.6667,
       "value": [
-       -41.7486,
-       43.0,
-       67.1122
+       -20.3455,
+       41.0,
+       30.9749
       ],
       "interp": "smooth"
      },
      {
       "time": 133.3333,
       "value": [
-       -36.9751,
-       42.2679,
-       69.719
+       -18.1424,
+       40.2679,
+       32.178
       ],
       "interp": "smooth"
      },
      {
       "time": 140.0,
       "value": [
-       -29.0409,
-       42.0,
-       73.1628
+       -14.4804,
+       40.0,
+       33.7674
       ],
       "interp": "smooth"
      },
      {
       "time": 146.6667,
       "value": [
-       -18.2171,
-       42.2679,
-       76.2955
+       -9.4848,
+       40.2679,
+       35.2133
       ],
       "interp": "smooth"
      },
      {
       "time": 153.3333,
       "value": [
-       -5.202,
-       43.0,
-       77.9342
+       -3.4779,
+       41.0,
+       35.9697
       ],
       "interp": "smooth"
      },
      {
       "time": 160.0,
       "value": [
-       8.8555,
-       44.0,
-       77.2409
+       3.0102,
+       42.0,
+       35.6497
       ],
       "interp": "smooth"
      }
@@ -1144,29 +1144,29 @@
       0.13252
      ],
      "key": [
-      0.52402,
-      0.70381,
+      0.33157,
+      0.54003,
       1.15
      ],
      "sky": [
-      0.44117,
-      0.52678,
+      0.25666,
+      0.36417,
       0.8
      ],
      "keymid": [
-      0.48259,
-      0.61529,
+      0.29411,
+      0.4521,
       0.975
      ],
      "fill": [
-      0.1132,
-      0.28472,
-      1.0
+      1.0,
+      0.0,
+      0.38304
      ],
      "hollow": [
-      0.09056,
-      0.22778,
-      0.8
+      0.8,
+      0.0,
+      0.30643
      ],
      "line": [
       0.40288,
@@ -1259,29 +1259,29 @@
       0.03845
      ],
      "key": [
-      0.76023,
-      0.59023,
+      0.73631,
+      0.4807,
       0.8
      ],
      "sky": [
-      0.76232,
-      0.59102,
+      0.60957,
+      0.34091,
       1.0
      ],
      "keymid": [
-      0.76128,
-      0.59063,
+      0.67294,
+      0.4108,
       0.9
      ],
      "fill": [
-      0.77473,
-      0.12618,
-      1.0
+      1.0,
+      0.0,
+      0.05151
      ],
      "hollow": [
       0.5,
-      0.02234,
-      0.15885
+      0.0,
+      0.02576
      ],
      "line": [
       1.3,
@@ -1375,28 +1375,28 @@
      ],
      "key": [
       1.0,
-      0.77051,
-      0.56474
+      0.68028,
+      0.41371
      ],
      "sky": [
       1.0,
-      0.60637,
-      0.55255
+      0.3822,
+      0.31707
      ],
      "keymid": [
       1.0,
-      0.68844,
-      0.55865
+      0.53124,
+      0.36539
      ],
      "fill": [
       1.0,
-      0.13736,
-      0.03482
+      0.23688,
+      0.0
      ],
      "hollow": [
       0.8,
-      0.10989,
-      0.02786
+      0.1895,
+      0.0
      ],
      "line": [
       1.0,
@@ -1489,29 +1489,29 @@
       0.08138
      ],
      "key": [
-      0.80024,
-      0.65835,
+      0.72038,
+      0.52552,
       1.0
      ],
      "sky": [
-      0.63441,
-      0.57621,
+      0.4437,
+      0.34388,
       1.0
      ],
      "keymid": [
-      0.71732,
-      0.61728,
+      0.58204,
+      0.4347,
       1.0
      ],
      "fill": [
-      0.45005,
-      0.10538,
-      1.0
+      1.0,
+      0.01093,
+      0.36959
      ],
      "hollow": [
       1.0,
-      0.15529,
-      0.64291
+      0.01093,
+      0.36959
      ],
      "line": [
       1.0,
@@ -1605,28 +1605,28 @@
      ],
      "key": [
       1.0,
-      0.88612,
-      0.76768
+      0.83568,
+      0.67049
      ],
      "sky": [
-      0.92641,
+      0.86161,
       1.0,
-      0.9806
+      0.96351
      ],
      "keymid": [
-      0.9632,
-      0.94306,
-      0.87414
+      0.9308,
+      0.91784,
+      0.817
      ],
      "fill": [
       1.0,
-      0.33126,
-      0.15078
+      0.40938,
+      0.0
      ],
      "hollow": [
       0.4,
-      0.1325,
-      0.06031
+      0.16375,
+      0.0
      ],
      "line": [
       1.0,
@@ -1719,28 +1719,28 @@
       0.13122
      ],
      "key": [
-      1.0925,
-      1.09838,
+      1.08909,
+      1.09766,
       1.1
      ],
      "sky": [
-      0.56277,
-      0.71215,
+      0.35028,
+      0.57739,
       0.9
      ],
      "keymid": [
-      0.82763,
-      0.90527,
+      0.71968,
+      0.83752,
       1.0
      ],
      "fill": [
-      0.56999,
-      0.86148,
+      0.05829,
+      0.95247,
       1.0
      ],
      "hollow": [
-      0.05271,
-      0.16071,
+      0.01457,
+      0.23812,
       0.25
      ],
      "line": [
@@ -1834,29 +1834,29 @@
       0.01513
      ],
      "key": [
-      0.76304,
+      0.65321,
       1.0,
-      0.83188
+      0.75453
      ],
      "sky": [
-      0.71783,
+      0.4897,
       1.0,
-      0.81912
+      0.67379
      ],
      "keymid": [
-      0.74043,
+      0.57146,
       1.0,
-      0.8255
+      0.71416
      ],
      "fill": [
-      0.10731,
+      0.6176,
       1.0,
-      0.37797
+      0.0
      ],
      "hollow": [
-      0.10731,
+      0.6176,
       1.0,
-      0.37797
+      0.0
      ],
      "line": [
       0.49687,
@@ -1950,28 +1950,28 @@
      ],
      "key": [
       0.7,
-      0.65687,
-      0.67001
+      0.63806,
+      0.65693
      ],
      "sky": [
       1.25,
-      0.88971,
-      1.13719
+      0.64401,
+      1.06221
      ],
      "keymid": [
       0.975,
-      0.77329,
-      0.9036
+      0.64103,
+      0.85957
      ],
      "fill": [
       1.0,
-      0.234,
-      0.48521
+      0.27212,
+      0.26239
      ],
      "hollow": [
       0.45,
-      0.1053,
-      0.21834
+      0.12245,
+      0.11808
      ],
      "line": [
       0.55,
@@ -2069,24 +2069,24 @@
       1.0
      ],
      "sky": [
-      0.89657,
-      0.93713,
+      0.80096,
+      0.87748,
       1.0
      ],
      "keymid": [
-      0.94829,
-      0.96857,
+      0.90048,
+      0.93874,
       1.0
      ],
      "fill": [
-      0.70341,
-      0.80927,
-      1.0
+      1.0,
+      0.87772,
+      0.75451
      ],
      "hollow": [
-      0.3517,
-      0.40464,
-      0.5
+      0.5,
+      0.43886,
+      0.37726
      ],
      "line": [
       0.83708,
@@ -2179,29 +2179,29 @@
       0.01588
      ],
      "key": [
-      0.99579,
-      0.92927,
+      0.99343,
+      0.89315,
       1.0
      ],
      "sky": [
-      0.69458,
-      0.71549,
+      0.49031,
+      0.51211,
       1.0
      ],
      "keymid": [
-      0.84518,
-      0.82238,
+      0.74187,
+      0.70263,
       1.0
      ],
      "fill": [
       1.0,
-      0.15643,
-      0.36542
+      0.13082,
+      0.14009
      ],
      "hollow": [
       0.35,
-      0.05475,
-      0.1279
+      0.04579,
+      0.04903
      ],
      "line": [
       0.7,
@@ -2274,82 +2274,82 @@
   "bindings": [
    {
     "role": "wave",
-    "target": "material/cwGround/op/12/ramp/constant2",
+    "target": "material/cwGround/op/17/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "wave",
-    "target": "material/cwGround/op/12/ramp/constant3",
+    "target": "material/cwGround/op/17/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "hollow",
-    "target": "material/cwGround/op/20/ramp/constant2",
+    "target": "material/cwGround/op/26/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "hollow",
-    "target": "material/cwGround/op/20/ramp/constant3",
+    "target": "material/cwGround/op/26/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "sheen",
-    "target": "material/cwGround/op/35/ramp/constant2",
+    "target": "material/cwGround/op/41/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "sheen",
-    "target": "material/cwGround/op/35/ramp/constant3",
+    "target": "material/cwGround/op/41/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "fill",
-    "target": "material/cwGround/op/38/ramp/constant2",
+    "target": "material/cwGround/op/44/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "fill",
-    "target": "material/cwGround/op/38/ramp/constant3",
+    "target": "material/cwGround/op/44/ramp/constant3",
     "mode": "multiply"
    },
    {
     "role": "line",
-    "target": "material/cwGround/op/10/constant/constant",
+    "target": "material/cwGround/op/15/constant/constant",
     "mode": "multiply"
    },
    {
     "role": "g0",
-    "target": "material/cwGround/op/27/oklabRamp/constant",
+    "target": "material/cwGround/op/33/oklabRamp/constant",
     "mode": "multiply"
    },
    {
     "role": "g1",
-    "target": "material/cwGround/op/27/oklabRamp/constant2",
+    "target": "material/cwGround/op/33/oklabRamp/constant2",
     "mode": "multiply"
    },
    {
     "role": "g2",
-    "target": "material/cwGround/op/27/oklabRamp/constant3",
+    "target": "material/cwGround/op/33/oklabRamp/constant3",
     "mode": "multiply"
    },
    {
     "role": "g3",
-    "target": "material/cwGround/op/27/oklabRamp/constant4",
+    "target": "material/cwGround/op/33/oklabRamp/constant4",
     "mode": "multiply"
    },
    {
     "role": "sky",
-    "target": "material/cwGround/op/32/ramp/constant",
+    "target": "material/cwGround/op/38/ramp/constant",
     "mode": "multiply"
    },
    {
     "role": "keymid",
-    "target": "material/cwGround/op/32/ramp/constant2",
+    "target": "material/cwGround/op/38/ramp/constant2",
     "mode": "multiply"
    },
    {
     "role": "key",
-    "target": "material/cwGround/op/32/ramp/constant3",
+    "target": "material/cwGround/op/38/ramp/constant3",
     "mode": "multiply"
    },
    {
