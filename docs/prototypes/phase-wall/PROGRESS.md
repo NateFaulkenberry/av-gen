@@ -25,6 +25,9 @@ Owner's ask: "oscillator A3-flaps looks good too - build this into a full scene,
 2. **Scene generator:** `python3 tools/phase_wall/build.py` writes `examples/experiments/phase-wall/`.
    - Review variant: `--variant --out <v.json> --camera nave|east|corner|end|up [--wav w] [--set p=json]`.
    - Strobe metric: `python3 tools/phase_wall/fdiff.py <clip.mp4>` (gate p50 ≤ 6, p95 ≤ 12).
+   - Dead-space gate: `python3 tools/phase_wall/sweep.py write <dir> --palette i`, render `<dir>/list.txt`, then
+     `sweep.py score <dir>` (60 frames; exit 0 = pass).
+   - Review palette: `--palette i` on a variant selects and locks state i.
 3. Proof generator (stage 0, throwaway): `python3 tools/phase_wall/proof.py --out <dir> [--flap square|blade]
    [--back lit|dark] [--pitch p] [--single]`. It writes a project outside the repository.
 4. Render: `AVGEN_GPU_LOCK_TIMEOUT=14400 tools/gpu-lock.sh build/release/src/avgen --headless --project <p.json>
@@ -69,3 +72,36 @@ Owner's ask: "oscillator A3-flaps looks good too - build this into a full scene,
       tint;
     - the crest tone dominates the islands state (more trough contrast wanted);
     - unison at the trough instant reads as a dark louvre screen (it alternates with bronze about every 5 s).
+- **2026-10-17/18. Stage 2 (environment, light, colour) and the palettes, done.** The coordinator's Stage 1 notes
+  were: the blades read as pixels; one mid value; a white floor sheen.
+  - **The blades as louvres:**
+    - a bevel (0.018 m, one segment), so each edge catches a highlight;
+    - a shading profile in each blade's own frame (localPosition): a dish across the width, a lift toward the top,
+      and soft shadow lines at the four edges that sink to 30%, never black.
+  - **The value range:**
+    - a three-stop ramp (trough, mid, crest) over the full sin θ range;
+    - spread 0.15 → 0.28, which gives more islands per view, so dark, mid and bright are all on screen;
+    - troughs lifted to a coloured dark, so a trough island is a colour, not a hole.
+  - **The palettes:** 8 role-based states with the ADR-1420 selector and the ADR-1421 change fallback:
+    - **the states:** Bronze Tide, Ember, Gilt Orchid, Coral Lagoon, Verdigris, Aurora, Cobalt Ice, Nocturne;
+    - **the roles:** environment, back, trough, mid, crest, wash, front, peak, trim, floor;
+    - every colour in the hall is bound to a role: 4 blade programs, the floor program, the backplanes, the strips,
+      the inlay, the piers, the coffers, the 6 lights, the sky, the fog and the post tint. The selector is in the
+      project now; the CC 9/10 routes come with the MIDI map in Stage 4.
+  - **The floor:**
+    - the 4 wall washes and the key are `diffuseOnly`, which killed the warm-white sheen;
+    - the floor is **unlit**: lacquer in the `floor` role, with fbm mottling, plus each wall's own tone pooled on the
+      floor beneath it (the floor program reads the 4 sin θ readers; a reader's frame maps a floor point to the
+      wall's bottom row);
+    - a bounce light (`back` role, diffuse only, from below) lights the coffers' soffits.
+  - **Gates:**
+    - **sweep:** 0 fails out of 60 frames on Nocturne (worst 4.6%) and on Ember (worst 4.0%). The threshold was
+      recalibrated to near-black at a linear luminance under 0.008; the R&D A3 frames score 37-41% dead on it.
+    - **strobe:** islands p50 0.5 / p95 0.7; unison p50 5.5 / p95 7.6.
+  - **Live:** `--live-profile --mode live --audio feline --target-fps 30` holds at Medium (1362×766) with GPU 26.9 ms
+    and **0 misses**.
+    - The cost is geometry/opaque: the per-pixel programs (the 33-op blades, the 36-op floor with 4 field reads), up
+      from 13.4 ms in the proof.
+    - Key shadows were removed (6 ms, invisible).
+    - Without `--target-fps 30`, Auto targets the 60 Hz display and drops to Emergency. Stage 6 should look at this.
+  - **Media:** `66-phase-wall-scene/02-colour/`.
