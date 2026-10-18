@@ -72,3 +72,29 @@ Media: `~/Desktop/av-gen-review/65-rd-pins-scene/proofs/`. Feline Footwear, 30-5
 
 None is planned. The scene uses ADR-1450-1452 and existing kinds. If a gap appears, I tell the coordinator before
 touching any shared file. ADRs would take numbers from 1453-1459.
+
+## Log
+
+**Stage 0 approved, 2026-10-17.** The coordinator's notes:
+- performance is a hard gate (Medium or better on loud passages, misses under 1%);
+- six genuinely different, colourful palettes;
+- the rings;
+- remove the sliver;
+- category Experiments for now.
+
+**Stage 1 (world and look), done.**
+- **Changes:**
+  - box pins, 190 across (0.46 m pitch), with a depth prepass and no per-pixel onset glint;
+  - three MIDI seeds (the field budget);
+  - rings: heads on the pattern are dark polished metal, boundary heads (B 0.11-0.29) carry a bright ring at ×2.4,
+    so spots read as copper rings on dark;
+  - camera at (10, 31, 31) → (−1, 0, −5): no floor sliver anywhere in the 90 s drift.
+- **Darks:** at 1080p, p5 luminance is 3.7% and 2.6% of pixels fall under 3%. These are the gaps between pins at
+  grazing angles; none is black.
+- **Live** (`--mode live`, Auto, 30 fps, 1920 × 1080, Feline Footwear, 10 s windows of 300 frames each):
+  - at 40 s: High (1632 × 918), GPU 27.9 / 30.5 ms (p50 / p95), 0 misses;
+  - at 95 s (loud): Ultra (1920 × 1080), GPU 30.4 / 34.0 ms, 0 misses;
+  - CPU work about 5 ms.
+- **Known:** the first ~10 s after a cold start show the seed blobs before the pattern forms (a pre-roll is a
+  Stage 2 item).
+- **Media:** `~/Desktop/av-gen-review/65-rd-pins-scene/stage1/`.

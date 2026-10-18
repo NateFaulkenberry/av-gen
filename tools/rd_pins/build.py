@@ -31,7 +31,7 @@ from tools.generative_rd.common import R, hexrgb  # noqa: E402
 ID = "rd-pins"
 TITLE = "RD Pins"
 OUT = os.path.join(REPO, "examples", "rd-pins")
-PIN = os.environ.get("RP_PIN", "round")
+PIN = os.environ.get("RP_PIN", "box")  # round pins cost 2.2x and look the same at this distance (plan, Q2)
 KICK = os.environ.get("RP_KICK", "regime")
 RES = bool(os.environ.get("RP_RES"))
 FLOOR = os.environ.get("RP_FLOOR", "1") != "0"
@@ -41,7 +41,7 @@ RING = float(os.environ.get("RP_RING", "1.0"))            # proofs: x the palett
 # ================================================================================================ the world (metres)
 SIZE = 88.0            # the pattern's square domain, centred on the bowl
 RES_RD = 320           # RD cells across (0.275 m)
-N_PINS = int(os.environ.get("RP_N", "220"))  # pins across (0.4 m pitch at 220)
+N_PINS = int(os.environ.get("RP_N", "190"))  # pins across (0.46 m pitch)
 BOWL_R, BOWL_H, BOWL_P = 44.0, 18.0, 2.4   # y = H (r / R)^P: flat floor, walls rising to the rim
 CENTRE = (0.0, 0.0, 0.0)
 
@@ -61,22 +61,23 @@ DA, DB = 0.3, 0.15
 # ================================================================================================ palettes
 ROLES = ["environment", "shadow", "base", "pattern", "ring", "key", "rim"]
 PALETTES = [
-    # name, environment, shadow, base, pattern, ring, key, rim, tuning
-    ("Copper Night", "#120708", "#2a1410", "#3a1d14", "#c8743c", "#ff8a3a", "#ffe2c4", "#6a3cff",
-     {"metal": 0.55, "rough": 0.3, "ringGain": 1.4, "keyI": 7.0}),
-    ("Verdigris", "#06100f", "#103430", "#1d4a42", "#d08a50", "#5ff2d0", "#fff0dc", "#3fa7b8",
-     {"metal": 0.75, "rough": 0.38, "ringGain": 1.1, "keyI": 4.0}),
-    ("Garnet and Indigo", "#06051a", "#14103a", "#1d1650", "#c01a36", "#ff5a6a", "#ffd8d0", "#4c3cff",
-     {"metal": 0.6, "rough": 0.3, "ringGain": 1.2, "keyI": 3.6}),
-    ("Violet and Gold", "#0c0614", "#22123a", "#2e1a4e", "#6a3fa0", "#ffc45a", "#f0e4ff", "#ffb347",
-     {"metal": 0.7, "rough": 0.28, "ringGain": 1.0, "keyI": 3.4}),
-    ("Bone and Basalt", "#0e0e0f", "#1c1c1e", "#2a2a2c", "#d9cdb4", "#000000", "#fff4e4", "#8fa8c8",
-     {"metal": 0.1, "rough": 0.55, "ringGain": 0.0, "keyI": 5.0}),
-    ("Ember", "#050404", "#0c0a0a", "#141111", "#2a2220", "#ff6a1a", "#a0a8b8", "#ff8a3a",
-     {"metal": 0.5, "rough": 0.4, "ringGain": 2.0, "keyI": 1.4}),
+    # name, environment, shadow, base, pattern, ring, key, rim, tuning. Six worlds, not six browns: each has its own
+    # hue for the darks (never black), the field, the rings and the two lights.
+    ("Copper Night", "#2e0e16", "#42141c", "#5a2420", "#7a3a20", "#ff9a40", "#ffe2c4", "#7a4cff",
+     {"metal": 0.55, "rough": 0.3, "ringGain": 2.4, "keyI": 5.0, "rimI": 1.6}),
+    ("Verdigris Reef", "#03262a", "#05363a", "#0a4a48", "#167a6a", "#8dffe0", "#e4fff6", "#ff6a8a",
+     {"metal": 0.45, "rough": 0.34, "ringGain": 2.0, "keyI": 4.6, "rimI": 1.8}),
+    ("Garnet and Indigo", "#100a40", "#180e58", "#24127a", "#8a1234", "#ff4a6a", "#ffd8e4", "#3a7cff",
+     {"metal": 0.5, "rough": 0.3, "ringGain": 2.2, "keyI": 4.4, "rimI": 2.0}),
+    ("Violet and Gold", "#22083c", "#300c56", "#3e1672", "#6a2ea0", "#ffd060", "#f6ecff", "#ffb040",
+     {"metal": 0.6, "rough": 0.28, "ringGain": 2.0, "keyI": 4.2, "rimI": 1.6}),
+    ("Electric Lagoon", "#021c38", "#03304e", "#044470", "#0a6aa8", "#e8ff5a", "#e6f6ff", "#ff3ad0",
+     {"metal": 0.4, "rough": 0.32, "ringGain": 2.2, "keyI": 4.6, "rimI": 2.0}),
+    ("Rose Quartz", "#341024", "#4a1a36", "#5e2446", "#b0587a", "#fff0c8", "#fff0f4", "#5ac8ff",
+     {"metal": 0.3, "rough": 0.4, "ringGain": 1.8, "keyI": 4.8, "rimI": 1.8}),
 ]
 START_PALETTE = int(os.environ.get("RP_PALETTE", "0"))
-JOURNEY = [0, 1, 2, 3, 4, 5]
+JOURNEY = [0, 4, 3, 1, 5, 2]
 CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0, "slow": 24.0,
           "threshold": 0.06, "rearm": 0.03, "primaryTimeout": 30.0, "maxHold": 90.0}
 P0 = dict(zip(ROLES, PALETTES[START_PALETTE][1:8]), **PALETTES[START_PALETTE][8])
@@ -127,7 +128,8 @@ def pattern(s):
     s.field("brush", {"kind": "sphere", "radius": 1.5, "softness": 0.8}, position=(0.0, 0.0, 0.0))
     common.lissajous_track(s, "field/brush/position", (0.0, 0.0, 0.0), (24.0, 18.0), 67.0, ratio=(2, 1))
     seeds = ["brush"]
-    for i, (x, z) in enumerate(((-18.0, -14.0), (16.0, -20.0), (20.0, 12.0), (-14.0, 18.0))):
+    # three MIDI seeds (the GPU has 16 field slots; four seeds and a second compound pushed the pins' own fields out)
+    for i, (x, z) in enumerate(((-18.0, -14.0), (16.0, -20.0), (14.0, 14.0))):
         n = "seed%d" % i
         s.field(n, {"kind": "sphere", "radius": 1.8, "softness": 0.8, "strength": 0.0}, position=(x, 0.0, z))
         seeds.append(n)
@@ -161,8 +163,9 @@ def pattern(s):
 
 # ================================================================================================ the programs
 def pin_program():
-    """A pin: oxidised (shadow -> base) where the pattern is low, bright metal (pattern) where it is high; a thin ring of
-    light at the head where the pin stands on the pattern's boundary; the kick's ring as a passing glint."""
+    """A pin (the C3 look, on a lit bowl): heads on the pattern are dark polished `pattern` metal; heads on the pattern's
+    boundary (B in about 0.12-0.30, the isoline band two pins wide) carry a bright ring of light; heads off the pattern
+    are low `base`; shafts fall to `shadow`. Bright rings against dark is the identity (owner, 2026-10-17)."""
     g = common.Prog("rpPin")
     g.op("vee", "field", 0, field="vee")                                # r0 = B
     g.op(None, "smoothstep", 1, a=0, k=[0.06, 0.24, 0, 0])               # r1 = on the pattern
@@ -174,20 +177,14 @@ def pin_program():
     g.op(None, "smoothstep", 6, a=5, k=[0.1 * PIN_H, 0.45 * PIN_H, 0, 0])  # r6 = the head
     g.op("shadow", "constant", 7, k=C("shadow") + [1])
     g.op(None, "mixBy", 4, a=7, b=4, c=6)                                # shaft dark, head lit
-    # the ring: B near the boundary isoline, at the head
-    g.op(None, "remap", 1, a=0, k=[0.17, 0.27, 0.0, 1.0])
+    # the ring: 1 at B = 0.2, falling to 0 at 0.2 +- 0.09, squared
+    g.op(None, "remap", 1, a=0, k=[0.11, 0.29, -1.0, 1.0])
     g.op(None, "multiply", 1, a=1, b=1)
     g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
-    g.op(None, "power", 1, a=1, f=6.0)
-    g.op(None, "multiply", 1, a=1, b=6)
+    g.op(None, "multiply", 1, a=1, b=1)
+    g.op(None, "multiply", 1, a=1, b=6)                                  # on the head
     g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])
     g.op(None, "multiply", 1, a=1, b=2)                                  # r1 = emission
-    if KICK == "regime" and os.environ.get("RP_GLINT", "1") != "0":
-        g.op("kick", "field", 2, field="kickRegime")                    # the passing ring: a glint on the heads
-        g.op(None, "multiply", 2, a=2, b=6)
-        g.op("kickCol", "constant", 3, k=C("ring", 0.35) + [1])
-        g.op(None, "multiply", 2, a=2, b=3)
-        g.op(None, "add", 1, a=1, b=2)
     g.op("rough", "constant", 7, k=[P0["rough"]] * 3 + [1])
     g.base, g.emit, g.rough = 4, 1, 7
     return g
@@ -199,10 +196,10 @@ def floor_program():
     g = common.Prog("rpFloor")
     g.op(None, "field", 0, field="vee")
     g.op(None, "smoothstep", 0, a=0, k=[0.05, 0.3, 0, 0])
-    g.op("env", "constant", 1, k=C("environment", 2.0) + [1])
+    g.op("env", "constant", 1, k=C("environment", 1.6) + [1])
     g.op("tint", "constant", 2, k=C("base") + [1])
     g.op(None, "mixBy", 3, a=1, b=2, c=0)
-    g.op("glow", "constant", 4, k=C("ring", 0.04) + [1])
+    g.op("glow", "constant", 4, k=C("ring", 0.03) + [1])
     g.op(None, "multiply", 4, a=4, b=0)
     g.base, g.emit = 3, 4
     return g
@@ -221,10 +218,10 @@ DESIGN = {
 
 def environment(s):
     s.environment = {
-        "intensity": 0.08, "background": C("environment"), "fogColor": C("environment"),
+        "intensity": 0.28, "background": C("environment"), "fogColor": C("environment"),
         "volumeDensity": 0.0, "fogSky": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0,
         "shadowRange": 120.0, "ambientOcclusion": False, "contactShadows": False,
-        "depthPrepass": os.environ.get("RP_PREPASS", "0") == "1",
+        "depthPrepass": os.environ.get("RP_PREPASS", "1") == "1",  # 75 -> 41 ms (plan, Q2): pins overdraw
         "sky": {"enabled": True, "zenithColor": C("environment", 1.5), "horizonColor": C("shadow", 1.2),
                 "groundColor": C("environment"), "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
@@ -232,7 +229,7 @@ def environment(s):
     # a warm key grazing across the bowl, a cool rim from behind, no shadows (the pins' own darkening does depth)
     s.light("key", "directional", direction=[0.62, -0.55, -0.56], color=C("key"), intensity=P0["keyI"],
             castsShadow=False, contactShadow=False, softness=0.3)
-    s.light("rim", "directional", direction=[-0.45, -0.3, 0.84], color=C("rim"), intensity=1.4,
+    s.light("rim", "directional", direction=[-0.45, -0.3, 0.84], color=C("rim"), intensity=P0["rimI"],
             castsShadow=False, contactShadow=False)
 
 
@@ -266,7 +263,7 @@ def build():
         s.nodes[-1]["procedural"]["material"].pop("program")
     environment(s)
     # on the rim, looking across and down: the far wall rises above the eye line, so the frame is all pins
-    s.camera = {"mode": 1, "position": [8.0, 34.0, 40.0], "target": [-4.0, 2.0, -8.0], "fov": 40.0,
+    s.camera = {"mode": 1, "position": [10.0, 31.0, 31.0], "target": [-1.0, 0.0, -5.0], "fov": 40.0,
                 "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(4.0, 1.0, 2.0), tamp=(2.0, 0.5, 0.0),
                    steps=8)
