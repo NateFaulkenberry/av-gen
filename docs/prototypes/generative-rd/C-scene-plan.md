@@ -175,3 +175,15 @@ The remainder under 3% are the slots between pins at grazing angles, coloured, n
   other agents' GPU work between runs. CPU work is about 6 ms.
 - **The index.** "RD Pins" (`examples/rd-pins/`) is in Experiments, live. The R&D harness it grew from is renamed
   "RD Pins (R&D)" and hidden.
+
+**Stage 3: final checks (2026-10-18, at `8bf11493` after a clean reconfigure and rebuild). Status: complete.**
+
+| check | result | exit |
+|---|---|---|
+| `tools/ci/run-suite.sh cpu-assets` | PASS: 4319 passed, 0 failed, 4339/4339 ran | 0 |
+| `tools/ci/run-suite.sh gpu` | PASS: 670 passed, 0 failed, 671/671 ran | 0 |
+| `tools/review_examples.py --only` for RD Pins (+ RD Pins (R&D)), Phase Membrane, Phase Wall and RD Relief | ok for every one | 0 each |
+| `tools/check_project_integrity.py` | 0 problems | 0 |
+
+**To regenerate:** `python3 tools/rd_pins/build.py`. It writes `examples/rd-pins/` and the index entry, and recomputes
+the pre-roll state.

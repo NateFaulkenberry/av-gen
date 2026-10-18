@@ -68,3 +68,12 @@ assets/audio/feline-footwear.wav --mode live --target-fps 30 --size 1920x1080 --
    with Audio Influence as the depth of every audio route, plus MIDI notes. Amounts were tuned on Feline Footwear
    40-60 s.
 7. **Media** (`compare/` folders), **performance** (`performance.md`: live profiles plus a grid-on/off A/B; the oscillator weights were made separable, 6.3 to 2.6 ms; the RD planes went to 384² and 320² at 12 iterations, 11.5 to 7.5 ms; the fog march was dropped, 7 ms), **docs**, and **final checks**, all exit 0 (`recommendation.md`, end). Status: complete; the coordinator merges.
+
+8. **The RD Pins live scene** (owner decision, 2026-10-17):
+   - research: `C-scene-research.md`;
+   - plan, stage log and final checks: `C-scene-plan.md`;
+   - generator: `tools/rd_pins/build.py`, which writes `examples/rd-pins/`;
+   - ADR-1453: an RD grid can start from authored values, used for the pre-roll;
+   - media: `~/Desktop/av-gen-review/65-rd-pins-scene/`.
+
+   Current Lines is hidden (flow stays a tool). Status: complete; the coordinator merges.
