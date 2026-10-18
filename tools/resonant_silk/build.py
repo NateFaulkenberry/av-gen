@@ -514,9 +514,11 @@ def palette_block(g):
     def op(label, field="constant"):
         return "material/%s/op/%d/%s/%s" % (g.name, g[label], g.ops[g[label] - 1]["kind"], field)
     b = [
-        {"role": "environment", "target": "env/sky/zenithColor", "gain": 0.6},
-        {"role": "environment", "target": "env/sky/groundColor", "gain": 0.7},
-        {"role": "environment", "target": "env/sky/horizonColor", "gain": 1.0},
+        # the void has colour (the overhaul, stage B): the sky's horizon in the shadow role, lifted, so the space behind
+        # the drapes is a deep coloured gradient, never black
+        {"role": "environment", "target": "env/sky/zenithColor", "gain": 1.0},
+        {"role": "shadow", "target": "env/sky/groundColor", "gain": 1.2},
+        {"role": "shadow", "target": "env/sky/horizonColor", "gain": 2.2},
         {"role": "environment", "target": "scene/fogColor", "gain": 1.6},
         {"role": "resonant", "target": "env/sky/sunColor", "gain": 1.0},
         {"role": "fillLight", "target": "lights/fill/color"},
@@ -565,7 +567,7 @@ FILL_I = float(os.environ.get("RS_FILL_I", "1.1"))
 BANDS_ON = os.environ.get("RS_BANDS", "1") == "1"
 BANDS = {"phase": 0.0, "rotation": 0.0, "gain": float(os.environ.get("RS_BANDS_GAIN", "0.6")),
          "softbox": {"intensity": 0.5, "azimuth": 2.6, "elevation": 0.55, "falloff": 2.2, "skyFill": 0.04},
-         "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.05, "intensity": 3.0, "segments": 0,
+         "strips": [{"axis": [0.2, 1.0, 0.1], "offset": 0.35, "width": 0.09, "intensity": 1.6, "segments": 0,
                      "warmth": 0.3, "rate": 0.0}]}
 SILK_FOG = float(os.environ.get("RS_FOG", "0.0013"))
 SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
