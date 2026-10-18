@@ -1,0 +1,553 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "osc-flaps.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.22,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.4,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 24.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.08
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "influence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "control.influence",
+        "weight": 1.0
+       }
+      ],
+      "bias": 0.5,
+      "gain": 0.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.sustain",
+   "target": "grid/net/coupling",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "grid/net/frequency",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "grid/net/noise",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "grid/net/phaseLag",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 6000,
+    "decayMs": 12000
+   }
+  },
+  {
+   "source": "control.coupling",
+   "target": "grid/net/coupling",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.complexity",
+   "target": "grid/net/spread",
+   "amount": 0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.motion",
+   "target": "grid/net/speed",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.persistence",
+   "target": "grid/net/persistence",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.mode",
+   "target": "grid/net/phaseLag",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "grid/net/coupling",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 96.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       1.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.0,
+      "value": [
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.0,
+      "value": [
+       14.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.0,
+      "value": [
+       1.5
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 110.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -30.0,
+       14.0,
+       29.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.75,
+      "value": [
+       -26.4645,
+       15.5,
+       29.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.5,
+      "value": [
+       -25.0,
+       14.0,
+       31.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.25,
+      "value": [
+       -26.4645,
+       12.5,
+       32.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.0,
+      "value": [
+       -30.0,
+       14.0,
+       33.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 68.75,
+      "value": [
+       -33.5355,
+       15.5,
+       32.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       -35.0,
+       14.0,
+       31.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.25,
+      "value": [
+       -33.5355,
+       12.5,
+       29.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       -30.0,
+       14.0,
+       29.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 110.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       11.6939,
+       34.8415,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.75,
+      "value": [
+       12.9486,
+       34.5403,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.5,
+      "value": [
+       12.476,
+       33.1585,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.25,
+      "value": [
+       10.553,
+       33.4597,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.0,
+      "value": [
+       8.3061,
+       34.8415,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 68.75,
+      "value": [
+       7.0514,
+       34.5403,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 82.5,
+      "value": [
+       7.524,
+       33.1585,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.25,
+      "value": [
+       9.447,
+       33.4597,
+       0.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 110.0,
+      "value": [
+       11.6939,
+       34.8415,
+       0.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-osc-flaps.mp4"
+ },
+ "sonicScene": {
+  "category": "experiment",
+  "thesis": "A kinetic wall of nearly ten thousand metal flaps, each turned by its own oscillator: when they fall into step the whole wall turns and flashes as one; as the coupling loosens it breaks into islands that turn against each other, and travelling waves sweep bands of light across it.",
+  "experiment": "A coupled oscillators",
+  "id": "osc-flaps",
+  "title": "Phase Wall"
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "coupling"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "complexity"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "motion"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "influence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "persistence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "mode"
+    }
+   ]
+  }
+ }
+}

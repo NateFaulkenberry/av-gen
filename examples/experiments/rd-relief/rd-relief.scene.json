@@ -1,0 +1,665 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "rd-relief",
+ "camera": {
+  "mode": 1,
+  "position": [
+   8.0,
+   30.0,
+   50.0
+  ],
+  "target": [
+   -6.0,
+   8.0,
+   -30.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.05,
+  "background": [
+   0.00335,
+   0.00304,
+   0.00368
+  ],
+  "fogColor": [
+   0.01852,
+   0.01411,
+   0.01156
+  ],
+  "volumeDensity": 0.0,
+  "fogSky": 1.0,
+  "fogHeight": 400.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 120.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00335,
+    0.00304,
+    0.00368
+   ],
+   "horizonColor": [
+    0.02315,
+    0.01764,
+    0.01444
+   ],
+   "groundColor": [
+    0.00335,
+    0.00304,
+    0.00368
+   ],
+   "haze": 1.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "regimePool",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.1,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -6.0,
+     0.0,
+     -2.0
+    ],
+    "kind": "radial",
+    "radius": 26.0
+   }
+  },
+  {
+   "name": "regimeDrift",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.55,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "noise",
+    "frequency": 0.05,
+    "speed": 0.12,
+    "seed": 5
+   }
+  },
+  {
+   "name": "regime",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "regimePool",
+     "regimeDrift"
+    ]
+   }
+  },
+  {
+   "name": "brush",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     6.0
+    ],
+    "kind": "sphere",
+    "radius": 1.6,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "patternRegimeMap",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "patternRegime"
+   }
+  },
+  {
+   "name": "relief",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "pattern"
+   }
+  },
+  {
+   "name": "plain",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rd-plain.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rdRelief",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.62,
+     "metallic": 0.0,
+     "doubleSided": true
+    },
+    "deformers": [
+     {
+      "kind": "field",
+      "field": "relief",
+      "amount": 1.6,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 0.08
+   }
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "low",
+    "point": [
+     -6.0,
+     0.0,
+     -2.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 10.0,
+    "onsetWidth": 0.9,
+    "onsetDecay": 0.5
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "mid",
+    "point": [
+     12.0,
+     0.0,
+     8.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 16.0,
+    "onsetWidth": 0.5,
+    "onsetDecay": 0.9
+   }
+  },
+  {
+   "name": "seed0",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -16.0,
+     0.0,
+     -10.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed1",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     10.0,
+     0.0,
+     -18.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed2",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     14.0,
+     0.0,
+     8.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seed3",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     -12.0,
+     0.0,
+     14.0
+    ],
+    "kind": "sphere",
+    "radius": 1.8,
+    "softness": 0.8
+   }
+  },
+  {
+   "name": "seeds",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "seed0",
+     "seed1",
+     "seed2",
+     "seed3"
+    ]
+   }
+  },
+  {
+   "name": "sources",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "brush",
+     "kickFront",
+     "snareFront",
+     "seeds"
+    ]
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.75,
+    -0.42,
+    -0.5
+   ],
+   "color": [
+    1.0,
+    0.7991,
+    0.55201
+   ],
+   "intensity": 6.0,
+   "castsShadow": true,
+   "contactShadow": false,
+   "softness": 0.3
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.6,
+    -0.3,
+    0.75
+   ],
+   "color": [
+    0.10224,
+    0.14703,
+    0.26225
+   ],
+   "intensity": 0.7,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "rdRelief",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "relief"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.04,
+      0.2,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.01298,
+      0.00972,
+      0.0075,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.58408,
+      0.49693,
+      0.34191,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 0,
+     "constant": [
+      0.17,
+      0.27,
+      0.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "power",
+     "dst": 5,
+     "srcA": 5,
+     "value": 6.0
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.62,
+      0.62,
+      0.62,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": 7,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "patternRegime",
+   "mode": "bake",
+   "wrap": "wrap",
+   "resolution": [
+    128,
+    1,
+    128
+   ],
+   "boundsMin": [
+    -48.0,
+    -3.0,
+    -48.0
+   ],
+   "boundsMax": [
+    48.0,
+    3.0,
+    48.0
+   ],
+   "injectField": "regime"
+  },
+  {
+   "name": "pattern",
+   "mode": "reactionDiffusion",
+   "wrap": "wrap",
+   "resolution": [
+    384,
+    1,
+    384
+   ],
+   "boundsMin": [
+    -48.0,
+    -3.0,
+    -48.0
+   ],
+   "boundsMax": [
+    48.0,
+    3.0,
+    48.0
+   ],
+   "diffusionA": 0.3,
+   "diffusionB": 0.15,
+   "feed": 0.055,
+   "kill": 0.062,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "speed": 720.0,
+   "iterations": 12,
+   "seed": 11,
+   "seedAmount": 1.0,
+   "checkpointInterval": 5.0,
+   "regimeField": "patternRegimeMap",
+   "feedB": 0.0367,
+   "killB": 0.0649,
+   "injectField": "sources",
+   "injectRate": 1.5
+  }
+ ]
+}

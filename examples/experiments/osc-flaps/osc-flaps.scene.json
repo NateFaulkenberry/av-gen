@@ -1,0 +1,513 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "osc-flaps",
+ "camera": {
+  "mode": 1,
+  "position": [
+   -30.0,
+   14.0,
+   30.0
+  ],
+  "target": [
+   10.0,
+   34.0,
+   0.0
+  ],
+  "fov": 40.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.06,
+  "background": [
+   0.00061,
+   0.00152,
+   0.00182
+  ],
+  "fogColor": [
+   0.00243,
+   0.00802,
+   0.007
+  ],
+  "volumeDensity": 0.0,
+  "fogSky": 1.0,
+  "fogHeight": 400.0,
+  "fogHeightFalloff": 0.0,
+  "skyIntensity": 1.0,
+  "shadowRange": 160.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": true,
+   "zenithColor": [
+    0.00061,
+    0.00152,
+    0.00182
+   ],
+   "horizonColor": [
+    0.00243,
+    0.00802,
+    0.007
+   ],
+   "groundColor": [
+    0.00061,
+    0.00152,
+    0.00182
+   ],
+   "haze": 1.0,
+   "sunIntensity": 0.0,
+   "intensity": 1.0,
+   "background": true,
+   "useKeyLight": false
+  }
+ },
+ "nodes": [
+  {
+   "name": "phase",
+   "kind": "field",
+   "position": [
+    0.0,
+    32.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 1
+   },
+   "rotation": [
+    -90.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "order",
+   "kind": "field",
+   "position": [
+    0.0,
+    32.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 2
+   },
+   "rotation": [
+    -90.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "activity",
+   "kind": "field",
+   "position": [
+    0.0,
+    32.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "grid",
+    "reference": "net",
+    "channel": 3
+   },
+   "rotation": [
+    -90.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "name": "flaps",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.86,
+      0.86,
+      0.035
+     ]
+    },
+    "distribution": {
+     "kind": "grid",
+     "gridCount": [
+      150,
+      64,
+      1
+     ],
+     "gridSpacing": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "program": "oscFlaps",
+     "baseColor": [
+      1,
+      1,
+      1
+     ],
+     "roughness": 0.34,
+     "metallic": 0.7
+    },
+    "effectors": [
+     {
+      "field": "phase",
+      "op": "rotation",
+      "blend": "add",
+      "strength": 0.9,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ]
+     }
+    ]
+   },
+   "position": [
+    0.0,
+    32.0,
+    0.0
+   ]
+  },
+  {
+   "name": "kickFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "low",
+    "point": [
+     0.0,
+     0.0,
+     -18.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 16.0,
+    "onsetWidth": 3.0,
+    "onsetDecay": 1.0
+   }
+  },
+  {
+   "name": "snareFront",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "onset",
+    "onsetSource": "mid",
+    "point": [
+     26.0,
+     0.0,
+     -32.0
+    ],
+    "waveGeometry": "spherical",
+    "audioSpeed": 24.0,
+    "onsetWidth": 1.6,
+    "onsetDecay": 1.8
+   }
+  },
+  {
+   "name": "kicks",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "kickFront",
+     "snareFront"
+    ]
+   }
+  }
+ ],
+ "lights": [
+  {
+   "id": "key",
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    0.35,
+    -0.4,
+    -0.85
+   ],
+   "color": [
+    1.0,
+    0.7454,
+    0.47932
+   ],
+   "intensity": 5.0,
+   "castsShadow": true,
+   "contactShadow": false,
+   "softness": 0.3
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "direction": [
+    0.5,
+    -0.35,
+    0.8
+   ],
+   "color": [
+    0.04971,
+    0.38643,
+    0.47932
+   ],
+   "intensity": 1.2,
+   "castsShadow": false,
+   "contactShadow": false
+  }
+ ],
+ "materialPrograms": [
+  {
+   "name": "oscFlaps",
+   "ops": [
+    {
+     "kind": "field",
+     "dst": 0,
+     "field": "phase"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      -0.7,
+      0.9,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.00121,
+      0.00518,
+      0.00478,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.33245,
+      0.19462,
+      0.07619,
+      1.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 4,
+     "srcA": 2,
+     "srcB": 3,
+     "srcC": 1
+    },
+    {
+     "kind": "field",
+     "dst": 5,
+     "field": "activity"
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.8,
+      3.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.0515,
+      0.39957,
+      0.33543,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "field",
+     "dst": 5,
+     "field": "order"
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.85,
+      0.2,
+      0.0,
+      1.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "power",
+     "dst": 5,
+     "srcA": 5,
+     "value": 3.0
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 5,
+     "srcA": 5,
+     "srcB": 7
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 5
+    },
+    {
+     "kind": "constant",
+     "dst": 7,
+     "constant": [
+      0.34,
+      0.34,
+      0.34,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 4,
+   "metallic": -1,
+   "roughness": 7,
+   "emission": 6,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "net",
+   "mode": "oscillator",
+   "wrap": "clamp",
+   "resolution": [
+    300,
+    1,
+    128
+   ],
+   "boundsMin": [
+    -75.0,
+    -40.0,
+    -32.0
+   ],
+   "boundsMax": [
+    75.0,
+    40.0,
+    32.0
+   ],
+   "frequency": 0.18,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "seed": 3,
+   "persistence": 0.6,
+   "links": 0,
+   "linkRange": 48.0,
+   "checkpointInterval": 5.0,
+   "coupling": 4.0,
+   "phaseLag": 0.3,
+   "couplingRadius": 4,
+   "spread": 0.15,
+   "seedAmount": 1.0,
+   "noise": 0.05,
+   "injectField": "kicks",
+   "injectRate": 2.0
+  }
+ ]
+}

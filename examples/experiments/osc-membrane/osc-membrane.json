@@ -1,0 +1,1297 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Sonic VFX"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "osc-membrane.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true,
+  "character": {
+   "dimensions": {
+    "roughness": {
+     "terms": [
+      {
+       "feature": "dissonance",
+       "lo": 0.01,
+       "hi": 0.12,
+       "weight": 1.5
+      },
+      {
+       "feature": "flatness",
+       "lo": 0.001,
+       "hi": 0.3,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "inharmonicity",
+       "lo": 0.15,
+       "hi": 0.7,
+       "weight": 1.0
+      },
+      {
+       "feature": "bandwidth",
+       "lo": 1500,
+       "hi": 6000,
+       "log": true,
+       "weight": 1.0
+      }
+     ],
+     "attack": 0.05,
+     "release": 0.25,
+     "slow": 1.8
+    },
+    "energy": {
+     "slow": 3.0
+    },
+    "brightness": {
+     "attack": 0.05,
+     "release": 0.2,
+     "slow": 2.0,
+     "terms": [
+      {
+       "feature": "centroid",
+       "lo": 160,
+       "hi": 4000,
+       "log": true,
+       "weight": 1.0
+      },
+      {
+       "feature": "rolloff",
+       "lo": 400,
+       "hi": 10000,
+       "log": true,
+       "weight": 0.75
+      },
+      {
+       "feature": "highRatio",
+       "lo": -40,
+       "hi": -6,
+       "weight": 1.0
+      }
+     ]
+    },
+    "warmth": {
+     "slow": 2.2
+    },
+    "sharpness": {
+     "slow": 2.0
+    },
+    "smoothness": {
+     "slow": 2.0
+    },
+    "harmonicity": {
+     "slow": 2.2
+    },
+    "inharmonicity": {
+     "slow": 2.2
+    },
+    "density": {
+     "slow": 2.2
+    },
+    "complexity": {
+     "slow": 2.2
+    },
+    "stability": {
+     "slow": 2.2
+    },
+    "movement": {
+     "slow": 2.0
+    }
+   }
+  },
+  "response": {
+   "sensitivity": 0.5,
+   "transient": 0.5,
+   "sustain": 0.5,
+   "attack": 1.0,
+   "release": 1.0
+  }
+ },
+ "parameters": {
+  "post/bloom/enabled": true,
+  "post/bloom/intensity": 0.2,
+  "post/bloom/threshold": 1.0,
+  "post/bloom/emissionWeight": 0.7,
+  "post/tonemap/chroma-retention": 0.6,
+  "post/output/vignette": 0.45,
+  "post/output/grain": 0.01,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "camera/lens/useExplicitFov": false,
+  "camera/lens/focalLength": 24.0,
+  "scene/volumeSteps": 24,
+  "scene/volumeJitter": 0.4,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.08
+ },
+ "sources": [
+  {
+   "kind": "interpret",
+   "name": "scene",
+   "settings": {
+    "mappings": [
+     {
+      "name": "influence",
+      "combine": "mean",
+      "inputs": [
+       {
+        "signal": "control.influence",
+        "weight": 1.0
+       }
+      ],
+      "bias": 0.5,
+      "gain": 0.5
+     }
+    ]
+   }
+  }
+ ],
+ "routes": [
+  {
+   "source": "response.sustain",
+   "target": "grid/net/coupling",
+   "amount": 6.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 3000,
+    "decayMs": 6000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "grid/net/frequency",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "grid/net/noise",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 40,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "response.intensity",
+   "target": "grid/net/phaseLag",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 6000,
+    "decayMs": 12000
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/membrane/deform/1/amount",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.coupling",
+   "target": "grid/net/coupling",
+   "amount": 12.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.complexity",
+   "target": "grid/net/spread",
+   "amount": 0.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.motion",
+   "target": "grid/net/speed",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.persistence",
+   "target": "grid/net/persistence",
+   "amount": 3.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.mode",
+   "target": "grid/net/phaseLag",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.motion",
+   "target": "procedural/membrane/deform/1/amount",
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.pace0",
+   "target": "field/pace0/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "control.pace1",
+   "target": "field/pace1/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "control.pace2",
+   "target": "field/pace2/strength",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 80,
+    "decayMs": 2500
+   }
+  }
+ ],
+ "presets": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "field/pace0/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 70.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -14.0,
+       0.0,
+       -3.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.9167,
+      "value": [
+       -12.4471,
+       0.0,
+       -3.1704
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.8333,
+      "value": [
+       -11.0,
+       0.0,
+       -3.6699
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.75,
+      "value": [
+       -9.7574,
+       0.0,
+       -4.4645
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.6667,
+      "value": [
+       -8.8038,
+       0.0,
+       -5.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 14.5833,
+      "value": [
+       -8.2044,
+       0.0,
+       -6.7059
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 17.5,
+      "value": [
+       -8.0,
+       0.0,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.4167,
+      "value": [
+       -8.2044,
+       0.0,
+       -9.2941
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 23.3333,
+      "value": [
+       -8.8038,
+       0.0,
+       -10.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 26.25,
+      "value": [
+       -9.7574,
+       0.0,
+       -11.5355
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 29.1667,
+      "value": [
+       -11.0,
+       0.0,
+       -12.3301
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 32.0833,
+      "value": [
+       -12.4471,
+       0.0,
+       -12.8296
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.0,
+      "value": [
+       -14.0,
+       0.0,
+       -13.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.9167,
+      "value": [
+       -15.5529,
+       0.0,
+       -12.8296
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.8333,
+      "value": [
+       -17.0,
+       0.0,
+       -12.3301
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.75,
+      "value": [
+       -18.2426,
+       0.0,
+       -11.5355
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.6667,
+      "value": [
+       -19.1962,
+       0.0,
+       -10.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 49.5833,
+      "value": [
+       -19.7956,
+       0.0,
+       -9.2941
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 52.5,
+      "value": [
+       -20.0,
+       0.0,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.4167,
+      "value": [
+       -19.7956,
+       0.0,
+       -6.7059
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 58.3333,
+      "value": [
+       -19.1962,
+       0.0,
+       -5.5
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 61.25,
+      "value": [
+       -18.2426,
+       0.0,
+       -4.4645
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 64.1667,
+      "value": [
+       -17.0,
+       0.0,
+       -3.6699
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.0833,
+      "value": [
+       -15.5529,
+       0.0,
+       -3.1704
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 70.0,
+      "value": [
+       -14.0,
+       0.0,
+       -3.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/pace1/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 95.9,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       16.3738,
+       0.0,
+       7.2434
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 3.9958,
+      "value": [
+       17.2878,
+       0.0,
+       5.9476
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 7.9917,
+      "value": [
+       17.8415,
+       0.0,
+       4.6554
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.9875,
+      "value": [
+       17.997,
+       0.0,
+       3.4548
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.9833,
+      "value": [
+       17.7439,
+       0.0,
+       2.4276
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 19.9792,
+      "value": [
+       17.0994,
+       0.0,
+       1.6439
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 23.975,
+      "value": [
+       16.1073,
+       0.0,
+       1.1571
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 27.9708,
+      "value": [
+       14.8353,
+       0.0,
+       1.0003
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 31.9667,
+      "value": [
+       13.3701,
+       0.0,
+       1.1842
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.9625,
+      "value": [
+       11.8115,
+       0.0,
+       1.6963
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.9583,
+      "value": [
+       10.2658,
+       0.0,
+       2.5017
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 43.9542,
+      "value": [
+       8.8383,
+       0.0,
+       3.5455
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 47.95,
+      "value": [
+       7.6262,
+       0.0,
+       4.7566
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 51.9458,
+      "value": [
+       6.7122,
+       0.0,
+       6.0524
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.9417,
+      "value": [
+       6.1585,
+       0.0,
+       7.3446
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 59.9375,
+      "value": [
+       6.003,
+       0.0,
+       8.5452
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 63.9333,
+      "value": [
+       6.2561,
+       0.0,
+       9.5724
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.9292,
+      "value": [
+       6.9006,
+       0.0,
+       10.3561
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 71.925,
+      "value": [
+       7.8927,
+       0.0,
+       10.8429
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 75.9208,
+      "value": [
+       9.1647,
+       0.0,
+       10.9997
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 79.9167,
+      "value": [
+       10.6299,
+       0.0,
+       10.8158
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 83.9125,
+      "value": [
+       12.1885,
+       0.0,
+       10.3037
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 87.9083,
+      "value": [
+       13.7342,
+       0.0,
+       9.4983
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 91.9042,
+      "value": [
+       15.1617,
+       0.0,
+       8.4545
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 95.9,
+      "value": [
+       16.3738,
+       0.0,
+       7.2434
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/pace2/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 121.8,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       3.9882,
+       0.0,
+       19.6185
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 5.075,
+      "value": [
+       3.6866,
+       0.0,
+       19.1443
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 10.15,
+      "value": [
+       2.9975,
+       0.0,
+       19.0011
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.225,
+      "value": [
+       1.9679,
+       0.0,
+       19.1985
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 20.3,
+      "value": [
+       0.6678,
+       0.0,
+       19.7232
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 25.375,
+      "value": [
+       -0.8141,
+       0.0,
+       20.5393
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.45,
+      "value": [
+       -2.3767,
+       0.0,
+       21.5912
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.525,
+      "value": [
+       -3.9138,
+       0.0,
+       22.8073
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 40.6,
+      "value": [
+       -5.3203,
+       0.0,
+       24.1047
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.675,
+      "value": [
+       -6.5007,
+       0.0,
+       25.395
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.75,
+      "value": [
+       -7.3743,
+       0.0,
+       26.5901
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 55.825,
+      "value": [
+       -7.8816,
+       0.0,
+       27.6088
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 60.9,
+      "value": [
+       -7.9882,
+       0.0,
+       28.3815
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 65.975,
+      "value": [
+       -7.6866,
+       0.0,
+       28.8557
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 71.05,
+      "value": [
+       -6.9975,
+       0.0,
+       28.9989
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 76.125,
+      "value": [
+       -5.9679,
+       0.0,
+       28.8015
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 81.2,
+      "value": [
+       -4.6678,
+       0.0,
+       28.2768
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 86.275,
+      "value": [
+       -3.1859,
+       0.0,
+       27.4607
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 91.35,
+      "value": [
+       -1.6233,
+       0.0,
+       26.4088
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 96.425,
+      "value": [
+       -0.0862,
+       0.0,
+       25.1927
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 101.5,
+      "value": [
+       1.3203,
+       0.0,
+       23.8953
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 106.575,
+      "value": [
+       2.5007,
+       0.0,
+       22.605
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 111.65,
+      "value": [
+       3.3743,
+       0.0,
+       21.4099
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 116.725,
+      "value": [
+       3.8816,
+       0.0,
+       20.3912
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 121.8,
+      "value": [
+       3.9882,
+       0.0,
+       19.6185
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       6.0,
+       22.0,
+       31.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       8.8284,
+       23.0,
+       31.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       10.0,
+       22.0,
+       33.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       8.8284,
+       21.0,
+       34.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       6.0,
+       22.0,
+       35.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       3.1716,
+       23.0,
+       34.4142
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       2.0,
+       22.0,
+       33.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       3.1716,
+       21.0,
+       31.5858
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       6.0,
+       22.0,
+       31.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "camera/target",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 90.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       -0.8707,
+       0.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.25,
+      "value": [
+       -0.0343,
+       0.2702,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       -0.3493,
+       -0.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       -1.6313,
+       -0.2702,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 45.0,
+      "value": [
+       -3.1293,
+       0.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 56.25,
+      "value": [
+       -3.9657,
+       0.2702,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 67.5,
+      "value": [
+       -3.6507,
+       -0.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       -2.3687,
+       -0.2702,
+       -8.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 90.0,
+      "value": [
+       -0.8707,
+       0.4207,
+       -8.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/sonic-vfx-osc-membrane.mp4"
+ },
+ "sonicScene": {
+  "category": "experiment",
+  "thesis": "An amphitheatre whose floor is a living membrane of coupled oscillators: a few pacemakers send concentric waves across it, the waves meet in cusps and annihilate, and wherever neighbours disagree the surface lights.",
+  "experiment": "A coupled oscillators",
+  "id": "osc-membrane",
+  "title": "Phase Membrane"
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1,
+     "signal": "coupling"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 2,
+     "signal": "complexity"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 3,
+     "signal": "motion"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 4,
+     "signal": "influence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 5,
+     "signal": "persistence"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 6,
+     "signal": "mode"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 36,
+     "signal": "pace0"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 37,
+     "signal": "pace1"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "note",
+     "number": 38,
+     "signal": "pace2"
+    }
+   ]
+  }
+ }
+}

@@ -64,7 +64,19 @@ struct FieldSet;
 // the frame's own clock. A field too costly to evaluate per vertex (and per vertex again for a
 // finite-difference normal) is evaluated once per cell instead, and everything that reads it samples the grid. Stateless,
 // so a seek lands where a play does with no catch-up and nothing to checkpoint.
-enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents, Excitable, Bake };
+// ADR-1450: Oscillator -- a plane [x, 1, z] of coupled phase oscillators (Kuramoto-Sakaguchi), 4 floats per cell:
+//   cos(theta), sin(theta)   the phase, as a unit vector so that every reader interpolates it smoothly
+//   R                        the local order parameter (0 = neighbours disagree, 1 = in step), low-passed by persistence
+//   activity                 strain, 4 (1 - mean cos(theta_j - theta_i)), plus kicks; low-passed by persistence
+// Each sub-step is a kick pass (injection kicks, the frequency field's phase advance, phase noise) then `iterations`
+// coupling passes: dtheta/dt = 2 pi omega_i + K m_i sum_j w_ij sin(theta_j - theta_i - phaseLag) / sum_j w_ij, over a
+// Gaussian disk of `couplingRadius` cells plus `links` hashed long-range partners. Sampled as a scalar it reads cos(theta).
+// ADR-1451: a ReactionDiffusion grid may also be a plane [x, 1, z] up to kMaxAgentGridResolution (isotropic 9-point
+// Laplacian), may step `iterations` times a sub-step at `speed`, and may blend its (feed, kill) toward (feedB, killB) by a
+// regime field.
+// ADR-1452: a Scalar or Vector grid with resolution.y == 1 is a plane, up to kMaxAgentGridResolution on x and z (a dye
+// or a wake that needs detail across a surface rather than depth).
+enum class GridMode : std::uint8_t { Scalar, Vector, ReactionDiffusion, Agents, Excitable, Bake, Oscillator };
 [[nodiscard]] const char* gridModeName(GridMode mode);
 [[nodiscard]] std::optional<GridMode> gridModeFromName(std::string_view name);
 
@@ -131,13 +143,37 @@ struct GridField {
     float energyTime = 3.0f;        // seconds, e's time constant
     float wakeTime = 30.0f;         // seconds, w's time constant
     float noise = 0.0f;             // 0..1: each cell's front delay jitters by +-noise, re-drawn every 0.25 s
+    // ADR-1450/1451: reaction-diffusion and oscillator grids. Each sub-step advances speed / simRate seconds of the
+    // model's own time in `iterations` explicit steps (defaults: one step of 1 / simRate, as before).
+    float speed = 1.0f;
+    int iterations = 1;
+    // ADR-1451, reaction-diffusion: a scalar field (0..1) that blends each cell's (feed, kill) toward (feedB, killB).
+    std::string regimeField;
+    float feedB = 0.037f;
+    float killB = 0.06f;
+    // ADR-1450, oscillator. Also read: coupling (K, radians per second), conductivityField (a scalar field multiplying
+    // K per cell: waveguides, regions), injectField x injectRate (a phase kick, radians per second per unit), noise
+    // (phase noise, radians per sqrt(second)) and seedAmount (0 = every phase 0, 1 = uniformly random phases).
+    float frequency = 0.25f;     // Hz, the mean natural frequency
+    float spread = 0.05f;        // Hz, each cell's natural frequency lies within frequency +- spread (triangular)
+    float phaseLag = 0.0f;       // radians, the Sakaguchi lag (travelling waves and spirals as it nears pi / 2)
+    int couplingRadius = 1;      // cells, 1..4: the Gaussian disk each cell couples to
+    int links = 0;               // 0..4 long-range partners per cell, hashed from the seed (the hybrid network)
+    float linkRange = 32.0f;     // cells: how far a partner may be
+    float linkWeight = 1.0f;     // a partner's weight, relative to a nearest neighbour's
+    float populationMix = 0.0f;  // 0..1: the share of cells (hashed) in a second population (0 = one population)
+    float detune = 0.0f;         // Hz added to the second population's natural frequency
+    float crossCoupling = 1.0f;  // coupling between the populations, x coupling (the layered network)
+    float persistence = 1.0f;    // seconds: the time constant of R and activity
+    std::string frequencyField;  // a scalar field (Hz) added to each cell's natural frequency, in the kick pass
     // Checkpoints for an exact seek (ADR-1119): one every this many seconds of steps; 0 = none.
     float checkpointInterval = 5.0f;
 
     // Cell values, `components()` floats per cell; empty until reset() (the GPU keeps its own
     // copy in the shared table and never fills this).
     // ADR-1282: authored starting values, components() floats per cell in the storage order above (JSON
-    // "initial": [...]). Empty = zero plus `seedAmount` noise, as before. Scalar and vector grids only. A grid
+    // "initial": [...]). Empty = zero plus `seedAmount` noise, as before. Scalar and vector grids, and (ADR-1453) reaction-
+// diffusion grids (A, B per cell). A reset, and a seek with no checkpoint to restore, return to these values exactly. A grid
     // with no injection, diffusion or dissipation keeps them for ever: a static, authored field (a glow map).
     std::vector<float> initial;
     std::vector<float> data;
@@ -170,8 +206,11 @@ struct GridField {
     [[nodiscard]] bool agents() const { return mode == GridMode::Agents; }
     [[nodiscard]] bool excitable() const { return mode == GridMode::Excitable; }
     [[nodiscard]] bool bake() const { return mode == GridMode::Bake; } // ADR-1407
-    // ADR-1201: a plane grid (agents, excitable): resolution [x, 1, z] up to kMaxAgentGridResolution.
-    [[nodiscard]] bool plane() const { return agents() || excitable(); }
+    [[nodiscard]] bool oscillator() const { return mode == GridMode::Oscillator; } // ADR-1450
+    // ADR-1201: a plane grid (agents, excitable, oscillator): resolution [x, 1, z] up to kMaxAgentGridResolution.
+    [[nodiscard]] bool plane() const { return agents() || excitable() || oscillator(); }
+    // ADR-1451: a reaction-diffusion grid one cell thick, stepped with the isotropic 9-point Laplacian.
+    [[nodiscard]] bool reactionPlane() const { return mode == GridMode::ReactionDiffusion && resolution.y == 1; }
     [[nodiscard]] Result<void> validate() const;
     // ADR-1122: what the state's shape and seed depend on -- mode, wrap, resolution, bounds, the sim rate, the
     // seed, the agents' count and species, and the names of the fields it reads. A change here re-seeds the grid

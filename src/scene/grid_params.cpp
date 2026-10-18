@@ -74,6 +74,22 @@ GridParameters registerGridParameters(params::ParameterSet& params, const spatia
         r.f("kill", "Gray-Scott kill", rest.kill, 0.0f, 0.2f, 0.0f, 0.1f);
         r.f("diffusionA", "diffusion of A", rest.diffusionA, 0.0f, 10.0f, 0.0f, 2.0f);
         r.f("diffusionB", "diffusion of B", rest.diffusionB, 0.0f, 10.0f, 0.0f, 2.0f);
+        // ADR-1451
+        r.f("feedB", "Gray-Scott feed where the regime field is 1", rest.feedB, 0.0f, 0.2f, 0.0f, 0.1f);
+        r.f("killB", "Gray-Scott kill where the regime field is 1", rest.killB, 0.0f, 0.2f, 0.0f, 0.1f);
+        r.f("speed", "model time per second", rest.speed, 0.0001f, 10000.0f, 0.0f, 2000.0f);
+    }
+    if (rest.mode == spatial::GridMode::Oscillator) { // ADR-1450
+        r.f("coupling", "coupling K (rad/s)", rest.coupling, 0.0f, 1000.0f, 0.0f, 20.0f);
+        r.f("frequency", "mean natural frequency (Hz)", rest.frequency, -100.0f, 100.0f, 0.0f, 2.0f);
+        r.f("spread", "natural frequency spread (Hz)", rest.spread, 0.0f, 100.0f, 0.0f, 1.0f);
+        r.f("phaseLag", "Sakaguchi phase lag (rad)", rest.phaseLag, -3.1416f, 3.1416f, 0.0f, 1.6f);
+        r.f("noise", "phase noise (rad per sqrt s)", rest.noise, 0.0f, 100.0f, 0.0f, 4.0f);
+        r.f("crossCoupling", "coupling between the populations (x K)", rest.crossCoupling, 0.0f, 10.0f, 0.0f, 1.0f);
+        r.f("detune", "second population's detune (Hz)", rest.detune, -100.0f, 100.0f, -1.0f, 1.0f);
+        r.f("linkWeight", "long-range link weight", rest.linkWeight, 0.0f, 100.0f, 0.0f, 4.0f);
+        r.f("persistence", "R and activity time constant (s)", rest.persistence, 0.001f, 1000.0f, 0.05f, 10.0f);
+        r.f("speed", "model time per second", rest.speed, 0.0001f, 1000.0f, 0.0f, 4.0f);
     }
     if (rest.mode == spatial::GridMode::Agents) {
         r.f("sensorAngle", "agents look this far aside (rad)", rest.sensorAngle, 0.0f, 3.1416f, 0.0f, 1.6f);
@@ -112,6 +128,16 @@ void applyGridParameters(const GridParameters& p, const spatial::GridField& rest
     live.energyTime = rest.energyTime;
     live.wakeTime = rest.wakeTime;
     live.noise = rest.noise;
+    live.feedB = rest.feedB; // ADR-1451
+    live.killB = rest.killB;
+    live.speed = rest.speed;
+    live.frequency = rest.frequency; // ADR-1450
+    live.spread = rest.spread;
+    live.phaseLag = rest.phaseLag;
+    live.crossCoupling = rest.crossCoupling;
+    live.detune = rest.detune;
+    live.linkWeight = rest.linkWeight;
+    live.persistence = rest.persistence;
     copy(p, "injectRate", live.injectRate);
     copy(p, "advect", live.advect);
     copy(p, "diffusion", live.diffusion);
@@ -137,6 +163,16 @@ void applyGridParameters(const GridParameters& p, const spatial::GridField& rest
     copy(p, "energyTime", live.energyTime);
     copy(p, "wakeTime", live.wakeTime);
     copy(p, "noise", live.noise);
+    copy(p, "feedB", live.feedB);
+    copy(p, "killB", live.killB);
+    copy(p, "speed", live.speed);
+    copy(p, "frequency", live.frequency);
+    copy(p, "spread", live.spread);
+    copy(p, "phaseLag", live.phaseLag);
+    copy(p, "crossCoupling", live.crossCoupling);
+    copy(p, "detune", live.detune);
+    copy(p, "linkWeight", live.linkWeight);
+    copy(p, "persistence", live.persistence);
 }
 
 } // namespace avgen::scene
