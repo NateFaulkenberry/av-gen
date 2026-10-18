@@ -713,8 +713,8 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             s.record.cold.prewarmMs = msSince(s.phaseStart);
             s.record.cold.prewarmVariants = static_cast<int>(renderer_->sdfs().compiledVariantCount());
         }
-        if ((out != nullptr && out->open()) || s.waitFrames > 300) {
-            if (out == nullptr || !out->open()) {
+        if (!o.projection || (out != nullptr && out->open()) || s.waitFrames > 300) {
+            if (o.projection && (out == nullptr || !out->open())) {
                 s.record.notes.push_back("the projection window did not open; the editor canvas was measured");
             }
             s.phase = P::Warmup;
@@ -743,6 +743,11 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             s.phase = P::Measure;
             s.measureStart = Clock::now();
             s.compilesBefore = gpu::pipelineCounters();
+            {
+                const auto hub = engine_->control().status();
+                s.midiMessagesBefore = hub.midi.messages;
+                s.midiAppliedBefore = hub.applied;
+            }
             s.record.conditions.startSeconds = engine_->positionSeconds();
             cpuProfile_.setFrameGroup(core::PhaseProfiler::kMaxGroups - 1);
             cpuProfile_.nameGroup(core::PhaseProfiler::kMaxGroups - 1, "live-profile");
@@ -772,7 +777,7 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             r.conditions.outputWidth = out->pixelWidth();
             r.conditions.outputHeight = out->pixelHeight();
         } else {
-            r.conditions.window = "windowed (editor canvas)";
+            r.conditions.window = o.projection ? "windowed (editor canvas)" : "windowed (editor canvas, no projection)";
             r.conditions.outputWidth = renderWidth_;
             r.conditions.outputHeight = renderHeight_;
         }
@@ -790,6 +795,13 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             if (!out) {
                 log::error("--live-profile: cannot write {}", o.trace->string());
             }
+        }
+        {
+            const auto hub = engine_->control().status();
+            r.notes.push_back(fmt::format("midi: {} message(s) received and {} control message(s) applied while "
+                                          "measuring, from {} source(s){}",
+                                          hub.midi.messages - s.midiMessagesBefore, hub.applied - s.midiAppliedBefore,
+                                          hub.midiSources.size(), hub.midiOpen ? "" : " (MIDI input closed)"));
         }
         if (liveTransitions_ > s.transitionsSeen) {
             r.notes.push_back(fmt::format("the live level changed {} time(s) WHILE MEASURING; the statistics mix "

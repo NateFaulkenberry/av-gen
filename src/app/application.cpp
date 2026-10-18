@@ -413,7 +413,12 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
         options.height = 900;
         options.sizeGiven = true;
         options.autoplay = true;
-        options.startProjection = true;
+        // ADR-1490: --projection off measures the editor alone. Its canvas renders the output frame at Native
+        // quality, exactly the output size, so the two arms render the same pixels and differ by the projection.
+        options.startProjection = o.projection;
+        if (!o.projection) {
+            options.previewMode = ui::PreviewViewMode::OutputFrame;
+        }
         if (o.capture) {
             options.capture = *o.capture; // the editor's own end-of-run capture
         }
@@ -1674,6 +1679,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // settings file happens to be left.
         if (options_.previewMode) {
             panel_->preview.mode = *options_.previewMode;
+        }
+        if (options_.liveProfile.enabled && options_.liveProfile.mode == LiveProfileMode::Live &&
+            !options_.liveProfile.projection) {
+            panel_->preview.quality = ui::PreviewQuality::Native; // ADR-1490: the output size, not the canvas's
         }
         // Never restored: a fullscreen preview closes every panel, and a session that ended in one
         // must not reopen with an empty editor and no record of what was open. The pan is dropped

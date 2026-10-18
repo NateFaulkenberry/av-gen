@@ -51,6 +51,10 @@ struct LiveProfileOptions {
     std::string camera;           // a named camera / shot; empty = the project's own
     bool audio = true;
     std::string midi;             // a MIDI input filter; empty = the machine's setting
+    // --projection on|off, live only (perf/resonator-live, ADR-1490): off measures the editor alone, its canvas in
+    // Output Frame mode at Native quality, so the frame is still rendered at the project's output size, without the
+    // projection window's second swapchain -- the brief's "internal only" arm against "projector enabled".
+    bool projection = true;
     std::optional<std::filesystem::path> capture; // a PNG of the last measured frame
     std::optional<std::filesystem::path> json;    // the record, avgen.liveprofile/1
     // --trace <csv>, live only (ADR-1362): one row per frame from the warm-up on -- the frame interval, the GPU span,

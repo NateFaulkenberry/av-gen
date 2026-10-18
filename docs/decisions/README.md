@@ -60,6 +60,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1440-1449 | proto/waveform-dimension (Waveform Dimension) |
 | 1450-1469 | proto/generative-rd (generative R&D: oscillators, flow, reaction-diffusion) |
 | 1470-1479 | art/resonator-quality (the Resonator scenes' quality pass) |
+| 1490-1499 | perf/resonator-live (the Resonator scenes' live performance, art pass II §7-8) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -801,3 +802,4 @@ confirm the citation you are about to change is your own.
 | [1453](ADR-1453-a-reaction-diffusion-grid-can-start-from-authored-values.md) | A reaction-diffusion grid can start from authored values (`initial`: A, B per cell, ADR-1282's rules; a reset or an unrestorable seek returns to it; without it nothing changes; RD Pins opens on a formed pattern its generator computes). proto/generative-rd | Accepted |
 | [1470](ADR-1470-a-material-program-can-ramp-in-oklab.md) | A material program can ramp through four colours in OKLab (`oklabRamp`: stops `constant`..`constant4` in linear RGB, blended with `mixOklab`; a negative `value` is cyclic, `fract(a.x)` with the first stop again at 1): a palette's roles become a perceptual gradient in one op, still written by the palette bindings. art/resonator-quality | Accepted |
 | [1471](ADR-1471-a-resonance-source-can-be-a-square-plate.md) | A resonance source can be a square plate (`kind: plate`, `plates: [[n, m], ...]`, 1..8, n != m: `cos(n pi u)cos(m pi v) - cos(m pi u)cos(n pi v)` at the bank's wavenumber, four signed plane waves, geometry 3; the Chladni family beside point and lattice; existing sources byte-identical). art/resonator-quality | Accepted |
+| [1490](ADR-1490-the-live-profile-measures-the-briefs-matrix-arms.md) | The live profile measures the brief's matrix arms (`--projection off`: the editor canvas in Output Frame mode at Native quality, the output's pixels without the projection window; the record counts the MIDI messages received and applied while measuring; `avgen_sonic_probe resonator`, a scripted controller on a CoreMIDI virtual source: CC sweeps, palette steps, pad bursts, a function of time). perf/resonator-live | Accepted |

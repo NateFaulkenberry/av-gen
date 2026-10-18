@@ -18,6 +18,11 @@
 //   drive     one held note; the drive rises from clean to hard clipping (§18 / PART 18).
 //   demo      a short phrase: low soft notes, high bright notes, chords, an arpeggio, a sweep, distortion.
 //   silence   nothing: the device-present, nothing-played baseline.
+//   resonator the Resonator scenes' controller (Cymatic World, Resonant Silk, Waveform Dimension; perf/resonator-live):
+//             a repeating 30 s pattern for --record-seconds (default 180 s). Two of CC 1-8 and 11 sweep at a time on
+//             triangle waves (25 messages a second each, like an encoder), CC 9 steps the palette every 10 s, CC 10
+//             toggles the lock every 30 s, and note 36 (Cymatic World's pad strike) plays bursts of four at 4 Hz.
+//             Deterministic: every event is a function of its time, so two runs send the same sequence.
 // The PART 15 checklist, one gesture each (the live art pass, 01-brief-live.md PARTS 15-16):
 //   low       low soft notes on a slow pad             (scale, warmth, movement)
 //   high      high bright notes on an open lead         (brightness, geometry, colour, spatial response)
@@ -270,6 +275,7 @@ struct Player {
     avgen::control::MidiVirtualSource& midi;
     Log& log;
     int tourScenes = 17; // `tour`: how many scenes to step through (--scenes)
+    double recordSeconds = 180.0; // `resonator`: how long the pattern repeats (--record-seconds)
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
     void waitUntil(double seconds) const {
@@ -789,6 +795,54 @@ void scenario(const std::string& name, Player& p) {
         p.ccRamp(1, 127, 0, t + 21.0, t + 31.0);  // back to the sunset
         p.off(40);
         p.waitUntil(t + 32.0);
+    } else if (name == "resonator") {
+        // 25 ticks a second. Knob k (CC 1-8, then 11) is active in its own 6 s window of the 30 s cycle, overlapping
+        // the next by half, so two knobs move at once; inside the window it rides a triangle 0 -> 127 -> 0.
+        constexpr std::array<int, 9> knobs{1, 2, 3, 4, 5, 6, 7, 8, 11};
+        std::array<int, 128> last{};
+        last.fill(-1);
+        const double end = std::max(10.0, p.recordSeconds - 2.0);
+        int palette = 0;
+        bool lock = false;
+        const auto send = [&](int number, int value) {
+            if (last[static_cast<std::size_t>(number)] != value) {
+                last[static_cast<std::size_t>(number)] = value;
+                p.cc(number, value);
+            }
+        };
+        for (int tick = 0;; ++tick) {
+            const double t = 1.0 + 0.04 * tick;
+            if (t > end) {
+                break;
+            }
+            p.waitUntil(t);
+            const double cycle = std::fmod(t - 1.0, 30.0);
+            for (std::size_t k = 0; k < knobs.size(); ++k) {
+                const double w0 = 3.0 * static_cast<double>(k);
+                const double u = (cycle - w0) / 6.0;
+                if (u >= 0.0 && u <= 1.0) {
+                    const double tri = u < 0.5 ? 2.0 * u : 2.0 - 2.0 * u;
+                    send(knobs[k], static_cast<int>(std::lround(127.0 * tri)));
+                }
+            }
+            if (tick % 250 == 0) { // every 10 s
+                palette = (palette + 1) % 4;
+                send(9, palette * 42);
+            }
+            if (tick % 750 == 375) { // every 30 s, offset
+                lock = !lock;
+                send(10, lock ? 127 : 0);
+            }
+            const int beat = tick % 50; // a burst of four pad strikes at 4 Hz every 2 s
+            if (beat == 0 || beat == 6 || beat == 12 || beat == 18) {
+                const std::array<std::uint8_t, 3> on{0x90, 36, static_cast<std::uint8_t>(96 + (tick / 50) % 3 * 12)};
+                static_cast<void>(p.midi.send(on));
+                p.log.row("pad", 36, static_cast<float>(on[2]) / 127.0f, p.synth);
+            } else if (beat == 3 || beat == 9 || beat == 15 || beat == 21) {
+                const std::array<std::uint8_t, 3> off{0x80, 36, 0};
+                static_cast<void>(p.midi.send(off));
+            }
+        }
     } else if (name == "silence") {
         p.waitUntil(5.0);
     } else {
@@ -828,7 +882,7 @@ bool writeWav(const std::string& path, const std::vector<float>& samples, std::s
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: avgen_sonic_probe <latency|sweep|drive|demo|silence|low|high|chords|arp|"
-                             "distorted|patches|play|tour> [--out f.csv] [--scenes n] "
+                             "distorted|patches|play|tour|controller|stress|resonator> [--out f.csv] [--scenes n] "
                              "[--wav f.wav] [--device BlackHole] [--lead-in s] [--period frames] [--record-seconds s]\n");
         return 2;
     }
@@ -916,6 +970,7 @@ int main(int argc, char** argv) {
     log.row("start", -1, 0.0f, synth);
     Player player{synth, midi, log};
     player.tourScenes = scenes;
+    player.recordSeconds = recordSeconds;
     scenario(name, player);
     log.row("end", -1, 0.0f, synth);
     log.out << synth.firstCallbackNs.load() << ",recording,-1,0,0,0\n";

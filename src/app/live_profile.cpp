@@ -43,6 +43,8 @@ std::string liveProfileUsage() {
            "                                               performance (default auto)\n"
            "                        --camera <name>        a named camera\n"
            "                        --no-audio             measure without the audio file playing\n"
+           "                        --projection on|off    live: off measures the editor alone, its canvas in Output\n"
+           "                                               Frame mode at the output size (default on)\n"
            "                        --midi <filter>        a MIDI input to open while measuring\n"
            "                        --capture <png>        the last measured frame\n"
            "                        --json <file>          the record (avgen.liveprofile/1)\n"
@@ -156,6 +158,14 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
             if (!text(i, "--camera", o.camera)) return out;
         } else if (a == "--no-audio") {
             o.audio = false;
+        } else if (a == "--projection") {
+            std::string v;
+            if (!text(i, "--projection", v)) return out;
+            if (v != "on" && v != "off") {
+                out.error = "--projection wants on or off, got '" + v + "'";
+                return out;
+            }
+            o.projection = v == "on";
         } else if (a == "--midi") {
             if (!text(i, "--midi", o.midi)) return out;
         } else if (a == "--capture") {

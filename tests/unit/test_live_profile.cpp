@@ -31,6 +31,16 @@ TEST_CASE("live profile: the command line takes its own flags and leaves the res
     CHECK(a.rest == std::vector<std::string>{"avgen", "--project", "p.json", "--tier", "realtime"});
 }
 
+TEST_CASE("live profile: --projection off measures the editor alone (ADR-1490)", "[live-profile][adr1490]") {
+    CHECK(parseLiveProfileArgs({"avgen", "--live-profile"}).options.projection);
+    const auto off = parseLiveProfileArgs({"avgen", "--live-profile", "--mode", "live", "--projection", "off"});
+    REQUIRE(off.error.empty());
+    CHECK_FALSE(off.options.projection);
+    CHECK(parseLiveProfileArgs({"avgen", "--live-profile", "--projection", "on"}).options.projection);
+    CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--projection", "maybe"}).error.empty());
+    CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--projection"}).error.empty());
+}
+
 TEST_CASE("live profile: fast and deep defaults, and bad values are refused", "[live-profile]") {
     const auto fast = parseLiveProfileArgs({"avgen", "--live-profile"});
     CHECK(fast.options.warmupSeconds == Approx(3.0));
