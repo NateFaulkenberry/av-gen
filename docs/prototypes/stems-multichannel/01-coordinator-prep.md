@@ -4,6 +4,38 @@ The coordinator gathered these before the agent started. They are a head start, 
 the brief's Phase 0. Verify every claim in the code and the sources before relying on it, and correct this
 file if anything is wrong.
 
+
+## 0. Owner update, 2026-10-19: the device is the **Volt 876**
+
+The owner says the target is https://www.uaudio.com/products/volt-876-usb-audio-interface, not a desktop Volt.
+
+### Published figures
+
+These come from retailer listings; confirm them on UA's spec page and against the device itself.
+- **Channels:** 24 inputs and 28 outputs, at 32-bit/192 kHz.
+- **Inputs:** 8 analog combo XLR/TRS inputs with preamps, plus 16 ADAT inputs over 2 optical ports.
+- **ADAT capacity:** 16 channels at 44.1-48 kHz, 8 at 88.2-96 kHz, 4 at 176.4-192 kHz (S/MUX).
+- **Other:** USB 2.0 Type-C and MIDI DIN. Up to three units can be linked over ADAT.
+- **Sources:**
+  - https://www.markertek.com/product/ua-volt-876/universal-audio-volt-876-usb-recording-studio-24-in-28-out-audio-interface-8-preamps-mac-win
+  - https://www.adorama.com/universal-audio-volt-876-usb-c-rackmount-audio-interface/p/uavolt876
+
+### What this means for the plan
+
+- **Eight real inputs.** Eight independent physical inputs ARE testable on real hardware once it is connected.
+  The synthetic 8-channel backend is still required for CI.
+- **Several streams.** A 24-input interface may present its inputs as several Core Audio streams (analog and
+  ADAT), which is exactly the miniaudio #312 risk (section 4.1). Check
+  `kAudioDevicePropertyStreamConfiguration` on the real device early.
+- **Sample rate.** The channel count changes with sample rate (ADAT halves at 96 kHz), so the device format can
+  change under you. Handle it as a format-change event.
+
+### Owner permissions
+
+- **BlackHole 16ch:** you may install it (for example `brew install --cask blackhole-16ch`) to test
+  multichannel capture without the Volt.
+- **Other installs:** ask the coordinator before installing anything else.
+
 ## 1. Hardware on this machine right now
 
 `system_profiler SPAudioDataType`, run 2026-10-19, reported:
