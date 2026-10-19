@@ -151,6 +151,8 @@ struct AudioInput::Impl {
         bool pending = false;                    // IO thread only: a block was dropped; mark before the next one
     };
     std::vector<InputSource> sources;
+    std::vector<std::uint32_t> mainChannels;     // as set (may name channels the device lacks)
+    std::vector<std::uint32_t> mainUsed;         // the ones the callback averages; empty = all. Replaced only while stopped
     std::vector<std::unique_ptr<Tap>> taps;      // replaced only while no callback runs
     std::vector<float> tapScratch;               // 2 * kScratchFrames
     std::array<std::atomic<float>, kMaxMeteredChannels> channelPeaks{};
@@ -260,15 +262,22 @@ void AudioInput::Impl::capturePlanar(const float* const* in, std::uint32_t chann
         expectedSampleTime = timing.sampleTime + static_cast<double>(frameCount);
     }
     const float g = gain.load(std::memory_order_relaxed);
-    const float scale = g / static_cast<float>(channelCount);
+    const bool chosen = !mainUsed.empty();
+    const float scale = g / static_cast<float>(chosen ? mainUsed.size() : channelCount);
     float blockPeak = 0.0f;
     std::uint32_t done = 0;
     while (done < frameCount) {
         const std::size_t chunk = std::min<std::size_t>(frameCount - done, kScratchFrames);
         for (std::size_t f = 0; f < chunk; ++f) {
             float sum = 0.0f;
-            for (std::uint32_t c = 0; c < channelCount; ++c) {
-                sum += in[c][done + f];
+            if (chosen) {
+                for (const std::uint32_t c : mainUsed) {
+                    sum += in[c][done + f];
+                }
+            } else {
+                for (std::uint32_t c = 0; c < channelCount; ++c) {
+                    sum += in[c][done + f];
+                }
             }
             const float v = sum * scale;
             monoScratch[f] = v;
@@ -379,6 +388,14 @@ void AudioInput::Impl::rebuildTaps() {
         taps.push_back(std::move(tap));
     }
     tapScratch.assign(2 * kScratchFrames, 0.0f);
+    mainUsed.clear();
+    if (backend) {
+        for (const std::uint32_t c : mainChannels) {
+            if (c < channels && std::find(mainUsed.begin(), mainUsed.end(), c) == mainUsed.end()) {
+                mainUsed.push_back(c);
+            }
+        }
+    }
 }
 
 void AudioInput::Impl::stopIo() {
@@ -597,6 +614,26 @@ void AudioInput::setSources(std::vector<InputSource> sources) {
 
 const std::vector<InputSource>& AudioInput::sources() const {
     return impl_->sources;
+}
+
+void AudioInput::setMainChannels(std::vector<std::uint32_t> channels) {
+    Impl& s = *impl_;
+    if (channels == s.mainChannels) {
+        return;
+    }
+    const bool running = s.backend != nullptr || s.deviceReady;
+    if (running) {
+        s.stopIo();
+    }
+    s.mainChannels = std::move(channels);
+    if (running) {
+        s.rebuildTaps(); // recomputes mainUsed; unchanged taps keep their streams
+        s.startIo();
+    }
+}
+
+const std::vector<std::uint32_t>& AudioInput::mainChannels() const {
+    return impl_->mainChannels;
 }
 
 AnalysisStream* AudioInput::sourceStream(std::size_t index) {

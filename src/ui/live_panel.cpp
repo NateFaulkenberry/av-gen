@@ -111,6 +111,33 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
             ImGui::TextDisabled("%u channels in %zu streams: %s", channels, d.streamChannels.size(), layout.c_str());
         }
     }
+    // The main mix: every channel (as a stereo input always was), or one pair -- a mixer's main out beside its stems.
+    {
+        std::vector<std::string> options{"All channels"};
+        int current = 0;
+        const auto& main = engine.inputMainChannels();
+        for (std::uint32_t c = 0; c + 1 < channels; c += 2) {
+            options.push_back(std::to_string(c + 1) + "/" + std::to_string(c + 2));
+            if (main.size() == 2 && main[0] == c && main[1] == c + 1) {
+                current = static_cast<int>(options.size()) - 1;
+            }
+        }
+        std::vector<const char*> names;
+        for (const auto& o : options) {
+            names.push_back(o.c_str());
+        }
+        ImGui::SetNextItemWidth(widthBesideLabel("Main mix"));
+        if (ImGui::Combo("Main mix", &current, names.data(), static_cast<int>(names.size())) && onLiveInputMain) {
+            onLiveInputMain(current == 0 ? std::vector<std::uint32_t>{}
+                                         : std::vector<std::uint32_t>{static_cast<std::uint32_t>(2 * (current - 1)),
+                                                                      static_cast<std::uint32_t>(2 * (current - 1) + 1)});
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("What audio.* -- and the Sonic layer and the beat -- listen to. All channels averages every input, "
+                    "as a stereo input always did; on a wide interface with one source plugged in that reads quiet. "
+                    "Pick the pair your main mix arrives on.");
+        }
+    }
     if (liveInputLabels_.size() != channels) {
         liveInputLabels_.assign(channels, {});
     }

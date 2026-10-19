@@ -5199,7 +5199,7 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     // ADR-1522: with sources to analyse, the device is opened through the Core Audio backend, which captures every
     // channel of every input stream. With none it is the plain miniaudio path, exactly as it always was (the owner's
     // BlackHole 2ch workflow).
-    if (!inputSources_.empty()) {
+    if (wantsMultichannelPath()) {
         std::string uid;
         for (const audio::AudioDeviceInfo& d : audio::listCaptureDevices()) {
             const bool match = deviceName.empty() ? d.isDefault : (d.id == deviceName || d.name == deviceName);
@@ -5233,6 +5233,7 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
 #endif
     auto input = std::make_unique<audio::AudioInput>();
     input->setSources(inputSources_); // ADR-1521: before the open, so its taps exist from the first block
+    input->setMainChannels(inputMain_);
     if (auto r = input->open(deviceName); !r) {
         return r;
     }
@@ -5245,6 +5246,7 @@ Result<void> Engine::useAudioInputBackend(std::unique_ptr<audio::CaptureBackend>
     }
     auto input = std::make_unique<audio::AudioInput>();
     input->setSources(inputSources_);
+    input->setMainChannels(inputMain_);
     if (auto r = input->openBackend(std::move(backend)); !r) {
         return r;
     }
@@ -5323,7 +5325,7 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
     // The capture path follows whether there are sources (ADR-1522): reopen the same device on the other one.
     const bool plainPath = input_ && input_->deviceId().empty();
     const bool synthetic = input_ && input_->deviceId().starts_with("synthetic:");
-    if (input_ && !synthetic && plainPath != inputSources_.empty()) {
+    if (input_ && !synthetic && plainPath == wantsMultichannelPath()) {
         const std::string selector = inputSelector_;
         if (auto r = useAudioInput(selector); !r) {
             log::warn("audio input: reopening '{}' for its sources: {}", selector, r.error().message);
@@ -5345,6 +5347,36 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
         inputActive_.assign(inputSources_.size(), 0);
     }
     rebind();
+}
+
+void Engine::setInputMainChannels(std::vector<std::uint32_t> channels) {
+    std::sort(channels.begin(), channels.end());
+    channels.erase(std::unique(channels.begin(), channels.end()), channels.end());
+    if (channels == inputMain_) {
+        return;
+    }
+    inputMain_ = std::move(channels);
+    if (!input_) {
+        return;
+    }
+#if defined(__APPLE__)
+    const bool plainPath = input_->deviceId().empty();
+    if (!input_->deviceId().starts_with("synthetic:") && plainPath == wantsMultichannelPath()) {
+        if (auto r = useAudioInput(inputSelector_); !r) {
+            noteBindingProblem("audio input: " + r.error().message);
+        }
+        return;
+    }
+#endif
+    if (channels_) {
+        channels_->stop();
+    }
+    input_->setMainChannels(inputMain_);
+    std::vector<std::string> keys;
+    for (const signals::StemSignals& s : inputSignals_) {
+        keys.push_back(s.key);
+    }
+    rebuildChannelAnalysis(keys);
 }
 
 void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys) {

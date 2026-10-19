@@ -66,6 +66,12 @@ public:
     // and `sourceStream` returns null for it -- the engine publishes it inactive and the UI says why.
     void setSources(std::vector<InputSource> sources);
     [[nodiscard]] const std::vector<InputSource>& sources() const;
+    // Which channels the main stream (what audio.* analyses) averages: empty = every channel, as it always was. A
+    // mixer's main out on inputs 7/8 beside stems on 1-6 is {6, 7}. Channels the device lacks are ignored; if none
+    // remain it is every channel again. Applies on the backend path (openBackend); the plain miniaudio path always
+    // averages every channel. Like setSources, a running capture is stopped and restarted around it.
+    void setMainChannels(std::vector<std::uint32_t> channels);
+    [[nodiscard]] const std::vector<std::uint32_t>& mainChannels() const;
     // The source's stream: mono samples, or for a pair interleaved (mid, side) frames -- two floats per frame.
     [[nodiscard]] AnalysisStream* sourceStream(std::size_t index);
     [[nodiscard]] float sourcePeak(std::size_t index) const;  // the last block's peak, 0..1

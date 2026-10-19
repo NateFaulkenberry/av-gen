@@ -295,12 +295,15 @@ TEST_CASE("Settings remember each device's input channel map by device id (ADR-1
     s.live.inputSources["AppleUSBAudioEngine:Universal Audio:Volt 876:1"] = {
         {.key = "drums", .label = "Drum bus", .channel = 0, .pair = true, .hits = true},
         {.key = "bass", .label = "Bass DI", .channel = 2}};
+    s.live.inputMain["AppleUSBAudioEngine:Universal Audio:Volt 876:1"] = {6, 7};
     const nlohmann::json j = s.toJson();
+    CHECK(j["live"]["inputMain"]["AppleUSBAudioEngine:Universal Audio:Volt 876:1"] == nlohmann::json::array({7, 8}));
     // Channels are 1-based in the file, as the interface's front panel numbers them.
     CHECK(j["live"]["inputSources"]["AppleUSBAudioEngine:Universal Audio:Volt 876:1"][0]["channel"] == 1);
     auto back = app::AppSettings::fromJson(j);
     REQUIRE(back.has_value());
     CHECK(back->live.inputSources == s.live.inputSources);
+    CHECK(back->live.inputMain == s.live.inputMain);
     // A malformed row is dropped, not the file.
     nlohmann::json bad = j;
     bad["live"]["inputSources"]["x"] = nlohmann::json::array({{{"label", "no channel"}}, {{"channel", 3}}});

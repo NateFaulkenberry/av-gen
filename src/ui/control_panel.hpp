@@ -209,6 +209,7 @@ public:
     std::function<void(const std::string&)> onLiveAudioInput;
     // ADR-1521: the Live panel's channel map for the open input.
     std::function<void(std::vector<audio::InputSource>)> onLiveInputSources;
+    std::function<void(std::vector<std::uint32_t>)> onLiveInputMain; // the main mix's channels; empty = all
     std::function<void(const std::string&)> onLiveMidiInput;
     std::function<void(float)> onLiveSmoothing;
     // ADR-1063/1341: the live scene switcher. The names the Scene dropdown lists (every live example), each one's

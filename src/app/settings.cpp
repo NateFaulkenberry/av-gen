@@ -92,6 +92,17 @@ json AppSettings::toJson() const {
         }
         doc["live"]["inputSources"] = std::move(devices);
     }
+    if (!live.inputMain.empty()) {
+        json devices = json::object();
+        for (const auto& [device, channels] : live.inputMain) {
+            json list = json::array();
+            for (const std::uint32_t c : channels) {
+                list.push_back(c + 1);
+            }
+            devices[device] = std::move(list);
+        }
+        doc["live"]["inputMain"] = std::move(devices);
+    }
     {
         json pj{{"display", projection.display},
                 {"windowWidth", projection.windowWidth},
@@ -185,6 +196,21 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
                                        .hits = item.value("hits", false)});
                 }
                 out.live.inputSources[device] = std::move(sources);
+            }
+        }
+        if (const auto devices = lv->find("inputMain"); devices != lv->end() && devices->is_object()) {
+            for (const auto& [device, list] : devices->items()) {
+                std::vector<std::uint32_t> channels;
+                if (list.is_array()) {
+                    for (const auto& c : list) {
+                        if (c.is_number_integer() && c.get<int>() >= 1) {
+                            channels.push_back(static_cast<std::uint32_t>(c.get<int>() - 1));
+                        }
+                    }
+                }
+                if (!channels.empty()) {
+                    out.live.inputMain[device] = std::move(channels);
+                }
             }
         }
     }

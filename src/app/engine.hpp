@@ -507,6 +507,10 @@ public:
     // machine's (the application keeps it in settings, by device), not the project's.
     void setInputSources(std::vector<audio::InputSource> sources);
     [[nodiscard]] const std::vector<audio::InputSource>& inputSources() const { return inputSources_; }
+    // The channels the main mix (audio.*, the Sonic layer, the beat) averages; empty = every channel. A device with a
+    // main-mix choice opens through the multichannel path, like one with sources.
+    void setInputMainChannels(std::vector<std::uint32_t> channels);
+    [[nodiscard]] const std::vector<std::uint32_t>& inputMainChannels() const { return inputMain_; }
     // Whether source `index` published live audio on the last frame.
     [[nodiscard]] bool inputSourceActive(std::size_t index) const {
         return index < inputActive_.size() && inputActive_[index] != 0;
@@ -1179,6 +1183,8 @@ private:
     // ADR-1521: after input_, so it is destroyed first: it reads the input's source streams.
     std::unique_ptr<analysis::ChannelAnalysis> channels_;
     std::vector<audio::InputSource> inputSources_;
+    std::vector<std::uint32_t> inputMain_;
+    [[nodiscard]] bool wantsMultichannelPath() const { return !inputSources_.empty() || !inputMain_.empty(); }
     std::vector<signals::StemSignals> inputSignals_;
     std::vector<analysis::LiveStemLatch> inputLatches_;
     std::vector<std::chrono::steady_clock::time_point> inputLastFrame_;

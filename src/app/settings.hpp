@@ -134,6 +134,8 @@ struct AppSettings {
         // ADR-1521: the analysis sources on each device's channels, by device id: this rig's patching (a mixer's drum
         // bus on input 1) belongs to the machine, not the project. Channels are 0-based here, 1-based in the file.
         std::map<std::string, std::vector<audio::InputSource>> inputSources;
+        // ...and which of its channels make the main mix (0-based; 1-based in the file). Absent = every channel.
+        std::map<std::string, std::vector<std::uint32_t>> inputMain;
     } live;
 
     // ---- projection (ADR-1026) ----

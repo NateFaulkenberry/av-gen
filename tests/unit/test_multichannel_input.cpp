@@ -299,3 +299,38 @@ TEST_CASE("multichannel: through the engine, live sources publish stem.<key>.*; 
     frame();
     CHECK(engine.signals().value(active) == 0.0f);
 }
+
+TEST_CASE("multichannel: the main mix can be one pair of a wide device instead of every channel",
+          "[multichannel][threading]") {
+    audio::AudioInput input;
+    input.setSources(monoSources(8));
+    input.setMainChannels({6, 7, 42}); // 42 does not exist and is ignored
+    SyntheticCapture* device = openSynthetic(input);
+    device->pump(50);
+    const auto seven = drain(*input.sourceStream(6));
+    const auto eight = drain(*input.sourceStream(7));
+    const auto main = drain(input.analysisStream());
+    REQUIRE(main.size() == seven.size());
+    for (std::size_t i = 0; i < main.size(); ++i) {
+        REQUIRE(main[i] == (seven[i] + eight[i]) * 0.5f);
+    }
+    // Back to every channel, on the running device.
+    for (std::uint32_t c = 0; c < 6; ++c) {
+        drain(*input.sourceStream(c));
+    }
+    input.setMainChannels({});
+    device->pump(10);
+    std::vector<std::vector<float>> mono(8);
+    for (std::uint32_t c = 0; c < 8; ++c) {
+        mono[c] = drain(*input.sourceStream(c));
+    }
+    const auto all = drain(input.analysisStream());
+    REQUIRE(all.size() == mono[0].size());
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        float sum = 0.0f;
+        for (std::uint32_t c = 0; c < 8; ++c) {
+            sum += mono[c][i];
+        }
+        REQUIRE(all[i] == sum * (1.0f / 8.0f));
+    }
+}

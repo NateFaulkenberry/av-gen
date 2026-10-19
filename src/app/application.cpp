@@ -2149,6 +2149,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             settings_.live.audioInput = name;
             saveSettings();
         };
+        panel_->onLiveInputMain = [this](std::vector<std::uint32_t> channels) {
+            engine_->setInputMainChannels(channels);
+            if (const audio::AudioInput* input = engine_->audioInput(); input != nullptr) {
+                const std::string id = inputDeviceId(input->deviceId().empty() ? input->deviceName() : input->deviceId());
+                if (!id.starts_with("synthetic:")) {
+                    if (channels.empty()) {
+                        settings_.live.inputMain.erase(id);
+                    } else {
+                        settings_.live.inputMain[id] = channels;
+                    }
+                    saveSettings();
+                }
+            }
+        };
         // ADR-1521: the channel map of the open device, remembered for it by its id.
         panel_->onLiveInputSources = [this](std::vector<audio::InputSource> sources) {
             engine_->setInputSources(std::move(sources));
@@ -7596,13 +7610,16 @@ Result<void> Application::openAudioInput(const std::string& selector) {
     // ADR-1521: the device's remembered channel map goes in before it opens (with sources it opens through the
     // multichannel path; without, the plain one). `--input-sources` overrides it for this run.
     engine_->stopAudioInput();
+    const std::string id = inputDeviceId(selector);
     if (options_.inputSources) {
         engine_->setInputSources(*options_.inputSources);
     } else {
-        const auto saved = settings_.live.inputSources.find(inputDeviceId(selector));
+        const auto saved = settings_.live.inputSources.find(id);
         engine_->setInputSources(saved != settings_.live.inputSources.end() ? saved->second
                                                                            : std::vector<audio::InputSource>{});
     }
+    const auto main = settings_.live.inputMain.find(id);
+    engine_->setInputMainChannels(main != settings_.live.inputMain.end() ? main->second : std::vector<std::uint32_t>{});
     // ADR-1521: `synthetic:<n>` is the test signal generator, for benchmarks only (it is in no device list).
     if (selector.starts_with("synthetic:")) {
         audio::SyntheticCaptureConfig config;
