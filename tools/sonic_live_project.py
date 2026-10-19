@@ -240,6 +240,11 @@ def respond(live):
         for m in src["settings"]["mappings"]:
             for i in m["inputs"]:
                 i["signal"] = LOUDNESS.get(i["signal"], i["signal"])
+            if m["name"] == "silence":
+                # ADR-1510: the response level reads against the music's own loudness, so a breakdown 20 dB down
+                # reads near 0 for a minute; the waiting world is for silence, so it also hears the character's
+                # fixed-dB energy (0.72 through Hyperborea's quiet passage, 0 in silence). Sensitivity still moves it.
+                m["inputs"].append({"signal": "sonic.energy.slow", "weight": 1.0, "invert": True})
     for r in live["routes"]:
         if r["source"] == "notes.noteOn":
             r["source"] = "response.note"
