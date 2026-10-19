@@ -83,6 +83,14 @@ SYNTH_SUSTAINS = [(4.0, 3.0, 659.25), (15.0, 3.0, 523.25)]  # (start, duration, 
 PAD_CHORD = (10.0, 6.0, [220.0, 277.18, 329.63])  # 500 ms attack
 
 
+def tail_fade(seg, rate, seconds=0.005):
+    """Fades the last `seconds` of a segment to zero: a segment cut off mid-decay is a step, and a step is an attack."""
+    k = min(len(seg), int(seconds * rate))
+    if k > 0:
+        seg[-k:] *= np.linspace(1.0, 0.0, k)
+    return seg
+
+
 def render_drums(rate, rng):
     n = int(DURATION * rate)
     out = np.zeros(n)
@@ -93,14 +101,14 @@ def render_drums(rate, rng):
         tt = np.arange(m) / rate
         freq = 50.0 + 100.0 * np.exp(-tt / 0.03)  # 150 -> 50 Hz sweep
         phase = 2 * np.pi * np.cumsum(freq) / rate
-        seg = 0.5 * np.sin(phase) * np.exp(-tt / 0.09)
+        seg = tail_fade(0.5 * np.sin(phase) * np.exp(-tt / 0.09), rate)
         out[i:i + m] += seg[: max(0, min(m, n - i))]
     for t in snares:
         i = int(round(t * rate))
         m = int(0.20 * rate)
         tt = np.arange(m) / rate
         noise = rng.uniform(-1.0, 1.0, m)
-        seg = (0.2 * noise * np.exp(-tt / 0.05) + 0.18 * np.sin(2 * np.pi * 190.0 * tt) * np.exp(-tt / 0.04))
+        seg = tail_fade(0.2 * noise * np.exp(-tt / 0.05) + 0.18 * np.sin(2 * np.pi * 190.0 * tt) * np.exp(-tt / 0.04), rate)
         out[i:i + m] += seg[: max(0, min(m, n - i))]
     for t in hats:
         i = int(round(t * rate))
@@ -108,7 +116,7 @@ def render_drums(rate, rng):
         tt = np.arange(m) / rate
         noise = rng.uniform(-1.0, 1.0, m + 1)
         hp = np.diff(noise)  # first difference: a crude high-pass, most energy above ~6 kHz
-        seg = 0.1 * hp * np.exp(-tt / 0.012)
+        seg = tail_fade(0.1 * hp * np.exp(-tt / 0.012), rate)
         out[i:i + m] += seg[: max(0, min(m, n - i))]
     return out
 
@@ -140,9 +148,9 @@ def render_synth(rate):
     right = np.zeros(n)
     for start, hz in SYNTH_PLUCKS:
         i = int(round(start * rate))
-        m = int(0.4 * rate)
+        m = int(0.8 * rate)
         tt = np.arange(m) / rate
-        seg = 0.5 * np.sin(2 * np.pi * hz * tt) * np.minimum(1.0, tt / 0.002) * np.exp(-tt / 0.18)
+        seg = tail_fade(0.5 * np.sin(2 * np.pi * hz * tt) * np.minimum(1.0, tt / 0.002) * np.exp(-tt / 0.18), rate)
         k = max(0, min(m, n - i))
         left[i:i + m] += 0.8 * seg[:k]
         right[i:i + m] += 1.0 * seg[:k]
