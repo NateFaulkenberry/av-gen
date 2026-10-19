@@ -1,4 +1,5 @@
 #include "app/engine.hpp"
+#include "audio/capture_coreaudio.hpp"
 #include "app/project_paths.hpp"
 
 #include "scene/authored_cut.hpp"
@@ -5193,6 +5194,43 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     if (mode_ != EngineMode::Live) {
         return fail("live audio input needs the live engine");
     }
+    inputSelector_ = deviceName;
+#if defined(__APPLE__)
+    // ADR-1522: with sources to analyse, the device is opened through the Core Audio backend, which captures every
+    // channel of every input stream. With none it is the plain miniaudio path, exactly as it always was (the owner's
+    // BlackHole 2ch workflow).
+    if (!inputSources_.empty()) {
+        std::string uid;
+        for (const audio::AudioDeviceInfo& d : audio::listCaptureDevices()) {
+            const bool match = deviceName.empty() ? d.isDefault : (d.id == deviceName || d.name == deviceName);
+            if (match) {
+                uid = d.id;
+                break;
+            }
+        }
+        if (uid.empty()) {
+            // The name substring the plain path accepts, so a saved "BlackHole" still finds "BlackHole 16ch".
+            std::string lower = deviceName;
+            std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+            for (const audio::AudioDeviceInfo& d : audio::listCaptureDevices()) {
+                std::string name = d.name;
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+                if (!lower.empty() && name.find(lower) != std::string::npos) {
+                    uid = d.id;
+                    break;
+                }
+            }
+        }
+        if (uid.empty()) {
+            return fail("no capture device matches '{}'", deviceName);
+        }
+        if (auto r = useAudioInputBackend(std::make_unique<audio::CoreAudioCapture>(uid)); !r) {
+            return r;
+        }
+        inputSelector_ = deviceName;
+        return {};
+    }
+#endif
     auto input = std::make_unique<audio::AudioInput>();
     input->setSources(inputSources_); // ADR-1521: before the open, so its taps exist from the first block
     if (auto r = input->open(deviceName); !r) {
@@ -5281,6 +5319,20 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
     for (const audio::InputSource& source : inputSources_) {
         inputSignals_.push_back(signals::StemSignals::declare(bus_, source.key, source.label));
     }
+#if defined(__APPLE__)
+    // The capture path follows whether there are sources (ADR-1522): reopen the same device on the other one.
+    const bool plainPath = input_ && input_->deviceId().empty();
+    const bool synthetic = input_ && input_->deviceId().starts_with("synthetic:");
+    if (input_ && !synthetic && plainPath != inputSources_.empty()) {
+        const std::string selector = inputSelector_;
+        if (auto r = useAudioInput(selector); !r) {
+            log::warn("audio input: reopening '{}' for its sources: {}", selector, r.error().message);
+            noteBindingProblem("audio input: " + r.error().message);
+        }
+        rebind();
+        return;
+    }
+#endif
     if (input_) {
         if (channels_) {
             channels_->stop(); // before the input replaces the streams it reads; the rebuild adopts what is unchanged
@@ -5323,6 +5375,31 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
     channels_ = std::make_unique<analysis::ChannelAnalysis>(std::move(sources), input_->sampleRate(), analyzerConfig_,
                                                             std::move(previous));
     channels_->start();
+}
+
+void Engine::watchInputDevice() {
+    // ADR-1522: the Core Audio backend's device went away or changed format. Nothing else is opened in its place
+    // (the brief: never a silent substitute); the same device is reopened when it is back, checked once a second.
+    if (!input_ || input_->deviceId().empty() || input_->deviceId().starts_with("synthetic:")) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const bool changed = input_->formatChanged();
+    if (input_->connected() && !changed) {
+        return;
+    }
+    if (!changed && now - inputRetry_ < std::chrono::seconds(1)) {
+        return;
+    }
+    inputRetry_ = now;
+    const std::string uid = input_->deviceId();
+    if (!audio::coreAudioDevicePresent(uid)) {
+        return; // still gone: its sources read inactive, the panel says disconnected
+    }
+    log::info("audio input '{}': {}; reopening", input_->deviceName(), changed ? "its format changed" : "it is back");
+    if (auto r = useAudioInputBackend(std::make_unique<audio::CoreAudioCapture>(uid)); !r) {
+        log::warn("audio input: reopening '{}': {}", uid, r.error().message);
+    }
 }
 
 void Engine::publishInputSources() {
@@ -6540,6 +6617,7 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
     updateAudioHistory(newFrame);
+    watchInputDevice();
     if (input_ != nullptr) {
         // ADR-1521: a live input's sources. An offline stem means nothing without its mix playing: inactive, unless a
         // live source of the same key publishes it (its signals are the same names).

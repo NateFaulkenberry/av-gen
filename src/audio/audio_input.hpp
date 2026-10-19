@@ -19,8 +19,13 @@ namespace avgen::audio {
 
 struct AudioDeviceInfo {
     std::string name;
-    std::string id;          // backend id string; "" = default
+    std::string id;          // backend id string (Core Audio: the device UID, stable across replugs); "" = default
     bool isDefault = false;
+    // ADR-1522, macOS: the device's input channels per Core Audio stream (one entry per stream) and nominal rate, from
+    // the HAL -- miniaudio's own count is the first stream's only. Empty / 0 where unknown (other platforms).
+    std::vector<std::uint32_t> streamChannels;
+    double sampleRate = 0.0;
+    [[nodiscard]] std::uint32_t channels() const;
 };
 // Capture devices known to miniaudio (may be empty on machines without inputs / permissions).
 [[nodiscard]] std::vector<AudioDeviceInfo> listCaptureDevices();
@@ -32,7 +37,7 @@ public:
     AudioInput(const AudioInput&) = delete;
     AudioInput& operator=(const AudioInput&) = delete;
 
-    // Opens the capture device whose name contains `deviceName` (case-insensitive; "" = default)
+    // Opens the capture device whose id is `deviceName`, or whose name contains it (case-insensitive; "" = default)
     // at `sampleRate` (0 = the device's native rate) and starts capturing. Errors: no device,
     // permission denied, backend failure.
     [[nodiscard]] Result<void> open(const std::string& deviceName = "", std::uint32_t sampleRate = 0);

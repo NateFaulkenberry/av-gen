@@ -1177,6 +1177,9 @@ private:
     std::vector<std::chrono::steady_clock::time_point> inputLastFrame_;
     std::vector<std::uint8_t> inputActive_;
     void rebuildChannelAnalysis(const std::vector<std::string>& previousKeys);
+    void watchInputDevice();
+    std::string inputSelector_; // what useAudioInput was asked for, to reopen the same device on the other path
+    std::chrono::steady_clock::time_point inputRetry_{};
     void publishInputSources();
     Result<void> adoptAudioInput(std::unique_ptr<audio::AudioInput> input);
     params::Parameter<float>* inputGain_ = nullptr;

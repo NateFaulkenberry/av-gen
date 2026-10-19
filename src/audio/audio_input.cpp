@@ -1,5 +1,6 @@
 #include "audio/audio_input.hpp"
 
+#include "audio/capture_coreaudio.hpp"
 #include "core/log.hpp"
 
 #include <miniaudio.h>
@@ -11,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <vector>
@@ -71,6 +73,10 @@ void forEachCaptureDevice(Fn&& fn) {
 
 } // namespace
 
+std::uint32_t AudioDeviceInfo::channels() const {
+    return std::accumulate(streamChannels.begin(), streamChannels.end(), 0u);
+}
+
 std::vector<AudioDeviceInfo> listCaptureDevices() {
     std::vector<AudioDeviceInfo> devices;
     forEachCaptureDevice([&](const ma_device_info& info, ma_backend backend) {
@@ -80,6 +86,15 @@ std::vector<AudioDeviceInfo> listCaptureDevices() {
         d.isDefault = info.isDefault != MA_FALSE;
         devices.push_back(std::move(d));
     });
+    // ADR-1522: the HAL's own stream layout and rate, by UID (empty off macOS).
+    for (const CoreAudioInputDevice& hal : coreAudioInputDevices()) {
+        for (AudioDeviceInfo& d : devices) {
+            if (d.id == hal.uid) {
+                d.streamChannels = hal.streamChannels;
+                d.sampleRate = hal.sampleRate;
+            }
+        }
+    }
     // At most one capture device is the default, and the backend does not always agree. Observed on
     // a machine with a USB interface attached: CoreAudio reported **both** "Volt 876" and "MacBook
     // Pro Microphone" as default, from a capture-only enumeration where two defaults cannot be
@@ -413,6 +428,13 @@ Result<void> AudioInput::open(const std::string& deviceName, std::uint32_t sampl
     std::optional<ma_device_id> selected;
     std::string selectedName;
     if (!deviceName.empty()) {
+        // An exact id (a saved Core Audio UID) first, then a name substring, as it always matched.
+        forEachCaptureDevice([&](const ma_device_info& info, ma_backend backend) {
+            if (!selected && deviceIdString(backend, info.id, info.name) == deviceName) {
+                selected = info.id;
+                selectedName = info.name;
+            }
+        });
         forEachCaptureDevice([&](const ma_device_info& info, ma_backend /*backend*/) {
             if (!selected && nameMatches(deviceName, info.name)) {
                 selected = info.id;
