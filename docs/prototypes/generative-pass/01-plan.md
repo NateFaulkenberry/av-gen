@@ -71,7 +71,7 @@ Each band gets a job, a spatial scale and a time constant, and the pinned levels
 | Band / feature | Signal used | RD Pins | Phase Hall | Envelope |
 |---|---|---|---|---|
 | Bass level | `response.bass` (pinned when loud: the presence of bass, not its shape) | the broad swell's height | the cores' warmth | 250-400 ms in, 1.2-2.5 s out |
-| Bass shape | the spectrogram history (Spectrum field, 0-16% of the log axis, 0.35 s window) laid out in space | a lift and a pool of light rolling out from the heart at 14 m/s | rings of membrane displacement rolling out from low in front at 34 m/s | the music's own, smoothed |
+| Bass shape | the spectrogram history (Spectrum field, 0-16% of the log axis, 0.15 s window) laid out in space | a lift and a pool of light rolling out from the heart at 14 m/s | rings of membrane displacement rolling out from low in front at 34 m/s | the music's own, smoothed |
 | Kick | low onsets (Onset field: the newest eight, each a ring) | a ring of impact: lift, contour swell, a band of light, the regime toward spots | a ring of push through the membrane + a phase front through the network + a ring of light | ring decays 0.7-1.4 /s |
 | Mids | `audio.mid` (auto-gained band) | the ripple's reach into the contours and its heave | (network frequency, kept) | 120 ms in, 700 ms out |
 | Snare | mid onsets | a quicker ring of light from off-centre; a burst of growth | a quicker phase front | decays 1.3-1.6 /s |
@@ -112,7 +112,7 @@ hit; a held note never retriggers a ring. Geometry, light and fine detail each h
 | Layer | What you see | Mechanism |
 |---|---|---|
 | A broad | Two broad swells (38 m at 4.2 m/s; 27 m at 2.9 m/s, crossing) heave the field | two world-space `sine` deformers; the bass level is A's height (route), CC 7 both |
-| A bass | The bass history rolls out from the heart: a lift and a pool of light | a Spectrum field (bass band, 14 m/s, 0.35 s window) as a lift effector and in the program |
+| A bass | The bass history rolls out from the heart: a lift and a pool of light | a Spectrum field (bass band, 14 m/s, 0.15 s window) as a lift effector and in the program |
 | B ripples | A 9.5 m ripple at 3.6 m/s bunches and opens the contours (the mids set its reach), with a small heave | a third `sine` deformer, reproduced exactly in the program (`gradient` + `time` + `palette` = the same sine) |
 | C impacts | A kick: a ring from the heart lifts the pins, swells the contours and carries a band of light, and turns the labyrinth toward spots; a snare: a quicker ring of light from off-centre | Onset fields (the newest eight onsets: bounded), in the regime bake, an effector and the program |
 | D interference | Where the ripple's crest meets the bass pool, hot spots; where crests meet contours, beads | products of the wave terms in the program |
@@ -147,7 +147,9 @@ a contour without filling the channel beside it. Vignette 0.4 → 0.22, grain of
 | P1 | Columns to the poles | — | Meridians converge: rays to a point, the brief's and the coordinator's "tunnel toward a pole" | Rejected |
 | P2 | Rings of constant pitch near the poles | No convergence | Concentric rings at the zenith read as a dome's oculus or a target | Rejected |
 | P3 | Columns end in a ragged hem | Simple | Proof P1: reads as an opening to a cloudy sky (an oculus) | Rejected (proof) |
-| P4 | **Columns dissolve**: from a latitude that wanders round the sphere, blades thin out one by one and shrink over 12-20 degrees into the glowing membrane | No edge and no circle anywhere; no long lines reach the pole | The caps carry less structure; the membrane must read as surface, not sky | **Chosen; proof P2** |
+| P4 | Columns dissolve into the glowing membrane | No edge, no circle | Proofs P2-P3: the bare cap reads as a dark opening, and the meridians still converge on it (the coordinator's gate-1 note) | Rejected (proof) |
+| P5 | Fibonacci-scattered chips fill the cap | No rings | Proof P4: the sunflower's spiral parastichies read as a vortex | Rejected (proof) |
+| P6 | **The cap as its own pattern**: from a latitude that wanders round the sphere (45-53°) the columns thin out over 10-15°, and a hexagonal lattice of chips (laid by the Lambert equal-area projection about each pole) fills in ahead of them; every chip lies along one parallel field across the cap (world Z projected), so nothing is radial, and it lights like a blade, as bright as the columns | No convergence, no rings, no hole; the chips continue the columns where the performance camera looks | The lattice reads as a woven panel overhead | **Chosen; proofs P5-P6** |
 
 Any tangent direction field on a sphere has a singular point (hairy ball); P4 puts no structure where it would show.
 
@@ -196,6 +198,10 @@ neighbours. CC 9 selects across the six.
 5. Clean reconfigure, the suites, review and integrity checks, the report (02).
 
 ## 6. Engine changes
+
+- **ADR-1502, a grid re-bakes what it reads at each of its sub-steps** (found while proving RD Pins: a render
+  started mid-track lost most of its pattern after the first frame, on main as well): a seek now replays exactly what
+  play did.
 
 - **ADR-1500, an effector's axis can be the point's own** (`effectors[].local`): a scalar PositionOffset along the
   point's own axis, a Rotation about it. Phase Hall's blades swing about their own hinges and move along their own

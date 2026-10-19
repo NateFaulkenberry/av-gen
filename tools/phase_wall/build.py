@@ -187,7 +187,7 @@ def chip_points():
 ROLES = ("environment", "back", "trough", "mid", "crest", "core", "glint", "glow", "front", "peak")
 PALETTES = [
     # name                  environment back       trough     mid        crest      core       glint      glow       front      peak
-    ("Polar Glass",         "#01030b", "#04122c", "#06163a", "#0d4486", "#4cc8ff", "#6eeaff", "#e2f4ff", "#1460e0", "#9ae6ff", "#f2fbff"),
+    ("Polar Glass",         "#01030b", "#04122c", "#040e26", "#0a2e60", "#1f80c8", "#5ad6ff", "#e2f4ff", "#1460e0", "#9ae6ff", "#f2fbff"),
     ("Glacial Teal",        "#010808", "#02191b", "#042426", "#08605a", "#22d6bc", "#6cffd8", "#e6fff6", "#0c9a88", "#aaffe4", "#f4fffb"),
     ("Acid Cathedral",      "#010308", "#030d16", "#0a1610", "#3a5418", "#b8f020", "#e0ff38", "#f8ffcc", "#5c8c0c", "#a2ff58", "#fdffe0"),
     ("Molten Signal",       "#070102", "#1c0305", "#260406", "#860c10", "#ff3418", "#ff6618", "#ffd088", "#b81406", "#ffac36", "#fff0c4"),
@@ -281,14 +281,14 @@ def motion_fields(s):
                        "waveWidth": 0.0, "amplitude": 1.0, "strength": 2.5})
     s.field("kickPush", {"kind": "onset", "onsetSource": "low", "point": list(on_sphere(*KICK_AT)),
                          "waveGeometry": "spherical", "audioSpeed": 70.0, "onsetWidth": 9.0, "onsetDecay": 1.4,
-                         "strength": 3.0})
+                         "strength": 7.0})   # onset rings are 0.1-0.5 at a kick's crest (measured): 1-3 m of push
     s.field("disp", {"kind": "compound", "combine": "add", "children": ["swell", "breath", "kickPush"]})
 
 
 # ================================================================================================ the blades
 ACT = (0.2, 0.5)        # activity -> front glow
-TONE = 0.5              # the blades' body under their light (the bands carry the light, the faces stay deep)
-CORE = 2.6              # the core's gain over its palette colour
+TONE = 0.38              # the blades' body under their light (the bands carry the light, the faces stay deep)
+CORE = 2.2              # the core's gain over its palette colour
 
 
 def blade_program():
@@ -320,7 +320,7 @@ def blade_program():
     g.op(None, "multiply", 6, a=6, b=4)                             # v (1 - v)
     g.op(None, "smoothstep", 6, a=6, k=[0.0, 0.03, 0, 0])
     g.op(None, "multiply", 3, a=3, b=6)
-    g.op(None, "power", 5, a=3, f=14.0)                             # r5 = core
+    g.op(None, "power", 5, a=3, f=22.0)                             # r5 = core
     g.op(None, "power", 6, a=3, f=2.5)
     g.op("shoulder", "remap", 6, a=6, k=[0.0, 1.0, 0.0, 0.12])      # r6 = shoulder
     g.op(None, "add", 5, a=5, b=6)                                  # r5 = the profile
@@ -336,15 +336,15 @@ def blade_program():
     g.op(None, "multiply", 5, a=5, b=6)
     g.op("core", "constant", 7, k=C("core", CORE) + [1])             # (routes multiply it: CC 6 light, the bass)
     g.op(None, "multiply", 5, a=5, b=7)                             # r5 = emission (core light)
-    # streaks: cos(2 pi (0.7 (v + random - 0.12 t))) to a high power, gated by the hats
+    # streaks: cos(2 pi 0.15 (v + random - 0.6 t))^60, a short glint running up a few blades at a time; the hats lift it
     g.op(None, "input", 6, inp="instanceRandom")
     g.op(None, "add", 4, a=4, b=6)                                  # v + random
     g.op(None, "input", 6, inp="time")
-    g.op("streakRate", "remap", 6, a=6, k=[0.0, 1.0, 0.0, -0.12])   # -0.12 t
+    g.op("streakRate", "remap", 6, a=6, k=[0.0, 1.0, 0.0, -0.6])    # -0.6 t: up the blade at 3 m/s
     g.op(None, "add", 4, a=4, b=6)
-    g.op(None, "palette", 4, a=4, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[0.7, 0.7, 0.7, 0],
-         k4=[0, 0, 0, 0])
-    g.op(None, "power", 4, a=4, f=24.0)                             # r4 = the streak band
+    g.op(None, "palette", 4, a=4, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[0.15, 0.15, 0.15, 0],
+         k4=[0, 0, 0, 0])                                           # one crest every ~7 blade lengths: sparse
+    g.op(None, "power", 4, a=4, f=200.0)                            # r4 = the streak: a short glint (about 1 m)
     g.op(None, "multiply", 4, a=4, b=3)                             # down the middle only
     g.op("glint", "constant", 6, k=C("glint", 3.0) + [1])           # (routes multiply it: the hats, CC 11)
     g.op(None, "multiply", 4, a=4, b=6)
@@ -517,7 +517,7 @@ def light(s):
     for k in ("env/sky/zenithColor", "env/sky/horizonColor", "env/sky/groundColor", "scene/fogColor"):
         bind(s, "environment", k)
     # the faces' light: a soft source at the sphere's heart, so a blade swinging away from the centre falls dark
-    s.light("heart", "point", position=[0.0, 10.0, 0.0], color=C("glow"), intensity=90000.0, range=0.0,
+    s.light("heart", "point", position=[0.0, 10.0, 0.0], color=C("glow"), intensity=50000.0, range=0.0,
             castsShadow=False, contactShadow=False, diffuseOnly=True)
     bind(s, "glow", "lights/heart/color")
 
@@ -564,7 +564,7 @@ def music(s, net, g):
             # the light: the bass warms the cores slowly, the hats run the streaks
             A("response.bass", op_path(g, "core"), 1.0, op="multiply", gain=0.5, offset=0.75, attackMs=200,
               decayMs=900),
-            A("response.hat", op_path(g, "glint"), 1.0, op="multiply", gain=2.5, offset=0.15, attackMs=8,
+            A("response.hat", op_path(g, "glint"), 1.0, op="multiply", gain=3.0, offset=0.04, attackMs=8,
               decayMs=260),
             # the held sound swells the membrane
             A("response.sustain", "field/breath/strength", 3.0, attackMs=2500, decayMs=5000))
@@ -604,8 +604,8 @@ CAMERAS = {  # review framings
 def camera(s):
     s.camera = {"mode": 1, "position": list(CAM[0]), "target": list(CAM[1]), "fov": 60.0, "orbitSpeed": 0.0}
     s.drift_camera(CAM[0], CAM[1], period=90.0, amp=(5.0, 2.0, 4.0), tamp=(6.0, 3.0, 0.0), steps=8)
-    s.params_({"camera/lens/focalLength": 20.0, "post/bloom/intensity": 0.32, "post/bloom/threshold": 1.0,
-               "post/bloom/radius": 1.2, "post/output/vignette": 0.2, "post/grade/contrast": 1.06})
+    s.params_({"camera/lens/focalLength": 20.0, "post/bloom/intensity": 0.26, "post/bloom/threshold": 1.0,
+               "post/bloom/radius": 0.8, "post/output/vignette": 0.2, "post/grade/contrast": 1.06})
 
 
 # ================================================================================================ build

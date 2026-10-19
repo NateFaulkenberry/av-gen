@@ -17,7 +17,7 @@ excited by waves of different scales and times:
   - a kick: a ring of impact from the heart (the pins jump, the contours swell, a band of light runs ahead of it),
     which also turns the labyrinth toward spots as it passes; a snare: a quicker ring from off-centre.
 
-Proof switches (environment, review only): RP_PIN=box|round, RP_RES=1 (resonance regime layer), RP_FLOOR=0 (no floor
+Proof switches (environment, review only): RP_PIN=box|round, RP_RES=1 (resonance regime layer), RP_FLOOR=1 (the floor
 tint), RP_PALETTE=<n>.
 """
 from __future__ import annotations
@@ -41,7 +41,8 @@ TITLE = "RD Pins"
 OUT = os.path.join(REPO, "examples", "rd-pins")
 PIN = os.environ.get("RP_PIN", "box")  # round pins cost 2.2x and look the same at this distance (plan, Q2)
 RES = bool(os.environ.get("RP_RES"))
-FLOOR = os.environ.get("RP_FLOOR", "1") != "0"
+FLOOR = os.environ.get("RP_FLOOR", "0") != "0"   # off: the pins heave now, and a floor carrying the pattern
+# beneath them showed through as a ghost of the contours at the wrong height
 KICK_GAIN = float(os.environ.get("RP_KICKGAIN", "1.0"))  # proofs; Stage 2 routes it through Audio Influence
 RING = float(os.environ.get("RP_RING", "1.0"))            # proofs: x the palette's ring gain
 
@@ -282,7 +283,7 @@ def pin_program():
     # S = B + shift
     g.op("rippleShift", "constant", 6, k=[0.035, 0.035, 0.035, 0])       # the ripple's reach into the contours (mids)
     g.op(None, "multiply", 6, a=1, b=6)
-    g.op(None, "remap", 7, a=2, k=[0.0, 1.0, 0.0, 0.03], f=1.0)          # the kick swells the contours (bounded)
+    g.op(None, "remap", 7, a=2, k=[0.0, 0.5, 0.0, 0.03], f=1.0)          # the kick swells the contours (bounded)
     g.op(None, "add", 6, a=6, b=7)
     g.op(None, "add", 6, a=0, b=6)                                       # r6 = S
     # the contour
@@ -305,9 +306,10 @@ def pin_program():
     g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 0.22, 3.2])                 # floor 0.22: most contours stay low
     g.op(None, "add", 1, a=1, b=0)
     g.op(None, "field", 2, field="kick")
-    g.op(None, "remap", 2, a=2, k=[0.15, 1.4, 0.0, 2.4], f=1.0)          # the kick's band of light
+    g.op(None, "remap", 2, a=2, k=[0.02, 0.45, 0.0, 2.6], f=1.0)         # the kick's band of light (onset rings are
+                                                                         # 0.1-0.5 at a kick's crest, measured)
     g.op(None, "add", 1, a=1, b=2)
-    g.op(None, "remap", 4, a=4, k=[0.15, 1.0, 0.0, 1.2], f=1.0)          # the snare's
+    g.op(None, "remap", 4, a=4, k=[0.02, 0.4, 0.0, 1.4], f=1.0)          # the snare's
     g.op(None, "add", 1, a=1, b=4)                                       # r1 = intensity
     g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])  # the halo: palette ring x ringGain
     g.op(None, "multiply", 7, a=7, b=2)
@@ -448,6 +450,7 @@ def palette_block(g, gf):
         {"role": "shadow", "target": "env/sky/horizonColor", "gain": 1.2},
         {"role": "environment", "target": "scene/fogColor"},
         {"role": "environment", "target": op(gf, "env"), "gain": 1.6},
+        {"role": "environment", "target": "procedural/floor/material/baseColor", "gain": 0.5},
         {"role": "base", "target": op(gf, "tint")},
         {"role": "ring", "target": op(gf, "glow"), "gain": 0.03},
         {"role": "base", "target": g.path("baseRamp", "constant")},
@@ -507,16 +510,16 @@ def build():
                                 # the bass history's lift, the kick's and the snare's rings (m)
                                 {"field": "swell", "op": "positionOffset", "blend": "add", "strength": 1.4,
                                  "axis": [0.0, 1.0, 0.0]},
-                                {"field": "kick", "op": "positionOffset", "blend": "add", "strength": 0.3,
+                                {"field": "kick", "op": "positionOffset", "blend": "add", "strength": 1.0,
                                  "axis": [0.0, 1.0, 0.0]},
-                                {"field": "snare", "op": "positionOffset", "blend": "add", "strength": 0.2,
+                                {"field": "snare", "op": "positionOffset", "blend": "add", "strength": 0.4,
                                  "axis": [0.0, 1.0, 0.0]}]})
     s.floor_program = gf = floor_program()
     s.program(gf.doc(base=gf.base, emission=gf.emit))
     pos, nrm, uv, idx = common.bowl_mesh(BOWL_R * 1.45, BOWL_H * 1.45 ** BOWL_P, 160, 240, power=BOWL_P)
     common.write_glb(os.path.join(OUT, "meshes", "rp-bowl.glb"), pos, nrm, uv, idx, "bowl")
     s.proc("floor", {"kind": "mesh", "asset": "meshes/rp-bowl.glb"}, position=(0.0, -0.05, 0.0),
-           material={"program": gf.name if FLOOR else None, "baseColor": C("environment", 2.0), "roughness": 0.6,
+           material={"program": gf.name if FLOOR else None, "baseColor": C("environment", 0.5), "roughness": 0.6,
                      "metallic": 0.0})
     if not FLOOR:
         s.nodes[-1]["procedural"]["material"].pop("program")

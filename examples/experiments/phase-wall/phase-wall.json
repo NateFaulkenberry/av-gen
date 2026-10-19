@@ -116,7 +116,7 @@
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.32,
+  "post/bloom/intensity": 0.26,
   "post/bloom/threshold": 1.0,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
@@ -130,7 +130,7 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "post/bloom/radius": 1.2,
+  "post/bloom/radius": 0.8,
   "post/grade/contrast": 1.06
  },
  "sources": [
@@ -237,8 +237,8 @@
    "polarity": "unipolar",
    "depthSource": "visual.influence",
    "chain": {
-    "gain": 2.5,
-    "offset": 0.15,
+    "gain": 3.0,
+    "offset": 0.04,
     "attackMs": 8,
     "decayMs": 260
    }
@@ -709,23 +709,23 @@
       0.02519
      ],
      "trough": [
-      0.00182,
-      0.00802,
-      0.04231
+      0.00121,
+      0.00439,
+      0.01938
      ],
      "mid": [
-      0.00402,
-      0.05781,
-      0.2384
+      0.00304,
+      0.02732,
+      0.11697
      ],
      "crest": [
-      0.07227,
-      0.57758,
-      1.0
+      0.0137,
+      0.21586,
+      0.57758
      ],
      "core": [
-      0.15593,
-      0.82279,
+      0.10224,
+      0.67244,
       1.0
      ],
      "glint": [
@@ -1036,22 +1036,22 @@
    {
     "role": "trough",
     "target": "material/bladeSphere/op/4/ramp/constant",
-    "gain": 0.5
+    "gain": 0.38
    },
    {
     "role": "mid",
     "target": "material/bladeSphere/op/4/ramp/constant2",
-    "gain": 0.5
+    "gain": 0.38
    },
    {
     "role": "crest",
     "target": "material/bladeSphere/op/4/ramp/constant3",
-    "gain": 0.5
+    "gain": 0.38
    },
    {
     "role": "core",
     "target": "material/bladeSphere/op/30/constant/constant",
-    "gain": 2.6
+    "gain": 2.2
    },
    {
     "role": "glint",
@@ -1066,22 +1066,22 @@
    {
     "role": "trough",
     "target": "material/chip/op/3/ramp/constant",
-    "gain": 0.5
+    "gain": 0.38
    },
    {
     "role": "mid",
     "target": "material/chip/op/3/ramp/constant2",
-    "gain": 0.5
+    "gain": 0.38
    },
    {
     "role": "crest",
     "target": "material/chip/op/3/ramp/constant3",
-    "gain": 0.5
+    "gain": 0.38
    },
    {
     "role": "core",
     "target": "material/chip/op/25/constant/constant",
-    "gain": 2.6
+    "gain": 2.2
    },
    {
     "role": "glow",

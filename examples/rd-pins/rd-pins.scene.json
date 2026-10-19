@@ -588,7 +588,7 @@
       "field": "kick",
       "op": "positionOffset",
       "blend": "add",
-      "strength": 0.3,
+      "strength": 1.0,
       "axis": [
        0.0,
        1.0,
@@ -599,7 +599,7 @@
       "field": "snare",
       "op": "positionOffset",
       "blend": "add",
-      "strength": 0.2,
+      "strength": 0.4,
       "axis": [
        0.0,
        1.0,
@@ -621,11 +621,10 @@
      "kind": "single"
     },
     "material": {
-     "program": "rpFloor",
      "baseColor": [
-      0.04631,
-      0.00735,
-      0.01605
+      0.01158,
+      0.00184,
+      0.00401
      ],
      "roughness": 0.6,
      "metallic": 0.0
@@ -792,7 +791,7 @@
      "srcA": 2,
      "constant": [
       0.0,
-      1.0,
+      0.5,
       0.0,
       0.03
      ],
@@ -961,10 +960,10 @@
      "dst": 2,
      "srcA": 2,
      "constant": [
-      0.15,
-      1.4,
+      0.02,
+      0.45,
       0.0,
-      2.4
+      2.6
      ],
      "value": 1.0
     },
@@ -979,10 +978,10 @@
      "dst": 4,
      "srcA": 4,
      "constant": [
-      0.15,
-      1.0,
+      0.02,
+      0.4,
       0.0,
-      1.2
+      1.4
      ],
      "value": 1.0
     },

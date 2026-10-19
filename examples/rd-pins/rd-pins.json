@@ -1653,6 +1653,11 @@
     "gain": 1.6
    },
    {
+    "role": "environment",
+    "target": "procedural/floor/material/baseColor",
+    "gain": 0.5
+   },
+   {
     "role": "base",
     "target": "material/rpFloor/op/4/constant/constant"
    },
