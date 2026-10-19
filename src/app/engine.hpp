@@ -512,6 +512,13 @@ public:
         return index < inputActive_.size() && inputActive_[index] != 0;
     }
     [[nodiscard]] const analysis::ChannelAnalysis* channelAnalysis() const { return channels_.get(); }
+    // ADR-1521: milliseconds from the newest sample of the analysed window to the render frame that put a live
+    // source's onset on the bus -- capture, ring, analysis and the wait for a render frame -- over the recent events.
+    struct InputLatency {
+        std::size_t events = 0;
+        double p50Ms = 0.0, p99Ms = 0.0, maxMs = 0.0;
+    };
+    [[nodiscard]] InputLatency inputLatency() const;
 
     // ---- live Sonic input (ADR-1025) ----
     // Live notes from the MIDI input (every source the control map's MIDI filter admits) and live timbre from
@@ -1176,6 +1183,11 @@ private:
     std::vector<analysis::LiveStemLatch> inputLatches_;
     std::vector<std::chrono::steady_clock::time_point> inputLastFrame_;
     std::vector<std::uint8_t> inputActive_;
+    std::vector<double> inputLatencyMs_;                 // a ring of the most recent onset latencies
+    std::size_t inputLatencyNext_ = 0;
+    std::chrono::steady_clock::time_point inputReportAt_{};
+    double inputReportBusy_ = 0.0;
+    void reportInputSources();
     void rebuildChannelAnalysis(const std::vector<std::string>& previousKeys);
     void watchInputDevice();
     std::string inputSelector_; // what useAudioInput was asked for, to reopen the same device on the other path

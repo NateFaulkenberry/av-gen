@@ -70,6 +70,8 @@ public:
     [[nodiscard]] double hopMicros() const { return hopMicros_.load(std::memory_order_relaxed); }
     [[nodiscard]] double passMaxMicros() const { return passMax_.load(std::memory_order_relaxed); }
     [[nodiscard]] std::uint64_t hopsProduced() const { return hops_.load(std::memory_order_relaxed); }
+    // Microseconds the thread has spent analysing (not sleeping) since it started: its CPU share over a wall interval.
+    [[nodiscard]] double busyMicros() const { return busy_.load(std::memory_order_relaxed); }
 
 private:
     struct Slot {
@@ -92,6 +94,7 @@ private:
     std::atomic<double> hopMicros_{0.0};
     std::atomic<double> passMax_{0.0};
     std::atomic<std::uint64_t> hops_{0};
+    std::atomic<double> busy_{0.0};
 };
 
 } // namespace avgen::analysis

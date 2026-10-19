@@ -81,6 +81,13 @@ public:
         double callbackMaxMicros = 0.0;
     };
     [[nodiscard]] Stats stats() const;
+    // The last block delivered: the stream frame just past it, and when (steady_clock nanoseconds). For latency
+    // measurement: when a given frame of the input arrived.
+    struct BlockStamp {
+        std::uint64_t frameEnd = 0;
+        std::int64_t steadyNs = 0;
+    };
+    [[nodiscard]] BlockStamp lastBlock() const;
     // Whether the device is still there (false after an unplug), and whether its format changed under the capture.
     [[nodiscard]] bool connected() const;
     [[nodiscard]] bool formatChanged() const;

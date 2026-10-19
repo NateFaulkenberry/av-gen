@@ -5402,6 +5402,53 @@ void Engine::watchInputDevice() {
     }
 }
 
+Engine::InputLatency Engine::inputLatency() const {
+    InputLatency out;
+    std::vector<double> v = inputLatencyMs_;
+    out.events = v.size();
+    if (v.empty()) {
+        return out;
+    }
+    std::sort(v.begin(), v.end());
+    out.p50Ms = v[v.size() / 2];
+    out.p99Ms = v[std::min(v.size() - 1, v.size() * 99 / 100)];
+    out.maxMs = v.back();
+    return out;
+}
+
+// Once every ten seconds while live sources run: what they cost and how they are doing, in the log (the benchmark
+// reads it; a performer's session log keeps it).
+void Engine::reportInputSources() {
+    if (!input_ || !channels_ || inputSources_.empty()) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (inputReportAt_ == std::chrono::steady_clock::time_point{}) {
+        inputReportAt_ = now;
+        inputReportBusy_ = channels_->busyMicros();
+        return;
+    }
+    const double wall = std::chrono::duration<double, std::micro>(now - inputReportAt_).count();
+    if (wall < 10e6) {
+        return;
+    }
+    const double busy = channels_->busyMicros();
+    const auto st = input_->stats();
+    const InputLatency lat = inputLatency();
+    std::size_t active = 0;
+    for (const std::uint8_t a : inputActive_) {
+        active += a;
+    }
+    log::info("live input sources: {} of {} active; callback {:.2f} us mean, {:.1f} us max; drops {} gaps {} "
+              "overloads {}; analysis {:.1f} us per source-hop, pass max {:.0f} us, {:.2f}% of a core; onset latency "
+              "p50 {:.1f} ms p99 {:.1f} ms max {:.1f} ms over {} events",
+              active, inputSources_.size(), st.callbackMeanMicros, st.callbackMaxMicros, st.droppedBlocks, st.gaps,
+              st.overloads, channels_->hopMicros(), channels_->passMaxMicros(), 100.0 * (busy - inputReportBusy_) / wall,
+              lat.p50Ms, lat.p99Ms, lat.maxMs, lat.events);
+    inputReportAt_ = now;
+    inputReportBusy_ = busy;
+}
+
 void Engine::publishInputSources() {
     // A source with no frame for this long reads inactive: the device stalled, or its analysis cannot keep up. Never
     // a held value, never an event that stays asserted.
@@ -5414,6 +5461,23 @@ void Engine::publishInputSources() {
             analysis::LiveStemFrame f = channels_->latest(i);
             inputLatches_[i].apply(f);
             ids.publish(bus_, f.frame);
+            if (f.frame.onset && input_->sampleRate() > 0) {
+                // When the newest sample of the window that found it arrived, from the input's last block stamp.
+                const audio::AudioInput::BlockStamp stamp = input_->lastBlock();
+                const double rate = static_cast<double>(input_->sampleRate());
+                const double windowEnd = f.frame.timeSeconds * rate + static_cast<double>(analyzerConfig_.windowSize) / 2.0;
+                const double arrivedNs = static_cast<double>(stamp.steadyNs) -
+                                         (static_cast<double>(stamp.frameEnd) - windowEnd) / rate * 1e9;
+                const double nowNs = static_cast<double>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
+                constexpr std::size_t kLatencyRing = 1024;
+                if (inputLatencyMs_.size() < kLatencyRing) {
+                    inputLatencyMs_.push_back((nowNs - arrivedNs) / 1e6);
+                } else {
+                    inputLatencyMs_[inputLatencyNext_] = (nowNs - arrivedNs) / 1e6;
+                    inputLatencyNext_ = (inputLatencyNext_ + 1) % kLatencyRing;
+                }
+            }
             inputLastFrame_[i] = now;
             inputActive_[i] = 1;
         } else if (live && inputActive_[i] != 0 && now - inputLastFrame_[i] <= kStale) {
@@ -6629,6 +6693,7 @@ void Engine::update(const FrameTime& time) {
             }
         }
         publishInputSources();
+        reportInputSources();
         stemPreviousSeconds_ = -1.0;
     } else if (!stems_.empty()) {
         // ADR-1520: a pure function of the instant and the previous one, in both modes (live: the transport second).

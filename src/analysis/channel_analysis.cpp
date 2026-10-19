@@ -168,6 +168,7 @@ void ChannelAnalysis::threadMain(std::stop_token token) {
             continue;
         }
         const double us = std::chrono::duration<double, std::micro>(clock::now() - started).count();
+        busy_.store(busy_.load(std::memory_order_relaxed) + us, std::memory_order_relaxed);
         const std::uint64_t made = hops_.load(std::memory_order_relaxed) - before;
         if (made > 0) {
             const double perHop = us / static_cast<double>(made);

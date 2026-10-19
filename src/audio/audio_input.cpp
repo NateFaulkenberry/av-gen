@@ -156,6 +156,8 @@ struct AudioInput::Impl {
     std::array<std::atomic<float>, kMaxMeteredChannels> channelPeaks{};
     std::atomic<std::uint64_t> blocks{0}, droppedBlocks{0}, gaps{0};
     std::atomic<double> callbackMean{0.0}, callbackMax{0.0};
+    std::atomic<std::uint64_t> stampFrame{0};
+    std::atomic<std::int64_t> stampNs{0};
     double expectedSampleTime = -1.0;            // IO thread only
 
     struct Sink final : CaptureSink {
@@ -336,6 +338,9 @@ void AudioInput::Impl::feedTap(Tap& tap, const float* a, const float* b, std::si
 }
 
 void AudioInput::Impl::noteCallbackTime(std::chrono::steady_clock::time_point started) {
+    stampNs.store(std::chrono::duration_cast<std::chrono::nanoseconds>(started.time_since_epoch()).count(),
+                  std::memory_order_relaxed);
+    stampFrame.store(frames.load(std::memory_order_relaxed), std::memory_order_release);
     const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - started).count();
     const std::uint64_t n = blocks.fetch_add(1, std::memory_order_relaxed) + 1;
     const double mean = callbackMean.load(std::memory_order_relaxed);
@@ -620,6 +625,13 @@ AudioInput::Stats AudioInput::stats() const {
     out.callbackMeanMicros = s.callbackMean.load(std::memory_order_relaxed);
     out.callbackMaxMicros = s.callbackMax.load(std::memory_order_relaxed);
     return out;
+}
+
+AudioInput::BlockStamp AudioInput::lastBlock() const {
+    BlockStamp b;
+    b.frameEnd = impl_->stampFrame.load(std::memory_order_acquire);
+    b.steadyNs = impl_->stampNs.load(std::memory_order_relaxed);
+    return b;
 }
 
 bool AudioInput::connected() const {
