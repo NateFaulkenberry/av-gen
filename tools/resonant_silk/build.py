@@ -652,13 +652,13 @@ VEIL_R = float(os.environ.get("RS_VEIL_R", "520"))
 VEIL_GAIN = float(os.environ.get("RS_VEIL_GAIN", "0.2"))      # the veil's colour, relative to the hero's gradient
 VEIL_GLOW = float(os.environ.get("RS_VEIL_GLOW", "0.9"))       # the glow behind the gather (resonant role)
 VEIL_RES = [int(v) for v in os.environ.get("RS_VEIL_RES", "96,48").split(",")]
-VEIL_DISP = tuple(float(v) for v in os.environ.get("RS_VEIL_DISP", "0,-0.5,0.85").split(","))
+VEIL_DISP = tuple(float(v) for v in os.environ.get("RS_VEIL_DISP", "0,-0.3,0.95").split(","))
 VEIL_NOISE = float(os.environ.get("RS_VEIL_NOISE", "10"))      # metres of slow noise relief on the veil
 VEIL_GLOW_IN = float(os.environ.get("RS_VEIL_GLOW_IN", "0.85"))  # where the glow begins (1 = behind the gather only)
 # the veil's crests run WITH the cloth's flow (rising bands, lower left to upper right) and drift slowly across it:
 # crests across the flow met the sphere like meridians and converged on the gather as rays (S3, a tunnel read)
 VEIL_FLOW = tuple(float(v) for v in os.environ.get("RS_VEIL_AXIS", "-0.35,0.94,0.0").split(","))
-VEIL_FOLD = float(os.environ.get("RS_VEIL_FOLD", "34"))        # metres: the travelling folds' depth
+VEIL_FOLD = float(os.environ.get("RS_VEIL_FOLD", "24"))        # metres: the travelling folds' depth
 VEIL_SWELL = float(os.environ.get("RS_VEIL_SWELL", "22"))      # metres: the bass swell's lift on the veil
 VEIL_LIGHT = (0.55, 0.5, 0.67)                                 # the painted light across the veil's folds
 TRANS = os.environ.get("RS_TRANS", "1") == "1"

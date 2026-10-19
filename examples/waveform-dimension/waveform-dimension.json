@@ -2069,18 +2069,6 @@
     "mode": "replace"
    },
    {
-    "role": "rim",
-    "target": "material/wdSurface/op/39/ramp/constant2",
-    "gain": 0.25,
-    "mode": "replace"
-   },
-   {
-    "role": "rim",
-    "target": "material/wdSurface/op/39/ramp/constant3",
-    "gain": 0.5,
-    "mode": "replace"
-   },
-   {
     "role": "d0",
     "target": "material/wdDome/op/7/oklabRamp/constant",
     "gain": 1.0,

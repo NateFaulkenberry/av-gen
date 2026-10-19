@@ -352,10 +352,11 @@ def surface_program(name):
         g.op("wdTransCol", "multiply", 3, a=3, b=4)
         g.op("wdTransGain", "remap", 3, a=3, k=[0.0, 1.0, 0.0, POLISH_TRANS])
         g.op(None, "add", 2, a=2, b=3)
-        g.op(None, "power", 6, a=6, f=POLISH_RIM_P / 2.0)
-        g.op("wdRim", "ramp", 6, a=6, k=[0, 0, 0, 0], k2=C("purple", 0.5 * POLISH_RIM) + [0.5],
-             k3=C("purple", POLISH_RIM) + [1.0])
-        g.op(None, "add", 2, a=2, b=6)
+        if POLISH_RIM > 0.0:   # (off: barely visible in review, and 3 ops of a scene at the edge of its budget)
+            g.op(None, "power", 6, a=6, f=POLISH_RIM_P / 2.0)
+            g.op("wdRim", "ramp", 6, a=6, k=[0, 0, 0, 0], k2=C("purple", 0.5 * POLISH_RIM) + [0.5],
+                 k3=C("purple", POLISH_RIM) + [1.0])
+            g.op(None, "add", 2, a=2, b=6)
     # roughness follows the field (stage C): where the families reinforce (the glow's rise, r5) the sheet is glossier,
     # elsewhere broad and soft -- gloss sits on the crests, not uniformly
     g.op("roughField", "remap", 0, a=5, k=[0.0, 1.0, 0.55, 0.25], f=1.0)
@@ -741,7 +742,7 @@ POLISH = os.environ.get("WD_POLISH", "1") == "1"
 POLISH_BACK = (-0.35, -0.25, 0.9)                                 # the rim light's travel: through the sheets, to the eye
 POLISH_TRANS = float(os.environ.get("WD_TRANS", "1.6"))          # the backlight's gain (the gradient's slope)
 POLISH_TRANS_W = float(os.environ.get("WD_TRANS_W", "0.0"))       # its wrap (an offset before the clamp)
-POLISH_RIM = float(os.environ.get("WD_RIM", "0.5"))              # the edge's brightness (palette rim role)
+POLISH_RIM = float(os.environ.get("WD_RIM", "0"))              # the edge's brightness (palette rim role)
 POLISH_RIM_P = float(os.environ.get("WD_RIM_P", "5.0"))           # the edge's narrowness (Fresnel power)
 FILL_I = float(os.environ.get("WD_FILL_I", "1.2"))
 WD_BANDS_GAIN = float(os.environ.get("WD_BANDS", "0.5"))
