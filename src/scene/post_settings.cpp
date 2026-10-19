@@ -129,6 +129,8 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.gain = &params.add(v3("post/grade/gain", s.gain, 0.0f, 4.0f));
     p.chromaticAberration = &params.add(f("post/lens/chromaticAberration", s.chromaticAberration, 0.0f, 1.0f, 0.0f, 1.0f));
     p.distortion = &params.add(f("post/lens/distortion", s.distortion, -1.0f, 1.0f, -1.0f, 1.0f));
+    p.fisheye = &params.add(f("post/lens/fisheye", s.fisheye, 0.0f, 1.0f, 0.0f, 1.0f));                // ADR-1540
+    p.fisheyeModel = &params.add(f("post/lens/fisheyeModel", s.fisheyeModel, 0.0f, 2.0f, 0.0f, 2.0f)); // ADR-1540
     p.dofEnabled = &params.add(b("post/dof/enabled", s.dofEnabled));
     p.focusDistance = &params.add(f("post/dof/focusDistance", s.focusDistance, 0.01f, 1000.0f, 0.5f, 30.0f));
     p.focusRange = &params.add(f("post/dof/focusRange", s.focusRange, 0.01f, 1000.0f, 0.1f, 20.0f));
@@ -278,6 +280,7 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"anamorphicIntensity", p.anamorphicIntensity},
         {"chromaticAberration", p.chromaticAberration},
         {"distortion", p.distortion},         {"antialias", p.antialias},
+        {"fisheye", p.fisheye},               {"fisheyeModel", p.fisheyeModel}, // ADR-1540
         {"sharpen", p.sharpen},               {"vignette", p.vignette},
         {"grain", p.grain},                   {"chromaRetention", p.chromaRetention},
         {"contrast", p.contrast},             {"saturation", p.saturation},
@@ -450,6 +453,8 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.gain = p.gain->value();
     s.chromaticAberration = p.chromaticAberration->value();
     s.distortion = p.distortion->value();
+    s.fisheye = p.fisheye->value();           // ADR-1540
+    s.fisheyeModel = p.fisheyeModel->value(); // ADR-1540
     s.dofEnabled = p.dofEnabled->value();
     s.focusDistance = p.focusDistance->value();
     s.focusRange = p.focusRange->value();

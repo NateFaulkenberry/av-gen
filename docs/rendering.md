@@ -279,7 +279,8 @@ scene HDR -> volumetrics -> user post layers
   2. exposure        one multiply; skipped entirely when the scale is 1
   3. depth of field  view distance from depth, circle-of-confusion gather
   4. motion blur     tile-based reconstruction over the ADR-035 velocity target (ADR-040)
-  5. lens            barrel/pincushion distortion, chromatic aberration
+  5. lens            the fisheye remap (ADR-1540: post/lens/fisheye, fisheyeModel), barrel/pincushion
+                     distortion, chromatic aberration
   6. bloom           soft-knee prefilter, 13-tap downsample chain, energy-conserving tent upsample
   7. halation        a wider, warm-weighted second pyramid; anamorphic streaks share its pass
   8. composite       bloom and the wide tier mixed in, then white balance, hue, contrast,
@@ -294,6 +295,11 @@ image and the depth buffer is not resampled with it. The upsample blends the lev
 (`mix(fine, tent(coarse), radius/2)`) instead of adding them, so the pyramid's mean equals the
 prefiltered image's mean whatever the level count — the old additive chain multiplied a
 highlight's energy by the number of levels, which is why every surface glowed.
+
+The fisheye (ADR-1540) is a remap, not a projection. The scene renders rectilinear with the camera's own field of
+view, and the lens pass gives each output pixel its fisheye angle and samples the frame at `tan(theta)`. The fit puts
+the camera's diagonal field of view on the output diagonal, so nothing is black and nothing is clamped. A wider camera
+FOV is a wider fisheye. The magnified centre is softer than the edges, by about 1.5x from a 140-degree source.
 
 Settings come from `Scene::post` (`post/*` parameters) plus the camera's own exposure and lens
 blocks (`camera/exposure/*`, `camera/lens/*`, `camera/focus/*`; ADR-037), which `app::Engine`

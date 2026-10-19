@@ -5,6 +5,7 @@
 #include "gpu/context.hpp"
 #include "gpu/frame_timeline.hpp"
 #include "gpu/shader_library.hpp"
+#include "scene/lens_projection.hpp"
 
 #include <algorithm>
 #include <array>
@@ -723,10 +724,26 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         pool.release(neighbours);
     }
     // ---- 4. lens: distortion and chromatic aberration -------------------------------------------
-    if (std::abs(s.distortion) > 1e-4f || s.chromaticAberration > 1e-4f) {
+    // ADR-1540: the fisheye remap rides the same pass (scene/lens_projection.hpp is its reference). The source's
+    // half-angle tangents come from the frame's own inverse view-projection, so they follow any camera and lens.
+    const float fisheye = std::clamp(s.fisheye, 0.0f, 1.0f);
+    if (std::abs(s.distortion) > 1e-4f || s.chromaticAberration > 1e-4f || fisheye > 1e-4f) {
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
         Uniforms u = base;
-        u.params0 = glm::vec4(s.chromaticAberration, s.distortion, 0.0f, 0.0f);
+        u.params0 = glm::vec4(s.chromaticAberration, s.distortion, fisheye,
+                              static_cast<float>(static_cast<int>(scene::fisheyeModelFrom(s.fisheyeModel))));
+        {
+            const auto dirAt = [&](float x, float y) {
+                const glm::vec4 w = in.invViewProj * glm::vec4(x, y, 0.5f, 1.0f);
+                return glm::normalize(glm::vec3(w) / w.w - in.cameraPos);
+            };
+            const glm::vec3 c = dirAt(0.0f, 0.0f);
+            const auto tanTo = [&](const glm::vec3& d) {
+                const float along = glm::dot(d, c);
+                return along > 1e-6f ? glm::length(d - c * along) / along : 0.0f;
+            };
+            u.params1 = glm::vec4(tanTo(dirAt(1.0f, 0.0f)), tanTo(dirAt(0.0f, 1.0f)), 0.0f, 0.0f);
+        }
         stage_ = "post/lens";
         runPass(encoder, lens_, target.view, current, nullptr, nullptr, u);
         captureStage("lens", target);

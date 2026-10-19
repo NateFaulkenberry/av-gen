@@ -166,6 +166,11 @@ struct PostSettings {
     // ---- lens (before bloom, after the depth-aware effects) ------------------------------------
     float chromaticAberration = 0.0f; // 0..1 (pixels scaled by resolution)
     float distortion = 0.0f;          // -1 pinch .. +1 barrel
+    // ADR-1540: the fisheye lens. 0 = the rectilinear frame (the pass is not encoded); 1 = the full remap to
+    // `fisheyeModel` (0 stereographic, 1 equisolid, 2 equidistant; scene/lens_projection.hpp), fitted so the
+    // output's diagonal holds the camera's whole diagonal field of view.
+    float fisheye = 0.0f;             // 0..1
+    float fisheyeModel = 0.0f;        // rounded to 0..2
 
     // ---- depth of field (needs depth) ----------------------------------------------------------
     bool dofEnabled = false;
@@ -299,6 +304,8 @@ struct PostParameters {
     params::Parameter<glm::vec3>* gain = nullptr;
     params::Parameter<float>* chromaticAberration = nullptr;
     params::Parameter<float>* distortion = nullptr;
+    params::Parameter<float>* fisheye = nullptr;      // ADR-1540
+    params::Parameter<float>* fisheyeModel = nullptr; // ADR-1540
     params::Parameter<bool>* dofEnabled = nullptr;
     params::Parameter<float>* focusDistance = nullptr;
     params::Parameter<float>* focusRange = nullptr;

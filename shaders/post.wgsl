@@ -283,11 +283,38 @@ fn distort(uv: vec2<f32>, amount: f32) -> vec2<f32> {
     return vec2<f32>(0.5) + c * (1.0 + amount * r2 * 2.0);
 }
 
+// ADR-1540: the fisheye remap. Transliterates scene::fisheyeSourceUv (src/scene/lens_projection.hpp): the output
+// pixel's angle under the model (0 stereographic, 1 equisolid, 2 equidistant), fitted so the output diagonal holds
+// the source's diagonal angle, and the rectilinear source sampled at tan(theta). tanHalf = the source's half-angle
+// tangents (x, y).
+fn fisheyeUv(uv: vec2<f32>, tanHalf: vec2<f32>, model: f32, amount: f32) -> vec2<f32> {
+    if (amount <= 0.0 || tanHalf.x <= 0.0 || tanHalf.y <= 0.0) {
+        return uv;
+    }
+    let aspect = tanHalf.x / tanHalf.y;
+    let d = vec2<f32>((uv.x - 0.5) * 2.0 * aspect, (uv.y - 0.5) * 2.0);
+    let rho = length(d);
+    let rhoDiag = sqrt(aspect * aspect + 1.0);
+    let thetaDiag = atan(length(tanHalf));
+    var fish = uv;
+    if (rho > 1e-7) {
+        var theta = rho / rhoDiag * thetaDiag;
+        if (model < 0.5) {
+            theta = 2.0 * atan(rho / (rhoDiag / tan(thetaDiag * 0.5)));
+        } else if (model < 1.5) {
+            theta = 2.0 * asin(clamp(rho / (rhoDiag / sin(thetaDiag * 0.5)), 0.0, 1.0));
+        }
+        let t = d / rho * tan(min(theta, thetaDiag));
+        fish = vec2<f32>(0.5) + 0.5 * vec2<f32>(t.x / tanHalf.x, t.y / tanHalf.y);
+    }
+    return mix(uv, fish, clamp(amount, 0.0, 1.0));
+}
+
 @fragment
 fn fs_lens(in: FsIn) -> @location(0) vec4<f32> {
     let chromatic = post.params0.x;
     let distortion = post.params0.y;
-    var uv = in.uv;
+    var uv = fisheyeUv(in.uv, post.params1.xy, post.params0.w, post.params0.z);
     if (abs(distortion) > 1e-4) {
         uv = clamp(distort(uv, distortion), vec2<f32>(0.0), vec2<f32>(1.0));
     }
