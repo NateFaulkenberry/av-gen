@@ -61,6 +61,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1450-1469 | proto/generative-rd (generative R&D: oscillators, flow, reaction-diffusion) |
 | 1470-1479 | art/resonator-quality (the Resonator scenes' quality pass) |
 | 1480-1489 | art/resonator-pass-2 (the Resonator scenes' targeted art pass II) |
+| 1500-1509 | art/generative-pass (RD Pins and Phase Hall: music reactivity, lighting and art direction) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -802,3 +803,5 @@ confirm the citation you are about to change is your own.
 | [1453](ADR-1453-a-reaction-diffusion-grid-can-start-from-authored-values.md) | A reaction-diffusion grid can start from authored values (`initial`: A, B per cell, ADR-1282's rules; a reset or an unrestorable seek returns to it; without it nothing changes; RD Pins opens on a formed pattern its generator computes). proto/generative-rd | Accepted |
 | [1470](ADR-1470-a-material-program-can-ramp-in-oklab.md) | A material program can ramp through four colours in OKLab (`oklabRamp`: stops `constant`..`constant4` in linear RGB, blended with `mixOklab`; a negative `value` is cyclic, `fract(a.x)` with the first stop again at 1): a palette's roles become a perceptual gradient in one op, still written by the palette bindings. art/resonator-quality | Accepted |
 | [1471](ADR-1471-a-resonance-source-can-be-a-square-plate.md) | A resonance source can be a square plate (`kind: plate`, `plates: [[n, m], ...]`, 1..8, n != m: `cos(n pi u)cos(m pi v) - cos(m pi u)cos(n pi v)` at the bank's wavenumber, four signed plane waves, geometry 3; the Chladni family beside point and lattice; existing sources byte-identical). art/resonator-quality | Accepted |
+| [1500](ADR-1500-an-effector-axis-can-be-the-points-own.md) | An effector's axis can be the point's own (`effectors[].local`: a scalar PositionOffset moves along `rotate(rotation, axis)`, a Rotation turns `rotation * angleAxis(axis, a)`; vector fields and other ops unchanged): panels placed in any orientation swing about their own hinges and a membrane moves along each panel's normal. art/generative-pass | Accepted |
+| [1501](ADR-1501-a-grid-field-can-read-a-plane-round-a-sphere.md) | A grid field can read a plane grid round the inside of a sphere (`projection: "sphere"`: x = radius·azimuth, z = radius·latitude about the field's origin, every radius the same cell; bit 5 of `gridRes.w`): Phase Hall's oscillator strip wraps the sphere with no seam through one reader per channel. art/generative-pass | Accepted |

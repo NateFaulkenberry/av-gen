@@ -394,6 +394,20 @@ std::vector<const FieldSpec*> compoundChildren(const FieldSpec& f, const FieldSe
     return out;
 }
 
+// ADR-1501: the grid-space point of a Grid field's local point (the sphere unroll, or the point itself).
+glm::vec3 gridPoint(const FieldSpec& f, const glm::vec3& q) {
+    if (!f.gridSphere) {
+        return q;
+    }
+    const float r = glm::length(q);
+    if (r <= 1e-6f) {
+        return glm::vec3(0.0f);
+    }
+    const float azimuth = (std::abs(q.x) + std::abs(q.z) > 1e-12f) ? std::atan2(q.z, q.x) : 0.0f; // atan2(0, 0) guard
+    const float latitude = std::asin(std::clamp(q.y / r, -1.0f, 1.0f));
+    return glm::vec3(f.radius * azimuth, 0.0f, f.radius * latitude);
+}
+
 // The grid a Grid field references (null when unbound, disabled or unallocated).
 const GridField* boundGrid(const FieldSpec& f, const FieldSet* set) {
     if (f.kind != FieldKind::Grid || set == nullptr) {
@@ -418,7 +432,8 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, double td, const FieldSet
             return glm::length(vectorAt(f, p, td, set, depth, element)); // vector as scalar
         }
         const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
-        float v = g == nullptr ? 0.0f : f.channel >= 0 ? g->sampleChannel(q, f.channel) : g->sampleScalar(q);
+        const glm::vec3 gq = gridPoint(f, q); // ADR-1501
+        float v = g == nullptr ? 0.0f : f.channel >= 0 ? g->sampleChannel(gq, f.channel) : g->sampleScalar(gq);
         if (f.invert) {
             v = 1.0f - v;
         }
@@ -499,7 +514,7 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, double td, const Fiel
         if (g == nullptr || f.channel >= 0 || (g->mode != GridMode::Vector && g->mode != GridMode::Agents)) {
             return scalarAt(f, p, td, set, depth, element) * (frame.rotation * fieldAxis(f)); // scalar as vector
         }
-        glm::vec3 dir = g->sampleVector(q);
+        glm::vec3 dir = g->sampleVector(gridPoint(f, q)); // ADR-1501
         if (f.invert) {
             dir = -dir;
         }
@@ -984,6 +999,9 @@ Result<void> FieldSpec::validate() const {
     if (kind == FieldKind::Grid && reference.empty()) {
         return fail("field '{}': grid needs a 'reference' (the grid's name)", name);
     }
+    if (gridSphere && (kind != FieldKind::Grid || !(radius > 0.0f))) { // ADR-1501
+        return fail("field '{}': projection \"sphere\" is only for a grid field, with a radius above 0", name);
+    }
     if (channel < -1 || channel > 3 || (channel >= 0 && kind != FieldKind::Grid)) {
         return fail("field '{}': channel must be -1 (the grid's reading) or 0..3, and only on a grid field", name);
     }
@@ -1059,6 +1077,9 @@ std::uint64_t FieldSpec::structuralHash() const {
     h.str(reference);
     if (channel >= 0) { // ADR-1201: hashed only when set, so every other field keeps its hash
         h.i32(channel);
+    }
+    if (gridSphere) { // ADR-1501: hashed only when set
+        h.boolean(gridSphere);
     }
     // ADR-1116: hashed only for the audio kinds, so every other field keeps the hash it always had.
     if (isAudio()) {
@@ -1142,6 +1163,9 @@ json FieldSpec::toJson() const {
     if (channel >= 0) {
         j["channel"] = channel; // ADR-1201: written only when set
     }
+    if (gridSphere) {
+        j["projection"] = "sphere"; // ADR-1501: written only when set
+    }
     // ADR-1116: written only for the audio kinds.
     if (isAudio()) {
         j["audioBand"] = audioBandName(audioBand);
@@ -1207,6 +1231,13 @@ Result<FieldSpec> FieldSpec::fromJson(const json& root) {
         AVGEN_SPATIAL_READ(f.mix, "mix", detail::readFloat);
         AVGEN_SPATIAL_READ(f.reference, "reference", detail::readString);
         AVGEN_SPATIAL_READ(f.channel, "channel", detail::readInt);
+        if (j.contains("projection")) { // ADR-1501
+            const auto& pj = j.at("projection");
+            if (!pj.is_string() || (pj != "plane" && pj != "sphere")) {
+                return fail("field 'projection' must be \"plane\" or \"sphere\"");
+            }
+            f.gridSphere = pj == "sphere";
+        }
         AVGEN_SPATIAL_READ_ENUM(f.audioBand, "audioBand", &audioBandFromName, "audio band");
         AVGEN_SPATIAL_READ(f.bandLow, "bandLow", detail::readFloat);
         AVGEN_SPATIAL_READ(f.bandHigh, "bandHigh", detail::readFloat);
@@ -1371,6 +1402,9 @@ FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
                 // The bound grid's mode decides how the record reads across types; a channel is a scalar.
                 const bool vector = channel < 0 && (grid.mode == GridMode::Vector || grid.mode == GridMode::Agents);
                 g.type = static_cast<std::uint32_t>(vector ? FieldType::Vector : FieldType::Scalar);
+                if (field.gridSphere) { // ADR-1501: bit 5 of gridRes.w; the unroll radius is axisRadius.w (radius)
+                    g.gridRes.w += 32.0f;
+                }
             }
         }
     }
