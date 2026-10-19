@@ -57,6 +57,12 @@ struct StemSignals {
     // The source has no data now: every value 0, no event, active 0.
     void publishInactive(SignalBus& bus) const;
     void clearEvents(SignalBus& bus) const;
+    // An offline stem at project time `to`: the newest frame of `track` at or before it (the stem starts `offset`
+    // seconds into the project), with the events of every frame in (from, to] OR-ed at their strongest. A pure
+    // function of (from, to): a play and a seek's replay stepping the same instants publish the same thing. `from`
+    // < 0 or >= `to` (a first frame, a jump) carries no event. Inactive outside [offset, offset + duration) and with
+    // no track.
+    void publishTrack(SignalBus& bus, const analysis::StemTrack* track, double offset, double from, double to) const;
     // Every id, in declaration order (for copying values between buses by name).
     [[nodiscard]] std::vector<SignalId> ids() const;
 };

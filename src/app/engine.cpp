@@ -50,6 +50,7 @@
 #include <cctype>
 #include <cstring>
 #include <chrono>
+#include <thread>
 
 namespace avgen::app {
 
@@ -296,6 +297,15 @@ private:
                 samplable_[id] = 1;
             }
         }
+        // ADR-1520: the stems are a pure function of the instant (`StemSignals::publishTrack`), so a route on one is
+        // replayed like a route on an onset.
+        for (const signals::StemSignals& stem : engine_.stemSignals_) {
+            for (const signals::SignalId id : stem.ids()) {
+                if (id < samplable_.size()) {
+                    samplable_[id] = 1;
+                }
+            }
+        }
         for (const auto& source : engine_.sources_.sources()) {
             if (!source->pureInTime()) {
                 continue;
@@ -374,6 +384,7 @@ private:
         ctx.tempoBpm = static_cast<float>(bpm);
         ctx.beatEvent = pulse;
         engine_.sources_.sample(sampling_, ctx);
+        engine_.publishStems(sampling_, time.deltaTime > 0.0 ? time.renderTime - time.deltaTime : -1.0, time.renderTime);
         // ADR-930: the beats the step before this one entered. With the entity replay driving this
         // (an analysed track) the record holds exactly the steps up to that one; replayed alone after
         // it (`runTo`, no track) it holds the whole replay, and the window picks the same step out.
@@ -434,6 +445,7 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
         mix(bits(static_cast<double>(section.energy)));
     }
     mix(sonic_ ? sonic_->key() : 0u); // ADR-1020: sonic.*, timbre.*, notes.*
+    mix(stemsRevision_); // ADR-1520: stem.<key>.*
     mix(playing ? 1u : 0u);
     return h;
 }
@@ -2537,6 +2549,20 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         assets["audioClips"] = std::move(list);
     }
+    if (!stems_.empty()) {
+        // ADR-1520: analysis-only files, never part of the arrangement above.
+        nlohmann::json list = nlohmann::json::array();
+        for (const StemState& stem : stems_) {
+            nlohmann::json item = nlohmann::json::object();
+            item["key"] = stem.source.key;
+            item["label"] = stem.source.label;
+            item["file"] = assetRefJson(stem.source.file, dir);
+            if (stem.source.offsetSeconds != 0.0) item["offset"] = stem.source.offsetSeconds;
+            if (stem.source.hits) item["hits"] = true;
+            list.push_back(std::move(item));
+        }
+        assets["stems"] = std::move(list);
+    }
     if (!environmentPath_.empty()) {
         assets["environment"] = assetRefJson(environmentPath_, dir);
     }
@@ -2943,6 +2969,28 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                     warn("audio: " + r.error().message);
                     static_cast<void>(setAudioClips({})); // as above: silence, not the last piece
                 }
+            }
+        }
+        // ADR-1520: the analysis stems, after the mix they are checked against. A document with none has none.
+        {
+            std::vector<audio::StemSource> stems;
+            if (const auto list = assets->find("stems"); list != assets->end() && list->is_array()) {
+                for (const auto& item : *list) {
+                    if (!item.is_object() || !item.contains("file")) {
+                        warn("assets.stems: an entry without a file was skipped");
+                        continue;
+                    }
+                    audio::StemSource stem;
+                    stem.file = resolveAsset(item["file"], "stem").value_or(std::filesystem::path());
+                    stem.key = item.value("key", std::string{});
+                    stem.label = item.value("label", std::string{});
+                    stem.offsetSeconds = item.value("offset", 0.0);
+                    stem.hits = item.value("hits", false);
+                    stems.push_back(std::move(stem));
+                }
+            }
+            if (!stems.empty() || !stems_.empty()) {
+                setStems(std::move(stems));
             }
         }
         stage(3);
@@ -4262,6 +4310,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         clock_.analysisCursor = 0;
         clock_.hasFrame = false;
         ++audioRevision_;
+        refreshStemMixDiagnostics(); // ADR-1520
         refreshTransport();
         return {};
     }
@@ -4314,6 +4363,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     audioFile_ = std::move(file);
     ++audioRevision_;
     refreshSonicTimbre(); // ADR-1020: only when the project has a `sonic` block
+    refreshStemMixDiagnostics(); // ADR-1520: the stems' span and rate against the new mix
     modulator_.resetState();
     clock_.music.reset();
     clock_.hasFrame = false;
@@ -4323,6 +4373,107 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     // answer the file just gave.
     refreshTransport();
     return {};
+}
+
+// ---- analysis stems (ADR-1520) ----------------------------------------------------------------
+
+void Engine::setStems(std::vector<audio::StemSource> wanted) {
+    // Keys: kept when valid and unique, otherwise made from the label -- and said, because routes follow keys.
+    std::vector<std::string> taken;
+    for (audio::StemSource& stem : wanted) {
+        if (stem.label.empty()) {
+            stem.label = stem.key.empty() ? stem.file.stem().string() : stem.key;
+        }
+        if (!audio::validStemKey(stem.key) || std::find(taken.begin(), taken.end(), stem.key) != taken.end()) {
+            const std::string made = audio::makeStemKey(stem.label, taken);
+            if (!stem.key.empty()) {
+                noteBindingProblem(fmt::format("stem '{}': the key '{}' is not valid or is used twice; it is '{}' "
+                                               "(routes on stem.{}.* follow the key)",
+                                               stem.label, stem.key, made, made));
+            }
+            stem.key = made;
+        }
+        taken.push_back(stem.key);
+    }
+    // Reuse every analysis whose file and tier are unchanged; decode and analyse the rest, one thread per stem.
+    std::vector<StemState> next(wanted.size());
+    std::vector<std::size_t> todo;
+    for (std::size_t i = 0; i < wanted.size(); ++i) {
+        next[i].source = wanted[i];
+        const auto same = std::find_if(stems_.begin(), stems_.end(), [&](const StemState& old) {
+            return old.source.file == wanted[i].file && old.source.hits == wanted[i].hits;
+        });
+        if (same != stems_.end()) {
+            next[i].report = same->report;
+            next[i].track = same->track;
+        } else {
+            todo.push_back(i);
+        }
+    }
+    {
+        const auto started = std::chrono::steady_clock::now();
+        std::vector<std::thread> workers;
+        workers.reserve(todo.size());
+        for (const std::size_t i : todo) {
+            workers.emplace_back([&state = next[i], config = analyzerConfig_] {
+                auto file = audio::AudioFile::load(state.source.file);
+                state.report = audio::checkStem(state.source, file ? &*file : nullptr, file ? "" : file.error().message);
+                if (file && state.report.ok()) {
+                    analysis::StemAnalysisConfig stemConfig;
+                    stemConfig.analyzer = config;
+                    stemConfig.hits = state.source.hits;
+                    state.track = std::make_shared<const analysis::StemTrack>(
+                        analysis::StemTrack::analyze(*file, stemConfig)); // the PCM goes when `file` does
+                }
+            });
+        }
+        for (std::thread& w : workers) {
+            w.join();
+        }
+        if (!todo.empty()) {
+            log::info("stems: analysed {} of {} in {:.0f} ms", todo.size(), next.size(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        }
+    }
+    // A key that left the list: its names stay declared (the bus cannot undeclare) and read inactive from now on.
+    for (const signals::StemSignals& old : stemSignals_) {
+        if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
+            old.publishInactive(bus_);
+        }
+    }
+    stems_ = std::move(next);
+    stemSignals_.clear();
+    for (const StemState& stem : stems_) {
+        stemSignals_.push_back(signals::StemSignals::declare(bus_, stem.source.key, stem.source.label));
+        for (const audio::StemDiagnostic& d : stem.report.diagnostics) {
+            if (d.severity != audio::StemSeverity::Info) {
+                noteBindingProblem(d.message);
+            }
+        }
+    }
+    refreshStemMixDiagnostics();
+    stemPreviousSeconds_ = -1.0;
+    ++stemsRevision_;
+    rebind(); // a route on stem.<key>.* written before the stem existed resolves now
+}
+
+void Engine::refreshStemMixDiagnostics() {
+    const audio::MixFacts mix{.sampleRate = audioFile_ ? audioFile_->sampleRate() : 0u,
+                              .durationSeconds = audioFile_ ? audioFile_->durationSeconds() : 0.0};
+    for (StemState& stem : stems_) {
+        stem.mix = audio::mixDiagnostics(stem.source, stem.report, mix);
+        for (const audio::StemDiagnostic& d : stem.mix) {
+            if (d.severity != audio::StemSeverity::Info) {
+                noteBindingProblem(d.message);
+            }
+        }
+    }
+}
+
+void Engine::publishStems(signals::SignalBus& bus, double from, double to) const {
+    for (std::size_t i = 0; i < stems_.size() && i < stemSignals_.size(); ++i) {
+        stemSignals_[i].publishTrack(bus, stems_[i].track.get(), stems_[i].source.offsetSeconds, from, to);
+    }
 }
 
 Result<double> Engine::loadAudio(const std::filesystem::path& path) {
@@ -4464,6 +4615,7 @@ void Engine::seekSeconds(double seconds) {
     seconds = target;
     modulator_.resetState();
     sources_.reset();
+    stemPreviousSeconds_ = -1.0; // ADR-1520: a jump is not an event
     if (!replaySignals) {
         // A seek discontinuity in the energy history reads as a drop; the detector must not carry
         // the old piece across it.
@@ -6267,6 +6419,11 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
     updateAudioHistory(newFrame);
+    if (!stems_.empty()) {
+        // ADR-1520: a pure function of the instant and the previous one, in both modes (live: the transport second).
+        publishStems(bus_, stemPreviousSeconds_, time.renderTime);
+        stemPreviousSeconds_ = time.renderTime;
+    }
 
     const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
     const std::uint32_t allocsAtStart = allocsNow();

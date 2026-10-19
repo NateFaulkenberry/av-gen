@@ -114,4 +114,52 @@ void StemSignals::clearEvents(SignalBus& bus) const {
     }
 }
 
+void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track, double offset, double from,
+                               double to) const {
+    if (track == nullptr || track->frames().empty()) {
+        publishInactive(bus);
+        return;
+    }
+    const double local = to - offset;
+    if (!(local >= 0.0) || local >= track->durationSeconds()) {
+        publishInactive(bus);
+        return;
+    }
+    const auto& frames = track->frames();
+    const auto after = std::upper_bound(frames.begin(), frames.end(), local,
+                                        [](double t, const analysis::StemFrame& f) { return t < f.timeSeconds; });
+    // Before the first window's centre (the stem's first 21 ms) the first frame stands: the stem has begun.
+    analysis::StemFrame f = after == frames.begin() ? frames.front() : *std::prev(after);
+    f.onset = f.kick = f.snare = f.hat = false;
+    f.kickStrength = f.snareStrength = f.hatStrength = 0.0f;
+    float onsetStrength = 0.0f;
+    if (from >= 0.0 && from < to) {
+        const double localFrom = from - offset;
+        auto it = std::upper_bound(frames.begin(), frames.end(), localFrom,
+                                   [](double t, const analysis::StemFrame& g) { return t < g.timeSeconds; });
+        for (; it != after; ++it) {
+            if (it->onset) {
+                f.onset = true;
+                onsetStrength = std::max(onsetStrength, it->onsetStrength);
+            }
+            if (it->kick) {
+                f.kick = true;
+                f.kickStrength = std::max(f.kickStrength, it->kickStrength);
+            }
+            if (it->snare) {
+                f.snare = true;
+                f.snareStrength = std::max(f.snareStrength, it->snareStrength);
+            }
+            if (it->hat) {
+                f.hat = true;
+                f.hatStrength = std::max(f.hatStrength, it->hatStrength);
+            }
+        }
+    }
+    if (f.onset) {
+        f.onsetStrength = std::max(f.onsetStrength, onsetStrength);
+    }
+    publish(bus, f);
+}
+
 } // namespace avgen::signals

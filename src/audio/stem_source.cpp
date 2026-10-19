@@ -74,8 +74,7 @@ std::string nativeSampleFormat(const std::filesystem::path& path) {
     }
 }
 
-StemReport checkStem(const StemSource& source, const AudioFile* file, const std::string& decodeError,
-                     const MixFacts& mix, double toleranceSeconds) {
+StemReport checkStem(const StemSource& source, const AudioFile* file, const std::string& decodeError) {
     StemReport r;
     const std::string name = source.file.filename().string();
     const auto add = [&r](StemSeverity s, std::string m) { r.diagnostics.push_back({s, std::move(m)}); };
@@ -109,14 +108,25 @@ StemReport checkStem(const StemSource& source, const AudioFile* file, const std:
         add(StemSeverity::Warning,
             fmt::format("stem '{}' ({}): every sample is silent; its signals will stay at 0", source.label, name));
     }
-    if (mix.sampleRate != 0 && mix.sampleRate != r.sampleRate) {
+    return r;
+}
+
+std::vector<StemDiagnostic> mixDiagnostics(const StemSource& source, const StemReport& report, const MixFacts& mix,
+                                           double toleranceSeconds) {
+    std::vector<StemDiagnostic> out;
+    if (!report.decoded) {
+        return out;
+    }
+    const std::string name = source.file.filename().string();
+    const auto add = [&out](StemSeverity s, std::string m) { out.push_back({s, std::move(m)}); };
+    if (mix.sampleRate != 0 && mix.sampleRate != report.sampleRate) {
         add(StemSeverity::Info, fmt::format("stem '{}' ({}): {} Hz beside a {} Hz mix; analysed at its own rate "
                                             "(nothing is resampled)",
-                                            source.label, name, r.sampleRate, mix.sampleRate));
+                                            source.label, name, report.sampleRate, mix.sampleRate));
     }
     if (mix.durationSeconds > 0.0) {
         const double start = source.offsetSeconds;
-        const double end = source.offsetSeconds + r.durationSeconds;
+        const double end = source.offsetSeconds + report.durationSeconds;
         if (end <= 0.0 || start >= mix.durationSeconds) {
             add(StemSeverity::Warning,
                 fmt::format("stem '{}' ({}): it lies wholly outside the mix ({:.3f}..{:.3f} s against 0..{:.3f} s); "
@@ -129,7 +139,7 @@ StemReport checkStem(const StemSource& source, const AudioFile* file, const std:
                             source.label, name, start, end, mix.durationSeconds));
         }
     }
-    return r;
+    return out;
 }
 
 } // namespace avgen::audio

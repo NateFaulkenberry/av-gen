@@ -68,15 +68,20 @@ struct MixFacts {
     double durationSeconds = 0.0;
 };
 
-// Checks a decoded stem (`file`, null when decoding failed with `decodeError`) against the mix. The caller decodes;
-// this reads the samples and, for `format`, the file's header. Diagnostics:
+// Checks one decoded stem (`file`, null when decoding failed with `decodeError`). The caller decodes; this reads the
+// samples and, for `format`, the file's header. Diagnostics, each naming the file:
 //   error    the file did not decode, or it holds non-finite samples
-//   warning  it is all silence; its extent (offset + duration) differs from the mix's by
-//            more than `toleranceSeconds`; it lies wholly outside the mix
+//   warning  every sample is silent
+[[nodiscard]] StemReport checkStem(const StemSource& source, const AudioFile* file, const std::string& decodeError);
+
+// What a checked stem is against the playback mix -- recomputed whenever the mix or the offset changes, without the
+// samples:
 //   info     its sample rate differs from the mix's (analysed at its own rate; nothing is resampled)
+//   warning  it lies wholly outside the mix; its span (offset .. offset + duration) differs from the mix's by more
+//            than `toleranceSeconds` (outside its span it publishes nothing)
 // Matching durations are NOT reported as alignment: alignment is whatever the offset says.
-[[nodiscard]] StemReport checkStem(const StemSource& source, const AudioFile* file, const std::string& decodeError,
-                                   const MixFacts& mix, double toleranceSeconds = 0.05);
+[[nodiscard]] std::vector<StemDiagnostic> mixDiagnostics(const StemSource& source, const StemReport& report,
+                                                         const MixFacts& mix, double toleranceSeconds = 0.05);
 
 // The file's own sample format ("u8", "s16", "s24", "s32", "f32") without decoding it, "" when unknown.
 [[nodiscard]] std::string nativeSampleFormat(const std::filesystem::path& path);

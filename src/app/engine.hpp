@@ -21,6 +21,9 @@
 #include "scene/rebuild_deferral.hpp"
 #include "app/world_director.hpp"
 #include "audio/audio_input.hpp"
+#include "audio/stem_source.hpp"
+#include "analysis/stem_analysis.hpp"
+#include "signals/stem_signals.hpp"
 #include "analysis/analysis_track.hpp"
 #include "analysis/audio_history_builder.hpp"
 #include "analysis/analyzer.hpp"
@@ -854,6 +857,25 @@ public:
     // waveform under the new clips. That was rare when audio changed only on an explicit load and
     // became likely the moment a clip drag started re-mixing.
     [[nodiscard]] std::uint64_t audioRevision() const { return audioRevision_; }
+    // ---- analysis stems (ADR-1520) --------------------------------------------------------------
+    //
+    // Files analysed beside the mix and published as `stem.<key>.*`; never played, never mixed (the arrangement above
+    // is the only thing the device hears). Saved as `assets.stems`.
+    struct StemState {
+        audio::StemSource source;
+        audio::StemReport report;                         // the file check
+        std::vector<audio::StemDiagnostic> mix;           // against the current mix; recomputed when it changes
+        std::shared_ptr<const analysis::StemTrack> track; // null when the file could not be analysed
+    };
+    [[nodiscard]] const std::vector<StemState>& stems() const { return stems_; }
+    // Replaces the stem list. Keys are kept as given when valid and unique; an empty, invalid or repeated key is made
+    // from the label (`audio::makeStemKey`) and the change is noted as a project warning. Only stems whose file or tier
+    // changed are decoded and analysed again (in parallel, one thread per stem); a new label or offset is free. Every
+    // problem is a diagnostic on its stem and a project warning naming the file; nothing here fails the call.
+    void setStems(std::vector<audio::StemSource> stems);
+    // Changes whenever the stem list, a stem's analysis or its offset changes.
+    [[nodiscard]] std::uint64_t stemsRevision() const { return stemsRevision_; }
+
     // The decoded source behind a clip, for drawing its waveform. Null while it is missing.
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> clipSource(const std::filesystem::path& p) const {
         return clipSources_.find(p);
@@ -1343,6 +1365,15 @@ private:
 
     std::vector<audio::AudioClip> audioClips_;
     std::uint64_t audioRevision_ = 1;
+    // ADR-1520: the analysis stems, their bus ids (parallel to stems_), and every stem vocabulary ever declared and no
+    // longer in the list (published inactive once when it left: the bus cannot undeclare a name).
+    std::vector<StemState> stems_;
+    std::vector<signals::StemSignals> stemSignals_;
+    std::uint64_t stemsRevision_ = 1;
+    double stemPreviousSeconds_ = -1.0; // the last instant the stems were published at (-1: none, or a jump since)
+    void refreshStemMixDiagnostics();
+    // The stems at `to` onto `bus` (the engine's own, or a seek replay's engine-shaped scratch bus), events since `from`.
+    void publishStems(signals::SignalBus& bus, double from, double to) const;
     // ADR-1116: see audioHistory(). Rebuilt when audioRevision_ moves; the live feed only without a track.
     void updateAudioHistory(bool newFrame);
     std::shared_ptr<spatial::AudioHistory> audioHistory_; // heard through the Response controls (ADR-1361)
