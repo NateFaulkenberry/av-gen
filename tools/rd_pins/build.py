@@ -9,10 +9,9 @@ A bowl of pins in the dark: a living, illuminated topographic interference field
 labyrinth and spots over the bowl's plan; each pin rises with the pattern under it, and the pattern's boundary is a
 contour of light: a fine hot core and a softer coloured halo, over dark channels. On top of the pattern the field is
 excited by waves of different scales and times:
-  - a broad swell travelling across the bowl (a sine heave, the bass level its height) and a second, crossing it; the
-    first also moves the contours themselves (they bunch and open as it passes; the mids set how far), lights the
-    field along its crest where the bass pool is, and where its crest crosses a contour a bead of light runs along it
-    (the hats sharpen it); 
+  - a broad swell travelling across the bowl (a sine heave, the bass level its height); it also moves the contours
+    themselves (they bunch and open as it passes; the mids set how far), lights the field along its crest where the
+    bass pool is, and where its crest crosses a contour a bead of light runs along it (the hats sharpen it);
   - the bass history rolling out from the bowl's heart (a spectrum field laid out at 14 m/s): a lift and a pool of
     light where it is loud, so loud passages reshape the field and quiet ones let it settle;
   - a kick: a ring of impact from a heart that wanders slowly about the bowl's middle (the pins jump, the contours
@@ -66,11 +65,10 @@ PIN_H = 0.25           # a pin's rest height (m); the pattern scales it
 KICK_AT = (0.0, 0.0, -2.0)     # the bowl's heart, where a kick lands and the bass rolls out from (in frame)
 SNARE_AT = (15.0, 0.0, -17.0)  # the snare's ring: off-centre, upper right of the frame
 
-# The waves (world space): (axis, wavelength m, speed m/s, phase). A is the broad swell (the bass level is its height),
-# B crosses it; the pin program reproduces A exactly (the same sine of the same
+# The wave (world space): (axis, wavelength m, speed m/s, phase). A is the broad swell (the bass level is its height);
+# the pin program reproduces it exactly (the same sine of the same
 # world position and clock) to move the contours and run beads of light along them.
 WAVE_A = ((0.8, 0.0, 0.6), 38.0, 4.2, 0.0)
-WAVE_B = ((-0.45, 0.0, 0.89), 27.0, 2.9, 1.3)
 GRAD_SCALE = 1.0 / 200.0       # the program's gradient op saturates: world dot axis * this + 0.5 stays inside 0..1
 
 # ================================================================================================ regimes
@@ -247,7 +245,7 @@ def pattern(s):
     # THE BASS HISTORY: the bass band's last seconds laid out from the heart at 14 m/s (ADR-1116), smoothed over a third
     # of a second (ADR-1370): a broad, music-shaped disturbance travelling outward, metres of lift where it is loud
     s.field("swell", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.16,
-                      "point": list(KICK_AT), "waveGeometry": "spherical", "audioSpeed": 14.0, "audioSmooth": 0.04,
+                      "point": list(KICK_AT), "waveGeometry": "spherical", "audioSpeed": 14.0, "audioSmooth": 0.02,
                       "strength": 1.0})
 
 
@@ -353,7 +351,7 @@ DESIGN = {
     "category": "experiment",
     "thesis": "A living, illuminated topographic interference field: a bowl of pins in the dark, a reaction-"
               "diffusion labyrinth growing over it, its edges drawn as contours of light (a fine hot core, a softer "
-              "halo, dark channels between). Broad swells heave the field and cross each other; the first bunches and "
+              "halo, dark channels between). A broad swell heaves the field, crossing the bass history's rings; it bunches and "
               "opens the contours and runs beads of light along them on the hats; the bass history rolls out from the "
               "heart as a lift and a pool of light; every kick sends a ring of impact across it that swells the "
               "contours, carries a band of light and turns the labyrinth toward spots; a busy mix lights it up, a "
@@ -386,7 +384,7 @@ MIDI_CC = [
     (4, "influence", "AUDIO INFLUENCE: how hard the music drives the field (half at rest)"),
     (5, "erase", "ERASE: starves the pattern (feed falls): regions collapse, and regrow on release"),
     (6, "light", "LIGHT: the contours' light (core and halo)"),
-    (7, "waves", "WAVES: how high the broad swells heave the field"),
+    (7, "waves", "WAVES: how high the broad swell heaves the field"),
     (8, "impact", "IMPACT: how hard the kick and snare rings strike"),
     (9, "palette", "PALETTE: choose one of the six (a direct blend to it)"),
     (10, "paletteLock", "PALETTE LOCK: hold the chosen palette"),
@@ -441,7 +439,6 @@ def instrument(s, g):
             R("control.light", ring, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.light", hot, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.waves", D + "1/amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
-            R("control.waves", D + "2/amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.impact", "field/kick/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.impact", "field/snare/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.shimmer", glint, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
@@ -488,12 +485,12 @@ def palette_block(g, gf):
 
 
 def waves():
-    """The heave: two sine deformers in world space (procedural/pins/deform/1..2): the broad swell A (the bass level is
-    its height; the pin program reproduces it exactly, ripple_palette) and B crossing it."""
+    """The heave: a sine deformer in world space (procedural/pins/deform/1): the broad swell A (the bass level is its
+    height; the pin program reproduces it exactly, ripple_palette)."""
     out = []
-    # (the ripple's own small heave was cut for the budget: 1.5 ms a deformer on 866k vertices, measured; the mids still
-    # move the contours through the program's swell)
-    for (axis, wl, v, ph), amount in ((WAVE_A, 0.6), (WAVE_B, 0.35)):
+    # (B, crossing it, and a small ripple were cut for the live budget: about 1.5 ms a deformer on 866k vertices,
+    # measured; A interferes with the bass history's rings and the kick's, and the mids still move the contours)
+    for (axis, wl, v, ph), amount in ((WAVE_A, 0.6),):
         freq = 2 * math.pi / wl
         out.append({"kind": "sine", "amount": amount, "frequency": round(freq, 6), "speed": round(freq * v, 6),
                     "phase": ph, "axis": list(axis), "displacementAxis": [0.0, 1.0, 0.0], "space": "world",
