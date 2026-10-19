@@ -276,20 +276,24 @@ def motion_fields(s):
     same field."""
     s.field("swell", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.16,
                       "point": list(on_sphere(*SWELL_AT)), "waveGeometry": "spherical", "audioSpeed": 34.0,
-                      "audioSmooth": 0.15, "strength": 5.0})
+                      "audioSmooth": 0.15, "strength": 12.0})
     s.field("breath", {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine",
                        "axis": [0.35, 0.25, -0.9], "point": [0.0, 0.0, 0.0], "wavelength": 260.0, "waveSpeed": 7.0,
-                       "waveWidth": 0.0, "amplitude": 1.0, "strength": 2.5})
+                       "waveWidth": 0.0, "amplitude": 1.0, "strength": 4.0})
     s.field("kickPush", {"kind": "onset", "onsetSource": "low", "point": list(on_sphere(*KICK_AT)),
                          "waveGeometry": "spherical", "audioSpeed": 70.0, "onsetWidth": 9.0, "onsetDecay": 1.4,
                          "strength": 7.0})   # onset rings are 0.1-0.5 at a kick's crest (measured): 1-3 m of push
-    s.field("disp", {"kind": "compound", "combine": "add", "children": ["swell", "breath", "kickPush"]})
+    # the composition: slow, irregular pools of the membrane pushed out and drawn back (a low fbm, drifting), so the
+    # sphere has regions that blaze and regions that rest even in a quiet passage
+    s.field("pools", {"kind": "noise", "frequency": 0.0075, "speed": 0.035, "seed": 9, "strength": 14.0})
+    s.field("disp", {"kind": "compound", "combine": "add", "children": ["swell", "breath", "kickPush", "pools"]})
 
 
 # ================================================================================================ the blades
-ACT = (0.2, 0.5)        # activity -> front glow
-TONE = 0.3              # the blades' body under their light (the bands carry the light, the faces stay deep)
-CORE = 2.2              # the core's gain over its palette colour
+ACT = (0.4, 0.9)        # activity -> front glow: only the strongest strain (a seam, a kick front)
+TONE = 0.18              # the blades' body under their light (the bands carry the light, the faces stay deep)
+FRONT = 0.18             # the strain glow
+CORE = 1.7              # the core's gain over its palette colour
 
 
 def blade_program():
@@ -322,17 +326,19 @@ def blade_program():
     g.op(None, "smoothstep", 6, a=6, k=[0.0, 0.03, 0, 0])
     g.op(None, "multiply", 3, a=3, b=6)
     g.op(None, "power", 5, a=3, f=22.0)                             # r5 = core
-    g.op(None, "power", 6, a=3, f=2.5)
-    g.op("shoulder", "remap", 6, a=6, k=[0.0, 1.0, 0.0, 0.12])      # r6 = shoulder
+    g.op(None, "power", 6, a=3, f=4.0)
+    g.op("shoulder", "remap", 6, a=6, k=[0.0, 1.0, 0.0, 0.035])     # r6 = shoulder: a faint spill, the gaps stay dark
     g.op(None, "add", 5, a=5, b=6)                                  # r5 = the profile
-    # brightness: floor + crest + displacement lift + the kick's ring
-    g.op(None, "power", 6, a=0, f=2.0)
-    g.op("floor", "remap", 6, a=6, k=[0.0, 1.0, 0.1, 1.7])          # r6 = floor + crest^2: islands in step glow
+    # brightness: (floor + crest^2) x the membrane's zone, + the kick's ring. The zone MULTIPLIES: where the swell
+    # carries the membrane out the bands blaze, where it falls back they go nearly dark -- moving regions, not stripes
+    g.op(None, "power", 6, a=0, f=3.0)
+    g.op("floor", "remap", 6, a=6, k=[0.0, 1.0, 0.08, 1.6])         # r6 = floor + crest^2: islands in step glow
     g.op(None, "field", 7, field="disp")                            # r7 = displacement (m)
-    g.op(None, "remap", 7, a=7, k=[-2.5, 6.0, 0.0, 1.4], f=1.0)     # zones: the swell's crests bright, troughs dark
-    g.op(None, "add", 6, a=6, b=7)
+    g.op(None, "remap", 7, a=7, k=[6.0, 9.5, 0.03, 3.4], f=1.0)     # the zone (pools add ~7 m on average): 0.03 in a
+                                                                    # trough, 3.2 on a crest
+    g.op(None, "multiply", 6, a=6, b=7)
     g.op(None, "field", 7, field="kickPush")
-    g.op(None, "remap", 7, a=7, k=[0.3, 2.4, 0.0, 2.0], f=1.0)      # the ring's crest
+    g.op(None, "remap", 7, a=7, k=[0.4, 2.4, 0.0, 4.0], f=1.0)      # the kick's ring: a pulse of light across panels
     g.op(None, "add", 6, a=6, b=7)                                  # r6 = intensity
     g.op(None, "multiply", 5, a=5, b=6)
     g.op("core", "constant", 7, k=C("core", CORE) + [1])             # (routes multiply it: CC 6 light, the bass)
@@ -353,7 +359,7 @@ def blade_program():
     # strain (activity, one value per blade from the effector)
     g.op(None, "input", 4, inp="instanceEmissive")
     g.op(None, "smoothstep", 2, a=4, k=[ACT[0], ACT[1], 0, 0])
-    g.op("front", "constant", 6, k=C("front", 1.2) + [1])
+    g.op("front", "constant", 6, k=C("front", FRONT) + [1])
     g.op(None, "multiply", 2, a=2, b=6)
     g.op(None, "multiply", 2, a=2, b=3)                             # in the blade's middle
     g.op(None, "add", 5, a=5, b=2)
@@ -372,7 +378,7 @@ def blades(s):
     bind(s, "crest", op_path(g, "tone", "constant3"), TONE)
     bind(s, "core", op_path(g, "core"), CORE)
     bind(s, "glint", op_path(g, "glint"), 1.6)
-    bind(s, "front", op_path(g, "front"), 1.2)
+    bind(s, "front", op_path(g, "front"), FRONT)
     pts = blade_points()
     s.blade_count = len(pts)
     s.blade_program = g
@@ -404,7 +410,7 @@ def membrane_program():
     g.op(None, "noise", 2, a=0, k=[0, 0, 0, 0], f=0.018)            # r2 = pools (0..1)
     g.op(None, "smoothstep", 2, a=2, k=[0.45, 0.85, 0, 0])
     g.op(None, "field", 3, field="disp")
-    g.op(None, "remap", 3, a=3, k=[0.0, 6.0, 0.0, 0.8], f=1.0)
+    g.op(None, "remap", 3, a=3, k=[5.5, 12.0, 0.0, 0.8], f=1.0)
     g.op(None, "add", 2, a=2, b=3)
     g.op(None, "field", 3, field="kickPush")
     g.op(None, "remap", 3, a=3, k=[0.3, 2.4, 0.0, 1.2], f=1.0)
@@ -448,7 +454,7 @@ def chip_program():
     g = common.Prog("chip")
     cw, ch = CHIP[0], CHIP[1]
     g.op(None, "field", 0, field="disp")
-    g.op(None, "remap", 0, a=0, k=[-2.5, 6.0, 0.0, 1.0], f=1.0)     # r0 = the swell's zone (0..1)
+    g.op(None, "remap", 0, a=0, k=[5.5, 12.0, 0.0, 1.0], f=1.0)     # r0 = the swell's zone (0..1)
     g.op("tone", "ramp", 1, a=0, k=C("trough", TONE) + [1], k2=C("mid", TONE) + [1], k3=C("crest", TONE) + [1])
     g.op(None, "input", 2, inp="localPosition")
     g.op(None, "gradient", 3, a=2, k=[1, 0, 0, 0.5], f=1.0 / cw)
@@ -501,7 +507,7 @@ def chips(s):
 def light(s):
     env = C("environment")
     s.environment = {
-        "intensity": 0.18, "background": env, "fogColor": env, "volumeDensity": 0.0,
+        "intensity": 0.08, "background": env, "fogColor": env, "volumeDensity": 0.0,
         "fogSky": 0.0, "fogHeight": 400.0, "fogHeightFalloff": 0.0, "skyIntensity": 1.0, "shadowRange": 160.0,
         "ambientOcclusion": False, "contactShadows": False,
         "depthPrepass": True,   # ADR-1406: the membrane and the blades' backs behind the faces
@@ -512,13 +518,13 @@ def light(s):
         "bands": {"phase": 0.0, "rotation": 0.0, "gain": 1.0,
                   "softbox": {"intensity": 0.0, "azimuth": 0.6, "elevation": 0.7, "falloff": 2.6, "skyFill": 0.0},
                   "strips": [{"axis": [math.cos(k * math.pi / 4), 0.0, math.sin(k * math.pi / 4)], "offset": 0.0,
-                              "width": 0.1, "intensity": 2.0, "segments": 0, "warmth": 0.5, "rate": 0.0}
+                              "width": 0.1, "intensity": 1.4, "segments": 0, "warmth": 0.5, "rate": 0.0}
                              for k in range(4)]},
     }
     for k in ("env/sky/zenithColor", "env/sky/horizonColor", "env/sky/groundColor", "scene/fogColor"):
         bind(s, "environment", k)
     # the faces' light: a soft source at the sphere's heart, so a blade swinging away from the centre falls dark
-    s.light("heart", "point", position=[0.0, 10.0, 0.0], color=C("glow"), intensity=26000.0, range=0.0,
+    s.light("heart", "point", position=[0.0, 10.0, 0.0], color=C("glow"), intensity=8000.0, range=0.0,
             castsShadow=False, contactShadow=False, diffuseOnly=True)
     bind(s, "glow", "lights/heart/color")
 
@@ -608,8 +614,8 @@ CAMERAS = {  # review framings
 def camera(s):
     s.camera = {"mode": 1, "position": list(CAM[0]), "target": list(CAM[1]), "fov": 60.0, "orbitSpeed": 0.0}
     s.drift_camera(CAM[0], CAM[1], period=90.0, amp=(5.0, 2.0, 4.0), tamp=(6.0, 3.0, 0.0), steps=8)
-    s.params_({"camera/lens/focalLength": 20.0, "post/bloom/intensity": 0.26, "post/bloom/threshold": 1.0,
-               "post/bloom/radius": 0.8, "post/output/vignette": 0.2, "post/grade/contrast": 1.06})
+    s.params_({"camera/lens/focalLength": 20.0, "post/bloom/intensity": 0.34, "post/bloom/threshold": 0.8,
+               "post/bloom/knee": 0.5, "post/bloom/radius": 0.95, "post/output/vignette": 0.2, "post/grade/contrast": 1.06})
 
 
 # ================================================================================================ build

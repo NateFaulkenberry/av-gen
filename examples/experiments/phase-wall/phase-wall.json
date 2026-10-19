@@ -116,8 +116,8 @@
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.26,
-  "post/bloom/threshold": 1.0,
+  "post/bloom/intensity": 0.34,
+  "post/bloom/threshold": 0.8,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
   "post/output/vignette": 0.2,
@@ -130,7 +130,8 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "post/bloom/radius": 0.8,
+  "post/bloom/knee": 0.5,
+  "post/bloom/radius": 0.95,
   "post/grade/contrast": 1.06
  },
  "sources": [
@@ -1050,22 +1051,22 @@
    {
     "role": "trough",
     "target": "material/bladeSphere/op/4/ramp/constant",
-    "gain": 0.3
+    "gain": 0.18
    },
    {
     "role": "mid",
     "target": "material/bladeSphere/op/4/ramp/constant2",
-    "gain": 0.3
+    "gain": 0.18
    },
    {
     "role": "crest",
     "target": "material/bladeSphere/op/4/ramp/constant3",
-    "gain": 0.3
+    "gain": 0.18
    },
    {
     "role": "core",
     "target": "material/bladeSphere/op/30/constant/constant",
-    "gain": 2.2
+    "gain": 1.7
    },
    {
     "role": "glint",
@@ -1075,27 +1076,27 @@
    {
     "role": "front",
     "target": "material/bladeSphere/op/45/constant/constant",
-    "gain": 1.2
+    "gain": 0.18
    },
    {
     "role": "trough",
     "target": "material/chip/op/3/ramp/constant",
-    "gain": 0.3
+    "gain": 0.18
    },
    {
     "role": "mid",
     "target": "material/chip/op/3/ramp/constant2",
-    "gain": 0.3
+    "gain": 0.18
    },
    {
     "role": "crest",
     "target": "material/chip/op/3/ramp/constant3",
-    "gain": 0.3
+    "gain": 0.18
    },
    {
     "role": "core",
     "target": "material/chip/op/25/constant/constant",
-    "gain": 2.2
+    "gain": 1.7
    },
    {
     "role": "glow",
