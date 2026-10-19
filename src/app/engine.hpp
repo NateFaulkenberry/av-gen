@@ -1198,6 +1198,7 @@ private:
     void watchInputDevice();
     std::string inputSelector_; // what useAudioInput was asked for, to reopen the same device on the other path
     std::chrono::steady_clock::time_point inputRetry_{};
+    bool inputStopped_ = false; // the open input's device went away and its IO was stopped
     void publishInputSources();
     Result<void> adoptAudioInput(std::unique_ptr<audio::AudioInput> input);
     params::Parameter<float>* inputGain_ = nullptr;

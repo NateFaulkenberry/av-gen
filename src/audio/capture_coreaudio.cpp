@@ -161,6 +161,12 @@ struct CoreAudioCapture::State {
 OSStatus CoreAudioCapture::State::input(void* ref, AudioUnitRenderActionFlags* flags, const AudioTimeStamp* stamp,
                                         UInt32 bus, UInt32 frames, AudioBufferList*) {
     auto* s = static_cast<State*>(ref);
+    // Measured on the Volt 876 unplugged mid-capture (and on a destroyed aggregate): AUHAL keeps calling this, at the
+    // system default input's 512-frame period, with silence. Nothing it delivers after the device has gone is the
+    // device's: not rendered, not passed on.
+    if (!s->alive.load(std::memory_order_relaxed)) {
+        return noErr;
+    }
     if (frames > s->maxFrames || s->sink == nullptr) {
         return noErr; // larger than the slice AUHAL was told: cannot happen; never write past the buffers
     }

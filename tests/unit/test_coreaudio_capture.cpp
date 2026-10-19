@@ -14,6 +14,8 @@
 #include "support/coreaudio_rig.hpp"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <chrono>
 #include <cmath>
 #include <numbers>
@@ -120,6 +122,12 @@ TEST_CASE("Core Audio capture: a device that disappears mid-capture reads discon
     CHECK(ms < 1000.0);
     static_cast<void>(seenDuringDestroy);
     CHECK_FALSE(audio::coreAudioDevicePresent("com.avgen.test.stems.unplug"));
+    // AUHAL keeps calling the input callback after its device has gone (measured on the Volt 876 and on this
+    // aggregate: at the default input's period, with silence). None of it reaches the sink.
+    const auto blocks = input.stats().blocks;
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    CHECK(input.stats().blocks == blocks);
+    input.stopCapture();
     input.close(); // and closing after the device is gone is safe
 }
 
@@ -206,6 +214,12 @@ TEST_CASE("Core Audio capture: the engine takes the Core Audio path for sources 
     }
     CHECK_FALSE(engine.audioInput()->connected());
     CHECK(engine.signals().value(active) == 0.0f);
+    const auto frozen = engine.audioInput()->stats().blocks; // the engine stopped the dead device's IO
+    for (int i = 0; i < 10; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(17));
+        frame();
+    }
+    CHECK(engine.audioInput()->stats().blocks == frozen);
     CHECK(engine.audioInput()->deviceId() == "com.avgen.test.stems.replug"); // still that device, not another
     aggregate = std::make_unique<testsupport::PrivateAggregate>("com.avgen.test.stems.replug",
                                                                 std::vector<std::string>{kBlackHole});
@@ -225,4 +239,51 @@ TEST_CASE("Core Audio capture is macOS only", "[coreaudio][audio]") {
     SKIP("no Core Audio on this platform");
 }
 
+#endif
+
+#if defined(__APPLE__)
+// Hidden ([.]): the engine's own reconnect path on a REAL device, with a person pulling and replugging the cable.
+//   AVGEN_HARDWARE_INPUT=<device id> AVGEN_HARDWARE_SECONDS=90 avgen_tests "[hardware]"
+// Prints, once a second: connected, sources with audio, blocks, gaps; fails unless it saw the device go and come back.
+TEST_CASE("hardware: the engine reconnects a real device after an unplug (manual)", "[.][hardware]") {
+    const char* id = std::getenv("AVGEN_HARDWARE_INPUT");
+    if (id == nullptr) {
+        SKIP("set AVGEN_HARDWARE_INPUT to a device id");
+    }
+    const double seconds = std::getenv("AVGEN_HARDWARE_SECONDS") ? std::atof(std::getenv("AVGEN_HARDWARE_SECONDS")) : 90.0;
+    app::Engine engine(app::EngineMode::Live);
+    std::vector<audio::InputSource> sources;
+    for (std::uint32_t c = 0; c < 8; ++c) {
+        sources.push_back({.key = "in" + std::to_string(c + 1), .label = "Input " + std::to_string(c + 1), .channel = c});
+    }
+    engine.setInputSources(sources);
+    REQUIRE(engine.useAudioInput(id).has_value());
+    bool sawGone = false, sawBack = false;
+    double t = 0.0;
+    const auto start = std::chrono::steady_clock::now();
+    auto next = start;
+    while (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() < seconds) {
+        engine.update(FrameTime{t, 1.0 / 60.0, static_cast<std::uint64_t>(t * 60.0)});
+        t += 1.0 / 60.0;
+        const bool connected = engine.audioInput() != nullptr && engine.audioInput()->connected();
+        sawGone |= !connected;
+        sawBack |= sawGone && connected;
+        if (std::chrono::steady_clock::now() >= next) {
+            next += std::chrono::seconds(1);
+            std::size_t active = 0;
+            for (std::size_t i = 0; i < sources.size(); ++i) {
+                active += engine.inputSourceActive(i) ? 1 : 0;
+            }
+            const auto st = engine.audioInput()->stats();
+            std::printf("%6.1f s  %s  sources with audio %zu/8  blocks %llu  gaps %llu  cb %.1f us\n",
+                        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(),
+                        connected ? "connected   " : "DISCONNECTED", active, static_cast<unsigned long long>(st.blocks),
+                        static_cast<unsigned long long>(st.gaps), st.callbackMeanMicros);
+            std::fflush(stdout);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    CHECK(sawGone);
+    CHECK(sawBack);
+}
 #endif

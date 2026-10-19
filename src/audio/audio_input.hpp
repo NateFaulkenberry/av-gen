@@ -94,6 +94,9 @@ public:
         std::int64_t steadyNs = 0;
     };
     [[nodiscard]] BlockStamp lastBlock() const;
+    // Stops the device's IO and keeps everything else (the device name and id, the sources, the stats), so a
+    // disconnected device stops costing anything while the owner waits for it to come back. open/openBackend restart.
+    void stopCapture();
     // Whether the device is still there (false after an unplug), and whether its format changed under the capture.
     [[nodiscard]] bool connected() const;
     [[nodiscard]] bool formatChanged() const;
