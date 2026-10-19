@@ -1,5 +1,7 @@
 # Remove live kick / snare / hat detection: blast radius and removal plan
 
+**Decision (owner, 2026-10-19): C1 with C4 = drop the whole row.** Implemented as ADR-1530.
+
 2026-10-19. Branch `eng/remove-ksh-detect` (from main `35a6883a`). Brief: [00-brief.md](00-brief.md). This report covers
 the brief's Phases 1 and 2. No production code is changed until the owner decides the Category C question in §8.
 
