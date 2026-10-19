@@ -163,8 +163,8 @@
     ],
     "waveGeometry": "spherical",
     "audioSpeed": 18.0,
-    "onsetWidth": 3.0,
-    "onsetDecay": 1.2
+    "onsetWidth": 2.0,
+    "onsetDecay": 1.6
    }
   },
   {
@@ -632,7 +632,7 @@
    },
    "position": [
     0.0,
-    -0.05,
+    -2.5,
     0.0
    ]
   }

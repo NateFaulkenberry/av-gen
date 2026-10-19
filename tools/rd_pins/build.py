@@ -183,7 +183,7 @@ def pattern(s):
     # passes toward spots (spots spread in rings), it lifts the pins it passes (an effector) and it swells the contours
     # and carries a band of light (the pin program)
     s.field("kick", {"kind": "onset", "onsetSource": "low", "point": list(KICK_AT), "waveGeometry": "spherical",
-                     "audioSpeed": 18.0, "onsetWidth": 3.0, "onsetDecay": 1.2, "strength": KICK_GAIN})
+                     "audioSpeed": 18.0, "onsetWidth": 2.0, "onsetDecay": 1.6, "strength": KICK_GAIN})
     children.append("kick")
     if RES:
         # option (proof Q5): the resonance field's settled figure (sand, ADR-1405) as a slower regime layer, so the
@@ -518,7 +518,8 @@ def build():
     s.program(gf.doc(base=gf.base, emission=gf.emit))
     pos, nrm, uv, idx = common.bowl_mesh(BOWL_R * 1.45, BOWL_H * 1.45 ** BOWL_P, 160, 240, power=BOWL_P)
     common.write_glb(os.path.join(OUT, "meshes", "rp-bowl.glb"), pos, nrm, uv, idx, "bowl")
-    s.proc("floor", {"kind": "mesh", "asset": "meshes/rp-bowl.glb"}, position=(0.0, -0.05, 0.0),
+    # well below the pins: the heave lowers them by up to ~1.5 m, and a pin under the floor reads as a hole
+    s.proc("floor", {"kind": "mesh", "asset": "meshes/rp-bowl.glb"}, position=(0.0, -2.5, 0.0),
            material={"program": gf.name if FLOOR else None, "baseColor": C("environment", 0.5), "roughness": 0.6,
                      "metallic": 0.0})
     if not FLOOR:
