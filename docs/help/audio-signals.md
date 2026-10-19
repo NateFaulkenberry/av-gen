@@ -72,6 +72,27 @@ from the whole-track analysis of a loaded file; live input has none.
 
 The centroid in Hz exists inside an analysis frame but is not published as a signal.
 
+## Stems and input sources
+
+One analysis source -- an offline stem file, or a channel of a live input -- publishes the same set, under its key
+(`stem.drums.level`, `stem.bass_di.onset`). See [Audio Input](help://audio/input) for adding them.
+
+| Signal | Range | Event | Meaning |
+|---|---|---|---|
+| `stem.<key>.active` | 0 – 1 | | 1 while the source has audio now; 0 outside a stem's span, for a missing file, an absent channel or a disconnected device |
+| `stem.<key>.rms` | 0 – 1 | | level of the window, unsmoothed |
+| `stem.<key>.peak` | 0 – 1 | | largest sample in the window |
+| `stem.<key>.level` | 0 – 1 | | the level against this source's own loudness, as `response.level` reads the mix |
+| `stem.<key>.onset` | 0 – 1 | ✓ | any attack in this source (log-spectral flux: a held bass note does not retrigger it) |
+| `stem.<key>.onsetStrength` | 0 – 4 | | how far the attack cleared its threshold |
+| `stem.<key>.bass` … `.treble` | 0 – 1 | | the five bands, auto-gained, as `audio.<band>` |
+| `stem.<key>.centroid` | 0 – 1 | | brightness |
+| `stem.<key>.width` | 0 – 2 | | stereo width of a stereo stem or a linked input pair; 0 for mono |
+| `stem.<key>.kick` `.snare` `.hat` | 0 – 1 | ✓ | with **Hits** on: kicks, snares and hats found in this source |
+
+Values change once per analysis hop (about 11 ms); a render frame shows the newest, and carries every event since the
+last frame, so none is lost at 30 fps. A source with no audio reads 0 and fires nothing -- never a held value.
+
 ## The beat clock
 
 With a loaded file, the analysed beat grid read at the playhead; with live input, interpolated at
