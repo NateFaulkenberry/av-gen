@@ -69,27 +69,81 @@ Main was merged twice: `1bddf349` (ADR-1510) and `c3828f06` (the generative pass
 | Onset to bus (live) | p50 5.8-7.0 ms, p99 11.7-15.7 ms (plus up to one hop, 10.7 ms, for the window) |
 | Offline: 8 stems of 3.5 min | 2.1-3.6 s to analyse; peak RSS unchanged from no stems (879-900 MB; it was 2.1 GB before analysing while decoding) |
 
-## 5. Hardware
+## 5. Hardware: the Volt 876 (connected 2026-10-19, 14:27-15:21)
 
-**The Volt 876 was not connected during this work, so none of brief §3.3 has been verified on it:**
-- its reported name, channel count and stream layout;
-- capture from each physical input;
-- independence between inputs;
-- unplug and replug;
-- the live arms on it.
+**Discovery** (`avgen --list-audio-devices` and the HAL probe):
+- **Name and id:** "Volt 876", id `AppleUSBAudioEngine:Universal Audio:Volt 876:25362061501116:1,2`, transport USB.
+- **Inputs:** **32 input channels in ONE Core Audio stream**, float32, 48 kHz. That is 32, not the 24 the retail listings
+  give. Input latency and safety offset are each 74 frames.
+- **One stream** means miniaudio's multi-stream limitation (#312, ADR-1522) does not affect this interface: the plain
+  path hears all 32 channels too.
 
-`07-hardware-test.md` is the procedure (`avgen --list-audio-devices`, `avgen --input-meter`), and I have asked the
-coordinator for the device. Findings so far come from Core Audio devices on this Mac:
-- BlackHole 2ch, the built-in microphone, and private aggregate devices built from them (a two-stream device, created
-  and destroyed by the tests).
-- The source comment at `audio_input.cpp:81` records that a "Volt 876" was once enumerated on this Mac. Nothing else
-  about it was observed.
+**What the 32 channels carried, with nothing plugged in at first (meter at 14:27):**
 
-BlackHole 16ch was approved but not installed: its installer needs the owner's admin password.
+| Channels | Level | Reading |
+|---|---|---|
+| 1-2 | about -58 dBFS | preamp noise, or a source left connected |
+| 3-8 | about -104 dBFS | the analog floor |
+| 9-28 | exact digital silence | the ADAT inputs, with no ADAT source |
+| 29-30 | about -4 dBFS | a live signal |
+| 31-32 | about -25 dBFS | a live signal |
+
+Channels 29-32 look like UA's loopback or virtual returns of what the Mac plays. That was not confirmed with the owner.
+**Practical consequence:** the default main mix (the average of all 32 channels) on this interface is dominated by the
+loopback and reads about 30 dB below any single input. This is why the Live panel's Main mix pair exists (`cba58ae0`).
+
+**Per-input independence** (the owner moved a microphone through inputs 1-8; `build/volt/owner-meter-151811.log`,
+from 15:18:11):
+
+| Input | Lit (s) | Peak on it | Highest other channel 1-8 |
+|---|---|---|---|
+| 1 | 1-29 | 0.0 dBFS | about -57 dBFS (the ch 1/2 noise floor) |
+| 2 | 30-39 | 0.0 dBFS | -57.3 dBFS |
+| 3 | 40-52 | 0.0 dBFS | -57.7 dBFS |
+| 4 | 53-61 | -5.6 dBFS | -57.1 dBFS |
+| 5 | 63-70 | -5.4 dBFS | -57.7 dBFS |
+| 6 | 71-79 | 0.0 dBFS | -56.6 dBFS |
+| 7 | 80-88 | -5.6 dBFS | -57.5 dBFS |
+| 8 | 104-115 | -1.9 dBFS | -57.7 dBFS |
+
+- Each input reached its own channel and only that one; no crosstalk was above the noise floor.
+- The 0.0 dBFS peaks are the gain the owner set (clipping at the preamp), not a fault.
+- Throughout: 0 drops, 0 gaps, 0 overloads. The callback averaged 17.0-17.5 µs, max 39.3 µs, at 128 frames with 32
+  sources.
+
+**Unplug and replug: found two defects, then fixed** (`5b5bc4d4`).
+- **Disconnect detection worked:** the pull at about 165 s read DISCONNECTED within a second, with one sample-time gap.
+- **Defect 1, no reopen in the meter:** `--input-meter` never reopened after the replug. It had no reopen logic; only
+  the engine did. It now reopens the same id once a second when the device is back.
+- **Defect 2, callbacks after the disconnect:** AUHAL kept calling the input callback at about 94 blocks/s (the
+  default input's 512-frame period) with silence. The callback mean drifted from 17 to 175 µs as those 4×-longer
+  blocks entered it.
+  - The callback now forwards nothing once the device is gone.
+  - The engine and the meter stop that device's IO as soon as they see the disconnect.
+  - The private-aggregate test reproduces it: without the guard, blocks went from 115 to 143 in 300 ms.
+- **Re-verifying both on the Volt (meter and engine path, a real unplug and replug) is pending.** The owner unplugged
+  the Volt at about 15:21. The procedure is in §5.1.
+
+**Not tested on the Volt:**
+- ADAT channels 9-24: there is no ADAT source.
+- Rates other than 48 kHz.
+- The Volt benchmark arms: they were queued behind another agent's GPU suite and cancelled when the Volt was unplugged.
+
+### 5.1 Pending: reconnect on the Volt
+
+With the Volt plugged in and a microphone on input 1, run each of these for 120 s:
+- `avgen --input-meter <id> 120`
+- `AVGEN_HARDWARE_INPUT=<id> AVGEN_HARDWARE_SECONDS=120 avgen_tests "[hardware]"`
+
+During each run: pull the USB cable at about 30 s and replug it at about 50 s. Expected:
+- DISCONNECTED, then RECONNECTED (meter) or `connected` again (engine);
+- "sources with audio" above 0 again after the replug;
+- the block count frozen while the device is out.
 
 ## 6. Not done, and limitations
 
-- **Volt hardware validation** (§5). ADAT channels 9-24 also need an ADAT source.
+- **Volt hardware:** the re-test of reconnect after the fix (§5.1), the ADAT channels (they need an ADAT source), and
+  the benchmark arms on the Volt.
 - **Rates:** live tests and benchmarks ran at 48 kHz only. A stem at 44.1 kHz was tested offline.
 - **Main mix only:** stems and live sources do not feed the beat clock, `music.*`, `sonic.*`, `response.*`,
   `AudioHistory` or the reactivity proposer.
@@ -106,8 +160,8 @@ BlackHole 16ch was approved but not installed: its installer needs the owner's a
   - Visual review by the owner is outstanding.
 - **Device enumeration** costs the UI thread about 2.4 ms per call, every 3 s, as before plus the HAL layout query.
   A listener-driven cache would remove it; not done.
-- **Disconnect latency:** a destroyed device read disconnected about 360 ms after the destroy (the HAL's notification
-  timing). A real USB unplug is untested.
+- **Disconnect latency:** a destroyed aggregate read disconnected about 360 ms after the destroy. The Volt's USB
+  unplug read disconnected within the meter's 1 s resolution.
 - **The plain path on a multi-stream device:** with no sources, it still hears only the first stream, as before this
   work (ADR-1522). Ticking any source, or choosing a main pair, moves it to the Core Audio path.
 
