@@ -23,6 +23,8 @@
 #include "audio/audio_input.hpp"
 #include "audio/stem_source.hpp"
 #include "analysis/stem_analysis.hpp"
+#include "analysis/channel_analysis.hpp"
+#include "audio/capture_backend.hpp"
 #include "signals/stem_signals.hpp"
 #include "analysis/analysis_track.hpp"
 #include "analysis/audio_history_builder.hpp"
@@ -488,6 +490,28 @@ public:
     void stopAudioInput();
     [[nodiscard]] bool hasLiveInput() const { return input_ != nullptr; }
     [[nodiscard]] audio::AudioInput* audioInput() { return input_.get(); }
+    [[nodiscard]] const audio::AudioInput* audioInput() const { return input_.get(); }
+    // ADR-1521: live input through a capture backend -- the Core Audio one for multichannel sources, the synthetic
+    // one in tests and benchmarks. Otherwise exactly useAudioInput().
+    [[nodiscard]] Result<void> useAudioInputBackend(std::unique_ptr<audio::CaptureBackend> backend);
+
+    // ---- live input sources (ADR-1521) -------------------------------------------------------------
+    //
+    // Channels (or linked pairs) of the open input, each analysed on its own and published as `stem.<key>.*` -- the
+    // same names an offline stem publishes, so a scene routed on stems offline plays live with the buses patched to
+    // inputs of those keys. A live source's key wins over an offline stem's while an input is open; offline stems
+    // with no live counterpart read inactive then (there is no mix playing for them to follow).
+    //
+    // Keys are normalised as stems' are. A source on a channel the device lacks reads inactive, and so does every
+    // source while the device is disconnected or its analysis has produced nothing for 250 ms. The map is the
+    // machine's (the application keeps it in settings, by device), not the project's.
+    void setInputSources(std::vector<audio::InputSource> sources);
+    [[nodiscard]] const std::vector<audio::InputSource>& inputSources() const { return inputSources_; }
+    // Whether source `index` published live audio on the last frame.
+    [[nodiscard]] bool inputSourceActive(std::size_t index) const {
+        return index < inputActive_.size() && inputActive_[index] != 0;
+    }
+    [[nodiscard]] const analysis::ChannelAnalysis* channelAnalysis() const { return channels_.get(); }
 
     // ---- live Sonic input (ADR-1025) ----
     // Live notes from the MIDI input (every source the control map's MIDI filter admits) and live timbre from
@@ -1145,6 +1169,16 @@ private:
     TempoSource tempoSource_ = TempoSource::Analysis;
     bool midiClockActive_ = false;
     std::unique_ptr<audio::AudioInput> input_;
+    // ADR-1521: after input_, so it is destroyed first: it reads the input's source streams.
+    std::unique_ptr<analysis::ChannelAnalysis> channels_;
+    std::vector<audio::InputSource> inputSources_;
+    std::vector<signals::StemSignals> inputSignals_;
+    std::vector<analysis::LiveStemLatch> inputLatches_;
+    std::vector<std::chrono::steady_clock::time_point> inputLastFrame_;
+    std::vector<std::uint8_t> inputActive_;
+    void rebuildChannelAnalysis(const std::vector<std::string>& previousKeys);
+    void publishInputSources();
+    Result<void> adoptAudioInput(std::unique_ptr<audio::AudioInput> input);
     params::Parameter<float>* inputGain_ = nullptr;
     params::TimelineClock timelineClock_;
     params::Timeline::CueState cueState_;

@@ -6,6 +6,8 @@
 // the wall clock (RealtimeClock) and `framesCaptured()` is the sample-accurate stream position.
 
 #include "audio/analysis_stream.hpp"
+#include "audio/capture_backend.hpp"
+#include "audio/input_source.hpp"
 #include "core/error.hpp"
 
 #include <cstdint>
@@ -47,6 +49,42 @@ public:
     // Software gain applied before the stream (1 = unity).
     void setGain(float gain);
     [[nodiscard]] float gain() const;
+
+    // ---- analysis sources on the device's channels (stems-multichannel, ADR-1521) ----------------------------------
+    //
+    // Each source gets its own stream, written by the same callback that writes the main mono stream above, so every
+    // source shares the device's sample clock. The main stream is unchanged by any of this: the average of every
+    // channel, as it always was.
+    //
+    // Sets the sources (UI thread). A running capture is stopped, reconfigured and restarted; nothing the callback
+    // reads changes while it runs. A source whose channel (or pair partner) the device does not have gets no stream
+    // and `sourceStream` returns null for it -- the engine publishes it inactive and the UI says why.
+    void setSources(std::vector<InputSource> sources);
+    [[nodiscard]] const std::vector<InputSource>& sources() const;
+    // The source's stream: mono samples, or for a pair interleaved (mid, side) frames -- two floats per frame.
+    [[nodiscard]] AnalysisStream* sourceStream(std::size_t index);
+    [[nodiscard]] float sourcePeak(std::size_t index) const;  // the last block's peak, 0..1
+    // Per device channel: the last block's peak (for the channel meters), 0 beyond channels().
+    [[nodiscard]] float channelPeak(std::uint32_t channel) const;
+
+    struct Stats {
+        std::uint64_t blocks = 0;          // callbacks
+        std::uint64_t droppedBlocks = 0;   // source blocks dropped whole because the analysis fell behind
+        std::uint64_t gaps = 0;            // the device's sample time jumped (input nobody received)
+        std::uint64_t overloads = 0;       // the HAL's IO cycle overran its deadline
+        double callbackMeanMicros = 0.0;   // the callback's own time
+        double callbackMaxMicros = 0.0;
+    };
+    [[nodiscard]] Stats stats() const;
+    // Whether the device is still there (false after an unplug), and whether its format changed under the capture.
+    [[nodiscard]] bool connected() const;
+    [[nodiscard]] bool formatChanged() const;
+    // The open device's stable id ("" for the plain miniaudio path, which selects by name).
+    [[nodiscard]] std::string deviceId() const;
+
+    // Opens a capture through a backend instead of the plain miniaudio path: the Core Audio backend for multichannel
+    // sources on macOS, or the synthetic backend in tests and benchmarks. Starts it.
+    [[nodiscard]] Result<void> openBackend(std::unique_ptr<CaptureBackend> backend);
 
 private:
     struct Impl;
