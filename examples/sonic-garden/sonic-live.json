@@ -155,7 +155,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 0.89
+      "gain": 1.22
      },
      {
       "name": "loudSlow",
@@ -166,7 +166,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 0.94
+      "gain": 1.12
      },
      {
       "name": "strike",
