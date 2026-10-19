@@ -28,6 +28,7 @@
 // you use, and cannot carry a key.
 
 #include "ai/control_plane.hpp"
+#include "audio/input_source.hpp"
 #include "core/error.hpp"
 #include "ui/output_preview.hpp"
 
@@ -35,8 +36,10 @@
 
 #include <filesystem>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace avgen::app {
 
@@ -125,9 +128,14 @@ struct AppSettings {
     // The devices a person plays through on this machine, so "plug in the keyboard and it works" survives a
     // restart. Not in the project: the same live project must open on another machine with that machine's rig.
     struct LiveInput {
-        std::string audioInput;     // capture device name (substring match); "" = none chosen yet
+        std::string audioInput;     // capture device id (Core Audio UID), or a name substring; "" = none chosen yet
         std::string midiInput = "*"; // MIDI source filter: "*" every source, else a name substring
         float smoothing = 1.0f;     // multiplier on the Sonic Character's time constants (0.25..4)
+        // ADR-1521: the analysis sources on each device's channels, by device id: this rig's patching (a mixer's drum
+        // bus on input 1) belongs to the machine, not the project. Channels are 0-based here, 1-based in the file.
+        std::map<std::string, std::vector<audio::InputSource>> inputSources;
+        // ...and which of its channels make the main mix (0-based; 1-based in the file). Absent = every channel.
+        std::map<std::string, std::vector<std::uint32_t>> inputMain;
     } live;
 
     // ---- projection (ADR-1026) ----

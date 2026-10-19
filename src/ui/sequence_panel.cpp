@@ -400,6 +400,7 @@ void SequencePanel::drawToolbar(app::Engine& engine) {
     if (ImGui::BeginPopup("audio-clips")) {
         ImGui::SetNextItemWidth(460.0f);
         drawAudioClips(engine);
+        drawStems(engine);
         ImGui::EndPopup();
     }
     if (ImGui::BeginPopup("import-lyrics")) {
@@ -4251,8 +4252,8 @@ void SequencePanel::drawAudioClips(app::Engine& engine) {
 
     if (clips.empty()) {
         ImGui::TextWrapped("A project can be made of several files: a song and a spoken outro, two "
-                           "cues with a gap, a stem set. They are mixed into one piece; drag them on "
-                           "the strip to move or trim them.");
+                           "cues with a gap. They are mixed into one piece; drag them on the strip to "
+                           "move or trim them. Stems to analyse without playing go under Stems, below.");
         return;
     }
 
@@ -4315,6 +4316,145 @@ void SequencePanel::drawAudioClips(app::Engine& engine) {
         if (auto r = engine.setAudioClips(std::move(next)); !r) {
             status_ = r.error().message;
         }
+    }
+}
+
+void SequencePanel::drawStems(app::Engine& engine) {
+    ImGui::Spacing();
+    ImGui::SeparatorText("Stems (analysis only)");
+    if (ImGui::IsItemHovered()) {
+        tooltip("Files analysed beside the mix -- a drum stem, a bass stem -- and published as stem.<key>.* for "
+                "routes: level, rms, peak, onset, the five bands, brightness, width, and kick/snare/hat with Hits. "
+                "Never played and never mixed: the clips above are what you hear. Line them up with the offset; "
+                "nothing is guessed.");
+    }
+    const auto& stems = engine.stems();
+    ImGui::SetNextItemWidth(-200.0f);
+    ImGui::InputTextWithHint("##stempath", "path to a stem file", stemPath_, sizeof(stemPath_));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(110.0f);
+    ImGui::InputTextWithHint("##stemlabel", "label (Drums)", stemLabel_, sizeof(stemLabel_));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(stemPath_[0] == '\0');
+    if (ImGui::Button("Add stem", ImVec2(-1.0f, 0.0f))) {
+        std::vector<audio::StemSource> next;
+        for (const auto& s : stems) {
+            next.push_back(s.source);
+        }
+        const std::filesystem::path file = stemPath_;
+        next.push_back({.key = "", .label = stemLabel_[0] != '\0' ? std::string(stemLabel_) : file.stem().string(),
+                        .file = file});
+        engine.setStems(std::move(next));
+        stemSelected_ = static_cast<int>(engine.stems().size()) - 1;
+        stemPath_[0] = stemLabel_[0] = '\0';
+    }
+    ImGui::EndDisabled();
+    if (stems.empty()) {
+        ImGui::TextDisabled("No stems. Routes on stem.* read 0 until there are.");
+        return;
+    }
+    // Edited through a copy and applied once: a label or offset edit re-analyses nothing.
+    std::vector<audio::StemSource> next;
+    for (const auto& s : stems) {
+        next.push_back(s.source);
+    }
+    bool changed = false;
+    for (std::size_t i = 0; i < stems.size(); ++i) {
+        const app::Engine::StemState& stem = stems[i];
+        ImGui::PushID(static_cast<int>(i) + 1000);
+        bool problem = !stem.report.ok();
+        bool warned = false;
+        for (const auto* list : {&stem.report.diagnostics, &stem.mix}) {
+            for (const auto& d : *list) {
+                warned |= d.severity == audio::StemSeverity::Warning;
+                problem |= d.severity == audio::StemSeverity::Error;
+            }
+        }
+        const std::string row = stem.source.label + "   stem." + stem.source.key + ".*" +
+                                (problem ? "   (not analysed)" : warned ? "   (see warnings)" : "");
+        const bool chosen = stemSelected_ == static_cast<int>(i);
+        if (problem || warned) {
+            ImGui::PushStyleColor(ImGuiCol_Text, problem ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f) : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+        }
+        if (ImGui::Selectable(row.c_str(), chosen)) {
+            stemSelected_ = chosen ? -1 : static_cast<int>(i);
+            std::snprintf(stemEdit_, sizeof(stemEdit_), "%s", stem.source.label.c_str());
+            std::snprintf(stemKeyEdit_, sizeof(stemKeyEdit_), "%s", stem.source.key.c_str());
+        }
+        if (problem || warned) {
+            ImGui::PopStyleColor();
+        }
+        if (stemSelected_ == static_cast<int>(i)) {
+            ImGui::Indent();
+            audio::StemSource& edit = next[i];
+            ImGui::TextDisabled("%s", stem.source.file.filename().string().c_str());
+            if (stem.report.decoded) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%u Hz, %u ch, %.2f s%s%s", stem.report.sampleRate, stem.report.channels,
+                                    stem.report.durationSeconds, stem.report.format.empty() ? "" : ", ",
+                                    stem.report.format.c_str());
+            }
+            ImGui::SetNextItemWidth(140.0f);
+            ImGui::InputText("label", stemEdit_, sizeof(stemEdit_));
+            if (ImGui::IsItemDeactivatedAfterEdit() && stemEdit_[0] != '\0') {
+                edit.label = stemEdit_;
+                changed = true;
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(110.0f);
+            ImGui::InputText("key", stemKeyEdit_, sizeof(stemKeyEdit_));
+            if (ImGui::IsItemHovered()) {
+                tooltip("The signal names: stem.<key>.level, stem.<key>.onset, ... Renaming the label keeps it; "
+                        "changing the key moves every route on this stem to the new names. Lower case, digits "
+                        "and _ only.");
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit() && std::string(stemKeyEdit_) != edit.key) {
+                edit.key = stemKeyEdit_;
+                changed = true;
+            }
+            auto offset = static_cast<float>(edit.offsetSeconds);
+            ImGui::SetNextItemWidth(110.0f);
+            ImGui::DragFloat("offset", &offset, 0.001f, -3600.0f, 3600.0f, "%.3f s");
+            if (ImGui::IsItemHovered()) {
+                tooltip("Where the stem's first sample sits on the timeline. Positive: it starts later. Set it from "
+                        "the session the stems were bounced from; it is never guessed from the audio.");
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                edit.offsetSeconds = static_cast<double>(offset);
+                changed = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("Hits", &edit.hits)) {
+                changed = true;
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("Also find kicks, snares and hats in this stem (stem.<key>.kick/snare/hat). Worth it on a "
+                        "drum stem; about six times the analysis cost of the rest.");
+            }
+            for (const auto* list : {&stem.report.diagnostics, &stem.mix}) {
+                for (const auto& d : *list) {
+                    const ImVec4 colour = d.severity == audio::StemSeverity::Error     ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f)
+                                          : d.severity == audio::StemSeverity::Warning ? ImVec4(1.0f, 0.75f, 0.35f, 1.0f)
+                                                                                       : ImVec4(0.6f, 0.6f, 0.65f, 1.0f);
+                    ImGui::PushStyleColor(ImGuiCol_Text, colour);
+                    ImGui::TextWrapped("%s", d.message.c_str());
+                    ImGui::PopStyleColor();
+                }
+            }
+            if (ImGui::SmallButton("Remove")) {
+                next.erase(next.begin() + static_cast<std::ptrdiff_t>(i));
+                stemSelected_ = -1;
+                changed = true;
+                ImGui::Unindent();
+                ImGui::PopID();
+                break;
+            }
+            ImGui::Unindent();
+        }
+        ImGui::PopID();
+    }
+    if (changed) {
+        engine.setStems(std::move(next));
     }
 }
 

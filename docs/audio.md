@@ -83,7 +83,7 @@ is applied at this level; each modulation route smooths independently.
 
 ## Live input (milestone 1.1, `audio::AudioInput`)
 
-`AudioInput` opens a miniaudio capture device (default, or the first whose name contains a
+`AudioInput` opens a miniaudio capture device (default, an exact device id, or the first whose name contains a
 case-insensitive substring; `listCaptureDevices()` enumerates them and marks the default) at its
 native rate or a requested one, and its callback downmixes every block to mono (channel average),
 applies a software gain (clamped to 0..16), tracks the block peak for a level meter and writes the
@@ -92,6 +92,29 @@ a microphone or line input as if it were a file. There is no play-head: `framesC
 sample-accurate stream position (a discontinuity at frame 0 is marked on every open) and the
 engine clock is the wall clock. The callback never allocates, locks or logs. macOS asks for
 microphone permission on first use; a denied device opens but delivers silence.
+
+## Analysis stems (ADR-1520)
+
+`assets.stems` lists files analysed beside the mix and never played: `{key, label, file, offset?, hits?}`.
+`Engine::setStems` decodes and analyses each changed stem on its own thread (`StemTrack::analyzeFile`: chunked
+`AudioFile::decode` into a `StemAnalyzer`, no PCM kept), checks it (`audio::checkStem`, `audio::mixDiagnostics`) and
+declares `stem.<key>.*` (`signals::StemSignals`). Each render frame, and each step of a seek's replay,
+`StemSignals::publishTrack` publishes the newest frame at or before the instant with the events since the previous one,
+inactive outside `[offset, offset + duration)`. Stems are analysed at their own rate. `stem.<key>.onset` is
+log-spectral flux and `stem.<key>.level` is ADR-1510's law per source. The fixture: `tools/make_stem_fixture.py`, run
+by the build into `build/<preset>/test-fixtures/stems` (or by the first test that needs it).
+
+## Live input sources (ADR-1521, ADR-1522)
+
+`Engine::setInputSources` names channels (or linked pairs) of the live input to analyse on their own. `AudioInput`'s
+callback writes each source's `AnalysisStream` beside the main mono stream, whole blocks or none, with a discontinuity
+at the true frame after a drop or a device sample-time gap. `analysis::ChannelAnalysis` (one thread) runs a
+`StemAnalyzer` per source and publishes through triple buffers; the engine publishes `stem.<key>.*`, inactive for an
+absent channel, a disconnect, or 250 ms with no frame. With sources, macOS opens the device through
+`audio::CoreAudioCapture` (AUHAL, every channel of every input stream, the HAL sample time, lifecycle listeners);
+without, the plain miniaudio path above, unchanged. `audio::SyntheticCapture` (`synthetic:<n>`) is the test and
+benchmark device. The map is saved per device id in settings (`live.inputSources`). `avgen --input-meter <device>`
+prints each channel's level once a second.
 
 ## Lifecycle and threading
 

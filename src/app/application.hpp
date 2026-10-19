@@ -323,6 +323,11 @@ struct AppOptions {
     std::uint32_t liveCaptureWidth = 960, liveCaptureHeight = 540;
     std::optional<int> oscPort;
     bool listAudioDevices = false;
+    // ADR-1522: `--input-meter <device> [seconds]` -- every input channel's level once a second, then exit. The
+    // hardware check: move a signal from input to input and watch which channel answers.
+    std::optional<std::string> inputMeter;
+    std::optional<std::vector<audio::InputSource>> inputSources; // ADR-1521: --input-sources
+    double inputMeterSeconds = 20.0;
     bool listMidi = false;
     // The Engineering Lab Suite (ADR-261). `--labs` prints the registry and exits; `--lab-case`
     // resolves `<lab>:<number>` into the flags the case is equivalent to, which is why almost
@@ -836,6 +841,10 @@ private:
     AppSettings settings_;
     std::filesystem::path settingsPath_;
     void saveSettings();
+    // ADR-1521: opens a capture device with its remembered channel map (or --input-sources); `synthetic:<n>` is the
+    // benchmark generator. And the id a device is remembered by, from an id, a name or a name substring.
+    Result<void> openAudioInput(const std::string& selector);
+    [[nodiscard]] static std::string inputDeviceId(const std::string& selector);
     // The per-instance LOD rung behind `DebugViewOptions::lod`, read from the cull pass's own
     // `lodIndex` buffer. Empty unless the overlay is on: it is a blocking readback per scattered
     // object and it belongs to the frame owner to decide when that is worth paying for.

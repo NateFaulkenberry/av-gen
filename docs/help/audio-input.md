@@ -23,7 +23,7 @@ them apart.
 
 The whole file is decoded into memory at load. Decoding is miniaudio's, at the file's own sample
 rate and channel count; WAV, FLAC and MP3 are its built-in decoders. AV Gen then mixes to mono by
-averaging the channels — there is no stereo analysis anywhere.
+averaging the channels. The one stereo measure is `audio.width`, from the first two channels.
 
 Loading a file also runs a **whole-track analysis** in a single pass, taking roughly a tenth of a
 second for a few minutes of audio. This happens in live playback as well as for offline renders,
@@ -46,6 +46,42 @@ beat tracking behaves differently. See [Beats and tempo](help://audio/beats).
 > [!NOTE]
 > Only capture devices are enumerated. AV Gen does not list output devices and cannot listen to
 > system audio without a loopback device installed at the operating-system level.
+
+## Stems: analysing the parts of a mix
+
+A project plays one mix. Beside it you can add **stems** -- the drum, bass or synth bounce of the same song -- which
+AV Gen analyses but never plays: open **Audio...** on the Sequence strip and use **Stems (analysis only)**. Each stem
+publishes `stem.<key>.*` (level, onset, the bands, and with **Hits** its kicks, snares and hats), so a route can follow
+the bass alone while the picture still plays the whole song. See the [Signal Reference](help://audio/signals).
+
+- **The key** (`drums`, `synth_lead`) is the signal name. It is made from the label once and kept: rename the label
+  freely; change the key only if you mean to move every route on it.
+- **Offset** is where the stem's first sample sits on the timeline, in seconds. Stems bounced from one session start
+  together and need 0. AV Gen never guesses an offset from the audio; matching lengths are not proof of alignment.
+- **Formats** are the decoder's: WAV (16/24/32-bit, float), FLAC, MP3. A stem may be at another sample rate than the
+  mix; it is analysed at its own (nothing is resampled).
+- **Problems** are listed on the stem and in the project warnings, naming the file: a file that will not decode, a
+  silent file, damaged samples, a stem shorter or longer than the mix. Outside a stem's span its signals read 0.
+
+## Several sources from one interface
+
+On an interface with more than two inputs, the **Live** panel lists every input channel under **Audio input** with a
+meter. Tick a channel to analyse it on its own as `stem.<key>.*`, beside the main mix; label it (Drum bus, Bass DI);
+tick **Pair** to treat it and the next channel as one stereo source; tick **Hits** on a drum channel. The map is
+remembered for that interface on this machine.
+
+AV Gen cannot know what is plugged in: the drum bus is only on input 1 if your mixer sends it there. Give each
+part its own physical output on the mixer (a group or aux bus, pre-fader if the main fader should not change it) and
+cable it to its own interface input. A stem key used offline (`drums`) works live when an input has the same key.
+
+When the interface is unplugged the panel says **Disconnected**, its sources read 0, and nothing else is opened in its
+place; it is reopened when it comes back. `avgen --list-audio-devices` prints every device's channels per stream;
+`avgen --input-meter <device>` prints each input's level once a second -- move a signal from input to input to see
+which channel answers.
+
+> [!NOTE]
+> With no channels ticked, an input is one mix exactly as before. Channels are only captured separately once one is
+> ticked.
 
 ## Input gain
 

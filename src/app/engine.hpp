@@ -21,6 +21,11 @@
 #include "scene/rebuild_deferral.hpp"
 #include "app/world_director.hpp"
 #include "audio/audio_input.hpp"
+#include "audio/stem_source.hpp"
+#include "analysis/stem_analysis.hpp"
+#include "analysis/channel_analysis.hpp"
+#include "audio/capture_backend.hpp"
+#include "signals/stem_signals.hpp"
 #include "analysis/analysis_track.hpp"
 #include "analysis/audio_history_builder.hpp"
 #include "analysis/analyzer.hpp"
@@ -485,6 +490,39 @@ public:
     void stopAudioInput();
     [[nodiscard]] bool hasLiveInput() const { return input_ != nullptr; }
     [[nodiscard]] audio::AudioInput* audioInput() { return input_.get(); }
+    [[nodiscard]] const audio::AudioInput* audioInput() const { return input_.get(); }
+    // ADR-1521: live input through a capture backend -- the Core Audio one for multichannel sources, the synthetic
+    // one in tests and benchmarks. Otherwise exactly useAudioInput().
+    [[nodiscard]] Result<void> useAudioInputBackend(std::unique_ptr<audio::CaptureBackend> backend);
+
+    // ---- live input sources (ADR-1521) -------------------------------------------------------------
+    //
+    // Channels (or linked pairs) of the open input, each analysed on its own and published as `stem.<key>.*` -- the
+    // same names an offline stem publishes, so a scene routed on stems offline plays live with the buses patched to
+    // inputs of those keys. A live source's key wins over an offline stem's while an input is open; offline stems
+    // with no live counterpart read inactive then (there is no mix playing for them to follow).
+    //
+    // Keys are normalised as stems' are. A source on a channel the device lacks reads inactive, and so does every
+    // source while the device is disconnected or its analysis has produced nothing for 250 ms. The map is the
+    // machine's (the application keeps it in settings, by device), not the project's.
+    void setInputSources(std::vector<audio::InputSource> sources);
+    [[nodiscard]] const std::vector<audio::InputSource>& inputSources() const { return inputSources_; }
+    // The channels the main mix (audio.*, the Sonic layer, the beat) averages; empty = every channel. A device with a
+    // main-mix choice opens through the multichannel path, like one with sources.
+    void setInputMainChannels(std::vector<std::uint32_t> channels);
+    [[nodiscard]] const std::vector<std::uint32_t>& inputMainChannels() const { return inputMain_; }
+    // Whether source `index` published live audio on the last frame.
+    [[nodiscard]] bool inputSourceActive(std::size_t index) const {
+        return index < inputActive_.size() && inputActive_[index] != 0;
+    }
+    [[nodiscard]] const analysis::ChannelAnalysis* channelAnalysis() const { return channels_.get(); }
+    // ADR-1521: milliseconds from the newest sample of the analysed window to the render frame that put a live
+    // source's onset on the bus -- capture, ring, analysis and the wait for a render frame -- over the recent events.
+    struct InputLatency {
+        std::size_t events = 0;
+        double p50Ms = 0.0, p99Ms = 0.0, maxMs = 0.0;
+    };
+    [[nodiscard]] InputLatency inputLatency() const;
 
     // ---- live Sonic input (ADR-1025) ----
     // Live notes from the MIDI input (every source the control map's MIDI filter admits) and live timbre from
@@ -854,6 +892,25 @@ public:
     // waveform under the new clips. That was rare when audio changed only on an explicit load and
     // became likely the moment a clip drag started re-mixing.
     [[nodiscard]] std::uint64_t audioRevision() const { return audioRevision_; }
+    // ---- analysis stems (ADR-1520) --------------------------------------------------------------
+    //
+    // Files analysed beside the mix and published as `stem.<key>.*`; never played, never mixed (the arrangement above
+    // is the only thing the device hears). Saved as `assets.stems`.
+    struct StemState {
+        audio::StemSource source;
+        audio::StemReport report;                         // the file check
+        std::vector<audio::StemDiagnostic> mix;           // against the current mix; recomputed when it changes
+        std::shared_ptr<const analysis::StemTrack> track; // null when the file could not be analysed
+    };
+    [[nodiscard]] const std::vector<StemState>& stems() const { return stems_; }
+    // Replaces the stem list. Keys are kept as given when valid and unique; an empty, invalid or repeated key is made
+    // from the label (`audio::makeStemKey`) and the change is noted as a project warning. Only stems whose file or tier
+    // changed are decoded and analysed again (in parallel, one thread per stem); a new label or offset is free. Every
+    // problem is a diagnostic on its stem and a project warning naming the file; nothing here fails the call.
+    void setStems(std::vector<audio::StemSource> stems);
+    // Changes whenever the stem list, a stem's analysis or its offset changes.
+    [[nodiscard]] std::uint64_t stemsRevision() const { return stemsRevision_; }
+
     // The decoded source behind a clip, for drawing its waveform. Null while it is missing.
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> clipSource(const std::filesystem::path& p) const {
         return clipSources_.find(p);
@@ -1123,6 +1180,26 @@ private:
     TempoSource tempoSource_ = TempoSource::Analysis;
     bool midiClockActive_ = false;
     std::unique_ptr<audio::AudioInput> input_;
+    // ADR-1521: after input_, so it is destroyed first: it reads the input's source streams.
+    std::unique_ptr<analysis::ChannelAnalysis> channels_;
+    std::vector<audio::InputSource> inputSources_;
+    std::vector<std::uint32_t> inputMain_;
+    [[nodiscard]] bool wantsMultichannelPath() const { return !inputSources_.empty() || !inputMain_.empty(); }
+    std::vector<signals::StemSignals> inputSignals_;
+    std::vector<analysis::LiveStemLatch> inputLatches_;
+    std::vector<std::chrono::steady_clock::time_point> inputLastFrame_;
+    std::vector<std::uint8_t> inputActive_;
+    std::vector<double> inputLatencyMs_;                 // a ring of the most recent onset latencies
+    std::size_t inputLatencyNext_ = 0;
+    std::chrono::steady_clock::time_point inputReportAt_{};
+    double inputReportBusy_ = 0.0;
+    void reportInputSources();
+    void rebuildChannelAnalysis(const std::vector<std::string>& previousKeys);
+    void watchInputDevice();
+    std::string inputSelector_; // what useAudioInput was asked for, to reopen the same device on the other path
+    std::chrono::steady_clock::time_point inputRetry_{};
+    void publishInputSources();
+    Result<void> adoptAudioInput(std::unique_ptr<audio::AudioInput> input);
     params::Parameter<float>* inputGain_ = nullptr;
     params::TimelineClock timelineClock_;
     params::Timeline::CueState cueState_;
@@ -1343,6 +1420,15 @@ private:
 
     std::vector<audio::AudioClip> audioClips_;
     std::uint64_t audioRevision_ = 1;
+    // ADR-1520: the analysis stems, their bus ids (parallel to stems_), and every stem vocabulary ever declared and no
+    // longer in the list (published inactive once when it left: the bus cannot undeclare a name).
+    std::vector<StemState> stems_;
+    std::vector<signals::StemSignals> stemSignals_;
+    std::uint64_t stemsRevision_ = 1;
+    double stemPreviousSeconds_ = -1.0; // the last instant the stems were published at (-1: none, or a jump since)
+    void refreshStemMixDiagnostics();
+    // The stems at `to` onto `bus` (the engine's own, or a seek replay's engine-shaped scratch bus), events since `from`.
+    void publishStems(signals::SignalBus& bus, double from, double to) const;
     // ADR-1116: see audioHistory(). Rebuilt when audioRevision_ moves; the live feed only without a track.
     void updateAudioHistory(bool newFrame);
     std::shared_ptr<spatial::AudioHistory> audioHistory_; // heard through the Response controls (ADR-1361)

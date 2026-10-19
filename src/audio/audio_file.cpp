@@ -9,7 +9,8 @@
 
 namespace avgen::audio {
 
-Result<AudioFile> AudioFile::load(const std::filesystem::path& path) {
+Result<DecodeFormat> AudioFile::decode(const std::filesystem::path& path,
+                                       const std::function<void(const DecodeFormat&, std::span<const float>)>& chunk) {
     std::error_code ec;
     if (!std::filesystem::is_regular_file(path, ec)) {
         return fail("audio file not found: {}", path.string());
@@ -22,47 +23,62 @@ Result<AudioFile> AudioFile::load(const std::filesystem::path& path) {
         return fail("cannot decode '{}': {}", path.string(), ma_result_description(initResult));
     }
 
-    AudioFile file;
-    file.path_ = path;
-    file.sampleRate_ = decoder.outputSampleRate;
-    file.channels_ = decoder.outputChannels;
-    if (file.channels_ == 0 || file.sampleRate_ == 0) {
+    DecodeFormat format;
+    format.sampleRate = decoder.outputSampleRate;
+    format.channels = decoder.outputChannels;
+    if (format.channels == 0 || format.sampleRate == 0) {
         ma_decoder_uninit(&decoder);
         return fail("decoder reported no channels or sample rate for '{}'", path.string());
     }
 
-    // Length may be unknown (some MP3 streams); grow as we read.
-    ma_uint64 declaredFrames = 0;
-    if (ma_decoder_get_length_in_pcm_frames(&decoder, &declaredFrames) == MA_SUCCESS && declaredFrames > 0) {
-        file.interleaved_.reserve(static_cast<std::size_t>(declaredFrames * file.channels_));
+    ma_uint64 declared = 0;
+    if (ma_decoder_get_length_in_pcm_frames(&decoder, &declared) == MA_SUCCESS) {
+        format.declaredFrames = declared;
     }
 
     constexpr ma_uint64 kChunkFrames = 16384;
-    std::vector<float> chunk(static_cast<std::size_t>(kChunkFrames * file.channels_));
-    ma_uint64 totalFrames = 0;
+    std::vector<float> buffer(static_cast<std::size_t>(kChunkFrames * format.channels));
     for (;;) {
         ma_uint64 framesRead = 0;
-        const ma_result r = ma_decoder_read_pcm_frames(&decoder, chunk.data(), kChunkFrames, &framesRead);
+        const ma_result r = ma_decoder_read_pcm_frames(&decoder, buffer.data(), kChunkFrames, &framesRead);
         if (framesRead > 0) {
-            file.interleaved_.insert(file.interleaved_.end(), chunk.begin(),
-                                     chunk.begin() + static_cast<std::ptrdiff_t>(framesRead * file.channels_));
-            totalFrames += framesRead;
+            chunk(format, std::span<const float>(buffer.data(), static_cast<std::size_t>(framesRead * format.channels)));
+            format.frames += framesRead;
         }
         if (r == MA_AT_END || framesRead == 0) {
             break;
         }
         if (r != MA_SUCCESS) {
             ma_decoder_uninit(&decoder);
-            return fail("decode error in '{}' after {} frames: {}", path.string(), totalFrames,
+            return fail("decode error in '{}' after {} frames: {}", path.string(), format.frames,
                         ma_result_description(r));
         }
     }
     ma_decoder_uninit(&decoder);
-
-    if (totalFrames == 0) {
+    if (format.frames == 0) {
         return fail("audio file '{}' contains no samples", path.string());
     }
-    file.frameCount_ = totalFrames;
+    return format;
+}
+
+Result<AudioFile> AudioFile::load(const std::filesystem::path& path) {
+    AudioFile file;
+    file.path_ = path;
+    bool reserved = false;
+    auto format = decode(path, [&](const DecodeFormat& f, std::span<const float> samples) {
+        if (!reserved && f.declaredFrames > 0) {
+            // Length may be unknown (some MP3 streams); then the buffer grows as it is read.
+            file.interleaved_.reserve(static_cast<std::size_t>(f.declaredFrames * f.channels));
+        }
+        reserved = true;
+        file.interleaved_.insert(file.interleaved_.end(), samples.begin(), samples.end());
+    });
+    if (!format) {
+        return std::unexpected(format.error());
+    }
+    file.sampleRate_ = format->sampleRate;
+    file.channels_ = format->channels;
+    file.frameCount_ = format->frames;
     file.buildMono();
     log::info("loaded '{}': {} Hz, {} ch, {} frames ({:.2f} s)", path.filename().string(), file.sampleRate_,
               file.channels_, file.frameCount_, file.durationSeconds());

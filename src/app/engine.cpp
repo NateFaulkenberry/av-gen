@@ -1,4 +1,5 @@
 #include "app/engine.hpp"
+#include "audio/capture_coreaudio.hpp"
 #include "app/project_paths.hpp"
 
 #include "scene/authored_cut.hpp"
@@ -50,6 +51,7 @@
 #include <cctype>
 #include <cstring>
 #include <chrono>
+#include <thread>
 
 namespace avgen::app {
 
@@ -296,6 +298,15 @@ private:
                 samplable_[id] = 1;
             }
         }
+        // ADR-1520: the stems are a pure function of the instant (`StemSignals::publishTrack`), so a route on one is
+        // replayed like a route on an onset.
+        for (const signals::StemSignals& stem : engine_.stemSignals_) {
+            for (const signals::SignalId id : stem.ids()) {
+                if (id < samplable_.size()) {
+                    samplable_[id] = 1;
+                }
+            }
+        }
         for (const auto& source : engine_.sources_.sources()) {
             if (!source->pureInTime()) {
                 continue;
@@ -374,6 +385,7 @@ private:
         ctx.tempoBpm = static_cast<float>(bpm);
         ctx.beatEvent = pulse;
         engine_.sources_.sample(sampling_, ctx);
+        engine_.publishStems(sampling_, time.deltaTime > 0.0 ? time.renderTime - time.deltaTime : -1.0, time.renderTime);
         // ADR-930: the beats the step before this one entered. With the entity replay driving this
         // (an analysed track) the record holds exactly the steps up to that one; replayed alone after
         // it (`runTo`, no track) it holds the whole replay, and the window picks the same step out.
@@ -434,6 +446,7 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
         mix(bits(static_cast<double>(section.energy)));
     }
     mix(sonic_ ? sonic_->key() : 0u); // ADR-1020: sonic.*, timbre.*, notes.*
+    mix(stemsRevision_); // ADR-1520: stem.<key>.*
     mix(playing ? 1u : 0u);
     return h;
 }
@@ -2537,6 +2550,20 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         assets["audioClips"] = std::move(list);
     }
+    if (!stems_.empty()) {
+        // ADR-1520: analysis-only files, never part of the arrangement above.
+        nlohmann::json list = nlohmann::json::array();
+        for (const StemState& stem : stems_) {
+            nlohmann::json item = nlohmann::json::object();
+            item["key"] = stem.source.key;
+            item["label"] = stem.source.label;
+            item["file"] = assetRefJson(stem.source.file, dir);
+            if (stem.source.offsetSeconds != 0.0) item["offset"] = stem.source.offsetSeconds;
+            if (stem.source.hits) item["hits"] = true;
+            list.push_back(std::move(item));
+        }
+        assets["stems"] = std::move(list);
+    }
     if (!environmentPath_.empty()) {
         assets["environment"] = assetRefJson(environmentPath_, dir);
     }
@@ -2943,6 +2970,28 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                     warn("audio: " + r.error().message);
                     static_cast<void>(setAudioClips({})); // as above: silence, not the last piece
                 }
+            }
+        }
+        // ADR-1520: the analysis stems, after the mix they are checked against. A document with none has none.
+        {
+            std::vector<audio::StemSource> stems;
+            if (const auto list = assets->find("stems"); list != assets->end() && list->is_array()) {
+                for (const auto& item : *list) {
+                    if (!item.is_object() || !item.contains("file")) {
+                        warn("assets.stems: an entry without a file was skipped");
+                        continue;
+                    }
+                    audio::StemSource stem;
+                    stem.file = resolveAsset(item["file"], "stem").value_or(std::filesystem::path());
+                    stem.key = item.value("key", std::string{});
+                    stem.label = item.value("label", std::string{});
+                    stem.offsetSeconds = item.value("offset", 0.0);
+                    stem.hits = item.value("hits", false);
+                    stems.push_back(std::move(stem));
+                }
+            }
+            if (!stems.empty() || !stems_.empty()) {
+                setStems(std::move(stems));
             }
         }
         stage(3);
@@ -4233,6 +4282,7 @@ Result<void> Engine::loadFile(const std::filesystem::path& path) try {
 }
 
 Engine::~Engine() {
+    channels_.reset(); // ADR-1521: reads the input's streams
     runner_.reset();
     player_.reset();
 }
@@ -4262,6 +4312,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         clock_.analysisCursor = 0;
         clock_.hasFrame = false;
         ++audioRevision_;
+        refreshStemMixDiagnostics(); // ADR-1520
         refreshTransport();
         return {};
     }
@@ -4314,6 +4365,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     audioFile_ = std::move(file);
     ++audioRevision_;
     refreshSonicTimbre(); // ADR-1020: only when the project has a `sonic` block
+    refreshStemMixDiagnostics(); // ADR-1520: the stems' span and rate against the new mix
     modulator_.resetState();
     clock_.music.reset();
     clock_.hasFrame = false;
@@ -4323,6 +4375,108 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     // answer the file just gave.
     refreshTransport();
     return {};
+}
+
+// ---- analysis stems (ADR-1520) ----------------------------------------------------------------
+
+void Engine::setStems(std::vector<audio::StemSource> wanted) {
+    // Keys: kept when valid and unique, otherwise made from the label -- and said, because routes follow keys.
+    std::vector<std::string> taken;
+    for (audio::StemSource& stem : wanted) {
+        if (stem.label.empty()) {
+            stem.label = stem.key.empty() ? stem.file.stem().string() : stem.key;
+        }
+        if (!audio::validStemKey(stem.key) || std::find(taken.begin(), taken.end(), stem.key) != taken.end()) {
+            const std::string made = audio::makeStemKey(stem.label, taken);
+            if (!stem.key.empty()) {
+                noteBindingProblem(fmt::format("stem '{}': the key '{}' is not valid or is used twice; it is '{}' "
+                                               "(routes on stem.{}.* follow the key)",
+                                               stem.label, stem.key, made, made));
+            }
+            stem.key = made;
+        }
+        taken.push_back(stem.key);
+    }
+    // Reuse every analysis whose file and tier are unchanged; decode and analyse the rest, one thread per stem.
+    std::vector<StemState> next(wanted.size());
+    std::vector<std::size_t> todo;
+    for (std::size_t i = 0; i < wanted.size(); ++i) {
+        next[i].source = wanted[i];
+        const auto same = std::find_if(stems_.begin(), stems_.end(), [&](const StemState& old) {
+            return old.source.file == wanted[i].file && old.source.hits == wanted[i].hits;
+        });
+        if (same != stems_.end()) {
+            next[i].report = same->report;
+            next[i].track = same->track;
+        } else {
+            todo.push_back(i);
+        }
+    }
+    {
+        const auto started = std::chrono::steady_clock::now();
+        std::vector<std::thread> workers;
+        workers.reserve(todo.size());
+        for (const std::size_t i : todo) {
+            workers.emplace_back([&state = next[i], config = analyzerConfig_] {
+                analysis::StemAnalysisConfig stemConfig;
+                stemConfig.analyzer = config;
+                stemConfig.hits = state.source.hits;
+                audio::StemFileFacts facts;
+                auto track = analysis::StemTrack::analyzeFile(state.source.file, stemConfig, facts);
+                state.report = audio::checkStem(state.source, track ? &facts : nullptr,
+                                                track ? std::string() : track.error().message);
+                if (track && state.report.ok()) {
+                    state.track = std::make_shared<const analysis::StemTrack>(std::move(*track));
+                }
+            });
+        }
+        for (std::thread& w : workers) {
+            w.join();
+        }
+        if (!todo.empty()) {
+            log::info("stems: analysed {} of {} in {:.0f} ms", todo.size(), next.size(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        }
+    }
+    // A key that left the list: its names stay declared (the bus cannot undeclare) and read inactive from now on.
+    for (const signals::StemSignals& old : stemSignals_) {
+        if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
+            old.publishInactive(bus_);
+        }
+    }
+    stems_ = std::move(next);
+    stemSignals_.clear();
+    for (const StemState& stem : stems_) {
+        stemSignals_.push_back(signals::StemSignals::declare(bus_, stem.source.key, stem.source.label));
+        for (const audio::StemDiagnostic& d : stem.report.diagnostics) {
+            if (d.severity != audio::StemSeverity::Info) {
+                noteBindingProblem(d.message);
+            }
+        }
+    }
+    refreshStemMixDiagnostics();
+    stemPreviousSeconds_ = -1.0;
+    ++stemsRevision_;
+    rebind(); // a route on stem.<key>.* written before the stem existed resolves now
+}
+
+void Engine::refreshStemMixDiagnostics() {
+    const audio::MixFacts mix{.sampleRate = audioFile_ ? audioFile_->sampleRate() : 0u,
+                              .durationSeconds = audioFile_ ? audioFile_->durationSeconds() : 0.0};
+    for (StemState& stem : stems_) {
+        stem.mix = audio::mixDiagnostics(stem.source, stem.report, mix);
+        for (const audio::StemDiagnostic& d : stem.mix) {
+            if (d.severity != audio::StemSeverity::Info) {
+                noteBindingProblem(d.message);
+            }
+        }
+    }
+}
+
+void Engine::publishStems(signals::SignalBus& bus, double from, double to) const {
+    for (std::size_t i = 0; i < stems_.size() && i < stemSignals_.size(); ++i) {
+        stemSignals_[i].publishTrack(bus, stems_[i].track.get(), stems_[i].source.offsetSeconds, from, to);
+    }
 }
 
 Result<double> Engine::loadAudio(const std::filesystem::path& path) {
@@ -4464,6 +4618,7 @@ void Engine::seekSeconds(double seconds) {
     seconds = target;
     modulator_.resetState();
     sources_.reset();
+    stemPreviousSeconds_ = -1.0; // ADR-1520: a jump is not an event
     if (!replaySignals) {
         // A seek discontinuity in the energy history reads as a drop; the detector must not carry
         // the old piece across it.
@@ -5039,10 +5194,67 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     if (mode_ != EngineMode::Live) {
         return fail("live audio input needs the live engine");
     }
+    inputSelector_ = deviceName;
+#if defined(__APPLE__)
+    // ADR-1522: with sources to analyse, the device is opened through the Core Audio backend, which captures every
+    // channel of every input stream. With none it is the plain miniaudio path, exactly as it always was (the owner's
+    // BlackHole 2ch workflow).
+    if (wantsMultichannelPath()) {
+        std::string uid;
+        for (const audio::AudioDeviceInfo& d : audio::listCaptureDevices()) {
+            const bool match = deviceName.empty() ? d.isDefault : (d.id == deviceName || d.name == deviceName);
+            if (match) {
+                uid = d.id;
+                break;
+            }
+        }
+        if (uid.empty()) {
+            // The name substring the plain path accepts, so a saved "BlackHole" still finds "BlackHole 16ch".
+            std::string lower = deviceName;
+            std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+            for (const audio::AudioDeviceInfo& d : audio::listCaptureDevices()) {
+                std::string name = d.name;
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+                if (!lower.empty() && name.find(lower) != std::string::npos) {
+                    uid = d.id;
+                    break;
+                }
+            }
+        }
+        if (uid.empty()) {
+            return fail("no capture device matches '{}'", deviceName);
+        }
+        if (auto r = useAudioInputBackend(std::make_unique<audio::CoreAudioCapture>(uid)); !r) {
+            return r;
+        }
+        inputSelector_ = deviceName;
+        return {};
+    }
+#endif
     auto input = std::make_unique<audio::AudioInput>();
+    input->setSources(inputSources_); // ADR-1521: before the open, so its taps exist from the first block
+    input->setMainChannels(inputMain_);
     if (auto r = input->open(deviceName); !r) {
         return r;
     }
+    return adoptAudioInput(std::move(input));
+}
+
+Result<void> Engine::useAudioInputBackend(std::unique_ptr<audio::CaptureBackend> backend) {
+    if (mode_ != EngineMode::Live) {
+        return fail("live audio input needs the live engine");
+    }
+    auto input = std::make_unique<audio::AudioInput>();
+    input->setSources(inputSources_);
+    input->setMainChannels(inputMain_);
+    if (auto r = input->openBackend(std::move(backend)); !r) {
+        return r;
+    }
+    return adoptAudioInput(std::move(input));
+}
+
+Result<void> Engine::adoptAudioInput(std::unique_ptr<audio::AudioInput> input) {
+    channels_.reset(); // reads the old input's streams: goes first
     runner_.reset();
     if (player_) {
         player_->pause();
@@ -5051,6 +5263,7 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, input->analysisStream());
     startRunner();
     input_ = std::move(input);
+    rebuildChannelAnalysis({}); // a new device: nothing carries over
     audioFile_.reset();
     audioPath_.clear();
     clock_.music.reset();
@@ -5068,11 +5281,244 @@ void Engine::stopAudioInput() {
     if (!input_) {
         return;
     }
+    channels_.reset();
     runner_.reset();
     input_.reset();
     clock_.music.reset();
     clock_.hasFrame = false;
     audioSignals_.publishSilence(bus_);
+    for (const signals::StemSignals& s : inputSignals_) {
+        s.publishInactive(bus_);
+    }
+    std::fill(inputActive_.begin(), inputActive_.end(), 0);
+}
+
+void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
+    std::vector<std::string> taken;
+    for (audio::InputSource& source : wanted) {
+        if (source.label.empty()) {
+            source.label = source.key.empty() ? fmt::format("Input {}", source.channel + 1) : source.key;
+        }
+        if (!audio::validStemKey(source.key) || std::find(taken.begin(), taken.end(), source.key) != taken.end()) {
+            source.key = audio::makeStemKey(source.label, taken);
+        }
+        taken.push_back(source.key);
+    }
+    if (wanted == inputSources_) {
+        return;
+    }
+    for (const signals::StemSignals& old : inputSignals_) {
+        if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
+            old.publishInactive(bus_);
+        }
+    }
+    std::vector<std::string> previousKeys;
+    for (const signals::StemSignals& old : inputSignals_) {
+        previousKeys.push_back(old.key);
+    }
+    inputSources_ = std::move(wanted);
+    inputSignals_.clear();
+    for (const audio::InputSource& source : inputSources_) {
+        inputSignals_.push_back(signals::StemSignals::declare(bus_, source.key, source.label));
+    }
+#if defined(__APPLE__)
+    // The capture path follows whether there are sources (ADR-1522): reopen the same device on the other one.
+    const bool plainPath = input_ && input_->deviceId().empty();
+    const bool synthetic = input_ && input_->deviceId().starts_with("synthetic:");
+    if (input_ && !synthetic && plainPath == wantsMultichannelPath()) {
+        const std::string selector = inputSelector_;
+        if (auto r = useAudioInput(selector); !r) {
+            log::warn("audio input: reopening '{}' for its sources: {}", selector, r.error().message);
+            noteBindingProblem("audio input: " + r.error().message);
+        }
+        rebind();
+        return;
+    }
+#endif
+    if (input_) {
+        if (channels_) {
+            channels_->stop(); // before the input replaces the streams it reads; the rebuild adopts what is unchanged
+        }
+        input_->setSources(inputSources_);
+        rebuildChannelAnalysis(previousKeys);
+    } else {
+        inputLatches_.assign(inputSources_.size(), {});
+        inputLastFrame_.assign(inputSources_.size(), {});
+        inputActive_.assign(inputSources_.size(), 0);
+    }
+    rebind();
+}
+
+void Engine::setInputMainChannels(std::vector<std::uint32_t> channels) {
+    std::sort(channels.begin(), channels.end());
+    channels.erase(std::unique(channels.begin(), channels.end()), channels.end());
+    if (channels == inputMain_) {
+        return;
+    }
+    inputMain_ = std::move(channels);
+    if (!input_) {
+        return;
+    }
+#if defined(__APPLE__)
+    const bool plainPath = input_->deviceId().empty();
+    if (!input_->deviceId().starts_with("synthetic:") && plainPath == wantsMultichannelPath()) {
+        if (auto r = useAudioInput(inputSelector_); !r) {
+            noteBindingProblem("audio input: " + r.error().message);
+        }
+        return;
+    }
+#endif
+    if (channels_) {
+        channels_->stop();
+    }
+    input_->setMainChannels(inputMain_);
+    std::vector<std::string> keys;
+    for (const signals::StemSignals& s : inputSignals_) {
+        keys.push_back(s.key);
+    }
+    rebuildChannelAnalysis(keys);
+}
+
+void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys) {
+    // The render side's state per source follows its key, so an edit to one source leaves the others' latches alone.
+    std::vector<analysis::LiveStemLatch> latches(inputSources_.size());
+    std::vector<std::chrono::steady_clock::time_point> last(inputSources_.size());
+    std::vector<std::uint8_t> active(inputSources_.size(), 0);
+    for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+        for (std::size_t j = 0; j < previousKeys.size() && j < inputLatches_.size(); ++j) {
+            if (previousKeys[j] == inputSources_[i].key && j < inputLastFrame_.size() && j < inputActive_.size()) {
+                latches[i] = inputLatches_[j];
+                last[i] = inputLastFrame_[j];
+                active[i] = inputActive_[j];
+            }
+        }
+    }
+    inputLatches_ = std::move(latches);
+    inputLastFrame_ = std::move(last);
+    inputActive_ = std::move(active);
+    std::unique_ptr<analysis::ChannelAnalysis> previous = std::move(channels_);
+    if (!input_ || inputSources_.empty()) {
+        return; // `previous` goes, stopping its thread
+    }
+    std::vector<analysis::ChannelAnalysis::Source> sources;
+    for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+        sources.push_back({.stream = input_->sourceStream(i), .pair = inputSources_[i].pair, .hits = inputSources_[i].hits});
+    }
+    channels_ = std::make_unique<analysis::ChannelAnalysis>(std::move(sources), input_->sampleRate(), analyzerConfig_,
+                                                            std::move(previous));
+    channels_->start();
+}
+
+void Engine::watchInputDevice() {
+    // ADR-1522: the Core Audio backend's device went away or changed format. Nothing else is opened in its place
+    // (the brief: never a silent substitute); the same device is reopened when it is back, checked once a second.
+    if (!input_ || input_->deviceId().empty() || input_->deviceId().starts_with("synthetic:")) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const bool changed = input_->formatChanged();
+    if (input_->connected() && !changed) {
+        return;
+    }
+    if (!changed && now - inputRetry_ < std::chrono::seconds(1)) {
+        return;
+    }
+    inputRetry_ = now;
+    const std::string uid = input_->deviceId();
+    if (!audio::coreAudioDevicePresent(uid)) {
+        return; // still gone: its sources read inactive, the panel says disconnected
+    }
+    log::info("audio input '{}': {}; reopening", input_->deviceName(), changed ? "its format changed" : "it is back");
+    if (auto r = useAudioInputBackend(std::make_unique<audio::CoreAudioCapture>(uid)); !r) {
+        log::warn("audio input: reopening '{}': {}", uid, r.error().message);
+    }
+}
+
+Engine::InputLatency Engine::inputLatency() const {
+    InputLatency out;
+    std::vector<double> v = inputLatencyMs_;
+    out.events = v.size();
+    if (v.empty()) {
+        return out;
+    }
+    std::sort(v.begin(), v.end());
+    out.p50Ms = v[v.size() / 2];
+    out.p99Ms = v[std::min(v.size() - 1, v.size() * 99 / 100)];
+    out.maxMs = v.back();
+    return out;
+}
+
+// Once every ten seconds while live sources run: what they cost and how they are doing, in the log (the benchmark
+// reads it; a performer's session log keeps it).
+void Engine::reportInputSources() {
+    if (!input_ || !channels_ || inputSources_.empty()) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (inputReportAt_ == std::chrono::steady_clock::time_point{}) {
+        inputReportAt_ = now;
+        inputReportBusy_ = channels_->busyMicros();
+        return;
+    }
+    const double wall = std::chrono::duration<double, std::micro>(now - inputReportAt_).count();
+    if (wall < 10e6) {
+        return;
+    }
+    const double busy = channels_->busyMicros();
+    const auto st = input_->stats();
+    const InputLatency lat = inputLatency();
+    std::size_t active = 0;
+    for (const std::uint8_t a : inputActive_) {
+        active += a;
+    }
+    log::info("live input sources: {} of {} active; callback {:.2f} us mean, {:.1f} us max; drops {} gaps {} "
+              "overloads {}; analysis {:.1f} us per source-hop, pass max {:.0f} us, {:.2f}% of a core; onset latency "
+              "p50 {:.1f} ms p99 {:.1f} ms max {:.1f} ms over {} events",
+              active, inputSources_.size(), st.callbackMeanMicros, st.callbackMaxMicros, st.droppedBlocks, st.gaps,
+              st.overloads, channels_->hopMicros(), channels_->passMaxMicros(), 100.0 * (busy - inputReportBusy_) / wall,
+              lat.p50Ms, lat.p99Ms, lat.maxMs, lat.events);
+    inputReportAt_ = now;
+    inputReportBusy_ = busy;
+}
+
+void Engine::publishInputSources() {
+    // A source with no frame for this long reads inactive: the device stalled, or its analysis cannot keep up. Never
+    // a held value, never an event that stays asserted.
+    constexpr auto kStale = std::chrono::milliseconds(250);
+    const auto now = std::chrono::steady_clock::now();
+    const bool live = input_ && input_->connected();
+    for (std::size_t i = 0; i < inputSignals_.size(); ++i) {
+        const signals::StemSignals& ids = inputSignals_[i];
+        if (live && channels_ && i < channels_->size() && channels_->acquire(i)) {
+            analysis::LiveStemFrame f = channels_->latest(i);
+            inputLatches_[i].apply(f);
+            ids.publish(bus_, f.frame);
+            if (f.frame.onset && input_->sampleRate() > 0) {
+                // When the newest sample of the window that found it arrived, from the input's last block stamp.
+                const audio::AudioInput::BlockStamp stamp = input_->lastBlock();
+                const double rate = static_cast<double>(input_->sampleRate());
+                const double windowEnd = f.frame.timeSeconds * rate + static_cast<double>(analyzerConfig_.windowSize) / 2.0;
+                const double arrivedNs = static_cast<double>(stamp.steadyNs) -
+                                         (static_cast<double>(stamp.frameEnd) - windowEnd) / rate * 1e9;
+                const double nowNs = static_cast<double>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
+                constexpr std::size_t kLatencyRing = 1024;
+                if (inputLatencyMs_.size() < kLatencyRing) {
+                    inputLatencyMs_.push_back((nowNs - arrivedNs) / 1e6);
+                } else {
+                    inputLatencyMs_[inputLatencyNext_] = (nowNs - arrivedNs) / 1e6;
+                    inputLatencyNext_ = (inputLatencyNext_ + 1) % kLatencyRing;
+                }
+            }
+            inputLastFrame_[i] = now;
+            inputActive_[i] = 1;
+        } else if (live && inputActive_[i] != 0 && now - inputLastFrame_[i] <= kStale) {
+            ids.clearEvents(bus_); // no new hop this frame: keep the levels, drop the pulses
+        } else {
+            ids.publishInactive(bus_);
+            inputActive_[i] = 0;
+        }
+    }
 }
 
 FrameTime Engine::tick(FrameClock& clock) {
@@ -6267,6 +6713,25 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
     updateAudioHistory(newFrame);
+    watchInputDevice();
+    if (input_ != nullptr) {
+        // ADR-1521: a live input's sources. An offline stem means nothing without its mix playing: inactive, unless a
+        // live source of the same key publishes it (its signals are the same names).
+        for (const signals::StemSignals& stem : stemSignals_) {
+            const bool live = std::any_of(inputSources_.begin(), inputSources_.end(),
+                                          [&](const audio::InputSource& s) { return s.key == stem.key; });
+            if (!live) {
+                stem.publishInactive(bus_);
+            }
+        }
+        publishInputSources();
+        reportInputSources();
+        stemPreviousSeconds_ = -1.0;
+    } else if (!stems_.empty()) {
+        // ADR-1520: a pure function of the instant and the previous one, in both modes (live: the transport second).
+        publishStems(bus_, stemPreviousSeconds_, time.renderTime);
+        stemPreviousSeconds_ = time.renderTime;
+    }
 
     const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
     const std::uint32_t allocsAtStart = allocsNow();

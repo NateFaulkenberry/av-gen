@@ -51,7 +51,10 @@ if(APPLE)
     target_link_libraries(avgen_core PUBLIC
         "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo" "-framework Foundation"
         "-framework CoreMIDI" "-framework CoreText" "-framework CoreGraphics"
-        "-framework Security" "-framework CoreFoundation")
+        "-framework Security" "-framework CoreFoundation"
+        # The Core Audio capture backend (ADR-1522: audio/capture_coreaudio.cpp). miniaudio loads these at run time;
+        # the AUHAL backend calls them directly.
+        "-framework CoreAudio" "-framework AudioToolbox")
 endif()
 target_compile_definitions(avgen_core PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_FORCE_RADIANS GLM_ENABLE_EXPERIMENTAL)
 if(AVGEN_HAVE_OIDN)

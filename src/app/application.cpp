@@ -1,4 +1,5 @@
 #include "app/live_audio_policy.hpp"
+#include "audio/synthetic_capture.hpp"
 #include "app/application.hpp"
 #include "rendering/procedural_renderer.hpp" // ADR-1493: compiledMaterialsActive
 #include "core/process_memory.hpp"
@@ -192,7 +193,12 @@ std::string usageText() {
            "                      at 960x540 (--live-capture-size WxH) into <d> as PPM plus frames.csv, for a\n"
            "                      review clip; costs frame time\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
-           "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
+           "  --list-audio-devices, --list-midi   enumerate inputs and exit (audio: id, channels per\n"
+           "                      Core Audio stream, rate)\n"
+           "  --input-sources <n>[h[k]]  analyse channels 1..n of the --input device as stem.in<c>.* (h: kick/\n"
+           "                      snare/hat on all, hk: on the first k); overrides the saved channel map\n"
+           "  --input-meter <device> [s]  every input channel's peak once a second for s seconds (default\n"
+           "                      20), through the multichannel capture path; device = id or name\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
            "                                      what it does not, and where its decision is made\n"
            "  --lab-case <lab>:<n>                open a lab case: its fixture, second, size, tier,\n"
@@ -540,6 +546,31 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             ++i;
         } else if (arg == "--list-audio-devices") {
             options.listAudioDevices = true;
+        } else if (arg == "--input-sources") {
+            // ADR-1521: "<n>[h[<k>]]": n mono sources on channels 1..n; h: the hits tier on all, hk: on the first k.
+            auto v = need(i, "--input-sources");
+            if (!v) return std::unexpected(v.error());
+            const std::string spec = *v;
+            const int n = std::atoi(spec.c_str());
+            if (n < 1 || n > 64) return fail("--input-sources: expected <n>[h[<k>]] with 1 <= n <= 64, got '{}'", spec);
+            const auto h = spec.find('h');
+            const int hits = h == std::string::npos ? 0 : (h + 1 < spec.size() ? std::atoi(spec.c_str() + h + 1) : n);
+            std::vector<audio::InputSource> sources;
+            for (int c = 0; c < n; ++c) {
+                sources.push_back({.key = "in" + std::to_string(c + 1), .label = "Input " + std::to_string(c + 1),
+                                   .channel = static_cast<std::uint32_t>(c), .hits = c < hits});
+            }
+            options.inputSources = std::move(sources);
+            ++i;
+        } else if (arg == "--input-meter") {
+            auto v = need(i, "--input-meter");
+            if (!v) return std::unexpected(v.error());
+            options.inputMeter = *v;
+            ++i;
+            if (i + 1 < argc && std::isdigit(static_cast<unsigned char>(argv[i + 1][0]))) {
+                options.inputMeterSeconds = std::max(1.0, std::atof(argv[i + 1]));
+                ++i;
+            }
         } else if (arg == "--labs") {
             options.listLabs = true;
         } else if (arg == "--lab-case") {
@@ -2100,7 +2131,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             storeOutputsToProject();
         };
         panel_->onUseAudioInput = [this](const std::string& name) {
-            if (auto r = engine_->useAudioInput(name); !r) {
+            if (auto r = openAudioInput(name); !r) {
                 panel_->setStatus(r.error().message);
             } else {
                 panel_->setStatus("live input: " + engine_->audioInput()->deviceName());
@@ -2111,12 +2142,37 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onLiveAudioInput = [this](const std::string& name) {
             if (name.empty()) {
                 engine_->stopAudioInput();
-            } else if (auto r = engine_->useAudioInput(name); !r) {
+            } else if (auto r = openAudioInput(name); !r) {
                 panel_->setStatus("audio input: " + r.error().message);
                 return;
             }
             settings_.live.audioInput = name;
             saveSettings();
+        };
+        panel_->onLiveInputMain = [this](std::vector<std::uint32_t> channels) {
+            engine_->setInputMainChannels(channels);
+            if (const audio::AudioInput* input = engine_->audioInput(); input != nullptr) {
+                const std::string id = inputDeviceId(input->deviceId().empty() ? input->deviceName() : input->deviceId());
+                if (!id.starts_with("synthetic:")) {
+                    if (channels.empty()) {
+                        settings_.live.inputMain.erase(id);
+                    } else {
+                        settings_.live.inputMain[id] = channels;
+                    }
+                    saveSettings();
+                }
+            }
+        };
+        // ADR-1521: the channel map of the open device, remembered for it by its id.
+        panel_->onLiveInputSources = [this](std::vector<audio::InputSource> sources) {
+            engine_->setInputSources(std::move(sources));
+            if (const audio::AudioInput* input = engine_->audioInput(); input != nullptr) {
+                const std::string id = inputDeviceId(input->deviceId().empty() ? input->deviceName() : input->deviceId());
+                if (!id.starts_with("synthetic:")) {
+                    settings_.live.inputSources[id] = engine_->inputSources();
+                    saveSettings();
+                }
+            }
         };
         panel_->onLiveMidiInput = [this](const std::string& filter) {
             // The panel has already put the filter into the hub's map and reopened MIDI; this remembers it.
@@ -2228,7 +2284,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         engine_->control().setMap(std::move(map));
     }
     if (options.input && !options.headless) {
-        if (auto r = engine_->useAudioInput(*options.input); !r) {
+        if (auto r = openAudioInput(*options.input); !r) {
             log::error("audio input: {}", r.error().message);
             if (panel_) panel_->setStatus(r.error().message);
         }
@@ -7526,13 +7582,52 @@ void Application::serviceLiveSonic() {
         // project measured or rendered against a known track -- so the saved capture device does not replace it
         if (liveSonicOpensSavedInput(engine_->hasLiveInput(), options_.input.has_value(), options_.audio.has_value(),
                                      settings_.live.audioInput)) {
-            if (auto r = engine_->useAudioInput(settings_.live.audioInput); !r) {
+            if (auto r = openAudioInput(settings_.live.audioInput); !r) {
                 panel_->setStatus("live audio input '" + settings_.live.audioInput + "': " + r.error().message);
                 log::warn("live sonic: audio input '{}': {}", settings_.live.audioInput, r.error().message);
             }
         }
     }
     liveSonicWasOn_ = on;
+}
+
+std::string Application::inputDeviceId(const std::string& selector) {
+    const auto devices = audio::listCaptureDevices();
+    for (const audio::AudioDeviceInfo& d : devices) {
+        if (d.id == selector || d.name == selector) {
+            return d.id;
+        }
+    }
+    for (const audio::AudioDeviceInfo& d : devices) {
+        if (!selector.empty() && d.name.find(selector) != std::string::npos) {
+            return d.id;
+        }
+    }
+    return selector;
+}
+
+Result<void> Application::openAudioInput(const std::string& selector) {
+    // ADR-1521: the device's remembered channel map goes in before it opens (with sources it opens through the
+    // multichannel path; without, the plain one). `--input-sources` overrides it for this run.
+    engine_->stopAudioInput();
+    const std::string id = inputDeviceId(selector);
+    if (options_.inputSources) {
+        engine_->setInputSources(*options_.inputSources);
+    } else {
+        const auto saved = settings_.live.inputSources.find(id);
+        engine_->setInputSources(saved != settings_.live.inputSources.end() ? saved->second
+                                                                           : std::vector<audio::InputSource>{});
+    }
+    const auto main = settings_.live.inputMain.find(id);
+    engine_->setInputMainChannels(main != settings_.live.inputMain.end() ? main->second : std::vector<std::uint32_t>{});
+    // ADR-1521: `synthetic:<n>` is the test signal generator, for benchmarks only (it is in no device list).
+    if (selector.starts_with("synthetic:")) {
+        audio::SyntheticCaptureConfig config;
+        config.channels = static_cast<std::uint32_t>(std::clamp(std::atoi(selector.c_str() + 10), 1, 64));
+        config.realtime = true;
+        return engine_->useAudioInputBackend(std::make_unique<audio::SyntheticCapture>(config));
+    }
+    return engine_->useAudioInput(selector);
 }
 
 void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {

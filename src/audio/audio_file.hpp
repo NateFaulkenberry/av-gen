@@ -7,15 +7,28 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <span>
 #include <vector>
 
 namespace avgen::audio {
 
+struct DecodeFormat {
+    std::uint32_t sampleRate = 0;
+    std::uint32_t channels = 0;
+    std::uint64_t frames = 0;         // frames delivered so far (the total once decoding returns)
+    std::uint64_t declaredFrames = 0; // the length the container declares, 0 when unknown (some MP3 streams)
+};
+
 class AudioFile {
 public:
     // Decodes WAV/FLAC/MP3 (and anything else miniaudio's decoder handles) to float32.
     static Result<AudioFile> load(const std::filesystem::path& path);
+    // The same decode, without holding the file: `chunk` receives consecutive interleaved float32 blocks (the format's
+    // rate and channels are set before the first). For a pass that needs no random access -- a stem's analysis
+    // (ADR-1520), which this keeps from holding every stem's PCM at once. Returns the format with the total frames.
+    static Result<DecodeFormat> decode(const std::filesystem::path& path,
+                                       const std::function<void(const DecodeFormat&, std::span<const float>)>& chunk);
 
     // Builds a file from interleaved samples; used by tests and generators. channels >= 1.
     static AudioFile fromInterleaved(std::vector<float> interleaved, std::uint32_t channels,

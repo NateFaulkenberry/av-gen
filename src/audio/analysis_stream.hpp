@@ -22,6 +22,9 @@ public:
     void markDiscontinuity(std::uint64_t frameIndex);
     // Writes mono samples; drops samples if the consumer is behind.
     std::size_t write(std::span<const float> samples);
+    // Samples write() can take now without dropping (producer view). Lets a producer drop a whole block rather than
+    // split one (stems-multichannel, ADR-1521).
+    [[nodiscard]] std::size_t freeSpace() const { return ring_.freeSpace(); }
 
     // ---- consumer (analysis thread) ----
     struct ReadResult {
