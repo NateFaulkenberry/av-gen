@@ -1,3 +1,5 @@
+# Summarise avgen --live-profile JSON records as one markdown table row each (stems-multichannel M0/M8).
+#   python3 tools/stems_bench/summarize.py build/bench/m0/*.json
 import json, sys
 print("| run | scene | level (end) | frame p50 / p99 ms | cpu work p50 / p99 ms | gpu p50 / p95 / p99 ms | misses / frames |")
 print("|---|---|---|---|---|---|---|")

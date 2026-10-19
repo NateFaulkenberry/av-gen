@@ -138,6 +138,24 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/live_scenes.cpp")
 target_link_libraries(avgen_tests PRIVATE avgen_core Catch2::Catch2WithMain)
 avgen_set_warnings(avgen_tests)
+# The stem-analysis fixture (stems-multichannel M1): generated into the build tree by tools/make_stem_fixture.py before
+# the tests build, so no test depends on audio in the repository and none SKIPs for want of it. Without a Python 3 the
+# directory is empty and the stem tests SKIP saying so (tests/support/stem_fixture.hpp).
+find_package(Python3 COMPONENTS Interpreter)
+set(AVGEN_STEM_FIXTURE_DIR "${CMAKE_BINARY_DIR}/test-fixtures/stems")
+if(Python3_Interpreter_FOUND)
+    add_custom_command(
+        OUTPUT "${AVGEN_STEM_FIXTURE_DIR}/fixture.json"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/make_stem_fixture.py" --out "${AVGEN_STEM_FIXTURE_DIR}"
+        DEPENDS "${CMAKE_SOURCE_DIR}/tools/make_stem_fixture.py"
+        COMMENT "Generating the stem test fixture"
+        VERBATIM)
+    add_custom_target(avgen_stem_fixture DEPENDS "${AVGEN_STEM_FIXTURE_DIR}/fixture.json")
+    add_dependencies(avgen_tests avgen_stem_fixture)
+else()
+    message(WARNING "No Python 3 interpreter: the stem fixture is not generated and the stem tests will SKIP")
+endif()
+target_compile_definitions(avgen_tests PRIVATE AVGEN_STEM_FIXTURE_DIR="${AVGEN_STEM_FIXTURE_DIR}")
 catch_discover_tests(avgen_tests
     TEST_PREFIX "unit."
     PROPERTIES LABELS "unit"
