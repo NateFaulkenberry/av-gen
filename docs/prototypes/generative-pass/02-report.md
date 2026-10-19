@@ -21,7 +21,7 @@
 | The main change | Contours of light (a hot core, a halo, dark channels) on a field excited by waves at three scales, the bass history, kick and snare rings, and density | The room is gone: a sphere of luminous blade columns seen from inside, caps as their own pattern, a membrane displaced by the music, a light hierarchy by region |
 | Fields (of 16) | 13 → 15 | 14 → 13 |
 | Main program ops (of 48) | 17 → 48 | 37 (×4 walls) → 48 (one program), plus a 24-op chip program and an 18-op membrane program |
-| Geometry | 36,100 pins (unchanged), 3 sine deformers, 5 effectors | 8,064 wall blades → 14,161 blades + 3,618 cap chips (`points`) + a membrane sphere |
+| Geometry | 36,100 pins (unchanged), 1 sine deformer, 5 effectors | 8,064 wall blades → 14,161 blades + 3,618 cap chips (`points`) + a membrane sphere |
 
 ## 0. The audit's main finding: the level signals are pinned
 
@@ -67,10 +67,8 @@ Response sliders (sensitivity, transient and sustain 0.5; attack and release 1).
 
 | Layer | Mechanism | Driver |
 |---|---|---|
-| Broad swell A (38 m, 4.2 m/s) | world-space `sine` deformer, reproduced exactly in the program (`gradient` + `time` + `palette`): it moves the contour level, so contours bunch and open, and its crest carries the light and the beads | height: the bass level (0.6-1.3 m), CC 7; contour reach: `audio.mid` |
-| Broad swell B (27 m, crossing) | `sine` deformer | CC 7 |
-| Ripple (9.5 m, 3.6 m/s) | `sine` deformer, a small heave | `audio.mid` |
-| Bass history | Spectrum field (bass band, 14 m/s, 0.15 s window) as a lift effector and a pool of light | the music's own shape |
+| Broad swell A (38 m, 4.2 m/s) | world-space `sine` deformer, reproduced exactly in the program (`gradient` + `time` + `palette`): it moves the contour level, so contours bunch and open, and its crest carries the light and the beads | height: the bass level (0.6-1.6 m), CC 7; contour reach: `audio.mid` |
+| Bass history | Spectrum field (bass band, 14 m/s, 0.02 s window) as a lift effector and a pool of light | the music's own shape |
 | Kick | Onset field, a ring from a heart that wanders slowly round the bowl: lift (effector), contour swell (bounded), a band of light; also in the regime bake (spots spread, then give the ground back) | kick onsets; CC 8 |
 | Snare | Onset field from off-centre: a quicker, thinner ring of light and a small lift; the brush's burst of growth (kept) | snare onsets; CC 8 |
 | Hats | beads on the contours | `response.hat` (8 ms in, 260 ms out); CC 11 |
@@ -117,6 +115,11 @@ Vignette 0.4 → 0.22, grain off.
   rings.
 - **No grazing glints.** Box pins do not tilt, so the heave reads through parallax and the shafts it exposes rather
   than through specular highlights.
+- **Live budget.** RD Pins is at the edge of the live budget (§4). Its interference is now between one broad swell,
+  the bass history's rings and the kick's rings; the crossing second swell was cut for cost.
+- **ADR-1510.** The response levels now read against an adaptive reference; the routes from them are scaled ×1.5.
+  The final evidence clips were rendered just before that merge; the post-merge check frames are
+  `stage4-final/post-adr1510.png`.
 - **Budgets.** The pin program is at 48 of 48 ops; fields are 15 of 16.
 
 ## 2. Phase Hall
@@ -215,18 +218,23 @@ Nothing in the live path (presentation, pacing, the quality controller, the prog
 `avgen --live-profile --mode live --target-fps 30 --size 1920x1080 --start 150 --measure 20 --project <live project>
 --audio feline-footwear.wav`, through the GPU lock.
 
-- **Engine:** both arms run on this branch's binary (main's ADR-1490..1493 merged in). The "before" arm is the scenes
-  as of `a55b49f9` (`build/gp/old/`).
+- **Engine:** both arms run on this branch's binary, with main's ADR-1490..1493 and ADR-1510 (response range)
+  merged in. The "before" arm is the scenes as of `a55b49f9` (`build/gp/old/`).
+- **Machine:** shared with other agents' GPU work, and the display ran at 120 Hz for these runs.
 - **Order:** back to back, after one warm-up run of each "after" scene, because ADR-1493 compiles a new program
   structure in about 14 s cold.
 - **Records:** `stage4-profiles/*.json` and `.txt`.
 
 | Scene | Arm | Auto level (scale) | GPU p50 / p95 | CPU work p50 | Misses |
 |---|---|---|---|---|---|
-| RD Pins | before | Ultra (1.00) | 26.6 / 30.3 ms | 7.4 ms | 0 / 600 |
-| | **after** | **High (0.85)** | 29.6 / 32.2 ms | 7.7 ms | **0 / 600** |
-| Phase Hall | before | Ultra (1.00) | 28.6 / 31.4 ms | 6.6 ms | 0 / 600 |
-| | **after** | **Ultra (1.00)** | **21.8 / 22.3 ms** | 5.9 ms | **0 / 600** |
+| RD Pins | before | Ultra (1.00) | 26.9 / 30.0 ms | 4.4 ms | 1 (0.2%) |
+| | **after** | **Ultra (1.00)** | **30.7 / 34.8 ms** | 4.7 ms | **3 (0.5%)** |
+| Phase Hall | before | Ultra (1.00) | 29.7 / 31.9 ms | 2.9 ms | 0 |
+| | **after** | **Ultra (1.00)** | **22.7 / 27.3 ms** | 1.8 ms | **2 (0.3%)** |
+
+Counts are deadline misses out of about 600 measured frames. RD Pins after holds Ultra, but its GPU p50 (30.7 ms) is
+above the 29.3 ms budget. Auto keeps Ultra here; in an earlier run on the same build before the last cut, it fell to
+Medium with 1.8% misses. RD Pins is at the edge of the live budget. Phase Hall has room.
 
 - **Phase Hall is cheaper than the hall.** About 18,000 instances in one draw, three programs where the hall had five,
   and no floor or room geometry: 7 ms less GPU at the same level.
@@ -239,17 +247,41 @@ Nothing in the live path (presentation, pacing, the quality controller, the prog
   | after, window off | 27.1 ms |
   | after, one deformer instead of three | 24.0 ms |
 
-  The shipped scene uses a 0.04 s window (4 taps) and two deformers. Live, Auto holds High (0.85) with no misses
-  where the scene used to hold Ultra. The rest is the 48-op pin program over a full frame of pins, and the deformers'
-  vertex work on 36,100 pins (×24 vertices, in the depth pass too).
+  The shipped scene uses a 0.02 s window (2 taps) and one deformer (the broad swell A). The crossing swell B and the
+  small ripple were cut for the budget. The rest of the cost over the baseline is:
+  - the 48-op pin program over a full frame of pins;
+  - one deformer's vertex work on 36,100 pins (×24 vertices, in the depth pass too).
+  The remaining levers, all costing look, are a gated program (a distance band) and fewer pins.
 - **MIDI:** neither scene was measured with a controller attached; none was available. The MIDI path is a handful of
   CC routes evaluated per frame on the CPU, the same kind as before the pass.
 - **No audio** (`--no-audio`, `stage4-profiles/*-noaudio.*`):
-  - RD Pins: Medium (0.71), GPU 25.0 / 32.8 ms, 0 misses;
+  - RD Pins: Medium (0.71), GPU 26.1 / 33.7 ms, 8 misses (1.3%);
   - Phase Hall: Ultra, 23.7 / 32.1 ms, 0 misses.
 
   Without audio the RD and the bake still step, and Auto settles a level lower on RD Pins.
 
 ## 5. Checks
 
-CHECKS
+Run once at the end on `dd8be100` (the code as shipped; this report's commit follows it), after ADR-1510's merge, a
+fresh reconfigure (`cmake --preset release --fresh`) and a full build (exit 0). Each process's own exit code:
+
+| Check | Result |
+|---|---|
+| `tools/ci/run-suite.sh cpu-assets` (under the GPU lock) | **PASS, exit 0**: 4334 passed, 0 failed, 19 skipped, 1 expected failure (the shouldfail case); ran 4354/4354 |
+| `tools/ci/run-suite.sh gpu` | **PASS, exit 0**: 678 passed, 0 failed, 1 skipped; ran 679/679 |
+| `tools/review_examples.py --only "RD Pins"` | `ok 2` (RD Pins, RD Pins (R&D)), exit 0 |
+| `tools/review_examples.py --only "Phase Hall"` | `ok 1`, exit 0 |
+| `tools/check_project_integrity.py` | **0 problems**, exit 0 |
+
+The suite includes the pass's new tests:
+- `A local axis is the point's own...`;
+- `Local-axis effectors agree with the CPU reference...`;
+- `A sphere-projected grid field agrees on the CPU and the GPU`;
+- `A grid reading a bake grid replays a seek exactly as it played`.
+
+## 6. Not done, and why
+
+- **MIDI** was not exercised with a controller (none attached). The bindings and routes are in place and documented
+  in each index description and generator.
+- **Moiré.** The 1080p check of Phase Hall's columns was done on stills and a 1 s 1080p sequence (`stage3-phase-hall/`):
+  clean line cores at about 6-8 px a blade, even frame-to-frame change. The full clips are 960×540.
