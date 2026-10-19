@@ -637,9 +637,25 @@ def place_rim_rocks(fr, protos, seed=5):
     return placed
 
 
+def frame_lerp(fr, s):
+    """The band's frame at any station, interpolated between rings (snapping to the nearest ring put every placement
+    on a 3-6 m grid along the band -- grass in rows -- and made finite-difference normals point along the band)."""
+    f = s / L * NS
+    if KNOT is not None:
+        f %= NS
+    f = max(0.0, min(float(NS), f))
+    i = min(int(f), NS - 1)
+    w = f - i
+    _, p0, t0, u0, s0 = fr[i]
+    _, p1, t1, u1, s1 = fr[i + 1]
+    t = t0.lerp(t1, w).normalized()
+    u = u0.lerp(u1, w)
+    u = (u - t * u.dot(t)).normalized()
+    return p0.lerp(p1, w), t, u, t.cross(u).normalized()
+
+
 def surface_point(fr, s, x, lift):
-    i = max(0, min(NS, int(round(s / L * NS))))
-    _, p, t, u, side = fr[i]
+    p, t, u, side = frame_lerp(fr, s)
     return p + side * x + u * (FACE + face_height(s, x, TOP_HILLS, 0.0) + lift), t, u, side
 
 

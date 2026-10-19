@@ -125,9 +125,9 @@ for o in placed:
                                    round(w, 5), round(sc[0], 3), round(sc[2], 3), round(sc[1], 3)])
 for rid, pts in by.items():
     for k in range(0, len(pts), 60000):
-        nodes.append(node_points("rim_%s_%d" % (rid.replace("rock_", ""), k // 60000), rid + ".glb", pts[k:k + 60000],
+        nodes.append(node_points("rim_%s_%d" % (rid.replace("rock_", ""), k // 60000), "rim" + rid + ".glb", pts[k:k + 60000],
                                  {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
-                                 lod={"cull": True, "minScreenRadius": 1.0}))
+                                 castsShadow=False, lod={"cull": True, "minScreenRadius": 1.5}))
 print("RIM ROCKS", sum(len(v) for v in by.values()))
 
 # ---- the camera path: weaving over the top meadow --------------------------------------------------------------------
@@ -161,6 +161,12 @@ print("CAMERA path %.0f m, roll turns %d" % (cam_path.length, cam_path.roll_turn
 def near_path(p, clearance):
     d = np.linalg.norm(cam_controls - np.array(p), axis=1)
     return d.min() < clearance
+
+
+def path_clear(s, x, clearance=20.0):
+    """True when the meadow point (s, x) is at least `clearance` metres across from the ride (so nothing the
+    camera flies through is planted there): the ride's lateral position at the same station."""
+    return abs(x - cam_x(s)) >= clearance
 
 
 # ---- grass: a corridor round the ride ------------------------------------------------------------------------------
@@ -202,34 +208,63 @@ for k in range(0, len(fpts), 60000):
                              castsShadow=False, lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 90.0}))
 print("FLOWERS", len(fpts))
 
-# ---- trees: landmark Great Trees and clusters on hill shoulders ------------------------------------------------------
-tpts = []
+# ---- trees: landmark Great Trees, clusters of small Great Trees and Blossom Puffs on hill shoulders, Weeper groves
+# in the dells (03-art-direction.md section 6: a family of distinct silhouettes, each placed where its shape belongs)
+fam = {"great": [], "weeper": [], "blossom": [], "pine": []}
 landmarks = []
 for k in range(9):  # one Great Tree every ~640 m, beside the ride: the landmarks the journey keeps passing
     s = (k + 0.5) * L / 9 + rng.uniform(-60, 60)
-    x = cam_x(s) + rng.choice((-1, 1)) * rng.uniform(25, 45)
-    x = max(-0.75 * band.HALF_W, min(0.75 * band.HALF_W, x))
+    side_ = rng.choice((-1, 1))
+    x = cam_x(s) + side_ * rng.uniform(28, 45)
+    if abs(x) > 0.75 * band.HALF_W:  # no room on that side: the other
+        x = cam_x(s) - side_ * rng.uniform(28, 45)
     p, t, u, sd = surf(s, x, -0.8)
     landmarks.append((s, x))
-    tpts.append(point(p, u.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.28)), rng.uniform(0.95, 1.2)))
-for hs, hx, h, *_ in band.TOP_HILLS:  # small clusters on the shoulders of the taller hills
-    if h < 8 or rng.random() < 0.3:
+    fam["great"].append(point(p, u.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.28)), rng.uniform(0.95, 1.2)))
+for hs, hx, h, *_ in band.TOP_HILLS:
+    if h >= 8 and rng.random() < 0.75:  # shoulders of the taller hills: small Great Trees, now and then a Blossom
+        for _ in range(rng.randint(3, 6)):
+            s, x = hs + rng.gauss(0, 14), hx + rng.gauss(0, 10)
+            if abs(x) > 0.78 * band.HALF_W or not path_clear(s, x, 22.0):
+                continue
+            p, t, u, sd = surf(s, x, -0.5)
+            q = u.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.28))
+            if rng.random() < 0.18:
+                fam["blossom"].append(point(p, q, rng.uniform(0.45, 0.6)))
+            else:
+                fam["great"].append(point(p, q, rng.uniform(0.3, 0.55)))
+    elif h < 0:  # the dells: a small grove of Weepers, on the dell's far side from the ride
+        away = 1.0 if hx >= cam_x(hs) else -1.0
+        for _ in range(rng.randint(3, 5)):
+            s, x = hs + rng.gauss(0, 14), cam_x(hs) + away * rng.uniform(30, 60)
+            if abs(x) > 0.78 * band.HALF_W or not path_clear(s, x, 24.0):
+                continue
+            p, t, u, sd = surf(s, x, -0.4)
+            fam["weeper"].append(point(p, u.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.28)), rng.uniform(0.75, 1.05)))
+for hs, hx, h, rs, rx, *_ in band.TOP_HILLS:  # the long ridges: Ridge Pines strung along the spine
+    if rs > 90:
+        for k in range(rng.randint(6, 10)):
+            s, x = hs + rng.uniform(-0.8, 0.8) * rs, hx + rng.gauss(0, 5)
+            if not path_clear(s, x, 16.0):
+                continue
+            p, t, u, sd = surf(s, x, -0.5)
+            fam["pine"].append(point(p, u.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.28)), rng.uniform(0.6, 0.95)))
+TREE_ASSETS = {"great": ("great_tree", "rw_canopy"), "weeper": ("weeper", "rw_weeper"), "blossom": ("blossom", "rw_blossom"),
+               "pine": ("pine", "rw_pine")}
+for f, pts in fam.items():
+    if not pts:
         continue
-    for _ in range(rng.randint(3, 6)):
-        s, x = hs + rng.gauss(0, 14), hx + rng.gauss(0, 10)
-        if abs(x) > 0.78 * band.HALF_W:
-            continue
-        p, t, u, sd = surf(s, x, -0.5)
-        tpts.append(point(p, u.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.28)), rng.uniform(0.3, 0.55)))
-nodes.append(node_points("tree_wood", "great_tree_wood.glb", tpts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
-                         lod={"cull": True, "minScreenRadius": 1.0}))
-nodes.append(node_points("tree_core", "great_tree_core.glb", tpts, {"baseColor": R(rw.P["canopy_core"][:3]), "roughness": 0.95, "metallic": 0.0},
-                         lod={"cull": True, "minScreenRadius": 1.0}))
-nodes.append(node_points("tree_leaves", "great_tree_leaves.glb", tpts,
-                         {"program": "rw_canopy", "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
-                          "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
-                         lod={"cull": True, "minScreenRadius": 1.0}))
-print("TREES", len(tpts))
+    asset, prog = TREE_ASSETS[f]
+    nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
+                             lod={"cull": True, "minScreenRadius": 1.0}))
+    nodes.append(node_points("%s_core" % f, "%s_core.glb" % asset, pts, {"baseColor": R(rw.P["canopy_core"][:3]), "roughness": 0.95, "metallic": 0.0},
+                             lod={"cull": True, "minScreenRadius": 1.0}))
+    nodes.append(node_points("%s_leaves" % f, "%s_leaves.glb" % asset, pts,
+                             {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
+                              "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
+                             lod={"cull": True, "minScreenRadius": 1.0}))
+tpts = [p for v in fam.values() for p in v]
+print("TREES", {k: len(v) for k, v in fam.items()})
 
 # ---- rainbows: arches across the band at landmarks ------------------------------------------------------------------
 rainbow_nodes = []
@@ -252,14 +287,17 @@ lo, hi = P.min(axis=0), P.max(axis=0)
 centre = (lo + hi) / 2
 extent = float(np.linalg.norm(hi - lo))
 tries = 0
-while len(cpts["hero"]) + len(cpts["tower"]) < 14 and tries < 4000:
+HALF = {"hero": 330.0, "tower": 290.0}   # half the mesh's largest extent (engine_assets CLOUD report), metres
+while len(cpts["hero"]) + len(cpts["tower"]) < 14 and tries < 6000:
     tries += 1
     c = centre + np.array([rng.uniform(-0.75, 0.75), rng.uniform(-0.75, 0.75), rng.uniform(-0.45, 0.6)]) * extent * 0.6
-    dband = np.linalg.norm(P - c, axis=1).min()
-    if dband < 330 or near_path(c, 420):  # the cloud's own half-size plus a margin: never in the camera's way
-        continue
     kind = "tower" if rng.random() < 0.4 else "hero"
-    cpts[kind].append(point(Vector(c), Quaternion((0, 0, 1), rng.uniform(0, 6.28)), rng.uniform(0.6, 1.0)))
+    sc = rng.uniform(0.5, 0.9)
+    reach = HALF[kind] * sc
+    # never in the camera's way, never through the land: the cloud's own reach plus a margin from both
+    if np.linalg.norm(P - c, axis=1).min() < reach + band.HALF_W + 60 or near_path(c, reach + 180):
+        continue
+    cpts[kind].append(point(Vector(c), Quaternion((0, 0, 1), rng.uniform(0, 6.28)), sc))
 sea_z = lo[2] - 380.0
 for k in range(260):  # the cloud sea, out to 6 km
     aa, rr = rng.uniform(0, 2 * math.pi), 6000 * math.sqrt(rng.random())

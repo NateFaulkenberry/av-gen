@@ -82,6 +82,10 @@ def export_rim_rocks(out, s2):
         c.data.materials.clear()
         c.data.materials.append(plain_material("rock", rw.P["stone_warm"], 0.85))
         rw.export_glb([c], os.path.join(out, p.name.split(".")[0] + ".glb"))
+        # the rim's copy: the same rock at ~300 triangles (rims are seen from tens to hundreds of metres; 2,000
+        # of them at full detail cost ~3 M triangles a pass -- Stage 4's first world profile)
+        decimate_to(c, 300)
+        rw.export_glb([c], os.path.join(out, "rim" + p.name.split(".")[0] + ".glb"))
     print("RIM ROCKS", {k: len(v) for k, v in by.items()})
 
 

@@ -12,6 +12,7 @@ travelled with a fisheye camera whose gravity turns with the land. Branch `art/r
 | [04-production-plan.md](04-production-plan.md) | Asset breakdown, licensing, AV Gen technical assessment, workflow, staged plan, uncertainties |
 | [05-gate1-experiments.md](05-gate1-experiments.md) | E1 lens, E2 knot world, E3 rainbow look |
 | [06-stage2-report.md](06-stage2-report.md) | Stage 2: the isolated prototypes, E4/E5 costs in AV Gen, the five weakest points |
+| [07-stage3-report.md](07-stage3-report.md) | Stage 3: the look-dev scene in AV Gen, v1-v7, colour against the references, ADR-1540/1541/1542/1545 |
 
 The owner's references (`~/Desktop/rainbow world/`) are not committed, because their source and licence are unknown.
 The review media is in `~/Desktop/av-gen-review/74-rainbow-world/`, and scratch is in `build/rw/`.

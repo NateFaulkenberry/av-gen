@@ -212,8 +212,28 @@ def node_points(name, asset, points, material, **extra):
 
 
 
+def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
+    """A canopy ramp by height in the tree (core -> skin), with a little world noise -- the Great Tree's program with
+    the tree's own colours: the Weeper's limes, the Blossom Puff's pinks."""
+    return {"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+            "emissionIntensity": 1.0, "opacity": -1, "ops": [
+                {"kind": "input", "dst": 0, "input": "objectPosition"},
+                {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, 1.0 / height, 0.0, offset], "value": 1.0},
+                {"kind": "input", "dst": 4, "input": "worldPosition"},
+                {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.35, "seed": 3},
+                {"kind": "mix", "dst": 1, "srcA": 1, "srcB": 2, "value": 0.35},
+                {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "constant": R(stops[0]) + [1.0],
+                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]}
+
+
 def all_programs():
-    return [ground_program(), grass_program(), canopy_program(), rock_program(), cloud_program(), flower_program()]
+    return [ground_program(), grass_program(), canopy_program(), rock_program(), cloud_program(), flower_program(),
+            tinted_canopy_program("rw_weeper", [rw.hexlin("#3C6E22")[:3], rw.hexlin("#6E9E2A")[:3],
+                                                rw.hexlin("#A6C83A")[:3], rw.hexlin("#D2E25A")[:3]], height=12.0, offset=0.0),
+            tinted_canopy_program("rw_blossom", [rw.hexlin("#8A3C78")[:3], rw.hexlin("#C9619E")[:3],
+                                                 rw.hexlin("#EE94C0")[:3], rw.hexlin("#FFD0E4")[:3]], height=10.0, offset=-1.0),
+            tinted_canopy_program("rw_pine", [rw.hexlin("#173F2E")[:3], rw.hexlin("#245C3C")[:3],
+                                              rw.hexlin("#3F7E46")[:3], rw.hexlin("#6FA552")[:3]], height=24.0, offset=-0.2)]
 
 
 def rim_ranges(band):
