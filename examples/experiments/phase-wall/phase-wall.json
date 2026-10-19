@@ -160,7 +160,7 @@
   {
    "source": "response.sustain",
    "target": "grid/net/coupling",
-   "amount": 3.0,
+   "amount": 4.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -172,7 +172,7 @@
   {
    "source": "response.bass",
    "target": "grid/net/frequency",
-   "amount": 0.25,
+   "amount": 0.375,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -196,7 +196,7 @@
   {
    "source": "response.intensity",
    "target": "grid/net/phaseLag",
-   "amount": 0.35,
+   "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -208,7 +208,7 @@
   {
    "source": "response.level",
    "target": "scene/bands/rotation",
-   "amount": 0.15,
+   "amount": 0.22,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -224,7 +224,7 @@
    "polarity": "unipolar",
    "depthSource": "visual.influence",
    "chain": {
-    "gain": 0.5,
+    "gain": 0.75,
     "offset": 0.75,
     "attackMs": 200,
     "decayMs": 900
@@ -261,7 +261,7 @@
   {
    "source": "response.sustain",
    "target": "field/breath/strength",
-   "amount": 3.0,
+   "amount": 4.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",

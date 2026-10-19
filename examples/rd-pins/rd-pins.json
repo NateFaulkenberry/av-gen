@@ -199,7 +199,7 @@
   {
    "source": "response.sustain",
    "target": "field/pool/strength",
-   "amount": 0.25,
+   "amount": 0.375,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -211,7 +211,7 @@
   {
    "source": "response.bass",
    "target": "procedural/pins/effector/2/strength",
-   "amount": 3.0,
+   "amount": 4.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -223,7 +223,7 @@
   {
    "source": "response.bass",
    "target": "procedural/pins/deform/1/amount",
-   "amount": 0.7,
+   "amount": 1.05,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",

@@ -413,15 +413,17 @@ def instrument(s, g):
     G = "grid/pattern/"
     ring, hot, glint, shift = g.path("ring"), g.path("hot"), g.path("glint"), g.path("rippleShift")
     A = common.audio
+    # ADR-1510: the level signals read against an adaptive reference (Feline p50 about 0.65, a breakdown near 0), so
+    # the routes from response.bass / level / sustain / intensity are scaled x1.5 from what they were tuned at
     s.route(R(common.INFLUENCE, "field/kick/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
               attackMs=200, decayMs=200),
             R(common.INFLUENCE, "field/snare/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
               attackMs=200, decayMs=200),
             R(common.INFLUENCE, "field/swell/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
               attackMs=200, decayMs=200),
-            A("response.sustain", "field/pool/strength", 0.25, attackMs=3000, decayMs=6000),
-            A("response.bass", E, 3.0, attackMs=250, decayMs=1200),
-            A("response.bass", D + "1/amount", 0.7, attackMs=400, decayMs=2500),
+            A("response.sustain", "field/pool/strength", 0.375, attackMs=3000, decayMs=6000),
+            A("response.bass", E, 4.5, attackMs=250, decayMs=1200),
+            A("response.bass", D + "1/amount", 1.05, attackMs=400, decayMs=2500),
             A("audio.mid", shift, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=120, decayMs=700),
             A("response.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
             A("response.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),

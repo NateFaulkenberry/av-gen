@@ -564,13 +564,15 @@ def music(s, net, g):
     s.field("tune", {"kind": "compound", "combine": "add", "children": ["tilt", "pace"]})
     net["frequencyField"] = "tune"
     A = common.audio
-    s.route(A("response.sustain", G + "coupling", 3.0, attackMs=3000, decayMs=6000),
-            A("response.bass", G + "frequency", 0.25, attackMs=300, decayMs=1500),
+    # ADR-1510: the level signals read against an adaptive reference (Feline p50 about 0.65, a breakdown near 0), so
+    # the routes from response.bass / level / sustain / intensity are scaled x1.5 from what they were tuned at
+    s.route(A("response.sustain", G + "coupling", 4.5, attackMs=3000, decayMs=6000),
+            A("response.bass", G + "frequency", 0.375, attackMs=300, decayMs=1500),
             A("response.hat", G + "noise", 0.12, attackMs=40, decayMs=400),
-            A("response.intensity", G + "phaseLag", 0.35, attackMs=6000, decayMs=12000),
-            A("response.level", "scene/bands/rotation", 0.15, integrate=True),
+            A("response.intensity", G + "phaseLag", 0.5, attackMs=6000, decayMs=12000),
+            A("response.level", "scene/bands/rotation", 0.22, integrate=True),
             # the light: the bass warms the cores slowly, the hats run the streaks
-            A("response.bass", op_path(g, "core"), 1.0, op="multiply", gain=0.5, offset=0.75, attackMs=200,
+            A("response.bass", op_path(g, "core"), 1.0, op="multiply", gain=0.75, offset=0.75, attackMs=200,
               decayMs=900),
             # density (hats a second, 0..0.65 measured): a busy mix lights the bands, a breakdown lets them settle
             A("response.hatRate", op_path(g, "core"), 1.0, op="multiply", gain=1.5, offset=0.45, attackMs=600,
@@ -578,7 +580,7 @@ def music(s, net, g):
             A("response.hat", op_path(g, "glint"), 1.0, op="multiply", gain=3.0, offset=0.04, attackMs=8,
               decayMs=260),
             # the held sound swells the membrane
-            A("response.sustain", "field/breath/strength", 3.0, attackMs=2500, decayMs=5000))
+            A("response.sustain", "field/breath/strength", 4.5, attackMs=2500, decayMs=5000))
     common.instrument(s, MIDI_CC, MIDI_NOTES)
     CC = common.CC
     s.route(R("control.coupling", G + "coupling", 12.0, **CC),
