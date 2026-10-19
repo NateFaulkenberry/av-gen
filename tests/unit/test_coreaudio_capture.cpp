@@ -51,8 +51,8 @@ double powerAt(const std::vector<float>& x, double hz, double rate) {
     double re = 0.0, im = 0.0;
     const double w = 2.0 * std::numbers::pi * hz / rate;
     for (std::size_t n = 0; n < x.size(); ++n) {
-        re += x[n] * std::cos(w * static_cast<double>(n));
-        im += x[n] * std::sin(w * static_cast<double>(n));
+        re += static_cast<double>(x[n]) * std::cos(w * static_cast<double>(n));
+        im += static_cast<double>(x[n]) * std::sin(w * static_cast<double>(n));
     }
     return re * re + im * im;
 }
@@ -146,7 +146,7 @@ TEST_CASE("Core Audio capture: on BlackHole 2ch the main stream carries the same
     for (std::size_t lag = 0; lag + window < b.size() && lag < 12000; ++lag) {
         double d = 0.0;
         for (std::size_t i = 0; i < 256; ++i) {
-            const double e = static_cast<double>(a[8000 + i]) - b[lag + i];
+            const double e = static_cast<double>(a[8000 + i]) - static_cast<double>(b[lag + i]);
             d += e * e;
         }
         if (d < best) {

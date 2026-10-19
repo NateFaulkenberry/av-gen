@@ -72,7 +72,7 @@ int runInputMeter(const std::string& device, double seconds) {
             for (std::uint32_t c = 0; c < input.channels(); ++c) {
                 const float p = held[c];
                 if (p > 0.0f) {
-                    std::printf(" %2u:%6.1f", c + 1, 20.0 * std::log10(p));
+                    std::printf(" %2u:%6.1f", c + 1, 20.0 * std::log10(static_cast<double>(p)));
                 } else {
                     std::printf(" %2u:  -inf", c + 1);
                 }

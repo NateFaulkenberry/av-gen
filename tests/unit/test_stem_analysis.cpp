@@ -144,10 +144,10 @@ TEST_CASE("stem analysis: sustained energy follows the bass notes, and silence r
         REQUIRE(f.rms == 0.0f);
         REQUIRE(f.peak == 0.0f);
         REQUIRE_FALSE(f.onset);
-        REQUIRE(f.level <= previous);
-        previous = f.level;
+        REQUIRE(static_cast<double>(f.level) <= previous);
+        previous = static_cast<double>(f.level);
     }
-    CHECK(previous == 0.0f);
+    CHECK(previous == 0.0);
 
     const StemTrack silent = analyzeFile(fx, "silent.wav");
     for (const StemFrame& f : silent.frames()) {

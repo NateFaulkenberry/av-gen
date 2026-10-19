@@ -132,7 +132,7 @@ void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track,
     analysis::StemFrame f = after == frames.begin() ? frames.front() : *std::prev(after);
     f.onset = f.kick = f.snare = f.hat = false;
     f.kickStrength = f.snareStrength = f.hatStrength = 0.0f;
-    float onsetStrength = 0.0f;
+    float batchStrength = 0.0f;
     if (from >= 0.0 && from < to) {
         const double localFrom = from - offset;
         auto it = std::upper_bound(frames.begin(), frames.end(), localFrom,
@@ -140,7 +140,7 @@ void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track,
         for (; it != after; ++it) {
             if (it->onset) {
                 f.onset = true;
-                onsetStrength = std::max(onsetStrength, it->onsetStrength);
+                batchStrength = std::max(batchStrength, it->onsetStrength);
             }
             if (it->kick) {
                 f.kick = true;
@@ -157,7 +157,7 @@ void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track,
         }
     }
     if (f.onset) {
-        f.onsetStrength = std::max(f.onsetStrength, onsetStrength);
+        f.onsetStrength = std::max(f.onsetStrength, batchStrength);
     }
     publish(bus, f);
 }

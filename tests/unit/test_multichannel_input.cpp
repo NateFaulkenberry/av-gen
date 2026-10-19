@@ -63,8 +63,8 @@ double powerAt(const std::vector<float>& x, double hz) {
     double re = 0.0, im = 0.0;
     const double w = 2.0 * std::numbers::pi * hz / kRate;
     for (std::size_t n = 0; n < x.size(); ++n) {
-        re += x[n] * std::cos(w * static_cast<double>(n));
-        im += x[n] * std::sin(w * static_cast<double>(n));
+        re += static_cast<double>(x[n]) * std::cos(w * static_cast<double>(n));
+        im += static_cast<double>(x[n]) * std::sin(w * static_cast<double>(n));
     }
     return re * re + im * im;
 }
@@ -97,7 +97,7 @@ TEST_CASE("multichannel: each of 8 channels reaches its own source and no other"
         std::uint32_t best = 0;
         double bestPower = -1.0, second = 0.0;
         for (std::uint32_t k = 0; k < 8; ++k) {
-            const double p = powerAt(x, SyntheticCaptureConfig::toneHz(k));
+            const double p = powerAt(x, static_cast<double>(SyntheticCaptureConfig::toneHz(k)));
             if (p > bestPower) {
                 second = std::max(second, bestPower);
                 bestPower = p;
@@ -109,7 +109,7 @@ TEST_CASE("multichannel: each of 8 channels reaches its own source and no other"
         CHECK(best == c);
         CHECK(second < bestPower * 1e-6); // the other tones are absent, not merely weaker
         // And sample-exact: the source holds the generator's own samples.
-        const double w = 2.0 * std::numbers::pi * SyntheticCaptureConfig::toneHz(c) / kRate;
+        const double w = 2.0 * std::numbers::pi * static_cast<double>(SyntheticCaptureConfig::toneHz(c)) / kRate;
         CHECK(x[1000] == cfg.amplitude * static_cast<float>(std::sin(w * 1000.0)));
     }
 }
