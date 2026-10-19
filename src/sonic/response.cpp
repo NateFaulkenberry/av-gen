@@ -249,13 +249,13 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     // silence -- after that followed up in seconds and down over a minute. Silence below the gate leaves it where it is.
     if (heard) {
         heardSeconds_ += dt;
-        const double a = std::max(alpha(dt, s.referenceSeconds), dt / heardSeconds_);
+        const double a = std::max(alpha(dt, static_cast<double>(s.referenceSeconds)), dt / heardSeconds_);
         referencePower_ += a * (power - referencePower_);
         const float source = powerToDb(referencePower_);
-        if (heardSeconds_ <= 2.0 * s.referenceSeconds) {
+        if (heardSeconds_ <= 2.0 * static_cast<double>(s.referenceSeconds)) {
             referenceDb_ = source; // warming: the average of what has been heard, with no lag on top of it
         } else {
-            follow(referenceDb_, source, dt, s.referenceRise, s.referenceFall);
+            follow(referenceDb_, source, dt, static_cast<double>(s.referenceRise), static_cast<double>(s.referenceFall));
         }
     }
     // The slow levels: power over levelSlowSeconds and intensitySeconds, from the first sound heard (the same warm-up),
@@ -263,12 +263,13 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     if (heard || sinceHeard_ > 0.0) {
         sinceHeard_ += dt;
         const double warm = dt / sinceHeard_;
-        const double slowTau = (power > levelSlowPower_ ? s.levelSlowSeconds * att : s.levelSlowSeconds * rel);
+        const double slowTau = static_cast<double>(s.levelSlowSeconds) * (power > levelSlowPower_ ? att : rel);
         levelSlowPower_ += std::max(alpha(dt, slowTau), warm) * (power - levelSlowPower_);
-        intensityPower_ += std::max(alpha(dt, s.intensitySeconds), warm) * (power - intensityPower_);
+        intensityPower_ += std::max(alpha(dt, static_cast<double>(s.intensitySeconds)), warm) * (power - intensityPower_);
     }
-    follow(bassDb_, bassDb, dt, s.bassAttack * att, s.bassRelease * rel);
-    follow(levelDb_, levelDb, dt, s.levelAttack * att, s.levelRelease * rel);
+    follow(bassDb_, bassDb, dt, static_cast<double>(s.bassAttack) * att, static_cast<double>(s.bassRelease) * rel);
+    follow(levelDb_, levelDb, dt, static_cast<double>(s.levelAttack) * att,
+           static_cast<double>(s.levelRelease) * rel);
     const float ref = referenceDb_;
     const float levelSlowDb = sinceHeard_ > 0.0 ? powerToDb(levelSlowPower_) : gate;
     const float intensityDb = sinceHeard_ > 0.0 ? powerToDb(intensityPower_) : gate;
