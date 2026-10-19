@@ -3,6 +3,7 @@
 #include "app/route_audit_cli.hpp"
 #include "app/sonic_trace_cli.hpp"
 #include "app/space_validate_cli.hpp"
+#include "app/input_meter_cli.hpp"
 #include "app/jump_trace_cli.hpp"
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
@@ -61,7 +62,17 @@ int main(int argc, char** argv) {
         if (options->listAudioDevices) {
             std::printf("audio capture devices:\n");
             for (const auto& d : avgen::audio::listCaptureDevices()) {
+                std::string streams;
+                for (const std::uint32_t n : d.streamChannels) {
+                    streams += (streams.empty() ? "" : "+") + std::to_string(n);
+                }
                 std::printf("  %s%s\n", d.name.c_str(), d.isDefault ? " (default)" : "");
+                std::printf("      id %s", d.id.c_str());
+                if (!d.streamChannels.empty()) {
+                    std::printf(", %u input channel(s) in %zu stream(s) (%s), %.0f Hz", d.channels(),
+                                d.streamChannels.size(), streams.c_str(), d.sampleRate);
+                }
+                std::printf("\n");
             }
         }
         if (options->listMidi) {
@@ -73,6 +84,9 @@ int main(int argc, char** argv) {
         return 0;
     }
     avgen::log::init(options->logLevel);
+    if (options->inputMeter) {
+        return avgen::app::runInputMeter(*options->inputMeter, options->inputMeterSeconds);
+    }
     // ADR-902: the route audit runs before the application exists, so it needs no window and no GPU.
     if (options->auditRoutes) {
         return avgen::app::runRouteAuditCommand(options->project.value_or(std::filesystem::path{}),

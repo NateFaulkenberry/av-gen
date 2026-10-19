@@ -192,7 +192,10 @@ std::string usageText() {
            "                      at 960x540 (--live-capture-size WxH) into <d> as PPM plus frames.csv, for a\n"
            "                      review clip; costs frame time\n"
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
-           "  --list-audio-devices, --list-midi   enumerate inputs and exit\n"
+           "  --list-audio-devices, --list-midi   enumerate inputs and exit (audio: id, channels per\n"
+           "                      Core Audio stream, rate)\n"
+           "  --input-meter <device> [s]  every input channel's peak once a second for s seconds (default\n"
+           "                      20), through the multichannel capture path; device = id or name\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
            "                                      what it does not, and where its decision is made\n"
            "  --lab-case <lab>:<n>                open a lab case: its fixture, second, size, tier,\n"
@@ -540,6 +543,15 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             ++i;
         } else if (arg == "--list-audio-devices") {
             options.listAudioDevices = true;
+        } else if (arg == "--input-meter") {
+            auto v = need(i, "--input-meter");
+            if (!v) return std::unexpected(v.error());
+            options.inputMeter = *v;
+            ++i;
+            if (i + 1 < argc && std::isdigit(static_cast<unsigned char>(argv[i + 1][0]))) {
+                options.inputMeterSeconds = std::max(1.0, std::atof(argv[i + 1]));
+                ++i;
+            }
         } else if (arg == "--labs") {
             options.listLabs = true;
         } else if (arg == "--lab-case") {
