@@ -171,9 +171,9 @@ void ResponseModel::declare(signals::SignalBus& bus) {
         bus.setLabel(ids_.env[h], std::string(kHitLabels[h]) + ", as an envelope");
     }
     ids_.bass = bus.declare("response.bass");
-    bus.setLabel(ids_.bass, "bass level (30-150 Hz, fast)");
+    bus.setLabel(ids_.bass, "bass level (30-150 Hz, the body: held between hits, against the music's loudness)");
     ids_.level = bus.declare("response.level");
-    bus.setLabel(ids_.level, "level (fast)");
+    bus.setLabel(ids_.level, "level (the body: held between hits, against the music's loudness)");
     ids_.transient = bus.declare("response.transient");
     bus.setLabel(ids_.transient, "attack energy (fast minus slow level)");
     ids_.sustain = bus.declare("response.sustain");
@@ -187,7 +187,7 @@ void ResponseModel::declare(signals::SignalBus& bus) {
     ids_.pitch = bus.declare("response.pitch");
     bus.setLabel(ids_.pitch, "pitch of the latest note or confident pitch (0 = C1, 1 = C8)");
     ids_.intensity = bus.declare("response.intensity");
-    bus.setLabel(ids_.intensity, "intensity (level over 12 s: the macro dynamics)");
+    bus.setLabel(ids_.intensity, "intensity (level over 12 s against the last minute: the macro dynamics)");
     // ADR-1361: declared last, after every older id.
     ids_.levelSlow = bus.declare("response.levelSlow");
     bus.setLabel(ids_.levelSlow, "level, slow (over about 3 s: when a rest becomes silence)");
