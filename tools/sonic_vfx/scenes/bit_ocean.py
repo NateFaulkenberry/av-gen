@@ -456,8 +456,7 @@ def camera_track(s):
 def build():
     generate_meshes()
     s = kit.Scene(ID, TITLE, DESIGN)
-    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
-                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
+    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1}
     s.environment = {
         "intensity": 0.55, "background": hexrgb(AREAS[0][8]), "fogColor": hexrgb(AREAS[0][8]),
         "volumeDensity": 0.0052, "volumeMaxDistance": 0.0, "skyIntensity": 1.0,

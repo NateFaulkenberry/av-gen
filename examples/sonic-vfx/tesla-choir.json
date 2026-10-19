@@ -961,7 +961,8 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 50,
-    "decayMs": 700
+    "decayMs": 700,
+    "offset": 0.35
    }
   },
   {
@@ -972,7 +973,8 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 50,
-    "decayMs": 700
+    "decayMs": 700,
+    "offset": 0.35
    }
   },
   {
@@ -983,7 +985,8 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 50,
-    "decayMs": 700
+    "decayMs": 700,
+    "offset": 0.35
    }
   },
   {
@@ -994,7 +997,8 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 50,
-    "decayMs": 900
+    "decayMs": 900,
+    "offset": 0.35
    }
   },
   {

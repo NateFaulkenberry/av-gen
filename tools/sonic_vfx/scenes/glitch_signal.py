@@ -304,8 +304,7 @@ def instrument(s):
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
     s.unshadowed_key()          # every material is unlit: the default key's shadow would be pure cost
-    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
-                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
+    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1}
     s.environment = {
         "intensity": 0.0, "background": hexrgb(INK), "fogColor": hexrgb(INK), "volumeDensity": 0.0042,
         "volumeMaxDistance": 0.0,

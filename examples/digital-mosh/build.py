@@ -870,7 +870,8 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 # `sonic/response/*`, ADR-1062) reach the live scene through `response.*`:
 #   hits    the kick, snare and hat are the response model's (ADR-1067's detector, the hit sensitivity's floor and
 #           curve, so Transients decides how many fire and how hard), scaled so a hit's peak is the old onset's
-#   levels  a level is the response model's fixed-dB level, never auto-gained: the bass melt reads response.bass;
+#   levels  a level is the response model's level, read against the music's own loudness (ADR-1510): the bass melt
+#           reads response.bass;
 #           an auto-gained band (the treble's glints, the limbs' lift) keeps its shape (character) and is multiplied
 #           by the response level (how loud it is heard), so a quiet input reads quiet and Sensitivity lifts it
 #   the arc the drive is how busy the music is (energy and treble: character) times how present it is heard (the
@@ -878,11 +879,13 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 #           Nightmare, and Sensitivity brings it back
 # Every gain below is the mean ratio on Trench at the neutral controls (docs/development/live-response-everywhere.md),
 # so the neutral live picture is the old one. The offline projects keep their audio.* routes: a file is not played.
-# The level range is the Sonic Abstract scenes' (-44..-2 dB): a mastered mix sits near 0.8, a take 15 dB down near 0.45.
-RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}
+# ADR-1510: the levels read against the music's own loudness, so a mastered mix's body sits near 0.6 (bass 0.63,
+# level 0.60 mean on Trench, from 0.77 and 0.83 on the old -44..-2 dB window) and a breakdown near 0; the gains are
+# the old ones times those ratios (1.21 bass, 1.38 level), and a quieter take reads as the mix does.
+RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 LIVE_HITS = {"audio.onsetLow": ("response.kick", 0.77), "audio.onsetMid": ("response.snare", 0.78),
              "audio.onsetHigh": ("response.hat", 0.91)}
-LIVE_LEVELS = {"audio.bassLevel": ("response.bass", 1.04), "audio.treble": ("visual.hTreble", 1.0),
+LIVE_LEVELS = {"audio.bassLevel": ("response.bass", 1.26), "audio.treble": ("visual.hTreble", 1.0),
                "audio.trebleLevel": ("visual.hTrebleLevel", 1.0), "audio.bass": ("visual.hBass", 1.0)}
 
 
@@ -898,15 +901,15 @@ def heard(name, band, level, gain):
 LIVE_HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
     # how busy the music is (the offline drive)
     dict(LISTEN["settings"]["mappings"][0], name="busy"),
-    # how present it is: the response level with a knee -- 1 from a level of 0.65, which a mastered mix holds at
-    # neutral, so the arc on a full mix is the offline one; 0.5 at 0.45; 0 at 0.25. The arc integrates its drive into
-    # the stage ladder, so a plain x level (whose small swings on a mix the old drive never had) moved Trench's
-    # stages by 16 s; the knee keeps them.
+    # how present it is: the response level with a knee -- 1 from a level of 0.45, which a mastered mix's body holds
+    # at neutral (ADR-1510: Trench's p10 is 0.48), so the arc on a full mix is the offline one; 0.5 at 0.25; 0 at
+    # 0.05, a breakdown. The arc integrates its drive into the stage ladder, so a plain x level (whose small swings on
+    # a mix the old drive never had) moved Trench's stages by 16 s; the knee keeps them.
     {"name": "presence", "combine": "mean", "inputs": [{"signal": "response.level", "weight": 1.0}],
-     "gain": 2.5, "bias": -0.625},
-    heard("hTreble", "audio.treble", "response.level", 1.2),
-    heard("hTrebleLevel", "audio.trebleLevel", "response.level", 1.2),
-    heard("hBass", "audio.bass", "response.bass", 1.22),
+     "gain": 2.5, "bias": -0.125},
+    heard("hTreble", "audio.treble", "response.level", 1.65),
+    heard("hTrebleLevel", "audio.trebleLevel", "response.level", 1.65),
+    heard("hBass", "audio.bass", "response.bass", 1.48),
 ]}}
 LIVE_LISTEN = {"kind": "interpret", "name": "listen", "settings": {"mappings": [
     {"name": "drive", "combine": "product", "inputs": [{"signal": "visual.busy", "weight": 1.0},

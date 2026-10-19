@@ -121,10 +121,14 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     const double keen = meanParam(p, "macros/energy");
     INFO("macros/energy: " << dull << " / " << neutral << " / " << keen);
     CHECK(dull < neutral);
-    CHECK(neutral < keen);
+    // ADR-1510: a steady groove at neutral reads as a mix's body, which is full presence (the arc on a mix is the
+    // offline one), so more Sensitivity cannot drive it faster; less slows it.
+    CHECK(keen >= neutral);
 
-    // A take 16 dB down is heard quieter at the same setting (the limbs' bass lift, an auto-gained band times the
-    // response bass) -- where the old audio.bass route read it as loud as the mix -- and Sensitivity gives it back.
+    // A take 16 dB down (the limbs' bass lift, an auto-gained band times the response bass): since ADR-1510 the
+    // response levels read against the take's own loudness, so a quieter channel playing the same music reads about
+    // as the mix does (ADR-1361 had it read quieter, on a fixed window mastered music always topped), and Sensitivity
+    // still lifts it.
     Play q = p;
     q.response = {{"sensitivity", 0.5f}};
     const double loud = meanSignal(q, "visual.hBass");
@@ -133,7 +137,8 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     q.response = {{"sensitivity", 0.9f}};
     const double lifted = meanSignal(q, "visual.hBass");
     INFO("visual.hBass: loud " << loud << ", quiet " << quiet << ", lifted " << lifted);
-    CHECK(quiet < 0.8 * loud);
+    CHECK(quiet > 0.2);
+    CHECK(std::abs(quiet - loud) < 0.25 * loud);
     CHECK(lifted > quiet);
 
     // The kick's fracture light (the Dream's rhythm gate opened): more Transients, harder kicks.
@@ -164,11 +169,16 @@ TEST_CASE("Sonic Live: the garden's loudness and strikes are the Response's", "[
     CHECK(lowSustain < neutral);
     CHECK(lowTransient == neutral);
 
-    // At Sensitivity 0 nothing is heard: the waiting world holds while the groove plays.
+    // At Sensitivity 0 the garden's loudness is off. Since ADR-1510 the waiting world is for silence: the response
+    // level reads against the music's own loudness (a breakdown reads near 0), so silence also hears the character's
+    // fixed-dB energy, and holds when the input is silent rather than when the slider is down.
     p.response = {{"sensitivity", 0.0f}};
-    CHECK(meanSignal(p, "visual.silence") > 0.9);
+    CHECK(meanSignal(p, "visual.energy") < 0.02);
     p.response = {};
     CHECK(meanSignal(p, "visual.silence") < 0.1);
+    Play quiet = p;
+    quiet.level = 0.0f; // a silent input
+    CHECK(meanSignal(quiet, "visual.silence") > 0.9);
 
     // Strikes: Transients decides how many onsets strike.
     p.response = {{"transient", 0.2f}};

@@ -44,8 +44,10 @@ first time. After that, AV Gen remembers your devices.
    - **Audio receiving** means a signal above -60 dBFS. The meter shows its level.
    - **MIDI receiving** shows the last note, its velocity and channel, and how many notes are held.
 
-5. **Set Sensitivity:** play hard and adjust until the meter peaks around -12 dBFS. The Sonic Character reads
-   levels on fixed scales, so an input that is too quiet looks like a quiet sound.
+5. **Set Input gain:** play hard and adjust until the meter peaks around -12 dBFS. The Sonic Character and the hit
+   detector read levels on fixed scales, so an input that is too quiet looks like a quiet sound to them. The
+   Response levels (bass, level, sustain, levelSlow, intensity) do not need it: since ADR-1510 they read the music
+   against its own recent loudness, so they only need the input to clear the -60 dBFS gate.
 
 6. **Play.** Try the brief's list: bass, pad, lead, pluck, FM, distorted, filtered, resonant, noisy, sustained,
    percussive. Then hold one note and sweep the synth's filter: the notes do not change, but the world should.
@@ -190,13 +192,15 @@ BlackHole as the input, then run the probe.
 
 - **Response** (the Live panel, under the audio input):
   - **Sensitivity** sets how readily the world answers: it lowers the floor and lifts small values, without pushing
-    loud ones past full.
+    loud ones past full. The levels are read against the music's own loudness over the last minute or so
+    (ADR-1510): at 0.5 a loud passage reads high, the body of a track sits around the middle, a breakdown reads low.
   - **Transients** sets kicks, snares, hats and notes. At 0, no hit fires.
   - **Sustain** sets the bass, the level and held sound.
   - **Attack** and **Release** are multipliers. Release is the feel.
   - The four meters show the kick, snare, hat and note as the detector hears them.
   - **Reset** returns the five sliders to the scene's own values.
-  - The old "Sensitivity" is now **Input gain** (the interface level).
+  - The old "Sensitivity" is now **Input gain** (the interface level). It feeds the meter, the gate, the hit
+    detector and the Sonic Character; it does not scale the Response levels, which follow the music's own loudness.
   - Every live scene answers these (ADR-1361). In Sonic Live they set the garden's dynamics, not its character: its
     loudness (the glow that holds a note, the waiting world), its strikes (the chaotic world's shards and sparks on
     the strongest onsets) and its note gestures (a note-on's velocity through the Transients curve).

@@ -1,6 +1,8 @@
 # ADR-1361: Every live scene reads the Response controls
 
 - Status: Accepted (2026-10-15), the owner's request
+- Superseded in part by ADR-1510 (2026-10-19): the response levels are read against an adaptive loudness reference,
+  so a quieter take no longer reads quieter.
 - Extends: ADR-1062 (the response model and the performer's Sensitivity / Transients / Sustain / Attack / Release),
   ADR-1116 (the audio history the spectrum and onset fields read), ADR-1221/1222 (THE ASTRAL FORGE's conductors).
 - Code: `src/spatial/audio_history.{hpp,cpp}` (`AudioResponse`, `AudioHistory::setResponse`, `onsetDecayScale`),
