@@ -15,6 +15,14 @@
 //   Density        : density *= s * strength (Replace: density = s * strength)
 //   Attribute      : attribute(target) = blend(existing, value(s or v or c) * strength)
 // Blend: Add (existing + new), Multiply (existing * new), Replace (new), Min, Max, Mix (mix by weight).
+//
+// ADR-1500: `local` reads a scalar field's `axis` in each point's own frame (its rotation) instead of the object's:
+//   PositionOffset : position += rotate(rotation, axis) * s * strength  (along the instance's own axis: a membrane
+//                    displaced along each panel's normal)
+//   Rotation       : rotation = rotation * axisAngle(axis, s * strength)  (about the instance's own axis: a blade swung
+//                    about its own hinge whatever way it was placed)
+// It changes nothing for vector fields (their vector is the axis) and nothing for any other op. Absent = false, and an
+// effector without it serialises and hashes exactly as before.
 
 #include "core/error.hpp"
 #include "spatial/field.hpp"
@@ -49,6 +57,7 @@ struct Effector {
     glm::vec3 axis{0.0f, 1.0f, 0.0f};   // scalar-field direction / rotation axis
     glm::vec3 scaleAxis{1.0f};          // Scale per-axis mask
     std::string target;                 // Attribute op target (created as Float/Vec3/Color by the field type)
+    bool local = false;                 // ADR-1500: scalar PositionOffset / Rotation axis in the point's own frame
     [[nodiscard]] nlohmann::json toJson() const;
     static Result<Effector> fromJson(const nlohmann::json& j);
     [[nodiscard]] std::uint64_t structuralHash() const;

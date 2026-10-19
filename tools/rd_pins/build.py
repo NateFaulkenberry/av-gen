@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
-"""RD PINS: the generator (docs/prototypes/generative-rd/C-scene-plan.md).
+"""RD PINS: the generator (docs/prototypes/generative-rd/C-scene-plan.md; the art pass:
+docs/prototypes/generative-pass/01-plan.md).
 
     python3 tools/rd_pins/build.py                                  # writes examples/rd-pins/ + its index entry
     python3 tools/rd_pins/build.py --variant --out <v.json> [--wav <w>] [--set path=json] [--camera ...]
 
-A bowl of copper pins in the dark. A Gray-Scott plane (ADR-1451) grows a labyrinth and spots over the bowl's plan;
-each pin rises with the pattern under it, its head turns from oxidised to bright metal on the pattern, and a thin ring
-of light marks the pattern's boundary. The music edits the regime map (labyrinth -> spots) rather than the pattern
-itself, so the pattern's own growth is the animation.
+A bowl of pins in the dark: a living, illuminated topographic interference field. A Gray-Scott plane (ADR-1451) grows a
+labyrinth and spots over the bowl's plan; each pin rises with the pattern under it, and the pattern's boundary is a
+contour of light: a fine hot core and a softer coloured halo, over dark channels. On top of the pattern the field is
+excited by waves of different scales and times:
+  - a broad swell travelling across the bowl (a sine heave, the bass level its height); it also moves the contours
+    themselves (they bunch and open as it passes; the mids set how far), lights the field along its crest where the
+    bass pool is, and where its crest crosses a contour a bead of light runs along it (the hats sharpen it);
+  - the bass history rolling out from the bowl's heart (a spectrum field laid out at 14 m/s): a lift and a pool of
+    light where it is loud, so loud passages reshape the field and quiet ones let it settle;
+  - a kick: a ring of impact from a heart that wanders slowly about the bowl's middle (the pins jump, the contours
+    swell, a band of light runs with it; accents bright, ghost hits faint), which also turns the labyrinth toward spots
+    as it passes, and the spots give the ground back; a snare: a quicker ring from off-centre;
+  - density (hats a second) lifts the contours' light; a breakdown or a held note lets the field settle.
 
-Proof switches (environment, review only): RP_PIN=box|round, RP_KICK=regime|growth, RP_RES=1 (resonance regime layer),
-RP_FLOOR=0 (no floor tint), RP_PALETTE=<n>.
+Proof switches (environment, review only): RP_PIN=box|round, RP_RES=1 (resonance regime layer), RP_FLOOR=1 (the floor
+tint), RP_PALETTE=<n>.
 """
 from __future__ import annotations
 
@@ -32,9 +42,9 @@ ID = "rd-pins"
 TITLE = "RD Pins"
 OUT = os.path.join(REPO, "examples", "rd-pins")
 PIN = os.environ.get("RP_PIN", "box")  # round pins cost 2.2x and look the same at this distance (plan, Q2)
-KICK = os.environ.get("RP_KICK", "regime")
 RES = bool(os.environ.get("RP_RES"))
-FLOOR = os.environ.get("RP_FLOOR", "1") != "0"
+FLOOR = os.environ.get("RP_FLOOR", "0") != "0"   # off: the pins heave now, and a floor carrying the pattern
+# beneath them showed through as a ghost of the contours at the wrong height
 KICK_GAIN = float(os.environ.get("RP_KICKGAIN", "1.0"))  # proofs; Stage 2 routes it through Audio Influence
 RING = float(os.environ.get("RP_RING", "1.0"))            # proofs: x the palette's ring gain
 
@@ -52,6 +62,14 @@ def bowl(x, z):
 
 
 PIN_H = 0.25           # a pin's rest height (m); the pattern scales it
+KICK_AT = (0.0, 0.0, -2.0)     # the bowl's heart, where a kick lands and the bass rolls out from (in frame)
+SNARE_AT = (15.0, 0.0, -17.0)  # the snare's ring: off-centre, upper right of the frame
+
+# The wave (world space): (axis, wavelength m, speed m/s, phase). A is the broad swell (the bass level is its height);
+# the pin program reproduces it exactly (the same sine of the same
+# world position and clock) to move the contours and run beads of light along them.
+WAVE_A = ((0.8, 0.0, 0.6), 38.0, 4.2, 0.0)
+GRAD_SCALE = 1.0 / 200.0       # the program's gradient op saturates: world dot axis * this + 0.5 stays inside 0..1
 
 # ================================================================================================ regimes
 REGIMES = {"maze": (0.029, 0.057), "spots": (0.030, 0.062), "coral": (0.055, 0.062), "cells": (0.0367, 0.0649)}
@@ -59,32 +77,35 @@ REGIMES = {"maze": (0.029, 0.057), "spots": (0.030, 0.062), "coral": (0.055, 0.0
 # once the front had passed, the spots stayed and the frame went to one field of rings (measured over 96 s); coral
 # stripes invade spots, so the two families trade ground both ways as the front sweeps.
 LABYRINTH = os.environ.get("RP_LAB", "coral")
+LAB_BIAS = 9.0   # m: the front's sweep sits this far toward the spots side, so a labyrinth always holds much of the frame
 DA, DB = 0.3, 0.15
 
 
 # ================================================================================================ palettes
-ROLES = ["environment", "shadow", "base", "pattern", "ring", "key", "rim"]
+ROLES = ["environment", "shadow", "base", "pattern", "ring", "hot", "key", "rim"]
 PALETTES = [
-    # name, environment, shadow, base, pattern, ring, key, rim, tuning. Six worlds, not six browns: each has its own
-    # hue for the darks (never black), the field, the rings and the two lights.
-    ("Copper Night", "#3a1420", "#561e26", "#5a2420", "#7a3a20", "#ff9a40", "#ffe2c4", "#7a4cff",
-     {"metal": 0.55, "rough": 0.3, "ringGain": 2.4, "keyI": 5.0, "rimI": 1.6}),
-    ("Verdigris Reef", "#03262a", "#05363a", "#0a4a48", "#167a6a", "#8dffe0", "#e4fff6", "#ff6a8a",
-     {"metal": 0.45, "rough": 0.34, "ringGain": 2.0, "keyI": 4.6, "rimI": 1.8}),
-    ("Garnet and Indigo", "#1a1258", "#241872", "#24127a", "#8a1234", "#ff4a6a", "#ffd8e4", "#3a7cff",
-     {"metal": 0.5, "rough": 0.3, "ringGain": 2.2, "keyI": 4.4, "rimI": 2.0}),
-    ("Violet and Gold", "#2a0c48", "#3c1468", "#3e1672", "#6a2ea0", "#ffd060", "#f6ecff", "#ffb040",
-     {"metal": 0.6, "rough": 0.28, "ringGain": 2.0, "keyI": 4.2, "rimI": 1.6}),
-    ("Electric Lagoon", "#021c38", "#03304e", "#044470", "#0a6aa8", "#e8ff5a", "#e6f6ff", "#ff3ad0",
-     {"metal": 0.4, "rough": 0.32, "ringGain": 2.2, "keyI": 4.6, "rimI": 2.0}),
-    ("Rose Quartz", "#341024", "#4a1a36", "#5e2446", "#b0587a", "#fff0c8", "#fff0f4", "#5ac8ff",
-     {"metal": 0.3, "rough": 0.4, "ringGain": 1.8, "keyI": 4.8, "rimI": 1.8}),
+    # name, environment, shadow, base, pattern, ring (the contour's halo: the dominant colour), hot (its core and the
+    # glints: the controlled highlight), key, rim, tuning (the finish, the lights, the bloom's character). Each is a
+    # coordinated set: a dark foundation in its own hue (never black), a dominant contour, a brighter accent, a
+    # highlight that stays in the family, and its own bloom.
+    ("Copper Night", "#3a1222", "#541a2c", "#5e2026", "#8a3a1e", "#ff8a28", "#ffc65a", "#ffe2c4", "#8a4cff",
+     {"metal": 0.55, "rough": 0.3, "ringGain": 1.8, "hotGain": 3.6, "keyI": 4.8, "rimI": 1.6, "bloomI": 0.5}),
+    ("Verdigris Reef", "#032a2c", "#043a3c", "#08504c", "#14806a", "#2affc0", "#b6ffe6", "#e4fff6", "#ff5a8a",
+     {"metal": 0.45, "rough": 0.34, "ringGain": 1.5, "hotGain": 3.0, "keyI": 4.4, "rimI": 1.8, "bloomI": 0.38}),
+    ("Garnet and Indigo", "#1c1270", "#26188c", "#2a1294", "#9a1440", "#ff2c5a", "#ffa0b8", "#ffd8e4", "#3a7cff",
+     {"metal": 0.5, "rough": 0.3, "ringGain": 1.8, "hotGain": 3.4, "keyI": 4.2, "rimI": 2.0, "bloomI": 0.46}),
+    ("Violet and Gold", "#2e0c56", "#401476", "#46188a", "#7a2eb6", "#ffb420", "#ffe27a", "#f6ecff", "#ff4ac0",
+     {"metal": 0.6, "rough": 0.28, "ringGain": 1.6, "hotGain": 3.4, "keyI": 4.0, "rimI": 1.8, "bloomI": 0.44}),
+    ("Electric Lagoon", "#021e44", "#033060", "#04488a", "#0a70c0", "#d4ff1a", "#f0ff8a", "#e6f6ff", "#ff2ad0",
+     {"metal": 0.4, "rough": 0.32, "ringGain": 1.7, "hotGain": 3.2, "keyI": 4.4, "rimI": 2.0, "bloomI": 0.42}),
+    ("Rose Quartz", "#3e1030", "#561c44", "#6a2456", "#b84a80", "#ff7aa8", "#ffd0dc", "#fff0f4", "#5ac8ff",
+     {"metal": 0.3, "rough": 0.4, "ringGain": 1.6, "hotGain": 3.0, "keyI": 4.6, "rimI": 1.8, "bloomI": 0.36}),
 ]
 START_PALETTE = int(os.environ.get("RP_PALETTE", "0"))
 JOURNEY = [0, 4, 3, 1, 5, 2]
 CHANGE = {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0, "slow": 24.0,
           "threshold": 0.06, "rearm": 0.03, "primaryTimeout": 30.0, "maxHold": 90.0}
-P0 = dict(zip(ROLES, PALETTES[START_PALETTE][1:8]), **PALETTES[START_PALETTE][8])
+P0 = dict(zip(ROLES, PALETTES[START_PALETTE][1:9]), **PALETTES[START_PALETTE][9])
 
 
 def C(role, s=1.0):
@@ -92,8 +113,8 @@ def C(role, s=1.0):
 
 
 def palette_states():
-    return [{"name": row[0], "colors": {r: hexrgb(h) for r, h in zip(ROLES, row[1:8])},
-             "scalars": {k: float(v) for k, v in row[8].items()}} for row in PALETTES]
+    return [{"name": row[0], "colors": {r: hexrgb(h) for r, h in zip(ROLES, row[1:9])},
+             "scalars": {k: float(v) for k, v in row[9].items()}} for row in PALETTES]
 
 
 # ================================================================================================ the pattern
@@ -152,6 +173,7 @@ def pattern(s):
     for i in range(13):
         t = 96.0 * i / 12
         d = 20.0 * math.sin(2 * math.pi * t / 96.0) + 4.0 * math.sin(2 * math.pi * 3 * t / 96.0)
+        d += LAB_BIAS
         keys.append({"time": round(t, 3), "value": [round(-3.0 + d * ax[0], 3), 0.0, round(-6.0 + d * ax[2], 3)],
                      "interp": "smooth"})
     s.track("field/front/position", keys, loop=96.0)
@@ -159,12 +181,14 @@ def pattern(s):
     common.lissajous_track(s, "field/pool/position", (-2.0, 0.0, -4.0), (18.0, 14.0), 70.0, ratio=(1, 2))
     s.field("drift", {"kind": "noise", "frequency": 0.06, "speed": 0.12, "seed": 21, "strength": 0.4})
     children = ["front", "pool", "drift"]
-    if KICK == "regime":
-        # a kick's ring flips the regime it passes toward spots for as long as it lasts: spots spread in rings
-        s.field("kickRegime", {"kind": "onset", "onsetSource": "low", "point": [0.0, 0.0, 0.0],
-                               "waveGeometry": "spherical", "audioSpeed": 7.0, "onsetWidth": 3.0,
-                               "onsetDecay": 0.35, "strength": KICK_GAIN})
-        children.append("kickRegime")
+    # THE KICK: a ring of impact travelling out from the bowl's heart. One field, three uses: it flips the regime it
+    # passes toward spots (spots spread in rings), it lifts the pins it passes (an effector) and it swells the contours
+    # and carries a band of light (the pin program)
+    s.field("kick", {"kind": "onset", "onsetSource": "low", "point": list(KICK_AT), "waveGeometry": "spherical",
+                     "audioSpeed": 18.0, "onsetWidth": 2.0, "onsetDecay": 1.6, "strength": KICK_GAIN})
+    children.append("kick")
+    # the rings' heart wanders (a slow loop about the bowl's middle), so the train is never a fixed conveyor
+    common.lissajous_track(s, "field/kick/position", (0.0, 0.0, 0.0), (9.0, 7.0), 53.0, ratio=(1, 2), phase=(0.1, 0.35))
     if RES:
         # option (proof Q5): the resonance field's settled figure (sand, ADR-1405) as a slower regime layer, so the
         # music's standing figure is written into the pattern family
@@ -192,11 +216,6 @@ def pattern(s):
         n = "seed%d" % i
         s.field(n, {"kind": "sphere", "radius": 1.8, "softness": 0.8, "strength": 0.0}, position=(x, 0.0, z))
         seeds.append(n)
-    if KICK == "growth":
-        s.field("kickGrowth", {"kind": "onset", "onsetSource": "low", "point": [0.0, 0.0, 0.0],
-                               "waveGeometry": "spherical", "audioSpeed": 10.0, "onsetWidth": 0.9,
-                               "onsetDecay": 0.5, "strength": KICK_GAIN})
-        seeds.append("kickGrowth")
     s.field("sources", {"kind": "compound", "combine": "add", "children": seeds[:4]})
     if len(seeds) > 4:
         s.field("sources2", {"kind": "compound", "combine": "add", "children": seeds[4:]})
@@ -220,33 +239,95 @@ def pattern(s):
            boundsMin=[-SIZE / 2, -1.0, -SIZE / 2], boundsMax=[SIZE / 2, 1.0, SIZE / 2], simRate=60.0,
            maxSubSteps=1, initial=[round(float(v), 3) for v in bowl(X, Z).reshape(-1)])
     s.grid_reader("bowlY", "bowlHeight")
+    # THE SNARE: a quicker, narrower ring from off-centre (light and a small lift)
+    s.field("snare", {"kind": "onset", "onsetSource": "mid", "point": list(SNARE_AT), "waveGeometry": "spherical",
+                      "audioSpeed": 16.0, "onsetWidth": 1.6, "onsetDecay": 1.3, "strength": 1.0})
+    # THE BASS HISTORY: the bass band's last seconds laid out from the heart at 14 m/s (ADR-1116), smoothed over a third
+    # of a second (ADR-1370): a broad, music-shaped disturbance travelling outward, metres of lift where it is loud
+    s.field("swell", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.16,
+                      "point": list(KICK_AT), "waveGeometry": "spherical", "audioSpeed": 14.0, "audioSmooth": 0.02,
+                      "strength": 1.0})
 
 
 # ================================================================================================ the programs
+def ripple_palette():
+    """The pin program's ripple: cos(2 pi (k3 (g + c t) + k4)) with g = saturate(dot(p, axis) * GRAD_SCALE + 0.5) is
+    exactly sin(dot(p, axis) * 2 pi / wavelength + speed_rad * t + phase), the deformer's sine (procedural.cpp,
+    applySine): k3 = freq / (2 pi s), c = speed_rad s / freq, k4 = (phase - pi / 2) / (2 pi) - k3 / 2."""
+    axis, wl, v, ph = WAVE_A
+    freq = 2 * math.pi / wl
+    k3 = freq / (2 * math.pi * GRAD_SCALE)
+    c = (freq * v) * GRAD_SCALE / freq
+    k4 = (ph - math.pi / 2) / (2 * math.pi) - 0.5 * k3
+    return axis, k3, c, k4
+
+
 def pin_program():
-    """A pin (the C3 look, on a lit bowl): heads on the pattern are dark polished `pattern` metal; heads on the pattern's
-    boundary (B in about 0.12-0.30, the isoline band two pins wide) carry a bright ring of light; heads off the pattern
-    are low `base`; shafts fall to `shadow`. Bright rings against dark is the identity (owner, 2026-10-17)."""
+    """A pin. The pattern's boundary is a contour of light; everything else is the dark it sits in.
+    - S = B + the ripple (a shift of the contour level, so contours bunch and open as the ripple passes) + the kick's
+      ring (the contours swell as it passes).
+    - The contour: d = (S - 0.2) / 0.09; a halo (1 - d^2)^2 in the palette's `ring` and a fine core (1 - d^2)^12 in
+      its `hot`: a bright, fine line with a softer edge, sharp at native resolution, on the pin heads only.
+    - The contour's light is not uniform: a floor, where the ripple's crest meets the bass history's pool a hot spot
+      (the two wave systems interfering), the kick's ring a band of light, the snare's a thinner one, and the ripple's
+      sharp crest running beads of light along every contour it crosses, gated by the hats.
+    - Heads on the pattern are dark polished `pattern` metal, off it low `base`; shafts fall to `shadow`."""
     g = common.Prog("rpPin")
-    g.op("vee", "field", 0, field="vee")                                # r0 = B
-    g.op(None, "smoothstep", 1, a=0, k=[0.06, 0.24, 0, 0])               # r1 = on the pattern
-    g.op("base", "constant", 2, k=C("base") + [1])
-    g.op("pattern", "constant", 3, k=C("pattern") + [1])
-    g.op(None, "mixBy", 4, a=2, b=3, c=1)                                # head colour
+    ax, k3, c, k4 = ripple_palette()
+    g.op("vee", "field", 0, field="vee")                                 # r0 = B
+    g.op(None, "input", 5, inp="worldPosition")
+    g.op(None, "gradient", 1, a=5, k=[ax[0], ax[1], ax[2], 0.5], f=GRAD_SCALE)
+    g.op(None, "input", 6, inp="time")
+    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 0.0, c])                    # c t
+    g.op(None, "add", 1, a=1, b=6)
+    g.op("ripple", "palette", 1, a=1, k=[0, 0, 0, 0], k2=[1, 1, 1, 0], k3=[k3, k3, k3, 0], k4=[k4, k4, k4, 0])  # r1 = sine
+    g.op(None, "field", 2, field="kick")                                 # r2 = the kick's ring
+    g.op(None, "field", 3, field="swell")                                # r3 = the bass history (0..1-ish)
+    g.op(None, "field", 4, field="snare")                                # r4 = the snare's ring
+    # S = B + shift
+    g.op("rippleShift", "constant", 6, k=[0.035, 0.035, 0.035, 0])       # the ripple's reach into the contours (mids)
+    g.op(None, "multiply", 6, a=1, b=6)
+    g.op(None, "remap", 7, a=2, k=[0.0, 0.5, 0.0, 0.03], f=1.0)          # the kick swells the contours (bounded)
+    g.op(None, "add", 6, a=6, b=7)
+    g.op(None, "add", 6, a=0, b=6)                                       # r6 = S
+    # the contour
+    g.op(None, "remap", 7, a=6, k=[0.11, 0.29, -1.0, 1.0])               # d
+    g.op(None, "multiply", 7, a=7, b=7)
+    g.op(None, "remap", 7, a=7, k=[0.0, 1.0, 1.0, 0.0], f=1.0)           # 1 - d^2, 0 outside
+    g.op(None, "power", 6, a=7, f=12.0)                                  # r6 = core
+    g.op(None, "multiply", 7, a=7, b=7)                                  # r7 = halo
     g.op(None, "input", 5, inp="localPosition")
-    g.op(None, "swizzle", 5, a=5, k=[1, 1, 1, 1])                        # local y: -PIN_H/2 .. PIN_H/2 along the pin
-    g.op(None, "smoothstep", 6, a=5, k=[0.1 * PIN_H, 0.45 * PIN_H, 0, 0])  # r6 = the head
-    g.op("shadow", "constant", 7, k=C("shadow") + [1])
-    g.op(None, "mixBy", 4, a=7, b=4, c=6)                                # shaft dark, head lit
-    # the ring: 1 at B = 0.2, falling to 0 at 0.2 +- 0.09, squared
-    g.op(None, "remap", 1, a=0, k=[0.11, 0.29, -1.0, 1.0])
-    g.op(None, "multiply", 1, a=1, b=1)
-    g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 1.0, 0.0], f=1.0)
-    g.op(None, "multiply", 1, a=1, b=1)
-    g.op(None, "multiply", 1, a=1, b=6)                                  # on the head
-    g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])  # palette: ring x ringGain
-    g.op(None, "multiply", 1, a=1, b=2)                                  # r1 = emission
-    g.base, g.emit, g.rough = 4, 1, -1                                   # roughness: the material's (palette)
+    g.op(None, "gradient", 5, a=5, k=[0.0, 1.0, 0.0, -0.1 / 0.35], f=1.0 / (0.35 * PIN_H))  # r5 = the head
+    g.op(None, "multiply", 6, a=6, b=5)
+    g.op(None, "multiply", 7, a=7, b=5)
+    # the light along the contour: r1 becomes the intensity
+    g.op(None, "remap", 1, a=1, k=[0.3, 1.0, 0.0, 1.0], f=1.0)           # the ripple's crest
+    g.op(None, "power", 0, a=1, f=10.0)                                  # its sharp crest (r0 = B is spent below first)
+    g.op("glint", "constant", 2, k=[0.25, 0.25, 0.25, 0])                # (routes: the hats, CC 11) -- r2 kick reused below
+    g.op(None, "multiply", 0, a=0, b=2)                                  # r0 = beads (gated)
+    g.op(None, "remap", 3, a=3, k=[0.15, 0.75, 0.0, 1.0], f=1.0)         # the bass pool
+    g.op(None, "multiply", 1, a=1, b=3)                                  # crest x pool: the interference
+    g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 0.32, 3.0])                 # floor 0.32: most contours stay low
+    g.op(None, "add", 1, a=1, b=0)
+    g.op(None, "field", 2, field="kick")
+    g.op(None, "remap", 2, a=2, k=[0.08, 0.5, 0.0, 3.0], f=1.0)          # the kick's band of light (onset rings are
+                                                                         # 0.1-0.5 at a kick's crest, measured)
+    g.op(None, "add", 1, a=1, b=2)
+    g.op(None, "remap", 4, a=4, k=[0.02, 0.4, 0.0, 1.4], f=1.0)          # the snare's
+    g.op(None, "add", 1, a=1, b=4)                                       # r1 = intensity
+    g.op("ring", "constant", 2, k=C("ring", P0["ringGain"] * RING) + [1])  # the halo: palette ring x ringGain
+    g.op(None, "multiply", 7, a=7, b=2)
+    g.op("hot", "constant", 3, k=C("hot", P0["hotGain"]) + [1])          # the core: palette hot x hotGain
+    g.op(None, "multiply", 6, a=6, b=3)
+    g.op(None, "add", 6, a=6, b=7)
+    g.op(None, "multiply", 6, a=6, b=1)                                  # r6 = emission
+    # the base: B again (r0 was spent)
+    g.op(None, "field", 0, field="vee")
+    g.op(None, "smoothstep", 1, a=0, k=[0.06, 0.24, 0, 0])               # on the pattern
+    g.op("baseRamp", "ramp", 2, a=1, k=C("base") + [1], k2=C("base") + [1], k3=C("pattern") + [1])
+    g.op("shadow", "constant", 3, k=C("shadow") + [1])
+    g.op(None, "mixBy", 2, a=3, b=2, c=5)                                # shaft dark, head lit
+    g.base, g.emit, g.rough = 2, 6, -1
     return g
 
 
@@ -268,10 +349,13 @@ def floor_program():
 # ================================================================================================ the scene
 DESIGN = {
     "category": "experiment",
-    "thesis": "A bowl of copper pins in the dark. A reaction-diffusion pattern grows over it and lifts every pin it "
-              "touches; a labyrinth wanders into spots and back; a thin ring of light runs along the pattern's edges. "
-              "The music never draws on it directly: kicks send rings that turn the labyrinth to spots, held sound "
-              "widens the spots, bass lifts the field.",
+    "thesis": "A living, illuminated topographic interference field: a bowl of pins in the dark, a reaction-"
+              "diffusion labyrinth growing over it, its edges drawn as contours of light (a fine hot core, a softer "
+              "halo, dark channels between). A broad swell heaves the field, crossing the bass history's rings; it bunches and "
+              "opens the contours and runs beads of light along them on the hats; the bass history rolls out from the "
+              "heart as a lift and a pool of light; every kick sends a ring of impact across it that swells the "
+              "contours, carries a band of light and turns the labyrinth toward spots; a busy mix lights it up, a "
+              "breakdown lets it settle.",
     "experiment": "C reaction-diffusion (production)",
 }
 
@@ -299,38 +383,65 @@ MIDI_CC = [
     (3, "height", "PIN HEIGHT: how far the pattern lifts the pins"),
     (4, "influence", "AUDIO INFLUENCE: how hard the music drives the field (half at rest)"),
     (5, "erase", "ERASE: starves the pattern (feed falls): regions collapse, and regrow on release"),
-    (6, "light", "RING LIGHT: the light on the pattern's edges"),
+    (6, "light", "LIGHT: the contours' light (core and halo)"),
+    (7, "waves", "WAVES: how high the broad swell heaves the field"),
+    (8, "impact", "IMPACT: how hard the kick and snare rings strike"),
     (9, "palette", "PALETTE: choose one of the six (a direct blend to it)"),
     (10, "paletteLock", "PALETTE LOCK: hold the chosen palette"),
+    (11, "shimmer", "SHIMMER: the beads of light the ripple runs along the contours (with the hats)"),
 ]
 MIDI_NOTES = [(36, "seed0"), (37, "seed1"), (38, "seed2")]
 
 
 def instrument(s, g):
-    """The music edits the regime map and the light, never B directly (plan, Q4: B rings made the void):
-      - a kick (low onset) is a ring travelling out from the bowl's centre that flips the labyrinth to spots as it
-        passes (the onset field inside the baked regime); its depth is Audio Influence
-      - held sound widens the spot pool; bass lifts the pins (a slow swell); hats brighten the rings
-      - a snare pulses the wandering brush (a burst of new growth where it is)
-      - MIDI: six handles, the palette pair, three seed notes"""
+    """Each band of the music has its own job, at its own scale and its own time:
+      - bass level: the broad swell's height (a slow attack, a long release) and the pattern's lift
+      - the bass history: a lift and a pool of light rolling out from the heart (the spectrum field, no route)
+      - mids: the ripple's reach into the contours (how far they bunch and open) and its small heave
+      - kicks: the ring of impact (lift, contour swell, a band of light, the regime toward spots)
+      - snares: a quicker ring of light from off-centre, and a burst of growth at the wandering brush
+      - hats: the beads of light the ripple runs along the contours (8 ms in, 260 ms out), never the whole field
+      - held sound: the spot pool widens
+    Every audio route's depth is Audio Influence (CC 4, half at rest). MIDI: eight handles, the palette pair, three
+    seed notes."""
     s.response = dict(common.RESPONSE)
     common.instrument(s, [(n, sig, d) for n, sig, d in MIDI_CC], MIDI_NOTES)
     E = "procedural/pins/effector/2/strength"
+    D = "procedural/pins/deform/"
     G = "grid/pattern/"
-    ring = g.path("ring")
-    s.route(R(common.INFLUENCE, "field/kickRegime/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
+    ring, hot, glint, shift = g.path("ring"), g.path("hot"), g.path("glint"), g.path("rippleShift")
+    A = common.audio
+    # ADR-1510: the level signals read against an adaptive reference (Feline p50 about 0.65, a breakdown near 0), so
+    # the routes from response.bass / level / sustain / intensity are scaled x1.5 from what they were tuned at
+    s.route(R(common.INFLUENCE, "field/kick/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
               attackMs=200, decayMs=200),
-            common.audio("response.sustain", "field/pool/strength", 0.6, attackMs=3000, decayMs=6000),
-            common.audio("response.bass", E, 3.0, attackMs=250, decayMs=1200),
-            common.audio("response.hat", ring, 1.0, op="multiply", gain=1.5, offset=1.0, attackMs=30, decayMs=300),
-            common.audio("response.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
+            R(common.INFLUENCE, "field/snare/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
+              attackMs=200, decayMs=200),
+            R(common.INFLUENCE, "field/swell/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
+              attackMs=200, decayMs=200),
+            A("response.sustain", "field/pool/strength", 0.375, attackMs=3000, decayMs=6000),
+            A("response.bass", E, 4.5, attackMs=250, decayMs=1200),
+            A("response.bass", D + "1/amount", 1.05, attackMs=400, decayMs=2500),
+            A("audio.mid", shift, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=120, decayMs=700),
+            A("response.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
+            A("response.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),
+            # density (hats a second, 0..0.65 measured on the test tracks): a busy mix lights the contours, a held
+            # note or a breakdown lets them settle
+            A("response.hatRate", hot, 1.0, op="multiply", gain=1.8, offset=0.55, attackMs=600, decayMs=2500),
+            A("response.hatRate", ring, 1.0, op="multiply", gain=1.2, offset=0.7, attackMs=600, decayMs=2500),
+            A("response.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
     CC = common.CC
     s.route(R("control.pattern", "field/pool/strength", 1.2, **CC),
             R("control.seeding", "field/brush/strength", 3.0, **CC),
             R("control.height", E, 6.0, **CC),
             R("control.erase", G + "feed", -0.03, **CC),
             R("control.erase", G + "feedB", -0.02, **CC),
-            R("control.light", ring, 1.0, op="multiply", gain=2.0, offset=1.0, **CC),
+            R("control.light", ring, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.light", hot, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.waves", D + "1/amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.impact", "field/kick/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.impact", "field/snare/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.shimmer", glint, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.palette", "palette/select", float(len(PALETTES) - 1), **CC),
             R("control.paletteLock", "palette/lock", 1.0, **CC))
     for i in range(3):
@@ -348,13 +459,18 @@ def palette_block(g, gf):
         {"role": "shadow", "target": "env/sky/horizonColor", "gain": 1.2},
         {"role": "environment", "target": "scene/fogColor"},
         {"role": "environment", "target": op(gf, "env"), "gain": 1.6},
+        {"role": "environment", "target": "procedural/floor/material/baseColor", "gain": 0.5},
         {"role": "base", "target": op(gf, "tint")},
         {"role": "ring", "target": op(gf, "glow"), "gain": 0.03},
-        {"role": "base", "target": op(g, "base")},
-        {"role": "pattern", "target": op(g, "pattern")},
+        {"role": "base", "target": g.path("baseRamp", "constant")},
+        {"role": "base", "target": g.path("baseRamp", "constant2")},
+        {"role": "pattern", "target": g.path("baseRamp", "constant3")},
         {"role": "shadow", "target": op(g, "shadow")},
         {"role": "ring", "target": op(g, "ring")},
         {"role": "ringGain", "target": op(g, "ring"), "mode": "multiply"},
+        {"role": "hot", "target": op(g, "hot")},
+        {"role": "hotGain", "target": op(g, "hot"), "mode": "multiply"},
+        {"role": "bloomI", "target": "post/bloom/intensity"},
         {"role": "key", "target": "lights/key/color"},
         {"role": "rim", "target": "lights/rim/color"},
         {"role": "keyI", "target": "lights/key/intensity"},
@@ -366,6 +482,20 @@ def palette_block(g, gf):
             "selector": {"select": START_PALETTE, "transition": 6.0, "lock": False, "hold": 40.0,
                          "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": JOURNEY,
                                      "change": CHANGE}}}
+
+
+def waves():
+    """The heave: a sine deformer in world space (procedural/pins/deform/1): the broad swell A (the bass level is its
+    height; the pin program reproduces it exactly, ripple_palette)."""
+    out = []
+    # (B, crossing it, and a small ripple were cut for the live budget: about 1.5 ms a deformer on 866k vertices,
+    # measured; A interferes with the bass history's rings and the kick's, and the mids still move the contours)
+    for (axis, wl, v, ph), amount in ((WAVE_A, 0.6),):
+        freq = 2 * math.pi / wl
+        out.append({"kind": "sine", "amount": amount, "frequency": round(freq, 6), "speed": round(freq * v, 6),
+                    "phase": ph, "axis": list(axis), "displacementAxis": [0.0, 1.0, 0.0], "space": "world",
+                    "center": [0.0, 0.0, 0.0]})
+    return out
 
 
 def build():
@@ -383,16 +513,25 @@ def build():
     s.proc("pins", src,
            distribution={"kind": "grid", "gridCount": [N_PINS, 1, N_PINS], "gridSpacing": [sp, 1.0, sp]},
            material={"program": g.name, "baseColor": [1, 1, 1], "roughness": P0["rough"], "metallic": P0["metal"]},
+           deformers=waves(),
            extra={"effectors": [{"field": "bowlY", "op": "positionOffset", "blend": "add", "strength": 1.0,
                                  "axis": [0.0, 1.0, 0.0]},
                                 {"field": "vee", "op": "scale", "blend": "add", "strength": 6.0,
-                                 "scaleAxis": [0.0, 1.0, 0.0]}]})
+                                 "scaleAxis": [0.0, 1.0, 0.0]},
+                                # the bass history's lift, the kick's and the snare's rings (m)
+                                {"field": "swell", "op": "positionOffset", "blend": "add", "strength": 1.4,
+                                 "axis": [0.0, 1.0, 0.0]},
+                                {"field": "kick", "op": "positionOffset", "blend": "add", "strength": 1.0,
+                                 "axis": [0.0, 1.0, 0.0]},
+                                {"field": "snare", "op": "positionOffset", "blend": "add", "strength": 0.4,
+                                 "axis": [0.0, 1.0, 0.0]}]})
     s.floor_program = gf = floor_program()
     s.program(gf.doc(base=gf.base, emission=gf.emit))
     pos, nrm, uv, idx = common.bowl_mesh(BOWL_R * 1.45, BOWL_H * 1.45 ** BOWL_P, 160, 240, power=BOWL_P)
     common.write_glb(os.path.join(OUT, "meshes", "rp-bowl.glb"), pos, nrm, uv, idx, "bowl")
-    s.proc("floor", {"kind": "mesh", "asset": "meshes/rp-bowl.glb"}, position=(0.0, -0.05, 0.0),
-           material={"program": gf.name if FLOOR else None, "baseColor": C("environment", 2.0), "roughness": 0.6,
+    # well below the pins: the heave lowers them by up to ~1.5 m, and a pin under the floor reads as a hole
+    s.proc("floor", {"kind": "mesh", "asset": "meshes/rp-bowl.glb"}, position=(0.0, -2.5, 0.0),
+           material={"program": gf.name if FLOOR else None, "baseColor": C("environment", 0.5), "roughness": 0.6,
                      "metallic": 0.0})
     if not FLOOR:
         s.nodes[-1]["procedural"]["material"].pop("program")
@@ -403,8 +542,11 @@ def build():
                 "orbitSpeed": 0.0}
     s.drift_camera(s.camera["position"], s.camera["target"], period=90.0, amp=(4.0, 1.0, 2.0), tamp=(2.0, 0.5, 0.0),
                    steps=8)
-    s.params_({"camera/lens/focalLength": 28.0, "post/bloom/intensity": 0.28, "post/output/vignette": 0.4,
-               "post/grade/contrast": 1.06, "post/output/grain": 0.01})
+    # bloom on the hot cores only (exposed units: the halo stays under the threshold), a tight radius so the glow
+    # spreads past a contour without filling the channel beside it; a light vignette, no grain
+    s.params_({"camera/lens/focalLength": 28.0, "post/bloom/intensity": P0["bloomI"], "post/bloom/threshold": 1.1,
+               "post/bloom/knee": 0.6, "post/bloom/radius": 0.75, "post/output/vignette": 0.22,
+               "post/grade/contrast": 1.08, "post/output/grain": 0.0})
     instrument(s, g)
     return s
 
@@ -424,7 +566,7 @@ def main():
     cc = common.describe_ccs(MIDI_CC, "notes 36-38 hold seeds")
     common.index_entry(TITLE, "rd-pins/rd-pins.json",
                        "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". " + DESIGN["thesis"]
-                       + " See docs/prototypes/generative-rd/C-scene-plan.md.", live=True, category="Generative")
+                       + " See docs/prototypes/generative-rd/C-scene-plan.md and docs/prototypes/generative-pass/.", live=True, category="Generative")
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))

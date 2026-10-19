@@ -128,3 +128,77 @@ TEST_CASE("Every GPU effector op agrees with the CPU reference under every blend
     CHECK(disagreeing == 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1500: a local axis (the point's own) for PositionOffset and Rotation, every blend, against the CPU reference,
+// on points with varied rotations (a fixed object axis would hide a wrong order of multiplication).
+TEST_CASE("Local-axis effectors agree with the CPU reference under every blend", "[gpu][points][effectors]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s;
+    s.camera.position = {0.0f, 4.0f, 14.0f};
+    spatial::FieldSpec bulge;
+    bulge.name = "bulge";
+    bulge.kind = spatial::FieldKind::Radial;
+    bulge.radius = 6.0f;
+    bulge.strength = 0.8f;
+    s.fields.fields.push_back(bulge);
+
+    const spatial::EffectorOp ops[] = {spatial::EffectorOp::PositionOffset, spatial::EffectorOp::Rotation};
+    const spatial::EffectorBlend blends[] = {spatial::EffectorBlend::Add, spatial::EffectorBlend::Multiply,
+                                             spatial::EffectorBlend::Replace, spatial::EffectorBlend::Min,
+                                             spatial::EffectorBlend::Max, spatial::EffectorBlend::Mix};
+    for (const auto op : ops) {
+        for (const auto blend : blends) {
+            scene::ProceduralGeometry object;
+            object.name = std::string("local-") + spatial::effectorOpName(op) + "-" + spatial::effectorBlendName(blend);
+            object.source.kind = scene::PrimitiveKind::Box;
+            object.distribution.kind = scene::DistributionKind::Grid;
+            object.distribution.gridCount = {8, 2, 8};
+            object.distribution.gridSpacing = {1.1f, 1.3f, 1.1f};
+            object.variation.randomRotation = glm::vec3(1.2f);
+            spatial::Effector e;
+            e.op = op;
+            e.blend = blend;
+            e.field = "bulge";
+            e.strength = 0.6f;
+            e.weight = 0.35f;
+            e.axis = {0.2f, 1.0f, 0.1f};
+            e.local = true;
+            object.effectors.push_back(e);
+            REQUIRE(object.rebuild());
+            s.procedurals.push_back(object);
+        }
+    }
+    const double time = 1.3;
+    REQUIRE(renderer.renderFrame(s, FrameTime{time, 1.0 / 60.0, 0}, 96, 96).has_value());
+    int disagreeing = 0;
+    for (const scene::ProceduralGeometry& object : s.procedurals) {
+        auto gpu = renderer.procedurals().readInstanceRecords(object.name);
+        REQUIRE(gpu.has_value());
+        REQUIRE(gpu->size() == object.instances.size());
+        std::vector<scene::InstanceRecord> cpu = object.instances;
+        spatial::applyEffectorsToRecords(cpu, object.effectors, s.fields, time);
+        float worst = 0.0f;
+        float moved = 0.0f;
+        for (std::size_t i = 0; i < cpu.size(); ++i) {
+            const auto& a = cpu[i];
+            const auto& b = (*gpu)[i];
+            worst = std::max({worst, maxAbs(a.position - b.position), maxAbs(a.scale - b.scale)});
+            worst = std::max(worst, std::min(maxAbs(a.rotation - b.rotation), maxAbs(a.rotation + b.rotation)));
+            const auto& base = object.instances[i];
+            moved = std::max({moved, maxAbs(a.position - base.position),
+                              std::min(maxAbs(a.rotation - base.rotation), maxAbs(a.rotation + base.rotation))});
+        }
+        if (worst > 1e-4f) {
+            ++disagreeing;
+        }
+        INFO(object.name << ": worst |CPU - GPU| " << worst << ", largest change " << moved);
+        CHECK(worst <= 1e-4f);
+        CHECK(moved > 1e-3f); // the effector did something to compare
+    }
+    CHECK(disagreeing == 0);
+    CHECK(ctx->errorCount() == 0);
+}

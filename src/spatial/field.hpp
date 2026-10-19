@@ -191,6 +191,12 @@ struct FieldSpec {
     // (scalar: the value, reaction-diffusion: B, excitable: u, vector and agents: the vector). For an excitable
     // grid 0..3 are u, r, e, w. Serialised and hashed only when set.
     int channel = -1;
+    // Grid (ADR-1501): how a point of the field's frame finds its cell. Plane (the default): the frame's (x, y, z) is the
+    // grid's. Sphere: the frame's point is unrolled about its origin onto the plane grid, x = radius * azimuth
+    // (atan2(z, x), in (-pi, pi]) and z = radius * latitude (asin(y / |q|)), y = 0 -- a plane grid laid round the inside
+    // of a sphere, its x wrapping once round it (bounds x = +-pi * radius) and every radius reading the same cell, so a
+    // membrane displaced along its normal keeps its pattern. Serialised and hashed only when set.
+    bool gridSphere = false;
     // Audio kinds (ADR-1116). Serialised, hashed and registered as parameters only for those kinds.
     AudioBand audioBand = AudioBand::Range;
     float bandLow = 0.0f;                  // [0, 1] of the log-frequency axis (kAudioMinHz..kAudioMaxHz)

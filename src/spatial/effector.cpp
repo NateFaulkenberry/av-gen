@@ -65,10 +65,12 @@ T blendValue(EffectorBlend blend, const T& existing, const T& natural, const T& 
     return natural;
 }
 
-glm::vec4 blendRotation(EffectorBlend blend, const glm::vec4& existing, float angle, const glm::vec3& axis, float weight) {
+glm::vec4 blendRotation(EffectorBlend blend, const glm::vec4& existing, float angle, const glm::vec3& axis, float weight,
+                        bool local = false) {
     const glm::quat e = toQuat(existing);
     const glm::quat delta = glm::angleAxis(angle, axis);
-    const glm::quat natural = glm::normalize(delta * e);
+    // ADR-1500: a local axis turns the point in its own frame (applied first, then the point's rotation)
+    const glm::quat natural = glm::normalize(local ? e * delta : delta * e);
     switch (blend) {
     case EffectorBlend::Replace:
         return fromQuat(glm::normalize(delta));
@@ -119,7 +121,9 @@ void applyOne(const Effector& e, const SampleContext& ctx, std::size_t count, Ac
         const Sample smp = sampleAt(ctx, p, access.element(i));
         switch (e.op) {
         case EffectorOp::PositionOffset: {
-            const glm::vec3 raw = vectorField ? smp.v * k : e.axis * (smp.s * k);
+            // ADR-1500: a local axis is the point's own (its rotation applied to `axis`)
+            const glm::vec3 axis = !vectorField && e.local ? toQuat(access.rotation(i)) * e.axis : e.axis;
+            const glm::vec3 raw = vectorField ? smp.v * k : axis * (smp.s * k);
             access.setPosition(i, blendValue(e.blend, p, p + raw, raw, e.weight));
             break;
         }
@@ -144,7 +148,8 @@ void applyOne(const Effector& e, const SampleContext& ctx, std::size_t count, Ac
                 }
                 axis /= len;
             }
-            access.setRotation(i, blendRotation(e.blend, access.rotation(i), smp.s * k, axis, e.weight));
+            access.setRotation(i, blendRotation(e.blend, access.rotation(i), smp.s * k, axis, e.weight,
+                                                !vectorField && e.local));
             break;
         }
         case EffectorOp::Velocity: {
@@ -348,6 +353,9 @@ json Effector::toJson() const {
     j["axis"] = detail::vecToJson(axis);
     j["scaleAxis"] = detail::vecToJson(scaleAxis);
     j["target"] = target;
+    if (local) {
+        j["local"] = true; // ADR-1500: written only when set
+    }
     return j;
 }
 
@@ -365,6 +373,7 @@ Result<Effector> Effector::fromJson(const json& j) {
     AVGEN_SPATIAL_READ(e.axis, "axis", detail::readVec3);
     AVGEN_SPATIAL_READ(e.scaleAxis, "scaleAxis", detail::readVec3);
     AVGEN_SPATIAL_READ(e.target, "target", detail::readString);
+    AVGEN_SPATIAL_READ(e.local, "local", detail::readBool); // ADR-1500
     if (e.field.empty()) {
         return fail("effector needs a 'field'");
     }
@@ -385,6 +394,9 @@ std::uint64_t Effector::structuralHash() const {
     h.v3(axis);
     h.v3(scaleAxis);
     h.str(target);
+    if (local) {
+        h.boolean(local); // ADR-1500: hashed only when set, so every older effector keeps its hash
+    }
     return h.value();
 }
 
@@ -451,7 +463,7 @@ EffectorGpu packEffector(const Effector& effector, const FieldSet& fields) {
     g.fieldSlot = (effector.enabled && field != nullptr && field->enabled) ? fields.indexOf(effector.field) : -1;
     g.strength = effector.strength;
     g.axisWeight = glm::vec4(effector.axis, effector.weight);
-    g.scaleAxisPad = glm::vec4(effector.scaleAxis, 0.0f);
+    g.scaleAxisPad = glm::vec4(effector.scaleAxis, effector.local ? 1.0f : 0.0f); // w: ADR-1500 local axis
     return g;
 }
 
