@@ -136,3 +136,59 @@ TEST_CASE("a spline camera at the end of an open spline keeps looking along it",
         CHECK(glm::length(cam.target - cam.position) == Approx(20.0f).margin(0.1f));
     }
 }
+
+// ADR-1541: a spline camera's up can follow the spline's own frame (its normal, with the points' authored roll),
+// so a camera riding a twisting band of land turns with the land -- through upside down -- and only when asked to.
+TEST_CASE("a spline camera's up follows the spline's frame when asked", "[camera][roll][adr1541]") {
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    // A straight path down -Z whose authored roll turns half a turn: upright at the start, on its side half way,
+    // upside down at the end.
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "twist",
+        "camera": { "mode": 2, "spline": "band", "fov": 45.0 },
+        "nodes": [
+          { "name": "band", "kind": "spline", "spline": { "name": "band", "kind": "catmullRom", "closed": false,
+            "up": [0, 1, 0],
+            "points": [ { "position": [0, 2, 0], "roll": 0.0 }, { "position": [0, 2, -100], "roll": 0.5236 },
+                        { "position": [0, 2, -200], "roll": 1.0472 }, { "position": [0, 2, -300], "roll": 1.5708 },
+                        { "position": [0, 2, -400], "roll": 2.0944 }, { "position": [0, 2, -500], "roll": 2.618 },
+                        { "position": [0, 2, -600], "roll": 3.1416 } ] } },
+          { "name": "box", "kind": "procedural", "procedural": {
+            "source": { "kind": "box", "size": [1, 1, 1] }, "distribution": { "kind": "single" } } } ] })"),
+                                             registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    auto* t = params.findAs<float>("camera/splineT");
+    auto* follow = params.findAs<float>("camera/splineUp");
+    REQUIRE(t != nullptr);
+    REQUIRE(follow != nullptr);
+    const auto frame = [&](float at) {
+        t->setBase(at);
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = 1.0;
+        (*comp)->update(ft);
+        return (*comp)->scene().camera.up;
+    };
+    // Off (the default): the world's up wherever the camera is, as before ADR-1541.
+    CHECK(frame(0.5f) == glm::vec3(0.0f, 1.0f, 0.0f));
+    CHECK(frame(1.0f) == glm::vec3(0.0f, 1.0f, 0.0f));
+    follow->setBase(1.0f);
+    const auto& spline = *(*comp)->scene().splines.find("band");
+    for (float at : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        const glm::vec3 up = frame(at);
+        const glm::vec3 n = spline.sampleByDistance(at * spline.length()).normal;
+        INFO("t " << at << ": up " << up.x << ", " << up.y << ", " << up.z << "; normal " << n.x << ", " << n.y << ", " << n.z);
+        CHECK(glm::dot(up, glm::normalize(n)) == Approx(1.0f).margin(1e-4));
+        CHECK(std::abs(up.z) < 1e-3f); // still perpendicular to the path
+    }
+    CHECK(frame(0.0f).y == Approx(1.0f).margin(1e-3));      // upright at the start
+    CHECK(std::abs(frame(0.5f).y) < 0.05f);                  // on its side half way
+    CHECK(frame(1.0f).y == Approx(-1.0f).margin(1e-3));     // upside down at the end
+    // Half way between the world's up and the frame's: the angle halves.
+    follow->setBase(0.5f);
+    const glm::vec3 half = frame(0.5f);
+    CHECK(half.y == Approx(std::cos(glm::radians(45.0f))).margin(0.02f));
+}

@@ -1823,6 +1823,7 @@ private:
     params::Parameter<float>* cameraSplineT_ = nullptr;
     params::Parameter<float>* cameraLookAhead_ = nullptr;
     params::Parameter<float>* cameraSplineBank_ = nullptr; // ADR-1166
+    params::Parameter<float>* cameraSplineUp_ = nullptr;   // ADR-1541
     params::Parameter<glm::vec3>* cameraSplineOffset_ = nullptr;
     // Camera mode 3 (the journey, ADR-1042): walks the periodic path of `journeySetting_` through a
     // world repeated by the same screw, at camera/journey/distance metres, wrapping invisibly.
@@ -1907,6 +1908,7 @@ private:
     [[nodiscard]] CameraPose evaluateMainCamera() const;
     // ADR-1166: the main spline camera's lean into its turn, in degrees of roll (0 unless camera/splineBank is set).
     [[nodiscard]] float splineBankDegrees() const;
+    [[nodiscard]] glm::vec3 splineCameraUp() const; // ADR-1541
     // ADR-391: the frame the *viewport* is showing, applied over the film's camera once the film's
     // camera is final. A no-op in `Film` mode, which is every render.
     void applyViewportView(float mainFovDegrees);
