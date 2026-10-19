@@ -722,7 +722,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         base.roughness = object.material.x;
         base.emission = object.emissive.rgb * object.emissive.w;
         base.opacity = object.baseColor.a;
-        let program = evaluateMaterialProgram(programIndex, ctx, base);
+        let program = evaluateMaterialProgramFast(programIndex, ctx, base); // ADR-1493
         // The program's emission is a finished radiance, so the intensity lane becomes 1.
         matColor = vec4<f32>(program.baseColor, program.opacity);
         matEmissive = vec4<f32>(program.emission, 1.0);

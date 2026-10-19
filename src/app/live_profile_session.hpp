@@ -30,6 +30,9 @@ struct Application::LiveProfileSession {
     std::vector<rendering::RenderStats> stats;
     gpu::PipelineCounters compilesBefore;
     std::chrono::steady_clock::time_point measureStart;
+    // ADR-1490: the control hub's MIDI counters when measurement began, so the record says how much MIDI the measured
+    // frames processed (the brief's "audio and MIDI on" arms are otherwise indistinguishable in the record).
+    std::uint64_t midiMessagesBefore = 0, midiAppliedBefore = 0;
     // Verification state.
     std::vector<std::size_t> queue; // candidate indices to verify
     std::size_t current = 0;

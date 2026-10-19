@@ -1946,6 +1946,10 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
     return kArms;
 }
 
+void SceneRenderer::setCompiledMaterials(bool on) {
+    procedurals_->setCompiledMaterials(on);
+}
+
 bool SceneRenderer::setQualityArm(QualitySettings& settings, std::string_view name) {
     for (const QualityArm& arm : qualityArms()) {
         if (name == arm.name) {
@@ -3239,7 +3243,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // needs to say how dark the side facing away from the sky is allowed to get.
     frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,
                                 std::clamp(scene.environment.styledAmbientFloor, 0.0f, 1.0f));
-    frame.styledGround = glm::vec4(scene.environment.styledGroundAmbient, 0.0f);
+    // ADR-1492: w = 1 when nothing reads the velocity target this frame (the live editor only, see
+    // setVelocityOnDemand): the motion-blur gate below closed or its shutter at zero, and no aux debug view.
+    {
+        const float shutter = std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
+        const bool blurReads = toggles_.post && qualitySettings_.motionBlur && scene.post.motionBlurAmount * shutter > 1e-4f;
+        velocitySkipped_ = velocityOnDemand_ && !blurReads && auxDebugView_ == AuxDebugView::None;
+    }
+    frame.styledGround = glm::vec4(scene.environment.styledGroundAmbient, velocitySkipped_ ? 1.0f : 0.0f);
     // ADR-055: the wind, packed once per frame. Wavenumbers are pre-divided here so no vertex ever
     // spends a divide on them, and the shadow views inherit the block verbatim.
     frame.wind = wind::packWind(scene.environment.wind);
@@ -3935,6 +3946,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.fieldAudio = fields_->audioStats();
     // ---- material programs (ADR-030): packed after the fields so Field ops resolve to slots ----
     materialPrograms_->update(scene.materialPrograms, fields_.get());
+    // ADR-1493: the procedural lit pass's compiled-materials variant follows the programs' structure.
+    procedurals_->noteMaterialPrograms(std::span<const scene::MaterialProgramGpu>(
+        materialPrograms_->block().programs, materialPrograms_->count()));
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
     splines_->update(scene.splines);
     stage(cpu.fieldsMs);
