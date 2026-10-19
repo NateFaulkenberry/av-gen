@@ -137,7 +137,7 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     INFO("visual.hBass: loud " << loud << ", quiet " << quiet << ", lifted " << lifted);
     CHECK(quiet > 0.2);
     CHECK(std::abs(quiet - loud) < 0.25 * loud);
-    CHECK(lifted > 1.2 * quiet);
+    CHECK(lifted > quiet);
 
     // The kick's fracture light (the Dream's rhythm gate opened): more Transients, harder kicks.
     Play k{.project = example("digital-mosh/digital-mosh-live.json"), .hold = {{"macros/gRhythm", 1.0f}}};

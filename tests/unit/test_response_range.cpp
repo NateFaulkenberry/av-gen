@@ -92,8 +92,32 @@ float shareAbove(const std::vector<float>& v, float x) {
                            static_cast<float>(v.size());
 }
 
+// Beat-rate movement: the median over 0.5 s windows of the signal's range inside each.
+float ripple(const Trace& tr, std::size_t signal, double from, double to) {
+    std::vector<float> spans;
+    double start = -1.0;
+    float lo = 0.0f, hi = 0.0f;
+    for (std::size_t f = 0; f < tr.t.size(); ++f) {
+        if (tr.t[f] < from || tr.t[f] >= to) {
+            continue;
+        }
+        const float v = tr.v[signal][f];
+        if (start < 0.0 || tr.t[f] - start >= 0.5) {
+            if (start >= 0.0) {
+                spans.push_back(hi - lo);
+            }
+            start = tr.t[f];
+            lo = hi = v;
+        } else {
+            lo = std::min(lo, v);
+            hi = std::max(hi, v);
+        }
+    }
+    return percentile(spans, 0.5);
+}
+
 struct Stats {
-    float p10 = 0, p50 = 0, p90 = 0, above = 0, breakdown = 0, drop = 0;
+    float p10 = 0, p50 = 0, p90 = 0, above = 0, breakdown = 0, drop = 0, ripple = 0;
 };
 
 std::array<Stats, kLevels.size()> measure(const testsupport::MasteredSong& song, const Trace& tr) {
@@ -108,6 +132,7 @@ std::array<Stats, kLevels.size()> measure(const testsupport::MasteredSong& song,
         s[i].above = shareAbove(all, 0.9f);
         s[i].breakdown = mean(span(tr, i, 0.5 * (song.breakdownStart + song.dropStart), song.dropStart));
         s[i].drop = mean(span(tr, i, song.dropStart + 6.0, song.end));
+        s[i].ripple = ripple(tr, i, song.verseStart + 4.0, song.end);
     }
     return s;
 }
@@ -116,7 +141,7 @@ std::string table(const std::array<Stats, kLevels.size()>& s) {
     std::ostringstream o;
     for (std::size_t i = 0; i < kLevels.size(); ++i) {
         o << kLevels[i] << " p10 " << s[i].p10 << " p50 " << s[i].p50 << " p90 " << s[i].p90 << " >0.9 "
-          << s[i].above << " breakdown " << s[i].breakdown << " drop " << s[i].drop << "\n";
+          << s[i].above << " breakdown " << s[i].breakdown << " drop " << s[i].drop << " ripple " << s[i].ripple << "\n";
     }
     return o.str();
 }
@@ -129,6 +154,9 @@ void checkRange(const std::array<Stats, kLevels.size()>& s) {
         CHECK(s[i].p50 > 0.2f);                 // ...and not a constant near the bottom either
         CHECK(s[i].p50 < 0.85f);
         CHECK(s[i].breakdown < s[i].drop - 0.2f); // the breakdown reads clearly lower than the drop
+        // ...and a level, not a second kick envelope: the body holds between two hits (bass and level used to
+        // fall to 0 between kicks; the kick envelope's own ripple on this song is about 0.5).
+        CHECK(s[i].ripple < (i < 2 ? 0.2f : i == 2 ? 0.15f : 0.1f)); // 200 ms releases: 0.25-0.28
     }
 }
 

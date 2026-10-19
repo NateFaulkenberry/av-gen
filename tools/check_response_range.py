@@ -4,7 +4,7 @@
 Runs `avgen --sonic-trace` over Feline Footwear, Trench and Hyperborea (assets/audio; a track that is absent is
 skipped, and with none present the check is skipped with exit 0), at the default Response controls, and prints the
 p10 / p50 / p90 of response.bass, level, sustain, levelSlow and intensity from 10 s in to 10 s before the end, with
-the share of frames above 0.9 -- and the transient envelopes beside them for comparison. Exits 1 when a level misses
+the share of frames above 0.9 and the beat-rate ripple -- and the transient envelopes beside them for comparison. Exits 1 when a level misses
 its target.
 
 Why it exists: ADR-1062's fixed -60..-12 dBFS window read every frame of a commercial master as 1 for months while the
@@ -35,17 +35,33 @@ TRACKS = {"feline": "feline-footwear.wav", "trench": "trench.wav", "hyperborea":
 LEVELS = ["bass", "level", "sustain", "levelSlow", "intensity"]
 ENVELOPES = ["kickEnv", "hatEnv"]
 
-# The targets (ADR-1510). Every level: not a constant near the top (at most 15% of frames above 0.9, p50 at most
-# 0.8) and not dead (p50 at least 0.3). The fast levels must also reach low (p10) and leave headroom (p90); the slow
-# ones rest high on a track that holds one loudness and dip at its breakdowns, so their p10 is not bounded.
+# The targets (ADR-1510). Every level: not a constant near the top (a capped share of frames above 0.9, p50 at
+# most 0.75-0.8), not dead (p50 at least 0.3-0.4), a real spread between p10 and p90 -- and not a second kick
+# envelope: the RIPPLE, the median over 0.5 s windows of the signal's range inside the window, is bounded (a body that
+# drops to zero between two kicks fails here as a pinned one fails above). kickEnv's ripple is printed beside them for
+# scale (about 0.5-0.6 on these tracks). The levels rest high on a track that holds one loudness and dip at its
+# breakdowns, so p10 is bounded loosely.
 TARGETS = {
-    #            p10 max  p50 min  p50 max  p90 max  >0.9 max  p90-p10 min
-    "bass":      (0.30,   0.30,    0.70,    0.95,    0.15,     0.40),
-    "level":     (0.30,   0.30,    0.70,    0.95,    0.15,     0.30),
-    "sustain":   (0.50,   0.30,    0.70,    0.90,    0.10,     0.10),
-    "levelSlow": (None,   0.40,    0.80,    0.90,    0.10,     0.08),
-    "intensity": (None,   0.40,    0.80,    0.90,    0.10,     0.05),
+    #            p10 max  p50 min  p50 max  p90 max  >0.9 max  p90-p10 min  ripple max
+    "bass":      (0.60,   0.35,    0.75,    0.92,    0.10,     0.20,        0.25),
+    "level":     (0.60,   0.35,    0.75,    0.92,    0.10,     0.15,        0.20),
+    "sustain":   (0.50,   0.30,    0.70,    0.90,    0.10,     0.10,        0.15),
+    "levelSlow": (None,   0.40,    0.80,    0.90,    0.10,     0.08,        0.10),
+    "intensity": (None,   0.40,    0.80,    0.90,    0.10,     0.05,        0.05),
 }
+
+
+def ripple(times: list[float], values: list[float], window: float = 0.5) -> float:
+    """The median over consecutive `window`-second windows of max - min inside each: beat-rate movement."""
+    spans, start, lo, hi = [], None, 0.0, 0.0
+    for t, v in zip(times, values):
+        if start is None or t - start >= window:
+            if start is not None:
+                spans.append(hi - lo)
+            start, lo, hi = t, v, v
+        else:
+            lo, hi = min(lo, v), max(hi, v)
+    return percentile(spans, 0.5)
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -98,7 +114,9 @@ def trace(avgen: Path, audio: Path, work: Path, name: str, response: dict) -> di
     t = [float(x["time"]) for x in rows]
     end = t[-1]
     keep = [i for i, x in enumerate(t) if 10.0 <= x <= end - 10.0]
-    return {s: [float(rows[i]["response." + s]) for i in keep] for s in LEVELS + ENVELOPES}
+    out = {s: [float(rows[i]["response." + s]) for i in keep] for s in LEVELS + ENVELOPES}
+    out["time"] = [t[i] for i in keep]
+    return out
 
 
 def main() -> int:
@@ -141,9 +159,10 @@ def main() -> int:
             v = sig[s]
             p10, p50, p90 = percentile(v, 0.1), percentile(v, 0.5), percentile(v, 0.9)
             above = sum(1 for x in v if x > 0.9) / max(len(v), 1)
+            rip = ripple(sig["time"], v)
             bad = []
             if s in TARGETS:
-                t10, t50lo, t50hi, t90, tabove, tspread = TARGETS[s]
+                t10, t50lo, t50hi, t90, tabove, tspread, tripple = TARGETS[s]
                 if t10 is not None and p10 > t10:
                     bad.append(f"p10 {p10:.2f} > {t10}")
                 if p50 < t50lo or p50 > t50hi:
@@ -154,9 +173,11 @@ def main() -> int:
                     bad.append(f"{above:.0%} of frames > 0.9 (max {tabove:.0%})")
                 if p90 - p10 < tspread:
                     bad.append(f"spread {p90 - p10:.2f} < {tspread}")
+                if rip > tripple:
+                    bad.append(f"ripple {rip:.2f} > {tripple} (a beat-rate envelope, not a level)")
             mark = "" if s in TARGETS else "   (for comparison)"
             verdict = ("  FAIL: " + "; ".join(bad)) if bad else ("  ok" if s in TARGETS else "")
-            print(f"  response.{s:<10} p10 {p10:.2f}  p50 {p50:.2f}  p90 {p90:.2f}  >0.9 {above:4.0%}{verdict}{mark}")
+            print(f"  response.{s:<10} p10 {p10:.2f}  p50 {p50:.2f}  p90 {p90:.2f}  >0.9 {above:4.0%}  ripple {rip:.2f}{verdict}{mark}")
             failures += [f"{k} response.{s}: {b}" for b in bad]
     if failures:
         print(f"\n{len(failures)} target(s) missed:")

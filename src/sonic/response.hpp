@@ -64,16 +64,18 @@ struct ResponseSettings {
         float spanDb = 12.0f; // ...and how far below that reads 0
         [[nodiscard]] bool operator==(const LevelWindow&) const = default;
     };
-    LevelWindow bassWindow{5.5f, 12.0f};      // the followed 30-150 Hz level
-    LevelWindow levelWindow{6.0f, 10.0f};     // the followed broadband level
+    LevelWindow bassWindow{6.5f, 15.0f};      // the followed 30-150 Hz level
+    LevelWindow levelWindow{6.5f, 12.0f};     // the followed broadband level
     LevelWindow sustainWindow{4.0f, 9.0f};    // the instant level sustain is made of (less its percussive share)
     LevelWindow levelSlowWindow{1.5f, 6.0f};  // the level over levelSlowSeconds
     LevelWindow intensityWindow{1.5f, 6.0f};  // the level over intensitySeconds
     // Envelope release per hit, seconds (Kick, Low, Snare, Hat, Onset, Note); attack is one hop (instant) x attack.
     std::array<float, kResponseHitCount> hitRelease{0.16f, 0.18f, 0.12f, 0.06f, 0.09f, 0.22f};
     // Levels' followers, seconds: attack / release.
-    float bassAttack = 0.015f, bassRelease = 0.20f;
-    float levelAttack = 0.02f, levelRelease = 0.25f;
+    // ADR-1510: the releases hold the body between two hits (read in a window ~12 dB wide, a 200 ms release turned
+    // every gap between kicks into a full-scale dip: a second kick envelope).
+    float bassAttack = 0.015f, bassRelease = 1.2f;
+    float levelAttack = 0.02f, levelRelease = 1.0f;
     float sustainAttack = 0.25f, sustainRelease = 0.9f;
     float fluxAttack = 0.01f, fluxRelease = 0.15f;
     float intensitySeconds = 12.0f;
