@@ -285,6 +285,8 @@ private:
     // The audio arrangement's editor (ADR-103): the clip list behind the toolbar's Audio... button.
     // Where a clip is moved and trimmed, because the strip's audio lane is a scrub and stays one.
     void drawAudioClips(app::Engine& engine);
+    // ADR-1520: the analysis stems, under the clips in the same popup. Analysis only: never played or mixed.
+    void drawStems(app::Engine& engine);
 
     // ---- song structure (ADR-215, ADR-216) ------------------------------------------------------
     //
@@ -313,6 +315,11 @@ private:
     // audio lane holds no drag state, because it holds no drag.
     int audioSelected_ = -1;
     char audioPath_[512] = {};
+    int stemSelected_ = -1;
+    char stemPath_[512] = {};
+    char stemLabel_[128] = {};
+    char stemEdit_[128] = {}; // the selected stem's label or key while it is being typed
+    char stemKeyEdit_[64] = {};
 
     // The **primary** selection: the last thing clicked, and what the inspector shows. Kept as a
     // kind and an index rather than folded into `chosen_` because every existing caller -- the
