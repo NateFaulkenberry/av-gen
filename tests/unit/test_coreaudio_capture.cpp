@@ -11,6 +11,7 @@
 
 #if defined(__APPLE__)
 
+#include "support/audio_devices.hpp"
 #include "support/coreaudio_rig.hpp"
 
 #include <algorithm>
@@ -62,6 +63,7 @@ double powerAt(const std::vector<float>& x, double hz, double rate) {
 } // namespace
 
 TEST_CASE("Core Audio capture: every channel of a two-stream device, each where it belongs", "[coreaudio][audio]") {
+    AVGEN_REQUIRE_AUDIO_DEVICE_TESTS();
     requireBlackHole();
     if (!audio::coreAudioDevicePresent(kMic)) {
         SKIP("no built-in microphone to make the aggregate's first stream");
@@ -95,6 +97,7 @@ TEST_CASE("Core Audio capture: every channel of a two-stream device, each where 
 }
 
 TEST_CASE("Core Audio capture: a device that disappears mid-capture reads disconnected at once", "[coreaudio][audio]") {
+    AVGEN_REQUIRE_AUDIO_DEVICE_TESTS();
     requireBlackHole();
     testsupport::PrivateAggregate aggregate("com.avgen.test.stems.unplug", {kBlackHole});
     REQUIRE(aggregate.ok());
@@ -133,6 +136,7 @@ TEST_CASE("Core Audio capture: a device that disappears mid-capture reads discon
 
 TEST_CASE("Core Audio capture: on BlackHole 2ch the main stream carries the same samples as the plain miniaudio path",
           "[coreaudio][audio]") {
+    AVGEN_REQUIRE_AUDIO_DEVICE_TESTS();
     requireBlackHole();
     testsupport::TonePlayer tone(kBlackHole, 440.0, 1250.0);
     REQUIRE(tone.playing());
@@ -178,6 +182,7 @@ TEST_CASE("Core Audio capture: on BlackHole 2ch the main stream carries the same
 TEST_CASE("Core Audio capture: the engine takes the Core Audio path for sources and the plain path without; a device that "
           "comes back is reopened",
           "[coreaudio][audio][engine]") {
+    AVGEN_REQUIRE_AUDIO_DEVICE_TESTS();
     requireBlackHole();
     app::Engine engine(app::EngineMode::Live);
     double t = 0.0;
@@ -234,6 +239,13 @@ TEST_CASE("Core Audio capture: the engine takes the Core Audio path for sources 
 }
 
 #else
+
+TEST_CASE("ADR-1550: the courteous period is the wanted one for a device that does not exist or runs nowhere else",
+          "[coreaudio][audio][adr1550]") {
+    // No IO: an unknown UID resolves to nothing, so the wanted period comes back unchanged.
+    CHECK(audio::courteousPeriodFrames("no-such-device-uid-adr1550", 128) == 128);
+    CHECK(audio::courteousPeriodFrames("no-such-device-uid-adr1550", 0, /*output=*/true) == 0);
+}
 
 TEST_CASE("Core Audio capture is macOS only", "[coreaudio][audio]") {
     SKIP("no Core Audio on this platform");

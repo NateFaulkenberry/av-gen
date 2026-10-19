@@ -66,6 +66,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1510-1519 | eng/response-range (the response levels' range on mastered music) |
 | 1520-1529 | eng/stems-multichannel (stem-aware offline analysis and live multichannel Core Audio input) |
 | 1530-1539 | eng/remove-ksh-detect (remove the Live panel's legacy kick/snare/hat detection display) |
+| 1550-1559 | coordinator fixes (2026-10-19: audio-device courtesy) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -819,3 +820,4 @@ confirm the citation you are about to change is your own.
 | [1521](ADR-1521-live-input-sources-publish-the-stem-vocabulary.md) | Live input channels and linked pairs publish the same `stem.<key>.*` from one callback (whole blocks or none, a discontinuity at the true frame) and one analysis thread; inactive on an absent channel, a disconnect or 250 ms without a frame; the channel map is the machine's; a synthetic 8-channel backend for tests and benchmarks | Accepted |
 | [1522](ADR-1522-a-narrow-auhal-backend-captures-every-channel-of-a-multi-stream-device.md) | A narrow AUHAL backend captures every channel of a multi-stream device (miniaudio 0.11.25 hears only the first stream, measured), with the HAL sample time and lifecycle listeners; the plain stereo path stays on miniaudio; a disconnected device is never substituted and is reopened when it returns; `avgen --input-meter` | Accepted |
 | [1530](ADR-1530-the-live-panel-drops-its-kick-snare-hat-meters-the-detection-stays.md) | The Live panel drops its kick / snare / hat meters (the Response group's four hit-envelope bars, the note bar with them, and the detector wording in the Transients and Input gain tooltips); the detection stays: `CausalOnsetDetector` also makes ADR-1510's levels, `response.flux`, live `audio.onset*` and the stems hits tier, and its hit signals carry 394 routes in 47 example files. No signal, parameter or project key changes. Source assignment (per-input Hits) is the replacement. eng/remove-ksh-detect | Accepted |
+| [1550](ADR-1550-never-resize-an-audio-device-another-app-is-running.md) | AV Gen never resizes an audio device another app is running (capture and playback keep the device's current buffer size when it is in use elsewhere); real-device tests are opt-in (`AVGEN_AUDIO_DEVICE_TESTS=1`). | Accepted |

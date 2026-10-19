@@ -3,6 +3,8 @@
 #include "support/synth.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include "support/audio_devices.hpp"
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <chrono>
@@ -30,6 +32,7 @@ void sleepMs(int ms) {
 
 // Installs the source or skips the test when there is no usable output device (CI).
 void requireSource(AudioPlayer& player, std::shared_ptr<const AudioFile> file) {
+    AVGEN_REQUIRE_AUDIO_DEVICE_TESTS();
     auto r = player.setSource(std::move(file));
     if (!r) {
         SKIP("no audio output device: " << r.error().message);

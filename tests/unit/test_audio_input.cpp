@@ -2,6 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "support/audio_devices.hpp"
+
 #include <chrono>
 #include <string>
 #include <thread>
@@ -19,6 +21,7 @@ void sleepMs(int ms) {
 // Opens the default capture device or skips the test (no input, denied microphone permission,
 // backend failure in CI). macOS may prompt for microphone access on the first run.
 void requireOpen(AudioInput& input) {
+    AVGEN_REQUIRE_AUDIO_DEVICE_TESTS();
     if (listCaptureDevices().empty()) {
         SKIP("no audio capture device");
     }

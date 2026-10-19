@@ -36,6 +36,14 @@ struct CoreAudioInputDevice {
 // Whether a device with this UID exists now (cheap: one HAL translation).
 [[nodiscard]] bool coreAudioDevicePresent(const std::string& uid);
 
+// ADR-1550: the capture period to ask of a device without disturbing other apps. A device's buffer size is shared by
+// every client, and changing it reconfigures whatever else is running the device -- above all a Multi-Output or
+// aggregate device the owner plays through, of which BlackHole is often a member (measured 2026-10-19: every AV Gen
+// open turned BlackHole 512 -> 128 under a running Multi-Output). So: `wanted` when nothing else runs the device, the
+// device's current buffer size when something does. `uid` empty = the default input device (`output`: the default
+// output device). Off macOS: `wanted`.
+[[nodiscard]] std::uint32_t courteousPeriodFrames(const std::string& uid, std::uint32_t wanted, bool output = false);
+
 class CoreAudioCapture final : public CaptureBackend {
 public:
     explicit CoreAudioCapture(std::string uid, std::uint32_t periodFrames = 128);

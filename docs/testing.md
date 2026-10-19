@@ -1304,6 +1304,8 @@ hashes are bit-identical with particles on; the render job's sequence hash is th
 
 ## Conventions
 
+**Real audio devices (ADR-1550).** Tests that open the machine's real audio devices (the default input, the speakers, BlackHole, private aggregates) skip unless `AVGEN_AUDIO_DEVICE_TESTS=1`. They reconfigure whatever the owner is playing through, so run them deliberately: `AVGEN_AUDIO_DEVICE_TESTS=1 build/release/tests/avgen_tests "[audio],[coreaudio]"`, with nothing playing.
+
 - A bug fix adds a test that failed before the fix.
 - Tests that need hardware (audio device, GPU) call `SKIP()` rather than fail when it is absent.
 - No test reads a system clock for correctness; timing-based tests (`[device]`) only check

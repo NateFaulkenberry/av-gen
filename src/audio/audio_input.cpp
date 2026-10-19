@@ -477,7 +477,11 @@ Result<void> AudioInput::open(const std::string& deviceName, std::uint32_t sampl
     // miniaudio's default 10 ms period that sample waited for the rest of its 480-frame block: measured on a
     // BlackHole loopback, 128 frames takes several milliseconds off audio -> bus for a live instrument. The callback
     // only downmixes and copies, so 375 calls a second cost nothing measurable.
-    config.periodSizeInFrames = 128;
+    // ADR-1550: but never resize a device something else is running (BlackHole inside the owner's Multi-Output): then
+    // keep its current buffer size, at a few milliseconds more latency. miniaudio sets the device's buffer to the
+    // period it is given, so the period must be the courteous one.
+    config.periodSizeInFrames = courteousPeriodFrames(
+        selected ? deviceIdString(ma_backend_coreaudio, *selected, selectedName.c_str()) : std::string{}, 128);
     config.dataCallback = &Impl::dataCallback;
     config.pUserData = &s;
 

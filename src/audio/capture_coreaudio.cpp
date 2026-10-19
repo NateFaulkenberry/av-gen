@@ -131,6 +131,33 @@ bool coreAudioDevicePresent(const std::string& uid) {
     return !uid.empty() && deviceForUid(uid) != kAudioObjectUnknown;
 }
 
+std::uint32_t courteousPeriodFrames(const std::string& uid, std::uint32_t wanted, bool output) {
+    AudioObjectID device = kAudioObjectUnknown;
+    if (uid.empty()) {
+        AudioObjectPropertyAddress a{output ? kAudioHardwarePropertyDefaultOutputDevice : kAudioHardwarePropertyDefaultInputDevice, kAudioObjectPropertyScopeGlobal, kMain};
+        UInt32 size = sizeof(device);
+        AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, nullptr, &size, &device);
+    } else {
+        device = deviceForUid(uid);
+    }
+    if (device == kAudioObjectUnknown) {
+        return wanted;
+    }
+    UInt32 running = 0;
+    UInt32 size = sizeof(running);
+    AudioObjectPropertyAddress r{kAudioDevicePropertyDeviceIsRunningSomewhere, kAudioObjectPropertyScopeGlobal, kMain};
+    if (AudioObjectGetPropertyData(device, &r, 0, nullptr, &size, &running) != noErr || running == 0) {
+        return wanted;
+    }
+    UInt32 current = 0;
+    size = sizeof(current);
+    AudioObjectPropertyAddress b{kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal, kMain};
+    if (AudioObjectGetPropertyData(device, &b, 0, nullptr, &size, &current) != noErr || current == 0) {
+        return wanted;
+    }
+    return current;
+}
+
 struct CoreAudioCapture::State {
     AudioObjectID device = kAudioObjectUnknown;
     AudioUnit unit = nullptr;
@@ -342,7 +369,7 @@ Result<CaptureFormat> CoreAudioCapture::open(CaptureSink& sink) {
     // whatever it takes, the buffers hold maxFrames.
     {
         AudioObjectPropertyAddress a{kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal, kMain};
-        UInt32 period = periodFrames_;
+        UInt32 period = courteousPeriodFrames(uid_, periodFrames_); // ADR-1550: never resize a device others run
         AudioObjectSetPropertyData(s.device, &a, 0, nullptr, sizeof(period), &period);
     }
     s.buffers.assign(s.channels, std::vector<float>(s.maxFrames, 0.0f));
@@ -415,6 +442,7 @@ std::uint32_t CoreAudioInputDevice::channels() const {
 }
 std::vector<CoreAudioInputDevice> coreAudioInputDevices() { return {}; }
 bool coreAudioDevicePresent(const std::string&) { return false; }
+std::uint32_t courteousPeriodFrames(const std::string&, std::uint32_t wanted, bool) { return wanted; }
 
 struct CoreAudioCapture::State {};
 CoreAudioCapture::CoreAudioCapture(std::string uid, std::uint32_t periodFrames)

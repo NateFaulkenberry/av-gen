@@ -1,5 +1,7 @@
 #include "audio/audio_player.hpp"
 
+#include "audio/capture_coreaudio.hpp"
+
 #include "core/log.hpp"
 
 #include <miniaudio.h>
@@ -175,6 +177,10 @@ Result<void> AudioPlayer::setSource(std::shared_ptr<const AudioFile> file) {
     config.playback.format = ma_format_f32;
     config.playback.channels = Impl::kOutputChannels;
     config.sampleRate = s.sampleRate; // miniaudio resamples to the device's native rate
+    // ADR-1550: miniaudio sets the output device's buffer to its period (10 ms by default). When something else is
+    // running the default output -- the owner's Multi-Output, of which it is the clock -- keep the device's current
+    // buffer instead, so playing a file never reconfigures the owner's audio. 0 = miniaudio's default.
+    config.periodSizeInFrames = courteousPeriodFrames({}, 0, /*output=*/true);
     config.dataCallback = &Impl::dataCallback;
     config.pUserData = &s;
 
