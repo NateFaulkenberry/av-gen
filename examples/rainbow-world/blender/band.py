@@ -151,12 +151,25 @@ def _hill_window(hills, s, reach=320.0):
     return [h for h in hs if abs((s - h[0] + 0.5 * L) % L - 0.5 * L) < reach]
 
 
-SECTIONS = {  # authored terrain movements (s0 relative to the section, x0, height, rs, rx, skew, rotation)
-    "rolling": (380.0, [(90, 40, 5, 30, 26, 1.2, 0.3), (250, -50, 4, 26, 22, 1.0, 0.0), (320, 70, 3, 18, 16, 1.0, 0.0)]),
-    "greathill": (420.0, [(120, -42, 22, 44, 34, 1.5, 0.4), (260, 20, -7, 40, 30, 1.0, 0.0), (340, 60, 6, 24, 20, 1.0, 0.0),
-                          (40, 70, 4, 18, 16, 1.0, 0.0)]),
-    "ridge": (400.0, [(200, 72, 14, 130, 18, 1.0, 0.0), (150, -60, 10, 34, 30, 1.3, -0.5), (330, -20, 5, 22, 22, 1.0, 0.0)]),
-    "twins": (360.0, [(110, -30, 15, 38, 32, 0.8, 0.2), (220, 35, 12, 34, 30, 1.2, -0.3), (300, -70, 4, 18, 18, 1.0, 0.0)]),
+SECTIONS = {  # authored terrain movements (s0 relative to the section, x0, height, rs along, rx across, skew, rotation)
+    # cross ridges that layer and recede along the ride (R3's rolling hills), a bowl at the end
+    "layered": (480.0, [(80, -20, 12, 22, 95, 1.6, 0.15), (190, 25, 17, 26, 110, 1.5, -0.1), (300, -10, 22, 30, 100, 1.7, 0.2),
+                        (400, 35, -10, 40, 50, 1.0, 0.0), (140, -85, 7, 16, 16, 1.0, 0.0), (250, 80, 6, 14, 14, 1.0, 0.0)]),
+    # one great hill with a hollow behind it and knolls round its foot
+    "greathill": (450.0, [(150, -40, 28, 50, 40, 1.5, 0.4), (290, 30, -10, 42, 34, 1.0, 0.0), (60, 70, 7, 18, 16, 1.0, 0.0),
+                          (210, 80, 9, 20, 18, 1.0, 0.0), (380, -5, 11, 24, 90, 1.4, -0.2)]),
+    # a valley along the band: a trough down the middle, walls rising either side toward the rims
+    "valley": (420.0, [(210, 0, -13, 170, 38, 1.0, 0.0), (200, 86, 19, 150, 20, 1.0, 0.05), (220, -86, 16, 150, 20, 1.0, -0.05),
+                       (90, 40, 5, 16, 16, 1.0, 0.0), (330, -35, 6, 18, 18, 1.0, 0.0)]),
+    # a long ridge spine with a dell beside it
+    "ridge": (400.0, [(200, 72, 18, 130, 18, 1.0, 0.0), (150, -60, 10, 34, 30, 1.3, -0.5), (300, 10, -8, 34, 30, 1.0, 0.0),
+                      (60, -20, 6, 18, 20, 1.0, 0.0)]),
+    # twin hills and a saddle
+    "twins": (380.0, [(110, -30, 18, 38, 32, 0.8, 0.2), (220, 35, 15, 34, 30, 1.2, -0.3), (300, -70, 5, 18, 18, 1.0, 0.0),
+                      (170, 0, -5, 24, 40, 1.0, 0.0)]),
+    # benches: three cross ridges with steep fronts, stepping down the band
+    "benches": (400.0, [(90, 0, 10, 20, 120, 2.4, 0.0), (190, 10, 14, 22, 120, 2.4, 0.08), (290, -10, 18, 24, 120, 2.4, -0.06),
+                        (360, 70, -7, 26, 26, 1.0, 0.0)]),
 }
 
 
@@ -164,10 +177,13 @@ def layout_hills(seed, total):
     """Lay the authored sections end to end round a loop of length `total`, mirrored at random."""
     import random as _r
     rng = _r.Random(seed)
-    order = ["greathill", "rolling", "ridge", "twins"]
-    out, s0 = [], 0.0
+    order = ["layered", "greathill", "valley", "ridge", "twins", "benches"]
+    out, s0, last = [], 0.0, None
     while s0 < total - 200:
-        name = order[rng.randrange(len(order))] if out else "rolling"
+        name = order[rng.randrange(len(order))] if out else "layered"
+        while name == last:  # never the same movement twice in a row
+            name = order[rng.randrange(len(order))]
+        last = name
         length, hills = SECTIONS[name]
         mirror = -1.0 if rng.random() < 0.5 else 1.0
         scale = rng.uniform(0.85, 1.15)

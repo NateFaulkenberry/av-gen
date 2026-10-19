@@ -107,10 +107,10 @@ def export_flowers(out):
     rng = _r.Random(9)
     me = bpy.data.meshes.new("flowers")
     bm = bmesh.new()
-    for k in range(7):
-        a, r = rng.uniform(0, 6.283), rng.uniform(0.0, 0.25)
+    for k in range(11):
+        a, r = rng.uniform(0, 6.283), rng.uniform(0.0, 0.35)
         base = Vector((math.cos(a) * r, math.sin(a) * r, 0))
-        h = rng.uniform(0.35, 0.7)
+        h = rng.uniform(0.3, 0.65)
         top = base + Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), h))
         # stem: a thin triangular prism
         ring0 = [bm.verts.new(base + Vector((math.cos(t) * 0.012, math.sin(t) * 0.012, 0))) for t in (0, 2.09, 4.19)]
@@ -119,12 +119,12 @@ def export_flowers(out):
             bm.faces.new((ring0[i], ring0[(i + 1) % 3], ring1[(i + 1) % 3], ring1[i]))
         # head: five petals as a flat star tilted up
         c = bm.verts.new(top + Vector((0, 0, 0.01)))
-        pr = rng.uniform(0.07, 0.12)
+        pr = rng.uniform(0.13, 0.22)
         outer = []
         for i in range(10):
             t = i * math.pi / 5
             rr = pr if i % 2 == 0 else pr * 0.42
-            outer.append(bm.verts.new(top + Vector((math.cos(t) * rr, math.sin(t) * rr, 0.015 * (i % 2)))))
+            outer.append(bm.verts.new(top + Vector((math.cos(t) * rr, math.sin(t) * rr, 0.05 * rr / pr + 0.015 * (i % 2)))))
         for i in range(10):
             bm.faces.new((c, outer[i], outer[(i + 1) % 10]))
     bm.to_mesh(me)

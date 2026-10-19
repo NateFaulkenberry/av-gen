@@ -11,13 +11,13 @@ from mathutils import Vector
 import rw_common as rw
 
 LOOK = {
-    "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.35, "atmosDist": 2600.0,
-    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 0.9, "skyIntensity": 1.0, "haze": 0.2,
-    "zenith": rw.hexlin("#1240C4")[:3], "horizon": rw.hexlin("#58BDEB")[:3], "ground": rw.hexlin("#D4E6F4")[:3],
+    "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.42, "atmosDist": 3200.0, "atmosTint": rw.hexlin("#8FB4E8")[:3],
+    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.2,
+    "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#D4E6F4")[:3],
     "meadow": [rw.hexlin("#2A6E2E")[:3], rw.hexlin("#4E9A2C")[:3], rw.hexlin("#6FB038")[:3], rw.hexlin("#9AC23A")[:3]],
     "shade": rw.hexlin("#155A5C")[:3],
-    "cloud": [rw.hexlin("#6670BC")[:3], rw.hexlin("#A6AEE2")[:3], rw.hexlin("#FFE4C2")[:3], [1.0, 0.96, 0.88]],
-    "cloudBounce": rw.hexlin("#F2C6A8")[:3], "cloudGain": 1.0,
+    "cloud": [rw.hexlin("#4C52AE")[:3], rw.hexlin("#8A8DD4")[:3], rw.hexlin("#F6C597")[:3], rw.hexlin("#FADBB6")[:3]],
+    "cloudBounce": rw.hexlin("#E9AE96")[:3], "cloudGain": 0.86,
     "rainbowStrength": 2.0,
 }
 
@@ -97,7 +97,7 @@ def ground_program():
         {"kind": "smoothstep", "dst": 2, "srcA": 6, "constant": [r1b - e, r1b, 0, 0]},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 7},
         {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
-        {"kind": "constant", "dst": 5, "constant": R(rw.P["stone_shadow"][:3]) + [1.0]},
+        {"kind": "constant", "dst": 5, "constant": R(rw.hexlin("#76665C")[:3]) + [1.0]},  # the rim core: a warm mid stone
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 1},
     ]
     ops.insert(1, {"kind": "constant", "dst": 7, "constant": [-1.0, -1.0, -1.0, -1.0]})
@@ -265,4 +265,5 @@ def post_parameters():
     return {"camera/exposure/compensation": LOOK["exposure"], "post/grade/saturation": LOOK["saturation"],
             "post/grade/contrast": LOOK["contrast"], "post/tonemap/chroma-retention": LOOK["chroma"],
             "post/look/atmospheric": LOOK["atmos"], "post/look/atmosphericDistance": LOOK["atmosDist"],
+            "post/look/atmosphericTint": R(LOOK["atmosTint"]),
             "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.2, "post/output/antialias": 0.8}
