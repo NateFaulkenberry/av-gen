@@ -2037,7 +2037,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 g.fieldSlot = fieldSlot;
                 g.strength = e.strength;
                 g.axisWeight = glm::vec4(e.axis, e.weight);
-                g.scaleAxisPad = glm::vec4(e.scaleAxis, 0.0f);
+                g.scaleAxisPad = glm::vec4(e.scaleAxis, e.local ? 1.0f : 0.0f); // w: ADR-1500 local axis
             }
         }
         const bool usesLive = effectorCount > 0;

@@ -45,7 +45,7 @@ struct EffectorGpu {
     fieldSlot: i32,       // -1 = disabled
     strength: f32,
     axisWeight: vec4<f32>,   // axis.xyz, weight (Mix)
-    scaleAxisPad: vec4<f32>, // scaleAxis.xyz
+    scaleAxisPad: vec4<f32>, // scaleAxis.xyz, w = 1 when the axis is the point's own (ADR-1500)
 };
 
 struct PointsParams {
@@ -125,6 +125,12 @@ fn quatAxisAngle(axis: vec3<f32>, angle: f32) -> vec4<f32> {
     return vec4<f32>(axis * s, cos(angle * 0.5));
 }
 
+// v rotated by the unit quaternion q (glm's q * v). ADR-1500.
+fn quatRotate(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
 @compute @workgroup_size(64)
 fn cs_effectors(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
@@ -146,6 +152,8 @@ fn cs_effectors(@builtin(global_invocation_id) gid: vec3<u32>) {
             var raw: vec3<f32>;
             if (vectorField) {
                 raw = (pointsParams.worldToObjectRotation * vec4<f32>(fieldVector(slot, pw), 0.0)).xyz * strength;
+            } else if (e.scaleAxisPad.w > 0.5) {
+                raw = quatRotate(r.rotation, e.axisWeight.xyz) * (s * strength); // ADR-1500: the point's own axis
             } else {
                 raw = e.axisWeight.xyz * (s * strength);
             }
@@ -167,7 +175,10 @@ fn cs_effectors(@builtin(global_invocation_id) gid: vec3<u32>) {
             if (len > 1e-8) {
                 axis = axis / len;
                 let delta = quatAxisAngle(axis, s * strength);
-                let natural = quatNormalize(quatMul(delta, r.rotation));
+                // ADR-1500: a local axis turns the point in its own frame
+                let ownAxis = !vectorField && e.scaleAxisPad.w > 0.5;
+                let natural = select(quatNormalize(quatMul(delta, r.rotation)), quatNormalize(quatMul(r.rotation, delta)),
+                                     ownAxis);
                 if (e.blend == BLEND_REPLACE) {
                     r.rotation = quatNormalize(delta);
                 } else if (e.blend == BLEND_MIX) {

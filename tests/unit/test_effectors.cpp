@@ -409,3 +409,65 @@ TEST_CASE("Effector JSON, hash and GPU packing", "[spatial][effectors]") {
     CHECK(packEffector(p, set).fieldSlot == -1);
     CHECK(sizeof(EffectorGpu) == 48);
 }
+
+TEST_CASE("A local axis is the point's own: offset along it, turn about it (ADR-1500)", "[spatial][effectors]") {
+    const FieldSet set = fields();
+    // A point laid on its side: its own +Y points along world +X.
+    const glm::quat lie = glm::angleAxis(-glm::half_pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f));
+    auto onePoint = [&] {
+        PointCloud c(1);
+        c.positions()[0] = {0.0f, 0.0f, 0.0f};
+        c.rotations()[0] = glm::vec4(lie.x, lie.y, lie.z, lie.w);
+        return c;
+    };
+    SECTION("PositionOffset follows the point's own axis") {
+        PointCloud c = onePoint();
+        Effector e = eff("half", EffectorOp::PositionOffset, 2.0f);
+        e.axis = {0.0f, 1.0f, 0.0f};
+        e.local = true;
+        CHECK(applyEffectors(c, std::vector<Effector>{e}, set, 0.0) == 1);
+        checkVec(c.positions()[0], {1.0f, 0.0f, 0.0f}); // 0.5 x 2 along world +X
+        PointCloud w = onePoint();
+        e.local = false;
+        applyEffectors(w, std::vector<Effector>{e}, set, 0.0);
+        checkVec(w.positions()[0], {0.0f, 1.0f, 0.0f}); // the object's +Y, as before
+    }
+    SECTION("Rotation turns about the point's own axis") {
+        PointCloud c = onePoint();
+        Effector e = eff("one", EffectorOp::Rotation, glm::half_pi<float>());
+        e.axis = {0.0f, 1.0f, 0.0f};
+        e.local = true;
+        applyEffectors(c, std::vector<Effector>{e}, set, 0.0);
+        const glm::quat q = quatOf(c.rotations()[0]);
+        // its own axis stays where it was (world +X) and its face (+Z) turns about it, to world -Y... or +Y
+        checkVec(q * glm::vec3(0.0f, 1.0f, 0.0f), {1.0f, 0.0f, 0.0f});
+        const glm::vec3 face = q * glm::vec3(0.0f, 0.0f, 1.0f);
+        CHECK_THAT(d(std::abs(face.y)), WithinAbs(1.0, 1e-5));
+        // a vector field ignores the flag (its vector is the axis)
+        PointCloud v = onePoint();
+        Effector ev = eff("up", EffectorOp::Rotation, 0.4f);
+        PointCloud v2 = onePoint();
+        Effector ev2 = ev;
+        ev2.local = true;
+        applyEffectors(v, std::vector<Effector>{ev}, set, 0.0);
+        applyEffectors(v2, std::vector<Effector>{ev2}, set, 0.0);
+        for (int k = 0; k < 4; ++k) {
+            CHECK(v.rotations()[0][k] == v2.rotations()[0][k]);
+        }
+    }
+    SECTION("JSON, hash and packing") {
+        Effector e = eff("half", EffectorOp::Rotation, 1.0f);
+        const auto plainHash = e.structuralHash();
+        CHECK_FALSE(e.toJson().contains("local"));
+        e.local = true;
+        CHECK(e.toJson().at("local") == true);
+        CHECK(e.structuralHash() != plainHash);
+        auto back = Effector::fromJson(e.toJson());
+        REQUIRE(back.has_value());
+        CHECK(back->local);
+        CHECK(back->structuralHash() == e.structuralHash());
+        CHECK(packEffector(e, set).scaleAxisPad.w == 1.0f);
+        e.local = false;
+        CHECK(packEffector(e, set).scaleAxisPad.w == 0.0f);
+    }
+}
