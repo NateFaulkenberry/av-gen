@@ -309,9 +309,9 @@
     "kind": "onset",
     "onsetSource": "mid",
     "point": [
-     -22.0,
-     3.0,
-     -80.0
+     -32.904399999999995,
+     1.8576,
+     -84.878
     ],
     "waveGeometry": "spherical",
     "audioSpeed": 55.0,
@@ -1318,6 +1318,47 @@
      "value": 2.5
     },
     {
+     "kind": "palette",
+     "dst": 7,
+     "srcA": 0,
+     "constant": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant2": [
+      0.5,
+      0.5,
+      0.5,
+      0.0
+     ],
+     "constant3": [
+      70.0,
+      70.0,
+      70.0,
+      0.0
+     ],
+     "constant4": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "power",
+     "dst": 7,
+     "srcA": 7,
+     "value": 8.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
      "kind": "input",
      "dst": 2,
      "input": "audio"
@@ -1370,7 +1411,7 @@
       0.0,
       1.0,
       0.0,
-      0.5
+      0.35
      ],
      "value": 0.0
     },

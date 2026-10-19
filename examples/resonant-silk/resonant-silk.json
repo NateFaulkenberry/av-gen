@@ -384,7 +384,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/37/remap/constant",
+   "target": "material/rsSilk/op/40/remap/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -398,7 +398,7 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/42/remap/constant",
+   "target": "material/rsSilk/op/45/remap/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -1530,21 +1530,21 @@
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/36/ramp/constant2",
+    "target": "material/rsSilk/op/39/ramp/constant2",
     "gain": 0.5
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/36/ramp/constant3"
+    "target": "material/rsSilk/op/39/ramp/constant3"
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/41/ramp/constant2",
+    "target": "material/rsSilk/op/44/ramp/constant2",
     "gain": 0.5
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/41/ramp/constant3"
+    "target": "material/rsSilk/op/44/ramp/constant3"
    }
   ],
   "position": 0.0,

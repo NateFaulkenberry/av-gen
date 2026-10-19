@@ -525,6 +525,14 @@ def silk_program():
     g.op(None, "add", 1, a=1, b=6)
     if MUSIC:
         g.op(None, "power", 6, a=4, f=2.5)                             # r6: the folds' turning edges (narrow)
+        if GLINT_N > 0.0:
+            # art pass II: GLINTS AT FIXED PLACES along the fold edges -- a sharpened lattice in the cloth's own length
+            # (u), so they travel with the cloth; the raw treble on every edge at once was a frame-wide flash on each
+            # hat (a single-frame spike in the motion measure, the brief's "the whole scene twitches")
+            g.op("glintLattice", "palette", 7, a=0, k=[0.5, 0.5, 0.5, 0], k2=[0.5, 0.5, 0.5, 0], k3=[GLINT_N] * 3 + [0],
+                 k4=[0, 0, 0, 0])
+            g.op(None, "power", 7, a=7, f=8.0)
+            g.op(None, "multiply", 6, a=6, b=7)
         # treble as a uniform (the analysis' treble band): a per-pixel field read cost 16 ms with the others at 1080p
         g.op("treble", "input", 2, inp="audio")
         g.op(None, "swizzle", 2, a=2, k=[3, 3, 3, 3])
@@ -532,7 +540,7 @@ def silk_program():
         g.op("trebleCol", "ramp", 2, a=2, k=[0, 0, 0, 0], k2=C("pearl", 0.5) + [0.5], k3=C("pearl") + [1])   # peak
         # x Light Response: the gain is the remap's top end (one op; CC 6 scales k.w, art pass II -- was a constant and
         # a multiply)
-        g.op("trebleGain", "remap", 2, a=2, k=[0.0, 1.0, 0.0, 0.5])
+        g.op("trebleGain", "remap", 2, a=2, k=[0.0, 1.0, 0.0, GLINT_GAIN])
         g.op(None, "add", 1, a=1, b=2)
         # resonant light: a kick's front travelling out across the cloth
         g.op("kick", "field", 2, field="kickFront")
@@ -671,6 +679,9 @@ CROSS_WAVE = float(os.environ.get("RS_CROSS_WAVE", "5.5"))
 CROSS_AMP = float(os.environ.get("RS_CROSS_AMP", "0.06"))
 CROSS_HAT = float(os.environ.get("RS_CROSS_HAT", "0.3"))
 SNARE_LIGHT = float(os.environ.get("RS_SNARE_LIGHT", "0"))
+GLINT_N = float(os.environ.get("RS_GLINT_N", "70"))        # glints along the cloth's 344 m (one each ~5 m)
+GLINT_GAIN = float(os.environ.get("RS_GLINT_GAIN", "0.35"))
+SNARE_OFF = float(os.environ.get("RS_SNARE_OFF", "12"))
 SEAM_U, SEAM_W = 0.625, float(os.environ.get("RS_SEAM_W", "0.012"))   # the gather's ring along the hero's length (u), and 9 m of it   # the rim and the sail's two lamps (the key: KEY_SCALE)
 BACK_DIR = (0.03, 0.02, 1.0)    # from the glow behind the gather toward the camera: the light passing through
 SILK_GLOW = float(os.environ.get("RS_GLOW", "1.2"))
@@ -753,7 +764,10 @@ def fields(s):
                           "wavelength": 150.0, "waveSpeed": 65.0, "waveWidth": 0.0, "amplitude": 1.0})
     fnode("kickFront", {"kind": "onset", "onsetSource": "low", "point": list(GATHER), "waveGeometry": "spherical",
                         "audioSpeed": 34.0, "onsetWidth": 14.0, "onsetDecay": 0.9})
-    fnode("snareFront", {"kind": "onset", "onsetSource": "mid", "point": list(WALL_MID),
+    # (art pass II: the source stands SNARE_OFF metres off the wall -- on the cloth itself a snare's front appeared at
+    # full strength in one frame, a once-a-second pop in the motion measure; from off the sheet it sweeps in)
+    snare_at = [m + SNARE_OFF * n for m, n in zip(WALL_MID, WALL_N)]
+    fnode("snareFront", {"kind": "onset", "onsetSource": "mid", "point": snare_at,
                          "waveGeometry": "spherical", "audioSpeed": 55.0, "onsetWidth": 5.0, "onsetDecay": 2.2})
     if RES_BAKE:
         # art pass II, with the performance agent's measurement: the wall's and the sail's compounds each sampled the
