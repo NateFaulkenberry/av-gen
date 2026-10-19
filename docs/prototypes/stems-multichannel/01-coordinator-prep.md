@@ -206,3 +206,37 @@ milestone), or the Sonic/response layer too. ADR-1510, the adaptive response ref
 - **Scratch and GPU.** Keep scratch in the worktree's `build/`; a reboot wipes /tmp. Use
   `tools/gpu-lock.sh` for GPU jobs. Don't wrap `run-suite.sh gpu` in it, because it takes the lock itself.
 - **Merge.** One branch, merged into main when you hand back.
+
+## 6. Verification notes (stems agent, 2026-10-19)
+
+Each claim above was checked against the code and the probes in `02-research-report.md`. **They are correct except
+for the following.**
+
+### Corrections
+
+- **§4.1, miniaudio #312: the channels are not "silent". They are not delivered at all.** Measured on a private
+  aggregate device with two input streams (mic 1 ch + BlackHole 2ch):
+  - With `channels = 0`, as `AudioInput` opens it, miniaudio opens **only the first stream's channels** (1 or 2,
+    depending on the stream order).
+  - With `channels = 3`, it reports 3 channels that are **upmixed copies of the first stream**, which is worse than
+    silence.
+- **How the channel count is chosen.** `ma_get_AudioObject_channel_count` (the preferred channel layout) is not
+  what limits capture. The client format is picked from `kAudioStreamPropertyAvailableVirtualFormats` queried on
+  the device. Those are per-stream formats, so the first stream's channel count wins. A 10-line patch that keeps
+  AUHAL's device-side channel count fixes it; so does a raw AUHAL capture.
+
+### Additions
+
+- **§4.2, notifications.** miniaudio offers `notificationCallback`, which reports started, stopped and rerouted.
+  When a device is destroyed mid-capture:
+  - "stopped" fires, but `ma_device_get_state` still says *started*, and callbacks keep arriving;
+  - the same is true of a raw AUHAL capture;
+  - `kAudioDevicePropertyDeviceIsAlive` (5 ms) and `kAudioHardwarePropertyDevices` (about 70 ms) are the reliable
+    signals.
+- **§3, device id.** `deviceIdString()` does return the Core Audio UID (`ma_device_id.coreaudio` is filled from
+  `kAudioDevicePropertyDeviceUID`), but `open()` never uses it.
+- **§3, the Volt on this machine.** The comment at `audio_input.cpp:81-84` records that CoreAudio once enumerated a
+  "Volt 876" here.
+- **§3, AudioFile.** `ma_decoder` is never asked to resample. The stem plan analyses every file at its own rate
+  instead (report §3.4).
+- **§0, BlackHole 16ch.** It is not installed: the cask's installer needs an admin password (sudo).

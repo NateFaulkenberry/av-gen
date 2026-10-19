@@ -62,6 +62,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1470-1479 | art/resonator-quality (the Resonator scenes' quality pass) |
 | 1480-1489 | art/resonator-pass-2 (the Resonator scenes' targeted art pass II) |
 | 1490-1499 | perf/resonator-live (the Resonator scenes' live performance, art pass II §7-8) |
+| 1520-1529 | eng/stems-multichannel (stem-aware offline analysis and live multichannel Core Audio input) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
