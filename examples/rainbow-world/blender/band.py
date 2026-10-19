@@ -41,8 +41,18 @@ def centre(s):
     return Vector((28.0 * math.sin(2 * math.pi * u * 0.7), s, 18.0 * math.sin(math.pi * u)))
 
 
+KNOT = None        # a knot_path.Path when the band is the closed knot (configure_knot); None = the 420 m section
+
+
 def frames():
     out = []
+    if KNOT is not None:
+        for i in range(NS + 1):
+            s = L * i / NS
+            p, t, n, b = KNOT.at(s)
+            t, u = Vector(t), Vector(n)
+            out.append((s, Vector(p), t, u, t.cross(u).normalized()))
+        return out
     up = Vector((0, 0, 1))
     for i in range(NS + 1):
         s = L * i / NS
@@ -61,12 +71,14 @@ def profile_points():
     """Closed control polygon, clockwise from the top face's centre. The right rim is a high crest
     over a tall terraced cliff; the left rim is lower, with a broad ledge (asymmetry is deliberate)."""
     W = HALF_W
-    top = [(0, FACE), (60, FACE), (100, FACE + 1.5), (116, FACE + 4.0)]
-    right = [(124, FACE + 6.0), (130, FACE + 3.0), (133, FACE - 4.0), (134, 0.0), (132.5, -FACE + 5.0),
-             (129, -FACE - 1.5), (120, -FACE - 3.0)]
+    # v2 (Stage 3): a crisper break at both cliff tops -- the meadow runs nearly flat to the edge and turns down
+    # over a short shoulder, instead of v1's rounded bulge that read as a lip of slime over the rocks.
+    top = [(0, FACE), (60, FACE), (100, FACE + 1.0), (114, FACE + 1.6)]
+    right = [(121, FACE + 1.2), (125.5, FACE - 1.5), (128.5, FACE - 6.0), (130.5, 0.0), (129.0, -FACE + 6.0),
+             (125.5, -FACE + 1.5), (120, -FACE - 1.4)]
     bottom = [(100, -FACE - 1.0), (40, -FACE), (-40, -FACE), (-100, -FACE - 1.0)]
-    left = [(-118, -FACE - 2.0), (-126, -FACE + 2.0), (-129, -8.0), (-136, -5.0), (-139, 2.0),
-            (-133, FACE - 4.0), (-126, FACE + 1.0), (-114, FACE + 1.5)]
+    left = [(-117, -FACE - 1.2), (-123, -FACE + 2.0), (-127, -8.0), (-134, -5.5), (-136.5, 1.0),
+            (-131, FACE - 5.0), (-124.5, FACE - 1.0), (-115, FACE + 1.4)]
     ret = top + right + bottom + left + [(-60, FACE)]
     return [(x * W / 130.0, y) for x, y in ret]
 
@@ -110,6 +122,8 @@ def profile_normal(k):
 # ---- authored surface features --------------------------------------------------------------------------
 def hill(s, x, s0, x0, h, rs, rx, skew=1.0, rot=0.0):
     ds, dx = s - s0, x - x0
+    if KNOT is not None:  # the closed loop: the shorter way round
+        ds = (ds + 0.5 * L) % L - 0.5 * L
     c, sn = math.cos(rot), math.sin(rot)
     a, b = c * ds - sn * dx, sn * ds + c * dx
     ra = rs * (skew if a > 0 else 1.0 / skew)
@@ -125,12 +139,60 @@ BOTTOM_HILLS = [
     (160, 60, -5, 30, 26, 1.0, 0.0), (280, 0, 5, 24, 30, 1.0, 0.6)]
 
 
+_WINDOWS = {}
+
+
+def _hill_window(hills, s, reach=320.0):
+    """The hills within `reach` of s along the loop (hills are sorted by s0 once)."""
+    key = id(hills)
+    if key not in _WINDOWS:
+        _WINDOWS[key] = sorted(hills, key=lambda h: h[0])
+    hs = _WINDOWS[key]
+    return [h for h in hs if abs((s - h[0] + 0.5 * L) % L - 0.5 * L) < reach]
+
+
+SECTIONS = {  # authored terrain movements (s0 relative to the section, x0, height, rs, rx, skew, rotation)
+    "rolling": (380.0, [(90, 40, 5, 30, 26, 1.2, 0.3), (250, -50, 4, 26, 22, 1.0, 0.0), (320, 70, 3, 18, 16, 1.0, 0.0)]),
+    "greathill": (420.0, [(120, -42, 22, 44, 34, 1.5, 0.4), (260, 20, -7, 40, 30, 1.0, 0.0), (340, 60, 6, 24, 20, 1.0, 0.0),
+                          (40, 70, 4, 18, 16, 1.0, 0.0)]),
+    "ridge": (400.0, [(200, 72, 14, 130, 18, 1.0, 0.0), (150, -60, 10, 34, 30, 1.3, -0.5), (330, -20, 5, 22, 22, 1.0, 0.0)]),
+    "twins": (360.0, [(110, -30, 15, 38, 32, 0.8, 0.2), (220, 35, 12, 34, 30, 1.2, -0.3), (300, -70, 4, 18, 18, 1.0, 0.0)]),
+}
+
+
+def layout_hills(seed, total):
+    """Lay the authored sections end to end round a loop of length `total`, mirrored at random."""
+    import random as _r
+    rng = _r.Random(seed)
+    order = ["greathill", "rolling", "ridge", "twins"]
+    out, s0 = [], 0.0
+    while s0 < total - 200:
+        name = order[rng.randrange(len(order))] if out else "rolling"
+        length, hills = SECTIONS[name]
+        mirror = -1.0 if rng.random() < 0.5 else 1.0
+        scale = rng.uniform(0.85, 1.15)
+        for hs, hx, h, rs, rx, sk, rot in hills:
+            out.append((s0 + hs * scale, hx * mirror, h * rng.uniform(0.85, 1.15), rs * scale, rx, sk, rot * mirror))
+        s0 += length * scale
+    return out
+
+
+def per(period):
+    """On the closed knot a periodic term must close too: the nearest period that divides the loop's length."""
+    if KNOT is None:
+        return period
+    return L / max(1, round(L / period))
+
+
 def face_height(s, x, hills, phase):
     edge = 1.0 - smoothstep(0.80, 0.95, abs(x) / HALF_W)
-    h = 4.5 * math.sin(2 * math.pi * s / 150.0 + 0.013 * x + phase) * (0.6 + 0.4 * math.sin(2 * math.pi * s / 330.0))
-    h += sum(hill(s, x, *p) for p in hills)
+    h = 4.5 * math.sin(2 * math.pi * s / per(150.0) + 0.013 * x + phase) * (0.6 + 0.4 * math.sin(2 * math.pi * s / per(330.0)))
+    if KNOT is not None and len(hills) > 24:
+        h += sum(hill(s, x, *p) for p in _hill_window(hills, s))
+    else:
+        h += sum(hill(s, x, *p) for p in hills)
     # a ridge spine running toward the right rim, rising and falling along the band
-    h += 7.0 * math.exp(-((x - 0.73 * HALF_W) ** 2) / (2 * 14.0 ** 2)) * (0.55 + 0.45 * math.sin(2 * math.pi * s / 210.0 + phase))
+    h += 7.0 * math.exp(-((x - 0.73 * HALF_W) ** 2) / (2 * 14.0 ** 2)) * (0.55 + 0.45 * math.sin(2 * math.pi * s / per(210.0) + phase))
     return h * edge
 
 
@@ -153,6 +215,20 @@ def _columns(seed):
 
 
 COLS = {True: _columns(11), False: _columns(23)}
+
+
+def configure_knot(path, ring_spacing=3.0, seed=1):
+    """Make this module sweep the closed knot instead of the 420 m section: frames from `path` (knot_path.Path,
+    the engine's own spline frames), the loop's length, rings every `ring_spacing` metres, authored terrain sections
+    laid round the loop, and the rim columns re-cut for the loop's length."""
+    global KNOT, L, NS, TOP_HILLS, BOTTOM_HILLS, COLS
+    KNOT = path
+    L = float(path.length)
+    NS = int(round(L / ring_spacing))
+    TOP_HILLS = layout_hills(seed, L)
+    BOTTOM_HILLS = layout_hills(seed + 100, L)
+    COLS = {True: _columns(11), False: _columns(23)}
+    _WINDOWS.clear()
 TIER_Y = (-7.0, 6.0)  # tier boundaries (m, before the per-column wobble)
 
 
@@ -182,7 +258,7 @@ def _block_depth(ci, s, y, right):
 
 def rim_offset(s, y, right):
     ph = 0.0 if right else 2.0
-    wander = 6.0 * math.sin(2 * math.pi * s / 97.0 + ph) + 3.5 * math.sin(2 * math.pi * s / 41.0 + ph)
+    wander = 6.0 * math.sin(2 * math.pi * s / per(97.0) + ph) + 3.5 * math.sin(2 * math.pi * s / per(41.0) + ph)
     ci = _block(s, y, right)
     s0, s1, *_ = COLS[right][ci]
     d = _block_depth(ci, s, y, right)
@@ -211,10 +287,12 @@ def rim_tone(s, y, right):
     return COLS[right][ci][3]
 
 
-def build_band(name="band_section"):
+def build_band(name="band_section", rings=None):
+    """The band mesh. `rings` = (first, last) ring indices for one chunk of the knot (inclusive); None = all."""
     fr = frames()
+    i0, i1 = rings if rings is not None else (0, NS)
     verts, uvs, zones, moss = [], [], [], []
-    for (s, p, t, u, side) in fr:
+    for (s, p, t, u, side) in fr[i0:i1 + 1]:
         for k in range(NP):
             q = PROFILE[k]
             n2 = profile_normal(k)
@@ -244,7 +322,7 @@ def build_band(name="band_section"):
     col = bm.loops.layers.color.new("zone")
     col2 = bm.loops.layers.color.new("rim2")
     faces = []
-    for i in range(NS):
+    for i in range(i1 - i0):
         for k in range(NP):
             a = i * NP + k
             b = i * NP + (k + 1) % NP
@@ -260,10 +338,13 @@ def build_band(name="band_section"):
                 loop[col] = (z[0], z[1], z[2], z[3])
                 loop[col2] = moss[vi]
             faces.append(f)
-    # end caps (a prototype section is open at its two ends; cap them so it renders as a solid)
-    for ring in (0, NS):
-        cap = bm.faces.new([bv[ring * NP + k] for k in (reversed(range(NP)) if ring == NS else range(NP))])
-        cap.smooth = False
+    # end caps (a prototype section is open at its two ends; cap them so it renders as a solid). The knot is
+    # closed: its chunks meet ring to ring, so they get none.
+    if KNOT is None:
+        last = i1 - i0
+        for ring in (0, last):
+            cap = bm.faces.new([bv[ring * NP + k] for k in (reversed(range(NP)) if ring == last else range(NP))])
+            cap.smooth = False
     bm.to_mesh(me)
     bm.free()
     for poly in me.polygons:
@@ -352,9 +433,9 @@ def grass_clump(name="grass_clump", blades=22, seed=3, segs=4):
     for b in range(blades):
         a = 2 * math.pi * b / blades + rng.uniform(-0.3, 0.3)
         r0 = rng.uniform(0.02, 0.16)
-        hgt = rng.uniform(0.25, 0.5)
-        lean = rng.uniform(0.25, 0.5)
-        wid = rng.uniform(0.045, 0.075)
+        hgt = rng.uniform(0.25, 0.55)
+        lean = rng.uniform(0.08, 0.28)
+        wid = rng.uniform(0.03, 0.05)
         base = Vector((math.cos(a) * r0, math.sin(a) * r0, 0))
         out = Vector((math.cos(a), math.sin(a), 0))
         side = Vector((-math.sin(a), math.cos(a), 0))
