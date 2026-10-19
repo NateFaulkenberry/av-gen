@@ -169,11 +169,16 @@ TEST_CASE("Sonic Live: the garden's loudness and strikes are the Response's", "[
     CHECK(lowSustain < neutral);
     CHECK(lowTransient == neutral);
 
-    // At Sensitivity 0 nothing is heard: the waiting world holds while the groove plays.
+    // At Sensitivity 0 the garden's loudness is off. Since ADR-1510 the waiting world is for silence: the response
+    // level reads against the music's own loudness (a breakdown reads near 0), so silence also hears the character's
+    // fixed-dB energy, and holds when the input is silent rather than when the slider is down.
     p.response = {{"sensitivity", 0.0f}};
-    CHECK(meanSignal(p, "visual.silence") > 0.9);
+    CHECK(meanSignal(p, "visual.energy") < 0.02);
     p.response = {};
     CHECK(meanSignal(p, "visual.silence") < 0.1);
+    Play quiet = p;
+    quiet.level = 0.0f; // a silent input
+    CHECK(meanSignal(quiet, "visual.silence") > 0.9);
 
     // Strikes: Transients decides how many onsets strike.
     p.response = {{"transient", 0.2f}};
