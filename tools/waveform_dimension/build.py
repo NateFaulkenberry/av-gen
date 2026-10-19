@@ -340,15 +340,19 @@ def surface_program(name):
     g.op(None, "multiply", 3, a=3, b=1)
     g.op(None, "add", 2, a=2, b=3)
     if POLISH:
-        # ART PASS II (08-plan §4, restrained): the rim light, from behind the sculpture, passes through the faces that
-        # turn to the eye -- a soft glow in the sheet's own colour (the slope of the gradient is its gain, so it never
-        # exceeds POLISH_TRANS x the albedo) -- and the silhouettes catch a narrow Fresnel edge in the palette's rim
-        # colour. The geometry, the glow, the edges' crimson line and every route are untouched.
+        # ART PASS II (08-plan §4, restrained): translucency AT THE FOLDS -- where a sheet turns from the eye it is thin
+        # to the eye, and the rim light behind the sculpture comes through there in the sheet's own colour (backlight x
+        # Fresnel^2 x albedo; a first try lit every camera-facing face and only lifted the shadows); and a narrow edge
+        # in the palette's rim colour on the silhouettes (Fresnel^5 from the same term). Geometry, glow, the crimson
+        # edge line and every route are untouched.
         g.op(None, "input", 3, inp="normal")
-        g.op("wdTrans", "gradient", 3, a=3, k=list(_unit3(POLISH_BACK)) + [POLISH_TRANS_W], f=POLISH_TRANS)
-        g.op(None, "multiply", 3, a=3, b=4)
+        g.op("wdTrans", "gradient", 3, a=3, k=list(_unit3(POLISH_BACK)) + [POLISH_TRANS_W], f=1.0)
+        g.op(None, "fresnel", 6, f=2.0)
+        g.op(None, "multiply", 3, a=3, b=6)
+        g.op("wdTransCol", "multiply", 3, a=3, b=4)
+        g.op("wdTransGain", "remap", 3, a=3, k=[0.0, 1.0, 0.0, POLISH_TRANS])
         g.op(None, "add", 2, a=2, b=3)
-        g.op(None, "fresnel", 6, f=POLISH_RIM_P)
+        g.op(None, "power", 6, a=6, f=POLISH_RIM_P / 2.0)
         g.op("wdRim", "ramp", 6, a=6, k=[0, 0, 0, 0], k2=C("purple", 0.5 * POLISH_RIM) + [0.5],
              k3=C("purple", POLISH_RIM) + [1.0])
         g.op(None, "add", 2, a=2, b=6)
@@ -733,11 +737,11 @@ def instrument(s, g):
 # the chromatic waves (surface_program): their direction, cycles across the sculpture, how far the displacement bends
 # them (cycles per metre of D), the step between nested sheets, and the phase's drift (cycles per second per unit of
 # the integrated energy + floor)
-POLISH = os.environ.get("WD_POLISH", "0") == "1"
+POLISH = os.environ.get("WD_POLISH", "1") == "1"
 POLISH_BACK = (-0.35, -0.25, 0.9)                                 # the rim light's travel: through the sheets, to the eye
-POLISH_TRANS = float(os.environ.get("WD_TRANS", "0.35"))          # the backlight's gain (the gradient's slope)
+POLISH_TRANS = float(os.environ.get("WD_TRANS", "1.6"))          # the backlight's gain (the gradient's slope)
 POLISH_TRANS_W = float(os.environ.get("WD_TRANS_W", "0.0"))       # its wrap (an offset before the clamp)
-POLISH_RIM = float(os.environ.get("WD_RIM", "0.25"))              # the edge's brightness (palette rim role)
+POLISH_RIM = float(os.environ.get("WD_RIM", "0.5"))              # the edge's brightness (palette rim role)
 POLISH_RIM_P = float(os.environ.get("WD_RIM_P", "5.0"))           # the edge's narrowness (Fresnel power)
 FILL_I = float(os.environ.get("WD_FILL_I", "1.2"))
 WD_BANDS_GAIN = float(os.environ.get("WD_BANDS", "0.5"))
