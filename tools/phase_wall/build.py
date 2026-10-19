@@ -53,7 +53,7 @@ ROW = 5.6                                         # row pitch along the meridian
                                                   # reads as one tall band
 DPHI = ROW / RS
 SWING = 0.9                                       # blade swing (rad) at |sin theta| = 1
-CHIP = (2.1, 2.7, 0.05)                           # the caps' chips
+CHIP = (2.4, 4.6, 0.05)                           # the caps' chips
 CHIP_PITCH = 3.5                                  # their spacing (m)
 FRONT_THETA = -math.pi / 2                        # the azimuth the performance camera faces
 
@@ -68,11 +68,11 @@ def fringe(theta, h):
     """Where each column starts to dissolve, at the top and the bottom (radians), and how far the dissolve runs: the
     columns thin out blade by blade and shrink into the membrane over 12-20 degrees, starting at a latitude that
     wanders round the sphere, so there is no edge and no circle (a circle there reads as a dome's rim or an oculus)."""
-    top = (math.radians(52.0) + math.radians(6.0) * math.sin(3 * theta + 1.0) + math.radians(4.0) * math.sin(7 * theta + 2.3)
+    top = (math.radians(49.0) + math.radians(4.0) * math.sin(3 * theta + 1.0) + math.radians(4.0) * math.sin(7 * theta + 2.3)
            + math.radians(4.0) * (h - 0.5))
-    bot = (-math.radians(46.0) - math.radians(5.0) * math.sin(2 * theta + 0.5) - math.radians(4.0) * math.sin(5 * theta + 4.0)
+    bot = (-math.radians(45.0) - math.radians(4.0) * math.sin(2 * theta + 0.5) - math.radians(4.0) * math.sin(5 * theta + 4.0)
            - math.radians(4.0) * (h - 0.5))
-    run = math.radians(14.0) + math.radians(6.0) * h
+    run = math.radians(10.0) + math.radians(5.0) * h
     return top, bot, run
 
 
@@ -130,31 +130,44 @@ def capness(theta, phi, h):
 
 
 def chip_points():
-    """The caps: chips scattered evenly over the sphere (a Fibonacci lattice) where the columns dissolve, appearing as
-    the columns thin out (complementary odds) so the transition has no edge, each turned off its meridian by a random
-    angle that grows toward the pole: no rays, no rings, no hole -- a scatter of luminous chips over the poles."""
-    area = 4 * math.pi * RS * RS
-    n = int(area / (CHIP_PITCH * CHIP_PITCH))
-    golden = math.pi * (3.0 - math.sqrt(5.0))
+    """The caps, their own pattern (the meridians never run into a pole): over each pole a hexagonal lattice laid on the
+    sphere by the Lambert equal-area projection (even spacing, no spirals, no rings), every chip's long axis along one
+    direction across the cap (the world Z projected on the sphere: a parallel field, nowhere radial, its own
+    singularities on the equator far outside the cap). The chips appear as the columns thin out (complementary odds),
+    so there is no edge, and they glow as bright as the columns."""
     pts = []
-    for i in range(n):
-        y = 1.0 - 2.0 * (i + 0.5) / n
-        ph = math.asin(y)
-        th = math.atan2(math.sin(golden * i), math.cos(golden * i))
-        c = int((th + math.pi) / (2 * math.pi) * NCOL) % NCOL
-        k = capness(th, ph, hash01(c, 3))
-        if k <= 0.0 or hash01(i, 11) > min(1.0, k * 1.25) ** 0.8:
-            continue
-        cp, sp, ct, st = math.cos(ph), math.sin(ph), math.cos(th), math.sin(th)
-        nrm = (cp * ct, sp, cp * st)
-        north = np.array((-sp * ct, cp, -sp * st))
-        east = np.array((-st, 0.0, ct))
-        a = (hash01(i, 13) - 0.5) * math.pi * min(1.0, k)          # turned off the meridian, more toward the pole
-        x = math.cos(a) * east + math.sin(a) * north
-        yv = -math.sin(a) * east + math.cos(a) * north
-        q = quat_from_basis(tuple(x), tuple(yv), (-nrm[0], -nrm[1], -nrm[2]))
-        sc = 0.75 + 0.25 * hash01(i, 17)
-        pts.append([round(v, 4) for v in (RS * nrm[0], RS * nrm[1], RS * nrm[2], q[0], q[1], q[2], q[3], sc, sc, 1.0)])
+    pitch_u, pitch_v = CHIP_PITCH, CHIP_PITCH * 1.6           # across and along the chips' axis
+    reach = 2 * RS * math.sin(math.radians(50.0) / 2)         # Lambert radius of colatitude 50 degrees
+    nu, nv = int(reach / pitch_u) + 2, int(reach / pitch_v) + 2
+    i = 0
+    for pole in (1.0, -1.0):
+        for jv in range(-nv, nv + 1):
+            for iu in range(-nu, nu + 1):
+                i += 1
+                u = (iu + 0.5 * (jv & 1)) * pitch_u
+                v = jv * pitch_v
+                r = math.hypot(u, v)
+                if r > reach:
+                    continue
+                colat = 2 * math.asin(min(1.0, r / (2 * RS)))
+                az = math.atan2(v, u)
+                ph = pole * (math.pi / 2 - colat)
+                th = az if pole > 0 else -az
+                c = int((th + math.pi) / (2 * math.pi) * NCOL) % NCOL
+                k = capness(th, ph, hash01(c, 3))
+                if k <= 0.0 or hash01(i, 11) > min(1.0, k * 2.5) ** 0.5:   # ahead of the columns' thinning
+                    continue
+                cp, sp, ct, st = math.cos(ph), math.sin(ph), math.cos(th), math.sin(th)
+                nrm = np.array((cp * ct, sp, cp * st))
+                d = np.array((0.0, 0.0, 1.0)) - nrm * nrm[2]       # world Z projected on the tangent plane: along the
+                # columns where the performance camera looks (-Z), so the cap continues them there
+                d /= np.linalg.norm(d)
+                inward = -nrm
+                x = np.cross(d, inward)                              # so that (x, d, inward) is right-handed
+                sc = 0.85 + 0.15 * hash01(i, 17)
+                q = quat_from_basis(tuple(x), tuple(d), tuple(inward))
+                pts.append([round(float(t), 4) for t in (RS * nrm[0], RS * nrm[1], RS * nrm[2], q[0], q[1], q[2], q[3],
+                                                         sc, sc, 1.0)])
     return pts
 
 
@@ -428,9 +441,9 @@ def membrane(s):
 
 
 def chip_program():
-    """A cap chip: a luminous lozenge (its light peaks in the middle of both axes), its body the palette's tone by the
-    membrane's displacement (it has no phase of its own: the network's azimuth is singular at a pole), lit by the same
-    hierarchy as the blades (the swell's zones, the kick's ring) and glinting on the hats."""
+    """A cap chip lights like a blade (a hot core down its long axis, a shoulder, dark edges, as bright as the columns);
+    its body is the palette's tone by the membrane's displacement (it has no phase of its own: the network's azimuth is
+    singular at a pole), and its brightness follows the same zones and the kick's ring."""
     g = common.Prog("chip")
     cw, ch = CHIP[0], CHIP[1]
     g.op(None, "field", 0, field="disp")
@@ -439,23 +452,27 @@ def chip_program():
     g.op(None, "input", 2, inp="localPosition")
     g.op(None, "gradient", 3, a=2, k=[1, 0, 0, 0.5], f=1.0 / cw)
     g.op(None, "gradient", 4, a=2, k=[-1, 0, 0, 0.5], f=1.0 / cw)
-    g.op(None, "multiply", 3, a=3, b=4)
+    g.op(None, "multiply", 3, a=3, b=4)                             # u (1 - u)
     g.op(None, "gradient", 4, a=2, k=[0, 1, 0, 0.5], f=1.0 / ch)
     g.op(None, "gradient", 5, a=2, k=[0, -1, 0, 0.5], f=1.0 / ch)
-    g.op(None, "multiply", 4, a=4, b=5)
-    g.op(None, "multiply", 3, a=3, b=4)                             # u(1-u) v(1-v): 1/16 in the middle
-    g.op(None, "remap", 3, a=3, k=[0.0, 0.0625, 0.0, 1.0], f=1.0)
-    g.op(None, "smoothstep", 5, a=3, k=[0.0, 0.1, 0, 0])
-    g.op(None, "multiply", 1, a=1, b=5)                             # the body darkens at the rim
-    g.op(None, "power", 3, a=3, f=6.0)                              # r3 = the lozenge of light
-    g.op(None, "remap", 6, a=0, k=[0.0, 1.0, 0.15, 1.8])            # intensity: the zones
+    g.op(None, "multiply", 4, a=4, b=5)                             # v (1 - v)
+    g.op(None, "smoothstep", 5, a=3, k=[0.0, 0.05, 0, 0])
+    g.op(None, "multiply", 1, a=1, b=5)                             # the body darkens at its edges
+    g.op(None, "remap", 3, a=3, k=[0.0, 0.25, 0.0, 1.0], f=1.0)     # 4u(1-u)
+    g.op(None, "smoothstep", 4, a=4, k=[0.0, 0.05, 0, 0])           # gone at the ends
+    g.op(None, "multiply", 3, a=3, b=4)
+    g.op(None, "power", 5, a=3, f=14.0)                             # core
+    g.op(None, "power", 6, a=3, f=2.5)
+    g.op(None, "remap", 6, a=6, k=[0.0, 1.0, 0.0, 0.12])            # shoulder
+    g.op(None, "add", 5, a=5, b=6)
+    g.op(None, "remap", 6, a=0, k=[0.0, 1.0, 0.45, 2.2])            # intensity: the zones
     g.op(None, "field", 7, field="kickPush")
     g.op(None, "remap", 7, a=7, k=[0.3, 2.4, 0.0, 2.0], f=1.0)
     g.op(None, "add", 6, a=6, b=7)
-    g.op(None, "multiply", 3, a=3, b=6)
-    g.op("core", "constant", 7, k=C("core", CORE * 0.8) + [1])
-    g.op(None, "multiply", 3, a=3, b=7)
-    g.base, g.emit = 1, 3
+    g.op(None, "multiply", 5, a=5, b=6)
+    g.op("core", "constant", 7, k=C("core", CORE) + [1])
+    g.op(None, "multiply", 5, a=5, b=7)
+    g.base, g.emit = 1, 5
     return g
 
 
@@ -465,7 +482,7 @@ def chips(s):
     bind(s, "trough", op_path(g, "tone", "constant"), TONE)
     bind(s, "mid", op_path(g, "tone", "constant2"), TONE)
     bind(s, "crest", op_path(g, "tone", "constant3"), TONE)
-    bind(s, "core", op_path(g, "core"), CORE * 0.8)
+    bind(s, "core", op_path(g, "core"), CORE)
     pts = chip_points()
     s.chip_count = len(pts)
     s.proc("chips", {"kind": "box", "size": list(CHIP)},
@@ -557,13 +574,13 @@ def music(s, net, g):
             R("control.complexity", G + "spread", 0.2, **CC),
             R("control.motion", G + "speed", 1.5, **CC),
             R("control.lag", G + "phaseLag", 1.0, **CC),
-            R("control.light", "scene/bands/gain", 1.0, op="multiply", gain=2.0, offset=1.0, **CC),
-            R("control.light", op_path(g, "core"), 1.0, op="multiply", gain=1.5, offset=0.5, **CC),
-            R("control.swell", "field/swell/strength", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.swell", "field/breath/strength", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.impact", "field/kickPush/strength", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.impact", G + "injectRate", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.shimmer", op_path(g, "glint"), 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
+            R("control.light", "scene/bands/gain", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.light", op_path(g, "core"), 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.swell", "field/swell/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.swell", "field/breath/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.impact", "field/kickPush/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.impact", G + "injectRate", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.shimmer", op_path(g, "glint"), 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.palette", "palette/select", float(len(PALETTES) - 1), **CC),
             R("control.paletteLock", "palette/lock", 1.0, **CC),
             R("control.pace", "field/pace/strength", 0.35, attackMs=80, decayMs=2500))

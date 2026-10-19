@@ -162,9 +162,9 @@
      -2.0
     ],
     "waveGeometry": "spherical",
-    "audioSpeed": 11.0,
-    "onsetWidth": 2.6,
-    "onsetDecay": 0.7
+    "audioSpeed": 18.0,
+    "onsetWidth": 3.0,
+    "onsetDecay": 1.2
    }
   },
   {
@@ -588,7 +588,7 @@
       "field": "kick",
       "op": "positionOffset",
       "blend": "add",
-      "strength": 0.55,
+      "strength": 0.3,
       "axis": [
        0.0,
        1.0,
@@ -794,9 +794,9 @@
       0.0,
       1.0,
       0.0,
-      0.06
+      0.03
      ],
-     "value": 0.0
+     "value": 1.0
     },
     {
      "kind": "add",
@@ -940,8 +940,8 @@
      "constant": [
       0.0,
       1.0,
-      0.4,
-      2.2
+      0.22,
+      3.2
      ],
      "value": 0.0
     },

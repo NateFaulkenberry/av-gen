@@ -182,7 +182,7 @@ def pattern(s):
     # passes toward spots (spots spread in rings), it lifts the pins it passes (an effector) and it swells the contours
     # and carries a band of light (the pin program)
     s.field("kick", {"kind": "onset", "onsetSource": "low", "point": list(KICK_AT), "waveGeometry": "spherical",
-                     "audioSpeed": 11.0, "onsetWidth": 2.6, "onsetDecay": 0.7, "strength": KICK_GAIN})
+                     "audioSpeed": 18.0, "onsetWidth": 3.0, "onsetDecay": 1.2, "strength": KICK_GAIN})
     children.append("kick")
     if RES:
         # option (proof Q5): the resonance field's settled figure (sand, ADR-1405) as a slower regime layer, so the
@@ -282,7 +282,7 @@ def pin_program():
     # S = B + shift
     g.op("rippleShift", "constant", 6, k=[0.035, 0.035, 0.035, 0])       # the ripple's reach into the contours (mids)
     g.op(None, "multiply", 6, a=1, b=6)
-    g.op(None, "remap", 7, a=2, k=[0.0, 1.0, 0.0, 0.06])                 # the kick swells the contours
+    g.op(None, "remap", 7, a=2, k=[0.0, 1.0, 0.0, 0.03], f=1.0)          # the kick swells the contours (bounded)
     g.op(None, "add", 6, a=6, b=7)
     g.op(None, "add", 6, a=0, b=6)                                       # r6 = S
     # the contour
@@ -302,7 +302,7 @@ def pin_program():
     g.op(None, "multiply", 0, a=0, b=2)                                  # r0 = beads (gated)
     g.op(None, "remap", 3, a=3, k=[0.15, 0.75, 0.0, 1.0], f=1.0)         # the bass pool
     g.op(None, "multiply", 1, a=1, b=3)                                  # crest x pool: the interference
-    g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 0.4, 2.2])                  # floor 0.4
+    g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 0.22, 3.2])                 # floor 0.22: most contours stay low
     g.op(None, "add", 1, a=1, b=0)
     g.op(None, "field", 2, field="kick")
     g.op(None, "remap", 2, a=2, k=[0.15, 1.4, 0.0, 2.4], f=1.0)          # the kick's band of light
@@ -424,13 +424,13 @@ def instrument(s, g):
             R("control.height", E, 6.0, **CC),
             R("control.erase", G + "feed", -0.03, **CC),
             R("control.erase", G + "feedB", -0.02, **CC),
-            R("control.light", ring, 1.0, op="multiply", gain=2.0, offset=0.5, **CC),
-            R("control.light", hot, 1.0, op="multiply", gain=2.0, offset=0.5, **CC),
-            R("control.waves", D + "1/amount", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.waves", D + "2/amount", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.impact", "field/kick/strength", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.impact", "field/snare/strength", 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
-            R("control.shimmer", glint, 1.0, op="multiply", gain=2.0, offset=0.0, **CC),
+            R("control.light", ring, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.light", hot, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.waves", D + "1/amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.waves", D + "2/amount", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.impact", "field/kick/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.impact", "field/snare/strength", 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
+            R("control.shimmer", glint, 1.0, op="multiply", gain=1.5, offset=1.0, **CC),
             R("control.palette", "palette/select", float(len(PALETTES) - 1), **CC),
             R("control.paletteLock", "palette/lock", 1.0, **CC))
     for i in range(3):
@@ -507,7 +507,7 @@ def build():
                                 # the bass history's lift, the kick's and the snare's rings (m)
                                 {"field": "swell", "op": "positionOffset", "blend": "add", "strength": 1.4,
                                  "axis": [0.0, 1.0, 0.0]},
-                                {"field": "kick", "op": "positionOffset", "blend": "add", "strength": 0.55,
+                                {"field": "kick", "op": "positionOffset", "blend": "add", "strength": 0.3,
                                  "axis": [0.0, 1.0, 0.0]},
                                 {"field": "snare", "op": "positionOffset", "blend": "add", "strength": 0.2,
                                  "axis": [0.0, 1.0, 0.0]}]})

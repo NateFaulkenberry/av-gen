@@ -306,7 +306,7 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
+    "gain": 1.5,
     "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
@@ -320,7 +320,7 @@
    "polarity": "unipolar",
    "chain": {
     "gain": 1.5,
-    "offset": 0.5,
+    "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
    }
@@ -332,8 +332,8 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
-    "offset": 0.0,
+    "gain": 1.5,
+    "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
    }
@@ -345,8 +345,8 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
-    "offset": 0.0,
+    "gain": 1.5,
+    "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
    }
@@ -358,8 +358,8 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
-    "offset": 0.0,
+    "gain": 1.5,
+    "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
    }
@@ -371,8 +371,8 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
-    "offset": 0.0,
+    "gain": 1.5,
+    "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
    }
@@ -384,8 +384,8 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
-    "offset": 0.0,
+    "gain": 1.5,
+    "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
    }
@@ -1080,8 +1080,8 @@
    },
    {
     "role": "core",
-    "target": "material/chip/op/21/constant/constant",
-    "gain": 2.08
+    "target": "material/chip/op/25/constant/constant",
+    "gain": 2.6
    },
    {
     "role": "glow",
