@@ -232,11 +232,13 @@ def build():
                 R(src, "fx/arc%d/light" % i, 320.0, attackMs=8, decayMs=140),
                 R("visual.jag", "fx/arc%d/jaggedness" % i, 0.25, **MEDIUM),
                 R("visual.jag", "fx/arc%d/flicker" % i, 0.4, **MEDIUM))
-    # bass: the core charges
-    s.route(R("bass", "procedural/coreLoad/material/emissive", 3.0, attackMs=50, decayMs=700),
-            R("bass", "lights/coreGlow/intensity", 150.0, attackMs=50, decayMs=700),
-            R("bass", "procedural/coreCoil/material/emissive", 1.6, attackMs=50, decayMs=700),
-            R("bass", "procedural/cables/material/emissive", 0.4, attackMs=50, decayMs=900))
+    # bass: the core charges. ADR-1510: bass reads against the music's own loudness, so a quiet passage reads 0 and a
+    # mix's body about 0.65 (it sat at 1 before); the 0.35 offset keeps the core and the hall lit through a quiet
+    # passage, and the body plus the offset is about the old full charge.
+    s.route(R("bass", "procedural/coreLoad/material/emissive", 3.0, attackMs=50, decayMs=700, offset=0.35),
+            R("bass", "lights/coreGlow/intensity", 150.0, attackMs=50, decayMs=700, offset=0.35),
+            R("bass", "procedural/coreCoil/material/emissive", 1.6, attackMs=50, decayMs=700, offset=0.35),
+            R("bass", "procedural/cables/material/emissive", 0.4, attackMs=50, decayMs=900, offset=0.35))
     # snare: crackle over the core
     s.route(R("snare", "fx/crackle/intensity", 60.0, attackMs=0, decayMs=240),
             R("snare", "fx/crackle/crackle", 14.0, attackMs=0, decayMs=240),

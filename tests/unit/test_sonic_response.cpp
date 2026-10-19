@@ -142,21 +142,22 @@ TEST_CASE("A pad reads sustained, drums read transient", "[sonic][adr1062]") {
     CHECK(p.snares.empty());
 }
 
-TEST_CASE("Sensitivity moves the floor, never multiplies the top", "[sonic][adr1062]") {
+TEST_CASE("Sensitivity moves the window, never multiplies the top", "[sonic][adr1062][adr1510]") {
     const sonic::ResponseSettings s;
+    const float ref = -10.0f; // the loudness reference (ADR-1510)
     for (const float sens : {0.2f, 0.5f, 0.8f, 1.0f}) {
         INFO(sens);
-        CHECK(sonic::conditionLevel(0.0f, sens, s) <= 1.0f); // full scale: never past 1
-        CHECK(sonic::conditionLevel(20.0f, sens, s) == 1.0f);
-        CHECK(sonic::conditionLevel(-130.0f, sens, s) == 0.0f); // silence is silent at any sensitivity
+        CHECK(sonic::conditionLevel(0.0f, ref, s.levelWindow, sens, s) <= 1.0f); // full scale: never past 1
+        CHECK(sonic::conditionLevel(20.0f, ref, s.levelWindow, sens, s) == 1.0f);
+        CHECK(sonic::conditionLevel(-130.0f, ref, s.levelWindow, sens, s) == 0.0f); // silence is silent at any sensitivity
     }
-    // A quiet sound is lifted by sensitivity rather than scaled: -40 dBFS.
-    const float low = sonic::conditionLevel(-40.0f, 0.2f, s);
-    const float mid = sonic::conditionLevel(-40.0f, 0.5f, s);
-    const float high = sonic::conditionLevel(-40.0f, 0.9f, s);
+    // A sound just under the reference is lifted by sensitivity rather than scaled.
+    const float low = sonic::conditionLevel(-11.0f, ref, s.levelWindow, 0.2f, s);
+    const float mid = sonic::conditionLevel(-11.0f, ref, s.levelWindow, 0.5f, s);
+    const float high = sonic::conditionLevel(-11.0f, ref, s.levelWindow, 0.9f, s);
     CHECK(low < mid);
     CHECK(mid < high);
-    CHECK(sonic::conditionLevel(-40.0f, 0.0f, s) == 0.0f); // 0: the kind is off
+    CHECK(sonic::conditionLevel(-11.0f, ref, s.levelWindow, 0.0f, s) == 0.0f); // 0: the kind is off
     // Overall sensitivity moves both kinds; the two kinds move one each.
     sonic::ResponseControls c;
     c.sensitivity = 0.8f;
@@ -165,18 +166,19 @@ TEST_CASE("Sensitivity moves the floor, never multiplies the top", "[sonic][adr1
     CHECK(sonic::levelSensitivity(c) == Approx(0.8f));
 }
 
-TEST_CASE("A quieter take keeps its hits and reads quieter levels", "[sonic][adr1062]") {
-    // The same kit 12 dB down: the hits are level-free, the levels are not (a quiet passage looks quiet).
+TEST_CASE("A quieter take keeps its hits, and its levels read against its own loudness", "[sonic][adr1062][adr1510]") {
+    // The same kit 12 dB down: the hits are level-free, and since ADR-1510 the levels are read against the take's own
+    // loudness reference, so a quieter channel reads the same music the same way (a breakdown inside one take still
+    // reads quiet: test_response_range.cpp).
     const auto loud = analysis::AnalysisTrack::analyze(testsupport::makeKit(6).file, analysis::AnalyzerConfig{});
     const auto quiet = analysis::AnalysisTrack::analyze(
         testsupport::makeKit(6, true, true, true, 124.0, 0.2f).file, analysis::AnalyzerConfig{});
     const Run a = run(loud);
     const Run b = run(quiet);
-    const testsupport::Kit qk = testsupport::makeKit(6, true, true, true, 124.0, 0.2f);
-    INFO("quiet kicks on bass " << near(b.kicks, qk.bass) << " on kicks " << near(b.kicks, qk.kicks) << " on snares " << near(b.kicks, qk.snares) << " on hats " << near(b.kicks, qk.hats));
     INFO("kicks " << a.kicks.size() << " vs " << b.kicks.size() << "; level " << a.meanLevel << " vs " << b.meanLevel);
     CHECK(std::abs(static_cast<int>(a.kicks.size()) - static_cast<int>(b.kicks.size())) <= 2);
-    CHECK(b.meanLevel < a.meanLevel - 0.05);
+    CHECK(b.meanLevel > 0.2);
+    CHECK(std::abs(b.meanLevel - a.meanLevel) < 0.12);
 }
 
 TEST_CASE("Voice slots: one note owns one slot for its life, the lowest free one", "[sonic][adr1062]") {

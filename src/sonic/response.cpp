@@ -3,6 +3,8 @@
 #include "sonic/notes.hpp"
 #include "sonic/timbre.hpp"
 
+#include "core/log.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -23,6 +25,14 @@ double alpha(double dt, double tau) {
 // An asymmetric one-pole: `attack` seconds rising, `release` falling.
 void follow(float& y, float x, double dt, double attack, double release) {
     y += static_cast<float>(alpha(dt, x > y ? attack : release)) * (x - y);
+}
+
+double dbToPower(float db) {
+    return std::pow(10.0, static_cast<double>(db) / 10.0);
+}
+
+float powerToDb(double p) {
+    return p > 1e-12 ? static_cast<float>(10.0 * std::log10(p)) : -120.0f;
 }
 
 // The response curve: higher sensitivity lifts the small values; 0 and 1 stay where they are.
@@ -54,9 +64,15 @@ float levelSensitivity(const ResponseControls& c) {
     return clamp01(c.sensitivity + c.sustain - 0.5f);
 }
 
-float conditionLevel(float db, float sensitivity, const ResponseSettings& s) {
-    const float floor = s.floorDb - (sensitivity - 0.5f) * 2.0f * s.sensitivityDb;
-    const float n = clamp01((db - floor) / std::max(s.rangeDb, 1.0f));
+float conditionLevel(float db, float referenceDb, const ResponseSettings::LevelWindow& window, float sensitivity,
+                     const ResponseSettings& s) {
+    if (!(db > s.gateDb)) {
+        return 0.0f;
+    }
+    const float span = std::max(window.spanDb, 1.0f);
+    const float top = std::max(referenceDb, s.referenceMinDb) + window.topDb -
+                      (sensitivity - 0.5f) * 2.0f * s.sensitivityShare * span;
+    const float n = clamp01(1.0f - (top - db) / span);
     return curve(n, sensitivity) * presence(sensitivity);
 }
 
@@ -70,9 +86,35 @@ Result<void> ResponseSettings::applyJson(const nlohmann::json& j) {
     c.sustain = std::clamp(j.value("sustain", c.sustain), 0.0f, 1.0f);
     c.attack = std::clamp(j.value("attack", c.attack), 0.25f, 4.0f);
     c.release = std::clamp(j.value("release", c.release), 0.25f, 4.0f);
-    floorDb = j.value("floorDb", floorDb);
-    rangeDb = std::max(1.0f, j.value("rangeDb", rangeDb));
-    sensitivityDb = j.value("sensitivityDb", sensitivityDb);
+    // ADR-1510 retired the fixed window (ADR-441: no aliases); a stale key is said once and ignored.
+    for (const char* retired : {"floorDb", "rangeDb", "sensitivityDb"}) {
+        if (j.contains(retired)) {
+            log::warn("sonic.response.{} was retired by ADR-1510 (the levels read against an adaptive reference); "
+                      "ignored",
+                      retired);
+        }
+    }
+    gateDb = j.value("gateDb", gateDb);
+    referenceMinDb = j.value("referenceMinDb", referenceMinDb);
+    referenceSeconds = std::max(0.05f, j.value("referenceSeconds", referenceSeconds));
+    referenceRise = std::max(0.0f, j.value("referenceRise", referenceRise));
+    referenceFall = std::max(0.0f, j.value("referenceFall", referenceFall));
+    sensitivityShare = std::clamp(j.value("sensitivityShare", sensitivityShare), 0.0f, 1.0f);
+    if (const auto w = j.find("windows"); w != j.end() && w->is_object()) {
+        for (auto [name, window] : {std::pair{"bass", &bassWindow}, std::pair{"level", &levelWindow},
+                                    std::pair{"sustain", &sustainWindow}, std::pair{"levelSlow", &levelSlowWindow},
+                                    std::pair{"intensity", &intensityWindow}}) {
+            const auto it = w->find(name);
+            if (it == w->end()) {
+                continue;
+            }
+            if (!it->is_array() || it->size() != 2 || !(*it)[0].is_number() || !(*it)[1].is_number()) {
+                return fail("'sonic.response.windows.{}' must be [topDb, spanDb]", name);
+            }
+            window->topDb = (*it)[0].get<float>();
+            window->spanDb = std::max(1.0f, (*it)[1].get<float>());
+        }
+    }
     if (const auto r = j.find("hitRelease"); r != j.end() && r->is_object()) {
         for (std::size_t h = 0; h < kResponseHitCount; ++h) {
             hitRelease[h] = std::max(0.005f, r->value(kHitNames[h], hitRelease[h]));
@@ -99,9 +141,25 @@ nlohmann::json ResponseSettings::toJson() const {
     for (std::size_t h = 0; h < kResponseHitCount; ++h) {
         releases[kHitNames[h]] = hitRelease[h];
     }
-    return {{"sensitivity", controls.sensitivity}, {"transient", controls.transient}, {"sustain", controls.sustain},
-            {"attack", controls.attack},           {"release", controls.release},     {"floorDb", floorDb},
-            {"rangeDb", rangeDb},                  {"sensitivityDb", sensitivityDb},  {"hitRelease", releases}};
+    nlohmann::json windows;
+    for (auto [name, window] : {std::pair{"bass", &bassWindow}, std::pair{"level", &levelWindow},
+                                std::pair{"sustain", &sustainWindow}, std::pair{"levelSlow", &levelSlowWindow},
+                                std::pair{"intensity", &intensityWindow}}) {
+        windows[name] = {window->topDb, window->spanDb};
+    }
+    return {{"sensitivity", controls.sensitivity},
+            {"transient", controls.transient},
+            {"sustain", controls.sustain},
+            {"attack", controls.attack},
+            {"release", controls.release},
+            {"gateDb", gateDb},
+            {"referenceMinDb", referenceMinDb},
+            {"referenceSeconds", referenceSeconds},
+            {"referenceRise", referenceRise},
+            {"referenceFall", referenceFall},
+            {"sensitivityShare", sensitivityShare},
+            {"windows", windows},
+            {"hitRelease", releases}};
 }
 
 void ResponseModel::declare(signals::SignalBus& bus) {
@@ -113,9 +171,9 @@ void ResponseModel::declare(signals::SignalBus& bus) {
         bus.setLabel(ids_.env[h], std::string(kHitLabels[h]) + ", as an envelope");
     }
     ids_.bass = bus.declare("response.bass");
-    bus.setLabel(ids_.bass, "bass level (30-150 Hz, fast)");
+    bus.setLabel(ids_.bass, "bass level (30-150 Hz, the body: held between hits, against the music's loudness)");
     ids_.level = bus.declare("response.level");
-    bus.setLabel(ids_.level, "level (fast)");
+    bus.setLabel(ids_.level, "level (the body: held between hits, against the music's loudness)");
     ids_.transient = bus.declare("response.transient");
     bus.setLabel(ids_.transient, "attack energy (fast minus slow level)");
     ids_.sustain = bus.declare("response.sustain");
@@ -129,7 +187,7 @@ void ResponseModel::declare(signals::SignalBus& bus) {
     ids_.pitch = bus.declare("response.pitch");
     bus.setLabel(ids_.pitch, "pitch of the latest note or confident pitch (0 = C1, 1 = C8)");
     ids_.intensity = bus.declare("response.intensity");
-    bus.setLabel(ids_.intensity, "intensity (level over 12 s: the macro dynamics)");
+    bus.setLabel(ids_.intensity, "intensity (level over 12 s against the last minute: the macro dynamics)");
     // ADR-1361: declared last, after every older id.
     ids_.levelSlow = bus.declare("response.levelSlow");
     bus.setLabel(ids_.levelSlow, "level, slow (over about 3 s: when a rest becomes silence)");
@@ -173,14 +231,52 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     }
     hatRate_ *= static_cast<float>(std::exp(-dt / std::max(0.1, static_cast<double>(s.hatRateSeconds))));
 
-    // ---- levels: fixed dB ranges, the moved floor, the curve, the followers ----
+    // ---- levels (ADR-1510): followers in dB, read against the adaptive loudness reference ----
     if (!o.valid) {
         return;
     }
-    const float bassN = conditionLevel(o.bassDb, levelS, s);
-    const float levelN = conditionLevel(o.levelDb, levelS, s);
-    follow(bass_, bassN, dt, s.bassAttack * att, s.bassRelease * rel);
-    follow(level_, levelN, dt, s.levelAttack * att, s.levelRelease * rel);
+    const float gate = s.gateDb;
+    const float levelDb = std::max(o.levelDb, gate);
+    const float bassDb = std::max(o.bassDb, gate);
+    if (!levelsPrimed_) {
+        bassDb_ = levelDb_ = referenceDb_ = gate;
+        levelsPrimed_ = true;
+    }
+    const double power = dbToPower(levelDb);
+    const bool heard = o.levelDb > gate;
+    // The reference: the gated level's power over a few seconds -- until that much has been heard, the plain average
+    // of what has (the character tiers' warm-up), so the first bars are read against themselves rather than against
+    // silence -- after that followed up in seconds and down over a minute. Silence below the gate leaves it where it is.
+    if (heard) {
+        heardSeconds_ += dt;
+        const double a = std::max(alpha(dt, static_cast<double>(s.referenceSeconds)), dt / heardSeconds_);
+        referencePower_ += a * (power - referencePower_);
+        const float source = powerToDb(referencePower_);
+        if (heardSeconds_ <= 2.0 * static_cast<double>(s.referenceSeconds)) {
+            referenceDb_ = source; // warming: the average of what has been heard, with no lag on top of it
+        } else {
+            follow(referenceDb_, source, dt, static_cast<double>(s.referenceRise), static_cast<double>(s.referenceFall));
+        }
+    }
+    // The slow levels: power over levelSlowSeconds and intensitySeconds, from the first sound heard (the same warm-up),
+    // silence included -- a rest becomes silence (ADR-1361).
+    if (heard || sinceHeard_ > 0.0) {
+        sinceHeard_ += dt;
+        const double warm = dt / sinceHeard_;
+        const double slowTau = static_cast<double>(s.levelSlowSeconds) * (power > levelSlowPower_ ? att : rel);
+        levelSlowPower_ += std::max(alpha(dt, slowTau), warm) * (power - levelSlowPower_);
+        intensityPower_ += std::max(alpha(dt, static_cast<double>(s.intensitySeconds)), warm) * (power - intensityPower_);
+    }
+    follow(bassDb_, bassDb, dt, static_cast<double>(s.bassAttack) * att, static_cast<double>(s.bassRelease) * rel);
+    follow(levelDb_, levelDb, dt, static_cast<double>(s.levelAttack) * att,
+           static_cast<double>(s.levelRelease) * rel);
+    const float ref = referenceDb_;
+    const float levelSlowDb = sinceHeard_ > 0.0 ? powerToDb(levelSlowPower_) : gate;
+    const float intensityDb = sinceHeard_ > 0.0 ? powerToDb(intensityPower_) : gate;
+    bass_ = conditionLevel(bassDb_, ref, s.bassWindow, levelS, s);
+    level_ = conditionLevel(levelDb_, ref, s.levelWindow, levelS, s);
+    levelSlow_ = conditionLevel(levelSlowDb, ref, s.levelSlowWindow, levelS, s);
+    intensity_ = conditionLevel(intensityDb, ref, s.intensityWindow, levelS, s);
     // The transient designer: a fast follower minus a slow one, in dB, 18 dB for 1.
     if (!primed_) {
         fastDb_ = slowDb_ = o.levelDb;
@@ -189,16 +285,16 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     follow(fastDb_, o.levelDb, dt, 0.003 * att, 0.04 * rel);
     follow(slowDb_, o.levelDb, dt, 0.04 * att, 0.4 * rel);
     const float rise = clamp01((fastDb_ - slowDb_) / 18.0f);
-    transient_ = curve(rise, hitS) * presence(hitS) * (o.levelDb > s.floorDb - 24.0f ? 1.0f : 0.0f);
+    transient_ = curve(rise, hitS) * presence(hitS) * (o.levelDb > gate - 24.0f ? 1.0f : 0.0f);
     follow(percussive_, rise, dt, 0.05, 0.6);
-    // Sustained: the slow level, less the share that is attacks.
-    follow(sustain_, levelN * (1.0f - clamp01(percussive_ * 2.5f)), dt, s.sustainAttack * att, s.sustainRelease * rel);
+    // Sustained: the level, less the share that is attacks, followed slowly.
+    const float sustainN = conditionLevel(o.levelDb, ref, s.sustainWindow, levelS, s);
+    follow(sustain_, sustainN * (1.0f - clamp01(percussive_ * 2.5f)), dt, s.sustainAttack * att,
+           s.sustainRelease * rel);
     // Change: the broadband ratio over its own background, 0.5..6.5 -> 0..1.
     const float fluxN = curve(clamp01((o.ratio[static_cast<std::size_t>(analysis::HitClass::Onset)] - 0.5f) / 6.0f),
                               levelS) * presence(levelS);
     follow(flux_, fluxN, dt, s.fluxAttack * att, s.fluxRelease * rel);
-    follow(intensity_, levelN, dt, s.intensitySeconds, s.intensitySeconds);
-    follow(levelSlow_, levelN, dt, s.levelSlowSeconds * att, s.levelSlowSeconds * rel); // ADR-1361
     // Melodic activity from the audio: confident pitch moves of half a semitone or more, weighted by size (7 = 1).
     float move = 0.0f;
     if (f.f0Hz > 0.0f && f.pitchConfidence >= 0.5f) {

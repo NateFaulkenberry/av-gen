@@ -72,7 +72,7 @@
        }
       ],
       "gain": 2.5,
-      "bias": -0.625
+      "bias": -0.125
      },
      {
       "name": "hTreble",
@@ -87,7 +87,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 1.2
+      "gain": 1.65
      },
      {
       "name": "hTrebleLevel",
@@ -102,7 +102,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 1.2
+      "gain": 1.65
      },
      {
       "name": "hBass",
@@ -117,7 +117,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 1.22
+      "gain": 1.48
      }
     ]
    }
@@ -261,10 +261,7 @@
  ],
  "sonic": {
   "live": true,
-  "response": {
-   "floorDb": -44.0,
-   "rangeDb": 42.0
-  }
+  "response": {}
  },
  "routes": [
   {
@@ -508,7 +505,7 @@
    "source": "response.bass",
    "target": "sdf/limb0/node/melt/amount",
    "op": "add",
-   "amount": 0.104,
+   "amount": 0.126,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -535,7 +532,7 @@
    "source": "response.bass",
    "target": "sdf/limb1/node/melt/amount",
    "op": "add",
-   "amount": 0.104,
+   "amount": 0.126,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -562,7 +559,7 @@
    "source": "response.bass",
    "target": "sdf/limb2/node/melt/amount",
    "op": "add",
-   "amount": -0.0832,
+   "amount": -0.1008,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -589,7 +586,7 @@
    "source": "response.bass",
    "target": "sdf/trunk/node/bark/amount",
    "op": "add",
-   "amount": 0.0416,
+   "amount": 0.0504,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -602,7 +599,7 @@
    "source": "response.bass",
    "target": "sdf/limb0/node/bark/amount",
    "op": "add",
-   "amount": 0.0416,
+   "amount": 0.0504,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -615,7 +612,7 @@
    "source": "response.bass",
    "target": "sdf/limb1/node/bark/amount",
    "op": "add",
-   "amount": 0.0416,
+   "amount": 0.0504,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,
@@ -628,7 +625,7 @@
    "source": "response.bass",
    "target": "sdf/limb2/node/bark/amount",
    "op": "add",
-   "amount": 0.0416,
+   "amount": 0.0504,
    "depthSource": "macro.gMelt",
    "depthMin": 0.0,
    "depthMax": 1.0,

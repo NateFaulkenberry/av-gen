@@ -30,9 +30,10 @@ RESPONSE = {
     "low": "response.low", "lowEnv": "response.lowEnv",          # any low attack: a kick or a bass note
     "onset": "response.onset", "onsetEnv": "response.onsetEnv",  # any attack, level-free
     "hatRate": "response.hatRate",                               # hats a second / 12: granular activity
-    # ---- levels (0..1, conditioned by the Live panel's sensitivity, never auto-gained)
-    "bass": "response.bass",              # 30-150 Hz, fast: displacement, pressure
-    "level": "response.level",            # full band, fast
+    # ---- levels (0..1, read against the music's own loudness over the last minute -- ADR-1510: a track's body sits
+    #      around 0.5-0.7, a breakdown low, a drop high -- and conditioned by the Live panel's sensitivity)
+    "bass": "response.bass",              # 30-150 Hz, the body (held between hits): displacement, pressure
+    "level": "response.level",            # full band, the body (held between hits)
     "transient": "response.transient",    # how attacky the sound is now
     "sustain": "response.sustain",        # energy that stays: breathing, ambient light, slow growth
     "flux": "response.flux",              # change, turbulence

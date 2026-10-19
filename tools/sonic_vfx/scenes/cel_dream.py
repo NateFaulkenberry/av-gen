@@ -243,8 +243,7 @@ def sky_whale(s):
 
 def build():
     s = kit.Scene(ID, TITLE, DESIGN)
-    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.0,
-                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
+    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.0}
     # surface fog the colour of the horizon: the classic cel depth cue, every island paler the farther it floats
     s.environment = {
         "intensity": 0.6, "background": hexrgb(SKY_HORIZON), "fogColor": hexrgb("#ffc4c8"), "volumeDensity": 0.011,

@@ -210,8 +210,9 @@ FAMILY_SHARPNESS = 4.0  # the master's 3: the leading world leads a little more 
 # the families) is not theirs and stays the Sonic Character's.
 #   loudness   the character's energy (sonic.energy, sonic.energy.slow: a fixed-dB loudness with a little attack and
 #              change in it) becomes the response level (response.level, response.levelSlow), scaled by the ratio
-#              of their means on Trench so the neutral garden is the old one. Sensitivity and Sustain move its
-#              floor: a quiet input reads quiet, and the waiting world (silence) comes later or sooner.
+#              of their means on Trench so the neutral garden is the old one (ADR-1510: 1.22 and 1.12, from 0.89 and
+#              0.94 on the old -44..-2 dB window). Sensitivity and Sustain move its floor: a breakdown reads quiet,
+#              and the waiting world (silence) comes later or sooner.
 #   strikes    sonic.transient (a fast rise in level) becomes `strike`: response.onset (an attack, level-free) above
 #              0.75 of 1, stretched over 0..1 (an onset of 0.85 strikes 0.4, like a middling old transient). On
 #              Trench that is the strongest eighth of the onsets (89 in 207 s; sonic.transient fired 31 times, 26 of
@@ -220,10 +221,10 @@ FAMILY_SHARPNESS = 4.0  # the master's 3: the leading world leads a little more 
 #   notes      notes.noteOn becomes response.note: the same event, its velocity through the hit curve (identical at
 #              the neutral controls).
 # A first interpret source, `heard`, makes the two loudness channels so the garden reads them on the same frame.
-RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}   # the Sonic Abstract scenes' level range
+RESPONSE = {}   # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
-    M("loud", [("response.level", 1.0, False)], "mean", gain=0.89),        # mean sonic.energy / mean response.level
-    M("loudSlow", [("response.levelSlow", 1.0, False)], "mean", gain=0.94),  # ... and their slow tiers
+    M("loud", [("response.level", 1.0, False)], "mean", gain=1.22),        # mean sonic.energy / mean response.level
+    M("loudSlow", [("response.levelSlow", 1.0, False)], "mean", gain=1.12),  # ... and their slow tiers
     M("strike", [("response.onset", 1.0, False)], "mean", -3.0, 4.0),
 ]}}
 LOUDNESS = {"sonic.energy": "visual.loud", "sonic.energy.slow": "visual.loudSlow"}
@@ -239,6 +240,11 @@ def respond(live):
         for m in src["settings"]["mappings"]:
             for i in m["inputs"]:
                 i["signal"] = LOUDNESS.get(i["signal"], i["signal"])
+            if m["name"] == "silence":
+                # ADR-1510: the response level reads against the music's own loudness, so a breakdown 20 dB down
+                # reads near 0 for a minute; the waiting world is for silence, so it also hears the character's
+                # fixed-dB energy (0.72 through Hyperborea's quiet passage, 0 in silence). Sensitivity still moves it.
+                m["inputs"].append({"signal": "sonic.energy.slow", "weight": 1.0, "invert": True})
     for r in live["routes"]:
         if r["source"] == "notes.noteOn":
             r["source"] = "response.note"

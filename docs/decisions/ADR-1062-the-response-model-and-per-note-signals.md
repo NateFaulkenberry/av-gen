@@ -1,6 +1,8 @@
 # ADR-1062: The response model: signals by kind on one conditioning chain, the performer's five controls, and per-note MIDI
 
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion, brief §9-11)
+- **Superseded in part** by ADR-1510 (2026-10-19): the levels are no longer read on the fixed `floorDb`/`rangeDb`
+  window but against an adaptive loudness reference.
 - **Code:**
   - `src/sonic/response.*` (`ResponseModel`, `ResponseControls`, `ResponseSettings`);
   - the per-note facts and `assignVoice` in `src/sonic/notes.*`;

@@ -492,8 +492,9 @@ void ControlPanel::drawLive(app::Engine& engine) {
             ImGui::TextDisabled("choose the input your synth is connected to");
         }
         if (auto* gain = engine.params().find("audio/inputGain")) {
-            // Sensitivity is the input gain, shown in dB: the character reads levels on fixed dB ranges, so a
-            // quiet interface channel reads as a quiet sound until it is brought up here.
+            // The input gain, shown in dB: the character and the hit detector read levels on fixed dB ranges, so a
+            // quiet interface channel reads as a quiet sound to them until it is brought up here. The response levels
+            // read against the music's own loudness (ADR-1510) and need it only to clear the gate.
             const float linear = std::max(gain->baseComponent(0), 1e-4f);
             float db = 20.0f * std::log10(linear);
             ImGui::SetNextItemWidth(widthBesideLabel("Input gain"));
@@ -502,7 +503,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
             }
             if (ImGui::IsItemHovered()) {
                 tooltip("The input gain before analysis (audio/inputGain). Aim for the level meter to peak "
-                        "around -12 dBFS when you play hard.");
+                        "around -12 dBFS when you play hard: the Sonic Character and the hits read fixed levels. "
+                        "The Response levels follow the music's own loudness, so they only need it above -60 dBFS.");
             }
         }
     }
@@ -528,7 +530,9 @@ void ControlPanel::drawLive(app::Engine& engine) {
         };
         slider("sonic/response/sensitivity", "Sensitivity", 0.0f, 1.0f, "%.2f", 0,
                "How readily the world answers: lowers the floor quiet sounds must clear and lifts small values, "
-               "without pushing loud ones past full. Moves both Transients and Sustain.");
+               "without pushing loud ones past full. The levels are read against the music's own recent loudness, "
+               "so at 0.5 the body of a track sits mid-range and a breakdown reads low. Moves both Transients and "
+               "Sustain.");
         slider("sonic/response/transient", "Transients", 0.0f, 1.0f, "%.2f", 0,
                "How strongly attacks fire: kicks, snares, hats, notes. 0 turns every hit off.");
         slider("sonic/response/sustain", "Sustain", 0.0f, 1.0f, "%.2f", 0,

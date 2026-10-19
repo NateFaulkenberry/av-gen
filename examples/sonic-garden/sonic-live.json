@@ -109,10 +109,7 @@
    }
   },
   "live": true,
-  "response": {
-   "floorDb": -44.0,
-   "rangeDb": 42.0
-  }
+  "response": {}
  },
  "parameters": {
   "post/bloom/enabled": true,
@@ -158,7 +155,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 0.89
+      "gain": 1.22
      },
      {
       "name": "loudSlow",
@@ -169,7 +166,7 @@
         "weight": 1.0
        }
       ],
-      "gain": 0.94
+      "gain": 1.12
      },
      {
       "name": "strike",
@@ -269,6 +266,11 @@
       "inputs": [
        {
         "signal": "visual.loudSlow",
+        "weight": 1.0,
+        "invert": true
+       },
+       {
+        "signal": "sonic.energy.slow",
         "weight": 1.0,
         "invert": true
        }
