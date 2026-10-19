@@ -1036,17 +1036,17 @@
    {
     "role": "trough",
     "target": "material/bladeSphere/op/4/ramp/constant",
-    "gain": 0.38
+    "gain": 0.3
    },
    {
     "role": "mid",
     "target": "material/bladeSphere/op/4/ramp/constant2",
-    "gain": 0.38
+    "gain": 0.3
    },
    {
     "role": "crest",
     "target": "material/bladeSphere/op/4/ramp/constant3",
-    "gain": 0.38
+    "gain": 0.3
    },
    {
     "role": "core",
@@ -1066,17 +1066,17 @@
    {
     "role": "trough",
     "target": "material/chip/op/3/ramp/constant",
-    "gain": 0.38
+    "gain": 0.3
    },
    {
     "role": "mid",
     "target": "material/chip/op/3/ramp/constant2",
-    "gain": 0.38
+    "gain": 0.3
    },
    {
     "role": "crest",
     "target": "material/chip/op/3/ramp/constant3",
-    "gain": 0.38
+    "gain": 0.3
    },
    {
     "role": "core",

@@ -77,6 +77,7 @@ REGIMES = {"maze": (0.029, 0.057), "spots": (0.030, 0.062), "coral": (0.055, 0.0
 # once the front had passed, the spots stayed and the frame went to one field of rings (measured over 96 s); coral
 # stripes invade spots, so the two families trade ground both ways as the front sweeps.
 LABYRINTH = os.environ.get("RP_LAB", "coral")
+LAB_BIAS = 9.0   # m: the front's sweep sits this far toward the spots side, so a labyrinth always holds much of the frame
 DA, DB = 0.3, 0.15
 
 
@@ -87,18 +88,18 @@ PALETTES = [
     # glints: the controlled highlight), key, rim, tuning (the finish, the lights, the bloom's character). Each is a
     # coordinated set: a dark foundation in its own hue (never black), a dominant contour, a brighter accent, a
     # highlight that stays in the family, and its own bloom.
-    ("Copper Night", "#2a0c16", "#3e1420", "#46181a", "#6a2e1a", "#ff8a30", "#fff0cc", "#ffe2c4", "#7a4cff",
-     {"metal": 0.55, "rough": 0.3, "ringGain": 1.6, "hotGain": 4.0, "keyI": 3.6, "rimI": 1.4, "bloomI": 0.5}),
-    ("Verdigris Reef", "#021a1e", "#03282c", "#063a3a", "#126858", "#4cffc8", "#e8fff6", "#e4fff6", "#ff6a8a",
-     {"metal": 0.45, "rough": 0.34, "ringGain": 1.3, "hotGain": 3.2, "keyI": 3.4, "rimI": 1.6, "bloomI": 0.36}),
-    ("Garnet and Indigo", "#120c46", "#1a125e", "#1c0e66", "#701030", "#ff3a5e", "#ffdce6", "#ffd8e4", "#3a7cff",
-     {"metal": 0.5, "rough": 0.3, "ringGain": 1.5, "hotGain": 3.6, "keyI": 3.2, "rimI": 1.8, "bloomI": 0.44}),
-    ("Violet and Gold", "#1e0838", "#2c1052", "#30125c", "#58248a", "#ffbe3a", "#fff4c8", "#f6ecff", "#ff4ac0",
-     {"metal": 0.6, "rough": 0.28, "ringGain": 1.4, "hotGain": 3.6, "keyI": 3.0, "rimI": 1.6, "bloomI": 0.42}),
-    ("Electric Lagoon", "#01142c", "#022440", "#03365e", "#085a94", "#d8ff2a", "#f8ffd0", "#e6f6ff", "#ff3ad0",
-     {"metal": 0.4, "rough": 0.32, "ringGain": 1.5, "hotGain": 3.4, "keyI": 3.4, "rimI": 1.8, "bloomI": 0.4}),
-    ("Rose Quartz", "#2a0c1e", "#3c142c", "#4c1c3a", "#96466a", "#ffb0c8", "#fff8ec", "#fff0f4", "#5ac8ff",
-     {"metal": 0.3, "rough": 0.4, "ringGain": 1.3, "hotGain": 3.0, "keyI": 3.6, "rimI": 1.6, "bloomI": 0.32}),
+    ("Copper Night", "#3a1222", "#541a2c", "#5e2026", "#8a3a1e", "#ff8a28", "#ffc65a", "#ffe2c4", "#8a4cff",
+     {"metal": 0.55, "rough": 0.3, "ringGain": 1.8, "hotGain": 3.6, "keyI": 4.8, "rimI": 1.6, "bloomI": 0.5}),
+    ("Verdigris Reef", "#032a2c", "#043a3c", "#08504c", "#14806a", "#2affc0", "#b6ffe6", "#e4fff6", "#ff5a8a",
+     {"metal": 0.45, "rough": 0.34, "ringGain": 1.5, "hotGain": 3.0, "keyI": 4.4, "rimI": 1.8, "bloomI": 0.38}),
+    ("Garnet and Indigo", "#1c1270", "#26188c", "#2a1294", "#9a1440", "#ff2c5a", "#ffa0b8", "#ffd8e4", "#3a7cff",
+     {"metal": 0.5, "rough": 0.3, "ringGain": 1.8, "hotGain": 3.4, "keyI": 4.2, "rimI": 2.0, "bloomI": 0.46}),
+    ("Violet and Gold", "#2e0c56", "#401476", "#46188a", "#7a2eb6", "#ffb420", "#ffe27a", "#f6ecff", "#ff4ac0",
+     {"metal": 0.6, "rough": 0.28, "ringGain": 1.6, "hotGain": 3.4, "keyI": 4.0, "rimI": 1.8, "bloomI": 0.44}),
+    ("Electric Lagoon", "#021e44", "#033060", "#04488a", "#0a70c0", "#d4ff1a", "#f0ff8a", "#e6f6ff", "#ff2ad0",
+     {"metal": 0.4, "rough": 0.32, "ringGain": 1.7, "hotGain": 3.2, "keyI": 4.4, "rimI": 2.0, "bloomI": 0.42}),
+    ("Rose Quartz", "#3e1030", "#561c44", "#6a2456", "#b84a80", "#ff7aa8", "#ffd0dc", "#fff0f4", "#5ac8ff",
+     {"metal": 0.3, "rough": 0.4, "ringGain": 1.6, "hotGain": 3.0, "keyI": 4.6, "rimI": 1.8, "bloomI": 0.36}),
 ]
 START_PALETTE = int(os.environ.get("RP_PALETTE", "0"))
 JOURNEY = [0, 4, 3, 1, 5, 2]
@@ -172,6 +173,7 @@ def pattern(s):
     for i in range(13):
         t = 96.0 * i / 12
         d = 20.0 * math.sin(2 * math.pi * t / 96.0) + 4.0 * math.sin(2 * math.pi * 3 * t / 96.0)
+        d += LAB_BIAS
         keys.append({"time": round(t, 3), "value": [round(-3.0 + d * ax[0], 3), 0.0, round(-6.0 + d * ax[2], 3)],
                      "interp": "smooth"})
     s.track("field/front/position", keys, loop=96.0)
@@ -185,6 +187,8 @@ def pattern(s):
     s.field("kick", {"kind": "onset", "onsetSource": "low", "point": list(KICK_AT), "waveGeometry": "spherical",
                      "audioSpeed": 18.0, "onsetWidth": 2.0, "onsetDecay": 1.6, "strength": KICK_GAIN})
     children.append("kick")
+    # the rings' heart wanders (a slow loop about the bowl's middle), so the train is never a fixed conveyor
+    common.lissajous_track(s, "field/kick/position", (0.0, 0.0, 0.0), (9.0, 7.0), 53.0, ratio=(1, 2), phase=(0.1, 0.35))
     if RES:
         # option (proof Q5): the resonance field's settled figure (sand, ADR-1405) as a slower regime layer, so the
         # music's standing figure is written into the pattern family
@@ -250,7 +254,7 @@ def ripple_palette():
     """The pin program's ripple: cos(2 pi (k3 (g + c t) + k4)) with g = saturate(dot(p, axis) * GRAD_SCALE + 0.5) is
     exactly sin(dot(p, axis) * 2 pi / wavelength + speed_rad * t + phase), the deformer's sine (procedural.cpp,
     applySine): k3 = freq / (2 pi s), c = speed_rad s / freq, k4 = (phase - pi / 2) / (2 pi) - k3 / 2."""
-    axis, wl, v, ph = RIPPLE
+    axis, wl, v, ph = WAVE_A
     freq = 2 * math.pi / wl
     k3 = freq / (2 * math.pi * GRAD_SCALE)
     c = (freq * v) * GRAD_SCALE / freq
@@ -303,10 +307,10 @@ def pin_program():
     g.op(None, "multiply", 0, a=0, b=2)                                  # r0 = beads (gated)
     g.op(None, "remap", 3, a=3, k=[0.15, 0.75, 0.0, 1.0], f=1.0)         # the bass pool
     g.op(None, "multiply", 1, a=1, b=3)                                  # crest x pool: the interference
-    g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 0.22, 3.2])                 # floor 0.22: most contours stay low
+    g.op(None, "remap", 1, a=1, k=[0.0, 1.0, 0.32, 3.0])                 # floor 0.32: most contours stay low
     g.op(None, "add", 1, a=1, b=0)
     g.op(None, "field", 2, field="kick")
-    g.op(None, "remap", 2, a=2, k=[0.02, 0.45, 0.0, 2.6], f=1.0)         # the kick's band of light (onset rings are
+    g.op(None, "remap", 2, a=2, k=[0.08, 0.5, 0.0, 3.0], f=1.0)          # the kick's band of light (onset rings are
                                                                          # 0.1-0.5 at a kick's crest, measured)
     g.op(None, "add", 1, a=1, b=2)
     g.op(None, "remap", 4, a=4, k=[0.02, 0.4, 0.0, 1.4], f=1.0)          # the snare's
@@ -412,13 +416,17 @@ def instrument(s, g):
               attackMs=200, decayMs=200),
             R(common.INFLUENCE, "field/swell/strength", 1.0, op="multiply", gain=2.0, offset=0.0,
               attackMs=200, decayMs=200),
-            A("response.sustain", "field/pool/strength", 0.6, attackMs=3000, decayMs=6000),
+            A("response.sustain", "field/pool/strength", 0.25, attackMs=3000, decayMs=6000),
             A("response.bass", E, 3.0, attackMs=250, decayMs=1200),
             A("response.bass", D + "1/amount", 0.7, attackMs=400, decayMs=2500),
             A("audio.mid", shift, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=120, decayMs=700),
             A("audio.mid", D + "3/amount", 0.12, attackMs=120, decayMs=700),
             A("response.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
             A("response.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),
+            # density (hats a second, 0..0.65 measured on the test tracks): a busy mix lights the contours, a held
+            # note or a breakdown lets them settle
+            A("response.hatRate", hot, 1.0, op="multiply", gain=1.8, offset=0.55, attackMs=600, decayMs=2500),
+            A("response.hatRate", ring, 1.0, op="multiply", gain=1.2, offset=0.7, attackMs=600, decayMs=2500),
             A("response.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
     CC = common.CC
     s.route(R("control.pattern", "field/pool/strength", 1.2, **CC),
@@ -479,7 +487,7 @@ def waves():
     """The heave: three sine deformers in world space (procedural/pins/deform/1..3): the broad swell A (the bass level
     is its height), B crossing it, and the ripple (the pin program reproduces this one exactly, ripple_palette)."""
     out = []
-    for (axis, wl, v, ph), amount in ((WAVE_A, 0.3), (WAVE_B, 0.32), (RIPPLE, 0.05)):
+    for (axis, wl, v, ph), amount in ((WAVE_A, 0.6), (WAVE_B, 0.35), (RIPPLE, 0.05)):
         freq = 2 * math.pi / wl
         out.append({"kind": "sine", "amount": amount, "frequency": round(freq, 6), "speed": round(freq * v, 6),
                     "phase": ph, "axis": list(axis), "displacementAxis": [0.0, 1.0, 0.0], "space": "world",

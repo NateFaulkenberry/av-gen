@@ -260,9 +260,10 @@ def network(s):
 
 
 # ================================================================================================ the membrane's motion
-KICK_AT = (FRONT_THETA + 0.35, math.radians(8.0))     # where a kick lands: on the far side, right of centre, low
+KICK_AT = (FRONT_THETA + 0.75, math.radians(-4.0))    # where a kick lands: right of the frame, low (arcs cross it)
 SNARE_AT = (FRONT_THETA - 0.9, math.radians(24.0))    # the snare: left, higher
-SWELL_AT = (FRONT_THETA - 0.15, math.radians(-46.0))  # the bass rolls out from low in front, under the eye line
+SWELL_AT = (FRONT_THETA - 1.3, math.radians(-38.0))   # the bass rolls out from low on the left, out of frame: its
+                                                      # rings cross the frame as arcs, never a target in its middle
 DISP = 1.0                                            # the displacement effector's gain (m per unit of field)
 
 
@@ -287,7 +288,7 @@ def motion_fields(s):
 
 # ================================================================================================ the blades
 ACT = (0.2, 0.5)        # activity -> front glow
-TONE = 0.38              # the blades' body under their light (the bands carry the light, the faces stay deep)
+TONE = 0.3              # the blades' body under their light (the bands carry the light, the faces stay deep)
 CORE = 2.2              # the core's gain over its palette colour
 
 
@@ -517,7 +518,7 @@ def light(s):
     for k in ("env/sky/zenithColor", "env/sky/horizonColor", "env/sky/groundColor", "scene/fogColor"):
         bind(s, "environment", k)
     # the faces' light: a soft source at the sphere's heart, so a blade swinging away from the centre falls dark
-    s.light("heart", "point", position=[0.0, 10.0, 0.0], color=C("glow"), intensity=50000.0, range=0.0,
+    s.light("heart", "point", position=[0.0, 10.0, 0.0], color=C("glow"), intensity=26000.0, range=0.0,
             castsShadow=False, contactShadow=False, diffuseOnly=True)
     bind(s, "glow", "lights/heart/color")
 
