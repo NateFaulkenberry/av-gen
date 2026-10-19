@@ -260,7 +260,8 @@ def network(s):
 
 
 # ================================================================================================ the membrane's motion
-KICK_AT = (FRONT_THETA + 0.75, math.radians(-4.0))    # where a kick lands: right of the frame, low (arcs cross it)
+KICK_AT = (FRONT_THETA + 1.35, math.radians(-4.0))    # where a kick lands: off the frame to the right, low, so its
+                                                      # rings sweep across the frame as arcs, never a target
 SNARE_AT = (FRONT_THETA - 0.9, math.radians(24.0))    # the snare: left, higher
 SWELL_AT = (FRONT_THETA - 1.3, math.radians(-38.0))   # the bass rolls out from low on the left, out of frame: its
                                                       # rings cross the frame as arcs, never a target in its middle

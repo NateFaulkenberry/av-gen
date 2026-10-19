@@ -256,9 +256,9 @@
     "kind": "onset",
     "onsetSource": "low",
     "point": [
-     101.997,
+     146.002,
      -10.463,
-     -109.486
+     -32.771
     ],
     "waveGeometry": "spherical",
     "audioSpeed": 70.0,
@@ -18321,7 +18321,7 @@
     "onsetWidth": 14.0,
     "onsetDecay": 0.9,
     "point": [
-     -123.119,
+     -33.119,
      0.0,
      -10.472
     ],
