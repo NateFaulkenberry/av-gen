@@ -119,6 +119,9 @@ perpendicular to the first tangent (a stable perpendicular is chosen when they a
 Closed splines receive a linear roll correction along the distance so the transported frame at
 the seam coincides with the start frame; then the interpolated per-point `roll` rotates the normal
 about the tangent (right-handed, so `roll = pi / 2` on a +Z line turns the +Y normal to -X).
+A closed spline whose rolls wind a whole number of turns round the loop sets `rollTurns` (ADR-1542). Its seam
+segment then interpolates toward the first point's roll plus `2 pi * rollTurns`. Without it, the seam segment spins
+back the whole twist.
 
 GPU tables (`packSplineTable`, `SplineSampleGpu`, 64 bytes per entry, `kSplineGpuSamples = 512`
 by default) are `samples(count)` packed as `position.w = distance`, `tangent.w = scale`,
