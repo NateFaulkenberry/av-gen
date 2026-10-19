@@ -3,6 +3,8 @@
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion, brief §9-11)
 - **Superseded in part** by ADR-1510 (2026-10-19): the levels are no longer read on the fixed `floorDb`/`rangeDb`
   window but against an adaptive loudness reference.
+- **Amended** by ADR-1530 (2026-10-19): the Live panel's Response group no longer shows the kick / snare / hat / note
+  meters. The hit signals and the five controls are unchanged.
 - **Code:**
   - `src/sonic/response.*` (`ResponseModel`, `ResponseControls`, `ResponseSettings`);
   - the per-note facts and `assignVoice` in `src/sonic/notes.*`;

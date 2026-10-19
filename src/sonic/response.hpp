@@ -121,7 +121,7 @@ public:
     [[nodiscard]] const ResponseSignals& ids() const { return ids_; }
     void restoreIds(const ResponseSignals& ids) { ids_ = ids; }
 
-    // Read-outs (tests, the panel's hit lights).
+    // Read-outs (tests).
     [[nodiscard]] float envelope(ResponseHit h) const { return env_[static_cast<std::size_t>(h)]; }
     [[nodiscard]] std::uint64_t hits(ResponseHit h) const { return count_[static_cast<std::size_t>(h)]; }
     [[nodiscard]] std::uint64_t demoted(ResponseHit h) const { return demoted_[static_cast<std::size_t>(h)]; }

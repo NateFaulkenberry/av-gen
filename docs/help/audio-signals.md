@@ -67,8 +67,9 @@ moves `audio.energy` and the band levels.
 | `audio.onsetMid` | 0 – 1 | yes | snare or clap: an attack in 2 – 6 kHz |
 | `audio.onsetHigh` | 0 – 1 | yes | hats: an attack in 6 – 16 kHz |
 
-Each carries its strength against the strongest of its band in the surrounding second. They come
-from the whole-track analysis of a loaded file; live input has none.
+With a loaded file they come from the whole-track analysis, and each carries its strength against
+the strongest of its band in the surrounding second. With live input they come from the causal
+kick, snare and hat detector (ADR-1060), the same one behind `response.kick`, `snare` and `hat`.
 
 The centroid in Hz exists inside an analysis frame but is not published as a signal.
 
