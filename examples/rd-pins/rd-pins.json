@@ -247,18 +247,6 @@
    }
   },
   {
-   "source": "audio.mid",
-   "target": "procedural/pins/deform/3/amount",
-   "amount": 0.12,
-   "op": "add",
-   "polarity": "unipolar",
-   "depthSource": "visual.influence",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   }
-  },
-  {
    "source": "response.hat",
    "target": "material/rpPin/op/27/constant/constant",
    "amount": 1.0,

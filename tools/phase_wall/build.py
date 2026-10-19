@@ -277,7 +277,7 @@ def motion_fields(s):
     same field."""
     s.field("swell", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.16,
                       "point": list(on_sphere(*SWELL_AT)), "waveGeometry": "spherical", "audioSpeed": 34.0,
-                      "audioSmooth": 0.15, "strength": 12.0})
+                      "audioSmooth": 0.04, "strength": 12.0})
     s.field("breath", {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine",
                        "axis": [0.35, 0.25, -0.9], "point": [0.0, 0.0, 0.0], "wavelength": 260.0, "waveSpeed": 7.0,
                        "waveWidth": 0.0, "amplitude": 1.0, "strength": 4.0})

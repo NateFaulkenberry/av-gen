@@ -12,7 +12,7 @@ excited by waves of different scales and times:
   - a broad swell travelling across the bowl (a sine heave, the bass level its height) and a second, crossing it; the
     first also moves the contours themselves (they bunch and open as it passes; the mids set how far), lights the
     field along its crest where the bass pool is, and where its crest crosses a contour a bead of light runs along it
-    (the hats sharpen it); a short ripple adds a small, faster heave (the mids);
+    (the hats sharpen it); 
   - the bass history rolling out from the bowl's heart (a spectrum field laid out at 14 m/s): a lift and a pool of
     light where it is loud, so loud passages reshape the field and quiet ones let it settle;
   - a kick: a ring of impact from a heart that wanders slowly about the bowl's middle (the pins jump, the contours
@@ -248,7 +248,7 @@ def pattern(s):
     # THE BASS HISTORY: the bass band's last seconds laid out from the heart at 14 m/s (ADR-1116), smoothed over a third
     # of a second (ADR-1370): a broad, music-shaped disturbance travelling outward, metres of lift where it is loud
     s.field("swell", {"kind": "spectrum", "audioBand": "range", "bandLow": 0.0, "bandHigh": 0.16,
-                      "point": list(KICK_AT), "waveGeometry": "spherical", "audioSpeed": 14.0, "audioSmooth": 0.15,
+                      "point": list(KICK_AT), "waveGeometry": "spherical", "audioSpeed": 14.0, "audioSmooth": 0.04,
                       "strength": 1.0})
 
 
@@ -424,7 +424,6 @@ def instrument(s, g):
             A("response.bass", E, 3.0, attackMs=250, decayMs=1200),
             A("response.bass", D + "1/amount", 0.7, attackMs=400, decayMs=2500),
             A("audio.mid", shift, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=120, decayMs=700),
-            A("audio.mid", D + "3/amount", 0.12, attackMs=120, decayMs=700),
             A("response.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
             A("response.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),
             # density (hats a second, 0..0.65 measured on the test tracks): a busy mix lights the contours, a held
@@ -488,10 +487,12 @@ def palette_block(g, gf):
 
 
 def waves():
-    """The heave: three sine deformers in world space (procedural/pins/deform/1..3): the broad swell A (the bass level
-    is its height), B crossing it, and the ripple (the pin program reproduces this one exactly, ripple_palette)."""
+    """The heave: two sine deformers in world space (procedural/pins/deform/1..2): the broad swell A (the bass level is
+    its height; the pin program reproduces it exactly, ripple_palette) and B crossing it."""
     out = []
-    for (axis, wl, v, ph), amount in ((WAVE_A, 0.6), (WAVE_B, 0.35), (RIPPLE, 0.05)):
+    # (the ripple's own small heave was cut for the budget: 1.5 ms a deformer on 866k vertices, measured; the mids still
+    # move the contours through the program's swell)
+    for (axis, wl, v, ph), amount in ((WAVE_A, 0.6), (WAVE_B, 0.35)):
         freq = 2 * math.pi / wl
         out.append({"kind": "sine", "amount": amount, "frequency": round(freq, 6), "speed": round(freq * v, 6),
                     "phase": ph, "axis": list(axis), "displacementAxis": [0.0, 1.0, 0.0], "space": "world",

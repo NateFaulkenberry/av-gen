@@ -195,7 +195,7 @@
     ],
     "waveGeometry": "spherical",
     "audioSpeed": 34.0,
-    "audioSmooth": 0.15
+    "audioSmooth": 0.04
    }
   },
   {
