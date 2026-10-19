@@ -492,8 +492,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
             ImGui::TextDisabled("choose the input your synth is connected to");
         }
         if (auto* gain = engine.params().find("audio/inputGain")) {
-            // The input gain, shown in dB: the character and the hit detector read levels on fixed dB ranges, so a
-            // quiet interface channel reads as a quiet sound to them until it is brought up here. The response levels
+            // The input gain, shown in dB: the Sonic Character reads levels on fixed dB ranges, so a quiet interface
+            // channel reads as a quiet sound to it until it is brought up here. The response levels
             // read against the music's own loudness (ADR-1510) and need it only to clear the gate.
             const float linear = std::max(gain->baseComponent(0), 1e-4f);
             float db = 20.0f * std::log10(linear);
@@ -503,7 +503,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             }
             if (ImGui::IsItemHovered()) {
                 tooltip("The input gain before analysis (audio/inputGain). Aim for the level meter to peak "
-                        "around -12 dBFS when you play hard: the Sonic Character and the hits read fixed levels. "
+                        "around -12 dBFS when you play hard: the Sonic Character reads fixed levels. "
                         "The Response levels follow the music's own loudness, so they only need it above -60 dBFS.");
             }
         }
@@ -534,25 +534,15 @@ void ControlPanel::drawLive(app::Engine& engine) {
                "so at 0.5 the body of a track sits mid-range and a breakdown reads low. Moves both Transients and "
                "Sustain.");
         slider("sonic/response/transient", "Transients", 0.0f, 1.0f, "%.2f", 0,
-               "How strongly attacks fire: kicks, snares, hats, notes. 0 turns every hit off.");
+               "How strongly attacks move the world: the hit signals and MIDI notes. 0 turns every hit off.");
         slider("sonic/response/sustain", "Sustain", 0.0f, 1.0f, "%.2f", 0,
                "How strongly held sound moves the world: bass, level, sustained energy. 0 turns them off.");
         slider("sonic/response/attack", "Attack", 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic,
                "How quickly a response appears (a multiplier on every attack time).");
         slider("sonic/response/release", "Release", 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic,
                "How long a response lingers: the feel. A multiplier on every release and decay time.");
-        // What the detector hears, as four meters: the hits' envelopes.
-        const auto& bus = engine.signals();
-        const char* names[] = {"response.kickEnv", "response.snareEnv", "response.hatEnv", "response.noteEnv"};
-        const char* labels[] = {"kick", "snare", "hat", "note"};
-        const float w = (ImGui::GetContentRegionAvail().x - 3.0f * ImGui::GetStyle().ItemSpacing.x) / 4.0f;
-        for (int i = 0; i < 4; ++i) {
-            if (i > 0) {
-                ImGui::SameLine();
-            }
-            const auto id = bus.find(names[i]);
-            ImGui::ProgressBar(id ? std::clamp(bus.value(*id), 0.0f, 1.0f) : 0.0f, ImVec2(w, 0), labels[i]);
-        }
+        // ADR-1530: no kick / snare / hat meters here. The hits are still detected and published (response.*,
+        // audio.onset*); which input is the drums is the Inputs table's per-source Hits, not a panel classifier.
         if (ImGui::Button("Reset response")) {
             for (const char* path : {"sonic/response/sensitivity", "sonic/response/transient", "sonic/response/sustain",
                                      "sonic/response/attack", "sonic/response/release"}) {
