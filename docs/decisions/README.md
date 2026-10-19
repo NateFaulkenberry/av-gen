@@ -65,6 +65,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1500-1509 | art/generative-pass (RD Pins and Phase Hall: music reactivity, lighting and art direction) |
 | 1510-1519 | eng/response-range (the response levels' range on mastered music) |
 | 1520-1529 | eng/stems-multichannel (stem-aware offline analysis and live multichannel Core Audio input) |
+| 1540-1549 | art/rainbow-world (Rainbow World: the painterly rainbow knot world, fisheye journey) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
