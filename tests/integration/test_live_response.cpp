@@ -121,7 +121,9 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     const double keen = meanParam(p, "macros/energy");
     INFO("macros/energy: " << dull << " / " << neutral << " / " << keen);
     CHECK(dull < neutral);
-    CHECK(neutral < keen);
+    // ADR-1510: a steady groove at neutral reads as a mix's body, which is full presence (the arc on a mix is the
+    // offline one), so more Sensitivity cannot drive it faster; less slows it.
+    CHECK(keen >= neutral);
 
     // A take 16 dB down (the limbs' bass lift, an auto-gained band times the response bass): since ADR-1510 the
     // response levels read against the take's own loudness, so a quieter channel playing the same music reads about
