@@ -9,13 +9,16 @@ A bowl of pins in the dark: a living, illuminated topographic interference field
 labyrinth and spots over the bowl's plan; each pin rises with the pattern under it, and the pattern's boundary is a
 contour of light: a fine hot core and a softer coloured halo, over dark channels. On top of the pattern the field is
 excited by waves of different scales and times:
-  - a broad swell travelling across the bowl (a sine heave, the bass level its height) and a second, crossing it;
-  - ripples (a shorter, faster wave) that move the contours themselves: they bunch and open as it passes, and where
-    its crest crosses a contour a bead of light runs along it (the hats sharpen it);
+  - a broad swell travelling across the bowl (a sine heave, the bass level its height) and a second, crossing it; the
+    first also moves the contours themselves (they bunch and open as it passes; the mids set how far), lights the
+    field along its crest where the bass pool is, and where its crest crosses a contour a bead of light runs along it
+    (the hats sharpen it); a short ripple adds a small, faster heave (the mids);
   - the bass history rolling out from the bowl's heart (a spectrum field laid out at 14 m/s): a lift and a pool of
     light where it is loud, so loud passages reshape the field and quiet ones let it settle;
-  - a kick: a ring of impact from the heart (the pins jump, the contours swell, a band of light runs ahead of it),
-    which also turns the labyrinth toward spots as it passes; a snare: a quicker ring from off-centre.
+  - a kick: a ring of impact from a heart that wanders slowly about the bowl's middle (the pins jump, the contours
+    swell, a band of light runs with it; accents bright, ghost hits faint), which also turns the labyrinth toward spots
+    as it passes, and the spots give the ground back; a snare: a quicker ring from off-centre;
+  - density (hats a second) lifts the contours' light; a breakdown or a held note lets the field settle.
 
 Proof switches (environment, review only): RP_PIN=box|round, RP_RES=1 (resonance regime layer), RP_FLOOR=1 (the floor
 tint), RP_PALETTE=<n>.
@@ -351,10 +354,11 @@ DESIGN = {
     "category": "experiment",
     "thesis": "A living, illuminated topographic interference field: a bowl of pins in the dark, a reaction-"
               "diffusion labyrinth growing over it, its edges drawn as contours of light (a fine hot core, a softer "
-              "halo, dark channels between). Broad swells heave the field and cross each other, ripples bunch and open "
-              "the contours and run beads of light along them on the hats, the bass history rolls out from the heart "
-              "as a lift and a pool of light, and every kick sends a ring of impact across it that swells the "
-              "contours, carries a band of light and turns the labyrinth toward spots.",
+              "halo, dark channels between). Broad swells heave the field and cross each other; the first bunches and "
+              "opens the contours and runs beads of light along them on the hats; the bass history rolls out from the "
+              "heart as a lift and a pool of light; every kick sends a ring of impact across it that swells the "
+              "contours, carries a band of light and turns the labyrinth toward spots; a busy mix lights it up, a "
+              "breakdown lets it settle.",
     "experiment": "C reaction-diffusion (production)",
 }
 
@@ -563,7 +567,7 @@ def main():
     cc = common.describe_ccs(MIDI_CC, "notes 36-38 hold seeds")
     common.index_entry(TITLE, "rd-pins/rd-pins.json",
                        "Play live audio (any mix) and, optionally, a MIDI controller: " + cc + ". " + DESIGN["thesis"]
-                       + " See docs/prototypes/generative-rd/C-scene-plan.md.", live=True, category="Generative")
+                       + " See docs/prototypes/generative-rd/C-scene-plan.md and docs/prototypes/generative-pass/.", live=True, category="Generative")
     if a.variant:
         params = {kv.split("=", 1)[0]: json.loads(kv.split("=", 1)[1]) for kv in a.set}
         print(common.variant(pp, a.out, a.wav, a.camera, params, a.track))

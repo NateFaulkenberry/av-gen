@@ -5,7 +5,7 @@
     python3 tools/phase_wall/build.py --variant --out <v.json> [--wav <w>] [--camera x,y,z:tx,ty,tz | <name>]
                                       [--set path=json] [--track path=v@t,...] [--palette n] [--autonomous]
 
-An immense membrane of luminous vertical blades round the inside of a sphere. About twenty thousand metal blades, in
+An immense membrane of luminous vertical blades round the inside of a sphere. About eighteen thousand metal blades and chips, in
 columns round the sphere, each swung about its own hinge (ADR-1500) by its own phase oscillator: one
 Kuramoto-Sakaguchi network (ADR-1450), a strip once round the sphere from its lower to its upper fringe, read through
 the sphere projection (ADR-1501), so islands, fronts and seams circle the viewer with no seam. Each blade is a
@@ -613,7 +613,7 @@ def camera(s):
 def build(autonomous=False):
     s = common.Scene(SID, TITLE, {"category": "experiment", "experiment": "A coupled oscillators",
                                   "thesis": "An immense membrane of luminous vertical blades round the inside of a "
-                                            "sphere: twenty thousand blades, each swung by its own oscillator, falling "
+                                            "sphere: about eighteen thousand blades, each swung by its own oscillator, falling "
                                             "into step and breaking apart round the viewer, the music travelling "
                                             "through the surface as rings, swells and streaks of light."})
     s.binds = []
