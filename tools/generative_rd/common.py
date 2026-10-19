@@ -231,6 +231,13 @@ def compact_initial(scene_path):
             key = "@@INITIAL%d@@" % i
             blobs[key] = json.dumps(g["initial"], separators=(",", ":"))
             g["initial"] = key
+    # a points distribution (ADR-1118): one placement a line, not one number a line
+    for i, n in enumerate(doc.get("nodes", [])):
+        dist = n.get("procedural", {}).get("distribution", {})
+        if isinstance(dist.get("points"), list):
+            key = "@@POINTS%d@@" % i
+            blobs[key] = "[\n" + ",\n".join(json.dumps(p, separators=(",", ":")) for p in dist["points"]) + "]"
+            dist["points"] = key
     if not blobs:
         return
     text = json.dumps(doc, indent=1)
