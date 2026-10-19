@@ -879,7 +879,7 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 # Every gain below is the mean ratio on Trench at the neutral controls (docs/development/live-response-everywhere.md),
 # so the neutral live picture is the old one. The offline projects keep their audio.* routes: a file is not played.
 # The level range is the Sonic Abstract scenes' (-44..-2 dB): a mastered mix sits near 0.8, a take 15 dB down near 0.45.
-RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}
+RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 LIVE_HITS = {"audio.onsetLow": ("response.kick", 0.77), "audio.onsetMid": ("response.snare", 0.78),
              "audio.onsetHigh": ("response.hat", 0.91)}
 LIVE_LEVELS = {"audio.bassLevel": ("response.bass", 1.04), "audio.treble": ("visual.hTreble", 1.0),

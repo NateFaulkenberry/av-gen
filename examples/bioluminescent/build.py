@@ -683,7 +683,7 @@ def macros():
 # Each gain is 1 / the response level's mean on Trench at the neutral controls, so the neutral picture is the old one
 # (docs/development/live-response-everywhere.md). The level range is the Sonic Abstract scenes' (-44..-2 dB). The
 # offline project keeps its audio.* routes.
-RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}
+RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 LIVE_SOURCES = {"audio.energy": "visual.hEnergy", "audio.bass": "visual.hBass", "audio.trebleLevel": "visual.hTreble",
                 "audio.mid": "visual.hMid", "audio.onsetMid": "response.snare"}
 LIVE_HIT_SCALE = {"audio.onsetMid": 0.78}   # a response snare's mean strength is 0.95 to the onset's 0.745

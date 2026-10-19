@@ -220,7 +220,7 @@ FAMILY_SHARPNESS = 4.0  # the master's 3: the leading world leads a little more 
 #   notes      notes.noteOn becomes response.note: the same event, its velocity through the hit curve (identical at
 #              the neutral controls).
 # A first interpret source, `heard`, makes the two loudness channels so the garden reads them on the same frame.
-RESPONSE = {"floorDb": -44.0, "rangeDb": 42.0}   # the Sonic Abstract scenes' level range
+RESPONSE = {}   # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
     M("loud", [("response.level", 1.0, False)], "mean", gain=0.89),        # mean sonic.energy / mean response.level
     M("loudSlow", [("response.levelSlow", 1.0, False)], "mean", gain=0.94),  # ... and their slow tiers

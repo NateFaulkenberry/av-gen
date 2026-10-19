@@ -123,8 +123,10 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     CHECK(dull < neutral);
     CHECK(neutral < keen);
 
-    // A take 16 dB down is heard quieter at the same setting (the limbs' bass lift, an auto-gained band times the
-    // response bass) -- where the old audio.bass route read it as loud as the mix -- and Sensitivity gives it back.
+    // A take 16 dB down (the limbs' bass lift, an auto-gained band times the response bass): since ADR-1510 the
+    // response levels read against the take's own loudness, so a quieter channel playing the same music reads about
+    // as the mix does (ADR-1361 had it read quieter, on a fixed window mastered music always topped), and Sensitivity
+    // still lifts it.
     Play q = p;
     q.response = {{"sensitivity", 0.5f}};
     const double loud = meanSignal(q, "visual.hBass");
@@ -133,8 +135,9 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     q.response = {{"sensitivity", 0.9f}};
     const double lifted = meanSignal(q, "visual.hBass");
     INFO("visual.hBass: loud " << loud << ", quiet " << quiet << ", lifted " << lifted);
-    CHECK(quiet < 0.8 * loud);
-    CHECK(lifted > quiet);
+    CHECK(quiet > 0.2);
+    CHECK(std::abs(quiet - loud) < 0.25 * loud);
+    CHECK(lifted > 1.2 * quiet);
 
     // The kick's fracture light (the Dream's rhythm gate opened): more Transients, harder kicks.
     Play k{.project = example("digital-mosh/digital-mosh-live.json"), .hold = {{"macros/gRhythm", 1.0f}}};

@@ -261,10 +261,7 @@
  ],
  "sonic": {
   "live": true,
-  "response": {
-   "floorDb": -44.0,
-   "rangeDb": 42.0
-  }
+  "response": {}
  },
  "routes": [
   {

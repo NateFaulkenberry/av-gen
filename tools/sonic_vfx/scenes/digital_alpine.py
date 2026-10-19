@@ -431,8 +431,7 @@ def build():
     generate_meshes()
     s = kit.Scene(ID, TITLE, DESIGN)
     s.unshadowed_key()          # every material is unlit: the default key's shadow would be pure cost
-    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1,
-                  "floorDb": -44.0, "rangeDb": 42.0}     # mastered music does not saturate the levels
+    s.response = {"sensitivity": 0.5, "transient": 0.55, "sustain": 0.55, "attack": 1.0, "release": 1.1}
     # nothing is lit and nothing is fogged: the programs paint the light and the air
     s.environment = {
         "intensity": 0.0, "background": hexrgb(HORIZON_COOL), "fogColor": hexrgb(HAZE_COOL), "volumeDensity": 0.0,
