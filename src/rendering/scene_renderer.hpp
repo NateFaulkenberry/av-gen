@@ -775,6 +775,9 @@ public:
     // deformer chain (a quarter of their vertex work) and write zero motion. Off (the default) for every other
     // renderer: an offline render, a render job's AOVs and the tests read the target whatever post does.
     void setVelocityOnDemand(bool on) { velocityOnDemand_ = on; }
+    // ADR-1493: procedural material programs compiled to straight-line WGSL in the lit pass (the live editor and the
+    // live profile; see ProceduralRenderer::setCompiledMaterials).
+    void setCompiledMaterials(bool on);
     [[nodiscard]] bool velocityOnDemand() const { return velocityOnDemand_; }
     // True when the last frame's velocity target was left unwritten (zero motion), for the tests and the profile.
     [[nodiscard]] bool velocitySkipped() const { return velocitySkipped_; }

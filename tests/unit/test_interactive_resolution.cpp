@@ -898,3 +898,36 @@ TEST_CASE("paced at 60 on a 120 Hz display: the same law, a level that holds is 
     CHECK(run.framesAt[2] > run.frames * 7 / 10);
     CHECK(c.stats().raises <= 6);
 }
+
+TEST_CASE("paced: when the frame gets cheaper underneath it, forgetting the backoff climbs back sooner (ADR-1493)",
+          "[unit][resolution][live-quality][adr1493]") {
+    // A live scene opens on the material interpreter (every level but Emergency over the frame), then the compiled
+    // variant lands and every level holds. The backoff the interpreter's misses earned would make the climb wait up to
+    // 16x the hold at each level.
+    PacedScene interpreted;
+    interpreted.levels = {PacedLevel{45.0, 0}, PacedLevel{42.0, 0}, PacedLevel{40.0, 0}, PacedLevel{37.0, 0},
+                          PacedLevel{25.0, 0}};
+    PacedScene compiled;
+    compiled.levels = {PacedLevel{30.0, 0}, PacedLevel{24.0, 0}, PacedLevel{20.0, 0}, PacedLevel{17.0, 0},
+                       PacedLevel{14.0, 0}};
+    const auto framesToTop = [&](bool forget) {
+        app::InteractiveResolution c;
+        c.configure(live(30));
+        runPaced(c, interpreted, 900); // about the 30 s a cold variant can take
+        REQUIRE(c.rung() == 4);
+        if (forget) {
+            c.forgetBackoff();
+        }
+        CHECK(c.rung() == 4); // the level in force is kept: forgetting is not a jump
+        int frames = 0;
+        while (c.rung() != 0 && frames < 30000) {
+            runPaced(c, compiled, 1);
+            ++frames;
+        }
+        return frames;
+    };
+    const int kept = framesToTop(false);
+    const int forgotten = framesToTop(true);
+    CHECK(forgotten < kept);
+    CHECK(forgotten <= 4 * 300); // four climbs at about the ordinary hold, not a minute each
+}

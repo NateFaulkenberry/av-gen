@@ -5,6 +5,7 @@
 #include "scene/wire_edges.hpp"
 
 #include "rendering/field_uniforms.hpp"
+#include "scene/material_compiler.hpp"
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared object slot layout)
 #include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 #include "rendering/spline_buffers.hpp"
@@ -408,6 +409,30 @@ struct ProceduralRenderer::Impl {
     wgpu::RenderPipeline pipelineCull;
     wgpu::RenderPipeline pipelineDepth; // depth-only: the prepass and the shadow passes (ADR-034)
     wgpu::RenderPipeline pipelineNoCull;
+    // ADR-1493: the lit pipelines of a compiled-materials variant, built on Dawn's workers.
+    struct MaterialVariant {
+        std::uint64_t key = 0;
+        wgpu::RenderPipeline cull;
+        wgpu::RenderPipeline noCull;
+        int pending = 0;
+        bool failed = false;
+        std::chrono::steady_clock::time_point started{};
+    };
+    bool compiledMaterials = false;
+    std::string procSource;                          // procedural.wgsl, includes resolved (the variants' base)
+    std::shared_ptr<MaterialVariant> materialVariant; // the variant for this frame's key (null: none requested)
+    // Every variant built this session, by structure key, so a scene visited again draws compiled from its first
+    // frame (a live set switches between a handful of scenes). Bounded: past kMaxMaterialVariants the oldest goes.
+    std::map<std::uint64_t, std::shared_ptr<MaterialVariant>> materialVariants;
+    std::vector<std::uint64_t> materialVariantOrder;
+    static constexpr std::size_t kMaxMaterialVariants = 16;
+    std::uint64_t materialKey = 0;                    // this frame's programs
+    [[nodiscard]] const MaterialVariant* activeVariant() const {
+        const MaterialVariant* v = materialVariant.get();
+        return compiledMaterials && v != nullptr && v->key == materialKey && v->pending == 0 && !v->failed ? v
+                                                                                                          : nullptr;
+    }
+    void buildMaterialVariant(std::span<const scene::MaterialProgramGpu> programs, std::uint64_t key);
     wgpu::RenderPipeline pipelineWire;      // ADR-1073: depth-tested lines
     wgpu::RenderPipeline pipelineWireXray;  // ADR-1073: lines through everything
     wgpu::Buffer wireArgs;                  // ADR-1073: indirect args of culled objects' lines, one per slot
@@ -731,6 +756,10 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     if (auto r = im.createPipelines(*module); !r) {
         return r;
     }
+    im.procSource = im.shaders.loadSource("procedural.wgsl").value_or(std::string()); // ADR-1493
+    im.materialVariant.reset();
+    im.materialVariants.clear();
+    im.materialVariantOrder.clear();
     auto points = im.shaders.load("points.wgsl");
     if (!points) {
         return std::unexpected(points.error());
@@ -819,6 +848,109 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     return {};
 }
 
+void ProceduralRenderer::setCompiledMaterials(bool on) {
+    impl_->compiledMaterials = on;
+}
+
+void ProceduralRenderer::noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs) {
+    Impl& im = *impl_;
+    if (!im.compiledMaterials || !im.initialised) {
+        return;
+    }
+    im.materialKey = scene::materialStructureKey(programs);
+    if (programs.empty() || im.procSource.empty() || (im.materialVariant && im.materialVariant->key == im.materialKey)) {
+        return;
+    }
+    if (const auto it = im.materialVariants.find(im.materialKey); it != im.materialVariants.end()) {
+        im.materialVariant = it->second; // built on an earlier visit (or still building)
+        return;
+    }
+    im.buildMaterialVariant(programs, im.materialKey);
+}
+
+std::size_t ProceduralRenderer::pendingCompiles() const {
+    return impl_->materialVariant && impl_->materialVariant->pending > 0 ? 1 : 0;
+}
+
+bool ProceduralRenderer::compiledMaterialsActive() const {
+    return impl_->activeVariant() != nullptr;
+}
+
+void ProceduralRenderer::Impl::buildMaterialVariant(std::span<const scene::MaterialProgramGpu> programs,
+                                                    std::uint64_t key) {
+    auto slot = std::make_shared<MaterialVariant>();
+    slot->key = key;
+    slot->started = std::chrono::steady_clock::now();
+    materialVariant = slot; // a callback still running holds its own slot
+    materialVariants[key] = slot;
+    materialVariantOrder.push_back(key);
+    if (materialVariantOrder.size() > kMaxMaterialVariants) {
+        materialVariants.erase(materialVariantOrder.front());
+        materialVariantOrder.erase(materialVariantOrder.begin());
+    }
+    const std::string source = scene::spliceCompiledMaterials(procSource, scene::compiledMaterialLibraryWgsl(programs));
+    if (source.empty()) {
+        slot->failed = true;
+        log::warn("procedural: material.wgsl has no compiled-materials markers; programs stay interpreted");
+        return;
+    }
+    auto module = shaders.compile(source, "procedural-compiled-materials");
+    if (!module) {
+        slot->failed = true;
+        log::warn("procedural: compiling the material programs failed, they stay interpreted: {}",
+                  module.error().message);
+        return;
+    }
+    VertexLayoutStorage vertex;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat, nullptr);
+    wgpu::FragmentState fragment{};
+    fragment.module = *module;
+    fragment.entryPoint = "fs_proc";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::LessEqual;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.layout = pipelineLayout;
+    desc.vertex.module = *module;
+    desc.vertex.entryPoint = "vs_proc";
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &vertex.layout;
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.depthStencil = &depth;
+    desc.multisample.count = sampleCount;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    slot->pending = 2;
+    const auto make = [&](wgpu::CullMode cull, const char* label, wgpu::RenderPipeline MaterialVariant::* member) {
+        desc.label = label;
+        desc.primitive.cullMode = cull;
+        static_cast<void>(gpu::pipelineCountersNoteAsync());
+        context.device().CreateRenderPipelineAsync(
+            &desc, wgpu::CallbackMode::AllowProcessEvents,
+            [slot, member](wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline, wgpu::StringView msg) {
+                if (status == wgpu::CreatePipelineAsyncStatus::Success && pipeline) {
+                    (*slot).*member = std::move(pipeline);
+                } else {
+                    slot->failed = true;
+                    log::warn("procedural: a compiled-materials pipeline failed, programs stay interpreted: {}",
+                              gpu::Context::toString(msg));
+                }
+                if (--slot->pending == 0 && !slot->failed) {
+                    log::info("procedural: compiled material programs ready after {:.1f} ms (on Dawn's workers)",
+                              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - slot->started)
+                                  .count());
+                }
+            });
+    };
+    make(wgpu::CullMode::Back, "procedural-opaque-compiled", &MaterialVariant::cull);
+    make(wgpu::CullMode::None, "procedural-opaque-twosided-compiled", &MaterialVariant::noCull);
+}
+
 Result<void> ProceduralRenderer::reload() {
     auto module = impl_->shaders.load("procedural.wgsl");
     if (!module) {
@@ -827,6 +959,10 @@ Result<void> ProceduralRenderer::reload() {
     if (auto r = impl_->createPipelines(*module); !r) {
         return r;
     }
+    impl_->procSource = impl_->shaders.loadSource("procedural.wgsl").value_or(std::string()); // ADR-1493
+    impl_->materialVariant.reset(); // a reload changes the source every variant was spliced into
+    impl_->materialVariants.clear();
+    impl_->materialVariantOrder.clear();
     auto points = impl_->shaders.load("points.wgsl");
     if (!points) {
         return std::unexpected(points.error());
@@ -2760,6 +2896,10 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
     SubmittedGeometry& submitted = shadowPass  ? stats_.submittedShadow
                                    : depthOnly ? stats_.submittedDepth
                                                : stats_.submittedCamera;
+    // ADR-1493: the compiled-materials variant's lit pipelines when one is ready for this frame's programs.
+    const Impl::MaterialVariant* variant = depthOnly ? nullptr : im.activeVariant();
+    const wgpu::RenderPipeline& litCull = variant != nullptr ? variant->cull : im.pipelineCull;
+    const wgpu::RenderPipeline& litNoCull = variant != nullptr ? variant->noCull : im.pipelineNoCull;
     const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
         if (p.Get() != boundPipeline.Get()) {
             pass.SetPipeline(p);
@@ -2832,7 +2972,7 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             // An object with no cull pass has one list and one group: the visible-list binding is
             // the inert placeholder the vertex stage never reads, so the shadow pass draws the same
             // group the camera does. There is no second list here because there is no first one.
-            setPipeline(depthOnly ? im.pipelineDepth : (twoSided ? im.pipelineNoCull : im.pipelineCull));
+            setPipeline(depthOnly ? im.pipelineDepth : (twoSided ? litNoCull : litCull));
             const auto& direct = item.state->usesLive ? item.state->groupsLive : item.state->groups;
             pass.SetBindGroup(1, direct[0], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
@@ -2869,8 +3009,7 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
                 ++stats_.skippedIndirectDraws;
                 continue;
             }
-            setPipeline(depthOnly ? im.pipelineDepth
-                                  : (twoSided || mesh->impostor ? im.pipelineNoCull : im.pipelineCull));
+            setPipeline(depthOnly ? im.pipelineDepth : (twoSided || mesh->impostor ? litNoCull : litCull));
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);

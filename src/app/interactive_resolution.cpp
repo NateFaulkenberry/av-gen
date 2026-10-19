@@ -324,6 +324,16 @@ void InteractiveResolution::reset() {
     unsustainable_ = false;
 }
 
+void InteractiveResolution::forgetBackoff() {
+    holdScale_.fill(1);
+    miss_.fill(0);
+    missCursor_ = 0;
+    probation_ = false;
+    raisedInto_ = false;
+    raiseStreak_ = 0;
+    unsustainable_ = false;
+}
+
 double InteractiveResolution::medianGpu() const {
     // The median of the window, not the mean: one 200 ms frame where a shader compiled or another
     // agent's process landed is not evidence that the world is too big, and a mean would let it

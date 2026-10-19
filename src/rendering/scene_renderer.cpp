@@ -1946,6 +1946,10 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
     return kArms;
 }
 
+void SceneRenderer::setCompiledMaterials(bool on) {
+    procedurals_->setCompiledMaterials(on);
+}
+
 bool SceneRenderer::setQualityArm(QualitySettings& settings, std::string_view name) {
     for (const QualityArm& arm : qualityArms()) {
         if (name == arm.name) {
@@ -3942,6 +3946,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     stats_.fieldAudio = fields_->audioStats();
     // ---- material programs (ADR-030): packed after the fields so Field ops resolve to slots ----
     materialPrograms_->update(scene.materialPrograms, fields_.get());
+    // ADR-1493: the procedural lit pass's compiled-materials variant follows the programs' structure.
+    procedurals_->noteMaterialPrograms(std::span<const scene::MaterialProgramGpu>(
+        materialPrograms_->block().programs, materialPrograms_->count()));
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
     splines_->update(scene.splines);
     stage(cpu.fieldsMs);
