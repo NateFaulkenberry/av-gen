@@ -664,6 +664,10 @@ AudioInput::Stats AudioInput::stats() const {
     return out;
 }
 
+void AudioInput::stopCapture() {
+    impl_->stopIo();
+}
+
 AudioInput::BlockStamp AudioInput::lastBlock() const {
     BlockStamp b;
     b.frameEnd = impl_->stampFrame.load(std::memory_order_acquire);

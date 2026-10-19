@@ -120,6 +120,12 @@ TEST_CASE("Core Audio capture: a device that disappears mid-capture reads discon
     CHECK(ms < 1000.0);
     static_cast<void>(seenDuringDestroy);
     CHECK_FALSE(audio::coreAudioDevicePresent("com.avgen.test.stems.unplug"));
+    // AUHAL keeps calling the input callback after its device has gone (measured on the Volt 876 and on this
+    // aggregate: at the default input's period, with silence). None of it reaches the sink.
+    const auto blocks = input.stats().blocks;
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    CHECK(input.stats().blocks == blocks);
+    input.stopCapture();
     input.close(); // and closing after the device is gone is safe
 }
 
@@ -206,6 +212,12 @@ TEST_CASE("Core Audio capture: the engine takes the Core Audio path for sources 
     }
     CHECK_FALSE(engine.audioInput()->connected());
     CHECK(engine.signals().value(active) == 0.0f);
+    const auto frozen = engine.audioInput()->stats().blocks; // the engine stopped the dead device's IO
+    for (int i = 0; i < 10; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(17));
+        frame();
+    }
+    CHECK(engine.audioInput()->stats().blocks == frozen);
     CHECK(engine.audioInput()->deviceId() == "com.avgen.test.stems.replug"); // still that device, not another
     aggregate = std::make_unique<testsupport::PrivateAggregate>("com.avgen.test.stems.replug",
                                                                 std::vector<std::string>{kBlackHole});

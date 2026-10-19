@@ -5263,6 +5263,7 @@ Result<void> Engine::adoptAudioInput(std::unique_ptr<audio::AudioInput> input) {
     runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, input->analysisStream());
     startRunner();
     input_ = std::move(input);
+    inputStopped_ = false;
     rebuildChannelAnalysis({}); // a new device: nothing carries over
     audioFile_.reset();
     audioPath_.clear();
@@ -5419,6 +5420,12 @@ void Engine::watchInputDevice() {
     const bool changed = input_->formatChanged();
     if (input_->connected() && !changed) {
         return;
+    }
+    if (!input_->connected() && !inputStopped_) {
+        // The device has gone: stop its IO now (AUHAL keeps calling back against another device otherwise).
+        input_->stopCapture();
+        inputStopped_ = true;
+        log::warn("audio input '{}' disconnected; waiting for it to come back", input_->deviceName());
     }
     if (!changed && now - inputRetry_ < std::chrono::seconds(1)) {
         return;
