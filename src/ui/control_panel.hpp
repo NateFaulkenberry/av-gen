@@ -207,6 +207,8 @@ public:
     std::function<void()> onStopAudioInput;
     // ADR-1025: the Live panel. Audio input by name ("" = none), MIDI source filter ("*" = every source), smoothing.
     std::function<void(const std::string&)> onLiveAudioInput;
+    // ADR-1521: the Live panel's channel map for the open input.
+    std::function<void(std::vector<audio::InputSource>)> onLiveInputSources;
     std::function<void(const std::string&)> onLiveMidiInput;
     std::function<void(float)> onLiveSmoothing;
     // ADR-1063/1341: the live scene switcher. The names the Scene dropdown lists (every live example), each one's
@@ -691,6 +693,9 @@ private:
     int inputDevice_ = 0;
     // ADR-1025: the Live panel's device lists, rescanned every few seconds.
     std::vector<audio::AudioDeviceInfo> liveAudioDevices_;
+    // ADR-1521: the Inputs table's label being typed, per device channel.
+    std::vector<std::array<char, 48>> liveInputLabels_;
+    void drawLiveInputs(app::Engine& engine);
     std::vector<control::MidiDeviceInfo> liveMidiDevices_;
     double liveLastScan_ = -1e9;
     std::vector<app::ProjectionDisplay> liveDisplays_; // ADR-1026, rescanned with the devices

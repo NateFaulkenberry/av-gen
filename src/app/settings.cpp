@@ -78,6 +78,20 @@ json AppSettings::toJson() const {
         {"toolbar", preview.toolbar},
     };
     doc["live"] = json{{"audioInput", live.audioInput}, {"midiInput", live.midiInput}, {"smoothing", live.smoothing}};
+    if (!live.inputSources.empty()) {
+        json devices = json::object();
+        for (const auto& [device, sources] : live.inputSources) {
+            json list = json::array();
+            for (const audio::InputSource& s : sources) {
+                json item{{"key", s.key}, {"label", s.label}, {"channel", s.channel + 1}};
+                if (s.pair) item["pair"] = true;
+                if (s.hits) item["hits"] = true;
+                list.push_back(std::move(item));
+            }
+            devices[device] = std::move(list);
+        }
+        doc["live"]["inputSources"] = std::move(devices);
+    }
     {
         json pj{{"display", projection.display},
                 {"windowWidth", projection.windowWidth},
@@ -153,6 +167,26 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
             out.live.midiInput = "*";
         }
         out.live.smoothing = std::clamp(lv->value("smoothing", out.live.smoothing), 0.25f, 4.0f);
+        if (const auto devices = lv->find("inputSources"); devices != lv->end() && devices->is_object()) {
+            for (const auto& [device, list] : devices->items()) {
+                if (!list.is_array()) {
+                    continue;
+                }
+                std::vector<audio::InputSource> sources;
+                for (const auto& item : list) {
+                    const int channel = item.is_object() ? item.value("channel", 0) : 0;
+                    if (channel < 1) {
+                        continue; // lenient like the rest of `live`: a bad row is dropped, not the file
+                    }
+                    sources.push_back({.key = item.value("key", std::string{}),
+                                       .label = item.value("label", std::string{}),
+                                       .channel = static_cast<std::uint32_t>(channel - 1),
+                                       .pair = item.value("pair", false),
+                                       .hits = item.value("hits", false)});
+                }
+                out.live.inputSources[device] = std::move(sources);
+            }
+        }
     }
     if (const auto pj = doc.find("projection"); pj != doc.end() && pj->is_object()) {
         // Lenient like `live`: a projector preference is never worth refusing the settings file over.

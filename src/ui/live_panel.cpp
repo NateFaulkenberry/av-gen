@@ -70,6 +70,167 @@ std::vector<app::ProjectionDisplay> connectedDisplays() {
 
 } // namespace
 
+// ADR-1521: the open input's channels, and which of them are analysed as sources (stem.<key>.*). A routing surface,
+// not a mixer: a meter, a label, mono or a linked pair, and the hits tier, per channel.
+void ControlPanel::drawLiveInputs(app::Engine& engine) {
+    audio::AudioInput* input = engine.audioInput();
+    if (input == nullptr) {
+        return;
+    }
+    const std::uint32_t channels = input->channels();
+    std::vector<audio::InputSource> sources = engine.inputSources();
+    if (!input->connected()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, palette().error);
+        ImGui::TextWrapped("Disconnected: %s. Waiting for it to come back -- its sources read 0, and nothing else "
+                           "is opened in its place.",
+                           input->deviceName().c_str());
+        ImGui::PopStyleColor();
+    }
+    if (channels <= 2 && sources.empty()) {
+        if (ImGui::SmallButton("Analyse channels separately...")) {
+            sources.push_back({.key = "", .label = "Input 1", .channel = 0});
+            if (onLiveInputSources) {
+                onLiveInputSources(sources);
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Analyse an input channel on its own as stem.<key>.* -- a drum bus, a bass DI -- beside the "
+                    "main mix. Off, the input is one mix, as it has always been.");
+        }
+        return;
+    }
+    // The device's stream layout, where the HAL gives it (an interface's analog and ADAT banks).
+    for (const auto& d : liveAudioDevices_) {
+        if ((d.id == input->deviceId() || d.name == input->deviceName()) && d.streamChannels.size() > 1) {
+            std::string layout;
+            std::uint32_t first = 1;
+            for (const std::uint32_t n : d.streamChannels) {
+                layout += (layout.empty() ? "" : ", ") + std::to_string(first) + "-" + std::to_string(first + n - 1);
+                first += n;
+            }
+            ImGui::TextDisabled("%u channels in %zu streams: %s", channels, d.streamChannels.size(), layout.c_str());
+        }
+    }
+    if (liveInputLabels_.size() != channels) {
+        liveInputLabels_.assign(channels, {});
+    }
+    bool changed = false;
+    const auto sourceOn = [&](std::uint32_t c) {
+        return std::find_if(sources.begin(), sources.end(), [&](const audio::InputSource& s) { return s.channel == c; });
+    };
+    const ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
+    const float rowHeight = ImGui::GetFrameHeightWithSpacing();
+    const float height = std::min(static_cast<float>(channels) + 1.5f, 10.5f) * rowHeight;
+    if (ImGui::BeginTable("##live-inputs", 5, flags, ImVec2(-1.0f, height))) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("In");
+        ImGui::TableSetupColumn("Level", ImGuiTableColumnFlags_WidthFixed, 56.0f);
+        ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Pair");
+        ImGui::TableSetupColumn("Hits");
+        ImGui::TableHeadersRow();
+        for (std::uint32_t c = 0; c < channels; ++c) {
+            ImGui::PushID(static_cast<int>(c));
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::Text("%u", c + 1);
+            ImGui::TableNextColumn();
+            const float peak = input->channelPeak(c);
+            const float meter = peak > 0.0f ? std::clamp((20.0f * std::log10(peak) + 60.0f) / 60.0f, 0.0f, 1.0f) : 0.0f;
+            ImGui::ProgressBar(meter, ImVec2(-1.0f, ImGui::GetTextLineHeight() * 0.7f), "");
+            ImGui::TableNextColumn();
+            const auto partner = std::find_if(sources.begin(), sources.end(), [&](const audio::InputSource& s) {
+                return s.pair && s.channel + 1 == c;
+            });
+            if (partner != sources.end()) {
+                ImGui::TextDisabled("with %u: %s", c, partner->label.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+                ImGui::PopID();
+                continue;
+            }
+            auto it = sourceOn(c);
+            bool on = it != sources.end();
+            if (ImGui::Checkbox("##on", &on)) {
+                if (on) {
+                    sources.push_back({.key = "", .label = "Input " + std::to_string(c + 1), .channel = c});
+                } else {
+                    sources.erase(it);
+                }
+                changed = true;
+                ImGui::PopID();
+                break; // the list changed under the iterators: draw the rest next frame
+            }
+            if (on) {
+                ImGui::SameLine();
+                auto& buffer = liveInputLabels_[c];
+                if (!ImGui::IsItemActive() && std::string(buffer.data()) != it->label && !ImGui::IsAnyItemActive()) {
+                    std::snprintf(buffer.data(), buffer.size(), "%s", it->label.c_str());
+                }
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::InputText("##label", buffer.data(), buffer.size());
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Signals: stem.%s.level, .onset, .rms, .bass ... The label is free; the key stays when "
+                            "it changes, so routes keep working.",
+                            it->key.c_str());
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit() && buffer[0] != '\0') {
+                    it->label = buffer.data();
+                    changed = true;
+                }
+                ImGui::TableNextColumn();
+                ImGui::BeginDisabled(c + 1 >= channels);
+                if (ImGui::Checkbox("##pair", &it->pair)) {
+                    // The partner channel cannot also be a source of its own.
+                    std::erase_if(sources, [&](const audio::InputSource& s) { return s.channel == c + 1; });
+                    changed = true;
+                }
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Analyse %u and %u together as one stereo source: their mono sum, and its width. For two "
+                            "independent channels, use two rows instead.",
+                            c + 1, c + 2);
+                }
+                ImGui::TableNextColumn();
+                changed |= ImGui::Checkbox("##hits", &it->hits);
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Also find kicks, snares and hats on this input (stem.<key>.kick/snare/hat): for a drum "
+                            "bus. About six times the analysis cost of the rest.");
+                }
+                if (changed) {
+                    ImGui::PopID();
+                    break;
+                }
+            } else {
+                ImGui::SameLine();
+                ImGui::TextDisabled("not analysed");
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    const auto st = input->stats();
+    std::size_t live = 0;
+    for (std::size_t i = 0; i < sources.size(); ++i) {
+        live += engine.inputSourceActive(i) ? 1 : 0;
+    }
+    ImGui::TextDisabled("%zu source(s), %zu with audio; dropped %llu, gaps %llu, overloads %llu", sources.size(), live,
+                        static_cast<unsigned long long>(st.droppedBlocks), static_cast<unsigned long long>(st.gaps),
+                        static_cast<unsigned long long>(st.overloads));
+    if (ImGui::IsItemHovered()) {
+        const auto* analysis = engine.channelAnalysis();
+        tooltip("Dropped: blocks the analysis fell too far behind to take (it resumes cleanly). Gaps: input the "
+                "device produced that never arrived. Overloads: the device's own IO deadline missed.\n"
+                "Callback %.1f us mean, %.1f us max. Analysis %.1f us per source per hop.",
+                st.callbackMeanMicros, st.callbackMaxMicros, analysis != nullptr ? analysis->hopMicros() : 0.0);
+    }
+    if (changed && onLiveInputSources) {
+        onLiveInputSources(sources);
+    }
+}
+
 void ControlPanel::drawLive(app::Engine& engine) {
     if (engine.mode() != app::EngineMode::Live) {
         ImGui::TextDisabled("Live input is for the live editor.");
@@ -467,16 +628,33 @@ void ControlPanel::drawLive(app::Engine& engine) {
         names.push_back("(none)");
         int current = 0;
         const std::string openName = engine.audioInput() != nullptr ? engine.audioInput()->deviceName() : std::string();
+        // Each device with its channel count, so an interface with more than two inputs says so before it is opened.
+        std::vector<std::string> labels;
+        labels.reserve(liveAudioDevices_.size());
+        for (const auto& d : liveAudioDevices_) {
+            labels.push_back(d.channels() > 0 ? d.name + "  (" + std::to_string(d.channels()) + " in)" : d.name);
+        }
         for (std::size_t i = 0; i < liveAudioDevices_.size(); ++i) {
-            names.push_back(liveAudioDevices_[i].name.c_str());
+            names.push_back(labels[i].c_str());
             if (!openName.empty() && liveAudioDevices_[i].name == openName) {
                 current = static_cast<int>(i) + 1;
             }
         }
+        // An open input the list does not hold (disconnected, or the benchmark's synthetic one) is still what is open.
+        if (!openName.empty() && current == 0) {
+            names.push_back(openName.c_str());
+            current = static_cast<int>(names.size()) - 1;
+        }
         ImGui::TextUnformatted("Audio input");
         ImGui::SetNextItemWidth(-1);
         if (ImGui::Combo("##live-audio", &current, names.data(), static_cast<int>(names.size())) && onLiveAudioInput) {
-            onLiveAudioInput(current == 0 ? std::string() : liveAudioDevices_[static_cast<std::size_t>(current - 1)].name);
+            // By id (Core Audio's UID: two devices with similar names stay two), the name where there is none.
+            if (current == 0) {
+                onLiveAudioInput(std::string());
+            } else if (static_cast<std::size_t>(current - 1) < liveAudioDevices_.size()) {
+                const auto& chosen = liveAudioDevices_[static_cast<std::size_t>(current - 1)];
+                onLiveAudioInput(chosen.id.empty() ? chosen.name : chosen.id);
+            }
         }
         light(st.audioReceiving, st.audioReceiving ? "Audio receiving" : "Audio: no signal");
         ImGui::SameLine();
@@ -486,6 +664,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
         ImGui::ProgressBar(on ? level : 0.0f, ImVec2(-1, 0), text);
         if (engine.audioInput() != nullptr) {
             ImGui::TextDisabled("%s, %u Hz", openName.c_str(), engine.audioInput()->sampleRate());
+            drawLiveInputs(engine);
         } else if (engine.runner() != nullptr) {
             ImGui::TextDisabled("no input device: listening to the playing audio file");
         } else {

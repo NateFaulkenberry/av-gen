@@ -288,3 +288,24 @@ TEST_CASE("the live antialiasing and the lowest adaptive scale round-trip", "[un
         CHECK(out->adaptiveCanvasFloor == app::kLiveScaleFloorMin);
     }
 }
+
+TEST_CASE("Settings remember each device's input channel map by device id (ADR-1521)", "[settings][multichannel]") {
+    app::AppSettings s;
+    s.live.audioInput = "AppleUSBAudioEngine:Universal Audio:Volt 876:1";
+    s.live.inputSources["AppleUSBAudioEngine:Universal Audio:Volt 876:1"] = {
+        {.key = "drums", .label = "Drum bus", .channel = 0, .pair = true, .hits = true},
+        {.key = "bass", .label = "Bass DI", .channel = 2}};
+    const nlohmann::json j = s.toJson();
+    // Channels are 1-based in the file, as the interface's front panel numbers them.
+    CHECK(j["live"]["inputSources"]["AppleUSBAudioEngine:Universal Audio:Volt 876:1"][0]["channel"] == 1);
+    auto back = app::AppSettings::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->live.inputSources == s.live.inputSources);
+    // A malformed row is dropped, not the file.
+    nlohmann::json bad = j;
+    bad["live"]["inputSources"]["x"] = nlohmann::json::array({{{"label", "no channel"}}, {{"channel", 3}}});
+    auto lenient = app::AppSettings::fromJson(bad);
+    REQUIRE(lenient.has_value());
+    REQUIRE(lenient->live.inputSources["x"].size() == 1);
+    CHECK(lenient->live.inputSources["x"][0].channel == 2);
+}
