@@ -183,4 +183,63 @@ StemTrack StemTrack::analyze(const audio::AudioFile& file, StemAnalysisConfig co
     return track;
 }
 
+Result<StemTrack> StemTrack::analyzeFile(const std::filesystem::path& path, StemAnalysisConfig config,
+                                         audio::StemFileFacts& facts) {
+    facts = audio::StemFileFacts{};
+    facts.format = audio::nativeSampleFormat(path);
+    StemTrack track;
+    track.hits_ = config.hits;
+    std::unique_ptr<StemAnalyzer> analyzer;
+    std::vector<float> mono;
+    std::vector<float> side;
+    StemFrame frame;
+    auto decoded = audio::AudioFile::decode(path, [&](const audio::DecodeFormat& f, std::span<const float> samples) {
+        if (!analyzer) {
+            config.analyzer.sampleRate = f.sampleRate;
+            analyzer = std::make_unique<StemAnalyzer>(config);
+            const AnalyzerConfig& cfg = analyzer->config().analyzer;
+            track.sampleRate_ = f.sampleRate;
+            track.hopSeconds_ = static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
+            if (f.declaredFrames >= cfg.windowSize) {
+                track.frames_.reserve(static_cast<std::size_t>((f.declaredFrames - cfg.windowSize) / cfg.hopSize + 1));
+            }
+        }
+        const std::size_t channels = f.channels;
+        const std::size_t n = samples.size() / channels;
+        mono.resize(n);
+        side.resize(channels >= 2 ? n : 0);
+        const float inv = 1.0f / static_cast<float>(channels);
+        for (std::size_t i = 0; i < n; ++i) {
+            float sum = 0.0f;
+            for (std::size_t c = 0; c < channels; ++c) {
+                const float v = samples[i * channels + c];
+                if (!std::isfinite(v)) {
+                    ++facts.nonFinite;
+                    continue;
+                }
+                facts.peak = std::max(facts.peak, std::fabs(v));
+                facts.silent = facts.silent && v == 0.0f;
+                sum += v;
+            }
+            mono[i] = sum * inv; // as AudioFile::mono(): the average of every channel
+            if (channels >= 2) {
+                side[i] = 0.5f * (samples[i * channels] - samples[i * channels + 1]);
+            }
+        }
+        analyzer->push(mono, side);
+        while (analyzer->pop(frame)) {
+            track.frames_.push_back(frame);
+        }
+    });
+    if (!decoded) {
+        return std::unexpected(decoded.error());
+    }
+    facts.sampleRate = decoded->sampleRate;
+    facts.channels = decoded->channels;
+    facts.frames = decoded->frames;
+    facts.silent = facts.silent && facts.nonFinite == 0;
+    track.duration_ = static_cast<double>(decoded->frames) / static_cast<double>(decoded->sampleRate);
+    return track;
+}
+
 } // namespace avgen::analysis

@@ -39,6 +39,19 @@ struct StemSource {
 // Whether `key` is a valid stem key ([a-z0-9_]+, not empty).
 [[nodiscard]] bool validStemKey(std::string_view key);
 
+// What reading a stem file found, gathered while it is analysed (the samples are not kept).
+struct StemFileFacts {
+    std::uint32_t sampleRate = 0;
+    std::uint32_t channels = 0;
+    std::uint64_t frames = 0;
+    float peak = 0.0f;
+    std::size_t nonFinite = 0; // NaN / Inf samples
+    bool silent = true;        // every sample is exactly 0
+    std::string format;        // the file's own sample format ("s16", "s24", "f32", ...), "" when unknown
+};
+// The facts of a decoded file (tests, and anything holding the samples already).
+[[nodiscard]] StemFileFacts factsOf(const AudioFile& file);
+
 enum class StemSeverity : std::uint8_t { Info, Warning, Error };
 
 struct StemDiagnostic {
@@ -68,11 +81,11 @@ struct MixFacts {
     double durationSeconds = 0.0;
 };
 
-// Checks one decoded stem (`file`, null when decoding failed with `decodeError`). The caller decodes; this reads the
-// samples and, for `format`, the file's header. Diagnostics, each naming the file:
+// The report on one stem file from what reading it found (`facts`, null when decoding failed with `decodeError`).
+// Diagnostics, each naming the file:
 //   error    the file did not decode, or it holds non-finite samples
 //   warning  every sample is silent
-[[nodiscard]] StemReport checkStem(const StemSource& source, const AudioFile* file, const std::string& decodeError);
+[[nodiscard]] StemReport checkStem(const StemSource& source, const StemFileFacts* facts, const std::string& decodeError);
 
 // What a checked stem is against the playback mix -- recomputed whenever the mix or the offset changes, without the
 // samples:

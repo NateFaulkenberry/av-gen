@@ -4281,6 +4281,7 @@ Result<void> Engine::loadFile(const std::filesystem::path& path) try {
 }
 
 Engine::~Engine() {
+    channels_.reset(); // ADR-1521: reads the input's streams
     runner_.reset();
     player_.reset();
 }
@@ -4416,14 +4417,15 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
         workers.reserve(todo.size());
         for (const std::size_t i : todo) {
             workers.emplace_back([&state = next[i], config = analyzerConfig_] {
-                auto file = audio::AudioFile::load(state.source.file);
-                state.report = audio::checkStem(state.source, file ? &*file : nullptr, file ? "" : file.error().message);
-                if (file && state.report.ok()) {
-                    analysis::StemAnalysisConfig stemConfig;
-                    stemConfig.analyzer = config;
-                    stemConfig.hits = state.source.hits;
-                    state.track = std::make_shared<const analysis::StemTrack>(
-                        analysis::StemTrack::analyze(*file, stemConfig)); // the PCM goes when `file` does
+                analysis::StemAnalysisConfig stemConfig;
+                stemConfig.analyzer = config;
+                stemConfig.hits = state.source.hits;
+                audio::StemFileFacts facts;
+                auto track = analysis::StemTrack::analyzeFile(state.source.file, stemConfig, facts);
+                state.report = audio::checkStem(state.source, track ? &facts : nullptr,
+                                                track ? std::string() : track.error().message);
+                if (track && state.report.ok()) {
+                    state.track = std::make_shared<const analysis::StemTrack>(std::move(*track));
                 }
             });
         }
@@ -5192,9 +5194,27 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
         return fail("live audio input needs the live engine");
     }
     auto input = std::make_unique<audio::AudioInput>();
+    input->setSources(inputSources_); // ADR-1521: before the open, so its taps exist from the first block
     if (auto r = input->open(deviceName); !r) {
         return r;
     }
+    return adoptAudioInput(std::move(input));
+}
+
+Result<void> Engine::useAudioInputBackend(std::unique_ptr<audio::CaptureBackend> backend) {
+    if (mode_ != EngineMode::Live) {
+        return fail("live audio input needs the live engine");
+    }
+    auto input = std::make_unique<audio::AudioInput>();
+    input->setSources(inputSources_);
+    if (auto r = input->openBackend(std::move(backend)); !r) {
+        return r;
+    }
+    return adoptAudioInput(std::move(input));
+}
+
+Result<void> Engine::adoptAudioInput(std::unique_ptr<audio::AudioInput> input) {
+    channels_.reset(); // reads the old input's streams: goes first
     runner_.reset();
     if (player_) {
         player_->pause();
@@ -5203,6 +5223,7 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     runner_ = std::make_unique<analysis::AnalysisRunner>(analyzerConfig_, input->analysisStream());
     startRunner();
     input_ = std::move(input);
+    rebuildChannelAnalysis({}); // a new device: nothing carries over
     audioFile_.reset();
     audioPath_.clear();
     clock_.music.reset();
@@ -5220,11 +5241,111 @@ void Engine::stopAudioInput() {
     if (!input_) {
         return;
     }
+    channels_.reset();
     runner_.reset();
     input_.reset();
     clock_.music.reset();
     clock_.hasFrame = false;
     audioSignals_.publishSilence(bus_);
+    for (const signals::StemSignals& s : inputSignals_) {
+        s.publishInactive(bus_);
+    }
+    std::fill(inputActive_.begin(), inputActive_.end(), 0);
+}
+
+void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
+    std::vector<std::string> taken;
+    for (audio::InputSource& source : wanted) {
+        if (source.label.empty()) {
+            source.label = source.key.empty() ? fmt::format("Input {}", source.channel + 1) : source.key;
+        }
+        if (!audio::validStemKey(source.key) || std::find(taken.begin(), taken.end(), source.key) != taken.end()) {
+            source.key = audio::makeStemKey(source.label, taken);
+        }
+        taken.push_back(source.key);
+    }
+    if (wanted == inputSources_) {
+        return;
+    }
+    for (const signals::StemSignals& old : inputSignals_) {
+        if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
+            old.publishInactive(bus_);
+        }
+    }
+    std::vector<std::string> previousKeys;
+    for (const signals::StemSignals& old : inputSignals_) {
+        previousKeys.push_back(old.key);
+    }
+    inputSources_ = std::move(wanted);
+    inputSignals_.clear();
+    for (const audio::InputSource& source : inputSources_) {
+        inputSignals_.push_back(signals::StemSignals::declare(bus_, source.key, source.label));
+    }
+    if (input_) {
+        if (channels_) {
+            channels_->stop(); // before the input replaces the streams it reads; the rebuild adopts what is unchanged
+        }
+        input_->setSources(inputSources_);
+        rebuildChannelAnalysis(previousKeys);
+    } else {
+        inputLatches_.assign(inputSources_.size(), {});
+        inputLastFrame_.assign(inputSources_.size(), {});
+        inputActive_.assign(inputSources_.size(), 0);
+    }
+    rebind();
+}
+
+void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys) {
+    // The render side's state per source follows its key, so an edit to one source leaves the others' latches alone.
+    std::vector<analysis::LiveStemLatch> latches(inputSources_.size());
+    std::vector<std::chrono::steady_clock::time_point> last(inputSources_.size());
+    std::vector<std::uint8_t> active(inputSources_.size(), 0);
+    for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+        for (std::size_t j = 0; j < previousKeys.size() && j < inputLatches_.size(); ++j) {
+            if (previousKeys[j] == inputSources_[i].key && j < inputLastFrame_.size() && j < inputActive_.size()) {
+                latches[i] = inputLatches_[j];
+                last[i] = inputLastFrame_[j];
+                active[i] = inputActive_[j];
+            }
+        }
+    }
+    inputLatches_ = std::move(latches);
+    inputLastFrame_ = std::move(last);
+    inputActive_ = std::move(active);
+    std::unique_ptr<analysis::ChannelAnalysis> previous = std::move(channels_);
+    if (!input_ || inputSources_.empty()) {
+        return; // `previous` goes, stopping its thread
+    }
+    std::vector<analysis::ChannelAnalysis::Source> sources;
+    for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+        sources.push_back({.stream = input_->sourceStream(i), .pair = inputSources_[i].pair, .hits = inputSources_[i].hits});
+    }
+    channels_ = std::make_unique<analysis::ChannelAnalysis>(std::move(sources), input_->sampleRate(), analyzerConfig_,
+                                                            std::move(previous));
+    channels_->start();
+}
+
+void Engine::publishInputSources() {
+    // A source with no frame for this long reads inactive: the device stalled, or its analysis cannot keep up. Never
+    // a held value, never an event that stays asserted.
+    constexpr auto kStale = std::chrono::milliseconds(250);
+    const auto now = std::chrono::steady_clock::now();
+    const bool live = input_ && input_->connected();
+    for (std::size_t i = 0; i < inputSignals_.size(); ++i) {
+        const signals::StemSignals& ids = inputSignals_[i];
+        if (live && channels_ && i < channels_->size() && channels_->acquire(i)) {
+            analysis::LiveStemFrame f = channels_->latest(i);
+            inputLatches_[i].apply(f);
+            ids.publish(bus_, f.frame);
+            inputLastFrame_[i] = now;
+            inputActive_[i] = 1;
+        } else if (live && inputActive_[i] != 0 && now - inputLastFrame_[i] <= kStale) {
+            ids.clearEvents(bus_); // no new hop this frame: keep the levels, drop the pulses
+        } else {
+            ids.publishInactive(bus_);
+            inputActive_[i] = 0;
+        }
+    }
 }
 
 FrameTime Engine::tick(FrameClock& clock) {
@@ -6419,7 +6540,19 @@ void Engine::update(const FrameTime& time) {
         audioSignals_.publishSilence(bus_);
     }
     updateAudioHistory(newFrame);
-    if (!stems_.empty()) {
+    if (input_ != nullptr) {
+        // ADR-1521: a live input's sources. An offline stem means nothing without its mix playing: inactive, unless a
+        // live source of the same key publishes it (its signals are the same names).
+        for (const signals::StemSignals& stem : stemSignals_) {
+            const bool live = std::any_of(inputSources_.begin(), inputSources_.end(),
+                                          [&](const audio::InputSource& s) { return s.key == stem.key; });
+            if (!live) {
+                stem.publishInactive(bus_);
+            }
+        }
+        publishInputSources();
+        stemPreviousSeconds_ = -1.0;
+    } else if (!stems_.empty()) {
         // ADR-1520: a pure function of the instant and the previous one, in both modes (live: the transport second).
         publishStems(bus_, stemPreviousSeconds_, time.renderTime);
         stemPreviousSeconds_ = time.renderTime;

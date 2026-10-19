@@ -1,5 +1,6 @@
 // stems-multichannel M2: stem keys, the stem file check, and the stem.<key>.* vocabulary.
 
+#include "analysis/stem_analysis.hpp"
 #include "audio/audio_file.hpp"
 #include "audio/stem_source.hpp"
 #include "signals/stem_signals.hpp"
@@ -28,9 +29,10 @@ bool has(const audio::StemReport& r, StemSeverity s, const std::string& fragment
 
 audio::StemReport check(const testsupport::StemFixture& fx, const std::string& name, double offset = 0.0) {
     audio::StemSource s{.key = "x", .label = "X", .file = fx.file(name), .offsetSeconds = offset};
-    auto file = audio::AudioFile::load(s.file);
+    audio::StemFileFacts facts;
+    auto track = analysis::StemTrack::analyzeFile(s.file, {}, facts);
     const audio::MixFacts mix{.sampleRate = 48000, .durationSeconds = 20.0};
-    auto r = audio::checkStem(s, file ? &*file : nullptr, file ? "" : file.error().message);
+    auto r = audio::checkStem(s, track ? &facts : nullptr, track ? "" : track.error().message);
     for (auto& d : audio::mixDiagnostics(s, r, mix)) {
         r.diagnostics.push_back(std::move(d));
     }
@@ -86,7 +88,8 @@ TEST_CASE("stem check: each problem is reported against the file that has it", "
     std::vector<float> bad(4800, 0.1f);
     bad[100] = std::numeric_limits<float>::quiet_NaN();
     const auto nan = audio::AudioFile::fromInterleaved(bad, 1, 48000);
-    const auto r = audio::checkStem({.key = "n", .label = "N", .file = "n.wav"}, &nan, "");
+    const auto facts = audio::factsOf(nan);
+    const auto r = audio::checkStem({.key = "n", .label = "N", .file = "n.wav"}, &facts, "");
     CHECK_FALSE(r.ok());
     CHECK(r.nonFinite == 1);
     CHECK(has(r, StemSeverity::Error, "not finite"));

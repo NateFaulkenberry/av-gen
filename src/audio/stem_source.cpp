@@ -74,31 +74,42 @@ std::string nativeSampleFormat(const std::filesystem::path& path) {
     }
 }
 
-StemReport checkStem(const StemSource& source, const AudioFile* file, const std::string& decodeError) {
+StemFileFacts factsOf(const AudioFile& file) {
+    StemFileFacts f;
+    f.sampleRate = file.sampleRate();
+    f.channels = file.channels();
+    f.frames = file.frameCount();
+    f.format = file.path().empty() ? std::string() : nativeSampleFormat(file.path());
+    for (const float v : file.interleaved()) {
+        if (!std::isfinite(v)) {
+            ++f.nonFinite;
+            continue;
+        }
+        f.peak = std::max(f.peak, std::fabs(v));
+        f.silent = f.silent && v == 0.0f;
+    }
+    f.silent = f.silent && f.nonFinite == 0;
+    return f;
+}
+
+StemReport checkStem(const StemSource& source, const StemFileFacts* facts, const std::string& decodeError) {
     StemReport r;
     const std::string name = source.file.filename().string();
     const auto add = [&r](StemSeverity s, std::string m) { r.diagnostics.push_back({s, std::move(m)}); };
-    if (file == nullptr) {
+    if (facts == nullptr) {
         add(StemSeverity::Error, fmt::format("stem '{}' ({}): cannot be decoded: {}", source.label, name,
                                              decodeError.empty() ? std::string("unknown error") : decodeError));
         return r;
     }
     r.decoded = true;
-    r.sampleRate = file->sampleRate();
-    r.channels = file->channels();
-    r.frames = file->frameCount();
-    r.durationSeconds = file->durationSeconds();
-    r.format = file->path().empty() ? std::string() : nativeSampleFormat(file->path());
-    bool allZero = true;
-    for (const float v : file->interleaved()) {
-        if (!std::isfinite(v)) {
-            ++r.nonFinite;
-            continue;
-        }
-        r.peak = std::max(r.peak, std::fabs(v));
-        allZero = allZero && v == 0.0f;
-    }
-    r.silent = allZero && r.nonFinite == 0;
+    r.sampleRate = facts->sampleRate;
+    r.channels = facts->channels;
+    r.frames = facts->frames;
+    r.durationSeconds = facts->sampleRate > 0 ? static_cast<double>(facts->frames) / facts->sampleRate : 0.0;
+    r.format = facts->format;
+    r.peak = facts->peak;
+    r.nonFinite = facts->nonFinite;
+    r.silent = facts->silent;
     if (r.nonFinite > 0) {
         add(StemSeverity::Error,
             fmt::format("stem '{}' ({}): {} sample(s) are not finite numbers; the file is damaged", source.label, name,

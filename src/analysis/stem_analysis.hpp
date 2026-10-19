@@ -18,6 +18,10 @@
 #include "analysis/analyzer.hpp"
 #include "analysis/causal_onsets.hpp"
 #include "audio/audio_file.hpp"
+#include "audio/stem_source.hpp"
+#include "core/error.hpp"
+
+#include <filesystem>
 
 #include <array>
 #include <cstdint>
@@ -119,6 +123,11 @@ private:
 class StemTrack {
 public:
     static StemTrack analyze(const audio::AudioFile& file, StemAnalysisConfig config);
+    // The same analysis while decoding: the file's PCM is never held, so N stems analysed together cost N chunk
+    // buffers, not N files (measured: 8 stems of 3.5 min held at once raised the peak RSS by ~1.2 GB). `facts` gets what
+    // reading found (rate, channels, length, peak, non-finite samples, silence, format) for the stem's report.
+    static Result<StemTrack> analyzeFile(const std::filesystem::path& path, StemAnalysisConfig config,
+                                         audio::StemFileFacts& facts);
 
     [[nodiscard]] const std::vector<StemFrame>& frames() const { return frames_; }
     [[nodiscard]] double durationSeconds() const { return duration_; }

@@ -204,6 +204,22 @@ TEST_CASE("stem analysis: deterministic, and independent of how the samples were
     const StemTrack b = StemTrack::analyze(*file, {});
     REQUIRE(a.frames().size() == b.frames().size());
     REQUIRE(a.frames() == b.frames());
+    // Analysed while decoding (the engine's path: no PCM held) is the same analysis as analysed from memory.
+    audio::StemFileFacts facts;
+    const auto streamed = StemTrack::analyzeFile(fx.file("drums.wav"), {}, facts);
+    REQUIRE(streamed.has_value());
+    CHECK(streamed->frames() == a.frames());
+    CHECK(streamed->durationSeconds() == a.durationSeconds());
+    CHECK(facts.frames == file->frameCount());
+    CHECK(facts.channels == 1);
+    CHECK(facts.format == "f32");
+    CHECK_FALSE(facts.silent);
+    audio::StemFileFacts synthFacts;
+    auto synthFile = audio::AudioFile::load(fx.file("synth.wav"));
+    REQUIRE(synthFile.has_value());
+    const auto synthStreamed = StemTrack::analyzeFile(fx.file("synth.wav"), {}, synthFacts);
+    REQUIRE(synthStreamed.has_value());
+    CHECK(synthStreamed->frames() == StemTrack::analyze(*synthFile, {}).frames()); // stereo: mono and side alike
 
     analysis::StemAnalysisConfig config;
     config.analyzer.sampleRate = file->sampleRate();
