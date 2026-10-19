@@ -211,6 +211,56 @@
    }
   },
   {
+   "source": "sonic.energy",
+   "target": "material/rsVeil/op/3/remap/constant",
+   "amount": 0.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
+   }
+  },
+  {
+   "source": "sonic.energy",
+   "target": "material/rsVeil/op/3/remap/constant",
+   "amount": 0.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 3,
+   "chain": {
+    "gain": 1.0,
+    "offset": 0.35,
+    "integrate": true
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "field/flowWave/strength",
+   "amount": 1.2222222222222223,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 150,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "sonic.energy.slow",
+   "target": "procedural/silk/deform/1/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 0.6,
+    "offset": 0.8,
+    "attackMs": 4000,
+    "decayMs": 8000
+   }
+  },
+  {
    "source": "control.resonance",
    "target": "field/resonator/resonance/sustain",
    "amount": 1.5,
@@ -333,11 +383,12 @@
    }
   },
   {
-   "source": "control.iridescence",
-   "target": "material/rsSilk/op/21/constant/constant",
+   "source": "control.light",
+   "target": "material/rsSilk/op/37/remap/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
+   "component": 3,
    "chain": {
     "gain": 2.0,
     "offset": 1.0,
@@ -347,23 +398,11 @@
   },
   {
    "source": "control.light",
-   "target": "material/rsSilk/op/32/constant/constant",
+   "target": "material/rsSilk/op/42/remap/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
-   "chain": {
-    "gain": 2.0,
-    "offset": 1.0,
-    "attackMs": 150,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "control.light",
-   "target": "material/rsSilk/op/38/constant/constant",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
+   "component": 3,
    "chain": {
     "gain": 2.0,
     "offset": 1.0,
@@ -802,9 +841,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.32,
+     "rough": 0.46,
      "film": 1.0,
-     "key": 3.5,
+     "key": 1.5,
      "emit": 1.0,
      "irid": 0.02,
      "filmIor": 1.7,
@@ -876,9 +915,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.29,
+     "rough": 0.43,
      "film": 0.9,
-     "key": 3.22,
+     "key": 1.38,
      "emit": 0.9,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -950,9 +989,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.36,
+     "rough": 0.5,
      "film": 0.8,
-     "key": 2.52,
+     "key": 1.08,
      "emit": 0.7,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1024,9 +1063,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.33,
+     "rough": 0.47,
      "film": 1.25,
-     "key": 2.66,
+     "key": 1.14,
      "emit": 0.8,
      "irid": 0.18,
      "filmIor": 2.0,
@@ -1098,9 +1137,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.3,
+     "rough": 0.44,
      "film": 0.9,
-     "key": 3.08,
+     "key": 1.32,
      "emit": 0.8,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1172,9 +1211,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.27,
+     "rough": 0.41,
      "film": 1.0,
-     "key": 3.64,
+     "key": 1.56,
      "emit": 1.1,
      "irid": 0.02,
      "filmIor": 1.6,
@@ -1246,9 +1285,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.34,
+     "rough": 0.48,
      "film": 0.8,
-     "key": 2.8,
+     "key": 1.2,
      "emit": 0.7,
      "irid": 0.0,
      "filmIor": 1.5,
@@ -1320,9 +1359,9 @@
      ]
     },
     "scalars": {
-     "rough": 0.26,
+     "rough": 0.4,
      "film": 0.95,
-     "key": 3.22,
+     "key": 1.38,
      "emit": 0.9,
      "irid": 0.45,
      "filmIor": 2.4,
@@ -1381,16 +1420,6 @@
     "target": "lights/key/color"
    },
    {
-    "role": "g1",
-    "target": "procedural/drapeAbove/material/baseColor",
-    "gain": 0.8
-   },
-   {
-    "role": "g2",
-    "target": "procedural/drapeBelow/material/baseColor",
-    "gain": 0.8
-   },
-   {
     "role": "fold",
     "target": "material/rsSilk/op/16/ramp/constant2",
     "gain": 0.175
@@ -1416,12 +1445,12 @@
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/25/ramp/constant",
+    "target": "material/rsSilk/op/30/ramp/constant",
     "gain": 0.5
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/25/ramp/constant2",
+    "target": "material/rsSilk/op/30/ramp/constant2",
     "gain": 0.375
    },
    {
@@ -1448,11 +1477,6 @@
     "mode": "multiply"
    },
    {
-    "role": "irid",
-    "target": "material/rsSilk/op/21/constant/constant",
-    "mode": "multiply"
-   },
-   {
     "role": "filmIor",
     "target": "procedural/silk/material/thinFilm/ior"
    },
@@ -1466,31 +1490,61 @@
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/25/ramp/constant",
+    "target": "material/rsSilk/op/30/ramp/constant",
     "mode": "multiply"
    },
    {
     "role": "emit",
-    "target": "material/rsSilk/op/25/ramp/constant2",
+    "target": "material/rsSilk/op/30/ramp/constant2",
     "mode": "multiply"
    },
    {
+    "role": "g0",
+    "target": "material/rsVeil/op/4/oklabRamp/constant",
+    "gain": 0.2
+   },
+   {
+    "role": "g1",
+    "target": "material/rsVeil/op/4/oklabRamp/constant2",
+    "gain": 0.2
+   },
+   {
+    "role": "g2",
+    "target": "material/rsVeil/op/4/oklabRamp/constant3",
+    "gain": 0.2
+   },
+   {
+    "role": "g3",
+    "target": "material/rsVeil/op/4/oklabRamp/constant4",
+    "gain": 0.2
+   },
+   {
+    "role": "resonant",
+    "target": "material/rsVeil/op/12/ramp/constant2",
+    "gain": 0.45
+   },
+   {
+    "role": "resonant",
+    "target": "material/rsVeil/op/12/ramp/constant3",
+    "gain": 0.9
+   },
+   {
     "role": "peak",
-    "target": "material/rsSilk/op/31/ramp/constant2",
+    "target": "material/rsSilk/op/36/ramp/constant2",
     "gain": 0.5
    },
    {
     "role": "peak",
-    "target": "material/rsSilk/op/31/ramp/constant3"
+    "target": "material/rsSilk/op/36/ramp/constant3"
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/37/ramp/constant2",
+    "target": "material/rsSilk/op/41/ramp/constant2",
     "gain": 0.5
    },
    {
     "role": "resonant",
-    "target": "material/rsSilk/op/37/ramp/constant3"
+    "target": "material/rsSilk/op/41/ramp/constant3"
    }
   ],
   "position": 0.0,

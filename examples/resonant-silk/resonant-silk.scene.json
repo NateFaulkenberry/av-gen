@@ -30,40 +30,14 @@
    0.01156
   ],
   "volumeMaxDistance": 0.0,
-  "volumeDensity": 0.0013,
+  "volumeDensity": 0.0007,
   "fogHeight": 400.0,
   "fogHeightFalloff": 0.0,
   "skyIntensity": 1.0,
   "shadowRange": 200.0,
+  "depthPrepass": true,
   "ambientOcclusion": false,
   "contactShadows": false,
-  "bands": {
-   "phase": 0.0,
-   "rotation": 0.0,
-   "gain": 0.6,
-   "softbox": {
-    "intensity": 0.5,
-    "azimuth": 2.6,
-    "elevation": 0.55,
-    "falloff": 2.2,
-    "skyFill": 0.04
-   },
-   "strips": [
-    {
-     "axis": [
-      0.2,
-      1.0,
-      0.1
-     ],
-     "offset": 0.35,
-     "width": 0.09,
-     "intensity": 1.0,
-     "segments": 0,
-     "warmth": 0.3,
-     "rate": 0.0
-    }
-   ]
-  },
   "sky": {
    "enabled": true,
    "zenithColor": [
@@ -96,28 +70,6 @@
   }
  },
  "nodes": [
-  {
-   "name": "gatherSeam",
-   "kind": "field",
-   "position": [
-    0.0,
-    4.0,
-    -170.0
-   ],
-   "field": {
-    "kind": "distance",
-    "point": [
-     0.0,
-     0.0,
-     0.0
-    ],
-    "radius": 9.0,
-    "strength": 1.0,
-    "falloff": {
-     "kind": "none"
-    }
-   }
-  },
   {
    "name": "resonator",
    "kind": "field",
@@ -368,6 +320,23 @@
    }
   },
   {
+   "name": "resGrid",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "grid",
+    "reference": "res-bake"
+   }
+  },
+  {
    "name": "wallRes",
    "kind": "field",
    "position": [
@@ -383,7 +352,7 @@
     "kind": "compound",
     "combine": "multiply",
     "children": [
-     "resonator",
+     "resGrid",
      "wallSide",
      "nearCalm"
     ]
@@ -427,7 +396,7 @@
     "kind": "compound",
     "combine": "multiply",
     "children": [
-     "resonator",
+     "resGrid",
      "sailSide"
     ]
    }
@@ -450,6 +419,54 @@
     "children": [
      "kickFront",
      "sailSide"
+    ]
+   }
+  },
+  {
+   "name": "flowWave",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 0.2777777777777778,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "wave",
+    "waveGeometry": "planar",
+    "waveShape": "sine",
+    "axis": [
+     0.4349728150485626,
+     -0.029998125175762936,
+     -0.8999437552728882
+    ],
+    "wavelength": 16.0,
+    "waveSpeed": 12.0,
+    "waveWidth": 0.0,
+    "amplitude": 1.0
+   }
+  },
+  {
+   "name": "wallLocal",
+   "kind": "field",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "field": {
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    },
+    "kind": "compound",
+    "combine": "add",
+    "children": [
+     "snareFront",
+     "flowWave"
     ]
    }
   },
@@ -477,6 +494,71 @@
    }
   },
   {
+   "name": "veil",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/rs-veil.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "program": "rsVeil",
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1,
+      1,
+      1
+     ],
+     "emissiveIntensity": 1.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true,
+     "doubleSided": true
+    },
+    "deformers": [
+     {
+      "kind": "displacement",
+      "amount": 10.0,
+      "scale": 0.004,
+      "speed": 0.015,
+      "space": "world"
+     },
+     {
+      "kind": "sine",
+      "amount": 34.0,
+      "space": "world",
+      "axis": [
+       -0.34893735911823864,
+       0.9371460502032696,
+       0.0
+      ],
+      "frequency": 0.041887902047863905,
+      "speed": -0.2513274122871834,
+      "displacementAxis": [
+       0.0,
+       -0.5070201265633938,
+       0.8619342151577695
+      ]
+     },
+     {
+      "kind": "field",
+      "field": "bassHistory",
+      "amount": 22.0,
+      "space": "world",
+      "alongNormal": true
+     }
+    ],
+    "normalStep": 8.0
+   }
+  },
+  {
    "name": "silk",
    "kind": "procedural",
    "procedural": {
@@ -501,7 +583,7 @@
      ],
      "emissiveIntensity": 0.0,
      "roughness": 0.28,
-     "metallic": 0.05,
+     "metallic": 0.0,
      "doubleSided": true,
      "thinFilm": {
       "thickness": 400.0,
@@ -601,7 +683,7 @@
      },
      {
       "kind": "field",
-      "field": "snareFront",
+      "field": "wallLocal",
       "amount": 0.9,
       "space": "world",
       "alongNormal": false,
@@ -612,97 +694,7 @@
       ]
      }
     ],
-    "normalStep": 0.15
-   }
-  },
-  {
-   "name": "drapeAbove",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "mesh",
-     "asset": "meshes/rs-drapeAbove.glb"
-    },
-    "distribution": {
-     "kind": "single"
-    },
-    "material": {
-     "baseColor": [
-      0.09391,
-      0.04765,
-      0.45655
-     ],
-     "emissiveColor": [
-      0,
-      0,
-      0
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.4,
-     "metallic": 0.0,
-     "doubleSided": true
-    },
-    "deformers": [
-     {
-      "kind": "noise",
-      "amount": 7.0,
-      "space": "world",
-      "scale": 0.009,
-      "speed": 0.06,
-      "seed": 11,
-      "axisMask": [
-       1.0,
-       1.0,
-       0.6
-      ]
-     }
-    ],
-    "normalStep": 0.15
-   }
-  },
-  {
-   "name": "drapeBelow",
-   "kind": "procedural",
-   "procedural": {
-    "source": {
-     "kind": "mesh",
-     "asset": "meshes/rs-drapeBelow.glb"
-    },
-    "distribution": {
-     "kind": "single"
-    },
-    "material": {
-     "baseColor": [
-      0.09391,
-      0.04765,
-      0.45655
-     ],
-     "emissiveColor": [
-      0,
-      0,
-      0
-     ],
-     "emissiveIntensity": 0.0,
-     "roughness": 0.4,
-     "metallic": 0.0,
-     "doubleSided": true
-    },
-    "deformers": [
-     {
-      "kind": "noise",
-      "amount": 7.0,
-      "space": "world",
-      "scale": 0.009,
-      "speed": 0.06,
-      "seed": 11,
-      "axisMask": [
-       1.0,
-       1.0,
-       0.6
-      ]
-     }
-    ],
-    "normalStep": 0.15
+    "normalStep": 1.6
    }
   }
  ],
@@ -740,7 +732,7 @@
     0.09531,
     0.9131
    ],
-   "intensity": 2.2,
+   "intensity": 1.32,
    "castsShadow": false,
    "contactShadow": false
   },
@@ -758,7 +750,7 @@
     0.09531,
     0.9131
    ],
-   "intensity": 45000.0,
+   "intensity": 27000.0,
    "range": 160.0,
    "castsShadow": false
   },
@@ -776,7 +768,7 @@
     0.7913,
     0.88792
    ],
-   "intensity": 30000.0,
+   "intensity": 18000.0,
    "range": 170.0,
    "castsShadow": false
   },
@@ -794,12 +786,178 @@
     0.6105,
     0.49693
    ],
-   "intensity": 1.1,
+   "intensity": 0.25,
    "castsShadow": false,
    "contactShadow": false
   }
  ],
  "materialPrograms": [
+  {
+   "name": "rsVeil",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 0,
+     "constant": [
+      0.62,
+      0.62,
+      0.48,
+      0.5
+     ],
+     "value": 0.0008741258741258741
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      1.6
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "oklabRamp",
+     "dst": 4,
+     "srcA": 1,
+     "constant": [
+      0.00857,
+      0.01229,
+      0.09084,
+      1.0
+     ],
+     "constant2": [
+      0.09391,
+      0.04765,
+      0.45655,
+      1.0
+     ],
+     "constant3": [
+      0.34855,
+      0.02891,
+      0.24958,
+      1.0
+     ],
+     "constant4": [
+      0.01227,
+      0.23739,
+      0.26638,
+      1.0
+     ],
+     "value": -1.0
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "normal"
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 2,
+     "constant": [
+      0.274808,
+      0.249825,
+      0.334766,
+      0.5
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 3
+    },
+    {
+     "kind": "input",
+     "dst": 5,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "gradient",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.03,
+      0.02,
+      -1.0,
+      -0.405
+     ],
+     "value": 0.0019230769230769232
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.85,
+      1.05,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "ramp",
+     "dst": 5,
+     "srcA": 5,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "constant2": [
+      0.08452,
+      0.04289,
+      0.41089,
+      0.5
+     ],
+     "constant3": [
+      0.16904,
+      0.08578,
+      0.82179,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 5
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    }
+   ],
+   "baseColor": 6,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 4,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
   {
    "name": "rsSilk",
    "ops": [
@@ -1031,55 +1189,38 @@
      "srcB": 6
     },
     {
-     "kind": "palette",
+     "kind": "input",
      "dst": 6,
-     "srcA": 4,
+     "input": "normal"
+    },
+    {
+     "kind": "gradient",
+     "dst": 6,
+     "srcA": 6,
      "constant": [
-      0.5,
-      0.38,
-      0.5,
+      0.029981,
+      0.019987,
+      0.999351,
       0.0
      ],
-     "constant2": [
-      0.5,
-      0.3,
-      0.5,
-      0.0
-     ],
-     "constant3": [
-      1.4,
-      1.4,
-      1.4,
-      0.0
-     ],
-     "constant4": [
-      0.0,
-      0.33,
-      0.67,
-      0.0
-     ]
+     "value": 1.0
     },
     {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 4
-    },
-    {
-     "kind": "multiply",
-     "dst": 6,
-     "srcA": 6,
-     "srcB": 4
-    },
-    {
-     "kind": "constant",
+     "kind": "input",
      "dst": 7,
+     "input": "viewDirection"
+    },
+    {
+     "kind": "gradient",
+     "dst": 7,
+     "srcA": 7,
      "constant": [
-      0.6,
-      0.6,
-      0.6,
-      1.0
-     ]
+      0.149903,
+      0.099935,
+      4.996753,
+      -4.0
+     ],
+     "value": 1.0
     },
     {
      "kind": "multiply",
@@ -1088,15 +1229,58 @@
      "srcB": 7
     },
     {
+     "kind": "power",
+     "dst": 6,
+     "srcA": 6,
+     "value": 2.5
+    },
+    {
+     "kind": "remap",
+     "dst": 7,
+     "srcA": 4,
+     "constant": [
+      0.0,
+      0.6,
+      6.0,
+      0.0
+     ],
+     "value": 1.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 7
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 5
+    },
+    {
      "kind": "add",
      "dst": 1,
      "srcA": 1,
      "srcB": 6
     },
     {
-     "kind": "field",
+     "kind": "remap",
      "dst": 6,
-     "field": "gatherSeam"
+     "srcA": 0,
+     "constant": [
+      0.613,
+      0.637,
+      -1.0,
+      1.0
+     ],
+     "value": 0.0
+    },
+    {
+     "kind": "multiply",
+     "dst": 6,
+     "srcA": 6,
+     "srcB": 6
     },
     {
      "kind": "ramp",
@@ -1179,20 +1363,16 @@
      ]
     },
     {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.5,
-      0.5,
-      0.5,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
+     "kind": "remap",
      "dst": 2,
      "srcA": 2,
-     "srcB": 3
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.5
+     ],
+     "value": 0.0
     },
     {
      "kind": "add",
@@ -1235,20 +1415,16 @@
      ]
     },
     {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.4,
-      0.4,
-      0.4,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
+     "kind": "remap",
      "dst": 2,
      "srcA": 2,
-     "srcB": 3
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.4
+     ],
+     "value": 0.0
     },
     {
      "kind": "add",
@@ -1263,6 +1439,30 @@
    "emission": 1,
    "emissionIntensity": 1.0,
    "opacity": -1
+  }
+ ],
+ "grids": [
+  {
+   "name": "res-bake",
+   "enabled": true,
+   "mode": "bake",
+   "wrap": "clamp",
+   "resolution": [
+    64,
+    48,
+    64
+   ],
+   "boundsMin": [
+    -121.7,
+    -68.3,
+    -207.3
+   ],
+   "boundsMax": [
+    124.1,
+    101.9,
+    34.1
+   ],
+   "injectField": "resonator"
   }
  ]
 }
