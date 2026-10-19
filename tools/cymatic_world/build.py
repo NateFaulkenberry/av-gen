@@ -491,7 +491,8 @@ BAKE_RES = int(os.environ.get("CW_BAKE_RES", "1024"))
 # a travelling SCAN of light on each kick, onset RIPPLES back in the geometry (riding the figure, low), and a BASS
 # WAVEFRONT: the bass of the last seconds laid out outward from the basin's heart, in the relief
 AMP_FROM_TINT = os.environ.get("CW_AMP_FROM_TINT", "1") == "1"
-AMP_GAIN = float(os.environ.get("CW_AMP_GAIN", "1.0"))         # tint^2 x this ~ the old excitation's scale
+AMP_FLOOR = float(os.environ.get("CW_AMP_FLOOR", "0.3"))
+AMP_GAIN = float(os.environ.get("CW_AMP_GAIN", "0.5"))         # tint^2 x this ~ the old excitation's scale
 SCAN = float(os.environ.get("CW_SCAN", "2.5"))                    # the scan's light gain (0 = off)
 SCAN_SPEED = float(os.environ.get("CW_SCAN_SPEED", "45"))       # m/s across the basin
 SCAN_WIDTH = float(os.environ.get("CW_SCAN_WIDTH", "4"))        # m, the band's half width
@@ -848,8 +849,15 @@ def palette_state(name, hexes):
         # saturated key on one flank of every ridge and a complementary grazing fill on the other, over dark floors.
         # Each palette now lights its ground with a pair from its own gradient: the counter light and the hollow glow
         # take the gradient's far end (g3's hue, at full chroma), the key stays the palette's spectral hue
-        _, c3, h3 = GRADIENTS[name][3]
-        warm = _hue(_oklch(0.72, max(c3, 0.012) * LIGHT_PAIR_CHROMA, h3))
+        # (gate 2 review: the gradient's far end is the palette's own family -- Molten read all orange, Crimson all red; the
+        # reference's beauty is a COMPLEMENTARY pair, cyan network against fuchsia cores. COUNTER names each palette's
+        # second hue: visibly different from its key, chosen to sit with its family)
+        if name in COUNTER:
+            hc, cc = COUNTER[name]
+        else:
+            _, c3, hc = GRADIENTS[name][3]
+            cc = max(c3, 0.012) * LIGHT_PAIR_CHROMA
+        warm = _hue(_oklch(0.72, cc, hc))
         colors["fill"] = [v * t.get("fill", 1.0) for v in warm]
         colors["hollow"] = [v * t.get("hollow", 1.0) for v in warm]
     # the environment (the overhaul, stage B): the sky's zenith deep in the palette's background hue, its horizon a
@@ -870,6 +878,19 @@ PAL_ALBEDO = float(os.environ.get("CW_PAL_ALBEDO", "0.28"))     # albedo = the b
 GRAD_ALBEDO = float(os.environ.get("CW_GRAD_ALBEDO", "1.0"))    # the chromatic field's stops, relative to it
 LIGHT_WHITE = float(os.environ.get("CW_LIGHT_WHITE", "0.2"))    # how far the key and ambient floor lean to white
 LIGHT_PAIR = os.environ.get("CW_LIGHT_PAIR", "1") == "1"           # art pass II: fill + glow from the gradient's end
+# each palette's counter hue (OKLCH hue degrees, chroma): the counter light on the far flanks and the glow on the inner
+# walls, against the key in the palette's spectral role -- the colour pass's cyan / fuchsia, in every palette's terms
+COUNTER = {
+    "Abyssal Resonance":      (348, 0.25),   # fuchsia against ice blue (the reference's pair)
+    "Crimson Singularity":    (285, 0.20),   # blue-violet against red
+    "Molten Glass":           (215, 0.15),   # cool blue-teal against orange
+    "Ultraviolet Bloom":      (195, 0.14),   # cyan against violet
+    "Oxidized Metal":         (180, 0.10),   # verdigris against copper
+    "Glacial Spectral":       (318, 0.12),   # pale magenta against ice
+    "Chlorophyll After Dark": (300, 0.16),   # violet against green
+    "Rose Quartz":            (240, 0.10),   # cool blue against rose
+    "Prismatic Oil":          (185, 0.12),   # teal against rose-gold
+}
 LIGHT_PAIR_CHROMA = float(os.environ.get("CW_LIGHT_PAIR_CHROMA", "1.6"))
 PAL_TRANSITION = float(os.environ.get("CW_PAL_TRANSITION", "6.0"))  # seconds of OKLab blend
 PAL_HOLD = float(os.environ.get("CW_PAL_HOLD", "24.0"))         # the least time a palette is held
@@ -899,11 +920,12 @@ RIDGE_SHIFT = float(os.environ.get("CW_RIDGE_SHIFT", "-0.25"))
 CREST_POWER = float(os.environ.get("CW_CREST_POWER", "4"))
 # where the hollow glow starts and saturates in the excitation (the overhaul's four families ring harder: 0.3..1.0 lit
 # every hollow)
-HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "1.6,3.2").split(",")]
+HOLLOW_RAMP = [float(v) for v in os.environ.get("CW_HOLLOW", "2.6,4.2").split(",")]
 TINT_GAIN = float(os.environ.get("CW_TINT_GAIN", "1.6"))   # F into the ramp about its middle: |F| ~ 0.55 -> an end
 BAND_RATE = float(os.environ.get("CW_BAND_RATE", "1.6"))   # the band's phase, metres a second per unit of the integral
 FLOOR_MIN = float(os.environ.get("CW_FLOOR_MIN", "0.06"))
 FLOOR_RANGE = [float(v) for v in os.environ.get("CW_FLOOR_RANGE", "0.25,0.85").split(",")]   # sand -> floor darkening
+FILL_POW = float(os.environ.get("CW_FILL_POW", "2.5"))   # (4 before gate 2: too narrow to show its hue)
 SHEEN_RIDGE = os.environ.get("CW_SHEEN_RIDGE", "1") == "1"
 WALL_BAND = [float(v) for v in os.environ.get("CW_WALL_BAND", "0.08,0.6").split(",")] if os.environ.get("CW_WALL_BAND", "0.08,0.6") else None
 KEY_DIR = (0.93, -0.2, -0.3)        # the direction the key travels: low, from the left-front quarter
@@ -981,7 +1003,9 @@ def ground_program():
         g.op("tintField", "field", 5, field="shade-tint-grid")
         if AMP_FROM_TINT:   # art pass II: the excitation is the large figure's |F|^2 (the colour field squared)
             g.op("ampFromTint", "multiply", 3, a=5, b=5)
-            g.op(None, "remap", 3, a=3, k=[0.0, 1.0, 0.0, AMP_GAIN])
+            # (+ AMP_FLOOR, gate 2 review: the crest lines keep a lit floor when the music drains -- quiet passages
+            # stay legible; the glow's threshold sits well above it)
+            g.op(None, "remap", 3, a=3, k=[0.0, 1.0, AMP_FLOOR, AMP_FLOOR + AMP_GAIN])
         else:
             g.op(None, "field", 3, field="shade-amp-grid")
         if PALETTE != "M":   # (the chromatic field reads F itself: its baked strength is the gain, its ramp is cyclic)
@@ -1101,7 +1125,7 @@ def ground_program():
     g.op(None, "multiply", 1, a=1, b=0 if (SHEEN_RIDGE and BAKE and PALETTE == "M") else 7)
     tint("sheen", 1, 1, "sheen", P_["sheenI"])                     # r1: sheen
     g.op("fillDot", "gradient", 3, a=6, k=_unit([-x for x in FILL_DIR]) + [0.0], f=1.0)
-    g.op(None, "power", 3, a=3, f=4.0)                             # the fill grazes: a narrow lobe on the far flanks
+    g.op(None, "power", 3, a=3, f=FILL_POW)                        # the fill grazes: a lobe on the far flanks
     tint("fill", 3, 3, "fill", P_["fillI"])
     g.op(None, "add", 5, a=5, b=3)                                 # + fill
     if not BAKE:
