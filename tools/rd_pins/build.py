@@ -67,11 +67,10 @@ KICK_AT = (0.0, 0.0, -2.0)     # the bowl's heart, where a kick lands and the ba
 SNARE_AT = (15.0, 0.0, -17.0)  # the snare's ring: off-centre, upper right of the frame
 
 # The waves (world space): (axis, wavelength m, speed m/s, phase). A is the broad swell (the bass level is its height),
-# B crosses it; RIPPLE is shorter and faster, and the pin program reproduces it exactly (the same sine of the same
+# B crosses it; the pin program reproduces A exactly (the same sine of the same
 # world position and clock) to move the contours and run beads of light along them.
 WAVE_A = ((0.8, 0.0, 0.6), 38.0, 4.2, 0.0)
 WAVE_B = ((-0.45, 0.0, 0.89), 27.0, 2.9, 1.3)
-RIPPLE = ((0.28, 0.0, -0.96), 9.5, 3.6, 0.4)
 GRAD_SCALE = 1.0 / 200.0       # the program's gradient op saturates: world dot axis * this + 0.5 stays inside 0..1
 
 # ================================================================================================ regimes
