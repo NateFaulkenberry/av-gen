@@ -45,6 +45,8 @@ ap.add_argument("--zamp", type=float, default=1.0)
 ap.add_argument("--turns", type=int, default=1)
 ap.add_argument("--chunks", type=int, default=24)
 ap.add_argument("--loop-seconds", type=float, default=600.0)
+ap.add_argument("--project", default=None, help="where to write the live project (default <out>/rainbow-world.json); "
+                "its scene path is written relative to it")
 a = ap.parse_args(rw.argv_after_dashes())
 OUT = os.path.abspath(a.out)
 ASSETS = os.path.abspath(a.assets) if a.assets else OUT
@@ -156,8 +158,8 @@ def hill_centre(h, face):
 FACE_HILLS = {"top": band.TOP_HILLS, "bottom": band.BOTTOM_HILLS}
 
 # ---- the ride: weaving over a meadow, and four times round the loop over a rim onto the other face and back ---------
-TR = 170.0                       # metres a rim crossing takes
-RIM_X, RIM_A, RIM_LIFT = 108.0, 62.0, 12.0
+TR = 110.0                       # metres a rim crossing takes
+RIM_X, RIM_A, RIM_LIFT = 108.0, 54.0, 14.0
 plan = []                        # (s0, s1, kind, side) with kind top|bottom|over (top->bottom) |back (bottom->top)
 quarter = L / 4
 for k in range(4):
@@ -356,7 +358,8 @@ for f, pts in fam.items():
 for k in range(0, len(outcrops), 60000):
     nodes.append(node_points("outcrops%d" % k, "rock_namaqualand_boulder_03.glb", outcrops[k:k + 60000],
                              {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
-                             lod={"cull": True, "minScreenRadius": 1.0}))
+                             lod={"cull": True, "minScreenRadius": 1.0, "count": 2, "byScreenSize": False,
+                                  "distance1": 90.0}))
 for k in range(0, len(fpts), 60000):
     nodes.append(node_points("flowers%02d" % (k // 60000), "flower_clump.glb", fpts[k:k + 60000],
                              {"program": "rw_flower", "roughness": 0.6, "metallic": 0.0, "doubleSided": True},
@@ -447,6 +450,10 @@ for k in range(16):  # banks on a ring round the knot
     c = Vector((centre[0] + 3800 * math.cos(aa), centre[1] + 3800 * math.sin(aa), centre[2] + rng.uniform(-300, 500)))
     cpts["bank"].append(point(c, Quaternion((0, 0, 1), rng.uniform(0, 6.28)),
                               (rng.uniform(2.0, 3.0), rng.uniform(1.4, 2.2), rng.uniform(1.4, 2.4))))
+# the floor of the cloud sea: one mesh of billows under the whole world (engine_assets.export_cloud_floor)
+nodes.append(node_points("cloud_floor", "cloud_floor.glb",
+                         [point(Vector((centre[0], centre[1], sea_z - 120.0)), Quaternion(), 1.0)],
+                         {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True}, castsShadow=False))
 for kind, pts in cpts.items():
     if pts:
         nodes.append(node_points("cloud_" + kind, "cloud_%s.glb" % kind, pts,
@@ -462,19 +469,108 @@ scene = {"format": "avgen-scene", "version": 1, "name": "rainbow-world",
 with open(os.path.join(OUT, "rainbow-world.scene.json"), "w") as f:
     json.dump(scene, f)
 params = look.post_parameters()
-params.update({"camera/splineUp": 1.0, "camera/lookAhead": 40.0, "post/lens/fisheye": 1.0, "post/lens/fisheyeModel": 0.0,
+params.update({"camera/splineUp": 1.0, "camera/lookAhead": 70.0, "post/lens/fisheye": 1.0, "post/lens/fisheyeModel": 0.0,
                "camera/far": 30000.0, "sources/ride/rate": 1.0 / a.loop_seconds})
+# ---- the live project: the ride, five looks (CC 9 selects, CC 10 locks), MIDI and audio --------------------------------
+def op_path(program, kind, nth=0):
+    """'material/<program>/op/<1-based index>/<kind>/' of the nth op of that kind in the program."""
+    prog = [pr for pr in programs if pr["name"] == program][0]
+    hits = [k for k, op in enumerate(prog["ops"]) if op["kind"] == kind]
+    return "material/%s/op/%d/%s/" % (program, hits[nth] + 1, kind)
+
+
+def H(h):
+    return R(rw.hexlin(h)[:3])
+
+
+# The looks (03-art-direction.md section 5): each a set of colours for the same roles. Bright Noon is the scene as
+# built (LOOK); the others are designed from the references (R3's golden hour, R1's lavender clouds, a storm-cleared
+# sky for the most vivid rainbows, and Prism -- R2's spectral land, restrained to the meadow's hues).
+L0 = LOOK
+STATES = [
+    ("Bright Noon", dict(zenith=R(L0["zenith"]), horizon=R(L0["horizon"]), ground=R(L0["ground"]), sun=R(L0["sunColor"]),
+                         bounce=R(rw.P["cloud_bounce"][:3]), haze=R(L0["atmosTint"]),
+                         cloud0=R(L0["cloud"][0]), cloud1=R(L0["cloud"][1]), cloud2=R(L0["cloud"][2]), cloud3=R(L0["cloud"][3]),
+                         meadow0=R(L0["meadow"][0]), meadow1=R(L0["meadow"][1]), meadow2=R(L0["meadow"][2]), meadow3=R(L0["meadow"][3]),
+                         shade=R(L0["shade"]))),
+    ("Golden Hour", dict(zenith=H("#1E3E9E"), horizon=H("#F0A464"), ground=H("#E8B08A"), sun=H("#FFB067"), bounce=H("#F09A70"),
+                         haze=H("#E8B48C"), cloud0=H("#6A4E8E"), cloud1=H("#C08A9C"), cloud2=H("#FFB07A"), cloud3=H("#FFD3A2"),
+                         meadow0=H("#2E5E22"), meadow1=H("#5E8E26"), meadow2=H("#9AB43A"), meadow3=H("#D4C24A"), shade=H("#2A4A5C"))),
+    ("After the Storm", dict(zenith=H("#0B2A8E"), horizon=H("#6FB6D8"), ground=H("#8E98B8"), sun=H("#FFF0D0"), bounce=H("#9FB0C8"),
+                             haze=H("#9FB8D8"), cloud0=H("#3A4068"), cloud1=H("#6E7698"), cloud2=H("#E6DED2"), cloud3=H("#F4EEE4"),
+                             meadow0=H("#1E5E2A"), meadow1=H("#3E8E2A"), meadow2=H("#62B03A"), meadow3=H("#8ED04A"), shade=H("#10485A"))),
+    ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#D8A8C8"), sun=H("#FFC0A0"), bounce=H("#D896B8"),
+                           haze=H("#B898D8"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
+                           meadow0=H("#24503E"), meadow1=H("#3E7A4A"), meadow2=H("#6E9E5A"), meadow3=H("#A6BE6A"), shade=H("#2A3A6A"))),
+    ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
+                   haze=H("#A8C8F0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
+                   meadow0=H("#1E7A6A"), meadow1=H("#3EA85A"), meadow2=H("#9AD040"), meadow3=H("#E8D040"), shade=H("#3A3AA0"))),
+]
+cloud_ramp = op_path("rw_cloud", "oklabRamp")
+bindings = [{"role": "zenith", "target": "env/sky/zenithColor"}, {"role": "horizon", "target": "env/sky/horizonColor"},
+            {"role": "ground", "target": "env/sky/groundColor"}, {"role": "horizon", "target": "scene/fogColor"},
+            {"role": "sun", "target": "lights/sun/color"}, {"role": "bounce", "target": "lights/cloudsea/color"},
+            {"role": "haze", "target": "post/look/atmosphericTint"}]
+g = LOOK["cloudGain"]
+for k, c in enumerate(("constant", "constant2", "constant3", "constant4")):
+    bindings.append({"role": "cloud%d" % k, "target": cloud_ramp + c, "gain": g})
+    for prog in ("rw_ground", "rw_grass"):
+        bindings.append({"role": "meadow%d" % k, "target": op_path(prog, "oklabRamp") + c})
+# the ground program's shade constant (the first `constant` op after the cavity input)
+bindings.append({"role": "shade", "target": op_path("rw_ground", "constant", 1) + "constant"})
+palette = {"states": [{"name": n, "colors": c, "scalars": {}} for n, c in STATES], "bindings": bindings,
+           "selector": {"select": 0, "transition": 8.0, "lock": False, "hold": 60.0,
+                        "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": [0, 1, 2, 3, 4],
+                                    "change": {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"],
+                                               "fast": 3.0, "slow": 24.0, "threshold": 0.06, "rearm": 0.03,
+                                               "primaryTimeout": 30.0, "maxHold": 120.0}}}}
+
+# MIDI (the house layout: CC 9 look, CC 10 lock) and the controls this world has
+CC = [(1, "glow"), (2, "lens"), (5, "haze"), (6, "light"), (7, "colour"), (9, "palette"), (10, "paletteLock")]
+control = {"midi": {"enabled": True, "filter": "*", "bindings": [
+    {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": sig} for n, sig in CC]}}
+ctl = {"attackMs": 150, "decayMs": 150}
+routes = [{"source": "lfo.ride", "target": "camera/splineT", "amount": 1.0, "op": "replace", "polarity": "unipolar"},
+          {"source": "control.palette", "target": "palette/select", "amount": 4.0, "op": "add", "polarity": "unipolar", "chain": ctl},
+          {"source": "control.paletteLock", "target": "palette/lock", "amount": 1.0, "op": "add", "polarity": "unipolar", "chain": ctl},
+          {"source": "control.lens", "target": "post/lens/fisheye", "amount": -1.0, "op": "add", "polarity": "unipolar", "chain": ctl},
+          {"source": "control.haze", "target": "post/look/atmospheric", "amount": 0.5, "op": "add", "polarity": "unipolar", "chain": ctl},
+          # every control rests at 0 = the world as built (no MIDI is the default state), and turns one way
+          {"source": "control.light", "target": "camera/exposure/compensation", "amount": 1.2, "op": "add", "polarity": "unipolar", "chain": ctl},
+          {"source": "control.colour", "target": "post/grade/saturation", "amount": 0.5, "op": "add", "polarity": "unipolar", "chain": ctl}]
+# audio: the rainbows breathe with the music, kicks send a pulse of light through them, the air glows with the level.
+# Bounded and smoothed; with no audio and no MIDI every amount is at rest and the world is as built.
+for rn in rainbow_nodes:
+    nm = rn["name"]
+    routes += [{"source": "response.sustain", "target": "nodes/%s/emissiveBoost" % nm, "amount": 0.6, "op": "add",
+                "polarity": "unipolar", "chain": {"attackMs": 600, "decayMs": 2500}},
+               {"source": "response.kick", "target": "nodes/%s/emissiveBoost" % nm, "amount": 0.8, "op": "add",
+                "polarity": "unipolar", "chain": {"attackMs": 15, "decayMs": 450}},
+               {"source": "control.glow", "target": "nodes/%s/emissiveBoost" % nm, "amount": 2.0, "op": "add",
+                "polarity": "unipolar", "chain": ctl}]
+routes += [{"source": "response.level", "target": "post/bloom/intensity", "amount": 0.12, "op": "add", "polarity": "unipolar",
+            "chain": {"attackMs": 300, "decayMs": 1500}},
+           {"source": "response.hat", "target": "post/grade/saturation", "amount": 0.06, "op": "add", "polarity": "unipolar",
+            "chain": {"attackMs": 20, "decayMs": 300}},
+           {"source": "response.bass", "target": "lights/cloudsea/intensity", "amount": 0.5, "op": "add", "polarity": "unipolar",
+            "chain": {"attackMs": 120, "decayMs": 900}}]
+proj_path = os.path.abspath(a.project) if a.project else os.path.join(OUT, "rainbow-world.json")
+scene_rel = os.path.relpath(os.path.join(OUT, "rainbow-world.scene.json"), os.path.dirname(proj_path))
 project = {
     "format": "avgen-project", "version": 4, "app": {"name": "Rainbow World"},
-    "assets": {"scene": {"kind": "composition", "path": "rainbow-world.scene.json"}},
-    "sonic": {"live": True},
+    "assets": {"scene": {"kind": "composition", "path": scene_rel}},
+    "sonic": {"live": True, "response": {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}},
+    "sonicScene": {"category": "world", "id": "rainbow-world", "title": "Rainbow World",
+                   "thesis": "A painterly meadow knotted through an all-round sky: the ride follows the land's own gravity "
+                             "round a twisting loop and over its rims, under rainbow arches, among sculpted clouds."},
     "parameters": params,
     "sources": [{"kind": "lfo", "name": "ride", "settings": {"shape": "saw"}}],
-    "routes": [{"source": "lfo.ride", "target": "camera/splineT", "amount": 1.0, "op": "replace",
-                "polarity": "unipolar"}],
+    "routes": routes,
+    "palette": palette,
+    "control": control,
     "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/rainbow-world.mp4"},
 }
-with open(os.path.join(OUT, "rainbow-world.json"), "w") as f:
+with open(proj_path, "w") as f:
     json.dump(project, f, indent=1)
 report = {"loopMetres": L, "cameraMetres": cam_path.length, "loopSeconds": a.loop_seconds,
           "grass": len(gpts), "flowers": len(fpts), "trees": len(tpts), "rimRocks": sum(len(v) for v in by.values()),

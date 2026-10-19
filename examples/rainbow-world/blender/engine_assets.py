@@ -175,7 +175,7 @@ def export_tree(out):
     # the canopy core: the pads' union shrunk to 80%, opaque and dark -- it fills the see-through holes between
     # cards from inside and is the canopy's shadow caster
     core = metaball_mesh("great_tree_core", [(Vector(c), 1.0, (r[0] * 0.8, r[1] * 0.8, r[2] * 0.72)) for c, r, _ in trees.MASSES], 0.8)
-    decimate_to(core, 4000)
+    decimate_to(core, 1500)
     core.data.materials.append(plain_material("canopy_core", rw.P["canopy_core"], 0.9))
     rw.export_glb([core], os.path.join(out, "great_tree_core.glb"))
 
@@ -210,6 +210,50 @@ def export_clouds(out):
         rw.export_glb([m], os.path.join(out, "cloud_%s.glb" % kind))
         dims = m.dimensions
         print("CLOUD", kind, len(m.data.polygons), [round(d) for d in dims])
+
+
+def export_cloud_floor(out, radius=14000.0, n=220, seed=12):
+    """The cloud sea as one continuous floor of billows under the whole world, so 'down' is never a flat colour:
+    a disc of lumps (smooth union of a few hundred domes, 150-600 m across), flattening toward the rim, where it
+    meets the sky's ground colour in the haze."""
+    import random as _r
+    rng = _r.Random(seed)
+    lumps = [(rng.uniform(-radius, radius), rng.uniform(-radius, radius), rng.uniform(150, 600), rng.uniform(40, 220))
+             for _ in range(900)]
+    lumps = [l for l in lumps if math.hypot(l[0], l[1]) < radius]
+    L_ = np.array(lumps)
+    xs = np.linspace(-radius, radius, n)
+    X, Y = np.meshgrid(xs, xs)
+    Z = np.zeros_like(X)
+    k = 60.0
+    acc = np.zeros_like(X)
+    for lx, ly, lr, lh in L_:
+        d2 = ((X - lx) ** 2 + (Y - ly) ** 2) / (lr * lr)
+        dome = lh * np.sqrt(np.clip(1.0 - d2, 0.0, None))
+        acc += np.exp(dome / k)
+    Z = k * np.log(acc)              # smooth max of the domes
+    Z -= Z.min()
+    r = np.hypot(X, Y) / radius
+    Z *= np.clip(1.0 - r, 0.0, 1.0) ** 0.5   # flatten toward the rim
+    rw.reset()
+    me = bpy.data.meshes.new("cloud_floor")
+    verts = [(float(X[i, j]), float(Y[i, j]), float(Z[i, j])) for i in range(n) for j in range(n)]
+    faces = []
+    for i in range(n - 1):
+        for j in range(n - 1):
+            if r[i, j] > 1.0 and r[i + 1, j + 1] > 1.0:
+                continue
+            a_ = i * n + j
+            faces.append((a_, a_ + 1, a_ + n + 1, a_ + n))
+    me.from_pydata(verts, [], faces)
+    me.update()
+    for poly in me.polygons:
+        poly.use_smooth = True
+    ob = bpy.data.objects.new("cloud_floor", me)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.data.materials.append(plain_material("cloud", (1.0, 1.0, 1.0), 1.0))
+    rw.export_glb([ob], os.path.join(out, "cloud_floor.glb"))
+    print("CLOUD FLOOR", len(faces))
 
 
 def spectral(t):
@@ -318,7 +362,8 @@ def main():
     steps = [("band", lambda: export_band(out)), ("rocks", lambda: export_rim_rocks(out, s2)),
              ("grass", lambda: export_grass(out)), ("flowers", lambda: export_flowers(out)),
              ("tree", lambda: export_tree(out)),
-             ("clouds", lambda: export_clouds(out)), ("rainbow", lambda: export_rainbow(out))]
+             ("clouds", lambda: export_clouds(out)), ("floor", lambda: export_cloud_floor(out)),
+             ("rainbow", lambda: export_rainbow(out))]
     for name, fn in steps:
         if only is None or name in only:
             fn()

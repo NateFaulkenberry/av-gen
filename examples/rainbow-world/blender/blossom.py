@@ -37,7 +37,7 @@ def main():
     trees.export_engine(wood, leaves, os.path.join(out, "blossom.glb"))
     import engine_assets  # noqa: E402  (the core helper)
     core = engine_assets.metaball_mesh("blossom_core", [(Vector(c), 1.0, (r[0] * 0.78, r[1] * 0.78, r[2] * 0.74)) for c, r, _ in PUFFS], 0.8)
-    engine_assets.decimate_to(core, 3000)
+    engine_assets.decimate_to(core, 1500)
     rw.export_glb([core], os.path.join(out, "blossom_core.glb"))
     sun = Vector((0.55, -0.6, 0.58)).normalized()
     rw.sky_world(sc, sun, strength=0.95)

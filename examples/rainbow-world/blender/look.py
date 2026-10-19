@@ -13,11 +13,11 @@ import rw_common as rw
 LOOK = {
     "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.42, "atmosDist": 3200.0, "atmosTint": rw.hexlin("#8FB4E8")[:3],
     "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.2,
-    "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#D4E6F4")[:3],
+    "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#B4B2DC")[:3],
     "meadow": [rw.hexlin("#2A6E2E")[:3], rw.hexlin("#4E9A2C")[:3], rw.hexlin("#6FB038")[:3], rw.hexlin("#9AC23A")[:3]],
     "shade": rw.hexlin("#155A5C")[:3],
-    "cloud": [rw.hexlin("#4C52AE")[:3], rw.hexlin("#8A8DD4")[:3], rw.hexlin("#F6C597")[:3], rw.hexlin("#FADBB6")[:3]],
-    "cloudBounce": rw.hexlin("#E9AE96")[:3], "cloudGain": 0.86,
+    "cloud": [rw.hexlin("#6A5A9E")[:3], rw.hexlin("#A888BC")[:3], rw.hexlin("#FFC28C")[:3], rw.hexlin("#FFDFB8")[:3]],
+    "cloudBounce": rw.hexlin("#F0A88C")[:3], "cloudGain": 0.92,
     "rainbowStrength": 2.0,
 }
 
@@ -171,7 +171,7 @@ def cloud_program():
                 {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.3, 0.7, -0.18, 0.18], "value": 1.0},
                 {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
                 {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 0.0, 1.0], "value": 1.0},
-                {"kind": "power", "dst": 1, "srcA": 1, "value": 1.4},
+                {"kind": "power", "dst": 1, "srcA": 1, "value": 0.85},
                 {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "constant": R([v * g for v in c[0]]) + [1.0],
                  "constant2": R([v * g for v in c[1]]) + [1.0], "constant3": R([v * g for v in c[2]]) + [1.0],
                  "constant4": R([v * g for v in c[3]]) + [1.0]},
@@ -250,7 +250,7 @@ def rim_ranges(band):
 
 def environment(sun_avgen, bounce_dir_avgen):
     return {
-        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 320.0, "ambientOcclusion": True,
+        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 240.0, "ambientOcclusion": True,
         "contactShadows": False, "depthPrepass": True, "fogColor": R(LOOK["horizon"]), "volumeDensity": 0.0,
         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": R(LOOK["zenith"]),
                 "horizonColor": R(LOOK["horizon"]), "groundColor": R(LOOK["ground"]), "haze": LOOK["haze"],

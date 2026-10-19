@@ -290,6 +290,13 @@ def export_engine(wood, leaves, path):
     for o in (w2, l2):
         bpy.context.scene.collection.objects.link(o)
         o.data.materials.clear()
+    # the wood at ~2,500 triangles: hundreds of trees draw it into three shadow cascades (Stage 4 profile)
+    ntri = sum(len(pp.vertices) - 2 for pp in w2.data.polygons)
+    if ntri > 2500:
+        dm = w2.modifiers.new("dec", "DECIMATE")
+        dm.ratio = 2500.0 / ntri
+        bpy.context.view_layer.objects.active = w2
+        bpy.ops.object.modifier_apply(modifier="dec")
     mb = bpy.data.materials.new("great_tree_bark")
     mb.use_nodes = True
     mb.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = rw.P["bark"]

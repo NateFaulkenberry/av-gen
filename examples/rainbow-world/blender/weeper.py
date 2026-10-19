@@ -186,6 +186,9 @@ def main():
     if "leaf_cluster" not in bpy.data.images:
         bpy.data.images["willow_cluster"].name = "leaf_cluster"
     trees.export_engine(wood, leaves, os.path.join(out, "weeper.glb"))
+    import engine_assets  # noqa: E402
+    bpy.ops.object.select_all(action="DESELECT")
+    engine_assets.decimate_to(core, 1500)
     rw.export_glb([core], os.path.join(out, "weeper_core.glb"))
     sun = Vector((0.55, -0.6, 0.58)).normalized()
     rw.sky_world(sc, sun, strength=0.95)
