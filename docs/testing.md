@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Forty-two ways a green suite has lied
+## Forty-three ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32, 34).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 33, 36, 37, 41, 42; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 33, 36, 37, 41, 42, 43; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -1236,6 +1236,21 @@ a wound.
    ADR-941 is the same lesson from the other side. A test helper returned a record pointing into its
    own dead frame, and **Release passed on whatever the frame still held.** Only UBSan's bool check
    noticed, and only because the byte happened to be 240.
+
+43. **A moderate test signal hid a saturated one, and downstream tuning hid it again.** For two and
+   a half weeks `response.bass`, `level`, `levelSlow` and `intensity` read 1 on 80-98% of the frames of every
+   commercial track (ADR-1510). ADR-1062's fixed window ended at -12 dBFS; mastered music sits between
+   -15 and -4. The response tests passed, because their fixture was a synthetic drum kit at a moderate
+   level, which sits inside the window. And nothing downstream disagreed, because about forty scenes were
+   tuned by eye against the pinned values: a route depth that only works against 1.0 looks like a good
+   route depth. Two habits:
+   - **A level-dependent signal is tested on a signal shaped like the real input**, loud-mastered (about
+     -8 dBFS RMS, limited) with a breakdown and a drop, and again 24 dB down
+     (`tests/support/mastered_song.hpp`, `tests/unit/test_response_range.cpp`). Assert the
+     *distribution* (p10, p90, the share near the top, quiet sections against loud ones), not a mean.
+   - **Before handing back audio-reactivity work, run `python3 tools/check_response_range.py`** (and
+     `--gain -24`). It traces the three real test tracks and exits 1 when a response level misses its
+     range target. It skips cleanly where the tracks are absent, so it is a local check, not CI's.
 
 ## The scratchpad is shared by every agent in a session
 
