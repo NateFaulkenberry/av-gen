@@ -336,3 +336,93 @@ TEST_CASE("A scalar plane carries dye downstream on the GPU", "[simulation][gpu]
     CHECK(at(-70.0f, 0.0f) < 0.01f);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1502: a grid that reads a bake grid (here a reaction-diffusion plane whose regime is a travelling wave baked once
+// a frame, as RD Pins's) replays a seek exactly as it played: every sub-step re-bakes what it reads at its own clock,
+// so a fresh start at t (one catch-up of every sub-step) and a play to t at 30 fps leave identical cells. Before it,
+// the catch-up read the table's previous contents (zeros on a cold start) for every replayed step.
+TEST_CASE("A grid reading a bake grid replays a seek exactly as it played", "[simulation][gpu][rd][adr1502]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+
+    scene::Scene scene;
+    spatial::FieldSpec wave; // the regime moves: a planar sine travelling across the plane
+    wave.name = "regimeWave";
+    wave.kind = spatial::FieldKind::Wave;
+    wave.waveGeometry = spatial::WaveGeometry::Planar;
+    wave.axis = {1.0f, 0.0f, 0.4f};
+    wave.wavelength = 40.0f;
+    wave.waveSpeed = 9.0f;
+    wave.waveWidth = 0.0f;
+    wave.amplitude = 0.5f;
+    wave.falloff.kind = spatial::FalloffKind::None;
+    scene.fields.fields.push_back(wave);
+    spatial::FieldSpec map;
+    map.name = "regimeMap";
+    map.kind = spatial::FieldKind::Grid;
+    map.reference = "regimeBake";
+    map.falloff.kind = spatial::FalloffKind::None;
+    scene.fields.fields.push_back(map);
+    spatial::FieldSpec seedField;
+    seedField.name = "seed";
+    seedField.kind = spatial::FieldKind::Sphere;
+    seedField.position = {32.0f, 0.0f, 32.0f};
+    seedField.radius = 8.0f;
+    seedField.softness = 0.5f;
+    scene.fields.fields.push_back(seedField);
+
+    spatial::GridField bake;
+    bake.name = "regimeBake";
+    bake.mode = spatial::GridMode::Bake;
+    bake.wrap = spatial::GridWrap::Wrap;
+    bake.resolution = {32, 1, 32};
+    bake.boundsMin = {0.0f, -1.0f, 0.0f};
+    bake.boundsMax = {64.0f, 1.0f, 64.0f};
+    bake.injectField = "regimeWave";
+    bake.simRate = 60.0f;
+    bake.maxSubSteps = 1;
+    REQUIRE(bake.validate().has_value());
+    scene.fields.grids.push_back(bake);
+    spatial::GridField grid;
+    grid.name = "rd";
+    grid.mode = spatial::GridMode::ReactionDiffusion;
+    grid.wrap = spatial::GridWrap::Wrap;
+    grid.resolution = {64, 1, 64};
+    grid.boundsMin = {0.0f, -1.0f, 0.0f};
+    grid.boundsMax = {64.0f, 1.0f, 64.0f};
+    grid.diffusionA = 0.3f;
+    grid.diffusionB = 0.15f;
+    grid.feed = 0.055f;
+    grid.kill = 0.062f;
+    grid.feedB = 0.030f;
+    grid.killB = 0.062f;
+    grid.regimeField = "regimeMap";
+    grid.injectField = "seed";
+    grid.injectRate = 3.0f;
+    grid.simRate = 60.0f;
+    grid.speed = 60.0f * 12.0f;
+    grid.iterations = 12;
+    grid.maxSubSteps = 8;
+    REQUIRE(grid.validate().has_value());
+    scene.fields.grids.push_back(grid);
+
+    constexpr int kFrames = 150; // 5 s at 30 fps: 300 sub-steps
+    SimHarness play(*ctx, shaders);
+    for (int f = 1; f <= kFrames; ++f) {
+        play.frame(scene, static_cast<double>(f) / 30.0, static_cast<std::uint64_t>(f));
+    }
+    const std::vector<float> played = play.read(scene.fields, 1);
+    SimHarness seek(*ctx, shaders);
+    seek.frame(scene, static_cast<double>(kFrames) / 30.0, 0);
+    const std::vector<float> sought = seek.read(scene.fields, 1);
+    INFO("max |seek - play| = " << maxAbsDifference(sought, played));
+    CHECK(maxAbsDifference(sought, played) == 0.0);
+
+    // ... and the regime is read at all (a frozen regime grows a different pattern)
+    scene::Scene frozen = scene;
+    frozen.fields.fields[0].waveSpeed = 0.0f;
+    SimHarness still(*ctx, shaders);
+    still.frame(frozen, static_cast<double>(kFrames) / 30.0, 0);
+    CHECK(maxAbsDifference(still.read(frozen.fields, 1), played) > 1e-2);
+    CHECK(ctx->errorCount() == 0);
+}
