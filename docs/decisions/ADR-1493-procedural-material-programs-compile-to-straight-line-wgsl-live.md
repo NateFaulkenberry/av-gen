@@ -85,6 +85,38 @@ The structure of a program is fixed for the length of a scene. Only its constant
    ever rebuilds a variant: a unit test changes each one and checks the key, and the GPU test moves a constant on a
    compiled program and checks that no compile starts.
 
+## The switch-in period, measured
+
+A live scene opens on the interpreter until its variant is built. This was measured live (projection, Feline from
+60 s, scripted MIDI, Auto, 30 fps target, `--live-profile --no-prewarm`, which does not wait for the variant).
+
+**Cold**, meaning a variant this machine has never compiled: the perf build adds a switch case no slot reaches, so the
+generated MSL misses every cache. The build takes 13.9 s on Dawn's workers for each of the three scenes. The
+controller descends on the interpreter's misses in that window (Cymatic World and Silk to Low or Emergency).
+
+The first table is the level when the variant lands and what follows. The second is where the 100 s were spent.
+
+| Scene | Variant at | With `forgetBackoff` | Without it |
+|---|---|---|---|
+| Cymatic World | 13.8 s | Medium 17.8 s, High 22.8 s, **Ultra 27.7 s**, held | Medium; High only at 78.8 s |
+| Resonant Silk | 13.9 s | Low 18.7 s, Medium 23.7 s; a High probe fails at 28.6 s, back at Medium by 38.8 s | Emergency until Low at 31.7 s, then Emergency again at 37.3 s |
+| Waveform Dimension | 21.8 s (its two programs) | High 25.8 s, **Ultra 30.7 s** | High 29.4 s, Ultra only at 94.3 s |
+
+| Scene | With | Without |
+|---|---|---|
+| Cymatic World | U75 L13 H6 M6 | M67 H24 L9 U1 |
+| Resonant Silk | M64 L24 E9 | E86 L11 |
+| Waveform Dimension | U71 M23 H6 | H67 M26 U7 |
+
+**Warm**, meaning the structure was compiled before on this machine, in any process: the variant arrives in 0.16-0.7 s
+from Metal's cache. On a second launch Cymatic World was compiled at 0.7 s and at Ultra by 10.4 s. Within a session,
+a scene revisited reuses its variant from the first frame.
+
+So the window costs a first-ever compile of about 14 s of the interpreter's picture cost, plus the ordinary climb of
+about 5 s a level. It recurs only after a program's structure changes: an art edit, or a build that changes the
+generated code. Starting the build at project load was considered and not chosen, because the build already starts
+on the scene's first frame.
+
 ## Consequences
 
 - **The picture.**
