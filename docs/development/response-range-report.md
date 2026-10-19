@@ -192,7 +192,9 @@ the engine change, and retuned for the four retuned scenes.
 
 Tests changed with them: `test_live_response.cpp` "Sensitivity drives the arc" now asks keen >= neutral (a steady
 groove reads as a mix's body, which is full presence), and the quiet take reads as the loud one (within 25%) where
-ADR-1361 had it read quieter.
+ADR-1361 had it read quieter. "Sonic Live: the garden's loudness and strikes are the Response's" now asks that
+Sensitivity 0 turns the garden's loudness off and that the waiting world holds on a silent input (it held at
+Sensitivity 0 before; silence is now the music's, not the slider's).
 
 **Not edited (another agent is rebuilding them), for that agent:** Phase Hall (`experiments/phase-wall`) routes
 sustain -> `grid/net/coupling` x3, bass -> `grid/net/frequency` x0.25, intensity -> `grid/net/phaseLag` x0.35 and
@@ -219,3 +221,19 @@ difference is modest; these scenes' level routes are a small share of their moti
   Sensitivity or Sustain. The Live Scene Guide needs the same note (the coordinator's, after the merge).
 - Scenes were checked on stills and four clips, not watched end to end; tuning judgement beyond "obviously wrong"
   (dead or blown out) is left to the art passes.
+
+## 7. Final checks
+
+After `cmake --preset release --fresh`, a clean full build (exit 0) and every commit above:
+
+| check | exit | counts |
+|---|---|---|
+| `tools/ci/run-suite.sh cpu-assets` (under tools/gpu-lock.sh) | 0 | 4333 passed, 0 failed, 19 skipped, 1 expected failure (the shouldfail case), 4353 / 4353 ran |
+| `tools/ci/run-suite.sh gpu` | 0 | 675 passed, 0 failed, 1 skipped, 676 / 676 ran |
+| `python3 tools/review_examples.py --out build/resp/review` | 0 | 108 ok, 1 "not generated" (Biovalley - Macro: its generated scene is absent from this worktree, not a render failure) |
+| `python3 tools/check_project_integrity.py` | 0 | 0 problems |
+| `python3 tools/check_response_range.py` (0 / -12 / -24 dB) | 0 / 0 / 0 | every level within its targets; main: exit 1 |
+
+The first cpu-assets run failed one case ("Sonic Live: the garden's loudness and strikes are the Response's": the
+waiting world no longer holds at Sensitivity 0, by the silence change in section 5); the test was updated to the new
+meaning and the suite rerun in full.
