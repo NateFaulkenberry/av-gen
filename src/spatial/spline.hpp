@@ -51,6 +51,10 @@ struct Spline {
     SplineKind kind = SplineKind::CatmullRom;
     bool closed = false;
     float tension = 0.5f;                // Catmull-Rom (0.5 = centripetal-like uniform)
+    // ADR-1542: whole turns the per-point roll winds round a CLOSED spline. The seam segment (last point back to the
+    // first) interpolates its roll toward the first point's roll + 2 pi * rollTurns, so a frame can twist a whole
+    // number of turns about the curve and still close without spinning back in one segment. 0 = as before.
+    int rollTurns = 0;
     std::vector<SplinePoint> points;     // explicit control points (generator Points)
     // Generator (when != Points the control points are produced by `generate()`):
     SplineGenerator generator = SplineGenerator::Points;
