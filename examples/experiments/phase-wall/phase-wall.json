@@ -116,28 +116,23 @@
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.28,
-  "post/bloom/threshold": 1.0,
+  "post/bloom/intensity": 0.34,
+  "post/bloom/threshold": 0.8,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
-  "post/output/vignette": 0.3,
+  "post/output/vignette": 0.2,
   "post/output/grain": 0.01,
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
-  "camera/lens/focalLength": 24.0,
+  "camera/lens/focalLength": 20.0,
   "scene/volumeSteps": 24,
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "post/grade/contrast": 1.08,
-  "post/look/atmospheric": 0.12,
-  "post/look/atmosphericDistance": 140.0,
-  "post/look/atmosphericTint": [
-   0.00364,
-   0.01302,
-   0.015
-  ]
+  "post/bloom/knee": 0.5,
+  "post/bloom/radius": 0.95,
+  "post/grade/contrast": 1.06
  },
  "sources": [
   {
@@ -165,7 +160,7 @@
   {
    "source": "response.sustain",
    "target": "grid/net/coupling",
-   "amount": 3.0,
+   "amount": 4.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -177,7 +172,7 @@
   {
    "source": "response.bass",
    "target": "grid/net/frequency",
-   "amount": 0.25,
+   "amount": 0.375,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -201,7 +196,7 @@
   {
    "source": "response.intensity",
    "target": "grid/net/phaseLag",
-   "amount": 0.35,
+   "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -213,12 +208,66 @@
   {
    "source": "response.level",
    "target": "scene/bands/rotation",
-   "amount": 0.15,
+   "amount": 0.22,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
    "chain": {
     "integrate": true
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "material/bladeSphere/op/30/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 0.75,
+    "offset": 0.75,
+    "attackMs": 200,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "material/bladeSphere/op/30/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 1.5,
+    "offset": 0.45,
+    "attackMs": 600,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "material/bladeSphere/op/40/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 3.0,
+    "offset": 0.04,
+    "attackMs": 8,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/breath/strength",
+   "amount": 4.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 2500,
+    "decayMs": 5000
    }
   },
   {
@@ -272,7 +321,85 @@
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/bladeSphere/op/30/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.swell",
+   "target": "field/swell/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.swell",
+   "target": "field/breath/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.impact",
+   "target": "field/kickPush/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.impact",
+   "target": "grid/net/injectRate",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.shimmer",
+   "target": "material/bladeSphere/op/40/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
     "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
@@ -281,7 +408,7 @@
   {
    "source": "control.palette",
    "target": "palette/select",
-   "amount": 7.0,
+   "amount": 5.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -309,58 +436,6 @@
    "chain": {
     "attackMs": 80,
     "decayMs": 2500
-   }
-  },
-  {
-   "source": "control.light",
-   "target": "procedural/back_west/material/emissive",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.5,
-    "offset": 1.0,
-    "attackMs": 150,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "control.light",
-   "target": "procedural/back_north/material/emissive",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.5,
-    "offset": 1.0,
-    "attackMs": 150,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "control.light",
-   "target": "procedural/back_east/material/emissive",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.5,
-    "offset": 1.0,
-    "attackMs": 150,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "control.light",
-   "target": "procedural/back_south/material/emissive",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.5,
-    "offset": 1.0,
-    "attackMs": 150,
-    "decayMs": 150
    }
   }
  ],
@@ -436,371 +511,91 @@
     ]
    },
    {
-    "target": "material/blade_west/op/29/constant/constant",
-    "component": -1,
-    "enabled": true,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 96.0,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 10.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 18.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 86.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 96.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "material/blade_north/op/29/constant/constant",
-    "component": -1,
-    "enabled": true,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 96.0,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 10.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 18.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 86.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 96.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "material/blade_east/op/29/constant/constant",
-    "component": -1,
-    "enabled": true,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 96.0,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 10.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 18.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 86.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 96.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
-    "target": "material/blade_south/op/29/constant/constant",
-    "component": -1,
-    "enabled": true,
-    "timeBase": "seconds",
-    "mode": "replace",
-    "loopLength": 96.0,
-    "keys": [
-     {
-      "time": 0.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 10.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 18.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 78.0,
-      "value": [
-       1.0,
-       1.0,
-       1.0,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 86.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 96.0,
-      "value": [
-       0.12,
-       0.12,
-       0.12,
-       1.0
-      ],
-      "interp": "smooth"
-     }
-    ]
-   },
-   {
     "target": "camera/position",
     "component": -1,
     "enabled": true,
     "timeBase": "seconds",
     "mode": "replace",
-    "loopLength": 120.0,
+    "loopLength": 90.0,
     "keys": [
      {
       "time": 0.0,
       "value": [
-       -15.0,
-       6.0,
-       42.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 15.0,
-      "value": [
-       -8.0,
        8.0,
-       22.0
+       -18.0,
+       50.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 30.0,
+      "time": 11.25,
       "value": [
-       4.0,
-       10.0,
-       -4.0
+       11.5355,
+       -16.0,
+       51.1716
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.5,
+      "value": [
+       13.0,
+       -18.0,
+       54.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       11.5355,
+       -20.0,
+       56.8284
       ],
       "interp": "smooth"
      },
      {
       "time": 45.0,
       "value": [
-       12.0,
-       6.0,
-       -30.0
+       8.0,
+       -18.0,
+       58.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 60.0,
+      "time": 56.25,
       "value": [
-       6.0,
-       4.0,
-       -46.0
+       4.4645,
+       -16.0,
+       56.8284
       ],
       "interp": "smooth"
      },
      {
-      "time": 75.0,
+      "time": 67.5,
       "value": [
-       -12.0,
-       9.0,
-       -36.0
+       3.0,
+       -18.0,
+       54.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       4.4645,
+       -20.0,
+       51.1716
       ],
       "interp": "smooth"
      },
      {
       "time": 90.0,
       "value": [
-       -6.0,
-       12.0,
-       -6.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 105.0,
-      "value": [
        8.0,
-       7.0,
-       24.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 120.0,
-      "value": [
-       -15.0,
-       6.0,
-       42.0
+       -18.0,
+       50.0
       ],
       "interp": "smooth"
      }
@@ -812,86 +607,86 @@
     "enabled": true,
     "timeBase": "seconds",
     "mode": "replace",
-    "loopLength": 120.0,
+    "loopLength": 90.0,
     "keys": [
      {
       "time": 0.0,
       "value": [
-       24.0,
-       13.0,
-       4.0
+       73.3879,
+       24.5244,
+       -140.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 15.0,
+      "time": 11.25,
       "value": [
-       24.0,
-       14.0,
-       0.0
+       75.8972,
+       23.6209,
+       -140.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 30.0,
+      "time": 22.5,
       "value": [
-       24.0,
-       16.0,
-       -34.0
+       74.952,
+       19.4756,
+       -140.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.75,
+      "value": [
+       71.106,
+       20.3791,
+       -140.0
       ],
       "interp": "smooth"
      },
      {
       "time": 45.0,
       "value": [
-       -24.0,
-       18.0,
-       -56.0
+       66.6121,
+       24.5244,
+       -140.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 60.0,
+      "time": 56.25,
       "value": [
-       -10.0,
-       14.0,
-       -64.0
+       64.1028,
+       23.6209,
+       -140.0
       ],
       "interp": "smooth"
      },
      {
-      "time": 75.0,
+      "time": 67.5,
       "value": [
-       -24.0,
-       15.0,
-       -8.0
+       65.048,
+       19.4756,
+       -140.0
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 78.75,
+      "value": [
+       68.894,
+       20.3791,
+       -140.0
       ],
       "interp": "smooth"
      },
      {
       "time": 90.0,
       "value": [
-       -24.0,
-       17.0,
-       30.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 105.0,
-      "value": [
-       -20.0,
-       12.0,
-       56.0
-      ],
-      "interp": "smooth"
-     },
-     {
-      "time": 120.0,
-      "value": [
-       24.0,
-       13.0,
-       4.0
+       73.3879,
+       24.5244,
+       -140.0
       ],
       "interp": "smooth"
      }
@@ -909,456 +704,344 @@
  "sonicScene": {
   "category": "experiment",
   "experiment": "A coupled oscillators",
-  "thesis": "A hall whose four walls are one kinetic installation: eight thousand metal blades, each swung by its own oscillator, falling into step and breaking apart round the room.",
+  "thesis": "An immense membrane of luminous vertical blades round the inside of a sphere: about eighteen thousand blades, each swung by its own oscillator, falling into step and breaking apart round the viewer, the music travelling through the surface as rings, swells and streaks of light.",
   "id": "phase-wall",
   "title": "Phase Hall"
  },
  "palette": {
   "states": [
    {
-    "name": "Bronze Tide",
+    "name": "Polar Glass",
     "colors": {
      "environment": [
-      0.00182,
-      0.00651,
-      0.0075
+      0.0003,
+      0.00091,
+      0.00335
      ],
      "back": [
-      0.00478,
-      0.09084,
-      0.11697
-     ],
-     "trough": [
-      0.00439,
-      0.02315,
-      0.02519
-     ],
-     "mid": [
-      0.19462,
-      0.04971,
-      0.01298
-     ],
-     "crest": [
-      0.87137,
-      0.39157,
-      0.11697
-     ],
-     "wash": [
-      1.0,
-      0.69387,
-      0.43415
-     ],
-     "front": [
-      0.07819,
-      0.87137,
-      0.71569
-     ],
-     "peak": [
-      1.0,
-      0.45079,
-      0.10702
-     ],
-     "trim": [
-      1.0,
-      0.62396,
-      0.32314
-     ],
-     "floor": [
-      0.00478,
-      0.02315,
-      0.02732
-     ]
-    },
-    "scalars": {}
-   },
-   {
-    "name": "Ember",
-    "colors": {
-     "environment": [
-      0.007,
-      0.00182,
-      0.00152
-     ],
-     "back": [
-      0.19462,
-      0.01033,
-      0.00304
-     ],
-     "trough": [
-      0.02732,
-      0.00368,
-      0.00243
-     ],
-     "mid": [
-      0.32314,
-      0.02519,
-      0.00518
-     ],
-     "crest": [
-      1.0,
-      0.32314,
-      0.05127
-     ],
-     "wash": [
-      1.0,
-      0.57758,
-      0.27889
-     ],
-     "front": [
-      1.0,
-      0.64448,
-      0.04519
-     ],
-     "peak": [
-      1.0,
-      0.90466,
-      0.63076
-     ],
-     "trim": [
-      1.0,
-      0.32314,
-      0.08022
-     ],
-     "floor": [
-      0.02519,
-      0.00402,
-      0.00212
-     ]
-    },
-    "scalars": {}
-   },
-   {
-    "name": "Gilt Orchid",
-    "colors": {
-     "environment": [
-      0.00402,
-      0.00152,
-      0.00651
-     ],
-     "back": [
-      0.09306,
-      0.00518,
-      0.16203
-     ],
-     "trough": [
-      0.01764,
-      0.00273,
-      0.02732
-     ],
-     "mid": [
-      0.25415,
-      0.02315,
-      0.19462
-     ],
-     "crest": [
-      1.0,
-      0.65141,
-      0.14413
-     ],
-     "wash": [
-      1.0,
-      0.87137,
-      0.68669
-     ],
-     "front": [
-      1.0,
-      0.04231,
-      0.43415
-     ],
-     "peak": [
-      1.0,
-      0.7454,
-      0.90466
-     ],
-     "trim": [
-      1.0,
-      0.62396,
-      0.19462
-     ],
-     "floor": [
-      0.01444,
-      0.00304,
-      0.02315
-     ]
-    },
-    "scalars": {}
-   },
-   {
-    "name": "Coral Lagoon",
-    "colors": {
-     "environment": [
       0.00121,
       0.00605,
-      0.00561
-     ],
-     "back": [
-      0.00243,
-      0.16203,
-      0.16203
+      0.02519
      ],
      "trough": [
-      0.00368,
-      0.01938,
+      0.00121,
+      0.00439,
       0.01938
      ],
      "mid": [
-      0.52712,
-      0.0648,
-      0.06848
-     ],
-     "crest": [
-      1.0,
-      0.45641,
-      0.26225
-     ],
-     "wash": [
-      1.0,
-      0.87137,
-      0.7454
-     ],
-     "front": [
-      0.05127,
-      1.0,
-      0.7454
-     ],
-     "peak": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "trim": [
-      1.0,
-      0.43415,
-      0.35153
-     ],
-     "floor": [
-      0.00335,
-      0.02519,
-      0.02519
-     ]
-    },
-    "scalars": {}
-   },
-   {
-    "name": "Verdigris",
-    "colors": {
-     "environment": [
-      0.00121,
-      0.00651,
-      0.00518
-     ],
-     "back": [
-      0.00368,
-      0.14413,
-      0.08022
-     ],
-     "trough": [
-      0.00368,
-      0.02315,
-      0.01298
-     ],
-     "mid": [
-      0.02843,
-      0.25415,
+      0.00304,
+      0.02732,
       0.11697
      ],
      "crest": [
-      0.38133,
-      0.87137,
-      0.47932
+      0.0137,
+      0.21586,
+      0.57758
      ],
-     "wash": [
-      0.82279,
-      1.0,
-      0.71569
+     "core": [
+      0.10224,
+      0.67244,
+      1.0
+     ],
+     "glint": [
+      0.76052,
+      0.90466,
+      1.0
+     ],
+     "glow": [
+      0.007,
+      0.11697,
+      0.7454
      ],
      "front": [
-      1.0,
-      0.19462,
-      0.10702
+      0.32314,
+      0.7913,
+      1.0
      ],
      "peak": [
-      1.0,
-      0.87137,
-      0.35153
-     ],
-     "trim": [
-      0.3467,
-      1.0,
-      0.63076
-     ],
-     "floor": [
-      0.00304,
-      0.02315,
-      0.01298
+      0.88792,
+      0.96469,
+      1.0
      ]
     },
     "scalars": {}
    },
    {
-    "name": "Aurora",
+    "name": "Glacial Teal",
     "colors": {
      "environment": [
-      0.00091,
+      0.0003,
+      0.00243,
+      0.00243
+     ],
+     "back": [
+      0.00061,
+      0.00972,
+      0.01096
+     ],
+     "trough": [
+      0.00121,
+      0.01764,
+      0.01938
+     ],
+     "mid": [
+      0.00243,
+      0.11697,
+      0.10224
+     ],
+     "crest": [
+      0.016,
+      0.67244,
+      0.50289
+     ],
+     "core": [
+      0.14996,
+      1.0,
+      0.68669
+     ],
+     "glint": [
+      0.7913,
+      1.0,
+      0.92158
+     ],
+     "glow": [
       0.00368,
+      0.32314,
+      0.2462
+     ],
+     "front": [
+      0.40198,
+      1.0,
+      0.77582
+     ],
+     "peak": [
+      0.90466,
+      1.0,
+      0.96469
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Acid Cathedral",
+    "colors": {
+     "environment": [
+      0.0003,
+      0.00091,
+      0.00243
+     ],
+     "back": [
+      0.00091,
+      0.00402,
+      0.00802
+     ],
+     "trough": [
+      0.00304,
+      0.00802,
+      0.00518
+     ],
+     "mid": [
+      0.04231,
+      0.08866,
+      0.00913
+     ],
+     "crest": [
+      0.47932,
+      0.87137,
+      0.01444
+     ],
+     "core": [
+      0.7454,
+      1.0,
+      0.03955
+     ],
+     "glint": [
+      0.93869,
+      1.0,
+      0.60383
+     ],
+     "glow": [
+      0.10702,
+      0.26225,
+      0.00368
+     ],
+     "front": [
+      0.36131,
+      1.0,
+      0.09759
+     ],
+     "peak": [
+      0.98225,
+      1.0,
+      0.7454
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Molten Signal",
+    "colors": {
+     "environment": [
+      0.00212,
+      0.0003,
+      0.00061
+     ],
+     "back": [
+      0.01161,
+      0.00091,
+      0.00152
+     ],
+     "trough": [
+      0.01938,
+      0.00121,
+      0.00182
+     ],
+     "mid": [
+      0.2384,
+      0.00368,
+      0.00518
+     ],
+     "crest": [
+      1.0,
+      0.03434,
+      0.00913
+     ],
+     "core": [
+      1.0,
+      0.13287,
+      0.00913
+     ],
+     "glint": [
+      1.0,
+      0.63076,
+      0.2462
+     ],
+     "glow": [
+      0.47932,
+      0.007,
+      0.00182
+     ],
+     "front": [
+      1.0,
+      0.41254,
+      0.03689
+     ],
+     "peak": [
+      1.0,
+      0.87137,
+      0.55201
+     ]
+    },
+    "scalars": {}
+   },
+   {
+    "name": "Sunset Interference",
+    "colors": {
+     "environment": [
+      0.00335,
+      0.00091,
       0.00605
      ],
      "back": [
-      0.00304,
-      0.10224,
-      0.0648
-     ],
-     "trough": [
-      0.00402,
-      0.00802,
+      0.0185,
+      0.00243,
       0.02956
      ],
+     "trough": [
+      0.03689,
+      0.00368,
+      0.04231
+     ],
      "mid": [
-      0.05781,
-      0.02956,
-      0.35153
+      0.47932,
+      0.02519,
+      0.12744
      ],
      "crest": [
-      0.11697,
       1.0,
-      0.43415
+      0.22323,
+      0.0648
      ],
-     "wash": [
+     "core": [
+      1.0,
+      0.31399,
+      0.09759
+     ],
+     "glint": [
+      1.0,
       0.7454,
+      0.56471
+     ],
+     "glow": [
       0.87137,
-      1.0
+      0.02956,
+      0.20864
      ],
      "front": [
       1.0,
-      0.11697,
-      0.52712
+      0.42327,
+      0.20156
      ],
      "peak": [
       1.0,
-      0.92158,
-      0.35153
-     ],
-     "trim": [
-      0.21586,
-      1.0,
-      0.52712
-     ],
-     "floor": [
-      0.00243,
-      0.01161,
-      0.02122
+      0.87137,
+      0.76052
      ]
     },
     "scalars": {}
    },
    {
-    "name": "Cobalt Ice",
+    "name": "Ultraviolet",
     "colors": {
      "environment": [
       0.00121,
-      0.00304,
-      0.01033
+      0.00061,
+      0.00402
      ],
      "back": [
-      0.00518,
-      0.0319,
-      0.35153
+      0.00605,
+      0.00182,
+      0.02732
      ],
      "trough": [
-      0.00304,
       0.00913,
-      0.05127
+      0.00243,
+      0.04231
      ],
      "mid": [
-      0.01444,
-      0.08022,
-      0.47932
+      0.06125,
+      0.00913,
+      0.29614
      ],
      "crest": [
-      0.35153,
-      0.68669,
+      0.39157,
+      0.05781,
       1.0
      ],
-     "wash": [
-      0.68669,
-      0.8388,
+     "core": [
+      0.71569,
+      0.07227,
       1.0
+     ],
+     "glint": [
+      0.85499,
+      0.67244,
+      1.0
+     ],
+     "glow": [
+      0.21586,
+      0.02122,
+      0.90466
      ],
      "front": [
-      0.14413,
+      1.0,
+      0.09759,
+      0.65837
+     ],
+     "peak": [
+      1.0,
       0.87137,
       1.0
-     ],
-     "peak": [
-      1.0,
-      1.0,
-      1.0
-     ],
-     "trim": [
-      0.25415,
-      0.57758,
-      1.0
-     ],
-     "floor": [
-      0.00304,
-      0.00913,
-      0.05127
-     ]
-    },
-    "scalars": {}
-   },
-   {
-    "name": "Nocturne",
-    "colors": {
-     "environment": [
-      0.00304,
-      0.00182,
-      0.00802
-     ],
-     "back": [
-      0.05127,
-      0.00913,
-      0.25415
-     ],
-     "trough": [
-      0.01161,
-      0.00439,
-      0.03434
-     ],
-     "mid": [
-      0.10224,
-      0.02315,
-      0.35153
-     ],
-     "crest": [
-      0.63076,
-      0.39157,
-      1.0
-     ],
-     "wash": [
-      0.68669,
-      0.57758,
-      1.0
-     ],
-     "front": [
-      1.0,
-      0.10224,
-      0.68669
-     ],
-     "peak": [
-      1.0,
-      0.64448,
-      0.19462
-     ],
-     "trim": [
-      0.45641,
-      0.26225,
-      1.0
-     ],
-     "floor": [
-      0.00913,
-      0.00439,
-      0.02956
      ]
     },
     "scalars": {}
@@ -1367,247 +1050,62 @@
   "bindings": [
    {
     "role": "trough",
-    "target": "material/blade_west/op/4/ramp/constant"
+    "target": "material/bladeSphere/op/4/ramp/constant",
+    "gain": 0.18
    },
    {
     "role": "mid",
-    "target": "material/blade_west/op/4/ramp/constant2"
+    "target": "material/bladeSphere/op/4/ramp/constant2",
+    "gain": 0.18
    },
    {
     "role": "crest",
-    "target": "material/blade_west/op/4/ramp/constant3"
+    "target": "material/bladeSphere/op/4/ramp/constant3",
+    "gain": 0.18
+   },
+   {
+    "role": "core",
+    "target": "material/bladeSphere/op/30/constant/constant",
+    "gain": 1.7
+   },
+   {
+    "role": "glint",
+    "target": "material/bladeSphere/op/40/constant/constant",
+    "gain": 1.6
    },
    {
     "role": "front",
-    "target": "material/blade_west/op/27/constant/constant",
-    "gain": 1.4
+    "target": "material/bladeSphere/op/45/constant/constant",
+    "gain": 0.18
    },
    {
-    "role": "peak",
-    "target": "material/blade_west/op/32/constant/constant",
-    "gain": 2.5
+    "role": "trough",
+    "target": "material/chip/op/3/ramp/constant",
+    "gain": 0.18
+   },
+   {
+    "role": "mid",
+    "target": "material/chip/op/3/ramp/constant2",
+    "gain": 0.18
+   },
+   {
+    "role": "crest",
+    "target": "material/chip/op/3/ramp/constant3",
+    "gain": 0.18
+   },
+   {
+    "role": "core",
+    "target": "material/chip/op/25/constant/constant",
+    "gain": 1.7
+   },
+   {
+    "role": "glow",
+    "target": "material/membrane/op/19/constant/constant",
+    "gain": 0.5
    },
    {
     "role": "back",
-    "target": "procedural/back_west/material/emissiveColor",
-    "gain": 0.7
-   },
-   {
-    "role": "trough",
-    "target": "material/blade_north/op/4/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/blade_north/op/4/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/blade_north/op/4/ramp/constant3"
-   },
-   {
-    "role": "front",
-    "target": "material/blade_north/op/27/constant/constant",
-    "gain": 1.4
-   },
-   {
-    "role": "peak",
-    "target": "material/blade_north/op/32/constant/constant",
-    "gain": 2.5
-   },
-   {
-    "role": "back",
-    "target": "procedural/back_north/material/emissiveColor",
-    "gain": 0.7
-   },
-   {
-    "role": "trough",
-    "target": "material/blade_east/op/4/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/blade_east/op/4/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/blade_east/op/4/ramp/constant3"
-   },
-   {
-    "role": "front",
-    "target": "material/blade_east/op/27/constant/constant",
-    "gain": 1.4
-   },
-   {
-    "role": "peak",
-    "target": "material/blade_east/op/32/constant/constant",
-    "gain": 2.5
-   },
-   {
-    "role": "back",
-    "target": "procedural/back_east/material/emissiveColor",
-    "gain": 0.7
-   },
-   {
-    "role": "trough",
-    "target": "material/blade_south/op/4/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/blade_south/op/4/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/blade_south/op/4/ramp/constant3"
-   },
-   {
-    "role": "front",
-    "target": "material/blade_south/op/27/constant/constant",
-    "gain": 1.4
-   },
-   {
-    "role": "peak",
-    "target": "material/blade_south/op/32/constant/constant",
-    "gain": 2.5
-   },
-   {
-    "role": "back",
-    "target": "procedural/back_south/material/emissiveColor",
-    "gain": 0.7
-   },
-   {
-    "role": "trim",
-    "target": "procedural/strips_w/material/emissiveColor"
-   },
-   {
-    "role": "trim",
-    "target": "procedural/strips_e/material/emissiveColor"
-   },
-   {
-    "role": "floor",
-    "target": "procedural/pier0/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/pier1/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/pier2/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/pier3/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/bays_w/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/bays_e/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/plinth_west/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/plinth_north/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/plinth_east/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "floor",
-    "target": "procedural/plinth_south/material/baseColor",
-    "gain": 0.6
-   },
-   {
-    "role": "environment",
-    "target": "procedural/beams_x/material/baseColor",
-    "gain": 3.0
-   },
-   {
-    "role": "environment",
-    "target": "procedural/beams_z/material/baseColor",
-    "gain": 3.0
-   },
-   {
-    "role": "environment",
-    "target": "procedural/ceiling/material/emissiveColor",
-    "gain": 3.0
-   },
-   {
-    "role": "trough",
-    "target": "material/floorLacquer/op/7/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/floorLacquer/op/7/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/floorLacquer/op/7/ramp/constant3"
-   },
-   {
-    "role": "trough",
-    "target": "material/floorLacquer/op/15/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/floorLacquer/op/15/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/floorLacquer/op/15/ramp/constant3"
-   },
-   {
-    "role": "trough",
-    "target": "material/floorLacquer/op/23/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/floorLacquer/op/23/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/floorLacquer/op/23/ramp/constant3"
-   },
-   {
-    "role": "trough",
-    "target": "material/floorLacquer/op/31/ramp/constant"
-   },
-   {
-    "role": "mid",
-    "target": "material/floorLacquer/op/31/ramp/constant2"
-   },
-   {
-    "role": "crest",
-    "target": "material/floorLacquer/op/31/ramp/constant3"
-   },
-   {
-    "role": "floor",
-    "target": "material/floorLacquer/op/36/constant/constant",
-    "gain": 2.6
-   },
-   {
-    "role": "trim",
-    "target": "procedural/inlay_z/material/baseColor",
-    "gain": 0.15
-   },
-   {
-    "role": "trim",
-    "target": "procedural/inlay_x/material/baseColor",
-    "gain": 0.15
+    "target": "material/membrane/op/21/constant/constant"
    },
    {
     "role": "environment",
@@ -1626,33 +1124,8 @@
     "target": "scene/fogColor"
    },
    {
-    "role": "wash",
-    "target": "lights/key/color"
-   },
-   {
-    "role": "wash",
-    "target": "lights/wash_west/color"
-   },
-   {
-    "role": "wash",
-    "target": "lights/wash_north/color"
-   },
-   {
-    "role": "wash",
-    "target": "lights/wash_east/color"
-   },
-   {
-    "role": "wash",
-    "target": "lights/wash_south/color"
-   },
-   {
-    "role": "back",
-    "target": "lights/bounce/color"
-   },
-   {
-    "role": "environment",
-    "target": "post/look/atmosphericTint",
-    "gain": 2.0
+    "role": "glow",
+    "target": "lights/heart/color"
    }
   ],
   "position": 0.0,
@@ -1672,9 +1145,7 @@
      2,
      3,
      4,
-     5,
-     6,
-     7
+     5
     ],
     "change": {
      "signals": [
@@ -1743,6 +1214,20 @@
      "source": "*",
      "channel": -1,
      "kind": "cc",
+     "number": 7,
+     "signal": "swell"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 8,
+     "signal": "impact"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
      "number": 9,
      "signal": "palette"
     },
@@ -1752,6 +1237,13 @@
      "kind": "cc",
      "number": 10,
      "signal": "paletteLock"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 11,
+     "signal": "shimmer"
     },
     {
      "source": "*",

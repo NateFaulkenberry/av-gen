@@ -52,6 +52,7 @@ struct FieldGpu {
     gridBounds0: vec4<f32>,          // Grid kind: boundsMin.xyz, offset into gridTable (floats)
     gridBounds1: vec4<f32>,          // boundsMax.xyz, components per cell (1 scalar, 2 Rd, 4 vector)
     gridRes: vec4<f32>,              // resolution.xyz, w = 0 unbound, else 1 + 2 (wrap) + 4 * (channel + 1) (ADR-1201)
+                                     // + 32 (ADR-1501: the sphere projection, radius = axisRadius.w)
 };
 
 // ADR-1116: the audio history the Spectrum and Onset kinds read (rendering::FieldUniforms packs it
@@ -144,8 +145,28 @@ const FIELD_TWO_PI: f32 = 6.28318530717958647692;
 // gridRes.w is then 0 for every record and no sample reads the buffer).
 @group(0) @binding(15) var<storage, read> gridTable: array<f32>;
 
+// ADR-1501: a Grid field's local point unrolled about its origin onto the plane grid (x = radius * azimuth,
+// z = radius * latitude, y = 0) when the record carries the sphere bit; the point itself otherwise.
+fn gridPoint(fi: u32, q: vec3<f32>) -> vec3<f32> {
+    if ((u32(fieldBlock.fields[fi].gridRes.w + 0.5) & 32u) == 0u) {
+        return q;
+    }
+    let r = length(q);
+    if (r <= 1e-6) {
+        return vec3<f32>(0.0);
+    }
+    let radius = fieldBlock.fields[fi].axisRadius.w;
+    var azimuth = 0.0;
+    if (abs(q.x) + abs(q.z) > 1e-12) { // atan2(0, 0) is NaN on Metal
+        azimuth = atan2(q.z, q.x);
+    }
+    let latitude = asin(clamp(q.y / r, -1.0, 1.0));
+    return vec3<f32>(radius * azimuth, 0.0, radius * latitude);
+}
+
 // Continuous cell coordinate of a point in the grid's own space (cell i is centred at i).
-fn gridCoord(fi: u32, q: vec3<f32>) -> vec3<f32> {
+fn gridCoord(fi: u32, qLocal: vec3<f32>) -> vec3<f32> {
+    let q = gridPoint(fi, qLocal); // ADR-1501
     let lo = fieldBlock.fields[fi].gridBounds0.xyz;
     let hi = fieldBlock.fields[fi].gridBounds1.xyz;
     let res = fieldBlock.fields[fi].gridRes.xyz;
@@ -216,7 +237,7 @@ fn gridScalarAt(fi: u32, q: vec3<f32>) -> f32 {
     }
     let comps = i32(fieldBlock.fields[fi].gridBounds1.w + 0.5);
     // ADR-1201: a chosen channel (gridRes.w's bits 2+ hold channel + 1), else B for reaction-diffusion, else 0.
-    let chosen = i32(u32(fieldBlock.fields[fi].gridRes.w + 0.5) >> 2u) - 1;
+    let chosen = i32((u32(fieldBlock.fields[fi].gridRes.w + 0.5) >> 2u) & 7u) - 1; // bit 5 is ADR-1501's
     let channel = select(select(0, 1, comps == 2), chosen, chosen >= 0);
     return gridTrilinear(fi, gridCoord(fi, q), channel);
 }

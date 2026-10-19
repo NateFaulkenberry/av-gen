@@ -116,12 +116,12 @@
  },
  "parameters": {
   "post/bloom/enabled": true,
-  "post/bloom/intensity": 0.28,
-  "post/bloom/threshold": 1.0,
+  "post/bloom/intensity": 0.5,
+  "post/bloom/threshold": 1.1,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
-  "post/output/vignette": 0.4,
-  "post/output/grain": 0.01,
+  "post/output/vignette": 0.22,
+  "post/output/grain": 0.0,
   "camera/exposure/mode": 0,
   "camera/exposure/compensation": 0.0,
   "camera/lens/useExplicitFov": false,
@@ -130,7 +130,9 @@
   "scene/volumeJitter": 0.4,
   "temporal/echo/enabled": false,
   "temporal/mosh/enabled": false,
-  "post/grade/contrast": 1.06
+  "post/bloom/knee": 0.6,
+  "post/bloom/radius": 0.75,
+  "post/grade/contrast": 1.08
  },
  "sources": [
   {
@@ -157,7 +159,33 @@
  "routes": [
   {
    "source": "visual.influence",
-   "target": "field/kickRegime/strength",
+   "target": "field/kick/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 0.0,
+    "attackMs": 200,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "visual.influence",
+   "target": "field/snare/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 2.0,
+    "offset": 0.0,
+    "attackMs": 200,
+    "decayMs": 200
+   }
+  },
+  {
+   "source": "visual.influence",
+   "target": "field/swell/strength",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
@@ -171,7 +199,7 @@
   {
    "source": "response.sustain",
    "target": "field/pool/strength",
-   "amount": 0.6,
+   "amount": 0.375,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -183,7 +211,7 @@
   {
    "source": "response.bass",
    "target": "procedural/pins/effector/2/strength",
-   "amount": 3.0,
+   "amount": 4.5,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
@@ -193,17 +221,85 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "material/rpPin/op/16/constant/constant",
+   "source": "response.bass",
+   "target": "procedural/pins/deform/1/amount",
+   "amount": 1.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "attackMs": 400,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "audio.mid",
+   "target": "material/rpPin/op/11/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
    "depthSource": "visual.influence",
    "chain": {
-    "gain": 1.5,
+    "gain": 1.6,
+    "offset": 0.4,
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "material/rpPin/op/27/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 3.0,
+    "offset": 0.12,
+    "attackMs": 8,
+    "decayMs": 260
+   }
+  },
+  {
+   "source": "response.hat",
+   "target": "material/rpPin/op/38/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 0.25,
     "offset": 1.0,
     "attackMs": 30,
     "decayMs": 300
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "material/rpPin/op/40/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 1.8,
+    "offset": 0.55,
+    "attackMs": 600,
+    "decayMs": 2500
+   }
+  },
+  {
+   "source": "response.hatRate",
+   "target": "material/rpPin/op/38/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 1.2,
+    "offset": 0.7,
+    "attackMs": 600,
+    "decayMs": 2500
    }
   },
   {
@@ -275,12 +371,77 @@
   },
   {
    "source": "control.light",
-   "target": "material/rpPin/op/16/constant/constant",
+   "target": "material/rpPin/op/38/constant/constant",
    "amount": 1.0,
    "op": "multiply",
    "polarity": "unipolar",
    "chain": {
-    "gain": 2.0,
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.light",
+   "target": "material/rpPin/op/40/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.waves",
+   "target": "procedural/pins/deform/1/amount",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.impact",
+   "target": "field/kick/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.impact",
+   "target": "field/snare/strength",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
+    "offset": 1.0,
+    "attackMs": 150,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.shimmer",
+   "target": "material/rpPin/op/27/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "chain": {
+    "gain": 1.5,
     "offset": 1.0,
     "attackMs": 150,
     "decayMs": 150
@@ -358,117 +519,117 @@
      {
       "time": 0.0,
       "value": [
-       -3.0,
+       4.2,
        0.0,
-       -6.0
+       -0.6
       ],
       "interp": "smooth"
      },
      {
       "time": 8.0,
       "value": [
-       8.2,
+       15.4,
        0.0,
-       2.4
+       7.8
       ],
       "interp": "smooth"
      },
      {
       "time": 16.0,
       "value": [
-       10.856,
+       18.056,
        0.0,
-       4.392
+       9.792
       ],
       "interp": "smooth"
      },
      {
       "time": 24.0,
       "value": [
-       9.8,
+       17.0,
        0.0,
-       3.6
+       9.0
       ],
       "interp": "smooth"
      },
      {
       "time": 32.0,
       "value": [
-       10.856,
+       18.056,
        0.0,
-       4.392
+       9.792
       ],
       "interp": "smooth"
      },
      {
       "time": 40.0,
       "value": [
-       8.2,
+       15.4,
        0.0,
-       2.4
+       7.8
       ],
       "interp": "smooth"
      },
      {
       "time": 48.0,
       "value": [
-       -3.0,
+       4.2,
        0.0,
-       -6.0
+       -0.6
       ],
       "interp": "smooth"
      },
      {
       "time": 56.0,
       "value": [
-       -14.2,
+       -7.0,
        0.0,
-       -14.4
+       -9.0
       ],
       "interp": "smooth"
      },
      {
       "time": 64.0,
       "value": [
-       -16.856,
+       -9.656,
        0.0,
-       -16.392
+       -10.992
       ],
       "interp": "smooth"
      },
      {
       "time": 72.0,
       "value": [
-       -15.8,
+       -8.6,
        0.0,
-       -15.6
+       -10.2
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       -16.856,
+       -9.656,
        0.0,
-       -16.392
+       -10.992
       ],
       "interp": "smooth"
      },
      {
       "time": 88.0,
       "value": [
-       -14.2,
+       -7.0,
        0.0,
-       -14.4
+       -9.0
       ],
       "interp": "smooth"
      },
      {
       "time": 96.0,
       "value": [
-       -3.0,
+       4.2,
        0.0,
-       -6.0
+       -0.6
       ],
       "interp": "smooth"
      }
@@ -704,6 +865,241 @@
        -2.0,
        0.0,
        -4.0
+      ],
+      "interp": "smooth"
+     }
+    ]
+   },
+   {
+    "target": "field/kick/position",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 53.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": [
+       5.2901,
+       0.0,
+       5.6631
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 2.2083,
+      "value": [
+       6.9943,
+       0.0,
+       2.8472
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 4.4167,
+      "value": [
+       8.2219,
+       0.0,
+       -0.7317
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 6.625,
+      "value": [
+       8.8892,
+       0.0,
+       -4.1145
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 8.8333,
+      "value": [
+       8.9507,
+       0.0,
+       -6.3948
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 11.0417,
+      "value": [
+       8.4022,
+       0.0,
+       -6.9617
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 13.25,
+      "value": [
+       7.2812,
+       0.0,
+       -5.6631
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 15.4583,
+      "value": [
+       5.6639,
+       0.0,
+       -2.8472
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 17.6667,
+      "value": [
+       3.6606,
+       0.0,
+       0.7317
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 19.875,
+      "value": [
+       1.4079,
+       0.0,
+       4.1145
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 22.0833,
+      "value": [
+       -0.9408,
+       0.0,
+       6.3948
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 24.2917,
+      "value": [
+       -3.2253,
+       0.0,
+       6.9617
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 26.5,
+      "value": [
+       -5.2901,
+       0.0,
+       5.6631
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 28.7083,
+      "value": [
+       -6.9943,
+       0.0,
+       2.8472
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 30.9167,
+      "value": [
+       -8.2219,
+       0.0,
+       -0.7317
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 33.125,
+      "value": [
+       -8.8892,
+       0.0,
+       -4.1145
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 35.3333,
+      "value": [
+       -8.9507,
+       0.0,
+       -6.3948
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 37.5417,
+      "value": [
+       -8.4022,
+       0.0,
+       -6.9617
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 39.75,
+      "value": [
+       -7.2812,
+       0.0,
+       -5.6631
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 41.9583,
+      "value": [
+       -5.6639,
+       0.0,
+       -2.8472
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 44.1667,
+      "value": [
+       -3.6606,
+       0.0,
+       0.7317
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 46.375,
+      "value": [
+       -1.4079,
+       0.0,
+       4.1145
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 48.5833,
+      "value": [
+       0.9408,
+       0.0,
+       6.3948
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 50.7917,
+      "value": [
+       3.2253,
+       0.0,
+       6.9617
+      ],
+      "interp": "smooth"
+     },
+     {
+      "time": 53.0,
+      "value": [
+       5.2901,
+       0.0,
+       5.6631
       ],
       "interp": "smooth"
      }
@@ -1137,7 +1533,7 @@
  },
  "sonicScene": {
   "category": "experiment",
-  "thesis": "A bowl of copper pins in the dark. A reaction-diffusion pattern grows over it and lifts every pin it touches; a labyrinth wanders into spots and back; a thin ring of light runs along the pattern's edges. The music never draws on it directly: kicks send rings that turn the labyrinth to spots, held sound widens the spots, bass lifts the field.",
+  "thesis": "A living, illuminated topographic interference field: a bowl of pins in the dark, a reaction-diffusion labyrinth growing over it, its edges drawn as contours of light (a fine hot core, a softer halo, dark channels between). A broad swell heaves the field, crossing the bass history's rings; it bunches and opens the contours and runs beads of light along them on the hats; the bass history rolls out from the heart as a lift and a pool of light; every kick sends a ring of impact across it that swells the contours, carries a band of light and turns the labyrinth toward spots; a busy mix lights it up, a breakdown lets it settle.",
   "experiment": "C reaction-diffusion (production)",
   "id": "rd-pins",
   "title": "RD Pins"
@@ -1149,28 +1545,33 @@
     "colors": {
      "environment": [
       0.04231,
-      0.007,
-      0.01444
+      0.00605,
+      0.016
      ],
      "shadow": [
-      0.09306,
-      0.01298,
-      0.01938
+      0.08866,
+      0.01033,
+      0.02519
      ],
      "base": [
-      0.10224,
-      0.01764,
-      0.01444
+      0.11193,
+      0.01444,
+      0.01938
      ],
      "pattern": [
-      0.19462,
+      0.25415,
       0.04231,
-      0.01444
+      0.01298
      ],
      "ring": [
       1.0,
-      0.32314,
-      0.05127
+      0.25415,
+      0.02122
+     ],
+     "hot": [
+      1.0,
+      0.56471,
+      0.10224
      ],
      "key": [
       1.0,
@@ -1178,7 +1579,7 @@
       0.55201
      ],
      "rim": [
-      0.19462,
+      0.25415,
       0.07227,
       1.0
      ]
@@ -1186,9 +1587,11 @@
     "scalars": {
      "metal": 0.55,
      "rough": 0.3,
-     "ringGain": 2.4,
-     "keyI": 5.0,
-     "rimI": 1.6
+     "ringGain": 1.8,
+     "hotGain": 3.6,
+     "keyI": 4.8,
+     "rimI": 1.6,
+     "bloomI": 0.5
     }
    },
    {
@@ -1196,28 +1599,33 @@
     "colors": {
      "environment": [
       0.00091,
-      0.01938,
-      0.02315
+      0.02315,
+      0.02519
      ],
      "shadow": [
-      0.00152,
-      0.03689,
-      0.04231
+      0.00121,
+      0.04231,
+      0.04519
      ],
      "base": [
-      0.00304,
-      0.06848,
-      0.0648
+      0.00243,
+      0.08022,
+      0.07227
      ],
      "pattern": [
-      0.00802,
-      0.19462,
+      0.007,
+      0.21586,
       0.14413
      ],
      "ring": [
-      0.26636,
+      0.02315,
       1.0,
-      0.7454
+      0.52712
+     ],
+     "hot": [
+      0.46778,
+      1.0,
+      0.7913
      ],
      "key": [
       0.77582,
@@ -1226,45 +1634,52 @@
      ],
      "rim": [
       1.0,
-      0.14413,
+      0.10224,
       0.25415
      ]
     },
     "scalars": {
      "metal": 0.45,
      "rough": 0.34,
-     "ringGain": 2.0,
-     "keyI": 4.6,
-     "rimI": 1.8
+     "ringGain": 1.5,
+     "hotGain": 3.0,
+     "keyI": 4.4,
+     "rimI": 1.8,
+     "bloomI": 0.38
     }
    },
    {
     "name": "Garnet and Indigo",
     "colors": {
      "environment": [
-      0.01033,
+      0.01161,
       0.00605,
-      0.09759
+      0.16203
      ],
      "shadow": [
-      0.01764,
+      0.01938,
       0.00913,
-      0.16827
+      0.26225
      ],
      "base": [
-      0.01764,
+      0.02315,
       0.00605,
-      0.19462
+      0.29614
      ],
      "pattern": [
-      0.25415,
-      0.00605,
-      0.03434
+      0.32314,
+      0.007,
+      0.05127
      ],
      "ring": [
       1.0,
-      0.06848,
-      0.14413
+      0.02519,
+      0.10224
+     ],
+     "hot": [
+      1.0,
+      0.35153,
+      0.47932
      ],
      "key": [
       1.0,
@@ -1280,38 +1695,45 @@
     "scalars": {
      "metal": 0.5,
      "rough": 0.3,
-     "ringGain": 2.2,
-     "keyI": 4.4,
-     "rimI": 2.0
+     "ringGain": 1.8,
+     "hotGain": 3.4,
+     "keyI": 4.2,
+     "rimI": 2.0,
+     "bloomI": 0.46
     }
    },
    {
     "name": "Violet and Gold",
     "colors": {
      "environment": [
-      0.02315,
+      0.02732,
       0.00368,
-      0.0648
+      0.09306
      ],
      "shadow": [
-      0.04519,
+      0.05127,
       0.007,
-      0.13843
+      0.18116
      ],
      "base": [
-      0.04817,
-      0.00802,
-      0.16827
+      0.06125,
+      0.00913,
+      0.25415
      ],
      "pattern": [
-      0.14413,
+      0.19462,
       0.02732,
-      0.35153
+      0.46778
      ],
      "ring": [
       1.0,
-      0.63076,
-      0.11697
+      0.45641,
+      0.01444
+     ],
+     "hot": [
+      1.0,
+      0.76052,
+      0.19462
      ],
      "key": [
       0.92158,
@@ -1320,16 +1742,18 @@
      ],
      "rim": [
       1.0,
-      0.43415,
-      0.05127
+      0.06848,
+      0.52712
      ]
     },
     "scalars": {
      "metal": 0.6,
      "rough": 0.28,
-     "ringGain": 2.0,
-     "keyI": 4.2,
-     "rimI": 1.6
+     "ringGain": 1.6,
+     "hotGain": 3.4,
+     "keyI": 4.0,
+     "rimI": 1.8,
+     "bloomI": 0.44
     }
    },
    {
@@ -1337,28 +1761,33 @@
     "colors": {
      "environment": [
       0.00061,
-      0.01161,
-      0.03955
+      0.01298,
+      0.05781
      ],
      "shadow": [
       0.00091,
       0.02956,
-      0.07619
+      0.11697
      ],
      "base": [
       0.00121,
-      0.05781,
-      0.16203
+      0.0648,
+      0.25415
      ],
      "pattern": [
       0.00304,
-      0.14413,
-      0.39157
+      0.16203,
+      0.52712
      ],
      "ring": [
-      0.80695,
+      0.65837,
       1.0,
-      0.10224
+      0.01033
+     ],
+     "hot": [
+      0.87137,
+      1.0,
+      0.25415
      ],
      "key": [
       0.7913,
@@ -1367,45 +1796,52 @@
      ],
      "rim": [
       1.0,
-      0.04231,
+      0.02315,
       0.63076
      ]
     },
     "scalars": {
      "metal": 0.4,
      "rough": 0.32,
-     "ringGain": 2.2,
-     "keyI": 4.6,
-     "rimI": 2.0
+     "ringGain": 1.7,
+     "hotGain": 3.2,
+     "keyI": 4.4,
+     "rimI": 2.0,
+     "bloomI": 0.42
     }
    },
    {
     "name": "Rose Quartz",
     "colors": {
      "environment": [
-      0.03434,
+      0.04817,
       0.00518,
-      0.01764
+      0.02956
      ],
      "shadow": [
-      0.06848,
-      0.01033,
-      0.03689
+      0.09306,
+      0.01161,
+      0.05781
      ],
      "base": [
-      0.11193,
+      0.14413,
       0.01764,
-      0.06125
+      0.09306
      ],
      "pattern": [
-      0.43415,
-      0.09759,
-      0.19462
+      0.47932,
+      0.06848,
+      0.21586
      ],
      "ring": [
       1.0,
-      0.87137,
-      0.57758
+      0.19462,
+      0.39157
+     ],
+     "hot": [
+      1.0,
+      0.63076,
+      0.71569
      ],
      "key": [
       1.0,
@@ -1421,9 +1857,11 @@
     "scalars": {
      "metal": 0.3,
      "rough": 0.4,
-     "ringGain": 1.8,
-     "keyI": 4.8,
-     "rimI": 1.8
+     "ringGain": 1.6,
+     "hotGain": 3.0,
+     "keyI": 4.6,
+     "rimI": 1.8,
+     "bloomI": 0.36
     }
    }
   ],
@@ -1453,6 +1891,11 @@
     "gain": 1.6
    },
    {
+    "role": "environment",
+    "target": "procedural/floor/material/baseColor",
+    "gain": 0.5
+   },
+   {
     "role": "base",
     "target": "material/rpFloor/op/4/constant/constant"
    },
@@ -1463,24 +1906,41 @@
    },
    {
     "role": "base",
-    "target": "material/rpPin/op/3/constant/constant"
+    "target": "material/rpPin/op/46/ramp/constant"
+   },
+   {
+    "role": "base",
+    "target": "material/rpPin/op/46/ramp/constant2"
    },
    {
     "role": "pattern",
-    "target": "material/rpPin/op/4/constant/constant"
+    "target": "material/rpPin/op/46/ramp/constant3"
    },
    {
     "role": "shadow",
-    "target": "material/rpPin/op/9/constant/constant"
+    "target": "material/rpPin/op/47/constant/constant"
    },
    {
     "role": "ring",
-    "target": "material/rpPin/op/16/constant/constant"
+    "target": "material/rpPin/op/38/constant/constant"
    },
    {
     "role": "ringGain",
-    "target": "material/rpPin/op/16/constant/constant",
+    "target": "material/rpPin/op/38/constant/constant",
     "mode": "multiply"
+   },
+   {
+    "role": "hot",
+    "target": "material/rpPin/op/40/constant/constant"
+   },
+   {
+    "role": "hotGain",
+    "target": "material/rpPin/op/40/constant/constant",
+    "mode": "multiply"
+   },
+   {
+    "role": "bloomI",
+    "target": "post/bloom/intensity"
    },
    {
     "role": "key",
@@ -1593,6 +2053,20 @@
      "source": "*",
      "channel": -1,
      "kind": "cc",
+     "number": 7,
+     "signal": "waves"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 8,
+     "signal": "impact"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
      "number": 9,
      "signal": "palette"
     },
@@ -1602,6 +2076,13 @@
      "kind": "cc",
      "number": 10,
      "signal": "paletteLock"
+    },
+    {
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 11,
+     "signal": "shimmer"
     },
     {
      "source": "*",

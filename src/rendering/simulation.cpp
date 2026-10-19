@@ -11,6 +11,7 @@
 #include "spatial/grid_field.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -589,6 +590,46 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
     if (slot == 0) {
         return;
     }
+    // ADR-1502: the bake grids each grid reads through its own input fields (regime, inject, frequency, velocity,
+    // conductivity, deposit; through compounds), as indices into `work`. Such a grid re-bakes them before each of its
+    // sub-steps, at that sub-step's clock, so a replayed step reads exactly what the played one read.
+    std::vector<std::vector<std::size_t>> bakeDeps(work.size());
+    {
+        std::vector<int> workOf(grids.size(), -1);
+        for (std::size_t k = 0; k < work.size(); ++k) {
+            workOf[work[k].index] = static_cast<int>(k);
+        }
+        const std::function<void(const std::string&, int, std::vector<std::size_t>&)> collect =
+            [&](const std::string& name, int depth, std::vector<std::size_t>& out) {
+                const spatial::FieldSpec* f = name.empty() || depth > 8 ? nullptr : scene.fields.find(name);
+                if (f == nullptr || !f->enabled) {
+                    return;
+                }
+                if (f->kind == spatial::FieldKind::Grid) {
+                    const int gi = scene.fields.gridIndexOf(f->reference);
+                    if (gi >= 0 && static_cast<std::size_t>(gi) < grids.size() && grids[static_cast<std::size_t>(gi)].bake() &&
+                        workOf[static_cast<std::size_t>(gi)] >= 0) {
+                        const auto k = static_cast<std::size_t>(workOf[static_cast<std::size_t>(gi)]);
+                        if (std::find(out.begin(), out.end(), k) == out.end()) {
+                            out.push_back(k);
+                        }
+                    }
+                }
+                for (const std::string& child : f->children) {
+                    collect(child, depth + 1, out);
+                }
+            };
+        for (std::size_t k = 0; k < work.size(); ++k) {
+            const spatial::GridField& g = grids[work[k].index];
+            if (g.bake()) {
+                continue;
+            }
+            for (const std::string* name : {&g.regimeField, &g.injectField, &g.frequencyField, &g.velocityField,
+                                            &g.conductivityField, &g.depositField}) {
+                collect(*name, 0, bakeDeps[k]);
+            }
+        }
+    }
     const auto& queue = im.context.queue();
     queue.WriteBuffer(im.uniforms, 0, im.uniformStaging.data(), static_cast<std::size_t>(slot) * kUniformStride);
 
@@ -684,8 +725,28 @@ void Simulation::update(wgpu::CommandEncoder& encoder, const scene::Scene& scene
             cp.DispatchWorkgroups(groups);
             ++encoded;
         };
+        const std::size_t self = static_cast<std::size_t>(&w - work.data());
+        const std::vector<std::size_t>& deps = self < bakeDeps.size() ? bakeDeps[self] : std::vector<std::size_t>{};
         for (std::uint32_t k = 0; k < count; ++k) {
             offsets[1] = static_cast<std::uint32_t>((firstBlock + k) * kStepBlockStride);
+            // ADR-1502: the bakes this grid reads, at this sub-step's clock (its field block), published to the table
+            // the step's field reads see; one pass break per step, only on a grid that reads a bake.
+            for (const std::size_t d : deps) {
+                const Work& bw = work[d];
+                const spatial::GridField& bake = grids[bw.index];
+                Impl::GridState& bs = im.states[bw.index];
+                const std::array<std::uint32_t, 2> bakeOffsets{bw.offset, offsets[1]};
+                cp.SetPipeline(im.bakePipeline);
+                cp.SetBindGroup(0, bs.currentIsA ? im.groupToB : im.groupToA, bakeOffsets.size(), bakeOffsets.data());
+                cp.DispatchWorkgroups((static_cast<std::uint32_t>(bake.cellCount()) + kWorkgroup - 1) / kWorkgroup);
+                bs.currentIsA = !bs.currentIsA;
+                ++encoded;
+                cp.End();
+                const std::uint64_t at = spatial::gridTableOffset(grids, bw.index) * sizeof(float);
+                enc.CopyBufferToBuffer(bs.currentIsA ? im.bufferA : im.bufferB, at, im.gridTable, at,
+                                       bake.floatCount() * sizeof(float));
+                cp = enc.BeginComputePass(&passDesc);
+            }
             if (grid.bake()) {
                 dispatch(im.bakePipeline); // ADR-1407
             } else if (grid.oscillator()) {

@@ -17,6 +17,7 @@
 #include "spatial/grid_field.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -505,5 +506,91 @@ TEST_CASE("Excitable grid cost per step", "[.][perf][excitable-perf]") {
                         fired(cells), cells.size() / 4);
         }
     }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1501: a grid field read through the sphere projection -- the plane grid unrolled round the inside of a sphere
+// (x = radius * azimuth, z = radius * latitude) -- agrees on the CPU and the GPU, reads the same cell at every radius
+// along a direction, and is not the plane reading.
+TEST_CASE("A sphere-projected grid field agrees on the CPU and the GPU", "[gpu][simulation][fields]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    scene::Scene s = pacedScene(0.2f);
+    const float unroll = 32.0f / 6.2831853f; // the grid is 32 m wide: once round
+    for (int c = -1; c < 1; ++c) {
+        spatial::FieldSpec f;
+        f.name = "sphere" + std::to_string(c + 1);
+        f.kind = spatial::FieldKind::Grid;
+        f.reference = "prop";
+        f.channel = c;
+        f.gridSphere = true;
+        f.radius = unroll;
+        f.position = {0.5f, -0.3f, 0.2f}; // off the origin: the unroll is about the field's frame
+        f.falloff.kind = spatial::FalloffKind::None;
+        REQUIRE(f.validate().has_value());
+        s.fields.fields.push_back(f);
+    }
+    spatial::FieldSpec plane;
+    plane.name = "plane";
+    plane.kind = spatial::FieldKind::Grid;
+    plane.reference = "prop";
+    plane.falloff.kind = spatial::FalloffKind::None;
+    s.fields.fields.push_back(plane);
+    Sim sim(*ctx, shaders);
+    for (int f = 0; f <= 45; ++f) {
+        sim.frame(s, f / 30.0);
+    }
+    spatial::FieldSet cpu = s.fields;
+    cpu.grids[0].data = sim.cells(s);
+    REQUIRE(cpu.grids[0].allocated());
+    std::vector<glm::vec3> points;
+    for (int i = 0; i < 64; ++i) {
+        const float az = static_cast<float>(i) * 0.61803f * 6.2831853f;
+        const float lat = -1.4f + 2.8f * static_cast<float>(i) / 63.0f;
+        const float r = 3.0f + 0.05f * static_cast<float>(i);
+        points.push_back(glm::vec3(0.5f, -0.3f, 0.2f) +
+                         r * glm::vec3(std::cos(lat) * std::cos(az), std::sin(lat), std::cos(lat) * std::sin(az)));
+    }
+    std::vector<glm::vec4> positions;
+    for (int slot = 2; slot <= 4; ++slot) {
+        for (const glm::vec3& p : points) {
+            positions.emplace_back(p, static_cast<float>(slot));
+        }
+    }
+    sim.fields.update(s.fields, 1.5);
+    const std::vector<float> got = probe(*ctx, shaders, sim.fields, positions);
+    float differsFromPlane = 0.0f;
+    float sum = 0.0f;
+    for (int slot = 2; slot <= 4; ++slot) {
+        const spatial::FieldSpec& f = cpu.fields[static_cast<std::size_t>(slot)];
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            const float want = spatial::sampleScalar(f, points[i], 1.5, &cpu);
+            const float have = got[static_cast<std::size_t>(slot - 2) * points.size() + i];
+            INFO(f.name << " at " << i << ": cpu " << want << " gpu " << have);
+            REQUIRE(std::abs(want - have) < 1e-5f);
+            if (slot == 2) {
+                sum += want;
+                differsFromPlane += std::abs(want - got[2 * points.size() + i]);
+                // every radius along the direction reads the same cell
+                const glm::vec3 c(0.5f, -0.3f, 0.2f);
+                const float further = spatial::sampleScalar(f, c + (points[i] - c) * 2.5f, 1.5, &cpu);
+                CHECK(std::abs(further - want) < 1e-5f);
+            }
+        }
+    }
+    CHECK(sum > 0.0f);
+    CHECK(differsFromPlane > 0.0f);
+    // JSON: written only when set, read back
+    const nlohmann::json j = cpu.fields[2].toJson();
+    CHECK(j.at("projection") == "sphere");
+    CHECK_FALSE(cpu.fields[4].toJson().contains("projection"));
+    auto back = spatial::FieldSpec::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->gridSphere);
+    CHECK(back->structuralHash() == cpu.fields[2].structuralHash());
+    spatial::FieldSpec bad = cpu.fields[4];
+    bad.kind = spatial::FieldKind::Radial;
+    bad.gridSphere = true;
+    CHECK_FALSE(bad.validate().has_value());
     CHECK(ctx->errorCount() == 0);
 }
