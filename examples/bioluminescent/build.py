@@ -673,16 +673,17 @@ def macros():
 # `sonic/response/*`, ADR-1062) reach THE RIFT LIVE twice:
 #   the routes  the snare is the response model's (Transients decides how many fire and how hard); an auto-gained
 #               band or the analyser's energy keeps its shape (what the music is doing) and is multiplied by the
-#               response level it is heard at (fixed dB, never auto-gained), so a quiet input wakes the canyon less
-#               and Sensitivity lifts it. The arc's two listeners (macro.energy, macro.bassSlow), and so the stage
+#               response level it is heard at (against the music's own loudness, ADR-1510), so a breakdown wakes the
+#               canyon less and Sensitivity lifts it. The arc's two listeners (macro.energy, macro.bassSlow), and so the stage
 #               machine, hear the same.
 #   the fields  the kick front (an onset field) and the highs (a spectrum field) read the audio history, which the
 #               engine hears through the same controls (AudioHistory::setResponse): a kick under the hit floor
 #               launches no front, the highs are curved by the level sensitivity, Release lengthens the front's
 #               decay.
 # Each gain is 1 / the response level's mean on Trench at the neutral controls, so the neutral picture is the old one
-# (docs/development/live-response-everywhere.md). The level range is the Sonic Abstract scenes' (-44..-2 dB). The
-# offline project keeps its audio.* routes.
+# (docs/development/live-response-everywhere.md). ADR-1510: the levels now read against the music's own loudness
+# (level 0.60, bass 0.63 mean on Trench, from 0.83 and 0.77 on the old -44..-2 dB window), so the gains are the old
+# ones times those ratios (1.38, 1.21). The offline project keeps its audio.* routes.
 RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 LIVE_SOURCES = {"audio.energy": "visual.hEnergy", "audio.bass": "visual.hBass", "audio.trebleLevel": "visual.hTreble",
                 "audio.mid": "visual.hMid", "audio.onsetMid": "response.snare"}
@@ -696,10 +697,10 @@ def heard(name, band, level, gain):
 
 
 LIVE_HEARD = {"kind": "interpret", "name": "heard", "settings": {"mappings": [
-    heard("hEnergy", "audio.energy", "response.level", 1.2),
-    heard("hBass", "audio.bass", "response.bass", 1.22),
-    heard("hTreble", "audio.trebleLevel", "response.level", 1.19),
-    heard("hMid", "audio.mid", "response.level", 1.19),
+    heard("hEnergy", "audio.energy", "response.level", 1.65),
+    heard("hBass", "audio.bass", "response.bass", 1.48),
+    heard("hTreble", "audio.trebleLevel", "response.level", 1.64),
+    heard("hMid", "audio.mid", "response.level", 1.64),
 ]}}
 
 
