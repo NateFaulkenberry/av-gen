@@ -565,6 +565,9 @@ def music(s, net, g):
             # the light: the bass warms the cores slowly, the hats run the streaks
             A("response.bass", op_path(g, "core"), 1.0, op="multiply", gain=0.5, offset=0.75, attackMs=200,
               decayMs=900),
+            # density (hats a second, 0..0.65 measured): a busy mix lights the bands, a breakdown lets them settle
+            A("response.hatRate", op_path(g, "core"), 1.0, op="multiply", gain=1.5, offset=0.45, attackMs=600,
+              decayMs=2500),
             A("response.hat", op_path(g, "glint"), 1.0, op="multiply", gain=3.0, offset=0.04, attackMs=8,
               decayMs=260),
             # the held sound swells the membrane

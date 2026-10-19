@@ -230,6 +230,20 @@
    }
   },
   {
+   "source": "response.hatRate",
+   "target": "material/bladeSphere/op/30/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "depthSource": "visual.influence",
+   "chain": {
+    "gain": 1.5,
+    "offset": 0.45,
+    "attackMs": 600,
+    "decayMs": 2500
+   }
+  },
+  {
    "source": "response.hat",
    "target": "material/bladeSphere/op/40/constant/constant",
    "amount": 1.0,
