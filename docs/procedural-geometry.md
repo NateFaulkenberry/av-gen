@@ -41,6 +41,10 @@ Parameters appear under `procedural/<node>/…`:
 | Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind) | evaluated on the GPU every frame |
 | Material | `material/baseColor`, `emissiveColor`, `emissive`, `roughness`, `metallic`; `materialVariation/hueShift|hueGradient|valueRandom|emissiveRandom|emissiveGradient` | per-instance colour is baked into the instance records |
 
+**Shadows.** By default an object is drawn into the shadow maps. Set `"castsShadow": false` in the `procedural`
+block to keep it out (ADR-1545). This suits ground cover and leaf cards, whose shadows are smaller than a shadow-map
+texel but whose cost is not. It is not a parameter.
+
 **Transform order**: `world = node × distribution × placement(i) × variation(i) × source`.
 Local-space deformers act on the source shape before instancing (each column twists about its
 own axis); world-space deformers act on the final world position (a wave across the whole hall).
