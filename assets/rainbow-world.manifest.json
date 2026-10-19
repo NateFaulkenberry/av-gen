@@ -1,0 +1,146 @@
+{
+ "scene": "Rainbow World",
+ "policy": "CC0 or CC-BY only, each verified on the asset page; downloads gitignored under assets/rainbow-world/ or the existing library folders; never commit third-party binaries (docs/prototypes/rainbow-world/04-production-plan.md section 3)",
+ "assets": [
+  {
+   "id": "boulder_01",
+   "source": "https://polyhaven.com/a/boulder_01",
+   "creators": [
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rico Cilliers)",
+   "localPath": "assets/terrain/rocks/boulder_01/boulder_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "sha256Bin": "7f5b06503d62bd95bfe9c6b8a354a5cc8ff04a4d271a8cf87a3e3125db4232d7",
+   "inspection": {
+    "triangles": 66122,
+    "textures": "1k diffuse, normal (GL), ARM or roughness",
+    "scale": "normalised to 1 m nominal on import"
+   },
+   "testRender": "~/Desktop/av-gen-review/74-rainbow-world/stage2/03-rock-adapted.png",
+   "modifications": "examples/rainbow-world/blender/rocks.py: voxel remesh 0.02, collapse decimate to ~170 faces, 1 cm bevel, smooth by angle 22 deg, new UVs; stylised material (warm stone, cool cavities, object-up moss); the scan's albedo kept only as a 30% value breakup",
+   "verdict": "adapted"
+  },
+  {
+   "id": "namaqualand_boulder_03",
+   "source": "https://polyhaven.com/a/namaqualand_boulder_03",
+   "creators": [
+    "Jenelle van Heerden",
+    "Dario Barresi"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Jenelle van Heerden, Dario Barresi)",
+   "localPath": "assets/terrain/rocks/namaqualand_boulder_03/namaqualand_boulder_03_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "sha256Bin": "d24151021ed310fe3207f1b5964bff22b583e77d2617427a88b5dcbc0447a475",
+   "inspection": {
+    "triangles": 64826,
+    "textures": "1k diffuse, normal (GL), ARM or roughness",
+    "scale": "normalised to 1 m nominal on import"
+   },
+   "testRender": "~/Desktop/av-gen-review/74-rainbow-world/stage2/03-rock-adapted.png",
+   "modifications": "examples/rainbow-world/blender/rocks.py: voxel remesh 0.02, collapse decimate to ~170 faces, 1 cm bevel, smooth by angle 22 deg, new UVs; stylised material (warm stone, cool cavities, object-up moss); the scan's albedo kept only as a 30% value breakup",
+   "verdict": "adapted (hero: the rim kit and the boulder)"
+  },
+  {
+   "id": "rock_07",
+   "source": "https://polyhaven.com/a/rock_07",
+   "creators": [
+    "Jenelle van Heerden"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Jenelle van Heerden)",
+   "localPath": "assets/terrain/rocks/rock_07/rock_07_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "sha256Bin": "e4a532a6d6cf4a08c288f501b790f32cba0528136a29959ce774c3cd39369e7e",
+   "inspection": {
+    "triangles": 14844,
+    "textures": "1k diffuse, normal (GL), ARM or roughness",
+    "scale": "normalised to 1 m nominal on import"
+   },
+   "testRender": "~/Desktop/av-gen-review/74-rainbow-world/stage2/03-rock-adapted.png",
+   "modifications": "examples/rainbow-world/blender/rocks.py: voxel remesh 0.02, collapse decimate to ~170 faces, 1 cm bevel, smooth by angle 22 deg, new UVs; stylised material (warm stone, cool cavities, object-up moss); the scan's albedo kept only as a 30% value breakup",
+   "verdict": "adapted"
+  },
+  {
+   "id": "rock_09",
+   "source": "https://polyhaven.com/a/rock_09",
+   "creators": [
+    "Jenelle van Heerden"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Jenelle van Heerden)",
+   "localPath": "assets/terrain/rocks/rock_09/rock_09_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "sha256Bin": "780c37d6fc11ca3a01c3763535ef883908b6007271a46bd446d2289ded820751",
+   "inspection": {
+    "triangles": 12416,
+    "textures": "1k diffuse, normal (GL), ARM or roughness",
+    "scale": "normalised to 1 m nominal on import"
+   },
+   "testRender": "~/Desktop/av-gen-review/74-rainbow-world/stage2/03-rock-adapted.png",
+   "modifications": "examples/rainbow-world/blender/rocks.py: voxel remesh 0.02, collapse decimate to ~170 faces, 1 cm bevel, smooth by angle 22 deg, new UVs; stylised material (warm stone, cool cavities, object-up moss); the scan's albedo kept only as a 30% value breakup",
+   "verdict": "adapted"
+  },
+  {
+   "id": "stone_01",
+   "source": "https://polyhaven.com/a/stone_01",
+   "creators": [
+    "Dario Barresi",
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Dario Barresi, Rico Cilliers)",
+   "localPath": "assets/terrain/rocks/stone_01/stone_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "sha256Bin": "ad037d15be3619be6aa3ddb144d450aea43b5efb66b670ba756272bf839418e3",
+   "inspection": {
+    "triangles": 53520,
+    "textures": "1k diffuse, normal (GL), ARM or roughness",
+    "scale": "normalised to 1 m nominal on import"
+   },
+   "testRender": "~/Desktop/av-gen-review/74-rainbow-world/stage2/03-rock-adapted.png",
+   "modifications": "examples/rainbow-world/blender/rocks.py: voxel remesh 0.02, collapse decimate to ~170 faces, 1 cm bevel, smooth by angle 22 deg, new UVs; stylised material (warm stone, cool cavities, object-up moss); the scan's albedo kept only as a 30% value breakup",
+   "verdict": "adapted"
+  },
+  {
+   "id": "rock_moss_set_01",
+   "source": "https://polyhaven.com/a/rock_moss_set_01",
+   "creators": [
+    "Kless Gyzen"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Kless Gyzen)",
+   "localPath": "assets/terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "sha256Bin": "de8360e6175879aaf02c171911069cf5f1852547f9ca7f10e440085dbcc3315e",
+   "inspection": {
+    "triangles": 63127,
+    "textures": "1k diffuse, normal (GL), ARM or roughness",
+    "scale": "normalised to 1 m nominal on import"
+   },
+   "testRender": "~/Desktop/av-gen-review/74-rainbow-world/stage2/03-rock-adapted.png",
+   "modifications": "examples/rainbow-world/blender/rocks.py: voxel remesh 0.02, collapse decimate to ~170 faces, 1 cm bevel, smooth by angle 22 deg, new UVs; stylised material (warm stone, cool cavities, object-up moss); the scan's albedo kept only as a 30% value breakup",
+   "verdict": "adapted"
+  }
+ ],
+ "own": [
+  {
+   "id": "leaf_cluster",
+   "what": "painted leaf-cluster card, generated by examples/rainbow-world/blender/trees.py",
+   "license": "repository licence"
+  },
+  {
+   "id": "band, trees, clouds, rainbows, grass",
+   "what": "generated by the scripts in examples/rainbow-world/blender/",
+   "license": "repository licence"
+  }
+ ]
+}
