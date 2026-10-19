@@ -244,7 +244,11 @@ Nothing in the live path (presentation, pacing, the quality controller, the prog
   vertex work on 36,100 pins (×24 vertices, in the depth pass too).
 - **MIDI:** neither scene was measured with a controller attached; none was available. The MIDI path is a handful of
   CC routes evaluated per frame on the CPU, the same kind as before the pass.
-- **No audio:** NOAUDIO
+- **No audio** (`--no-audio`, `stage4-profiles/*-noaudio.*`):
+  - RD Pins: Medium (0.71), GPU 25.0 / 32.8 ms, 0 misses;
+  - Phase Hall: Ultra, 23.7 / 32.1 ms, 0 misses.
+
+  Without audio the RD and the bake still step, and Auto settles a level lower on RD Pins.
 
 ## 5. Checks
 
