@@ -1,5 +1,6 @@
 #include "app/live_audio_policy.hpp"
 #include "app/application.hpp"
+#include "rendering/procedural_renderer.hpp" // ADR-1493: compiledMaterialsActive
 #include "core/process_memory.hpp"
 #include "app/live_profile_session.hpp"
 #include "app/cli_batch.hpp"
@@ -413,7 +414,12 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
         options.height = 900;
         options.sizeGiven = true;
         options.autoplay = true;
-        options.startProjection = true;
+        // ADR-1490: --projection off measures the editor alone. Its canvas renders the output frame at Native
+        // quality, exactly the output size, so the two arms render the same pixels and differ by the projection.
+        options.startProjection = o.projection;
+        if (!o.projection) {
+            options.previewMode = ui::PreviewViewMode::OutputFrame;
+        }
         if (o.capture) {
             options.capture = *o.capture; // the editor's own end-of-run capture
         }
@@ -1674,6 +1680,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // settings file happens to be left.
         if (options_.previewMode) {
             panel_->preview.mode = *options_.previewMode;
+        }
+        if (options_.liveProfile.enabled && options_.liveProfile.mode == LiveProfileMode::Live &&
+            !options_.liveProfile.projection) {
+            panel_->preview.quality = ui::PreviewQuality::Native; // ADR-1490: the output size, not the canvas's
         }
         // Never restored: a fullscreen preview closes every panel, and a session that ended in one
         // must not reopen with an empty editor and no record of what was open. The pan is dropped
@@ -4787,6 +4797,11 @@ int Application::runLive() {
     // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
     // never calls this, so an offline render rebuilds whenever the hash moves, as it always did.
     renderer_->setInteractiveEnvironmentBudget(2.0);
+    // ADR-1492, live only as well: the velocity target is computed only on frames something reads it (motion blur
+    // open on the live level, an aux debug view). A render job has its own renderer and keeps it whatever.
+    renderer_->setVelocityOnDemand(true);
+    // ADR-1493: material programs compiled into the procedural lit pass, built on Dawn's workers when they change.
+    renderer_->setCompiledMaterials(true);
     // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
     // and rebuilds its lighting at a capped rate, spread across frames.
     renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
@@ -5814,6 +5829,15 @@ int Application::runLive() {
             // ADR-1362: the pacing the interval was taken under -- a capped loop's intervals are the deadlines the
             // viewer sees met or missed.
             autoResolution_.setPacing(pacePeriodMs, paceRefreshHz);
+            // ADR-1493: the compiled-materials variant just replaced the interpreter -- forget the backoff the
+            // interpreter's misses earned, so the controller climbs to what the compiled scene holds.
+            if (const bool compiled = renderer_->procedurals().compiledMaterialsActive();
+                compiled != compiledMaterialsSeen_) {
+                compiledMaterialsSeen_ = compiled;
+                if (compiled) {
+                    autoResolution_.forgetBackoff();
+                }
+            }
             static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs));
             // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
             // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.

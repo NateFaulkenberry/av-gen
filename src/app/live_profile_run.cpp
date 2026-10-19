@@ -401,6 +401,9 @@ int Application::runLiveProfileHeadless() {
     if (!options_.liveAntialias.has_value()) {
         base.antialiasFloor = rendering::kLiveAntialiasFloor;
     }
+    renderer_->setVelocityOnDemand(true); // ADR-1492: as the live editor renders
+    renderer_->setCompiledMaterials(true); // ADR-1493
+
     if (const auto profile = liveQualityProfile()) {
         base = applyQualityProfile(base, *profile);
     }
@@ -493,7 +496,8 @@ int Application::runLiveProfileHeadless() {
             // before warm-up, and report the wait apart from the frames.
             const auto prewarmStart = Clock::now();
             const std::size_t variantsBefore = renderer_->sdfs().compiledVariantCount();
-            while (renderer_->sdfs().pendingCompiles() > 0 && msSince(prewarmStart) < 60000.0) {
+            while (renderer_->sdfs().pendingCompiles() + (options_.liveProfile.prewarm ? renderer_->procedurals().pendingCompiles() : 0) > 0 &&
+                   msSince(prewarmStart) < 60000.0) {
                 context_->processEvents();
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
@@ -686,15 +690,16 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         const auto pinned = livePinnedQuality();
         const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
         if (s.trace.empty()) {
-            s.trace = "phase,t,frameMs,gpuMs,rung,level,scale,costMs,paceMs,refreshMs\n";
+            s.trace = "phase,t,frameMs,gpuMs,rung,level,scale,costMs,paceMs,refreshMs,compiledMaterials\n";
         }
-        s.trace += fmt::format("{},{:.4f},{:.3f},{:.3f},{},{},{:.2f},{:.3f},{:.3f},{:.3f}\n", s.phase == P::Warmup ? 'w' : 'm',
+        s.trace += fmt::format("{},{:.4f},{:.3f},{:.3f},{},{},{:.2f},{:.3f},{:.3f},{:.3f},{}\n", s.phase == P::Warmup ? 'w' : 'm',
                                msSince(s.phaseStart) / 1000.0, frame.frameMs, frame.gpuMs, rung,
                                liveQualityLevelName(autoResolution_.ladder()[rung].level),
                                static_cast<double>(effectiveRenderScale(autoResolution_.ladder()[rung],
                                                                         autoResolution_.settings().scaleFloor)),
                                autoResolution_.gpuCostMs(), autoResolution_.pacing().periodMs,
-                               autoResolution_.pacing().refreshMs);
+                               autoResolution_.pacing().refreshMs,
+                               renderer_->procedurals().compiledMaterialsActive() ? 1 : 0);
     }
     switch (s.phase) {
     case P::WaitingForOutput: {
@@ -706,15 +711,16 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
                                    frame.frameMs;
         }
         // ADR-1102: wait for the pre-warm (variants compiling on Dawn's workers) too, and time it.
-        if (renderer_->sdfs().pendingCompiles() > 0 && s.waitFrames < 3000) {
+        if (renderer_->sdfs().pendingCompiles() + (o.prewarm ? renderer_->procedurals().pendingCompiles() : 0) > 0 &&
+            s.waitFrames < 3000) {
             return true;
         }
         if (s.record.cold.prewarmMs < 0.0) {
             s.record.cold.prewarmMs = msSince(s.phaseStart);
             s.record.cold.prewarmVariants = static_cast<int>(renderer_->sdfs().compiledVariantCount());
         }
-        if ((out != nullptr && out->open()) || s.waitFrames > 300) {
-            if (out == nullptr || !out->open()) {
+        if (!o.projection || (out != nullptr && out->open()) || s.waitFrames > 300) {
+            if (o.projection && (out == nullptr || !out->open())) {
                 s.record.notes.push_back("the projection window did not open; the editor canvas was measured");
             }
             s.phase = P::Warmup;
@@ -743,6 +749,11 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             s.phase = P::Measure;
             s.measureStart = Clock::now();
             s.compilesBefore = gpu::pipelineCounters();
+            {
+                const auto hub = engine_->control().status();
+                s.midiMessagesBefore = hub.midi.messages;
+                s.midiAppliedBefore = hub.applied;
+            }
             s.record.conditions.startSeconds = engine_->positionSeconds();
             cpuProfile_.setFrameGroup(core::PhaseProfiler::kMaxGroups - 1);
             cpuProfile_.nameGroup(core::PhaseProfiler::kMaxGroups - 1, "live-profile");
@@ -772,7 +783,7 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             r.conditions.outputWidth = out->pixelWidth();
             r.conditions.outputHeight = out->pixelHeight();
         } else {
-            r.conditions.window = "windowed (editor canvas)";
+            r.conditions.window = o.projection ? "windowed (editor canvas)" : "windowed (editor canvas, no projection)";
             r.conditions.outputWidth = renderWidth_;
             r.conditions.outputHeight = renderHeight_;
         }
@@ -790,6 +801,13 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
             if (!out) {
                 log::error("--live-profile: cannot write {}", o.trace->string());
             }
+        }
+        {
+            const auto hub = engine_->control().status();
+            r.notes.push_back(fmt::format("midi: {} message(s) received and {} control message(s) applied while "
+                                          "measuring, from {} source(s){}",
+                                          hub.midi.messages - s.midiMessagesBefore, hub.applied - s.midiAppliedBefore,
+                                          hub.midiSources.size(), hub.midiOpen ? "" : " (MIDI input closed)"));
         }
         if (liveTransitions_ > s.transitionsSeen) {
             r.notes.push_back(fmt::format("the live level changed {} time(s) WHILE MEASURING; the statistics mix "

@@ -554,6 +554,174 @@ TEST_CASE("Procedural rendering is deterministic across renderers and animates w
     CHECK(ctx2->errorCount() == 0);
 }
 
+namespace {
+// A column field under a deformer stack that moves every vertex (sine, bend, noise), seen at a grazing angle so
+// columns overlap: the depth test decides most of the frame.
+scene::Scene deformedColumns() {
+    scene::Scene s = columnScene(48);
+    s.camera.position = {0.0f, 2.0f, 12.0f};
+    scene::Deformer sine;
+    sine.kind = scene::DeformerKind::Sine;
+    sine.space = scene::DeformSpace::World;
+    sine.amount = 0.6f;
+    sine.axis = {1.0f, 0.0f, 0.0f};
+    sine.frequency = 1.5f;
+    sine.speed = 2.0f;
+    sine.displacementAxis = {0.0f, 1.0f, 0.0f};
+    s.procedurals[0].deformers.push_back(sine);
+    scene::Deformer bend;
+    bend.kind = scene::DeformerKind::Bend;
+    bend.amount = 0.3f;
+    bend.falloff = 1.0f;
+    s.procedurals[0].deformers.push_back(bend);
+    scene::Deformer noise;
+    noise.kind = scene::DeformerKind::Noise;
+    noise.amount = 0.05f;
+    noise.scale = 2.0f;
+    noise.speed = 0.5f;
+    s.procedurals[0].deformers.push_back(noise);
+    return s;
+}
+} // namespace
+
+TEST_CASE("The depth-only procedural vertex stage lands on the lit pass's depth (ADR-1491)",
+          "[gpu][procedural][depth][adr1491]") {
+    // The prepass draws through vs_proc_depth (no normal, no velocity chain), the lit pass through vs_proc and tests
+    // LessEqual against it. Were the two positions to differ by a bit, the lit pass would fail its test on the
+    // surfaces it should draw and the frame would differ from the one rendered without a prepass.
+    auto ctx = makeContext();
+    scene::Scene s = deformedColumns();
+    s.environment.depthPrepass = false;
+    const auto without = renderOnce(*ctx, s, 1.0);
+    s.environment.depthPrepass = true;
+    const auto with = renderOnce(*ctx, s, 1.0);
+    CHECK(coverage(with).pixels > 2000);
+    CHECK(gpu::hashImage(with) == gpu::hashImage(without));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Velocity on demand: the picture is unchanged and the chain is skipped only while unread (ADR-1492)",
+          "[gpu][procedural][adr1492]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    scene::Scene s = deformedColumns();
+    FrameTime t{};
+    t.renderTime = 1.0;
+    CHECK_FALSE(renderer.velocityOnDemand()); // every renderer but the live editor's computes velocity
+    auto always = renderer.renderToImage(s, t, 256, 256);
+    REQUIRE(always.has_value());
+    CHECK_FALSE(renderer.velocitySkipped());
+
+    renderer.setVelocityOnDemand(true);
+    auto onDemand = renderer.renderToImage(s, t, 256, 256);
+    REQUIRE(onDemand.has_value());
+    CHECK(renderer.velocitySkipped()); // no motion blur in this scene: nothing reads the target
+    CHECK(gpu::hashImage(*onDemand) == gpu::hashImage(*always));
+
+    // Motion blur open: the target is read, so it is written.
+    s.post.motionBlurAmount = 1.0f;
+    s.camera.lens.shutterAngle = 180.0f;
+    auto blurred = renderer.renderToImage(s, t, 256, 256);
+    REQUIRE(blurred.has_value());
+    CHECK_FALSE(renderer.velocitySkipped());
+    // ...unless the live level closes the motion-blur gate.
+    rendering::QualitySettings q = renderer.qualitySettings();
+    q.motionBlur = false;
+    renderer.setQualitySettings(q);
+    auto gated = renderer.renderToImage(s, t, 256, 256);
+    REQUIRE(gated.has_value());
+    CHECK(renderer.velocitySkipped());
+    // An aux debug view reads it too.
+    renderer.setAuxDebugView(rendering::AuxDebugView::Velocity);
+    auto debug = renderer.renderToImage(s, t, 256, 256);
+    REQUIRE(debug.has_value());
+    CHECK_FALSE(renderer.velocitySkipped());
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Velocity on demand changes neither seek nor play, and motion blur switched on mid-run is right on its "
+          "first frame "
+          "(ADR-1492)",
+          "[gpu][procedural][adr1492]") {
+    // The previous-frame chain is a pure function of last frame's time and matrices, never a stored history, so a
+    // frame that computes it after frames that skipped it must match a renderer that never skipped.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    const auto frameAt = [](int i) {
+        FrameTime t{};
+        t.renderTime = 1.0 + i / 30.0;
+        t.deltaTime = i == 0 ? 0.0 : 1.0 / 30.0;
+        t.frameIndex = static_cast<std::uint64_t>(i);
+        return t;
+    };
+    scene::Scene still = deformedColumns();
+    scene::Scene blur = still;
+    blur.post.motionBlurAmount = 1.0f;
+    blur.camera.lens.shutterAngle = 180.0f;
+    constexpr int kSwitch = 4;
+
+    // Play, on demand: frames 0..3 without motion blur (the chain skipped), then frame 4 with it.
+    rendering::SceneRenderer onDemand(*ctx, shaders);
+    REQUIRE(onDemand.init().has_value());
+    onDemand.setVelocityOnDemand(true);
+    std::uint64_t playStill = 0;
+    for (int i = 0; i < kSwitch; ++i) {
+        auto img = onDemand.renderToImage(still, frameAt(i), 256, 256);
+        REQUIRE(img.has_value());
+        CHECK(onDemand.velocitySkipped());
+        playStill = gpu::hashImage(*img);
+    }
+    auto switched = onDemand.renderToImage(blur, frameAt(kSwitch), 256, 256);
+    REQUIRE(switched.has_value());
+    CHECK_FALSE(onDemand.velocitySkipped());
+
+    // The reference: the same frames from a renderer that always writes velocity.
+    rendering::SceneRenderer always(*ctx, shaders);
+    REQUIRE(always.init().has_value());
+    std::uint64_t referenceStill = 0;
+    for (int i = 0; i < kSwitch; ++i) {
+        auto img = always.renderToImage(still, frameAt(i), 256, 256);
+        REQUIRE(img.has_value());
+        referenceStill = gpu::hashImage(*img);
+    }
+    auto reference = always.renderToImage(blur, frameAt(kSwitch), 256, 256);
+    REQUIRE(reference.has_value());
+    CHECK(playStill == referenceStill);
+    CHECK(gpu::hashImage(*switched) == gpu::hashImage(*reference));
+    // And the blur is really there: a sharp frame at the same instant differs.
+    auto sharp = always.renderToImage(still, frameAt(kSwitch), 256, 256);
+    REQUIRE(sharp.has_value());
+    CHECK(gpu::hashImage(*sharp) != gpu::hashImage(*reference));
+
+    // A seek (a fresh renderer opening at frame 3) draws the same with and without on-demand velocity. Seek and play
+    // can differ by the renderer's own frame-to-frame state; on-demand velocity adds nothing to that.
+    rendering::SceneRenderer seek(*ctx, shaders);
+    REQUIRE(seek.init().has_value());
+    seek.setVelocityOnDemand(true);
+    auto sought = seek.renderToImage(still, frameAt(kSwitch - 1), 256, 256);
+    REQUIRE(sought.has_value());
+    CHECK(seek.velocitySkipped());
+    rendering::SceneRenderer seekAlways(*ctx, shaders);
+    REQUIRE(seekAlways.init().has_value());
+    auto soughtAlways = seekAlways.renderToImage(still, frameAt(kSwitch - 1), 256, 256);
+    REQUIRE(soughtAlways.has_value());
+    CHECK(gpu::hashImage(*sought) == gpu::hashImage(*soughtAlways));
+    // ...and with motion blur open, a seek straight onto the switch frame matches the never-skipping renderer's.
+    rendering::SceneRenderer seekBlur(*ctx, shaders);
+    REQUIRE(seekBlur.init().has_value());
+    seekBlur.setVelocityOnDemand(true);
+    auto soughtBlur = seekBlur.renderToImage(blur, frameAt(kSwitch), 256, 256);
+    REQUIRE(soughtBlur.has_value());
+    rendering::SceneRenderer seekBlurAlways(*ctx, shaders);
+    REQUIRE(seekBlurAlways.init().has_value());
+    auto soughtBlurAlways = seekBlurAlways.renderToImage(blur, frameAt(kSwitch), 256, 256);
+    REQUIRE(soughtBlurAlways.has_value());
+    CHECK(gpu::hashImage(*soughtBlur) == gpu::hashImage(*soughtBlurAlways));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("4096 procedural instances render without GPU errors and re-upload only on structural change",
           "[gpu][procedural]") {
     auto ctx = makeContext();

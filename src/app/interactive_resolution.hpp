@@ -425,6 +425,11 @@ public:
     // the controller is switched off, and when the thing being measured changes underneath it (a
     // new project, a new strategy).
     void reset();
+    // ADR-1493: the frame got cheaper underneath the controller (a compiled-materials variant arrived after the
+    // interpreter drew the scene's first seconds). The levels it left on the interpreter's misses are no evidence
+    // against the new cost, so their backoff and the miss window are forgotten; the level in force is kept, and the
+    // climb proceeds at the ordinary hold.
+    void forgetBackoff();
 
     // The cost ratio between rung k-1 and rung k (cost(k-1) / cost(k)) the controller would use to
     // predict a climb from k: measured on the way down when it has been, the prior otherwise.

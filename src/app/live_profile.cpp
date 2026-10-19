@@ -43,13 +43,17 @@ std::string liveProfileUsage() {
            "                                               performance (default auto)\n"
            "                        --camera <name>        a named camera\n"
            "                        --no-audio             measure without the audio file playing\n"
+           "                        --projection on|off    live: off measures the editor alone, its canvas in Output\n"
+           "                                               Frame mode at the output size (default on)\n"
            "                        --midi <filter>        a MIDI input to open while measuring\n"
            "                        --capture <png>        the last measured frame\n"
            "                        --json <file>          the record (avgen.liveprofile/1)\n"
            "                        --trace <csv>          live: one row per frame (interval, GPU, level), warm-up on\n"
            "                        --text / --no-text     the human report on stdout (default on)\n"
            "                        --verify-candidates <n> measure the top n candidates' savings (A/B)\n"
-           "                        --no-prewarm           SDF variants compiled at first use on the main thread (the\n"
+           "                        --no-prewarm           SDF variants compiled at first use on the main thread, and\n"
+           "                                               the compiled-materials variant not waited for (ADR-1493: the\n"
+           "                                               period after a scene switch) (the\n"
            "                                               behaviour before ADR-1102), for before/after measurements\n"
            "                      Phase 5, headless only (ADR-1108..1112):\n"
            "                        --compare <levers|project> ORIGINAL vs OPTIMIZED: the levers (comma separated A/B\n"
@@ -156,6 +160,14 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
             if (!text(i, "--camera", o.camera)) return out;
         } else if (a == "--no-audio") {
             o.audio = false;
+        } else if (a == "--projection") {
+            std::string v;
+            if (!text(i, "--projection", v)) return out;
+            if (v != "on" && v != "off") {
+                out.error = "--projection wants on or off, got '" + v + "'";
+                return out;
+            }
+            o.projection = v == "on";
         } else if (a == "--midi") {
             if (!text(i, "--midi", o.midi)) return out;
         } else if (a == "--capture") {

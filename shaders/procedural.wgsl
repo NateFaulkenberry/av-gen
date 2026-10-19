@@ -588,8 +588,22 @@ struct ProcVertexOut {
     @location(9) @interpolate(flat) variation: vec2<f32>,
 };
 
+// ADR-1491: one vertex stage, two entries. `vs_proc` (the lit pass) and `vs_proc_depth` (the depth prepass and the
+// shadow passes) run the same code with `depthOnly` a constant, so the compiler drops what a depth-only draw never
+// reads: the two extra chain evaluations of the finite-difference normal (unless a masked material's cutout program
+// reads the normal in `fs_proc_depth`) and the previous-frame chain of the velocity. The position is the same
+// expression in both, and `clip` is @invariant, so the lit pass's LessEqual test against the prepass still holds.
 @vertex
 fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
+    return procVertex(in, instanceIndex, false);
+}
+
+@vertex
+fn vs_proc_depth(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
+    return procVertex(in, instanceIndex, true);
+}
+
+fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOut {
     // Indirection is per draw (uniform across the whole draw), so both paths stay coherent.
     var recordIndex = instanceIndex;
     if (proc.fieldInfo.w > 0.5) { recordIndex = visibleIndices[instanceIndex]; }
@@ -678,9 +692,18 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
 
     let eps = proc.timeInfo.z;
     let now = proc.timeInfo.x;
+    // ADR-1492: read before the chain (see the handedness note above): no velocity in a depth-only pass, nor in a lit
+    // pass whose velocity target nothing reads this frame (frame.styledGround.w, the live editor only).
+    let skipVelocity = depthOnly || frame.styledGround.w > 0.5;
     var p0 = deformChain(srcPos, n, nRef, inst, now, object.model);
-    var p1 = deformChain(srcPos + t1 * eps, n, nRef, inst, now, object.model);
-    var p2 = deformChain(srcPos + t2 * eps, n, nRef, inst, now, object.model);
+    // A depth-only draw needs the normal only for a masked material (fs_proc_depth's cutout program reads it).
+    let needNormal = !depthOnly || (object.flags.x > 0.5 && object.flags.x < 1.5);
+    var p1 = p0;
+    var p2 = p0;
+    if (needNormal) {
+        p1 = deformChain(srcPos + t1 * eps, n, nRef, inst, now, object.model);
+        p2 = deformChain(srcPos + t2 * eps, n, nRef, inst, now, object.model);
+    }
 
     // ---- ADR-055 Tier 0 wind ----
     // The field is sampled ONCE, at the instance's root, because a plant is small compared with
@@ -709,10 +732,12 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
             }
         }
         p0 = p0 + bendDisplacement(srcPos.y, bend, proc.windTiming, proc.windPlant, inst.scale.y);
-        p1 = p1 + bendDisplacement(srcPos.y + t1.y * eps, bend, proc.windTiming, proc.windPlant,
-                                   inst.scale.y);
-        p2 = p2 + bendDisplacement(srcPos.y + t2.y * eps, bend, proc.windTiming, proc.windPlant,
-                                   inst.scale.y);
+        if (needNormal) {
+            p1 = p1 + bendDisplacement(srcPos.y + t1.y * eps, bend, proc.windTiming, proc.windPlant,
+                                       inst.scale.y);
+            p2 = p2 + bendDisplacement(srcPos.y + t2.y * eps, bend, proc.windTiming, proc.windPlant,
+                                       inst.scale.y);
+        }
     }
     // ---- Effect Library Wave 2 (FXL): the owner's displacement -- Breathing, Organic Pulsation,
     // Motion Smear -- on all three points, so the finite-difference normal below leans with a
@@ -727,8 +752,10 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
             fxMoves = true;
             fxLanes = fxVertexLanesOf(entityFx[u32(object.fxA.w + 0.5)]);
             p0 = p0 + fxVertexOffset(p0, nRef, now, fxFlags, fxLanes);
-            p1 = p1 + fxVertexOffset(p1, nRef, now, fxFlags, fxLanes);
-            p2 = p2 + fxVertexOffset(p2, nRef, now, fxFlags, fxLanes);
+            if (needNormal) {
+                p1 = p1 + fxVertexOffset(p1, nRef, now, fxFlags, fxLanes);
+                p2 = p2 + fxVertexOffset(p2, nRef, now, fxFlags, fxLanes);
+            }
         }
     }
     // ADR-1021. cross(J t1, J t2) = det(J) J^-T n: the rebuilt normal is the outward one times the
@@ -738,7 +765,7 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     // taken from the angle to the *undeformed* normal, which turned any twist past a quarter turn
     // inside out.)
     var nw = cross(p1 - p0, p2 - p0);
-    if (dot(nw, nw) < 1e-30) {
+    if (!needNormal || dot(nw, nw) < 1e-30) {
         nw = nRef;
     } else {
         nw = normalize(nw);
@@ -750,6 +777,10 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     out.clip = frame.viewProj * vec4<f32>(p0, 1.0);
     out.worldPos = p0;
     out.normal = nw;
+    if (skipVelocity) {
+        out.prevClip = out.clip; // zero motion: no velocity target, or one nothing reads
+        return out;
+    }
     // Velocity covers camera, object, instance and deformation motion: the same chain evaluated
     // with last frame's time and last frame's object matrix (ADR-035).
     var pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);

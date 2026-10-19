@@ -319,6 +319,17 @@ public:
                                     wgpu::Buffer gridTable = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of procedural.wgsl / points.wgsl / cull.wgsl (keeps buffers)
 
+    // ADR-1493: the lit pass draws through a pipeline variant whose material programs are compiled to straight-line
+    // WGSL (scene/material_compiler.hpp). Off by default; the live editor and the live profile turn it on. A
+    // variant is built on Dawn's workers when the programs' structure changes, and until it is ready (or if it fails)
+    // the interpreter's pipelines draw, so a change never stalls a frame.
+    void setCompiledMaterials(bool on);
+    // Per frame, after the material program block is packed: the programs the next draws will read.
+    void noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs);
+    // A variant still compiling (0 or 1), and whether this frame's lit draws use one.
+    [[nodiscard]] std::size_t pendingCompiles() const;
+    [[nodiscard]] bool compiledMaterialsActive() const;
+
     // Per frame, before the lit pass: uploads source meshes (cached by `meshHash`) and instance
     // buffers that changed, writes the deformer/time and object uniforms, and encodes the
     // effector compute pass for objects with effectors. The scene is const here, so the engine

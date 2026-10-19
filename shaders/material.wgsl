@@ -534,175 +534,383 @@ fn matOpConstant4(pi: u32, oi: u32) -> vec4<f32> { return materialPrograms.progr
 // the interpreter's register-to-register dependency chain is only hidable by occupancy.
 // Reading each field where it is used lets the four constants sink into the five branches
 // that want them.
+// ADR-1493: one function per op kind, so a compiled program (scene/material_compiler.cpp) calls exactly the code
+// the interpreter runs for that op, with its registers passed as values. `k` and `f` are read here, from the buffer,
+// so a route that moves an op's constants reaches a compiled program without a recompile.
+fn matKInput(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return materialInputValue(matOpInput(pi, oi), ctx);
+}
+
+fn matKConstant(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return k;
+}
+
+fn matKGradient(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(saturate(dot(a.xyz, k.xyz) * f + k.w));
+}
+
+fn matKNoise(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(fbm3(a.xyz * f + k.xyz, matOpSeed(pi, oi)));
+}
+
+fn matKVoronoi(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(voronoiF1(a.xyz * f + k.xyz, matOpSeed(pi, oi)));
+}
+
+fn matKFresnel(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(matPow1(1.0 - saturate(dot(ctx.normal, ctx.viewDirection)), f));
+}
+
+fn matKRamp(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return ramp3(k, matOpConstant2(pi, oi), matOpConstant3(pi, oi), a.x);
+}
+
+fn matKRemap(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let inSpan = k.y - k.x;
+    var u = vec4<f32>(0.0);
+    if (inSpan != 0.0) {
+        u = (a - vec4<f32>(k.x)) / inSpan;
+    }
+    var remapped = u * (k.w - k.z) + vec4<f32>(k.z);
+    if (f > 0.5) {
+        remapped = clamp(remapped, vec4<f32>(min(k.z, k.w)), vec4<f32>(max(k.z, k.w)));
+    }
+    return remapped;
+}
+
+fn matKMultiply(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return a * b;
+}
+
+fn matKAdd(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return a + b;
+}
+
+fn matKMix(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return matMix4(a, b, f);
+}
+
+fn matKMixby(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return matMix4(a, b, c.x);
+}
+
+fn matKPower(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return matPow4(max(a, vec4<f32>(0.0)), f);
+}
+
+fn matKSmoothstep(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return matSmoothstep4(k.x, k.y, a);
+}
+
+fn matKThreshold(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return select(vec4<f32>(0.0), vec4<f32>(1.0), a >= vec4<f32>(f));
+}
+
+fn matKHueshift(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(hueShift(a.xyz, f + b.x), a.w);
+}
+
+fn matKSaturate(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(colorSaturate(a.xyz, f), a.w);
+}
+
+fn matKPalette(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(cosinePalette(k.xyz, matOpConstant2(pi, oi).xyz, matOpConstant3(pi, oi).xyz,
+                                   matOpConstant4(pi, oi).xyz, a.x + f),
+                     1.0);
+}
+
+fn matKField(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return matFieldGet(fields, matOpFieldOrdinal(pi, oi));
+}
+
+fn matKTriplanar(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let p = a.xyz * f + k.xyz;
+    let w = matTriplanarWeights(ctx.normal, matOpConstant2(pi, oi).x);
+    let sx = fbm3(vec3<f32>(p.y, p.z, 0.0), matOpSeed(pi, oi));
+    let sy = fbm3(vec3<f32>(p.z, p.x, 0.0), matOpSeed(pi, oi));
+    let sz = fbm3(vec3<f32>(p.x, p.y, 0.0), matOpSeed(pi, oi));
+    return vec4<f32>(w.x * sx + w.y * sy + w.z * sz);
+}
+
+fn matKWorldProject(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(ctx.worldPosition * f + k.xyz, 1.0);
+}
+
+fn matKObjectProject(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(ctx.localPosition * f + k.xyz, 1.0);
+}
+
+fn matKHeightBlend(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(matHeightBlend(a.x, b.x, c.x, f));
+}
+
+fn matKDetailNormal(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(matReorientNormal(a.xyz, b.xyz), 0.0);
+}
+
+fn matKCurvatureMask(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return vec4<f32>(matSmoothstep1(k.x, k.y, ctx.curvature * f));
+}
+
+fn matKEdgeWear(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let edge = saturate(max(ctx.curvature, 0.0) * f);
+    let nz = fbm3(ctx.worldPosition * k.x + vec3<f32>(k.y, k.z, k.w), matOpSeed(pi, oi));
+    let influence = saturate(matOpConstant2(pi, oi).x);
+    let v = edge * (1.0 - influence + influence * nz);
+    return vec4<f32>(matSmoothstep1(matOpConstant2(pi, oi).y, matOpConstant2(pi, oi).z, v));
+}
+
+fn matKDecalBox(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let halfExtent = max(abs(matOpConstant2(pi, oi).xyz), vec3<f32>(1e-4));
+    let q = (ctx.worldPosition - k.xyz) / halfExtent;
+    let soft = saturate(f);
+    let mask =
+        matDecalFalloff(abs(q.x), soft) * matDecalFalloff(abs(q.y), soft) * matDecalFalloff(abs(q.z), soft);
+    return vec4<f32>(q.x * 0.5 + 0.5, q.y * 0.5 + 0.5, mask, mask);
+}
+
+fn matKAnisotropy(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let roughness = max(a.x, 0.0);
+    let alpha = roughness * roughness;
+    let aniso = clamp(f, -0.95, 0.95);
+    let alphaT = alpha * (1.0 + aniso);
+    let alphaB = alpha * (1.0 - aniso);
+    let n = ctx.normal;
+    let tangent = k.xyz - n * dot(n, k.xyz);
+    if (dot(tangent, tangent) <= 1e-10) {
+        return vec4<f32>(roughness);
+    }
+    let t = tangent * inverseSqrt(dot(tangent, tangent));
+    let viewTangent = ctx.viewDirection - n * dot(n, ctx.viewDirection);
+    var cos2 = 0.5;
+    if (dot(viewTangent, viewTangent) > 1e-10) {
+        let cosine = dot(viewTangent * inverseSqrt(dot(viewTangent, viewTangent)), t);
+        cos2 = saturate(cosine * cosine);
+    }
+    let alphaEff = sqrt(alphaT * alphaT * cos2 + alphaB * alphaB * (1.0 - cos2));
+    return vec4<f32>(sqrt(alphaEff));
+}
+
+fn matKRoughnessFilter(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let roughness = max(a.x, 0.0);
+    let alpha = roughness * roughness;
+    let kernel = min(2.0 * max(f, 0.0) * max(ctx.normalVariance, 0.0), 0.18);
+    return vec4<f32>(sqrt(min(alpha + kernel, 1.0)));
+}
+
+fn matKMicroDetail(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let p = a.xyz * f + k.xyz;
+    let fade = saturate(1.0 - ctx.footprint * abs(f) * 2.0);
+    return vec4<f32>(0.5 + (fbm3(p, matOpSeed(pi, oi)) - 0.5) * fade);
+}
+
+fn matKSwizzle(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    // `constant` names the source component of each output channel. The default all-zero
+    // constant broadcasts x, which is the case that matters: it takes a value that arrived in
+    // some other channel and puts it where every mask op looks for it.
+    return vec4<f32>(matPick(a, k.x), matPick(a, k.y), matPick(a, k.z), matPick(a, k.w));
+}
+
+fn matKVoronoiEdge(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    // ADR-1069: F2 - F1 is 0 on the boundary between two cells -- polygons, not blobs.
+    let w = worleyF1F2(a.xyz * f + k.xyz, matOpSeed(pi, oi));
+    return vec4<f32>(w.y - w.x, w.x, w.z, w.y);
+}
+
+fn matKQuantize(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    // ADR-1162: the centre of a's square cell, in a's own units, and a uniform random per cell.
+    if (!(f > 0.0)) {
+        return a;
+    }
+    let cell = floor(a.xyz * f + k.xyz);
+    return vec4<f32>((cell + vec3<f32>(0.5) - k.xyz) / f, hash01(vec3<i32>(cell), matOpSeed(pi, oi)));
+}
+
+fn matKOklabRamp(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    return matOklabRamp4(k, matOpConstant2(pi, oi), matOpConstant3(pi, oi), matOpConstant4(pi, oi), a.x, f < 0.0);
+}
+
+// The interpreter: the op's kind read from the buffer, then the kind's function.
+fn materialEvalOpKind(kind: u32, pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>,
+                      fields: MatFields) -> vec4<f32> {
+    if (kind == MAT_OP_INPUT) {
+        return matKInput(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_CONSTANT) {
+        return matKConstant(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_GRADIENT) {
+        return matKGradient(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_NOISE) {
+        return matKNoise(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_VORONOI) {
+        return matKVoronoi(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_FRESNEL) {
+        return matKFresnel(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_RAMP) {
+        return matKRamp(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_REMAP) {
+        return matKRemap(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_MULTIPLY) {
+        return matKMultiply(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_ADD) {
+        return matKAdd(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_MIX) {
+        return matKMix(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_MIXBY) {
+        return matKMixby(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_POWER) {
+        return matKPower(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_SMOOTHSTEP) {
+        return matKSmoothstep(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_THRESHOLD) {
+        return matKThreshold(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_HUESHIFT) {
+        return matKHueshift(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_SATURATE) {
+        return matKSaturate(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_PALETTE) {
+        return matKPalette(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_FIELD) {
+        return matKField(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_TRIPLANAR) {
+        return matKTriplanar(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_WORLD_PROJECT) {
+        return matKWorldProject(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_OBJECT_PROJECT) {
+        return matKObjectProject(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_HEIGHT_BLEND) {
+        return matKHeightBlend(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_DETAIL_NORMAL) {
+        return matKDetailNormal(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_CURVATURE_MASK) {
+        return matKCurvatureMask(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_EDGE_WEAR) {
+        return matKEdgeWear(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_DECAL_BOX) {
+        return matKDecalBox(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_ANISOTROPY) {
+        return matKAnisotropy(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_ROUGHNESS_FILTER) {
+        return matKRoughnessFilter(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_MICRO_DETAIL) {
+        return matKMicroDetail(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_SWIZZLE) {
+        return matKSwizzle(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_VORONOI_EDGE) {
+        return matKVoronoiEdge(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_QUANTIZE) {
+        return matKQuantize(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_OKLAB_RAMP) {
+        return matKOklabRamp(pi, oi, ctx, a, b, c, fields);
+    }
+    return vec4<f32>(0.0);
+}
+
 fn materialEvalOp(pi: u32, oi: u32, ctx: MaterialContext, regs: MatRegs, fields: MatFields) -> vec4<f32> {
     let kind = materialPrograms.programs[pi].ops[oi].kind;
     let reg = materialPrograms.programs[pi].ops[oi].registers;
-    let a = matGet(regs, reg.y);
-    let b = matGet(regs, reg.z);
-    let c = matGet(regs, reg.w);
-    let k = materialPrograms.programs[pi].ops[oi].constant;
-    let f = materialPrograms.programs[pi].ops[oi].value;
-    if (kind == MAT_OP_INPUT) {
-        return materialInputValue(matOpInput(pi, oi), ctx);
-    }
-    if (kind == MAT_OP_CONSTANT) {
-        return k;
-    }
-    if (kind == MAT_OP_GRADIENT) {
-        return vec4<f32>(saturate(dot(a.xyz, k.xyz) * f + k.w));
-    }
-    if (kind == MAT_OP_NOISE) {
-        return vec4<f32>(fbm3(a.xyz * f + k.xyz, matOpSeed(pi, oi)));
-    }
-    if (kind == MAT_OP_VORONOI) {
-        return vec4<f32>(voronoiF1(a.xyz * f + k.xyz, matOpSeed(pi, oi)));
-    }
-    if (kind == MAT_OP_FRESNEL) {
-        return vec4<f32>(matPow1(1.0 - saturate(dot(ctx.normal, ctx.viewDirection)), f));
-    }
-    if (kind == MAT_OP_RAMP) {
-        return ramp3(k, matOpConstant2(pi, oi), matOpConstant3(pi, oi), a.x);
-    }
-    if (kind == MAT_OP_REMAP) {
-        let inSpan = k.y - k.x;
-        var u = vec4<f32>(0.0);
-        if (inSpan != 0.0) {
-            u = (a - vec4<f32>(k.x)) / inSpan;
-        }
-        var remapped = u * (k.w - k.z) + vec4<f32>(k.z);
-        if (f > 0.5) {
-            remapped = clamp(remapped, vec4<f32>(min(k.z, k.w)), vec4<f32>(max(k.z, k.w)));
-        }
-        return remapped;
-    }
-    if (kind == MAT_OP_MULTIPLY) {
-        return a * b;
-    }
-    if (kind == MAT_OP_ADD) {
-        return a + b;
-    }
-    if (kind == MAT_OP_MIX) {
-        return matMix4(a, b, f);
-    }
-    if (kind == MAT_OP_MIXBY) {
-        return matMix4(a, b, c.x);
-    }
-    if (kind == MAT_OP_POWER) {
-        return matPow4(max(a, vec4<f32>(0.0)), f);
-    }
-    if (kind == MAT_OP_SMOOTHSTEP) {
-        return matSmoothstep4(k.x, k.y, a);
-    }
-    if (kind == MAT_OP_THRESHOLD) {
-        return select(vec4<f32>(0.0), vec4<f32>(1.0), a >= vec4<f32>(f));
-    }
-    if (kind == MAT_OP_HUESHIFT) {
-        return vec4<f32>(hueShift(a.xyz, f + b.x), a.w);
-    }
-    if (kind == MAT_OP_SATURATE) {
-        return vec4<f32>(colorSaturate(a.xyz, f), a.w);
-    }
-    if (kind == MAT_OP_PALETTE) {
-        return vec4<f32>(cosinePalette(k.xyz, matOpConstant2(pi, oi).xyz, matOpConstant3(pi, oi).xyz,
-                                       matOpConstant4(pi, oi).xyz, a.x + f),
-                         1.0);
-    }
-    if (kind == MAT_OP_FIELD) {
-        return matFieldGet(fields, matOpFieldOrdinal(pi, oi));
-    }
-    if (kind == MAT_OP_TRIPLANAR) {
-        let p = a.xyz * f + k.xyz;
-        let w = matTriplanarWeights(ctx.normal, matOpConstant2(pi, oi).x);
-        let sx = fbm3(vec3<f32>(p.y, p.z, 0.0), matOpSeed(pi, oi));
-        let sy = fbm3(vec3<f32>(p.z, p.x, 0.0), matOpSeed(pi, oi));
-        let sz = fbm3(vec3<f32>(p.x, p.y, 0.0), matOpSeed(pi, oi));
-        return vec4<f32>(w.x * sx + w.y * sy + w.z * sz);
-    }
-    if (kind == MAT_OP_WORLD_PROJECT) {
-        return vec4<f32>(ctx.worldPosition * f + k.xyz, 1.0);
-    }
-    if (kind == MAT_OP_OBJECT_PROJECT) {
-        return vec4<f32>(ctx.localPosition * f + k.xyz, 1.0);
-    }
-    if (kind == MAT_OP_HEIGHT_BLEND) {
-        return vec4<f32>(matHeightBlend(a.x, b.x, c.x, f));
-    }
-    if (kind == MAT_OP_DETAIL_NORMAL) {
-        return vec4<f32>(matReorientNormal(a.xyz, b.xyz), 0.0);
-    }
-    if (kind == MAT_OP_CURVATURE_MASK) {
-        return vec4<f32>(matSmoothstep1(k.x, k.y, ctx.curvature * f));
-    }
-    if (kind == MAT_OP_EDGE_WEAR) {
-        let edge = saturate(max(ctx.curvature, 0.0) * f);
-        let nz = fbm3(ctx.worldPosition * k.x + vec3<f32>(k.y, k.z, k.w), matOpSeed(pi, oi));
-        let influence = saturate(matOpConstant2(pi, oi).x);
-        let v = edge * (1.0 - influence + influence * nz);
-        return vec4<f32>(matSmoothstep1(matOpConstant2(pi, oi).y, matOpConstant2(pi, oi).z, v));
-    }
-    if (kind == MAT_OP_DECAL_BOX) {
-        let halfExtent = max(abs(matOpConstant2(pi, oi).xyz), vec3<f32>(1e-4));
-        let q = (ctx.worldPosition - k.xyz) / halfExtent;
-        let soft = saturate(f);
-        let mask =
-            matDecalFalloff(abs(q.x), soft) * matDecalFalloff(abs(q.y), soft) * matDecalFalloff(abs(q.z), soft);
-        return vec4<f32>(q.x * 0.5 + 0.5, q.y * 0.5 + 0.5, mask, mask);
-    }
-    if (kind == MAT_OP_ANISOTROPY) {
-        let roughness = max(a.x, 0.0);
-        let alpha = roughness * roughness;
-        let aniso = clamp(f, -0.95, 0.95);
-        let alphaT = alpha * (1.0 + aniso);
-        let alphaB = alpha * (1.0 - aniso);
-        let n = ctx.normal;
-        let tangent = k.xyz - n * dot(n, k.xyz);
-        if (dot(tangent, tangent) <= 1e-10) {
-            return vec4<f32>(roughness);
-        }
-        let t = tangent * inverseSqrt(dot(tangent, tangent));
-        let viewTangent = ctx.viewDirection - n * dot(n, ctx.viewDirection);
-        var cos2 = 0.5;
-        if (dot(viewTangent, viewTangent) > 1e-10) {
-            let cosine = dot(viewTangent * inverseSqrt(dot(viewTangent, viewTangent)), t);
-            cos2 = saturate(cosine * cosine);
-        }
-        let alphaEff = sqrt(alphaT * alphaT * cos2 + alphaB * alphaB * (1.0 - cos2));
-        return vec4<f32>(sqrt(alphaEff));
-    }
-    if (kind == MAT_OP_ROUGHNESS_FILTER) {
-        let roughness = max(a.x, 0.0);
-        let alpha = roughness * roughness;
-        let kernel = min(2.0 * max(f, 0.0) * max(ctx.normalVariance, 0.0), 0.18);
-        return vec4<f32>(sqrt(min(alpha + kernel, 1.0)));
-    }
-    if (kind == MAT_OP_MICRO_DETAIL) {
-        let p = a.xyz * f + k.xyz;
-        let fade = saturate(1.0 - ctx.footprint * abs(f) * 2.0);
-        return vec4<f32>(0.5 + (fbm3(p, matOpSeed(pi, oi)) - 0.5) * fade);
-    }
-    if (kind == MAT_OP_SWIZZLE) {
-        // `constant` names the source component of each output channel. The default all-zero
-        // constant broadcasts x, which is the case that matters: it takes a value that arrived in
-        // some other channel and puts it where every mask op looks for it.
-        return vec4<f32>(matPick(a, k.x), matPick(a, k.y), matPick(a, k.z), matPick(a, k.w));
-    }
-    if (kind == MAT_OP_VORONOI_EDGE) {
-        // ADR-1069: F2 - F1 is 0 on the boundary between two cells -- polygons, not blobs.
-        let w = worleyF1F2(a.xyz * f + k.xyz, matOpSeed(pi, oi));
-        return vec4<f32>(w.y - w.x, w.x, w.z, w.y);
-    }
-    if (kind == MAT_OP_QUANTIZE) {
-        // ADR-1162: the centre of a's square cell, in a's own units, and a uniform random per cell.
-        if (!(f > 0.0)) {
-            return a;
-        }
-        let cell = floor(a.xyz * f + k.xyz);
-        return vec4<f32>((cell + vec3<f32>(0.5) - k.xyz) / f, hash01(vec3<i32>(cell), matOpSeed(pi, oi)));
-    }
-    if (kind == MAT_OP_OKLAB_RAMP) {
-        return matOklabRamp4(k, matOpConstant2(pi, oi), matOpConstant3(pi, oi), matOpConstant4(pi, oi), a.x, f < 0.0);
-    }
-    return vec4<f32>(0.0);
+    return materialEvalOpKind(kind, pi, oi, ctx, matGet(regs, reg.y), matGet(regs, reg.z), matGet(regs, reg.w), fields);
 }
 
 // Samples the program's distinct fields once, before any op runs.
@@ -864,3 +1072,12 @@ fn evaluateMaterialProgram(programIndex: i32, ctx: MaterialContext, base: Materi
     }
     return result;
 }
+
+// ADR-1493: the entry the shading passes call. In the source tree it is the interpreter. A pipeline variant built for
+// a scene's programs (ProceduralRenderer, scene/material_compiler.cpp) replaces everything between the two markers
+// with one straight-line function per program and a switch on the slot that falls back to the interpreter.
+// @@material-compiled-begin
+fn evaluateMaterialProgramFast(programIndex: i32, ctx: MaterialContext, base: MaterialResult) -> MaterialResult {
+    return evaluateMaterialProgram(programIndex, ctx, base);
+}
+// @@material-compiled-end

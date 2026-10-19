@@ -373,6 +373,7 @@ private:
     int runLiveProfileHeadless();
     struct LiveProfileSession;
     std::unique_ptr<LiveProfileSession> liveProfileSession_;
+    bool compiledMaterialsSeen_ = false; // ADR-1493: the last frame's compiled-materials state, for the controller
     void beginLiveProfile();
     // Returns false when the profile is finished and the loop should end.
     bool noteLiveProfileFrame(const LiveProfileFrame& frame);
