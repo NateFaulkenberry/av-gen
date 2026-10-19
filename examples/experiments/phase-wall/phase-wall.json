@@ -1056,7 +1056,7 @@
    {
     "role": "glint",
     "target": "material/bladeSphere/op/40/constant/constant",
-    "gain": 3.0
+    "gain": 1.6
    },
    {
     "role": "front",

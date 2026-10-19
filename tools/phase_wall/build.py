@@ -346,7 +346,7 @@ def blade_program():
          k4=[0, 0, 0, 0])                                           # one crest every ~7 blade lengths: sparse
     g.op(None, "power", 4, a=4, f=200.0)                            # r4 = the streak: a short glint (about 1 m)
     g.op(None, "multiply", 4, a=4, b=3)                             # down the middle only
-    g.op("glint", "constant", 6, k=C("glint", 3.0) + [1])           # (routes multiply it: the hats, CC 11)
+    g.op("glint", "constant", 6, k=C("glint", 1.6) + [1])           # (routes multiply it: the hats, CC 11)
     g.op(None, "multiply", 4, a=4, b=6)
     g.op(None, "add", 5, a=5, b=4)
     # strain (activity, one value per blade from the effector)
@@ -370,7 +370,7 @@ def blades(s):
     bind(s, "mid", op_path(g, "tone", "constant2"), TONE)
     bind(s, "crest", op_path(g, "tone", "constant3"), TONE)
     bind(s, "core", op_path(g, "core"), CORE)
-    bind(s, "glint", op_path(g, "glint"), 3.0)
+    bind(s, "glint", op_path(g, "glint"), 1.6)
     bind(s, "front", op_path(g, "front"), 1.2)
     pts = blade_points()
     s.blade_count = len(pts)
