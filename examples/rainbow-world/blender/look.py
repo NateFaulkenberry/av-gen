@@ -22,6 +22,42 @@ LOOK = {
 }
 
 
+# ---- Rainbow World 2: the music's ops (16-effect-mapping.md) --------------------------------------------------------
+# Effect ops carry a "_role"; `finish` strips it and records the op's 1-based index per program in FX, so the project's
+# routes name "material/<program>/op/<index>/<kind>/..." without counting ops by hand.
+FX = {}
+RING = {"tail": 4.0, "lead": 1.0, "r0": 10.0}         # the kick ring's shape, metres (its radius is routed)
+RING_COLOUR = rw.hexlin("#FFE6A6")[:3]                # a warm white-gold: light, not a hue of its own
+GLINT_COLOUR = rw.hexlin("#FFF4D8")[:3]
+
+
+def finish(prog):
+    roles = {}
+    for i, op in enumerate(prog["ops"]):
+        r = op.pop("_role", None)
+        if r:
+            roles[r] = i + 1
+    FX[prog["name"]] = roles
+    return prog
+
+
+def ring_ops(out, a, b, c):
+    """The kick ring (drums): a thin shell of light on every surface at the ring's radius from the eye. Camera distance
+    is the metric, so the ring is a sphere about the camera and follows whatever face it crosses -- the world's gravity
+    turns, so a ground-plane ring would be wrong on most of it. Its radius rides beat.phase (it starts on the beat and
+    is gone before the next); its gain is the drum stem's low band. `out` = ring radiance; uses a, b, c as scratch."""
+    return [
+        {"kind": "input", "dst": a, "input": "cameraDistance"},
+        {"kind": "remap", "dst": b, "srcA": a, "constant": [6.0, 10.0, 0.0, 1.0], "value": 1.0, "_role": "ring_in"},
+        {"kind": "remap", "dst": a, "srcA": a, "constant": [11.0, 10.0, 0.0, 1.0], "value": 1.0, "_role": "ring_out"},
+        {"kind": "multiply", "dst": a, "srcA": a, "srcB": b},
+        {"kind": "constant", "dst": c, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "ring_gain"},
+        {"kind": "constant", "dst": b, "constant": R(RING_COLOUR) + [1.0], "_role": "ring_colour"},
+        {"kind": "multiply", "dst": b, "srcA": b, "srcB": c},
+        {"kind": "multiply", "dst": out, "srcA": a, "srcB": b},
+    ]
+
+
 def load_look(path=None):
     if path:
         LOOK.update(json.load(open(path)))
@@ -103,8 +139,9 @@ def ground_program(name="rw_ground", rim_hex="#76665C"):
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 1},
     ]
     ops.insert(1, {"kind": "constant", "dst": 7, "constant": [-1.0, -1.0, -1.0, -1.0]})
-    return {"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
-            "emissionIntensity": 1.0, "opacity": -1, "ops": ops}
+    ops += ring_ops(5, 1, 2, 4)  # Rainbow World 2: r1, r2, r4 are free once the colour is in r3
+    return finish({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 5,
+                   "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
 
 def grass_program():
@@ -116,8 +153,24 @@ def grass_program():
         {"kind": "constant", "dst": 5, "constant": R(LOOK["meadow"][3]) + [1.0]},
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4},
     ]
-    return {"name": "rw_grass", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
-            "emissionIntensity": 1.0, "opacity": -1, "ops": ops}
+    ops += ring_ops(5, 1, 2, 6)
+    ops += [
+        # hat glints: the tips of a few tufts flash. The same tufts each time, but at 30 m/s the field in view is
+        # always new, so the subset never reads as fixed. The threshold lowers with the hats (more tufts), the gain
+        # carries the decay. r4 is the tuft's height gradient (0 root .. 1 tip).
+        {"kind": "input", "dst": 1, "input": "instanceRandom"},
+        {"kind": "swizzle", "dst": 1, "srcA": 1, "constant": [2, 2, 2, 2]},
+        {"kind": "threshold", "dst": 1, "srcA": 1, "value": 1.01, "_role": "glint_threshold"},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 4},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 4},
+        {"kind": "constant", "dst": 2, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "glint_gain"},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
+        {"kind": "constant", "dst": 2, "constant": R(GLINT_COLOUR) + [1.0]},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
+        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 1},
+    ]
+    return finish({"name": "rw_grass", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 5,
+                   "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
 
 def canopy_program():
@@ -196,7 +249,10 @@ def cloud_program():
                 {"kind": "fresnel", "dst": 4, "value": 6.0},
                 {"kind": "remap", "dst": 4, "srcA": 4, "constant": [0.0, 1.0, 0.0, 0.75], "value": 1.0},
                 {"kind": "constant", "dst": 5, "constant": R(LOOK["horizon"]) + [1.0]},
-                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4}]}
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4},
+                # Rainbow World 2: the synth's light on the clouds (1 = as built; routed up by the synth)
+                {"kind": "constant", "dst": 5, "constant": [1.0, 1.0, 1.0, 1.0], "_role": "cloud_glow"},
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5}]}
 
 
 FLOOR_STOPS = ("#1A3AA8", "#4A78CE", "#DCBE9A", "#F4E2C8")  # deeper than the clouds, so the heads on it read
@@ -247,6 +303,77 @@ def flower_program():
                 {"kind": "mixBy", "dst": 3, "srcA": 2, "srcB": 3, "srcC": 1}]}
 
 
+def rainbow_program(name, reverse=False, alpha_peak=0.66, strength=2.0, bands=5.0, flow_speed=0.18):
+    """The arch as a program (Rainbow World 2), so light can move along it. The Stage 2-8 arch was a glTF with a
+    baked spectral emissive texture and alpha (engine_assets.rainbow_textures); this rebuilds the same bow from the
+    tube's UVs -- u across (0 inner, 1 outer), v along (0 and 1 are the feet) -- and adds what moves:
+      flow   bright bands drifting along the arch, always on, their depth set by the synth (`flow_gain`);
+      fronts on the backbeat a pair of fronts runs up from both feet to the crown in one beat (`front_*`, beat.phase),
+             their brightness the drum stem's clap band (`front_gain`);
+      gain   the arch's own brightness (`arch_gain`): the synth's level, the phrase and the drop.
+    The spectrum is two four-stop OKLab ramps (violet-blue-cyan-green, green-yellow-orange-red), so it never passes
+    through grey; every moving term multiplies that spectrum, so a band is the bow brighter, never another hue."""
+    sp = [(t, c) for t, c in rw.SPECTRUM]
+
+    def at(t):
+        for (t0, c0), (t1, c1) in zip(sp, sp[1:]):
+            if t <= t1:
+                f = (t - t0) / max(1e-9, t1 - t0)
+                return [c0[i] + (c1[i] - c0[i]) * f for i in range(3)]
+        return list(sp[-1][1])
+    lo = [R(at(x)) + [1.0] for x in (0.0, 0.17, 0.33, 0.5)]
+    hi = [R(at(x)) + [1.0] for x in (0.5, 0.67, 0.83, 1.0)]
+    if reverse:
+        lo, hi = [c for c in reversed(hi)], [c for c in reversed(lo)]
+    ops = [
+        {"kind": "input", "dst": 0, "input": "uv"},
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
+        {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.0, 0.5, 0.0, 1.0], "value": 1.0},
+        {"kind": "oklabRamp", "dst": 3, "srcA": 2, "value": 1.0, "constant": lo[0], "constant2": lo[1],
+         "constant3": lo[2], "constant4": lo[3]},
+        {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.5, 1.0, 0.0, 1.0], "value": 1.0},
+        {"kind": "oklabRamp", "dst": 4, "srcA": 2, "value": 1.0, "constant": hi[0], "constant2": hi[1],
+         "constant3": hi[2], "constant4": hi[3]},
+        {"kind": "threshold", "dst": 2, "srcA": 1, "value": 0.5},
+        {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 2},
+        # coverage across the tube (soft both sides) and at the feet (they dissolve into the meadow)
+        {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.02, 0.26, 0.0, alpha_peak], "value": 1.0},
+        {"kind": "remap", "dst": 4, "srcA": 1, "constant": [0.98, 0.74, 0.0, 1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
+        {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [1, 1, 1, 1]},
+        {"kind": "remap", "dst": 5, "srcA": 4, "constant": [0.0, 0.1, 0.0, 1.0], "value": 1.0},
+        {"kind": "remap", "dst": 6, "srcA": 4, "constant": [1.0, 0.9, 0.0, 1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 5},
+        # flow: cos bands along v drifting with the transport's time
+        {"kind": "remap", "dst": 5, "srcA": 4, "constant": [0.0, 1.0, 0.0, bands], "value": 0.0},
+        {"kind": "input", "dst": 6, "input": "time"},
+        {"kind": "remap", "dst": 6, "srcA": 6, "constant": [0.0, 1.0, 0.0, -flow_speed], "value": 0.0},
+        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
+        {"kind": "palette", "dst": 5, "srcA": 5, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.0],
+         "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [1.0, 1.0, 1.0, 0.0], "constant4": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": 6.0},
+        {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "flow_gain"},
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
+        # the backbeat fronts: left foot (v = 0) up to the crown, right foot (v = 1) down to it; a sharp lead, a tail
+        {"kind": "remap", "dst": 6, "srcA": 4, "constant": [-0.08, 0.0, 0.0, 1.0], "value": 1.0, "_role": "front_l_in"},
+        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.015, 0.0, 0.0, 1.0], "value": 1.0, "_role": "front_l_out"},
+        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.985, 1.0, 0.0, 1.0], "value": 1.0, "_role": "front_r_in"},
+        {"kind": "remap", "dst": 1, "srcA": 4, "constant": [1.08, 1.0, 0.0, 1.0], "value": 1.0, "_role": "front_r_out"},
+        {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 1},
+        {"kind": "add", "dst": 6, "srcA": 6, "srcB": 7},
+        {"kind": "constant", "dst": 7, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "front_gain"},
+        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
+        {"kind": "constant", "dst": 6, "constant": [strength, strength, strength, 0.0], "_role": "arch_gain"},
+        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+    ]
+    return finish({"name": name, "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 3,
+                   "emissionIntensity": 1.0, "opacity": 2, "ops": ops})
+
+
 def node_points(name, asset, points, material, **extra):
     p = {"source": {"kind": "mesh", "asset": asset}, "distribution": {"kind": "points", "points": points},
          "material": material}
@@ -271,7 +398,8 @@ def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
 
 
 def all_programs():
-    return [ground_program(), ground_program("rw_ground_lip", "#4C7A2E"), grass_program(), canopy_program(), rock_program(), cloud_program(), flower_program(),
+    return [rainbow_program("rw_rainbow"), rainbow_program("rw_rainbow2", reverse=True, alpha_peak=0.22, strength=1.0),
+            ground_program(), ground_program("rw_ground_lip", "#4C7A2E"), grass_program(), canopy_program(), rock_program(), finish(cloud_program()), flower_program(),
             tinted_canopy_program("rw_weeper", [rw.hexlin("#5E9426")[:3], rw.hexlin("#8EBE2E")[:3],
                                                 rw.hexlin("#BEDC44")[:3], rw.hexlin("#E2EE6A")[:3]], height=12.0, offset=0.0),
             tinted_canopy_program("rw_blossom", [rw.hexlin("#8A3C78")[:3], rw.hexlin("#C9619E")[:3],

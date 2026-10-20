@@ -354,6 +354,10 @@ def export_rainbow(out, strength=2.0):
     s = tube_arc("rainbow_secondary", R * 1.24, 18.0)
     s.data.materials.append(rainbow_material("rainbow_secondary", e2, a2, strength * 0.5))
     rw.export_glb([p, s], os.path.join(out, "rainbow_arch.glb"))
+    # Rainbow World 2: each bow on its own, for the procedural arches whose look is the rw_rainbow programs (the
+    # programs rebuild the spectrum and coverage from the UVs; these meshes carry only the shape and the UVs)
+    rw.export_glb([p], os.path.join(out, "rainbow_primary.glb"))
+    rw.export_glb([s], os.path.join(out, "rainbow_secondary.glb"))
 
 
 def main():

@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(HERE, "blender"))
 import band  # noqa: E402
 import knot_path  # noqa: E402
 import look  # noqa: E402
+import music  # noqa: E402
 import rw_common as rw  # noqa: E402
 from look import R, av, node_points, point  # noqa: E402
 
@@ -472,7 +473,10 @@ for f, pts in fam.items():
     asset, prog = TREE_ASSETS[f]
     # the leaf cards (alpha-tested, the depth prepass's dearest geometry) thin with distance (ADR-1548: whole cards removed,
     # the rest grown, 35% at 22 m and 12% at 55 m; Stage 8: the near cards were the p95) and stop at 150 m; beyond it the canopy core,
-    # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps
+    # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps.
+    # Rainbow World 2 (17-slow-frames.md): a fourth, thinner level from 90 m. The cards at 90-150 m were the arch holds'
+    # GPU tail (about 7 ms: thousands of sub-pixel cards, every one alpha-tested in the prepass); stopping them at 90 m
+    # left bare branches, a thinner level keeps the canopy's read for 6-10 ms less.
     nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
                              lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0, "count": 3,
                                   "byScreenSize": False, "distance1": 70.0, "distance2": 180.0}))
@@ -482,8 +486,9 @@ for f, pts in fam.items():
     nodes.append(node_points("%s_leaves" % f, "%s_leaves.glb" % asset, pts,
                              {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
                               "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
-                             lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 150.0, "count": 3,
-                                  "byScreenSize": False, "distance1": 22.0, "distance2": 55.0, "thinning": True}))
+                             lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 150.0, "count": 4,
+                                  "byScreenSize": False, "distance1": 22.0, "distance2": 55.0, "distance3": 90.0,
+                                  "thinning": True}))
 for k in range(0, len(outcrops), 60000):
     nodes.append(node_points("outcrops%d" % k, "rock_namaqualand_boulder_03.glb", outcrops[k:k + 60000],
                              {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
@@ -570,12 +575,15 @@ for k, sa_ in enumerate(arch_s):
         m = Matrix((-sda, ta, -ua)).transposed()
         pos = pa - ua * (band.FACE - 6.0)
     eul = (rw.Q_ZUP_TO_YUP @ m.to_quaternion() @ rw.Q_ZUP_TO_YUP.inverted()).to_euler("XYZ")
-    rainbow_nodes.append({"name": "rainbow_%d" % k, "kind": "gltf", "asset": "rainbow_arch.glb", "position": av(pos), "castsShadow": False,
-                          # 0.76: both bows' feet land inside the face (primary 87 m, secondary 108 m < the rim's
-                          # 112 m), never poking out of a rim where a foot seen from the strand's far side read as a
-                          # spectral blob
-                          "scale": [0.76, 0.76, 0.76],
-                          "rotation": [round(math.degrees(v), 3) for v in eul]})
+    # Rainbow World 2: each bow its own gltf node drawn through the rw_rainbow programs (ADR-1572), so light can travel
+    # along it; the shape is the Stage 2-8 tube. 0.76: both bows' feet land inside the face (primary 87 m, secondary
+    # 108 m < the rim's 112 m), never poking out of a rim where a foot seen from the strand's far side read as a
+    # spectral blob
+    for bow, prog in (("p", "rw_rainbow"), ("s", "rw_rainbow2")):
+        rainbow_nodes.append({"name": "rainbow_%d%s" % (k, bow), "kind": "gltf",
+                              "asset": "rainbow_%s.glb" % ("primary" if bow == "p" else "secondary"),
+                              "position": av(pos), "castsShadow": False, "program": prog,
+                              "scale": [0.76, 0.76, 0.76], "rotation": [round(math.degrees(v), 3) for v in eul]})
 nodes += rainbow_nodes
 print("RAINBOWS", len(rainbow_nodes))
 tpts = [q for v in fam.values() for q in v]
@@ -631,6 +639,32 @@ for kind, pts in cpts.items():
                                  {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True},
                                  castsShadow=False, lod=lod_))
 print("CLOUDS", {k: len(v) for k, v in cpts.items()})
+
+# ---- Rainbow World 2: the bass swell (16-effect-mapping.md section 3) ------------------------------------------------
+# Two world-space sine deformers on the land and everything standing on it, the same two on every node, so a meadow and
+# the grass, flowers, stones and trees on it move together (each vertex is displaced by a function of where it is, not
+# of what it belongs to). Their amounts rest at 0 -- the world as built -- and the bass sets them through the `swell`
+# macro. Two waves, never one: different axes, wavelengths and speeds, so the sum heaves rather than slides (Finch,
+# GPU Gems ch. 1). They travel at about the ride's own speed.
+SWELL = [  # (axis of travel, displacement direction, wavelength m, speed rad/s, metres at a full swell)
+    ((0.62, 0.31, 0.72), (0.25, 0.93, 0.27), 115.0, 1.6, 1.4),
+    ((-0.45, 0.78, 0.43), (0.80, -0.18, 0.57), 72.0, 2.3, 0.9),
+]
+SWELL_NODES = []
+for n_ in nodes:
+    nm_ = n_["name"]
+    if n_.get("kind") != "procedural" or nm_.startswith(("cloud", "rainbow")) or nm_ == "ride":
+        continue
+    defs = []
+    for axis, disp, wl, sp, _m in SWELL:
+        a_ = np.array(axis) / np.linalg.norm(axis)
+        d_ = np.array(disp) / np.linalg.norm(disp)
+        defs.append({"kind": "sine", "space": "world", "amount": 0.0, "axis": R(rw.to_avgen(Vector(a_))),
+                     "displacementAxis": R(rw.to_avgen(Vector(d_))), "frequency": round(2 * math.pi / wl, 6),
+                     "speed": sp, "phase": 0.0, "center": [0.0, 0.0, 0.0]})
+    n_["procedural"]["deformers"] = defs
+    SWELL_NODES.append(nm_)
+print("SWELL nodes", len(SWELL_NODES))
 
 # ---- scene and project ----------------------------------------------------------------------------------------------
 env, lights = look.environment(SUN, rw.to_avgen(Vector((0, 0, 1))))
@@ -780,26 +814,13 @@ routes = [{"source": "timeline.ride", "target": "camera/splineT", "amount": 1.0,
           # every control rests at 0 = the world as built (no MIDI is the default state), and turns one way
           {"source": "control.light", "target": "camera/exposure/compensation", "amount": 1.2, "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.colour", "target": "post/grade/saturation", "amount": 0.5, "op": "add", "polarity": "unipolar", "chain": ctl}]
-# audio: the rainbows breathe with the music, kicks send a pulse of light through them, the air glows with the level.
-# Bounded and smoothed; with no audio and no MIDI every amount is at rest and the world is as built.
+# Rainbow World 2: the music (music.py, 16-effect-mapping.md). The Stage 7 routes on response.* (the arches' breath,
+# the kick's bloom flash, the hats' saturation, the bass's bounce light) are replaced by the stem-driven set; the
+# rainbows keep CC 1's glow.
 for rn in rainbow_nodes:
-    nm = rn["name"]
-    # Stage 7 with Feline Footwear: at 0.6/0.8 the arches' pulse measured +-3% (lost in the camera's own motion);
-    # doubled, so a kick reads as a flash of the bow and a held chord as its swell
-    routes += [{"source": "response.sustain", "target": "nodes/%s/emissiveBoost" % nm, "amount": 1.2, "op": "add",
-                "polarity": "unipolar", "chain": {"attackMs": 600, "decayMs": 2500}},
-               {"source": "response.kick", "target": "nodes/%s/emissiveBoost" % nm, "amount": 1.8, "op": "add",
-                "polarity": "unipolar", "chain": {"attackMs": 15, "decayMs": 450}},
-               {"source": "control.glow", "target": "nodes/%s/emissiveBoost" % nm, "amount": 2.0, "op": "add",
-                "polarity": "unipolar", "chain": ctl}]
-routes += [{"source": "response.level", "target": "post/bloom/intensity", "amount": 0.12, "op": "add", "polarity": "unipolar",
-            "chain": {"attackMs": 300, "decayMs": 1500}},
-           {"source": "response.kick", "target": "post/bloom/intensity", "amount": 0.1, "op": "add", "polarity": "unipolar",
-            "chain": {"attackMs": 10, "decayMs": 350}},
-           {"source": "response.hat", "target": "post/grade/saturation", "amount": 0.06, "op": "add", "polarity": "unipolar",
-            "chain": {"attackMs": 20, "decayMs": 300}},
-           {"source": "response.bass", "target": "lights/cloudsea/intensity", "amount": 0.5, "op": "add", "polarity": "unipolar",
-            "chain": {"attackMs": 120, "decayMs": 900}}]
+    routes.append({"source": "control.glow", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 2.0,
+                   "op": "add", "polarity": "unipolar", "chain": ctl})
+routes += music.routes(look.FX, SWELL_NODES, SWELL)
 proj_path = os.path.abspath(a.project) if a.project else os.path.join(OUT, "rainbow-world.json")
 scene_rel = os.path.relpath(os.path.join(OUT, "rainbow-world.scene.json"), os.path.dirname(proj_path))
 project = {
@@ -810,7 +831,9 @@ project = {
                    "thesis": "A painterly meadow knotted through an all-round sky: the ride follows the land's own gravity "
                              "round a twisting loop and over its rims, under rainbow arches, among sculpted clouds."},
     "parameters": params,
-    "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}}],
+    "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}},
+                {"kind": "macro", "name": "macros", "settings": {"knobs": [{"name": k_, "default": d_}
+                                                                          for k_, d_ in music.MACROS]}}],
     "routes": routes,
     "palette": palette,
     "control": control,
@@ -818,6 +841,22 @@ project = {
 }
 with open(proj_path, "w") as f:
     json.dump(project, f, indent=1)
+# The Feline Footwear showcase (brief 13 section 12.5): the same world and routes, plus the mix as the playback source
+# and the three stems as analysis sources (ADR-1520), for offline renders. A separate file, because the live scene
+# carries no audio file. The audio is the owner's and gitignored; the project only names it.
+showcase = json.loads(json.dumps(project))
+showcase["app"] = {"name": "Rainbow World: Feline Footwear"}
+audio_dir = os.path.relpath(os.path.join(HERE, "..", "..", "assets", "audio"), os.path.dirname(proj_path))
+showcase["assets"]["audio"] = {"path": os.path.join(audio_dir, "feline-footwear.wav")}
+showcase["assets"]["stems"] = [{"key": k_, "label": k_.capitalize(),
+                                "file": os.path.join(audio_dir, "stems", "feline-footwear (%s).wav" % k_.capitalize())}
+                               for k_ in music.STEMS]
+showcase["sonic"]["live"] = False
+showcase["sonicScene"]["id"] = "rainbow-world-feline"
+showcase["sonicScene"]["title"] = "Rainbow World: Feline Footwear"
+showcase["render"]["path"] = "renders/rainbow-world-feline.mp4"
+with open(os.path.join(os.path.dirname(proj_path), "rainbow-world-feline.json"), "w") as f:
+    json.dump(showcase, f, indent=1)
 report = {"loopMetres": L, "cameraMetres": cam_path.length, "loopSeconds": loop_seconds, "baseSpeed": a.base_speed,
           "grass": len(gpts), "flowers": len(fpts), "trees": len(tpts), "rimRocks": sum(len(v) for v in by.values()),
           "rainbows": len(rainbow_nodes), "clouds": {k: len(v) for k, v in cpts.items()}, "bandChunks": len(band_nodes)}
