@@ -603,9 +603,10 @@ def speed_at(s_band, holds):
     for s0, s1, side in CROSSINGS:
         mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
         w = max(w, 1.0 + 0.5 * (1.0 - band.smoothstep(half, half + 140.0, _circ(s_band - mid))))
+    hold = 1.0
     for h_ in holds:
-        w = min(w, 0.3 + 0.7 * band.smoothstep(25.0, 170.0, _circ(s_band - h_)))
-    return w
+        hold = min(hold, 0.3 + 0.7 * band.smoothstep(25.0, 170.0, _circ(s_band - h_)))
+    return w * hold
 
 
 great_s = sorted({round(hs) for hs, xx, face in landmarks})
