@@ -799,8 +799,8 @@ float heroMotion(const Engine& engine, const world::HeroPoint& hero) {
 
 SongInputs songInputsForEngine(const Engine& engine) {
     SongInputs inputs;
-    if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr) {
-        inputs.grid = musicalGridFrom(track->beats().beatTimes, engine.meter());
+    if (engine.track() != nullptr) {
+        inputs.grid = musicalGridFrom(engine.beatGrid().beats.beatTimes, engine.meter()); // ADR-1581
     }
     if (const scene::Composition* composition = engine.composition()) {
         for (const world::HeroPoint& hero : composition->heroes()) {

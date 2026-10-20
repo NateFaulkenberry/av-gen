@@ -83,10 +83,33 @@ which channel answers.
 > With no channels ticked, an input is one mix exactly as before. Channels are only captured separately once one is
 > ticked.
 
+**Gain** (the last column) trims one source before it is analysed, -24 to +24 dB, on top of Input gain. Use it to lift
+a quiet channel over the gate and into the kick, snare, hat and beat detectors. It does not make that source's levels
+bigger: those read against the source's own loudness. A stem has the same **gain** in the Stems section (a change
+analyses the stem again).
+
+## Feeds: the beat and the response from a source
+
+By default the beat clock (`beat.*`, bars, `music.*`) and `response.*` follow the main mix. The **Feeds** row, under
+the Inputs table and under the Stems section, lets a source drive them instead:
+
+- **Beat**: the beat clock from this source. A clean kick or drum bus gives a steadier grid than a full mix. A running
+  MIDI clock still wins.
+- **Hits**: `response.kick`, `low`, `snare`, `hat` and `onset` (and their envelopes) from this source. The bass line in
+  the mix no longer fires `response.low`.
+- **Levels**: `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient` and `flux` from this source,
+  read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
+  with every hit.
+
+Every route keeps working: a route on `response.kick` now follows the drum stem's kicks. A source a feed uses gets the
+kick/snare/hat analysis automatically. A fed source that goes quiet, or a stem outside its span, feeds nothing. It is
+not swapped for the mix. The same key works offline (a stem) and live (an input source with that key). The choice is
+saved in the project as `"feeds"` (see `docs/audio.md`).
+
 ## Input gain
 
 The parameter `audio/inputGain` scales the incoming signal. Default 1.0; the slider runs 0 to 4 and
-the hard limit is 8.
+the hard limit is 8. Each input source also has its own **Gain** (above).
 
 ## The transport
 

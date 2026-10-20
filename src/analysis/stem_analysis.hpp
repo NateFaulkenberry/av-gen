@@ -17,6 +17,7 @@
 
 #include "analysis/analyzer.hpp"
 #include "analysis/causal_onsets.hpp"
+#include "analysis/response_feed.hpp"
 #include "audio/audio_file.hpp"
 #include "audio/stem_source.hpp"
 #include "core/error.hpp"
@@ -45,6 +46,12 @@ struct StemFrame {
     bool kick = false, snare = false, hat = false; // hits tier only
     float kickStrength = 0.0f, snareStrength = 0.0f, hatStrength = 0.0f;
     bool stereo = false;        // the source carried a side channel (a stereo stem, a linked input pair)
+    // ADR-1581: the mix's beat trackers' input, the Analyzer's linear-flux onset strength and picked onset, so a
+    // source can drive the beat clock with the same trackers the mix does.
+    float beatOnsetStrength = 0.0f;
+    bool beatOnset = false;
+    // ADR-1580: what the response model reads of this hop (hits tier only; `valid` false otherwise).
+    ResponseFeed feed;
     [[nodiscard]] bool operator==(const StemFrame&) const = default;
 };
 
@@ -78,7 +85,14 @@ struct StemAnalysisConfig {
     AnalyzerConfig analyzer{};
     StemOnsetConfig onset{};
     bool hits = false;
+    // ADR-1582: the source's trim, dB, applied to its samples before anything is measured. 0 touches no sample.
+    float gainDb = 0.0f;
 };
+
+// The linear factor of a trim in dB, clamped to the trim's range (-24..+24 dB); exactly 1 at 0 dB.
+[[nodiscard]] float trimGain(float gainDb);
+inline constexpr float kMinTrimDb = -24.0f;
+inline constexpr float kMaxTrimDb = 24.0f;
 
 // Streaming: feed mono samples (and optionally the side channel, one per mono sample) in any chunk size; pop frames.
 // Deterministic and chunking-invariant like the Analyzer it wraps.
@@ -86,6 +100,8 @@ class StemAnalyzer {
 public:
     explicit StemAnalyzer(StemAnalysisConfig config);
     void push(std::span<const float> mono, std::span<const float> side = {});
+    // ADR-1582: changes the trim without resetting the analysis (a live source's Gain column). Analysis thread.
+    void setGainDb(float gainDb);
     bool pop(StemFrame& out);
     // Clears all history; the next sample pushed is PCM frame `startFrame` of the source.
     void reset(std::uint64_t startFrame = 0);
@@ -96,6 +112,8 @@ private:
     float followLevel(float rms);
 
     StemAnalysisConfig config_;
+    float gain_ = 1.0f;
+    std::vector<float> gainedMono_, gainedSide_;
     Analyzer analyzer_;
     CausalOnsetDetector causal_;
     AnalysisFrame scratch_;

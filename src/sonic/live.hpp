@@ -24,6 +24,7 @@
 #include "analysis/analysis_runner.hpp"
 #include "control/midi.hpp"
 #include "signals/signal_bus.hpp"
+#include "core/spsc_queue.hpp"
 #include "sonic/sonic_runtime.hpp"
 
 #include <array>
@@ -37,41 +38,8 @@ namespace avgen::sonic {
 // Nanoseconds on the host clock MIDI timestamps use (mach_absolute_time on macOS; steady_clock elsewhere).
 [[nodiscard]] std::uint64_t hostNowNs();
 
-// A fixed-capacity single-producer single-consumer queue. No allocation after construction, no locks.
-template <class T, std::size_t Capacity>
-class SpscQueue {
-    static_assert(Capacity >= 2 && (Capacity & (Capacity - 1)) == 0, "capacity must be a power of two");
-
-public:
-    // Producer. False (and the item is not queued) when full.
-    bool push(const T& item) {
-        const std::size_t head = head_.load(std::memory_order_relaxed);
-        if (head - tail_.load(std::memory_order_acquire) >= Capacity) {
-            return false;
-        }
-        items_[head & (Capacity - 1)] = item;
-        head_.store(head + 1, std::memory_order_release);
-        return true;
-    }
-    // Consumer.
-    bool pop(T& out) {
-        const std::size_t tail = tail_.load(std::memory_order_relaxed);
-        if (tail == head_.load(std::memory_order_acquire)) {
-            return false;
-        }
-        out = items_[tail & (Capacity - 1)];
-        tail_.store(tail + 1, std::memory_order_release);
-        return true;
-    }
-    [[nodiscard]] std::size_t size() const {
-        return head_.load(std::memory_order_acquire) - tail_.load(std::memory_order_acquire);
-    }
-
-private:
-    std::array<T, Capacity> items_{};
-    alignas(64) std::atomic<std::size_t> head_{0};
-    alignas(64) std::atomic<std::size_t> tail_{0};
-};
+// The fixed-capacity SPSC queue (core/spsc_queue.hpp; it moved there for the live sources' feed queues, ADR-1580).
+using avgen::SpscQueue;
 
 // One analysis frame's timbre: the compact thing the analysis thread hands the render thread (about 100 bytes).
 struct TimbreSnapshot {
@@ -207,8 +175,9 @@ public:
 
     // Once per frame, on the engine thread: steps every queued snapshot through the character, then publishes
     // sonic.*, timbre.* and notes.* at `frameSeconds`.
+    // `feeds` (ADR-1580), when given, supplies each stepped hop's response feed.
     void frame(const SonicSetup& setup, LiveTimbre* timbre, signals::SignalBus& bus, double frameSeconds,
-               std::uint64_t frameNs);
+               std::uint64_t frameNs, analysis::FeedProvider* feeds = nullptr);
 
     void declare(signals::SignalBus& bus) { runtime_.declare(bus); }
     void setSmoothing(float scale) { runtime_.setTimeScale(scale); }

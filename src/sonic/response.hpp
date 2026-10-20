@@ -22,6 +22,7 @@
 // backward seek replays it from zero exactly as the character does.
 
 #include "analysis/causal_onsets.hpp"
+#include "analysis/response_feed.hpp"
 #include "core/error.hpp"
 #include "signals/signal_bus.hpp"
 
@@ -112,6 +113,10 @@ public:
     void declare(signals::SignalBus& bus);
     // One analysis frame, `dt` after the previous.
     void step(const TimbreFeatures& f, double dt, const ResponseControls& c, const ResponseSettings& s);
+    // The same with the hits and levels read from `feed` (ADR-1580: the mix's, or a source's where the project's feeds
+    // say so). `step(f, ...)` is `step(f, ResponseFeed::fromCausal(f.causal), ...)`.
+    void step(const TimbreFeatures& f, const analysis::ResponseFeed& feed, double dt, const ResponseControls& c,
+              const ResponseSettings& s);
     // This render frame's values. `noteOn`/`noteVelocity` are the notes begun since the last publish, `notes` the
     // track the context reads (the note envelope is a pure function of it and `seconds`), and `midiMelodic` /
     // `midiPitch` (< 0 when none) the MIDI half of `response.melodic` and `response.pitch`.

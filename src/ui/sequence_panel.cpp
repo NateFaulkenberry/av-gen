@@ -2,6 +2,7 @@
 #include "ui/sequence_panel.hpp"
 
 #include "ui/shortcuts.hpp"
+#include "ui/feeds_row.hpp"
 #include "ui/style.hpp"
 #include "ui/theme.hpp"
 #include "ui/treatment_editor_logic.hpp"
@@ -4093,7 +4094,7 @@ void SequencePanel::pollStructureAnalysis(app::Engine& engine) {
     }
     piece.refreshSectionMarkers();
     if (engine.track() != nullptr) {
-        piece.setBeatMarkers(engine.track()->beats().beatTimes);
+        piece.setBeatMarkers(engine.beatGrid().beats.beatTimes); // ADR-1581: the beat clock's grid
     }
     // ADR-216: the generated Director events, if this project has a table and the box was ticked.
     //
@@ -4131,11 +4132,7 @@ double SequencePanel::snapSection(const app::Engine& engine, double seconds) con
     if (sectionSnap_ == 0) {
         return seconds;
     }
-    const analysis::AnalysisTrack* track = engine.track();
-    if (track == nullptr) {
-        return seconds;
-    }
-    const std::vector<double>& beats = track->beats().beatTimes;
+    const std::vector<double>& beats = engine.beatGrid().beats.beatTimes; // ADR-1581
     if (beats.empty()) {
         return seconds;
     }
@@ -4158,11 +4155,7 @@ double SequencePanel::snap(const app::Engine& engine, double seconds) const {
     case seq::SnapMode::Frames:
         return seq::snapTime(seconds, mode, {}, std::max(1.0, engine.renderSettings().fps));
     case seq::SnapMode::Beats: {
-        const analysis::AnalysisTrack* track = engine.track();
-        if (track == nullptr) {
-            return seconds;
-        }
-        return seq::snapTime(seconds, mode, track->beats().beatTimes);
+        return seq::snapTime(seconds, mode, engine.beatGrid().beats.beatTimes); // ADR-1581
     }
     case seq::SnapMode::Markers: {
         std::vector<double> points;
@@ -4179,15 +4172,10 @@ double SequencePanel::snap(const app::Engine& engine, double seconds) const {
 }
 
 const std::vector<double>& SequencePanel::beats(const app::Engine& engine) {
-    const analysis::AnalysisTrack* track = engine.track();
-    if (track == nullptr) {
-        beatCache_.clear();
-        beatRevision_ = 0;
-        return beatCache_;
-    }
-    if (beatRevision_ != engine.audioRevision()) {
-        beatCache_ = track->beats().beatTimes;
-        beatRevision_ = engine.audioRevision();
+    // ADR-1581: the beat clock's grid (the mix's, or the beat feed's stem's), which changes with either.
+    if (beatRevision_ != engine.feedsRevision()) {
+        beatCache_ = engine.beatGrid().beats.beatTimes;
+        beatRevision_ = engine.feedsRevision();
     }
     return beatCache_;
 }
@@ -4431,6 +4419,20 @@ void SequencePanel::drawStems(app::Engine& engine) {
                 tooltip("Also find kicks, snares and hats in this stem (stem.<key>.kick/snare/hat). Worth it on a "
                         "drum stem; about six times the analysis cost of the rest.");
             }
+            ImGui::SameLine();
+            float gain = edit.gainDb;
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 4.5f);
+            ImGui::DragFloat("gain", &gain, 0.1f, analysis::kMinTrimDb, analysis::kMaxTrimDb, "%+.1f dB",
+                             ImGuiSliderFlags_AlwaysClamp);
+            if (ImGui::IsItemHovered()) {
+                tooltip("Trim before analysis (ADR-1582): lifts a quiet stem over the gate and into the hit and beat "
+                        "detectors. The levels read against the stem's own loudness, so it does not make them bigger. "
+                        "A change analyses the stem again.");
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                edit.gainDb = gain;
+                changed = true;
+            }
             for (const auto* list : {&stem.report.diagnostics, &stem.mix}) {
                 for (const auto& d : *list) {
                     const ImVec4 colour = d.severity == audio::StemSeverity::Error     ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f)
@@ -4456,6 +4458,7 @@ void SequencePanel::drawStems(app::Engine& engine) {
     if (changed) {
         engine.setStems(std::move(next));
     }
+    drawFeedsRow(engine); // ADR-1580/1581
 }
 
 const audio::WaveformSummary& SequencePanel::waveform(const app::Engine& engine) {

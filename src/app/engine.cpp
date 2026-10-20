@@ -447,6 +447,7 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
     }
     mix(sonic_ ? sonic_->key() : 0u); // ADR-1020: sonic.*, timbre.*, notes.*
     mix(stemsRevision_); // ADR-1520: stem.<key>.*
+    mix(feedsRevision_); // ADR-1580/1581: the grid and the response feed
     mix(playing ? 1u : 0u);
     return h;
 }
@@ -530,8 +531,8 @@ analysis::Meter Engine::resolveMeter(MeterSource* source) const {
     const MeterSettings settings = meterSettings();
     analysis::Meter m;
     m.sectionPhrases = settings.sectionPhrases;
-    const analysis::MeterEstimate* estimate =
-        track_ != nullptr && track_->meterEstimate().valid ? &track_->meterEstimate() : nullptr;
+    // ADR-1581: the estimate made on the beat clock's grid (the mix's, or the beat feed's stem's).
+    const analysis::MeterEstimate* estimate = grid_.meter.valid ? &grid_.meter : nullptr;
     MeterSource from;
     // A MIDI clock's beat 0 is its own downbeat: the analysis's estimate is about tracked beats and
     // says nothing about it. A pinned offset is the person's word and applies to either clock.
@@ -2488,6 +2489,10 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         doc["transport"]["tempo"] = {{"bpm", tempoOverride_.bpm},
                                      {"source", audio::tempoProvenanceToken(tempoOverride_.source)}};
     }
+    // ADR-1580/1581: the feeds, only when one is set.
+    if (nlohmann::json feeds = feeds_.toJson(); !feeds.empty()) {
+        doc["feeds"] = std::move(feeds);
+    }
     // ADR-1020: the `sonic` block as it was loaded, with its notes path written relative to this file.
     if (sonic_) {
         nlohmann::json block = sonic_->document;
@@ -2560,6 +2565,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
             item["file"] = assetRefJson(stem.source.file, dir);
             if (stem.source.offsetSeconds != 0.0) item["offset"] = stem.source.offsetSeconds;
             if (stem.source.hits) item["hits"] = true;
+            if (stem.source.gainDb != 0.0f) item["gainDb"] = stem.source.gainDb; // ADR-1582
             list.push_back(std::move(item));
         }
         assets["stems"] = std::move(list);
@@ -2906,6 +2912,22 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
             }
         }
     }
+    // ADR-1580/1581: the feeds, read before the sonic block, the audio and the stems so that each builds what they
+    // need once. Absent means the mix feeds everything, not the last project's feeds.
+    feeds_ = {};
+    // Rebuilt as the sonic block, the audio and the stems arrive; said once, when they all have (below).
+    feedsQuiet_ = true;
+    struct LoudAgain {
+        bool& quiet;
+        ~LoudAgain() { quiet = false; }
+    } loudAgain{feedsQuiet_};
+    if (const auto block = doc.find("feeds"); block != doc.end()) {
+        if (auto parsed = audio::Feeds::fromJson(*block)) {
+            feeds_ = std::move(*parsed);
+        } else {
+            warn(parsed.error().message + "; the mix feeds everything");
+        }
+    }
     // ADR-1020: the Sonic Garden block, read before the audio so that loading the audio analyses its timbre
     // once. Absent means the subsystem is off, not inherited from the last project.
     {
@@ -2987,6 +3009,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                     stem.label = item.value("label", std::string{});
                     stem.offsetSeconds = item.value("offset", 0.0);
                     stem.hits = item.value("hits", false);
+                    stem.gainDb = std::clamp(item.value("gainDb", 0.0f), analysis::kMinTrimDb, analysis::kMaxTrimDb);
                     stems.push_back(std::move(stem));
                 }
             }
@@ -3592,6 +3615,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     // ADR-902: every route, track and effect, now that everything a rule reads exists -- the shot
     // spans, the sequence's markers, the scene's programs and nodes.
+    feedsQuiet_ = false;
+    rebuildFeeds(); // ADR-1580/1581: every stem is known now (a key that names none is said), and no grid or feed of
+                    // the last project's survives into this one
+    if (input_ && channels_) {
+        std::vector<std::string> keys;
+        for (const signals::StemSignals& s : inputSignals_) {
+            keys.push_back(s.key);
+        }
+        channels_->stop();
+        rebuildChannelAnalysis(keys); // the live sources' roles under this project's feeds
+    }
     reportRouteLiveness();
     finishTimings();
     projectPath_ = path;
@@ -4282,6 +4316,7 @@ Result<void> Engine::loadFile(const std::filesystem::path& path) try {
 }
 
 Engine::~Engine() {
+    liveFeeds_.reset(); // ADR-1580: reads `channels_`
     channels_.reset(); // ADR-1521: reads the input's streams
     runner_.reset();
     player_.reset();
@@ -4313,6 +4348,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         clock_.hasFrame = false;
         ++audioRevision_;
         refreshStemMixDiagnostics(); // ADR-1520
+        rebuildFeeds(); // ADR-1581: no track, no grid
         refreshTransport();
         return {};
     }
@@ -4366,6 +4402,7 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     ++audioRevision_;
     refreshSonicTimbre(); // ADR-1020: only when the project has a `sonic` block
     refreshStemMixDiagnostics(); // ADR-1520: the stems' span and rate against the new mix
+    rebuildFeeds(); // ADR-1580/1581: the grid and the response feed over the new track
     modulator_.resetState();
     clock_.music.reset();
     clock_.hasFrame = false;
@@ -4402,8 +4439,11 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
     std::vector<std::size_t> todo;
     for (std::size_t i = 0; i < wanted.size(); ++i) {
         next[i].source = wanted[i];
+        // ADR-1580: a stem a response feed names runs the hits tier whatever its own flag says.
+        const bool tier = wanted[i].hits || feeds_.feedsResponse(wanted[i].key);
         const auto same = std::find_if(stems_.begin(), stems_.end(), [&](const StemState& old) {
-            return old.source.file == wanted[i].file && old.source.hits == wanted[i].hits;
+            const bool oldTier = old.track ? old.track->hits() : old.source.hits || feeds_.feedsResponse(old.source.key);
+            return old.source.file == wanted[i].file && oldTier == tier && old.source.gainDb == wanted[i].gainDb;
         });
         if (same != stems_.end()) {
             next[i].report = same->report;
@@ -4417,10 +4457,12 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
         std::vector<std::thread> workers;
         workers.reserve(todo.size());
         for (const std::size_t i : todo) {
-            workers.emplace_back([&state = next[i], config = analyzerConfig_] {
+            workers.emplace_back([&state = next[i], config = analyzerConfig_,
+                                  tier = next[i].source.hits || feeds_.feedsResponse(next[i].source.key)] {
                 analysis::StemAnalysisConfig stemConfig;
                 stemConfig.analyzer = config;
-                stemConfig.hits = state.source.hits;
+                stemConfig.hits = tier;
+                stemConfig.gainDb = state.source.gainDb; // ADR-1582
                 audio::StemFileFacts facts;
                 auto track = analysis::StemTrack::analyzeFile(state.source.file, stemConfig, facts);
                 state.report = audio::checkStem(state.source, track ? &facts : nullptr,
@@ -4457,6 +4499,7 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
     refreshStemMixDiagnostics();
     stemPreviousSeconds_ = -1.0;
     ++stemsRevision_;
+    rebuildFeeds(); // ADR-1580/1581: a feed on a stem reads its new analysis
     rebind(); // a route on stem.<key>.* written before the stem existed resolves now
 }
 
@@ -4476,6 +4519,268 @@ void Engine::refreshStemMixDiagnostics() {
 void Engine::publishStems(signals::SignalBus& bus, double from, double to) const {
     for (std::size_t i = 0; i < stems_.size() && i < stemSignals_.size(); ++i) {
         stemSignals_[i].publishTrack(bus, stems_[i].track.get(), stems_[i].source.offsetSeconds, from, to);
+    }
+}
+
+// ---- feeds (ADR-1580, ADR-1581) ---------------------------------------------------------------------------------
+
+namespace {
+
+// The beat count (beats landed) at every frame of `times`, beat `b` landing on the frame nearest it, strictly
+// increasing -- `AnalysisTrack`'s stamping, for a grid that is not the mix's own.
+std::vector<std::uint32_t> beatCountsAt(std::span<const double> times, std::span<const double> beats) {
+    std::vector<std::uint32_t> counts(times.size(), 0);
+    if (times.empty()) {
+        return counts;
+    }
+    std::vector<std::size_t> at;
+    at.reserve(beats.size());
+    for (const double t : beats) {
+        auto i = static_cast<std::size_t>(std::lower_bound(times.begin(), times.end(), t) - times.begin());
+        if (i >= times.size()) {
+            i = times.size() - 1;
+        } else if (i > 0 && t - times[i - 1] <= times[i] - t) {
+            --i;
+        }
+        if (!at.empty()) {
+            i = std::max(i, std::min(at.back() + 1, times.size() - 1));
+        }
+        at.push_back(i);
+    }
+    std::size_t next = 0;
+    for (std::size_t i = 0; i < times.size(); ++i) {
+        while (next < at.size() && at[next] <= i) {
+            ++next;
+        }
+        counts[i] = static_cast<std::uint32_t>(next);
+    }
+    return counts;
+}
+
+} // namespace
+
+void Engine::setFeeds(audio::Feeds feeds) {
+    if (feeds == feeds_) {
+        return;
+    }
+    const audio::Feeds before = std::move(feeds_);
+    feeds_ = std::move(feeds);
+    // A stem a response feed names needs the hits tier (the causal detector); one no longer named goes back to its own.
+    bool retier = false;
+    for (const StemState& stem : stems_) {
+        retier = retier || before.feedsResponse(stem.source.key) != feeds_.feedsResponse(stem.source.key);
+    }
+    if (retier) {
+        std::vector<audio::StemSource> sources;
+        for (const StemState& stem : stems_) {
+            sources.push_back(stem.source);
+        }
+        setStems(std::move(sources)); // rebuilds the feeds
+    } else {
+        rebuildFeeds();
+    }
+    if (input_ && channels_) {
+        std::vector<std::string> keys;
+        for (const signals::StemSignals& s : inputSignals_) {
+            keys.push_back(s.key);
+        }
+        channels_->stop();
+        rebuildChannelAnalysis(keys); // the live sources' tiers, beat tracker and feed queues
+    }
+}
+
+Engine::FeedState Engine::feedState(const std::string& key) const {
+    FeedState out;
+    out.key = key;
+    if (key.empty()) {
+        out.resolved = out.active = true;
+        return out;
+    }
+    if (input_) {
+        for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+            if (inputSources_[i].key == key) {
+                out.resolved = out.live = true;
+                out.active = inputSourceActive(i);
+                return out;
+            }
+        }
+    }
+    for (const StemState& stem : stems_) {
+        if (stem.source.key == key) {
+            out.resolved = true;
+            out.active = stem.track != nullptr;
+            return out;
+        }
+    }
+    return out;
+}
+
+std::optional<MusicRuntime::BeatFields> Engine::gridBeatAt(std::size_t frameIndex) const {
+    if (gridBeatCount_.empty() || frameIndex >= gridBeatCount_.size()) {
+        return std::nullopt;
+    }
+    const std::uint32_t count = gridBeatCount_[frameIndex];
+    return MusicRuntime::BeatFields{.beat = frameIndex > 0 ? count > gridBeatCount_[frameIndex - 1] : count > 0,
+                                    .beatCount = count};
+}
+
+std::optional<MusicRuntime::BeatFields> Engine::liveGridBeat() const {
+    if (!liveBeatValid_) {
+        return std::nullopt;
+    }
+    const bool landed = liveBeat_.beatCount != liveGridCount_;
+    liveGridCount_ = liveBeat_.beatCount;
+    return MusicRuntime::BeatFields{.beat = landed, .beatCount = liveBeat_.beatCount};
+}
+
+void Engine::rebuildFeeds() {
+    ++feedsRevision_;
+    const auto stemOf = [&](const std::string& key) -> const StemState* {
+        for (const StemState& stem : stems_) {
+            if (stem.source.key == key) {
+                return &stem;
+            }
+        }
+        return nullptr;
+    };
+    const auto liveKey = [&](const std::string& key) {
+        return std::any_of(inputSources_.begin(), inputSources_.end(),
+                           [&](const audio::InputSource& s) { return s.key == key; });
+    };
+    const auto unresolved = [&](const char* feed, const std::string& key) {
+        // ADR-1580: a key that names nothing is a project bug; the part reads the mix so a typo does not black out a
+        // show, and it is said. A live input source of that key resolves it while an input is open.
+        if (!feedsQuiet_ && !liveKey(key)) {
+            noteBindingProblem(fmt::format("feeds.{}: there is no stem or input source 'stem.{}'; it follows the mix",
+                                           feed, key));
+        }
+    };
+
+    // ---- the grid (ADR-1581) ----
+    grid_ = analysis::TrackedGrid{};
+    gridBeatCount_.clear();
+    if (track_ && !track_->empty()) {
+        grid_.beats = track_->beats();
+        grid_.meter = track_->meterEstimate();
+    }
+    if (!feeds_.beat.empty()) {
+        const StemState* stem = stemOf(feeds_.beat);
+        if (stem == nullptr) {
+            unresolved("beat", feeds_.beat);
+        } else if (stem->track && !stem->track->frames().empty()) {
+            const auto& frames = stem->track->frames();
+            std::vector<double> times;
+            std::vector<float> onsets;
+            times.reserve(frames.size());
+            onsets.reserve(frames.size());
+            std::size_t picked = 0;
+            for (const analysis::StemFrame& f : frames) {
+                times.push_back(f.timeSeconds);
+                onsets.push_back(f.beatOnsetStrength);
+                picked += f.beatOnset ? 1 : 0;
+            }
+            analysis::BeatTrackerConfig beatConfig;
+            if (embeddedTempo_.available) {
+                beatConfig.preferredBpm = static_cast<float>(embeddedTempo_.bpm);
+                beatConfig.priorWidthOctaves = audio::kSeededPriorWidthOctaves;
+            }
+            analysis::OfflineBeats beats =
+                analysis::trackGrid(times, onsets, picked, stem->track->hopSeconds(), beatConfig);
+            if (beats.beatTimes.empty()) {
+                if (!feedsQuiet_) {
+                    noteBindingProblem(fmt::format("feeds.beat: no beat was found in stem '{}'; the beat clock "
+                                                   "follows the mix",
+                                                   feeds_.beat));
+                }
+            } else {
+                for (double& t : beats.beatTimes) {
+                    t += stem->source.offsetSeconds; // onto the project clock
+                }
+                grid_.beats = std::move(beats);
+                grid_.sourceKey = feeds_.beat;
+                grid_.meter = {};
+                if (track_ && !track_->empty()) {
+                    const auto& cfg = track_->config();
+                    const float binHz = static_cast<float>(cfg.sampleRate) / static_cast<float>(cfg.windowSize);
+                    grid_.meter = analysis::estimateMeter(track_->frames(), grid_.beats.beatTimes, binHz);
+                    std::vector<double> mixTimes;
+                    mixTimes.reserve(track_->frames().size());
+                    for (const analysis::AnalysisFrame& f : track_->frames()) {
+                        mixTimes.push_back(f.timeSeconds);
+                    }
+                    gridBeatCount_ = beatCountsAt(mixTimes, grid_.beats.beatTimes);
+                }
+                log::info("feeds: the beat clock follows stem '{}': {:.2f} bpm, {} beats", feeds_.beat,
+                          grid_.beats.tempoBpm, grid_.beats.beatTimes.size());
+            }
+        }
+    }
+
+    // ---- the response feed (ADR-1580) ----
+    if (!sonic_) {
+        return;
+    }
+    const std::uint64_t oldKey = sonic_->feedKey;
+    sonic_->feed.clear();
+    sonic_->feedKey = 0;
+    if (track_ && !track_->empty() && feeds_.anyResponse() && sonic_->timbre.size() == track_->frames().size()) {
+        std::vector<const StemState*> sources;
+        analysis::FeedRouting routing;
+        const auto route = [&](const char* feed, const std::string& key) -> int {
+            if (key.empty()) {
+                return -1;
+            }
+            const StemState* stem = stemOf(key);
+            if (stem == nullptr) {
+                unresolved(feed, key);
+                return -1;
+            }
+            const auto it = std::find(sources.begin(), sources.end(), stem);
+            if (it != sources.end()) {
+                return static_cast<int>(it - sources.begin());
+            }
+            sources.push_back(stem);
+            return static_cast<int>(sources.size()) - 1;
+        };
+        for (std::size_t k = 0; k < routing.hit.size(); ++k) {
+            routing.hit[k] = route(audio::kFeedHitNames[k], feeds_.hitSource(k));
+        }
+        routing.levels = route("levels", feeds_.levels);
+        if (routing.any()) {
+            const auto& frames = track_->frames();
+            std::vector<analysis::FeedFolder> folders(sources.size());
+            std::vector<std::size_t> cursors(sources.size(), 0);
+            std::vector<analysis::ResponseFeed> now(sources.size());
+            std::vector<analysis::TimedFeed> window;
+            sonic_->feed.reserve(frames.size());
+            for (std::size_t i = 0; i < frames.size(); ++i) {
+                const double t = frames[i].timeSeconds;
+                for (std::size_t s = 0; s < sources.size(); ++s) {
+                    const StemState& stem = *sources[s];
+                    window.clear();
+                    if (stem.track) {
+                        const auto& hops = stem.track->frames();
+                        const double offset = stem.source.offsetSeconds;
+                        while (cursors[s] < hops.size() && hops[cursors[s]].timeSeconds + offset <= t) {
+                            window.push_back({hops[cursors[s]].timeSeconds + offset, hops[cursors[s]].feed});
+                            ++cursors[s];
+                        }
+                    }
+                    const bool inSpan = stem.track != nullptr && t >= stem.source.offsetSeconds &&
+                                        t <= stem.source.offsetSeconds + stem.track->durationSeconds();
+                    now[s] = folders[s].fold(window, t, inSpan);
+                }
+                sonic_->feed.push_back(analysis::mergeFeeds(
+                    analysis::ResponseFeed::fromCausal(sonic_->timbre[i].causal), now, routing));
+            }
+            sonic_->feedKey = std::hash<std::string>{}(feeds_.toJson().dump()) ^ (stemsRevision_ * 0x9e3779b97f4a7c15ull);
+            if (sonic_->feedKey == 0) {
+                sonic_->feedKey = 1;
+            }
+        }
+    }
+    if (sonic_->feedKey != oldKey) {
+        clock_.sonic.reset(); // the response's history was another feed's
     }
 }
 
@@ -4959,6 +5264,14 @@ std::pair<audio::TempoProvenance, double> Engine::resolvedTempo(const SignalCloc
     if (embeddedTempo_.available) {
         return {audio::TempoProvenance::EmbeddedMetadata, embeddedTempo_.bpm};
     }
+    // ADR-1581: a beat feed's source has its own tempo (the mix's frames carry the mix's): live, the input source's
+    // tracker; offline, the stem's grid.
+    if (input_ != nullptr && liveBeatSource_ >= 0 && liveBeat_.tempoBpm > 0.0f) {
+        return {audio::TempoProvenance::Detected, static_cast<double>(liveBeat_.tempoBpm)};
+    }
+    if (input_ == nullptr && !grid_.sourceKey.empty() && grid_.beats.tempoBpm > 0.0f) {
+        return {audio::TempoProvenance::Detected, static_cast<double>(grid_.beats.tempoBpm)};
+    }
     if (clock.hasFrame && clock.latest.tempoBpm > 0.0f) {
         return {audio::TempoProvenance::Detected, static_cast<double>(clock.latest.tempoBpm)};
     }
@@ -5032,8 +5345,8 @@ void Engine::refreshTransport() {
     // signals -- and so does where bar 1 begins (ADR-896): the second the meter's downbeat falls on.
     const analysis::Meter m = meter();
     double origin = 0.0;
-    if (track_ != nullptr && !track_->beats().beatTimes.empty()) {
-        origin = analysis::secondsAtClockBeats(track_->beats().beatTimes, track_->beatSeconds(),
+    if (!grid_.empty()) { // ADR-1581
+        origin = analysis::secondsAtClockBeats(grid_.beats.beatTimes, grid_.beatSeconds(),
                                                static_cast<double>(m.downbeat));
     }
     transport_.setTempo(resolvedTempo().second, m.beatsPerBar, origin);
@@ -5089,9 +5402,9 @@ double Engine::beatBoundary(double fromSeconds, int direction) const {
     }
     // The analyzed grid first: it is where the beats actually are, as opposed to where a constant
     // tempo says they ought to be, and a piece that breathes is exactly where that difference shows.
-    if (track_ != nullptr) {
-        const auto& beats = track_->beats().beatTimes;
-        if (!beats.empty()) {
+    if (!grid_.empty()) { // ADR-1581: the beat clock's grid
+        const auto& beats = grid_.beats.beatTimes;
+        {
             constexpr double kNudge = 1e-3; // so "next" from exactly on a beat is the following one
             if (direction > 0) {
                 for (const float t : beats) {
@@ -5254,6 +5567,7 @@ Result<void> Engine::useAudioInputBackend(std::unique_ptr<audio::CaptureBackend>
 }
 
 Result<void> Engine::adoptAudioInput(std::unique_ptr<audio::AudioInput> input) {
+    liveFeeds_.reset(); // ADR-1580: reads `channels_`
     channels_.reset(); // reads the old input's streams: goes first
     runner_.reset();
     if (player_) {
@@ -5282,6 +5596,9 @@ void Engine::stopAudioInput() {
     if (!input_) {
         return;
     }
+    liveFeeds_.reset(); // ADR-1580: reads `channels_`
+    liveBeatSource_ = -1;
+    liveBeatValid_ = false;
     channels_.reset();
     runner_.reset();
     input_.reset();
@@ -5307,6 +5624,22 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
     }
     if (wanted == inputSources_) {
         return;
+    }
+    // ADR-1582: only trims moved: no stream, tier or analysis changes; the analysis thread picks them up.
+    if (wanted.size() == inputSources_.size() && channels_ && channels_->size() == wanted.size()) {
+        bool trimsOnly = true;
+        for (std::size_t i = 0; i < wanted.size(); ++i) {
+            audio::InputSource a = wanted[i];
+            a.gainDb = inputSources_[i].gainDb;
+            trimsOnly = trimsOnly && a == inputSources_[i];
+        }
+        if (trimsOnly) {
+            for (std::size_t i = 0; i < wanted.size(); ++i) {
+                channels_->setGainDb(i, wanted[i].gainDb);
+            }
+            inputSources_ = std::move(wanted);
+            return;
+        }
     }
     for (const signals::StemSignals& old : inputSignals_) {
         if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
@@ -5397,16 +5730,59 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
     inputLatches_ = std::move(latches);
     inputLastFrame_ = std::move(last);
     inputActive_ = std::move(active);
+    liveFeeds_.reset(); // it reads `channels_`
+    liveBeatSource_ = -1;
+    liveBeatValid_ = false;
+    liveBeat_ = {};
     std::unique_ptr<analysis::ChannelAnalysis> previous = std::move(channels_);
     if (!input_ || inputSources_.empty()) {
         return; // `previous` goes, stopping its thread
     }
     std::vector<analysis::ChannelAnalysis::Source> sources;
     for (std::size_t i = 0; i < inputSources_.size(); ++i) {
-        sources.push_back({.stream = input_->sourceStream(i), .pair = inputSources_[i].pair, .hits = inputSources_[i].hits});
+        const audio::InputSource& s = inputSources_[i];
+        const bool fed = feeds_.feedsResponse(s.key); // ADR-1580: needs the hits tier
+        const bool beat = !feeds_.beat.empty() && feeds_.beat == s.key;
+        if (beat) {
+            liveBeatSource_ = static_cast<int>(i);
+        }
+        sources.push_back({.stream = input_->sourceStream(i),
+                           .pair = s.pair,
+                           .hits = s.hits || fed,
+                           .gainDb = s.gainDb,
+                           .beat = beat,
+                           .feed = fed});
     }
     channels_ = std::make_unique<analysis::ChannelAnalysis>(std::move(sources), input_->sampleRate(), analyzerConfig_,
                                                             std::move(previous));
+    // ADR-1580: the live response feeds, routed by key onto these sources.
+    if (feeds_.anyResponse()) {
+        std::vector<std::size_t> slots;
+        analysis::FeedRouting routing;
+        const auto route = [&](const std::string& key) -> int {
+            if (key.empty()) {
+                return -1;
+            }
+            for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+                if (inputSources_[i].key == key) {
+                    const auto it = std::find(slots.begin(), slots.end(), i);
+                    if (it != slots.end()) {
+                        return static_cast<int>(it - slots.begin());
+                    }
+                    slots.push_back(i);
+                    return static_cast<int>(slots.size()) - 1;
+                }
+            }
+            return -1; // not a live source: the mix (the offline warning names it)
+        };
+        for (std::size_t k = 0; k < routing.hit.size(); ++k) {
+            routing.hit[k] = route(feeds_.hitSource(k));
+        }
+        routing.levels = route(feeds_.levels);
+        if (routing.any()) {
+            liveFeeds_ = std::make_unique<analysis::LiveFeedMixer>(*channels_, std::move(slots), routing);
+        }
+    }
     channels_->start();
 }
 
@@ -5499,6 +5875,10 @@ void Engine::publishInputSources() {
         if (live && channels_ && i < channels_->size() && channels_->acquire(i)) {
             analysis::LiveStemFrame f = channels_->latest(i);
             inputLatches_[i].apply(f);
+            if (static_cast<int>(i) == liveBeatSource_ && f.tracked) {
+                liveBeat_ = f.beat; // ADR-1581
+                liveBeatValid_ = true;
+            }
             ids.publish(bus_, f.frame);
             if (f.frame.onset && input_->sampleRate() > 0) {
                 // When the newest sample of the window that found it arrived, from the input's last block stamp.
@@ -5524,6 +5904,9 @@ void Engine::publishInputSources() {
         } else {
             ids.publishInactive(bus_);
             inputActive_[i] = 0;
+            if (static_cast<int>(i) == liveBeatSource_) {
+                liveBeatValid_ = false; // the clock free-runs at the last tempo it was given
+            }
         }
     }
 }
@@ -5580,7 +5963,16 @@ void Engine::publishFrame(SignalClock& clock, signals::SignalBus& bus, const ana
     audioSignals_.publish(bus, published);
     // Live, this is every analysis frame the render thread sees. Offline it is the last of the
     // batch update() already walked, which consume() recognises by frame index and ignores.
-    clock.music.consume(published, meter());
+    // ADR-1581: music.* takes its beat from the clock's grid when that is a stem's (playback of a file: the track
+    // frame at this instant) or a live source's.
+    std::optional<MusicRuntime::BeatFields> gridBeat;
+    if (input_ == nullptr && !gridBeatCount_.empty() && track_ != nullptr && !track_->empty()) {
+        const analysis::AnalysisFrame& here = track_->at(published.timeSeconds);
+        gridBeat = gridBeatAt(static_cast<std::size_t>(&here - track_->frames().data()));
+    } else if (input_ != nullptr) {
+        gridBeat = liveGridBeat();
+    }
+    clock.music.consume(published, meter(), gridBeat);
 }
 
 bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double renderTime) const {
@@ -5624,7 +6016,7 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
         // a detector that samples the music at the frame rate is a detector whose answers
         // depend on the frame rate (ADR-073).
-        clock.music.consume(f, m);
+        clock.music.consume(f, m, gridBeatAt(cursor)); // ADR-1581: the beat from the clock's grid
         ++cursor;
     }
     if (cursor > clock.analysisCursor) {
@@ -5668,10 +6060,8 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     // An analysed grid is the clock whenever there is one and nothing else owns the beat: a file is
     // loaded (not live input) and no MIDI clock is running. In both engine modes, so the editor's
     // bars are the render's bars.
-    const std::vector<double>* grid =
-        !in.midi && track_ != nullptr && input_ == nullptr && !track_->beats().beatTimes.empty()
-            ? &track_->beats().beatTimes
-            : nullptr;
+    // ADR-1581: the mix's grid, or the beat feed's stem's (`grid_`).
+    const std::vector<double>* grid = !in.midi && input_ == nullptr && !grid_.empty() ? &grid_.beats.beatTimes : nullptr;
     if (in.midi) {
         // The MIDI clock owns the beat clock: phase and count come straight from the tracker
         // (already extrapolated to this frame by the hub). Its beat 0 is the song's first beat.
@@ -5683,17 +6073,21 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
         // ADR-896: a pure function of the second -- interpolated between tracked beats, extrapolated
         // at the track's tempo outside them -- so a seek lands on the beat a play reaches, at any
         // frame rate. The pulse is the frame on which the clock passes a whole beat.
-        clockBeats = analysis::clockBeatsAt(*grid, track_->beatSeconds(), time.renderTime);
+        clockBeats = analysis::clockBeatsAt(*grid, grid_.beatSeconds(), time.renderTime);
         pulse = clock.haveClockBeats && std::floor(clockBeats) > std::floor(clock.clockBeats);
         clock.beatPhase = clockBeats - std::floor(clockBeats);
     } else if (bpm > 0.0) {
         // Live input: advance the per-frame beat clock; re-sync to the analyzer whenever it reports
         // a beat.
         clock.beatPhase += time.deltaTime * bpm / 60.0;
-        if (newAnalysisFrame && clock.latest.beatCount != clock.lastAnalysisBeatCount) {
-            clock.beatPhase = static_cast<double>(clock.latest.beatPhase);
-            clock.beatCount = clock.latest.beatCount;
-            clock.lastAnalysisBeatCount = clock.latest.beatCount;
+        // ADR-1581: the beat feed's input source's tracker when it has one, else the mix's.
+        const bool fromSource = in.sourceBeat != nullptr;
+        const std::uint32_t trackedCount = fromSource ? in.sourceBeat->beatCount : clock.latest.beatCount;
+        const float trackedPhase = fromSource ? in.sourceBeat->phase : clock.latest.beatPhase;
+        if (!in.sourceBeatHeld && (newAnalysisFrame || fromSource) && trackedCount != clock.lastAnalysisBeatCount) {
+            clock.beatPhase = static_cast<double>(trackedPhase);
+            clock.beatCount = trackedCount;
+            clock.lastAnalysisBeatCount = trackedCount;
             pulse = true;
         } else if (clock.beatPhase >= 1.0) {
             clock.beatPhase -= 1.0;
@@ -5793,13 +6187,18 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
         in.midiCount = midiClock.beatCount();
         in.midiPulse = midiClock.beatEvent();
     }
+    if (input_ != nullptr && liveBeatSource_ >= 0) { // ADR-1581
+        in.sourceBeat = liveBeatValid_ ? &liveBeat_ : nullptr;
+        in.sourceBeatHeld = !liveBeatValid_;
+    }
     in.position = positionSeconds();
     in.duration = durationSeconds();
     in.playing = isPlaying();
     const bool pulse = advanceClock(clock_, bus_, time, newAnalysisFrame, in);
     if (liveSonic_.running()) {
         liveSonic_.setControls(responseControls_);
-        liveSonic_.frame(*activeSonicSetup(), liveTimbre_.get(), bus_, liveFrameSeconds_, liveFrameNs_);
+        liveSonic_.frame(*activeSonicSetup(), liveTimbre_.get(), bus_, liveFrameSeconds_, liveFrameNs_,
+                         input_ != nullptr ? liveFeeds_.get() : nullptr); // ADR-1580
     }
 
     sourceContext_.time = time;
@@ -6445,7 +6844,8 @@ world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene)
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
     // Wave 2 (TRIGGER): beats and onsets from the offline track, the sequence's markers, HIST.
-    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, meter());
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, meter(),
+                       grid_.beats.beatTimes);
     ctx.triggers = &triggerClock_;
     return ctx;
 }
@@ -6849,7 +7249,8 @@ void Engine::update(const FrameTime& time) {
     // ADR-906: the trigger clock, bound to this frame's transport second before the flatten, which
     // counts every triggered field's clock from it. Binding it again later in the frame is the same
     // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
-    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter(),
+                       grid_.beats.beatTimes);
     serviceSignalTriggers(); // ADR-1061: derive or record the bus events Signal triggers fire on
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
@@ -7180,6 +7581,7 @@ Result<void> Engine::setSonic(const nlohmann::json& block, const std::filesystem
     log::info("sonic: {} notes{}", sonic_->notes.notes.size(),
               sonic_->notesPath.empty() ? std::string(" (no notes file)") : " from " + sonic_->notesPath.filename().string());
     refreshSonicTimbre();
+    rebuildFeeds(); // ADR-1580
     syncResponseControls(); // ADR-1062: the response parameters exist before the project's parameters are applied
     return {};
 }
