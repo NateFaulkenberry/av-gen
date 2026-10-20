@@ -213,7 +213,10 @@ def grass_program():
 
 
 def canopy_program():
-    return finish(with_ring({"name": "rw_canopy", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+    # (Rainbow World 2 tried the kick ring on the canopies: the leaf cards are masked, and a masked draw evaluates its
+    # program in the depth prepass too, so 8 ops cost 3.6 ms of prepass at the 200 s hold. The trees take the ring's
+    # light from the ground and grass round them instead.)
+    return finish(({"name": "rw_canopy", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
             "emissionIntensity": 1.0, "opacity": -1, "ops": [
                 {"kind": "input", "dst": 0, "input": "objectPosition"},
                 {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, 1.0 / 14.0, 0.0, -0.75], "value": 1.0},
@@ -224,7 +227,7 @@ def canopy_program():
                  # Stage 7, against the Blender preview: the AV Gen pads read cooler and darker than the Cycles
                  # tree; the two upper stops are warmer and lighter so the lit tops come out yellow-green
                  "constant": R(rw.hexlin("#2A6034")[:3]) + [1.0], "constant2": R(rw.hexlin("#5A9A3C")[:3]) + [1.0],
-                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]}]}, 5, 6, 7, 2))
+                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]}]}))
 
 
 def rock_program():
@@ -425,7 +428,7 @@ def node_points(name, asset, points, material, **extra):
 def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
     """A canopy ramp by height in the tree (core -> skin), with a little world noise -- the Great Tree's program with
     the tree's own colours: the Weeper's limes, the Blossom Puff's pinks."""
-    return finish(with_ring({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+    return finish(({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
             "emissionIntensity": 1.0, "opacity": -1, "ops": [
                 {"kind": "input", "dst": 0, "input": "objectPosition"},
                 {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, 1.0 / height, 0.0, offset], "value": 1.0},
@@ -433,8 +436,7 @@ def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
                 {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.35, "seed": 3},
                 {"kind": "mix", "dst": 1, "srcA": 1, "srcB": 2, "value": 0.35},
                 {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "constant": R(stops[0]) + [1.0],
-                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]},
-        5, 6, 7, 2))
+                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]}))
 
 
 def all_programs():
