@@ -782,14 +782,18 @@ routes = [{"source": "timeline.ride", "target": "camera/splineT", "amount": 1.0,
 # Bounded and smoothed; with no audio and no MIDI every amount is at rest and the world is as built.
 for rn in rainbow_nodes:
     nm = rn["name"]
-    routes += [{"source": "response.sustain", "target": "nodes/%s/emissiveBoost" % nm, "amount": 0.6, "op": "add",
+    # Stage 7 with Feline Footwear: at 0.6/0.8 the arches' pulse measured +-3% (lost in the camera's own motion);
+    # doubled, so a kick reads as a flash of the bow and a held chord as its swell
+    routes += [{"source": "response.sustain", "target": "nodes/%s/emissiveBoost" % nm, "amount": 1.2, "op": "add",
                 "polarity": "unipolar", "chain": {"attackMs": 600, "decayMs": 2500}},
-               {"source": "response.kick", "target": "nodes/%s/emissiveBoost" % nm, "amount": 0.8, "op": "add",
+               {"source": "response.kick", "target": "nodes/%s/emissiveBoost" % nm, "amount": 1.8, "op": "add",
                 "polarity": "unipolar", "chain": {"attackMs": 15, "decayMs": 450}},
                {"source": "control.glow", "target": "nodes/%s/emissiveBoost" % nm, "amount": 2.0, "op": "add",
                 "polarity": "unipolar", "chain": ctl}]
 routes += [{"source": "response.level", "target": "post/bloom/intensity", "amount": 0.12, "op": "add", "polarity": "unipolar",
             "chain": {"attackMs": 300, "decayMs": 1500}},
+           {"source": "response.kick", "target": "post/bloom/intensity", "amount": 0.1, "op": "add", "polarity": "unipolar",
+            "chain": {"attackMs": 10, "decayMs": 350}},
            {"source": "response.hat", "target": "post/grade/saturation", "amount": 0.06, "op": "add", "polarity": "unipolar",
             "chain": {"attackMs": 20, "decayMs": 300}},
            {"source": "response.bass", "target": "lights/cloudsea/intensity", "amount": 0.5, "op": "add", "polarity": "unipolar",

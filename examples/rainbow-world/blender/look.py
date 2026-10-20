@@ -129,8 +129,10 @@ def canopy_program():
                 {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.35, "seed": 3},
                 {"kind": "mix", "dst": 1, "srcA": 1, "srcB": 2, "value": 0.35},
                 {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0,
-                 "constant": R(rw.P["canopy_core"][:3]) + [1.0], "constant2": R(rw.hexlin("#3A7A3A")[:3]) + [1.0],
-                 "constant3": R(rw.P["canopy_lit"][:3]) + [1.0], "constant4": R(rw.hexlin("#9BD24C")[:3]) + [1.0]}]}
+                 # Stage 7, against the Blender preview: the AV Gen pads read cooler and darker than the Cycles
+                 # tree; the two upper stops are warmer and lighter so the lit tops come out yellow-green
+                 "constant": R(rw.hexlin("#2A6034")[:3]) + [1.0], "constant2": R(rw.hexlin("#5A9A3C")[:3]) + [1.0],
+                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]}]}
 
 
 def rock_program():

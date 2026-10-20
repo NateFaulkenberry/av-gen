@@ -3980,7 +3980,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_0/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -3991,7 +3991,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_0/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4013,7 +4013,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_1/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4024,7 +4024,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_1/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4046,7 +4046,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_2/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4057,7 +4057,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_2/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4079,7 +4079,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_3/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4090,7 +4090,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_3/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4112,7 +4112,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_4/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4123,7 +4123,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_4/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4145,7 +4145,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_5/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4156,7 +4156,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_5/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4178,7 +4178,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_6/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4189,7 +4189,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_6/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4211,7 +4211,7 @@
   {
    "source": "response.sustain",
    "target": "nodes/rainbow_7/emissiveBoost",
-   "amount": 0.6,
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4222,7 +4222,7 @@
   {
    "source": "response.kick",
    "target": "nodes/rainbow_7/emissiveBoost",
-   "amount": 0.8,
+   "amount": 1.8,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4250,6 +4250,17 @@
    "chain": {
     "attackMs": 300,
     "decayMs": 1500
+   }
+  },
+  {
+   "source": "response.kick",
+   "target": "post/bloom/intensity",
+   "amount": 0.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 10,
+    "decayMs": 350
    }
   },
   {
