@@ -34,8 +34,8 @@ runs when run alone.
 - **So the renderer itself is not bit-repeatable under GPU contention**, about once in several thousand renders. It is
   not the cascade code, and it has been seen in two of the three arms. Had either odd render been the live or the
   stripped arm's in the failing comparison, a few glint pixels "moved on flat water", which is the reported failure.
-- **A probe did not narrow it.** `[.probe-repeat]` renders the same frame with fresh renderers, one at a time and
-  three alive at once. It ran 2,000+ renders across 440 processes under the same contention without a single odd
+- **A probe did not narrow it.** `[.probe-repeat]` renders the same frame with fresh renderers: three alive at once, the
+  third compared. An earlier version made one at a time. It ran 2,000+ renders across 440 processes under the same contention without a single odd
   frame, so the trigger also depends on something the probe does not do. The glint is the directional light's GGX
   term times `shadowFactor`, so the shadow atlas is the first suspect, but this was not proved.
 
