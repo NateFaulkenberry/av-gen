@@ -41,6 +41,20 @@ Parameters appear under `procedural/<node>/…`:
 | Deformation | `deform/1/amount`, `speed`, `phase`, `frequency`, `scale`, `falloff`, `center`, `axis`, `enabled` (slot 1..8, label shows the kind) | evaluated on the GPU every frame |
 | Material | `material/baseColor`, `emissiveColor`, `emissive`, `roughness`, `metallic`; `materialVariation/hueShift|hueGradient|valueRandom|emissiveRandom|emissiveGradient` | per-instance colour is baked into the instance records |
 
+**Shadows.** By default an object is drawn into the shadow maps. Set `"castsShadow": false` in the `procedural`
+block to keep it out (ADR-1545). This suits ground cover and leaf cards, whose shadows are smaller than a shadow-map
+texel but whose cost is not. It is not a parameter.
+
+**Chunked surfaces.** A mesh source's LOD levels (`"lod": {"count": 2-4, ...}`) are simplified with no regard for the
+mesh's open edges, which is right for a rock or a tree, whose border is its silhouette. For a surface cut into chunks
+(terrain), add `"lockBorder": true` to the `lod` block (ADR-1546): the simplifier holds every border vertex still, so
+a near chunk at LOD0 and a far one at LOD2 still meet without a crack. Centre each chunk on its own origin and place
+it with its distribution, because the culler's bound and the LOD distance are both measured from the instance.
+
+**Leaf cards.** A mesh made of many small separate cards (a canopy) collapses under the simplifier: it deletes whole
+cards and grows none. Add `"thinning": true` to the `lod` block (ADR-1548), and its levels are thinned instead. Whole
+cards are removed and the survivors grown to keep the leaf area, as imported gltf trees already do (ADR-351).
+
 **Transform order**: `world = node × distribution × placement(i) × variation(i) × source`.
 Local-space deformers act on the source shape before instancing (each column twists about its
 own axis); world-space deformers act on the final world position (a wave across the whole hall).

@@ -1442,7 +1442,8 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
         const std::uint32_t sourceTris = base != nullptr ? base->indexCount / 3 : 0;
         const CachedMesh uploaded =
             uploadMesh(scene::makeLodMesh(object.source, level, object.lod.impostorSize,
-                                          object.sourceTransform.scale),
+                                          object.sourceTransform.scale, object.lod.lockBorder,
+                                          object.lod.thinning),
                        object.name);
         log::debug("procedural '{}': lod {} = {} triangles, {:.0f}% of the source mesh's {}",
                    object.name, level, uploaded.indexCount / 3,

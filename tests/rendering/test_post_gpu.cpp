@@ -573,3 +573,47 @@ TEST_CASE("The spectrum sweep is off at its defaults and moves a band of hue acr
     CHECK(late > 64u);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("The fisheye lens is off at its default and magnifies the frame's centre when on",
+          "[gpu][post][lens][adr1540]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    auto s = brightCubeScene();
+    s.camera.fovYRadians = 1.75f; // ~100 degrees: a wide rectilinear source, as the lens is meant to remap
+    s.camera.lens.useExplicitFov = true;
+    FrameTime time{};
+    auto plain = renderer.renderToImage(s, time, 160, 90);
+    REQUIRE(plain.has_value());
+    // The model alone, with no amount, encodes nothing.
+    s.post.fisheyeModel = 1.0f;
+    auto idle = renderer.renderToImage(s, time, 160, 90);
+    REQUIRE(idle.has_value());
+    {
+        const auto d = testing::byteDiff(plain->rgba, idle->rgba);
+        INFO(d.describe());
+        CHECK(d.identical());
+    }
+    const auto litPixels = [](const gpu::Image8& img) {
+        int n = 0;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                n += sum3(img.pixel(x, y)) > 120 ? 1 : 0;
+            }
+        }
+        return n;
+    };
+    s.post.fisheye = 1.0f;
+    for (float model : {0.0f, 1.0f, 2.0f}) {
+        s.post.fisheyeModel = model;
+        auto fish = renderer.renderToImage(s, time, 160, 90);
+        REQUIRE(fish.has_value());
+        const int before = litPixels(*plain);
+        const int after = litPixels(*fish);
+        INFO("model " << model << ": lit pixels " << before << " -> " << after);
+        CHECK(before > 0);
+        CHECK(after > before); // the cube sits at the centre, which the fisheye magnifies
+    }
+    CHECK(ctx->errorCount() == 0);
+}

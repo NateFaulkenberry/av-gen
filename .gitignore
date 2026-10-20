@@ -176,3 +176,7 @@ __pycache__/
 # Output of the hidden [.capture] cases in tests/rendering/test_temporal_gpu.cpp, which now write to
 # AVGEN_CAPTURE_DIR or build/captures; this catches a run with AVGEN_CAPTURE_DIR=. from the root.
 /temporal-*.png
+
+# Rainbow World (docs/prototypes/rainbow-world/04-production-plan.md section 3): downloads, milestone .blend files and
+# large generated meshes. assets/rainbow-world.manifest.json is the part the repository keeps.
+/assets/rainbow-world/

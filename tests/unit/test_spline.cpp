@@ -977,3 +977,79 @@ TEST_CASE("SplineSet find and indexOf", "[spatial][spline]") {
     CHECK(set.find("missing") == nullptr);
     CHECK(SplineSet{}.find("rail") == nullptr);
 }
+
+// ADR-1542: a closed spline's per-point roll may wind a whole number of turns round the loop. Without `rollTurns`
+// the seam segment interpolates from the last point's roll straight back to the first's, so a frame that twists a
+// whole turn spins back through it inside one segment; with it, the seam continues the twist and the frame closes.
+namespace {
+spatial::Spline windingCircle(int rollTurns) {
+    spatial::Spline s;
+    s.name = "loop";
+    s.kind = spatial::SplineKind::CatmullRom;
+    s.closed = true;
+    s.samplesPerSegment = 32;
+    s.up = {0.0f, 1.0f, 0.0f};
+    s.rollTurns = rollTurns;
+    const int n = 16;
+    for (int i = 0; i < n; ++i) {
+        const float a = glm::two_pi<float>() * static_cast<float>(i) / static_cast<float>(n);
+        spatial::SplinePoint p;
+        p.position = {std::cos(a) * 100.0f, 0.0f, std::sin(a) * 100.0f};
+        p.roll = glm::two_pi<float>() * static_cast<float>(i) / static_cast<float>(n); // one turn, unwrapped
+        s.points.push_back(p);
+    }
+    return s;
+}
+
+float worstNormalStepDegrees(const spatial::Spline& s) {
+    float worst = 0.0f;
+    const int count = 2048;
+    glm::vec3 prev = s.sampleByDistance(0.0f).normal;
+    for (int k = 1; k <= count; ++k) {
+        const glm::vec3 n = s.sampleByDistance(s.length() * static_cast<float>(k) / static_cast<float>(count)).normal;
+        worst = std::max(worst, glm::degrees(std::acos(std::clamp(glm::dot(prev, n), -1.0f, 1.0f))));
+        prev = n;
+    }
+    return worst;
+}
+} // namespace
+
+TEST_CASE("a closed spline's roll can wind whole turns and still close smoothly", "[spline][adr1542]") {
+    const auto unwound = windingCircle(0);
+    const auto wound = windingCircle(1);
+    // The control: the same rolls without rollTurns spin back a whole turn inside the seam segment (1/16 of the
+    // loop), so its steps are fifteen times the rest's; with rollTurns the twist is even all the way round.
+    CHECK(worstNormalStepDegrees(unwound) > 2.0f);
+    CHECK(worstNormalStepDegrees(wound) < 0.5f);
+    // Half way through the seam segment the two disagree by half a turn: one is unwinding, the other continuing.
+    const float seamMid = 15.5f / 16.0f;
+    CHECK(glm::dot(unwound.sampleByDistance(unwound.length() * seamMid).normal,
+                   wound.sampleByDistance(wound.length() * seamMid).normal) < -0.9f);
+    // And the frame closes: the end of the loop is the start.
+    const glm::vec3 start = wound.sampleByDistance(0.0f).normal;
+    const glm::vec3 end = wound.sampleByDistance(wound.length() * 0.99999f).normal;
+    CHECK(glm::dot(start, end) > 0.999f);
+    // Half way round the frame has turned half a turn relative to the unrolled frame: the roll arrived.
+    spatial::Spline flat = windingCircle(0);
+    for (auto& p : flat.points) {
+        p.roll = 0.0f;
+    }
+    const glm::vec3 a = flat.sampleByDistance(flat.length() * 0.5f).normal;
+    const glm::vec3 b = wound.sampleByDistance(wound.length() * 0.5f).normal;
+    CHECK(glm::dot(a, b) < -0.99f);
+}
+
+TEST_CASE("rollTurns round-trips, is absent when zero and leaves existing hashes alone", "[spline][json][adr1542]") {
+    const auto wound = windingCircle(1);
+    const nlohmann::json j = wound.toJson();
+    REQUIRE(j.contains("rollTurns"));
+    auto back = spatial::Spline::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->rollTurns == 1);
+    const auto plain = windingCircle(0);
+    CHECK_FALSE(plain.toJson().contains("rollTurns"));
+    CHECK(plain.structuralHash() != wound.structuralHash());
+    nlohmann::json bad = j;
+    bad["rollTurns"] = 0.5;
+    CHECK_FALSE(spatial::Spline::fromJson(bad).has_value());
+}

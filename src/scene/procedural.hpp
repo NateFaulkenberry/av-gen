@@ -257,7 +257,8 @@ struct SourceSpec {
 //
 // Pure and deterministic: the same spec/level/scale always gives the same mesh.
 [[nodiscard]] Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize = 1.0f,
-                                           const glm::vec3& sourceScale = glm::vec3(1.0f));
+                                           const glm::vec3& sourceScale = glm::vec3(1.0f), bool lockBorder = false,
+                                           bool thinning = false);
 // True when `makeLodMesh(spec, level)` returns a camera-facing impostor quad rather than geometry
 // in the source's own space.
 //
@@ -581,7 +582,16 @@ struct LodSettings {
     // trade against this engine's frame-independence, so it is offered rather than assumed.
     float lodHysteresis = 0.0f;
     float impostorSize = 1.0f;     // multiplies the LOD2/LOD3 billboard size
-    [[nodiscard]] std::uint64_t structuralHash() const; // lodCount only (the rest are uniforms)
+    // ADR-1546: a mesh source's simplified levels hold their open border still (meshoptimizer's
+    // LockBorder, no sloppy or clustering fallback). For a mesh that is one piece of a larger
+    // surface -- a terrain chunk -- so neighbouring pieces at different levels still meet. Off by
+    // default; a level that will not simplify with the border held is the source, not a cracked mesh.
+    bool lockBorder = false;
+    // ADR-1548: a mesh source made of many small separate shells (leaf cards) has its stalled levels thinned --
+    // whole cards removed, the survivors grown to keep the canopy's area (assets::ShellThinning, the foliage
+    // calibration ADR-351 uses for imported trees) -- rather than sloppy-collapsed into specks. Off by default.
+    bool thinning = false;
+    [[nodiscard]] std::uint64_t structuralHash() const; // lodCount, lockBorder, thinning (the rest are uniforms)
 };
 constexpr int kMaxLodLevels = 4;
 

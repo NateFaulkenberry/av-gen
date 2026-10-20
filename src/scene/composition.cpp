@@ -4681,6 +4681,9 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // ADR-1166: a spline camera banks into its turns: degrees of roll per radian the path's heading turns over the
     // look-ahead. 0 (the default) keeps the world's up, as before.
     cameraSplineBank_ = &params.add(floatDesc(prefix_ + "camera/splineBank", 0.0f, -90.0f, 90.0f, 0.0f, 40.0f));
+    // ADR-1541: how far a spline camera's up follows the spline's own frame (its rotation-minimising normal plus the
+    // points' authored roll) instead of the world's up. 0 (the default) keeps the world's up, as before.
+    cameraSplineUp_ = &params.add(floatDesc(prefix_ + "camera/splineUp", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f));
     // Camera shake (ADR-098). Ordinary parameters, so a beat drives the amplitude through an
     // ordinary modulation route and a sequence keys it like anything else; `start` carries the
     // second the impulse began so the decay is `now - start` rather than an accumulated timer.
@@ -6071,6 +6074,7 @@ void Composition::detach() {
     cameraSplineT_ = nullptr;
     cameraLookAhead_ = nullptr;
     cameraSplineBank_ = nullptr;
+    cameraSplineUp_ = nullptr;
     cameraSplineOffset_ = nullptr;
     materialParams_.clear();
     cameraFov_ = nullptr;
@@ -8122,6 +8126,30 @@ JourneyPose Composition::guardJourneyPose(JourneyPose pose, std::size_t chapter)
     return pose;
 }
 
+glm::vec3 Composition::splineCameraUp() const {
+    // ADR-1541: the world's up turned toward the spline's normal at the camera's point by `camera/splineUp`. A pure
+    // function of the parameters (no state between frames), so a seek lands where play does.
+    const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+    const float weight = cameraSplineUp_ != nullptr ? std::clamp(cameraSplineUp_->value(), 0.0f, 1.0f) : 0.0f;
+    const int cameraMode = cameraMode_ != nullptr ? cameraMode_->value() : cameraModeSetting_;
+    if (weight <= 0.0f || cameraMode != 2 || cameraSplineSetting_.empty()) {
+        return worldUp;
+    }
+    const spatial::Spline* spline = scene_.splines.find(prefixed(sanitise(prefix_), cameraSplineSetting_));
+    if (spline == nullptr) {
+        return worldUp;
+    }
+    const float length = spline->length();
+    const float tRaw = cameraSplineT_ != nullptr ? cameraSplineT_->value() : 0.0f;
+    const float t = spline->closed ? tRaw - std::floor(tRaw) : std::clamp(tRaw, 0.0f, 1.0f);
+    const glm::vec3 n = spline->sampleByDistance(t * length).normal;
+    if (glm::dot(n, n) < 1e-12f) {
+        return worldUp;
+    }
+    const glm::quat full = glm::rotation(worldUp, glm::normalize(n));
+    return glm::normalize(glm::slerp(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), full, weight) * worldUp);
+}
+
 float Composition::splineBankDegrees() const {
     // ADR-1166: how far the spline's heading turns between the camera and the point it looks at, seen from above
     // (positive = turning left, counter-clockwise), times the bank. The camera leans into the turn: a left turn rolls
@@ -8581,6 +8609,9 @@ void Composition::applyParameters() {
             Entity& e = scene_.entities[range.firstEntity + k];
             e.transform = compose(full, range.restTransforms[k]);
             e.visible = visible && (child == nullptr || child->entities[k].visible);
+            if (!node.castsShadow) {
+                e.castsShadow = false; // ADR-1547: only ever clears; the node flag is not a parameter
+            }
             // ADR-903: the boost is the entity's emission lane, applied by the shader after any
             // material program -- not a multiplier on `emissiveIntensity`, which a program that
             // asserts emission discards (ADR-179). A nested scene's entity keeps its own node's
@@ -9156,7 +9187,7 @@ void Composition::applyParameters() {
     {
         float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
         roll += splineBankDegrees(); // ADR-1166
-        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        glm::vec3 up = splineCameraUp(); // ADR-1541: the world's up unless the spline's frame is asked for
         const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
         if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {
             up = glm::angleAxis(glm::radians(roll), glm::normalize(forward)) * up;
@@ -10574,6 +10605,9 @@ nlohmann::json Composition::toJson() const {
         }
         
         n["visible"] = node.visible;
+        if (!node.castsShadow) {
+            n["castsShadow"] = false; // ADR-1547: written only when off
+        }
         // Only when locked: an additive key that no existing scene carries, so a file written by
         // this build and read by an older one loses a working preference and nothing else, and a
         // file that was never locked round-trips byte for byte.
@@ -12060,6 +12094,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
             auto locked = readBool(item, "locked", false);
+            auto castsShadow = readBool(item, "castsShadow", true); // ADR-1547
             // ADR-1097: optional; absent = inferred.
             if (item.contains("importance")) {
                 Importance importance = Importance::Normal;
@@ -12155,6 +12190,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             check(rotation);
             check(scale);
             check(visible);
+            check(castsShadow);
             check(emissive);
             check(roughness);
             if (fieldError != nullptr) {
@@ -12164,6 +12200,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.transform.rotation = quatFromEulerDegrees(*rotation);
             node.transform.scale = *scale;
             node.visible = *visible;
+            node.castsShadow = *castsShadow;
             node.locked = *locked;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;

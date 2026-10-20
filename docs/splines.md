@@ -119,6 +119,9 @@ perpendicular to the first tangent (a stable perpendicular is chosen when they a
 Closed splines receive a linear roll correction along the distance so the transported frame at
 the seam coincides with the start frame; then the interpolated per-point `roll` rotates the normal
 about the tangent (right-handed, so `roll = pi / 2` on a +Z line turns the +Y normal to -X).
+A closed spline whose rolls wind a whole number of turns round the loop sets `rollTurns` (ADR-1542). Its seam
+segment then interpolates toward the first point's roll plus `2 pi * rollTurns`. Without it, the seam segment spins
+back the whole twist.
 
 GPU tables (`packSplineTable`, `SplineSampleGpu`, 64 bytes per entry, `kSplineGpuSamples = 512`
 by default) are `samples(count)` packed as `position.w = distance`, `tangent.w = scale`,
@@ -193,9 +196,14 @@ lights and the camera describe the intended contract with the spline API.
   the tangent and using `normal` as the light's up.
 - **Camera** (`camera/mode = spline`): the camera sits at `sampleByDistance(splineT * length)`
   (or `sample(splineT)`), looks at the position a look-ahead distance further along
-  (`sampleByDistance(d + lookAhead)`), and uses the sample normal rotated by an extra roll as up.
-  `camera/splineT` is a normal parameter, so the timeline and audio can drive the ride. `camera/splineBank`
-  (ADR-1166) leans the camera into the path's turns: degrees of roll per radian its heading turns over the look-ahead.
+  (`sampleByDistance(d + lookAhead)`).
+  - **Up.** By default the camera's up is the world's up, turned by `camera/roll`. Until ADR-1541 this
+    paragraph said the spline's normal was used; it was not. `camera/splineUp` (ADR-1541, 0..1) turns the up
+    toward the sample's normal: the rotation-minimising frame plus the points' authored `roll`. At 1, a camera
+    riding a twisting path turns with it, upside down included.
+  - **Driving the ride.** `camera/splineT` is a normal parameter, so the timeline and audio can drive it.
+  - **Banking.** `camera/splineBank` (ADR-1166) leans the camera into the path's turns: degrees of roll per radian
+    its heading turns over the look-ahead.
 
 All of these consume the same table, so the frame convention above (x = binormal, y = normal,
 z = tangent) is the one to match on the GPU (`shaders/spline.wgsl`).

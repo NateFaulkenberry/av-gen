@@ -1891,7 +1891,7 @@ bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
 }
 
 Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize,
-                             const glm::vec3& sourceScale) {
+                             const glm::vec3& sourceScale, bool lockBorder, bool thinning) {
     // An imported mesh has no generator parameters to halve, so its levels are simplifications of
     // whatever the budget already left.
     //
@@ -1922,12 +1922,36 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
         if (!base) {
             return base;
         }
-        auto chain = assets::buildLodChain(*base, assets::vegetationLodSettings());
+        assets::LodChainSettings settings = assets::vegetationLodSettings();
+        if (thinning) {
+            // ADR-1548: the foliage calibration's shell thinning (foliageLodSettings). On a mesh of small shells the
+            // preserving simplifier would otherwise reach its ratio by collapsing whole cards along their open
+            // edges -- deleting them without growing the rest, so the level "succeeds" and thinning never runs.
+            // Holding those edges makes it refuse instead, and the refusal is what hands the level to thinning.
+            // A mesh that is not made of small shells is left exactly as it was.
+            settings.thinning.fallback = assets::foliageLodSettings().thinning.fallback;
+            const std::uint32_t shells = assets::countShells(*base);
+            const std::size_t triangles = base->indices.size() / 3;
+            if (shells >= settings.thinning.minShells &&
+                triangles / std::max<std::size_t>(shells, 1) <= settings.thinning.maxShellTriangles) {
+                settings.lockBorder = true;
+            }
+        }
+        if (lockBorder) {
+            // ADR-1546: the sloppy simplifier and the clustering below both ignore topology, so
+            // neither can hold a border; with the border locked, a stalled level stays the source.
+            settings.lockBorder = true;
+            settings.sloppyFallback = 0.0f;
+        }
+        auto chain = assets::buildLodChain(*base, settings);
         if (chain && static_cast<std::size_t>(level) < chain->levels.size()) {
             MeshData out = std::move(chain->levels[static_cast<std::size_t>(level)].mesh);
             if (!out.indices.empty() && out.valid()) {
                 return out;
             }
+        }
+        if (lockBorder) {
+            return base;
         }
         // A mesh the simplifier refuses is still better served by the old clustering than by the
         // source at every distance.
@@ -2247,7 +2271,13 @@ std::uint64_t Distribution::structuralHash() const {
 
 std::uint64_t LodSettings::structuralHash() const {
     StructHash h;
-    h.i32(lodCount); // the only structural field: it decides how many LOD meshes are generated
+    h.i32(lodCount); // structural: it decides how many LOD meshes are generated
+    if (lockBorder) { // ADR-1546: it decides what they are; hashed only when set, so every existing hash is unchanged
+        h.i32(1546);
+    }
+    if (thinning) { // ADR-1548: likewise
+        h.i32(1548);
+    }
     return h.value();
 }
 
@@ -2960,6 +2990,9 @@ json ProceduralGeometry::toJson() const {
         j["partOf"] = partOf;
     }
     j["visible"] = visible;
+    if (!castsShadow) {
+        j["castsShadow"] = false; // ADR-1545: written only when off, so every existing save is unchanged
+    }
     {
         json s = json::object();
         s["kind"] = primitiveKindName(source.kind);
@@ -3158,6 +3191,12 @@ json ProceduralGeometry::toJson() const {
         s2["spread"] = lod.lodSpread;
         s2["hysteresis"] = lod.lodHysteresis;
         s2["impostorSize"] = lod.impostorSize;
+        if (lod.lockBorder) {
+            s2["lockBorder"] = true; // ADR-1546: written only when set
+        }
+        if (lod.thinning) {
+            s2["thinning"] = true; // ADR-1548: written only when set
+        }
         j["lod"] = std::move(s2);
     }
     if (motion.windSensitivity > 0.0f) { // ADR-1292: written only when the object answers the wind
@@ -3234,6 +3273,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.name, "name", readString);
         AVGEN_PROC_READ(g.partOf, "partOf", readString);
         AVGEN_PROC_READ(g.visible, "visible", readBool);
+        AVGEN_PROC_READ(g.castsShadow, "castsShadow", readBool); // ADR-1545
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);
         AVGEN_PROC_READ(g.emissiveField, "emissiveField", readString);
@@ -3547,7 +3587,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         static constexpr std::string_view kLodKeys[] = {
             "cull",        "maxDistance", "minScreenRadius", "count",     "distance1",
             "distance2",   "distance3",   "byScreenSize",    "spread",    "hysteresis",
-            "impostorSize"};
+            "impostorSize", "lockBorder", "thinning"};
         for (const auto& entry : j.items()) {
             const std::string& key = entry.key();
             if (std::find(std::begin(kLodKeys), std::end(kLodKeys), key) == std::end(kLodKeys)) {
@@ -3566,6 +3606,8 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(l.lodSpread, "spread", readFloat);
         AVGEN_PROC_READ(l.lodHysteresis, "hysteresis", readFloat);
         AVGEN_PROC_READ(l.impostorSize, "impostorSize", readFloat);
+        AVGEN_PROC_READ(l.lockBorder, "lockBorder", readBool); // ADR-1546
+        AVGEN_PROC_READ(l.thinning, "thinning", readBool);     // ADR-1548
     }
     if (root.contains("material")) {
         const json& j = root.at("material");

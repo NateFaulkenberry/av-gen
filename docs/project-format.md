@@ -191,6 +191,10 @@ Node kinds: `gltf` (a glTF 2.0 file; instances of the same file share meshes and
 particle system, every `ParticleSystem` field optional with the defaults from `docs/rendering.md`),
 `scene` (another scene file). `camera.distance` 0 means "fit to the scene bounds".
 
+A `gltf` node may carry `"castsShadow": false` to keep its meshes out of the shadow maps (ADR-1547), for something
+made of light, such as a rainbow or a glow card. It defaults to true and is written only when false. Procedural
+nodes take the same key in their `procedural` block (ADR-1545).
+
 ### `cameraDirection` — more than one camera (ADR-245)
 
 Optional, and written only when the scene has more than the one camera it has always had, so a scene

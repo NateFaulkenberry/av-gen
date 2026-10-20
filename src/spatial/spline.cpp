@@ -179,7 +179,11 @@ SegmentEval evaluateSegment(const Spline& spline, const std::vector<SplinePoint>
     const SplinePoint& a = controls[static_cast<std::size_t>(neighbourIndex(segment, n, spline.closed))];
     const SplinePoint& b = controls[static_cast<std::size_t>(neighbourIndex(segment + 1, n, spline.closed))];
     SegmentEval e{};
-    e.roll = a.roll + (b.roll - a.roll) * u;
+    // ADR-1542: on a closed spline the seam segment winds to the first point's roll plus the authored whole turns.
+    const float bRoll = spline.closed && spline.rollTurns != 0 && segment == n - 1
+                            ? b.roll + 6.28318530717958647692f * static_cast<float>(spline.rollTurns)
+                            : b.roll;
+    e.roll = a.roll + (bRoll - a.roll) * u;
     e.scale = a.scale + (b.scale - a.scale) * u;
     switch (spline.kind) {
     case SplineKind::Polyline:
@@ -493,6 +497,9 @@ std::uint64_t Spline::structuralHash() const {
     h.u32(static_cast<std::uint32_t>(kind));
     h.boolean(closed);
     h.f32(tension);
+    if (rollTurns != 0) { // ADR-1542: hashed only when set, so every existing spline keeps its hash
+        h.u32(static_cast<std::uint32_t>(rollTurns));
+    }
     h.u32(static_cast<std::uint32_t>(points.size()));
     for (const SplinePoint& p : points) {
         h.v3(p.position);
@@ -830,6 +837,9 @@ json Spline::toJson() const {
     j["kind"] = splineKindName(kind);
     j["closed"] = closed;
     j["tension"] = tension;
+    if (rollTurns != 0) {
+        j["rollTurns"] = rollTurns; // ADR-1542: written only when set
+    }
     json pts = json::array();
     for (const SplinePoint& p : points) {
         pts.push_back(pointToJson(p));
@@ -869,6 +879,12 @@ Result<Spline> Spline::fromJson(const json& j) {
     }
     AVGEN_SPLINE_READ(s.closed, "closed", readBool);
     AVGEN_SPLINE_READ(s.tension, "tension", readFloat);
+    if (j.contains("rollTurns")) { // ADR-1542
+        if (!j.at("rollTurns").is_number_integer()) {
+            return fail("'rollTurns' must be an integer");
+        }
+        s.rollTurns = j.at("rollTurns").get<int>();
+    }
     if (j.contains("points")) {
         const json& pts = j.at("points");
         if (!pts.is_array()) {
