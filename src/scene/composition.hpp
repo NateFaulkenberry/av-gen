@@ -293,6 +293,11 @@ struct CompositionNode {
     // ADR-1545's procedural key. For a thing made of light -- a rainbow, a glow card -- whose asset is a mesh but
     // which must not throw a solid shadow. Only ever clears an entity's own flag; written only when false.
     bool castsShadow = true;
+    // ADR-1572: a gltf node's meshes can be drawn through one of the scene's material programs (`"program":
+    // "<name>"`), in place of whatever program their materials name. The asset keeps its shape, UVs, textures and
+    // alpha mode; the program decides what the surface shows, so a route can move light along it. Empty (the
+    // default) leaves every material as the asset authored it; written only when set.
+    std::string program;
     // Locked out of the pointer, the way a locked layer is in an image editor. It still renders and
     // still belongs to the scene -- it simply stops answering clicks and box selections, so the
     // ground plane a world is built on stops being what you select every time you aim at something

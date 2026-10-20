@@ -4136,6 +4136,8 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
     copy.city = node.city;
     copy.cityLibrary = node.cityLibrary;
     copy.floats = node.floats;
+    copy.castsShadow = node.castsShadow; // ADR-1547 (it was missing here too)
+    copy.program = node.program;         // ADR-1572
     // The live transform, not the one the node was born with: duplicating something you have just
     // moved has to duplicate it where it is now. The parameter is the value the flattened scene
     // uses, so it is the one that is true.
@@ -8612,6 +8614,9 @@ void Composition::applyParameters() {
             if (!node.castsShadow) {
                 e.castsShadow = false; // ADR-1547: only ever clears; the node flag is not a parameter
             }
+            if (!node.program.empty()) {
+                e.material.program = prefixed(sanitise(prefix_), node.program); // ADR-1572
+            }
             // ADR-903: the boost is the entity's emission lane, applied by the shader after any
             // material program -- not a multiplier on `emissiveIntensity`, which a program that
             // asserts emission discards (ADR-179). A nested scene's entity keeps its own node's
@@ -10608,6 +10613,9 @@ nlohmann::json Composition::toJson() const {
         if (!node.castsShadow) {
             n["castsShadow"] = false; // ADR-1547: written only when off
         }
+        if (!node.program.empty()) {
+            n["program"] = node.program; // ADR-1572: written only when set
+        }
         // Only when locked: an additive key that no existing scene carries, so a file written by
         // this build and read by an older one loses a working preference and nothing else, and a
         // file that was never locked round-trips byte for byte.
@@ -12201,6 +12209,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.transform.scale = *scale;
             node.visible = *visible;
             node.castsShadow = *castsShadow;
+            if (const auto it = item.find("program"); it != item.end()) { // ADR-1572
+                if (!it->is_string()) {
+                    return fail("node '{}': 'program' must be a string", node.name);
+                }
+                node.program = it->get<std::string>();
+            }
             node.locked = *locked;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
