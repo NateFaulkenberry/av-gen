@@ -3,6 +3,8 @@
 #include "app/live_profile.hpp"
 
 #include <catch2/catch_approx.hpp>
+
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
@@ -267,4 +269,22 @@ TEST_CASE("live profile: a capped loop at the budget with no deadline misses is 
     }
     buildLiveProfile(r, frames, true);
     CHECK(r.status == "AT RISK");
+}
+
+TEST_CASE("live profile: a headless trace row puts each pass in its column and the piece time first (ADR-1571)",
+          "[live-profile][adr1571]") {
+    using namespace avgen::app;
+    LiveProfileFrame f;
+    f.frameMs = 31.0;
+    f.gpuMs = 28.5;
+    f.cpuWorkMs = 4.25;
+    f.passes = {{"scene", 15.0}, {"depth", 6.0}, {"shadow-cascade-0", 1.5}, {"shadow-cascade-1", 1.0},
+                {"cull", 1.25}, {"post/bloom", 0.5}, {"tonemap", 0.25}};
+    const std::string header = headlessTraceHeader();
+    const std::string row = headlessTraceRow('m', 259.8333, f, HeadlessTraceCounts{1400000, 210, 40, 380000}, 4, true);
+    CHECK(header.starts_with("phase,pieceT,frameMs,gpuMs,cpuWorkMs,sceneMs,depthMs,shadowMs,cullMs,otherMs,"));
+    CHECK(row == "m,259.8333,31.000,28.500,4.250,15.000,6.000,2.500,1.250,0.750,1400000,210,40,380000,4,1\n");
+    // As many fields as the header names.
+    const auto commas = [](const std::string& s) { return std::count(s.begin(), s.end(), ','); };
+    CHECK(commas(row) == commas(header));
 }

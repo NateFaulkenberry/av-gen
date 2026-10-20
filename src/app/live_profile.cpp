@@ -17,6 +17,35 @@ namespace avgen::app {
 
 using nlohmann::json;
 
+// ---- ADR-1571: the headless per-frame trace --------------------------------------------------------------------------
+
+std::string headlessTraceHeader() {
+    return "phase,pieceT,frameMs,gpuMs,cpuWorkMs,sceneMs,depthMs,shadowMs,cullMs,otherMs,triangles,drawCalls,"
+           "shadowDraws,visibleInstances,compiles,compiledMaterials\n";
+}
+
+std::string headlessTraceRow(char phase, double pieceT, const LiveProfileFrame& f, const HeadlessTraceCounts& counts,
+                             std::uint64_t compiles, bool compiledMaterials) {
+    double scene = 0.0, depth = 0.0, shadow = 0.0, cull = 0.0, other = 0.0;
+    for (const auto& p : f.passes) {
+        if (p.label == "scene") {
+            scene += p.ms;
+        } else if (p.label == "depth") {
+            depth += p.ms;
+        } else if (p.label.starts_with("shadow")) {
+            shadow += p.ms;
+        } else if (p.label == "cull") {
+            cull += p.ms;
+        } else {
+            other += p.ms;
+        }
+    }
+    return fmt::format("{},{:.4f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{},{},{},{},{},{}\n", phase,
+                       pieceT, f.frameMs, f.gpuMs, f.cpuWorkMs, scene, depth, shadow, cull, other, counts.triangles,
+                       counts.drawCalls, counts.shadowDraws, counts.visibleInstances, compiles,
+                       compiledMaterials ? 1 : 0);
+}
+
 // ---- the command line ----------------------------------------------------------------------------------------------
 
 bool hasLiveProfileFlag(int argc, char** argv) {
@@ -48,7 +77,9 @@ std::string liveProfileUsage() {
            "                        --midi <filter>        a MIDI input to open while measuring\n"
            "                        --capture <png>        the last measured frame\n"
            "                        --json <file>          the record (avgen.liveprofile/1)\n"
-           "                        --trace <csv>          live: one row per frame (interval, GPU, level), warm-up on\n"
+           "                        --trace <csv>          one row per frame, warm-up on. Live: interval, GPU, level;\n"
+           "                                               headless: piece time, GPU, CPU, pass times, counts and\n"
+           "                                               pipeline creations (ADR-1571)\n"
            "                        --text / --no-text     the human report on stdout (default on)\n"
            "                        --verify-candidates <n> measure the top n candidates' savings (A/B)\n"
            "                        --no-prewarm           SDF variants compiled at first use on the main thread, and\n"

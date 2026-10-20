@@ -132,6 +132,21 @@ struct LiveProfileFrame {
     std::vector<gpu::TimelineInterval> passes; // this frame's passes, summed per label
 };
 
+// ADR-1571: the headless per-frame trace (`--trace` with `--mode headless`). One row per warm-up ('w') and measured
+// ('m') frame: the piece time (exact: the headless clock is fixed-step), the frame, GPU and CPU times, the scene,
+// depth, shadow and cull passes and the rest, the frame's counts, and the pipelines created since the run began (a
+// variant built mid-run shows as a step in that column).
+struct HeadlessTraceCounts {
+    std::uint64_t triangles = 0;
+    std::uint64_t drawCalls = 0;
+    std::uint64_t shadowDraws = 0;
+    std::uint64_t visibleInstances = 0;
+};
+[[nodiscard]] std::string headlessTraceHeader();
+[[nodiscard]] std::string headlessTraceRow(char phase, double pieceT, const LiveProfileFrame& f,
+                                           const HeadlessTraceCounts& counts, std::uint64_t compiles,
+                                           bool compiledMaterials);
+
 // ---- what the record holds -----------------------------------------------------------------------------------------
 
 struct LiveProfileConditions {

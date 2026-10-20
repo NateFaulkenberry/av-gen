@@ -58,6 +58,10 @@ std::vector<gpu::TimelineInterval> framePasses(rendering::SceneRenderer& rendere
     return out;
 }
 
+HeadlessTraceCounts traceCounts(const rendering::RenderStats& st) {
+    return {st.triangles, st.drawCalls, st.shadowDraws, st.visibleInstances};
+}
+
 void fillFromProbe(LiveProfileFrame& f) {
     const probe2::Frame& pr = probe2::frame();
     f.updControlMs = pr.updControlMs;
@@ -478,6 +482,8 @@ int Application::runLiveProfileHeadless() {
         return true;
     };
 
+    std::string headlessTrace; // ADR-1571
+    const std::uint64_t traceCompilesBase = gpu::pipelineCounters().compiles();
     LiveProfileRecord record;
     // ---- warm-up: until the frame settles, or the cap ----
     auto warmStart = Clock::now();
@@ -505,6 +511,14 @@ int Application::runLiveProfileHeadless() {
             record.cold.prewarmVariants =
                 static_cast<int>(renderer_->sdfs().compiledVariantCount() - std::min(variantsBefore, renderer_->sdfs().compiledVariantCount()));
             warmStart = Clock::now(); // the warm-up cap counts from here, not from before the pre-warm
+        }
+        if (o.trace) {
+            if (headlessTrace.empty()) {
+                headlessTrace = headlessTraceHeader();
+            }
+            headlessTrace += headlessTraceRow('w', clock.current().renderTime, f, traceCounts(renderer_->stats()),
+                                              gpu::pipelineCounters().compiles() - traceCompilesBase,
+                                              renderer_->procedurals().compiledMaterialsActive());
         }
         ++warmFrames;
         const double cost = std::max(f.gpuMs, f.cpuWorkMs);
@@ -548,6 +562,11 @@ int Application::runLiveProfileHeadless() {
             return 2;
         }
         f.atSeconds = msSince(measureStart) / 1000.0;
+        if (o.trace) {
+            headlessTrace += headlessTraceRow('m', clock.current().renderTime, f, traceCounts(renderer_->stats()),
+                                              gpu::pipelineCounters().compiles() - traceCompilesBase,
+                                              renderer_->procedurals().compiledMaterialsActive());
+        }
         measured.push_back(std::move(f));
         stats.push_back(renderer_->stats());
         if (capture && image) {
@@ -560,6 +579,15 @@ int Application::runLiveProfileHeadless() {
     }
     record.cold.compilesDuringMeasure =
         static_cast<int>(gpu::pipelineCounters().compiles() - compilesBefore.compiles());
+    if (o.trace) {
+        std::ofstream out(*o.trace, std::ios::binary);
+        out << headlessTrace;
+        if (!out) {
+            log::error("--live-profile: cannot write {}", o.trace->string());
+        } else {
+            log::info("live profile: per-frame trace written to {}", o.trace->string());
+        }
+    }
 
     fillLiveProfileConditions(record, false);
     record.conditions.startSeconds = measureStartPiece;
