@@ -297,9 +297,19 @@ LiveRun runLive(const audio::Feeds& feeds, double seconds) {
     REQUIRE(engine.setLiveSonic(true).has_value());
     double t = 0.0;
     const int frames = static_cast<int>(seconds * 60.0);
+    std::uint64_t pumped = 0;
     for (int i = 0; i < frames; ++i) {
         device->pump(6); // 768 frames, 16 ms
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        pumped += 6 * cfg.blockFrames;
+        // Wait for both analysis threads to reach the audio (a sanitizer build runs them many times slower): the test
+        // is about where the feed comes from, not about how fast a debug build keeps up.
+        const std::uint64_t hops = pumped >= 2048 ? (pumped - 2048) / 512 + 1 : 0;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (std::chrono::steady_clock::now() < deadline &&
+               ((engine.channelAnalysis() != nullptr && engine.channelAnalysis()->hopsProduced() + 4 < 2 * hops) ||
+                (engine.liveTimbre() != nullptr && engine.liveTimbre()->produced() + 2 < hops))) {
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
+        }
         engine.update(FrameTime{t, 1.0 / 60.0, static_cast<std::uint64_t>(i)});
         t += 1.0 / 60.0;
     }
