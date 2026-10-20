@@ -2,6 +2,8 @@
 
 #include <dawn/native/DawnNative.h>
 
+#include "gpu/pipeline_compile.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <map>
@@ -43,12 +45,16 @@ std::uint64_t pipelineCountersNoteAsync() { return gRenderPipelines.fetch_add(1,
 
 wgpu::RenderPipeline createRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineDescriptor* desc) {
     gRenderPipelines.fetch_add(1, std::memory_order_relaxed);
-    return device.CreateRenderPipeline(desc);
+    return compileRenderPipeline(device, desc); // ADR-1562: on Dawn's workers, the waiting thread responsive
+}
+
+std::uint64_t pipelineCountersNoteAsyncCompute() {
+    return gComputePipelines.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 wgpu::ComputePipeline createComputePipeline(const wgpu::Device& device, const wgpu::ComputePipelineDescriptor* desc) {
     gComputePipelines.fetch_add(1, std::memory_order_relaxed);
-    return device.CreateComputePipeline(desc);
+    return compileComputePipeline(device, desc);
 }
 
 MemoryReport memoryReport(const wgpu::Device& device, std::size_t largestCount) {

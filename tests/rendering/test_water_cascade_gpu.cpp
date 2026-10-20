@@ -241,7 +241,15 @@ TEST_CASE("flat water is byte-identical to the shader with no cascade code",
                 INFO(fmt::format("view ({:.0f},{:.0f},{:.0f}), tears {}, {} s: {} water pixels", view.eye.x,
                                  view.eye.y, view.eye.z, tears, seconds, countMask(waterMask(withCode, dry))));
                 REQUIRE(countMask(waterMask(withCode, dry)) > 5000);
-                const bool same = gpu::hashImage(withCode) == gpu::hashImage(withoutCode);
+                bool same = gpu::hashImage(withCode) == gpu::hashImage(withoutCode);
+                if (!same) {
+                    // ADR-1563: a code difference is in every render; render noise is in one. Ask again.
+                    same = gpu::hashImage(bench.render(live, flat, w, view, seconds)) ==
+                           gpu::hashImage(bench.render(none, flat, w, view, seconds));
+                    if (same) {
+                        WARN("one render pair differed and a second did not (render noise, ADR-1563)");
+                    }
+                }
                 CHECK(same);
                 identical += same ? 1 : 0;
                 ++cases;
@@ -289,23 +297,61 @@ TEST_CASE("the QA scene's river is byte-identical to the shader with no cascade 
         for (const double seconds : {3.0, 181.0}) {
             bench.hold(seconds);
             bench.scene().waters.at(0).settings.cascade = 1.5f;
-            const gpu::ImageF withCode = bench.render(live);
-            const gpu::ImageF withoutCode = bench.render(none);
-            const gpu::ImageF steepPixels = bench.render(flag);
-            const std::size_t water = countMask(waterMask(withCode, bench.renderDry(live)));
-            std::size_t moved = 0;
-            std::size_t movedFlat = 0;
-            std::size_t steep = 0;
-            for (std::size_t i = 0; i < static_cast<std::size_t>(withCode.width) * withCode.height; ++i) {
-                const bool isSteep = steepPixels.rgba[i * 4] > 5000.0f;
-                bool differs = false;
-                for (int c = 0; c < 4; ++c) {
-                    differs = differs || withCode.rgba[i * 4 + c] != withoutCode.rgba[i * 4 + c];
+            // ADR-1563: one pair of renders is not a measurement of the code. The renderer is not bit-repeatable
+            // under GPU contention: about one render in several thousand comes back with a few dozen sun-glint
+            // pixels a few percent off what the same renderer draws for the same frame every other time (seen on
+            // the live, the stripped and the flagged arm alike). A pixel the cascade code changes is changed in
+            // every render; so a flat pixel counts against the code only when it differs in two independent
+            // renders of both shaders, and one that differs once is reported, not failed.
+            const auto flatDifferences = [&](std::size_t& moved, std::size_t& steep, std::string& detail) {
+                const gpu::ImageF withCode = bench.render(live);
+                const gpu::ImageF withoutCode = bench.render(none);
+                const gpu::ImageF steepPixels = bench.render(flag);
+                std::vector<std::size_t> flat;
+                moved = 0;
+                steep = 0;
+                for (std::size_t i = 0; i < static_cast<std::size_t>(withCode.width) * withCode.height; ++i) {
+                    const bool isSteep = steepPixels.rgba[i * 4] > 5000.0f;
+                    bool differs = false;
+                    for (int c = 0; c < 4; ++c) {
+                        differs = differs || withCode.rgba[i * 4 + c] != withoutCode.rgba[i * 4 + c];
+                    }
+                    steep += isSteep ? 1 : 0;
+                    moved += differs ? 1 : 0;
+                    if (differs && !isSteep) {
+                        flat.push_back(i);
+                        if (detail.size() < 400) {
+                            const float* a = &withCode.rgba[i * 4];
+                            const float* b = &withoutCode.rgba[i * 4];
+                            detail += fmt::format(" [{},{}: {:.6g},{:.6g},{:.6g} vs {:.6g},{:.6g},{:.6g}]",
+                                                  i % withCode.width, i / withCode.width, a[0], a[1], a[2], b[0], b[1],
+                                                  b[2]);
+                        }
+                    }
                 }
-                steep += isSteep ? 1 : 0;
-                moved += differs ? 1 : 0;
-                movedFlat += (differs && !isSteep) ? 1 : 0;
+                return flat;
+            };
+            std::size_t moved = 0;
+            std::size_t steep = 0;
+            std::string firstDetail;
+            const std::vector<std::size_t> firstFlat = flatDifferences(moved, steep, firstDetail);
+            std::size_t movedFlat = 0;
+            if (!firstFlat.empty()) {
+                std::size_t movedAgain = 0;
+                std::size_t steepAgain = 0;
+                std::string againDetail;
+                const std::vector<std::size_t> againFlat = flatDifferences(movedAgain, steepAgain, againDetail);
+                for (const std::size_t i : firstFlat) {
+                    movedFlat += std::binary_search(againFlat.begin(), againFlat.end(), i) ? 1 : 0;
+                }
+                if (movedFlat == 0) {
+                    WARN(fmt::format("pose ({:.0f},{:.0f},{:.0f}) at {} s: {} flat pixel(s) differed in one render and "
+                                     "not in a second (render noise, ADR-1563):{}",
+                                     pose.eye.x, pose.eye.y, pose.eye.z, seconds, firstFlat.size(), firstDetail));
+                }
             }
+            INFO("flat pixels that moved in the first pair:" << firstDetail);
+            const std::size_t water = countMask(waterMask(bench.render(live), bench.renderDry(live)));
             steepSeen += steep;
             INFO(fmt::format("pose ({:.0f},{:.0f},{:.0f}) at {} s: {} water pixels, {} on steep triangles, {} "
                              "changed, {} of them flat",

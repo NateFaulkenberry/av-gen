@@ -1,4 +1,6 @@
 #include "rendering/particle_renderer.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
 
 #include "rendering/scene_targets.hpp" // the five colour targets of the scene pass (ADR-035)
@@ -277,7 +279,7 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
     if (!module) {
         return std::unexpected(module.error());
     }
-    if (auto r = createPipelines(*module); !r) {
+    if (auto r = createPipelines(*module, true); !r) {
         return r;
     }
     initialised_ = true;
@@ -366,8 +368,24 @@ const ParticleRenderer::CompiledLatent& ParticleRenderer::compiledLatentPipeline
     return slot;
 }
 
-Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module) {
+Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module, bool start) {
     const auto& device = context_.device();
+    // ADR-1562: at init the four heaviest compute pipelines are started into their members (compiled in parallel
+    // with the rest of the renderer's init, which waits for them); a reload creates them all, all or nothing.
+    const auto startCompute = [&](const char* entry, wgpu::ComputePipeline* member) {
+        wgpu::ComputePipelineDescriptor desc{};
+        desc.label = entry;
+        desc.layout = computePipelineLayout_;
+        desc.compute.module = module;
+        desc.compute.entryPoint = entry;
+        gpu::startComputePipeline(device, &desc, member);
+    };
+    if (start) {
+        startCompute("cs_emit", &emitPipeline_);
+        startCompute("cs_simulate", &simulatePipeline_);
+        startCompute("cs_latent", &latentPipeline_);
+        startCompute("cs_latent_project", &latentProjectPipeline_);
+    }
     auto makeCompute = [&](const char* entry, const wgpu::ShaderModule* other = nullptr,
                            const wgpu::PipelineLayout* layout = nullptr) -> Result<wgpu::ComputePipeline> {
         wgpu::ComputePipelineDescriptor desc{};
@@ -438,9 +456,9 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         }
         return pipeline;
     };
-    auto emit = makeCompute("cs_emit");
+    auto emit = start ? Result<wgpu::ComputePipeline>(wgpu::ComputePipeline{}) : makeCompute("cs_emit");
     if (!emit) return std::unexpected(emit.error());
-    auto simulate = makeCompute("cs_simulate");
+    auto simulate = start ? Result<wgpu::ComputePipeline>(wgpu::ComputePipeline{}) : makeCompute("cs_simulate");
     if (!simulate) return std::unexpected(simulate.error());
     auto reduce = makeCompute("cs_scan_reduce");
     if (!reduce) return std::unexpected(reduce.error());
@@ -452,9 +470,10 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!glowReduce) return std::unexpected(glowReduce.error());
     auto glowTop = makeCompute("cs_glow_top");
     if (!glowTop) return std::unexpected(glowTop.error());
-    auto latent = makeCompute("cs_latent"); // ADR-1140
+    auto latent = start ? Result<wgpu::ComputePipeline>(wgpu::ComputePipeline{}) : makeCompute("cs_latent"); // ADR-1140
     if (!latent) return std::unexpected(latent.error());
-    auto latentProject = makeCompute("cs_latent_project"); // ADR-1155
+    auto latentProject = start ? Result<wgpu::ComputePipeline>(wgpu::ComputePipeline{})
+                               : makeCompute("cs_latent_project"); // ADR-1155
     if (!latentProject) return std::unexpected(latentProject.error());
     auto latentSpring = makeCompute("cs_latent_spring");
     if (!latentSpring) return std::unexpected(latentSpring.error());
@@ -523,15 +542,17 @@ Result<void> ParticleRenderer::createPipelines(const wgpu::ShaderModule& module)
         return pipeline;
     }();
     if (!shard) return std::unexpected(shard.error());
-    emitPipeline_ = *emit;
-    simulatePipeline_ = *simulate;
+    if (!start) {
+        emitPipeline_ = *emit;
+        simulatePipeline_ = *simulate;
+        latentPipeline_ = *latent;
+        latentProjectPipeline_ = *latentProject;
+    }
     scanReducePipeline_ = *reduce;
     scanTopPipeline_ = *top;
     scanScatterPipeline_ = *scatter;
     glowReducePipeline_ = *glowReduce;
     glowTopPipeline_ = *glowTop;
-    latentPipeline_ = *latent;
-    latentProjectPipeline_ = *latentProject;
     latentSpringPipeline_ = *latentSpring;
     densitySplatPipeline_ = *densitySplat;
     densityResolvePipeline_ = *densityResolve;

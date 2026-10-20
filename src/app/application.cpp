@@ -1,6 +1,8 @@
 #include "app/live_audio_policy.hpp"
 #include "audio/synthetic_capture.hpp"
 #include "app/application.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "rendering/procedural_renderer.hpp" // ADR-1493: compiledMaterialsActive
 #include "core/process_memory.hpp"
 #include "app/live_profile_session.hpp"
@@ -1461,6 +1463,20 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     context_ = std::move(*context);
 
     shaders_ = std::make_unique<gpu::ShaderLibrary>(*context_, gpu::ShaderLibrary::defaultSearchDirs(executablePath));
+    if (window_) {
+        // ADR-1562: the interface layer first, so the window can say what it is doing while the renderer's pipelines
+        // compile -- minutes, the first time a build's shaders meet a cold Metal cache, before ADR-1561.
+        context_->configureSurface(window_->pixelWidth(), window_->pixelHeight());
+        const std::filesystem::path prefs = platform::preferencesDirectory();
+        auto imgui = ui::ImGuiLayer::create(*window_, *context_,
+                                            prefs.empty() ? std::filesystem::path{}
+                                                          : prefs / "editor-layout.ini");
+        if (!imgui) {
+            return std::unexpected(imgui.error());
+        }
+        imgui_ = std::move(*imgui);
+        gpu::setPipelineWaitHook([this](const gpu::PipelineCompileProgress& p) { drawCompilingScreen(p); });
+    }
     renderer_ = std::make_unique<rendering::SceneRenderer>(*context_, *shaders_);
     mapper_ = std::make_unique<rendering::OutputMapper>(*context_, *shaders_);
     if (auto r = mapper_->init(); !r) {
@@ -1576,15 +1592,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             return std::unexpected(r.error());
         }
         // ImGui keeps the dock tree and the window geometry in its own ini beside the recent-files
-        // list; which panels are open is avgen's and lives next to it (ADR-076).
+        // list; which panels are open is avgen's and lives next to it (ADR-076). The layer itself was made before the
+        // renderer (ADR-1562); from here on a pipeline wait only keeps the window responsive.
         const std::filesystem::path prefs = platform::preferencesDirectory();
-        auto imgui = ui::ImGuiLayer::create(*window_, *context_,
-                                            prefs.empty() ? std::filesystem::path{}
-                                                          : prefs / "editor-layout.ini");
-        if (!imgui) {
-            return std::unexpected(imgui.error());
+        gpu::setPipelineWaitHook([](const gpu::PipelineCompileProgress&) { platform::Window::pumpSystemEvents(); });
+        window_->setTitle("avgen 0.2"); // the compiling screen's title (ADR-1562) back to the window's own
+        if (bootQuitRequested_) {
+            return fail("quit while the shaders were compiling");
         }
-        imgui_ = std::move(*imgui);
         jobs_ = std::make_unique<JobSystem>(2);
         worldBuilder_ = std::make_unique<WorldBuilder>(*jobs_);
 
@@ -7690,6 +7705,74 @@ void Application::captureLiveFrame(const FrameTime& time) {
         return;
     }
     *liveCaptureIndex_ << name << ',' << ns << ',' << fmt::format("{:.6f}", engine_->liveSonicSeconds()) << '\n';
+}
+
+
+// ADR-1562: one frame of the "compiling shaders" screen, drawn while the renderer's pipelines compile at startup (the
+// pipeline wait hook calls it about every 30 ms). It keeps the window serviced -- moved, resized, not marked as not
+// responding -- and says what is happening and how far it has got.
+void Application::drawCompilingScreen(const gpu::PipelineCompileProgress& progress) {
+    if (!window_ || !imgui_) {
+        return;
+    }
+    const auto events = window_->pollEvents([this](const SDL_Event& e) { imgui_->processEvent(e); });
+    if (events.quit || events.closeRequested) {
+        bootQuitRequested_ = true; // honoured when init can stop: it cannot abandon a compile half-way
+    }
+    if (events.resized) {
+        context_->configureSurface(window_->pixelWidth(), window_->pixelHeight());
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (bootScreenStart_.time_since_epoch().count() == 0) {
+        bootScreenStart_ = now;
+    }
+    const double seconds = std::chrono::duration<double>(now - bootScreenStart_).count();
+    window_->setTitle(fmt::format("avgen 0.2 -- compiling shaders ({} compiled)", progress.landed));
+    auto view = context_->acquireSurfaceView();
+    if (!view) {
+        return;
+    }
+    const std::uint32_t pw = window_->pixelWidth();
+    const std::uint32_t ph = window_->pixelHeight();
+    wgpu::CommandEncoder encoder = context_->device().CreateCommandEncoder();
+    {
+        wgpu::RenderPassColorAttachment ground{};
+        ground.view = *view;
+        ground.loadOp = wgpu::LoadOp::Clear;
+        ground.storeOp = wgpu::StoreOp::Store;
+        ground.clearValue = {0.04, 0.04, 0.05, 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "compiling-ground";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &ground;
+        encoder.BeginRenderPass(&pass).End();
+    }
+    imgui_->newFrame();
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(520.0f, 0.0f), ImGuiCond_Always);
+    ImGui::Begin("##compiling", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::TextUnformatted("Compiling shaders...");
+    const float fraction = progress.started > 0 ? static_cast<float>(progress.landed) / static_cast<float>(progress.started)
+                                                : 0.0f;
+    // The total is not known in advance (each renderer asks for its pipelines as it initialises), so the bar is
+    // the share of those asked for so far that have landed.
+    ImGui::ProgressBar(fraction, ImVec2(-1.0f, 0.0f),
+                       fmt::format("{} compiled, {} compiling", progress.landed, progress.started - progress.landed)
+                           .c_str());
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", fmt::format("{:.0f} s. The first launch after an update compiles each shader once; later "
+                                          "launches read them from Metal's cache.",
+                                          seconds)
+                                  .c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::End();
+    imgui_->render(encoder, gpu::TargetView{*view, context_->surfaceFormat(), pw, ph});
+    wgpu::CommandBuffer commands = encoder.Finish();
+    context_->queue().Submit(1, &commands);
+    context_->present();
 }
 
 } // namespace avgen::app
