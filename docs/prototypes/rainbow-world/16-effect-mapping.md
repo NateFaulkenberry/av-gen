@@ -40,8 +40,8 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
 
 - **Trigger and timing:**
   - Every beat; the drums are four-on-the-floor.
-  - Its radius follows `beat.phase`: radius = 6 m + 54 m x phase. The front leaves the camera on the beat at about
-    110 m/s and has faded by the next one.
+  - Its radius follows `beat.phase`: radius = 18 m + 70 m x phase. The front leaves 18 m ahead on the beat at about
+    140 m/s and has faded by the next one. Starting nearer read as a pale wash over the bottom of the fisheye frame.
   - Its brightness is `stem.drums.bass`: the kick's body, attack 4 ms, decay 160 ms, conditioned so a hat or tick
     (which has no low end) reads 0. A beat with no kick draws nothing: the fills at 101.4 and 109.3 s, and after the
     drums stop at 182.7 s.
@@ -54,10 +54,10 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
     (`cameraDistance`).
   - Because the world's gravity turns, a ground-plane ring (ADR-207's world effects) would be wrong on most faces. A
     camera-distance ring lies on whatever face it crosses, follows the folds, and climbs the crossings' cliffs.
-  - Programs: `rw_ground`, `rw_ground_lip`, `rw_grass`.
-  - Shape: a sharp 1.5 m leading edge and an 8 m trailing tail, so it reads as moving outward.
+  - Programs: `rw_ground`, `rw_ground_lip`, `rw_grass`, `rw_rock`.
+  - Shape: a sharp 1 m leading edge and a 4 m trailing tail: a line of light, not a band.
 - **Colour:** warm white-gold (`#FFE6A6`). It is light, not a hue of its own. It fades to 12% over the beat.
-- **Maximum:** gain 2.6 at a full kick. It covers about 5-12% of the frame at once, never the frame, and never more
+- **Maximum:** gain 1.1 at a full kick (1.5 on a phrase's first beat). It covers about 5-12% of the frame at once, never the frame, and never more
   than one ring at a time.
 - **Cost:** 8 ops in three programs.
 - **Live:** `response.kickEnv` (the mix's kick envelope) with the live beat clock. Offline: the stem.
@@ -66,10 +66,10 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
 
 - **Trigger:** beats 2 and 4, through `stem.drums.highMid` (the clap is 2-6 kHz), conditioned so beats 1 and 3, which
   have no clap, read 0.
-- **Where:** on every arch, two fronts start at the feet and meet at the crown in one beat (`beat.phase` moves both
-  edges). They brighten the bow's own spectrum, so they are never another colour.
+- **Where:** on every arch, two fronts start just above the feet (where the bow is fully opaque) and meet at the crown in
+  one beat (`beat.phase` moves both edges). They brighten the bow's own spectrum, so they are never another colour.
 - **Time:** attack 4 ms, decay 280 ms.
-- **Maximum:** gain 5 on top of the arch's 2 (primary).
+- **Maximum:** gain 10 on top of the arch's 2 (primary). At 5 the front was lost in the bow's own saturation.
 - **Interaction:** the backbeat makes the ring and the fronts alternate. Beats 1 and 3 are a ring on the land;
   beats 2 and 4 are a ring plus a flash running up the bows.
 - **Live:** `response.snareEnv`.
@@ -95,9 +95,10 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
   - plus 0.35 on every `stem.bass.onset` (each note), falling at 3 per second.
   - The bass plays short syncopated plucks against a four-on-the-floor kick, so the swell moves on the bass's own
     rhythm (`x..x..x...x..x..`), not the kick's.
-- **Where:** two world-space sine deformers on the band and on every grass, flower, rock and tree node.
-  - Wavelengths 115 m and 72 m, different axes and displacement directions, travelling at about the ride's own speed.
-  - Amplitude at a full swell: 1.4 m + 0.9 m.
+- **Where:** one world-space sine deformer on the band and on every grass, flower, rock and tree node.
+  - Wavelength 105 m, oblique to the knot, travelling at about the ride's own speed.
+  - Amplitude at a full swell: 1.9 m. A second wave cost 1.1 ms more (17 section 4) for a shape the camera's motion
+    hides.
   - The ground and what stands on it move together, because the displacement is a function of the world position.
     It is not a scale of the world: every place moves by a different amount at a different time.
 - **Also:** the cloud sea's bounce light (`lights/cloudsea`) rises with the swell, the Stage 7 route moved onto the
@@ -133,9 +134,10 @@ sky, not only the arches.
 ## 4.4 The meadow wash (synth, phrase, drop)
 
 Slow bands of the bow's own colours (blue, green, orange, red-orange: a cyclic OKLab ramp) drift across the meadow and
-the grass in world space, about 47 m apart, along world X: the arches' light reaching the land.
+the grass in world space, one band per 160 m, along world X: the arches' light reaching the land.
 
-- **Gain:** `macro.synth` x 0.35, plus `macro.lift` x 0.25, plus a phrase flare of 0.9 that falls over 2 s. The flare's
+- **Gain:** `macro.synth` x 0.12, plus `macro.lift` x 0.1, plus a phrase flare of 0.3 that falls over 2 s. At three
+  times that the meadow read as painted stripes. The flare's
   depth is the synth, so phrases before the drop flare less.
 - **At rest it is 0:** with no music the meadow is as built.
 - **Why it exists:** the drop at 47.85 s comes as the ride leaves an arch hold (41.6-50.4 s) and the camera faces
@@ -143,8 +145,9 @@ the grass in world space, about 47 m apart, along world X: the arches' light rea
 
 ## 4.5 Trees and rocks
 
-The kick ring is also on the canopies (`rw_canopy`, `rw_weeper`, `rw_blossom`, `rw_pine`, cores and leaf cards) and
-the stones (`rw_rock`): the ring's light passes through the trees and over the outcrops as it crosses them. They heave
+The kick ring is also on the stones (`rw_rock`). It was tried on the canopies and removed: the leaf cards are masked,
+and a masked draw runs its program in the depth prepass as well, which cost 3.6 ms at the 200 s hold. The trees take
+the ring from the meadow and grass round them. They heave
 with the swell, because they carry the same deformer as the ground under them.
 
 ## 5. The hierarchy (brief section 7.3)
