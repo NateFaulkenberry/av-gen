@@ -53,7 +53,7 @@ def op_target(program, roles, role, kind, field):
 MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("surge", 0.0), ("scantrig", 0.0), ("scan", 0.0), ("one", 1.0)]
 SCAN_REST = 980.0    # look.SCAN_REST
 SCAN_DELAY_MS = 300.0
-RAINBOWS = ("rw_rainbow", "rw_rainbow2")
+RAINBOWS = ("rw_rainbow",)
 
 
 def routes(fx, swell_nodes, swell):
@@ -113,13 +113,11 @@ def routes(fx, swell_nodes, swell):
     # both feet to the crown in one beat; bright only where the drum stem's 2-6 kHz band says a clap landed
     for prog in RAINBOWS:
         roles = fx.get(prog, {})
-        if "front_gain" not in roles:
+        if "flow_gain" not in roles:
             continue
-        for role, amt in (("front_l_in", 0.4), ("front_l_out", 0.4), ("front_r_in", -0.4), ("front_r_out", -0.4)):
-            for c in (0, 1):
-                out.append(route("beat.phase", op_target(prog, roles, role, "remap", "constant"), amt, component=c))
+        # the clap brightens the flow bands: the backbeat travels along the bow
         out += stem_route("drums", "highMid", "response.snareEnv",
-                          op_target(prog, roles, "front_gain", "constant", "constant"), 10.0,
+                          op_target(prog, roles, "flow_gain", "constant", "constant"), 2.5,
                           {"offset": -1.55, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                            "attackMs": 4.0, "decayMs": 280.0}, fb_chain={"attackMs": 4.0, "decayMs": 220.0})
         # ---- synth: the arches' flow and brightness ----------------------------------------------------------------

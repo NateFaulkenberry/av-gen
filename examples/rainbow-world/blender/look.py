@@ -382,48 +382,21 @@ def flower_program():
                 {"kind": "multiply", "dst": 6, "srcA": 4, "srcB": 5}]}
 
 
-def rainbow_program(name, reverse=False, alpha_peak=0.66, strength=2.0, bands=5.0, flow_speed=0.18):
-    """The arch as a program (Rainbow World 2), so light can move along it. The Stage 2-8 arch was a glTF with a
-    baked spectral emissive texture and alpha (engine_assets.rainbow_textures); this rebuilds the same bow from the
-    tube's UVs -- u across (0 inner, 1 outer), v along (0 and 1 are the feet) -- and adds what moves:
-      flow   bright bands drifting along the arch, always on, their depth set by the synth (`flow_gain`);
-      fronts on the backbeat a pair of fronts runs up from both feet to the crown in one beat (`front_*`, beat.phase),
-             their brightness the drum stem's clap band (`front_gain`);
-      gain   the arch's own brightness (`arch_gain`): the synth's level, the phrase and the drop.
-    The spectrum is two four-stop OKLab ramps (violet-blue-cyan-green, green-yellow-orange-red), so it never passes
-    through grey; every moving term multiplies that spectrum, so a band is the bow brighter, never another hue."""
-    sp = [(t, c) for t, c in rw.SPECTRUM]
-
-    def at(t):
-        for (t0, c0), (t1, c1) in zip(sp, sp[1:]):
-            if t <= t1:
-                f = (t - t0) / max(1e-9, t1 - t0)
-                return [c0[i] + (c1[i] - c0[i]) * f for i in range(3)]
-        return list(sp[-1][1])
-    lo = [R(at(x)) + [1.0] for x in (0.0, 0.17, 0.33, 0.5)]
-    hi = [R(at(x)) + [1.0] for x in (0.5, 0.67, 0.83, 1.0)]
-    if reverse:
-        lo, hi = [c for c in reversed(hi)], [c for c in reversed(lo)]
+def rainbow_program(name, strength=2.0, bands=5.0, flow_speed=0.18):
+    """The arch's light as a program (Rainbow World 2), so light can move along it. The bow itself -- the spectrum
+    across the tube and its coverage and feet -- stays the asset's own baked emissive and alpha textures (Stage 2-8),
+    which the lit path multiplies into whatever the program writes; the program writes only a scalar brightness along
+    v (0 and 1 are the feet):
+      flow   bright bands drifting along the arch, always a little, full with the synth (`flow_gain`);
+             (the clap brightens the bands: the backbeat moves along the bow rather than flashing all of it)
+      gain   the arch's own brightness (`arch_gain`, the material's strength at rest): synth, phrase, the scan.
+    Lean on purpose: a glTF node's program runs in the entity path's interpreter on every blended fragment of a bow
+    that can fill the fisheye frame. The first version rebuilt the spectrum and coverage from the UVs (37 ops) and
+    cost 6.9 ms at 0.5 render scale under an arch (17 section 6); this one is 13 ops (flow and gain; the clap
+    fronts' 9 ops went), on the primary bow only -- the faint secondary draws its textures with no program."""
     ops = [
         {"kind": "input", "dst": 0, "input": "uv"},
-        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
-        {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.0, 0.5, 0.0, 1.0], "value": 1.0},
-        {"kind": "oklabRamp", "dst": 3, "srcA": 2, "value": 1.0, "constant": lo[0], "constant2": lo[1],
-         "constant3": lo[2], "constant4": lo[3]},
-        {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.5, 1.0, 0.0, 1.0], "value": 1.0},
-        {"kind": "oklabRamp", "dst": 4, "srcA": 2, "value": 1.0, "constant": hi[0], "constant2": hi[1],
-         "constant3": hi[2], "constant4": hi[3]},
-        {"kind": "threshold", "dst": 2, "srcA": 1, "value": 0.5},
-        {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 2},
-        # coverage across the tube (soft both sides) and at the feet (they dissolve into the meadow)
-        {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.02, 0.26, 0.0, alpha_peak], "value": 1.0},
-        {"kind": "remap", "dst": 4, "srcA": 1, "constant": [0.98, 0.74, 0.0, 1.0], "value": 1.0},
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
         {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [1, 1, 1, 1]},
-        {"kind": "remap", "dst": 5, "srcA": 4, "constant": [0.0, 0.1, 0.0, 1.0], "value": 1.0},
-        {"kind": "remap", "dst": 6, "srcA": 4, "constant": [1.0, 0.9, 0.0, 1.0], "value": 1.0},
-        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 5},
         # flow: cos bands along v drifting with the transport's time
         {"kind": "remap", "dst": 5, "srcA": 4, "constant": [0.0, 1.0, 0.0, bands], "value": 0.0},
         {"kind": "input", "dst": 6, "input": "time"},
@@ -434,23 +407,11 @@ def rainbow_program(name, reverse=False, alpha_peak=0.66, strength=2.0, bands=5.
         {"kind": "power", "dst": 5, "srcA": 5, "value": 6.0},
         {"kind": "constant", "dst": 6, "constant": [0.4, 0.4, 0.4, 0.0], "_role": "flow_gain"},  # always a little
         {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
-        # the backbeat fronts: left foot (v = 0) up to the crown, right foot (v = 1) down to it; a sharp lead, a tail
-        {"kind": "remap", "dst": 6, "srcA": 4, "constant": [-0.05, 0.1, 0.0, 1.0], "value": 1.0, "_role": "front_l_in"},
-        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.12, 0.1, 0.0, 1.0], "value": 1.0, "_role": "front_l_out"},
-        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
-        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.88, 0.9, 0.0, 1.0], "value": 1.0, "_role": "front_r_in"},
-        {"kind": "remap", "dst": 1, "srcA": 4, "constant": [1.05, 0.9, 0.0, 1.0], "value": 1.0, "_role": "front_r_out"},
-        {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 1},
-        {"kind": "add", "dst": 6, "srcA": 6, "srcB": 7},
-        {"kind": "constant", "dst": 7, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "front_gain"},
-        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
-        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
         {"kind": "constant", "dst": 6, "constant": [strength, strength, strength, 0.0], "_role": "arch_gain"},
         {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
     ]
-    return finish({"name": name, "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 3,
-                   "emissionIntensity": 1.0, "opacity": 2, "ops": ops})
+    return finish({"name": name, "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 5,
+                   "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
 
 def node_points(name, asset, points, material, **extra):
@@ -477,7 +438,7 @@ def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
 
 
 def all_programs():
-    return [rainbow_program("rw_rainbow"), rainbow_program("rw_rainbow2", reverse=True, alpha_peak=0.22, strength=1.0),
+    return [rainbow_program("rw_rainbow"),
             ground_program(), ground_program("rw_ground_lip", "#4C7A2E"), grass_program(), canopy_program(), rock_program(), finish(cloud_program()), finish(flower_program()),
             tinted_canopy_program("rw_weeper", [rw.hexlin("#5E9426")[:3], rw.hexlin("#8EBE2E")[:3],
                                                 rw.hexlin("#BEDC44")[:3], rw.hexlin("#E2EE6A")[:3]], height=12.0, offset=0.0),

@@ -695,11 +695,14 @@ for k, sa_ in enumerate(arch_s):
     # along it; the shape is the Stage 2-8 tube. 0.76: both bows' feet land inside the face (primary 87 m, secondary
     # 108 m < the rim's 112 m), never poking out of a rim where a foot seen from the strand's far side read as a
     # spectral blob
-    for bow, prog in (("p", "rw_rainbow"), ("s", "rw_rainbow2")):
-        rainbow_nodes.append({"name": "rainbow_%d%s" % (k, bow), "kind": "gltf",
-                              "asset": "rainbow_%s.glb" % ("primary" if bow == "p" else "secondary"),
-                              "position": av(pos), "castsShadow": False, "program": prog,
-                              "scale": [0.76, 0.76, 0.76], "rotation": [round(math.degrees(v), 3) for v in eul]})
+    for bow in ("p", "s"):
+        rn_ = {"name": "rainbow_%d%s" % (k, bow), "kind": "gltf",
+               "asset": "rainbow_%s.glb" % ("primary" if bow == "p" else "secondary"),
+               "position": av(pos), "castsShadow": False,
+               "scale": [0.76, 0.76, 0.76], "rotation": [round(math.degrees(v), 3) for v in eul]}
+        if bow == "p":
+            rn_["program"] = "rw_rainbow"   # the faint secondary keeps its textures: no program cost (17 section 6)
+        rainbow_nodes.append(rn_)
 nodes += rainbow_nodes
 print("RAINBOWS", len(rainbow_nodes))
 tpts = [q for v in fam.values() for q in v]
@@ -941,6 +944,13 @@ for rn in rainbow_nodes:
     routes.append({"source": "control.glow", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 2.0,
                    "op": "add", "polarity": "unipolar", "chain": ctl})
 routes += music.routes(look.FX, SWELL_NODES, SWELL)
+# the faint secondary bows carry no program: the synth's light and the scan reach them through the node's glow lane
+for rn in rainbow_nodes:
+    if rn["name"].endswith("s"):
+        routes.append({"source": "macro.synth", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 0.8,
+                       "op": "add", "polarity": "unipolar"})
+        routes.append({"source": "macro.scan", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 3.0,
+                       "op": "add", "polarity": "unipolar"})
 proj_path = os.path.abspath(a.project) if a.project else os.path.join(OUT, "rainbow-world.json")
 scene_rel = os.path.relpath(os.path.join(OUT, "rainbow-world.scene.json"), os.path.dirname(proj_path))
 project = {
