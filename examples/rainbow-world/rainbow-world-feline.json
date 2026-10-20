@@ -5958,5 +5958,8 @@
   "fps": 30,
   "output": "video",
   "path": "renders/rainbow-world-feline.mp4"
+ },
+ "feeds": {
+  "beat": "stem.drums"
  }
 }
