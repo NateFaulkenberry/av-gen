@@ -9,7 +9,7 @@
     - reads the key with the node's other fields and refuses a non-string;
     - writes it only when set;
     - copies it in `cloneNodeSpec`, with `castsShadow`, which was also missing there;
-    - in the per-frame node application, sets each of the node's entities' `material.program` to it, prefixed for a
+    - at the flatten and in the per-frame node application, sets each of the node's entities' `material.program` to it, prefixed for a
       nested scene as every other program name is.
 - Tests: `tests/unit/test_node_program.cpp` (`[adr1572]`):
   - the program reaches the entity through attach and three frames, and resolves to a program the scene carries;

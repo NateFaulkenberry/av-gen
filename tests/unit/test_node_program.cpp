@@ -51,6 +51,9 @@ TEST_CASE("a gltf node's program reaches its entities and round-trips; a node wi
     params::ParameterSet params;
     params::Modulator modulator;
     (*comp)->attach(params, modulator);
+    // From the flatten on, before any frame: route liveness asks which programs a surface names at load.
+    REQUIRE((*comp)->scene().entities.size() == 2);
+    CHECK((*comp)->scene().entities[0].material.program == "glow");
     for (int frame = 0; frame < 3; ++frame) {
         params.resetFinals();
         FrameTime ft{};

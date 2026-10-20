@@ -6758,6 +6758,11 @@ void Composition::rebuild() {
                 e.name = node.name + "/" + src.name;
                 e.transform = compose(nodeT, src.transform);
                 e.visible = visible && src.visible;
+                if (!node.program.empty()) {
+                    // ADR-1572: from the flatten on, not only the first per-frame application, so a question asked
+                    // of the scene before the first frame (route liveness: which programs a surface names) sees it
+                    e.material.program = prefixed(sanitise(prefix_), node.program);
+                }
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
                 range.restRoughness.push_back(src.material.roughness);
