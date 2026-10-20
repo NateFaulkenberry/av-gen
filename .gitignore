@@ -60,6 +60,9 @@ cmake-build-*/
 # A worktree gets them from tools/link-worktree-assets.sh; CI does not have them, and their cases SKIP.
 /assets/audio/*.mp3
 
+/assets/audio/stems/*.wav
+/assets/audio/stems/*.mp3
+
 # The city, character and concert packs (assets/city.manifest.json, ADR-none): 700+ meshes and
 # their texture atlases, imported 2026-09-11 for the music video. Gitignored for size, not for
 # licence -- both Kenney and Quaternius are CC0, and assets/imported/ATTRIBUTION.md records where
