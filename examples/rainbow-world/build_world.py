@@ -754,7 +754,18 @@ palette = {"states": [{"name": n, "colors": c, "scalars": {}} for n, c in STATES
                                                "fast": 3.0, "slow": 24.0, "threshold": 0.06, "rearm": 0.03,
                                                "primaryTimeout": 30.0, "maxHold": 120.0}}}}
 
-# MIDI (the house layout: CC 9 look, CC 10 lock) and the controls this world has
+# MIDI (the house layout: CC 9 look, CC 10 lock) and the controls this world has. Every control rests at 0 = the
+# world as built, and turns one way. Documented the same in examples/index.json:
+#   CC 1  glow        the rainbows' light, up to 3x (nodes/rainbow_*/emissiveBoost)
+#   CC 2  lens        fisheye to rectilinear (post/lens/fisheye 1 -> 0)
+#   CC 5  haze        more distance haze (post/look/atmospheric +0.5)
+#   CC 6  light       brighter (camera/exposure/compensation +1.2 EV)
+#   CC 7  colour      more saturated (post/grade/saturation +0.5)
+#   CC 9  look        Bright Noon, Golden Hour, After the Storm, Lavender Dusk, Prism (palette/select 0-4)
+#   CC 10 look lock   hold the current look (palette/lock); unlocked, the look advances on phrase boundaries
+#                     (beat.phrasePulse) or a big change in the music, holding each at least 60 s
+# Audio (live input, no file): response.sustain and response.kick light the rainbows, response.level blooms the air,
+# response.hat lifts saturation, response.bass lifts the warm bounce light from the cloud sea.
 CC = [(1, "glow"), (2, "lens"), (5, "haze"), (6, "light"), (7, "colour"), (9, "palette"), (10, "paletteLock")]
 control = {"midi": {"enabled": True, "filter": "*", "bindings": [
     {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": sig} for n, sig in CC]}}

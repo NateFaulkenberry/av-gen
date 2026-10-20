@@ -84,6 +84,8 @@ def setup_render(sc, w, h, samples=64, exposure=0.0, look="AgX - Base Contrast",
 
 
 def render(sc, path):
+    if os.environ.get("RW_NO_PREVIEW"):  # examples/rainbow-world/build.py: the engine exports only
+        return
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     sc.render.filepath = path
     bpy.ops.render.render(write_still=True)

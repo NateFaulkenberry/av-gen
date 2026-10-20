@@ -714,6 +714,14 @@
       "live": true,
       "name": "Phase Hall",
       "project": "experiments/phase-wall/phase-wall.json"
+    },
+    {
+      "category": "Worlds",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 rainbow glow, CC 2 lens (fisheye to rectilinear), CC 5 haze, CC 6 light, CC 7 colour, CC 9 look (Bright Noon, Golden Hour, After the Storm, Lavender Dusk, Prism), CC 10 look lock (unlocked, the look moves on at phrase boundaries or a big change in the music). The Rainbow Knot: a painterly meadow world knotted through an all-round sky. A fisheye ride flies low and fast over hills, flower fields and groves on a 5.7 km twisting band of land; gravity turns with the land, the ride swings over the rims onto the band's other face, and it slows under rainbow arches above a sea of clouds. The music lights the rainbows (held sound and kicks), blooms the air and lifts the colour. Run examples/rainbow-world/build.py first (Blender 5.x; it writes the scene). See docs/prototypes/rainbow-world/.",
+      "live": true,
+      "name": "Rainbow World",
+      "project": "rainbow-world/rainbow-world.json",
+      "generate": "python3 examples/rainbow-world/build.py   (needs Blender 5.x and the six CC0 Poly Haven rocks in assets/terrain/rocks: tools/fetch_polyhaven.py)"
     }
   ]
 }
