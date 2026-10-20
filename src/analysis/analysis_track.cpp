@@ -89,51 +89,46 @@ void refineGrid(std::vector<double>& times, const std::vector<double>& strength,
     }
 }
 
-// The frame whose centre is nearest `seconds`.
-std::size_t nearestFrame(const std::vector<AnalysisFrame>& frames, double seconds) {
-    const auto it = std::lower_bound(frames.begin(), frames.end(), seconds,
-                                     [](const AnalysisFrame& f, double t) { return f.timeSeconds < t; });
-    auto i = static_cast<std::size_t>(it - frames.begin());
-    if (i >= frames.size()) {
-        return frames.size() - 1;
+// The hop whose centre is nearest `seconds`.
+std::size_t nearestFrame(std::span<const double> times, double seconds) {
+    const auto it = std::lower_bound(times.begin(), times.end(), seconds);
+    auto i = static_cast<std::size_t>(it - times.begin());
+    if (i >= times.size()) {
+        return times.size() - 1;
     }
-    if (i > 0 && seconds - frames[i - 1].timeSeconds <= frames[i].timeSeconds - seconds) {
+    if (i > 0 && seconds - times[i - 1] <= times[i] - seconds) {
         --i;
     }
     return i;
 }
 
-// Runs the offline beat tracker over the frames' onset strengths and stamps the beat fields.
-void stampBeats(std::vector<AnalysisFrame>& frames, OfflineBeats& beats, const AnalyzerConfig& cfg,
-                const BeatTrackerConfig& beatConfig) {
-    beats = OfflineBeats{};
-    if (frames.empty() || cfg.sampleRate == 0) {
-        return;
-    }
-    const double hop = static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
-    std::vector<float> onsets;
-    onsets.reserve(frames.size());
-    std::size_t picked = 0;
-    for (const auto& f : frames) {
-        onsets.push_back(f.onsetStrength);
-        picked += f.onset ? 1 : 0;
+} // namespace
+
+OfflineBeats trackGrid(std::span<const double> times, std::span<const float> onsetStrength, std::size_t picked,
+                       double hop, const BeatTrackerConfig& beatConfig, std::vector<std::size_t>* hops) {
+    OfflineBeats beats;
+    std::vector<std::size_t> beatFrames;
+    if (times.empty() || times.size() != onsetStrength.size() || !(hop > 0.0)) {
+        if (hops != nullptr) {
+            hops->clear();
+        }
+        return beats;
     }
     if (picked >= kMinOnsets) {
-        beats = trackBeatsOffline(onsets, static_cast<float>(hop), beatConfig);
+        beats = trackBeatsOffline(onsetStrength, static_cast<float>(hop), beatConfig);
     }
 
     // The tracker's beat times are hop-relative (hopIndex * hop); move them onto the frames'
     // clock (window-centre times) so they compare directly with AnalysisFrame::timeSeconds.
-    std::vector<std::size_t> beatFrames;
     beatFrames.reserve(beats.beatTimes.size());
     for (double& t : beats.beatTimes) {
         const auto index = static_cast<std::size_t>(
-            std::clamp<long long>(std::llround(t / hop), 0, static_cast<long long>(frames.size()) - 1));
+            std::clamp<long long>(std::llround(t / hop), 0, static_cast<long long>(times.size()) - 1));
         if (!beatFrames.empty() && beatFrames.back() == index) {
             continue;
         }
         beatFrames.push_back(index);
-        t = frames[index].timeSeconds;
+        t = times[index];
     }
     beats.beatTimes.resize(beatFrames.size());
 
@@ -147,29 +142,58 @@ void stampBeats(std::vector<AnalysisFrame>& frames, OfflineBeats& beats, const A
             const std::size_t f = beatFrames[b];
             double sum = 0.0;
             int count = 0;
-            for (std::size_t g = f > 0 ? f - 1 : 0; g <= f + 1 && g < frames.size(); ++g, ++count) {
-                sum += static_cast<double>(frames[g].onsetStrength);
+            for (std::size_t g = f > 0 ? f - 1 : 0; g <= f + 1 && g < times.size(); ++g, ++count) {
+                sum += static_cast<double>(onsetStrength[g]);
             }
             strength[b] = count > 0 ? sum / count : 0.0;
             strongest = std::max(strongest, strength[b]);
         }
         if (strongest > 0.0) {
-            for (double& s : strength) {
-                s /= strongest;
+            for (double& v : strength) {
+                v /= strongest;
             }
         }
         refineGrid(beats.beatTimes, strength, period);
         // The frame each refined beat is stamped on is the one nearest its refined time; the
         // refinement moves beats less than half a hop almost everywhere, so this rarely changes.
         for (std::size_t b = 0; b < beatFrames.size(); ++b) {
-            beatFrames[b] = nearestFrame(frames, beats.beatTimes[b]);
+            beatFrames[b] = nearestFrame(times, beats.beatTimes[b]);
         }
         // Two beats cannot share a frame (they are a period apart and moved a tenth of one); keep the
         // stamping strictly increasing regardless, so a beat is never counted twice.
         for (std::size_t b = 1; b < beatFrames.size(); ++b) {
-            beatFrames[b] = std::max(beatFrames[b], std::min(beatFrames[b - 1] + 1, frames.size() - 1));
+            beatFrames[b] = std::max(beatFrames[b], std::min(beatFrames[b - 1] + 1, times.size() - 1));
         }
     }
+    if (hops != nullptr) {
+        *hops = std::move(beatFrames);
+    }
+    return beats;
+}
+
+namespace {
+
+// Runs the offline beat tracker over the frames' onset strengths and stamps the beat fields.
+void stampBeats(std::vector<AnalysisFrame>& frames, OfflineBeats& beats, const AnalyzerConfig& cfg,
+                const BeatTrackerConfig& beatConfig) {
+    beats = OfflineBeats{};
+    if (frames.empty() || cfg.sampleRate == 0) {
+        return;
+    }
+    const double hop = static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
+    std::vector<float> onsets;
+    std::vector<double> times;
+    onsets.reserve(frames.size());
+    times.reserve(frames.size());
+    std::size_t picked = 0;
+    for (const auto& f : frames) {
+        onsets.push_back(f.onsetStrength);
+        times.push_back(f.timeSeconds);
+        picked += f.onset ? 1 : 0;
+    }
+    std::vector<std::size_t> beatFrames;
+    beats = trackGrid(times, onsets, picked, hop, beatConfig, &beatFrames);
+    const double period = beats.tempoBpm > 0.0f ? 60.0 / static_cast<double>(beats.tempoBpm) : 0.0;
 
     std::size_t next = 0; // index of the first beat after the frame
     for (std::size_t i = 0; i < frames.size(); ++i) {

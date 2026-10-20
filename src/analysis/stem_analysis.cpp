@@ -21,8 +21,16 @@ double alpha(double dt, double tau) {
 
 } // namespace
 
+float trimGain(float gainDb) {
+    if (!(gainDb == gainDb) || gainDb == 0.0f) { // NaN, or no trim
+        return 1.0f;
+    }
+    return std::pow(10.0f, std::clamp(gainDb, kMinTrimDb, kMaxTrimDb) / 20.0f);
+}
+
 StemAnalyzer::StemAnalyzer(StemAnalysisConfig config)
     : config_(std::move(config))
+    , gain_(trimGain(config_.gainDb))
     , analyzer_(config_.analyzer) {
     const AnalyzerConfig& a = analyzer_.config();
     hopSeconds_ = static_cast<double>(a.hopSize) / static_cast<double>(a.sampleRate);
@@ -36,7 +44,25 @@ StemAnalyzer::StemAnalyzer(StemAnalysisConfig config)
 }
 
 void StemAnalyzer::push(std::span<const float> mono, std::span<const float> side) {
-    analyzer_.push(mono, side);
+    if (gain_ == 1.0f) {
+        analyzer_.push(mono, side);
+        return;
+    }
+    // ADR-1582: the trim, on a copy (grows to the largest chunk once; a live source's chunks are at most a hop).
+    gainedMono_.resize(mono.size());
+    for (std::size_t i = 0; i < mono.size(); ++i) {
+        gainedMono_[i] = mono[i] * gain_;
+    }
+    gainedSide_.resize(side.size());
+    for (std::size_t i = 0; i < side.size(); ++i) {
+        gainedSide_[i] = side[i] * gain_;
+    }
+    analyzer_.push(gainedMono_, gainedSide_);
+}
+
+void StemAnalyzer::setGainDb(float gainDb) {
+    config_.gainDb = gainDb;
+    gain_ = trimGain(gainDb);
 }
 
 void StemAnalyzer::reset(std::uint64_t startFrame) {
@@ -134,9 +160,12 @@ bool StemAnalyzer::pop(StemFrame& out) {
         out.bands[b] = b < f.bandCount ? f.bands[b] : 0.0f;
     }
     out.level = followLevel(f.rms);
+    out.beatOnsetStrength = f.onsetStrength;
+    out.beatOnset = f.onset;
     if (config_.hits) {
         causal_.process(scratch_, binHz_, hopSeconds_);
         const CausalOnsets& c = scratch_.causal;
+        out.feed = ResponseFeed::fromCausal(c);
         out.kick = c.hit[static_cast<std::size_t>(HitClass::Kick)];
         out.kickStrength = c.strength[static_cast<std::size_t>(HitClass::Kick)];
         out.snare = c.hit[static_cast<std::size_t>(HitClass::Snare)];
