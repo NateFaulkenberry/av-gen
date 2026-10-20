@@ -3,6 +3,7 @@
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/frame_timeline.hpp"
+#include "gpu/resource_stats.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/render_quality.hpp"
 #include "scene/scene.hpp"
@@ -123,7 +124,7 @@ wgpu::ComputePipeline makeCompute(gpu::Context& ctx, const wgpu::ShaderModule& m
     d.layout = pl;
     d.compute.module = m;
     d.compute.entryPoint = entry;
-    return ctx.device().CreateComputePipeline(&d);
+    return gpu::createComputePipeline(ctx.device(), &d);
 }
 wgpu::Texture makeTex(gpu::Context& ctx, wgpu::Extent3D size, wgpu::TextureFormat f, wgpu::TextureUsage u,
                       wgpu::TextureDimension dim = wgpu::TextureDimension::e2D) {
@@ -307,7 +308,7 @@ Result<void> AstralRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
         rpd.vertex.module = *surfMod;
         rpd.vertex.entryPoint = "vs_full";
         rpd.fragment = &fst;
-        surfPipe_ = ctx.device().CreateRenderPipeline(&rpd);
+        surfPipe_ = gpu::createRenderPipeline(ctx.device(), &rpd);
     }
     {
         wgpu::ColorTargetState cts{};
@@ -323,7 +324,7 @@ Result<void> AstralRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
         rpd.vertex.module = *surfMod;
         rpd.vertex.entryPoint = "vs_full";
         rpd.fragment = &fst;
-        halfPipe_ = ctx.device().CreateRenderPipeline(&rpd);
+        halfPipe_ = gpu::createRenderPipeline(ctx.device(), &rpd);
     }
     {
         wgpu::ColorTargetState cts{};
@@ -345,7 +346,7 @@ Result<void> AstralRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
         rpd.fragment = &fst;
         rpd.depthStencil = &ds;
         rpd.primitive.cullMode = wgpu::CullMode::None;
-        shardPipe_ = ctx.device().CreateRenderPipeline(&rpd);
+        shardPipe_ = gpu::createRenderPipeline(ctx.device(), &rpd);
     }
     {
         // the combine: the scene's HDR (replaced) and depth (tested and written; the void at the far plane)
@@ -367,7 +368,7 @@ Result<void> AstralRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
         rpd.vertex.entryPoint = "vs_full";
         rpd.fragment = &fst;
         rpd.depthStencil = &ds;
-        combinePipe_ = ctx.device().CreateRenderPipeline(&rpd);
+        combinePipe_ = gpu::createRenderPipeline(ctx.device(), &rpd);
     }
     return {};
 }

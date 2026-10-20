@@ -2,15 +2,11 @@
 
 #include <dawn/native/DawnNative.h>
 
-#include "core/log.hpp"
+#include "gpu/pipeline_compile.hpp"
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
-#include <cstring>
-#include <cstdlib>
 #include <map>
-#include <string_view>
 
 namespace avgen::gpu {
 
@@ -47,41 +43,18 @@ void noteShaderModuleCreated() { gShaderModules.fetch_add(1, std::memory_order_r
 
 std::uint64_t pipelineCountersNoteAsync() { return gRenderPipelines.fetch_add(1, std::memory_order_relaxed) + 1; }
 
-namespace {
-// AVGEN_PIPELINE_TIMING=1 logs every pipeline's creation time (the Metal compile is inside it).
-bool timingAll() {
-    static const bool on = [] {
-        const char* v = std::getenv("AVGEN_PIPELINE_TIMING");
-        return v != nullptr && v[0] != '\0' && v[0] != '0';
-    }();
-    return on;
-}
-void noteTime(const char* kind, wgpu::StringView label, std::chrono::steady_clock::time_point start) {
-    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
-    const std::string_view name = label.data != nullptr
-                                      ? std::string_view(label.data, label.length == WGPU_STRLEN ? std::strlen(label.data)
-                                                                                                  : label.length)
-                                      : std::string_view("(unlabelled)");
-    if (timingAll()) {
-        log::info("pipeline-timing {} '{}' {:.1f} ms", kind, name, ms);
-    }
-}
-} // namespace
-
 wgpu::RenderPipeline createRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineDescriptor* desc) {
     gRenderPipelines.fetch_add(1, std::memory_order_relaxed);
-    const auto start = std::chrono::steady_clock::now();
-    wgpu::RenderPipeline p = device.CreateRenderPipeline(desc);
-    noteTime("render", desc->label, start);
-    return p;
+    return compileRenderPipeline(device, desc); // ADR-1562: on Dawn's workers, the waiting thread responsive
+}
+
+std::uint64_t pipelineCountersNoteAsyncCompute() {
+    return gComputePipelines.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 wgpu::ComputePipeline createComputePipeline(const wgpu::Device& device, const wgpu::ComputePipelineDescriptor* desc) {
     gComputePipelines.fetch_add(1, std::memory_order_relaxed);
-    const auto start = std::chrono::steady_clock::now();
-    wgpu::ComputePipeline p = device.CreateComputePipeline(desc);
-    noteTime("compute", desc->label, start);
-    return p;
+    return compileComputePipeline(device, desc);
 }
 
 MemoryReport memoryReport(const wgpu::Device& device, std::size_t largestCount) {

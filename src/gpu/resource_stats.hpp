@@ -30,6 +30,7 @@ struct PipelineCounters {
 void noteShaderModuleCreated();
 // An async render pipeline creation (counted like a synchronous one; returns the new render count).
 std::uint64_t pipelineCountersNoteAsync();
+std::uint64_t pipelineCountersNoteAsyncCompute();
 
 // Every pipeline in the renderer is created through these, so the counters cannot miss one.
 [[nodiscard]] wgpu::RenderPipeline createRenderPipeline(const wgpu::Device& device,
