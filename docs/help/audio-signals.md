@@ -94,6 +94,9 @@ One analysis source -- an offline stem file, or a channel of a live input -- pub
 Values change once per analysis hop (about 11 ms); a render frame shows the newest, and carries every event since the
 last frame, so none is lost at 30 fps. A source with no audio reads 0 and fires nothing -- never a held value.
 
+A project's **feeds** can make a source drive the beat clock and `response.*` (the kick from the drum stem, the levels
+from the bass) without changing any route. See [Audio Input](help://audio/input).
+
 ## The beat clock
 
 With a loaded file, the analysed beat grid read at the playhead; with live input, interpolated at

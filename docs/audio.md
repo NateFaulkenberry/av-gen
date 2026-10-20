@@ -95,7 +95,7 @@ microphone permission on first use; a denied device opens but delivers silence.
 
 ## Analysis stems (ADR-1520)
 
-`assets.stems` lists files analysed beside the mix and never played: `{key, label, file, offset?, hits?}`.
+`assets.stems` lists files analysed beside the mix and never played: `{key, label, file, offset?, hits?, gainDb?}`.
 `Engine::setStems` decodes and analyses each changed stem on its own thread (`StemTrack::analyzeFile`: chunked
 `AudioFile::decode` into a `StemAnalyzer`, no PCM kept), checks it (`audio::checkStem`, `audio::mixDiagnostics`) and
 declares `stem.<key>.*` (`signals::StemSignals`). Each render frame, and each step of a seek's replay,
@@ -115,6 +115,62 @@ absent channel, a disconnect, or 250 ms with no frame. With sources, macOS opens
 without, the plain miniaudio path above, unchanged. `audio::SyntheticCapture` (`synthetic:<n>`) is the test and
 benchmark device. The map is saved per device id in settings (`live.inputSources`). `avgen --input-meter <device>`
 prints each channel's level once a second.
+
+## Feeds: the beat clock and response.* from a source (ADR-1580, ADR-1581)
+
+By default the mix drives everything. A project's top-level `feeds` block lets a stem (offline) or a live input source
+(while an input is open) drive the beat clock and parts of `response.*`. No route changes.
+
+```json
+{
+  "assets": {
+    "audio": "feline-footwear.wav",
+    "stems": [
+      {"key": "drums", "label": "Drums", "file": "stems/feline-footwear (Drums).wav"},
+      {"key": "bass",  "label": "Bass",  "file": "stems/feline-footwear (Bass).wav", "gainDb": 6}
+    ]
+  },
+  "sonic": {},
+  "feeds": {
+    "beat":   "stem.drums",
+    "hits":   "stem.drums",
+    "levels": "stem.bass"
+  }
+}
+```
+
+| Key | Routes | Default |
+|---|---|---|
+| `beat` | the beat clock: `beat.*`, the metre (bar 1, phrases), `music.*`, the timeline's beat markers and snap, the Director's and the camera director's grid, effect triggers | `"audio"` |
+| `hits` | every response hit class not named below: `response.kick`, `low`, `snare`, `hat`, `onset` and their `*Env` | `"audio"` |
+| `kick` `low` `snare` `hat` `onset` | that one class, over `hits` (`"audio"` puts one class back on the mix) | `hits` |
+| `levels` | `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient`, `flux` (one source: they share one loudness reference, ADR-1510) | `"audio"` |
+
+**Values:**
+- `"audio"` is the mix.
+- `"stem.<key>"` is the stem with that key in `assets.stems`, or, live, the input source with that key (the same key
+  works in both).
+- Anything else is a load warning, and then the mix feeds everything.
+
+**Rules:**
+- **Not fed by a source:** `response.melodic`, `pitch` and `note` stay on the mix and MIDI. `audio.*` is always the
+  mix's measurement, `audio.beat` and `audio.tempo` included.
+- **Needs a `sonic` block:** `response.*` runs only with a `sonic` block (or live Sonic input). `beat` needs none.
+- **The hits tier:** a stem or input source that a response feed names runs the kick/snare/hat analysis whatever its
+  own `hits` says.
+- **Inactive sources:** an inactive source feeds nothing: no hits, and its levels read 0. That covers a stem outside
+  `[offset, offset + duration)`, and an absent, disconnected or stalled input channel. Offline the beat clock keeps the
+  stem's grid, extrapolated at its tempo. Live it free-runs at the last tempo.
+- **Unknown keys:** a key with no stem or input source is a project warning, and that part reads the mix.
+- **Seek equals play:** the fed response and the stem's grid are pure functions of the second, like everything a seek
+  replays.
+- **Guidance:** take hits from a drum source and levels from a sustained one. Levels read from a drum stem pulse with
+  each hit: on Feline, `response.level`'s ripple is 0.65 from the drum stem against 0.14 from the mix.
+
+**Trims (ADR-1582):**
+- `assets.stems[].gainDb` sets a stem's trim, and an input source's `gainDb` in `live.inputSources` sets a live
+  source's (the Inputs table's Gain column). The range is -24 to +24 dB, applied before analysis.
+- A trim lifts a quiet source over the gate and into the detectors. It does not make levels bigger.
 
 ## Lifecycle and threading
 
