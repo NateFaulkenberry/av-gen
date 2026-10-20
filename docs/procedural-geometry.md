@@ -51,6 +51,10 @@ mesh's open edges, which is right for a rock or a tree, whose border is its silh
 a near chunk at LOD0 and a far one at LOD2 still meet without a crack. Centre each chunk on its own origin and place
 it with its distribution, because the culler's bound and the LOD distance are both measured from the instance.
 
+**Leaf cards.** A mesh made of many small separate cards (a canopy) collapses under the simplifier: it deletes whole
+cards and grows none. Add `"thinning": true` to the `lod` block (ADR-1548), and its levels are thinned instead. Whole
+cards are removed and the survivors grown to keep the leaf area, as imported gltf trees already do (ADR-351).
+
 **Transform order**: `world = node × distribution × placement(i) × variation(i) × source`.
 Local-space deformers act on the source shape before instancing (each column twists about its
 own axis); world-space deformers act on the final world position (a wave across the whole hall).
