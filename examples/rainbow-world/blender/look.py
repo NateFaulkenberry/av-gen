@@ -16,8 +16,8 @@ LOOK = {
     "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#B4B2DC")[:3],
     "meadow": [rw.hexlin("#2A6E2E")[:3], rw.hexlin("#4E9A2C")[:3], rw.hexlin("#6FB038")[:3], rw.hexlin("#9AC23A")[:3]],
     "shade": rw.hexlin("#155A5C")[:3],
-    "cloud": [rw.hexlin("#6A5A9E")[:3], rw.hexlin("#A888BC")[:3], rw.hexlin("#FFC28C")[:3], rw.hexlin("#FFDFB8")[:3]],
-    "cloudBounce": rw.hexlin("#F0A88C")[:3], "cloudGain": 0.92,
+    "cloud": [rw.hexlin("#5660B4")[:3], rw.hexlin("#9CA2DC")[:3], rw.hexlin("#FFE2B8")[:3], rw.hexlin("#FFF2DE")[:3]],
+    "cloudBounce": rw.hexlin("#F4B49A")[:3], "cloudGain": 0.9,
     "rainbowStrength": 2.0,
 }
 
@@ -71,7 +71,9 @@ def meadow_ops(dst, pos_reg=0, scratch=(1, 2, 5)):
     ]
 
 
-def ground_program():
+def ground_program(name="rw_ground", rim_hex="#76665C"):
+    """The band's ground. `rim_hex` colours the rim core between the rocks; the lip variant (rw_ground_lip) is moss,
+    for the chunks where the ride swings over a rim: a vegetated lip, not bare rock (Stage 5)."""
     (r0a, r0b), (r1a, r1b) = ranges
     e = 0.004
     ops = [{"kind": "input", "dst": 0, "input": "worldPosition"}]
@@ -97,11 +99,11 @@ def ground_program():
         {"kind": "smoothstep", "dst": 2, "srcA": 6, "constant": [r1b - e, r1b, 0, 0]},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 7},
         {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
-        {"kind": "constant", "dst": 5, "constant": R(rw.hexlin("#76665C")[:3]) + [1.0]},  # the rim core: a warm mid stone
+        {"kind": "constant", "dst": 5, "constant": R(rw.hexlin(rim_hex)[:3]) + [1.0]},  # the rim core
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 1},
     ]
     ops.insert(1, {"kind": "constant", "dst": 7, "constant": [-1.0, -1.0, -1.0, -1.0]})
-    return {"name": "rw_ground", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+    return {"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
             "emissionIntensity": 1.0, "opacity": -1, "ops": ops}
 
 
@@ -188,6 +190,39 @@ def cloud_program():
                 {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4}]}
 
 
+FLOOR_STOPS = ("#24287C", "#545CB2", "#D6B08C", "#F2DEC2")  # deeper than the clouds, so the heads on it read
+
+
+def cloud_floor_program(base_y, top_h=650.0):
+    """The cloud sea's floor (unlit). Seen from the ride it filled half of a crossing's frame as one flat cream wall,
+    because every up-facing billow took the ramp's top stop. Here height leads: the deep troughs between billows are
+    blue-violet (R1's shadowed cloud valleys), the flanks lavender, and only the heads catch the white-gold light, with
+    the sun's N.L and a billow noise breaking it up. The far floor still dissolves to the horizon colour."""
+    g = LOOK["cloudGain"]
+    stops = [rw.hexlin(h)[:3] for h in FLOOR_STOPS]
+    return {"name": "rw_cloudfloor", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+            "emissionIntensity": 1.0, "opacity": -1, "ops": [
+                {"kind": "input", "dst": 7, "input": "worldPosition"},
+                {"kind": "swizzle", "dst": 1, "srcA": 7, "constant": [1, 1, 1, 1]},
+                {"kind": "remap", "dst": 1, "srcA": 1, "constant": [base_y + 40.0, base_y + top_h, 0.0, 1.0], "value": 1.0},
+                {"kind": "power", "dst": 1, "srcA": 1, "value": 0.7},
+                {"kind": "input", "dst": 0, "input": "normal"},
+                {"kind": "gradient", "dst": 2, "srcA": 0, "constant": R(SUN) + [0.5], "value": 0.5},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.0, 1.0, -0.3, 0.3], "value": 1.0},
+                {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
+                {"kind": "noise", "dst": 2, "srcA": 7, "value": 0.0022, "seed": 9},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.3, 0.7, -0.28, 0.28], "value": 1.0},
+                {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
+                {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 0.0, 1.0], "value": 1.0},
+                {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "constant": R([v * g for v in stops[0]]) + [1.0],
+                 "constant2": R([v * g for v in stops[1]]) + [1.0], "constant3": R([v * g for v in stops[2]]) + [1.0],
+                 "constant4": R([v * g for v in stops[3]]) + [1.0]},
+                {"kind": "fresnel", "dst": 4, "value": 8.0},
+                {"kind": "remap", "dst": 4, "srcA": 4, "constant": [0.0, 1.0, 0.0, 0.4], "value": 1.0},
+                {"kind": "constant", "dst": 5, "constant": R(LOOK["horizon"]) + [1.0]},
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4}]}
+
+
 def flower_program():
     """Heads in the accent palette by instance (magenta, coral, lilac, buttercup), stems green below the head line."""
     return {"name": "rw_flower", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
@@ -227,9 +262,9 @@ def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
 
 
 def all_programs():
-    return [ground_program(), grass_program(), canopy_program(), rock_program(), cloud_program(), flower_program(),
-            tinted_canopy_program("rw_weeper", [rw.hexlin("#3C6E22")[:3], rw.hexlin("#6E9E2A")[:3],
-                                                rw.hexlin("#A6C83A")[:3], rw.hexlin("#D2E25A")[:3]], height=12.0, offset=0.0),
+    return [ground_program(), ground_program("rw_ground_lip", "#4C7A2E"), grass_program(), canopy_program(), rock_program(), cloud_program(), flower_program(),
+            tinted_canopy_program("rw_weeper", [rw.hexlin("#5E9426")[:3], rw.hexlin("#8EBE2E")[:3],
+                                                rw.hexlin("#BEDC44")[:3], rw.hexlin("#E2EE6A")[:3]], height=12.0, offset=0.0),
             tinted_canopy_program("rw_blossom", [rw.hexlin("#8A3C78")[:3], rw.hexlin("#C9619E")[:3],
                                                  rw.hexlin("#EE94C0")[:3], rw.hexlin("#FFD0E4")[:3]], height=10.0, offset=-1.0),
             tinted_canopy_program("rw_pine", [rw.hexlin("#173F2E")[:3], rw.hexlin("#245C3C")[:3],
@@ -250,13 +285,13 @@ def rim_ranges(band):
 
 def environment(sun_avgen, bounce_dir_avgen):
     return {
-        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 240.0, "ambientOcclusion": True,
+        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 240.0, "ambientOcclusion": False,
         "contactShadows": False, "depthPrepass": True, "fogColor": R(LOOK["horizon"]), "volumeDensity": 0.0,
         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": R(LOOK["zenith"]),
                 "horizonColor": R(LOOK["horizon"]), "groundColor": R(LOOK["ground"]), "haze": LOOK["haze"],
                 "sunIntensity": 6.0, "intensity": 1.0}}, [
         {"name": "sun", "type": "directional", "direction": R(-Vector(sun_avgen).normalized()), "color": R(LOOK["sunColor"]),
-         "intensity": LOOK["sun"], "castsShadow": True, "contactShadow": False, "shadowBias": 0.1},
+         "intensity": LOOK["sun"], "castsShadow": True, "contactShadow": False, "shadowBias": 0.25},
         {"name": "cloudsea", "type": "directional", "direction": R(Vector(bounce_dir_avgen).normalized()),
          "color": R(rw.P["cloud_bounce"][:3]), "intensity": LOOK["bounce"], "castsShadow": False}]
 

@@ -212,14 +212,17 @@ def export_clouds(out):
         print("CLOUD", kind, len(m.data.polygons), [round(d) for d in dims])
 
 
-def export_cloud_floor(out, radius=14000.0, n=220, seed=12):
+def export_cloud_floor(out, radius=14000.0, n=360, seed=12):
     """The cloud sea as one continuous floor of billows under the whole world, so 'down' is never a flat colour:
     a disc of lumps (smooth union of a few hundred domes, 150-600 m across), flattening toward the rim, where it
     meets the sky's ground colour in the haze."""
     import random as _r
     rng = _r.Random(seed)
-    lumps = [(rng.uniform(-radius, radius), rng.uniform(-radius, radius), rng.uniform(150, 600), rng.uniform(40, 220))
-             for _ in range(900)]
+    # two octaves: big rolling billows (500-1600 m, 120-420 m high) and cauliflower heads on them (150-450 m)
+    lumps = [(rng.uniform(-radius, radius), rng.uniform(-radius, radius), rng.uniform(500, 1600), rng.uniform(120, 420))
+             for _ in range(420)]
+    lumps += [(rng.uniform(-radius, radius), rng.uniform(-radius, radius), rng.uniform(150, 450), rng.uniform(80, 220))
+              for _ in range(1600)]
     lumps = [l for l in lumps if math.hypot(l[0], l[1]) < radius]
     L_ = np.array(lumps)
     xs = np.linspace(-radius, radius, n)
@@ -234,7 +237,7 @@ def export_cloud_floor(out, radius=14000.0, n=220, seed=12):
     Z = k * np.log(acc)              # smooth max of the domes
     Z -= Z.min()
     r = np.hypot(X, Y) / radius
-    Z *= np.clip(1.0 - r, 0.0, 1.0) ** 0.5   # flatten toward the rim
+    Z *= np.clip(1.0 - r, 0.0, 1.0) ** 0.2   # flatten toward the rim (late: the far billows must still read)
     rw.reset()
     me = bpy.data.meshes.new("cloud_floor")
     verts = [(float(X[i, j]), float(Y[i, j]), float(Z[i, j])) for i in range(n) for j in range(n)]

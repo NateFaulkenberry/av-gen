@@ -93,7 +93,7 @@ def build_weeper(out, rng):
     anchors = []
     for pts in arches:
         for i in range(2, 17):
-            for _ in range(7):
+            for _ in range(5):
                 anchors.append(pts[i] + Vector((rng.uniform(-0.8, 0.8), rng.uniform(-0.8, 0.8), rng.uniform(-0.3, 0.4))))
     for _ in range(140):  # the crown: strands from inside the dome's top
         a, r = rng.uniform(0, 2 * math.pi), rng.uniform(0, 4.5)

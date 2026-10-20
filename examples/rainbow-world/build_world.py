@@ -43,8 +43,8 @@ ap.add_argument("--quick", action="store_true", help="coarse band (6 m rings), f
 ap.add_argument("--scale", type=float, default=180.0)
 ap.add_argument("--zamp", type=float, default=1.0)
 ap.add_argument("--turns", type=int, default=1)
-ap.add_argument("--chunks", type=int, default=24)
-ap.add_argument("--loop-seconds", type=float, default=600.0)
+ap.add_argument("--chunks", type=int, default=48)
+ap.add_argument("--base-speed", type=float, default=30.0, help="the ride's base speed, m/s")
 ap.add_argument("--project", default=None, help="where to write the live project (default <out>/rainbow-world.json); "
                 "its scene path is written relative to it")
 a = ap.parse_args(rw.argv_after_dashes())
@@ -95,10 +95,19 @@ for c, (i0, i1) in enumerate(chunk_rings):
     m = bpy.data.materials.new("band")
     m.use_nodes = True
     ob.data.materials.append(m)
+    # each chunk about its own centre: the culler's bound is the mesh's extent about its origin, and the LOD
+    # selector measures to the instance, so a chunk left in world space is never culled and never simplified
+    vs = ob.data.vertices
+    lo_ = Vector((min(v.co.x for v in vs), min(v.co.y for v in vs), min(v.co.z for v in vs)))
+    hi_ = Vector((max(v.co.x for v in vs), max(v.co.y for v in vs), max(v.co.z for v in vs)))
+    ctr = (lo_ + hi_) * 0.5
+    ob.data.transform(Matrix.Translation(-ctr))
     rw.export_glb([ob], os.path.join(OUT, "band_%02d.glb" % c))
-    band_nodes.append(node_points("band_%02d" % c, "band_%02d.glb" % c, [point(Vector((0, 0, 0)), Quaternion(), 1.0)],
+    # mesh LOD with the chunk's open ends held still (ADR-1546), so a near chunk and a far one still meet
+    band_nodes.append(node_points("band_%02d" % c, "band_%02d.glb" % c, [point(ctr, Quaternion(), 1.0)],
                                   {"program": "rw_ground", "roughness": 0.93, "metallic": 0.0},
-                                  lod={"cull": True}))
+                                  lod={"cull": True, "count": 4, "byScreenSize": False, "distance1": 240.0,
+                                       "distance2": 600.0, "distance3": 1300.0, "spread": 0.0, "lockBorder": True}))
 print("BAND chunks", len(band_nodes))
 
 # copy the shared assets (rocks, grass, flowers, trees, clouds, rainbow) beside the scene
@@ -117,20 +126,22 @@ rw.reset()
 protos = band.append_rocks(os.path.join(ASSETS, "..", "stage2", "rocks", "rocks.blend")
                            if not os.path.exists(os.path.join(ASSETS, "rocks.blend")) else os.path.join(ASSETS, "rocks.blend"))
 placed = band.place_rim_rocks(fr, protos, seed=5)
-by = {}
+ring_pts = np.array([np.array(f_[1]) for f_ in fr])
+rock_info = []
 for o in placed:
+    k_ = int(np.argmin(np.linalg.norm(ring_pts - np.array(o.location), axis=1)))
+    _, pr_, tr_, ur_, sr_ = fr[k_]
+    rock_info.append((o, fr[k_][0], 1.0 if (o.location - pr_).dot(sr_) > 0 else -1.0))
+by = {}
+ROCKS_DEFERRED = rock_info  # filtered by the ride's crossings below, then written
+for o in []:
     rid = o.name.split(".")[0]
     w, x, y, z = rw.quat_to_avgen(o.rotation_quaternion)
     p = rw.to_avgen(o.location)
     sc = o.scale
     by.setdefault(rid, []).append([round(p[0], 3), round(p[1], 3), round(p[2], 3), round(x, 5), round(y, 5), round(z, 5),
                                    round(w, 5), round(sc[0], 3), round(sc[2], 3), round(sc[1], 3)])
-for rid, pts in by.items():
-    for k in range(0, len(pts), 60000):
-        nodes.append(node_points("rim_%s_%d" % (rid.replace("rock_", ""), k // 60000), "rim" + rid + ".glb", pts[k:k + 60000],
-                                 {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
-                                 castsShadow=False, lod={"cull": True, "minScreenRadius": 1.5}))
-print("RIM ROCKS", sum(len(v) for v in by.values()))
+
 
 # ---- the two faces of the band -------------------------------------------------------------------------------------
 # The band has two meadows: TOP (its up is the band's u) and BOTTOM (its up is -u: the other gravity). Hills on the
@@ -159,7 +170,7 @@ FACE_HILLS = {"top": band.TOP_HILLS, "bottom": band.BOTTOM_HILLS}
 
 # ---- the ride: weaving over a meadow, and four times round the loop over a rim onto the other face and back ---------
 TR = 110.0                       # metres a rim crossing takes
-RIM_X, RIM_A, RIM_LIFT = 108.0, 54.0, 14.0
+RIM_X, RIM_A, RIM_LIFT = 108.0, 40.0, 11.0
 plan = []                        # (s0, s1, kind, side) with kind top|bottom|over (top->bottom) |back (bottom->top)
 quarter = L / 4
 for k in range(4):
@@ -180,8 +191,8 @@ def seg_at(s):
 
 
 def weave(s):
-    return 0.40 * band.HALF_W * math.sin(2 * math.pi * s / band.per(1150.0)) + 0.16 * band.HALF_W * math.sin(
-        2 * math.pi * s / band.per(410.0) + 1.0)
+    return 0.40 * band.HALF_W * math.sin(2 * math.pi * s / band.per(820.0)) + 0.16 * band.HALF_W * math.sin(
+        2 * math.pi * s / band.per(300.0) + 1.0)
 
 
 def ride_x(s):
@@ -194,15 +205,18 @@ def ride_x(s):
         if kind not in ("over", "back"):
             continue
         for d in ((s0 - s) % L, (s - s1) % L):   # metres to the crossing's start ahead, from its end behind
-            if d < 220.0:
-                w = band.smoothstep(220.0, 0.0, d)
+            if d < 160.0:
+                w = band.smoothstep(160.0, 0.0, d)
                 if w > best_w:
                     best_w, target = w, side * RIM_X
     return x + (target - x) * best_w
 
 
 def cam_lift(s):
-    return 4.5 + 2.5 * (0.5 + 0.5 * math.sin(2 * math.pi * s / band.per(700.0)))
+    # swoops: low skims (6 m) and lifts to 17 m, so the fast ride dives at the meadow and rises over it; never so low
+    # that the grass under a 30 m/s camera strobes
+    u = 0.5 + 0.5 * math.sin(2 * math.pi * s / band.per(520.0))
+    return 6.0 + 11.0 * u * u
 
 
 def ride(s):
@@ -260,6 +274,38 @@ def ride_face(s):
     return seg_at(s)[2]
 
 
+# ---- the crossings' rims: a vegetated lip instead of bare rock -----------------------------------------------------
+CROSSINGS = [(s0, s1, side) for s0, s1, kind, side in plan if kind in ("over", "back")]
+
+
+def near_crossing(s, side=None, margin=160.0):
+    for s0, s1, sd_ in CROSSINGS:
+        if (side is None or sd_ == side) and min((s - s1) % L, (s0 - s) % L, 0.0 if s0 <= s % L <= s1 else 1e9) < margin:
+            return True
+    return False
+
+
+for o, s_r, side_r in ROCKS_DEFERRED:
+    if near_crossing(s_r, side_r):
+        continue  # the ride swings round this rim: no bare rock in its face
+    rid = o.name.split(".")[0]
+    w, x, y, z = rw.quat_to_avgen(o.rotation_quaternion)
+    p = rw.to_avgen(o.location)
+    sc = o.scale
+    by.setdefault(rid, []).append([round(p[0], 3), round(p[1], 3), round(p[2], 3), round(x, 5), round(y, 5), round(z, 5),
+                                   round(w, 5), round(sc[0], 3), round(sc[2], 3), round(sc[1], 3)])
+for rid, pts in by.items():
+    for k in range(0, len(pts), 60000):
+        nodes.append(node_points("rim_%s_%d" % (rid.replace("rock_", ""), k // 60000), "rim" + rid + ".glb", pts[k:k + 60000],
+                                 {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
+                                 castsShadow=False, lod={"cull": True, "minScreenRadius": 1.5}))
+print("RIM ROCKS", sum(len(v) for v in by.values()), "of", len(ROCKS_DEFERRED))
+# the chunks a crossing touches are drawn with the lip program (moss on the rim core)
+for c, (i0, i1) in enumerate(chunk_rings):
+    sa_, sb_ = L * i0 / band.NS, L * i1 / band.NS
+    if any(not (s1 < sa_ - 60 or s0 > sb_ + 60) for s0, s1, sd_ in CROSSINGS):
+        band_nodes[c]["procedural"]["material"]["program"] = "rw_ground_lip"
+
 # ---- dressing: every feature of the land gets the dressing its shape asks for (deliberate clusters, rest between) ----
 fam = {"great": [], "weeper": [], "blossom": [], "pine": []}
 outcrops, fpts = [], []
@@ -279,7 +325,7 @@ def drift(s, x, face, n, spread):
         if abs(xx) > 0.8 * band.HALF_W:
             continue
         p, t, up, sd = surf_any(s + ds, xx, face, -0.02)
-        fpts.append(point(p, up.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)), rng.uniform(0.9, 1.5)))
+        fpts.append(point(p, up.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)), rng.uniform(1.2, 2.0)))
 
 
 def outcrop(s, x, face, size):
@@ -332,6 +378,47 @@ for face in ("top", "bottom"):
                 plant("blossom", hs, hx, face, rng.uniform(0.45, 0.6))
             if rng.random() < 0.5:
                 drift(hs + rs, hx, face, rng.randint(60, 120), 5.0)
+# the crossings' lips: a hanging garden on the crest the ride swings round -- drifts, Blossom Puffs and Weepers on
+# both faces' edges, so what the camera passes is planted, not quarried
+for s0, s1, side in CROSSINGS:
+    for face in ("top", "bottom"):
+        for k in range(rng.randint(4, 6)):
+            ss = rng.uniform(s0 - 120, s1 + 120)
+            xx = side * rng.uniform(0.62, 0.78) * band.HALF_W
+            drift(ss, xx, face, rng.randint(80, 160), rng.uniform(4, 7))
+        for k in range(rng.randint(1, 2)):
+            ss = rng.uniform(s0 - 140, s1 + 140)
+            xx = side * rng.uniform(0.6, 0.76) * band.HALF_W
+            if path_clear(ss, xx, face, 26.0):
+                plant(rng.choice(("blossom", "blossom", "weeper")), ss, xx, face, rng.uniform(0.5, 0.8))
+
+# along the ride, every ~170 m one deliberate cluster near the camera (alternating sides, rest between):
+# a grove of big trees, a flower field, or a rock garden ringed with flowers -- the big near shapes the frame lacked
+CLUSTERS = ("grove", "field", "garden", "grove", "rest", "field")
+for k, s0 in enumerate(np.arange(60.0, L, 170.0)):
+    kind = ride_face(s0)
+    if kind not in ("top", "bottom") or near_crossing(s0, None, 60.0):
+        continue
+    what = CLUSTERS[k % len(CLUSTERS)]
+    side = 1.0 if k % 2 == 0 else -1.0
+    xc = ride_x(s0) + side * rng.uniform(32, 55)
+    if abs(xc) > 0.74 * band.HALF_W:
+        xc = ride_x(s0) - side * rng.uniform(32, 55)
+    if abs(xc) > 0.78 * band.HALF_W:
+        continue
+    if what == "grove":
+        for j in range(rng.randint(3, 5)):
+            ss, xx = s0 + rng.gauss(0, 16), xc + rng.gauss(0, 10)
+            if abs(xx) < 0.8 * band.HALF_W and path_clear(ss, xx, kind, 24.0):
+                plant(rng.choice(("great", "great", "great", "blossom", "pine")), ss, xx, kind, rng.uniform(0.7, 1.25))
+    elif what == "field":
+        drift(s0, xc, kind, rng.randint(450, 800), rng.uniform(11, 17))
+    elif what == "garden":
+        outcrop(s0, xc, kind, rng.uniform(4, 7))
+        for j in range(5):
+            aa = rng.uniform(0, 2 * math.pi)
+            drift(s0 + 9 * math.cos(aa), xc + 9 * math.sin(aa), kind, rng.randint(40, 80), 2.5)
+
 # foreground bands: drifts close beside the ride, every ~120 m, on the face the ride is on
 for s0 in np.arange(0.0, L, 120.0):
     kind = ride_face(s0)
@@ -345,16 +432,16 @@ for f, pts in fam.items():
     if not pts:
         continue
     asset, prog = TREE_ASSETS[f]
-    # the leaf cards (alpha-tested, the depth prepass's dearest geometry) stop at 240 m; beyond it the canopy core,
+    # the leaf cards (alpha-tested, the depth prepass's dearest geometry) stop at 110 m; beyond it the canopy core,
     # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps
     nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
-                             lod={"cull": True, "minScreenRadius": 1.5, "maxDistance": 500.0}))
+                             lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0}))
     nodes.append(node_points("%s_core" % f, "%s_core.glb" % asset, pts, {"program": prog, "roughness": 0.95, "metallic": 0.0},
                              lod={"cull": True, "minScreenRadius": 1.0}))
     nodes.append(node_points("%s_leaves" % f, "%s_leaves.glb" % asset, pts,
                              {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
                               "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
-                             lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 240.0}))
+                             lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 110.0}))
 for k in range(0, len(outcrops), 60000):
     nodes.append(node_points("outcrops%d" % k, "rock_namaqualand_boulder_03.glb", outcrops[k:k + 60000],
                              {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
@@ -383,6 +470,30 @@ for s in np.arange(0.0, L, 1.0):
             sc = rng.uniform(0.55, 0.95)
             gpts.append(point(p - n * 0.03, n.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)),
                               (sc, sc, sc * rng.uniform(0.8, 1.2))))
+# the hanging gardens: where the ride swings round a rim, the cliff itself is planted -- turf tufts growing straight
+# out of the rock face (each face's gravity is its own, so on a cliff "up" is outward) and flowers spilling over both
+# lips. The camera passes this at 10-20 m, so it is what a crossing is made of.
+n_hang, hang_f = 0, []
+for s0, s1, side in CROSSINGS:
+    right = side > 0
+    for ss in np.arange(s0 - 170.0, s1 + 170.0, 0.6):
+        for _ in range(9):
+            sj = ss + rng.uniform(0, 0.6)
+            y = rng.uniform(-band.FACE + 0.5, band.FACE - 0.5)
+            pos, nrm, t_, u_ = band.rim_point(fr, sj % L, y, right)
+            i_ = max(0, min(band.NS, int(round((sj % L) / L * band.NS))))
+            pos = pos + t_ * ((sj % L) - i_ * L / band.NS)
+            sc = rng.uniform(0.7, 1.15)
+            gpts.append(point(pos - nrm * 0.05, nrm.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)),
+                              (sc, sc, sc * rng.uniform(0.9, 1.3))))
+            n_hang += 1
+            if abs(y) > band.FACE - 9.0 and rng.random() < 0.55:
+                up_ = (nrm + u_ * (1.0 if y > 0 else -1.0) * 0.6).normalized()
+                hang_f.append(point(pos - nrm * 0.05, up_.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)),
+                                  rng.uniform(1.2, 2.0)))
+print("HANGING GARDEN tufts", n_hang, "flowers", len(hang_f))
+nodes.append(node_points("flowers_hang", "flower_clump.glb", hang_f, {"program": "rw_flower", "roughness": 0.6, "metallic": 0.0, "doubleSided": True}, castsShadow=False,
+                         lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 75.0}))
 for k in range(0, len(gpts), 60000):
     nodes.append(node_points("grass%03d" % (k // 60000), "grass_lite.glb", gpts[k:k + 60000],
                              {"program": "rw_grass", "roughness": 0.95, "metallic": 0.0}, castsShadow=False,
@@ -436,15 +547,15 @@ while len(cpts["hero"]) + len(cpts["tower"]) < 14 and tries < 6000:
     cpts[kind].append(point(Vector(c), Quaternion((0, 0, 1), rng.uniform(0, 6.28)), sc))
 sea_z = lo[2] - 380.0
 placed_puffs = 0
-while placed_puffs < 260:  # the cloud sea, out to 6 km, never within reach of the ride
-    aa, rr = rng.uniform(0, 2 * math.pi), 6000 * math.sqrt(rng.random())
-    c = Vector((centre[0] + rr * math.cos(aa), centre[1] + rr * math.sin(aa), sea_z - rng.uniform(0, 160)))
-    sx_ = rng.uniform(2.6, 4.2)
-    if near_path(np.array(c), 250.0 * sx_ + 200.0):
+while placed_puffs < 900:  # the cloud sea: heads packed out to 9 km over the floor, never within reach of the ride
+    aa, rr = rng.uniform(0, 2 * math.pi), 9000 * math.sqrt(rng.random())
+    c = Vector((centre[0] + rr * math.cos(aa), centre[1] + rr * math.sin(aa), sea_z - rng.uniform(-40, 140)))
+    sx_ = rng.uniform(1.6, 3.6)
+    if near_path(np.array(c), 250.0 * sx_ + 120.0):
         continue
     placed_puffs += 1
     cpts["puff"].append(point(c, Quaternion((0, 0, 1), rng.uniform(0, 6.28)),
-                              (sx_, rng.uniform(2.6, 4.2), rng.uniform(0.6, 1.0))))
+                              (sx_, sx_ * rng.uniform(0.8, 1.2), rng.uniform(0.7, 1.15))))
 for k in range(16):  # banks on a ring round the knot
     aa = 2 * math.pi * k / 16 + rng.uniform(-0.1, 0.1)
     c = Vector((centre[0] + 3800 * math.cos(aa), centre[1] + 3800 * math.sin(aa), centre[2] + rng.uniform(-300, 500)))
@@ -453,12 +564,17 @@ for k in range(16):  # banks on a ring round the knot
 # the floor of the cloud sea: one mesh of billows under the whole world (engine_assets.export_cloud_floor)
 nodes.append(node_points("cloud_floor", "cloud_floor.glb",
                          [point(Vector((centre[0], centre[1], sea_z - 120.0)), Quaternion(), 1.0)],
-                         {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True}, castsShadow=False))
+                         {"program": "rw_cloudfloor", "roughness": 1.0, "metallic": 0.0, "unlit": True}, castsShadow=False))
+programs.append(look.cloud_floor_program(sea_z - 120.0))
 for kind, pts in cpts.items():
     if pts:
+        lod_ = {"cull": True}
+        if kind == "puff":  # 520 heads: simplified with distance (a cloud's silhouette survives the simplifier)
+            lod_ = {"cull": True, "count": 4, "byScreenSize": False, "distance1": 1200.0, "distance2": 2400.0,
+                    "distance3": 3800.0}
         nodes.append(node_points("cloud_" + kind, "cloud_%s.glb" % kind, pts,
                                  {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True},
-                                 castsShadow=False, lod={"cull": True}))
+                                 castsShadow=False, lod=lod_))
 print("CLOUDS", {k: len(v) for k, v in cpts.items()})
 
 # ---- scene and project ----------------------------------------------------------------------------------------------
@@ -470,7 +586,43 @@ with open(os.path.join(OUT, "rainbow-world.scene.json"), "w") as f:
     json.dump(scene, f)
 params = look.post_parameters()
 params.update({"camera/splineUp": 1.0, "camera/lookAhead": 70.0, "post/lens/fisheye": 1.0, "post/lens/fisheyeModel": 0.0,
-               "camera/far": 30000.0, "sources/ride/rate": 1.0 / a.loop_seconds})
+               "camera/far": 30000.0})
+# ---- the ride's rhythm. The owner (Stage 4): "definitely want faster camera movements". The clip covers a lot of
+# structure in 8 s with quick swoops and rolls, so the base is fast (BASE m/s) and the holds read by contrast:
+#   - lap A: brief holds (30% speed) under each rainbow arch, eased over ~150 m either side;
+#   - lap B: the holds move to the Great Tree landmarks, and the arches are passed at full speed;
+#   - both laps surge to 1.5x into and through every crossing (ramped over 140 m), so the swing round the rim is quick.
+# Two laps with different holds make the loop ~2 laps long before it repeats. A looping timeline maps time to splineT:
+# a pure function of the transport (seek equals play). Each lap ends with a step key back to 0 (closed spline: 1 == 0).
+def _circ(d):
+    return abs(((d) + L / 2) % L - L / 2)
+
+
+def speed_at(s_band, holds):
+    w = 1.0
+    for s0, s1, side in CROSSINGS:
+        mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
+        w = max(w, 1.0 + 0.5 * (1.0 - band.smoothstep(half, half + 140.0, _circ(s_band - mid))))
+    for h_ in holds:
+        w = min(w, 0.3 + 0.7 * band.smoothstep(25.0, 170.0, _circ(s_band - h_)))
+    return w
+
+
+great_s = sorted({round(hs) for hs, xx, face in landmarks})
+holds_b = []
+for g_ in great_s:  # thin to one hold per ~600 m
+    if not holds_b or g_ - holds_b[-1] > 600.0:
+        holds_b.append(float(g_))
+cam_D = [cam_path.D[k * cam_path.per] for k in range(len(cam_s))] + [cam_path.length]
+ride_keys, t_acc = [], 0.0
+for lap, holds in enumerate((arch_s, holds_b)):
+    for k in range(len(cam_s)):
+        ride_keys.append({"time": round(t_acc, 4), "value": round(float(cam_D[k] / cam_path.length), 6), "interp": "linear"})
+        t_acc += (cam_D[k + 1] - cam_D[k]) / (a.base_speed * speed_at(cam_s[k], holds))
+    ride_keys.append({"time": round(t_acc - 1e-3, 4), "value": 1.0, "interp": "step"})
+loop_seconds = round(t_acc, 4)
+print("RIDE base %.0f m/s, lap A+B %.1f s, holds A %d B %d" % (a.base_speed, loop_seconds, len(arch_s), len(holds_b)))
+
 # ---- the live project: the ride, five looks (CC 9 selects, CC 10 locks), MIDI and audio --------------------------------
 def op_path(program, kind, nth=0):
     """'material/<program>/op/<1-based index>/<kind>/' of the nth op of that kind in the program."""
@@ -506,7 +658,19 @@ STATES = [
                    haze=H("#A8C8F0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
                    meadow0=H("#1E7A6A"), meadow1=H("#3EA85A"), meadow2=H("#9AD040"), meadow3=H("#E8D040"), shade=H("#3A3AA0"))),
 ]
+# the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
+# (Bright Noon keeps the floor program's own stops)
+FLOOR_NOON = [R(rw.hexlin(h)[:3]) for h in look.FLOOR_STOPS]
+for k_, (n_, c_) in enumerate(STATES):
+    if k_ == 0:
+        fl = FLOOR_NOON
+    else:
+        c0, c1, c2, c3 = (np.array(c_["cloud%d" % i]) for i in range(4))
+        fl = [list(np.round(c0 * 0.55, 4)), list(np.round(0.6 * c0 + 0.4 * c1, 4)), list(np.round(c2 * 0.92, 4)), list(c3)]
+    for i in range(4):
+        c_["floor%d" % i] = [float(v) for v in fl[i]]
 cloud_ramp = op_path("rw_cloud", "oklabRamp")
+floor_ramp = op_path("rw_cloudfloor", "oklabRamp")
 bindings = [{"role": "zenith", "target": "env/sky/zenithColor"}, {"role": "horizon", "target": "env/sky/horizonColor"},
             {"role": "ground", "target": "env/sky/groundColor"}, {"role": "horizon", "target": "scene/fogColor"},
             {"role": "sun", "target": "lights/sun/color"}, {"role": "bounce", "target": "lights/cloudsea/color"},
@@ -514,10 +678,12 @@ bindings = [{"role": "zenith", "target": "env/sky/zenithColor"}, {"role": "horiz
 g = LOOK["cloudGain"]
 for k, c in enumerate(("constant", "constant2", "constant3", "constant4")):
     bindings.append({"role": "cloud%d" % k, "target": cloud_ramp + c, "gain": g})
-    for prog in ("rw_ground", "rw_grass"):
+    bindings.append({"role": "floor%d" % k, "target": floor_ramp + c, "gain": g})
+    for prog in ("rw_ground", "rw_ground_lip", "rw_grass"):
         bindings.append({"role": "meadow%d" % k, "target": op_path(prog, "oklabRamp") + c})
 # the ground program's shade constant (the first `constant` op after the cavity input)
 bindings.append({"role": "shade", "target": op_path("rw_ground", "constant", 1) + "constant"})
+bindings.append({"role": "shade", "target": op_path("rw_ground_lip", "constant", 1) + "constant"})
 palette = {"states": [{"name": n, "colors": c, "scalars": {}} for n, c in STATES], "bindings": bindings,
            "selector": {"select": 0, "transition": 8.0, "lock": False, "hold": 60.0,
                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": [0, 1, 2, 3, 4],
@@ -530,7 +696,7 @@ CC = [(1, "glow"), (2, "lens"), (5, "haze"), (6, "light"), (7, "colour"), (9, "p
 control = {"midi": {"enabled": True, "filter": "*", "bindings": [
     {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": sig} for n, sig in CC]}}
 ctl = {"attackMs": 150, "decayMs": 150}
-routes = [{"source": "lfo.ride", "target": "camera/splineT", "amount": 1.0, "op": "replace", "polarity": "unipolar"},
+routes = [{"source": "timeline.ride", "target": "camera/splineT", "amount": 1.0, "op": "replace", "polarity": "unipolar"},
           {"source": "control.palette", "target": "palette/select", "amount": 4.0, "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.paletteLock", "target": "palette/lock", "amount": 1.0, "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.lens", "target": "post/lens/fisheye", "amount": -1.0, "op": "add", "polarity": "unipolar", "chain": ctl},
@@ -564,7 +730,7 @@ project = {
                    "thesis": "A painterly meadow knotted through an all-round sky: the ride follows the land's own gravity "
                              "round a twisting loop and over its rims, under rainbow arches, among sculpted clouds."},
     "parameters": params,
-    "sources": [{"kind": "lfo", "name": "ride", "settings": {"shape": "saw"}}],
+    "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}}],
     "routes": routes,
     "palette": palette,
     "control": control,
@@ -572,7 +738,7 @@ project = {
 }
 with open(proj_path, "w") as f:
     json.dump(project, f, indent=1)
-report = {"loopMetres": L, "cameraMetres": cam_path.length, "loopSeconds": a.loop_seconds,
+report = {"loopMetres": L, "cameraMetres": cam_path.length, "loopSeconds": loop_seconds, "baseSpeed": a.base_speed,
           "grass": len(gpts), "flowers": len(fpts), "trees": len(tpts), "rimRocks": sum(len(v) for v in by.values()),
           "rainbows": len(rainbow_nodes), "clouds": {k: len(v) for k, v in cpts.items()}, "bandChunks": len(band_nodes)}
 with open(os.path.join(OUT, "world_report.json"), "w") as f:
