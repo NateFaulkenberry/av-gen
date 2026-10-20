@@ -106,8 +106,8 @@ for c, (i0, i1) in enumerate(chunk_rings):
     # mesh LOD with the chunk's open ends held still (ADR-1546), so a near chunk and a far one still meet
     band_nodes.append(node_points("band_%02d" % c, "band_%02d.glb" % c, [point(ctr, Quaternion(), 1.0)],
                                   {"program": "rw_ground", "roughness": 0.93, "metallic": 0.0},
-                                  lod={"cull": True, "count": 4, "byScreenSize": False, "distance1": 240.0,
-                                       "distance2": 600.0, "distance3": 1300.0, "spread": 0.0, "lockBorder": True}))
+                                  lod={"cull": True, "count": 4, "byScreenSize": False, "distance1": 160.0,
+                                       "distance2": 420.0, "distance3": 950.0, "spread": 0.0, "lockBorder": True}))
 print("BAND chunks", len(band_nodes))
 
 # copy the shared assets (rocks, grass, flowers, trees, clouds, rainbow) beside the scene
@@ -218,13 +218,14 @@ ARCH_S = [0.5 * (s0 + s1) for s0, s1, kind, side in plan if kind in ("top", "bot
 
 def cam_lift(s):
     """Low and fast between landmarks -- 4.5-8 m, so the grass, flowers and stones beside the line give the
-    near-field parallax that sells 30 m/s -- rising to ~16 m over the 200 m before each arch, where the ride
+    near-field parallax that sells 30 m/s -- rising to ~12 m over the 200 m before each arch (16 m showed so much of
+    the world at once that those frames were the GPU's p95, Stage 8), where the ride
     slows and the view opens (the clip's resolution beat)."""
     u = 0.5 + 0.5 * math.sin(2 * math.pi * s / band.per(380.0))
     low = 4.5 + 3.5 * u * u
     d = min([abs(((s - a_) + L / 2) % L - L / 2) for a_ in ARCH_S] + [1e9])
     rise = 1.0 - band.smoothstep(40.0, 240.0, d)
-    return low + (16.0 - low) * rise
+    return low + (12.0 - low) * rise
 
 
 def ride(s):
@@ -470,7 +471,7 @@ for f, pts in fam.items():
         continue
     asset, prog = TREE_ASSETS[f]
     # the leaf cards (alpha-tested, the depth prepass's dearest geometry) thin with distance (ADR-1548: whole cards removed,
-    # the rest grown, 35% at 40 m and 12% at 85 m) and stop at 150 m; beyond it the canopy core,
+    # the rest grown, 35% at 22 m and 12% at 55 m; Stage 8: the near cards were the p95) and stop at 150 m; beyond it the canopy core,
     # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps
     nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
                              lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0, "count": 3,
@@ -482,7 +483,7 @@ for f, pts in fam.items():
                              {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
                               "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
                              lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 150.0, "count": 3,
-                                  "byScreenSize": False, "distance1": 40.0, "distance2": 85.0, "thinning": True}))
+                                  "byScreenSize": False, "distance1": 22.0, "distance2": 55.0, "thinning": True}))
 for k in range(0, len(outcrops), 60000):
     nodes.append(node_points("outcrops%d" % k, "rock_namaqualand_boulder_03.glb", outcrops[k:k + 60000],
                              {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
@@ -517,8 +518,8 @@ for s in np.arange(0.0, L, 1.0):
 n_hang, hang_f = 0, []
 for s0, s1, side in CROSSINGS:
     right = side > 0
-    for ss in np.arange(s0 - 170.0, s1 + 170.0, 0.6):
-        for _ in range(9):
+    for ss in np.arange(s0 - 130.0, s1 + 130.0, 0.6):
+        for _ in range(5):  # Stage 8: 9 a step was the crossings' GPU p95; 5 still reads as turf on the face
             sj = ss + rng.uniform(0, 0.6)
             y = rng.uniform(-band.FACE + 0.5, band.FACE - 0.5)
             pos, nrm, t_, u_ = band.rim_point(fr, sj % L, y, right)
@@ -570,9 +571,10 @@ for k, sa_ in enumerate(arch_s):
         pos = pa - ua * (band.FACE - 6.0)
     eul = (rw.Q_ZUP_TO_YUP @ m.to_quaternion() @ rw.Q_ZUP_TO_YUP.inverted()).to_euler("XYZ")
     rainbow_nodes.append({"name": "rainbow_%d" % k, "kind": "gltf", "asset": "rainbow_arch.glb", "position": av(pos), "castsShadow": False,
-                          # 0.82: the feet land inside the face (R 94 m < the rim's 112 m), never poking out of a rim
-                          # where an arch seen from the strand's far side read as a spectral blob
-                          "scale": [0.82, 0.82, 0.82],
+                          # 0.76: both bows' feet land inside the face (primary 87 m, secondary 108 m < the rim's
+                          # 112 m), never poking out of a rim where a foot seen from the strand's far side read as a
+                          # spectral blob
+                          "scale": [0.76, 0.76, 0.76],
                           "rotation": [round(math.degrees(v), 3) for v in eul]})
 nodes += rainbow_nodes
 print("RAINBOWS", len(rainbow_nodes))
@@ -621,8 +623,8 @@ for kind, pts in cpts.items():
     if pts:
         lod_ = {"cull": True}
         if kind == "puff":  # 900 heads: simplified with distance (a cloud's silhouette survives the simplifier)
-            lod_ = {"cull": True, "count": 4, "byScreenSize": False, "distance1": 1200.0, "distance2": 2400.0,
-                    "distance3": 3800.0}
+            lod_ = {"cull": True, "count": 4, "byScreenSize": False, "distance1": 700.0, "distance2": 1500.0,
+                    "distance3": 2800.0}
         else:               # the masses and banks: 24-30k triangles each, mostly seen from far
             lod_ = {"cull": True, "count": 3, "byScreenSize": False, "distance1": 900.0, "distance2": 2200.0}
         nodes.append(node_points("cloud_" + kind, "cloud_%s.glb" % kind, pts,
@@ -711,10 +713,10 @@ STATES = [
                              meadow0=H("#1E5E2A"), meadow1=H("#3E8E2A"), meadow2=H("#62B03A"), meadow3=H("#8ED04A"), shade=H("#10485A"))),
     ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#9C90CC"), sun=H("#FFB4C4"), bounce=H("#8A78D2"),
                            haze=H("#8C70D4"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
-                           meadow0=H("#10704E"), meadow1=H("#1E9858"), meadow2=H("#4CB85C"), meadow3=H("#8CD466"), shade=H("#262C92"))),
+                           meadow0=H("#16703E"), meadow1=H("#2A9A48"), meadow2=H("#5CBC4C"), meadow3=H("#9AD858"), shade=H("#262C92"))),
     ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
                    haze=H("#6AAAF0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
-                   meadow0=H("#1E7A6A"), meadow1=H("#34A85A"), meadow2=H("#7CCC44"), meadow3=H("#B6DE46"), shade=H("#3A3AA0"))),
+                   meadow0=H("#1E7A58"), meadow1=H("#30A852"), meadow2=H("#62C848"), meadow3=H("#98DA4E"), shade=H("#3A3AA0"))),
 ]
 # the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
 # (Bright Noon keeps the floor program's own stops)

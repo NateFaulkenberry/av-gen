@@ -294,7 +294,7 @@ def rim_ranges(band):
 
 def environment(sun_avgen, bounce_dir_avgen):
     return {
-        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 240.0, "ambientOcclusion": False,
+        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 240.0, "shadowCascades": 2, "ambientOcclusion": False,
         "contactShadows": False, "depthPrepass": True, "fogColor": R(LOOK["horizon"]), "volumeDensity": 0.0,
         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": R(LOOK["zenith"]),
                 "horizonColor": R(LOOK["horizon"]), "groundColor": R(LOOK["ground"]), "haze": LOOK["haze"],
