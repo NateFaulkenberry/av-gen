@@ -56,7 +56,13 @@ The evaluator and the chain are each called from one place. The arithmetic, and 
 3. **`procVertex` evaluates its chain points in one loop.** The points are p0, the two neighbours when the normal is
    wanted, and the previous frame's point when the velocity is. The point path's two centres are also one loop.
 4. **`fiberPoint` makes one call of `fiberTurn`**, whose two midpoint pulls are one call of `fiberPull`.
-5. **A unit test (`[adr1561]`) counts the call sites** of these functions in `procedural.wgsl`, so a new copy is a
+5. **Second step: one chain loop for every path.** Fibers, point sources and meshes set up their points and share
+   `procVertex`'s one loop of `deformRun`, so the chain is compiled once per pipeline, not three times. `deformWorld`
+   is gone. `fiberVertex` is split into `fiberCentreLine` (before the chain) and `fiberVertex` (after it).
+6. **The material interpreter runs a program's base and its layers through one call of `materialRunOps`.** Segment
+   0 is the base and segment 1 + i is layer i. The op dispatch was compiled twice into every shader that shades a
+   surface.
+7. **A unit test (`[adr1561]`) counts the call sites** of these functions in `procedural.wgsl`, so a new copy is a
    decision rather than an accident.
 
 Loops with constant trip counts were checked: making their counts opaque to the compiler changed nothing (22.9 s
@@ -64,11 +70,21 @@ against 23.2 s), so they are not being unrolled into copies.
 
 ## Consequences
 
-- **Cold compile:** `procedural-opaque` 126 s to 23 s, `procedural-depth` 88 s to 19 s. The whole cold launch (still
-  serial at this commit) went from 305 s to 135 s.
+- **Cold compile** (lit / depth, seconds):
+
+  | Step | Lit | Depth |
+  |---|---|---|
+  | 416d48f1 | 126 | 88 |
+  | Steps 1-4 | 23 | 19 |
+  | Steps 5-6 | 15 | 10 |
+
+  After steps 1-4 the whole serial cold launch went from 305 s to 135 s. In the A/B, the interpreter's one call site
+  made no measurable difference to `pbr-opaque` (6-7 s). Its op dispatch is simply large: stubbing the interpreter
+  takes `pbr-opaque` to 1.6 s.
 - **The compiled-materials variant (ADR-1493)** builds this same module. Its cold build gets the same gain, so a live
   scene sits on the interpreter for correspondingly less time.
-- **The images are unchanged.** The arithmetic is the same: the procedural, fiber, field, points, wind, spline and
-  depth GPU tests pass (55 cases), including the fiber centre line's CPU parity and ADR-1491's depth-equals-lit
-  invariance.
+- **The images are unchanged.** The arithmetic is the same. These GPU tests pass (72 cases):
+  - procedural, fiber, field, points, wind, spline and depth;
+  - material, ADR-1493's compiled-against-interpreted, and ADR-1491's depth-equals-lit invariance;
+  - the fiber centre line's CPU parity.
 - **Further sites cost a copy.** A new field-sampling deformer or chain call should go through the existing sites.

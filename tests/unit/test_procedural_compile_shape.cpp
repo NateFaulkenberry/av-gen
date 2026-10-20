@@ -71,13 +71,21 @@ TEST_CASE("the procedural shader calls the field evaluator and the deformer chai
     // stage's emissive field.
     CHECK(callSites(proc, "fieldVector") == 2);
     CHECK(callSites(proc, "fieldScalar") == 2);
-    // The deformer chain: deformChain from the vertex's point loop and the wire stage, deformWorld from the point
-    // path's loop and the fiber vertex, deformRun from those two wrappers only.
+    // The deformer chain: deformRun from procVertex's one loop (meshes, points and fibers) and from deformChain,
+    // which only the wire stage calls.
     CHECK(callSites(proc, "deformRun") == 2);
-    CHECK(callSites(proc, "deformChain") == 2);
-    CHECK(callSites(proc, "deformWorld") == 2);
+    CHECK(callSites(proc, "deformChain") == 1);
+    CHECK(callSites(proc, "deformWorld") == 0);
     CHECK(callSites(proc, "fiberPull") == 1);
     CHECK(callSites(proc, "fiberTurn") == 1);
     // The field deformers' arithmetic never samples on its own.
     CHECK(callSites(proc, "fieldDeformerSample") == 1);
+}
+
+TEST_CASE("the material interpreter runs a program's base and layers through one call", "[adr1561][shaders]") {
+    // materialRunOps holds the op dispatch over every kind; pbr.wgsl, procedural.wgsl and sdf_raymarch.wgsl all
+    // include it, and two call sites (the base, the layer loop) compiled it twice into each.
+    const std::string material = readStripped(shaderDir() / "material.wgsl");
+    CHECK(callSites(material, "materialRunOps") == 1);
+    CHECK(callSites(material, "materialEvalOp") == 1);
 }

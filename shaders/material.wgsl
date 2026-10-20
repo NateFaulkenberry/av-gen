@@ -1000,46 +1000,55 @@ fn evaluateMaterialProgram(programIndex: i32, ctx: MaterialContext, base: Materi
     var local = ctx;
     let fields = materialFieldPrepass(pi, ctx.worldPosition);
     let baseCount = u32(max(materialPrograms.programs[pi].opacityCountPad.y, 0));
-    regs = materialRunOps(pi, 0u, baseCount, local, regs, fields);
-
     var result = base;
-    let outputs = materialPrograms.programs[pi].outputs;
-    let opacityRegister = materialPrograms.programs[pi].opacityCountPad.x;
-    let aux = materialPrograms.programs[pi].aux;
-    if (materialRegisterInRange(outputs.x)) {
-        result.baseColor = max(matGet(regs, outputs.x).xyz, vec3<f32>(0.0));
-    }
-    if (materialRegisterInRange(outputs.y)) {
-        result.metallic = saturate(matGet(regs, outputs.y).x);
-    }
-    if (materialRegisterInRange(outputs.z)) {
-        result.roughness = saturate(matGet(regs, outputs.z).x);
-    }
-    if (materialRegisterInRange(outputs.w)) {
-        result.emission = matGet(regs, outputs.w).xyz * materialPrograms.programs[pi].emissionIntensityPad.x;
-    }
-    if (materialRegisterInRange(opacityRegister)) {
-        result.opacity = saturate(matGet(regs, opacityRegister).x);
-    }
-    if (materialRegisterInRange(aux.x)) {
-        result.normal = matSafeNormalize(matGet(regs, aux.x).xyz, vec3<f32>(0.0, 0.0, 1.0));
-    }
-    if (materialRegisterInRange(aux.y)) {
-        result.occlusion = saturate(matGet(regs, aux.y).x);
-    }
-    if (materialRegisterInRange(aux.z)) {
-        result.height = matGet(regs, aux.z).x;
-    }
 
-    // ---- layers (ADR-036) ----
+    // ADR-1561: the base's ops and each layer's (ADR-036) run through one call of materialRunOps -- segment 0 is the
+    // base, segment 1 + li layer li -- so the interpreter's op dispatch is compiled once per shader, not twice. The
+    // arithmetic and its order are what the base-then-layer-loop form did.
     let layerCount = u32(max(materialPrograms.programs[pi].opacityCountPad.z, 0));
-    for (var li = 0u; li < MAT_MAX_LAYERS; li = li + 1u) {
-        if (li >= layerCount) {
-            break;
+    let segments = 1u + min(layerCount, MAT_MAX_LAYERS);
+    for (var seg = 0u; seg < segments; seg = seg + 1u) {
+        var first = 0u;
+        var count = baseCount;
+        if (seg > 0u) {
+            let range = materialPrograms.programs[pi].layers[seg - 1u].range;
+            local.height = result.height;
+            first = u32(max(range.x, 0));
+            count = u32(max(range.y, 0));
         }
-        let layer = materialPrograms.programs[pi].layers[li];
-        local.height = result.height;
-        regs = materialRunOps(pi, u32(max(layer.range.x, 0)), u32(max(layer.range.y, 0)), local, regs, fields);
+        regs = materialRunOps(pi, first, count, local, regs, fields);
+        if (seg == 0u) {
+            let outputs = materialPrograms.programs[pi].outputs;
+            let opacityRegister = materialPrograms.programs[pi].opacityCountPad.x;
+            let aux = materialPrograms.programs[pi].aux;
+            if (materialRegisterInRange(outputs.x)) {
+                result.baseColor = max(matGet(regs, outputs.x).xyz, vec3<f32>(0.0));
+            }
+            if (materialRegisterInRange(outputs.y)) {
+                result.metallic = saturate(matGet(regs, outputs.y).x);
+            }
+            if (materialRegisterInRange(outputs.z)) {
+                result.roughness = saturate(matGet(regs, outputs.z).x);
+            }
+            if (materialRegisterInRange(outputs.w)) {
+                result.emission = matGet(regs, outputs.w).xyz * materialPrograms.programs[pi].emissionIntensityPad.x;
+            }
+            if (materialRegisterInRange(opacityRegister)) {
+                result.opacity = saturate(matGet(regs, opacityRegister).x);
+            }
+            if (materialRegisterInRange(aux.x)) {
+                result.normal = matSafeNormalize(matGet(regs, aux.x).xyz, vec3<f32>(0.0, 0.0, 1.0));
+            }
+            if (materialRegisterInRange(aux.y)) {
+                result.occlusion = saturate(matGet(regs, aux.y).x);
+            }
+            if (materialRegisterInRange(aux.z)) {
+                result.height = matGet(regs, aux.z).x;
+            }
+            continue;
+        }
+        // ---- layer seg - 1 (ADR-036) ----
+        let layer = materialPrograms.programs[pi].layers[seg - 1u];
         var mask = 1.0;
         if (materialRegisterInRange(layer.aux.z)) {
             mask = saturate(matGet(regs, layer.aux.z).x);
