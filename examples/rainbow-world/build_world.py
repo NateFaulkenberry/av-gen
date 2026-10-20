@@ -45,7 +45,7 @@ ap.add_argument("--scale", type=float, default=180.0)
 ap.add_argument("--zamp", type=float, default=1.0)
 ap.add_argument("--turns", type=int, default=1)
 ap.add_argument("--chunks", type=int, default=48)
-ap.add_argument("--base-speed", type=float, default=30.0, help="the ride's base speed, m/s")
+ap.add_argument("--base-speed", type=float, default=36.0, help="the ride's base speed, m/s")
 ap.add_argument("--project", default=None, help="where to write the live project (default <out>/rainbow-world.json); "
                 "its scene path is written relative to it")
 a = ap.parse_args(rw.argv_after_dashes())
@@ -217,16 +217,38 @@ def ride_x(s):
 ARCH_S = [0.5 * (s0 + s1) for s0, s1, kind, side in plan if kind in ("top", "bottom") and s1 - s0 > 380.0]
 
 
+# ---- Rainbow World 2: the ride as a roller coaster (the owner, gate 2: "flying / racing around this contorted
+# distorted tracking, flipping through the air, diving back down ... not really stopping to take in the scenery").
+# No holds. The ride races low over the land and, at the music's big moments, launches: an airtime arc off the band
+# along its own up -- launch, airtime, dive back down -- some with a barrel roll at the apex, timed so the apex lands on
+# the moment (the drop's at 47.85 s). Speed falls a little through the airtime and rushes back on the dive. Still a
+# pure function of the timeline (seek equals play).
+HOPS = []   # (station of the apex, length m, height m, barrel rolls), filled below once the ride's timing is known
+BIG_CROSSINGS = set()   # the rim crossings a moment falls in: swung far out instead of hopped
+
+
+def _circ(d):
+    return abs(((d) + L / 2) % L - L / 2)
+
+
+def hop_at(s):
+    """(height, roll angle, airtime fraction 0..1) of the hops at band station s."""
+    h, roll, frac = 0.0, 0.0, 0.0
+    for sc, ln, hh, turns in HOPS:
+        d = ((s - sc) + L / 2) % L - L / 2
+        if abs(d) < ln / 2:
+            u = (d + ln / 2) / ln
+            f = math.sin(math.pi * u) ** 2
+            h = max(h, hh * f)
+            frac = max(frac, f)
+            roll += 2 * math.pi * turns * band.smoothstep(0.3, 0.7, u)
+    return h, roll, frac
+
+
 def cam_lift(s):
-    """Low and fast between landmarks -- 4.5-8 m, so the grass, flowers and stones beside the line give the
-    near-field parallax that sells 30 m/s -- rising to ~12 m over the 200 m before each arch (16 m showed so much of
-    the world at once that those frames were the GPU's p95, Stage 8), where the ride
-    slows and the view opens (the clip's resolution beat)."""
+    """Low and fast -- 4.5-7.5 m, so the grass, flowers and stones beside the line sell the speed -- plus the hops."""
     u = 0.5 + 0.5 * math.sin(2 * math.pi * s / band.per(380.0))
-    low = 4.5 + 3.5 * u * u
-    d = min([abs(((s - a_) + L / 2) % L - L / 2) for a_ in ARCH_S] + [1e9])
-    rise = 1.0 - band.smoothstep(40.0, 240.0, d)
-    return low + (12.0 - low) * rise
+    return 4.5 + 3.0 * u * u + hop_at(s)[0]
 
 
 def ride(s):
@@ -242,24 +264,117 @@ def ride(s):
     phi = math.pi * w if kind == "over" else math.pi * (1.0 - w)   # 0 = on top, pi = on the bottom
     p, t, u, sd = band.frame_lerp(fr, s % L)
     xr = side * RIM_X                                              # the rim in band coordinates
-    b_top = band.FACE + band.face_height(s % L, xr, band.TOP_HILLS, 0.0) + RIM_LIFT
-    b_bot = band.FACE + band.face_height(s % L, -xr, band.BOTTOM_HILLS, 1.3) + RIM_LIFT
+    big = s0 in BIG_CROSSINGS     # Rainbow World 2: a moment's crossing swings far out round the rim (airtime)
+    rim_a = 100.0 if big else RIM_A
+    lift_ = 42.0 if big else RIM_LIFT
+    b_top = band.FACE + band.face_height(s % L, xr, band.TOP_HILLS, 0.0) + lift_
+    b_bot = band.FACE + band.face_height(s % L, -xr, band.BOTTOM_HILLS, 1.3) + lift_
     c = math.cos(phi)
     b = b_top if c >= 0 else b_bot
-    X = xr + side * RIM_A * math.sin(phi)
+    X = xr + side * rim_a * math.sin(phi)
     Y = b * c
-    nrm = (sd * (side * math.sin(phi) / RIM_A) + u * (c / b)).normalized()
+    nrm = (sd * (side * math.sin(phi) / rim_a) + u * (c / b)).normalized()
     return p + sd * X + u * Y, nrm
 
 
 CAM_STEP = 15.0
 cam_s = np.arange(0.0, L, CAM_STEP)
+BASE = a.base_speed
+
+
+def speed_at(s_band):
+    """The ride's speed factor: a surge to 1.5x round every rim crossing, airtime a little slower, the rush after."""
+    w = 1.0
+    for s0, s1, kind_, side in plan:
+        if kind_ not in ("over", "back"):
+            continue
+        mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
+        w = max(w, 1.0 + 0.5 * (1.0 - band.smoothstep(half, half + 140.0, _circ(s_band - mid))))
+    return w * (1.12 - 0.34 * hop_at(s_band)[2])
+
+
+def ride_times():
+    pts = [np.array(ride(s_)[0]) for s_ in cam_s]
+    t_, out = 0.0, []
+    for k in range(len(cam_s)):
+        out.append(t_)
+        nxt = pts[(k + 1) % len(pts)]
+        t_ += float(np.linalg.norm(nxt - pts[k])) / (BASE * speed_at(cam_s[k]))
+    return np.array(out), t_
+
+
+def in_face(sc, ln):
+    """The whole hop, with 50 m either side, on one face (consecutive plan entries of one face are one stretch)."""
+    kind0 = seg_at(sc)[2]
+    return kind0 in ("top", "bottom") and all(seg_at(sc + d_)[2] == kind0
+                                               for d_ in np.arange(-ln / 2 - 30.0, ln / 2 + 30.1, 15.0))
+
+
+# The moments (14-stem-analysis.md): the drop at 47.85 s is the biggest launch with a roll; every 8-bar phrase start a
+# smaller one, alternate ones rolling; the end of the riser (194.6 s, the drums gone) a last big one.
+BAR = 1.983471
+MOMENTS = [(47.85, 360.0, 70.0, 1)] + [(0.2425 + BAR * 8 * k_, 220.0, 38.0, k_ % 2) for k_ in range(1, 12)
+                                      if abs(0.2425 + BAR * 8 * k_ - 47.85) > 6.0] + [(194.6, 340.0, 58.0, 1)]
+# one lap is the song: the base speed is set so a lap takes LAP seconds (Feline Footwear is 210.5 s), so the hops
+# land on their moments and the showcase never repeats a stretch of the ride
+LAP = 211.0
+
+
+def place():
+    times_, lap_ = ride_times()
+    placed, big = [], set()
+    for tm, ln, hh, turns in MOMENTS:
+        if tm >= lap_:
+            continue
+        sc = float(np.interp(tm, times_, cam_s))
+        s0_, s1_, kind_, side_ = seg_at(sc)
+        if kind_ in ("over", "back"):
+            big.add(s0_)          # a moment inside a crossing: that crossing becomes the launch
+            continue
+        if not in_face(sc, ln) or any(_circ(sc - p_[0]) < (ln + p_[1]) / 2 + 40 for p_ in placed):
+            continue
+        placed.append((sc, ln, hh, turns))
+    HOPS[:] = placed
+    BIG_CROSSINGS.clear()
+    BIG_CROSSINGS.update(big)
+
+
+for _it in range(4):            # the base speed first (one lap is the song), then the hops settle on their moments
+    place()
+    times, lap_t = ride_times()
+    BASE *= lap_t / LAP
+for _it in range(5):
+    place()
+times, lap_t = ride_times()
+print("HOPS", [(round(float(np.interp(h_[0], cam_s, times)), 2), round(h_[0]), h_[2], h_[3]) for h_ in HOPS],
+      "lap %.1f s" % lap_t)
+for tm, ln, hh, turns in MOMENTS:
+    sc = float(np.interp(tm, times, cam_s))
+    print("MOMENT %.2f s at %.0f m: %s, %s" % (tm, sc, seg_at(sc)[2], "hop" if any(abs(h_[0] - sc) < 1 for h_ in HOPS) else "-"))
+
 cam_pts, cam_ups = [], []
 for s in cam_s:
     p, n = ride(s)
+    _, roll_, _ = hop_at(s)
+    if roll_:
+        pa_, _ = ride(s + 1.0)
+        pb_, _ = ride(s - 1.0)
+        tg = (pa_ - pb_).normalized()
+        n = knot_path._rotate_about(np.array(n), np.array(tg), roll_)
+        n = Vector(n)
     cam_pts.append(np.array(p))
     cam_ups.append(np.array(n))
 cam_controls = np.array(cam_pts)
+# clearance: the ride against every other part of the band (stations more than 400 m away along the loop), so an
+# airtime arc or a big crossing never flies into another strand of the knot
+_ring_s = np.array([f_[0] for f_ in fr])
+_ring_p = np.array([np.array(f_[1]) for f_ in fr])
+_worst = 1e9
+for s_, p_ in zip(cam_s, cam_controls):
+    far = np.abs(((_ring_s - s_) + L / 2) % L - L / 2) > 400.0
+    d_ = np.linalg.norm(_ring_p[far] - p_, axis=1).min() - band.HALF_W
+    _worst = min(_worst, d_)
+print("CLEARANCE ride to other strands: %.0f m (band centre distance less its half width)" % _worst)
 cam_rolls, cam_path = knot_path.rolls_to_follow(cam_controls, cam_ups)
 nodes.append(cam_path.to_avgen_json("ride", rw.to_avgen))
 print("CAMERA path %.0f m, roll turns %d, plan %s" % (cam_path.length, cam_path.roll_turns,
@@ -684,35 +799,14 @@ params.update({"camera/splineUp": 1.0, "camera/lookAhead": 70.0, "post/lens/fish
 #   - both laps surge to 1.5x into and through every crossing (ramped over 140 m), so the swing round the rim is quick.
 # Two laps with different holds make the loop ~2 laps long before it repeats. A looping timeline maps time to splineT:
 # a pure function of the transport (seek equals play). Each lap ends with a step key back to 0 (closed spline: 1 == 0).
-def _circ(d):
-    return abs(((d) + L / 2) % L - L / 2)
-
-
-def speed_at(s_band, holds):
-    w = 1.0
-    for s0, s1, side in CROSSINGS:
-        mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
-        w = max(w, 1.0 + 0.5 * (1.0 - band.smoothstep(half, half + 140.0, _circ(s_band - mid))))
-    hold = 1.0
-    for h_ in holds:
-        hold = min(hold, 0.4 + 0.6 * band.smoothstep(8.0, 100.0, _circ(s_band - h_)))
-    return w * hold
-
-
-great_s = sorted({round(hs) for hs, xx, face in landmarks})
-holds_b = []
-for g_ in great_s:  # thin to one hold per ~600 m
-    if not holds_b or g_ - holds_b[-1] > 600.0:
-        holds_b.append(float(g_))
 cam_D = [cam_path.D[k * cam_path.per] for k in range(len(cam_s))] + [cam_path.length]
 ride_keys, t_acc = [], 0.0
-for lap, holds in enumerate((arch_s, holds_b)):
-    for k in range(len(cam_s)):
-        ride_keys.append({"time": round(t_acc, 4), "value": round(float(cam_D[k] / cam_path.length), 6), "interp": "linear"})
-        t_acc += (cam_D[k + 1] - cam_D[k]) / (a.base_speed * speed_at(cam_s[k], holds))
-    ride_keys.append({"time": round(t_acc - 1e-3, 4), "value": 1.0, "interp": "step"})
+for k in range(len(cam_s)):
+    ride_keys.append({"time": round(t_acc, 4), "value": round(float(cam_D[k] / cam_path.length), 6), "interp": "linear"})
+    t_acc += (cam_D[k + 1] - cam_D[k]) / (BASE * speed_at(cam_s[k]))
+ride_keys.append({"time": round(t_acc - 1e-3, 4), "value": 1.0, "interp": "step"})
 loop_seconds = round(t_acc, 4)
-print("RIDE base %.0f m/s, lap A+B %.1f s, holds A %d B %d" % (a.base_speed, loop_seconds, len(arch_s), len(holds_b)))
+print("RIDE base %.0f m/s, one lap %.1f s, %d hops" % (BASE, loop_seconds, len(HOPS)))
 
 # ---- the live project: the ride, five looks (CC 9 selects, CC 10 locks), MIDI and audio --------------------------------
 def op_path(program, kind, nth=0):
@@ -752,10 +846,30 @@ STATES = [
     ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
                    haze=H("#6AAAF0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
                    meadow0=H("#1E7A58"), meadow1=H("#30A852"), meadow2=H("#62C848"), meadow3=H("#98DA4E"), shade=H("#3A3AA0"))),
+    # Rainbow World 2 (19-brief-color-vfx section 4.1): three more directions, each its own hue relationship and none
+    # of them the cyan/magenta default; the meadow stays a meadow in every one (its ramp moves within the greens).
+    # Candy: pink and coral air, golden sun, a lime-yellow meadow, violet shade.
+    ("Candy", dict(zenith=H("#6A5CE0"), horizon=H("#FFB0D8"), ground=H("#FFE0F0"), sun=H("#FFE7A0"), bounce=H("#FF9FC8"),
+                   haze=H("#FFA6C8"), cloud0=H("#B07CE0"), cloud1=H("#FF9CC8"), cloud2=H("#FFD0A0"), cloud3=H("#FFF0D8"),
+                   meadow0=H("#3F9E3A"), meadow1=H("#7CC23A"), meadow2=H("#B8DA48"), meadow3=H("#E6EA6A"), shade=H("#8A4AA8"))),
+    # Electric: a deep indigo-to-violet sky, a magenta sun, an electric green meadow.
+    ("Electric", dict(zenith=H("#14106A"), horizon=H("#A030E0"), ground=H("#6A50C8"), sun=H("#FF8AF0"), bounce=H("#6A40FF"),
+                      haze=H("#7A3AE8"), cloud0=H("#2A1A7A"), cloud1=H("#6A3AC8"), cloud2=H("#E05ACF"), cloud3=H("#FFB0F0"),
+                      meadow0=H("#0E6A5A"), meadow1=H("#1A9A62"), meadow2=H("#3AC86A"), meadow3=H("#8AF07A"), shade=H("#3A1A9A"))),
+    # Spring: a clean cyan sky, white clouds, the brightest spring-green meadow, violet only in the shade.
+    ("Spring", dict(zenith=H("#1A78D8"), horizon=H("#9AF0FF"), ground=H("#D8F0FF"), sun=H("#FFFBE0"), bounce=H("#B8A0FF"),
+                    haze=H("#8AE0F0"), cloud0=H("#6A7AE8"), cloud1=H("#A8C0FF"), cloud2=H("#F0F8FF"), cloud3=H("#FFFFFF"),
+                    meadow0=H("#2A9A3A"), meadow1=H("#58C83A"), meadow2=H("#9AE84A"), meadow3=H("#D2F86A"), shade=H("#5A48C0"))),
 ]
 # the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
 # (Bright Noon keeps the floor program's own stops)
 FLOOR_NOON = [R(rw.hexlin(h)[:3]) for h in look.FLOOR_STOPS]
+# Rainbow World 2: the kick ring takes the look's own light (a colour per look, not a hue cycle)
+RING_BY_LOOK = {"Bright Noon": "#FFD87A", "Golden Hour": "#FF9A4A", "After the Storm": "#7FE6FF",
+                "Lavender Dusk": "#FF86D2", "Prism": "#C8FF7A", "Candy": "#FF7AC8", "Electric": "#C86AFF",
+                "Spring": "#9AFFC8"}
+for n_, c_ in STATES:
+    c_["ring"] = H(RING_BY_LOOK[n_])
 for k_, (n_, c_) in enumerate(STATES):
     # (the sky's ground colour stays pale: it is also the ambient from below, and a deep one turned every shaded face
     # navy -- tested at #2C56C4, #5C80D8 and #8AA6E6, Stage 6. The deep sky below is the cloud floor's troughs.)
@@ -784,9 +898,12 @@ for k, c in enumerate(("constant", "constant2", "constant3", "constant4")):
 # the ground program's shade constant (the first `constant` op after the cavity input)
 bindings.append({"role": "shade", "target": op_path("rw_ground", "constant", 1) + "constant"})
 bindings.append({"role": "shade", "target": op_path("rw_ground_lip", "constant", 1) + "constant"})
+for prog_, roles_ in look.FX.items():
+    if "kick_colour" in roles_:
+        bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
 palette = {"states": [{"name": n, "colors": c, "scalars": {}} for n, c in STATES], "bindings": bindings,
            "selector": {"select": 0, "transition": 8.0, "lock": False, "hold": 60.0,
-                        "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": [0, 1, 2, 3, 4],
+                        "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": list(range(len(STATES))),
                                     "change": {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"],
                                                "fast": 3.0, "slow": 24.0, "threshold": 0.06, "rearm": 0.03,
                                                "primaryTimeout": 30.0, "maxHold": 120.0}}}}
@@ -798,7 +915,8 @@ palette = {"states": [{"name": n, "colors": c, "scalars": {}} for n, c in STATES
 #   CC 5  haze        more distance haze (post/look/atmospheric +0.5)
 #   CC 6  light       brighter (camera/exposure/compensation +1.2 EV)
 #   CC 7  colour      more saturated (post/grade/saturation +0.5)
-#   CC 9  look        Bright Noon, Golden Hour, After the Storm, Lavender Dusk, Prism (palette/select 0-4)
+#   CC 9  look        Bright Noon, Golden Hour, After the Storm, Lavender Dusk, Prism, Candy, Electric, Spring
+#                     (palette/select 0-7)
 #   CC 10 look lock   hold the current look (palette/lock); unlocked, the look advances on phrase boundaries
 #                     (beat.phrasePulse) or a big change in the music, holding each at least 60 s
 # Audio (live input, no file): response.sustain and response.kick light the rainbows, response.level blooms the air,
@@ -808,7 +926,7 @@ control = {"midi": {"enabled": True, "filter": "*", "bindings": [
     {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": sig} for n, sig in CC]}}
 ctl = {"attackMs": 150, "decayMs": 150}
 routes = [{"source": "timeline.ride", "target": "camera/splineT", "amount": 1.0, "op": "replace", "polarity": "unipolar"},
-          {"source": "control.palette", "target": "palette/select", "amount": 4.0, "op": "add", "polarity": "unipolar", "chain": ctl},
+          {"source": "control.palette", "target": "palette/select", "amount": float(len(STATES) - 1), "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.paletteLock", "target": "palette/lock", "amount": 1.0, "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.lens", "target": "post/lens/fisheye", "amount": -1.0, "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.haze", "target": "post/look/atmospheric", "amount": 0.5, "op": "add", "polarity": "unipolar", "chain": ctl},

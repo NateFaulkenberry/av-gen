@@ -50,7 +50,8 @@ def op_target(program, roles, role, kind, field):
     return "material/%s/op/%d/%s/%s" % (program, roles[role], kind, field)
 
 
-MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0)]
+MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("surge", 0.0), ("scan", 0.0), ("one", 1.0)]
+SCAN_REST = 1610.0   # look.SCAN_REST
 RAINBOWS = ("rw_rainbow", "rw_rainbow2")
 
 
@@ -58,26 +59,16 @@ def routes(fx, swell_nodes, swell):
     """`fx`: look.FX (program -> role -> 1-based op index). `swell_nodes`: the nodes carrying the swell deformers.
     `swell`: look's SWELL list (its last field is metres at a full swell)."""
     out = []
-    ring_programs = [p for p in fx if "ring_in" in fx[p]]
+    scan_programs = [p for p in fx if "scan_mask" in fx[p]]
 
-    # ---- drums: the kick ring --------------------------------------------------------------------------------------
-    # radius from the beat clock (both edges of both clamps move together), so the front starts on the beat and runs
-    # outward; brightness from the drum stem's low band, so a beat with no kick draws nothing.
-    for prog in ring_programs:
-        roles = fx[prog]
-        for role, comp_bases in (("ring_in", (0, 1)), ("ring_out", (0, 1))):
-            for c in comp_bases:
-                out.append(route("beat.phase", op_target(prog, roles, role, "remap", "constant"), RING_REACH,
-                                 component=c))
-        # the front fades as it travels: x (1 -> 0.12) over the beat
-        out.append(route("beat.phase", op_target(prog, roles, "ring_colour", "constant", "constant"), 1.0,
-                         {"remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 1.0,
-                          "remapOutMax": 0.12}, op="multiply"))
-        gain = op_target(prog, roles, "ring_gain", "constant", "constant")
-        out += stem_route("drums", "bass", "response.kickEnv", gain, 1.1,
+    # ---- drums: the kick, locally (the owner at gate 2: no world sweep on every quarter note) ----------------------
+    # the grass round the camera pops its tips on each kick: the drum stem's low band, fast attack, short decay
+    if "kick_gain" in fx.get("rw_grass", {}):
+        out += stem_route("drums", "bass", "response.kickEnv",
+                          op_target("rw_grass", fx["rw_grass"], "kick_gain", "constant", "constant"), 2.2,
                           {"gain": 3.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                           "attackMs": 4.0, "decayMs": 160.0},
-                          fb_amount=1.1, fb_chain={"attackMs": 4.0, "decayMs": 120.0})
+                           "attackMs": 4.0, "decayMs": 140.0},
+                          fb_chain={"attackMs": 4.0, "decayMs": 110.0})
 
     # ---- drums: hat glints in the grass ----------------------------------------------------------------------------
     if "glint_gain" in fx.get("rw_grass", {}):
@@ -104,6 +95,18 @@ def routes(fx, swell_nodes, swell):
         for k, wave in enumerate(swell):
             out.append(route("macro.swell", "procedural/%s/deform/%d/amount" % (nm, k + 1), wave[-1]))
     out.append(route("macro.swell", "lights/cloudsea/intensity", 0.6))
+    # the bass as colour energy (19-brief-color-vfx: "bass energy increases the intensity of selected terrain
+    # colours"): the meadow's saturation and value rise with the bass body
+    for prog in [p_ for p_ in fx if "bass_sat" in fx[p_]]:
+        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_sat", "saturate", "value"), 0.75))
+        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_gain", "constant", "constant"), 0.22))
+    # shimmer across the flower fields: the synth's light, lifted on the hats
+    if "shimmer_gain" in fx.get("rw_flower", {}):
+        sh = op_target("rw_flower", fx["rw_flower"], "shimmer_gain", "constant", "constant")
+        out.append(route("macro.synth", sh, 1.6))
+        out += stem_route("drums", "treble", "response.hatEnv", sh, 1.2,
+                          {"offset": -0.35, "gain": 1.6, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                           "attackMs": 3.0, "decayMs": 160.0}, fb_chain={"attackMs": 3.0, "decayMs": 120.0})
 
     # ---- drums: the clap fronts on the arches ----------------------------------------------------------------------
     # both feet to the crown in one beat; bright only where the drum stem's 2-6 kHz band says a clap landed
@@ -144,13 +147,10 @@ def routes(fx, swell_nodes, swell):
     for prog in RAINBOWS:
         roles = fx.get(prog, {})
         if "arch_gain" in roles:
-            out.append(route("beat.phrasePulse", op_target(prog, roles, "arch_gain", "constant", "constant"), 2.0,
+            out.append(route("beat.phrasePulse", op_target(prog, roles, "arch_gain", "constant", "constant"), 4.0,
                              {"envelope": "linearfall", "envelopeFallPerSecond": 0.6, "attackMs": 30.0},
                              depthSource="macro.synth", depthMin=0.35, depthMax=1.0))
             out.append(route("macro.lift", op_target(prog, roles, "arch_gain", "constant", "constant"), 1.0))
-    for prog in ring_programs:
-        out.append(route("beat.phrasePulse", op_target(prog, fx[prog], "ring_gain", "constant", "constant"), 0.4,
-                         {"envelope": "linearfall", "envelopeFallPerSecond": 2.2}))
     # ---- lift: the synth's brightness over bars (its centroid; the 151-165 s rise, the riser at 183-190 s) lifts
     # the sun's glow, the bloom and the arches together, slowly
     # (gated by the synth's light: a silent stem's centroid is its noise floor's, and read high)
@@ -164,17 +164,59 @@ def routes(fx, swell_nodes, swell):
             r_.update(depthSource="macro.synth", depthMin=0.0, depthMax=1.0)
     out.append(route("macro.lift", "env/sky/sunGlow", 0.35))
     out.append(route("macro.lift", "post/bloom/intensity", 0.12))
-    # ---- the meadow wash: the synth's light reaching the land; a phrase and the drop flare it
-    for prog in ring_programs:
+    # ---- the drop: a world-scale impact, rare by construction --------------------------------------------------------
+    # `surge` is the synth's absolute loudness (rms) times how far its level stands above its own recent past (the
+    # level reads against an adaptive reference, ADR-1510, so a loud entry after a quiet stretch reads at the top for a
+    # few seconds): high only when a LOUD synth ARRIVES -- the drop at 47.85 s. The intro's calls are quiet (low rms),
+    # the groove's bed is not new (level mid-range). A phrase boundary with a surge behind it is the impact.
+    out += stem_route("synth", "rms", None, "macros/surge", 1.0,
+                      {"gain": 4.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0, "attackMs": 40.0,
+                       "decayMs": 5000.0})   # slow release: the scan's hold reads it as its depth for seconds
+    out[-1].update(depthSource="stem.synth.level", depthMin=-2.0, depthMax=1.0)
+    impact = {"envelope": "linearfall", "envelopeFallPerSecond": 0.25, "attackMs": 20.0}   # four seconds down
+    def hit(target, amount, component=-1):
+        out.append(route("beat.phrasePulse", target, amount, impact, component,
+                         depthSource="macro.surge", depthMin=0.0, depthMax=1.0))
+    for prog in RAINBOWS:
+        if "arch_gain" in fx.get(prog, {}):
+            hit(op_target(prog, fx[prog], "arch_gain", "constant", "constant"), 14.0)
+            hit(op_target(prog, fx[prog], "flow_gain", "constant", "constant"), 10.0)
+    # ---- the world scan: the drop's showpiece (and the synth's biggest lifts), rainbow over everything it passes ---
+    # The front's radius R: pulled in to the eye on every phrase pulse and let run out (1600 m in 5.5 s); invisible
+    # unless `macro.scan` -- held about six seconds, then relaxing over three -- says this phrase deserves it, which
+    # the surge (the drop) does, and a big lift (the synth at its brightest) does a little.
+    rest = SCAN_REST - 10.0
+    front = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / 5.5}
+    for prog in scan_programs:
         roles = fx[prog]
-        if "wash_gain" not in roles:
+        for role in ("scan_mask", "scan_hue", "scan_edge_out", "scan_edge_in"):
+            for c in (0, 1):
+                out.append(route("beat.phrasePulse", op_target(prog, roles, role, "remap", "constant"), -rest, front,
+                                 component=c))
+        out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))
+        hit(op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0)
+    hold = {"envelope": "peakhold", "envelopeHoldMs": 6000.0, "envelopeFallPerSecond": 0.33, "attackMs": 300.0}
+    out.append(route("beat.phrasePulse", "macros/scan", 1.0, hold, depthSource="macro.surge", depthMin=0.0,
+                     depthMax=1.0))
+    out.append(route("beat.phrasePulse", "macros/scan", 0.8, hold, depthSource="macro.lift", depthMin=-0.6,
+                     depthMax=1.4))
+    # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) and the
+    # clouds -- crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth)
+    spectrum4 = [(0.90, 0.14, 0.05), (0.95, 0.80, 0.05), (0.10, 0.75, 0.30), (0.25, 0.30, 1.00)]
+    pastel4 = [tuple(0.55 * c + 0.45 for c in col) for col in spectrum4]
+    for prog, role, cols in [(p_, "canopy_ramp", spectrum4) for p_ in fx if "canopy_ramp" in fx[p_]] + \
+                            [("rw_cloud", "cloud_ramp", pastel4)]:
+        if role not in fx.get(prog, {}):
             continue
-        wash = op_target(prog, roles, "wash_gain", "constant", "constant")
-        out.append(route("macro.synth", wash, 0.12))
-        out.append(route("macro.lift", wash, 0.1))
-        out.append(route("beat.phrasePulse", wash, 0.3, {"envelope": "linearfall", "envelopeFallPerSecond": 0.5,
-                                                         "attackMs": 60.0},
-                         depthSource="macro.synth", depthMin=0.2, depthMax=1.0))
+        for k, field in enumerate(("constant", "constant2", "constant3", "constant4")):
+            for c in range(3):
+                out.append(route("macro.one", op_target(prog, fx[prog], role, "oklabRamp", field), cols[k][c],
+                                 component=c, op="replace", depthSource="macro.scan", depthMin=0.0, depthMax=1.0))
+    if "cloud_glow" in fx.get("rw_cloud", {}):
+        hit(op_target("rw_cloud", fx["rw_cloud"], "cloud_glow", "constant", "constant"), 0.6)
+    hit("env/sky/sunGlow", 1.2)
+    hit("post/bloom/intensity", 0.35)
+    hit("post/grade/saturation", 0.25)
     if "cloud_glow" in fx.get("rw_cloud", {}):
         out.append(route("macro.synth", op_target("rw_cloud", fx["rw_cloud"], "cloud_glow", "constant", "constant"),
                          0.3))
