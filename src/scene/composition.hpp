@@ -289,6 +289,10 @@ struct CompositionNode {
     std::string parent;            // name of the parent node ("" = root); world = parent world x local
     Transform transform;           // local transform of the instance
     bool visible = true;
+    // ADR-1547: a node's meshes can stay out of the shadow maps (`"castsShadow": false`), the gltf twin of
+    // ADR-1545's procedural key. For a thing made of light -- a rainbow, a glow card -- whose asset is a mesh but
+    // which must not throw a solid shadow. Only ever clears an entity's own flag; written only when false.
+    bool castsShadow = true;
     // Locked out of the pointer, the way a locked layer is in an image editor. It still renders and
     // still belongs to the scene -- it simply stops answering clicks and box selections, so the
     // ground plane a world is built on stops being what you select every time you aim at something

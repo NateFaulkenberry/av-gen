@@ -8609,6 +8609,9 @@ void Composition::applyParameters() {
             Entity& e = scene_.entities[range.firstEntity + k];
             e.transform = compose(full, range.restTransforms[k]);
             e.visible = visible && (child == nullptr || child->entities[k].visible);
+            if (!node.castsShadow) {
+                e.castsShadow = false; // ADR-1547: only ever clears; the node flag is not a parameter
+            }
             // ADR-903: the boost is the entity's emission lane, applied by the shader after any
             // material program -- not a multiplier on `emissiveIntensity`, which a program that
             // asserts emission discards (ADR-179). A nested scene's entity keeps its own node's
@@ -10602,6 +10605,9 @@ nlohmann::json Composition::toJson() const {
         }
         
         n["visible"] = node.visible;
+        if (!node.castsShadow) {
+            n["castsShadow"] = false; // ADR-1547: written only when off
+        }
         // Only when locked: an additive key that no existing scene carries, so a file written by
         // this build and read by an older one loses a working preference and nothing else, and a
         // file that was never locked round-trips byte for byte.
@@ -12088,6 +12094,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
             auto locked = readBool(item, "locked", false);
+            auto castsShadow = readBool(item, "castsShadow", true); // ADR-1547
             // ADR-1097: optional; absent = inferred.
             if (item.contains("importance")) {
                 Importance importance = Importance::Normal;
@@ -12183,6 +12190,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             check(rotation);
             check(scale);
             check(visible);
+            check(castsShadow);
             check(emissive);
             check(roughness);
             if (fieldError != nullptr) {
@@ -12192,6 +12200,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             node.transform.rotation = quatFromEulerDegrees(*rotation);
             node.transform.scale = *scale;
             node.visible = *visible;
+            node.castsShadow = *castsShadow;
             node.locked = *locked;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
