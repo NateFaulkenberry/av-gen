@@ -11,13 +11,13 @@ from mathutils import Vector
 import rw_common as rw
 
 LOOK = {
-    "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.42, "atmosDist": 3200.0, "atmosTint": rw.hexlin("#8FB4E8")[:3],
-    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.2,
+    "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.3, "atmosDist": 3200.0, "atmosTint": rw.hexlin("#5FA2E6")[:3],
+    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.08,
     "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#B4B2DC")[:3],
     "meadow": [rw.hexlin("#2A6E2E")[:3], rw.hexlin("#4E9A2C")[:3], rw.hexlin("#6FB038")[:3], rw.hexlin("#9AC23A")[:3]],
     "shade": rw.hexlin("#155A5C")[:3],
-    "cloud": [rw.hexlin("#5660B4")[:3], rw.hexlin("#9CA2DC")[:3], rw.hexlin("#FFE2B8")[:3], rw.hexlin("#FFF2DE")[:3]],
-    "cloudBounce": rw.hexlin("#F4B49A")[:3], "cloudGain": 0.9,
+    "cloud": [rw.hexlin("#4A50AC")[:3], rw.hexlin("#8A8ED6")[:3], rw.hexlin("#F4CFA4")[:3], rw.hexlin("#FFEAD0")[:3]],
+    "cloudBounce": rw.hexlin("#8478CC")[:3], "cloudGain": 0.88,
     "rainbowStrength": 2.0,
 }
 
@@ -172,13 +172,20 @@ def cloud_program():
                 {"kind": "noise", "dst": 2, "srcA": 7, "value": 0.018, "seed": 4},
                 {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.3, 0.7, -0.18, 0.18], "value": 1.0},
                 {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
+                # a second, broad billow octave (~150 m): a mass seen close and sunlit still breaks into lobes
+                # with shaded clefts instead of reading as one flat cream shape
+                {"kind": "noise", "dst": 2, "srcA": 7, "value": 0.0065, "seed": 11},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.3, 0.7, -0.3, 0.12], "value": 1.0},
+                {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
                 {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 0.0, 1.0], "value": 1.0},
                 {"kind": "power", "dst": 1, "srcA": 1, "value": 0.85},
+                # only the most sun-facing lobes reach the top stop: a near, sunlit mass keeps a gradient
+                {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 0.0, 0.86], "value": 1.0},
                 {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "constant": R([v * g for v in c[0]]) + [1.0],
                  "constant2": R([v * g for v in c[1]]) + [1.0], "constant3": R([v * g for v in c[2]]) + [1.0],
                  "constant4": R([v * g for v in c[3]]) + [1.0]},
                 {"kind": "gradient", "dst": 2, "srcA": 0, "constant": [0.0, -1.0, 0.0, 0.0], "value": 1.0},
-                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.2, 1.0, 0.0, 0.55], "value": 1.0},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.1, 1.0, 0.0, 0.7], "value": 1.0},
                 {"kind": "constant", "dst": 5, "constant": R([v * g for v in LOOK["cloudBounce"]]) + [1.0]},
                 {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 2},
                 {"kind": "fresnel", "dst": 4, "value": 3.0},
@@ -190,7 +197,7 @@ def cloud_program():
                 {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4}]}
 
 
-FLOOR_STOPS = ("#24287C", "#545CB2", "#D6B08C", "#F2DEC2")  # deeper than the clouds, so the heads on it read
+FLOOR_STOPS = ("#1A3AA8", "#4A78CE", "#DCBE9A", "#F4E2C8")  # deeper than the clouds, so the heads on it read
 
 
 def cloud_floor_program(base_y, top_h=650.0):
@@ -289,7 +296,7 @@ def environment(sun_avgen, bounce_dir_avgen):
         "contactShadows": False, "depthPrepass": True, "fogColor": R(LOOK["horizon"]), "volumeDensity": 0.0,
         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": R(LOOK["zenith"]),
                 "horizonColor": R(LOOK["horizon"]), "groundColor": R(LOOK["ground"]), "haze": LOOK["haze"],
-                "sunIntensity": 6.0, "intensity": 1.0}}, [
+                "sunIntensity": 6.0, "sunGlow": 0.32, "intensity": 1.0}}, [
         {"name": "sun", "type": "directional", "direction": R(-Vector(sun_avgen).normalized()), "color": R(LOOK["sunColor"]),
          "intensity": LOOK["sun"], "castsShadow": True, "contactShadow": False, "shadowBias": 0.25},
         {"name": "cloudsea", "type": "directional", "direction": R(Vector(bounce_dir_avgen).normalized()),
@@ -301,4 +308,5 @@ def post_parameters():
             "post/grade/contrast": LOOK["contrast"], "post/tonemap/chroma-retention": LOOK["chroma"],
             "post/look/atmospheric": LOOK["atmos"], "post/look/atmosphericDistance": LOOK["atmosDist"],
             "post/look/atmosphericTint": R(LOOK["atmosTint"]),
+            "post/grade/lift": [-0.006, -0.006, -0.004],
             "post/bloom/intensity": 0.18, "post/bloom/threshold": 1.2, "post/output/antialias": 0.8}

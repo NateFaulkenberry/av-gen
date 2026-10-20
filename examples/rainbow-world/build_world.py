@@ -212,11 +212,19 @@ def ride_x(s):
     return x + (target - x) * best_w
 
 
+# the arches stand at the middle of every long stretch on a face (placed below); the ride's holds are there
+ARCH_S = [0.5 * (s0 + s1) for s0, s1, kind, side in plan if kind in ("top", "bottom") and s1 - s0 > 380.0]
+
+
 def cam_lift(s):
-    # swoops: low skims (6 m) and lifts to 17 m, so the fast ride dives at the meadow and rises over it; never so low
-    # that the grass under a 30 m/s camera strobes
-    u = 0.5 + 0.5 * math.sin(2 * math.pi * s / band.per(520.0))
-    return 6.0 + 11.0 * u * u
+    """Low and fast between landmarks -- 4.5-8 m, so the grass, flowers and stones beside the line give the
+    near-field parallax that sells 30 m/s -- rising to ~16 m over the 200 m before each arch, where the ride
+    slows and the view opens (the clip's resolution beat)."""
+    u = 0.5 + 0.5 * math.sin(2 * math.pi * s / band.per(380.0))
+    low = 4.5 + 3.5 * u * u
+    d = min([abs(((s - a_) + L / 2) % L - L / 2) for a_ in ARCH_S] + [1e9])
+    rise = 1.0 - band.smoothstep(40.0, 240.0, d)
+    return low + (16.0 - low) * rise
 
 
 def ride(s):
@@ -419,6 +427,35 @@ for k, s0 in enumerate(np.arange(60.0, L, 170.0)):
             aa = rng.uniform(0, 2 * math.pi)
             drift(s0 + 9 * math.cos(aa), xc + 9 * math.sin(aa), kind, rng.randint(40, 80), 2.5)
 
+# streakers: the near field of a fast ride. Every 13-26 m on the fast stretches something stands 5-16 m off the
+# ride line -- a tight flower clump, a stone, now and then a Blossom Puff or a Ridge Pine further out -- so at 30 m/s
+# the frame's edges change every few frames (the coordinator's Stage 5 note: speed must read in the near field)
+ss_ = 30.0
+n_streak = 0
+while ss_ < L:
+    kind = ride_face(ss_)
+    calm = min([abs(((ss_ - a_) + L / 2) % L - L / 2) for a_ in ARCH_S] + [1e9]) < 110.0
+    if kind in ("top", "bottom") and not calm and not near_crossing(ss_, None, 40.0):
+        side = rng.choice((-1.0, 1.0))
+        r = rng.random()
+        if r < 0.5:
+            xx = ride_x(ss_) + side * rng.uniform(5.0, 11.0)
+            if abs(xx) < 0.8 * band.HALF_W:
+                drift(ss_, xx, kind, rng.randint(18, 34), rng.uniform(1.2, 2.2))
+                n_streak += 1
+        elif r < 0.78:
+            xx = ride_x(ss_) + side * rng.uniform(6.0, 12.0)
+            if abs(xx) < 0.8 * band.HALF_W:
+                outcrop(ss_, xx, kind, rng.uniform(1.2, 2.6))
+                n_streak += 1
+        else:
+            xx = ride_x(ss_) + side * rng.uniform(15.0, 22.0)
+            if abs(xx) < 0.78 * band.HALF_W and path_clear(ss_, xx, kind, 14.0):
+                plant(rng.choice(("blossom", "pine")), ss_, xx, kind, rng.uniform(0.4, 0.6))
+                n_streak += 1
+    ss_ += rng.uniform(13.0, 26.0)
+print("STREAKERS", n_streak)
+
 # foreground bands: drifts close beside the ride, every ~120 m, on the face the ride is on
 for s0 in np.arange(0.0, L, 120.0):
     kind = ride_face(s0)
@@ -432,7 +469,8 @@ for f, pts in fam.items():
     if not pts:
         continue
     asset, prog = TREE_ASSETS[f]
-    # the leaf cards (alpha-tested, the depth prepass's dearest geometry) stop at 110 m; beyond it the canopy core,
+    # the leaf cards (alpha-tested, the depth prepass's dearest geometry) thin with distance (ADR-1548: whole cards removed,
+    # the rest grown, 35% at 40 m and 12% at 85 m) and stop at 150 m; beyond it the canopy core,
     # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps
     nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
                              lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0}))
@@ -441,7 +479,8 @@ for f, pts in fam.items():
     nodes.append(node_points("%s_leaves" % f, "%s_leaves.glb" % asset, pts,
                              {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
                               "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
-                             lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 110.0}))
+                             lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 150.0, "count": 3,
+                                  "byScreenSize": False, "distance1": 40.0, "distance2": 85.0, "thinning": True}))
 for k in range(0, len(outcrops), 60000):
     nodes.append(node_points("outcrops%d" % k, "rock_namaqualand_boulder_03.glb", outcrops[k:k + 60000],
                              {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
@@ -484,8 +523,15 @@ for s0, s1, side in CROSSINGS:
             i_ = max(0, min(band.NS, int(round((sj % L) / L * band.NS))))
             pos = pos + t_ * ((sj % L) - i_ * L / band.NS)
             sc = rng.uniform(0.7, 1.15)
-            gpts.append(point(pos - nrm * 0.05, nrm.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)),
-                              (sc, sc, sc * rng.uniform(0.9, 1.3))))
+            if abs(y) > band.FACE - 12.0 and rng.random() < 0.6:
+                # trailers: under each lip the turf hangs -- long tufts pointing down the cliff (away from that
+                # face's ground), so from outside the rim reads as a planted curtain, not a smooth fold
+                hang = (-u_ * (1.0 if y > 0 else -1.0) + nrm * 0.35).normalized()
+                gpts.append(point(pos - nrm * 0.05, hang.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)),
+                                  (sc * 1.2, sc * 1.2, sc * rng.uniform(2.2, 3.4))))
+            else:
+                gpts.append(point(pos - nrm * 0.05, nrm.to_track_quat("Z", "Y") @ Quaternion((0, 0, 1), rng.uniform(0, 6.283)),
+                                  (sc, sc, sc * rng.uniform(0.9, 1.3))))
             n_hang += 1
             if abs(y) > band.FACE - 9.0 and rng.random() < 0.55:
                 up_ = (nrm + u_ * (1.0 if y > 0 else -1.0) * 0.6).normalized()
@@ -508,7 +554,7 @@ def far_from_crossing(s, margin=320.0):
 
 # one arch at the middle of every long stretch on a face: the ride passes under it in each sequence's calm, and it is
 # always as far as it can be from a rim crossing
-arch_s = [0.5 * (s0 + s1) for s0, s1, kind, side in plan if kind in ("top", "bottom") and s1 - s0 > 380.0]
+arch_s = list(ARCH_S)
 for k, sa_ in enumerate(arch_s):
     face = ride_face(sa_)
     if face not in ("top", "bottom"):
@@ -521,7 +567,7 @@ for k, sa_ in enumerate(arch_s):
         m = Matrix((-sda, ta, -ua)).transposed()
         pos = pa - ua * (band.FACE - 6.0)
     eul = (rw.Q_ZUP_TO_YUP @ m.to_quaternion() @ rw.Q_ZUP_TO_YUP.inverted()).to_euler("XYZ")
-    rainbow_nodes.append({"name": "rainbow_%d" % k, "kind": "gltf", "asset": "rainbow_arch.glb", "position": av(pos),
+    rainbow_nodes.append({"name": "rainbow_%d" % k, "kind": "gltf", "asset": "rainbow_arch.glb", "position": av(pos), "castsShadow": False,
                           "rotation": [round(math.degrees(v), 3) for v in eul]})
 nodes += rainbow_nodes
 print("RAINBOWS", len(rainbow_nodes))
@@ -605,7 +651,7 @@ def speed_at(s_band, holds):
         w = max(w, 1.0 + 0.5 * (1.0 - band.smoothstep(half, half + 140.0, _circ(s_band - mid))))
     hold = 1.0
     for h_ in holds:
-        hold = min(hold, 0.3 + 0.7 * band.smoothstep(25.0, 170.0, _circ(s_band - h_)))
+        hold = min(hold, 0.4 + 0.6 * band.smoothstep(8.0, 100.0, _circ(s_band - h_)))
     return w * hold
 
 
@@ -647,27 +693,32 @@ STATES = [
                          meadow0=R(L0["meadow"][0]), meadow1=R(L0["meadow"][1]), meadow2=R(L0["meadow"][2]), meadow3=R(L0["meadow"][3]),
                          shade=R(L0["shade"]))),
     ("Golden Hour", dict(zenith=H("#1E3E9E"), horizon=H("#F0A464"), ground=H("#E8B08A"), sun=H("#FFB067"), bounce=H("#F09A70"),
-                         haze=H("#E8B48C"), cloud0=H("#6A4E8E"), cloud1=H("#C08A9C"), cloud2=H("#FFB07A"), cloud3=H("#FFD3A2"),
+                         haze=H("#E89A64"), cloud0=H("#6A4E8E"), cloud1=H("#C08A9C"), cloud2=H("#FFB07A"), cloud3=H("#FFD3A2"),
                          meadow0=H("#2E5E22"), meadow1=H("#5E8E26"), meadow2=H("#9AB43A"), meadow3=H("#D4C24A"), shade=H("#2A4A5C"))),
     ("After the Storm", dict(zenith=H("#0B2A8E"), horizon=H("#6FB6D8"), ground=H("#8E98B8"), sun=H("#FFF0D0"), bounce=H("#9FB0C8"),
-                             haze=H("#9FB8D8"), cloud0=H("#3A4068"), cloud1=H("#6E7698"), cloud2=H("#E6DED2"), cloud3=H("#F4EEE4"),
+                             haze=H("#6E9CD8"), cloud0=H("#3A4068"), cloud1=H("#6E7698"), cloud2=H("#E6DED2"), cloud3=H("#F4EEE4"),
                              meadow0=H("#1E5E2A"), meadow1=H("#3E8E2A"), meadow2=H("#62B03A"), meadow3=H("#8ED04A"), shade=H("#10485A"))),
     ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#D8A8C8"), sun=H("#FFC0A0"), bounce=H("#D896B8"),
-                           haze=H("#B898D8"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
+                           haze=H("#9A72D0"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
                            meadow0=H("#24503E"), meadow1=H("#3E7A4A"), meadow2=H("#6E9E5A"), meadow3=H("#A6BE6A"), shade=H("#2A3A6A"))),
     ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
-                   haze=H("#A8C8F0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
+                   haze=H("#6AAAF0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
                    meadow0=H("#1E7A6A"), meadow1=H("#3EA85A"), meadow2=H("#9AD040"), meadow3=H("#E8D040"), shade=H("#3A3AA0"))),
 ]
 # the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
 # (Bright Noon keeps the floor program's own stops)
 FLOOR_NOON = [R(rw.hexlin(h)[:3]) for h in look.FLOOR_STOPS]
 for k_, (n_, c_) in enumerate(STATES):
+    # (the sky's ground colour stays pale: it is also the ambient from below, and a deep one turned every shaded face
+    # navy -- tested at #2C56C4, #5C80D8 and #8AA6E6, Stage 6. The deep sky below is the cloud floor's troughs.)
     if k_ == 0:
         fl = FLOOR_NOON
     else:
         c0, c1, c2, c3 = (np.array(c_["cloud%d" % i]) for i in range(4))
-        fl = [list(np.round(c0 * 0.55, 4)), list(np.round(0.6 * c0 + 0.4 * c1, 4)), list(np.round(c2 * 0.92, 4)), list(c3)]
+        z_, h_ = np.array(c_["zenith"]), np.array(c_["horizon"])
+        # troughs are the sky showing between the heads; flanks shade toward the look's cloud shadow
+        fl = [list(np.round(0.9 * z_ + 0.1 * h_, 4)), list(np.round(0.5 * z_ + 0.25 * h_ + 0.25 * c0, 4)),
+              list(np.round(c2 * 0.92, 4)), list(c3)]
     for i in range(4):
         c_["floor%d" % i] = [float(v) for v in fl[i]]
 cloud_ramp = op_path("rw_cloud", "oklabRamp")
