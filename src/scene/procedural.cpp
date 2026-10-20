@@ -1891,7 +1891,7 @@ bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
 }
 
 Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize,
-                             const glm::vec3& sourceScale) {
+                             const glm::vec3& sourceScale, bool lockBorder) {
     // An imported mesh has no generator parameters to halve, so its levels are simplifications of
     // whatever the budget already left.
     //
@@ -1922,12 +1922,22 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
         if (!base) {
             return base;
         }
-        auto chain = assets::buildLodChain(*base, assets::vegetationLodSettings());
+        assets::LodChainSettings settings = assets::vegetationLodSettings();
+        if (lockBorder) {
+            // ADR-1546: the sloppy simplifier and the clustering below both ignore topology, so
+            // neither can hold a border; with the border locked, a stalled level stays the source.
+            settings.lockBorder = true;
+            settings.sloppyFallback = 0.0f;
+        }
+        auto chain = assets::buildLodChain(*base, settings);
         if (chain && static_cast<std::size_t>(level) < chain->levels.size()) {
             MeshData out = std::move(chain->levels[static_cast<std::size_t>(level)].mesh);
             if (!out.indices.empty() && out.valid()) {
                 return out;
             }
+        }
+        if (lockBorder) {
+            return base;
         }
         // A mesh the simplifier refuses is still better served by the old clustering than by the
         // source at every distance.
@@ -2247,7 +2257,10 @@ std::uint64_t Distribution::structuralHash() const {
 
 std::uint64_t LodSettings::structuralHash() const {
     StructHash h;
-    h.i32(lodCount); // the only structural field: it decides how many LOD meshes are generated
+    h.i32(lodCount); // structural: it decides how many LOD meshes are generated
+    if (lockBorder) { // ADR-1546: it decides what they are; hashed only when set, so every existing hash is unchanged
+        h.i32(1546);
+    }
     return h.value();
 }
 
@@ -3161,6 +3174,9 @@ json ProceduralGeometry::toJson() const {
         s2["spread"] = lod.lodSpread;
         s2["hysteresis"] = lod.lodHysteresis;
         s2["impostorSize"] = lod.impostorSize;
+        if (lod.lockBorder) {
+            s2["lockBorder"] = true; // ADR-1546: written only when set
+        }
         j["lod"] = std::move(s2);
     }
     if (motion.windSensitivity > 0.0f) { // ADR-1292: written only when the object answers the wind
@@ -3551,7 +3567,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         static constexpr std::string_view kLodKeys[] = {
             "cull",        "maxDistance", "minScreenRadius", "count",     "distance1",
             "distance2",   "distance3",   "byScreenSize",    "spread",    "hysteresis",
-            "impostorSize"};
+            "impostorSize", "lockBorder"};
         for (const auto& entry : j.items()) {
             const std::string& key = entry.key();
             if (std::find(std::begin(kLodKeys), std::end(kLodKeys), key) == std::end(kLodKeys)) {
@@ -3570,6 +3586,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(l.lodSpread, "spread", readFloat);
         AVGEN_PROC_READ(l.lodHysteresis, "hysteresis", readFloat);
         AVGEN_PROC_READ(l.impostorSize, "impostorSize", readFloat);
+        AVGEN_PROC_READ(l.lockBorder, "lockBorder", readBool); // ADR-1546
     }
     if (root.contains("material")) {
         const json& j = root.at("material");
