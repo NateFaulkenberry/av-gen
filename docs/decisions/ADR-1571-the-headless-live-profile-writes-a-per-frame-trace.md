@@ -31,3 +31,12 @@ visibleInstances,compiles,compiledMaterials`
 
 - Frame-by-frame comparison of two runs of the same window separates content cost (the same in both) from contention
   or clock effects (uncorrelated), which is how Rainbow World's spikes were diagnosed (rainbow-world/14).
+
+## Addendum: the sonic trace's columns
+
+`avgen --sonic-trace` (the offline signal dump `tools/check_response_range.py` reads) also writes the `stem.*`,
+`beat.*` and `env.*` columns. Events are cleared at the end of `Engine::update`, so an event is traced through an
+envelope source triggered by it (`env.<name>`). This let Rainbow World's stem analysis compare the engine's stem
+events with the grid (rainbow-world/14 §5). Code: `src/app/sonic_trace_cli.cpp`; test:
+`tests/integration/test_sonic_trace_stems.cpp` (`[adr1571]`). Existing readers select columns by name, so the wider
+file changes nothing for them.
