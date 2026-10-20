@@ -111,11 +111,11 @@ def routes(fx, swell_nodes, swell):
         roles = fx.get(prog, {})
         if "front_gain" not in roles:
             continue
-        for role, amt in (("front_l_in", 0.5), ("front_l_out", 0.5), ("front_r_in", -0.5), ("front_r_out", -0.5)):
+        for role, amt in (("front_l_in", 0.4), ("front_l_out", 0.4), ("front_r_in", -0.4), ("front_r_out", -0.4)):
             for c in (0, 1):
                 out.append(route("beat.phase", op_target(prog, roles, role, "remap", "constant"), amt, component=c))
         out += stem_route("drums", "highMid", "response.snareEnv",
-                          op_target(prog, roles, "front_gain", "constant", "constant"), 5.0,
+                          op_target(prog, roles, "front_gain", "constant", "constant"), 10.0,
                           {"offset": -1.55, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                            "attackMs": 4.0, "decayMs": 280.0}, fb_chain={"attackMs": 4.0, "decayMs": 220.0})
         # ---- synth: the arches' flow and brightness ----------------------------------------------------------------
@@ -142,7 +142,7 @@ def routes(fx, swell_nodes, swell):
                              depthSource="macro.synth", depthMin=0.35, depthMax=1.0))
             out.append(route("macro.lift", op_target(prog, roles, "arch_gain", "constant", "constant"), 1.0))
     for prog in ring_programs:
-        out.append(route("beat.phrasePulse", op_target(prog, fx[prog], "ring_gain", "constant", "constant"), 1.0,
+        out.append(route("beat.phrasePulse", op_target(prog, fx[prog], "ring_gain", "constant", "constant"), 0.4,
                          {"envelope": "linearfall", "envelopeFallPerSecond": 2.2}))
     # ---- lift: the synth's brightness over bars (its centroid; the 151-165 s rise, the riser at 183-190 s) lifts
     # the sun's glow, the bloom and the arches together, slowly
@@ -159,9 +159,9 @@ def routes(fx, swell_nodes, swell):
         if "wash_gain" not in roles:
             continue
         wash = op_target(prog, roles, "wash_gain", "constant", "constant")
-        out.append(route("macro.synth", wash, 0.35))
-        out.append(route("macro.lift", wash, 0.25))
-        out.append(route("beat.phrasePulse", wash, 0.9, {"envelope": "linearfall", "envelopeFallPerSecond": 0.5,
+        out.append(route("macro.synth", wash, 0.12))
+        out.append(route("macro.lift", wash, 0.1))
+        out.append(route("beat.phrasePulse", wash, 0.3, {"envelope": "linearfall", "envelopeFallPerSecond": 0.5,
                                                          "attackMs": 60.0},
                          depthSource="macro.synth", depthMin=0.2, depthMax=1.0))
     if "cloud_glow" in fx.get("rw_cloud", {}):

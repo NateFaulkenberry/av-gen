@@ -130,6 +130,23 @@ sky, not only the arches.
 
 **Live:** `response.sustain` drives the synth control.
 
+## 4.4 The meadow wash (synth, phrase, drop)
+
+Slow bands of the bow's own colours (blue, green, orange, red-orange: a cyclic OKLab ramp) drift across the meadow and
+the grass in world space, about 47 m apart, along world X: the arches' light reaching the land.
+
+- **Gain:** `macro.synth` x 0.35, plus `macro.lift` x 0.25, plus a phrase flare of 0.9 that falls over 2 s. The flare's
+  depth is the synth, so phrases before the drop flare less.
+- **At rest it is 0:** with no music the meadow is as built.
+- **Why it exists:** the drop at 47.85 s comes as the ride leaves an arch hold (41.6-50.4 s) and the camera faces
+  open meadow. A world-scale moment cannot depend on an arch being in view.
+
+## 4.5 Trees and rocks
+
+The kick ring is also on the canopies (`rw_canopy`, `rw_weeper`, `rw_blossom`, `rw_pine`, cores and leaf cards) and
+the stones (`rw_rock`): the ring's light passes through the trees and over the outcrops as it crosses them. They heave
+with the swell, because they carry the same deformer as the ground under them.
+
 ## 5. The hierarchy (brief section 7.3)
 
 | Tier | What | How often | Share of the frame lit |
@@ -137,8 +154,8 @@ sky, not only the arches.
 | Background | the swell, the arch flow, the cloud light | always, following the bass and synth | the whole world, gently |
 | Rhythm | kick ring; glints | each beat; each hat | under 15%; specks |
 | Accent | the clap fronts | beats 2 and 4 | the arches only |
-| Phrase | (prototype 2) every 4 bars | 7.9 s | |
-| World-scale | (prototype 2) the drop at 47.85 s; the riser at 183-190 s | twice in the track | |
+| Phrase | the arches flare, the ring brightens, the meadow wash flares; all scaled by the synth | every 4 bars (7.9 s) | the arches and soft bands on the land |
+| World-scale | the drop at 47.85 s (phrase pulse + the synth's entry read against its adaptive reference); the riser at 183-190 s (`lift`: sun glow, bloom, arches, wash) | twice in the track | the whole world, colour not white |
 
 No full-frame flash anywhere. The Stage 7 kick-to-bloom route is removed. The sky's exposure never moves on a hit.
 
@@ -156,7 +173,25 @@ No full-frame flash anywhere. The Stage 7 kick-to-bloom route is removed. The sk
   - No route assumes knowledge of the future: the ring is phase-locked to the tracker's beat, as a live tracker
     predicts it.
 
-## 7. Prototype 2 and on (planned)
+## 7. The effect timeline (Feline Footwear)
+
+| Time (s) | Bars | Stems | Feature | Effect | Intensity, duration | Scope | With |
+|---|---|---|---|---|---|---|---|
+| 0.24-8.2 | 1-4 | drums | kick body on the beat; treble | kick rings, glints | ring 1.1, one beat; glints 110 ms | land, trees, rocks; grass | a calm world: no swell, no synth light |
+| 8.2 | 5 | bass | level, onsets | the swell starts | up to 1.9 m, 60 ms / 0.5 s | the whole land | rings ride on the heaving ground |
+| 20.1, 28, 31-32, 35-36, 39.6, 44-45 | 11-24 | synth | onset (the falling calls), level | each call: the arches, clouds and wash swell, falling over 0.7 s | synth macro +0.3 | arches, clouds, meadow | |
+| 28.0 on | 15 | drums | 2-6 kHz on beats 2 and 4 | clap fronts up every arch | gain up to 5, 280 ms | arches | alternates with beats 1 and 3: ring alone |
+| 39.9 | 21 | bass | the progression starts | the swell's pattern changes with the bass's | | land | |
+| **47.85** | **25** | **all** | **phrase pulse + synth level jumps against its reference** | **arches +2 (falling over 1.7 s) and the synth's +1.2; wash flare 0.9; ring +1** | **the track's largest** | **arches, meadow, clouds, ring** | the bass pattern changes; the camera leaves the arch hold into open meadow, so the meadow wash carries it |
+| every 7.93 | 1 + 4k | all | phrase pulse | phrase flare | x synth | arches, meadow | |
+| 101.4, 109.3 | 52, 56 | drums | fills: no kick, no clap | the ring and fronts skip | | | a hush the swell carries over |
+| 111.3 on | 57 | drums | 16th hats | glints denser and finer | | grass | |
+| 151-165 | 77-84 | synth | centroid rising to its peak (160.9 s) | `lift`: sun glow, bloom, arches, wash rise slowly | lift 0-1, 1.5 s / 3 s | sky and world | |
+| 172-182 | 88-92 | synth | centroid falls | the lift falls back | | | the bass returns to the pedal |
+| **182.7** | **93** | drums stop, synth riser | no drum energy; centroid and treble rise | **rings, fronts and glints stop**; the lift rises through the riser | | | the swell continues on the bass pedal until 193.5 s |
+| 194.6-210.5 | 99-106 | synth alone | level, falling from 200 s | the arches' flow, clouds and wash fade with the synth | | | the last thing glowing is the arches |
+
+## 8. Further ideas (not built)
 
 - **Phrase pulses** (`beat.phrasePulse`, bars 1 + 4k): a stronger, wider ring in the arches' colours, and an arch
   flare.

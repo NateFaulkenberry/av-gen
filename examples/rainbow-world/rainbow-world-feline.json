@@ -5573,7 +5573,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/25/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5581,7 +5581,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/25/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5589,7 +5589,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/26/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5597,7 +5597,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/26/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5605,7 +5605,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/28/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5613,7 +5613,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/28/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5621,7 +5621,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/29/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5629,7 +5629,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow/op/29/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5637,7 +5637,7 @@
   {
    "source": "stem.drums.highMid",
    "target": "material/rw_rainbow/op/32/constant/constant",
-   "amount": 5.0,
+   "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5655,7 +5655,7 @@
   {
    "source": "response.snareEnv",
    "target": "material/rw_rainbow/op/32/constant/constant",
-   "amount": 5.0,
+   "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5687,7 +5687,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/25/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5695,7 +5695,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/25/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5703,7 +5703,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/26/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5711,7 +5711,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/26/remap/constant",
-   "amount": 0.5,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5719,7 +5719,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/28/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5727,7 +5727,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/28/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5735,7 +5735,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/29/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -5743,7 +5743,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_rainbow2/op/29/remap/constant",
-   "amount": -0.5,
+   "amount": -0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -5751,7 +5751,7 @@
   {
    "source": "stem.drums.highMid",
    "target": "material/rw_rainbow2/op/32/constant/constant",
-   "amount": 5.0,
+   "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5769,7 +5769,7 @@
   {
    "source": "response.snareEnv",
    "target": "material/rw_rainbow2/op/32/constant/constant",
-   "amount": 5.0,
+   "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5902,7 +5902,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/31/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5914,7 +5914,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/31/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5926,7 +5926,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/15/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5938,7 +5938,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_canopy/op/11/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5950,7 +5950,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/19/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5962,7 +5962,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_weeper/op/11/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5974,7 +5974,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_blossom/op/11/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -5986,7 +5986,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_pine/op/11/constant/constant",
-   "amount": 1.0,
+   "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6053,7 +6053,7 @@
   {
    "source": "macro.synth",
    "target": "material/rw_ground/op/44/constant/constant",
-   "amount": 0.35,
+   "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -6061,7 +6061,7 @@
   {
    "source": "macro.lift",
    "target": "material/rw_ground/op/44/constant/constant",
-   "amount": 0.25,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -6069,7 +6069,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/44/constant/constant",
-   "amount": 0.9,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6085,7 +6085,7 @@
   {
    "source": "macro.synth",
    "target": "material/rw_ground_lip/op/44/constant/constant",
-   "amount": 0.35,
+   "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -6093,7 +6093,7 @@
   {
    "source": "macro.lift",
    "target": "material/rw_ground_lip/op/44/constant/constant",
-   "amount": 0.25,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -6101,7 +6101,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/44/constant/constant",
-   "amount": 0.9,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -6117,7 +6117,7 @@
   {
    "source": "macro.synth",
    "target": "material/rw_grass/op/38/constant/constant",
-   "amount": 0.35,
+   "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -6125,7 +6125,7 @@
   {
    "source": "macro.lift",
    "target": "material/rw_grass/op/38/constant/constant",
-   "amount": 0.25,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -6133,7 +6133,7 @@
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/38/constant/constant",
-   "amount": 0.9,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,

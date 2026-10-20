@@ -58,7 +58,7 @@ def ring_ops(out, a, b, c):
     ]
 
 
-WASH = {"wavelength": 140.0, "speed": 0.09}            # the meadow's light wash: metres per colour cycle, cycles/s
+WASH = {"wavelength": 160.0, "speed": 0.07}            # the meadow's light wash: metres per colour cycle, cycles/s
 
 
 def wash_ops(out, pos, a, b, c):
@@ -78,8 +78,8 @@ def wash_ops(out, pos, a, b, c):
         {"kind": "oklabRamp", "dst": b, "srcA": a, "value": -1.0, "constant": stops[0], "constant2": stops[1],
          "constant3": stops[2], "constant4": stops[3]},
         {"kind": "palette", "dst": a, "srcA": a, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.0],
-         "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [3.0, 3.0, 3.0, 0.0], "constant4": [0.0, 0.0, 0.0, 0.0]},
-        {"kind": "power", "dst": a, "srcA": a, "value": 4.0},
+         "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [1.0, 1.0, 1.0, 0.0], "constant4": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "power", "dst": a, "srcA": a, "value": 6.0},
         {"kind": "multiply", "dst": b, "srcA": b, "srcB": a},
         {"kind": "constant", "dst": c, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "wash_gain"},
         {"kind": "multiply", "dst": b, "srcA": b, "srcB": c},
@@ -395,11 +395,11 @@ def rainbow_program(name, reverse=False, alpha_peak=0.66, strength=2.0, bands=5.
         {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "flow_gain"},
         {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
         # the backbeat fronts: left foot (v = 0) up to the crown, right foot (v = 1) down to it; a sharp lead, a tail
-        {"kind": "remap", "dst": 6, "srcA": 4, "constant": [-0.08, 0.0, 0.0, 1.0], "value": 1.0, "_role": "front_l_in"},
-        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.015, 0.0, 0.0, 1.0], "value": 1.0, "_role": "front_l_out"},
+        {"kind": "remap", "dst": 6, "srcA": 4, "constant": [-0.05, 0.1, 0.0, 1.0], "value": 1.0, "_role": "front_l_in"},
+        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.12, 0.1, 0.0, 1.0], "value": 1.0, "_role": "front_l_out"},
         {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
-        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.985, 1.0, 0.0, 1.0], "value": 1.0, "_role": "front_r_in"},
-        {"kind": "remap", "dst": 1, "srcA": 4, "constant": [1.08, 1.0, 0.0, 1.0], "value": 1.0, "_role": "front_r_out"},
+        {"kind": "remap", "dst": 7, "srcA": 4, "constant": [0.88, 0.9, 0.0, 1.0], "value": 1.0, "_role": "front_r_in"},
+        {"kind": "remap", "dst": 1, "srcA": 4, "constant": [1.05, 0.9, 0.0, 1.0], "value": 1.0, "_role": "front_r_out"},
         {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 1},
         {"kind": "add", "dst": 6, "srcA": 6, "srcB": 7},
         {"kind": "constant", "dst": 7, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "front_gain"},

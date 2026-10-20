@@ -18,6 +18,36 @@ travelled with a fisheye camera whose gravity turns with the land. Branch `art/r
 | [10-stage6-report.md](10-stage6-report.md) | Stage 6: speed you can feel (streakers, low and fast), cloud form, deeper sky, less haze, ADR-1547 (rainbow shadows), ADR-1548 (leaf thinning), cost |
 | [11-stage7-report.md](11-stage7-report.md) | Stage 7: build.py, the committed live project and Worlds index entry, Blender against AV Gen, seek equals play, the three tracks, CC 9 under audio |
 | [12-final-report.md](12-final-report.md) | Stage 8 and the final report: what a fresh clone shows, optimisation, the final review, ADR 1540-1548, limitations |
+| [13-brief-stem-reactivity.md](13-brief-stem-reactivity.md) | Rainbow World 2: the owner's brief for stem-driven reactivity, world FX and the slow frames (verbatim) |
+| [14-stem-analysis.md](14-stem-analysis.md) | Feline Footwear's three stems analysed: files, grid, what each stem plays, the event map, the engine's features |
+| [15-research.md](15-research.md) | The research dossier for the reactive pass |
+| [16-effect-mapping.md](16-effect-mapping.md) | The effect mapping: three layers, each stem's effects, the hierarchy, determinism and live |
+| [17-slow-frames.md](17-slow-frames.md) | The slow frames: diagnosis (not compiles, not contention), the leaf-card fix, what the effects cost |
+| [18-final-report.md](18-final-report.md) | Rainbow World 2's final report: deliverables, profiles, limitations |
+
+## Playing it (Rainbow World 2)
+
+- **Build the scene first:** `python3 examples/rainbow-world/build.py` (Blender 5.x, about 90 s; `--scene-only` after
+  the first full build). It writes `examples/rainbow-world/scene/` (gitignored) and both projects.
+- **Live:** open Examples > Live > Rainbow World (`rainbow-world.json`), play any music into the live input.
+  - On a plain stereo input the world follows the main mix (`response.*`, the beat clock).
+  - With a multichannel interface, map channels in the Live panel's Inputs table to sources keyed `drums`, `bass`
+    and `synth`. The stem routes switch on and the main-mix fallbacks stand aside (ADR-1570). Unmapped stems keep
+    their fallback.
+- **Offline, the Feline Footwear showcase:** `rainbow-world-feline.json` plays `assets/audio/feline-footwear.wav` and
+  analyses the three stems in `assets/audio/stems/` (the owner's files, gitignored). Open it in the app, or render:
+
+  ```
+  build/release/src/avgen --project examples/rainbow-world/rainbow-world-feline.json \
+      --render "$PWD/renders/rainbow-world-feline.mp4" --fps 30 --codec h264      # --range 38:58 for a part
+  ```
+
+  Without the stem files it still plays, on the fallbacks; each missing file is a project warning.
+- **Other music offline:** the live project with `--audio <file>` (or the editor's audio) runs on the fallbacks.
+- **Re-run the analysis:** `python3 docs/prototypes/rainbow-world/scripts/stem_analysis.py build/rw2/stems`, and
+  `avgen --project <project with the stems> --sonic-trace out.csv` for the engine's own stem, beat and envelope
+  columns (ADR-1571).
+- **MIDI:** unchanged (CC 1 glow, 2 lens, 5 haze, 6 light, 7 colour, 9 look, 10 look lock).
 
 The owner's references (`~/Desktop/rainbow world/`) are not committed, because their source and licence are unknown.
 The review media is in `~/Desktop/av-gen-review/74-rainbow-world/`, and scratch is in `build/rw/`.
