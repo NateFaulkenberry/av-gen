@@ -55,6 +55,11 @@ struct SonicSetup {
     std::filesystem::path notesPath;      // as resolved; empty = no notes
     std::vector<TimbreFeatures> timbre;   // parallel to the analysis track's frames; empty until analysed
     std::uint64_t trackFrames = 0;        // the frame count `timbre` was computed for
+    // ADR-1580: with the project's feeds set, the response model's input per analysis frame (parallel to `timbre`):
+    // the mix's causal onsets with the routed parts replaced by their sources', folded onto the mix's hops. Empty with
+    // no feeds (the model reads `timbre[i].causal`, as it always has). Built by the engine; `feedKey` hashes it.
+    std::vector<analysis::ResponseFeed> feed;
+    std::uint64_t feedKey = 0;
     double timbreMillis = 0.0;            // what the pass cost (the performance report)
     nlohmann::json document;              // the project's `sonic` block as loaded (saved back as is)
     bool live = false;                    // `"live": true`: made to be played (ADR-1025); the live editor enables
@@ -146,7 +151,9 @@ public:
     [[nodiscard]] const SonicSignals& ids() const { return ids_; }
 
     // One analysis step (exposed for tests): the features of one frame, dt seconds after the previous one.
-    void step(const SonicSetup& setup, const TimbreFeatures& features, double dt);
+    // `feed` (ADR-1580), when given, is what the response model reads instead of `features.causal`.
+    void step(const SonicSetup& setup, const TimbreFeatures& features, double dt,
+              const analysis::ResponseFeed* feed = nullptr);
 
 private:
     SonicSignals ids_;

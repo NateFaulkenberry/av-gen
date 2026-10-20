@@ -111,6 +111,7 @@ std::uint64_t SonicSetup::key() const {
     std::uint64_t h = std::hash<std::string>{}(document.dump());
     h ^= trackFrames + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= notes.notes.size() + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= feedKey + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); // ADR-1580: 0 with no feeds
     return h;
 }
 
@@ -213,7 +214,7 @@ void SonicRuntime::reset() {
     restoreResponseIds(responseIds);
 }
 
-void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double dt) {
+void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double dt, const analysis::ResponseFeed* feed) {
     const CharacterSpec& spec = setup.character;
     latest_ = f;
     const float loud = std::max(f.loudnessDb, -120.0f);
@@ -287,7 +288,11 @@ void SonicRuntime::step(const SonicSetup& setup, const TimbreFeatures& f, double
     }
     primed_ = true;
 
-    response_.step(f, dt, controls_, setup.response); // ADR-1062
+    if (feed != nullptr) {
+        response_.step(f, *feed, dt, controls_, setup.response); // ADR-1580: the project's feeds
+    } else {
+        response_.step(f, dt, controls_, setup.response); // ADR-1062
+    }
 
     // The fast tier: a transient event on the rising edge, with a refractory time and hysteresis.
     sinceTransient_ += dt;
@@ -322,7 +327,7 @@ void SonicRuntime::advance(const SonicSetup& setup, const analysis::AnalysisTrac
     }
     const double hop = static_cast<double>(track.config().hopSize) / static_cast<double>(track.config().sampleRate);
     while (cursor_ < frames.size() && frames[cursor_].timeSeconds <= seconds) {
-        step(setup, setup.timbre[cursor_], hop);
+        step(setup, setup.timbre[cursor_], hop, setup.feed.size() == frames.size() ? &setup.feed[cursor_] : nullptr);
         ++cursor_;
     }
     lastSeconds_ = seconds;

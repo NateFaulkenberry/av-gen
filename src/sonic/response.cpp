@@ -1,5 +1,6 @@
 #include "sonic/response.hpp"
 
+#include "analysis/response_feed.hpp"
 #include "sonic/notes.hpp"
 #include "sonic/timbre.hpp"
 
@@ -194,7 +195,13 @@ void ResponseModel::declare(signals::SignalBus& bus) {
 }
 
 void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseControls& c, const ResponseSettings& s) {
-    const analysis::CausalOnsets& o = f.causal;
+    step(f, analysis::ResponseFeed::fromCausal(f.causal), dt, c, s);
+}
+
+void ResponseModel::step(const TimbreFeatures& f, const analysis::ResponseFeed& o, double dt, const ResponseControls& c,
+                         const ResponseSettings& s) {
+    // ADR-1580: the hits and levels come from `o`, the mix's causal onsets unless the project's feeds route a part of
+    // them to a source; the melodic activity below stays on the mix's timbre.
     const float hitS = hitSensitivity(c);
     const float levelS = levelSensitivity(c);
     const double att = std::clamp(static_cast<double>(c.attack), 0.25, 4.0);
@@ -208,7 +215,7 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     const float minStrength = std::max(0.0f, 0.5f - hitS) * 1.2f;
     for (std::size_t i = 0; i < kAudioHits.size(); ++i) {
         const auto k = static_cast<std::size_t>(kAudioHits[i]);
-        float strength = hitS > 0.0f && o.valid && o.hit[k] ? o.strength[k] : 0.0f;
+        float strength = hitS > 0.0f && o.hit[k] ? o.strength[k] : 0.0f;
         if (strength < minStrength) {
             strength = 0.0f;
         }
@@ -292,7 +299,7 @@ void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseContr
     follow(sustain_, sustainN * (1.0f - clamp01(percussive_ * 2.5f)), dt, s.sustainAttack * att,
            s.sustainRelease * rel);
     // Change: the broadband ratio over its own background, 0.5..6.5 -> 0..1.
-    const float fluxN = curve(clamp01((o.ratio[static_cast<std::size_t>(analysis::HitClass::Onset)] - 0.5f) / 6.0f),
+    const float fluxN = curve(clamp01((o.onsetRatio - 0.5f) / 6.0f),
                               levelS) * presence(levelS);
     follow(flux_, fluxN, dt, s.fluxAttack * att, s.fluxRelease * rel);
     // Melodic activity from the audio: confident pitch moves of half a semitone or more, weighted by size (7 = 1).
