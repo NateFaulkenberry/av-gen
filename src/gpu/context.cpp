@@ -3,7 +3,10 @@
 #include "core/log.hpp"
 #include "gpu/surface.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cstdlib>
+#include <string>
 #include <cstring>
 #include <vector>
 
@@ -175,6 +178,29 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
     }
     wgpu::DeviceDescriptor deviceDesc{};
     deviceDesc.label = desc.label.c_str();
+    // AVGEN_DAWN_TOGGLES=a,b,...: Dawn device toggles to enable, for investigation only (e.g. dump_shaders, which
+    // logs the MSL each pipeline compiles at debug level). Unset, the device is created exactly as before.
+    std::vector<std::string> toggleNames;
+    std::vector<const char*> toggles;
+    wgpu::DawnTogglesDescriptor togglesDesc{};
+    if (const char* env = std::getenv("AVGEN_DAWN_TOGGLES"); env != nullptr && env[0] != '\0') {
+        std::string list = env;
+        std::size_t start = 0;
+        while (start <= list.size()) {
+            const std::size_t comma = std::min(list.find(',', start), list.size());
+            if (comma > start) {
+                toggleNames.push_back(list.substr(start, comma - start));
+            }
+            start = comma + 1;
+        }
+        for (const std::string& t : toggleNames) {
+            toggles.push_back(t.c_str());
+        }
+        togglesDesc.enabledToggleCount = toggles.size();
+        togglesDesc.enabledToggles = toggles.data();
+        deviceDesc.nextInChain = &togglesDesc;
+        log::info("Dawn toggles enabled from AVGEN_DAWN_TOGGLES: {}", list);
+    }
     deviceDesc.requiredFeatureCount = features.size();
     deviceDesc.requiredFeatures = features.data();
     deviceDesc.requiredLimits = &adapterLimits;

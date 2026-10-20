@@ -68,6 +68,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1530-1539 | eng/remove-ksh-detect (remove the Live panel's legacy kick/snare/hat detection display) |
 | 1540-1549 | art/rainbow-world (Rainbow World: the painterly rainbow knot world, fisheye journey) |
 | 1550-1559 | coordinator fixes (2026-10-19: audio-device courtesy) |
+| 1560-1569 | eng/perf-reliability (cold shader-compile launch, Rainbow World p95 and spikes, the water-cascade GPU flake) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -829,3 +830,4 @@ confirm the citation you are about to change is your own.
 | [1547](ADR-1547-a-gltf-node-can-stay-out-of-the-shadow-maps.md) | A gltf node can stay out of the shadow maps (`"castsShadow": false` on a scene file's gltf node; the twin of ADR-1545; clears its entities' flag each frame, written only when off): Rainbow World's glTF rainbow arches threw solid shadows. art/rainbow-world | Accepted |
 | [1548](ADR-1548-a-procedural-nodes-leaf-cards-thin-instead-of-collapsing.md) | A procedural node's leaf cards thin instead of collapsing (`"thinning": true` in the lod block: ADR-351's shell thinning for mesh sources, shells' borders held so the simplifier refuses and thinning takes the level; hashed and written only when set): Rainbow World's leaf cards 53.5 to 43.1 ms at the worst frame, canopy intact. art/rainbow-world | Accepted |
 | [1550](ADR-1550-never-resize-an-audio-device-another-app-is-running.md) | AV Gen never resizes an audio device another app is running (capture and playback keep the device's current buffer size when it is in use elsewhere); real-device tests are opt-in (`AVGEN_AUDIO_DEVICE_TESTS=1`). | Accepted |
+| [1560](ADR-1560-avgen-keeps-its-own-metal-shader-cache.md) | avgen keeps its own Metal shader cache (a bundle identifier, `com.avgen.avgen`), so a cold launch is reproducible by clearing it and a test run cannot evict it; `AVGEN_PIPELINE_TIMING=1` logs each pipeline's creation time, `AVGEN_DAWN_TOGGLES` enables Dawn toggles (dump_shaders). eng/perf-reliability | Accepted |
