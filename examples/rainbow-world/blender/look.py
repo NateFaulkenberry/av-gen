@@ -12,7 +12,7 @@ import rw_common as rw
 
 LOOK = {
     "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.3, "atmosDist": 3200.0, "atmosTint": rw.hexlin("#5FA2E6")[:3],
-    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.08,
+    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.12,
     "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#B4B2DC")[:3],
     "meadow": [rw.hexlin("#2A6E2E")[:3], rw.hexlin("#4E9A2C")[:3], rw.hexlin("#6FB038")[:3], rw.hexlin("#9AC23A")[:3]],
     "shade": rw.hexlin("#155A5C")[:3],
@@ -466,7 +466,7 @@ def environment(sun_avgen, bounce_dir_avgen):
         "contactShadows": False, "depthPrepass": True, "fogColor": R(LOOK["horizon"]), "volumeDensity": 0.0,
         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": R(LOOK["zenith"]),
                 "horizonColor": R(LOOK["horizon"]), "groundColor": R(LOOK["ground"]), "haze": LOOK["haze"],
-                "sunIntensity": 6.0, "sunGlow": 0.32, "intensity": 1.0}}, [
+                "sunIntensity": 6.0, "sunGlow": 0.55, "intensity": 1.0}}, [
         {"name": "sun", "type": "directional", "direction": R(-Vector(sun_avgen).normalized()), "color": R(LOOK["sunColor"]),
          "intensity": LOOK["sun"], "castsShadow": True, "contactShadow": False, "shadowBias": 0.25},
         {"name": "cloudsea", "type": "directional", "direction": R(Vector(bounce_dir_avgen).normalized()),

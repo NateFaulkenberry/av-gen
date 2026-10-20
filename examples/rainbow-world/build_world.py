@@ -846,24 +846,27 @@ STATES = [
                              meadow0=H("#1E5E2A"), meadow1=H("#3E8E2A"), meadow2=H("#62B03A"), meadow3=H("#8ED04A"), shade=H("#10485A"))),
     ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#9C90CC"), sun=H("#FFB4C4"), bounce=H("#8A78D2"),
                            haze=H("#8C70D4"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
-                           meadow0=H("#16703E"), meadow1=H("#2A9A48"), meadow2=H("#5CBC4C"), meadow3=H("#9AD858"), shade=H("#262C92"))),
+                           meadow0=H("#1C5E66"), meadow1=H("#357E86"), meadow2=H("#7AA0BE"), meadow3=H("#C4B4EC"), shade=H("#262C92"))),
     ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
                    haze=H("#6AAAF0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
-                   meadow0=H("#1E7A58"), meadow1=H("#30A852"), meadow2=H("#62C848"), meadow3=H("#98DA4E"), shade=H("#3A3AA0"))),
-    # Rainbow World 2 (19-brief-color-vfx section 4.1): three more directions, each its own hue relationship and none
-    # of them the cyan/magenta default; the meadow stays a meadow in every one (its ramp moves within the greens).
-    # Candy: pink and coral air, golden sun, a lime-yellow meadow, violet shade.
-    ("Candy", dict(zenith=H("#6A5CE0"), horizon=H("#FFB0D8"), ground=H("#FFE0F0"), sun=H("#FFE7A0"), bounce=H("#FF9FC8"),
-                   haze=H("#FFA6C8"), cloud0=H("#B07CE0"), cloud1=H("#FF9CC8"), cloud2=H("#FFD0A0"), cloud3=H("#FFF0D8"),
-                   meadow0=H("#3A9A3A"), meadow1=H("#6CBC3A"), meadow2=H("#9ED44A"), meadow3=H("#CFE868"), shade=H("#8A4AA8"))),
-    # Electric: a deep indigo-to-violet sky, a magenta sun, an electric green meadow.
-    ("Electric", dict(zenith=H("#14106A"), horizon=H("#A030E0"), ground=H("#6A50C8"), sun=H("#FF8AF0"), bounce=H("#6A40FF"),
-                      haze=H("#7A3AE8"), cloud0=H("#2A1A7A"), cloud1=H("#6A3AC8"), cloud2=H("#E05ACF"), cloud3=H("#FFB0F0"),
-                      meadow0=H("#127A4A"), meadow1=H("#1EA855"), meadow2=H("#46D068"), meadow3=H("#9AF080"), shade=H("#3A1A9A"))),
-    # Spring: a clean cyan sky, white clouds, the brightest spring-green meadow, violet only in the shade.
-    ("Spring", dict(zenith=H("#1A78D8"), horizon=H("#9AF0FF"), ground=H("#D8F0FF"), sun=H("#FFFBE0"), bounce=H("#B8A0FF"),
-                    haze=H("#8AE0F0"), cloud0=H("#6A7AE8"), cloud1=H("#A8C0FF"), cloud2=H("#F0F8FF"), cloud3=H("#FFFFFF"),
-                    meadow0=H("#2A9A3A"), meadow1=H("#58C83A"), meadow2=H("#9AE84A"), meadow3=H("#D2F86A"), shade=H("#5A48C0"))),
+                   meadow0=H("#0E7A5E"), meadow1=H("#1EB07E"), meadow2=H("#5ADCA6"), meadow3=H("#C8F4A8"), shade=H("#3A3AA0"))),
+    # Rainbow World 2 (19-brief-color-vfx section 4.1, and the coordinator at gate 3: "each non-default look should
+    # transform the whole frame"): three bold directions, each its own hue relationship, none collapsing into
+    # cyan/magenta. The meadow is still read as land by its value ramp (dark troughs, light crests), not its hue.
+    # Candy: a pink-coral meadow with violet shade under a gold sky; lilac and cream clouds.
+    ("Candy", dict(zenith=H("#E08A3C"), horizon=H("#FFE2A0"), ground=H("#FFD8E8"), sun=H("#FFF2C8"), bounce=H("#FF8CC0"),
+                   haze=H("#FFB898"), cloud0=H("#B07CD8"), cloud1=H("#FFA8D0"), cloud2=H("#FFDCC0"), cloud3=H("#FFF6EA"),
+                   meadow0=H("#B23C78"), meadow1=H("#E86A8C"), meadow2=H("#FF9C8A"), meadow3=H("#FFD2A0"), shade=H("#6A34A8"))),
+    # Electric: a deep blue-violet world -- an indigo meadow with cyan crests, a near-black violet zenith, a magenta sun
+    # and cyan bounce light, magenta-lit clouds.
+    ("Electric", dict(zenith=H("#0A0630"), horizon=H("#6A1CC8"), ground=H("#3A2A8C"), sun=H("#FF5ADC"), bounce=H("#00C8FF"),
+                      haze=H("#5A22D0"), cloud0=H("#24105C"), cloud1=H("#5A28A8"), cloud2=H("#D040C8"), cloud3=H("#FF90EE"),
+                      meadow0=H("#1C1A6E"), meadow1=H("#2E3AAE"), meadow2=H("#3E78E8"), meadow3=H("#6EE8FF"), shade=H("#38086A"))),
+    # Spring: the brightest morning -- a clean cyan sky, white clouds, a fresh yellow-green meadow, violet only in the
+    # shade.
+    ("Spring", dict(zenith=H("#2A8CF0"), horizon=H("#B8F8FF"), ground=H("#E0F6FF"), sun=H("#FFFBE0"), bounce=H("#C0A8FF"),
+                    haze=H("#9AE8F8"), cloud0=H("#7A8CF0"), cloud1=H("#B8CCFF"), cloud2=H("#F4FAFF"), cloud3=H("#FFFFFF"),
+                    meadow0=H("#2EA048"), meadow1=H("#6CD040"), meadow2=H("#B8F060"), meadow3=H("#F0FF9A"), shade=H("#5A48C0"))),
 ]
 # the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
 # (Bright Noon keeps the floor program's own stops)
@@ -872,8 +875,16 @@ FLOOR_NOON = [R(rw.hexlin(h)[:3]) for h in look.FLOOR_STOPS]
 RING_BY_LOOK = {"Bright Noon": "#FFD87A", "Golden Hour": "#FF9A4A", "After the Storm": "#7FE6FF",
                 "Lavender Dusk": "#FF86D2", "Prism": "#C8FF7A", "Candy": "#FF7AC8", "Electric": "#C86AFF",
                 "Spring": "#9AFFC8"}
+# and the trees' and stones' tints (multiplied into their ramps, so each tree keeps its own colours under them)
+TINTS = {"Bright Noon": ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)), "Golden Hour": ((1.15, 1.0, 0.72), (1.2, 0.95, 0.78)),
+         "After the Storm": ((0.9, 1.05, 1.1), (0.85, 0.95, 1.1)), "Lavender Dusk": ((1.0, 0.82, 1.25), (1.1, 0.88, 1.3)),
+         "Prism": ((1.1, 1.0, 1.15), (1.05, 0.95, 1.2)), "Candy": ((1.7, 0.75, 1.15), (1.35, 0.9, 1.05)),
+         "Electric": ((0.55, 0.7, 1.8), (0.8, 0.55, 1.6)), "Spring": ((1.0, 1.18, 0.85), (1.0, 1.05, 0.95))}
+RING_BY_LOOK.update({"Candy": "#FFE070", "Electric": "#00FFE0"})
 for n_, c_ in STATES:
     c_["ring"] = H(RING_BY_LOOK[n_])
+    c_["foliage"] = list(TINTS[n_][0])
+    c_["stone"] = list(TINTS[n_][1])
 for k_, (n_, c_) in enumerate(STATES):
     # (the sky's ground colour stays pale: it is also the ambient from below, and a deep one turned every shaded face
     # navy -- tested at #2C56C4, #5C80D8 and #8AA6E6, Stage 6. The deep sky below is the cloud floor's troughs.)
@@ -902,7 +913,13 @@ for k, c in enumerate(("constant", "constant2", "constant3", "constant4")):
 # the ground program's shade constant (the first `constant` op after the cavity input)
 bindings.append({"role": "shade", "target": op_path("rw_ground", "constant", 1) + "constant"})
 bindings.append({"role": "shade", "target": op_path("rw_ground_lip", "constant", 1) + "constant"})
+for f_ in ("constant", "constant2", "constant3", "constant4"):
+    bindings.append({"role": "stone", "mode": "multiply", "target": op_path("rw_rock", "oklabRamp") + f_})
 for prog_, roles_ in look.FX.items():
+    if "canopy_ramp" in roles_:
+        for f_ in ("constant", "constant2", "constant3", "constant4"):
+            bindings.append({"role": "foliage", "mode": "multiply",
+                             "target": "material/%s/op/%d/oklabRamp/%s" % (prog_, roles_["canopy_ramp"], f_)})
     if "kick_colour" in roles_:
         bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
 palette = {"states": [{"name": n, "colors": c, "scalars": {}} for n, c in STATES], "bindings": bindings,

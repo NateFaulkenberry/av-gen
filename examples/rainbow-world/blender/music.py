@@ -162,6 +162,7 @@ def routes(fx, swell_nodes, swell):
         if r_["target"] == "macros/lift" and r_["source"].startswith("stem."):
             r_.update(depthSource="macro.synth", depthMin=0.0, depthMax=1.0)
     out.append(route("macro.lift", "env/sky/sunGlow", 0.35))
+    out.append(route("macro.synth", "env/sky/sunGlow", 0.25))   # the synth's light in the sky
     out.append(route("macro.lift", "post/bloom/intensity", 0.12))
     # ---- the drop: a world-scale impact, rare by construction --------------------------------------------------------
     # `surge` is the synth's absolute loudness (rms) times how far its level stands above its own recent past (the
@@ -204,12 +205,12 @@ def routes(fx, swell_nodes, swell):
     out.append(route("macro.scantrig", "macros/scan", 1.0,
                      {"threshold": "binary", "thresholdLevel": 0.6, "envelope": "peakhold", "envelopeHoldMs": 6000.0,
                       "envelopeFallPerSecond": 0.33, "attackMs": 250.0}))
-    # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) and the
-    # clouds -- crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth)
+    # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) --
+    # crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth). (The
+    # clouds' ramp is the palette's, which replaces after the routes: the clouds flare through `cloud_glow` instead.)
     spectrum4 = [(0.90, 0.14, 0.05), (0.95, 0.80, 0.05), (0.10, 0.75, 0.30), (0.25, 0.30, 1.00)]
     pastel4 = [tuple(0.55 * c + 0.45 for c in col) for col in spectrum4]
-    for prog, role, cols in [(p_, "canopy_ramp", spectrum4) for p_ in fx if "canopy_ramp" in fx[p_]] + \
-                            [("rw_cloud", "cloud_ramp", pastel4)]:
+    for prog, role, cols in [(p_, "canopy_ramp", spectrum4) for p_ in fx if "canopy_ramp" in fx[p_]]:
         if role not in fx.get(prog, {}):
             continue
         for k, field in enumerate(("constant", "constant2", "constant3", "constant4")):

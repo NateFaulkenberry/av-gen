@@ -3324,6 +3324,14 @@
    "component": -1
   },
   {
+   "source": "macro.synth",
+   "target": "env/sky/sunGlow",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
    "source": "macro.lift",
    "target": "post/bloom/intensity",
    "amount": 0.12,
@@ -4410,138 +4418,6 @@
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant",
-   "amount": 0.945,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant",
-   "amount": 0.527,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant",
-   "amount": 0.4775,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant2",
-   "amount": 0.9725,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant2",
-   "amount": 0.89,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant2",
-   "amount": 0.4775,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant3",
-   "amount": 0.505,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant3",
-   "amount": 0.8625,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant3",
-   "amount": 0.615,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant4",
-   "amount": 0.5875,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant4",
-   "amount": 0.615,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.one",
-   "target": "material/rw_cloud/op/14/oklabRamp/constant4",
-   "amount": 1.0,
-   "op": "replace",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "macro.scan",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
    "source": "macro.scan",
    "target": "material/rw_cloud/op/26/constant/constant",
    "amount": 0.6,
@@ -4779,6 +4655,16 @@
       0.6867,
       0.1946
      ],
+     "foliage": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "stone": [
+      1.0,
+      1.0,
+      1.0
+     ],
      "floor0": [
       0.0103,
       0.0423,
@@ -4884,6 +4770,16 @@
       1.0,
       0.3231,
       0.0685
+     ],
+     "foliage": [
+      1.15,
+      1.0,
+      0.72
+     ],
+     "stone": [
+      1.2,
+      0.95,
+      0.78
      ],
      "floor0": [
       0.0988,
@@ -4991,6 +4887,16 @@
       0.7913,
       1.0
      ],
+     "foliage": [
+      0.9,
+      1.05,
+      1.1
+     ],
+     "stone": [
+      0.85,
+      0.95,
+      1.1
+     ],
      "floor0": [
       0.0189,
       0.0677,
@@ -5068,24 +4974,24 @@
       0.5647
      ],
      "meadow0": [
-      0.008,
-      0.162,
-      0.0482
+      0.0116,
+      0.1119,
+      0.1329
      ],
      "meadow1": [
-      0.0232,
-      0.3231,
-      0.0648
+      0.0356,
+      0.2086,
+      0.2384
      ],
      "meadow2": [
-      0.107,
-      0.5029,
-      0.0723
+      0.1946,
+      0.3515,
+      0.5149
      ],
      "meadow3": [
-      0.3231,
-      0.6867,
-      0.0976
+      0.552,
+      0.4564,
+      0.8388
      ],
      "shade": [
       0.0194,
@@ -5096,6 +5002,16 @@
       1.0,
       0.2384,
       0.6445
+     ],
+     "foliage": [
+      1.0,
+      0.82,
+      1.25
+     ],
+     "stone": [
+      1.1,
+      0.88,
+      1.3
      ],
      "floor0": [
       0.0786,
@@ -5174,24 +5090,24 @@
       0.6172
      ],
      "meadow0": [
-      0.013,
+      0.0044,
       0.1946,
-      0.0976
+      0.1119
      ],
      "meadow1": [
-      0.0296,
-      0.3916,
-      0.0844
+      0.013,
+      0.4342,
+      0.2086
      ],
      "meadow2": [
-      0.1221,
-      0.5776,
-      0.0648
+      0.1022,
+      0.7157,
+      0.3813
      ],
      "meadow3": [
-      0.314,
-      0.7011,
-      0.0762
+      0.5776,
+      0.9047,
+      0.3916
      ],
      "shade": [
       0.0423,
@@ -5202,6 +5118,16 @@
       0.5776,
       1.0,
       0.1946
+     ],
+     "foliage": [
+      1.1,
+      1.0,
+      1.15
+     ],
+     "stone": [
+      1.05,
+      0.95,
+      1.2
      ],
      "floor0": [
       0.0171,
@@ -5230,104 +5156,114 @@
     "name": "Candy",
     "colors": {
      "zenith": [
-      0.1441,
-      0.107,
-      0.7454
+      0.7454,
+      0.2542,
+      0.0452
      ],
      "horizon": [
       1.0,
-      0.4342,
-      0.6867
+      0.7605,
+      0.3515
      ],
      "ground": [
       1.0,
-      0.7454,
-      0.8714
+      0.6867,
+      0.807
      ],
      "sun": [
       1.0,
-      0.7991,
-      0.3515
+      0.8879,
+      0.5776
      ],
      "bounce": [
       1.0,
-      0.3467,
-      0.5776
+      0.2623,
+      0.5271
      ],
      "haze": [
       1.0,
-      0.3813,
-      0.5776
+      0.4793,
+      0.314
      ],
      "cloud0": [
       0.4342,
       0.2016,
-      0.7454
+      0.6867
      ],
      "cloud1": [
       1.0,
-      0.3325,
-      0.5776
+      0.3916,
+      0.6308
      ],
      "cloud2": [
       1.0,
-      0.6308,
-      0.3515
+      0.7157,
+      0.5271
      ],
      "cloud3": [
       1.0,
-      0.8714,
-      0.6867
+      0.9216,
+      0.8228
      ],
      "meadow0": [
-      0.0423,
-      0.3231,
-      0.0423
+      0.4452,
+      0.0452,
+      0.1878
      ],
      "meadow1": [
-      0.15,
-      0.5029,
-      0.0423
+      0.807,
+      0.1441,
+      0.2623
      ],
      "meadow2": [
-      0.3419,
-      0.6584,
-      0.0685
+      1.0,
+      0.3325,
+      0.2542
      ],
      "meadow3": [
-      0.624,
-      0.807,
-      0.1384
+      1.0,
+      0.6445,
+      0.3515
      ],
      "shade": [
-      0.2542,
-      0.0685,
+      0.1441,
+      0.0343,
       0.3916
      ],
      "ring": [
       1.0,
-      0.1946,
-      0.5776
+      0.7454,
+      0.162
+     ],
+     "foliage": [
+      1.7,
+      0.75,
+      1.15
+     ],
+     "stone": [
+      1.35,
+      0.9,
+      1.05
      ],
      "floor0": [
-      0.2297,
-      0.1397,
-      0.7395
+      0.7709,
+      0.3048,
+      0.0758
      ],
      "floor1": [
-      0.4306,
-      0.2124,
-      0.7307
+      0.7313,
+      0.3676,
+      0.2822
      ],
      "floor2": [
       0.92,
-      0.5803,
-      0.3234
+      0.6584,
+      0.4849
      ],
      "floor3": [
       1.0,
-      0.8714,
-      0.6867
+      0.9216,
+      0.8228
      ]
     },
     "scalars": {}
@@ -5336,104 +5272,114 @@
     "name": "Electric",
     "colors": {
      "zenith": [
-      0.007,
-      0.0052,
-      0.1441
+      0.003,
+      0.0018,
+      0.0296
      ],
      "horizon": [
-      0.3515,
-      0.0296,
-      0.7454
+      0.1441,
+      0.0116,
+      0.5776
      ],
      "ground": [
-      0.1441,
-      0.0802,
-      0.5776
+      0.0423,
+      0.0232,
+      0.2623
      ],
      "sun": [
       1.0,
-      0.2542,
-      0.8714
+      0.1022,
+      0.7157
      ],
      "bounce": [
-      0.1441,
-      0.0513,
+      0.0,
+      0.5776,
       1.0
      ],
      "haze": [
-      0.1946,
-      0.0423,
-      0.807
+      0.1022,
+      0.016,
+      0.6308
      ],
      "cloud0": [
-      0.0232,
-      0.0103,
-      0.1946
+      0.0176,
+      0.0052,
+      0.107
      ],
      "cloud1": [
-      0.1441,
-      0.0423,
-      0.5776
+      0.1022,
+      0.0212,
+      0.3916
      ],
      "cloud2": [
-      0.7454,
-      0.1022,
-      0.624
+      0.6308,
+      0.0513,
+      0.5776
      ],
      "cloud3": [
       1.0,
-      0.4342,
-      0.8714
+      0.2789,
+      0.855
      ],
      "meadow0": [
-      0.006,
-      0.1946,
-      0.0685
+      0.0116,
+      0.0103,
+      0.1559
      ],
      "meadow1": [
-      0.013,
-      0.3916,
-      0.0908
+      0.0273,
+      0.0423,
+      0.4233
      ],
      "meadow2": [
-      0.0612,
-      0.6308,
-      0.1384
+      0.0482,
+      0.1878,
+      0.807
      ],
      "meadow3": [
-      0.3231,
-      0.8714,
-      0.2159
-     ],
-     "shade": [
-      0.0423,
-      0.0103,
-      0.3231
-     ],
-     "ring": [
-      0.5776,
-      0.1441,
+      0.1559,
+      0.807,
       1.0
      ],
+     "shade": [
+      0.0395,
+      0.0024,
+      0.1441
+     ],
+     "ring": [
+      0.0,
+      1.0,
+      0.7454
+     ],
+     "foliage": [
+      0.55,
+      0.7,
+      1.8
+     ],
+     "stone": [
+      0.8,
+      0.55,
+      1.6
+     ],
      "floor0": [
-      0.0414,
-      0.0076,
-      0.2042
+      0.0171,
+      0.0028,
+      0.0844
      ],
      "floor1": [
-      0.0972,
-      0.0126,
-      0.307
+      0.0419,
+      0.0051,
+      0.186
      ],
      "floor2": [
-      0.6858,
-      0.094,
-      0.5741
+      0.5803,
+      0.0472,
+      0.5314
      ],
      "floor3": [
       1.0,
-      0.4342,
-      0.8714
+      0.2789,
+      0.855
      ]
     },
     "scalars": {}
@@ -5442,18 +5388,18 @@
     "name": "Spring",
     "colors": {
      "zenith": [
-      0.0103,
-      0.1878,
-      0.6867
+      0.0232,
+      0.2623,
+      0.8714
      ],
      "horizon": [
-      0.3231,
-      0.8714,
+      0.4793,
+      0.9387,
       1.0
      ],
      "ground": [
-      0.6867,
-      0.8714,
+      0.7454,
+      0.9216,
       1.0
      ],
      "sun": [
@@ -5462,28 +5408,28 @@
       0.7454
      ],
      "bounce": [
-      0.4793,
-      0.3515,
+      0.5271,
+      0.3916,
       1.0
      ],
      "haze": [
-      0.2542,
-      0.7454,
-      0.8714
+      0.3231,
+      0.807,
+      0.9387
      ],
      "cloud0": [
-      0.1441,
       0.1946,
-      0.807
+      0.2623,
+      0.8714
      ],
      "cloud1": [
-      0.3916,
-      0.5271,
+      0.4793,
+      0.6038,
       1.0
      ],
      "cloud2": [
-      0.8714,
-      0.9387,
+      0.9047,
+      0.956,
       1.0
      ],
      "cloud3": [
@@ -5492,24 +5438,24 @@
       1.0
      ],
      "meadow0": [
-      0.0232,
-      0.3231,
-      0.0423
+      0.0273,
+      0.3515,
+      0.0648
      ],
      "meadow1": [
-      0.0976,
-      0.5776,
-      0.0423
+      0.15,
+      0.6308,
+      0.0513
      ],
      "meadow2": [
-      0.3231,
-      0.807,
-      0.0685
+      0.4793,
+      0.8714,
+      0.117
      ],
      "meadow3": [
-      0.6445,
-      0.9387,
-      0.1441
+      0.8714,
+      1.0,
+      0.3231
      ],
      "shade": [
       0.1022,
@@ -5521,19 +5467,29 @@
       1.0,
       0.5776
      ],
+     "foliage": [
+      1.0,
+      1.18,
+      0.85
+     ],
+     "stone": [
+      1.0,
+      1.05,
+      0.95
+     ],
      "floor0": [
-      0.0416,
-      0.2562,
-      0.718
+      0.0688,
+      0.3299,
+      0.8843
      ],
      "floor1": [
-      0.122,
-      0.3604,
-      0.7951
+      0.1801,
+      0.4314,
+      0.9036
      ],
      "floor2": [
-      0.8017,
-      0.8636,
+      0.8323,
+      0.8795,
       0.92
      ],
      "floor3": [
@@ -5671,8 +5627,108 @@
     "target": "material/rw_ground_lip/op/10/constant/constant"
    },
    {
+    "role": "stone",
+    "mode": "multiply",
+    "target": "material/rw_rock/op/3/oklabRamp/constant"
+   },
+   {
+    "role": "stone",
+    "mode": "multiply",
+    "target": "material/rw_rock/op/3/oklabRamp/constant2"
+   },
+   {
+    "role": "stone",
+    "mode": "multiply",
+    "target": "material/rw_rock/op/3/oklabRamp/constant3"
+   },
+   {
+    "role": "stone",
+    "mode": "multiply",
+    "target": "material/rw_rock/op/3/oklabRamp/constant4"
+   },
+   {
     "role": "ring",
     "target": "material/rw_grass/op/42/constant/constant"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_canopy/op/6/oklabRamp/constant"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_canopy/op/6/oklabRamp/constant2"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_canopy/op/6/oklabRamp/constant3"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_canopy/op/6/oklabRamp/constant4"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_weeper/op/6/oklabRamp/constant"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_weeper/op/6/oklabRamp/constant2"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_weeper/op/6/oklabRamp/constant3"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_weeper/op/6/oklabRamp/constant4"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_blossom/op/6/oklabRamp/constant"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_blossom/op/6/oklabRamp/constant2"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_blossom/op/6/oklabRamp/constant3"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_blossom/op/6/oklabRamp/constant4"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_pine/op/6/oklabRamp/constant"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_pine/op/6/oklabRamp/constant2"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_pine/op/6/oklabRamp/constant3"
+   },
+   {
+    "role": "foliage",
+    "mode": "multiply",
+    "target": "material/rw_pine/op/6/oklabRamp/constant4"
    }
   ],
   "selector": {
