@@ -570,6 +570,9 @@ for k, sa_ in enumerate(arch_s):
         pos = pa - ua * (band.FACE - 6.0)
     eul = (rw.Q_ZUP_TO_YUP @ m.to_quaternion() @ rw.Q_ZUP_TO_YUP.inverted()).to_euler("XYZ")
     rainbow_nodes.append({"name": "rainbow_%d" % k, "kind": "gltf", "asset": "rainbow_arch.glb", "position": av(pos), "castsShadow": False,
+                          # 0.82: the feet land inside the face (R 94 m < the rim's 112 m), never poking out of a rim
+                          # where an arch seen from the strand's far side read as a spectral blob
+                          "scale": [0.82, 0.82, 0.82],
                           "rotation": [round(math.degrees(v), 3) for v in eul]})
 nodes += rainbow_nodes
 print("RAINBOWS", len(rainbow_nodes))
@@ -696,18 +699,22 @@ STATES = [
                          cloud0=R(L0["cloud"][0]), cloud1=R(L0["cloud"][1]), cloud2=R(L0["cloud"][2]), cloud3=R(L0["cloud"][3]),
                          meadow0=R(L0["meadow"][0]), meadow1=R(L0["meadow"][1]), meadow2=R(L0["meadow"][2]), meadow3=R(L0["meadow"][3]),
                          shade=R(L0["shade"]))),
-    ("Golden Hour", dict(zenith=H("#1E3E9E"), horizon=H("#F0A464"), ground=H("#E8B08A"), sun=H("#FFB067"), bounce=H("#F09A70"),
-                         haze=H("#E89A64"), cloud0=H("#6A4E8E"), cloud1=H("#C08A9C"), cloud2=H("#FFB07A"), cloud3=H("#FFD3A2"),
-                         meadow0=H("#286E2C"), meadow1=H("#4C9C2E"), meadow2=H("#86BE38"), meadow3=H("#C6D04A"), shade=H("#2A4A5C"))),
+    # Golden Hour and Lavender Dusk change the LIGHT and the sky, not the grass (coordinator, Stage 6): a warm key
+    # but cool violet fill and ambient, so the shadows go long and blue-violet, and meadow ramps pushed toward blue-
+    # green so the warm sun lands on them as green, not mustard. Measured target: the meadow's hue and saturation
+    # within reach of Bright Noon's.
+    ("Golden Hour", dict(zenith=H("#1E3E9E"), horizon=H("#F0A464"), ground=H("#A8A0CC"), sun=H("#FFC486"), bounce=H("#9C8CD4"),
+                         haze=H("#E8A878"), cloud0=H("#5A4A96"), cloud1=H("#B888A8"), cloud2=H("#FFB880"), cloud3=H("#FFD8A8"),
+                         meadow0=H("#147A44"), meadow1=H("#2CA244"), meadow2=H("#60C442"), meadow3=H("#9ED84C"), shade=H("#26408C"))),
     ("After the Storm", dict(zenith=H("#0B2A8E"), horizon=H("#6FB6D8"), ground=H("#8E98B8"), sun=H("#FFF0D0"), bounce=H("#9FB0C8"),
                              haze=H("#6E9CD8"), cloud0=H("#3A4068"), cloud1=H("#6E7698"), cloud2=H("#E6DED2"), cloud3=H("#F4EEE4"),
                              meadow0=H("#1E5E2A"), meadow1=H("#3E8E2A"), meadow2=H("#62B03A"), meadow3=H("#8ED04A"), shade=H("#10485A"))),
-    ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#D8A8C8"), sun=H("#FFC0A0"), bounce=H("#D896B8"),
-                           haze=H("#9A72D0"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
-                           meadow0=H("#1C6A48"), meadow1=H("#38904E"), meadow2=H("#70B058"), meadow3=H("#AECC68"), shade=H("#2A3A6A"))),
+    ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#9C90CC"), sun=H("#FFB4C4"), bounce=H("#8A78D2"),
+                           haze=H("#8C70D4"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
+                           meadow0=H("#10704E"), meadow1=H("#1E9858"), meadow2=H("#4CB85C"), meadow3=H("#8CD466"), shade=H("#262C92"))),
     ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
                    haze=H("#6AAAF0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
-                   meadow0=H("#1E7A6A"), meadow1=H("#3EA85A"), meadow2=H("#9AD040"), meadow3=H("#E8D040"), shade=H("#3A3AA0"))),
+                   meadow0=H("#1E7A6A"), meadow1=H("#34A85A"), meadow2=H("#7CCC44"), meadow3=H("#B6DE46"), shade=H("#3A3AA0"))),
 ]
 # the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
 # (Bright Noon keeps the floor program's own stops)
