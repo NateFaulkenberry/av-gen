@@ -42,7 +42,7 @@ def finish(prog):
 
 
 SCAN = {"wavelength": 55.0, "soft": 30.0, "edge": 22.0}
-SCAN_REST = 1610.0   # metres: one spectrum cycle behind the front, its blend, its lit edge
+SCAN_REST = 980.0    # the front's rest radius, m: under the material constants' hard range (+-1000), which clamps
 
 
 def scan_ops(out, a, b, c, d):

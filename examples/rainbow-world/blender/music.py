@@ -50,8 +50,9 @@ def op_target(program, roles, role, kind, field):
     return "material/%s/op/%d/%s/%s" % (program, roles[role], kind, field)
 
 
-MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("surge", 0.0), ("scan", 0.0), ("one", 1.0)]
-SCAN_REST = 1610.0   # look.SCAN_REST
+MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("surge", 0.0), ("scantrig", 0.0), ("scan", 0.0), ("one", 1.0)]
+SCAN_REST = 980.0    # look.SCAN_REST
+SCAN_DELAY_MS = 300.0
 RAINBOWS = ("rw_rainbow", "rw_rainbow2")
 
 
@@ -98,8 +99,8 @@ def routes(fx, swell_nodes, swell):
     # the bass as colour energy (19-brief-color-vfx: "bass energy increases the intensity of selected terrain
     # colours"): the meadow's saturation and value rise with the bass body
     for prog in [p_ for p_ in fx if "bass_sat" in fx[p_]]:
-        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_sat", "saturate", "value"), 0.75))
-        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_gain", "constant", "constant"), 0.22))
+        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_sat", "saturate", "value"), 0.3))
+        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_gain", "constant", "constant"), 0.1))
     # shimmer across the flower fields: the synth's light, lifted on the hats
     if "shimmer_gain" in fx.get("rw_flower", {}):
         sh = op_target("rw_flower", fx["rw_flower"], "shimmer_gain", "constant", "constant")
@@ -170,23 +171,23 @@ def routes(fx, swell_nodes, swell):
     # few seconds): high only when a LOUD synth ARRIVES -- the drop at 47.85 s. The intro's calls are quiet (low rms),
     # the groove's bed is not new (level mid-range). A phrase boundary with a surge behind it is the impact.
     out += stem_route("synth", "rms", None, "macros/surge", 1.0,
-                      {"gain": 4.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0, "attackMs": 40.0,
-                       "decayMs": 5000.0})   # slow release: the scan's hold reads it as its depth for seconds
+                      {"gain": 8.0, "offset": -0.4, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                       "attackMs": 40.0, "decayMs": 5000.0})   # slow release: the scan's hold reads it as its depth
     out[-1].update(depthSource="stem.synth.level", depthMin=-2.0, depthMax=1.0)
     impact = {"envelope": "linearfall", "envelopeFallPerSecond": 0.25, "attackMs": 20.0}   # four seconds down
     def hit(target, amount, component=-1):
-        out.append(route("beat.phrasePulse", target, amount, impact, component,
-                         depthSource="macro.surge", depthMin=0.0, depthMax=1.0))
+        # the impact rides the scan's own latch: everything flares together and relaxes together
+        out.append(route("macro.scan", target, amount, None, component))
     for prog in RAINBOWS:
         if "arch_gain" in fx.get(prog, {}):
             hit(op_target(prog, fx[prog], "arch_gain", "constant", "constant"), 14.0)
             hit(op_target(prog, fx[prog], "flow_gain", "constant", "constant"), 10.0)
     # ---- the world scan: the drop's showpiece (and the synth's biggest lifts), rainbow over everything it passes ---
-    # The front's radius R: pulled in to the eye on every phrase pulse and let run out (1600 m in 5.5 s); invisible
+    # The front's radius R: pulled in to the eye on every phrase pulse and let run out (970 m in 4 s); invisible
     # unless `macro.scan` -- held about six seconds, then relaxing over three -- says this phrase deserves it, which
     # the surge (the drop) does, and a big lift (the synth at its brightest) does a little.
     rest = SCAN_REST - 10.0
-    front = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / 5.5}
+    front = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / 4.0, "delayMs": SCAN_DELAY_MS}
     for prog in scan_programs:
         roles = fx[prog]
         for role in ("scan_mask", "scan_hue", "scan_edge_out", "scan_edge_in"):
@@ -194,12 +195,17 @@ def routes(fx, swell_nodes, swell):
                 out.append(route("beat.phrasePulse", op_target(prog, roles, role, "remap", "constant"), -rest, front,
                                  component=c))
         out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))
-        hit(op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0)
-    hold = {"envelope": "peakhold", "envelopeHoldMs": 6000.0, "envelopeFallPerSecond": 0.33, "attackMs": 300.0}
-    out.append(route("beat.phrasePulse", "macros/scan", 1.0, hold, depthSource="macro.surge", depthMin=0.0,
-                     depthMax=1.0))
-    out.append(route("beat.phrasePulse", "macros/scan", 0.8, hold, depthSource="macro.lift", depthMin=-0.6,
-                     depthMax=1.4))
+        out.append(route("macro.scan", op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0))
+    # One shot per qualifying phrase: the phrase pulse, read SCAN_DELAY_MS late (the synth enters on the drop's
+    # downbeat, so its surge is only measurable a beat-fraction after it), scaled by the surge at that instant, is a
+    # one-frame trigger; past 0.6 it latches the scan for six seconds, which then relaxes over three.
+    out.append(route("beat.phrasePulse", "macros/scantrig", 1.0,
+                     {"delayMs": SCAN_DELAY_MS, "envelope": "peakhold", "envelopeHoldMs": 60.0,
+                      "envelopeFallPerSecond": 20.0},
+                     depthSource="macro.surge", depthMin=0.0, depthMax=1.0))
+    out.append(route("macro.scantrig", "macros/scan", 1.0,
+                     {"threshold": "binary", "thresholdLevel": 0.6, "envelope": "peakhold", "envelopeHoldMs": 6000.0,
+                      "envelopeFallPerSecond": 0.33, "attackMs": 250.0}))
     # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) and the
     # clouds -- crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth)
     spectrum4 = [(0.90, 0.14, 0.05), (0.95, 0.80, 0.05), (0.10, 0.75, 0.30), (0.25, 0.30, 1.00)]

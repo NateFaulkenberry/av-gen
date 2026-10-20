@@ -57,7 +57,7 @@
    "kind": "timeline",
    "name": "ride",
    "settings": {
-    "loopLength": 215.9407,
+    "loopLength": 209.8999,
     "keys": [
      {
       "time": 0.0,
@@ -65,1917 +65,1917 @@
       "interp": "linear"
      },
      {
-      "time": 0.5254,
-      "value": 0.002213,
+      "time": 0.539,
+      "value": 0.00232,
       "interp": "linear"
      },
      {
-      "time": 1.0728,
-      "value": 0.004518,
+      "time": 1.1005,
+      "value": 0.004737,
       "interp": "linear"
      },
      {
-      "time": 1.5865,
-      "value": 0.006682,
+      "time": 1.6275,
+      "value": 0.007005,
       "interp": "linear"
      },
      {
-      "time": 2.0407,
-      "value": 0.008595,
+      "time": 2.0934,
+      "value": 0.00901,
       "interp": "linear"
      },
      {
-      "time": 2.5211,
-      "value": 0.010618,
+      "time": 2.5862,
+      "value": 0.011131,
       "interp": "linear"
      },
      {
-      "time": 3.084,
-      "value": 0.012989,
+      "time": 3.1637,
+      "value": 0.013617,
       "interp": "linear"
      },
      {
-      "time": 3.5795,
-      "value": 0.015075,
+      "time": 3.672,
+      "value": 0.015805,
       "interp": "linear"
      },
      {
-      "time": 4.068,
-      "value": 0.017132,
+      "time": 4.1731,
+      "value": 0.017961,
       "interp": "linear"
      },
      {
-      "time": 4.5504,
-      "value": 0.019164,
+      "time": 4.668,
+      "value": 0.020091,
       "interp": "linear"
      },
      {
-      "time": 5.0313,
-      "value": 0.021189,
+      "time": 5.1613,
+      "value": 0.022214,
       "interp": "linear"
      },
      {
-      "time": 5.5072,
-      "value": 0.023194,
+      "time": 5.6495,
+      "value": 0.024316,
       "interp": "linear"
      },
      {
-      "time": 5.9678,
-      "value": 0.025134,
+      "time": 6.122,
+      "value": 0.026349,
       "interp": "linear"
      },
      {
-      "time": 6.4479,
-      "value": 0.027156,
+      "time": 6.6145,
+      "value": 0.028469,
       "interp": "linear"
      },
      {
-      "time": 6.9922,
-      "value": 0.029448,
+      "time": 7.1729,
+      "value": 0.030872,
       "interp": "linear"
      },
      {
-      "time": 7.5459,
-      "value": 0.03178,
+      "time": 7.7409,
+      "value": 0.033317,
       "interp": "linear"
      },
      {
-      "time": 8.0879,
-      "value": 0.034063,
+      "time": 8.2969,
+      "value": 0.03571,
       "interp": "linear"
      },
      {
-      "time": 8.6275,
-      "value": 0.036335,
+      "time": 8.8504,
+      "value": 0.038092,
       "interp": "linear"
      },
      {
-      "time": 9.1484,
-      "value": 0.038529,
+      "time": 9.3849,
+      "value": 0.040393,
       "interp": "linear"
      },
      {
-      "time": 9.6346,
-      "value": 0.040577,
+      "time": 9.8836,
+      "value": 0.042539,
       "interp": "linear"
      },
      {
-      "time": 10.1413,
-      "value": 0.042711,
+      "time": 10.4036,
+      "value": 0.044777,
       "interp": "linear"
      },
      {
-      "time": 10.7289,
-      "value": 0.045185,
+      "time": 11.0149,
+      "value": 0.047408,
       "interp": "linear"
      },
      {
-      "time": 11.3103,
-      "value": 0.047634,
+      "time": 11.6687,
+      "value": 0.050186,
       "interp": "linear"
      },
      {
-      "time": 11.8754,
-      "value": 0.050014,
+      "time": 12.3595,
+      "value": 0.053008,
       "interp": "linear"
      },
      {
-      "time": 12.4598,
-      "value": 0.052475,
+      "time": 13.1559,
+      "value": 0.056068,
       "interp": "linear"
      },
      {
-      "time": 13.0651,
-      "value": 0.055024,
+      "time": 14.043,
+      "value": 0.059232,
       "interp": "linear"
      },
      {
-      "time": 13.6835,
-      "value": 0.057629,
+      "time": 14.9727,
+      "value": 0.062304,
       "interp": "linear"
      },
      {
-      "time": 14.2964,
-      "value": 0.06021,
+      "time": 15.8618,
+      "value": 0.065065,
       "interp": "linear"
      },
      {
-      "time": 14.8713,
-      "value": 0.062631,
+      "time": 16.618,
+      "value": 0.067338,
       "interp": "linear"
      },
      {
-      "time": 15.32,
-      "value": 0.064521,
+      "time": 17.0799,
+      "value": 0.068733,
       "interp": "linear"
      },
      {
-      "time": 15.7362,
-      "value": 0.066274,
+      "time": 17.5619,
+      "value": 0.070253,
       "interp": "linear"
      },
      {
-      "time": 16.2613,
-      "value": 0.068525,
+      "time": 18.3118,
+      "value": 0.072826,
       "interp": "linear"
      },
      {
-      "time": 16.9095,
-      "value": 0.071425,
+      "time": 19.2077,
+      "value": 0.076292,
       "interp": "linear"
      },
      {
-      "time": 17.6184,
-      "value": 0.074786,
+      "time": 20.0711,
+      "value": 0.080098,
       "interp": "linear"
      },
      {
-      "time": 18.3191,
-      "value": 0.078332,
+      "time": 20.8346,
+      "value": 0.083894,
       "interp": "linear"
      },
      {
-      "time": 18.944,
-      "value": 0.081704,
+      "time": 21.4804,
+      "value": 0.087432,
       "interp": "linear"
      },
      {
-      "time": 19.5103,
-      "value": 0.084944,
+      "time": 22.0613,
+      "value": 0.090829,
       "interp": "linear"
      },
      {
-      "time": 19.9962,
-      "value": 0.087861,
+      "time": 22.5598,
+      "value": 0.093887,
       "interp": "linear"
      },
      {
-      "time": 20.4069,
-      "value": 0.090412,
+      "time": 22.9811,
+      "value": 0.096561,
       "interp": "linear"
      },
      {
-      "time": 20.8093,
-      "value": 0.092951,
+      "time": 23.3938,
+      "value": 0.099223,
       "interp": "linear"
      },
      {
-      "time": 21.3132,
-      "value": 0.096135,
+      "time": 23.9108,
+      "value": 0.10256,
       "interp": "linear"
      },
      {
-      "time": 21.9031,
-      "value": 0.099861,
+      "time": 24.5159,
+      "value": 0.106467,
       "interp": "linear"
      },
      {
-      "time": 22.5317,
-      "value": 0.103832,
+      "time": 25.1607,
+      "value": 0.11063,
       "interp": "linear"
      },
      {
-      "time": 23.2207,
-      "value": 0.108185,
+      "time": 25.8676,
+      "value": 0.115194,
       "interp": "linear"
      },
      {
-      "time": 23.8053,
-      "value": 0.111878,
+      "time": 26.4672,
+      "value": 0.119065,
       "interp": "linear"
      },
      {
-      "time": 24.2518,
-      "value": 0.114699,
+      "time": 26.9253,
+      "value": 0.122022,
       "interp": "linear"
      },
      {
-      "time": 24.628,
-      "value": 0.117076,
+      "time": 27.3113,
+      "value": 0.124514,
       "interp": "linear"
      },
      {
-      "time": 25.0291,
-      "value": 0.119605,
+      "time": 27.7227,
+      "value": 0.127166,
       "interp": "linear"
      },
      {
-      "time": 25.4963,
-      "value": 0.122497,
+      "time": 28.2021,
+      "value": 0.130199,
       "interp": "linear"
      },
      {
-      "time": 26.0334,
-      "value": 0.125705,
+      "time": 28.7629,
+      "value": 0.133621,
       "interp": "linear"
      },
      {
-      "time": 26.6189,
-      "value": 0.129034,
+      "time": 29.3875,
+      "value": 0.137181,
       "interp": "linear"
      },
      {
-      "time": 27.2142,
-      "value": 0.132223,
+      "time": 30.0422,
+      "value": 0.140547,
       "interp": "linear"
      },
      {
-      "time": 27.8133,
-      "value": 0.135231,
+      "time": 30.8002,
+      "value": 0.14397,
       "interp": "linear"
      },
      {
-      "time": 28.3442,
-      "value": 0.13773,
+      "time": 31.485,
+      "value": 0.146657,
       "interp": "linear"
      },
      {
-      "time": 28.8265,
-      "value": 0.139838,
+      "time": 32.0939,
+      "value": 0.148752,
       "interp": "linear"
      },
      {
-      "time": 29.279,
-      "value": 0.141659,
+      "time": 32.5222,
+      "value": 0.150088,
       "interp": "linear"
      },
      {
-      "time": 29.7872,
-      "value": 0.143551,
+      "time": 32.967,
+      "value": 0.151422,
       "interp": "linear"
      },
      {
-      "time": 30.4034,
-      "value": 0.145678,
+      "time": 33.6126,
+      "value": 0.153384,
       "interp": "linear"
      },
      {
-      "time": 31.1051,
-      "value": 0.147925,
+      "time": 34.377,
+      "value": 0.155823,
       "interp": "linear"
      },
      {
-      "time": 31.8763,
-      "value": 0.150253,
+      "time": 35.1588,
+      "value": 0.158499,
       "interp": "linear"
      },
      {
-      "time": 32.7234,
-      "value": 0.15274,
+      "time": 35.901,
+      "value": 0.161244,
       "interp": "linear"
      },
      {
-      "time": 33.5543,
-      "value": 0.155206,
+      "time": 36.5638,
+      "value": 0.163873,
       "interp": "linear"
      },
      {
-      "time": 34.3572,
-      "value": 0.157703,
+      "time": 37.1394,
+      "value": 0.166276,
       "interp": "linear"
      },
      {
-      "time": 35.0889,
-      "value": 0.160143,
+      "time": 37.6538,
+      "value": 0.168482,
       "interp": "linear"
      },
      {
-      "time": 35.7514,
-      "value": 0.16253,
+      "time": 38.1562,
+      "value": 0.170644,
       "interp": "linear"
      },
      {
-      "time": 36.3808,
-      "value": 0.164962,
+      "time": 38.6847,
+      "value": 0.172919,
       "interp": "linear"
      },
      {
-      "time": 36.8973,
-      "value": 0.167067,
+      "time": 39.186,
+      "value": 0.175077,
       "interp": "linear"
      },
      {
-      "time": 37.3654,
-      "value": 0.16903,
+      "time": 39.6636,
+      "value": 0.177132,
       "interp": "linear"
      },
      {
-      "time": 37.8476,
-      "value": 0.171061,
+      "time": 40.1582,
+      "value": 0.179261,
       "interp": "linear"
      },
      {
-      "time": 38.4243,
-      "value": 0.173489,
+      "time": 40.7498,
+      "value": 0.181807,
       "interp": "linear"
      },
      {
-      "time": 39.1001,
-      "value": 0.176336,
+      "time": 41.4431,
+      "value": 0.184791,
       "interp": "linear"
      },
      {
-      "time": 39.8391,
-      "value": 0.179486,
+      "time": 42.2011,
+      "value": 0.188094,
       "interp": "linear"
      },
      {
-      "time": 40.5867,
-      "value": 0.182799,
+      "time": 42.968,
+      "value": 0.191567,
       "interp": "linear"
      },
      {
-      "time": 41.2929,
-      "value": 0.186108,
+      "time": 43.6925,
+      "value": 0.195037,
       "interp": "linear"
      },
      {
-      "time": 41.9354,
-      "value": 0.189319,
+      "time": 44.3517,
+      "value": 0.198403,
       "interp": "linear"
      },
      {
-      "time": 42.5212,
-      "value": 0.192443,
+      "time": 44.9526,
+      "value": 0.201678,
       "interp": "linear"
      },
      {
-      "time": 43.0656,
-      "value": 0.195527,
+      "time": 45.5111,
+      "value": 0.20491,
       "interp": "linear"
      },
      {
-      "time": 43.544,
-      "value": 0.198375,
+      "time": 46.0018,
+      "value": 0.207896,
       "interp": "linear"
      },
      {
-      "time": 44.0103,
-      "value": 0.201256,
+      "time": 46.4644,
+      "value": 0.210817,
       "interp": "linear"
      },
      {
-      "time": 44.8107,
-      "value": 0.206301,
+      "time": 46.9051,
+      "value": 0.213656,
       "interp": "linear"
      },
      {
-      "time": 45.6175,
-      "value": 0.211397,
+      "time": 47.4444,
+      "value": 0.217138,
       "interp": "linear"
      },
      {
-      "time": 46.674,
-      "value": 0.218071,
+      "time": 48.058,
+      "value": 0.221099,
       "interp": "linear"
      },
      {
-      "time": 47.734,
-      "value": 0.224768,
+      "time": 48.7201,
+      "value": 0.225373,
       "interp": "linear"
      },
      {
-      "time": 48.7868,
-      "value": 0.231419,
+      "time": 49.3984,
+      "value": 0.229752,
       "interp": "linear"
      },
      {
-      "time": 49.9105,
-      "value": 0.238517,
+      "time": 50.0837,
+      "value": 0.234177,
       "interp": "linear"
      },
      {
-      "time": 50.8182,
-      "value": 0.244252,
+      "time": 50.6619,
+      "value": 0.23791,
       "interp": "linear"
      },
      {
-      "time": 51.6106,
-      "value": 0.249258,
+      "time": 51.0633,
+      "value": 0.240501,
       "interp": "linear"
      },
      {
-      "time": 52.0489,
-      "value": 0.252025,
+      "time": 51.4948,
+      "value": 0.243286,
       "interp": "linear"
      },
      {
-      "time": 52.4807,
-      "value": 0.254712,
+      "time": 51.9378,
+      "value": 0.246102,
       "interp": "linear"
      },
      {
-      "time": 52.9259,
-      "value": 0.257392,
+      "time": 52.3945,
+      "value": 0.248912,
       "interp": "linear"
      },
      {
-      "time": 53.3601,
-      "value": 0.259886,
+      "time": 52.8399,
+      "value": 0.251526,
       "interp": "linear"
      },
      {
-      "time": 53.7899,
-      "value": 0.262215,
+      "time": 53.2808,
+      "value": 0.253969,
       "interp": "linear"
      },
      {
-      "time": 54.2502,
-      "value": 0.264555,
+      "time": 53.753,
+      "value": 0.256422,
       "interp": "linear"
      },
      {
-      "time": 54.7557,
-      "value": 0.266963,
+      "time": 54.2715,
+      "value": 0.258946,
       "interp": "linear"
      },
      {
-      "time": 55.3079,
-      "value": 0.269443,
+      "time": 54.838,
+      "value": 0.261545,
       "interp": "linear"
      },
      {
-      "time": 55.8807,
-      "value": 0.271904,
+      "time": 55.4256,
+      "value": 0.264126,
       "interp": "linear"
      },
      {
-      "time": 56.4457,
-      "value": 0.274284,
+      "time": 56.0052,
+      "value": 0.266621,
       "interp": "linear"
      },
      {
-      "time": 57.0448,
-      "value": 0.276807,
+      "time": 56.6199,
+      "value": 0.269266,
       "interp": "linear"
      },
      {
-      "time": 57.6037,
-      "value": 0.279161,
+      "time": 57.1932,
+      "value": 0.271734,
       "interp": "linear"
      },
      {
-      "time": 58.1479,
-      "value": 0.281453,
+      "time": 57.7514,
+      "value": 0.274137,
       "interp": "linear"
      },
      {
-      "time": 58.6758,
-      "value": 0.283676,
+      "time": 58.2929,
+      "value": 0.276467,
       "interp": "linear"
      },
      {
-      "time": 59.1863,
-      "value": 0.285826,
+      "time": 58.8167,
+      "value": 0.278722,
       "interp": "linear"
      },
      {
-      "time": 59.6622,
-      "value": 0.28783,
+      "time": 59.3048,
+      "value": 0.280822,
       "interp": "linear"
      },
      {
-      "time": 60.1098,
-      "value": 0.289716,
+      "time": 59.7639,
+      "value": 0.282798,
       "interp": "linear"
      },
      {
-      "time": 60.633,
-      "value": 0.291919,
+      "time": 60.2978,
+      "value": 0.285097,
       "interp": "linear"
      },
      {
-      "time": 61.1979,
-      "value": 0.294285,
+      "time": 60.8348,
+      "value": 0.287407,
       "interp": "linear"
      },
      {
-      "time": 61.7353,
-      "value": 0.296468,
+      "time": 61.3246,
+      "value": 0.289509,
       "interp": "linear"
      },
      {
-      "time": 62.2923,
-      "value": 0.298611,
+      "time": 61.8372,
+      "value": 0.29165,
       "interp": "linear"
      },
      {
-      "time": 62.7929,
-      "value": 0.300404,
+      "time": 62.3329,
+      "value": 0.293618,
       "interp": "linear"
      },
      {
-      "time": 63.0615,
-      "value": 0.301295,
+      "time": 62.6601,
+      "value": 0.294829,
       "interp": "linear"
      },
      {
-      "time": 63.3479,
-      "value": 0.302181,
+      "time": 62.9743,
+      "value": 0.295907,
       "interp": "linear"
      },
      {
-      "time": 64.3537,
-      "value": 0.30516,
+      "time": 63.9568,
+      "value": 0.299044,
       "interp": "linear"
      },
      {
-      "time": 65.6215,
-      "value": 0.308885,
+      "time": 65.2426,
+      "value": 0.302954,
       "interp": "linear"
      },
      {
-      "time": 66.5349,
-      "value": 0.311652,
+      "time": 66.2117,
+      "value": 0.30586,
       "interp": "linear"
      },
      {
-      "time": 67.4421,
-      "value": 0.314572,
+      "time": 67.2354,
+      "value": 0.309007,
       "interp": "linear"
      },
      {
-      "time": 68.2557,
-      "value": 0.317396,
+      "time": 68.1783,
+      "value": 0.312076,
       "interp": "linear"
      },
      {
-      "time": 68.9407,
-      "value": 0.31996,
+      "time": 68.9592,
+      "value": 0.314813,
       "interp": "linear"
      },
      {
-      "time": 69.5065,
-      "value": 0.322214,
+      "time": 69.5805,
+      "value": 0.317164,
       "interp": "linear"
      },
      {
-      "time": 69.9835,
-      "value": 0.324193,
+      "time": 70.0886,
+      "value": 0.319216,
       "interp": "linear"
      },
      {
-      "time": 70.4328,
-      "value": 0.326085,
+      "time": 70.557,
+      "value": 0.321193,
       "interp": "linear"
      },
      {
-      "time": 70.8794,
-      "value": 0.327966,
+      "time": 71.0158,
+      "value": 0.323167,
       "interp": "linear"
      },
      {
-      "time": 71.3089,
-      "value": 0.329775,
+      "time": 71.4564,
+      "value": 0.325063,
       "interp": "linear"
      },
      {
-      "time": 71.7126,
-      "value": 0.331475,
+      "time": 71.8706,
+      "value": 0.326845,
       "interp": "linear"
      },
      {
-      "time": 72.0995,
-      "value": 0.333105,
+      "time": 72.2675,
+      "value": 0.328554,
       "interp": "linear"
      },
      {
-      "time": 72.4953,
-      "value": 0.334772,
+      "time": 72.6735,
+      "value": 0.330301,
       "interp": "linear"
      },
      {
-      "time": 73.0415,
-      "value": 0.337072,
+      "time": 73.2338,
+      "value": 0.332713,
       "interp": "linear"
      },
      {
-      "time": 73.7608,
-      "value": 0.340109,
+      "time": 73.9717,
+      "value": 0.335896,
       "interp": "linear"
      },
      {
-      "time": 74.5704,
-      "value": 0.343618,
+      "time": 74.8022,
+      "value": 0.339575,
       "interp": "linear"
      },
      {
-      "time": 75.3746,
-      "value": 0.347277,
+      "time": 75.6273,
+      "value": 0.343412,
       "interp": "linear"
      },
      {
-      "time": 76.1024,
-      "value": 0.350798,
+      "time": 76.3739,
+      "value": 0.347103,
       "interp": "linear"
      },
      {
-      "time": 76.7347,
-      "value": 0.354064,
+      "time": 77.0225,
+      "value": 0.350526,
       "interp": "linear"
      },
      {
-      "time": 77.241,
-      "value": 0.356849,
+      "time": 77.5418,
+      "value": 0.353446,
       "interp": "linear"
      },
      {
-      "time": 77.6546,
-      "value": 0.359255,
+      "time": 77.9662,
+      "value": 0.355968,
       "interp": "linear"
      },
      {
-      "time": 78.0218,
-      "value": 0.361486,
+      "time": 78.3198,
+      "value": 0.358165,
       "interp": "linear"
      },
      {
-      "time": 78.8472,
-      "value": 0.366649,
+      "time": 78.6945,
+      "value": 0.36056,
       "interp": "linear"
      },
      {
-      "time": 79.2848,
-      "value": 0.369414,
+      "time": 79.0297,
+      "value": 0.362724,
       "interp": "linear"
      },
      {
-      "time": 80.0762,
-      "value": 0.374413,
+      "time": 79.4578,
+      "value": 0.365488,
       "interp": "linear"
      },
      {
-      "time": 80.9714,
-      "value": 0.380068,
+      "time": 79.9426,
+      "value": 0.368618,
       "interp": "linear"
      },
      {
-      "time": 81.7828,
-      "value": 0.385194,
+      "time": 80.4444,
+      "value": 0.371857,
       "interp": "linear"
      },
      {
-      "time": 82.6971,
-      "value": 0.39097,
+      "time": 80.9722,
+      "value": 0.375264,
       "interp": "linear"
      },
      {
-      "time": 83.5814,
-      "value": 0.396556,
+      "time": 81.4507,
+      "value": 0.378354,
       "interp": "linear"
      },
      {
-      "time": 84.1761,
-      "value": 0.400314,
+      "time": 81.842,
+      "value": 0.38088,
       "interp": "linear"
      },
      {
-      "time": 85.0776,
-      "value": 0.406008,
+      "time": 82.267,
+      "value": 0.383624,
       "interp": "linear"
      },
      {
-      "time": 85.448,
-      "value": 0.408335,
+      "time": 82.6239,
+      "value": 0.385916,
       "interp": "linear"
      },
      {
-      "time": 85.8154,
-      "value": 0.410589,
+      "time": 83.0009,
+      "value": 0.388278,
       "interp": "linear"
      },
      {
-      "time": 86.2063,
-      "value": 0.41289,
+      "time": 83.4018,
+      "value": 0.390691,
       "interp": "linear"
      },
      {
-      "time": 86.5981,
-      "value": 0.415079,
+      "time": 83.8038,
+      "value": 0.392986,
       "interp": "linear"
      },
      {
-      "time": 86.9956,
-      "value": 0.417166,
+      "time": 84.2115,
+      "value": 0.395174,
       "interp": "linear"
      },
      {
-      "time": 87.4003,
-      "value": 0.419157,
+      "time": 84.6267,
+      "value": 0.397261,
       "interp": "linear"
      },
      {
-      "time": 87.8244,
-      "value": 0.421116,
+      "time": 85.0618,
+      "value": 0.399314,
       "interp": "linear"
      },
      {
-      "time": 88.2721,
-      "value": 0.423077,
+      "time": 85.5211,
+      "value": 0.401371,
       "interp": "linear"
      },
      {
-      "time": 88.7353,
-      "value": 0.425041,
+      "time": 85.9962,
+      "value": 0.403429,
       "interp": "linear"
      },
      {
-      "time": 89.1987,
-      "value": 0.426992,
+      "time": 86.4716,
+      "value": 0.405475,
       "interp": "linear"
      },
      {
-      "time": 89.6595,
-      "value": 0.428933,
+      "time": 86.9443,
+      "value": 0.40751,
       "interp": "linear"
      },
      {
-      "time": 90.1257,
-      "value": 0.430896,
+      "time": 87.4225,
+      "value": 0.409568,
       "interp": "linear"
      },
      {
-      "time": 90.5976,
-      "value": 0.432884,
+      "time": 87.9066,
+      "value": 0.411651,
       "interp": "linear"
      },
      {
-      "time": 91.0913,
-      "value": 0.434963,
+      "time": 88.4124,
+      "value": 0.413828,
       "interp": "linear"
      },
      {
-      "time": 91.6374,
-      "value": 0.437255,
+      "time": 88.956,
+      "value": 0.416168,
       "interp": "linear"
      },
      {
-      "time": 92.2204,
-      "value": 0.439634,
+      "time": 89.5074,
+      "value": 0.418541,
       "interp": "linear"
      },
      {
-      "time": 92.8449,
-      "value": 0.442055,
+      "time": 90.0632,
+      "value": 0.420933,
       "interp": "linear"
      },
      {
-      "time": 93.5535,
-      "value": 0.444617,
+      "time": 90.6312,
+      "value": 0.423378,
       "interp": "linear"
      },
      {
-      "time": 94.3701,
-      "value": 0.44735,
+      "time": 91.2056,
+      "value": 0.42585,
       "interp": "linear"
      },
      {
-      "time": 95.2686,
-      "value": 0.450151,
+      "time": 91.7706,
+      "value": 0.428282,
       "interp": "linear"
      },
      {
-      "time": 96.1984,
-      "value": 0.452915,
+      "time": 92.3171,
+      "value": 0.430634,
       "interp": "linear"
      },
      {
-      "time": 97.0717,
-      "value": 0.455478,
+      "time": 92.8453,
+      "value": 0.432907,
       "interp": "linear"
      },
      {
-      "time": 97.8562,
-      "value": 0.457841,
+      "time": 93.3764,
+      "value": 0.435193,
       "interp": "linear"
      },
      {
-      "time": 98.5912,
-      "value": 0.460188,
+      "time": 93.92,
+      "value": 0.437534,
       "interp": "linear"
      },
      {
-      "time": 99.265,
-      "value": 0.462557,
+      "time": 94.474,
+      "value": 0.439971,
       "interp": "linear"
      },
      {
-      "time": 99.8623,
-      "value": 0.464927,
+      "time": 95.0206,
+      "value": 0.442487,
       "interp": "linear"
      },
      {
-      "time": 100.4938,
-      "value": 0.467763,
+      "time": 95.6016,
+      "value": 0.445325,
       "interp": "linear"
      },
      {
-      "time": 101.0287,
-      "value": 0.470442,
+      "time": 96.1306,
+      "value": 0.448083,
       "interp": "linear"
      },
      {
-      "time": 101.4957,
-      "value": 0.472981,
+      "time": 96.6095,
+      "value": 0.450745,
       "interp": "linear"
      },
      {
-      "time": 101.9436,
-      "value": 0.475561,
+      "time": 97.0691,
+      "value": 0.45345,
       "interp": "linear"
      },
      {
-      "time": 102.3353,
-      "value": 0.477925,
+      "time": 97.4709,
+      "value": 0.455928,
       "interp": "linear"
      },
      {
-      "time": 102.7211,
-      "value": 0.480328,
+      "time": 97.8667,
+      "value": 0.458447,
       "interp": "linear"
      },
      {
-      "time": 103.1586,
-      "value": 0.483091,
+      "time": 98.3154,
+      "value": 0.461343,
       "interp": "linear"
      },
      {
-      "time": 103.6286,
-      "value": 0.48606,
+      "time": 98.7976,
+      "value": 0.464456,
       "interp": "linear"
      },
      {
-      "time": 104.1798,
-      "value": 0.489542,
+      "time": 99.363,
+      "value": 0.468106,
       "interp": "linear"
      },
      {
-      "time": 104.6995,
-      "value": 0.492825,
+      "time": 99.8962,
+      "value": 0.471549,
       "interp": "linear"
      },
      {
-      "time": 105.1827,
-      "value": 0.495878,
+      "time": 100.3919,
+      "value": 0.474749,
       "interp": "linear"
      },
      {
-      "time": 105.6014,
-      "value": 0.498523,
+      "time": 100.8214,
+      "value": 0.477522,
       "interp": "linear"
      },
      {
-      "time": 105.9447,
-      "value": 0.500691,
+      "time": 101.1735,
+      "value": 0.479795,
       "interp": "linear"
      },
      {
-      "time": 106.2699,
-      "value": 0.502746,
+      "time": 101.5072,
+      "value": 0.481949,
       "interp": "linear"
      },
      {
-      "time": 106.5285,
-      "value": 0.504375,
+      "time": 101.7725,
+      "value": 0.483657,
       "interp": "linear"
      },
      {
-      "time": 106.7816,
-      "value": 0.505936,
+      "time": 102.0321,
+      "value": 0.485294,
       "interp": "linear"
      },
      {
-      "time": 107.0888,
-      "value": 0.507761,
+      "time": 102.3469,
+      "value": 0.487205,
       "interp": "linear"
      },
      {
-      "time": 107.4821,
-      "value": 0.509975,
+      "time": 102.7398,
+      "value": 0.489472,
       "interp": "linear"
      },
      {
-      "time": 107.9223,
-      "value": 0.512248,
+      "time": 103.1834,
+      "value": 0.491881,
       "interp": "linear"
      },
      {
-      "time": 108.4121,
-      "value": 0.514501,
+      "time": 103.694,
+      "value": 0.49448,
       "interp": "linear"
      },
      {
-      "time": 109.0376,
-      "value": 0.517019,
+      "time": 104.3166,
+      "value": 0.497452,
       "interp": "linear"
      },
      {
-      "time": 109.8456,
-      "value": 0.519869,
+      "time": 105.0243,
+      "value": 0.500648,
       "interp": "linear"
      },
      {
-      "time": 111.1188,
-      "value": 0.523896,
+      "time": 105.7619,
+      "value": 0.503857,
       "interp": "linear"
      },
      {
-      "time": 112.1399,
-      "value": 0.526937,
+      "time": 106.3839,
+      "value": 0.506534,
       "interp": "linear"
      },
      {
-      "time": 112.6205,
-      "value": 0.528347,
+      "time": 106.8865,
+      "value": 0.508698,
       "interp": "linear"
      },
      {
-      "time": 113.1266,
-      "value": 0.529868,
+      "time": 107.3731,
+      "value": 0.510792,
       "interp": "linear"
      },
      {
-      "time": 113.8177,
-      "value": 0.532065,
+      "time": 107.8774,
+      "value": 0.512962,
       "interp": "linear"
      },
      {
-      "time": 114.5085,
-      "value": 0.53443,
+      "time": 108.384,
+      "value": 0.515143,
       "interp": "linear"
      },
      {
-      "time": 115.1435,
-      "value": 0.536777,
+      "time": 108.9131,
+      "value": 0.517404,
       "interp": "linear"
      },
      {
-      "time": 115.7081,
-      "value": 0.539005,
+      "time": 109.4971,
+      "value": 0.519819,
       "interp": "linear"
      },
      {
-      "time": 116.2192,
-      "value": 0.541114,
+      "time": 110.1416,
+      "value": 0.522339,
       "interp": "linear"
      },
      {
-      "time": 116.7099,
-      "value": 0.543179,
+      "time": 110.8071,
+      "value": 0.52476,
       "interp": "linear"
      },
      {
-      "time": 117.1896,
-      "value": 0.5452,
+      "time": 111.4877,
+      "value": 0.527051,
       "interp": "linear"
      },
      {
-      "time": 117.6663,
-      "value": 0.547207,
+      "time": 112.2069,
+      "value": 0.529315,
       "interp": "linear"
      },
      {
-      "time": 118.1471,
-      "value": 0.549232,
+      "time": 113.0004,
+      "value": 0.531712,
       "interp": "linear"
      },
      {
-      "time": 118.6409,
-      "value": 0.551312,
+      "time": 113.8471,
+      "value": 0.534257,
       "interp": "linear"
      },
      {
-      "time": 119.1379,
-      "value": 0.553405,
+      "time": 114.7357,
+      "value": 0.537019,
       "interp": "linear"
      },
      {
-      "time": 119.6355,
-      "value": 0.555501,
+      "time": 115.5804,
+      "value": 0.539815,
       "interp": "linear"
      },
      {
-      "time": 120.1252,
-      "value": 0.557563,
+      "time": 116.3085,
+      "value": 0.542415,
       "interp": "linear"
      },
      {
-      "time": 120.6068,
-      "value": 0.559591,
+      "time": 116.912,
+      "value": 0.544737,
       "interp": "linear"
      },
      {
-      "time": 121.0667,
-      "value": 0.561528,
+      "time": 117.4238,
+      "value": 0.546829,
       "interp": "linear"
      },
      {
-      "time": 121.506,
-      "value": 0.563379,
+      "time": 117.8813,
+      "value": 0.548774,
       "interp": "linear"
      },
      {
-      "time": 121.945,
-      "value": 0.565228,
+      "time": 118.3318,
+      "value": 0.550713,
       "interp": "linear"
      },
      {
-      "time": 122.3939,
-      "value": 0.567118,
+      "time": 118.7923,
+      "value": 0.552695,
       "interp": "linear"
      },
      {
-      "time": 122.8811,
-      "value": 0.56917,
+      "time": 119.2921,
+      "value": 0.554846,
       "interp": "linear"
      },
      {
-      "time": 123.3903,
-      "value": 0.571315,
+      "time": 119.8145,
+      "value": 0.557095,
       "interp": "linear"
      },
      {
-      "time": 123.9352,
-      "value": 0.573609,
+      "time": 120.3734,
+      "value": 0.5595,
       "interp": "linear"
      },
      {
-      "time": 124.5145,
-      "value": 0.576049,
+      "time": 120.9677,
+      "value": 0.562058,
       "interp": "linear"
      },
      {
-      "time": 125.1057,
-      "value": 0.578539,
+      "time": 121.5741,
+      "value": 0.564668,
       "interp": "linear"
      },
      {
-      "time": 125.7079,
-      "value": 0.581075,
+      "time": 122.1919,
+      "value": 0.567327,
       "interp": "linear"
      },
      {
-      "time": 126.3123,
-      "value": 0.583621,
+      "time": 122.812,
+      "value": 0.569996,
       "interp": "linear"
      },
      {
-      "time": 126.9523,
-      "value": 0.586316,
+      "time": 123.4684,
+      "value": 0.572821,
       "interp": "linear"
      },
      {
-      "time": 127.6233,
-      "value": 0.589142,
+      "time": 124.1569,
+      "value": 0.575784,
       "interp": "linear"
      },
      {
-      "time": 128.3204,
-      "value": 0.5921,
+      "time": 124.872,
+      "value": 0.578886,
       "interp": "linear"
      },
      {
-      "time": 129.0117,
-      "value": 0.595137,
+      "time": 125.5811,
+      "value": 0.582069,
       "interp": "linear"
      },
      {
-      "time": 129.6303,
-      "value": 0.598004,
+      "time": 126.2157,
+      "value": 0.585074,
       "interp": "linear"
      },
      {
-      "time": 130.1822,
-      "value": 0.600728,
+      "time": 126.7818,
+      "value": 0.587931,
       "interp": "linear"
      },
      {
-      "time": 130.6655,
-      "value": 0.603276,
+      "time": 127.2777,
+      "value": 0.590602,
       "interp": "linear"
      },
      {
-      "time": 131.0925,
-      "value": 0.605669,
+      "time": 127.7157,
+      "value": 0.59311,
       "interp": "linear"
      },
      {
-      "time": 131.4804,
-      "value": 0.607959,
+      "time": 128.1137,
+      "value": 0.595512,
       "interp": "linear"
      },
      {
-      "time": 131.8399,
-      "value": 0.610168,
+      "time": 128.4824,
+      "value": 0.597827,
       "interp": "linear"
      },
      {
-      "time": 132.2022,
-      "value": 0.612446,
+      "time": 128.8541,
+      "value": 0.600215,
       "interp": "linear"
      },
      {
-      "time": 132.6124,
-      "value": 0.615038,
+      "time": 129.2749,
+      "value": 0.602932,
       "interp": "linear"
      },
      {
-      "time": 133.1487,
-      "value": 0.618425,
+      "time": 129.825,
+      "value": 0.606484,
       "interp": "linear"
      },
      {
-      "time": 133.7723,
-      "value": 0.622365,
+      "time": 130.4647,
+      "value": 0.610613,
       "interp": "linear"
      },
      {
-      "time": 134.3902,
-      "value": 0.626268,
+      "time": 131.0986,
+      "value": 0.614706,
       "interp": "linear"
      },
      {
-      "time": 134.9414,
-      "value": 0.629751,
+      "time": 131.6641,
+      "value": 0.618357,
       "interp": "linear"
      },
      {
-      "time": 135.3754,
-      "value": 0.632492,
+      "time": 132.1092,
+      "value": 0.621231,
+      "interp": "linear"
+     },
+     {
+      "time": 132.3755,
+      "value": 0.622949,
+      "interp": "linear"
+     },
+     {
+      "time": 132.6492,
+      "value": 0.624717,
+      "interp": "linear"
+     },
+     {
+      "time": 133.0154,
+      "value": 0.627055,
+      "interp": "linear"
+     },
+     {
+      "time": 133.3564,
+      "value": 0.629168,
+      "interp": "linear"
+     },
+     {
+      "time": 133.7096,
+      "value": 0.631261,
+      "interp": "linear"
+     },
+     {
+      "time": 134.0908,
+      "value": 0.633397,
+      "interp": "linear"
+     },
+     {
+      "time": 134.5494,
+      "value": 0.635808,
+      "interp": "linear"
+     },
+     {
+      "time": 135.078,
+      "value": 0.638412,
       "interp": "linear"
      },
      {
       "time": 135.6349,
-      "value": 0.634131,
+      "value": 0.640994,
       "interp": "linear"
      },
      {
-      "time": 135.9018,
-      "value": 0.635817,
+      "time": 136.2497,
+      "value": 0.643711,
       "interp": "linear"
      },
      {
-      "time": 136.2587,
-      "value": 0.638047,
+      "time": 136.9794,
+      "value": 0.646857,
       "interp": "linear"
      },
      {
-      "time": 136.5912,
-      "value": 0.640064,
+      "time": 137.606,
+      "value": 0.649554,
       "interp": "linear"
      },
      {
-      "time": 136.9354,
-      "value": 0.64206,
+      "time": 138.1776,
+      "value": 0.652014,
       "interp": "linear"
      },
      {
-      "time": 137.307,
-      "value": 0.644097,
+      "time": 138.7496,
+      "value": 0.654476,
       "interp": "linear"
      },
      {
-      "time": 137.754,
-      "value": 0.646397,
+      "time": 139.3152,
+      "value": 0.65691,
       "interp": "linear"
      },
      {
-      "time": 138.2694,
-      "value": 0.648881,
+      "time": 139.8683,
+      "value": 0.659291,
       "interp": "linear"
      },
      {
-      "time": 138.81,
-      "value": 0.651333,
+      "time": 140.3997,
+      "value": 0.661578,
       "interp": "linear"
      },
      {
-      "time": 139.3978,
-      "value": 0.653846,
+      "time": 140.8982,
+      "value": 0.663724,
       "interp": "linear"
      },
      {
-      "time": 140.2404,
-      "value": 0.657226,
+      "time": 141.3706,
+      "value": 0.665752,
       "interp": "linear"
      },
      {
-      "time": 141.1242,
-      "value": 0.660559,
+      "time": 141.8401,
+      "value": 0.667719,
       "interp": "linear"
      },
      {
-      "time": 141.857,
-      "value": 0.663124,
+      "time": 142.3443,
+      "value": 0.669729,
       "interp": "linear"
      },
      {
-      "time": 142.6504,
-      "value": 0.665698,
+      "time": 142.9108,
+      "value": 0.671838,
       "interp": "linear"
      },
      {
-      "time": 143.5076,
-      "value": 0.668308,
+      "time": 143.5471,
+      "value": 0.674031,
       "interp": "linear"
      },
      {
-      "time": 144.3621,
-      "value": 0.670823,
+      "time": 144.2368,
+      "value": 0.676243,
       "interp": "linear"
      },
      {
-      "time": 145.1044,
-      "value": 0.673015,
+      "time": 144.9408,
+      "value": 0.67839,
       "interp": "linear"
      },
      {
-      "time": 145.7044,
-      "value": 0.674861,
+      "time": 145.6683,
+      "value": 0.680579,
       "interp": "linear"
      },
      {
-      "time": 146.2348,
-      "value": 0.676606,
+      "time": 146.3957,
+      "value": 0.682886,
       "interp": "linear"
      },
      {
-      "time": 146.7354,
-      "value": 0.678384,
+      "time": 147.1158,
+      "value": 0.685424,
       "interp": "linear"
      },
      {
-      "time": 147.2276,
-      "value": 0.680264,
+      "time": 147.7667,
+      "value": 0.688052,
       "interp": "linear"
      },
      {
-      "time": 147.7102,
-      "value": 0.682215,
+      "time": 148.328,
+      "value": 0.690664,
       "interp": "linear"
      },
      {
-      "time": 148.1861,
-      "value": 0.684204,
+      "time": 148.8408,
+      "value": 0.693378,
       "interp": "linear"
      },
      {
-      "time": 148.6575,
-      "value": 0.68619,
+      "time": 149.2885,
+      "value": 0.695997,
       "interp": "linear"
      },
      {
-      "time": 149.1148,
-      "value": 0.688116,
+      "time": 149.6922,
+      "value": 0.698513,
       "interp": "linear"
      },
      {
-      "time": 149.5813,
-      "value": 0.690088,
+      "time": 150.0638,
+      "value": 0.700894,
       "interp": "linear"
      },
      {
-      "time": 150.065,
-      "value": 0.692195,
+      "time": 150.4776,
+      "value": 0.703566,
       "interp": "linear"
      },
      {
-      "time": 150.5652,
-      "value": 0.694488,
+      "time": 151.0274,
+      "value": 0.707115,
       "interp": "linear"
      },
      {
-      "time": 151.0598,
-      "value": 0.6969,
+      "time": 151.6669,
+      "value": 0.711244,
       "interp": "linear"
      },
      {
-      "time": 151.5278,
-      "value": 0.699337,
+      "time": 152.2938,
+      "value": 0.715291,
       "interp": "linear"
      },
      {
-      "time": 151.9762,
-      "value": 0.701822,
+      "time": 152.9336,
+      "value": 0.719422,
       "interp": "linear"
      },
      {
-      "time": 152.3959,
-      "value": 0.704278,
+      "time": 153.5098,
+      "value": 0.723142,
       "interp": "linear"
      },
      {
-      "time": 152.7886,
-      "value": 0.706676,
+      "time": 153.9681,
+      "value": 0.726101,
       "interp": "linear"
      },
      {
-      "time": 153.1509,
-      "value": 0.708947,
+      "time": 154.3857,
+      "value": 0.728796,
       "interp": "linear"
      },
      {
-      "time": 153.5543,
-      "value": 0.711496,
+      "time": 154.8319,
+      "value": 0.731656,
       "interp": "linear"
      },
      {
-      "time": 154.0902,
-      "value": 0.714881,
+      "time": 155.3452,
+      "value": 0.734859,
       "interp": "linear"
      },
      {
-      "time": 154.7136,
-      "value": 0.718819,
+      "time": 155.9464,
+      "value": 0.738456,
       "interp": "linear"
      },
      {
-      "time": 155.3247,
-      "value": 0.72268,
+      "time": 156.6467,
+      "value": 0.742424,
       "interp": "linear"
      },
      {
-      "time": 155.9484,
-      "value": 0.72662,
+      "time": 157.4202,
+      "value": 0.746541,
       "interp": "linear"
      },
      {
-      "time": 156.5101,
-      "value": 0.730168,
+      "time": 158.2078,
+      "value": 0.750464,
       "interp": "linear"
      },
      {
-      "time": 156.9569,
-      "value": 0.732991,
+      "time": 158.9713,
+      "value": 0.753963,
       "interp": "linear"
      },
      {
-      "time": 157.3639,
-      "value": 0.735562,
+      "time": 159.6244,
+      "value": 0.756678,
       "interp": "linear"
      },
      {
-      "time": 157.7988,
-      "value": 0.738289,
+      "time": 160.169,
+      "value": 0.758735,
       "interp": "linear"
      },
      {
-      "time": 158.2992,
-      "value": 0.741345,
+      "time": 160.6789,
+      "value": 0.760511,
       "interp": "linear"
      },
      {
-      "time": 158.8853,
-      "value": 0.744776,
+      "time": 161.0472,
+      "value": 0.761703,
       "interp": "linear"
      },
      {
-      "time": 159.5679,
-      "value": 0.74856,
+      "time": 161.7415,
+      "value": 0.76383,
       "interp": "linear"
      },
      {
-      "time": 160.3218,
-      "value": 0.752488,
+      "time": 162.7813,
+      "value": 0.766947,
       "interp": "linear"
      },
      {
-      "time": 161.0841,
-      "value": 0.756206,
+      "time": 163.4055,
+      "value": 0.76885,
       "interp": "linear"
      },
      {
-      "time": 161.7901,
-      "value": 0.759443,
+      "time": 163.9664,
+      "value": 0.770651,
       "interp": "linear"
      },
      {
-      "time": 162.3567,
-      "value": 0.761913,
+      "time": 164.6081,
+      "value": 0.772865,
       "interp": "linear"
      },
      {
-      "time": 162.774,
-      "value": 0.763677,
+      "time": 165.2264,
+      "value": 0.775169,
       "interp": "linear"
      },
      {
-      "time": 163.149,
-      "value": 0.765257,
+      "time": 165.7705,
+      "value": 0.77734,
       "interp": "linear"
      },
      {
-      "time": 163.5253,
-      "value": 0.766842,
+      "time": 166.2492,
+      "value": 0.779346,
       "interp": "linear"
      },
      {
-      "time": 163.9636,
-      "value": 0.768688,
+      "time": 166.6945,
+      "value": 0.781258,
       "interp": "linear"
      },
      {
-      "time": 164.4546,
-      "value": 0.770755,
+      "time": 167.1166,
+      "value": 0.783075,
       "interp": "linear"
      },
      {
-      "time": 164.909,
-      "value": 0.772669,
+      "time": 167.531,
+      "value": 0.784859,
       "interp": "linear"
      },
      {
-      "time": 165.3404,
-      "value": 0.774486,
+      "time": 167.9582,
+      "value": 0.786697,
       "interp": "linear"
      },
      {
-      "time": 165.7731,
-      "value": 0.776308,
+      "time": 168.4045,
+      "value": 0.788618,
       "interp": "linear"
      },
      {
-      "time": 166.2109,
-      "value": 0.778152,
+      "time": 168.8681,
+      "value": 0.790614,
       "interp": "linear"
      },
      {
-      "time": 166.6531,
-      "value": 0.780014,
+      "time": 169.3399,
+      "value": 0.792644,
       "interp": "linear"
      },
      {
-      "time": 167.0949,
-      "value": 0.781875,
+      "time": 169.8343,
+      "value": 0.794772,
       "interp": "linear"
      },
      {
-      "time": 167.5277,
-      "value": 0.783698,
+      "time": 170.3478,
+      "value": 0.796982,
       "interp": "linear"
      },
      {
-      "time": 167.9392,
-      "value": 0.785431,
+      "time": 170.8812,
+      "value": 0.799278,
       "interp": "linear"
      },
      {
-      "time": 168.3432,
-      "value": 0.787132,
+      "time": 171.4872,
+      "value": 0.801886,
       "interp": "linear"
      },
      {
-      "time": 168.7596,
-      "value": 0.788886,
+      "time": 172.1315,
+      "value": 0.804659,
       "interp": "linear"
      },
      {
-      "time": 169.1947,
-      "value": 0.790718,
+      "time": 172.7244,
+      "value": 0.807211,
       "interp": "linear"
      },
      {
-      "time": 169.6466,
-      "value": 0.792622,
+      "time": 173.2708,
+      "value": 0.809563,
       "interp": "linear"
      },
      {
-      "time": 170.1065,
-      "value": 0.794559,
+      "time": 173.8567,
+      "value": 0.812085,
       "interp": "linear"
      },
      {
-      "time": 170.5885,
-      "value": 0.796588,
+      "time": 174.423,
+      "value": 0.814522,
       "interp": "linear"
      },
      {
-      "time": 171.09,
-      "value": 0.798701,
+      "time": 174.9369,
+      "value": 0.816734,
       "interp": "linear"
      },
      {
-      "time": 171.6182,
-      "value": 0.800909,
+      "time": 175.4145,
+      "value": 0.81879,
       "interp": "linear"
      },
      {
-      "time": 172.2673,
-      "value": 0.803532,
+      "time": 175.9724,
+      "value": 0.821191,
       "interp": "linear"
      },
      {
-      "time": 173.0979,
-      "value": 0.806705,
+      "time": 176.4979,
+      "value": 0.823452,
       "interp": "linear"
      },
      {
-      "time": 173.8579,
-      "value": 0.809405,
+      "time": 176.9611,
+      "value": 0.825478,
       "interp": "linear"
      },
      {
-      "time": 174.5047,
-      "value": 0.811533,
+      "time": 177.349,
+      "value": 0.827246,
       "interp": "linear"
      },
      {
-      "time": 175.3048,
-      "value": 0.813994,
+      "time": 177.7736,
+      "value": 0.829295,
       "interp": "linear"
      },
      {
-      "time": 176.116,
-      "value": 0.81639,
+      "time": 178.1472,
+      "value": 0.83122,
       "interp": "linear"
      },
      {
-      "time": 176.8373,
-      "value": 0.818513,
+      "time": 178.4671,
+      "value": 0.832978,
       "interp": "linear"
      },
      {
-      "time": 177.5443,
-      "value": 0.820666,
+      "time": 178.7924,
+      "value": 0.834873,
       "interp": "linear"
      },
      {
-      "time": 178.4165,
-      "value": 0.823495,
+      "time": 179.112,
+      "value": 0.836829,
       "interp": "linear"
      },
      {
-      "time": 179.1646,
-      "value": 0.826114,
+      "time": 179.376,
+      "value": 0.838502,
       "interp": "linear"
      },
      {
-      "time": 179.7555,
-      "value": 0.828377,
+      "time": 179.7079,
+      "value": 0.840642,
       "interp": "linear"
      },
      {
-      "time": 180.1854,
-      "value": 0.830201,
+      "time": 180.0158,
+      "value": 0.84263,
       "interp": "linear"
      },
      {
-      "time": 180.6074,
-      "value": 0.832171,
+      "time": 180.4325,
+      "value": 0.84532,
       "interp": "linear"
      },
      {
-      "time": 180.9718,
-      "value": 0.834007,
+      "time": 180.8957,
+      "value": 0.84831,
       "interp": "linear"
      },
      {
-      "time": 181.2836,
-      "value": 0.835684,
+      "time": 181.4008,
+      "value": 0.851571,
       "interp": "linear"
      },
      {
-      "time": 181.6007,
-      "value": 0.837492,
+      "time": 181.8232,
+      "value": 0.854299,
       "interp": "linear"
      },
      {
-      "time": 181.9123,
-      "value": 0.839358,
+      "time": 182.1544,
+      "value": 0.856437,
       "interp": "linear"
      },
      {
-      "time": 182.1696,
-      "value": 0.840953,
+      "time": 182.5108,
+      "value": 0.858737,
       "interp": "linear"
      },
      {
-      "time": 182.4931,
-      "value": 0.842995,
+      "time": 182.771,
+      "value": 0.860415,
       "interp": "linear"
      },
      {
-      "time": 182.7933,
-      "value": 0.844891,
+      "time": 183.0749,
+      "value": 0.862341,
       "interp": "linear"
      },
      {
-      "time": 183.1995,
-      "value": 0.847457,
+      "time": 183.54,
+      "value": 0.865188,
       "interp": "linear"
      },
      {
-      "time": 183.651,
-      "value": 0.850309,
+      "time": 184.0023,
+      "value": 0.867883,
       "interp": "linear"
      },
      {
-      "time": 184.1434,
-      "value": 0.85342,
+      "time": 184.6066,
+      "value": 0.871204,
       "interp": "linear"
      },
      {
-      "time": 184.5552,
-      "value": 0.856021,
+      "time": 185.4455,
+      "value": 0.875525,
       "interp": "linear"
      },
      {
-      "time": 184.878,
-      "value": 0.858061,
+      "time": 186.2751,
+      "value": 0.879531,
       "interp": "linear"
      },
      {
-      "time": 185.2254,
-      "value": 0.860255,
+      "time": 187.0965,
+      "value": 0.883275,
       "interp": "linear"
      },
      {
-      "time": 185.4791,
-      "value": 0.861856,
+      "time": 187.8416,
+      "value": 0.886534,
       "interp": "linear"
      },
      {
-      "time": 185.7753,
-      "value": 0.863693,
+      "time": 188.4652,
+      "value": 0.889217,
       "interp": "linear"
      },
      {
-      "time": 186.2287,
-      "value": 0.866408,
+      "time": 189.0539,
+      "value": 0.891751,
       "interp": "linear"
      },
      {
-      "time": 186.6794,
-      "value": 0.868979,
+      "time": 189.6432,
+      "value": 0.894288,
       "interp": "linear"
      },
      {
-      "time": 187.267,
-      "value": 0.872137,
+      "time": 190.2254,
+      "value": 0.896794,
       "interp": "linear"
      },
      {
-      "time": 188.1389,
-      "value": 0.876489,
+      "time": 190.8123,
+      "value": 0.89932,
       "interp": "linear"
      },
      {
-      "time": 189.001,
-      "value": 0.880442,
-      "interp": "linear"
-     },
-     {
-      "time": 189.882,
-      "value": 0.884139,
-      "interp": "linear"
-     },
-     {
-      "time": 190.708,
-      "value": 0.887336,
-      "interp": "linear"
-     },
-     {
-      "time": 191.4538,
-      "value": 0.89005,
-      "interp": "linear"
-     },
-     {
-      "time": 192.3358,
-      "value": 0.893103,
-      "interp": "linear"
-     },
-     {
-      "time": 193.3096,
-      "value": 0.89631,
-      "interp": "linear"
-     },
-     {
-      "time": 194.2644,
-      "value": 0.899314,
-      "interp": "linear"
-     },
-     {
-      "time": 195.1024,
+      "time": 191.4013,
       "value": 0.901855,
       "interp": "linear"
      },
      {
-      "time": 195.8085,
-      "value": 0.903945,
+      "time": 191.998,
+      "value": 0.904423,
       "interp": "linear"
      },
      {
-      "time": 196.5258,
-      "value": 0.906049,
+      "time": 192.606,
+      "value": 0.90704,
       "interp": "linear"
      },
      {
-      "time": 197.3943,
-      "value": 0.908616,
+      "time": 193.206,
+      "value": 0.909622,
       "interp": "linear"
      },
      {
-      "time": 198.3591,
-      "value": 0.911534,
+      "time": 193.7886,
+      "value": 0.91213,
       "interp": "linear"
      },
      {
-      "time": 199.3192,
-      "value": 0.914546,
+      "time": 194.3418,
+      "value": 0.914511,
       "interp": "linear"
      },
      {
-      "time": 200.1732,
-      "value": 0.917348,
+      "time": 194.8613,
+      "value": 0.916747,
       "interp": "linear"
      },
      {
-      "time": 200.912,
-      "value": 0.919896,
+      "time": 195.3501,
+      "value": 0.91885,
       "interp": "linear"
      },
      {
-      "time": 201.5596,
-      "value": 0.922243,
+      "time": 195.8043,
+      "value": 0.920805,
       "interp": "linear"
      },
      {
-      "time": 202.119,
-      "value": 0.924367,
+      "time": 196.3058,
+      "value": 0.922964,
       "interp": "linear"
      },
      {
-      "time": 202.6642,
-      "value": 0.926522,
+      "time": 196.8875,
+      "value": 0.925494,
       "interp": "linear"
      },
      {
-      "time": 203.2501,
-      "value": 0.928937,
+      "time": 197.5272,
+      "value": 0.928383,
       "interp": "linear"
      },
      {
-      "time": 203.8791,
-      "value": 0.931686,
+      "time": 198.1761,
+      "value": 0.931479,
       "interp": "linear"
      },
      {
-      "time": 204.5122,
-      "value": 0.93464,
+      "time": 198.8161,
+      "value": 0.934734,
       "interp": "linear"
      },
      {
-      "time": 205.1361,
-      "value": 0.937745,
+      "time": 199.5008,
+      "value": 0.938452,
       "interp": "linear"
      },
      {
-      "time": 205.8036,
-      "value": 0.941292,
+      "time": 200.1258,
+      "value": 0.942057,
       "interp": "linear"
      },
      {
-      "time": 206.4128,
-      "value": 0.94473,
+      "time": 200.6302,
+      "value": 0.945118,
       "interp": "linear"
      },
      {
-      "time": 206.9045,
-      "value": 0.94765,
+      "time": 201.0818,
+      "value": 0.947965,
       "interp": "linear"
      },
      {
-      "time": 207.3447,
-      "value": 0.950365,
+      "time": 201.5218,
+      "value": 0.950797,
       "interp": "linear"
      },
      {
-      "time": 207.7736,
-      "value": 0.953066,
+      "time": 201.9794,
+      "value": 0.953751,
       "interp": "linear"
      },
      {
-      "time": 208.2198,
-      "value": 0.955885,
+      "time": 202.5387,
+      "value": 0.957362,
       "interp": "linear"
      },
      {
-      "time": 208.7649,
-      "value": 0.959329,
+      "time": 203.1293,
+      "value": 0.961175,
       "interp": "linear"
      },
      {
-      "time": 209.3407,
-      "value": 0.962966,
+      "time": 203.7029,
+      "value": 0.964878,
       "interp": "linear"
      },
      {
-      "time": 209.8998,
-      "value": 0.966498,
+      "time": 204.2602,
+      "value": 0.968476,
       "interp": "linear"
      },
      {
-      "time": 210.4431,
-      "value": 0.96993,
+      "time": 204.7322,
+      "value": 0.971523,
       "interp": "linear"
      },
      {
-      "time": 210.9032,
-      "value": 0.972837,
+      "time": 205.1777,
+      "value": 0.974399,
       "interp": "linear"
      },
      {
-      "time": 211.3374,
-      "value": 0.97558,
+      "time": 205.5819,
+      "value": 0.977008,
       "interp": "linear"
      },
      {
-      "time": 211.7315,
-      "value": 0.978069,
+      "time": 206.0435,
+      "value": 0.979947,
       "interp": "linear"
      },
      {
-      "time": 212.1814,
-      "value": 0.980872,
+      "time": 206.5732,
+      "value": 0.983214,
       "interp": "linear"
      },
      {
-      "time": 212.6978,
-      "value": 0.983988,
+      "time": 207.1306,
+      "value": 0.986496,
       "interp": "linear"
      },
      {
-      "time": 213.2411,
-      "value": 0.987119,
+      "time": 207.6718,
+      "value": 0.989506,
       "interp": "linear"
      },
      {
-      "time": 213.7688,
-      "value": 0.98999,
+      "time": 208.1752,
+      "value": 0.992131,
       "interp": "linear"
      },
      {
-      "time": 214.2595,
-      "value": 0.992494,
+      "time": 208.6386,
+      "value": 0.994395,
       "interp": "linear"
      },
      {
-      "time": 214.7112,
-      "value": 0.994654,
+      "time": 209.0776,
+      "value": 0.996416,
       "interp": "linear"
      },
      {
-      "time": 215.1391,
-      "value": 0.996581,
+      "time": 209.5303,
+      "value": 0.998408,
       "interp": "linear"
      },
      {
-      "time": 215.5805,
-      "value": 0.998482,
-      "interp": "linear"
-     },
-     {
-      "time": 215.9397,
+      "time": 209.8989,
       "value": 1.0,
       "interp": "step"
      }
@@ -2001,6 +2001,10 @@
      },
      {
       "name": "surge",
+      "default": 0.0
+     },
+     {
+      "name": "scantrig",
       "default": 0.0
      },
      {
@@ -3038,7 +3042,7 @@
   {
    "source": "macro.swell",
    "target": "material/rw_ground/op/27/saturate/value",
-   "amount": 0.75,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3046,7 +3050,7 @@
   {
    "source": "macro.swell",
    "target": "material/rw_ground/op/28/constant/constant",
-   "amount": 0.22,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3054,7 +3058,7 @@
   {
    "source": "macro.swell",
    "target": "material/rw_ground_lip/op/27/saturate/value",
-   "amount": 0.75,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3062,7 +3066,7 @@
   {
    "source": "macro.swell",
    "target": "material/rw_ground_lip/op/28/constant/constant",
-   "amount": 0.22,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3070,7 +3074,7 @@
   {
    "source": "macro.swell",
    "target": "material/rw_grass/op/11/saturate/value",
-   "amount": 0.75,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3078,7 +3082,7 @@
   {
    "source": "macro.swell",
    "target": "material/rw_grass/op/12/constant/constant",
-   "amount": 0.22,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3537,7 +3541,8 @@
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "gain": 4.5,
+    "gain": 8.0,
+    "offset": -0.4,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
@@ -3550,163 +3555,139 @@
    "depthMax": 1.0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_rainbow/op/35/constant/constant",
    "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_rainbow/op/23/constant/constant",
    "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_rainbow2/op/35/constant/constant",
    "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_rainbow2/op/23/constant/constant",
    "amount": 10.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_ground/op/31/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "envelope": "linearfall",
     "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/31/remap/constant",
-   "amount": -1600.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/31/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/32/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/32/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/39/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/39/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/40/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground/op/40/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
@@ -3718,115 +3699,115 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_ground/op/43/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_ground_lip/op/31/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "envelope": "linearfall",
     "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/31/remap/constant",
-   "amount": -1600.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/31/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/32/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/32/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/39/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/39/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/40/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_ground_lip/op/40/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
@@ -3838,115 +3819,115 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_ground_lip/op/43/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_grass/op/15/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "envelope": "linearfall",
     "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/15/remap/constant",
-   "amount": -1600.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/15/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/16/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/16/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/23/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/23/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/24/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_grass/op/24/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
@@ -3958,115 +3939,115 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_grass/op/27/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_rock/op/16/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "envelope": "linearfall",
     "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "beat.phrasePulse",
-   "target": "material/rw_rock/op/16/remap/constant",
-   "amount": -1600.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/16/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/17/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/17/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/24/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/24/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/25/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
    "source": "beat.phrasePulse",
    "target": "material/rw_rock/op/25/remap/constant",
-   "amount": -1600.0,
+   "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.18181818181818182
+    "envelopeFallPerSecond": 0.25,
+    "delayMs": 300.0
    }
   },
   {
@@ -4078,54 +4059,45 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_rock/op/28/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "macros/scantrig",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
+    "delayMs": 300.0,
+    "envelope": "peakhold",
+    "envelopeHoldMs": 60.0,
+    "envelopeFallPerSecond": 20.0
    },
    "depthSource": "macro.surge",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scantrig",
    "target": "macros/scan",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.6,
     "envelope": "peakhold",
     "envelopeHoldMs": 6000.0,
     "envelopeFallPerSecond": 0.33,
-    "attackMs": 300.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "beat.phrasePulse",
-   "target": "macros/scan",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "peakhold",
-    "envelopeHoldMs": 6000.0,
-    "envelopeFallPerSecond": 0.33,
-    "attackMs": 300.0
-   },
-   "depthSource": "macro.lift",
-   "depthMin": -0.6,
-   "depthMax": 1.4
+    "attackMs": 250.0
+   }
   },
   {
    "source": "macro.one",
@@ -4788,68 +4760,36 @@
    "depthMax": 1.0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "material/rw_cloud/op/26/constant/constant",
    "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "env/sky/sunGlow",
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "post/bloom/intensity",
    "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "macro.scan",
    "target": "post/grade/saturation",
    "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "attackMs": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "component": -1
   },
   {
    "source": "macro.synth",
@@ -5446,24 +5386,24 @@
       0.6867
      ],
      "meadow0": [
-      0.0497,
-      0.3419,
+      0.0423,
+      0.3231,
       0.0423
      ],
      "meadow1": [
-      0.2016,
-      0.5395,
+      0.15,
+      0.5029,
       0.0423
      ],
      "meadow2": [
-      0.4793,
-      0.7011,
-      0.0648
+      0.3419,
+      0.6584,
+      0.0685
      ],
      "meadow3": [
-      0.7913,
-      0.8228,
-      0.1441
+      0.624,
+      0.807,
+      0.1384
      ],
      "shade": [
       0.2542,
@@ -5552,24 +5492,24 @@
       0.8714
      ],
      "meadow0": [
-      0.0044,
-      0.1441,
-      0.1022
+      0.006,
+      0.1946,
+      0.0685
      ],
      "meadow1": [
-      0.0103,
-      0.3231,
-      0.1221
+      0.013,
+      0.3916,
+      0.0908
      ],
      "meadow2": [
-      0.0423,
-      0.5776,
-      0.1441
+      0.0612,
+      0.6308,
+      0.1384
      ],
      "meadow3": [
-      0.2542,
+      0.3231,
       0.8714,
-      0.1946
+      0.2159
      ],
      "shade": [
       0.0423,

@@ -61,7 +61,7 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
                     name.starts_with("music.") || // ADR-1581: the beat clock beside the response
                     // ADR-1571: the stems (ADR-1520) and envelope sources, so a stem-driven scene can be checked
                     // against the music it follows without a render
-                    name.starts_with("stem.") || name.starts_with("env.")) {
+                    name.starts_with("stem.") || name.starts_with("env.") || name.starts_with("macro.")) {
                     columns.push_back(static_cast<signals::SignalId>(i));
                     file << ',' << name;
                 }

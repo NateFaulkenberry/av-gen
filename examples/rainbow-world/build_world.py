@@ -329,7 +329,8 @@ def place():
         sc = float(np.interp(tm, times_, cam_s))
         s0_, s1_, kind_, side_ = seg_at(sc)
         if kind_ in ("over", "back"):
-            big.add(s0_)          # a moment inside a crossing: that crossing becomes the launch
+            # a moment inside a crossing: the crossing's own flip over the rim is the launch. (Swinging it 100 m out
+            # was tried at gate 3 and removed: three seconds facing open sky -- dead space -- at the drop.)
             continue
         if not in_face(sc, ln) or any(_circ(sc - p_[0]) < (ln + p_[1]) / 2 + 40 for p_ in placed):
             continue
@@ -851,11 +852,11 @@ STATES = [
     # Candy: pink and coral air, golden sun, a lime-yellow meadow, violet shade.
     ("Candy", dict(zenith=H("#6A5CE0"), horizon=H("#FFB0D8"), ground=H("#FFE0F0"), sun=H("#FFE7A0"), bounce=H("#FF9FC8"),
                    haze=H("#FFA6C8"), cloud0=H("#B07CE0"), cloud1=H("#FF9CC8"), cloud2=H("#FFD0A0"), cloud3=H("#FFF0D8"),
-                   meadow0=H("#3F9E3A"), meadow1=H("#7CC23A"), meadow2=H("#B8DA48"), meadow3=H("#E6EA6A"), shade=H("#8A4AA8"))),
+                   meadow0=H("#3A9A3A"), meadow1=H("#6CBC3A"), meadow2=H("#9ED44A"), meadow3=H("#CFE868"), shade=H("#8A4AA8"))),
     # Electric: a deep indigo-to-violet sky, a magenta sun, an electric green meadow.
     ("Electric", dict(zenith=H("#14106A"), horizon=H("#A030E0"), ground=H("#6A50C8"), sun=H("#FF8AF0"), bounce=H("#6A40FF"),
                       haze=H("#7A3AE8"), cloud0=H("#2A1A7A"), cloud1=H("#6A3AC8"), cloud2=H("#E05ACF"), cloud3=H("#FFB0F0"),
-                      meadow0=H("#0E6A5A"), meadow1=H("#1A9A62"), meadow2=H("#3AC86A"), meadow3=H("#8AF07A"), shade=H("#3A1A9A"))),
+                      meadow0=H("#127A4A"), meadow1=H("#1EA855"), meadow2=H("#46D068"), meadow3=H("#9AF080"), shade=H("#3A1A9A"))),
     # Spring: a clean cyan sky, white clouds, the brightest spring-green meadow, violet only in the shade.
     ("Spring", dict(zenith=H("#1A78D8"), horizon=H("#9AF0FF"), ground=H("#D8F0FF"), sun=H("#FFFBE0"), bounce=H("#B8A0FF"),
                     haze=H("#8AE0F0"), cloud0=H("#6A7AE8"), cloud1=H("#A8C0FF"), cloud2=H("#F0F8FF"), cloud3=H("#FFFFFF"),
