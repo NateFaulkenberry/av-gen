@@ -473,9 +473,11 @@ for f, pts in fam.items():
     # the rest grown, 35% at 40 m and 12% at 85 m) and stop at 150 m; beyond it the canopy core,
     # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps
     nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
-                             lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0}))
+                             lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0, "count": 3,
+                                  "byScreenSize": False, "distance1": 70.0, "distance2": 180.0}))
     nodes.append(node_points("%s_core" % f, "%s_core.glb" % asset, pts, {"program": prog, "roughness": 0.95, "metallic": 0.0},
-                             lod={"cull": True, "minScreenRadius": 1.0}))
+                             lod={"cull": True, "minScreenRadius": 1.0, "count": 3, "byScreenSize": False,
+                                  "distance1": 160.0, "distance2": 450.0}))
     nodes.append(node_points("%s_leaves" % f, "%s_leaves.glb" % asset, pts,
                              {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
                               "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
@@ -489,7 +491,7 @@ for k in range(0, len(outcrops), 60000):
 for k in range(0, len(fpts), 60000):
     nodes.append(node_points("flowers%02d" % (k // 60000), "flower_clump.glb", fpts[k:k + 60000],
                              {"program": "rw_flower", "roughness": 0.6, "metallic": 0.0, "doubleSided": True},
-                             castsShadow=False, lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 75.0}))
+                             castsShadow=False, lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 62.0}))
 print("TREES", {k: len(v) for k, v in fam.items()}, "OUTCROPS", len(outcrops), "FLOWERS", len(fpts))
 
 # ---- grass: a corridor round the ride, on the face the ride is on ----------------------------------------------------
@@ -539,11 +541,11 @@ for s0, s1, side in CROSSINGS:
                                   rng.uniform(1.2, 2.0)))
 print("HANGING GARDEN tufts", n_hang, "flowers", len(hang_f))
 nodes.append(node_points("flowers_hang", "flower_clump.glb", hang_f, {"program": "rw_flower", "roughness": 0.6, "metallic": 0.0, "doubleSided": True}, castsShadow=False,
-                         lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 75.0}))
+                         lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 62.0}))
 for k in range(0, len(gpts), 60000):
     nodes.append(node_points("grass%03d" % (k // 60000), "grass_lite.glb", gpts[k:k + 60000],
                              {"program": "rw_grass", "roughness": 0.95, "metallic": 0.0}, castsShadow=False,
-                             lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 70.0}))
+                             lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 58.0}))
 print("GRASS", len(gpts))
 
 # ---- rainbows: arches across the band near the landmarks, on the face the ride is on there ----------------------------
@@ -615,9 +617,11 @@ programs.append(look.cloud_floor_program(sea_z - 120.0))
 for kind, pts in cpts.items():
     if pts:
         lod_ = {"cull": True}
-        if kind == "puff":  # 520 heads: simplified with distance (a cloud's silhouette survives the simplifier)
+        if kind == "puff":  # 900 heads: simplified with distance (a cloud's silhouette survives the simplifier)
             lod_ = {"cull": True, "count": 4, "byScreenSize": False, "distance1": 1200.0, "distance2": 2400.0,
                     "distance3": 3800.0}
+        else:               # the masses and banks: 24-30k triangles each, mostly seen from far
+            lod_ = {"cull": True, "count": 3, "byScreenSize": False, "distance1": 900.0, "distance2": 2200.0}
         nodes.append(node_points("cloud_" + kind, "cloud_%s.glb" % kind, pts,
                                  {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True},
                                  castsShadow=False, lod=lod_))
@@ -694,13 +698,13 @@ STATES = [
                          shade=R(L0["shade"]))),
     ("Golden Hour", dict(zenith=H("#1E3E9E"), horizon=H("#F0A464"), ground=H("#E8B08A"), sun=H("#FFB067"), bounce=H("#F09A70"),
                          haze=H("#E89A64"), cloud0=H("#6A4E8E"), cloud1=H("#C08A9C"), cloud2=H("#FFB07A"), cloud3=H("#FFD3A2"),
-                         meadow0=H("#2E5E22"), meadow1=H("#5E8E26"), meadow2=H("#9AB43A"), meadow3=H("#D4C24A"), shade=H("#2A4A5C"))),
+                         meadow0=H("#286E2C"), meadow1=H("#4C9C2E"), meadow2=H("#86BE38"), meadow3=H("#C6D04A"), shade=H("#2A4A5C"))),
     ("After the Storm", dict(zenith=H("#0B2A8E"), horizon=H("#6FB6D8"), ground=H("#8E98B8"), sun=H("#FFF0D0"), bounce=H("#9FB0C8"),
                              haze=H("#6E9CD8"), cloud0=H("#3A4068"), cloud1=H("#6E7698"), cloud2=H("#E6DED2"), cloud3=H("#F4EEE4"),
                              meadow0=H("#1E5E2A"), meadow1=H("#3E8E2A"), meadow2=H("#62B03A"), meadow3=H("#8ED04A"), shade=H("#10485A"))),
     ("Lavender Dusk", dict(zenith=H("#2A1E7A"), horizon=H("#C88AD8"), ground=H("#D8A8C8"), sun=H("#FFC0A0"), bounce=H("#D896B8"),
                            haze=H("#9A72D0"), cloud0=H("#4A3A8A"), cloud1=H("#9A7AC0"), cloud2=H("#F6B6A8"), cloud3=H("#FFD6C6"),
-                           meadow0=H("#24503E"), meadow1=H("#3E7A4A"), meadow2=H("#6E9E5A"), meadow3=H("#A6BE6A"), shade=H("#2A3A6A"))),
+                           meadow0=H("#1C6A48"), meadow1=H("#38904E"), meadow2=H("#70B058"), meadow3=H("#AECC68"), shade=H("#2A3A6A"))),
     ("Prism", dict(zenith=H("#1238C0"), horizon=H("#60D0E8"), ground=H("#C8C0F0"), sun=H("#FFF0C0"), bounce=H("#F0B8E0"),
                    haze=H("#6AAAF0"), cloud0=H("#6058C0"), cloud1=H("#B090E0"), cloud2=H("#FFC8A0"), cloud3=H("#FFE6CE"),
                    meadow0=H("#1E7A6A"), meadow1=H("#3EA85A"), meadow2=H("#9AD040"), meadow3=H("#E8D040"), shade=H("#3A3AA0"))),

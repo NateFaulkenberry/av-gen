@@ -15,6 +15,7 @@ travelled with a fisheye camera whose gravity turns with the land. Branch `art/r
 | [07-stage3-report.md](07-stage3-report.md) | Stage 3: the look-dev scene in AV Gen, v1-v7, colour against the references, ADR-1540/1541/1542/1545 |
 | [08-stage4-report.md](08-stage4-report.md) | Stage 4: the knot, the ride (gravity follows the land, rim crossings), richness, cost |
 | [09-stage5-report.md](09-stage5-report.md) | Stage 5: the faster ride (owner), hanging gardens at the crossings, the cloud sea, clusters, ADR-1546, the GTAO stripes, cost |
+| [10-stage6-report.md](10-stage6-report.md) | Stage 6: speed you can feel (streakers, low and fast), cloud form, deeper sky, less haze, ADR-1547 (rainbow shadows), ADR-1548 (leaf thinning), cost |
 
 The owner's references (`~/Desktop/rainbow world/`) are not committed, because their source and licence are unknown.
 The review media is in `~/Desktop/av-gen-review/74-rainbow-world/`, and scratch is in `build/rw/`.
