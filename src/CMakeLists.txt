@@ -121,6 +121,13 @@ add_custom_target(avgen_build_info ALL
 
 add_executable(avgen ${AVGEN_APP_SOURCES})
 add_dependencies(avgen avgen_build_info)
+if(APPLE)
+    # ADR-1560: an identifier of its own, so Metal keeps avgen's compiled shaders in their own cache
+    # ($DARWIN_USER_CACHE_DIR/com.avgen.avgen/com.apple.metal) rather than in the one every unbundled tool on the
+    # machine shares -- the test binaries fill that one with gigabytes of shader variants.
+    target_link_options(avgen PRIVATE "LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_SOURCE_DIR}/cmake/avgen-Info.plist")
+    set_property(TARGET avgen APPEND PROPERTY LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/avgen-Info.plist")
+endif()
 target_include_directories(avgen PRIVATE "${AVGEN_BUILD_INFO_DIR}")
 target_link_libraries(avgen PRIVATE avgen_core)
 if(TARGET avgen_platform)

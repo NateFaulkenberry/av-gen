@@ -1,4 +1,6 @@
 #include "rendering/sdf_renderer.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
 #include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
@@ -143,8 +145,10 @@ struct SdfRenderer::Impl {
     }
 
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
-    Result<void> createRaymarchPipeline(const wgpu::ShaderModule& module);
-    Result<Pipelines> buildPipelines(const wgpu::ShaderModule& module);
+    // ADR-1562: `start` (init) starts the three pipelines into the members; a reload creates them.
+    Result<void> createRaymarchPipeline(const wgpu::ShaderModule& module, bool start = false);
+    // With `startInto`, each pipeline's compile is started into its member and the result is empty.
+    Result<Pipelines> buildPipelines(const wgpu::ShaderModule& module, std::array<wgpu::RenderPipeline*, 3> startInto = {});
     // ADR-1102: the same three pipelines, created asynchronously into `slot` (kept alive by the shared pointer).
     void buildPipelinesAsync(const wgpu::ShaderModule& module, const std::shared_ptr<Pipelines>& slot);
     const Pipelines* compiledPipelines(const scene::SdfObject& object, const spatial::FieldSet* fields);
@@ -400,7 +404,7 @@ Result<void> SdfRenderer::init(wgpu::TextureFormat colorFormat, wgpu::TextureFor
     if (!raymarch) {
         return std::unexpected(raymarch.error());
     }
-    if (auto r = im.createRaymarchPipeline(*raymarch); !r) {
+    if (auto r = im.createRaymarchPipeline(*raymarch, true); !r) {
         return r;
     }
     if (auto r = im.createCompositePipeline(); !r) {
@@ -587,7 +591,17 @@ Result<wgpu::RenderPipeline> SdfRenderer::Impl::finish(const wgpu::RenderPipelin
     return pipeline;
 }
 
-Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgpu::ShaderModule& module) {
+Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgpu::ShaderModule& module,
+                                                                      std::array<wgpu::RenderPipeline*, 3> startInto) {
+    const bool start = startInto[0] != nullptr;
+    const auto build = [&](const wgpu::RenderPipelineDescriptor& d, const char* label,
+                           wgpu::RenderPipeline* into) -> Result<wgpu::RenderPipeline> {
+        if (start) {
+            gpu::startRenderPipeline(context.device(), &d, into); // ADR-1562
+            return wgpu::RenderPipeline{};
+        }
+        return finish(d, label);
+    };
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, colorFormat, nullptr);
     wgpu::FragmentState fragment{};
@@ -611,7 +625,7 @@ Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgp
     desc.multisample.count = 1;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
-    auto pipeline = finish(desc, "sdf-raymarch");
+    auto pipeline = build(desc, "sdf-raymarch", startInto[0]);
     if (!pipeline) {
         return std::unexpected(pipeline.error());
     }
@@ -628,14 +642,14 @@ Result<SdfRenderer::Impl::Pipelines> SdfRenderer::Impl::buildPipelines(const wgp
     depthDesc.label = "sdf-raymarch-depth";
     depthDesc.fragment = &depthFragment;
     depthDesc.depthStencil = &depthOnly;
-    auto depthPipeline = finish(depthDesc, "sdf-raymarch-depth");
+    auto depthPipeline = build(depthDesc, "sdf-raymarch-depth", startInto[1]);
     if (!depthPipeline) {
         return std::unexpected(depthPipeline.error());
     }
     depthFragment.entryPoint = "fs_sdf_shadow";
     depthDesc.label = "sdf-raymarch-shadow";
     depthDesc.vertex.entryPoint = "vs_sdf_shadow"; // ADR-1160: the view's own rect, not the camera's
-    auto shadowPipeline = finish(depthDesc, "sdf-raymarch-shadow");
+    auto shadowPipeline = build(depthDesc, "sdf-raymarch-shadow", startInto[2]);
     if (!shadowPipeline) {
         return std::unexpected(shadowPipeline.error());
     }
@@ -710,14 +724,21 @@ void SdfRenderer::Impl::buildPipelinesAsync(const wgpu::ShaderModule& module, co
     make(shadowDesc, &Pipelines::shadow);
 }
 
-Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule& module) {
-    auto built = buildPipelines(module);
-    if (!built) {
-        return std::unexpected(built.error());
+Result<void> SdfRenderer::Impl::createRaymarchPipeline(const wgpu::ShaderModule& module, bool start) {
+    if (start) {
+        auto r = buildPipelines(module, {&raymarchPipeline, &raymarchDepthPipeline, &raymarchShadowPipeline});
+        if (!r) {
+            return std::unexpected(r.error());
+        }
+    } else {
+        auto built = buildPipelines(module);
+        if (!built) {
+            return std::unexpected(built.error());
+        }
+        raymarchPipeline = built->lit;
+        raymarchDepthPipeline = built->depth;
+        raymarchShadowPipeline = built->shadow;
     }
-    raymarchPipeline = built->lit;
-    raymarchDepthPipeline = built->depth;
-    raymarchShadowPipeline = built->shadow;
     compiledVariants.clear(); // a reload changes the pass source every variant was spliced into
     interpreterVariants.clear();
     if (auto source = shaders.loadSource("sdf_raymarch.wgsl")) {

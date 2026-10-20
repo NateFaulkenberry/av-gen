@@ -1,4 +1,6 @@
 #include "rendering/procedural_renderer.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
 #include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
@@ -368,10 +370,15 @@ struct ProceduralRenderer::Impl {
     Impl(const Impl&) = delete;
     Impl& operator=(const Impl&) = delete;
 
+    // ADR-1562: with `startInto`, the compile is started into it (init() of the SceneRenderer waits) and an empty
+    // pipeline is returned.
     Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull,
-                                                bool depthOnly = false);
-    Result<void> createPipelines(const wgpu::ShaderModule& module);
-    Result<wgpu::RenderPipeline> createWirePipeline(const wgpu::ShaderModule& module, bool occlude);
+                                                bool depthOnly = false, wgpu::RenderPipeline* startInto = nullptr);
+    // `start`: the five render pipelines are started rather than created (init); a reload creates them.
+    Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false);
+    Result<wgpu::RenderPipeline> createWirePipeline(const wgpu::ShaderModule& module, bool occlude,
+                                                    wgpu::RenderPipeline* startInto = nullptr);
+    bool startingPipelines = false; // ADR-1562: makeCompute starts into `computeStartInto` while set
     Result<void> createComputePipeline(const wgpu::ShaderModule& module);
     Result<void> createCullPipelines(const wgpu::ShaderModule& module);
     Result<void> createGeneratorPipeline(const wgpu::ShaderModule& module); // ADR-1117
@@ -379,7 +386,8 @@ struct ProceduralRenderer::Impl {
     Result<void> createStrandPipeline(const wgpu::ShaderModule& module); // ADR-1181
     void ensureStrandGroup(ObjectState& state, const wgpu::Buffer& records, std::uint64_t recordBytes);
     Result<wgpu::ComputePipeline> makeCompute(const wgpu::PipelineLayout& layout, const wgpu::ShaderModule& module,
-                                              const char* entry, const char* label);
+                                              const char* entry, const char* label,
+                                              wgpu::ComputePipeline* startInto = nullptr);
     CachedMesh uploadMesh(const Result<scene::MeshData>& mesh, const std::string& name);
     const CachedMesh* ensureMesh(const scene::ProceduralGeometry& object);
     const WireMesh* ensureWireMesh(const scene::ProceduralGeometry& object);
@@ -753,7 +761,9 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
     if (!module) {
         return std::unexpected(module.error());
     }
-    if (auto r = im.createPipelines(*module); !r) {
+    im.startingPipelines = true; // ADR-1562: the lit, depth, wire, effector and strand pipelines compile in parallel
+    if (auto r = im.createPipelines(*module, true); !r) {
+        im.startingPipelines = false;
         return r;
     }
     im.procSource = im.shaders.loadSource("procedural.wgsl").value_or(std::string()); // ADR-1493
@@ -842,8 +852,10 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         return std::unexpected(strandModule.error());
     }
     if (auto r = im.createStrandPipeline(*strandModule); !r) {
+        im.startingPipelines = false;
         return r;
     }
+    im.startingPipelines = false;
     im.initialised = true;
     return {};
 }
@@ -992,6 +1004,10 @@ Result<void> ProceduralRenderer::reload() {
 }
 
 Result<void> ProceduralRenderer::Impl::createStrandPipeline(const wgpu::ShaderModule& module) {
+    if (startingPipelines) {
+        return makeCompute(strandPipelineLayout, module, "cs_fiber_strands", "procedural-fiber-strands", &strandPipeline)
+            .transform([](auto&&) {});
+    }
     auto pipeline = makeCompute(strandPipelineLayout, module, "cs_fiber_strands", "procedural-fiber-strands");
     if (!pipeline) {
         return std::unexpected(pipeline.error());
@@ -1130,7 +1146,16 @@ void ProceduralRenderer::setShadowViews(std::span<const FrustumPlanes> views) {
                                                        std::min<std::size_t>(views.size(), kMaxShadowCullViews)));
 }
 
-Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule& module) {
+Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule& module, bool start) {
+    if (start) {
+        // ADR-1562: the heaviest pipelines in the renderer; compiled in parallel with everything after them.
+        for (auto r : {createPipeline(module, true, false, &pipelineCull), createPipeline(module, false, false, &pipelineNoCull),
+                       createPipeline(module, false, true, &pipelineDepth), createWirePipeline(module, true, &pipelineWire),
+                       createWirePipeline(module, false, &pipelineWireXray)}) {
+            if (!r) return std::unexpected(r.error());
+        }
+        return {};
+    }
     auto cull = createPipeline(module, true);
     if (!cull) return std::unexpected(cull.error());
     auto noCull = createPipeline(module, false);
@@ -1152,7 +1177,8 @@ Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule&
 // ADR-1073: the line pipeline. Its own vertex layout (scene::WireEdgeVertex), the surface's bind groups.
 // Colour and emission blend; the normal, velocity and identifier targets keep the surface's.
 Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createWirePipeline(const wgpu::ShaderModule& module,
-                                                                          bool occlude) {
+                                                                          bool occlude,
+                                                                          wgpu::RenderPipeline* startInto) {
     std::array<wgpu::VertexAttribute, 5> attributes{};
     const std::array<std::pair<wgpu::VertexFormat, std::uint64_t>, 5> fields{{
         {wgpu::VertexFormat::Float32x3, offsetof(scene::WireEdgeVertex, position)},
@@ -1208,8 +1234,12 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createWirePipeline(const 
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
     const auto& device = context.device();
+    if (startInto != nullptr) {
+        gpu::startRenderPipeline(device, &desc, startInto);
+        return wgpu::RenderPipeline{};
+    }
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
-    wgpu::RenderPipeline pipeline = device.CreateRenderPipeline(&desc);
+    wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
     std::string error;
     auto future = device.PopErrorScope(
         wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
@@ -1226,13 +1256,18 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createWirePipeline(const 
 
 Result<wgpu::ComputePipeline> ProceduralRenderer::Impl::makeCompute(const wgpu::PipelineLayout& layout,
                                                                    const wgpu::ShaderModule& module,
-                                                                   const char* entry, const char* label) {
+                                                                   const char* entry, const char* label,
+                                                                   wgpu::ComputePipeline* startInto) {
     wgpu::ComputePipelineDescriptor desc{};
     desc.label = label;
     desc.layout = layout;
     desc.compute.module = module;
     desc.compute.entryPoint = entry;
     const auto& device = context.device();
+    if (startInto != nullptr) {
+        gpu::startComputePipeline(device, &desc, startInto); // ADR-1562
+        return wgpu::ComputePipeline{};
+    }
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
     wgpu::ComputePipeline pipeline = gpu::createComputePipeline(device, &desc);
     std::string error;
@@ -1250,6 +1285,10 @@ Result<wgpu::ComputePipeline> ProceduralRenderer::Impl::makeCompute(const wgpu::
 }
 
 Result<void> ProceduralRenderer::Impl::createComputePipeline(const wgpu::ShaderModule& module) {
+    if (startingPipelines) {
+        return makeCompute(computePipelineLayout, module, "cs_effectors", "procedural-effectors", &effectorPipeline)
+            .transform([](auto&&) {});
+    }
     auto pipeline = makeCompute(computePipelineLayout, module, "cs_effectors", "procedural-effectors");
     if (!pipeline) {
         return std::unexpected(pipeline.error());
@@ -1277,7 +1316,8 @@ Result<void> ProceduralRenderer::Impl::createCullPipelines(const wgpu::ShaderMod
 }
 
 Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu::ShaderModule& module, bool cull,
-                                                                      bool depthOnly) {
+                                                                      bool depthOnly,
+                                                                      wgpu::RenderPipeline* startInto) {
     VertexLayoutStorage vertex;
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, colorFormat, nullptr);
@@ -1309,6 +1349,10 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     desc.fragment = &fragment;
 
     const auto& device = context.device();
+    if (startInto != nullptr) {
+        gpu::startRenderPipeline(device, &desc, startInto);
+        return wgpu::RenderPipeline{};
+    }
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
     wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(device, &desc);
     std::string error;

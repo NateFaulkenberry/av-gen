@@ -245,50 +245,70 @@ fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f
     return p;
 }
 
+// Field deformers. ADR-1561: the field evaluator (fields.wgsl, every kind) is the largest thing in this file, and the
+// Metal compiler inlines a whole copy of it at every call site. Called from each deformer branch of each of the four
+// chain evaluations a lit vertex makes, it was compiled about twenty times over, and the procedural pipelines took
+// 126 s (lit) and 88 s (depth) to compile cold on an M2 Max. So a field deformer is two steps: `fieldDeformerSample`
+// is the one place the evaluator is called (one scalar and one vector call), and the two `apply...FieldDeformer`
+// functions only do the arithmetic around it. The arithmetic is what it was.
+struct FieldDeformerSample {
+    vector: vec3<f32>,
+    scalar: f32,
+    isVector: bool,
+};
+
+fn fieldDeformerSample(slot: i32, at: vec3<f32>) -> FieldDeformerSample {
+    var out: FieldDeformerSample;
+    out.vector = vec3<f32>(0.0);
+    out.scalar = 0.0;
+    out.isVector = fieldTypeOf(slot) == FIELD_TYPE_VECTOR;
+    if (out.isVector) {
+        out.vector = fieldVector(slot, at);
+    } else {
+        out.scalar = fieldScalar(slot, at);
+    }
+    return out;
+}
+
 // Field deformer on a world-space point: samples slot params.x at p and displaces p (vector
 // fields by v * amount; scalar fields along the world normal or the axis by s * amount).
-fn applyWorldFieldDeformer(d: DeformerUniform, p: vec3<f32>, nWorld: vec3<f32>) -> vec3<f32> {
-    let slot = i32(floor(d.params.x + 0.5));
-    if (slot < 0) {
-        return p;
-    }
+fn applyWorldFieldDeformer(d: DeformerUniform, p: vec3<f32>, nWorld: vec3<f32>, f: FieldDeformerSample) -> vec3<f32> {
     let amount = d.centerAmount.w;
-    if (fieldTypeOf(slot) == FIELD_TYPE_VECTOR) {
-        return p + fieldVector(slot, p) * amount;
+    if (f.isVector) {
+        return p + f.vector * amount;
     }
-    let s = fieldScalar(slot, p);
     var dir = d.axisKind.xyz;
     if (d.params.y > 0.5) {
         dir = nWorld;
     }
-    return p + dir * (s * amount);
+    return p + dir * (f.scalar * amount);
+}
+
+// The point a local field deformer samples at: p's current world position.
+fn localFieldDeformerPoint(p: vec3<f32>, inst: InstanceRecord) -> vec3<f32> {
+    return (object.model * vec4<f32>(instancePoint(inst, p), 1.0)).xyz;
 }
 
 // Field deformer on an object-space point: samples at the point's current world position and
 // brings vector results back through the inverse of the object's linear part (the transpose of
 // its normal matrix) and the instance rotation and scale.
-fn applyLocalFieldDeformer(d: DeformerUniform, p: vec3<f32>, nLocal: vec3<f32>, inst: InstanceRecord) -> vec3<f32> {
-    let slot = i32(floor(d.params.x + 0.5));
-    if (slot < 0) {
-        return p;
-    }
+fn applyLocalFieldDeformer(d: DeformerUniform, p: vec3<f32>, nLocal: vec3<f32>, inst: InstanceRecord,
+                           f: FieldDeformerSample) -> vec3<f32> {
     let amount = d.centerAmount.w;
-    let pw = (object.model * vec4<f32>(instancePoint(inst, p), 1.0)).xyz;
-    if (fieldTypeOf(slot) == FIELD_TYPE_VECTOR) {
+    if (f.isVector) {
         let s = inst.scale.xyz;
         let safeScale = select(s, vec3<f32>(1.0), abs(s) < vec3<f32>(1e-8));
         let nm = object.normalMatrix;
         let objInv = transpose(mat3x3<f32>(nm[0].xyz, nm[1].xyz, nm[2].xyz));
         let conj = vec4<f32>(-inst.rotation.xyz, inst.rotation.w);
-        let vObj = objInv * fieldVector(slot, pw);
+        let vObj = objInv * f.vector;
         return p + (quatRotate(conj, vObj) / safeScale) * amount;
     }
-    let sv = fieldScalar(slot, pw);
     var dir = d.axisKind.xyz;
     if (d.params.y > 0.5) {
         dir = nLocal;
     }
-    return p + dir * (sv * amount);
+    return p + dir * (f.scalar * amount);
 }
 
 // Path deformer (object space): see the header comment. Mirrors scene::applyPathDeformer.
@@ -321,19 +341,51 @@ fn deformerCode(d: DeformerUniform) -> i32 {
     return i32(floor(d.axisKind.w + 0.5)); // -1 stays -1 (disabled)
 }
 
-// The world-space deformers applied to a world-space point (the second half of the chain).
-fn deformWorld(pIn: vec3<f32>, nWorld: vec3<f32>, t: f32) -> vec3<f32> {
+// The chain for one point (ADR-1561: one loop over both halves, so each deformer kind -- above all the field
+// evaluator -- is compiled once per call rather than once per half). `fromWorld` false: the whole chain -- the local
+// deformers in order, then the instance and the object (`model`), then the world deformers in order. `fromWorld`
+// true: the world deformers alone, on a point already in world space (`model` and `nLocal` unread). The arithmetic,
+// and its order, is what the two separate loops did.
+fn deformRun(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: InstanceRecord, t: f32,
+             model: mat4x4<f32>, fromWorld: bool) -> vec3<f32> {
     let count = u32(proc.timeInfo.y + 0.5);
     var p = pIn;
-    for (var i = 0u; i < 8u; i = i + 1u) {
-        if (i >= count) { break; }
+    var world = fromWorld;
+    var i = 0u;
+    loop {
+        if (i >= min(count, 8u)) {
+            if (world) {
+                break;
+            }
+            p = instancePoint(inst, p);
+            p = (model * vec4<f32>(p, 1.0)).xyz;
+            world = true;
+            i = 0u;
+            continue;
+        }
         let d = proc.deformers[i];
         let code = deformerCode(d);
-        if (code < DEFORM_WORLD) { continue; }
-        if (code - DEFORM_WORLD == DEFORM_FIELD) {
-            p = applyWorldFieldDeformer(d, p, nWorld);
+        i = i + 1u;
+        var kind = code;
+        if (world) {
+            if (code < DEFORM_WORLD) { continue; }
+            kind = code - DEFORM_WORLD;
+        } else if (code < 0 || code >= DEFORM_WORLD) {
+            continue;
+        }
+        if (kind == DEFORM_FIELD) {
+            let slot = i32(floor(d.params.x + 0.5));
+            if (slot < 0) { continue; }
+            let f = fieldDeformerSample(slot, select(localFieldDeformerPoint(p, inst), p, world));
+            if (world) {
+                p = applyWorldFieldDeformer(d, p, nWorld, f);
+            } else {
+                p = applyLocalFieldDeformer(d, p, nLocal, inst, f);
+            }
+        } else if (kind == DEFORM_PATH && !world) {
+            p = applyPathDeformer(d, p);
         } else {
-            p = applyDeformer(d, code - DEFORM_WORLD, p, nWorld, t);
+            p = applyDeformer(d, kind, p, select(nLocal, nWorld, world), t);
         }
     }
     return p;
@@ -342,24 +394,7 @@ fn deformWorld(pIn: vec3<f32>, nWorld: vec3<f32>, t: f32) -> vec3<f32> {
 // The whole chain for one source point: local deformers, instance, object, world deformers.
 fn deformChain(pIn: vec3<f32>, nLocal: vec3<f32>, nWorld: vec3<f32>, inst: InstanceRecord, t: f32,
                model: mat4x4<f32>) -> vec3<f32> {
-    let count = u32(proc.timeInfo.y + 0.5);
-    var p = pIn;
-    for (var i = 0u; i < 8u; i = i + 1u) {
-        if (i >= count) { break; }
-        let d = proc.deformers[i];
-        let code = deformerCode(d);
-        if (code < 0 || code >= DEFORM_WORLD) { continue; }
-        if (code == DEFORM_FIELD) {
-            p = applyLocalFieldDeformer(d, p, nLocal, inst);
-        } else if (code == DEFORM_PATH) {
-            p = applyPathDeformer(d, p);
-        } else {
-            p = applyDeformer(d, code, p, nLocal, t);
-        }
-    }
-    p = instancePoint(inst, p);
-    p = (model * vec4<f32>(p, 1.0)).xyz;
-    return deformWorld(p, nWorld, t);
+    return deformRun(pIn, nLocal, nWorld, inst, t, model, false);
 }
 
 // ---- ADR-1180/1181: fibers ---------------------------------------------------------------------
@@ -418,11 +453,22 @@ fn fiberTurnBy(d: vec3<f32>, pull: vec3<f32>, h: f32) -> vec3<f32> {
     return d;
 }
 
-// One midpoint (RK2) step's new direction from (d, r) at arc length `arc`.
+// One midpoint (RK2) step's new direction from (d, r) at arc length `arc`: two pulls, at r and at the midpoint. The
+// pulls go through one call of fiberPull (ADR-1561: its field evaluator is compiled once per call site).
 fn fiberTurn(d: vec3<f32>, r: vec3<f32>, arc: f32, ds: f32) -> vec3<f32> {
-    let half = fiberTurnBy(d, fiberPull(r, arc), 0.5 * ds);
-    let mid = r + half * (0.5 * ds);
-    return fiberTurnBy(d, fiberPull(mid, arc + 0.5 * ds), ds);
+    var half = d;
+    var turned = d;
+    for (var j = 0u; j < 2u; j = j + 1u) {
+        let second = j == 1u;
+        let at = select(r, r + half * (0.5 * ds), second);
+        let pull = fiberPull(at, select(arc, arc + 0.5 * ds, second));
+        if (second) {
+            turned = fiberTurnBy(d, pull, ds);
+        } else {
+            half = fiberTurnBy(d, pull, 0.5 * ds);
+        }
+    }
+    return turned;
 }
 
 struct FiberPoint {
@@ -439,13 +485,19 @@ fn fiberPoint(root: vec3<f32>, axis: vec3<f32>, k: u32, ds: f32) -> FiberPoint {
         out.tangent = d;
         return out;
     }
-    for (var i = 0u; i < 64u; i = i + 1u) {
-        if (i >= k) { break; }
-        d = fiberTurn(d, r, ds * f32(i), ds);
-        r = r + d * ds;
+    // k steps (at most 64), then one more turn for the tangent, all through one call of fiberTurn (ADR-1561).
+    let steps = min(k, 64u);
+    for (var i = 0u; i <= steps; i = i + 1u) {
+        let last = i == steps;
+        let turned = fiberTurn(d, r, ds * f32(select(i, k, last)), ds);
+        if (last) {
+            out.tangent = turned;
+        } else {
+            d = turned;
+            r = r + d * ds;
+        }
     }
     out.centre = r;
-    out.tangent = fiberTurn(d, r, ds * f32(k), ds);
     return out;
 }
 
@@ -490,16 +542,11 @@ fn fiberStrandPoint(recordIndex: u32, segments: u32, k: u32) -> FiberPoint {
     return out;
 }
 
-fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut, recordIndex: u32) -> ProcVertexOut {
-    var out = outIn;
-    let s = inst.scale.xyz;
-    let lengthScale = s.y;
-    let widthScale = s.x;
-    let ds = in.normal.x * lengthScale;
+// The fiber's centre-line point and tangent for this vertex, before the world deformers (procVertex applies them, in
+// its one chain loop: ADR-1561).
+fn fiberCentreLine(in: VertexIn, inst: InstanceRecord, recordIndex: u32) -> FiberPoint {
+    let ds = in.normal.x * inst.scale.y;
     let k = u32(floor(in.position.y / max(in.normal.x, 1e-9) + 0.5));
-    let rootHalf = max(in.normal.z, 1e-9);
-    let side = select(-1.0, 1.0, in.position.x > 0.0);
-    var half = abs(in.position.x) * widthScale;
     let root = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
     let axis = normalize((object.model * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0)), 0.0)).xyz);
     let strand = fiberStrandInfo();
@@ -511,8 +558,16 @@ fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut, recordI
     } else {
         fp = fiberPoint(root, axis, k, ds);
     }
-    let now = proc.timeInfo.x;
-    let c = deformWorld(fp.centre, fp.tangent, now);
+    return fp;
+}
+
+// The fiber vertex around its centre point `c` (fp's centre through the world deformers).
+fn fiberVertex(in: VertexIn, inst: InstanceRecord, outIn: ProcVertexOut, fp: FiberPoint, c: vec3<f32>) -> ProcVertexOut {
+    var out = outIn;
+    let widthScale = inst.scale.x;
+    let k = u32(floor(in.position.y / max(in.normal.x, 1e-9) + 0.5));
+    let side = select(-1.0, 1.0, in.position.x > 0.0);
+    var half = abs(in.position.x) * widthScale;
     let t = fp.tangent;
     let toCamera = frame.cameraPos.xyz - c;
     let dist = max(length(toCamera), 1e-6);
@@ -636,28 +691,21 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
 
-    if (proc.fieldInfo.z > 1.5) {
-        return fiberVertex(in, inst, out, recordIndex); // ADR-1180
+    // ADR-1180 fibers, points and meshes share one evaluation of the deformer chain (ADR-1561: deformRun, and the
+    // field evaluator inside it, is compiled once per pipeline). Each path sets up its points, the one loop below
+    // runs the chain on them, and each path finishes with the results.
+    let isFiber = proc.fieldInfo.z > 1.5;
+    let isPoint = !isFiber && proc.fieldInfo.z > 0.5;
+    var fp: FiberPoint;
+    if (isFiber) {
+        fp = fiberCentreLine(in, inst, recordIndex);
     }
-    if (proc.fieldInfo.z > 0.5) {
-        // Point source: a camera-facing quad around the instance centre. The centre goes through
-        // the object matrix and the world deformers; the quad offsets skip the deformer stack.
-        let srcOffset = (proc.sourceMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0)).xyz;
-        var c = (object.model * vec4<f32>(instancePoint(inst, srcOffset), 1.0)).xyz;
-        let toCamera = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
-        c = deformWorld(c, toCamera, proc.timeInfo.x);
-        let right = frame.cameraRight.xyz;
-        let up = frame.cameraUp.xyz;
-        let p = c + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
-        out.clip = frame.viewProj * vec4<f32>(p, 1.0);
-        out.worldPos = p;
-        out.normal = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
-        var cPrev = (object.prevModel * vec4<f32>(instancePoint(inst, srcOffset), 1.0)).xyz;
-        cPrev = deformWorld(cPrev, toCamera, proc.prevInfo.x);
-        let pPrev = cPrev + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
-        out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
-        return out;
-    }
+    // Point source: a camera-facing quad around the instance centre. The centre goes through
+    // the object matrix and the world deformers; the quad offsets skip the deformer stack.
+    let srcOffset = (proc.sourceMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0)).xyz;
+    let cRest = (object.model * vec4<f32>(instancePoint(inst, srcOffset), 1.0)).xyz;
+    let toCamera = normalize(frame.cameraPos.xyz - cRest + vec3<f32>(0.0, 0.0, 1e-6));
+    let cPrevRest = (object.prevModel * vec4<f32>(instancePoint(inst, srcOffset), 1.0)).xyz;
 
     // The source transform is step 1 of the chain: the vertex and its normal enter the deformer
     // stack already placed.
@@ -695,14 +743,71 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     // ADR-1492: read before the chain (see the handedness note above): no velocity in a depth-only pass, nor in a lit
     // pass whose velocity target nothing reads this frame (frame.styledGround.w, the live editor only).
     let skipVelocity = depthOnly || frame.styledGround.w > 0.5;
-    var p0 = deformChain(srcPos, n, nRef, inst, now, object.model);
     // A depth-only draw needs the normal only for a masked material (fs_proc_depth's cutout program reads it).
     let needNormal = !depthOnly || (object.flags.x > 0.5 && object.flags.x < 1.5);
-    var p1 = p0;
-    var p2 = p0;
-    if (needNormal) {
-        p1 = deformChain(srcPos + t1 * eps, n, nRef, inst, now, object.model);
-        p2 = deformChain(srcPos + t2 * eps, n, nRef, inst, now, object.model);
+    // The chain's evaluations. A mesh: the point (0), the two finite-difference neighbours when the normal is
+    // wanted (1, 2), last frame's point when the velocity is (3). A point source: its centre now (0) and last frame
+    // (1), world deformers only. A fiber: its centre-line point (0), world deformers only.
+    var p0 = srcPos;
+    var p1 = srcPos;
+    var p2 = srcPos;
+    var pPrevChain = srcPos;
+    for (var k = 0u; k < 4u; k = k + 1u) {
+        if (isFiber) {
+            if (k > 0u) { continue; }
+        } else if (isPoint) {
+            if (k > 1u) { continue; }
+        } else {
+            if ((k == 1u || k == 2u) && !needNormal) { continue; }
+            if (k == 3u && skipVelocity) { continue; }
+        }
+        var src = srcPos;
+        var nWorld = nRef;
+        var t = now;
+        var model = object.model;
+        var fromWorld = false;
+        if (isFiber) {
+            src = fp.centre;
+            nWorld = fp.tangent;
+            fromWorld = true;
+        } else if (isPoint) {
+            let prev = k == 1u;
+            src = select(cRest, cPrevRest, prev);
+            nWorld = toCamera;
+            t = select(proc.timeInfo.x, proc.prevInfo.x, prev);
+            fromWorld = true;
+        } else {
+            if (k == 1u) { src = srcPos + t1 * eps; }
+            if (k == 2u) { src = srcPos + t2 * eps; }
+            let prev = k == 3u;
+            if (prev) { model = object.prevModel; }
+            t = select(now, proc.prevInfo.x, prev);
+        }
+        let r = deformRun(src, n, nWorld, inst, t, model, fromWorld);
+        if (k == 0u) { p0 = r; }
+        if (k == 1u) { p1 = r; }
+        if (k == 2u) { p2 = r; }
+        if (k == 3u) { pPrevChain = r; }
+    }
+    if (isFiber) {
+        return fiberVertex(in, inst, out, fp, p0); // ADR-1180
+    }
+    if (isPoint) {
+        let c = p0;
+        let cPrev = p1;
+        let right = frame.cameraRight.xyz;
+        let up = frame.cameraUp.xyz;
+        let p = c + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
+        out.clip = frame.viewProj * vec4<f32>(p, 1.0);
+        out.worldPos = p;
+        out.normal = normalize(frame.cameraPos.xyz - c + vec3<f32>(0.0, 0.0, 1e-6));
+        let pPrev = cPrev + right * (in.position.x * inst.scale.x) + up * (in.position.y * inst.scale.y);
+        out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
+        return out;
+    }
+    if (!needNormal) {
+        p1 = p0;
+        p2 = p0;
     }
 
     // ---- ADR-055 Tier 0 wind ----
@@ -783,7 +888,7 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     }
     // Velocity covers camera, object, instance and deformation motion: the same chain evaluated
     // with last frame's time and last frame's object matrix (ADR-035).
-    var pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);
+    var pPrev = pPrevChain;
     if (proc.windSway.w > 0.5) {
         pPrev = pPrev + bendDisplacement(srcPos.y, bendPrev, proc.windTiming, proc.windPlant, inst.scale.y);
     }

@@ -74,6 +74,9 @@ public:
     // event is routed to the window it belongs to (resize, close, focus, drops; quit goes to
     // every window). Call once per frame, then read each window with takeEvents().
     static void pumpEvents(const std::function<void(const SDL_Event&)>& sink);
+    // Services the system's event loop without draining SDL's queue (the events wait for the next pumpEvents): what
+    // a long wait on the main thread calls so macOS does not mark the app as not responding (ADR-1562).
+    static void pumpSystemEvents();
     // Returns and clears the events routed to this window since the last call.
     FrameEvents takeEvents();
     // pumpEvents + takeEvents for this window (the primary window's per-frame call).

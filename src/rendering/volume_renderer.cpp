@@ -1,4 +1,6 @@
 #include "rendering/volume_renderer.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
 
 #include "core/vortex.hpp"
@@ -39,7 +41,7 @@ std::uint32_t scaledOf(std::uint32_t v, float scale) {
 struct VolumeRenderer::Impl {
     Impl(gpu::Context& c, gpu::ShaderLibrary& s) : context(c), shaders(s) {}
 
-    Result<void> createPipelines(const wgpu::ShaderModule& module);
+    Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false); // ADR-1562: start at init
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     Result<void> ensureTarget(std::uint32_t width, std::uint32_t height, float scale);
     void rebuildGroups(const wgpu::TextureView& sceneDepth);
@@ -197,7 +199,7 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
     if (!module) {
         return std::unexpected(module.error());
     }
-    if (auto r = im.createPipelines(*module); !r) {
+    if (auto r = im.createPipelines(*module, true); !r) {
         return r;
     }
     im.initialised = true;
@@ -231,7 +233,7 @@ Result<wgpu::RenderPipeline> VolumeRenderer::Impl::finish(const wgpu::RenderPipe
     return pipeline;
 }
 
-Result<void> VolumeRenderer::Impl::createPipelines(const wgpu::ShaderModule& module) {
+Result<void> VolumeRenderer::Impl::createPipelines(const wgpu::ShaderModule& module, bool start) {
     // The march pass writes the half-res target unblended.
     wgpu::ColorTargetState marchTarget{};
     marchTarget.format = colorFormat;
@@ -251,7 +253,10 @@ Result<void> VolumeRenderer::Impl::createPipelines(const wgpu::ShaderModule& mod
     marchDesc.multisample.count = 1;
     marchDesc.multisample.mask = 0xFFFFFFFFu;
     marchDesc.fragment = &marchFragment;
-    auto march = finish(marchDesc, "volume-march");
+    if (start) {
+        gpu::startRenderPipeline(context.device(), &marchDesc, &marchPipeline); // ADR-1562: the heavy one
+    }
+    auto march = start ? Result<wgpu::RenderPipeline>(wgpu::RenderPipeline{}) : finish(marchDesc, "volume-march");
     if (!march) {
         return std::unexpected(march.error());
     }
@@ -281,7 +286,9 @@ Result<void> VolumeRenderer::Impl::createPipelines(const wgpu::ShaderModule& mod
     if (!composite) {
         return std::unexpected(composite.error());
     }
-    marchPipeline = *march;
+    if (!start) {
+        marchPipeline = *march;
+    }
     compositePipeline = *composite;
     return {};
 }

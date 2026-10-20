@@ -1,4 +1,6 @@
 #include "rendering/scene_renderer.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
 #include "rendering/optics_pack.hpp"
 #include "rendering/toon_pack.hpp"
@@ -218,6 +220,9 @@ SceneRenderer::~SceneRenderer() = default;
 
 Result<void> SceneRenderer::init() {
     const auto& device = context_.device();
+    // ADR-1562: the heavy pipelines below are started rather than created, compile on Dawn's workers in parallel
+    // with the rest of init, and are waited for at the end (the batch's destructor also waits on an early return).
+    gpu::PipelineBatch pipelineBatch(device);
 
     // ---- bind group layouts ----
     auto uniformLayout = [&](const char* label, std::uint64_t minSize, bool dynamic) {
@@ -515,7 +520,6 @@ Result<void> SceneRenderer::init() {
         !r) {
         return r;
     }
-    sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_); // Mesh-mode objects draw as entities
     // ADR-086: the skinned variants of the lit and depth-only pipelines, and the joint buffer they
     // read. Same frame, material and IBL groups; only group 1 differs.
     if (auto r = skinning_->init(frameLayout_, materialLayout_, iblLayout_, objectUniforms_,
@@ -576,6 +580,11 @@ Result<void> SceneRenderer::init() {
     if (auto r = distortion_->init(frameLayout_, kHdrFormat, kEmissionFormat); !r) {
         return r;
     }
+    // ADR-1562: every pipeline started above (the heavy ones) has been compiling in parallel with the rest; wait.
+    if (auto r = pipelineBatch.finish(); !r) {
+        return r;
+    }
+    sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_); // Mesh-mode objects draw as entities
     if (context_.errorCount() > 0) {
         return fail("renderer initialisation raised {} GPU error(s): {}", context_.errorCount(),
                     context_.lastError());
@@ -1179,15 +1188,12 @@ Result<void> SceneRenderer::createPipelines() {
     if (!overdraw) return std::unexpected(overdraw.error());
     pbrModule_ = *pbr;
 
-    auto a = createLitPipeline(*pbr, LitVariant::OpaqueCull);
-    if (!a) return std::unexpected(a.error());
-    litOpaqueCull_ = *a;
-    auto b = createLitPipeline(*pbr, LitVariant::OpaqueNoCull);
-    if (!b) return std::unexpected(b.error());
-    litOpaqueNoCull_ = *b;
-    auto c = createLitPipeline(*pbr, LitVariant::Blend);
-    if (!c) return std::unexpected(c.error());
-    litBlend_ = *c;
+    // ADR-1562: started, so they compile in parallel with the rest of init; init() waits for them at its end.
+    for (const auto& [variant, member] : {std::pair{LitVariant::OpaqueCull, &litOpaqueCull_},
+                                          std::pair{LitVariant::OpaqueNoCull, &litOpaqueNoCull_},
+                                          std::pair{LitVariant::Blend, &litBlend_}}) {
+        if (auto r = createLitPipeline(*pbr, variant, member); !r) return std::unexpected(r.error());
+    }
     auto g = createGridPipeline(*grid);
     if (!g) return std::unexpected(g.error());
     gridPipeline_ = *g;
@@ -1260,7 +1266,8 @@ struct VertexLayoutStorage {
 static_assert(sizeof(scene::Vertex) == 32);
 } // namespace
 
-Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant) {
+Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
+                                                               wgpu::RenderPipeline* startInto) {
     VertexLayoutStorage vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -1302,6 +1309,10 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     desc.multisample.count = 1;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
+    if (startInto != nullptr) {
+        gpu::startRenderPipeline(context_.device(), &desc, startInto); // ADR-1562
+        return wgpu::RenderPipeline{};
+    }
     return finishPipeline(desc, label);
 }
 

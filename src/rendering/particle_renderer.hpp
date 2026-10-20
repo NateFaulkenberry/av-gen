@@ -376,7 +376,7 @@ private:
         } density;
     };
 
-    Result<void> createPipelines(const wgpu::ShaderModule& module);
+    Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false); // ADR-1562
     // ADR-360: encodes and submits `frame_.warmUpFrames` emit/simulate steps ending just before
     // `time`, each in its own command buffer. Its own buffer per step is not an optimisation
     // oversight: the per-system uniforms live in ONE buffer per pool, and queue writes are ordered

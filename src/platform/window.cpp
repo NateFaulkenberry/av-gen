@@ -195,6 +195,8 @@ void Window::updateSize() {
     }
 }
 
+void Window::pumpSystemEvents() { SDL_PumpEvents(); }
+
 void Window::pumpEvents(const std::function<void(const SDL_Event&)>& sink) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {

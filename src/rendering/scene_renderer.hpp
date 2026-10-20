@@ -958,7 +958,9 @@ private:
     // Packs this frame's lights, uploads them and encodes the cluster build.
     void updateLights(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const glm::mat4& view,
                       float aspect, FrameUniforms& frame);
-    Result<wgpu::RenderPipeline> createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant);
+    // ADR-1562: with `startInto`, the compile is started into it (init waits for it) and an empty pipeline returned.
+    Result<wgpu::RenderPipeline> createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
+                                                   wgpu::RenderPipeline* startInto = nullptr);
     Result<wgpu::RenderPipeline> createGridPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createSkyboxPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createAtmospherePipeline(const wgpu::ShaderModule& module);

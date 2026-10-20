@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gpu/pipeline_compile.hpp"
+
 // Application lifecycle: window + GPU + engine + UI in live mode, or a headless deterministic
 // frame loop in offline mode (ADR-012). Both modes drive the same Engine and SceneRenderer.
 
@@ -849,6 +851,10 @@ private:
     // `lodIndex` buffer. Empty unless the overlay is on: it is a blocking readback per scattered
     // object and it belongs to the frame owner to decide when that is worth paying for.
     void initControlPlane();
+    // ADR-1562: one frame of the startup "compiling shaders" screen (the pipeline wait hook).
+    void drawCompilingScreen(const gpu::PipelineCompileProgress& progress);
+    bool bootQuitRequested_ = false;
+    std::chrono::steady_clock::time_point bootScreenStart_{};
     // Runs `--ai-prompt` / `--ai-script` to completion on this thread, servicing the control
     // plane's queue the way the frame loop would. Returns a process exit code.
     int runAiTask();

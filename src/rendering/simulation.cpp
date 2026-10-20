@@ -1,4 +1,6 @@
 #include "rendering/simulation.hpp"
+
+#include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
 
 #include "rendering/field_uniforms.hpp"
@@ -75,7 +77,7 @@ struct Simulation::Impl {
         uniformStaging.resize(static_cast<std::size_t>(kMaxGrids) * kUniformStride);
     }
 
-    Result<void> createPipelines(const wgpu::ShaderModule& module);
+    Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false); // ADR-1562: start at init
     bool ensureBuffers(std::uint64_t floats, std::uint64_t agents);
     void rebuildGroups();
     // The grid's initial state into A, B, initial and the table; its accumulators zeroed. An agents grid
@@ -213,7 +215,7 @@ Result<void> Simulation::init(wgpu::Buffer gridTable) {
     if (!module) {
         return std::unexpected(module.error());
     }
-    if (auto r = im.createPipelines(*module); !r) {
+    if (auto r = im.createPipelines(*module, true); !r) {
         return r;
     }
     im.initialised = true;
@@ -228,7 +230,7 @@ Result<void> Simulation::reload() {
     return impl_->createPipelines(*module);
 }
 
-Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module) {
+Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module, bool start) {
     const auto& device = context.device();
     auto make = [&](const char* entry) -> Result<wgpu::ComputePipeline> {
         wgpu::ComputePipelineDescriptor desc{};
@@ -267,6 +269,18 @@ Result<void> Simulation::Impl::createPipelines(const wgpu::ShaderModule& module)
         {"cs_osc_kick", &oscKickPipeline},
         {"cs_oscillate", &oscillatePipeline},
     }};
+    if (start) {
+        // ADR-1562: at init, every kernel compiles on Dawn's workers in parallel with the rest of init.
+        for (const auto& [entry, member] : all) {
+            wgpu::ComputePipelineDescriptor desc{};
+            desc.label = entry;
+            desc.layout = pipelineLayout;
+            desc.compute.module = module;
+            desc.compute.entryPoint = entry;
+            gpu::startComputePipeline(device, &desc, member);
+        }
+        return {};
+    }
     std::array<wgpu::ComputePipeline, all.size()> built{};
     for (std::size_t i = 0; i < all.size(); ++i) {
         auto p = make(all[i].first);
