@@ -57,7 +57,8 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
             for (std::size_t i = 0; i < bus.size(); ++i) {
                 const std::string& name = bus.info(static_cast<signals::SignalId>(i)).name;
                 if (name.starts_with("sonic.") || name.starts_with("notes.") || name.starts_with("timbre.") ||
-                    name.starts_with("visual.") || name.starts_with("response.")) {
+                    name.starts_with("visual.") || name.starts_with("response.") || name.starts_with("beat.") ||
+                    name.starts_with("music.")) { // ADR-1581: the beat clock beside the response
                     columns.push_back(static_cast<signals::SignalId>(i));
                     file << ',' << name;
                 }
