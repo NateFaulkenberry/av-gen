@@ -26,7 +26,7 @@ LOOK = {
 # Effect ops carry a "_role"; `finish` strips it and records the op's 1-based index per program in FX, so the project's
 # routes name "material/<program>/op/<index>/<kind>/..." without counting ops by hand.
 FX = {}
-RING = {"tail": 4.0, "lead": 1.0, "r0": 10.0}         # the kick ring's shape, metres (its radius is routed)
+RING = {"tail": 4.0, "lead": 1.0, "r0": 18.0}         # the kick ring's shape, metres (its radius is routed)
 RING_COLOUR = rw.hexlin("#FFE6A6")[:3]                # a warm white-gold: light, not a hue of its own
 GLINT_COLOUR = rw.hexlin("#FFF4D8")[:3]
 
@@ -48,14 +48,51 @@ def ring_ops(out, a, b, c):
     is gone before the next); its gain is the drum stem's low band. `out` = ring radiance; uses a, b, c as scratch."""
     return [
         {"kind": "input", "dst": a, "input": "cameraDistance"},
-        {"kind": "remap", "dst": b, "srcA": a, "constant": [6.0, 10.0, 0.0, 1.0], "value": 1.0, "_role": "ring_in"},
-        {"kind": "remap", "dst": a, "srcA": a, "constant": [11.0, 10.0, 0.0, 1.0], "value": 1.0, "_role": "ring_out"},
+        {"kind": "remap", "dst": b, "srcA": a, "constant": [14.0, 18.0, 0.0, 1.0], "value": 1.0, "_role": "ring_in"},
+        {"kind": "remap", "dst": a, "srcA": a, "constant": [19.0, 18.0, 0.0, 1.0], "value": 1.0, "_role": "ring_out"},
         {"kind": "multiply", "dst": a, "srcA": a, "srcB": b},
         {"kind": "constant", "dst": c, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "ring_gain"},
         {"kind": "constant", "dst": b, "constant": R(RING_COLOUR) + [1.0], "_role": "ring_colour"},
         {"kind": "multiply", "dst": b, "srcA": b, "srcB": c},
         {"kind": "multiply", "dst": out, "srcA": a, "srcB": b},
     ]
+
+
+WASH = {"wavelength": 140.0, "speed": 0.09}            # the meadow's light wash: metres per colour cycle, cycles/s
+
+
+def wash_ops(out, pos, a, b, c):
+    """The synth's light on the land (Rainbow World 2): slow bands of the bow's own colours drifting across the
+    meadow in world space -- the arches' light reaching the ground. A cyclic OKLab ramp through four of the
+    spectrum's roles, along world X, drifting with the transport's time; a cosine band (to the 4th) keeps it to a few
+    soft stripes rather than a tint over everything. Its gain (`wash_gain`) is the synth, the phrase and the drop:
+    0 at rest, so the meadow is as built with no music. Adds to `out`; uses a, b, c as scratch."""
+    sp = rw.SPECTRUM
+    stops = [R(c_) + [1.0] for c_ in (sp[1][1], sp[3][1], sp[5][1], sp[6][1])]  # blue, green, orange, red-orange
+    return [
+        {"kind": "swizzle", "dst": a, "srcA": pos, "constant": [0, 0, 0, 0]},
+        {"kind": "remap", "dst": a, "srcA": a, "constant": [0.0, WASH["wavelength"], 0.0, 1.0], "value": 0.0},
+        {"kind": "input", "dst": b, "input": "time"},
+        {"kind": "remap", "dst": b, "srcA": b, "constant": [0.0, 1.0, 0.0, -WASH["speed"]], "value": 0.0},
+        {"kind": "add", "dst": a, "srcA": a, "srcB": b},
+        {"kind": "oklabRamp", "dst": b, "srcA": a, "value": -1.0, "constant": stops[0], "constant2": stops[1],
+         "constant3": stops[2], "constant4": stops[3]},
+        {"kind": "palette", "dst": a, "srcA": a, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.0],
+         "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [3.0, 3.0, 3.0, 0.0], "constant4": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "power", "dst": a, "srcA": a, "value": 4.0},
+        {"kind": "multiply", "dst": b, "srcA": b, "srcB": a},
+        {"kind": "constant", "dst": c, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "wash_gain"},
+        {"kind": "multiply", "dst": b, "srcA": b, "srcB": c},
+        {"kind": "add", "dst": out, "srcA": out, "srcB": b},
+    ]
+
+
+def with_ring(prog, out, a, b, c):
+    """Rainbow World 2: the kick ring on a program that had no emission (trees, rocks): the light passes through the
+    canopies and over the stones as it crosses them."""
+    prog["ops"] = prog["ops"] + ring_ops(out, a, b, c)
+    prog["emission"] = out
+    return prog
 
 
 def load_look(path=None):
@@ -140,6 +177,7 @@ def ground_program(name="rw_ground", rim_hex="#76665C"):
     ]
     ops.insert(1, {"kind": "constant", "dst": 7, "constant": [-1.0, -1.0, -1.0, -1.0]})
     ops += ring_ops(5, 1, 2, 4)  # Rainbow World 2: r1, r2, r4 are free once the colour is in r3
+    ops += wash_ops(5, 0, 1, 2, 4)
     return finish({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 5,
                    "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
@@ -169,12 +207,13 @@ def grass_program():
         {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
         {"kind": "add", "dst": 5, "srcA": 5, "srcB": 1},
     ]
+    ops += wash_ops(5, 0, 1, 2, 4)
     return finish({"name": "rw_grass", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 5,
                    "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
 
 def canopy_program():
-    return {"name": "rw_canopy", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+    return finish(with_ring({"name": "rw_canopy", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
             "emissionIntensity": 1.0, "opacity": -1, "ops": [
                 {"kind": "input", "dst": 0, "input": "objectPosition"},
                 {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, 1.0 / 14.0, 0.0, -0.75], "value": 1.0},
@@ -185,11 +224,11 @@ def canopy_program():
                  # Stage 7, against the Blender preview: the AV Gen pads read cooler and darker than the Cycles
                  # tree; the two upper stops are warmer and lighter so the lit tops come out yellow-green
                  "constant": R(rw.hexlin("#2A6034")[:3]) + [1.0], "constant2": R(rw.hexlin("#5A9A3C")[:3]) + [1.0],
-                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]}]}
+                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]}]}, 5, 6, 7, 2))
 
 
 def rock_program():
-    return {"name": "rw_rock", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+    return finish(with_ring({"name": "rw_rock", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
             "emissionIntensity": 1.0, "opacity": -1, "ops": [
                 {"kind": "input", "dst": 0, "input": "worldPosition"},
                 {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.2, "seed": 5},
@@ -206,7 +245,7 @@ def rock_program():
                 {"kind": "input", "dst": 6, "input": "cavity"},
                 {"kind": "constant", "dst": 5, "constant": R(rw.P["stone_shadow"][:3]) + [1.0]},
                 {"kind": "remap", "dst": 6, "srcA": 6, "constant": [0.0, 0.5, 0.0, 0.7], "value": 1.0},
-                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 6}]}
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 6}]}, 7, 1, 2, 4))
 
 
 def cloud_program():
@@ -386,7 +425,7 @@ def node_points(name, asset, points, material, **extra):
 def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
     """A canopy ramp by height in the tree (core -> skin), with a little world noise -- the Great Tree's program with
     the tree's own colours: the Weeper's limes, the Blossom Puff's pinks."""
-    return {"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+    return finish(with_ring({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
             "emissionIntensity": 1.0, "opacity": -1, "ops": [
                 {"kind": "input", "dst": 0, "input": "objectPosition"},
                 {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, 1.0 / height, 0.0, offset], "value": 1.0},
@@ -394,7 +433,8 @@ def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
                 {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.35, "seed": 3},
                 {"kind": "mix", "dst": 1, "srcA": 1, "srcB": 2, "value": 0.35},
                 {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "constant": R(stops[0]) + [1.0],
-                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]}
+                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]},
+        5, 6, 7, 2))
 
 
 def all_programs():

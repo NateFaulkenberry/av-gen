@@ -21,8 +21,8 @@ STEMS = ("drums", "bass", "synth")
 
 # the kick ring's travel: radius = R0 + RING_REACH * beat.phase (metres). One beat is 0.496 s at Feline's 121 BPM, so
 # the front runs at about 110 m/s and is gone (faded) before the next kick.
-RING_R0 = 10.0
-RING_REACH = 60.0
+RING_R0 = 18.0
+RING_REACH = 70.0
 
 
 def route(source, target, amount, chain=None, component=-1, op="add", **extra):
@@ -58,7 +58,7 @@ def routes(fx, swell_nodes, swell):
     """`fx`: look.FX (program -> role -> 1-based op index). `swell_nodes`: the nodes carrying the swell deformers.
     `swell`: look's SWELL list (its last field is metres at a full swell)."""
     out = []
-    ring_programs = [p for p in ("rw_ground", "rw_ground_lip", "rw_grass") if "ring_in" in fx.get(p, {})]
+    ring_programs = [p for p in fx if "ring_in" in fx[p]]
 
     # ---- drums: the kick ring --------------------------------------------------------------------------------------
     # radius from the beat clock (both edges of both clamps move together), so the front starts on the beat and runs
@@ -74,10 +74,10 @@ def routes(fx, swell_nodes, swell):
                          {"remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 1.0,
                           "remapOutMax": 0.12}, op="multiply"))
         gain = op_target(prog, roles, "ring_gain", "constant", "constant")
-        out += stem_route("drums", "bass", "response.kickEnv", gain, 1.4,
+        out += stem_route("drums", "bass", "response.kickEnv", gain, 1.1,
                           {"gain": 3.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                            "attackMs": 4.0, "decayMs": 160.0},
-                          fb_amount=1.4, fb_chain={"attackMs": 4.0, "decayMs": 120.0})
+                          fb_amount=1.1, fb_chain={"attackMs": 4.0, "decayMs": 120.0})
 
     # ---- drums: hat glints in the grass ----------------------------------------------------------------------------
     if "glint_gain" in fx.get("rw_grass", {}):
@@ -116,7 +116,7 @@ def routes(fx, swell_nodes, swell):
                 out.append(route("beat.phase", op_target(prog, roles, role, "remap", "constant"), amt, component=c))
         out += stem_route("drums", "highMid", "response.snareEnv",
                           op_target(prog, roles, "front_gain", "constant", "constant"), 5.0,
-                          {"offset": -0.6, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                          {"offset": -1.55, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                            "attackMs": 4.0, "decayMs": 280.0}, fb_chain={"attackMs": 4.0, "decayMs": 220.0})
         # ---- synth: the arches' flow and brightness ----------------------------------------------------------------
         out.append(route("macro.synth", op_target(prog, roles, "flow_gain", "constant", "constant"), 3.0))
@@ -153,6 +153,17 @@ def routes(fx, swell_nodes, swell):
                                 "attackMs": 1500.0, "decayMs": 3000.0})
     out.append(route("macro.lift", "env/sky/sunGlow", 0.35))
     out.append(route("macro.lift", "post/bloom/intensity", 0.12))
+    # ---- the meadow wash: the synth's light reaching the land; a phrase and the drop flare it
+    for prog in ring_programs:
+        roles = fx[prog]
+        if "wash_gain" not in roles:
+            continue
+        wash = op_target(prog, roles, "wash_gain", "constant", "constant")
+        out.append(route("macro.synth", wash, 0.35))
+        out.append(route("macro.lift", wash, 0.25))
+        out.append(route("beat.phrasePulse", wash, 0.9, {"envelope": "linearfall", "envelopeFallPerSecond": 0.5,
+                                                         "attackMs": 60.0},
+                         depthSource="macro.synth", depthMin=0.2, depthMax=1.0))
     if "cloud_glow" in fx.get("rw_cloud", {}):
         out.append(route("macro.synth", op_target("rw_cloud", fx["rw_cloud"], "cloud_glow", "constant", "constant"),
                          0.3))

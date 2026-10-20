@@ -35,8 +35,27 @@ The owner, 2026-10-20:
   - Run A's 66.8 ms frame at 259.8 s (scene 38.5 + depth 23.2, both inflated at once) is a normal frame in run B.
   - Every frame over 45 ms sits in a window whose smoothed cost is already 37-44 ms. The jitter is ±10 ms (residual
     standard deviation 2.1-2.4 ms, with tails).
-  - It is consistent with the GPU being shared: another agent's avgen and an open Blender ran during these runs.
-  - The cure is the same either way: lower the expensive windows' cost so the jitter no longer crosses the budget.
+  - **It is not GPU contention.** The coordinator paused the perf agent for a clean window, and I repeated the 300 s
+    run on a quiet GPU (`quiet_orig.csv`, the as-built scene and project from 416d48f1):
+
+    | Run | p50 | p95 | max | Frames > 45 ms | Jitter std | Residual > 8 ms |
+    |---|---|---|---|---|---|---|
+    | Shared GPU, run A | 26.0 | 37.6 | 66.8 | 33 | 2.12 ms | 73 |
+    | Shared GPU, run B | 26.3 | 38.3 | 61.5 | 86 | 2.42 ms | 121 |
+    | **Quiet GPU** | **26.5** | **38.3** | **71.6** | **100** | **2.73 ms** | **175** |
+
+    The jitter did not go away on a quiet GPU; if anything it was larger.
+  - **It is not the geometry either.** Triangle and instance counts agree between runs to 0.5%: the GPU cull's
+    readback timing moves a few instances. A frame's jump in GPU time correlates with its jump in triangles at only
+    0.15.
+  - **It is not the sky rebuilds.** The palette's transitions rebuild the procedural sky 261 times in 300 s. Spikes
+    land within 0.15 s of a rebuild 9% of the time, against 5% by chance: at most a small share.
+  - **The spike frames:** single frames in which the scene pass (and often the depth pass) takes 1.5-2x its
+    neighbours, with the same geometry. I have not found the cause.
+  - **Plain statement:** the 50-70 ms spikes are a property of the GPU timeline on this machine (or of how Metal
+    schedules this scene's passes), not of the content, the other agent or a compile. They do not repeat at the same
+    frame. The scene's lever against them is headroom: a window whose smoothed cost is 25 ms does not cross 45 with
+    ±10 ms of jitter, and one at 38 does.
 - **No history cost.**
   - A short run started at 40 s measured 32.2 / 39.0 (p50 / p95) over 40-50 s.
   - The continuous runs measured 32.1 / 42.3 and 31.4 over the same window.
@@ -118,7 +137,25 @@ The 40-50 s hold improved; the 200 s hold did not, because its trees are near (2
 **Not yet met:** p95 is still over 29.3 ms at the 200-215 s hold and at a few other windows, at Ultra 1080p and full
 render scale. What remains, and what this pass does next (section 4), is in the next revision of this report.
 
-## 4. Next (in progress)
+## 4. What the new effects cost (prototype 1, the 40 s hold, 10 s windows, Ultra 1080p)
+
+| Arm | p50 | p95 | scene | depth | shadow |
+|---|---|---|---|---|---|
+| prototype 1 (two swell waves) | 31.4-31.7 | 42-43.5 | 17.2 | 6.3 | 4.5 |
+| without the swell deformers | 26.6-28.3 | 34.9-37.7 | 14.3-15.6 | 5.5 | 2.9-3.0 |
+| one swell wave | 28.8 | 38.1 | 15.5 | 5.9 | 3.7 |
+| swell on everything but the trees | 30.3 | 39.7 | 16.4 | 6.4 | 4.2 |
+| without the rainbow programs (glTF bows) | 31.1 | 36.0 | 16.6 | 6.6 | 4.5 |
+| without the ring and glint ops | 32.1 | 41.5 | 18.2 | 6.2 | 4.5 |
+
+- **The swell is the dear effect:** about 1.1 ms per wave, in the depth, lit and shadow passes of every scattered
+  vertex. It is now **one** wave (105 m, 1.9 m at a full swell).
+  - On stills, the swell visibly reshapes the ridge lines and the horizon (`build/rw2/caps/swpair_95.1.png`).
+  - Taking the trees out of it saves little, and their trunks would then part from the heaving ground.
+- **The ring, glint and arch programs are within the run-to-run noise:** under 0.5 ms each, as the profile's 0.09 ms
+  per op predicts for programs that cover part of the frame.
+
+## 5. Next (in progress)
 
 - Measure the live mode (`--mode live`), the owner's own measurement: the auto ladder and present included. The
   numbers above are pinned Ultra.

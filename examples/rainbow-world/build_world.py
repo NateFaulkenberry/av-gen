@@ -641,14 +641,15 @@ for kind, pts in cpts.items():
 print("CLOUDS", {k: len(v) for k, v in cpts.items()})
 
 # ---- Rainbow World 2: the bass swell (16-effect-mapping.md section 3) ------------------------------------------------
-# Two world-space sine deformers on the land and everything standing on it, the same two on every node, so a meadow and
+# A world-space sine deformer on the land and everything standing on it, the same two on every node, so a meadow and
 # the grass, flowers, stones and trees on it move together (each vertex is displaced by a function of where it is, not
 # of what it belongs to). Their amounts rest at 0 -- the world as built -- and the bass sets them through the `swell`
-# macro. Two waves, never one: different axes, wavelengths and speeds, so the sum heaves rather than slides (Finch,
-# GPU Gems ch. 1). They travel at about the ride's own speed.
+# macro. It travels at about the ride's own speed, along an axis oblique to the knot, so the heave crosses the track
+# rather than running with it. (Finch's sum of waves, GPU Gems ch. 1, was tried with two: measured in 17 section 5.)
 SWELL = [  # (axis of travel, displacement direction, wavelength m, speed rad/s, metres at a full swell)
-    ((0.62, 0.31, 0.72), (0.25, 0.93, 0.27), 115.0, 1.6, 1.4),
-    ((-0.45, 0.78, 0.43), (0.80, -0.18, 0.57), 72.0, 2.3, 0.9),
+    # One wave, not two (Rainbow World 2 gate 2): a second deformer measured 1.1 ms more at the 40 s hold (every
+    # scattered vertex in the depth, lit and shadow passes pays per deformer) for a shape the camera's own motion hides
+    ((0.62, 0.31, 0.72), (0.25, 0.93, 0.27), 105.0, 1.7, 1.9),
 ]
 SWELL_NODES = []
 for n_ in nodes:

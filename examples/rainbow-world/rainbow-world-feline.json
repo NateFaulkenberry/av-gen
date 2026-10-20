@@ -4196,7 +4196,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground/op/28/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -4204,7 +4204,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground/op/28/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -4212,7 +4212,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground/op/29/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -4220,7 +4220,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground/op/29/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -4243,7 +4243,7 @@
   {
    "source": "stem.drums.bass",
    "target": "material/rw_ground/op/31/constant/constant",
-   "amount": 1.4,
+   "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4260,7 +4260,7 @@
   {
    "source": "response.kickEnv",
    "target": "material/rw_ground/op/31/constant/constant",
-   "amount": 1.4,
+   "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4276,7 +4276,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground_lip/op/28/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -4284,7 +4284,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground_lip/op/28/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -4292,7 +4292,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground_lip/op/29/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -4300,7 +4300,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_ground_lip/op/29/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -4323,7 +4323,7 @@
   {
    "source": "stem.drums.bass",
    "target": "material/rw_ground_lip/op/31/constant/constant",
-   "amount": 1.4,
+   "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4340,7 +4340,7 @@
   {
    "source": "response.kickEnv",
    "target": "material/rw_ground_lip/op/31/constant/constant",
-   "amount": 1.4,
+   "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4356,7 +4356,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_grass/op/12/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -4364,7 +4364,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_grass/op/12/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -4372,7 +4372,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_grass/op/13/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0
@@ -4380,7 +4380,7 @@
   {
    "source": "beat.phase",
    "target": "material/rw_grass/op/13/remap/constant",
-   "amount": 60.0,
+   "amount": 70.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1
@@ -4403,7 +4403,7 @@
   {
    "source": "stem.drums.bass",
    "target": "material/rw_grass/op/15/constant/constant",
-   "amount": 1.4,
+   "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4420,7 +4420,407 @@
   {
    "source": "response.kickEnv",
    "target": "material/rw_grass/op/15/constant/constant",
-   "amount": 1.4,
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 4.0,
+    "decayMs": 120.0
+   },
+   "depthSource": "stem.drums.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_canopy/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_canopy/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_canopy/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_canopy/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_canopy/op/12/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.12
+   }
+  },
+  {
+   "source": "stem.drums.bass",
+   "target": "material/rw_canopy/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "gain": 3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 4.0,
+    "decayMs": 160.0
+   },
+   "optional": true
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/rw_canopy/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 4.0,
+    "decayMs": 120.0
+   },
+   "depthSource": "stem.drums.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_rock/op/16/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_rock/op/16/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_rock/op/17/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_rock/op/17/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_rock/op/20/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.12
+   }
+  },
+  {
+   "source": "stem.drums.bass",
+   "target": "material/rw_rock/op/19/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "gain": 3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 4.0,
+    "decayMs": 160.0
+   },
+   "optional": true
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/rw_rock/op/19/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 4.0,
+    "decayMs": 120.0
+   },
+   "depthSource": "stem.drums.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_weeper/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_weeper/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_weeper/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_weeper/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_weeper/op/12/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.12
+   }
+  },
+  {
+   "source": "stem.drums.bass",
+   "target": "material/rw_weeper/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "gain": 3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 4.0,
+    "decayMs": 160.0
+   },
+   "optional": true
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/rw_weeper/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 4.0,
+    "decayMs": 120.0
+   },
+   "depthSource": "stem.drums.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_blossom/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_blossom/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_blossom/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_blossom/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_blossom/op/12/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.12
+   }
+  },
+  {
+   "source": "stem.drums.bass",
+   "target": "material/rw_blossom/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "gain": 3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 4.0,
+    "decayMs": 160.0
+   },
+   "optional": true
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/rw_blossom/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 4.0,
+    "decayMs": 120.0
+   },
+   "depthSource": "stem.drums.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_pine/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_pine/op/8/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_pine/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_pine/op/9/remap/constant",
+   "amount": 70.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "beat.phase",
+   "target": "material/rw_pine/op/12/constant/constant",
+   "amount": 1.0,
+   "op": "multiply",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.12
+   }
+  },
+  {
+   "source": "stem.drums.bass",
+   "target": "material/rw_pine/op/11/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "gain": 3.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 4.0,
+    "decayMs": 160.0
+   },
+   "optional": true
+  },
+  {
+   "source": "response.kickEnv",
+   "target": "material/rw_pine/op/11/constant/constant",
+   "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -4557,15 +4957,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_00/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_00/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4573,15 +4965,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_01/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_01/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4589,15 +4973,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_02/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_02/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4605,15 +4981,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_03/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_03/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4621,15 +4989,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_04/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_04/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4637,15 +4997,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_05/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_05/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4653,15 +5005,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_06/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_06/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4669,15 +5013,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_07/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_07/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4685,15 +5021,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_08/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_08/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4701,15 +5029,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_09/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_09/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4717,15 +5037,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_10/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_10/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4733,15 +5045,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_11/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_11/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4749,15 +5053,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_12/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_12/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4765,15 +5061,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_13/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_13/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4781,15 +5069,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_14/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_14/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4797,15 +5077,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_15/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_15/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4813,15 +5085,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_16/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_16/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4829,15 +5093,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_17/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_17/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4845,15 +5101,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_18/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_18/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4861,15 +5109,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_19/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_19/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4877,15 +5117,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_20/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_20/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4893,15 +5125,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_21/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_21/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4909,15 +5133,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_22/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_22/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4925,15 +5141,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_23/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_23/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4941,15 +5149,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_24/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_24/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4957,15 +5157,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_25/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_25/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4973,15 +5165,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_26/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_26/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -4989,15 +5173,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_27/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_27/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5005,15 +5181,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_28/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_28/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5021,15 +5189,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_29/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_29/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5037,15 +5197,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_30/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_30/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5053,15 +5205,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_31/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_31/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5069,15 +5213,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_32/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_32/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5085,15 +5221,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_33/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_33/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5101,15 +5229,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_34/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_34/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5117,15 +5237,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_35/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_35/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5133,15 +5245,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_36/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_36/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5149,15 +5253,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_37/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_37/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5165,15 +5261,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_38/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_38/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5181,15 +5269,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_39/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_39/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5197,15 +5277,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_40/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_40/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5213,15 +5285,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_41/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_41/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5229,15 +5293,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_42/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_42/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5245,15 +5301,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_43/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_43/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5261,15 +5309,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_44/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_44/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5277,15 +5317,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_45/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_45/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5293,15 +5325,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_46/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_46/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5309,15 +5333,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/band_47/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/band_47/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5325,15 +5341,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/rim_moss_set_01_0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/rim_moss_set_01_0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5341,15 +5349,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/rim_09_0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/rim_09_0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5357,15 +5357,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/rim_boulder_01_0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/rim_boulder_01_0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5373,15 +5365,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/rim_stone_01_0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/rim_stone_01_0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5389,15 +5373,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/rim_namaqualand_boulder_03_0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/rim_namaqualand_boulder_03_0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5405,15 +5381,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/rim_07_0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/rim_07_0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5421,15 +5389,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/great_wood/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/great_wood/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5437,15 +5397,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/great_core/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/great_core/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5453,15 +5405,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/great_leaves/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/great_leaves/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5469,15 +5413,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/weeper_wood/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/weeper_wood/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5485,15 +5421,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/weeper_core/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/weeper_core/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5501,15 +5429,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/weeper_leaves/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/weeper_leaves/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5517,15 +5437,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/blossom_wood/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/blossom_wood/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5533,15 +5445,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/blossom_core/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/blossom_core/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5549,15 +5453,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/blossom_leaves/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/blossom_leaves/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5565,15 +5461,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/pine_wood/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/pine_wood/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5581,15 +5469,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/pine_core/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/pine_core/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5597,15 +5477,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/pine_leaves/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/pine_leaves/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5613,15 +5485,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/outcrops0/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/outcrops0/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5629,15 +5493,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/flowers00/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/flowers00/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5645,15 +5501,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/flowers_hang/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/flowers_hang/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5661,15 +5509,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass000/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass000/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5677,15 +5517,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass001/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass001/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5693,15 +5525,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass002/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass002/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5709,15 +5533,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass003/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass003/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5725,15 +5541,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass004/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass004/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5741,15 +5549,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass005/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass005/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5757,15 +5557,7 @@
   {
    "source": "macro.swell",
    "target": "procedural/grass006/deform/1/amount",
-   "amount": 1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "procedural/grass006/deform/2/amount",
-   "amount": 0.9,
+   "amount": 1.9,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -5850,7 +5642,7 @@
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "offset": -0.6,
+    "offset": -1.55,
     "gain": 2.5,
     "clampEnabled": true,
     "clampMin": 0.0,
@@ -5964,7 +5756,7 @@
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "offset": -0.6,
+    "offset": -1.55,
     "gain": 2.5,
     "clampEnabled": true,
     "clampMin": 0.0,
@@ -6144,6 +5936,66 @@
    }
   },
   {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_canopy/op/11/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.2
+   }
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_rock/op/19/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.2
+   }
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_weeper/op/11/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.2
+   }
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_blossom/op/11/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.2
+   }
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_pine/op/11/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.2
+   }
+  },
+  {
    "source": "stem.synth.centroid",
    "target": "macros/lift",
    "amount": 1.0,
@@ -6197,6 +6049,102 @@
    "op": "add",
    "polarity": "unipolar",
    "component": -1
+  },
+  {
+   "source": "macro.synth",
+   "target": "material/rw_ground/op/44/constant/constant",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.lift",
+   "target": "material/rw_ground/op/44/constant/constant",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_ground/op/44/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.5,
+    "attackMs": 60.0
+   },
+   "depthSource": "macro.synth",
+   "depthMin": 0.2,
+   "depthMax": 1.0
+  },
+  {
+   "source": "macro.synth",
+   "target": "material/rw_ground_lip/op/44/constant/constant",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.lift",
+   "target": "material/rw_ground_lip/op/44/constant/constant",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_ground_lip/op/44/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.5,
+    "attackMs": 60.0
+   },
+   "depthSource": "macro.synth",
+   "depthMin": 0.2,
+   "depthMax": 1.0
+  },
+  {
+   "source": "macro.synth",
+   "target": "material/rw_grass/op/38/constant/constant",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.lift",
+   "target": "material/rw_grass/op/38/constant/constant",
+   "amount": 0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "beat.phrasePulse",
+   "target": "material/rw_grass/op/38/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.5,
+    "attackMs": 60.0
+   },
+   "depthSource": "macro.synth",
+   "depthMin": 0.2,
+   "depthMax": 1.0
   },
   {
    "source": "macro.synth",
