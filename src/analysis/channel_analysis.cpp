@@ -218,6 +218,12 @@ bool LiveFeedMixer::feedAt(double seconds, const CausalOnsets& mix, ResponseFeed
         while (pending.size() < pending.capacity() && slots_[s] < channels_.size() && channels_.popFeed(slots_[s], hop)) {
             pending.push_back(hop);
         }
+        // Hops too old to be this step's (queued while live Sonic was off, or before a stall) carry no event.
+        auto fresh = pending.begin();
+        while (fresh != pending.end() && fresh->seconds < seconds - FeedFolder::kStaleSeconds) {
+            ++fresh;
+        }
+        pending.erase(pending.begin(), fresh);
         auto end = pending.begin();
         while (end != pending.end() && end->seconds <= seconds) {
             ++end;

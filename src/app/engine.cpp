@@ -3616,8 +3616,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // ADR-902: every route, track and effect, now that everything a rule reads exists -- the shot
     // spans, the sequence's markers, the scene's programs and nodes.
     feedsQuiet_ = false;
-    if (!feeds_.empty()) {
-        rebuildFeeds(); // ADR-1580/1581: now every stem is known, a key that names none is said
+    rebuildFeeds(); // ADR-1580/1581: every stem is known now (a key that names none is said), and no grid or feed of
+                    // the last project's survives into this one
+    if (input_ && channels_) {
+        std::vector<std::string> keys;
+        for (const signals::StemSignals& s : inputSignals_) {
+            keys.push_back(s.key);
+        }
+        channels_->stop();
+        rebuildChannelAnalysis(keys); // the live sources' roles under this project's feeds
     }
     reportRouteLiveness();
     finishTimings();
