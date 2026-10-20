@@ -86,6 +86,7 @@ json AppSettings::toJson() const {
                 json item{{"key", s.key}, {"label", s.label}, {"channel", s.channel + 1}};
                 if (s.pair) item["pair"] = true;
                 if (s.hits) item["hits"] = true;
+                if (s.gainDb != 0.0f) item["gainDb"] = s.gainDb;
                 list.push_back(std::move(item));
             }
             devices[device] = std::move(list);
@@ -193,7 +194,8 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
                                        .label = item.value("label", std::string{}),
                                        .channel = static_cast<std::uint32_t>(channel - 1),
                                        .pair = item.value("pair", false),
-                                       .hits = item.value("hits", false)});
+                                       .hits = item.value("hits", false),
+                                       .gainDb = std::clamp(item.value("gainDb", 0.0f), -24.0f, 24.0f)});
                 }
                 out.live.inputSources[device] = std::move(sources);
             }

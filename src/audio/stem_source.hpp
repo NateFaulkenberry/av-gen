@@ -30,6 +30,7 @@ struct StemSource {
     // only -- AV Gen never guesses an offset from the audio.
     double offsetSeconds = 0.0;
     bool hits = false;              // also run the kick/snare/hat classifier (ADR-1060) on this stem
+    float gainDb = 0.0f;            // ADR-1582: the stem's trim before analysis, -24..+24 dB (`gainDb`)
     [[nodiscard]] bool operator==(const StemSource&) const = default;
 };
 

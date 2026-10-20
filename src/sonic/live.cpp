@@ -282,7 +282,7 @@ bool LiveSonic::midi(const control::MidiMessage& m, double frameSeconds) {
 }
 
 void LiveSonic::frame(const SonicSetup& setup, LiveTimbre* timbre, signals::SignalBus& bus, double frameSeconds,
-                      std::uint64_t frameNs) {
+                      std::uint64_t frameNs, analysis::FeedProvider* feeds) {
     if (!running_) {
         return;
     }
@@ -291,7 +291,9 @@ void LiveSonic::frame(const SonicSetup& setup, LiveTimbre* timbre, signals::Sign
     if (timbre != nullptr) {
         TimbreSnapshot s;
         while (timbre->pop(s)) {
-            runtime_.step(setup, s.features, s.hopSeconds);
+            analysis::ResponseFeed feed;
+            const bool fed = feeds != nullptr && feeds->feedAt(s.audioSeconds, s.features.causal, feed);
+            runtime_.step(setup, s.features, s.hopSeconds, fed ? &feed : nullptr);
             ++lastStepped_;
             status_.audioLevelDb = s.features.loudnessDb;
             if (s.features.loudnessDb > -60.0f) {

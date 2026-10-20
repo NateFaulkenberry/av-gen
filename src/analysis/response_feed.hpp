@@ -71,6 +71,15 @@ private:
     bool have_ = false;
 };
 
+// A live path's feeds (ADR-1580): the render thread asks for the feed of each mix hop it steps, in order.
+class FeedProvider {
+public:
+    virtual ~FeedProvider() = default;
+    // The feed for the mix hop at `seconds` (the input's frame clock) whose own causal onsets are `mix`. False: no
+    // feed is routed, step on the mix's onsets.
+    virtual bool feedAt(double seconds, const CausalOnsets& mix, ResponseFeed& out) = 0;
+};
+
 // The feed the response model steps on: the mix's, with each routed part replaced by its source's.
 [[nodiscard]] ResponseFeed mergeFeeds(const ResponseFeed& mix, std::span<const ResponseFeed> sources,
                                       const FeedRouting& routing);

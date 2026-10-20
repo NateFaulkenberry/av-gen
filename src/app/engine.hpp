@@ -21,6 +21,7 @@
 #include "scene/rebuild_deferral.hpp"
 #include "app/world_director.hpp"
 #include "audio/audio_input.hpp"
+#include "audio/feeds.hpp"
 #include "audio/stem_source.hpp"
 #include "analysis/stem_analysis.hpp"
 #include "analysis/channel_analysis.hpp"
@@ -911,6 +912,26 @@ public:
     // Changes whenever the stem list, a stem's analysis or its offset changes.
     [[nodiscard]] std::uint64_t stemsRevision() const { return stemsRevision_; }
 
+    // ---- feeds (ADR-1580, ADR-1581) ---------------------------------------------------------------
+    //
+    // Which analysis source drives the beat clock and feeds each part of `response.*` (audio/feeds.hpp; saved as the
+    // project's `feeds` block). A key names an offline stem, or while a live input is open the input source of that
+    // key. A source a response feed names gets the hits tier. Nothing changes for a project with no feeds.
+    [[nodiscard]] const audio::Feeds& feeds() const { return feeds_; }
+    void setFeeds(audio::Feeds feeds);
+    // The grid the beat clock, the metre, music.* and the timeline's beats run on: the mix's, or the beat feed's
+    // stem's (offline). Empty with no audio.
+    [[nodiscard]] const analysis::TrackedGrid& beatGrid() const { return grid_; }
+    // What became of each feed, for the panels.
+    struct FeedState {
+        std::string key;        // the stem or input-source key
+        bool resolved = false;  // a stem or (live) an input source of that key exists
+        bool live = false;      // resolved to a live input source
+        bool active = false;    // it has data now (live: the source is active; offline: the stem was analysed)
+    };
+    [[nodiscard]] FeedState feedState(const std::string& key) const;
+    [[nodiscard]] std::uint64_t feedsRevision() const { return feedsRevision_; }
+
     // The decoded source behind a clip, for drawing its waveform. Null while it is missing.
     [[nodiscard]] std::shared_ptr<const audio::AudioFile> clipSource(const std::filesystem::path& p) const {
         return clipSources_.find(p);
@@ -1132,6 +1153,9 @@ private:
         double midiPhase = 0.0;
         std::uint32_t midiCount = 0;
         bool midiPulse = false;
+        // ADR-1581: live input with a beat feed on an active input source: its tracker instead of the mix's.
+        const analysis::BeatState* sourceBeat = nullptr;
+        bool sourceBeatHeld = false; // the beat feed is a live source that is inactive now: free-run, no resync
         double position = 0.0;
         double duration = 0.0;
         bool playing = false;
@@ -1428,6 +1452,23 @@ private:
     std::uint64_t stemsRevision_ = 1;
     double stemPreviousSeconds_ = -1.0; // the last instant the stems were published at (-1: none, or a jump since)
     void refreshStemMixDiagnostics();
+    // ---- feeds (ADR-1580/1581) ----
+    audio::Feeds feeds_;
+    analysis::TrackedGrid grid_;                 // the beat clock's grid (the mix's unless feeds.beat names a stem)
+    std::vector<std::uint32_t> gridBeatCount_;   // beats landed at each mix frame, when the grid is a stem's (music.*)
+    std::uint64_t feedsRevision_ = 1;
+    // Rebuilds the grid and the Sonic setup's per-frame response feed from the feeds, the stems and the track. Called
+    // whenever any of them changes.
+    void rebuildFeeds();
+    // music.* reads the beat of a mix frame from the grid when the grid is a stem's (`nullptr`: the frame's own).
+    [[nodiscard]] std::optional<app::MusicRuntime::BeatFields> gridBeatAt(std::size_t frameIndex) const;
+    // Live (ADR-1580/1581): the fed input sources' feeds for the live Sonic step, and the beat feed's source's tracker.
+    std::unique_ptr<analysis::LiveFeedMixer> liveFeeds_;
+    int liveBeatSource_ = -1;           // index into inputSources_ of the beat feed's source, -1 none
+    analysis::BeatState liveBeat_{};    // its tracker after the newest hop the render thread took
+    bool liveBeatValid_ = false;        // ...while the source is active
+    mutable std::uint32_t liveGridCount_ = 0;
+    [[nodiscard]] std::optional<app::MusicRuntime::BeatFields> liveGridBeat() const;
     // The stems at `to` onto `bus` (the engine's own, or a seek replay's engine-shaped scratch bus), events since `from`.
     void publishStems(signals::SignalBus& bus, double from, double to) const;
     // ADR-1116: see audioHistory(). Rebuilt when audioRevision_ moves; the live feed only without a track.

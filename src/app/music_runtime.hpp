@@ -53,6 +53,7 @@
 #include <vector>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace avgen::app {
@@ -96,7 +97,15 @@ public:
     // engine hands frames over from two places (the offline catch-up loop walks every frame, then
     // publishFrame() publishes the last of them again) and duplicate delivery would otherwise
     // advance the detector's clock by zero seconds and double-count the frame's onset.
-    void consume(const analysis::AnalysisFrame& frame, const analysis::Meter& meter) {
+    // ADR-1581: a frame's beat from the project's beat grid when that is not the mix's own (a stem's or a live
+    // source's): whether a beat landed on the frame, and how many have.
+    struct BeatFields {
+        bool beat = false;
+        std::uint32_t beatCount = 0;
+    };
+
+    void consume(const analysis::AnalysisFrame& frame, const analysis::Meter& meter,
+                 const std::optional<BeatFields>& grid = std::nullopt) {
         if (haveFrame_ && frame.frameIndex == lastFrameIndex_) {
             return;
         }
@@ -114,11 +123,12 @@ public:
         // every hop, so an untouched sustained transient sits above the impact threshold for its
         // whole decay and fires an Impact on each hop the cooldown permits.
         mf.onsetStrength = frame.onset ? frame.onsetStrength : 0.0f;
-        mf.beat = frame.beat;
+        mf.beat = grid ? grid->beat : frame.beat;
         // `beatCount` is how many tracked beats have landed, so the beat this frame is in is
         // `beatCount - 1` on the clock (-1 before the first); the meter turns that into a musical
         // beat, and a bar, phrase and section, with beat 1 of bar 1 on its downbeat (ADR-896).
-        const std::int64_t beat = meter.beat(static_cast<std::int64_t>(frame.beatCount) - 1);
+        const std::int64_t beat =
+            meter.beat(static_cast<std::int64_t>(grid ? grid->beatCount : frame.beatCount) - 1);
         mf.beatInBar = meter.beatInBar(beat);
         mf.barCount = meter.bar(beat);
         mf.phraseCount = meter.phrase(beat);
