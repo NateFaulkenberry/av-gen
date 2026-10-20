@@ -111,8 +111,13 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
 ### 4.1 The musical control
 
 `macro.synth` is:
-- `stem.synth.level` conditioned (`x 2.2 - 0.95`: the drop's bed at 0.47-0.71 reads 0.1-0.6), attack 250 ms, decay
-  1.2 s, so the kick's sidechain pump does not ripple the light;
+- 0.4 x `stem.synth.level` conditioned (`x 2.2 - 0.95`), attack 250 ms, decay 1.2 s, so the kick's sidechain pump does
+  not ripple the light. The level reads against the stem's adaptive reference (ADR-1510), so on its own it put the
+  intro's isolated calls at the top and the drop's steady bed in the middle -- backwards for this track.
+- 0.7 x `stem.synth.rms` (`x 4.5`, absolute: the bed 0.12-0.18 against the calls' 0.02-0.06), attack 300 ms, decay
+  1.2 s. With both, the synth light is 0.3-0.6 through the calls, 0.85 at the drop, 0.6-0.8 through the grooves and
+  0.85-0.9 through the riser, falling with the outro (`stems/05-controls.jpg`, emulated by
+  `scripts/control_plot.py` from the engine's own stem features);
 - plus 0.3 per `stem.synth.onset`, falling at 1.4 per second: the intro's falling calls and the chord changes.
 
 ### 4.2 The arches as instruments
