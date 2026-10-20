@@ -125,11 +125,18 @@ def routes(fx, swell_nodes, swell):
     # ---- synth: the musical control. Its followed level (the drop's bed sits at 0.47-0.71) conditioned and smoothed
     # over a beat and more, so the kick's sidechain pump does not ripple the light; each synth onset (the intro's
     # falling calls, chord changes) adds a swell that falls over 0.7 s.
-    out += stem_route("synth", "level", "response.sustain", "macros/synth", 1.0,
+    # The level reads against the stem's own adaptive reference (ADR-1510), so the intro's isolated calls read at the
+    # top and the drop's steady bed reads mid-range; the window RMS is absolute, so the bed (0.12-0.18) outweighs the
+    # calls (0.02-0.06). Both, so the world is brightest where the synth is loudest and still answers each entry.
+    out += stem_route("synth", "level", "response.sustain", "macros/synth", 0.4,
                       {"gain": 2.2, "offset": -0.95, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                        "attackMs": 250.0, "decayMs": 1200.0},
+                      fb_amount=0.9,
                       fb_chain={"gain": 2.0, "offset": -0.75, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                                 "attackMs": 250.0, "decayMs": 1200.0})
+    out += stem_route("synth", "rms", None, "macros/synth", 0.7,
+                      {"gain": 4.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                       "attackMs": 300.0, "decayMs": 1200.0})
     out += stem_route("synth", "onset", None, "macros/synth", 0.3,
                       {"envelope": "linearfall", "envelopeFallPerSecond": 1.4, "attackMs": 20.0})
     # ---- phrase: every 4 bars (beat.phrasePulse, bars 1 + 4k) the arches flare and the kick's ring is brighter; the
@@ -146,11 +153,15 @@ def routes(fx, swell_nodes, swell):
                          {"envelope": "linearfall", "envelopeFallPerSecond": 2.2}))
     # ---- lift: the synth's brightness over bars (its centroid; the 151-165 s rise, the riser at 183-190 s) lifts
     # the sun's glow, the bloom and the arches together, slowly
+    # (gated by the synth's light: a silent stem's centroid is its noise floor's, and read high)
     out += stem_route("synth", "centroid", "audio.spectralCentroid", "macros/lift", 1.0,
                       {"gain": 6.0, "offset": -3.75, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                        "attackMs": 1500.0, "decayMs": 3000.0},
                       fb_chain={"gain": 4.0, "offset": -2.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                                 "attackMs": 1500.0, "decayMs": 3000.0})
+    for r_ in out[-2:]:
+        if r_["target"] == "macros/lift" and r_["source"].startswith("stem."):
+            r_.update(depthSource="macro.synth", depthMin=0.0, depthMax=1.0)
     out.append(route("macro.lift", "env/sky/sunGlow", 0.35))
     out.append(route("macro.lift", "post/bloom/intensity", 0.12))
     # ---- the meadow wash: the synth's light reaching the land; a phrase and the drop flare it
