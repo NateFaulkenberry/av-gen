@@ -163,13 +163,19 @@ void TriggerClock::setFrame(double seconds) {
 }
 
 void TriggerClock::bind(const analysis::AnalysisTrack* track, std::span<const seq::Marker> markers,
-                        const HistoryBank* history, double seconds, const analysis::Meter& meter) {
+                        const HistoryBank* history, double seconds, const analysis::Meter& meter,
+                        std::span<const double> beats) {
     history_ = history;
     setFrame(seconds);
 
     const std::size_t frames = track != nullptr ? track->frames().size() : 0;
-    const std::size_t beatCount = track != nullptr ? track->beats().beatTimes.size() : 0;
-    if (track != boundTrack_ || frames != boundFrames_ || beatCount != boundBeats_ || !(meter == boundMeter_)) {
+    const std::span<const double> grid =
+        !beats.empty() ? beats : (track != nullptr ? std::span<const double>(track->beats().beatTimes) : std::span<const double>{});
+    const std::size_t beatCount = grid.size();
+    const double gridEdge = grid.empty() ? 0.0 : grid.front() + grid.back();
+    if (track != boundTrack_ || frames != boundFrames_ || beatCount != boundBeats_ || gridEdge != boundGridEdge_ ||
+        !(meter == boundMeter_)) {
+        boundGridEdge_ = gridEdge;
         boundTrack_ = track;
         boundFrames_ = frames;
         boundBeats_ = beatCount;
@@ -179,7 +185,7 @@ void TriggerClock::bind(const analysis::AnalysisTrack* track, std::span<const se
         moments_.clear();
         downbeat_ = meter.downbeat;
         if (track != nullptr) {
-            beats_ = track->beats().beatTimes;
+            beats_.assign(grid.begin(), grid.end());
             std::sort(beats_.begin(), beats_.end());
             // The walk the Auto-director's structure fold does: a detector of its own, over every
             // frame from the first, so the moments are a property of the track and not of where a

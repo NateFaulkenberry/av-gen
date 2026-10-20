@@ -11,6 +11,7 @@
 #include "params/parameter.hpp"
 #include "platform/window.hpp"
 #include "sonic/notes.hpp"
+#include "ui/feeds_row.hpp"
 #include "ui/style.hpp"
 #include "ui/theme.hpp"
 
@@ -148,13 +149,14 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
     const ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
     const float rowHeight = ImGui::GetFrameHeightWithSpacing();
     const float height = std::min(static_cast<float>(channels) + 1.5f, 10.5f) * rowHeight;
-    if (ImGui::BeginTable("##live-inputs", 5, flags, ImVec2(-1.0f, height))) {
+    if (ImGui::BeginTable("##live-inputs", 6, flags, ImVec2(-1.0f, height))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("In");
         ImGui::TableSetupColumn("Level", ImGuiTableColumnFlags_WidthFixed, 56.0f);
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("Pair");
         ImGui::TableSetupColumn("Hits");
+        ImGui::TableSetupColumn("Gain", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 3.6f);
         ImGui::TableHeadersRow();
         for (std::uint32_t c = 0; c < channels; ++c) {
             ImGui::PushID(static_cast<int>(c));
@@ -171,6 +173,7 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
             });
             if (partner != sources.end()) {
                 ImGui::TextDisabled("with %u: %s", c, partner->label.c_str());
+                ImGui::TableNextColumn();
                 ImGui::TableNextColumn();
                 ImGui::TableNextColumn();
                 ImGui::PopID();
@@ -224,6 +227,19 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
                     tooltip("Also find kicks, snares and hats on this input (stem.<key>.kick/snare/hat): for a drum "
                             "bus. About six times the analysis cost of the rest.");
                 }
+                // ADR-1582: the source's trim. Applied while dragging (no reset), saved when released.
+                ImGui::TableNextColumn();
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::DragFloat("##gain", &it->gainDb, 0.1f, analysis::kMinTrimDb, analysis::kMaxTrimDb, "%+.1f dB",
+                                     ImGuiSliderFlags_AlwaysClamp)) {
+                    engine.setInputSources(sources);
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltip("Trim before this source's analysis, on top of Input gain. It lifts a quiet channel over the "
+                            "gate and into the kick/snare/hat and beat detectors; it does not make the picture bigger "
+                            "(the levels read against the source's own loudness). Ctrl-click to type; 0 is none.");
+                }
+                changed |= ImGui::IsItemDeactivatedAfterEdit();
                 if (changed) {
                     ImGui::PopID();
                     break;
@@ -231,6 +247,7 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
             } else {
                 ImGui::SameLine();
                 ImGui::TextDisabled("not analysed");
+                ImGui::TableNextColumn();
                 ImGui::TableNextColumn();
                 ImGui::TableNextColumn();
             }
@@ -253,6 +270,7 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
                 "Callback %.1f us mean, %.1f us max. Analysis %.1f us per source per hop.",
                 st.callbackMeanMicros, st.callbackMaxMicros, analysis != nullptr ? analysis->hopMicros() : 0.0);
     }
+    drawFeedsRow(engine); // ADR-1580/1581
     if (changed && onLiveInputSources) {
         onLiveInputSources(sources);
     }

@@ -94,8 +94,10 @@ public:
     // the frame's transport second; a new value moves `edgeStart` to the previous one (see the
     // header). Called by the host once or more per frame -- repeated calls with the same second are
     // the same frame.
+    // `beats` (ADR-1581), when not empty, is the beat clock's grid to use instead of the track's own (a stem's).
     void bind(const analysis::AnalysisTrack* track, std::span<const seq::Marker> markers,
-              const HistoryBank* history, double seconds, const analysis::Meter& meter = {});
+              const HistoryBank* history, double seconds, const analysis::Meter& meter = {},
+              std::span<const double> beats = {});
 
     // Direct setters, for a host that has no track (a test, a tool) -- and what `bind` itself uses.
     // `downbeat` is the index of the beat that is beat 1 of bar 1 (`analysis::Meter::downbeat`).
@@ -158,6 +160,7 @@ private:
     const analysis::AnalysisTrack* boundTrack_ = nullptr;
     std::size_t boundFrames_ = 0;
     std::size_t boundBeats_ = 0;
+    double boundGridEdge_ = 0.0; // ADR-1581: the grid's first + last beat, so a new grid of the same size rebinds
     analysis::Meter boundMeter_{0, 0, 0, 0}; // never a real meter, so the first bind derives
 
     [[nodiscard]] const SignalEvents& signalEvents(const std::string& name) const;

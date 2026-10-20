@@ -30,9 +30,9 @@ namespace avgen::app {
 [[nodiscard]] inline directing::MusicalContext musicalContextFor(const Engine& engine) {
     std::vector<double> beats;
     double tempo = 0.0;
-    if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr) {
-        beats = track->beats().beatTimes;
-        tempo = static_cast<double>(track->beats().tempoBpm);
+    if (engine.track() != nullptr) { // ADR-1581: the beat clock's grid
+        beats = engine.beatGrid().beats.beatTimes;
+        tempo = static_cast<double>(engine.beatGrid().beats.tempoBpm);
     }
     // The piece is bounded by its audio. With none, the transport's duration is only the extent of
     // whatever is already on the timeline -- which is exactly what a plan may be extending -- so it

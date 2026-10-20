@@ -2871,7 +2871,8 @@ void registerAudioTools(ToolRegistry& registry) {
                 audio["durationSeconds"] = engine.durationSeconds();
             }
             if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr) {
-                const std::vector<double>& beats = track->beats().beatTimes;
+                const std::vector<double>& beats = engine.beatGrid().beats.beatTimes; // ADR-1581: the clock's grid
+                audio["beatSource"] = avgen::audio::feedValue(engine.beatGrid().sourceKey);
                 audio["beatCount"] = beats.size();
                 if (!beats.empty()) {
                     audio["firstBeatSeconds"] = beats.front();

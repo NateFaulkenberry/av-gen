@@ -6825,7 +6825,8 @@ world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene)
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
     // Wave 2 (TRIGGER): beats and onsets from the offline track, the sequence's markers, HIST.
-    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, meter());
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, meter(),
+                       grid_.beats.beatTimes);
     ctx.triggers = &triggerClock_;
     return ctx;
 }
@@ -7229,7 +7230,8 @@ void Engine::update(const FrameTime& time) {
     // ADR-906: the trigger clock, bound to this frame's transport second before the flatten, which
     // counts every triggered field's clock from it. Binding it again later in the frame is the same
     // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
-    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter(),
+                       grid_.beats.beatTimes);
     serviceSignalTriggers(); // ADR-1061: derive or record the bus events Signal triggers fire on
     if (auto* comp = composition()) {
         comp->setTriggerClock(&triggerClock_);
