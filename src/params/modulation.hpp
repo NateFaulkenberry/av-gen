@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -42,6 +43,16 @@ struct ModRoute {
     std::string depthSource;
     float depthMin = 0.0f;
     float depthMax = 1.0f;
+    // ADR-1570: the value the depth signal is taken to have while the bus does not carry it at all. Unset (the
+    // default), a depth signal the bus lacks leaves the route unresolved, as before. Set, the route binds and reads
+    // this instead -- the shape of a fallback: a route on `response.kick` with depth `stem.drums.active`, min 1,
+    // max 0 and default 0 plays at full depth with no drum stem in the project or on the input, and stands aside
+    // while one is active.
+    std::optional<float> depthDefault;
+    // ADR-1570: a route on a signal that may not exist here -- `stem.drums.kick` in a live scene that also plays on
+    // a plain stereo input. An unknown SOURCE is then the expected state, not a binding problem: the route stays
+    // unresolved and silent and nothing is reported. (An unknown target is still reported.)
+    bool optional = false;
     // ADR-924: the Director plan item that made this route, "<planId>/<itemKey>"; empty for a route a
     // person or a subsystem made. Saved with the route (and only when set), so the Modulation panel can
     // say which plan item made it and why, and the plan's next revision can find it again -- its
@@ -72,6 +83,7 @@ struct ModRoute {
     ProcessorChain::State state{};
     signals::SignalId sourceId = signals::kInvalidSignal;
     signals::SignalId depthId = signals::kInvalidSignal; // ADR-900; invalid when depthSource is empty
+    bool depthMissing = false; // ADR-1570: bound with depthDefault standing in for a signal the bus lacks
     IParameter* targetParam = nullptr;
     float lastOutput = 0.0f;       // for UI display
 };

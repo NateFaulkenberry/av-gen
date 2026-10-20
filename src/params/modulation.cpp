@@ -38,6 +38,7 @@ float applyModOp(ModOp op, float current, float modulation) {
 ModRoute& Modulator::addRoute(ModRoute route) {
     route.sourceId = signals::kInvalidSignal;
     route.depthId = signals::kInvalidSignal;
+    route.depthMissing = false;
     route.targetParam = nullptr;
     routes_.push_back(std::move(route));
     bound_ = false;
@@ -58,6 +59,7 @@ Result<void> Modulator::bind(const signals::SignalBus& bus, ParameterSet& params
     auto reject = [&](ModRoute& route, std::size_t index, std::string reason) {
         route.sourceId = signals::kInvalidSignal;
         route.depthId = signals::kInvalidSignal;
+        route.depthMissing = false;
         route.targetParam = nullptr;
         ++failed;
         if (!problems.empty()) {
@@ -75,6 +77,14 @@ Result<void> Modulator::bind(const signals::SignalBus& bus, ParameterSet& params
         const auto sourceId = bus.find(route.source);
         IParameter* target = params.find(route.target);
         if (!sourceId) {
+            if (route.optional) {
+                // ADR-1570: expected (a stem this session does not have); silent, and not a binding problem.
+                route.sourceId = signals::kInvalidSignal;
+                route.depthId = signals::kInvalidSignal;
+                route.depthMissing = false;
+                route.targetParam = nullptr;
+                continue;
+            }
             reject(route, i, fmt::format("unknown source signal '{}'", route.source));
             continue;
         }
@@ -93,16 +103,21 @@ Result<void> Modulator::bind(const signals::SignalBus& bus, ParameterSet& params
             continue;
         }
         signals::SignalId depthId = signals::kInvalidSignal;
+        bool depthMissing = false;
         if (!route.depthSource.empty()) {
             const auto found = bus.find(route.depthSource);
-            if (!found) {
+            if (!found && route.depthDefault.has_value()) {
+                depthMissing = true; // ADR-1570: the default stands in
+            } else if (!found) {
                 reject(route, i, fmt::format("unknown depth signal '{}'", route.depthSource));
                 continue;
+            } else {
+                depthId = *found;
             }
-            depthId = *found;
         }
         route.sourceId = *sourceId;
         route.depthId = depthId;
+        route.depthMissing = depthMissing;
         route.targetParam = target;
     }
 
@@ -157,7 +172,8 @@ void Modulator::applyRoutesWhere(const signals::SignalBus& bus, ParameterSet& pa
             // ADR-900: a depth signal the bus does not carry (a seek replay's bus) skips the route,
             // exactly as a source the bus does not carry does.
             const bool scaled = !route.depthSource.empty();
-            if (scaled && (route.depthId == signals::kInvalidSignal || route.depthId >= bus.size())) {
+            if (scaled && !route.depthMissing &&
+                (route.depthId == signals::kInvalidSignal || route.depthId >= bus.size())) {
                 continue;
             }
             float x = bus.value(route.sourceId);
@@ -168,8 +184,10 @@ void Modulator::applyRoutesWhere(const signals::SignalBus& bus, ParameterSet& pa
             const float y =
                 route.chain.process(x, event, dt, route.state) * route.amount * route.spatialGain * masterGain;
             route.lastOutput = y;
-            const float depth =
-                scaled ? route.depthMin + (route.depthMax - route.depthMin) * bus.value(route.depthId) : 1.0f;
+            // ADR-1570: bound without the depth signal, the route reads its default (a constant for the session).
+            const float depthValue =
+                scaled ? (route.depthMissing ? *route.depthDefault : bus.value(route.depthId)) : 0.0f;
+            const float depth = scaled ? route.depthMin + (route.depthMax - route.depthMin) * depthValue : 1.0f;
 
             IParameter& target = *route.targetParam;
             const std::size_t count = target.componentCount();

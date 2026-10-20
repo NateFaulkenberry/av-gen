@@ -275,11 +275,16 @@ std::vector<Finding> Registry::checkRoute(const ModRoute& route, const Facts& fa
         out.push_back(make("disabled", Verdict::Dead, "the route is switched off"));
     }
     const SignalFacts source = facts.signal(route.source);
+    if (!source.exists && route.optional) {
+        // ADR-1570: an optional route on a signal this session does not have is the expected state (a stem route in
+        // a live scene on a plain stereo input), not a dead route. Its target is still checked.
+        return checkTarget(route.target, route.component, facts);
+    }
     if (!source.exists) {
         out.push_back(make("unknown-source", Verdict::Dead,
                            fmt::format("'{}' is not a signal on the bus", route.source)));
     }
-    if (!route.depthSource.empty() && !facts.signal(route.depthSource).exists) {
+    if (!route.depthSource.empty() && !facts.signal(route.depthSource).exists && !route.depthDefault) {
         out.push_back(make("unknown-depth-source", Verdict::Dead,
                            fmt::format("depth source '{}' is not a signal on the bus", route.depthSource)));
     }

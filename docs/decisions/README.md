@@ -68,6 +68,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1530-1539 | eng/remove-ksh-detect (remove the Live panel's legacy kick/snare/hat detection display) |
 | 1540-1549 | art/rainbow-world (Rainbow World: the painterly rainbow knot world, fisheye journey) |
 | 1550-1559 | coordinator fixes (2026-10-19: audio-device courtesy) |
+| 1570-1579 | art/rainbow-world-2 (Rainbow World: stem-driven reactivity, world FX and the slow frames) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -828,4 +829,5 @@ confirm the citation you are about to change is your own.
 | [1546](ADR-1546-a-chunked-surfaces-mesh-lod-can-hold-its-border.md) | A chunked surface's mesh LOD can hold its border (`"lockBorder": true` in a procedural node's `lod` block: meshoptimizer's LockBorder, no sloppy or clustering fallback; written only when set, hashed only when set): Rainbow World's band chunks took LOD without cracks, 12 to 7 ms of shadows. art/rainbow-world | Accepted |
 | [1547](ADR-1547-a-gltf-node-can-stay-out-of-the-shadow-maps.md) | A gltf node can stay out of the shadow maps (`"castsShadow": false` on a scene file's gltf node; the twin of ADR-1545; clears its entities' flag each frame, written only when off): Rainbow World's glTF rainbow arches threw solid shadows. art/rainbow-world | Accepted |
 | [1548](ADR-1548-a-procedural-nodes-leaf-cards-thin-instead-of-collapsing.md) | A procedural node's leaf cards thin instead of collapsing (`"thinning": true` in the lod block: ADR-351's shell thinning for mesh sources, shells' borders held so the simplifier refuses and thinning takes the level; hashed and written only when set): Rainbow World's leaf cards 53.5 to 43.1 ms at the worst frame, canopy intact. art/rainbow-world | Accepted |
+| [1570](ADR-1570-a-route-can-be-optional-and-its-depth-signal-can-have-a-default.md) | A route can be optional, and its depth signal can have a default (`"optional": true`: an unknown source is the expected state, silent, not a binding problem or a dead route; `"depthDefault"`: the depth signal's value while the bus lacks it; both written only when set): a stem route and its main-mix fallback in one live scene. art/rainbow-world-2 | Accepted |
 | [1550](ADR-1550-never-resize-an-audio-device-another-app-is-running.md) | AV Gen never resizes an audio device another app is running (capture and playback keep the device's current buffer size when it is in use elsewhere); real-device tests are opt-in (`AVGEN_AUDIO_DEVICE_TESTS=1`). | Accepted |
