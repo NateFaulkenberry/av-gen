@@ -2915,6 +2915,12 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // ADR-1580/1581: the feeds, read before the sonic block, the audio and the stems so that each builds what they
     // need once. Absent means the mix feeds everything, not the last project's feeds.
     feeds_ = {};
+    // Rebuilt as the sonic block, the audio and the stems arrive; said once, when they all have (below).
+    feedsQuiet_ = true;
+    struct LoudAgain {
+        bool& quiet;
+        ~LoudAgain() { quiet = false; }
+    } loudAgain{feedsQuiet_};
     if (const auto block = doc.find("feeds"); block != doc.end()) {
         if (auto parsed = audio::Feeds::fromJson(*block)) {
             feeds_ = std::move(*parsed);
@@ -3609,6 +3615,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     // ADR-902: every route, track and effect, now that everything a rule reads exists -- the shot
     // spans, the sequence's markers, the scene's programs and nodes.
+    feedsQuiet_ = false;
+    if (!feeds_.empty()) {
+        rebuildFeeds(); // ADR-1580/1581: now every stem is known, a key that names none is said
+    }
     reportRouteLiveness();
     finishTimings();
     projectPath_ = path;
@@ -4633,7 +4643,7 @@ void Engine::rebuildFeeds() {
     const auto unresolved = [&](const char* feed, const std::string& key) {
         // ADR-1580: a key that names nothing is a project bug; the part reads the mix so a typo does not black out a
         // show, and it is said. A live input source of that key resolves it while an input is open.
-        if (!liveKey(key)) {
+        if (!feedsQuiet_ && !liveKey(key)) {
             noteBindingProblem(fmt::format("feeds.{}: there is no stem or input source 'stem.{}'; it follows the mix",
                                            feed, key));
         }
@@ -4670,9 +4680,11 @@ void Engine::rebuildFeeds() {
             analysis::OfflineBeats beats =
                 analysis::trackGrid(times, onsets, picked, stem->track->hopSeconds(), beatConfig);
             if (beats.beatTimes.empty()) {
-                noteBindingProblem(fmt::format("feeds.beat: no beat was found in stem '{}'; the beat clock follows the "
-                                               "mix",
-                                               feeds_.beat));
+                if (!feedsQuiet_) {
+                    noteBindingProblem(fmt::format("feeds.beat: no beat was found in stem '{}'; the beat clock "
+                                                   "follows the mix",
+                                                   feeds_.beat));
+                }
             } else {
                 for (double& t : beats.beatTimes) {
                     t += stem->source.offsetSeconds; // onto the project clock

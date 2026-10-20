@@ -1457,6 +1457,7 @@ private:
     analysis::TrackedGrid grid_;                 // the beat clock's grid (the mix's unless feeds.beat names a stem)
     std::vector<std::uint32_t> gridBeatCount_;   // beats landed at each mix frame, when the grid is a stem's (music.*)
     std::uint64_t feedsRevision_ = 1;
+    bool feedsQuiet_ = false; // a project is loading: its stems may not be there yet, so nothing is said
     // Rebuilds the grid and the Sonic setup's per-frame response feed from the feeds, the stems and the track. Called
     // whenever any of them changes.
     void rebuildFeeds();

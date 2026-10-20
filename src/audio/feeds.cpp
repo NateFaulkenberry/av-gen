@@ -64,7 +64,7 @@ Result<std::string> feedKey(std::string_view value) {
     if (value.starts_with("stem.") && validStemKey(value.substr(5))) {
         return std::string(value.substr(5));
     }
-    return fail("feeds: '{}' is neither \"audio\" (the mix) nor \"stem.<key>\"", value);
+    return fail("'{}' is neither \"audio\" (the mix) nor \"stem.<key>\"", value);
 }
 
 Result<Feeds> Feeds::fromJson(const nlohmann::json& j) {
