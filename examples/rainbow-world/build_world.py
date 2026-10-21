@@ -1481,6 +1481,15 @@ SUN_RAYS = ["sun_burst"]
 nodes.append({"name": "sun_burst", "kind": "gltf", "asset": "sun_burst.glb", "position": [0.0, 0.0, 0.0],
               "castsShadow": False, "emissiveBoost": 1.0})
 
+# ---- gate 8 (the owner: "shadow popping during the live projection play back ... also ground color popping"): the
+# live tiers shade every LOD rung past the foreground flat (ADR-155) -- here another colour, and no shadow -- so the
+# ground bands popped at each rung boundary, colour and shadows, live only. The ground's bands keep every rung at the
+# frame's tier (ADR-1576). Only the ground: the trees too measured +1.2 ms GPU median and +8 ms at p95 (High, 140-200 s,
+# headless), the bands alone +0.6 / +1.9 ms, and a far tree's flat rung is a few pixels.
+for n_ in nodes:
+    if n_.get("kind") == "procedural" and n_["name"].startswith("band_"):
+        n_["procedural"]["flatFarRungs"] = False
+
 # ---- scene and project ----------------------------------------------------------------------------------------------
 env, lights = look.environment(SUN, rw.to_avgen(Vector((0, 0, 1))))
 scene = {"format": "avgen-scene", "version": 1, "name": "rainbow-world",

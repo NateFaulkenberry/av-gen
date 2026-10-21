@@ -46,9 +46,18 @@ A procedural block may carry `"flatFarRungs": false`. Every rung of that object 
 
 ## Consequences
 
-- Rainbow World sets the key on every procedural node with two or more LOD rungs: the ground bands, the trees and
-  the outcrops (65 nodes). Realtime then measures 0.98%, at the offline and High level, and its frame matches the
-  offline one.
-- The cost is ADR-155's saving given back on those objects. It was measured live on AC (docs/prototypes/
-  rainbow-world/17).
-- No other shipped scene sets the key, so no other frame changes.
+- Rainbow World sets the key on its 48 ground bands only. On the 8 s flight, Realtime's pop share falls from 1.76%
+  to 1.19%, against 1.10% offline, and its frame matches the offline one.
+- Setting it on the trees as well reached 0.98%. It was measured and declined on cost (headless, High pinned,
+  140-200 s of the song, GPU median / p95):
+
+  | Variant | Median | p95 |
+  |---|---|---|
+  | No key | 26.5 ms | 36.0 ms |
+  | Ground bands only (shipped) | 27.1 ms | 38.0 ms |
+  | Bands and trees | 27.7 ms | 44.5 ms |
+
+  A far tree's flat rung covers a few pixels.
+- No other shipped scene sets the key, so no other frame changes. Of the other live projects, the Rift's
+  (`examples/bioluminescent/rift-live.json`) is the only one with multi-rung procedural LOD nodes (4), so it probably
+  shows the same pop live.
