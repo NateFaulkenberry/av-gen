@@ -332,7 +332,7 @@ private:
             for (const float f : {c.delayMs, c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
                                   c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
                                   c.remapInMax, c.remapOutMin, c.remapOutMax, c.envelopeRefractoryMs,
-                                  c.envelopeRearm}) {
+                                  c.envelopeRearm, c.trendSeconds, c.trendFastMs, c.trendFloor}) {
                 mix(bits(f));
             }
             mix(static_cast<std::uint64_t>(c.curve) | (static_cast<std::uint64_t>(c.threshold) << 8u) |

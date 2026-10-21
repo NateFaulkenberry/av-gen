@@ -121,8 +121,8 @@ TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the m
     CHECK(showSources == live.at("sources"));
 }
 
-TEST_CASE("Rainbow World: the live scan latches, on the synth stem or the mix, never re-firing within 20 s",
-          "[examples][rainbow-world][adr1574]") {
+TEST_CASE("Rainbow World: the live scan latches on a swell, on the synth stem or the mix, never re-firing within 12 s",
+          "[examples][rainbow-world][adr1574][adr1575]") {
     const json live = load("rainbow-world.json");
     std::set<std::string> sources;
     int latched = 0;
@@ -132,7 +132,8 @@ TEST_CASE("Rainbow World: the live scan latches, on the synth stem or the mix, n
         }
         sources.insert(r.at("source").get<std::string>());
         const json& c = r.at("chain");
-        CHECK(c.at("envelopeRefractoryMs").get<double>() >= 20000.0);
+        CHECK(c.at("envelopeRefractoryMs").get<double>() >= 12000.0);
+        CHECK(c.at("trendSeconds").get<double>() > 0.0); // ADR-1575: a swell over the bed, not a level
         CHECK(c.contains("envelopeRearm"));
         CHECK_FALSE((r.contains("depthSource") && r.at("depthSource") == "stem.synth.level")); // the gate-4 tail glitch
         ++latched;

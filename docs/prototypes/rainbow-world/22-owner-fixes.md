@@ -5,3 +5,9 @@ investigate tree popping - might be an LOD issue, but im seeing a lot of twitchy
 find colorful pulsating effect for the rainbows that is beat synced
 rainbow world scan only happened once and there was a glitch at the end of the effect (popped back into view for a second)
 have agent list current modulations that are built into the scene, describe what should be happening - im not seeing a lot of audio reactivity yet, so I need to understand where improvements can be made"
+
+The owner's note on the scan sparkle (verbatim, 2026-10-21):
+
+"with the rainbow world scan effect - we wants the trees to spin and light up with sparkles as the effect flows through the entity - also the sparkles need another art pass they look a little cheesy - maybe make it a bit more explosive / fireworks looking"
+
+The owner's decision on performance (verbatim, 2026-10-21): "medium quality during scans is prob fine"

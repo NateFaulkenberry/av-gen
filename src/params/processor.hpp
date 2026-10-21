@@ -43,6 +43,16 @@ struct ProcessorChain {
     float normalizeSeconds = 0.0f;
     float normalizeFloor = 0.05f;
     float normalizeSmoothMs = 250.0f;
+    // ADR-1575: the trend stage, after the normalise stage. > 0: the chain reads the signal's short-term average (a
+    // one-pole over `trendFastMs`) as a multiple of its long-term average (a one-pole over `trendSeconds`) -- 1 while
+    // the music holds steady, above 1 while it swells past what it has just been doing, whatever its absolute level
+    // (so on any input gain, and on a loud section's own bed). The musical event detector's rise measure, as a route
+    // stage. 0 = off.
+    float trendSeconds = 0.0f;
+    float trendFastMs = 1000.0f;
+    // the long-term average's floor in the signal's own units, so near silence (an intro, a gap) cannot spike the
+    // ratio: a blip out of silence reads at most blip / trendFloor
+    float trendFloor = 0.02f;
 
     float gain = 1.0f;
     float offset = 0.0f;
@@ -144,6 +154,10 @@ struct ProcessorChain {
         // ADR-1182: the normalise stage's level and its running peak.
         float level = 0.0f;
         float peak = 0.0f;
+        // ADR-1575: the trend stage's short- and long-term averages (seeded to the first input).
+        float trendFast = 0.0f;
+        float trendSlow = 0.0f;
+        bool trendInitialised = false;
         // ADR-1574: the latching envelope's refractory time still to run, and whether it is armed.
         double refractoryRemaining = 0.0;
         bool armed = true;

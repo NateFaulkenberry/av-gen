@@ -90,3 +90,42 @@ TEST_CASE("ADR-1574: the fields round-trip, and are written only when used", "[m
     CHECK(back->envelopeRefractoryMs == 20000.0f);
     CHECK(back->envelopeRearm == 0.3f);
 }
+
+// ADR-1575: the trend stage -- the short-term average over the long-term one.
+TEST_CASE("ADR-1575: the trend reads 1 on a steady input and above 1 on a swell, at any level", "[modulation][adr1575]") {
+    ProcessorChain c;
+    c.trendSeconds = 8.0f;
+    c.trendFastMs = 1000.0f;
+    for (const float level : {0.05f, 0.8f}) {
+        ProcessorChain::State s;
+        float y = 0.0f;
+        for (int i = 0; i < 60 * 30; ++i) { // 30 s steady
+            y = c.process(level, false, kDt, s);
+        }
+        CHECK_THAT(y, WithinAbs(1.0, 1e-3));
+        for (int i = 0; i < 60 * 2; ++i) { // a swell to 1.5x for 2 s
+            y = c.process(level * 1.5f, false, kDt, s);
+        }
+        CHECK(y > 1.2f);
+    }
+    // silence, then a small blip: the long-term average's floor bounds the ratio
+    {
+        ProcessorChain::State s;
+        float y = 0.0f;
+        for (int i = 0; i < 60 * 10; ++i) {
+            y = c.process(0.0f, false, kDt, s);
+        }
+        CHECK_THAT(y, WithinAbs(0.0, 1e-6));
+        float worst = 0.0f;
+        for (int i = 0; i < 30; ++i) {
+            worst = std::max(worst, c.process(0.004f, false, kDt, s));
+        }
+        CHECK(worst <= 0.004f / c.trendFloor + 1e-6f);
+    }
+    ProcessorChain off;
+    CHECK_FALSE(chainToJson(off).contains("trendSeconds"));
+    const auto back = chainFromJson(chainToJson(c));
+    REQUIRE(back.has_value());
+    CHECK(back->trendSeconds == 8.0f);
+    CHECK(back->trendFastMs == 1000.0f);
+}

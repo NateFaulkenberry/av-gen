@@ -97,7 +97,7 @@ def showcase_scan_sources(song_end):
             {"kind": "timeline", "name": "scanFront", "settings": {"keys": front}}]
 
 
-SCAN_REFRACTORY_MS = 20000.0
+SCAN_REFRACTORY_MS = 12000.0
 
 
 def front_targets(fx, scan_programs):
@@ -261,37 +261,35 @@ def routes(fx, swell_nodes, swell):
     # unless `macro.scan` -- held about six seconds, then relaxing over three -- says this phrase deserves it, which
     # the surge (the drop) does, and a big lift (the synth at its brightest) does a little.
     rest = SCAN_REST - 10.0
-    # The live scan (gate 5, the coordinator: "make the live trigger latch"; 26-world-scan.md section 4). It fires on
-    # a SURGE and then plays its whole shape whatever the music does meanwhile: the latching envelope (ADR-1574)
-    # ignores its input for 20 s once triggered, and re-arms only once the input has fallen back (a new rising
-    # edge). Two triggers, each a single replay-safe signal conditioned to on/off (no depth to dip on the tail):
-    #   stem   the synth stem's rms rising past 0.16 (the drop reaches 0.19; the intro's loudest call 0.146), re-arming
-    #          only after 2.5 s under it -- so the drop, and the riser after the drums go (the bed holds in between)
-    #   mix    on a plain stereo input, the mix's sustained (pad and synth) energy, against its adaptive reference
-    #          (ADR-1510), rising past 0.6 (the intro sits at 0.0-0.4, the drop at 0.64); stands aside while a synth
-    #          stem is active (ADR-1570's fallback shape); 30 s apart at least, re-arming after 6 s under it
+    # The live scan (gate 5, the coordinator: "make the live trigger latch"; 26-world-scan.md section 4). It fires on a
+    # SWELL -- the trigger signal's short-term average rising past its long-term one (ADR-1575), so each new swell
+    # above the current bed counts, however loud the bed -- and then plays its whole shape whatever the music does
+    # meanwhile: the latching envelope (ADR-1574) ignores its input for 12 s once triggered and re-arms only once the
+    # swell has passed. Two triggers, each one replay-safe signal (no depth to dip on the tail):
+    #   stem   the synth stem's rms, 1.25x its 8 s average (floored at 0.06 rms: the intro's calls cannot qualify)
+    #   mix    on a plain stereo input, the mix's sustained (pad/synth) energy, 1.1x its 8 s average (floored at 0.1);
+    #          stands aside while a synth stem is active (ADR-1570's fallback shape)
     # The amount holds 6.5 s and falls over 3 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
     # the same latch, so it never resets part-way through.
-    def latch(extra, gain, level, rearm, hold_off, refractory):
-        # on/off at the level (on at once, so the latch takes a full trigger), then held through the music's own
-        # dips (the kick's sidechain pumps the synth every beat): it reads "off" only after `hold_off` ms under the
-        # level, and only then can the latch re-arm
-        c = {"gain": gain, "threshold": "binary", "thresholdLevel": level, "attackMs": 0.0, "decayMs": hold_off,
-             "envelopeRefractoryMs": refractory, "envelopeRearm": rearm}
+    def latch(extra, trend, level, hold_off):
+        # the swell: the trigger signal's short-term average over its long-term one (ADR-1575; floored so an intro's
+        # near-silence cannot spike it), on at `level`, held through the music's own dips for `hold_off` ms; the
+        # latch (ADR-1574) then plays the whole scan and re-arms only once the swell has passed
+        c = {"trendSeconds": trend[0], "trendFastMs": trend[1], "trendFloor": trend[2],
+             "threshold": "binary", "thresholdLevel": level, "attackMs": 0.0, "decayMs": hold_off,
+             "envelopeRefractoryMs": SCAN_REFRACTORY_MS, "envelopeRearm": 0.3}
         c.update(extra)
         return c
     amount_env = {"envelope": "peakhold", "envelopeHoldMs": 6500.0, "envelopeFallPerSecond": 0.33,
                   "springHz": 0.5, "springDamping": 1.0}
     front_env = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN}
-    triggers = [("stem.synth.rms", 1.0, 0.16, 0.3, 2500.0, SCAN_REFRACTORY_MS, {"optional": True}),
-                ("response.sustain", 1.0, 0.6, 0.3, 6000.0, SCAN_REFRACTORY_MS * 1.5,
+    triggers = [("stem.synth.rms", (8.0, 450.0, 0.06), 1.25, 1500.0, {"optional": True}),
+                ("response.sustain", (8.0, 1000.0, 0.1), 1.1, 1500.0,
                  {"depthSource": "stem.synth.active", "depthMin": 1.0, "depthMax": 0.0, "depthDefault": 0.0})]
-    for src, gain, level, rearm, hold_off, refr, extra in triggers:
-        out.append(route(src, "macros/scan", 1.0, latch(amount_env, gain, level, rearm, hold_off, refr), op="max",
-                         **extra))
+    for src, trend, level, hold_off, extra in triggers:
+        out.append(route(src, "macros/scan", 1.0, latch(amount_env, trend, level, hold_off), op="max", **extra))
         for tgt in front_targets(fx, scan_programs):
-            out.append(route(src, tgt[0], -rest, latch(front_env, gain, level, rearm, hold_off, refr),
-                             component=tgt[1], **extra))
+            out.append(route(src, tgt[0], -rest, latch(front_env, trend, level, hold_off), component=tgt[1], **extra))
     for prog in scan_programs:
         roles = fx[prog]
         out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))

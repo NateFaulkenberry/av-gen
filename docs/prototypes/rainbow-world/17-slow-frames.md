@@ -261,3 +261,8 @@ The screen-size leaves were the only cost: leaves out to 12 px cost 2.2 ms. With
 - Before gate 5 (`live16`, one scan) it held High for 2400 of 2700 frames with 4 misses.
 - The bass heave's 1.1-2.7 ms is gone. The gate-5 additions (four scans with their sparkle, the leaves, the sunburst)
   spend it and a little more at the scan peaks.
+
+**The owner's bar after gate 5** (22-owner-fixes.md, verbatim: "medium quality during scans is prob fine"):
+- High outside the scans;
+- Medium allowed during a scan's window;
+- 30 fps held throughout, with no sustained misses.

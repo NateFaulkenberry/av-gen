@@ -248,6 +248,11 @@ json chainToJson(const ProcessorChain& chain) {
         j["normalizeFloor"] = static_cast<double>(chain.normalizeFloor);
         j["normalizeSmoothMs"] = static_cast<double>(chain.normalizeSmoothMs);
     }
+    if (chain.trendSeconds > 0.0f) { // ADR-1575; written only when used
+        j["trendSeconds"] = static_cast<double>(chain.trendSeconds);
+        j["trendFastMs"] = static_cast<double>(chain.trendFastMs);
+        j["trendFloor"] = static_cast<double>(chain.trendFloor);
+    }
     if (chain.springHz > 0.0f) {
         j["springHz"] = static_cast<double>(chain.springHz);
         j["springDamping"] = static_cast<double>(chain.springDamping);
@@ -270,7 +275,7 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         return fail("processor chain must be a JSON object");
     }
     ProcessorChain chain;
-    std::array<Result<void>, 30> results{
+    std::array<Result<void>, 33> results{
         readFloat(j, "delayMs", chain.delayMs), // ADR-900; absent = no delay
         readFloat(j, "gain", chain.gain),
         readFloat(j, "offset", chain.offset),
@@ -301,6 +306,9 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         readFloat(j, "integrateMax", chain.integrateMax),   // ADR-1161; absent = unbounded
         readFloat(j, "envelopeRefractoryMs", chain.envelopeRefractoryMs), // ADR-1574; absent = off
         readFloat(j, "envelopeRearm", chain.envelopeRearm),               // ADR-1574; absent = off
+        readFloat(j, "trendSeconds", chain.trendSeconds),                 // ADR-1575; absent = off
+        readFloat(j, "trendFastMs", chain.trendFastMs),
+        readFloat(j, "trendFloor", chain.trendFloor),
     };
     for (const auto& r : results) {
         if (!r) {

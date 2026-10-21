@@ -57,16 +57,30 @@ mix) and re-arms only after the trigger signal has been "off" for a while. Each 
 conditioned to on/off, so there is no depth to dip. A spring eases the amount in and out. The front runs on the same
 latch, so it never resets mid-scan.
 
-| Input | Trigger | Re-arms after | Fires on Feline Footwear |
-|---|---|---|---|
-| A synth channel (or stem) | `stem.synth.rms` > 0.16 (the intro's loudest call is 0.146, the drop 0.19) | 2.5 s under | 48.2 s (the drop). The synth bed then holds above 0.16 until the end, so it does not re-arm |
-| Plain stereo | `response.sustain` > 0.6 (the mix's pad/synth energy against its adaptive reference; stands aside with a synth stem) | 6 s under, 30 s apart | 12.8, 102.6, 133.8, 172.0 s |
+Each trigger is a SWELL: the signal's short-term average over its 8 s average (ADR-1575), so each new swell above
+the current bed counts, however loud the bed. The re-arm needs the swell to have passed, and the refractory time is
+12 s.
 
-**The trace** (`avgen --sonic-trace` of the live project fed the mix, then the mix and stems;
-`build/rw2/livescan/trace_summary.txt`):
-- every firing rises to 1.00 with no dip;
-- no firing rises again on its way down;
-- the largest change in one frame is 0.039 (the spring).
+| Path | Trigger |
+|---|---|
+| Synth channel (or stem) | `stem.synth.rms` at 1.25x its average, floored at 0.06 rms (the intro's calls cannot qualify) |
+| Plain stereo | `response.sustain` (the mix's pad and synth energy) at 1.1x its average, floored at 0.1; stands aside with a synth stem |
 
-The mix path is approximate. It fires on the mix's own swells of sustained energy, and on this track the first is in
-the intro, which uses the refractory time that would otherwise cover the drop. The stem path fires on the drop.
+Engine traces (`avgen --sonic-trace` of the live project fed each track; `build/rw2/livescan/trace_summary.txt`):
+
+| Track, input | Scans at (s) | Nearest to the drop |
+|---|---|---|
+| Feline Footwear, mix only | 8.8, 33.2, 45.5, 118.5 | 2.3 s before 47.85 (1.2 bars) |
+| Feline Footwear, mix + stems | 48.3, 65.7, 91.0, 183.5 | 0.4 s after 47.85 (0.2 bars) |
+| Trench, mix only | 2.6, 50.3, 95.7, 110.5, 129.5, 145.6 | 0.1 s after 95.6 (0.1 bars) |
+| Hyperborea, mix only | 1.9, 16.3, 35.7, 78.4, 141.8, 162.9 | 2.3 s after 76.1 (0.8 bars) |
+
+**About this table:**
+- **The drops:** 47.85 s is from the stems; Trench's and Hyperborea's are the largest four-bar rises in the mix's
+  energy after the intro.
+- **Envelope shape:** every firing rises to 1.00 with no dip and never rises again on its way down; the largest
+  change in one frame is 0.039.
+- **Counts:** Trench and Hyperborea fire six times, once as the music enters (2.6 and 1.9 s). A higher floor removes
+  that, but it also loses their drops, so the entry is kept: the world wakes with the music.
+- **Stems:** only Feline Footwear has stems.
+

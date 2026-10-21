@@ -172,6 +172,19 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
         state.peak = std::max(state.level, state.peak * fall);
         x = state.level / std::max(state.peak, std::max(normalizeFloor, 1e-6f));
     }
+    // ADR-1575: the trend -- the short-term average over the long-term one.
+    if (trendSeconds > 0.0f) {
+        if (!state.trendInitialised) {
+            state.trendFast = state.trendSlow = x;
+            state.trendInitialised = true;
+        } else {
+            const float kf = smoothingCoefficient(trendFastMs, dt);
+            const float ks = smoothingCoefficient(trendSeconds * 1000.0f, dt);
+            state.trendFast = kf >= 1.0f ? x : state.trendFast + (x - state.trendFast) * kf;
+            state.trendSlow = ks >= 1.0f ? x : state.trendSlow + (x - state.trendSlow) * ks;
+        }
+        x = state.trendFast / std::max(std::fabs(state.trendSlow), std::max(trendFloor, 1e-6f));
+    }
 
     // gain -> offset -> curve
     float y = applyCurve(x * gain + offset, curve, curveAmount);
