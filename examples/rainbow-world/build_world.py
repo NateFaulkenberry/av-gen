@@ -1005,7 +1005,7 @@ print("CLOUDS", {k: len(v) for k, v in cpts.items()})
 # the grass, flowers, stones and trees on it move together (each vertex is displaced by a function of where it is, not
 # of what it belongs to). Their amounts rest at 0 -- the world as built -- and the bass sets them through the `swell`
 # macro. It travels at about the ride's own speed, along an axis oblique to the knot, so the heave crosses the track
-# rather than running with it. (Finch's sum of waves, GPU Gems ch. 1, was tried with two: measured in 17 section 5.)
+# rather than running with it. (Finch's sum of waves, GPU Gems ch. 1, was tried with two: measured in 17 section 4.)
 SWELL = [  # (axis of travel, displacement direction, wavelength m, speed rad/s, metres at a full swell)
     # One wave, not two (Rainbow World 2 gate 2): a second deformer measured 1.1 ms more at the 40 s hold (every
     # scattered vertex in the depth, lit and shadow passes pays per deformer) for a shape the camera's own motion hides

@@ -155,11 +155,71 @@ render scale. What remains, and what this pass does next (section 4), is in the 
 - **The ring, glint and arch programs are within the run-to-run noise:** under 0.5 ms each, as the profile's 0.09 ms
   per op predicts for programs that cover part of the frame.
 
-## 5. Next (in progress)
+## 5. The machine's state moves the numbers more than the scene does
 
-- Measure the live mode (`--mode live`), the owner's own measurement: the auto ladder and present included. The
-  numbers above are pinned Ultra.
-- Decide the live render scale or quality profile in the project's `live` block.
-  - The fisheye pass already resamples the frame non-uniformly, so 0.85-0.9 may cost little to the eye.
-  - It has to be checked on stills, not assumed.
-- The 200 s hold: the near trees' cards and the clouds (3 ms there).
+- **Power:** the same binary, scene and window measured 25-35% slower on battery than on AC (GPU p50). Every profile
+  record now logs `pmset -g batt` at its start and end (`build/rw2/prof/ac_power.txt`); runs on battery are void.
+- **Load:** a Blender job running alongside (the scene builder) inflated the GPU times again. Profiles run with no
+  CPU-heavy work alongside.
+- **Code:** the clean A/Bs ruled out the merged perf branch -- the shader A/B (ADR-1561) and the binary A/B (main
+  against the base) both came back inside the noise. Absolute numbers from one session do not compare with another's.
+- **Headless Ultra on AC** (`ac2_*`, the 40-56 s window, pinned Ultra, full render scale): as built 40.7 / 55.8 ms
+  (p50 / p95); prototype 1 46.7 / 65.1; gate 3 46.8 / 65.7. That is why the target became the live auto ladder (the
+  owner's own measurement), not pinned Ultra.
+
+## 6. The arches' program
+
+- The arches are glTF nodes drawn through a material program (ADR-1572). A glTF entity program runs the
+  interpreter, not a compiled program (ADR-1493 compiles the procedural lit pass only), and an arch can fill half the
+  frame under it.
+- The first version (two programs, spectrum rebuilt from UVs, both bows) cost **6.9 ms** at 0.5 render scale under an
+  arch. Now one 13-op program on the primary bow, the textures carrying the spectrum: **2.2 ms**. The faint secondary
+  keeps its textures and no program.
+
+## 7. The cuts and the live ceilings
+
+Each cut, what it buys, what it costs to the eye (headless Medium 0.71 unless noted):
+
+| Cut | Saving | Visual cost |
+|---|---|---|
+| The swell's deformers removed (colour over geometry) | ~2.2-2.7 ms | none intended: the owner asked for colour over geometry |
+| The kick ring made local; the bass colour moved to the palette's saturation | 3 ops off the ground and grass | none |
+| Flower reach 45 m, grass 42 m | with the LOD cuts below: 37.4 -> 34.1 ms base | thinner grass seen from the soar |
+| Cloud LOD distances 300/800/1600; hero, tower and bank masses 500/1200 | (in the above) | none seen in the clips |
+| One 200 m shadow cascade | 34.1 -> 31.3 ms with the above | no tree shadows past 200 m |
+| Live ceiling lodBias 1.5 (live mode only) | part of 5.5 ms at lodBias 2 | none seen at 1.5 or 1.25 |
+| Live ceiling reduced shadow filtering | small | slightly harder shadow edges |
+| Not taken: lodBias 2 | 5.5 ms | **the trees' shadows and the far grass disappear** (`gate4-live-lodbias-2-1.5-1.25-off.jpg`) |
+| Not taken: 1k shadow map | none measured | none |
+| Not taken: no material programs | 5.6 ms | the look and every effect |
+
+**Added since:** one OKLCH hue op after each canopy ramp (the trees follow the look) -- three masked programs, so it
+also runs in the depth prepass. Its cost is inside the run-to-run noise of the live result below (GPU p50 23.5 against
+23.1-25.5).
+
+The ceilings are in the project (`"live": {"overrides": {"lodBias": 1.5, "reducedShadowFiltering": true}}`), written
+by `build_world.py`; an offline render keeps full quality.
+
+## 8. Live, the owner's measurement
+
+`--live-profile --mode live --quality auto`, Feline showcase, 90 s from 30 s, 1080p, 30 fps target, on AC unless
+marked:
+
+| Run | Ladder (frames) | Frame p50 / p95 | GPU p50 / p95 | Misses |
+|---|---|---|---|---|
+| As built (gate 1) | Emergency 0.5: 1750, Medium: 557, Low: 319 | 33.4 / 37.7 | 26.9 / 37.9 | 84 |
+| Gate 3 | Emergency 0.5: 2184, Low: 480 | 33.4 / 38.3 | 27.2 / 37.2 | 49 |
+| The cuts, no ceilings (**battery**: void) | Low 0.5: 2671 | 33.3 / 35.2 | 23.1 / 31.1 | 11 |
+| Cuts + lodBias 2 ceiling | High 0.85: 2700 | 33.3 / 35.6 | 23.1 / 30.4 | 2 |
+| Cuts + lodBias 1.5 ceiling | High: 2580, Ultra: 120 | 33.4 / 35.7 | 25.5 / 31.3 | 1 |
+| **Final: + the trees' hue op** | **High: 2400, Medium: 184, Ultra: 117** | **33.4 / 35.8** | **23.5 / 31.5** | **4** |
+
+The frame p50 of 33.3-33.4 ms is the 30 fps pacing itself. The goal (at least Medium at 30 fps, live) is met: the
+ladder holds High for most of the window and never falls below Medium.
+
+## 9. What remains
+
+- The spikes (section 1) are intrinsic GPU-timing jitter; nothing in the scene removes them. Live, the ladder absorbs
+  them (4 misses in 90 s).
+- The glTF program interpreter is the arches' remaining cost; compiling glTF entity programs (as ADR-1493 does for the
+  procedural pass) would take it off. That is engine work, not this pass's.
