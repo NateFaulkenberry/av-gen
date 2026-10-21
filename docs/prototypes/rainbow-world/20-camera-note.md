@@ -10,3 +10,7 @@
 > The owner's verdict on the gate-4 flight proofs (verbatim, 2026-10-21; they chose the more-soar variant):
 
 "gate4-flight-proof-moresoar-22-47s.mp4 - no barrel rolls into the rainbows though and it should still smooth out some of the twitchy camera movements"
+
+> The owner after the gate-4 revision clips (verbatim, 2026-10-21):
+
+"I'd have it to one more pass on the smoothing - there's still these minor corrections it makes that makes it feel unrealistic - we want it to feel like we're flying/gliding in a plane but still some small shifts/corrections are made that feel unnatural - see if one more smoothing pass can correct this first"

@@ -115,3 +115,50 @@ into pitch, yaw and roll, with the angular jerk and the look and up turns per fr
 | Look-direction turn per frame, peak / p95 (deg) | 2.5 / 1.3 | 1.5 / 0.9 |
 
 The remaining peak is one crossing (the fourth quarter's, ~165 s), where the knot's own geometry is tightest.
+
+## 6. Second smoothing pass: the small corrections
+
+The owner after the revision: "still these minor corrections it makes that makes it feel unrealistic"
+(`20-camera-note.md`).
+
+**Measured as corrections, not peaks.** `scripts/camera_motion.py` now reports, per axis:
+- reversals of the rate's sign per minute, counted once the rate has swung past +/-2 deg/s on both sides;
+- the share of the rate's energy above 0.4 Hz;
+- the RMS left after a 2 s moving average.
+
+**The source** was found by trying each candidate on the built line offline:
+- **Not the source:**
+  - a longer look-ahead halves pitch and yaw corrections but doubles roll's;
+  - smoothing the roll values alone changes nothing.
+- **The source: the line itself.** The spline's rotation-minimising normal (the camera's up) twists with every small
+  wiggle of the tangent. Those wiggles come from the clearance bumps, the altitude spring and the land at 15 m. One
+  sample of Gaussian smoothing on the final control points took roll reversals from 23 to 3.5 per minute.
+
+**The fix:**
+- **Plan the clearances, then smooth.** The final line is the base smoothed over two samples (30 m). Each tree, meadow
+  or rim hit on the smoothed line raises a broad bump (+/-120 m) in the base, and the next smoothing turns it into an
+  early, gentle detour. This repeats until the smoothed line touches nothing: 20 rounds, all clearances held.
+- **Slower altitude:** the altitude spring's period went from 180 m to 280 m.
+- **Lap unchanged:** the base speed is set again after smoothing, so the lap is still 190.0 s.
+
+Two smoothing samples is the most the clearances allow. At 2.5 the line no longer converges clear of the trees.
+
+**Before and after** (whole lap, 30 fps; "before" is the gate-4 revision, 9bd22994):
+
+| | Before | After |
+|---|---|---|
+| Reversals per minute, pitch / yaw / roll | 13.5 / 16.3 / 23.2 | 7.0 / 7.0 / 1.6 |
+| Energy above 0.4 Hz, pitch / yaw / roll | 9% / 9% / 30% | 0% / 0% / 1% |
+| Residual after a 2 s average (deg/s), pitch / yaw / roll | 3.2 / 3.5 / 5.8 | 0.7 / 0.9 / 0.8 |
+| Total rate, peak / p95 (deg/s) | 106 / 32 | 38 / 29 |
+| Roll rate, peak / p95 | 103 / 21 | 32 / 18 |
+| Yaw rate, peak / p95 | 44 / 16 | 32 / 13 |
+| Pitch rate, peak / p95 | 33 / 22 | 27 / 21 |
+| Up-vector turn per frame, peak / p95 (deg) | 3.4 / 1.0 | 1.1 / 0.9 |
+
+**What is left:** about seven pitch and seven yaw reversals a minute. These are the flight's real manoeuvres -- climbs
+into soars, dives toward the rims and the flips over them, turns with the knot -- not corrections. Pitch p95 stays
+around 21 deg/s because the rim flips are loops.
+
+**Guardrails held:** trees 3.0 m, meadow 3.5 m, rim 4.1 m, other strands 98 m; baked, so seek equals play; no rolls;
+lap 190.0 s; the drop still lands as the rim flip at 1287 m ends (the drop is at 1305 m).

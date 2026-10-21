@@ -870,7 +870,7 @@ def flight_times(speed):
 
 
 def solve_altitude(tgt):
-    e_ = np.clip(spring(tgt, 1.0 / 180.0), floor_c, cap_c)
+    e_ = np.clip(spring(tgt, 1.0 / 280.0), floor_c, cap_c)
     e_ = np.clip(gsmooth(e_, np.full(n_s, 1.5)), floor_c, cap_c)
     return np.clip(e_, 0.0, None)
 
@@ -1124,23 +1124,36 @@ def dense_ground_hits(path_):
 
 # the spline runs between the controls, and a trunk or a crest can stand between two of them: check the line every
 # 3 m and push the nearest controls clear of any tree or ground it would touch, then rebuild (a few rounds)
-for _it in range(16):
+# The last pass is the plane's (the owner after the gate-4 revision: "minor corrections ... that feel unnatural";
+# 21 section 6): the whole line smoothed over FINAL_SIGMA samples, so its curvature -- and with it the frame the
+# spline carries (its rotation-minimising normal twists with every wiggle of the tangent) -- changes only slowly.
+# Smoothing and the clearances are reconciled by planning, not by local pushes: the line is smoothed from a base, the
+# smoothed line checked (trees, meadow, rim), and any hit raises a broad bump in the base, which the next smoothing
+# turns into an early, gentle detour. Repeat until the smoothed line touches nothing.
+FINAL_SIGMA = 2.0
+_base = cam_controls.copy()
+for _it in range(30):
+    cam_controls = gsmooth(_base, np.full(n_s, FINAL_SIGMA))
     raw_rolls, raw_path, cam_rolls, cam_path = build_path()
     _worst_tree, _wt_at, _hits = dense_tree_hits(cam_path)
     _worst_ground, _wg_at, _ghits = dense_ground_hits(cam_path)
     _hits = _hits + _ghits
+    for i_ in range(n_s):
+        if not on_face[i_]:
+            gap, out_ = rim_gap(i_, cam_controls[i_])
+            if gap < RIM_MARGIN - 0.4:
+                _hits.append((i_, out_, RIM_MARGIN - gap))
     if not _hits:
         break
-    # each hit: the strongest push needed per control, spread as a smooth bump over +/-6 controls (90 m), so the line
-    # bends round the tree instead of kinking at it
     push = np.zeros((n_s, 3))
     for i_, dirn, need in _hits:
-        for k_ in range(-6, 7):
+        for k_ in range(-8, 9):
             j_ = (i_ + k_) % n_s
-            v_ = dirn * need * 1.15 * math.exp(-0.5 * (k_ / 2.5) ** 2)
+            v_ = dirn * need * 1.4 * math.exp(-0.5 * (k_ / 3.0) ** 2)
             if np.linalg.norm(v_) > np.linalg.norm(push[j_]):
                 push[j_] = v_
-    cam_controls = cam_controls + push
+    _base = _base + push
+print("FINAL smoothing %.1f samples: %d rounds, %d hits left" % (FINAL_SIGMA, _it + 1, len(_hits)))
 print("TREES along the spline (every 3 m): nearest envelope edge %.1f m" % _worst_tree, _wt_at, "after %d rounds" % (_it + 1))
 print("GROUND along the spline (every 3 m, over the faces): lowest %.1f m at %s" % (_worst_ground, _wg_at))
 print("RIM clearance after the tree pushes: %.1f m" % min(rim_gap(i_, cam_controls[i_])[0] for i_ in range(n_s)
@@ -1251,6 +1264,8 @@ params.update({"camera/splineUp": 1.0, "camera/lookAhead": 90.0, "post/lens/fish
 # Two laps with different holds make the loop ~2 laps long before it repeats. A looping timeline maps time to splineT:
 # a pure function of the transport (seek equals play). Each lap ends with a step key back to 0 (closed spline: 1 == 0).
 cam_D = [cam_path.D[k * cam_path.per] for k in range(len(cam_s))] + [cam_path.length]
+# (the final smoothing shortens the line a little: the base speed is set again so a lap is still LAP seconds)
+BASE = float(sum((cam_D[k + 1] - cam_D[k]) / speed_at(cam_s[k]) for k in range(len(cam_s))) / LAP)
 ride_keys, t_acc = [], 0.0
 for k in range(len(cam_s)):
     ride_keys.append({"time": round(t_acc, 4), "value": round(float(cam_D[k] / cam_path.length), 6), "interp": "linear"})

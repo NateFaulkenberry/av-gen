@@ -88,6 +88,10 @@ def analyse(project_path, fps=30.0):
     return dict(t=tt, s=s, rate=rate, acc=acc, jerk=jerk, look=look, up=upc, lap=lap, length=path.length)
 
 
+REV_DEG = 2.0     # deg/s: a reversal must swing past this on both sides
+HF_HZ = 0.4       # Hz: a big glider's attitude changes are slower than this
+
+
 def summary(a):
     names = ("pitch", "yaw", "roll")
     out = {}
@@ -102,6 +106,28 @@ def summary(a):
                     "rate_peak_at": float(a["t"][int(tot.argmax())])}
     out["look_per_frame"] = {"peak": float(a["look"].max()), "p95": float(np.percentile(a["look"], 95))}
     out["up_per_frame"] = {"peak": float(a["up"].max()), "p95": float(np.percentile(a["up"], 95))}
+    # the small corrections (the owner after gate 4: "minor corrections ... that feel unnatural"): a big glider's
+    # attitude changes slowly and seldom reverses, so per axis -- reversals of the rate's sign per minute (a reversal
+    # counts once the rate has swung past +/-REV_DEG on both sides, so noise around zero is not counted), the share of
+    # the rate's energy above HF_HZ, and the RMS left after a heavy low-pass (what a 2 s moving average does not
+    # explain)
+    fps_ = 1.0 / (a["t"][1] - a["t"][0])
+    minutes = len(a["t"]) / fps_ / 60.0
+    for i, nm in enumerate(names):
+        x = a["rate"][:, i]
+        state, rev = 0, 0
+        for v in x:
+            if v > REV_DEG and state <= 0:
+                rev += state < 0
+                state = 1
+            elif v < -REV_DEG and state >= 0:
+                rev += state > 0
+                state = -1
+        X = np.abs(np.fft.rfft(x - x.mean())) ** 2
+        f = np.fft.rfftfreq(len(x), 1.0 / fps_)
+        lp = np.convolve(np.concatenate([x[-30:], x, x[:30]]), np.ones(61) / 61.0, "same")[30:-30]
+        out[nm].update({"reversals_per_min": rev / minutes, "hf_share": float(X[f > HF_HZ].sum() / max(1e-12, X.sum())),
+                        "residual_rms": float(np.sqrt(np.mean((x - lp) ** 2)))})
     # the twitchiest 3 s windows: the summed angular jerk, so a sharp change counts, not a steady turn
     jm = np.linalg.norm(a["jerk"], axis=1)
     fps = 1.0 / (a["t"][1] - a["t"][0])
