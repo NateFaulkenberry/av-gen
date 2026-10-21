@@ -236,6 +236,16 @@ def grass_program():
                    "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
 
+# Rainbow World 2 (gate 4): the trees follow the look -- the canopy's colour turned in OKLCH by the look's own hue
+# (a palette scalar; 0 in Bright Noon). An op, not the palette on the ramp's stops, because the world scan crossfades
+# those stops to the spectrum and the palette (applied after the routes) would overwrite it: a turned spectrum is
+# still a spectrum. One op in a masked program, so it runs in the depth prepass too (17 section 7 has its cost).
+def foliage_hue_op():
+    # srcB r7: hueShift adds reg[srcB].x to the turn, and srcB defaults to r0 (here the object position); r7 is
+    # never written in the canopy programs, so it stays 0. (A fresh dict each time: finish pops the role.)
+    return {"kind": "hueShift", "dst": 3, "srcA": 3, "srcB": 7, "value": 0.0, "_role": "foliage_hue"}
+
+
 def canopy_program():
     # (Rainbow World 2 tried the kick ring on the canopies: the leaf cards are masked, and a masked draw evaluates its
     # program in the depth prepass too, so 8 ops cost 3.6 ms of prepass at the 200 s hold. The trees take the ring's
@@ -251,7 +261,8 @@ def canopy_program():
                  # Stage 7, against the Blender preview: the AV Gen pads read cooler and darker than the Cycles
                  # tree; the two upper stops are warmer and lighter so the lit tops come out yellow-green
                  "constant": R(rw.hexlin("#2A6034")[:3]) + [1.0], "constant2": R(rw.hexlin("#5A9A3C")[:3]) + [1.0],
-                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]}]}))
+                 "constant3": R(rw.hexlin("#9ACC44")[:3]) + [1.0], "constant4": R(rw.hexlin("#CCE85A")[:3]) + [1.0]},
+                foliage_hue_op()]}))
 
 
 def rock_program():
@@ -424,7 +435,7 @@ def node_points(name, asset, points, material, **extra):
 
 
 
-def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
+def tinted_canopy_program(name, stops, height=14.0, offset=-0.75, follow_look=True):
     """A canopy ramp by height in the tree (core -> skin), with a little world noise -- the Great Tree's program with
     the tree's own colours: the Weeper's limes, the Blossom Puff's pinks."""
     return finish(({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
@@ -435,7 +446,8 @@ def tinted_canopy_program(name, stops, height=14.0, offset=-0.75):
                 {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.35, "seed": 3},
                 {"kind": "mix", "dst": 1, "srcA": 1, "srcB": 2, "value": 0.35},
                 {"kind": "oklabRamp", "dst": 3, "srcA": 1, "value": 1.0, "_role": "canopy_ramp", "constant": R(stops[0]) + [1.0],
-                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]}))
+                 "constant2": R(stops[1]) + [1.0], "constant3": R(stops[2]) + [1.0], "constant4": R(stops[3]) + [1.0]}]
+                + ([foliage_hue_op()] if follow_look else [])}))
 
 
 def all_programs():
@@ -444,7 +456,8 @@ def all_programs():
             tinted_canopy_program("rw_weeper", [rw.hexlin("#5E9426")[:3], rw.hexlin("#8EBE2E")[:3],
                                                 rw.hexlin("#BEDC44")[:3], rw.hexlin("#E2EE6A")[:3]], height=12.0, offset=0.0),
             tinted_canopy_program("rw_blossom", [rw.hexlin("#8A3C78")[:3], rw.hexlin("#C9619E")[:3],
-                                                 rw.hexlin("#EE94C0")[:3], rw.hexlin("#FFD0E4")[:3]], height=10.0, offset=-1.0),
+                                                 rw.hexlin("#EE94C0")[:3], rw.hexlin("#FFD0E4")[:3]], height=10.0, offset=-1.0,
+                                  follow_look=False),   # (pink blossom is at home in every look)
             tinted_canopy_program("rw_pine", [rw.hexlin("#173F2E")[:3], rw.hexlin("#245C3C")[:3],
                                               rw.hexlin("#3F7E46")[:3], rw.hexlin("#6FA552")[:3]], height=24.0, offset=-0.2)]
 

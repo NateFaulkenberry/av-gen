@@ -1141,49 +1141,33 @@ for n_, c_ in STATES:
 SCALARS = {n_: {"skyHaze": SKY_HAZE[n_]} for n_, c_ in STATES}
 
 
-# The trees follow the look (coordinator, gate 4 sheets: "a dark green tree on a pink or indigo meadow"): each species'
-# own canopy ramp, its hue turned in OKLab toward the look's foliage hue by the look's weight, its lightness kept (a
-# touch darker, so a canopy still reads against the meadow) and its chroma scaled. Each species keeps its own value
-# structure and its own place relative to the others; the Blossom Puff, already pink, turns less.
-def _oklab(c):
-    r, g, b = (max(0.0, float(v)) for v in c[:3])
+# The trees follow the look (coordinator, gate 4 sheets: "a dark green tree on a pink or indigo meadow"): every
+# canopy's colour turned in OKLCH by the look's own hue (look.foliage_hue_op), the turn taking the Great Tree's mid
+# canopy green to the look's foliage hue -- by the look's weight, along the shorter arc. Lightness and each species'
+# own value structure stay; the species keep their places relative to each other.
+# look: (foliage hue in degrees, weight toward it). A partial weight lands between the two along the shorter arc
+# (green part-way toward pink lands on rust): Spring's cherry blossom takes the whole turn.
+FOLIAGE = {"Bright Noon": (0.0, 0.0), "Golden Hour": (110.0, 0.3), "After the Storm": (175.0, 0.55),
+           "Lavender Dusk": (330.0, 0.85), "Prism": (285.0, 0.7), "Candy": (22.0, 0.9), "Electric": (200.0, 0.9),
+           "Spring": (350.0, 1.0)}
+GREAT_MID = (0.1022, 0.3231, 0.0452)     # rw_canopy's second stop (#5A9A3C), the canopy's body colour
+
+
+def _hue_deg(c):
+    r, g, b = c
     l_ = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
     m_ = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
     s_ = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
-    return (0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
-            1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
-            0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_)
+    a_ = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_
+    b_ = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+    return math.degrees(math.atan2(b_, a_))
 
 
-def _linrgb(L_, a_, b_):
-    l_ = (L_ + 0.3963377774 * a_ + 0.2158037573 * b_) ** 3
-    m_ = (L_ - 0.1055613458 * a_ - 0.0638541728 * b_) ** 3
-    s_ = (L_ - 0.0894841775 * a_ - 1.2914855480 * b_) ** 3
-    rgb = (4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
-           -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
-           -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_)
-    return [round(min(1.0, max(0.0, v)), 4) for v in rgb]
-
-
-# look: (foliage hue in degrees, weight toward it, chroma scale, lightness scale). A partial weight turns the hue part
-# way along the shorter arc, so a far target at a partial weight lands between (green toward pink lands on rust):
-# Spring's cherry blossom takes the whole turn
-FOLIAGE = {"Bright Noon": (0.0, 0.0, 1.0, 1.0), "Golden Hour": (110.0, 0.3, 1.1, 1.0),
-           "After the Storm": (175.0, 0.55, 0.95, 0.9), "Lavender Dusk": (330.0, 0.85, 0.85, 0.85),
-           "Prism": (285.0, 0.7, 1.0, 0.95), "Candy": (22.0, 0.9, 1.0, 1.05),
-           "Electric": (200.0, 0.9, 1.3, 0.85), "Spring": (350.0, 1.0, 0.7, 1.15)}
-CANOPY = {pr["name"]: pr["ops"][look.FX[pr["name"]]["canopy_ramp"] - 1] for pr in programs
-          if "canopy_ramp" in look.FX.get(pr["name"], {})}
 for n_, c_ in STATES:
-    hue_t, w_, cs_, ls_ = FOLIAGE[n_]
-    for prog_, op_ in CANOPY.items():
-        w2 = w_ * (0.4 if prog_ == "rw_blossom" else 1.0)
-        for k_, f_ in enumerate(("constant", "constant2", "constant3", "constant4")):
-            L_, a_, b_ = _oklab(op_[f_])
-            C_, h_ = math.hypot(a_, b_), math.degrees(math.atan2(b_, a_))
-            dh = ((hue_t - h_ + 180.0) % 360.0) - 180.0
-            h2 = math.radians(h_ + w2 * dh)
-            c_["canopy_%s_%d" % (prog_, k_)] = _linrgb(L_ * ls_, C_ * cs_ * math.cos(h2), C_ * cs_ * math.sin(h2))
+    hue_t, w_ = FOLIAGE[n_]
+    dh = ((hue_t - _hue_deg(GREAT_MID) + 180.0) % 360.0) - 180.0
+    SCALARS[n_]["foliageHue"] = round(w_ * dh / 360.0, 4)       # turns
+print("FOLIAGE turns", {n_: SCALARS[n_]["foliageHue"] for n_ in SCALARS})
 for k_, (n_, c_) in enumerate(STATES):
     # (the sky's ground colour stays pale: it is also the ambient from below, and a deep one turned every shaded face
     # navy -- tested at #2C56C4, #5C80D8 and #8AA6E6, Stage 6. The deep sky below is the cloud floor's troughs.)
@@ -1215,10 +1199,8 @@ bindings.append({"role": "shade", "target": op_path("rw_ground_lip", "constant",
 for f_ in ("constant", "constant2", "constant3", "constant4"):
     bindings.append({"role": "stone", "mode": "multiply", "target": op_path("rw_rock", "oklabRamp") + f_})
 for prog_, roles_ in look.FX.items():
-    if "canopy_ramp" in roles_:
-        for k_, f_ in enumerate(("constant", "constant2", "constant3", "constant4")):
-            bindings.append({"role": "canopy_%s_%d" % (prog_, k_),
-                             "target": "material/%s/op/%d/oklabRamp/%s" % (prog_, roles_["canopy_ramp"], f_)})
+    if "foliage_hue" in roles_:
+        bindings.append({"role": "foliageHue", "target": "material/%s/op/%d/hueShift/value" % (prog_, roles_["foliage_hue"])})
     if "kick_colour" in roles_:
         bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
 palette = {"states": [{"name": n, "colors": c, "scalars": SCALARS[n]} for n, c in STATES], "bindings": bindings,
