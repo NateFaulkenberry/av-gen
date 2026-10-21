@@ -1533,6 +1533,9 @@ showcase["assets"]["stems"] = [{"key": k_, "label": k_.capitalize(),
                                 "file": os.path.join(audio_dir, "stems", "feline-footwear (%s).wav" % k_.capitalize())}
                                for k_ in music.STEMS]
 showcase["sonic"]["live"] = False
+# the showcase's world scans are baked from the song (music.SCAN_TIMES); the live project keeps the live trigger
+showcase["sources"] = showcase["sources"] + music.showcase_scan_sources(210.5)
+showcase["routes"] = music.showcase_scan_routes(showcase["routes"])
 # the beat clock from the drum stem (ADR-1581): the kicks' own grid, not the mix's, under the clap fronts and the
 # phrase pulses. The levels and hits stay on the mix (the fallbacks stand aside while the stems are active anyway).
 showcase["feeds"] = {"beat": "stem.drums"}

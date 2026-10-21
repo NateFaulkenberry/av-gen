@@ -2035,6 +2035,742 @@
      }
     ]
    }
+  },
+  {
+   "kind": "timeline",
+   "name": "scan",
+   "settings": {
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 48.3,
+      "value": 0.043,
+      "interp": "linear"
+     },
+     {
+      "time": 48.45,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 48.6,
+      "value": 0.3164,
+      "interp": "linear"
+     },
+     {
+      "time": 48.75,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 48.9,
+      "value": 0.6836,
+      "interp": "linear"
+     },
+     {
+      "time": 49.05,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 49.2,
+      "value": 0.957,
+      "interp": "linear"
+     },
+     {
+      "time": 49.35,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 54.15,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 54.4,
+      "value": 0.9803,
+      "interp": "linear"
+     },
+     {
+      "time": 54.65,
+      "value": 0.9259,
+      "interp": "linear"
+     },
+     {
+      "time": 54.9,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 55.15,
+      "value": 0.7407,
+      "interp": "linear"
+     },
+     {
+      "time": 55.4,
+      "value": 0.6238,
+      "interp": "linear"
+     },
+     {
+      "time": 55.65,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 55.9,
+      "value": 0.3762,
+      "interp": "linear"
+     },
+     {
+      "time": 56.15,
+      "value": 0.2593,
+      "interp": "linear"
+     },
+     {
+      "time": 56.4,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 56.65,
+      "value": 0.0741,
+      "interp": "linear"
+     },
+     {
+      "time": 56.9,
+      "value": 0.0197,
+      "interp": "linear"
+     },
+     {
+      "time": 57.15,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 111.75,
+      "value": 0.043,
+      "interp": "linear"
+     },
+     {
+      "time": 111.9,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 112.05,
+      "value": 0.3164,
+      "interp": "linear"
+     },
+     {
+      "time": 112.2,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 112.35,
+      "value": 0.6836,
+      "interp": "linear"
+     },
+     {
+      "time": 112.5,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 112.65,
+      "value": 0.957,
+      "interp": "linear"
+     },
+     {
+      "time": 112.8,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 117.6,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 117.85,
+      "value": 0.9803,
+      "interp": "linear"
+     },
+     {
+      "time": 118.1,
+      "value": 0.9259,
+      "interp": "linear"
+     },
+     {
+      "time": 118.35,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 118.6,
+      "value": 0.7407,
+      "interp": "linear"
+     },
+     {
+      "time": 118.85,
+      "value": 0.6238,
+      "interp": "linear"
+     },
+     {
+      "time": 119.1,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 119.35,
+      "value": 0.3762,
+      "interp": "linear"
+     },
+     {
+      "time": 119.6,
+      "value": 0.2593,
+      "interp": "linear"
+     },
+     {
+      "time": 119.85,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 120.1,
+      "value": 0.0741,
+      "interp": "linear"
+     },
+     {
+      "time": 120.35,
+      "value": 0.0197,
+      "interp": "linear"
+     },
+     {
+      "time": 120.6,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 159.35,
+      "value": 0.043,
+      "interp": "linear"
+     },
+     {
+      "time": 159.5,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 159.65,
+      "value": 0.3164,
+      "interp": "linear"
+     },
+     {
+      "time": 159.8,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 159.95,
+      "value": 0.6836,
+      "interp": "linear"
+     },
+     {
+      "time": 160.1,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 160.25,
+      "value": 0.957,
+      "interp": "linear"
+     },
+     {
+      "time": 160.4,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 165.2,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 165.45,
+      "value": 0.9803,
+      "interp": "linear"
+     },
+     {
+      "time": 165.7,
+      "value": 0.9259,
+      "interp": "linear"
+     },
+     {
+      "time": 165.95,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 166.2,
+      "value": 0.7407,
+      "interp": "linear"
+     },
+     {
+      "time": 166.45,
+      "value": 0.6238,
+      "interp": "linear"
+     },
+     {
+      "time": 166.7,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 166.95,
+      "value": 0.3762,
+      "interp": "linear"
+     },
+     {
+      "time": 167.2,
+      "value": 0.2593,
+      "interp": "linear"
+     },
+     {
+      "time": 167.45,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 167.7,
+      "value": 0.0741,
+      "interp": "linear"
+     },
+     {
+      "time": 167.95,
+      "value": 0.0197,
+      "interp": "linear"
+     },
+     {
+      "time": 168.2,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 191.15,
+      "value": 0.043,
+      "interp": "linear"
+     },
+     {
+      "time": 191.3,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 191.45,
+      "value": 0.3164,
+      "interp": "linear"
+     },
+     {
+      "time": 191.6,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 191.75,
+      "value": 0.6836,
+      "interp": "linear"
+     },
+     {
+      "time": 191.9,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 192.05,
+      "value": 0.957,
+      "interp": "linear"
+     },
+     {
+      "time": 192.2,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 197.0,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 197.25,
+      "value": 0.9803,
+      "interp": "linear"
+     },
+     {
+      "time": 197.5,
+      "value": 0.9259,
+      "interp": "linear"
+     },
+     {
+      "time": 197.75,
+      "value": 0.8438,
+      "interp": "linear"
+     },
+     {
+      "time": 198.0,
+      "value": 0.7407,
+      "interp": "linear"
+     },
+     {
+      "time": 198.25,
+      "value": 0.6238,
+      "interp": "linear"
+     },
+     {
+      "time": 198.5,
+      "value": 0.5,
+      "interp": "linear"
+     },
+     {
+      "time": 198.75,
+      "value": 0.3762,
+      "interp": "linear"
+     },
+     {
+      "time": 199.0,
+      "value": 0.2593,
+      "interp": "linear"
+     },
+     {
+      "time": 199.25,
+      "value": 0.1562,
+      "interp": "linear"
+     },
+     {
+      "time": 199.5,
+      "value": 0.0741,
+      "interp": "linear"
+     },
+     {
+      "time": 199.75,
+      "value": 0.0197,
+      "interp": "linear"
+     },
+     {
+      "time": 200.0,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 210.5,
+      "value": 0.0,
+      "interp": "linear"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "timeline",
+   "name": "scanFront",
+   "settings": {
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 48.149,
+      "value": 0.0,
+      "interp": "step"
+     },
+     {
+      "time": 48.15,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 48.4833,
+      "value": 0.8403,
+      "interp": "linear"
+     },
+     {
+      "time": 48.8167,
+      "value": 0.6944,
+      "interp": "linear"
+     },
+     {
+      "time": 49.15,
+      "value": 0.5625,
+      "interp": "linear"
+     },
+     {
+      "time": 49.4833,
+      "value": 0.4444,
+      "interp": "linear"
+     },
+     {
+      "time": 49.8167,
+      "value": 0.3403,
+      "interp": "linear"
+     },
+     {
+      "time": 50.15,
+      "value": 0.25,
+      "interp": "linear"
+     },
+     {
+      "time": 50.4833,
+      "value": 0.1736,
+      "interp": "linear"
+     },
+     {
+      "time": 50.8167,
+      "value": 0.1111,
+      "interp": "linear"
+     },
+     {
+      "time": 51.15,
+      "value": 0.0625,
+      "interp": "linear"
+     },
+     {
+      "time": 51.4833,
+      "value": 0.0278,
+      "interp": "linear"
+     },
+     {
+      "time": 51.8167,
+      "value": 0.0069,
+      "interp": "linear"
+     },
+     {
+      "time": 52.15,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 111.599,
+      "value": 0.0,
+      "interp": "step"
+     },
+     {
+      "time": 111.6,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 111.9333,
+      "value": 0.8403,
+      "interp": "linear"
+     },
+     {
+      "time": 112.2667,
+      "value": 0.6944,
+      "interp": "linear"
+     },
+     {
+      "time": 112.6,
+      "value": 0.5625,
+      "interp": "linear"
+     },
+     {
+      "time": 112.9333,
+      "value": 0.4444,
+      "interp": "linear"
+     },
+     {
+      "time": 113.2667,
+      "value": 0.3403,
+      "interp": "linear"
+     },
+     {
+      "time": 113.6,
+      "value": 0.25,
+      "interp": "linear"
+     },
+     {
+      "time": 113.9333,
+      "value": 0.1736,
+      "interp": "linear"
+     },
+     {
+      "time": 114.2667,
+      "value": 0.1111,
+      "interp": "linear"
+     },
+     {
+      "time": 114.6,
+      "value": 0.0625,
+      "interp": "linear"
+     },
+     {
+      "time": 114.9333,
+      "value": 0.0278,
+      "interp": "linear"
+     },
+     {
+      "time": 115.2667,
+      "value": 0.0069,
+      "interp": "linear"
+     },
+     {
+      "time": 115.6,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 159.199,
+      "value": 0.0,
+      "interp": "step"
+     },
+     {
+      "time": 159.2,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 159.5333,
+      "value": 0.8403,
+      "interp": "linear"
+     },
+     {
+      "time": 159.8667,
+      "value": 0.6944,
+      "interp": "linear"
+     },
+     {
+      "time": 160.2,
+      "value": 0.5625,
+      "interp": "linear"
+     },
+     {
+      "time": 160.5333,
+      "value": 0.4444,
+      "interp": "linear"
+     },
+     {
+      "time": 160.8667,
+      "value": 0.3403,
+      "interp": "linear"
+     },
+     {
+      "time": 161.2,
+      "value": 0.25,
+      "interp": "linear"
+     },
+     {
+      "time": 161.5333,
+      "value": 0.1736,
+      "interp": "linear"
+     },
+     {
+      "time": 161.8667,
+      "value": 0.1111,
+      "interp": "linear"
+     },
+     {
+      "time": 162.2,
+      "value": 0.0625,
+      "interp": "linear"
+     },
+     {
+      "time": 162.5333,
+      "value": 0.0278,
+      "interp": "linear"
+     },
+     {
+      "time": 162.8667,
+      "value": 0.0069,
+      "interp": "linear"
+     },
+     {
+      "time": 163.2,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 190.999,
+      "value": 0.0,
+      "interp": "step"
+     },
+     {
+      "time": 191.0,
+      "value": 1.0,
+      "interp": "linear"
+     },
+     {
+      "time": 191.3333,
+      "value": 0.8403,
+      "interp": "linear"
+     },
+     {
+      "time": 191.6667,
+      "value": 0.6944,
+      "interp": "linear"
+     },
+     {
+      "time": 192.0,
+      "value": 0.5625,
+      "interp": "linear"
+     },
+     {
+      "time": 192.3333,
+      "value": 0.4444,
+      "interp": "linear"
+     },
+     {
+      "time": 192.6667,
+      "value": 0.3403,
+      "interp": "linear"
+     },
+     {
+      "time": 193.0,
+      "value": 0.25,
+      "interp": "linear"
+     },
+     {
+      "time": 193.3333,
+      "value": 0.1736,
+      "interp": "linear"
+     },
+     {
+      "time": 193.6667,
+      "value": 0.1111,
+      "interp": "linear"
+     },
+     {
+      "time": 194.0,
+      "value": 0.0625,
+      "interp": "linear"
+     },
+     {
+      "time": 194.3333,
+      "value": 0.0278,
+      "interp": "linear"
+     },
+     {
+      "time": 194.6667,
+      "value": 0.0069,
+      "interp": "linear"
+     },
+     {
+      "time": 195.0,
+      "value": 0.0,
+      "interp": "linear"
+     },
+     {
+      "time": 210.5,
+      "value": 0.0,
+      "interp": "linear"
+     }
+    ]
+   }
   }
  ],
  "routes": [
@@ -2727,108 +3463,68 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
    "source": "macro.scan",
@@ -2847,108 +3543,68 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_ground_lip/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
    "source": "macro.scan",
@@ -2967,108 +3623,68 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/12/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/12/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/13/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/13/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/20/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/20/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/21/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_grass/op/21/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
    "source": "macro.scan",
@@ -3087,108 +3703,68 @@
    "component": -1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/16/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/16/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/17/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/17/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/24/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/24/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/25/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 0
   },
   {
-   "source": "beat.phrasePulse",
+   "source": "timeline.scanFront",
    "target": "material/rw_rock/op/25/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.25,
-    "delayMs": 300.0
-   }
+   "component": 1
   },
   {
    "source": "macro.scan",
@@ -3205,43 +3781,6 @@
    "op": "add",
    "polarity": "unipolar",
    "component": -1
-  },
-  {
-   "source": "beat.phrasePulse",
-   "target": "macros/scan",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "delayMs": 300.0,
-    "envelope": "peakhold",
-    "envelopeHoldMs": 6000.0,
-    "envelopeFallPerSecond": 0.33,
-    "attackMs": 250.0
-   },
-   "depthSource": "stem.synth.level",
-   "depthMin": -12.0,
-   "depthMax": 1.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.synth.rms",
-   "target": "macros/scan",
-   "amount": 2.5,
-   "op": "min",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 12.0,
-    "offset": -1.0,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 1200.0,
-    "decayMs": 3000.0
-   },
-   "optional": true
   },
   {
    "source": "macro.one",
@@ -3922,6 +4461,14 @@
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.scan",
+   "target": "macros/scan",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
   }
  ],
  "palette": {

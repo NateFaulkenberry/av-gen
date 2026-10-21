@@ -55,6 +55,60 @@ SCAN_REST = 980.0    # look.SCAN_REST
 SCAN_DELAY_MS = 300.0
 RAINBOWS = ("rw_rainbow",)
 
+# The showcase's world scans (gate 5, the owner: "rainbow world scan only happened once and there was a glitch at the
+# end"; 26-world-scan.md). On Feline Footwear the scan fires at the song's big synth swells and section peaks, from
+# the stems' own analysis (the synth stem's rms over the four bars after each phrase start against the four before;
+# 14-stem-analysis for the sections):
+#   47.85 s  the drop: the synth's entry, by far the largest rise (+0.10 rms)
+#   111.3 s  section B: the drums go to 16th hats under the full synth bed
+#   158.9 s  the synth's brightness climbing to its peak (centroid at 160.9 s)
+#   190.7 s  the riser's top: the synth's loudest phrase (0.21 rms), the drums gone
+# Irregular (63, 48, 32 s apart), never on a grid. Each is baked into two timelines -- the scan's amount and its
+# front -- so a seek lands where a play does, and nothing in the effect can reset part-way through (the gate-4 glitch
+# was the live trigger's depth, the synth level, dipping and recovering on the scan's tail).
+SCAN_TIMES = (47.85, 111.3, 158.9, 190.7)
+SCAN_RISE, SCAN_HOLD, SCAN_FALL, SCAN_RUN = 1.2, 4.8, 3.0, 4.0     # seconds: ease in, hold, ease out; the front's run
+
+
+def _ease(u):
+    u = min(1.0, max(0.0, u))
+    return u * u * (3 - 2 * u)
+
+
+def showcase_scan_sources(song_end):
+    """The `scan` (amount 0..1) and `scanFront` (1 = the front at the eye .. 0 = run out to rest) timelines."""
+    amt, front = [{"time": 0.0, "value": 0.0, "interp": "linear"}], [{"time": 0.0, "value": 0.0, "interp": "linear"}]
+    for t0 in SCAN_TIMES:
+        t0 += SCAN_DELAY_MS / 1000.0
+        for k in range(1, 9):                                   # eased in
+            amt.append({"time": round(t0 + SCAN_RISE * k / 8, 4), "value": round(_ease(k / 8), 4), "interp": "linear"})
+        for k in range(0, 13):                                  # held, then eased out
+            tt = t0 + SCAN_RISE + SCAN_HOLD + SCAN_FALL * k / 12
+            amt.append({"time": round(tt, 4), "value": round(1.0 - _ease(k / 12), 4), "interp": "linear"})
+        front.append({"time": round(t0 - 0.001, 4), "value": 0.0, "interp": "step"})
+        for k in range(0, 13):                                  # the front leaves the eye and eases out to rest
+            u = k / 12
+            front.append({"time": round(t0 + SCAN_RUN * u, 4), "value": round(1.0 - (1 - (1 - u) ** 2), 4),
+                          "interp": "linear"})
+    amt.append({"time": round(song_end, 4), "value": 0.0, "interp": "linear"})
+    front.append({"time": round(song_end, 4), "value": 0.0, "interp": "linear"})
+    return [{"kind": "timeline", "name": "scan", "settings": {"keys": amt}},
+            {"kind": "timeline", "name": "scanFront", "settings": {"keys": front}}]
+
+
+def showcase_scan_routes(routes_):
+    """The live trigger (phrase pulse x synth) swapped for the showcase's baked scans."""
+    out = []
+    for r in routes_:
+        if r["target"] == "macros/scan":
+            continue
+        if r["source"] == "beat.phrasePulse" and "/remap/constant" in r["target"]:
+            r = dict(r, source="timeline.scanFront")
+            r.pop("chain", None)
+        out.append(r)
+    out.append(route("timeline.scan", "macros/scan", 1.0))
+    return out
+
 
 def routes(fx, swell_nodes, swell):
     """`fx`: look.FX (program -> role -> 1-based op index). `swell_nodes`: the nodes carrying the swell deformers.

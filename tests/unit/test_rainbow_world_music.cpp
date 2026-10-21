@@ -64,7 +64,7 @@ TEST_CASE("Rainbow World: stem routes are optional and each fallback stands asid
     }
 }
 
-TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the mix and three stems, nothing else",
+TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the mix, three stems and its baked scans",
           "[examples][rainbow-world]") {
     const json live = load("rainbow-world.json");
     const json show = load("rainbow-world-feline.json");
@@ -80,9 +80,45 @@ TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the m
         CHECK_FALSE(s.contains("offset")); // the stems are sample-aligned with the mix (rainbow-world/14 section 1)
     }
     CHECK(keys == std::set<std::string>{"drums", "bass", "synth"});
-    CHECK(show.at("routes") == live.at("routes"));
-    CHECK(show.at("sources") == live.at("sources"));
     CHECK(show.at("control") == live.at("control"));
+    // The one difference (gate 5, 26-world-scan.md): the showcase's world scans are baked from the song -- two
+    // timelines, `scan` and `scanFront` -- in place of the live trigger (the phrase pulse gated by the synth stem).
+    // Everything else is the live project's.
+    const auto isScan = [](const json& r) {
+        const std::string target = r.at("target").get<std::string>();
+        const std::string source = r.at("source").get<std::string>();
+        return target == "macros/scan" ||
+               ((source == "beat.phrasePulse" || source == "timeline.scanFront") &&
+                target.find("/remap/constant") != std::string::npos);
+    };
+    json liveRest = json::array();
+    json showRest = json::array();
+    for (const json& r : live.at("routes")) {
+        if (!isScan(r)) liveRest.push_back(r);
+    }
+    int baked = 0;
+    for (const json& r : show.at("routes")) {
+        if (!isScan(r)) {
+            showRest.push_back(r);
+        } else {
+            CHECK(r.at("source").get<std::string>().starts_with("timeline.scan"));
+            ++baked;
+        }
+    }
+    CHECK(showRest == liveRest);
+    CHECK(baked > 1);
+    json showSources = json::array();
+    std::set<std::string> scanTimelines;
+    for (const json& src : show.at("sources")) {
+        const std::string name = src.value("name", "");
+        if (name == "scan" || name == "scanFront") {
+            scanTimelines.insert(name);
+        } else {
+            showSources.push_back(src);
+        }
+    }
+    CHECK(scanTimelines == std::set<std::string>{"scan", "scanFront"});
+    CHECK(showSources == live.at("sources"));
 }
 
 TEST_CASE("Rainbow World: the MIDI layout keeps CC 9 look and CC 10 look lock", "[examples][rainbow-world]") {
