@@ -329,7 +329,25 @@ def cloud_program():
                 {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4},
                 # Rainbow World 2: the synth's light on the clouds (1 = as built; routed up by the synth)
                 {"kind": "constant", "dst": 5, "constant": [1.0, 1.0, 1.0, 1.0], "_role": "cloud_glow"},
-                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5}]}
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+                # gate 7 (the owner: "audio reactivity to the sky ... splashes of color"): patches of saturated colour
+                # bloom across the clouds on the claps and the phrase starts and fade within a beat or two. The
+                # patches are a broad noise (~400 m) whose sample point travels with the phrase and the bar
+                # (`splash_shift`, routed from beat.phrase and beat.bar: bounded, seekable), so each splash lands
+                # somewhere else; the colour turns once round the spectrum a phrase (`splash_hue`); `splash_amount`
+                # (0 at rest) is how much shows. Never the whole sky: about a third of the cloud area at most.
+                {"kind": "constant", "dst": 4, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "splash_shift"},
+                {"kind": "add", "dst": 4, "srcA": 7, "srcB": 4},
+                {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.0025, "seed": 23},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.42, 0.58, 0.0, 1.0], "value": 1.0},
+                {"kind": "palette", "dst": 5, "srcA": 2, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.0],
+                 "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [0.35, 0.35, 0.35, 0.0],
+                 "constant4": [0.0, 0.33, 0.67, 0.0], "_role": "splash_hue"},
+                {"kind": "constant", "dst": 6, "constant": [1.5, 1.5, 1.5, 1.0]},
+                {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
+                {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "splash_amount"},
+                {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 6},
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 2}]}
 
 
 FLOOR_STOPS = ("#1A3AA8", "#4A78CE", "#DCBE9A", "#F4E2C8")  # deeper than the clouds, so the heads on it read

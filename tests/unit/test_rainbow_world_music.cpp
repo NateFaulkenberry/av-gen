@@ -91,7 +91,8 @@ TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the m
         // the land's front (remap constants) and the fireworks' fields riding it (gate 6)
         return target == "macros/scan" || target.find("/remap/constant") != std::string::npos ||
                (target.starts_with("field/fw") &&
-                (target.ends_with("/radius") || target.ends_with("/falloff/inner") || target.ends_with("/falloff/outer")));
+                (target.ends_with("/radius") || target.ends_with("/falloff/inner") || target.ends_with("/falloff/outer") ||
+                 target.ends_with("/waveOrigin")));
     };
     json liveRest = json::array();
     json showRest = json::array();

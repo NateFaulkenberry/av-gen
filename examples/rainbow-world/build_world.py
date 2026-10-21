@@ -1282,14 +1282,16 @@ print("SWELL nodes", len(SWELL_NODES))
 # No events and no per-tree state: every stage is a function of how far the front has run past the tree, `a` metres,
 # read from scene fields centred on the camera (its baked position) whose falloff edges ride the front (ADR-025), and
 # effectors on the instances (ADR-1500). A pure function of the transport: seek equals play.
-#   spin   smootherstep(a / SPIN_A)              a whole turn about the trunk
 #   glow   up in 15 m, down over GLOW_A           the tree's own light (instance emissive)
 #   out    1 - (1 - a/BURST_A)^3                  the sparks' flight, decelerating
 #   drop   (a/BURST_A)^3                          their fall
-#   life   up in 6 m, down from 0.45 BURST_A      their size (streaks along the flight)
-#   heat   (1 - a/HEAT_A)^3                       white-hot to colour (the instance emissive the program reads)
+#   life   up in 6 m, down 0.35..0.8 BURST_A      their size (streaks along the flight)
+#   heat   (1 - a/HEAT_A)                         white-hot to colour (the instance emissive the program reads)
 #   flash  up in 3 m, down over FLASH_A           the ignition flash
-SPIN_A, GLOW_A, BURST_A, HEAT_A, FLASH_A = 120.0, 240.0, 280.0, 60.0, 45.0
+# Gate 7 (the owner: "they hold in the air maybe a second too long"): the burst is 200 m (1.4 s at the front's
+# ~139 m/s), not 280, and the sparks are gone by 0.8 of it (160 m, 1.15 s) where they lasted to 280 m (2 s); the
+# white heat cools in 40 m, not 60, and the crackle (alive while the spark is) ends with them.
+GLOW_A, BURST_A, HEAT_A, FLASH_A = 240.0, 200.0, 40.0, 45.0
 SPARKS_PER_TREE = 44
 REST_R = look.SCAN_REST
 
@@ -1309,35 +1311,93 @@ def edge_field(name, kind, behind_inner, behind_outer):
 
 def ramp_field(name, a0, a1, down=False):
     """A linear ramp, up (0 at a0 metres behind the front, 1 at a1) or down (1 at a0, 0 at a1): a sphere about the
-    camera whose radius rides the front (inverted for down). Compounds may only nest one level on the GPU, so the
-    windows below are products of these."""
+    camera whose radius rides the front (inverted for down)."""
     nodes.append(field_node(name, {"kind": "sphere", "radius": REST_R - a1, "softness": a1 - a0, "invert": down}))
     FW_EDGES.append((name, ("radius",)))
 
 
 def window(name, rise, fall_from, fall_to):
-    ramp_field(name + "In", 0.0, rise)
-    ramp_field(name + "Out", fall_from, fall_to, down=True)
-    nodes.append(field_node(name, {"kind": "compound", "children": [name + "In", name + "Out"], "combine": "multiply"}))
+    """Up over `rise` metres behind the front, down from `fall_from` to `fall_to`: ONE field (the GPU has sixteen
+    field slots) -- an inverted sphere (the fall) whose falloff is the rise (a falloff weights every kind)."""
+    nodes.append(field_node(name, {"kind": "sphere", "radius": REST_R - fall_to, "softness": fall_to - fall_from,
+                                   "invert": True, "falloff": {"kind": "linear", "inner": REST_R - rise,
+                                                               "outer": REST_R}}))
+    FW_EDGES.append((name, ("radius", "falloff/inner", "falloff/outer")))
+
+
+def wave_field(name, centre, wavelength, width, ramp):
+    """A damped oscillation behind the front: a spherical sine about the camera whose origin rides the front,
+    `centre` metres behind it, enveloped over `width` and faded in over the first `ramp` metres (so nothing moves
+    before the front arrives). s = d - origin = centre - a."""
+    nodes.append(field_node(name, {"kind": "wave", "waveGeometry": "spherical", "waveShape": "sine",
+                                   "amplitude": 1.0, "wavelength": wavelength, "waveWidth": width, "waveSpeed": 0.0,
+                                   "waveOrigin": REST_R - centre,
+                                   "falloff": {"kind": "smooth", "inner": REST_R - ramp, "outer": REST_R}}))
+    FW_EDGES.append((name, ("waveOrigin", "falloff/inner", "falloff/outer")))
 
 
 FW_EDGES = []
-edge_field("fwSpin", "smooth", SPIN_A, 0.0)
 edge_field("fwOut", "easeIn", BURST_A, 0.0)
 edge_field("fwDrop", "easeOut", BURST_A, 0.0)
 ramp_field("fwHeat", 0.0, HEAT_A, down=True)
-window("fwLife", 6.0, 0.5 * BURST_A, BURST_A)
+window("fwLife", 6.0, 0.35 * BURST_A, 0.8 * BURST_A)
 window("fwFlash", 3.0, 0.3 * FLASH_A, FLASH_A)
 window("fwGlow", 15.0, 0.3 * GLOW_A, GLOW_A)
+
+# ---- gate 7: the twirl (the owner: "a dancing object in a disney movie rather than just a mechanical rotation") ---
+# The principles (Thomas and Johnston), each a function of a -- research and curves in 28-twirl-sky-sun.md:
+#   anticipation        a counter-twist and a crouch the instant the front arrives (the sine's first lobe)
+#   slow in / slow out  the turn eases out of the wind-up and into the landing (smootherstep)
+#   squash and stretch  crouch, stretch tall mid-turn, squash on landing, a rebound; XZ against Y, so the volume
+#                       holds (1 + s k) (1 - s k / 2)^2 ~ 1
+#   arcs                the same field lifts the tree on the stretch and sinks it on the squashes (a hop), and it
+#                       leans out on its own X axis, which turns with it, so the lean sweeps round (a skirt)
+#   follow-through      the turn overshoots and settles in a damped wobble (a second sine)
+#   overlapping action  the canopy wobbles 40% more than the wood (it trails and overshoots more)
+#   secondary variety   two temperaments: the heavy trees (great, weeper) wind up longer and turn slower with less
+#                       squash; the light ones (blossom, pine) are quick, bouncy, and turn the other way round; and
+#                       each family its own direction; trees nearer the eye start first (the front's cascade)
+TWIRL = {  # spin edge a0..a1; twist sine: centre, wavelength, width, amount; squash sine: centre, wavelength,
+           # width; fade-in metres; squash, hop (m), lean (rad)
+    "heavy": dict(s0=22.0, s1=150.0, tc=-5.0, tl=84.0, tw=330.0, ta=0.42, qc=-10.0, ql=110.0, qw=300.0,
+                  ramp=16.0, squash=0.07, hop=1.4, lean=0.06),
+    "light": dict(s0=16.0, s1=105.0, tc=-2.0, tl=64.0, tw=260.0, ta=0.45, qc=-8.0, ql=86.0, qw=240.0,
+                  ramp=12.0, squash=0.12, hop=2.2, lean=0.09)}
+TEMPER = {"great": ("heavy", 1.0), "weeper": ("heavy", -1.0), "blossom": ("light", -1.0), "pine": ("light", 1.0)}
+for tk, tp in TWIRL.items():
+    edge_field("fwTwSpin_" + tk, "smooth", tp["s1"], tp["s0"])
+    wave_field("fwTwTwist_" + tk, tp["tc"], tp["tl"], tp["tw"], tp["ramp"])
+    wave_field("fwTwSquash_" + tk, tp["qc"], tp["ql"], tp["qw"], tp["ramp"])
 for n_ in nodes:
     if n_.get("kind") == "procedural" and n_["name"].split("_")[0] in fam and \
             n_["name"].endswith(("_wood", "_core", "_leaves")):
-        n_["procedural"].setdefault("effectors", []).extend([
-            {"field": "fwSpin", "op": "rotation", "blend": "add", "strength": round(2 * math.pi, 5),
+        tk, sign = TEMPER[n_["name"].split("_")[0]]
+        tp = TWIRL[tk]
+        effs = [
+            {"field": "fwTwSpin_" + tk, "op": "rotation", "blend": "add", "strength": round(sign * 2 * math.pi, 5),
              "axis": [0.0, 1.0, 0.0], "local": True},
-            {"field": "fwGlow", "op": "rotation", "blend": "add", "strength": 0.16, "axis": [1.0, 0.0, 0.0],
-             "local": True},                                     # a nod as the light goes through it
-            {"field": "fwGlow", "op": "emission", "blend": "replace", "strength": 2.2}])   # it lights up
+            {"field": "fwTwTwist_" + tk, "op": "rotation", "blend": "add", "strength": round(sign * tp["ta"], 4),
+             "axis": [0.0, 1.0, 0.0], "local": True},
+            {"field": "fwTwSquash_" + tk, "op": "scale", "blend": "add", "strength": tp["squash"],
+             "scaleAxis": [-0.5, 1.0, -0.5]},
+            {"field": "fwTwSquash_" + tk, "op": "positionOffset", "blend": "add", "strength": tp["hop"],
+             "axis": [0.0, 1.0, 0.0], "local": True},
+            {"field": "fwTwSquash_" + tk, "op": "rotation", "blend": "add", "strength": tp["lean"],
+             "axis": [1.0, 0.0, 0.0], "local": True},
+            {"field": "fwGlow", "op": "emission", "blend": "replace", "strength": 2.2}]   # it lights up
+        if n_["name"].endswith("_leaves"):   # the canopy trails the wood: it wobbles more
+            effs.insert(2, {"field": "fwTwTwist_" + tk, "op": "rotation", "blend": "add",
+                            "strength": round(sign * 0.4 * tp["ta"], 4), "axis": [0.0, 1.0, 0.0], "local": True})
+        n_["procedural"].setdefault("effectors", []).extend(effs)
+        assert len(n_["procedural"]["effectors"]) <= 8, n_["name"]
+
+# ---- gate 7: the clouds breathe with the bass (music.sky_routes): a constant field, strength 0 at rest and routed
+# from the bass body, scales every puff about its own centre (14% at a full swell)
+nodes.append(field_node(music.SKY_BREATH, {"kind": "constant", "strength": 0.0}))
+for n_ in nodes:
+    if n_.get("kind") == "procedural" and n_["procedural"].get("material", {}).get("program") == "rw_cloud":
+        n_["procedural"].setdefault("effectors", []).append(
+            {"field": music.SKY_BREATH, "op": "scale", "blend": "add", "strength": 0.14, "scaleAxis": [1.0, 1.0, 1.0]})
 
 # the sparks: a pool per crown (avgen coordinates), every spark at the crown's centre, turned so its local Y is its
 # flight and its local Z is gravity (the tree's down, square to the flight); a pool per family, so the burst's reach
@@ -1410,21 +1470,16 @@ print("FIREWORKS %d sparks and %d flash cores; fields %s" % (n_sparks, sum(len(v
 # and the look's sun colours them (their tint).
 import ray_asset  # noqa: E402
 _sun = np.array(SUN); _sun /= np.linalg.norm(_sun)
-_e1 = np.cross(_sun, [0.0, 1.0, 0.0] if abs(_sun[1]) < 0.9 else [1.0, 0.0, 0.0]); _e1 /= np.linalg.norm(_e1)
-_e2 = np.cross(_sun, _e1)
-SUN_DIST, RAY_N = 5000.0, 22
-_rays = []
-for k_ in range(RAY_N):
-    ang = 2 * math.pi * (k_ + rng.uniform(-0.3, 0.3)) / RAY_N
-    r_dir = math.cos(ang) * _e1 + math.sin(ang) * _e2
-    length_ = rng.uniform(1100.0, 2400.0) * (1.4 if k_ % 3 == 0 else 1.0)
-    width_ = rng.uniform(380.0, 900.0)
-    _rays.append((_sun * SUN_DIST + r_dir * 20.0, r_dir, np.cross(r_dir, -_sun), -_sun, length_, width_))
-ray_asset.write_burst_glb(os.path.join(OUT, "sun_burst.glb"), _rays)
+# Gate 7 (the owner: "the sun rays look weird, let's try making them look more realistic or I might cut them"): the
+# 22 spokes are gone. In their place the sun's glare as the air scatters it -- one quad at the sun carrying a soft
+# forward-scattering halo with faint, uneven, soft-edged streaks inside it that start at the sun and die with the
+# halo (ray_asset.glare_texture; 28-twirl-sky-sun.md section 3). No occlusion: the world has no medium to march.
+SUN_DIST, GLARE_SIZE = 5000.0, 4400.0
+ray_asset.write_glare_glb(os.path.join(OUT, "sun_burst.glb"), _sun * SUN_DIST, -_sun, GLARE_SIZE)
 # one node: its origin follows the camera (routed from the baked camera timelines), so the burst stays on the sun
 SUN_RAYS = ["sun_burst"]
 nodes.append({"name": "sun_burst", "kind": "gltf", "asset": "sun_burst.glb", "position": [0.0, 0.0, 0.0],
-              "castsShadow": False, "emissiveBoost": 0.25})
+              "castsShadow": False, "emissiveBoost": 1.0})
 
 # ---- scene and project ----------------------------------------------------------------------------------------------
 env, lights = look.environment(SUN, rw.to_avgen(Vector((0, 0, 1))))

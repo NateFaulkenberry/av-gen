@@ -49,6 +49,47 @@ def write_burst_glb(path, rays):
     _write(path, pos, nrm, uv, idx)
 
 
+def glare_texture(n=512, seed=5, streaks=34):
+    """Gate 7 (the owner: "the sun rays look weird ... more realistic"): the sun's glare as the air scatters it, not
+    spokes -- a forward-scattering halo (a tight core and a broad aureole, both exponential in the distance from the
+    sun) and, inside it, many faint soft streaks of uneven width and strength that start AT the sun and die with
+    the halo (no gap, no hard edges, no countable spokes), all to nothing at the quad's rim. Alpha and emission alike
+    (the node's tint colours it, its glow lane brightens it)."""
+    rng = np.random.default_rng(seed)
+    c = (np.arange(n) + 0.5) / n * 2 - 1
+    x, y = np.meshgrid(c, c)
+    r = np.hypot(x, y)
+    th = np.arctan2(y, x)
+    halo = 0.8 * np.exp(-r / 0.08) + 0.55 * np.exp(-r / 0.28) + 0.3 * np.exp(-r / 0.6)
+    ang = np.zeros_like(r)
+    for _ in range(streaks):
+        t0, w, a = rng.uniform(-np.pi, np.pi), rng.uniform(0.05, 0.16), rng.uniform(0.3, 1.0)
+        d = np.angle(np.exp(1j * (th - t0)))
+        ang += a * np.exp(-(d / w) ** 2)
+    ang = (ang - ang.min()) / max(ang.max() - ang.min(), 1e-6)
+    reach = rng.uniform(0.55, 1.0, streaks)   # noqa: F841 (kept: the draw order fixes the texture)
+    rays = ang * np.clip(1 - r, 0, 1) ** 1.4 * (1 - np.exp(-r / 0.2))
+    prof = (halo * (1.0 + 0.4 * rays) + 0.3 * rays) * np.clip((1 - r) / 0.25, 0, 1) ** 2
+    prof = np.clip(prof, 0, 1)
+    img = np.zeros((n, n, 4), np.uint8)
+    img[..., 0:3] = (255 * prof[..., None]).astype(np.uint8)
+    img[..., 3] = (255 * 0.8 * prof).astype(np.uint8)
+    return img
+
+
+def write_glare_glb(path, centre, facing, size):
+    """One quad `size` metres a side at `centre`, facing `facing` (unit), carrying the glare texture."""
+    centre, facing = np.asarray(centre, np.float64), np.asarray(facing, np.float64)
+    e1 = np.cross(facing, [0.0, 1.0, 0.0] if abs(facing[1]) < 0.9 else [1.0, 0.0, 0.0]); e1 /= np.linalg.norm(e1)
+    e2 = np.cross(facing, e1)
+    pos = np.array([centre + (cu - 0.5) * size * e1 + (cv - 0.5) * size * e2
+                    for cu, cv in ((0, 0), (1, 0), (1, 1), (0, 1))], np.float32)
+    nrm = np.array([facing] * 4, np.float32)
+    uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], np.float32)
+    idx = np.array([0, 1, 2, 0, 2, 3], np.uint16)
+    _write(path, pos, nrm, uv, idx, _png_rgba(glare_texture()))
+
+
 def write_ray_glb(path, size=1000.0):
     """One quad, `size` metres a side."""
     pos = np.array([[-0.5, 0, 0], [0.5, 0, 0], [0.5, 1, 0], [-0.5, 1, 0]], np.float32) * size
@@ -58,8 +99,8 @@ def write_ray_glb(path, size=1000.0):
     _write(path, pos, nrm, uv, idx)
 
 
-def _write(path, pos, nrm, uv, idx):
-    png = _png_rgba(ray_texture())
+def _write(path, pos, nrm, uv, idx, png=None):
+    png = png if png is not None else _png_rgba(ray_texture())
     blobs, views, off = [], [], 0
     for data, target in ((pos.tobytes(), 34962), (nrm.tobytes(), 34962), (uv.tobytes(), 34962),
                          (idx.tobytes(), 34963), (png, None)):

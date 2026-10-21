@@ -318,4 +318,35 @@ def routes(fx, swell_nodes, swell):
     if "cloud_glow" in fx.get("rw_cloud", {}):
         out.append(route("macro.synth", op_target("rw_cloud", fx["rw_cloud"], "cloud_glow", "constant", "constant"),
                          0.3))
+    out += sky_routes(fx)
+    return out
+
+
+SKY_BREATH = "skyBreath"   # build_world's constant field the clouds' scale effector reads (its strength is routed)
+
+
+def sky_routes(fx):
+    """Gate 7 (the owner: "adding a bit of audio reacivity to the sky - pulsating clouds maybe, splashes of color";
+    28-twirl-sky-sun.md section 4).
+    - the clouds breathe with the bass: every puff swells about its own centre (a scale effector on a constant field
+      whose strength the bass body drives) and brightens with it;
+    - splashes of colour: on each clap (the drum stem's 2-6 kHz band) patches of saturated colour bloom across the
+      clouds and fade within about a beat; each phrase start (bars 1 + 4k) blooms bigger and fades over two beats.
+      Patches, never the whole sky (the owner's rule at gate 2: no world sweep)."""
+    out = [route("macro.swell", "field/%s/strength" % SKY_BREATH, 1.0)]
+    roles = fx.get("rw_cloud", {})
+    if "cloud_glow" in roles:
+        out.append(route("macro.swell", op_target("rw_cloud", roles, "cloud_glow", "constant", "constant"), 0.3))
+    if "splash_amount" not in roles:
+        return out
+    amt = op_target("rw_cloud", roles, "splash_amount", "constant", "constant")
+    out += stem_route("drums", "highMid", "response.snareEnv", amt, 0.7,
+                      {"offset": -1.3, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                       "attackMs": 8.0, "decayMs": 420.0}, fb_chain={"attackMs": 8.0, "decayMs": 380.0})
+    out.append(route("beat.phrasePulse", amt, 0.6, {"envelope": "linearfall", "envelopeFallPerSecond": 0.9,
+                                                      "attackMs": 30.0}))
+    out.append(route("beat.phrase", op_target("rw_cloud", roles, "splash_hue", "palette", "value"), 1.0, op="replace"))
+    shift = op_target("rw_cloud", roles, "splash_shift", "constant", "constant")
+    out.append(route("beat.phrase", shift, 900.0, op="replace", component=0))
+    out.append(route("beat.bar", shift, 500.0, op="replace", component=2))
     return out
