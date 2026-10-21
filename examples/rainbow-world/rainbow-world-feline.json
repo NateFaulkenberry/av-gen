@@ -72,6 +72,13 @@
   "post/lens/fisheyeModel": 0.0,
   "camera/far": 30000.0
  },
+ "live": {
+  "overrides": {
+   "lodBias": 2.0,
+   "shadowResolution": 1024,
+   "reducedShadowFiltering": true
+  }
+ },
  "sources": [
   {
    "kind": "timeline",
@@ -2283,7 +2290,7 @@
   },
   {
    "source": "stem.drums.bass",
-   "target": "material/rw_grass/op/44/constant/constant",
+   "target": "material/rw_grass/op/41/constant/constant",
    "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
@@ -2300,7 +2307,7 @@
   },
   {
    "source": "response.kickEnv",
-   "target": "material/rw_grass/op/44/constant/constant",
+   "target": "material/rw_grass/op/41/constant/constant",
    "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
@@ -2316,7 +2323,7 @@
   },
   {
    "source": "stem.drums.treble",
-   "target": "material/rw_grass/op/34/constant/constant",
+   "target": "material/rw_grass/op/31/constant/constant",
    "amount": 3.2,
    "op": "add",
    "polarity": "unipolar",
@@ -2334,7 +2341,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/rw_grass/op/34/constant/constant",
+   "target": "material/rw_grass/op/31/constant/constant",
    "amount": 3.2,
    "op": "add",
    "polarity": "unipolar",
@@ -2350,7 +2357,7 @@
   },
   {
    "source": "stem.drums.treble",
-   "target": "material/rw_grass/op/31/threshold/value",
+   "target": "material/rw_grass/op/28/threshold/value",
    "amount": -0.14,
    "op": "add",
    "polarity": "unipolar",
@@ -2368,7 +2375,7 @@
   },
   {
    "source": "response.hatEnv",
-   "target": "material/rw_grass/op/31/threshold/value",
+   "target": "material/rw_grass/op/28/threshold/value",
    "amount": -0.14,
    "op": "add",
    "polarity": "unipolar",
@@ -3053,48 +3060,8 @@
   },
   {
    "source": "macro.swell",
-   "target": "material/rw_ground/op/27/saturate/value",
-   "amount": 0.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "material/rw_ground/op/28/constant/constant",
-   "amount": 0.1,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "material/rw_ground_lip/op/27/saturate/value",
-   "amount": 0.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "material/rw_ground_lip/op/28/constant/constant",
-   "amount": 0.1,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "material/rw_grass/op/11/saturate/value",
-   "amount": 0.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.swell",
-   "target": "material/rw_grass/op/12/constant/constant",
-   "amount": 0.1,
+   "target": "palette/saturation",
+   "amount": 0.18,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -3370,7 +3337,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/31/remap/constant",
+   "target": "material/rw_ground/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3383,7 +3350,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/31/remap/constant",
+   "target": "material/rw_ground/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3396,7 +3363,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/32/remap/constant",
+   "target": "material/rw_ground/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3409,7 +3376,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/32/remap/constant",
+   "target": "material/rw_ground/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3422,7 +3389,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/39/remap/constant",
+   "target": "material/rw_ground/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3435,7 +3402,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/39/remap/constant",
+   "target": "material/rw_ground/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3448,7 +3415,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/40/remap/constant",
+   "target": "material/rw_ground/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3461,7 +3428,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground/op/40/remap/constant",
+   "target": "material/rw_ground/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3474,7 +3441,7 @@
   },
   {
    "source": "macro.scan",
-   "target": "material/rw_ground/op/36/constant/constant",
+   "target": "material/rw_ground/op/33/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3482,7 +3449,7 @@
   },
   {
    "source": "macro.scan",
-   "target": "material/rw_ground/op/43/constant/constant",
+   "target": "material/rw_ground/op/40/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3490,7 +3457,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/31/remap/constant",
+   "target": "material/rw_ground_lip/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3503,7 +3470,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/31/remap/constant",
+   "target": "material/rw_ground_lip/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3516,7 +3483,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/32/remap/constant",
+   "target": "material/rw_ground_lip/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3529,7 +3496,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/32/remap/constant",
+   "target": "material/rw_ground_lip/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3542,7 +3509,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/39/remap/constant",
+   "target": "material/rw_ground_lip/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3555,7 +3522,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/39/remap/constant",
+   "target": "material/rw_ground_lip/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3568,7 +3535,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/40/remap/constant",
+   "target": "material/rw_ground_lip/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3581,7 +3548,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_ground_lip/op/40/remap/constant",
+   "target": "material/rw_ground_lip/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3594,7 +3561,7 @@
   },
   {
    "source": "macro.scan",
-   "target": "material/rw_ground_lip/op/36/constant/constant",
+   "target": "material/rw_ground_lip/op/33/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3602,7 +3569,7 @@
   },
   {
    "source": "macro.scan",
-   "target": "material/rw_ground_lip/op/43/constant/constant",
+   "target": "material/rw_ground_lip/op/40/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3610,7 +3577,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/15/remap/constant",
+   "target": "material/rw_grass/op/12/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3623,7 +3590,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/15/remap/constant",
+   "target": "material/rw_grass/op/12/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3636,7 +3603,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/16/remap/constant",
+   "target": "material/rw_grass/op/13/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3649,7 +3616,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/16/remap/constant",
+   "target": "material/rw_grass/op/13/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3662,7 +3629,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/23/remap/constant",
+   "target": "material/rw_grass/op/20/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3675,7 +3642,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/23/remap/constant",
+   "target": "material/rw_grass/op/20/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3688,7 +3655,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/24/remap/constant",
+   "target": "material/rw_grass/op/21/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3701,7 +3668,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "material/rw_grass/op/24/remap/constant",
+   "target": "material/rw_grass/op/21/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3714,7 +3681,7 @@
   },
   {
    "source": "macro.scan",
-   "target": "material/rw_grass/op/20/constant/constant",
+   "target": "material/rw_grass/op/17/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3722,7 +3689,7 @@
   },
   {
    "source": "macro.scan",
-   "target": "material/rw_grass/op/27/constant/constant",
+   "target": "material/rw_grass/op/24/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
@@ -5435,23 +5402,23 @@
      ],
      "meadow0": [
       0.0273,
-      0.3515,
+      0.2705,
       0.0648
      ],
      "meadow1": [
-      0.15,
-      0.6308,
-      0.0513
+      0.107,
+      0.4793,
+      0.0648
      ],
      "meadow2": [
-      0.4793,
-      0.8714,
-      0.117
+      0.3325,
+      0.6867,
+      0.15
      ],
      "meadow3": [
+      0.7157,
       0.8714,
-      1.0,
-      0.3231
+      0.3916
      ],
      "shade": [
       0.1022,
@@ -5644,7 +5611,7 @@
    },
    {
     "role": "ring",
-    "target": "material/rw_grass/op/42/constant/constant"
+    "target": "material/rw_grass/op/39/constant/constant"
    },
    {
     "role": "foliage",

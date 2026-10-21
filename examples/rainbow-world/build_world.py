@@ -634,7 +634,7 @@ for k in range(0, len(outcrops), 60000):
 for k in range(0, len(fpts), 60000):
     nodes.append(node_points("flowers%02d" % (k // 60000), "flower_clump.glb", fpts[k:k + 60000],
                              {"program": "rw_flower", "roughness": 0.6, "metallic": 0.0, "doubleSided": True},
-                             castsShadow=False, lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 62.0}))
+                             castsShadow=False, lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 45.0}))
 print("TREES", {k: len(v) for k, v in fam.items()}, "OUTCROPS", len(outcrops), "FLOWERS", len(fpts))
 
 # ---- grass: a corridor round the ride, on the face the ride is on ----------------------------------------------------
@@ -684,11 +684,11 @@ for s0, s1, side in CROSSINGS:
                                   rng.uniform(1.2, 2.0)))
 print("HANGING GARDEN tufts", n_hang, "flowers", len(hang_f))
 nodes.append(node_points("flowers_hang", "flower_clump.glb", hang_f, {"program": "rw_flower", "roughness": 0.6, "metallic": 0.0, "doubleSided": True}, castsShadow=False,
-                         lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 62.0}))
+                         lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 45.0}))
 for k in range(0, len(gpts), 60000):
     nodes.append(node_points("grass%03d" % (k // 60000), "grass_lite.glb", gpts[k:k + 60000],
                              {"program": "rw_grass", "roughness": 0.95, "metallic": 0.0}, castsShadow=False,
-                             lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 58.0}))
+                             lod={"cull": True, "minScreenRadius": 0.8, "maxDistance": 42.0}))
 print("GRASS", len(gpts))
 
 # ---- rainbows: arches across the band near the landmarks, on the face the ride is on there ----------------------------
@@ -771,10 +771,10 @@ for kind, pts in cpts.items():
     if pts:
         lod_ = {"cull": True}
         if kind == "puff":  # 900 heads: simplified with distance (a cloud's silhouette survives the simplifier)
-            lod_ = {"cull": True, "count": 4, "byScreenSize": False, "distance1": 700.0, "distance2": 1500.0,
-                    "distance3": 2800.0}
+            lod_ = {"cull": True, "count": 4, "byScreenSize": False, "distance1": 300.0, "distance2": 800.0,
+                    "distance3": 1600.0}
         else:               # the masses and banks: 24-30k triangles each, mostly seen from far
-            lod_ = {"cull": True, "count": 3, "byScreenSize": False, "distance1": 900.0, "distance2": 2200.0}
+            lod_ = {"cull": True, "count": 3, "byScreenSize": False, "distance1": 500.0, "distance2": 1200.0}
         nodes.append(node_points("cloud_" + kind, "cloud_%s.glb" % kind, pts,
                                  {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True},
                                  castsShadow=False, lod=lod_))
@@ -887,7 +887,7 @@ STATES = [
     # shade.
     ("Spring", dict(zenith=H("#2A8CF0"), horizon=H("#B8F8FF"), ground=H("#E0F6FF"), sun=H("#FFFBE0"), bounce=H("#C0A8FF"),
                     haze=H("#9AE8F8"), cloud0=H("#7A8CF0"), cloud1=H("#B8CCFF"), cloud2=H("#F4FAFF"), cloud3=H("#FFFFFF"),
-                    meadow0=H("#2EA048"), meadow1=H("#6CD040"), meadow2=H("#B8F060"), meadow3=H("#F0FF9A"), shade=H("#5A48C0"))),
+                    meadow0=H("#2E8E48"), meadow1=H("#5CB848"), meadow2=H("#9CD86C"), meadow3=H("#DCF0A8"), shade=H("#5A48C0"))),
 ]
 # the cloud floor follows each look: troughs a deeper cloud0, flanks between cloud0 and cloud1, heads cloud2/3
 # (Bright Noon keeps the floor program's own stops)
@@ -999,6 +999,9 @@ project = {
                    "thesis": "A painterly meadow knotted through an all-round sky: the ride follows the land's own gravity "
                              "round a twisting loop and over its rims, under rainbow arches, among sculpted clouds."},
     "parameters": params,
+    # Rainbow World 2 (17 section 7): the live ceilings -- in live mode only (an offline render keeps full quality):
+    # coarser mesh LOD sooner (measured 5.5 ms at Medium) and a 1k, lightly filtered shadow map
+    "live": {"overrides": {"lodBias": 2.0, "shadowResolution": 1024, "reducedShadowFiltering": True}},
     "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}},
                 {"kind": "macro", "name": "macros", "settings": {"knobs": [{"name": k_, "default": d_}
                                                                           for k_, d_ in music.MACROS]}}],

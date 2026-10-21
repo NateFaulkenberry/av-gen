@@ -198,8 +198,7 @@ def ground_program(name="rw_ground", rim_hex="#76665C"):
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 1},
     ]
     ops.insert(1, {"kind": "constant", "dst": 7, "constant": [-1.0, -1.0, -1.0, -1.0]})
-    ops += bass_colour_ops(1)        # Rainbow World 2: r1, r2, r4, r6 are free once the colour is in r3
-    ops += scan_ops(5, 1, 2, 4, 6)
+    ops += scan_ops(5, 1, 2, 4, 6)   # Rainbow World 2: r1, r2, r4, r6 are free once the colour is in r3
     return finish({"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 5,
                    "emissionIntensity": 1.0, "opacity": -1, "ops": ops})
 
@@ -213,7 +212,6 @@ def grass_program():
         {"kind": "constant", "dst": 5, "constant": R(LOOK["meadow"][3]) + [1.0]},
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4},
     ]
-    ops += bass_colour_ops(1)
     ops += scan_ops(5, 1, 2, 6, 7)
     ops += [
         # hat glints: the tips of a few tufts flash. The same tufts each time, but at 30 m/s the field in view is
@@ -462,7 +460,7 @@ def rim_ranges(band):
 
 def environment(sun_avgen, bounce_dir_avgen):
     return {
-        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 240.0, "shadowCascades": 2, "ambientOcclusion": False,
+        "intensity": 1.0, "skyIntensity": LOOK["skyIntensity"], "shadowRange": 200.0, "shadowCascades": 1, "ambientOcclusion": False,
         "contactShadows": False, "depthPrepass": True, "fogColor": R(LOOK["horizon"]), "volumeDensity": 0.0,
         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": R(LOOK["zenith"]),
                 "horizonColor": R(LOOK["horizon"]), "groundColor": R(LOOK["ground"]), "haze": LOOK["haze"],

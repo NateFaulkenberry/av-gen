@@ -97,10 +97,10 @@ def routes(fx, swell_nodes, swell):
             out.append(route("macro.swell", "procedural/%s/deform/%d/amount" % (nm, k + 1), wave[-1]))
     out.append(route("macro.swell", "lights/cloudsea/intensity", 0.6))
     # the bass as colour energy (19-brief-color-vfx: "bass energy increases the intensity of selected terrain
-    # colours"): the meadow's saturation and value rise with the bass body
-    for prog in [p_ for p_ in fx if "bass_sat" in fx[p_]]:
-        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_sat", "saturate", "value"), 0.3))
-        out.append(route("macro.swell", op_target(prog, fx[prog], "bass_gain", "constant", "constant"), 0.1))
+    # colours"): the palette's own chroma (ADR-1043's palette/saturation, applied to every colour the look binds --
+    # meadow, sky, clouds, trees, stones) rises with the bass body. No shader cost: the first version did it with
+    # three ops in the ground and grass programs.
+    out.append(route("macro.swell", "palette/saturation", 0.18))
     # shimmer across the flower fields: the synth's light, lifted on the hats
     if "shimmer_gain" in fx.get("rw_flower", {}):
         sh = op_target("rw_flower", fx["rw_flower"], "shimmer_gain", "constant", "constant")
