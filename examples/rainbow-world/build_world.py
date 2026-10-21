@@ -699,6 +699,10 @@ tpts = [q for v in fam.values() for q in v]
 LAP = 190.0          # the owner: "a little faster" -- 11% on the glide's 211 s lap (the ride loops past the song's end)
 G = 9.81
 SOAR = 30.0          # metres over the ground line at the top of a soar
+# RW_MORE_SOAR=1 builds the "more soar" variant (gate 4, for the owner to compare; not the default): the dive into a
+# crossing bottoms out ~10 m over the low line instead of on it, and 8 m of room (not 15) is enough to soar
+MORE_SOAR = os.environ.get("RW_MORE_SOAR") == "1"
+ROOM = 8.0 if MORE_SOAR else 15.0
 n_s = len(cam_s)
 sm1 = lambda i_: (i_ - 1) % n_s  # noqa: E731
 sp1 = lambda i_: (i_ + 1) % n_s  # noqa: E731
@@ -739,11 +743,13 @@ def slope_limit(e, per_sample):
 ENVELOPE = {"great": (20.5, 9.0, 27.0), "blossom": (9.6, 10.0, 23.3), "pine": (6.0, 6.6, 25.6), "weeper": (11.0, 0.0, 13.4)}
 CLIMB = CAM_STEP * math.tan(math.radians(12.0))
 cap = np.full(n_s, SOAR + 20.0)
-cap[near_x < 6] = 0.0
+cap[near_x < 6] = 14.0 if MORE_SOAR else 0.0
+if MORE_SOAR:
+    cap[near_x < 2] = 0.0                     # the last 30 m into the rim's ellipse
 for sa_ in ARCH_S:          # under a bow: the primary's crown is ~66 m over the face
     for i_ in range(n_s):
         if _circ(cam_s[i_] - sa_) < 120.0:
-            cap[i_] = min(cap[i_], 16.0)
+            cap[i_] = min(cap[i_], 24.0 if MORE_SOAR else 16.0)
 over = np.zeros(n_s)       # the height that clears every crown near the line
 under = np.full(n_s, 1e9)  # the height that stays under every canopy near the line
 for f_, pts_ in fam.items():
@@ -791,11 +797,11 @@ for _ in range(20):                                               # where over a
                 floor[j_] = 0.0
                 cap[j_] = min(cap[j_], under[j_])
 cap_c, floor_c = cone_min(cap), cone_max(floor)
-print("ROOM soar-able (cap >= 15 m) %.0f%%, over the crowns at %d samples, under the canopies at %d"
-      % (100 * (cap_c >= 15).mean(), int((floor > 0).sum()), int((trees_ & (floor == 0)).sum())))
+print("ROOM soar-able (cap >= %.0f m) %.0f%%, over the crowns at %d samples, under the canopies at %d"
+      % (ROOM, 100 * (cap_c >= ROOM).mean(), int((floor > 0).sum()), int((trees_ & (floor == 0)).sum())))
 
 # 2. the soar's target: high wherever there is room; the spring gives it weight, the cones keep it clear
-target = np.where(cap_c >= 15.0, SOAR, 0.0)
+target = np.where(cap_c >= ROOM, np.minimum(SOAR, cap_c) if MORE_SOAR else SOAR, 0.0)
 target = np.maximum(target, floor_c)
 
 
@@ -837,8 +843,8 @@ for _it in range(3):                           # settle the base speed on the la
     SPEED = speed_profile(e_alt, BASE)
 times_f, BASE = flight_times(SPEED)
 i_drop = int(np.argmin(np.abs(times_f - DROP)))
-print("FLIGHT soar %.0f%% of the loop over 15 m, max %.1f m, mean %.1f m; at the drop (%d m) %.1f m; base %.1f m/s, "
-      "speed factor %.2f-%.2f" % (100.0 * (e_alt > 15).mean(), e_alt.max(), e_alt.mean(), cam_s[i_drop], e_alt[i_drop],
+print("FLIGHT over 10 m: %.0f%% of the loop; soar %.0f%% of the loop over 15 m, max %.1f m, mean %.1f m; at the drop (%d m) %.1f m; base %.1f m/s, "
+      "speed factor %.2f-%.2f" % (100.0 * (e_alt > 10).mean(), 100.0 * (e_alt > 15).mean(), e_alt.max(), e_alt.mean(), cam_s[i_drop], e_alt[i_drop],
                                  BASE, SPEED.min(), SPEED.max()))
 
 # 3. the bank: a coordinated turn's up from the path's lateral curvature at the ride's own speed, clamped, sprung;
