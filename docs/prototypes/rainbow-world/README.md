@@ -24,6 +24,9 @@ travelled with a fisheye camera whose gravity turns with the land. Branch `art/r
 | [16-effect-mapping.md](16-effect-mapping.md) | The effect mapping: three layers, each stem's effects, the hierarchy, determinism and live |
 | [17-slow-frames.md](17-slow-frames.md) | The slow frames: diagnosis (not compiles, not contention), the leaf-card fix, what the effects cost |
 | [18-final-report.md](18-final-report.md) | Rainbow World 2's final report: deliverables, profiles, limitations |
+| [19-brief-color-vfx.md](19-brief-color-vfx.md) | The owner's colour-VFX brief (verbatim): colour, light and material response over geometry; the looks |
+| [20-camera-note.md](20-camera-note.md) | The owner's two camera notes (verbatim): gliding, then a plane |
+| [21-camera-research.md](21-camera-research.md) | The plane-like camera: springs, coordinated turns, the energy trade, earned rolls; baked, so seek equals play |
 
 ## Playing it (Rainbow World 2)
 
