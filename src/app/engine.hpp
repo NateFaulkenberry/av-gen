@@ -1125,6 +1125,12 @@ public:
     // True when a seek replays the signal bus: offline, with an analysed track. Live mode keeps a
     // null bus in its replay -- a live analysis thread, MIDI and OSC are not functions of time.
     [[nodiscard]] bool seekReplaysSignals() const;
+    // ADR-1573: whether a seek must replay the control layer (ADR-1168) to land where a play does: the project has
+    // scene states, or a route writes a source's own parameter (a macro knob `macros/<k>`, a source setting
+    // `sources/<name>/...`). A source publishes from its parameters, so a route reading `macro.<k>` reads what the
+    // routes into the knob wrote; only the control replay steps the sources, so without it such a route lands on
+    // the knob's reset value on the seek's landing frame (and its chain, if it has one, from a reset state).
+    [[nodiscard]] bool controlReplayNeeded() const;
     [[nodiscard]] const EngineStats& stats() const { return stats_; }
 
     // ADR-410. The renderer publishes what the temporal ring actually holds; the Engine carries it

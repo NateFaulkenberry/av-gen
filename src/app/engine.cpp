@@ -5051,7 +5051,7 @@ void Engine::seekSeconds(double seconds) {
     // ADR-1168: a project with scene states replays its control layer -- the sources, the state machine and every
     // route -- from zero to the target, on the play's own frame grid, so the seek lands where a play does.
     static const bool noControlReplay = std::getenv("AVGEN_NO_CONTROL_REPLAY") != nullptr; // A/B arm (bench)
-    if (seekReplaysSignals() && !states_.states.empty() && !noControlReplay) {
+    if (seekReplaysSignals() && controlReplayNeeded() && !noControlReplay) {
         replayControl(seconds);
     }
     // ADR-1420: the palette selector carries state (the blend, the hold, the advance's last level). Offline with an
@@ -5111,6 +5111,19 @@ void Engine::seekSeconds(double seconds) {
 // of it -- the seek above has placed them -- so this is the control state only: the state machine's state, its
 // transition and timers, every route's chain (integrals, followers, envelopes) and every source's own history (an
 // interpret mapping's follower). A target off the grid lands on the frame before it.
+bool Engine::controlReplayNeeded() const {
+    if (!states_.states.empty()) {
+        return true;
+    }
+    // ADR-1573: a route that feeds a source -- the macro knobs and source settings are parameters the sources read
+    for (const params::ModRoute& r : modulator_.routes()) {
+        if (r.enabled && (r.target.starts_with("macros/") || r.target.starts_with("sources/"))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Engine::replayControl(double target) {
     const double fps = renderSettings().fps > 0.0 ? renderSettings().fps : 60.0;
     ReplaySignals replay(*this);
@@ -5137,6 +5150,13 @@ void Engine::replayControl(double target) {
     }
     std::sort(targets.begin(), targets.end());
     targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+    std::vector<params::IParameter*> sourceParams; // ADR-1573: the knobs the sources read, restored for the landing
+    for (params::IParameter* p : params_.ordered()) {
+        if (p->path().starts_with("macros/") || p->path().starts_with("sources/")) {
+            sourceParams.push_back(p);
+        }
+    }
+    std::vector<std::vector<float>> sourceKnobs;
     const auto frames = static_cast<std::uint64_t>(std::floor(std::max(target, 0.0) * fps + 1e-6));
     // Through the frame at the target itself: the landing update that follows a seek runs at dt 0 (a render's first
     // tick after its seek), so it re-derives the outputs without stepping any integral, timer or transition again.
@@ -5182,6 +5202,26 @@ void Engine::replayControl(double target) {
             p->resetFinal();
         }
         modulator_.applyRoutes(scratch, params_, dt);
+        // ADR-1573: a source publishes the knob a frame late (it reads the finals the last frame's routes wrote), so
+        // the landing frame must find the knobs as frame target-1 left them, not as the replay's last step (the
+        // target itself, re-derived by the landing at dt 0) wrote them.
+        if (k + 1 == frames) {
+            sourceKnobs.clear();
+            for (params::IParameter* p : sourceParams) {
+                std::vector<float> v(p->componentCount());
+                for (std::size_t c = 0; c < v.size(); ++c) {
+                    v[c] = p->finalComponent(c);
+                }
+                sourceKnobs.push_back(std::move(v));
+            }
+        }
+    }
+    if (frames >= 1 && sourceKnobs.size() == sourceParams.size()) {
+        for (std::size_t i = 0; i < sourceParams.size(); ++i) {
+            for (std::size_t c = 0; c < sourceKnobs[i].size(); ++c) {
+                sourceParams[i]->setFinalComponent(c, sourceKnobs[i][c]);
+            }
+        }
     }
     ++stats_.controlReplays;
 }
