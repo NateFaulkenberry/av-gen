@@ -27,26 +27,35 @@ travelled with a fisheye camera whose gravity turns with the land. Branch `art/r
 | [19-brief-color-vfx.md](19-brief-color-vfx.md) | The owner's colour-VFX brief (verbatim): colour, light and material response over geometry; the looks |
 | [20-camera-note.md](20-camera-note.md) | The owner's two camera notes (verbatim): gliding, then a plane |
 | [21-camera-research.md](21-camera-research.md) | The plane-like camera: springs, coordinated turns, the energy trade, earned rolls; baked, so seek equals play |
+| [22-owner-fixes.md](22-owner-fixes.md) to [28-twirl-sky-sun.md](28-twirl-sky-sun.md) | Rainbow World 2's gates 3-8: the owner's verdicts, the modulation inventory, the scan, its fireworks, the twirl, the sky, the clouds, live popping |
+| [29-brief-feline-video.md](29-brief-feline-video.md) | The owner's Feline Footwear video brief (verbatim): the offline and live versions, and the song's own video outside the repository |
+| [30-feline-structure-and-plan.md](30-feline-structure-and-plan.md) | Feline Footwear's structure map (the synth's swells measured) and the video plan |
 
 ## Playing it (Rainbow World 2)
 
-- **Build the scene first:** `python3 examples/rainbow-world/build.py` (Blender 5.x, about 90 s; `--scene-only` after
-  the first full build). It writes `examples/rainbow-world/scene/` (gitignored) and both projects.
-- **Live:** open Examples > Live > Rainbow World (`rainbow-world.json`), play any music into the live input.
+- **Build the scenes first:** `python3 examples/rainbow-world/build.py` (Blender 5.x, about 90 s; `--scene-only` after
+  the first full build). It writes `examples/rainbow-world/scene/` (gitignored): the live scene, the offline scene
+  and the offline scene's video hooks. Until then both menu entries show "(needs generating)" with this command.
+- **Live:** open Examples > Live > Rainbow World (`rainbow-world.json`, no audio file), and play any music into the
+  live input.
   - On a plain stereo input the world follows the main mix (`response.*`, the beat clock).
   - With a multichannel interface, map channels in the Live panel's Inputs table to sources keyed `drums`, `bass`
     and `synth`. The stem routes switch on and the main-mix fallbacks stand aside (ADR-1570). Unmapped stems keep
     their fallback.
-- **Offline, the Feline Footwear showcase:** `rainbow-world-feline.json` plays `assets/audio/feline-footwear.wav` and
-  analyses the three stems in `assets/audio/stems/` (the owner's files, gitignored). Open it in the app, or render:
+- **Offline:** Examples > Offline > Worlds > Rainbow World (offline) (`rainbow-world-offline.json`). It is the same
+  world at full quality, with no live ceilings, playing `assets/audio/feline-footwear.wav` (the mix only, gitignored).
+  - It is song-agnostic: it reacts as the live version does, with the latched scans, and bakes no song's timing.
+  - A project that names stems (`assets.stems`, keys `drums`, `bass`, `synth`) gets the stem routes.
+  - Its scene adds the world distortion (the `distort` macro, 0 at rest). It publishes
+    `scene/rainbow-world-offline.video.json`, for a song's own video to bake its scans, camera and looks over it.
+  - The Feline Footwear video is such a project. It lives outside the repository, in `~/Desktop/Feline Footwear/`
+    (29).
 
   ```
-  build/release/src/avgen --project examples/rainbow-world/rainbow-world-feline.json \
-      --render "$PWD/renders/rainbow-world-feline.mp4" --fps 30 --codec h264      # --range 38:58 for a part
+  build/release/src/avgen --project examples/rainbow-world/rainbow-world-offline.json \
+      --render "$PWD/renders/rainbow-world-offline.mp4" --fps 30 --codec h264      # --range 38:58 for a part
   ```
-
-  Without the stem files it still plays, on the fallbacks; each missing file is a project warning.
-- **Other music offline:** the live project with `--audio <file>` (or the editor's audio) runs on the fallbacks.
+- **Other music offline:** the offline project with `--audio <file>` (or the editor's audio).
 - **Re-run the analysis:** `python3 docs/prototypes/rainbow-world/scripts/stem_analysis.py build/rw2/stems`, and
   `avgen --project <project with the stems> --sonic-trace out.csv` for the engine's own stem, beat and envelope
   columns (ADR-1571).

@@ -11,8 +11,11 @@ second spline over the meadow whose rolls make its up the band's up (ADR-1541).
 
 Outputs in <outdir>:
   band_<k>.glb                    the band in chunks (culled as single instances)
-  rainbow-world.scene.json        the composition
+  rainbow-world.scene.json        the composition (the live version)
+  rainbow-world-offline.scene.json  the offline version: the same, plus the world distortion's deformers (at 0)
+  rainbow-world-offline.video.json  the hooks a song's own video bakes over the offline version (29)
   rainbow-world.json              the live project (no audio file; palette, MIDI, routes)
+  rainbow-world-offline.json      the offline project (beside the live one; full quality, a mix, song-agnostic)
   world_report.json               counts, lengths, clearances
 """
 import argparse
@@ -1778,28 +1781,89 @@ project = {
 }
 with open(proj_path, "w") as f:
     json.dump(project, f, indent=1)
-# The Feline Footwear showcase (brief 13 section 12.5): the same world and routes, plus the mix as the playback source
-# and the three stems as analysis sources (ADR-1520), for offline renders. A separate file, because the live scene
-# carries no audio file. The audio is the owner's and gitignored; the project only names it.
-showcase = json.loads(json.dumps(project))
-showcase["app"] = {"name": "Rainbow World: Feline Footwear"}
+# ---- the offline version (29-brief-feline-video.md, the owner: "rainbow world scene (offline version), rainbow world
+# scene (live version)"). The same world and the same routes, at full quality (no live ceilings), playing a file, and
+# song-agnostic: it reacts to whatever it is fed, with the live project's latched scans (stems when a project names
+# them, the mix otherwise). Its scene adds what only an offline piece can afford:
+#   - the world distortion: three world-space sine deformers on the land and everything standing on it, at amount 0
+#     (the world as built) unless the `distort` macro raises them -- a song-specific project's ending, say. A mesh
+#     with a deformer pays for the chain even at 0 (1.1-2.7 ms, 17 section 4), which is why the live scene has none.
+# And it publishes `rainbow-world-offline.video.json` beside the scene: what a song-specific project needs to bake its
+# own scans, camera and distortion over this one (the ride's path sampled with its height over the meadow, the scan's
+# targets, the deformer targets, the looks).
+DISTORT = [  # (axis of travel, displacement direction, wavelength m, speed rad/s, metres at distort 1)
+    ((1.0, 0.35, 0.2), (0.0, 0.0, 1.0), 140.0, 1.3, 9.0),
+    ((-0.3, 1.0, 0.5), (1.0, 0.2, 0.0), 61.0, -2.1, 4.0),
+    ((0.2, -0.4, 1.0), (0.0, 1.0, 0.3), 23.0, 3.4, 1.6)]
+off_nodes = json.loads(json.dumps(nodes))
+DISTORT_NODES = []
+for n_ in off_nodes:
+    nm_ = n_["name"]
+    if n_.get("kind") != "procedural" or nm_.startswith(("cloud", "rainbow", "fw_")) or nm_ == "ride":
+        continue
+    defs = n_["procedural"].setdefault("deformers", [])
+    if len(defs) + len(DISTORT) > 8:
+        continue
+    for axis, disp, wl, sp, _m in DISTORT:
+        a_ = np.array(axis) / np.linalg.norm(axis)
+        d_ = np.array(disp) / np.linalg.norm(disp)
+        defs.append({"kind": "sine", "space": "world", "amount": 0.0, "axis": R(rw.to_avgen(Vector(a_))),
+                     "displacementAxis": R(rw.to_avgen(Vector(d_))), "frequency": round(2 * math.pi / wl, 6),
+                     "speed": sp, "phase": 0.0, "center": [0.0, 0.0, 0.0]})
+    DISTORT_NODES.append((nm_, len(defs) - len(DISTORT)))
+off_scene = dict(scene, name="rainbow-world-offline", nodes=off_nodes)
+with open(os.path.join(OUT, "rainbow-world-offline.scene.json"), "w") as f:
+    json.dump(off_scene, f)
+print("DISTORT nodes", len(DISTORT_NODES))
+offline = json.loads(json.dumps(project))
+offline["app"] = {"name": "Rainbow World (offline)"}
+offline["assets"]["scene"]["path"] = os.path.relpath(os.path.join(OUT, "rainbow-world-offline.scene.json"),
+                                                     os.path.dirname(proj_path))
 audio_dir = os.path.relpath(os.path.join(HERE, "..", "..", "assets", "audio"), os.path.dirname(proj_path))
-showcase["assets"]["audio"] = {"path": os.path.join(audio_dir, "feline-footwear.wav")}
-showcase["assets"]["stems"] = [{"key": k_, "label": k_.capitalize(),
-                                "file": os.path.join(audio_dir, "stems", "feline-footwear (%s).wav" % k_.capitalize())}
-                               for k_ in music.STEMS]
-showcase["sonic"]["live"] = False
-# the showcase's world scans are baked from the song (music.SCAN_TIMES); the live project keeps the live trigger
-showcase["sources"] = showcase["sources"] + music.showcase_scan_sources(210.5)
-showcase["routes"] = music.showcase_scan_routes(showcase["routes"], look.FX)
-# the beat clock from the drum stem (ADR-1581): the kicks' own grid, not the mix's, under the clap fronts and the
-# phrase pulses. The levels and hits stay on the mix (the fallbacks stand aside while the stems are active anyway).
-showcase["feeds"] = {"beat": "stem.drums"}
-showcase["sonicScene"]["id"] = "rainbow-world-feline"
-showcase["sonicScene"]["title"] = "Rainbow World: Feline Footwear"
-showcase["render"]["path"] = "renders/rainbow-world-feline.mp4"
-with open(os.path.join(os.path.dirname(proj_path), "rainbow-world-feline.json"), "w") as f:
-    json.dump(showcase, f, indent=1)
+offline["assets"]["audio"] = {"path": os.path.join(audio_dir, "feline-footwear.wav")}  # the owner's flagship track, the mix only
+offline["sonic"]["live"] = False
+offline.pop("live", None)
+offline["sonicScene"]["id"] = "rainbow-world-offline"
+offline["sonicScene"]["title"] = "Rainbow World (offline)"
+offline["render"]["path"] = "renders/rainbow-world-offline.mp4"
+for src_ in offline["sources"]:
+    if src_.get("name") == "macros":
+        src_["settings"]["knobs"].append({"name": "distort", "default": 0.0})
+for nm_, k0 in DISTORT_NODES:
+    for j_, (_a, _d, _wl, _sp, m_) in enumerate(DISTORT):
+        offline["routes"].append({"source": "macro.distort", "target": "procedural/%s/deform/%d/amount" % (nm_, k0 + j_ + 1),
+                                  "amount": m_, "op": "add", "polarity": "unipolar"})
+off_path = os.path.join(os.path.dirname(proj_path), "rainbow-world-offline.json")
+with open(off_path, "w") as f:
+    json.dump(offline, f, indent=1)
+# the video hooks: the ride's path every 2 m (avgen position, and its height over the meadow where it flies over a
+# face -- None over a rim), the ride's own timing, and the targets a song's project re-binds
+samples = []
+for s_d in np.arange(0.0, cam_path.length, 2.0):
+    q_ = cam_path.at(float(s_d))[0]
+    i_ = int(np.argmin(np.linalg.norm(cam_controls - q_, axis=1)))
+    h_ = None
+    if on_face[i_]:
+        pp, tt_, uu, sdd = band.frame_lerp(fr, cam_s[i_] % L)
+        d_ = q_ - np.array(pp)
+        Xs, Ys = float(np.dot(d_, sdd)), float(np.dot(d_, uu))
+        if abs(Xs) <= band.HALF_W:
+            g_ = band.FACE + (band.face_height(cam_s[i_] % L, Xs, band.TOP_HILLS, 0.0) if Ys >= 0 else
+                              band.face_height(cam_s[i_] % L, -Xs, band.BOTTOM_HILLS, 1.3))
+            h_ = round(abs(Ys) - g_, 2)
+    samples.append([round(float(s_d / cam_path.length), 6)] + [round(float(c), 3) for c in rw.to_avgen(Vector(q_))] + [h_])
+hooks = {"format": "rainbow-world-video-hooks", "version": 1,
+         "scan": music.scan_hooks(look.FX),
+         "fireworkFields": [f_ for f_, _p in FW_EDGES], "sunNodes": SUN_RAYS,
+         "rainbowNodes": [rn["name"] for rn in rainbow_nodes],
+         "distort": {"macro": "distort", "nodes": len(DISTORT_NODES)},
+         "looks": [nm for nm, _c in STATES], "lookTarget": "palette/select",
+         "sparkGain": music.op_target("rw_spark", look.FX["rw_spark"], "spark_gain", "constant", "constant")
+         if "spark_gain" in look.FX.get("rw_spark", {}) else None,
+         "ride": {"loopSeconds": loop_seconds, "keys": ride_keys, "lengthMetres": cam_path.length},
+         "path": {"columns": ["splineT", "x", "y", "z", "heightOverMeadow"], "samples": samples}}
+with open(os.path.join(OUT, "rainbow-world-offline.video.json"), "w") as f:
+    json.dump(hooks, f)
 report = {"loopMetres": L, "cameraMetres": cam_path.length, "loopSeconds": loop_seconds, "baseSpeed": a.base_speed,
           "grass": len(gpts), "flowers": len(fpts), "trees": len(tpts), "rimRocks": sum(len(v) for v in by.values()),
           "rainbows": len(rainbow_nodes), "clouds": {k: len(v) for k, v in cpts.items()}, "bandChunks": len(band_nodes)}
