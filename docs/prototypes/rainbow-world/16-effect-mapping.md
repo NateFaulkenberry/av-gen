@@ -76,8 +76,8 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
   - the palette's own saturation (+0.18 at a full swell): every colour the look binds -- meadow, sky, clouds,
     stones -- deepens with the bass. No shader cost;
   - the cloud sea's bounce light (`lights/cloudsea`, +0.6).
-- **Removed:** the world-space sine deformers (1.9 m of heave). The owner's colour brief puts colour over geometry,
-  and they cost about 1.1 ms each (17 section 4).
+  - the heave: one world-space sine deformer (105 m, up to 1.9 m) on the land and everything on it. (An earlier
+    revision of this document said it was removed; it was not -- 23-modulation-inventory.md. It costs 1.1-2.7 ms.)
 - **Live:** `response.bass`.
 
 ## 4. Synth: atmosphere, colour, spectacle

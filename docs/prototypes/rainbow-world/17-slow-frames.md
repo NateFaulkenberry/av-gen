@@ -182,7 +182,7 @@ Each cut, what it buys, what it costs to the eye (headless Medium 0.71 unless no
 
 | Cut | Saving | Visual cost |
 |---|---|---|
-| The swell's deformers removed (colour over geometry) | ~2.2-2.7 ms | none intended: the owner asked for colour over geometry |
+| The swell's second deformer removed (one wave kept; the first is still on, 23-modulation-inventory) | ~1.1 ms | none seen |
 | The kick ring made local; the bass colour moved to the palette's saturation | 3 ops off the ground and grass | none |
 | Flower reach 45 m, grass 42 m | with the LOD cuts below: 37.4 -> 34.1 ms base | thinner grass seen from the soar |
 | Cloud LOD distances 300/800/1600; hero, tower and bank masses 500/1200 | (in the above) | none seen in the clips |
