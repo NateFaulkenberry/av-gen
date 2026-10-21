@@ -54,8 +54,7 @@
  },
  "live": {
   "overrides": {
-   "lodBias": 2.0,
-   "shadowResolution": 1024,
+   "lodBias": 1.5,
    "reducedShadowFiltering": true
   }
  },

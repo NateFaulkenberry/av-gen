@@ -1278,8 +1278,10 @@ project = {
                              "round a twisting loop and over its rims, under rainbow arches, among sculpted clouds."},
     "parameters": params,
     # Rainbow World 2 (17 section 7): the live ceilings -- in live mode only (an offline render keeps full quality):
-    # coarser mesh LOD sooner (measured 5.5 ms at Medium) and a 1k, lightly filtered shadow map
-    "live": {"overrides": {"lodBias": 2.0, "shadowResolution": 1024, "reducedShadowFiltering": True}},
+    # coarser mesh LOD a little sooner and lighter shadow filtering. lodBias 2 (5.5 ms at Medium) dropped the trees'
+    # shadows and the far grass; 1.5 keeps both and still holds High at 30 fps live (1 miss in 90 s, on AC). A 1k shadow
+    # map made no visible or measured difference, so it is not set.
+    "live": {"overrides": {"lodBias": 1.5, "reducedShadowFiltering": True}},
     "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}},
                 {"kind": "macro", "name": "macros", "settings": {"knobs": [{"name": k_, "default": d_}
                                                                           for k_, d_ in music.MACROS]}}],
