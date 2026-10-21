@@ -176,6 +176,14 @@ def routes(fx, swell_nodes, swell):
                           op_target(prog, roles, "flow_gain", "constant", "constant"), 2.5,
                           {"offset": -1.55, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                            "attackMs": 4.0, "decayMs": 280.0}, fb_chain={"attackMs": 4.0, "decayMs": 220.0})
+        # ---- the beat on the bows (gate 5): the bands' colours turn once a beat, and each beat flashes them
+        if "flow_palette" in roles:
+            out.append(route("beat.phase", op_target(prog, roles, "flow_palette", "palette", "value"), 1.0,
+                             op="replace"))
+        out.append(route("beat.pulse", op_target(prog, roles, "flow_gain", "constant", "constant"), 2.5,
+                         {"envelope": "linearfall", "envelopeFallPerSecond": 3.5, "attackMs": 5.0}))
+        out.append(route("beat.pulse", op_target(prog, roles, "arch_gain", "constant", "constant"), 0.8,
+                         {"envelope": "linearfall", "envelopeFallPerSecond": 3.5, "attackMs": 5.0}))
         # ---- synth: the arches' flow and brightness ----------------------------------------------------------------
         out.append(route("macro.synth", op_target(prog, roles, "flow_gain", "constant", "constant"), 3.0))
         out.append(route("macro.synth", op_target(prog, roles, "arch_gain", "constant", "constant"), 1.2))

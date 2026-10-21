@@ -1589,6 +1589,10 @@ for rn in rainbow_nodes:
                        "op": "add", "polarity": "unipolar"})
         routes.append({"source": "macro.scan", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 3.0,
                        "op": "add", "polarity": "unipolar"})
+        # and the beat (gate 5): the outer bow flashes on every beat, the inner bow's bands flash with it
+        routes.append({"source": "beat.pulse", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 1.6,
+                       "op": "add", "polarity": "unipolar",
+                       "chain": {"envelope": "linearfall", "envelopeFallPerSecond": 3.5, "attackMs": 5.0}})
 proj_path = os.path.abspath(a.project) if a.project else os.path.join(OUT, "rainbow-world.json")
 scene_rel = os.path.relpath(os.path.join(OUT, "rainbow-world.scene.json"), os.path.dirname(proj_path))
 project = {

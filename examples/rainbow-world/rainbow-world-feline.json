@@ -9297,6 +9297,40 @@
    "depthDefault": 0.0
   },
   {
+   "source": "beat.phase",
+   "target": "material/rw_rainbow/op/7/palette/value",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "beat.pulse",
+   "target": "material/rw_rainbow/op/9/constant/constant",
+   "amount": 2.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
+  },
+  {
+   "source": "beat.pulse",
+   "target": "material/rw_rainbow/op/11/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
+  },
+  {
    "source": "macro.synth",
    "target": "material/rw_rainbow/op/9/constant/constant",
    "amount": 3.0,
@@ -10496,6 +10530,18 @@
    "polarity": "unipolar"
   },
   {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_0s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
+  },
+  {
    "source": "macro.synth",
    "target": "nodes/rainbow_1s/emissiveBoost",
    "amount": 0.8,
@@ -10508,6 +10554,18 @@
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_1s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
   },
   {
    "source": "macro.synth",
@@ -10524,6 +10582,18 @@
    "polarity": "unipolar"
   },
   {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_2s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
+  },
+  {
    "source": "macro.synth",
    "target": "nodes/rainbow_3s/emissiveBoost",
    "amount": 0.8,
@@ -10536,6 +10606,18 @@
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_3s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
   },
   {
    "source": "macro.synth",
@@ -10552,6 +10634,18 @@
    "polarity": "unipolar"
   },
   {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_4s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
+  },
+  {
    "source": "macro.synth",
    "target": "nodes/rainbow_5s/emissiveBoost",
    "amount": 0.8,
@@ -10564,6 +10658,18 @@
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_5s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
   },
   {
    "source": "macro.synth",
@@ -10580,6 +10686,18 @@
    "polarity": "unipolar"
   },
   {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_6s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
+  },
+  {
    "source": "macro.synth",
    "target": "nodes/rainbow_7s/emissiveBoost",
    "amount": 0.8,
@@ -10592,6 +10710,18 @@
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
+  },
+  {
+   "source": "beat.pulse",
+   "target": "nodes/rainbow_7s/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 3.5,
+    "attackMs": 5.0
+   }
   },
   {
    "source": "timeline.scan",

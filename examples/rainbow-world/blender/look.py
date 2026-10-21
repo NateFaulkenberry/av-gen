@@ -414,8 +414,13 @@ def rainbow_program(name, strength=2.0, bands=5.0, flow_speed=0.18):
         {"kind": "input", "dst": 6, "input": "time"},
         {"kind": "remap", "dst": 6, "srcA": 6, "constant": [0.0, 1.0, 0.0, -flow_speed], "value": 0.0},
         {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
+        # (gate 5, the owner: "colorful pulsating effect for the rainbows that is beat synced"): the bands are now
+        # spectral -- the cosine palette's phases spread over the channels -- and their colours turn once a beat (the
+        # op's `value`, routed from the beat clock's phase), so a beat-locked colour cycle runs through the bow's own
+        # spectrum; the beat flashes them (flow_gain). No new ops: two constants and a route.
         {"kind": "palette", "dst": 5, "srcA": 5, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.0],
-         "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [1.0, 1.0, 1.0, 0.0], "constant4": [0.0, 0.0, 0.0, 0.0]},
+         "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [1.0, 1.0, 1.0, 0.0], "constant4": [0.0, 0.33, 0.67, 0.0],
+         "_role": "flow_palette"},
         {"kind": "power", "dst": 5, "srcA": 5, "value": 6.0},
         {"kind": "constant", "dst": 6, "constant": [0.4, 0.4, 0.4, 0.0], "_role": "flow_gain"},  # always a little
         {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
