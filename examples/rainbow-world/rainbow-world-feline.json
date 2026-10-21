@@ -9533,321 +9533,9 @@
    "component": -1
   },
   {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
    "source": "macro.scan",
    "target": "material/rw_ground/op/33/constant/constant",
    "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_ground_lip/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "macro.scan",
-   "target": "material/rw_ground_lip/op/33/constant/constant",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/12/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/12/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/13/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/13/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/20/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/20/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/21/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_grass/op/21/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "macro.scan",
-   "target": "material/rw_grass/op/17/constant/constant",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/16/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/16/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/17/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/17/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/24/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/24/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/25/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "material/rw_rock/op/25/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "macro.scan",
-   "target": "material/rw_rock/op/21/constant/constant",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "field/scanSpin/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "field/scanShellOut/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "timeline.scanFront",
-   "target": "field/scanShellIn/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1
-  },
-  {
-   "source": "macro.synth",
-   "target": "material/rw_glitter/op/13/constant/constant",
-   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -9862,8 +9550,24 @@
   },
   {
    "source": "macro.scan",
+   "target": "material/rw_ground_lip/op/33/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.scan",
    "target": "material/rw_ground_lip/op/40/constant/constant",
    "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.scan",
+   "target": "material/rw_grass/op/17/constant/constant",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -9878,7 +9582,23 @@
   },
   {
    "source": "macro.scan",
+   "target": "material/rw_rock/op/21/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.scan",
    "target": "material/rw_rock/op/28/constant/constant",
+   "amount": 4.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.synth",
+   "target": "material/rw_glitter/op/13/constant/constant",
    "amount": 4.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10776,6 +10496,286 @@
     "envelopeFallPerSecond": 3.5,
     "attackMs": 5.0
    }
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/28/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/28/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/29/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/29/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/36/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/36/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/37/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground/op/37/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/28/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/28/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/29/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/29/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/36/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/36/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/37/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_ground_lip/op/37/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/12/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/12/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/13/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/13/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/20/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/20/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/21/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_grass/op/21/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/16/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/16/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/17/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/17/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/24/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/24/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/25/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "material/rw_rock/op/25/remap/constant",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "field/scanSpin/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "field/scanShellOut/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "timeline.scanFront",
+   "target": "field/scanShellIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
   },
   {
    "source": "timeline.scan",

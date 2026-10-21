@@ -3534,7 +3534,8 @@ std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource*
             const params::ProcessorChain& c = r.chain;
             for (const float f : {c.delayMs, c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
                                   c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
-                                  c.remapInMax, c.remapOutMin, c.remapOutMax}) {
+                                  c.remapInMax, c.remapOutMin, c.remapOutMax, c.envelopeRefractoryMs,
+                                  c.envelopeRearm}) {
                 mix(bits(f));
             }
             mix(static_cast<std::uint64_t>(c.curve));

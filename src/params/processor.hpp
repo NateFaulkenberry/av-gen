@@ -67,6 +67,16 @@ struct ProcessorChain {
     EnvelopeMode envelope = EnvelopeMode::None;
     float envelopeHoldMs = 0.0f;
     float envelopeFallPerSecond = 4.0f;
+    // ADR-1574: a latching envelope. Once the input triggers it, the envelope ignores its input for
+    // `envelopeRefractoryMs` -- it plays its whole hold and fall whatever the input does meanwhile -- and, when
+    // `envelopeRearm` is finite, it cannot trigger again until the input has fallen to that level (so a
+    // continuous input re-triggers only on a new rising edge past that level: hysteresis). Off by default (0, -inf):
+    // every chain behaves exactly as before. Chain state, so a seek's replay rebuilds it (ADR-901).
+    float envelopeRefractoryMs = 0.0f;
+    float envelopeRearm = -std::numeric_limits<float>::infinity();
+    [[nodiscard]] bool envelopeLatches() const {
+        return envelopeRefractoryMs > 0.0f || envelopeRearm > -std::numeric_limits<float>::infinity();
+    }
 
     // ADR-1041: a critically (or under-) damped second-order follower after the envelope, so a change
     // eases in AND out (continuous velocity) instead of cornering like the one-pole: x'' = w^2 (u - x)
@@ -134,6 +144,10 @@ struct ProcessorChain {
         // ADR-1182: the normalise stage's level and its running peak.
         float level = 0.0f;
         float peak = 0.0f;
+        // ADR-1574: the latching envelope's refractory time still to run, and whether it is armed.
+        double refractoryRemaining = 0.0;
+        bool armed = true;
+        float latchLastInput = 0.0f; // the input last frame: a trigger must be a rise
     };
 
     // x: raw signal value; event: true when the source fired this frame; dt: seconds.

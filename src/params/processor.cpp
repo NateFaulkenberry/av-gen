@@ -246,11 +246,39 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
 
     // envelope
     const float fall = static_cast<float>(static_cast<double>(envelopeFallPerSecond) * dt);
+    // ADR-1574: a latching envelope accepts its input only once it is armed and out of its refractory time; a
+    // trigger starts the refractory time and disarms it until the input falls to `envelopeRearm`.
+    bool accept = true;
+    const bool latching = envelope != EnvelopeMode::None && envelopeLatches();
+    if (latching) {
+        if (state.refractoryRemaining > 0.0) {
+            state.refractoryRemaining = std::max(0.0, state.refractoryRemaining - dt);
+            accept = false;
+        }
+        if (!state.armed) {
+            if (y <= envelopeRearm) {
+                state.armed = true;
+            }
+            accept = false;
+        }
+        // a trigger is a RISE (and past the rearm level): never a value the input is falling through
+        if (y <= envelopeRearm || !(y > state.latchLastInput)) {
+            accept = false;
+        }
+        state.latchLastInput = y;
+    }
+    const auto triggered = [&](bool fires) {
+        if (latching && fires) {
+            state.refractoryRemaining = static_cast<double>(std::max(envelopeRefractoryMs, 0.0f)) / 1000.0;
+            state.armed = !(envelopeRearm > -std::numeric_limits<float>::infinity());
+        }
+        return fires;
+    };
     switch (envelope) {
     case EnvelopeMode::None:
         break;
     case EnvelopeMode::PeakHold:
-        if (event || y > state.envelope) {
+        if (accept && triggered(event || y > state.envelope)) {
             state.envelope = std::max(state.envelope, y);
             state.holdRemaining = envelopeHoldMs / 1000.0f;
         } else if (state.holdRemaining > 0.0f) {
@@ -261,7 +289,7 @@ float ProcessorChain::process(float x, bool event, double dt, State& state) cons
         y = state.envelope;
         break;
     case EnvelopeMode::LinearFall:
-        if (event || y > state.envelope) {
+        if (accept && triggered(event || y > state.envelope)) {
             state.envelope = std::max(state.envelope, y);
         } else {
             state.envelope = std::max(0.0f, state.envelope - fall);

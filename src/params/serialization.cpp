@@ -230,6 +230,12 @@ json chainToJson(const ProcessorChain& chain) {
     j["envelope"] = enumToString(kEnvelopeNames, chain.envelope);
     j["envelopeHoldMs"] = static_cast<double>(chain.envelopeHoldMs);
     j["envelopeFallPerSecond"] = static_cast<double>(chain.envelopeFallPerSecond);
+    if (chain.envelopeRefractoryMs > 0.0f) { // ADR-1574; written only when used
+        j["envelopeRefractoryMs"] = static_cast<double>(chain.envelopeRefractoryMs);
+    }
+    if (std::isfinite(chain.envelopeRearm)) {
+        j["envelopeRearm"] = static_cast<double>(chain.envelopeRearm);
+    }
     j["remapEnabled"] = chain.remapEnabled;
     j["remapInMin"] = static_cast<double>(chain.remapInMin);
     j["remapInMax"] = static_cast<double>(chain.remapInMax);
@@ -264,7 +270,7 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         return fail("processor chain must be a JSON object");
     }
     ProcessorChain chain;
-    std::array<Result<void>, 28> results{
+    std::array<Result<void>, 30> results{
         readFloat(j, "delayMs", chain.delayMs), // ADR-900; absent = no delay
         readFloat(j, "gain", chain.gain),
         readFloat(j, "offset", chain.offset),
@@ -293,6 +299,8 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         readBool(j, "integrate", chain.integrate),          // ADR-1041; absent = off
         readFloat(j, "integrateMin", chain.integrateMin),   // ADR-1161; absent = unbounded
         readFloat(j, "integrateMax", chain.integrateMax),   // ADR-1161; absent = unbounded
+        readFloat(j, "envelopeRefractoryMs", chain.envelopeRefractoryMs), // ADR-1574; absent = off
+        readFloat(j, "envelopeRearm", chain.envelopeRearm),               // ADR-1574; absent = off
     };
     for (const auto& r : results) {
         if (!r) {

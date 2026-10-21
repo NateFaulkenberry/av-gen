@@ -97,17 +97,28 @@ def showcase_scan_sources(song_end):
             {"kind": "timeline", "name": "scanFront", "settings": {"keys": front}}]
 
 
-def showcase_scan_routes(routes_):
-    """The live trigger (phrase pulse x synth) swapped for the showcase's baked scans."""
+SCAN_REFRACTORY_MS = 20000.0
+
+
+def front_targets(fx, scan_programs):
+    """Every (target, component) the scan's front pulls in: the land's scan ops and the sparkle's fields."""
     out = []
-    for r in routes_:
-        if r["target"] == "macros/scan":
-            continue
-        if r["source"] == "beat.phrasePulse" and ("/remap/constant" in r["target"] or
-                                                  (r["target"].startswith("field/scan") and r["target"].endswith("/radius"))):
-            r = dict(r, source="timeline.scanFront")
-            r.pop("chain", None)
-        out.append(r)
+    for prog in scan_programs:
+        for role in ("scan_mask", "scan_hue", "scan_edge_out", "scan_edge_in"):
+            for c in (0, 1):
+                out.append((op_target(prog, fx[prog], role, "remap", "constant"), c))
+    for fld in SPARKLE_FIELDS:
+        out.append(("field/%s/radius" % fld, -1))
+    return out
+
+
+def showcase_scan_routes(routes_, fx):
+    """The live triggers swapped for the showcase's baked scans (one route per front target, and the amount)."""
+    scan_programs = [p for p in fx if "scan_mask" in fx[p]]
+    fronts = {t for t, _c in front_targets(fx, scan_programs)}
+    out = [r for r in routes_ if r["target"] != "macros/scan" and r["target"] not in fronts]
+    for tgt, c in front_targets(fx, scan_programs):
+        out.append(route("timeline.scanFront", tgt, -(SCAN_REST - 10.0), component=c))
     out.append(route("timeline.scan", "macros/scan", 1.0))
     return out
 
@@ -250,39 +261,44 @@ def routes(fx, swell_nodes, swell):
     # unless `macro.scan` -- held about six seconds, then relaxing over three -- says this phrase deserves it, which
     # the surge (the drop) does, and a big lift (the synth at its brightest) does a little.
     rest = SCAN_REST - 10.0
-    front = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN, "delayMs": SCAN_DELAY_MS}
+    # The live scan (gate 5, the coordinator: "make the live trigger latch"; 26-world-scan.md section 4). It fires on
+    # a SURGE and then plays its whole shape whatever the music does meanwhile: the latching envelope (ADR-1574)
+    # ignores its input for 20 s once triggered, and re-arms only once the input has fallen back (a new rising
+    # edge). Two triggers, each a single replay-safe signal conditioned to on/off (no depth to dip on the tail):
+    #   stem   the synth stem's rms rising past 0.16 (the drop reaches 0.19; the intro's loudest call 0.146), re-arming
+    #          only after 2.5 s under it -- so the drop, and the riser after the drums go (the bed holds in between)
+    #   mix    on a plain stereo input, the mix's sustained (pad and synth) energy, against its adaptive reference
+    #          (ADR-1510), rising past 0.6 (the intro sits at 0.0-0.4, the drop at 0.64); stands aside while a synth
+    #          stem is active (ADR-1570's fallback shape); 30 s apart at least, re-arming after 6 s under it
+    # The amount holds 6.5 s and falls over 3 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
+    # the same latch, so it never resets part-way through.
+    def latch(extra, gain, level, rearm, hold_off, refractory):
+        # on/off at the level (on at once, so the latch takes a full trigger), then held through the music's own
+        # dips (the kick's sidechain pumps the synth every beat): it reads "off" only after `hold_off` ms under the
+        # level, and only then can the latch re-arm
+        c = {"gain": gain, "threshold": "binary", "thresholdLevel": level, "attackMs": 0.0, "decayMs": hold_off,
+             "envelopeRefractoryMs": refractory, "envelopeRearm": rearm}
+        c.update(extra)
+        return c
+    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 6500.0, "envelopeFallPerSecond": 0.33,
+                  "springHz": 0.5, "springDamping": 1.0}
+    front_env = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN}
+    triggers = [("stem.synth.rms", 1.0, 0.16, 0.3, 2500.0, SCAN_REFRACTORY_MS, {"optional": True}),
+                ("response.sustain", 1.0, 0.6, 0.3, 6000.0, SCAN_REFRACTORY_MS * 1.5,
+                 {"depthSource": "stem.synth.active", "depthMin": 1.0, "depthMax": 0.0, "depthDefault": 0.0})]
+    for src, gain, level, rearm, hold_off, refr, extra in triggers:
+        out.append(route(src, "macros/scan", 1.0, latch(amount_env, gain, level, rearm, hold_off, refr), op="max",
+                         **extra))
+        for tgt in front_targets(fx, scan_programs):
+            out.append(route(src, tgt[0], -rest, latch(front_env, gain, level, rearm, hold_off, refr),
+                             component=tgt[1], **extra))
     for prog in scan_programs:
         roles = fx[prog]
-        for role in ("scan_mask", "scan_hue", "scan_edge_out", "scan_edge_in"):
-            for c in (0, 1):
-                out.append(route("beat.phrasePulse", op_target(prog, roles, role, "remap", "constant"), -rest, front,
-                                 component=c))
         out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))
-    # the scan sparkle's fields follow the same front (27-scan-sparkle.md): their radii pulled in with it
-    for fld in SPARKLE_FIELDS:
-        out.append(route("beat.phrasePulse", "field/%s/radius" % fld, -rest, front))
+        out.append(route("macro.scan", op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0))
     if "glitter_gain" in fx.get("rw_glitter", {}):
         out.append(route("macro.synth", op_target("rw_glitter", fx["rw_glitter"], "glitter_gain", "constant",
                                                   "constant"), 4.0))   # the synth's light in the glitter
-    for prog in scan_programs:
-        roles = fx[prog]
-        out.append(route("macro.scan", op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0))
-    # When it fires -- seek-exact by construction: every stateful route here reads a signal the seek replay rebuilds
-    # (beat.*, stem.*), never a macro (a macro is a parameter, which the replay does not write; ADR-901). Two routes
-    # onto the one knob, combined by `min`:
-    #   A  the phrase pulse, read SCAN_DELAY_MS late (the synth enters on the drop's downbeat, so it is measurable a
-    #      beat-fraction after it), latched six seconds, then relaxing; its depth is the synth stem's LEVEL mapped so
-    #      only the top of its range counts (the level reads against the stem's adaptive reference, ADR-1510: a loud
-    #      entry after a quiet stretch reads at the top for a few seconds; the groove's bed sits mid-range);
-    #   B  the synth stem's absolute loudness (rms): the intro's calls are quiet (0.01-0.06), the drop is not.
-    # Only the drop at 47.85 s satisfies both (rainbow-world/16, the trace in section 9).
-    out.append(route("beat.phrasePulse", "macros/scan", 1.0,
-                     {"delayMs": SCAN_DELAY_MS, "envelope": "peakhold", "envelopeHoldMs": 6000.0,
-                      "envelopeFallPerSecond": 0.33, "attackMs": 250.0},
-                     depthSource="stem.synth.level", depthMin=-12.0, depthMax=1.0, depthDefault=0.0))
-    out.append(route("stem.synth.rms", "macros/scan", 2.5,
-                     {"gain": 12.0, "offset": -1.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                      "attackMs": 1200.0, "decayMs": 3000.0}, op="min", optional=True))   # (slow attack: sustained)
     # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) --
     # crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth). (The
     # clouds' ramp is the palette's, which replaces after the routes: the clouds flare through `cloud_glow` instead.)

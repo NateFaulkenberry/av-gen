@@ -82,15 +82,14 @@ TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the m
     CHECK(keys == std::set<std::string>{"drums", "bass", "synth"});
     CHECK(show.at("control") == live.at("control"));
     // The one difference (gate 5, 26-world-scan.md): the showcase's world scans are baked from the song -- two
-    // timelines, `scan` and `scanFront` -- in place of the live trigger (the phrase pulse gated by the synth stem).
+    // timelines, `scan` and `scanFront` -- in place of the live triggers (ADR-1574's latching surges).
     // Everything else is the live project's.
     const auto isScan = [](const json& r) {
         const std::string target = r.at("target").get<std::string>();
         const std::string source = r.at("source").get<std::string>();
-        return target == "macros/scan" ||
-               ((source == "beat.phrasePulse" || source == "timeline.scanFront") &&
-                (target.find("/remap/constant") != std::string::npos ||
-                 (target.starts_with("field/scan") && target.ends_with("/radius"))));
+        (void)source;
+        return target == "macros/scan" || target.find("/remap/constant") != std::string::npos ||
+               (target.starts_with("field/scan") && target.ends_with("/radius"));
     };
     json liveRest = json::array();
     json showRest = json::array();
@@ -120,6 +119,26 @@ TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the m
     }
     CHECK(scanTimelines == std::set<std::string>{"scan", "scanFront"});
     CHECK(showSources == live.at("sources"));
+}
+
+TEST_CASE("Rainbow World: the live scan latches, on the synth stem or the mix, never re-firing within 20 s",
+          "[examples][rainbow-world][adr1574]") {
+    const json live = load("rainbow-world.json");
+    std::set<std::string> sources;
+    int latched = 0;
+    for (const json& r : live.at("routes")) {
+        if (r.at("target") != "macros/scan") {
+            continue;
+        }
+        sources.insert(r.at("source").get<std::string>());
+        const json& c = r.at("chain");
+        CHECK(c.at("envelopeRefractoryMs").get<double>() >= 20000.0);
+        CHECK(c.contains("envelopeRearm"));
+        CHECK_FALSE((r.contains("depthSource") && r.at("depthSource") == "stem.synth.level")); // the gate-4 tail glitch
+        ++latched;
+    }
+    CHECK(latched == 2);
+    CHECK(sources == std::set<std::string>{"stem.synth.rms", "response.sustain"});
 }
 
 TEST_CASE("Rainbow World: the MIDI layout keeps CC 9 look and CC 10 look lock", "[examples][rainbow-world]") {
