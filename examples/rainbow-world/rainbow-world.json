@@ -47,7 +47,7 @@
   "post/bloom/threshold": 1.2,
   "post/output/antialias": 0.8,
   "camera/splineUp": 1.0,
-  "camera/lookAhead": 70.0,
+  "camera/lookAhead": 90.0,
   "post/lens/fisheye": 1.0,
   "post/lens/fisheyeModel": 0.0,
   "camera/far": 30000.0
@@ -57,7 +57,7 @@
    "kind": "timeline",
    "name": "ride",
    "settings": {
-    "loopLength": 209.8999,
+    "loopLength": 211.5595,
     "keys": [
      {
       "time": 0.0,
@@ -65,1917 +65,1917 @@
       "interp": "linear"
      },
      {
-      "time": 0.539,
-      "value": 0.00232,
+      "time": 0.4667,
+      "value": 0.002212,
       "interp": "linear"
      },
      {
-      "time": 1.1005,
-      "value": 0.004737,
+      "time": 0.9474,
+      "value": 0.004411,
       "interp": "linear"
      },
      {
-      "time": 1.6275,
-      "value": 0.007005,
+      "time": 1.4432,
+      "value": 0.006603,
       "interp": "linear"
      },
      {
-      "time": 2.0934,
-      "value": 0.00901,
+      "time": 1.9539,
+      "value": 0.008795,
       "interp": "linear"
      },
      {
-      "time": 2.5862,
-      "value": 0.011131,
+      "time": 2.4718,
+      "value": 0.010959,
       "interp": "linear"
      },
      {
-      "time": 3.1637,
-      "value": 0.013617,
+      "time": 3.0375,
+      "value": 0.013271,
       "interp": "linear"
      },
      {
-      "time": 3.672,
-      "value": 0.015805,
+      "time": 3.5844,
+      "value": 0.015465,
       "interp": "linear"
      },
      {
-      "time": 4.1731,
-      "value": 0.017961,
+      "time": 4.1484,
+      "value": 0.017697,
       "interp": "linear"
      },
      {
-      "time": 4.668,
-      "value": 0.020091,
+      "time": 4.7231,
+      "value": 0.019947,
       "interp": "linear"
      },
      {
-      "time": 5.1613,
-      "value": 0.022214,
+      "time": 5.3072,
+      "value": 0.022217,
       "interp": "linear"
      },
      {
-      "time": 5.6495,
-      "value": 0.024316,
+      "time": 5.8991,
+      "value": 0.024505,
       "interp": "linear"
      },
      {
-      "time": 6.122,
-      "value": 0.026349,
+      "time": 6.4975,
+      "value": 0.02681,
       "interp": "linear"
      },
      {
-      "time": 6.6145,
-      "value": 0.028469,
+      "time": 7.0831,
+      "value": 0.029062,
       "interp": "linear"
      },
      {
-      "time": 7.1729,
-      "value": 0.030872,
+      "time": 7.7121,
+      "value": 0.03148,
       "interp": "linear"
      },
      {
-      "time": 7.7409,
-      "value": 0.033317,
+      "time": 8.3608,
+      "value": 0.033977,
       "interp": "linear"
      },
      {
-      "time": 8.2969,
-      "value": 0.03571,
+      "time": 8.9653,
+      "value": 0.036309,
       "interp": "linear"
      },
      {
-      "time": 8.8504,
-      "value": 0.038092,
+      "time": 9.5564,
+      "value": 0.038596,
       "interp": "linear"
      },
      {
-      "time": 9.3849,
-      "value": 0.040393,
+      "time": 10.148,
+      "value": 0.040895,
       "interp": "linear"
      },
      {
-      "time": 9.8836,
-      "value": 0.042539,
+      "time": 10.7318,
+      "value": 0.043177,
       "interp": "linear"
      },
      {
-      "time": 10.4036,
-      "value": 0.044777,
+      "time": 11.2997,
+      "value": 0.045413,
       "interp": "linear"
      },
      {
-      "time": 11.0149,
-      "value": 0.047408,
+      "time": 11.8903,
+      "value": 0.047757,
       "interp": "linear"
      },
      {
-      "time": 11.6687,
-      "value": 0.050186,
+      "time": 12.5887,
+      "value": 0.050557,
       "interp": "linear"
      },
      {
-      "time": 12.3595,
-      "value": 0.053008,
+      "time": 13.2184,
+      "value": 0.053108,
       "interp": "linear"
      },
      {
-      "time": 13.1559,
-      "value": 0.056068,
+      "time": 13.8332,
+      "value": 0.055626,
       "interp": "linear"
      },
      {
-      "time": 14.043,
-      "value": 0.059232,
+      "time": 14.4167,
+      "value": 0.058045,
       "interp": "linear"
      },
      {
-      "time": 14.9727,
-      "value": 0.062304,
+      "time": 14.9711,
+      "value": 0.060372,
       "interp": "linear"
      },
      {
-      "time": 15.8618,
-      "value": 0.065065,
+      "time": 15.518,
+      "value": 0.062697,
       "interp": "linear"
      },
      {
-      "time": 16.618,
-      "value": 0.067338,
+      "time": 16.0706,
+      "value": 0.065078,
       "interp": "linear"
      },
      {
-      "time": 17.0799,
-      "value": 0.068733,
+      "time": 16.6206,
+      "value": 0.067483,
       "interp": "linear"
      },
      {
-      "time": 17.5619,
-      "value": 0.070253,
+      "time": 17.1748,
+      "value": 0.069942,
       "interp": "linear"
      },
      {
-      "time": 18.3118,
-      "value": 0.072826,
+      "time": 17.715,
+      "value": 0.07238,
       "interp": "linear"
      },
      {
-      "time": 19.2077,
-      "value": 0.076292,
+      "time": 18.3043,
+      "value": 0.075086,
       "interp": "linear"
      },
      {
-      "time": 20.0711,
-      "value": 0.080098,
+      "time": 18.9342,
+      "value": 0.078035,
       "interp": "linear"
      },
      {
-      "time": 20.8346,
-      "value": 0.083894,
+      "time": 19.5485,
+      "value": 0.08097,
       "interp": "linear"
      },
      {
-      "time": 21.4804,
-      "value": 0.087432,
+      "time": 20.1603,
+      "value": 0.083957,
       "interp": "linear"
      },
      {
-      "time": 22.0613,
-      "value": 0.090829,
+      "time": 20.9196,
+      "value": 0.087747,
       "interp": "linear"
      },
      {
-      "time": 22.5598,
-      "value": 0.093887,
+      "time": 21.6135,
+      "value": 0.091291,
       "interp": "linear"
      },
      {
-      "time": 22.9811,
-      "value": 0.096561,
+      "time": 22.1582,
+      "value": 0.094138,
       "interp": "linear"
      },
      {
-      "time": 23.3938,
-      "value": 0.099223,
+      "time": 22.6867,
+      "value": 0.096962,
       "interp": "linear"
      },
      {
-      "time": 23.9108,
-      "value": 0.10256,
+      "time": 23.3352,
+      "value": 0.100501,
       "interp": "linear"
      },
      {
-      "time": 24.5159,
-      "value": 0.106467,
+      "time": 24.0798,
+      "value": 0.104644,
       "interp": "linear"
      },
      {
-      "time": 25.1607,
-      "value": 0.11063,
+      "time": 24.8597,
+      "value": 0.109059,
       "interp": "linear"
      },
      {
-      "time": 25.8676,
-      "value": 0.115194,
+      "time": 25.7026,
+      "value": 0.113899,
       "interp": "linear"
      },
      {
-      "time": 26.4672,
-      "value": 0.119065,
+      "time": 26.4101,
+      "value": 0.118005,
       "interp": "linear"
      },
      {
-      "time": 26.9253,
-      "value": 0.122022,
+      "time": 26.9468,
+      "value": 0.121141,
       "interp": "linear"
      },
      {
-      "time": 27.3113,
-      "value": 0.124514,
+      "time": 27.3977,
+      "value": 0.123784,
       "interp": "linear"
      },
      {
-      "time": 27.7227,
-      "value": 0.127166,
+      "time": 27.8804,
+      "value": 0.126607,
       "interp": "linear"
      },
      {
-      "time": 28.2021,
-      "value": 0.130199,
+      "time": 28.4739,
+      "value": 0.130054,
       "interp": "linear"
      },
      {
-      "time": 28.7629,
-      "value": 0.133621,
+      "time": 29.1225,
+      "value": 0.133778,
       "interp": "linear"
      },
      {
-      "time": 29.3875,
-      "value": 0.137181,
+      "time": 29.6171,
+      "value": 0.136572,
       "interp": "linear"
      },
      {
-      "time": 30.0422,
-      "value": 0.140547,
+      "time": 30.1067,
+      "value": 0.139278,
       "interp": "linear"
      },
      {
-      "time": 30.8002,
-      "value": 0.14397,
+      "time": 30.5928,
+      "value": 0.1419,
       "interp": "linear"
      },
      {
-      "time": 31.485,
-      "value": 0.146657,
+      "time": 31.0736,
+      "value": 0.144419,
       "interp": "linear"
      },
      {
-      "time": 32.0939,
-      "value": 0.148752,
+      "time": 31.5497,
+      "value": 0.146838,
       "interp": "linear"
      },
      {
-      "time": 32.5222,
-      "value": 0.150088,
+      "time": 32.0256,
+      "value": 0.149178,
       "interp": "linear"
      },
      {
-      "time": 32.967,
-      "value": 0.151422,
+      "time": 32.5075,
+      "value": 0.151472,
       "interp": "linear"
      },
      {
-      "time": 33.6126,
-      "value": 0.153384,
+      "time": 33.0013,
+      "value": 0.153749,
       "interp": "linear"
      },
      {
-      "time": 34.377,
-      "value": 0.155823,
+      "time": 33.5099,
+      "value": 0.156024,
       "interp": "linear"
      },
      {
-      "time": 35.1588,
-      "value": 0.158499,
+      "time": 34.0324,
+      "value": 0.158298,
       "interp": "linear"
      },
      {
-      "time": 35.901,
-      "value": 0.161244,
+      "time": 34.5648,
+      "value": 0.16056,
       "interp": "linear"
      },
      {
-      "time": 36.5638,
-      "value": 0.163873,
+      "time": 35.1017,
+      "value": 0.162795,
       "interp": "linear"
      },
      {
-      "time": 37.1394,
-      "value": 0.166276,
+      "time": 35.638,
+      "value": 0.164995,
       "interp": "linear"
      },
      {
-      "time": 37.6538,
-      "value": 0.168482,
+      "time": 36.1747,
+      "value": 0.167173,
       "interp": "linear"
      },
      {
-      "time": 38.1562,
-      "value": 0.170644,
+      "time": 36.717,
+      "value": 0.169364,
       "interp": "linear"
      },
      {
-      "time": 38.6847,
-      "value": 0.172919,
+      "time": 37.2664,
+      "value": 0.171582,
       "interp": "linear"
      },
      {
-      "time": 39.186,
-      "value": 0.175077,
+      "time": 37.8288,
+      "value": 0.173863,
       "interp": "linear"
      },
      {
-      "time": 39.6636,
-      "value": 0.177132,
+      "time": 38.4062,
+      "value": 0.176226,
       "interp": "linear"
      },
      {
-      "time": 40.1582,
-      "value": 0.179261,
+      "time": 39.0015,
+      "value": 0.178697,
       "interp": "linear"
      },
      {
-      "time": 40.7498,
-      "value": 0.181807,
+      "time": 39.6173,
+      "value": 0.181299,
       "interp": "linear"
      },
      {
-      "time": 41.4431,
-      "value": 0.184791,
+      "time": 40.266,
+      "value": 0.184099,
       "interp": "linear"
      },
      {
-      "time": 42.2011,
-      "value": 0.188094,
+      "time": 40.9577,
+      "value": 0.187156,
       "interp": "linear"
      },
      {
-      "time": 42.968,
-      "value": 0.191567,
+      "time": 41.6727,
+      "value": 0.1904,
       "interp": "linear"
      },
      {
-      "time": 43.6925,
-      "value": 0.195037,
+      "time": 42.3446,
+      "value": 0.193529,
       "interp": "linear"
      },
      {
-      "time": 44.3517,
-      "value": 0.198403,
+      "time": 42.9663,
+      "value": 0.196504,
       "interp": "linear"
      },
      {
-      "time": 44.9526,
-      "value": 0.201678,
+      "time": 43.6826,
+      "value": 0.200024,
       "interp": "linear"
      },
      {
-      "time": 45.5111,
-      "value": 0.20491,
+      "time": 44.4107,
+      "value": 0.203693,
       "interp": "linear"
      },
      {
-      "time": 46.0018,
-      "value": 0.207896,
+      "time": 45.0606,
+      "value": 0.207048,
       "interp": "linear"
      },
      {
-      "time": 46.4644,
-      "value": 0.210817,
+      "time": 45.6489,
+      "value": 0.210153,
       "interp": "linear"
      },
      {
-      "time": 46.9051,
-      "value": 0.213656,
+      "time": 46.2082,
+      "value": 0.213163,
       "interp": "linear"
      },
      {
-      "time": 47.4444,
-      "value": 0.217138,
+      "time": 46.8821,
+      "value": 0.216856,
       "interp": "linear"
      },
      {
-      "time": 48.058,
-      "value": 0.221099,
+      "time": 47.6371,
+      "value": 0.221057,
       "interp": "linear"
      },
      {
-      "time": 48.7201,
-      "value": 0.225373,
+      "time": 48.4415,
+      "value": 0.22559,
       "interp": "linear"
      },
      {
-      "time": 49.3984,
-      "value": 0.229752,
+      "time": 49.2575,
+      "value": 0.230234,
       "interp": "linear"
      },
      {
-      "time": 50.0837,
-      "value": 0.234177,
+      "time": 50.0759,
+      "value": 0.234926,
       "interp": "linear"
      },
      {
-      "time": 50.6619,
-      "value": 0.23791,
+      "time": 50.7636,
+      "value": 0.238885,
       "interp": "linear"
      },
      {
-      "time": 51.0633,
-      "value": 0.240501,
+      "time": 51.2405,
+      "value": 0.241633,
       "interp": "linear"
      },
      {
-      "time": 51.4948,
-      "value": 0.243286,
+      "time": 51.7544,
+      "value": 0.244588,
       "interp": "linear"
      },
      {
-      "time": 51.9378,
-      "value": 0.246102,
+      "time": 52.2735,
+      "value": 0.247555,
       "interp": "linear"
      },
      {
-      "time": 52.3945,
-      "value": 0.248912,
+      "time": 52.7492,
+      "value": 0.250249,
       "interp": "linear"
      },
      {
-      "time": 52.8399,
-      "value": 0.251526,
+      "time": 53.2217,
+      "value": 0.25289,
       "interp": "linear"
      },
      {
-      "time": 53.2808,
-      "value": 0.253969,
+      "time": 53.7124,
+      "value": 0.255587,
       "interp": "linear"
      },
      {
-      "time": 53.753,
-      "value": 0.256422,
+      "time": 54.2049,
+      "value": 0.258241,
       "interp": "linear"
      },
      {
-      "time": 54.2715,
-      "value": 0.258946,
+      "time": 54.7016,
+      "value": 0.260856,
       "interp": "linear"
      },
      {
-      "time": 54.838,
-      "value": 0.261545,
+      "time": 55.2043,
+      "value": 0.263436,
       "interp": "linear"
      },
      {
-      "time": 55.4256,
-      "value": 0.264126,
+      "time": 55.7144,
+      "value": 0.265985,
       "interp": "linear"
      },
      {
-      "time": 56.0052,
-      "value": 0.266621,
+      "time": 56.2288,
+      "value": 0.268485,
       "interp": "linear"
      },
      {
-      "time": 56.6199,
-      "value": 0.269266,
+      "time": 56.7878,
+      "value": 0.271127,
       "interp": "linear"
      },
      {
-      "time": 57.1932,
-      "value": 0.271734,
+      "time": 57.3155,
+      "value": 0.273556,
       "interp": "linear"
      },
      {
-      "time": 57.7514,
-      "value": 0.274137,
+      "time": 57.8513,
+      "value": 0.275961,
       "interp": "linear"
      },
      {
-      "time": 58.2929,
-      "value": 0.276467,
+      "time": 58.3944,
+      "value": 0.278344,
       "interp": "linear"
      },
      {
-      "time": 58.8167,
-      "value": 0.278722,
+      "time": 58.9385,
+      "value": 0.280684,
       "interp": "linear"
      },
      {
-      "time": 59.3048,
-      "value": 0.280822,
+      "time": 59.4808,
+      "value": 0.282978,
       "interp": "linear"
      },
      {
-      "time": 59.7639,
-      "value": 0.282798,
+      "time": 60.0191,
+      "value": 0.285225,
       "interp": "linear"
      },
      {
-      "time": 60.2978,
-      "value": 0.285097,
+      "time": 60.5361,
+      "value": 0.287361,
       "interp": "linear"
      },
      {
-      "time": 60.8348,
-      "value": 0.287407,
+      "time": 61.1051,
+      "value": 0.289694,
       "interp": "linear"
      },
      {
-      "time": 61.3246,
-      "value": 0.289509,
+      "time": 61.614,
+      "value": 0.29177,
       "interp": "linear"
      },
      {
-      "time": 61.8372,
-      "value": 0.29165,
+      "time": 62.1207,
+      "value": 0.29383,
       "interp": "linear"
      },
      {
-      "time": 62.3329,
-      "value": 0.293618,
+      "time": 62.6217,
+      "value": 0.295863,
       "interp": "linear"
      },
      {
-      "time": 62.6601,
-      "value": 0.294829,
+      "time": 63.1181,
+      "value": 0.297874,
       "interp": "linear"
      },
      {
-      "time": 62.9743,
-      "value": 0.295907,
+      "time": 63.6135,
+      "value": 0.299879,
       "interp": "linear"
      },
      {
-      "time": 63.9568,
-      "value": 0.299044,
+      "time": 64.079,
+      "value": 0.301761,
       "interp": "linear"
      },
      {
-      "time": 65.2426,
-      "value": 0.302954,
+      "time": 64.6234,
+      "value": 0.303958,
       "interp": "linear"
      },
      {
-      "time": 66.2117,
-      "value": 0.30586,
+      "time": 65.1741,
+      "value": 0.306174,
       "interp": "linear"
      },
      {
-      "time": 67.2354,
-      "value": 0.309007,
+      "time": 65.7301,
+      "value": 0.308402,
       "interp": "linear"
      },
      {
-      "time": 68.1783,
-      "value": 0.312076,
+      "time": 66.251,
+      "value": 0.310477,
       "interp": "linear"
      },
      {
-      "time": 68.9592,
-      "value": 0.314813,
+      "time": 66.7719,
+      "value": 0.312538,
       "interp": "linear"
      },
      {
-      "time": 69.5805,
-      "value": 0.317164,
+      "time": 67.2994,
+      "value": 0.314608,
       "interp": "linear"
      },
      {
-      "time": 70.0886,
-      "value": 0.319216,
+      "time": 67.8205,
+      "value": 0.316635,
       "interp": "linear"
      },
      {
-      "time": 70.557,
-      "value": 0.321193,
+      "time": 68.3309,
+      "value": 0.318604,
       "interp": "linear"
      },
      {
-      "time": 71.0158,
-      "value": 0.323167,
+      "time": 68.8295,
+      "value": 0.320514,
       "interp": "linear"
      },
      {
-      "time": 71.4564,
-      "value": 0.325063,
+      "time": 69.3204,
+      "value": 0.322388,
       "interp": "linear"
      },
      {
-      "time": 71.8706,
-      "value": 0.326845,
+      "time": 69.8141,
+      "value": 0.324273,
       "interp": "linear"
      },
      {
-      "time": 72.2675,
-      "value": 0.328554,
+      "time": 70.3253,
+      "value": 0.326235,
       "interp": "linear"
      },
      {
-      "time": 72.6735,
-      "value": 0.330301,
+      "time": 70.8674,
+      "value": 0.328336,
       "interp": "linear"
      },
      {
-      "time": 73.2338,
-      "value": 0.332713,
+      "time": 71.4469,
+      "value": 0.330618,
       "interp": "linear"
      },
      {
-      "time": 73.9717,
-      "value": 0.335896,
+      "time": 72.0611,
+      "value": 0.333088,
       "interp": "linear"
      },
      {
-      "time": 74.8022,
-      "value": 0.339575,
+      "time": 72.6992,
+      "value": 0.335719,
       "interp": "linear"
      },
      {
-      "time": 75.6273,
-      "value": 0.343412,
+      "time": 73.3458,
+      "value": 0.338462,
       "interp": "linear"
      },
      {
-      "time": 76.3739,
-      "value": 0.347103,
+      "time": 73.9857,
+      "value": 0.34126,
       "interp": "linear"
      },
      {
-      "time": 77.0225,
-      "value": 0.350526,
+      "time": 74.7372,
+      "value": 0.344651,
       "interp": "linear"
      },
      {
-      "time": 77.5418,
-      "value": 0.353446,
+      "time": 75.5729,
+      "value": 0.348544,
       "interp": "linear"
      },
      {
-      "time": 77.9662,
-      "value": 0.355968,
+      "time": 76.209,
+      "value": 0.351599,
       "interp": "linear"
      },
      {
-      "time": 78.3198,
-      "value": 0.358165,
+      "time": 76.6821,
+      "value": 0.35394,
       "interp": "linear"
      },
      {
-      "time": 78.6945,
-      "value": 0.36056,
+      "time": 77.1814,
+      "value": 0.356479,
       "interp": "linear"
      },
      {
-      "time": 79.0297,
-      "value": 0.362724,
+      "time": 77.6211,
+      "value": 0.358775,
       "interp": "linear"
      },
      {
-      "time": 79.4578,
-      "value": 0.365488,
+      "time": 78.1693,
+      "value": 0.361706,
       "interp": "linear"
      },
      {
-      "time": 79.9426,
-      "value": 0.368618,
+      "time": 78.7773,
+      "value": 0.365025,
       "interp": "linear"
      },
      {
-      "time": 80.4444,
-      "value": 0.371857,
+      "time": 79.395,
+      "value": 0.368461,
       "interp": "linear"
      },
      {
-      "time": 80.9722,
-      "value": 0.375264,
+      "time": 80.035,
+      "value": 0.372075,
       "interp": "linear"
      },
      {
-      "time": 81.4507,
-      "value": 0.378354,
+      "time": 80.6089,
+      "value": 0.375351,
       "interp": "linear"
      },
      {
-      "time": 81.842,
-      "value": 0.38088,
+      "time": 81.0751,
+      "value": 0.37803,
       "interp": "linear"
      },
      {
-      "time": 82.267,
-      "value": 0.383624,
+      "time": 81.5807,
+      "value": 0.38094,
       "interp": "linear"
      },
      {
-      "time": 82.6239,
-      "value": 0.385916,
+      "time": 82.0045,
+      "value": 0.383371,
       "interp": "linear"
      },
      {
-      "time": 83.0009,
-      "value": 0.388278,
+      "time": 82.448,
+      "value": 0.385892,
       "interp": "linear"
      },
      {
-      "time": 83.4018,
-      "value": 0.390691,
+      "time": 82.8617,
+      "value": 0.38821,
       "interp": "linear"
      },
      {
-      "time": 83.8038,
-      "value": 0.392986,
+      "time": 83.269,
+      "value": 0.390447,
       "interp": "linear"
      },
      {
-      "time": 84.2115,
-      "value": 0.395174,
+      "time": 83.69,
+      "value": 0.392703,
       "interp": "linear"
      },
      {
-      "time": 84.6267,
-      "value": 0.397261,
+      "time": 84.1191,
+      "value": 0.394939,
       "interp": "linear"
      },
      {
-      "time": 85.0618,
-      "value": 0.399314,
+      "time": 84.559,
+      "value": 0.397159,
       "interp": "linear"
      },
      {
-      "time": 85.5211,
-      "value": 0.401371,
+      "time": 85.0127,
+      "value": 0.399373,
       "interp": "linear"
      },
      {
-      "time": 85.9962,
-      "value": 0.403429,
+      "time": 85.4814,
+      "value": 0.401584,
       "interp": "linear"
      },
      {
-      "time": 86.4716,
-      "value": 0.405475,
+      "time": 85.9656,
+      "value": 0.403793,
       "interp": "linear"
      },
      {
-      "time": 86.9443,
-      "value": 0.40751,
+      "time": 86.4655,
+      "value": 0.406004,
       "interp": "linear"
      },
      {
-      "time": 87.4225,
-      "value": 0.409568,
+      "time": 86.981,
+      "value": 0.40822,
       "interp": "linear"
      },
      {
-      "time": 87.9066,
-      "value": 0.411651,
+      "time": 87.5169,
+      "value": 0.410469,
       "interp": "linear"
      },
      {
-      "time": 88.4124,
-      "value": 0.413828,
+      "time": 88.072,
+      "value": 0.412755,
       "interp": "linear"
      },
      {
-      "time": 88.956,
-      "value": 0.416168,
+      "time": 88.6447,
+      "value": 0.41508,
       "interp": "linear"
      },
      {
-      "time": 89.5074,
-      "value": 0.418541,
+      "time": 89.2318,
+      "value": 0.417444,
       "interp": "linear"
      },
      {
-      "time": 90.0632,
-      "value": 0.420933,
+      "time": 89.8294,
+      "value": 0.419843,
       "interp": "linear"
      },
      {
-      "time": 90.6312,
-      "value": 0.423378,
+      "time": 90.4309,
+      "value": 0.422262,
       "interp": "linear"
      },
      {
-      "time": 91.2056,
-      "value": 0.42585,
+      "time": 91.0398,
+      "value": 0.424726,
       "interp": "linear"
      },
      {
-      "time": 91.7706,
-      "value": 0.428282,
+      "time": 91.6542,
+      "value": 0.427238,
       "interp": "linear"
      },
      {
-      "time": 92.3171,
-      "value": 0.430634,
+      "time": 92.2651,
+      "value": 0.42977,
       "interp": "linear"
      },
      {
-      "time": 92.8453,
-      "value": 0.432907,
+      "time": 92.8645,
+      "value": 0.432295,
       "interp": "linear"
      },
      {
-      "time": 93.3764,
-      "value": 0.435193,
+      "time": 93.4568,
+      "value": 0.434835,
       "interp": "linear"
      },
      {
-      "time": 93.92,
-      "value": 0.437534,
+      "time": 94.0444,
+      "value": 0.437406,
       "interp": "linear"
      },
      {
-      "time": 94.474,
-      "value": 0.439971,
+      "time": 94.6247,
+      "value": 0.44,
       "interp": "linear"
      },
      {
-      "time": 95.0206,
-      "value": 0.442487,
+      "time": 95.186,
+      "value": 0.442566,
       "interp": "linear"
      },
      {
-      "time": 95.6016,
-      "value": 0.445325,
+      "time": 95.7468,
+      "value": 0.445191,
       "interp": "linear"
      },
      {
-      "time": 96.1306,
-      "value": 0.448083,
+      "time": 96.3304,
+      "value": 0.447989,
       "interp": "linear"
      },
      {
-      "time": 96.6095,
-      "value": 0.450745,
+      "time": 96.9023,
+      "value": 0.450799,
       "interp": "linear"
      },
      {
-      "time": 97.0691,
-      "value": 0.45345,
+      "time": 97.4656,
+      "value": 0.453636,
       "interp": "linear"
      },
      {
-      "time": 97.4709,
-      "value": 0.455928,
+      "time": 97.9969,
+      "value": 0.456375,
       "interp": "linear"
      },
      {
-      "time": 97.8667,
-      "value": 0.458447,
+      "time": 98.5042,
+      "value": 0.45905,
       "interp": "linear"
      },
      {
-      "time": 98.3154,
-      "value": 0.461343,
+      "time": 99.0749,
+      "value": 0.462122,
       "interp": "linear"
      },
      {
-      "time": 98.7976,
-      "value": 0.464456,
+      "time": 99.6774,
+      "value": 0.465423,
       "interp": "linear"
      },
      {
-      "time": 99.363,
-      "value": 0.468106,
+      "time": 100.3739,
+      "value": 0.469294,
       "interp": "linear"
      },
      {
-      "time": 99.8962,
-      "value": 0.471549,
+      "time": 101.0239,
+      "value": 0.472945,
       "interp": "linear"
      },
      {
-      "time": 100.3919,
-      "value": 0.474749,
+      "time": 101.6246,
+      "value": 0.476339,
       "interp": "linear"
      },
      {
-      "time": 100.8214,
-      "value": 0.477522,
+      "time": 102.1446,
+      "value": 0.47928,
       "interp": "linear"
      },
      {
-      "time": 101.1735,
-      "value": 0.479795,
+      "time": 102.5725,
+      "value": 0.481691,
       "interp": "linear"
      },
      {
-      "time": 101.5072,
-      "value": 0.481949,
+      "time": 102.9815,
+      "value": 0.483975,
       "interp": "linear"
      },
      {
-      "time": 101.7725,
-      "value": 0.483657,
+      "time": 103.3109,
+      "value": 0.48579,
       "interp": "linear"
      },
      {
-      "time": 102.0321,
-      "value": 0.485294,
+      "time": 103.6676,
+      "value": 0.487722,
       "interp": "linear"
      },
      {
-      "time": 102.3469,
-      "value": 0.487205,
+      "time": 104.1467,
+      "value": 0.490261,
       "interp": "linear"
      },
      {
-      "time": 102.7398,
-      "value": 0.489472,
+      "time": 104.6772,
+      "value": 0.493006,
       "interp": "linear"
      },
      {
-      "time": 103.1834,
-      "value": 0.491881,
+      "time": 105.1428,
+      "value": 0.495353,
       "interp": "linear"
      },
      {
-      "time": 103.694,
-      "value": 0.49448,
+      "time": 105.6306,
+      "value": 0.497743,
       "interp": "linear"
      },
      {
-      "time": 104.3166,
-      "value": 0.497452,
+      "time": 106.1376,
+      "value": 0.500156,
       "interp": "linear"
      },
      {
-      "time": 105.0243,
-      "value": 0.500648,
+      "time": 106.6583,
+      "value": 0.502563,
       "interp": "linear"
      },
      {
-      "time": 105.7619,
-      "value": 0.503857,
+      "time": 107.1867,
+      "value": 0.504934,
       "interp": "linear"
      },
      {
-      "time": 106.3839,
-      "value": 0.506534,
+      "time": 107.7177,
+      "value": 0.50725,
       "interp": "linear"
      },
      {
-      "time": 106.8865,
-      "value": 0.508698,
+      "time": 108.249,
+      "value": 0.509504,
       "interp": "linear"
      },
      {
-      "time": 107.3731,
-      "value": 0.510792,
+      "time": 108.7816,
+      "value": 0.511704,
       "interp": "linear"
      },
      {
-      "time": 107.8774,
-      "value": 0.512962,
+      "time": 109.3187,
+      "value": 0.513869,
       "interp": "linear"
      },
      {
-      "time": 108.384,
-      "value": 0.515143,
+      "time": 109.8616,
+      "value": 0.516009,
       "interp": "linear"
      },
      {
-      "time": 108.9131,
-      "value": 0.517404,
+      "time": 110.4209,
+      "value": 0.518172,
       "interp": "linear"
      },
      {
-      "time": 109.4971,
-      "value": 0.519819,
+      "time": 110.9986,
+      "value": 0.520368,
       "interp": "linear"
      },
      {
-      "time": 110.1416,
-      "value": 0.522339,
+      "time": 111.5879,
+      "value": 0.52258,
       "interp": "linear"
      },
      {
-      "time": 110.8071,
-      "value": 0.52476,
+      "time": 112.1803,
+      "value": 0.524782,
       "interp": "linear"
      },
      {
-      "time": 111.4877,
-      "value": 0.527051,
+      "time": 112.7765,
+      "value": 0.526986,
       "interp": "linear"
      },
      {
-      "time": 112.2069,
-      "value": 0.529315,
+      "time": 113.3759,
+      "value": 0.529196,
       "interp": "linear"
      },
      {
-      "time": 113.0004,
-      "value": 0.531712,
+      "time": 113.9803,
+      "value": 0.531426,
       "interp": "linear"
      },
      {
-      "time": 113.8471,
-      "value": 0.534257,
+      "time": 114.5868,
+      "value": 0.533672,
       "interp": "linear"
      },
      {
-      "time": 114.7357,
-      "value": 0.537019,
+      "time": 115.2013,
+      "value": 0.53596,
       "interp": "linear"
      },
      {
-      "time": 115.5804,
-      "value": 0.539815,
+      "time": 115.8127,
+      "value": 0.538252,
       "interp": "linear"
      },
      {
-      "time": 116.3085,
-      "value": 0.542415,
+      "time": 116.4006,
+      "value": 0.540474,
       "interp": "linear"
      },
      {
-      "time": 116.912,
-      "value": 0.544737,
+      "time": 116.9597,
+      "value": 0.542606,
       "interp": "linear"
      },
      {
-      "time": 117.4238,
-      "value": 0.546829,
+      "time": 117.5116,
+      "value": 0.544729,
       "interp": "linear"
      },
      {
-      "time": 117.8813,
-      "value": 0.548774,
+      "time": 118.0611,
+      "value": 0.546863,
       "interp": "linear"
      },
      {
-      "time": 118.3318,
-      "value": 0.550713,
+      "time": 118.6056,
+      "value": 0.548997,
       "interp": "linear"
      },
      {
-      "time": 118.7923,
-      "value": 0.552695,
+      "time": 119.1567,
+      "value": 0.551178,
       "interp": "linear"
      },
      {
-      "time": 119.2921,
-      "value": 0.554846,
+      "time": 119.7155,
+      "value": 0.553412,
       "interp": "linear"
      },
      {
-      "time": 119.8145,
-      "value": 0.557095,
+      "time": 120.2926,
+      "value": 0.555743,
       "interp": "linear"
      },
      {
-      "time": 120.3734,
-      "value": 0.5595,
+      "time": 120.9112,
+      "value": 0.558269,
       "interp": "linear"
      },
      {
-      "time": 120.9677,
-      "value": 0.562058,
+      "time": 121.5683,
+      "value": 0.560983,
       "interp": "linear"
      },
      {
-      "time": 121.5741,
-      "value": 0.564668,
+      "time": 122.202,
+      "value": 0.563632,
       "interp": "linear"
      },
      {
-      "time": 122.1919,
-      "value": 0.567327,
+      "time": 122.8305,
+      "value": 0.566293,
       "interp": "linear"
      },
      {
-      "time": 122.812,
-      "value": 0.569996,
+      "time": 123.4622,
+      "value": 0.569004,
       "interp": "linear"
      },
      {
-      "time": 123.4684,
-      "value": 0.572821,
+      "time": 124.0926,
+      "value": 0.571749,
       "interp": "linear"
      },
      {
-      "time": 124.1569,
-      "value": 0.575784,
+      "time": 124.7048,
+      "value": 0.574457,
       "interp": "linear"
      },
      {
-      "time": 124.872,
-      "value": 0.578886,
+      "time": 125.2941,
+      "value": 0.577109,
       "interp": "linear"
      },
      {
-      "time": 125.5811,
-      "value": 0.582069,
+      "time": 125.96,
+      "value": 0.580161,
       "interp": "linear"
      },
      {
-      "time": 126.2157,
-      "value": 0.585074,
+      "time": 126.7837,
+      "value": 0.584013,
       "interp": "linear"
      },
      {
-      "time": 126.7818,
-      "value": 0.587931,
+      "time": 127.4259,
+      "value": 0.587079,
       "interp": "linear"
      },
      {
-      "time": 127.2777,
-      "value": 0.590602,
+      "time": 127.9552,
+      "value": 0.589662,
       "interp": "linear"
      },
      {
-      "time": 127.7157,
-      "value": 0.59311,
+      "time": 128.5145,
+      "value": 0.592453,
       "interp": "linear"
      },
      {
-      "time": 128.1137,
-      "value": 0.595512,
+      "time": 129.0356,
+      "value": 0.59511,
       "interp": "linear"
      },
      {
-      "time": 128.4824,
-      "value": 0.597827,
+      "time": 129.507,
+      "value": 0.597567,
       "interp": "linear"
      },
      {
-      "time": 128.8541,
-      "value": 0.600215,
+      "time": 129.9832,
+      "value": 0.6001,
       "interp": "linear"
      },
      {
-      "time": 129.2749,
-      "value": 0.602932,
+      "time": 130.5143,
+      "value": 0.602982,
       "interp": "linear"
      },
      {
-      "time": 129.825,
-      "value": 0.606484,
+      "time": 131.1968,
+      "value": 0.606748,
       "interp": "linear"
      },
      {
-      "time": 130.4647,
-      "value": 0.610613,
+      "time": 131.9783,
+      "value": 0.611128,
       "interp": "linear"
      },
      {
-      "time": 131.0986,
-      "value": 0.614706,
+      "time": 132.7432,
+      "value": 0.615468,
       "interp": "linear"
      },
      {
-      "time": 131.6641,
-      "value": 0.618357,
+      "time": 133.4192,
+      "value": 0.61934,
       "interp": "linear"
      },
      {
-      "time": 132.1092,
-      "value": 0.621231,
+      "time": 133.948,
+      "value": 0.622388,
       "interp": "linear"
      },
      {
-      "time": 132.3755,
-      "value": 0.622949,
+      "time": 134.2635,
+      "value": 0.624211,
       "interp": "linear"
      },
      {
-      "time": 132.6492,
-      "value": 0.624717,
+      "time": 134.5884,
+      "value": 0.626085,
       "interp": "linear"
      },
      {
-      "time": 133.0154,
-      "value": 0.627055,
+      "time": 135.0124,
+      "value": 0.628519,
       "interp": "linear"
      },
      {
-      "time": 133.3564,
-      "value": 0.629168,
+      "time": 135.4298,
+      "value": 0.630892,
       "interp": "linear"
      },
      {
-      "time": 133.7096,
-      "value": 0.631261,
+      "time": 135.8987,
+      "value": 0.633522,
       "interp": "linear"
      },
      {
-      "time": 134.0908,
-      "value": 0.633397,
+      "time": 136.3338,
+      "value": 0.635919,
       "interp": "linear"
      },
      {
-      "time": 134.5494,
-      "value": 0.635808,
+      "time": 136.7896,
+      "value": 0.638376,
       "interp": "linear"
      },
      {
-      "time": 135.078,
-      "value": 0.638412,
+      "time": 137.2659,
+      "value": 0.640881,
       "interp": "linear"
      },
      {
-      "time": 135.6349,
-      "value": 0.640994,
+      "time": 137.7628,
+      "value": 0.643423,
       "interp": "linear"
      },
      {
-      "time": 136.2497,
-      "value": 0.643711,
+      "time": 138.2792,
+      "value": 0.645987,
       "interp": "linear"
      },
      {
-      "time": 136.9794,
-      "value": 0.646857,
+      "time": 138.7974,
+      "value": 0.648483,
       "interp": "linear"
      },
      {
-      "time": 137.606,
-      "value": 0.649554,
+      "time": 139.3943,
+      "value": 0.65127,
       "interp": "linear"
      },
      {
-      "time": 138.1776,
-      "value": 0.652014,
+      "time": 139.9404,
+      "value": 0.653744,
       "interp": "linear"
      },
      {
-      "time": 138.7496,
-      "value": 0.654476,
+      "time": 140.4872,
+      "value": 0.656151,
       "interp": "linear"
      },
      {
-      "time": 139.3152,
-      "value": 0.65691,
+      "time": 141.0269,
+      "value": 0.658467,
       "interp": "linear"
      },
      {
-      "time": 139.8683,
-      "value": 0.659291,
+      "time": 141.5543,
+      "value": 0.660678,
       "interp": "linear"
      },
      {
-      "time": 140.3997,
-      "value": 0.661578,
+      "time": 142.0777,
+      "value": 0.662831,
       "interp": "linear"
      },
      {
-      "time": 140.8982,
-      "value": 0.663724,
+      "time": 142.5926,
+      "value": 0.664919,
       "interp": "linear"
      },
      {
-      "time": 141.3706,
-      "value": 0.665752,
+      "time": 143.1015,
+      "value": 0.666966,
       "interp": "linear"
      },
      {
-      "time": 141.8401,
-      "value": 0.667719,
+      "time": 143.6083,
+      "value": 0.668998,
       "interp": "linear"
      },
      {
-      "time": 142.3443,
-      "value": 0.669729,
+      "time": 144.1156,
+      "value": 0.671037,
       "interp": "linear"
      },
      {
-      "time": 142.9108,
-      "value": 0.671838,
+      "time": 144.6254,
+      "value": 0.673101,
       "interp": "linear"
      },
      {
-      "time": 143.5471,
-      "value": 0.674031,
+      "time": 145.1375,
+      "value": 0.675203,
       "interp": "linear"
      },
      {
-      "time": 144.2368,
-      "value": 0.676243,
+      "time": 145.6513,
+      "value": 0.677351,
       "interp": "linear"
      },
      {
-      "time": 144.9408,
-      "value": 0.67839,
+      "time": 146.166,
+      "value": 0.679549,
       "interp": "linear"
      },
      {
-      "time": 145.6683,
-      "value": 0.680579,
+      "time": 146.681,
+      "value": 0.681805,
       "interp": "linear"
      },
      {
-      "time": 146.3957,
-      "value": 0.682886,
+      "time": 147.1962,
+      "value": 0.684123,
       "interp": "linear"
      },
      {
-      "time": 147.1158,
-      "value": 0.685424,
+      "time": 147.7108,
+      "value": 0.686504,
       "interp": "linear"
      },
      {
-      "time": 147.7667,
-      "value": 0.688052,
+      "time": 148.2242,
+      "value": 0.688947,
       "interp": "linear"
      },
      {
-      "time": 148.328,
-      "value": 0.690664,
+      "time": 148.6941,
+      "value": 0.691245,
       "interp": "linear"
      },
      {
-      "time": 148.8408,
-      "value": 0.693378,
+      "time": 149.2223,
+      "value": 0.693896,
       "interp": "linear"
      },
      {
-      "time": 149.2885,
-      "value": 0.695997,
+      "time": 149.7624,
+      "value": 0.696671,
       "interp": "linear"
      },
      {
-      "time": 149.6922,
-      "value": 0.698513,
+      "time": 150.2707,
+      "value": 0.69934,
       "interp": "linear"
      },
      {
-      "time": 150.0638,
-      "value": 0.700894,
+      "time": 150.7428,
+      "value": 0.701865,
       "interp": "linear"
      },
      {
-      "time": 150.4776,
-      "value": 0.703566,
+      "time": 151.2643,
+      "value": 0.704699,
       "interp": "linear"
      },
      {
-      "time": 151.0274,
-      "value": 0.707115,
+      "time": 151.9483,
+      "value": 0.708463,
       "interp": "linear"
      },
      {
-      "time": 151.6669,
-      "value": 0.711244,
+      "time": 152.7362,
+      "value": 0.712841,
       "interp": "linear"
      },
      {
-      "time": 152.2938,
-      "value": 0.715291,
+      "time": 153.5034,
+      "value": 0.717133,
       "interp": "linear"
      },
      {
-      "time": 152.9336,
-      "value": 0.719422,
+      "time": 154.2835,
+      "value": 0.721514,
       "interp": "linear"
      },
      {
-      "time": 153.5098,
-      "value": 0.723142,
+      "time": 154.9856,
+      "value": 0.725459,
       "interp": "linear"
      },
      {
-      "time": 153.9681,
-      "value": 0.726101,
+      "time": 155.5454,
+      "value": 0.728597,
       "interp": "linear"
      },
      {
-      "time": 154.3857,
-      "value": 0.728796,
+      "time": 156.058,
+      "value": 0.731456,
       "interp": "linear"
      },
      {
-      "time": 154.8319,
-      "value": 0.731656,
+      "time": 156.6082,
+      "value": 0.734501,
       "interp": "linear"
      },
      {
-      "time": 155.3452,
-      "value": 0.734859,
+      "time": 157.2975,
+      "value": 0.738274,
       "interp": "linear"
      },
      {
-      "time": 155.9464,
-      "value": 0.738456,
+      "time": 158.0899,
+      "value": 0.742557,
       "interp": "linear"
      },
      {
-      "time": 156.6467,
-      "value": 0.742424,
+      "time": 158.7342,
+      "value": 0.745988,
       "interp": "linear"
      },
      {
-      "time": 157.4202,
-      "value": 0.746541,
+      "time": 159.3079,
+      "value": 0.748994,
       "interp": "linear"
      },
      {
-      "time": 158.2078,
-      "value": 0.750464,
+      "time": 159.8719,
+      "value": 0.751897,
       "interp": "linear"
      },
      {
-      "time": 158.9713,
-      "value": 0.753963,
+      "time": 160.4133,
+      "value": 0.754637,
       "interp": "linear"
      },
      {
-      "time": 159.6244,
-      "value": 0.756678,
+      "time": 160.9273,
+      "value": 0.757193,
       "interp": "linear"
      },
      {
-      "time": 160.169,
-      "value": 0.758735,
+      "time": 161.412,
+      "value": 0.759566,
       "interp": "linear"
      },
      {
-      "time": 160.6789,
-      "value": 0.760511,
+      "time": 161.87,
+      "value": 0.761776,
       "interp": "linear"
      },
      {
-      "time": 161.0472,
-      "value": 0.761703,
+      "time": 162.3084,
+      "value": 0.763865,
       "interp": "linear"
      },
      {
-      "time": 161.7415,
-      "value": 0.76383,
+      "time": 162.7344,
+      "value": 0.765875,
       "interp": "linear"
      },
      {
-      "time": 162.7813,
-      "value": 0.766947,
+      "time": 163.157,
+      "value": 0.767852,
       "interp": "linear"
      },
      {
-      "time": 163.4055,
-      "value": 0.76885,
+      "time": 163.5756,
+      "value": 0.769797,
       "interp": "linear"
      },
      {
-      "time": 163.9664,
-      "value": 0.770651,
+      "time": 163.9934,
+      "value": 0.771727,
       "interp": "linear"
      },
      {
-      "time": 164.6081,
-      "value": 0.772865,
+      "time": 164.4105,
+      "value": 0.773643,
       "interp": "linear"
      },
      {
-      "time": 165.2264,
-      "value": 0.775169,
+      "time": 164.8288,
+      "value": 0.775554,
       "interp": "linear"
      },
      {
-      "time": 165.7705,
-      "value": 0.77734,
+      "time": 165.2502,
+      "value": 0.777466,
       "interp": "linear"
      },
      {
-      "time": 166.2492,
-      "value": 0.779346,
+      "time": 165.6765,
+      "value": 0.779387,
       "interp": "linear"
      },
      {
-      "time": 166.6945,
-      "value": 0.781258,
+      "time": 166.111,
+      "value": 0.781327,
       "interp": "linear"
      },
      {
-      "time": 167.1166,
-      "value": 0.783075,
+      "time": 166.5567,
+      "value": 0.783296,
       "interp": "linear"
      },
      {
-      "time": 167.531,
-      "value": 0.784859,
+      "time": 167.016,
+      "value": 0.785303,
       "interp": "linear"
      },
      {
-      "time": 167.9582,
-      "value": 0.786697,
+      "time": 167.4913,
+      "value": 0.787355,
       "interp": "linear"
      },
      {
-      "time": 168.4045,
-      "value": 0.788618,
+      "time": 167.9847,
+      "value": 0.789458,
       "interp": "linear"
      },
      {
-      "time": 168.8681,
-      "value": 0.790614,
+      "time": 168.4975,
+      "value": 0.791617,
       "interp": "linear"
      },
      {
-      "time": 169.3399,
-      "value": 0.792644,
+      "time": 169.0301,
+      "value": 0.793834,
       "interp": "linear"
      },
      {
-      "time": 169.8343,
-      "value": 0.794772,
+      "time": 169.5818,
+      "value": 0.796107,
       "interp": "linear"
      },
      {
-      "time": 170.3478,
-      "value": 0.796982,
+      "time": 170.1503,
+      "value": 0.79843,
       "interp": "linear"
      },
      {
-      "time": 170.8812,
-      "value": 0.799278,
+      "time": 170.7319,
+      "value": 0.800792,
       "interp": "linear"
      },
      {
-      "time": 171.4872,
-      "value": 0.801886,
+      "time": 171.3213,
+      "value": 0.803178,
       "interp": "linear"
      },
      {
-      "time": 172.1315,
-      "value": 0.804659,
+      "time": 171.9127,
+      "value": 0.805571,
       "interp": "linear"
      },
      {
-      "time": 172.7244,
-      "value": 0.807211,
+      "time": 172.4997,
+      "value": 0.807955,
       "interp": "linear"
      },
      {
-      "time": 173.2708,
-      "value": 0.809563,
+      "time": 173.077,
+      "value": 0.810317,
       "interp": "linear"
      },
      {
-      "time": 173.8567,
-      "value": 0.812085,
+      "time": 173.6401,
+      "value": 0.812649,
       "interp": "linear"
      },
      {
-      "time": 174.423,
-      "value": 0.814522,
+      "time": 174.186,
+      "value": 0.814945,
       "interp": "linear"
      },
      {
-      "time": 174.9369,
-      "value": 0.816734,
+      "time": 174.7113,
+      "value": 0.817199,
       "interp": "linear"
      },
      {
-      "time": 175.4145,
-      "value": 0.81879,
+      "time": 175.2146,
+      "value": 0.81941,
       "interp": "linear"
      },
      {
-      "time": 175.9724,
-      "value": 0.821191,
+      "time": 175.7032,
+      "value": 0.821613,
       "interp": "linear"
      },
      {
-      "time": 176.4979,
-      "value": 0.823452,
+      "time": 176.1699,
+      "value": 0.823777,
       "interp": "linear"
      },
      {
-      "time": 176.9611,
-      "value": 0.825478,
+      "time": 176.6103,
+      "value": 0.825876,
       "interp": "linear"
      },
      {
-      "time": 177.349,
-      "value": 0.827246,
+      "time": 177.0153,
+      "value": 0.827862,
       "interp": "linear"
      },
      {
-      "time": 177.7736,
-      "value": 0.829295,
+      "time": 177.3985,
+      "value": 0.829791,
       "interp": "linear"
      },
      {
-      "time": 178.1472,
-      "value": 0.83122,
+      "time": 177.7635,
+      "value": 0.831674,
       "interp": "linear"
      },
      {
-      "time": 178.4671,
-      "value": 0.832978,
+      "time": 178.1712,
+      "value": 0.833823,
       "interp": "linear"
      },
      {
-      "time": 178.7924,
-      "value": 0.834873,
+      "time": 178.5417,
+      "value": 0.835812,
       "interp": "linear"
      },
      {
-      "time": 179.112,
-      "value": 0.836829,
+      "time": 178.9199,
+      "value": 0.837873,
       "interp": "linear"
      },
      {
-      "time": 179.376,
-      "value": 0.838502,
+      "time": 179.2418,
+      "value": 0.839649,
       "interp": "linear"
      },
      {
-      "time": 179.7079,
-      "value": 0.840642,
+      "time": 179.6492,
+      "value": 0.841919,
       "interp": "linear"
      },
      {
-      "time": 180.0158,
-      "value": 0.84263,
+      "time": 180.0253,
+      "value": 0.844027,
       "interp": "linear"
      },
      {
-      "time": 180.4325,
-      "value": 0.84532,
+      "time": 180.5322,
+      "value": 0.84688,
       "interp": "linear"
      },
      {
-      "time": 180.8957,
-      "value": 0.84831,
+      "time": 181.0944,
+      "value": 0.850051,
       "interp": "linear"
      },
      {
-      "time": 181.4008,
-      "value": 0.851571,
+      "time": 181.7079,
+      "value": 0.85351,
       "interp": "linear"
      },
      {
-      "time": 181.8232,
-      "value": 0.854299,
+      "time": 182.2221,
+      "value": 0.856402,
       "interp": "linear"
      },
      {
-      "time": 182.1544,
-      "value": 0.856437,
+      "time": 182.6271,
+      "value": 0.85867,
       "interp": "linear"
      },
      {
-      "time": 182.5108,
-      "value": 0.858737,
+      "time": 183.0658,
+      "value": 0.86111,
       "interp": "linear"
      },
      {
-      "time": 182.771,
-      "value": 0.860415,
+      "time": 183.3897,
+      "value": 0.862896,
       "interp": "linear"
      },
      {
-      "time": 183.0749,
-      "value": 0.862341,
+      "time": 183.8555,
+      "value": 0.865439,
       "interp": "linear"
      },
      {
-      "time": 183.54,
-      "value": 0.865188,
+      "time": 184.5181,
+      "value": 0.869015,
       "interp": "linear"
      },
      {
-      "time": 184.0023,
-      "value": 0.867883,
+      "time": 185.1935,
+      "value": 0.872613,
       "interp": "linear"
      },
      {
-      "time": 184.6066,
-      "value": 0.871204,
+      "time": 185.6908,
+      "value": 0.875225,
       "interp": "linear"
      },
      {
-      "time": 185.4455,
-      "value": 0.875525,
+      "time": 186.2713,
+      "value": 0.878231,
       "interp": "linear"
      },
      {
-      "time": 186.2751,
-      "value": 0.879531,
+      "time": 186.8225,
+      "value": 0.881041,
       "interp": "linear"
      },
      {
-      "time": 187.0965,
-      "value": 0.883275,
+      "time": 187.3536,
+      "value": 0.883707,
       "interp": "linear"
      },
      {
-      "time": 187.8416,
-      "value": 0.886534,
+      "time": 187.8593,
+      "value": 0.886204,
       "interp": "linear"
      },
      {
-      "time": 188.4652,
-      "value": 0.889217,
+      "time": 188.3496,
+      "value": 0.888584,
       "interp": "linear"
      },
      {
-      "time": 189.0539,
-      "value": 0.891751,
+      "time": 188.8403,
+      "value": 0.890923,
       "interp": "linear"
      },
      {
-      "time": 189.6432,
-      "value": 0.894288,
+      "time": 189.3201,
+      "value": 0.893169,
       "interp": "linear"
      },
      {
-      "time": 190.2254,
-      "value": 0.896794,
+      "time": 189.8021,
+      "value": 0.895379,
       "interp": "linear"
      },
      {
-      "time": 190.8123,
-      "value": 0.89932,
+      "time": 190.3012,
+      "value": 0.897621,
       "interp": "linear"
      },
      {
-      "time": 191.4013,
-      "value": 0.901855,
+      "time": 190.8257,
+      "value": 0.899926,
       "interp": "linear"
      },
      {
-      "time": 191.998,
-      "value": 0.904423,
+      "time": 191.3747,
+      "value": 0.902287,
       "interp": "linear"
      },
      {
-      "time": 192.606,
-      "value": 0.90704,
+      "time": 191.9419,
+      "value": 0.904673,
       "interp": "linear"
      },
      {
-      "time": 193.206,
-      "value": 0.909622,
+      "time": 192.5317,
+      "value": 0.907103,
       "interp": "linear"
      },
      {
-      "time": 193.7886,
-      "value": 0.91213,
+      "time": 193.1395,
+      "value": 0.90956,
       "interp": "linear"
      },
      {
-      "time": 194.3418,
-      "value": 0.914511,
+      "time": 193.7467,
+      "value": 0.911975,
       "interp": "linear"
      },
      {
-      "time": 194.8613,
-      "value": 0.916747,
+      "time": 194.3447,
+      "value": 0.914324,
       "interp": "linear"
      },
      {
-      "time": 195.3501,
-      "value": 0.91885,
+      "time": 194.9376,
+      "value": 0.916635,
       "interp": "linear"
      },
      {
-      "time": 195.8043,
-      "value": 0.920805,
+      "time": 195.5474,
+      "value": 0.919006,
       "interp": "linear"
      },
      {
-      "time": 196.3058,
-      "value": 0.922964,
+      "time": 196.1738,
+      "value": 0.921447,
       "interp": "linear"
      },
      {
-      "time": 196.8875,
-      "value": 0.925494,
+      "time": 196.8195,
+      "value": 0.923986,
       "interp": "linear"
      },
      {
-      "time": 197.5272,
-      "value": 0.928383,
+      "time": 197.4819,
+      "value": 0.926629,
       "interp": "linear"
      },
      {
-      "time": 198.1761,
-      "value": 0.931479,
+      "time": 198.153,
+      "value": 0.929363,
       "interp": "linear"
      },
      {
-      "time": 198.8161,
-      "value": 0.934734,
+      "time": 198.8224,
+      "value": 0.93216,
       "interp": "linear"
      },
      {
-      "time": 199.5008,
-      "value": 0.938452,
+      "time": 199.5287,
+      "value": 0.935202,
       "interp": "linear"
      },
      {
-      "time": 200.1258,
-      "value": 0.942057,
+      "time": 200.4019,
+      "value": 0.939091,
       "interp": "linear"
      },
      {
-      "time": 200.6302,
-      "value": 0.945118,
+      "time": 201.1632,
+      "value": 0.942607,
       "interp": "linear"
      },
      {
-      "time": 201.0818,
-      "value": 0.947965,
+      "time": 201.7949,
+      "value": 0.945636,
       "interp": "linear"
      },
      {
-      "time": 201.5218,
-      "value": 0.950797,
+      "time": 202.3982,
+      "value": 0.94864,
       "interp": "linear"
      },
      {
-      "time": 201.9794,
-      "value": 0.953751,
+      "time": 203.005,
+      "value": 0.951773,
       "interp": "linear"
      },
      {
-      "time": 202.5387,
-      "value": 0.957362,
+      "time": 203.7215,
+      "value": 0.955602,
       "interp": "linear"
      },
      {
-      "time": 203.1293,
-      "value": 0.961175,
+      "time": 204.455,
+      "value": 0.959646,
       "interp": "linear"
      },
      {
-      "time": 203.7029,
-      "value": 0.964878,
+      "time": 205.1482,
+      "value": 0.963574,
       "interp": "linear"
      },
      {
-      "time": 204.2602,
-      "value": 0.968476,
+      "time": 205.8066,
+      "value": 0.967389,
       "interp": "linear"
      },
      {
-      "time": 204.7322,
-      "value": 0.971523,
+      "time": 206.3548,
+      "value": 0.970621,
       "interp": "linear"
      },
      {
-      "time": 205.1777,
-      "value": 0.974399,
+      "time": 206.8663,
+      "value": 0.973671,
       "interp": "linear"
      },
      {
-      "time": 205.5819,
-      "value": 0.977008,
+      "time": 207.3294,
+      "value": 0.976447,
       "interp": "linear"
      },
      {
-      "time": 206.0435,
-      "value": 0.979947,
+      "time": 207.8922,
+      "value": 0.979818,
       "interp": "linear"
      },
      {
-      "time": 206.5732,
-      "value": 0.983214,
+      "time": 208.4401,
+      "value": 0.983076,
       "interp": "linear"
      },
      {
-      "time": 207.1306,
-      "value": 0.986496,
+      "time": 208.8687,
+      "value": 0.985591,
       "interp": "linear"
      },
      {
-      "time": 207.6718,
-      "value": 0.989506,
+      "time": 209.3202,
+      "value": 0.98819,
       "interp": "linear"
      },
      {
-      "time": 208.1752,
-      "value": 0.992131,
+      "time": 209.7683,
+      "value": 0.990707,
       "interp": "linear"
      },
      {
-      "time": 208.6386,
-      "value": 0.994395,
+      "time": 210.2132,
+      "value": 0.993136,
       "interp": "linear"
      },
      {
-      "time": 209.0776,
-      "value": 0.996416,
+      "time": 210.6573,
+      "value": 0.995482,
       "interp": "linear"
      },
      {
-      "time": 209.5303,
-      "value": 0.998408,
+      "time": 211.1046,
+      "value": 0.997763,
       "interp": "linear"
      },
      {
-      "time": 209.8989,
+      "time": 211.5585,
       "value": 1.0,
       "interp": "step"
      }

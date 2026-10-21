@@ -310,61 +310,82 @@ def in_face(sc, ln):
                                                for d_ in np.arange(-ln / 2 - 30.0, ln / 2 + 30.1, 15.0))
 
 
-# The moments (14-stem-analysis.md): the drop at 47.85 s is the biggest launch with a roll; every 8-bar phrase start a
-# smaller one, alternate ones rolling; the end of the riser (194.6 s, the drums gone) a last big one.
-BAR = 1.983471
-MOMENTS = [(47.85, 360.0, 70.0, 1)] + [(0.2425 + BAR * 8 * k_, 220.0, 38.0, k_ % 2) for k_ in range(1, 12)
-                                      if abs(0.2425 + BAR * 8 * k_ - 47.85) > 6.0] + [(194.6, 340.0, 58.0, 1)]
-# one lap is the song: the base speed is set so a lap takes LAP seconds (Feline Footwear is 210.5 s), so the hops
-# land on their moments and the showcase never repeats a stretch of the ride
-LAP = 211.0
-
-
-def place():
-    times_, lap_ = ride_times()
-    placed, big = [], set()
-    for tm, ln, hh, turns in MOMENTS:
-        if tm >= lap_:
-            continue
-        sc = float(np.interp(tm, times_, cam_s))
-        s0_, s1_, kind_, side_ = seg_at(sc)
-        if kind_ in ("over", "back"):
-            # a moment inside a crossing: the crossing's own flip over the rim is the launch. (Swinging it 100 m out
-            # was tried at gate 3 and removed: three seconds facing open sky -- dead space -- at the drop.)
-            continue
-        if not in_face(sc, ln) or any(_circ(sc - p_[0]) < (ln + p_[1]) / 2 + 40 for p_ in placed):
-            continue
-        placed.append((sc, ln, hh, turns))
-    HOPS[:] = placed
-    BIG_CROSSINGS.clear()
-    BIG_CROSSINGS.update(big)
-
-
-for _it in range(4):            # the base speed first (one lap is the song), then the hops settle on their moments
-    place()
-    times, lap_t = ride_times()
-    BASE *= lap_t / LAP
-for _it in range(5):
-    place()
-times, lap_t = ride_times()
-print("HOPS", [(round(float(np.interp(h_[0], cam_s, times)), 2), round(h_[0]), h_[2], h_[3]) for h_ in HOPS],
-      "lap %.1f s" % lap_t)
-for tm, ln, hh, turns in MOMENTS:
-    sc = float(np.interp(tm, times, cam_s))
-    print("MOMENT %.2f s at %.0f m: %s, %s" % (tm, sc, seg_at(sc)[2], "hop" if any(abs(h_[0] - sc) < 1 for h_ in HOPS) else "-"))
-
-cam_pts, cam_ups = [], []
+# The owner after gate 3 (20-camera-note.md): no flips on a timer -- "only if it makes sense whilst following the
+# geometry" -- and "more fluid ... more gliding". So no hops and no scheduled rolls: the camera's roll is the land's
+# own (the band's twist, the rim crossings), and the ride glides: its path is the low line over the meadow, smoothed
+# over about 60 m so it floats over small rises instead of tracing them, never closer than 3.5 m to the ground; its
+# up is smoothed the same way, so the roll eases; and its speed breathes with the slope -- faster going down, a
+# float over the crests -- smoothed over about 90 m so it never jerks.
+LAP = 211.0   # one lap is the song (Feline Footwear is 210.5 s): the base speed is set from it below
+cam_raw, cam_upraw, cam_lift_raw = [], [], []
 for s in cam_s:
     p, n = ride(s)
-    _, roll_, _ = hop_at(s)
-    if roll_:
-        pa_, _ = ride(s + 1.0)
-        pb_, _ = ride(s - 1.0)
-        tg = (pa_ - pb_).normalized()
-        n = knot_path._rotate_about(np.array(n), np.array(tg), roll_)
-        n = Vector(n)
-    cam_pts.append(np.array(p))
-    cam_ups.append(np.array(n))
+    cam_raw.append(np.array(p))
+    cam_upraw.append(np.array(n) / max(1e-9, np.linalg.norm(n)))
+cam_raw, cam_upraw = np.array(cam_raw), np.array(cam_upraw)
+on_face = np.array([seg_at(s_)[2] in ("top", "bottom") for s_ in cam_s])
+# how far each sample is from a crossing, in samples: the smoothing narrows to nothing there, where the path swings
+# round the rim and smoothing would cut the corner into the cliff
+near_x = np.full(len(cam_s), 99)
+idx = np.where(~on_face)[0]
+for i_ in range(len(cam_s)):
+    if len(idx):
+        d_ = np.abs(((idx - i_) + len(cam_s) // 2) % len(cam_s) - len(cam_s) // 2).min()
+        near_x[i_] = d_
+
+
+def gsmooth(arr, sigma_at):
+    n_ = len(arr)
+    out = np.empty_like(arr)
+    for i_ in range(n_):
+        sg = sigma_at[i_]
+        if sg < 0.3:
+            out[i_] = arr[i_]
+            continue
+        r_ = int(3 * sg) + 1
+        ks = np.arange(-r_, r_ + 1)
+        w_ = np.exp(-0.5 * (ks / sg) ** 2)
+        out[i_] = (arr[(i_ + ks) % n_] * w_[:, None]).sum(axis=0) / w_.sum() if arr.ndim == 2 else \
+            (arr[(i_ + ks) % n_] * w_).sum() / w_.sum()
+    return out
+
+
+sig = np.clip((near_x - 2.0) / 3.0, 0.0, 1.0) * 4.0          # 4 samples (60 m) on the faces, 0 at a crossing
+cam_sm = gsmooth(cam_raw, sig)
+up_sm = gsmooth(cam_upraw, sig)
+up_sm /= np.linalg.norm(up_sm, axis=1)[:, None]
+pushed = 0
+for i_ in range(len(cam_s)):
+    if not on_face[i_]:
+        continue
+    ground = cam_raw[i_] - cam_upraw[i_] * cam_lift(cam_s[i_])
+    h_ = float(np.dot(cam_sm[i_] - ground, cam_upraw[i_]))
+    if h_ < 3.5:
+        cam_sm[i_] += cam_upraw[i_] * (3.5 - h_)
+        pushed += 1
+# speed: the climb rate along the local up (gravity turns with the land), smoothed; plus the crossings' surge
+climb = np.array([np.dot(cam_sm[(i_ + 1) % len(cam_s)] - cam_sm[i_ - 1], up_sm[i_]) / (2 * CAM_STEP)
+                  for i_ in range(len(cam_s))])
+SPEED = np.clip(1.0 - 5.0 * climb, 0.78, 1.3)
+for i_, s_ in enumerate(cam_s):
+    w = 1.0
+    for s0, s1, kind_, side in plan:
+        if kind_ in ("over", "back"):
+            mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
+            w = max(w, 1.0 + 0.45 * (1.0 - band.smoothstep(half, half + 160.0, _circ(s_ - mid))))
+    SPEED[i_] *= w
+SPEED = gsmooth(SPEED, np.full(len(cam_s), 6.0))
+seg_len = np.linalg.norm(np.roll(cam_sm, -1, axis=0) - cam_sm, axis=1)
+BASE = float((seg_len / SPEED).sum() / LAP)
+print("GLIDE pushed %d samples up to 3.5 m, speed factor %.2f-%.2f, base %.1f m/s" % (pushed, SPEED.min(), SPEED.max(), BASE))
+
+
+def speed_at(s_band):
+    return float(np.interp(s_band % L, cam_s, SPEED))
+
+
+cam_pts = list(cam_sm)
+cam_ups = list(up_sm)
 cam_controls = np.array(cam_pts)
 # clearance: the ride against every other part of the band (stations more than 400 m away along the loop), so an
 # airtime arc or a big crossing never flies into another strand of the knot
@@ -794,7 +815,7 @@ scene = {"format": "avgen-scene", "version": 1, "name": "rainbow-world",
 with open(os.path.join(OUT, "rainbow-world.scene.json"), "w") as f:
     json.dump(scene, f)
 params = look.post_parameters()
-params.update({"camera/splineUp": 1.0, "camera/lookAhead": 70.0, "post/lens/fisheye": 1.0, "post/lens/fisheyeModel": 0.0,
+params.update({"camera/splineUp": 1.0, "camera/lookAhead": 90.0, "post/lens/fisheye": 1.0, "post/lens/fisheyeModel": 0.0,
                "camera/far": 30000.0})
 # ---- the ride's rhythm. The owner (Stage 4): "definitely want faster camera movements". The clip covers a lot of
 # structure in 8 s with quick swoops and rolls, so the base is fast (BASE m/s) and the holds read by contrast:
