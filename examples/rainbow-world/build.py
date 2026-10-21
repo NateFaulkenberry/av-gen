@@ -36,7 +36,9 @@ ROCKS = ["boulder_01", "namaqualand_boulder_03", "rock_07", "rock_09", "rock_mos
 
 
 def blender(exe, script, *args):
-    cmd = [exe, "-b", "--factory-startup", "-P", os.path.join(HERE, script), "--", *args]
+    # --python-exit-code 1: without it Blender exits 0 when the script raises, and the build printed "built" over a
+    # traceback (Rainbow World 2, 2026-10-20)
+    cmd = [exe, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(HERE, script), "--", *args]
     print("+", " ".join(os.path.relpath(c, REPO) if c.startswith(REPO) else c for c in cmd), flush=True)
     env = dict(os.environ, RW_NO_PREVIEW="1")
     log = os.path.join(WORK, os.path.basename(script).replace(".py", ".log"))
