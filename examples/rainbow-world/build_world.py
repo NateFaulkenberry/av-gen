@@ -1273,6 +1273,80 @@ for n_ in nodes:
     SWELL_NODES.append(nm_)
 print("SWELL nodes", len(SWELL_NODES))
 
+# ---- Rainbow World 2, gate 5: the scan sparkle (24-brief-scan-sparkle.md; 27-scan-sparkle.md) ----------------------
+# As the scan's front passes a tree, the tree spins once about its trunk and a burst of glitter lights round its
+# crown. Built from what the engine has, with no per-tree state and no events: three scene fields follow the
+# front -- spheres about the camera (their centres the camera's baked position, their radii the front's) -- and
+# effectors on the tree and glitter instances read them (ADR-025). A tree inside the front's sphere is turned a whole
+# turn (no change); one in its soft edge is part-way round; so as the front sweeps past, each tree spins once, eased,
+# nearer trees first (the cascade), and never again until the next scan. The glitter is a pool of tiny emissive
+# instances in every crown, at scale 0 except inside a thin shell just behind the front, where they swell, rise and
+# fade. A pure function of the transport: seek equals play.
+SPIN_SOFT = 120.0         # m: the spin happens over this much of the front's run (~0.6-1 s at its speed)
+SHELL_W, SHELL_SOFT = 90.0, 40.0    # m: the glitter's shell, just behind the front
+GLITTER_PER_TREE = 28
+REST_R = look.SCAN_REST
+
+
+def field_node(name, spec):
+    return {"name": name, "kind": "field", "position": [0.0, 0.0, 0.0],
+            "field": dict({"strength": 1.0, "falloff": {"kind": "none"}, "position": [0.0, 0.0, 0.0]}, **spec)}
+
+
+SPARKLE_FIELDS = {   # name -> (rest radius, the front's pull on it)
+    "scanSpin": REST_R, "scanShellOut": REST_R - 10.0, "scanShellIn": REST_R - 10.0 - SHELL_W}
+nodes.append(field_node("scanSpin", {"kind": "sphere", "radius": REST_R, "softness": SPIN_SOFT}))
+nodes.append(field_node("scanShellOut", {"kind": "sphere", "radius": SPARKLE_FIELDS["scanShellOut"],
+                                         "softness": SHELL_SOFT}))
+nodes.append(field_node("scanShellIn", {"kind": "sphere", "radius": SPARKLE_FIELDS["scanShellIn"],
+                                        "softness": SHELL_SOFT, "invert": True}))
+nodes.append(field_node("scanShell", {"kind": "compound", "children": ["scanShellOut", "scanShellIn"],
+                                      "combine": "multiply"}))
+for n_ in nodes:
+    if n_.get("kind") == "procedural" and n_["name"].split("_")[0] in fam and \
+            n_["name"].endswith(("_wood", "_core", "_leaves")):
+        # the spin: a whole turn about the trunk across the front's soft edge; and a bow: tipped 0.22 rad (13 deg)
+        # and back up across the glitter's shell, so the tree nods as the wave goes through it
+        n_["procedural"].setdefault("effectors", []).extend([
+            {"field": "scanSpin", "op": "rotation", "blend": "add", "strength": round(2 * math.pi, 5),
+             "axis": [0.0, 1.0, 0.0], "local": True},
+            {"field": "scanShell", "op": "rotation", "blend": "add", "strength": 0.22,
+             "axis": [1.0, 0.0, 0.0], "local": True}])
+# the glitter: a pool per crown (avgen coordinates, each instance turned to its tree's up)
+_ENV = {"great": (20.5, 9.0, 27.0), "blossom": (9.6, 10.0, 23.3), "pine": (6.0, 6.6, 25.6), "weeper": (11.0, 0.0, 13.4)}
+glit = []
+for f_, pts_ in fam.items():
+    Rr, lo_, top_ = _ENV[f_]
+    for q in pts_:
+        base_ = np.array(q[:3]); qx, qy, qz, qw = q[3:7]; sc_ = q[8]
+        up_ = np.array([2 * (qx * qy - qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qw * qx)])
+        up_ /= np.linalg.norm(up_)
+        side_a = np.cross(up_, [1.0, 0.0, 0.0])
+        if np.linalg.norm(side_a) < 1e-3:
+            side_a = np.cross(up_, [0.0, 0.0, 1.0])
+        side_a /= np.linalg.norm(side_a)
+        side_b = np.cross(up_, side_a)
+        mid, hh = 0.5 * (lo_ + top_) * sc_, 0.5 * (top_ - lo_) * sc_
+        for _k in range(GLITTER_PER_TREE):
+            while True:
+                v_ = np.array([rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1)])
+                if v_ @ v_ <= 1.0:
+                    break
+            p_ = base_ + up_ * (mid + v_[1] * hh * 1.1) + side_a * v_[0] * Rr * sc_ * 1.1 + side_b * v_[2] * Rr * sc_ * 1.1
+            glit.append([round(float(c), 3) for c in p_] + [qx, qy, qz, qw, 1.0, 1.0, 1.0])
+programs.append(look.glitter_program())
+nodes.append({"name": "scan_glitter", "kind": "procedural", "procedural": {
+    "source": {"kind": "sphere", "radius": 0.55, "segments": 6, "rings": 3},
+    "distribution": {"kind": "points", "points": glit},
+    "material": {"program": "rw_glitter", "roughness": 0.4, "metallic": 0.0},
+    "castsShadow": False,
+    "lod": {"cull": True, "minScreenRadius": 0.5, "maxDistance": 700.0},
+    "effectors": [
+        {"field": "scanShell", "op": "scale", "blend": "replace", "strength": 1.0, "scaleAxis": [1.0, 1.0, 1.0]},
+        {"field": "scanShell", "op": "positionOffset", "blend": "add", "strength": 5.0, "axis": [0.0, 1.0, 0.0],
+         "local": True}]}})
+print("SPARKLE %d glitter instances in %d crowns" % (len(glit), len(glit) // GLITTER_PER_TREE))
+
 # ---- scene and project ----------------------------------------------------------------------------------------------
 env, lights = look.environment(SUN, rw.to_avgen(Vector((0, 0, 1))))
 scene = {"format": "avgen-scene", "version": 1, "name": "rainbow-world",
@@ -1451,6 +1525,11 @@ for prog_, roles_ in look.FX.items():
         bindings.append({"role": "foliageHue", "target": "material/%s/op/%d/hueShift/value" % (prog_, roles_["foliage_hue"])})
     if "kick_colour" in roles_:
         bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
+# the scan glitter's four colours are the look's own, chosen to contrast: its kick colour, horizon, cloud shadow, crest
+if "glitter_ramp" in look.FX.get("rw_glitter", {}):
+    for role_, f_ in zip(("ring", "horizon", "cloud0", "meadow3"), ("constant", "constant2", "constant3", "constant4")):
+        bindings.append({"role": role_, "target": "material/rw_glitter/op/%d/oklabRamp/%s"
+                         % (look.FX["rw_glitter"]["glitter_ramp"], f_)})
 palette = {"states": [{"name": n, "colors": c, "scalars": SCALARS[n]} for n, c in STATES], "bindings": bindings,
            "selector": {"select": 0, "transition": 8.0, "lock": False, "hold": 60.0,
                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": list(range(len(STATES))),
@@ -1490,6 +1569,19 @@ for rn in rainbow_nodes:
     routes.append({"source": "control.glow", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 2.0,
                    "op": "add", "polarity": "unipolar", "chain": ctl})
 routes += music.routes(look.FX, SWELL_NODES, SWELL)
+# the scan sparkle's spheres are centred on the camera: its position over the lap, baked from the ride (the same
+# keys as the ride's timeline, so the two never part), routed to each sphere's centre
+CAM_KEYS = [[], [], []]
+for k_ in ride_keys:
+    q_ = rw.to_avgen(Vector(cam_path.at((k_["value"] % 1.0) * cam_path.length)[0]))
+    for c_ in range(3):
+        CAM_KEYS[c_].append({"time": k_["time"], "value": round(float(q_[c_]), 3), "interp": k_["interp"]})
+CAM_SOURCES = [{"kind": "timeline", "name": "cam" + "XYZ"[c_], "settings": {"loopLength": loop_seconds,
+                                                                            "keys": CAM_KEYS[c_]}} for c_ in range(3)]
+for fld in music.SPARKLE_FIELDS:
+    for c_ in range(3):
+        routes.append({"source": "timeline.cam" + "XYZ"[c_], "target": "field/%s/position" % fld, "amount": 1.0,
+                       "op": "replace", "polarity": "unipolar", "component": c_})
 # the faint secondary bows carry no program: the synth's light and the scan reach them through the node's glow lane
 for rn in rainbow_nodes:
     if rn["name"].endswith("s"):
@@ -1514,7 +1606,7 @@ project = {
     "live": {"overrides": {"lodBias": 1.5, "reducedShadowFiltering": True}},
     "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}},
                 {"kind": "macro", "name": "macros", "settings": {"knobs": [{"name": k_, "default": d_}
-                                                                          for k_, d_ in music.MACROS]}}],
+                                                                          for k_, d_ in music.MACROS]}}] + CAM_SOURCES,
     "routes": routes,
     "palette": palette,
     "control": control,

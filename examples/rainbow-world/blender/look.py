@@ -435,6 +435,31 @@ def node_points(name, asset, points, material, **extra):
 
 
 
+def glitter_program():
+    """The scan's glitter (gate 5): each grain in one of four palette colours (its instance random picks; the look's
+    kick colour, sun, cloud light and horizon -- bound by the palette), a fifth of them white-hot, twinkling on a
+    per-grain clock, glowing hot."""
+    return finish({"name": "rw_glitter", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6,
+                   "emissionIntensity": 1.0, "opacity": -1, "ops": [
+                       {"kind": "input", "dst": 0, "input": "instanceRandom"},
+                       {"kind": "oklabRamp", "dst": 3, "srcA": 0, "value": -1.0, "_role": "glitter_ramp",
+                        "constant": [1.0, 0.85, 0.4, 1.0], "constant2": [1.0, 0.4, 0.7, 1.0],
+                        "constant3": [0.4, 0.8, 1.0, 1.0], "constant4": [0.7, 1.0, 0.5, 1.0]},
+                       {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [3, 3, 3, 3]},
+                       {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.78, 0.8, 0.0, 0.0]},
+                       {"kind": "constant", "dst": 2, "constant": [1.0, 1.0, 1.0, 1.0]},
+                       {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 2, "srcC": 1},
+                       {"kind": "input", "dst": 4, "input": "time"},
+                       {"kind": "swizzle", "dst": 5, "srcA": 0, "constant": [1, 1, 1, 1]},
+                       {"kind": "remap", "dst": 4, "srcA": 4, "constant": [0.0, 1.0, 0.0, 9.0], "value": 0.0},
+                       {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},
+                       {"kind": "noise", "dst": 4, "srcA": 4, "value": 6.0, "seed": 41},
+                       {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.35, 0.75, 0.0, 0.0]},
+                       {"kind": "constant", "dst": 7, "constant": [14.0, 14.0, 14.0, 1.0], "_role": "glitter_gain"},
+                       {"kind": "multiply", "dst": 6, "srcA": 3, "srcB": 7},
+                       {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 4}]})
+
+
 def tinted_canopy_program(name, stops, height=14.0, offset=-0.75, follow_look=True):
     """A canopy ramp by height in the tree (core -> skin), with a little world noise -- the Great Tree's program with
     the tree's own colours: the Weeper's limes, the Blossom Puff's pinks."""

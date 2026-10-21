@@ -89,7 +89,8 @@ TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the m
         const std::string source = r.at("source").get<std::string>();
         return target == "macros/scan" ||
                ((source == "beat.phrasePulse" || source == "timeline.scanFront") &&
-                target.find("/remap/constant") != std::string::npos);
+                (target.find("/remap/constant") != std::string::npos ||
+                 (target.starts_with("field/scan") && target.ends_with("/radius"))));
     };
     json liveRest = json::array();
     json showRest = json::array();

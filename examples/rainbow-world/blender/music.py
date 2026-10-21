@@ -54,6 +54,7 @@ MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("scan", 0.0), ("one", 
 SCAN_REST = 980.0    # look.SCAN_REST
 SCAN_DELAY_MS = 300.0
 RAINBOWS = ("rw_rainbow",)
+SPARKLE_FIELDS = ("scanSpin", "scanShellOut", "scanShellIn")   # build_world's scan-sparkle fields
 
 # The showcase's world scans (gate 5, the owner: "rainbow world scan only happened once and there was a glitch at the
 # end"; 26-world-scan.md). On Feline Footwear the scan fires at the song's big synth swells and section peaks, from
@@ -67,7 +68,7 @@ RAINBOWS = ("rw_rainbow",)
 # front -- so a seek lands where a play does, and nothing in the effect can reset part-way through (the gate-4 glitch
 # was the live trigger's depth, the synth level, dipping and recovering on the scan's tail).
 SCAN_TIMES = (47.85, 111.3, 158.9, 190.7)
-SCAN_RISE, SCAN_HOLD, SCAN_FALL, SCAN_RUN = 1.2, 4.8, 3.0, 4.0     # seconds: ease in, hold, ease out; the front's run
+SCAN_RISE, SCAN_HOLD, SCAN_FALL, SCAN_RUN = 1.2, 5.3, 3.0, 7.0     # seconds: ease in, hold, ease out; the front's run
 
 
 def _ease(u):
@@ -86,10 +87,10 @@ def showcase_scan_sources(song_end):
             tt = t0 + SCAN_RISE + SCAN_HOLD + SCAN_FALL * k / 12
             amt.append({"time": round(tt, 4), "value": round(1.0 - _ease(k / 12), 4), "interp": "linear"})
         front.append({"time": round(t0 - 0.001, 4), "value": 0.0, "interp": "step"})
-        for k in range(0, 13):                                  # the front leaves the eye and eases out to rest
-            u = k / 12
-            front.append({"time": round(t0 + SCAN_RUN * u, 4), "value": round(1.0 - (1 - (1 - u) ** 2), 4),
-                          "interp": "linear"})
+        for k in range(0, 25):                                  # the front leaves the eye and runs out to rest,
+            u = k / 24                                          # eased both ways (gate 5: slow enough near the
+            front.append({"time": round(t0 + SCAN_RUN * u, 4), "value": round(1.0 - _ease(u), 4),   # eye for the
+                          "interp": "linear"})                                                       # trees to spin)
     amt.append({"time": round(song_end, 4), "value": 0.0, "interp": "linear"})
     front.append({"time": round(song_end, 4), "value": 0.0, "interp": "linear"})
     return [{"kind": "timeline", "name": "scan", "settings": {"keys": amt}},
@@ -102,7 +103,8 @@ def showcase_scan_routes(routes_):
     for r in routes_:
         if r["target"] == "macros/scan":
             continue
-        if r["source"] == "beat.phrasePulse" and "/remap/constant" in r["target"]:
+        if r["source"] == "beat.phrasePulse" and ("/remap/constant" in r["target"] or
+                                                  (r["target"].startswith("field/scan") and r["target"].endswith("/radius"))):
             r = dict(r, source="timeline.scanFront")
             r.pop("chain", None)
         out.append(r)
@@ -232,7 +234,7 @@ def routes(fx, swell_nodes, swell):
     # unless `macro.scan` -- held about six seconds, then relaxing over three -- says this phrase deserves it, which
     # the surge (the drop) does, and a big lift (the synth at its brightest) does a little.
     rest = SCAN_REST - 10.0
-    front = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / 4.0, "delayMs": SCAN_DELAY_MS}
+    front = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN, "delayMs": SCAN_DELAY_MS}
     for prog in scan_programs:
         roles = fx[prog]
         for role in ("scan_mask", "scan_hue", "scan_edge_out", "scan_edge_in"):
@@ -240,6 +242,14 @@ def routes(fx, swell_nodes, swell):
                 out.append(route("beat.phrasePulse", op_target(prog, roles, role, "remap", "constant"), -rest, front,
                                  component=c))
         out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))
+    # the scan sparkle's fields follow the same front (27-scan-sparkle.md): their radii pulled in with it
+    for fld in SPARKLE_FIELDS:
+        out.append(route("beat.phrasePulse", "field/%s/radius" % fld, -rest, front))
+    if "glitter_gain" in fx.get("rw_glitter", {}):
+        out.append(route("macro.synth", op_target("rw_glitter", fx["rw_glitter"], "glitter_gain", "constant",
+                                                  "constant"), 4.0))   # the synth's light in the glitter
+    for prog in scan_programs:
+        roles = fx[prog]
         out.append(route("macro.scan", op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0))
     # When it fires -- seek-exact by construction: every stateful route here reads a signal the seek replay rebuilds
     # (beat.*, stem.*), never a macro (a macro is a parameter, which the replay does not write; ADR-901). Two routes
