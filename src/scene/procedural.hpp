@@ -669,6 +669,12 @@ struct ProceduralGeometry {
     // than a shadow-map texel -- so the cost is real and the result is not visible. Never a
     // structural property: it changes which passes draw the object, not what the object is.
     bool castsShadow = true;
+    // ADR-1576: whether the live tiers' ADR-155 demotion reaches this object -- its LOD rungs past the foreground drawn at
+    // the flat material tier. False keeps every rung at the frame's tier: for an object whose far rungs are a large part
+    // of the picture (a ground cut into distance-LOD bands), where the flat tier's different colour and lost shadows pop
+    // as a band crosses a rung boundary. Never structural; written only when false. An offline render is unaffected
+    // (its tier demotes nothing).
+    bool flatFarRungs = true;
     Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.
@@ -827,5 +833,11 @@ struct ProceduralParameters {
 // Relaxed atomic because the world builder regenerates on a job worker; the increment is noise
 // beside the generation it counts.
 [[nodiscard]] std::uint64_t proceduralRebuildCount() noexcept;
+
+// ADR-155 / ADR-1576: whether LOD rung `level` of an object draws at the flat material tier. `flatFromRung` < 0 = the tier
+// demotes nothing (High, Offline); an object with `flatFarRungs` false is never demoted.
+[[nodiscard]] constexpr bool proceduralRungDemoted(int flatFromRung, std::uint32_t level, bool flatFarRungs) {
+    return flatFarRungs && flatFromRung >= 0 && static_cast<int>(level) >= flatFromRung;
+}
 
 } // namespace avgen::scene

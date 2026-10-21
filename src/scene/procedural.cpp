@@ -2993,6 +2993,9 @@ json ProceduralGeometry::toJson() const {
     if (!castsShadow) {
         j["castsShadow"] = false; // ADR-1545: written only when off, so every existing save is unchanged
     }
+    if (!flatFarRungs) {
+        j["flatFarRungs"] = false; // ADR-1576: likewise
+    }
     {
         json s = json::object();
         s["kind"] = primitiveKindName(source.kind);
@@ -3274,6 +3277,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.partOf, "partOf", readString);
         AVGEN_PROC_READ(g.visible, "visible", readBool);
         AVGEN_PROC_READ(g.castsShadow, "castsShadow", readBool); // ADR-1545
+        AVGEN_PROC_READ(g.flatFarRungs, "flatFarRungs", readBool); // ADR-1576
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);
         AVGEN_PROC_READ(g.emissiveField, "emissiveField", readString);

@@ -2571,8 +2571,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             // is possible here -- heroes live on the Composition, not the Scene the renderer sees
             // -- but a hero is by definition large on screen and therefore already at rung 0.
             // `elder-crown` measures ~330 px across in the canonical frame.
-            const bool demote =
-                flatTierFromRung_ >= 0 && static_cast<int>(level) >= flatTierFromRung_;
+            const bool demote = scene::proceduralRungDemoted(flatTierFromRung_, level, object.flatFarRungs); // ADR-1576
             u.prevInfo.z = demote ? static_cast<float>(MaterialTierFlatValue) : 0.0f;
             std::memcpy(im.deformerStaging.data() + static_cast<std::size_t>(level) * kDeformerSlotStride, &u,
                         sizeof(u));
