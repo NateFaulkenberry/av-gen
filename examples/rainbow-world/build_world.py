@@ -1241,12 +1241,14 @@ for kind, pts in cpts.items():
         # Gate 8 (the owner: "no hard edges or corners"): simplified by SCREEN size, not distance. By distance, a puff
         # or a bank 300-1600 m off -- large on screen in this sky -- drew at 12% or 4% of its triangles, and those
         # rungs were the faceted, crystal-cut clouds; now a cloud only coarsens once it is small enough that its facets
-        # are under a few pixels (radii in pixels; the same spread and hysteresis as the trees).
+        # are under a few pixels (radii in pixels; the same spread and hysteresis as the trees). Thresholds this coarse
+        # look the same as finer ones (220/60/18 px: +290k triangles and +2.4 ms GPU at 150 s, High) and cost nothing
+        # over the distance ladder (25.8 ms against 25.7).
         if kind == "puff":  # 900 heads
-            lod_ = {"cull": True, "count": 4, "byScreenSize": True, "distance1": 220.0, "distance2": 60.0,
-                    "distance3": 18.0, "spread": 0.35, "hysteresis": 0.2}
+            lod_ = {"cull": True, "count": 4, "byScreenSize": True, "distance1": 400.0, "distance2": 120.0,
+                    "distance3": 40.0, "spread": 0.35, "hysteresis": 0.2}
         else:               # the masses and banks: 24-30k triangles each
-            lod_ = {"cull": True, "count": 3, "byScreenSize": True, "distance1": 260.0, "distance2": 70.0,
+            lod_ = {"cull": True, "count": 3, "byScreenSize": True, "distance1": 450.0, "distance2": 140.0,
                     "spread": 0.35, "hysteresis": 0.2}
         nodes.append(node_points("cloud_" + kind, "cloud_%s.glb" % kind, pts,
                                  {"program": "rw_cloud", "roughness": 1.0, "metallic": 0.0, "unlit": True},
