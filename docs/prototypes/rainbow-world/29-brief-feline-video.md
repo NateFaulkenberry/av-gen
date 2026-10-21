@@ -49,3 +49,12 @@ Coordinator note: "~2:29" after "~2:31" is probably 2:39, since the list runs ab
 "that 2:31 one happens a little later organically in the song I think so it may be slightly off the down beat"
 
 Coordinator note: follow the synth stem's actual onset for this one rather than snapping it to the bar grid.
+
+## 6. The owner on the app's menus (verbatim)
+
+"make sure rainbow world is available in the app too under offline and live sections"
+
+Coordinator note: Rainbow World (offline) goes in Examples under its offline section (the Worlds category), and
+Rainbow World (live) under the Live section (ADR-1340; the index's "live": true and sonic.live). Check the examples
+index, the menu code and test_examples for both, and what a fresh checkout shows before build.py runs ("needs
+generating"). The README must say how to build it.
