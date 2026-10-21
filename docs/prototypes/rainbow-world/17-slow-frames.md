@@ -223,3 +223,41 @@ ladder holds High for most of the window and never falls below Medium.
   them (4 misses in 90 s).
 - The glTF program interpreter is the arches' remaining cost; compiling glTF entity programs (as ADR-1493 does for the
   procedural pass) would take it off. That is engine work, not this pass's.
+
+## 10. Gate 5: the owner's fixes, measured
+
+All on AC (`build/rw2/prof/ac_power.txt`).
+
+**Headless Medium A/B, 45-75 s** (GPU p50 / p95, ms):
+
+| Variant | GPU p50 / p95 |
+|---|---|
+| Everything in | 23.4 / 29.7 |
+| Without the glitter | 23.5 / 29.8 |
+| Without the rays | 23.7 / 30.1 |
+| Without the scan effectors | 23.4 / 29.8 |
+| The old leaf levels | 21.2 / 28.6 |
+
+The screen-size leaves were the only cost: leaves out to 12 px cost 2.2 ms. With the leaves stopped at 22 px it is
+21.7 / 27.8.
+
+**Live A/B, 40-85 s.**
+- 22 sunray nodes moving every frame (they follow the camera) caused CPU-side frame spikes: 23 frames over 40 ms,
+  against 6 without the rays.
+- Merged into one node, they cost nothing measurable.
+
+**Final live profile** (`live_g5c`, 35-125 s, auto ladder):
+
+| | |
+|---|---|
+| Ladder (frames) | High 1495, Medium 967, Ultra 237 |
+| Frame p50 / p95 | 33.3 / 35.9 ms |
+| GPU p50 / p95 | 22.6 / 32.2 ms |
+| Deadline misses | 33 |
+| Frames over 40 ms | 13 |
+
+- The two scans in the window (48-57 s and 111-120 s) are the heaviest stretches, at GPU p95 35 and 34 ms.
+- The ladder drops to Medium after them and climbs back.
+- Before gate 5 (`live16`, one scan) it held High for 2400 of 2700 frames with 4 misses.
+- The bass heave's 1.1-2.7 ms is gone. The gate-5 additions (four scans with their sparkle, the leaves, the sunburst)
+  spend it and a little more at the scan peaks.
