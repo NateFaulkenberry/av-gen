@@ -5,7 +5,7 @@
 - **ADRs:** 1570-1573.
 - **Review media:** `~/Desktop/av-gen-review/76-rainbow-world-2/`.
 
-> Status: DRAFT until gate 4 (the owner's verdict on the flight, then the full lap and the final checks).
+> Status: final checks done on the default flight; awaiting the owner's verdict on the flight (default or more-soar).
 
 ## 1. The deliverables
 
@@ -49,4 +49,18 @@ The cuts and their visual costs are in 17 section 7.
 
 ## 5. Final checks
 
-To be filled after the clean reconfigure and full build.
+After a fresh CMake configure (`cmake --preset release --fresh`) and a full build (exit 0), on the default flight:
+
+| Check | Head | Exit | Counts |
+|---|---|---|---|
+| `tools/ci/run-suite.sh gpu` | 2f0b16c6 | 0 | 682 passed, 0 failed, 1 skipped (no NDI runtime); 683/683 cases, 728,939 assertions, 39m 23s |
+| `tools/ci/run-suite.sh cpu-assets` | 2a323a41 | 0 | 4401 passed, 0 failed, 29 skipped, 1 expected failure (the suite's one shouldfail); 4431/4431, 19m 31s |
+| `python3 tools/review_examples.py --only "Rainbow World"` | 2a323a41 | 0 | Rainbow World ok |
+| `python3 tools/check_project_integrity.py` | 2a323a41 | 0 | 0 problems |
+
+The first cpu-assets run failed one case: the hygiene check that every writer of a parameter final has an Inspector
+kind found ADR-1573's restore in `app/engine.cpp`. It restores what the routes wrote (Kind::Route); 2a323a41 names it
+in the test. The GPU suite's binary does not contain that test, so its run at 2f0b16c6 stands.
+
+The more-soar flight (`RW_MORE_SOAR=1`) is a variant for the owner to compare; if it is chosen, the projects are
+rebuilt and cpu-assets, the review and the integrity check run again.
