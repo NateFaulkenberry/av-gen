@@ -1675,9 +1675,8 @@ for prog_, roles_ in look.FX.items():
         bindings.append({"role": "foliageHue", "target": "material/%s/op/%d/hueShift/value" % (prog_, roles_["foliage_hue"])})
     if "kick_colour" in roles_:
         bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
-# the sunburst takes the look's sun colour
-for rn_ in SUN_RAYS:
-    bindings.append({"role": "sun", "target": "nodes/%s/tint" % rn_})
+# (gate 8: the sun glare's binding to the look's sun colour is gone -- a node has no `tint` parameter, so it never
+# bound (the load warned "no parameter 'nodes/sun_burst/tint'" since gate 5); the glare is its texture's warm white)
 # the sparks' four colours are the look's own, chosen to contrast: its kick colour, horizon, cloud shadow, crest
 if "spark_ramp" in look.FX.get("rw_spark", {}):
     for role_, f_ in zip(("ring", "horizon", "cloud0", "meadow3"), ("constant", "constant2", "constant3", "constant4")):

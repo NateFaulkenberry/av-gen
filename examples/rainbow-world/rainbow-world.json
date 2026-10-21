@@ -13853,10 +13853,6 @@
     "target": "material/rw_pine/op/7/hueShift/value"
    },
    {
-    "role": "sun",
-    "target": "nodes/sun_burst/tint"
-   },
-   {
     "role": "ring",
     "target": "material/rw_spark/op/2/oklabRamp/constant"
    },
