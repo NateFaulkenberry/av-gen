@@ -650,7 +650,7 @@ for f, pts in fam.items():
     if not pts:
         continue
     asset, prog = TREE_ASSETS[f]
-    LEAF_PX, LEAF_CULL_PX = (130.0, 60.0, 28.0), 12.0     # projected radius, px, at which each leaf level is taken
+    LEAF_PX, LEAF_CULL_PX = (130.0, 75.0, 42.0), 22.0     # projected radius, px, at which each leaf level is taken
     # the leaf cards (alpha-tested, the depth prepass's dearest geometry) thin with distance (ADR-1548: whole cards removed,
     # the rest grown, 35% at 22 m and 12% at 55 m; Stage 8: the near cards were the p95) and stop at 150 m; beyond it the canopy core,
     # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps.
@@ -1355,30 +1355,22 @@ print("SPARKLE %d glitter instances in %d crowns" % (len(glit), len(glit) // GLI
 # aerial perspective leaves them alone, as it does the sky. Faint at rest; the synth swells them (their glow lane),
 # and the look's sun colours them (their tint).
 import ray_asset  # noqa: E402
-ray_asset.write_ray_glb(os.path.join(OUT, "sun_ray.glb"))
-# (a node's position and scale are capped at 1e4 and 100: the burst stands 5 km out from the camera and follows it --
-# its position is the camera's, routed from the baked camera timelines, plus each ray's own offset -- so it stays on
-# the sun as the ride flies)
 _sun = np.array(SUN); _sun /= np.linalg.norm(_sun)
 _e1 = np.cross(_sun, [0.0, 1.0, 0.0] if abs(_sun[1]) < 0.9 else [1.0, 0.0, 0.0]); _e1 /= np.linalg.norm(_e1)
 _e2 = np.cross(_sun, _e1)
 SUN_DIST, RAY_N = 5000.0, 22
-SUN_RAYS = []
+_rays = []
 for k_ in range(RAY_N):
     ang = 2 * math.pi * (k_ + rng.uniform(-0.3, 0.3)) / RAY_N
     r_dir = math.cos(ang) * _e1 + math.sin(ang) * _e2
     length_ = rng.uniform(1100.0, 2400.0) * (1.4 if k_ % 3 == 0 else 1.0)
     width_ = rng.uniform(380.0, 900.0)
-    base_ = _sun * SUN_DIST + r_dir * 20.0
-    # the quad's local X across the ray, Y along it (out from the sun), Z toward the world
-    m_ = Matrix((tuple(np.cross(r_dir, -_sun)), tuple(r_dir), tuple(-_sun))).transposed()
-    eul = m_.to_euler("XYZ")
-    rn_ = "sunray_%02d" % k_
-    nodes.append({"name": rn_, "kind": "gltf", "asset": "sun_ray.glb", "position": [round(float(c), 2) for c in base_],
-                  "rotation": [round(math.degrees(v), 3) for v in eul], "scale": [round(width_ / 1000.0, 4), round(length_ / 1000.0, 4), 1.0],
-                  "castsShadow": False, "emissiveBoost": 0.25})
-    SUN_RAYS.append(rn_)
-print("SUN RAYS", len(SUN_RAYS))
+    _rays.append((_sun * SUN_DIST + r_dir * 20.0, r_dir, np.cross(r_dir, -_sun), -_sun, length_, width_))
+ray_asset.write_burst_glb(os.path.join(OUT, "sun_burst.glb"), _rays)
+# one node: its origin follows the camera (routed from the baked camera timelines), so the burst stays on the sun
+SUN_RAYS = ["sun_burst"]
+nodes.append({"name": "sun_burst", "kind": "gltf", "asset": "sun_burst.glb", "position": [0.0, 0.0, 0.0],
+              "castsShadow": False, "emissiveBoost": 0.25})
 
 # ---- scene and project ----------------------------------------------------------------------------------------------
 env, lights = look.environment(SUN, rw.to_avgen(Vector((0, 0, 1))))

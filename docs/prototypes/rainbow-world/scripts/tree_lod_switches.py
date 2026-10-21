@@ -6,7 +6,7 @@ they do (the camera re-evaluated as the engine places it; trees from the built s
 import sys, json, math, numpy as np
 sys.path.insert(0, 'docs/prototypes/rainbow-world/scripts')
 import camera_motion as cm
-mode = sys.argv[1]   # "dist": the old distance thresholds (22/55/90/150 m); "px": the screen-size ones (130/60/28/12 px)
+mode = sys.argv[1]   # "dist": the old distance thresholds (22/55/90/150 m); "px": the screen-size ones (130/75/42/22 px)
 path, keys, la = cm.load('examples/rainbow-world/rainbow-world-feline.json')
 scene = json.load(open('examples/rainbow-world/scene/rainbow-world.scene.json'))
 R_ = {"great": 20.5, "blossom": 9.6, "pine": 6.0, "weeper": 11.0}
@@ -27,7 +27,7 @@ for i, s in enumerate(ss):
     if mode == 'dist':
         lvl = np.searchsorted(np.array([22, 55, 90, 150]), dist)
     else:
-        lvl = np.where(px > 130, 0, np.where(px > 60, 1, np.where(px > 28, 2, np.where(px > 12, 3, 4))))
+        lvl = np.where(px > 130, 0, np.where(px > 75, 1, np.where(px > 42, 2, np.where(px > 22, 3, 4))))
     vis = (d @ Rm[:, 2]) / dist > math.cos(math.radians(60))
     if prev is not None:
         for j in np.flatnonzero((lvl != prev) & vis):

@@ -31,12 +31,34 @@ def ray_texture(w=64, h=256, alpha_peak=0.32):
     return img[::-1]   # glTF's v runs down the image: v = 0 (the sun end) is the image's top row
 
 
+def write_burst_glb(path, rays):
+    """The whole sunburst as one mesh (one entity: a moving node costs per node, and 22 of them moving every frame
+    spiked the frame time). `rays`: (base point, along unit, across unit, facing unit, length, width), metres, in
+    the node's own frame (its origin the camera)."""
+    pos, nrm, uv, idx = [], [], [], []
+    for k, (b, al, ac, fc, ln, wd) in enumerate(rays):
+        b, al, ac, fc = (np.asarray(x, np.float64) for x in (b, al, ac, fc))
+        for cu, cv in ((0, 0), (1, 0), (1, 1), (0, 1)):
+            pos.append(b + ac * (cu - 0.5) * wd + al * cv * ln)
+            nrm.append(fc)
+            uv.append((cu, cv))
+        o = 4 * k
+        idx += [o, o + 1, o + 2, o, o + 2, o + 3]
+    pos = np.array(pos, np.float32); nrm = np.array(nrm, np.float32); uv = np.array(uv, np.float32)
+    idx = np.array(idx, np.uint16)
+    _write(path, pos, nrm, uv, idx)
+
+
 def write_ray_glb(path, size=1000.0):
-    """`size` metres a side: a node's scale is capped at 100, so the quad is built at the sunburst's own scale."""
+    """One quad, `size` metres a side."""
     pos = np.array([[-0.5, 0, 0], [0.5, 0, 0], [0.5, 1, 0], [-0.5, 1, 0]], np.float32) * size
     nrm = np.array([[0, 0, 1]] * 4, np.float32)
     uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], np.float32)
     idx = np.array([0, 1, 2, 0, 2, 3], np.uint16)
+    _write(path, pos, nrm, uv, idx)
+
+
+def _write(path, pos, nrm, uv, idx):
     png = _png_rgba(ray_texture())
     blobs, views, off = [], [], 0
     for data, target in ((pos.tobytes(), 34962), (nrm.tobytes(), 34962), (uv.tobytes(), 34962),
@@ -51,11 +73,11 @@ def write_ray_glb(path, size=1000.0):
     gl = {"asset": {"version": "2.0", "generator": "rainbow-world ray_asset.py"},
           "buffers": [{"byteLength": off}], "bufferViews": views,
           "accessors": [
-              {"bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3", "min": [-0.5 * size, 0, 0],
-               "max": [0.5 * size, size, 0]},
-              {"bufferView": 1, "componentType": 5126, "count": 4, "type": "VEC3"},
-              {"bufferView": 2, "componentType": 5126, "count": 4, "type": "VEC2"},
-              {"bufferView": 3, "componentType": 5123, "count": 6, "type": "SCALAR"}],
+              {"bufferView": 0, "componentType": 5126, "count": len(pos), "type": "VEC3",
+               "min": [float(v) for v in pos.min(axis=0)], "max": [float(v) for v in pos.max(axis=0)]},
+              {"bufferView": 1, "componentType": 5126, "count": len(pos), "type": "VEC3"},
+              {"bufferView": 2, "componentType": 5126, "count": len(pos), "type": "VEC2"},
+              {"bufferView": 3, "componentType": 5123, "count": len(idx), "type": "SCALAR"}],
           "images": [{"bufferView": 4, "mimeType": "image/png"}],
           "samplers": [{"magFilter": 9729, "minFilter": 9729, "wrapS": 33071, "wrapT": 33071}],
           "textures": [{"source": 0, "sampler": 0}],
