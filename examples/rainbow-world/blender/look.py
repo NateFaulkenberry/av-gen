@@ -12,9 +12,12 @@ import rw_common as rw
 
 LOOK = {
     "exposure": 0.2, "saturation": 1.15, "contrast": 1.14, "chroma": 0.65, "atmos": 0.3, "atmosDist": 3200.0, "atmosTint": rw.hexlin("#5FA2E6")[:3],
-    "sun": 6.5, "sunColor": rw.hexlin("#FFD49A")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.12,
+    "sun": 6.5, "sunColor": rw.hexlin("#FFE2BC")[:3], "bounce": 1.6, "skyIntensity": 1.0, "haze": 0.4,
     "zenith": rw.hexlin("#0E36B2")[:3], "horizon": rw.hexlin("#3EAAE2")[:3], "ground": rw.hexlin("#B4B2DC")[:3],
-    "meadow": [rw.hexlin("#2A6E2E")[:3], rw.hexlin("#4E9A2C")[:3], rw.hexlin("#6FB038")[:3], rw.hexlin("#9AC23A")[:3]],
+    # Rainbow World 2 (gate 3, "the lime"): the crests were a yellow-green (#9AC23A) that the warm key and the grade's
+    # saturation pushed to lime; now an emerald ramp whose light end leans blue-green, under a paler sun (#FFE2BC, was
+    # #FFD49A)
+    "meadow": [rw.hexlin("#1C6238")[:3], rw.hexlin("#2C8642")[:3], rw.hexlin("#469C52")[:3], rw.hexlin("#68AE68")[:3]],
     "shade": rw.hexlin("#155A5C")[:3],
     "cloud": [rw.hexlin("#4A50AC")[:3], rw.hexlin("#8A8ED6")[:3], rw.hexlin("#F4CFA4")[:3], rw.hexlin("#FFEAD0")[:3]],
     "cloudBounce": rw.hexlin("#8478CC")[:3], "cloudGain": 0.88,
