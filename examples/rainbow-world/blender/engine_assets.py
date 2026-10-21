@@ -193,15 +193,19 @@ def export_clouds(out):
         rw.reset()
         lobes = clouds.author_cloud(seed=seed, width=width)
         ell = [(Vector((c.x, c.y, c.z * fz)), r * 1.15, (sc[0], sc[1], sc[2] * fz)) for c, r, sc, _, _ in lobes]
-        m = metaball_mesh("cloud_" + kind, ell, 5.0 if width < 700 else 8.0)
+        # gate 8: a lower metaball threshold, so neighbouring lobes merge in a smooth union with filled necks rather
+        # than meeting in creases (0.6 before)
+        m = metaball_mesh("cloud_" + kind, ell, 5.0 if width < 700 else 8.0, threshold=0.42)
         # merge the cauliflower's spheres into billows: a voxel remesh then a gentle smooth
         bpy.context.view_layer.objects.active = m
         r = m.modifiers.new("remesh", "REMESH")
         r.mode = "VOXEL"
         r.voxel_size = width * 0.0055
+        # gate 8 (the owner: clouds with "no hard edges or corners"): smoothed far longer, so the voxel steps, the
+        # small cauliflower buds' creases and the seams where lobes merge round off into billows
         sm = m.modifiers.new("smooth", "SMOOTH")
-        sm.factor = 0.5
-        sm.iterations = 2
+        sm.factor = 0.8
+        sm.iterations = 30
         bpy.ops.object.modifier_apply(modifier="remesh")
         bpy.ops.object.modifier_apply(modifier="smooth")
         decimate_to(m, tris)

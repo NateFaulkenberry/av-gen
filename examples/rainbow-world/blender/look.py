@@ -323,8 +323,10 @@ def cloud_program():
                 {"kind": "fresnel", "dst": 4, "value": 3.0},
                 {"kind": "multiply", "dst": 2, "srcA": 4, "srcB": 6},
                 {"kind": "add", "dst": 3, "srcA": 3, "srcB": 2},
+                # gate 8 (the owner: no hard edges): the grazing dissolve to the horizon colour reaches 0.45, not 0.75 --
+                # at full strength it outlined every fold between lobes in pale blue, a hard line inside the mass
                 {"kind": "fresnel", "dst": 4, "value": 6.0},
-                {"kind": "remap", "dst": 4, "srcA": 4, "constant": [0.0, 1.0, 0.0, 0.75], "value": 1.0},
+                {"kind": "remap", "dst": 4, "srcA": 4, "constant": [0.0, 1.0, 0.0, 0.45], "value": 1.0},
                 {"kind": "constant", "dst": 5, "constant": R(LOOK["horizon"]) + [1.0]},
                 {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 4},
                 # Rainbow World 2: the synth's light on the clouds (1 = as built; routed up by the synth)

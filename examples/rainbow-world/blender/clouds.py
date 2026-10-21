@@ -32,9 +32,12 @@ def author_cloud(seed=8, width=620.0):
 
     def add(c, r, sc=(1, 1, 1), dens=1.0, soft=0.35):
         # keep the floor flat: a lobe may not reach below it by more than a sliver
+        # (gate 8: a lobe may round 30% of its own height under the floor, so the base is a soft, rounded belly and
+        # not a flat cut with a hard rim -- the owner saw the undersides jagged when the ride turns upside down)
+        sink = 4.0 + 0.3 * r * sc[2]
         lowest = c.z - r * sc[2]
-        if lowest < FLOOR - 4.0:
-            c = Vector((c.x, c.y, FLOOR - 4.0 + r * sc[2]))
+        if lowest < FLOOR - sink:
+            c = Vector((c.x, c.y, FLOOR - sink + r * sc[2]))
         lobes.append((c, r, sc, dens, soft))
 
     # 1. base
