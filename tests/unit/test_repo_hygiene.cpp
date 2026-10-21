@@ -157,6 +157,9 @@ TEST_CASE("every writer of a parameter final is a kind the Inspector can name", 
     //   params/parameter_set.cpp -> resets finals; it establishes the base rather than modulating
     //   ui/edit_history.cpp    -> an undo. A user action, not an influence on a running scene.
     //   params/palette.cpp     -> Kind::Palette (ADR-1043, the project palette's bindings)
+    //   app/engine.cpp         -> the seek's control replay (ADR-1573) puts back the source knobs' finals as the
+    //                             routes left them on the frame before the landing. The writer is still the
+    //                             routes (Kind::Route); the replay only restores what they wrote.
     // World macros do not appear because a macro writes through routes.
     //   stage/staging.cpp      -> Kind::Entity *and* Kind::Staging. A scenario (ADR-210) drives a
     //                             body through `entity::DirectorMotion`, which the entity branch
@@ -170,6 +173,7 @@ TEST_CASE("every writer of a parameter final is a kind the Inspector can name", 
     const std::set<std::string> known{
         "params/modulation.cpp", "params/timeline.cpp", "entity/entity.cpp",
         "params/parameter_set.cpp", "ui/edit_history.cpp", "stage/staging.cpp", "params/palette.cpp",
+        "app/engine.cpp",
     };
     std::vector<std::string> unexpected;
     std::set_difference(writers.begin(), writers.end(), known.begin(), known.end(),
