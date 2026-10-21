@@ -1,4 +1,4 @@
-# Rainbow World 2, gate 7: fireworks fade, the twirl, the sun, the sky
+# Rainbow World 2, gates 7-8: fireworks fade, the twirl, the sun, the sky, the clouds, live popping
 
 The owner's gate-6 verdict (verbatim in 22-owner-fixes.md) asked for four things:
 - fireworks that fade about a second sooner;
@@ -84,13 +84,73 @@ Clip: gate7-sky-reactivity-40-65s-before-left-after-right.mp4, which includes th
 
 ## 5. Live profile
 
-The machine was on battery at the time (build/rw2/prof/ac_power.txt), so this run does not count against the bar.
-Rerun it on AC.
+Gate 7's run was on battery and does not count. The gate-8 run on AC at the final scene is in 17 section 11.
 
-| | Gate 6 (AC) | Gate 7 (battery) |
-|---|---|---|
-| Frame p50 / p95 | 33.4 / 35.9 ms | 33.3 / 36.9 ms |
-| GPU p50 | 24.4 ms | 23.3 ms |
-| Misses | 2 | 101 |
+## 6. Gate 8: the cloud pass
 
-The gate-7 run spent 269 frames at Medium, mostly between the scans.
+The owner, verbatim: "could we just smooth out some of the cloud bottoms in the sky? they look a little jagged when
+they're upside down", then "it looks that way right side up too so I think clouds just need a visual pass altogether
+but I like generally how they look, just need to be no hard edges or corners".
+
+**Diagnosis, from A/B stills:**
+- **The main cause was the LOD rungs.** The masses and puffs simplified by distance (rungs from 300-500 m). In this
+  sky, a cloud 300-1600 m away is large on screen, so it drew at 12% or 4% of its triangles: the crystal-cut, faceted
+  clouds. With LOD off, they were already far softer.
+- **Smaller causes:**
+  - the small cauliflower buds met the mass in creases;
+  - the bases were a flat cut with a hard rim;
+  - the grazing dissolve to the horizon colour (up to 0.75) drew a pale line along every fold.
+
+**The changes:**
+- **Smooth union:** the metaball threshold is 0.42 (was 0.6), so lobes merge with filled necks.
+- **Smoothing:** 30 iterations at 0.8, where it was 2 at 0.5.
+- **Rounded bases:** a lobe may sink 30% of its height under the floor.
+- **Screen-size LOD:** puffs coarsen at 400/120/40 px radius and masses at 450/140 px. These coarse thresholds look
+  the same as finer ones (220/60/18 px), which cost +290k triangles and +2.4 ms. At 150 s, High, GPU is 25.8 ms
+  against 25.7 ms on the old distance ladder.
+- **Softer folds:** the grazing dissolve stops at 0.45.
+
+Unchanged: the shapes, colours, palette response, breathing and splashes. The clouds are unlit and draw no LOD rung
+flat-shaded in a way that differs, so ADR-1576 is not needed for them.
+
+**Media:**
+- gate8-clouds-upside-down-22s-62s-before-left-after-right.png
+- gate8-clouds-right-side-up-40s-113s-before-left-after-right.png
+- gate8-clouds-in-flight-18-30s-before-left-after-right.mp4
+
+Puffs that overlap one another still meet in a visible line. That is two meshes crossing, and blending it would need
+a soft-depth or volumetric pass.
+
+## 7. Gate 8: live popping (shadows and ground colour)
+
+The owner, verbatim: "noticed some shadow popping during the live projection play back" and "its also ground color
+popping so might not just be shadows - usable for live if theres no easy fix".
+
+**Cause.** The live tiers (Preview and Realtime) draw every procedural LOD rung past the foreground at the flat
+material tier (ADR-155). This world's ground is 48 bands with four distance rungs each. At the flat tier they turned
+brown, lost their modelling and their shadows, and every band crossing a rung boundary popped. Offline never demotes,
+which is why only live showed it.
+
+I checked the candidates the coordinator listed against this:
+- **Tier changes:** a few a minute, so they cannot explain constant popping.
+- **The mask resolution:** the `maskfull` arm left the pop metric unchanged.
+- **The grass reach:** `--render-limits live` left it unchanged.
+
+**Measured** on 88-96 s at 1080p (the pop share is the share of pixels departing from the mean of their neighbours in
+time by more than 0.12):
+
+| Tier | Pop share |
+|---|---|
+| Offline | 1.10% |
+| Realtime, as it was | 1.76% |
+| Realtime, ground bands keep their rungs | 1.19% |
+| Realtime, bands and trees keep their rungs | 0.98% |
+
+**Fix.** ADR-1576 adds `"flatFarRungs": false` (approved), set on the 48 ground bands. The trees were measured and
+left on ADR-155. At High pinned on 140-200 s, the trees add +1.2 ms GPU median and +8 ms at p95, against +0.6 / +1.9
+ms for the bands, and a far tree's flat rung is a few pixels.
+
+Clip: gate8-live-popping-88-96s-before-left-after-right.mp4. A three-way version adds the render on the right.
+
+Other live scenes with multi-rung procedural LOD probably show the same pop. A grep of the live projects finds one:
+the Rift (`examples/bioluminescent/rift-live.json`, 4 nodes).

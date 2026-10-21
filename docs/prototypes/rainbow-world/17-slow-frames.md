@@ -266,3 +266,56 @@ The screen-size leaves were the only cost: leaves out to 12 px cost 2.2 ms. With
 - High outside the scans;
 - Medium allowed during a scan's window;
 - 30 fps held throughout, with no sustained misses.
+
+## 11. Gates 6-8: the final scene against the owner's bar
+
+All on AC (`build/rw2/prof/ac_power.txt`). Gate 7's run (`live_g7`) was on battery and is discarded.
+
+**Final live profile** (`live_final`, at the final scene: the cloud pass and ADR-1576 on the ground bands). Feline
+showcase, 15-215 s, the whole song bar the first 15 s, auto ladder, 1080p30:
+
+| | |
+|---|---|
+| Ladder (frames) | High 4484, Medium 808, Ultra 385, Low 269 |
+| Frame p50 / p95 | 33.4 / 35.9 ms |
+| GPU p50 / p95 | 24.0 / 32.6 ms |
+| Deadline misses | 8 |
+
+| Window (s) | Scan | Ladder (frames) |
+|---|---|---|
+| 15-47.9 | | High 663, Medium 269, Ultra 71 |
+| 47.9-57.5 | scan | Ultra 164, High 125 |
+| 57.5-111.3 | | High 1464, Ultra 150 |
+| 111.3-121 | scan | High 291 |
+| 121-158.9 | | High 896, Low 210, Medium 30 |
+| 158.9-168.5 | scan | Medium 229, Low 59 |
+| 168.5-190.7 | | High 386, Medium 280 |
+| 190.7-200.4 | scan | High 291 |
+| 200.4-215 | | High 368 |
+
+**Against the bar:** 30 fps holds, with 8 misses in 200 s. There are three exceptions:
+- **Medium outside the scans:** 15-48 s (269 frames) and 169-191 s (280 frames).
+- **Low around 150-165 s:** 210 frames before the third scan and 59 in it.
+
+**Run-to-run variation is large.** An earlier full-song run at gate 8 (`live_g8b`, before the cloud pass) sat at Low
+from about 150 s to the end. A gate-8 run measuring 40-210 s spent 1696 frames at Low.
+
+**Why the late song is heavy.** Headless, High pinned, GPU median:
+
+| Window | GPU median |
+|---|---|
+| 70 s | 25.3 ms |
+| 150 s | 28.1 ms |
+| 185 s | 30.6 ms |
+
+The budget at the 12% headroom is 29.3 ms.
+- **Geometry, not fill:** the scene pass is 15-19 ms and depth 5-7 ms. Medium's lower render scale saves only about
+  1 ms there (live, at 140 s and later: High 30.5, Medium 29.3, Low 23.5 ms), so the ladder falls through to Low.
+- **Draw distance at 75%** saves 1.4 ms (4%), measured, with SSIM 0.994: not enough on its own.
+
+This is a follow-up, not a fix, in this pass.
+
+**What gate 8 costs:**
+- **ADR-1576 on the 48 ground bands:** +0.6 ms GPU median, +1.9 ms p95 (High pinned, 140-200 s). The trees as well
+  would have been +1.2 / +8 ms, and were left out.
+- **The cloud pass:** 0, at the coarse screen-size thresholds (28 section 6).

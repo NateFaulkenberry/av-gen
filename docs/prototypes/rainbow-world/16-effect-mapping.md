@@ -8,6 +8,9 @@ Brief 13, Phases 4-5 and 7. It rests on the stem analysis (`14-stem-analysis.md`
 - **Revised for gate 4** (2026-10-20), after the owner's colour brief (`19-brief-color-vfx.md`): colour over geometry.
   The swell's deformers and the per-beat world ring are gone; the kick is local, the world scan is the drop's moment,
   and the looks carry the colour.
+- **Revised for gates 5-8** (2026-10-21): the bass swell's new conditioning; the scan four times in the showcase,
+  with a latching live trigger, the trees' fireworks and twirl; the sky's breathing clouds, colour splashes and sun
+  glare; the cloud pass; the live ground's LOD tiers (22-owner-fixes.md has each verdict).
 - **Numbers:** every number here is the generator's. If this document and the generator disagree, the generator is
   right and this document is stale.
 
@@ -69,15 +72,15 @@ stem.<key>.* (a stem file offline, a mapped input channel live)      response.*,
 
 ## 3. Bass: colour energy
 
-- **Musical control:** `macro.swell`, the bass's body: `stem.bass.level` conditioned (`x 1.6 - 0.55`), attack 60 ms,
-  decay 500 ms; plus 0.35 per `stem.bass.onset`, falling at 3 per second. It moves on the bass's own syncopated
-  rhythm, not the kick's.
+- **Musical control:** `macro.swell`, the bass's body. It is `stem.bass.level` conditioned (`x 2.4 - 1.4`, so only
+  the bass's top half counts), attack 40 ms, decay 180 ms, plus 0.5 per `stem.bass.onset`. It swings 0-1 within a
+  bar, on the bass's own syncopated rhythm, not the kick's (gate 5).
 - **What it drives:**
-  - the palette's own saturation (+0.18 at a full swell): every colour the look binds -- meadow, sky, clouds,
-    stones -- deepens with the bass. No shader cost;
-  - the cloud sea's bounce light (`lights/cloudsea`, +0.6).
-  - the heave: one world-space sine deformer (105 m, up to 1.9 m) on the land and everything on it. (An earlier
-    revision of this document said it was removed; it was not -- 23-modulation-inventory.md. It costs 1.1-2.7 ms.)
+  - the palette's own saturation (+0.18 at a full swell) and value (+0.07): every colour the look binds (meadow,
+    sky, clouds, stones) deepens with the bass. No shader cost;
+  - the cloud sea's bounce light (`lights/cloudsea`, +1.2);
+  - the clouds' breathing (14% swell) and their light (+0.3) (gate 7, section 4.3).
+  - The heave (a world-space sine deformer on the land) is retired. `SWELL` is empty, so no node carries it.
 - **Live:** `response.bass`.
 
 ## 4. Synth: atmosphere, colour, spectacle
@@ -109,6 +112,19 @@ light.
 ### 4.3 Clouds, sky and flowers
 
 - **Clouds:** `macro.synth` lifts the painted clouds' light by up to 30% (`cloud_glow`).
+- **The clouds breathe (gate 7):** every puff swells about its own centre with the bass body, up to 14% at a full
+  swell (`macro.swell` sets the strength of a constant field, `skyBreath`; a scale effector on the cloud nodes reads
+  it). The clouds also brighten with it (`cloud_glow` +0.3).
+- **Splashes of colour (gate 7):** patches of saturated colour bloom across the clouds and fade within a beat or two.
+  - **Triggers:** each clap (the drum stem's 2-6 kHz band) and, bigger, each phrase start (`beat.phrasePulse`).
+  - **Placement:** the patches are a ~400 m noise whose sample point travels with `beat.phrase` and `beat.bar`.
+  - **Colour:** it turns once round the spectrum a phrase.
+  - **Extent:** never more than about a third of the cloud area (28 section 4).
+- **The cloud pass (gate 8, the owner: "no hard edges or corners"):** the lobes merge in a smooth union and are
+  smoothed far longer, the bases round under the floor, and the masses simplify by screen size, not distance. The
+  pale outline that the grazing dissolve drew at every fold is softened (28 section 6).
+- **The sun (gate 7):** a soft glare (a forward-scattering halo with faint, uneven streaks) in place of gate 5's 22
+  spokes. `macro.synth` (x1.6), `macro.lift` and a scan brighten it, and the look's sun colour tints it.
 - **Sun glow:** `macro.synth` +0.25; `macro.lift` +0.35.
 - **Shimmer:** the flower fields shimmer (world-position noise drifting in time), `macro.synth` x1.6 plus the hats.
 
@@ -118,21 +134,45 @@ light.
 synth's rms so a silent stem's noisy centroid reads 0). It carries the 151-165 s rise and the riser at 183-190 s:
 sun glow, bloom (+0.12) and the arches rise together, slowly.
 
-## 5. The world scan: the drop
+## 5. The world scan
 
-The drop's showpiece (the owner at gate 2: "rare and dramatic, turning everything rainbow, holding then relaxing").
-- **What:** a front runs out from the camera over everything in reach -- meadow, grass, stones, rims (scan ops in
-  their programs) and the trees (their canopy ramps crossfade to the spectrum) -- leaving the land rainbow behind it:
-  a cyclic OKLab spectrum by distance, its value the surface's own, so the land keeps its shading. The front's edge
-  is bright.
-- **With it:** the arches +14 and their flow +10, cloud light +0.6, sun glow +1.2, bloom +0.35, saturation +0.25.
-- **Shape:** the front runs 970 m in 4 s; the scan holds about six seconds and relaxes over three.
-- **When:** only where two conditions meet, both replayable (no stateful route reads a macro):
-  - A: the phrase pulse, read 300 ms late, latched six seconds, its depth the synth stem's level near the top of its
-    adaptive range (a loud entry after a quiet stretch);
-  - B: the synth stem's absolute loudness (rms): the intro's calls are too quiet.
-  - Combined by `min` onto `macros/scan`. The trace confirms one firing, 48.1-52 s: the drop.
-- **Live:** the scan needs the synth stem; on a stereo input it stays off (the fallback depth is 0).
+The showpiece (the owner at gate 2: "rare and dramatic, turning everything rainbow, holding then relaxing"; gates 5-7).
+The design and its measurements are in 26 (the scan), 27 (the fireworks) and 28 (the twirl).
+
+**What it does.** A front runs out from the camera over everything in reach, 10 m to 980 m in 7 s:
+- the meadow, grass, stones and rims (scan ops in their programs) and the trees (their canopy ramps crossfade to the
+  spectrum);
+- it leaves the land rainbow behind it, a cyclic OKLab spectrum by distance with the surface's own value, so the land
+  keeps its shading;
+- the front's edge is bright.
+
+**The trees and fireworks.** As the front reaches each tree, the tree twirls like a dancer and lights up in its own
+colour. Its crown bursts like a firework shell, with an ignition flash and streaked sparks that fly out, slow, arc
+down, cool from white-hot and crackle, gone about 1.15 s after the front.
+- **The twirl:** anticipation, squash and stretch, a hop, a sweeping lean, overshoot and a damped wobble, in two
+  temperaments.
+- **How it is driven:** every stage is a function of how far the front has passed the tree (scene fields riding the
+  front, effectors on the instances). There are no events, so seek equals play.
+
+**With it:** the arches +14 and their flow +10, cloud light +0.6, sun glow +1.2, bloom +0.35, saturation +0.25. The
+scan holds about six seconds and relaxes over three.
+
+**When, in the showcase.** Four baked scans at the song's big synth swells and section peaks: 47.85 s (the drop),
+111.3 s, 158.9 s and 190.7 s, as `timeline.scan` and `timeline.scanFront`.
+
+**When, live.** A latching trigger on the swell over the current bed:
+- the synth stem's rms, or the mix's sustain response without stems;
+- read as a trend (short-term average over long-term, ADR-1575);
+- latched for its whole hold and fall, with a 12 s refractory time and a re-arm on a new rise (ADR-1574).
+
+Measured, from the drop to the nearest scan (26 section 4):
+
+| Track, input | Scans | Distance from the drop |
+|---|---|---|
+| Feline, mix | 4 | 1.2 bars |
+| Feline, stems | 4 | 0.2 bars |
+| Trench | 6 | 0.1 bars |
+| Hyperborea | 6 | 0.8 bars |
 
 ## 6. The looks
 
@@ -176,11 +216,10 @@ the ramp stops and the look's tree colour on a later op.
 
 | Tier | What | How often | Share of the frame lit |
 |---|---|---|---|
-| Background | the look; the arch flow, cloud light, sun glow, shimmer; the bass's chroma | always, following the bass and synth | the whole world, gently |
-| Rhythm | kick tips; glints; the clap along the bows | each beat; each hat; beats 2 and 4 | the grass near the camera; specks; the arches |
-| Phrase | the arch flare (depth: the synth) | every 4 bars (7.9 s) | the arches |
-| Musical moments | the rolls under the bows | twice a lap | the whole frame turns |
-| World-scale | the scan at the drop; the lift through the riser | once; once | the whole world, colour not white |
+| Background | the look; the arch flow, cloud light, sun glare, shimmer; the bass's chroma and the clouds' breathing | always, following the bass and synth | the whole world, gently |
+| Rhythm | kick tips; glints; the clap along the bows and the cloud splashes; the bows' beat colour turn | each beat; each hat; beats 2 and 4 | the grass near the camera; specks; the arches; patches of cloud |
+| Phrase | the arch flare (depth: the synth); a bigger cloud splash | every 4 bars (7.9 s) | the arches; patches of cloud |
+| World-scale | the scan with its fireworks and twirling trees; the lift through the riser | four times in the showcase; once | the whole world, colour not white |
 
 No full-frame flash anywhere. The sky's exposure never moves on a hit.
 
@@ -190,24 +229,26 @@ No full-frame flash anywhere. The sky's exposure never moves on a hit.
   (ADR-901); stems are on the replay bus (ADR-1520); routes feeding a macro make the seek replay the control layer
   (ADR-1573). The scan reads only replayable signals (section 5). The look selector is the documented exception.
 - **Live:** the same routes run on the mix's `response.*` and the live beat tracker; a mapped input channel keyed
-  `drums`, `bass` or `synth` turns the stem routes on and the fallbacks stand aside (ADR-1570). Without a synth
-  channel there is no scan.
+  `drums`, `bass` or `synth` turns the stem routes on and the fallbacks stand aside (ADR-1570). The live scan reads the
+  synth stem's trend, or the mix's sustain trend without one (section 5).
+- **Live tiers:** the ground's bands keep their far LOD rungs at the frame's material tier (ADR-1576), so live ground
+  colour and shadows match a render and do not pop at rung boundaries (gate 8).
 
 ## 10. The effect timeline (Feline Footwear)
 
 | Time (s) | Bars | Stems | Effect | With |
 |---|---|---|---|---|
 | 0.24-8.2 | 1-4 | drums | kick tips, glints | Bright Noon; a calm world |
-| 8.2 on | 5 | bass | the bass's chroma, cloud-sea light | |
-| 20.1-45 | 11-24 | synth | each call: arches, clouds, sun glow swell and fall | |
-| 28.0 on | 15 | drums | the clap along the bows | |
-| 32.0 | 17 | -- | a roll under a bow | phrase start |
-| **47.85** | **25** | **all** | **the camera flips over a rim; the scan runs out 300 ms later and turns the world rainbow, holding to ~52 s, relaxing to ~55 s; arches +14** | the track's largest |
-| every 7.93 | 1 + 4k | all | the arch flare (x synth) | |
-| 79.6 | 41 | -- | a roll under a bow | phrase start |
+| 8.2 on | 5 | bass | the bass's chroma, cloud-sea light, the clouds breathe | |
+| 20.1-45 | 11-24 | synth | each call: arches, clouds, sun glare swell and fall | |
+| 28.0 on | 15 | drums | the clap along the bows and splashes on the clouds | |
+| **47.85** | **25** | **all** | **the drop: the camera flips over a rim; the scan runs out and turns the world rainbow, the trees twirl and burst; holds to ~53 s, relaxes to ~56 s; arches +14** | the track's largest |
+| every 7.93 | 1 + 4k | all | the arch flare (x synth), a bigger cloud splash | |
 | 101.4, 109.3 | 52, 56 | drums | fills: no kick, no clap | a hush |
-| 111.3 on | 57 | drums | 16th hats: glints denser | |
-| 151-165 | 77-84 | synth | the lift: sun glow, bloom, arches rise slowly | |
-| **182.7** | **93** | drums stop | kick, clap and glints stop; the lift rises through the riser | |
+| **111.3** | **57** | **drums** | **16th hats: glints denser; the second scan** | section B |
+| 151-165 | 77-84 | synth | the lift: sun glare, bloom, arches rise slowly | |
+| **158.9** | **81** | synth | **the third scan** | inside the rise |
+| **182.7** | **93** | drums stop | kick, clap, glints and splashes stop; the lift rises through the riser | |
 | 190 | -- | -- | the ride's lap ends and begins again (seamless) | |
-| 194.6-210.5 | 99-106 | synth alone | arches, clouds and sun glow fade with the synth | the last thing glowing is the arches |
+| **190.7** | **97** | synth | **the fourth scan** | the riser's peak |
+| 194.6-210.5 | 99-106 | synth alone | arches, clouds and sun glare fade with the synth | the last thing glowing is the arches |
