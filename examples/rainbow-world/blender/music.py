@@ -141,17 +141,22 @@ def routes(fx, swell_nodes, swell):
 
     # ---- bass: the swell -------------------------------------------------------------------------------------------
     # the bass body (its followed level, conditioned so the stem's quiet floor reads 0) plus a push on each note
+    # (gate 5, the owner chose 23 item 3: "breathe across their range": it sat above 0.3 for 85% of the song; now
+    # only the bass's top half counts and it lets go in 180 ms, so it swings 0-1 within a bar -- median 0.31, a 0.46
+    # swing a second -- and each note pushes it)
     out += stem_route("bass", "level", "response.bass", "macros/swell", 1.0,
-                      {"gain": 1.6, "offset": -0.55, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 60.0, "decayMs": 500.0},
-                      fb_chain={"gain": 1.6, "offset": -0.6, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                                "attackMs": 60.0, "decayMs": 500.0})
-    out += stem_route("bass", "onset", None, "macros/swell", 0.35,
-                      {"envelope": "linearfall", "envelopeFallPerSecond": 3.0, "attackMs": 10.0})
+                      {"gain": 2.4, "offset": -1.4, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                       "attackMs": 40.0, "decayMs": 180.0},
+                      fb_chain={"gain": 2.4, "offset": -1.45, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                                "attackMs": 40.0, "decayMs": 180.0})
+    out += stem_route("bass", "onset", None, "macros/swell", 0.5,
+                      {"envelope": "linearfall", "envelopeFallPerSecond": 4.0, "attackMs": 10.0})
     for nm in swell_nodes:
         for k, wave in enumerate(swell):
             out.append(route("macro.swell", "procedural/%s/deform/%d/amount" % (nm, k + 1), wave[-1]))
-    out.append(route("macro.swell", "lights/cloudsea/intensity", 0.6))
+    out.append(route("macro.swell", "lights/cloudsea/intensity", 1.2))
+    # the bass on the big surfaces (gate 5): the whole palette -- meadow, sky, clouds -- brightens with it a little
+    out.append(route("macro.swell", "palette/value", 0.07))
     # the bass as colour energy (19-brief-color-vfx: "bass energy increases the intensity of selected terrain
     # colours"): the palette's own chroma (ADR-1043's palette/saturation, applied to every colour the look binds --
     # meadow, sky, clouds, trees, stones) rises with the bass body. No shader cost: the first version did it with
@@ -194,17 +199,19 @@ def routes(fx, swell_nodes, swell):
     # The level reads against the stem's own adaptive reference (ADR-1510), so the intro's isolated calls read at the
     # top and the drop's steady bed reads mid-range; the window RMS is absolute, so the bed (0.12-0.18) outweighs the
     # calls (0.02-0.06). Both, so the world is brightest where the synth is loudest and still answers each entry.
-    out += stem_route("synth", "level", "response.sustain", "macros/synth", 0.4,
+    # (gate 5, "breathe": it sat above 0.3 for 84% of the song at 0.5-0.8; now the bed sits about 0.3 and the
+    # swells and peaks reach 0.6-1 -- the rms counts from 0.11, the level and the notes push on top)
+    out += stem_route("synth", "level", "response.sustain", "macros/synth", 0.3,
                       {"gain": 2.2, "offset": -0.95, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 250.0, "decayMs": 1200.0},
+                       "attackMs": 250.0, "decayMs": 900.0},
                       fb_amount=0.9,
                       fb_chain={"gain": 2.0, "offset": -0.75, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                                 "attackMs": 250.0, "decayMs": 1200.0})
-    out += stem_route("synth", "rms", None, "macros/synth", 0.7,
-                      {"gain": 4.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 300.0, "decayMs": 1200.0})
-    out += stem_route("synth", "onset", None, "macros/synth", 0.3,
-                      {"envelope": "linearfall", "envelopeFallPerSecond": 1.4, "attackMs": 20.0})
+    out += stem_route("synth", "rms", None, "macros/synth", 0.8,
+                      {"gain": 7.0, "offset": -0.8, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                       "attackMs": 250.0, "decayMs": 900.0})
+    out += stem_route("synth", "onset", None, "macros/synth", 0.35,
+                      {"envelope": "linearfall", "envelopeFallPerSecond": 1.6, "attackMs": 20.0})
     # ---- phrase: every 4 bars (beat.phrasePulse, bars 1 + 4k) the arches flare and the kick's ring is brighter; the
     # flare's depth is the synth (a phrase in the intro, before the bed, flares less)
     for prog in RAINBOWS:
@@ -226,7 +233,8 @@ def routes(fx, swell_nodes, swell):
         if r_["target"] == "macros/lift" and r_["source"].startswith("stem."):
             r_.update(depthSource="stem.synth.rms", depthMin=-0.2, depthMax=6.0)   # replayable: not a macro
     out.append(route("macro.lift", "env/sky/sunGlow", 0.35))
-    out.append(route("macro.synth", "env/sky/sunGlow", 0.25))   # the synth's light in the sky
+    out.append(route("macro.synth", "env/sky/sunGlow", 0.6))    # the synth's light in the sky
+    # (the sun's rays swell with the synth too: build_world's sunburst routes)
     out.append(route("macro.lift", "post/bloom/intensity", 0.12))
     # ---- the drop: a world-scale impact, rare by construction --------------------------------------------------------
     impact = {"envelope": "linearfall", "envelopeFallPerSecond": 0.25, "attackMs": 20.0}   # four seconds down

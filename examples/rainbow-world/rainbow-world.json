@@ -8163,13 +8163,13 @@
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "gain": 1.6,
-    "offset": -0.55,
+    "gain": 2.4,
+    "offset": -1.4,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 60.0,
-    "decayMs": 500.0
+    "attackMs": 40.0,
+    "decayMs": 180.0
    },
    "optional": true
   },
@@ -8181,13 +8181,13 @@
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "gain": 1.6,
-    "offset": -0.6,
+    "gain": 2.4,
+    "offset": -1.45,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 60.0,
-    "decayMs": 500.0
+    "attackMs": 40.0,
+    "decayMs": 180.0
    },
    "depthSource": "stem.bass.active",
    "depthMin": 1.0,
@@ -8197,13 +8197,13 @@
   {
    "source": "stem.bass.onset",
    "target": "macros/swell",
-   "amount": 0.35,
+   "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 3.0,
+    "envelopeFallPerSecond": 4.0,
     "attackMs": 10.0
    },
    "optional": true
@@ -8211,7 +8211,15 @@
   {
    "source": "macro.swell",
    "target": "lights/cloudsea/intensity",
-   "amount": 0.6,
+   "amount": 1.2,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
+   "source": "macro.swell",
+   "target": "palette/value",
+   "amount": 0.07,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -8353,7 +8361,7 @@
   {
    "source": "stem.synth.level",
    "target": "macros/synth",
-   "amount": 0.4,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
@@ -8364,7 +8372,7 @@
     "clampMin": 0.0,
     "clampMax": 1.0,
     "attackMs": 250.0,
-    "decayMs": 1200.0
+    "decayMs": 900.0
    },
    "optional": true
   },
@@ -8392,30 +8400,31 @@
   {
    "source": "stem.synth.rms",
    "target": "macros/synth",
-   "amount": 0.7,
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "gain": 4.5,
+    "gain": 7.0,
+    "offset": -0.8,
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 300.0,
-    "decayMs": 1200.0
+    "attackMs": 250.0,
+    "decayMs": 900.0
    },
    "optional": true
   },
   {
    "source": "stem.synth.onset",
    "target": "macros/synth",
-   "amount": 0.3,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 1.4,
+    "envelopeFallPerSecond": 1.6,
     "attackMs": 20.0
    },
    "optional": true
@@ -8498,7 +8507,7 @@
   {
    "source": "macro.synth",
    "target": "env/sky/sunGlow",
-   "amount": 0.25,
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -9730,6 +9739,996 @@
    "op": "replace",
    "polarity": "unipolar",
    "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_00/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_00/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_00/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_00/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_00/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_00/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_01/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_01/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_01/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_01/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_01/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_01/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_02/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_02/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_02/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_02/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_02/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_02/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_03/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_03/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_03/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_03/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_03/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_03/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_04/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_04/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_04/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_04/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_04/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_04/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_05/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_05/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_05/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_05/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_05/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_05/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_06/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_06/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_06/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_06/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_06/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_06/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_07/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_07/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_07/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_07/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_07/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_07/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_08/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_08/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_08/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_08/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_08/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_08/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_09/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_09/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_09/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_09/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_09/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_09/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_10/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_10/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_10/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_10/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_10/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_10/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_11/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_11/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_11/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_11/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_11/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_11/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_12/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_12/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_12/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_12/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_12/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_12/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_13/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_13/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_13/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_13/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_13/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_13/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_14/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_14/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_14/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_14/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_14/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_14/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_15/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_15/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_15/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_15/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_15/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_15/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_16/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_16/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_16/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_16/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_16/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_16/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_17/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_17/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_17/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_17/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_17/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_17/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_18/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_18/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_18/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_18/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_18/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_18/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_19/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_19/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_19/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_19/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_19/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_19/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_20/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_20/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_20/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_20/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_20/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_20/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "timeline.camX",
+   "target": "nodes/sunray_21/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "nodes/sunray_21/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "nodes/sunray_21/position",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "macro.synth",
+   "target": "nodes/sunray_21/emissiveBoost",
+   "amount": 1.6,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.lift",
+   "target": "nodes/sunray_21/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "macro.scan",
+   "target": "nodes/sunray_21/emissiveBoost",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar"
   },
   {
    "source": "macro.synth",
@@ -11019,6 +12018,94 @@
    {
     "role": "foliageHue",
     "target": "material/rw_pine/op/7/hueShift/value"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_00/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_01/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_02/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_03/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_04/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_05/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_06/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_07/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_08/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_09/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_10/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_11/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_12/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_13/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_14/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_15/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_16/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_17/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_18/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_19/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_20/tint"
+   },
+   {
+    "role": "sun",
+    "target": "nodes/sunray_21/tint"
    },
    {
     "role": "ring",

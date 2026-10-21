@@ -1347,6 +1347,39 @@ nodes.append({"name": "scan_glitter", "kind": "procedural", "procedural": {
          "local": True}]}})
 print("SPARKLE %d glitter instances in %d crowns" % (len(glit), len(glit) // GLITTER_PER_TREE))
 
+# ---- Rainbow World 2, gate 5: the sunburst (the owner: "effects in the sky might be better if it were like sunrays")
+# The engine's light shafts are the volumetric march's (ADR-570: placed media and their self-shadow; this world has
+# no medium) and THE ASTRAL FORGE's renderer's own; neither reaches this scene, so the rays are geometry: long
+# translucent quads radiating from the sun's place in the sky, far out, faded by their own textures toward the tip
+# and the edges (glTF nodes: a procedural node draws blend as opaque). Blended, they write no depth, so the image's
+# aerial perspective leaves them alone, as it does the sky. Faint at rest; the synth swells them (their glow lane),
+# and the look's sun colours them (their tint).
+import ray_asset  # noqa: E402
+ray_asset.write_ray_glb(os.path.join(OUT, "sun_ray.glb"))
+# (a node's position and scale are capped at 1e4 and 100: the burst stands 5 km out from the camera and follows it --
+# its position is the camera's, routed from the baked camera timelines, plus each ray's own offset -- so it stays on
+# the sun as the ride flies)
+_sun = np.array(SUN); _sun /= np.linalg.norm(_sun)
+_e1 = np.cross(_sun, [0.0, 1.0, 0.0] if abs(_sun[1]) < 0.9 else [1.0, 0.0, 0.0]); _e1 /= np.linalg.norm(_e1)
+_e2 = np.cross(_sun, _e1)
+SUN_DIST, RAY_N = 5000.0, 22
+SUN_RAYS = []
+for k_ in range(RAY_N):
+    ang = 2 * math.pi * (k_ + rng.uniform(-0.3, 0.3)) / RAY_N
+    r_dir = math.cos(ang) * _e1 + math.sin(ang) * _e2
+    length_ = rng.uniform(1100.0, 2400.0) * (1.4 if k_ % 3 == 0 else 1.0)
+    width_ = rng.uniform(380.0, 900.0)
+    base_ = _sun * SUN_DIST + r_dir * 20.0
+    # the quad's local X across the ray, Y along it (out from the sun), Z toward the world
+    m_ = Matrix((tuple(np.cross(r_dir, -_sun)), tuple(r_dir), tuple(-_sun))).transposed()
+    eul = m_.to_euler("XYZ")
+    rn_ = "sunray_%02d" % k_
+    nodes.append({"name": rn_, "kind": "gltf", "asset": "sun_ray.glb", "position": [round(float(c), 2) for c in base_],
+                  "rotation": [round(math.degrees(v), 3) for v in eul], "scale": [round(width_ / 1000.0, 4), round(length_ / 1000.0, 4), 1.0],
+                  "castsShadow": False, "emissiveBoost": 0.25})
+    SUN_RAYS.append(rn_)
+print("SUN RAYS", len(SUN_RAYS))
+
 # ---- scene and project ----------------------------------------------------------------------------------------------
 env, lights = look.environment(SUN, rw.to_avgen(Vector((0, 0, 1))))
 scene = {"format": "avgen-scene", "version": 1, "name": "rainbow-world",
@@ -1525,6 +1558,9 @@ for prog_, roles_ in look.FX.items():
         bindings.append({"role": "foliageHue", "target": "material/%s/op/%d/hueShift/value" % (prog_, roles_["foliage_hue"])})
     if "kick_colour" in roles_:
         bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
+# the sunburst takes the look's sun colour
+for rn_ in SUN_RAYS:
+    bindings.append({"role": "sun", "target": "nodes/%s/tint" % rn_})
 # the scan glitter's four colours are the look's own, chosen to contrast: its kick colour, horizon, cloud shadow, crest
 if "glitter_ramp" in look.FX.get("rw_glitter", {}):
     for role_, f_ in zip(("ring", "horizon", "cloud0", "meadow3"), ("constant", "constant2", "constant3", "constant4")):
@@ -1582,6 +1618,14 @@ for fld in music.SPARKLE_FIELDS:
     for c_ in range(3):
         routes.append({"source": "timeline.cam" + "XYZ"[c_], "target": "field/%s/position" % fld, "amount": 1.0,
                        "op": "replace", "polarity": "unipolar", "component": c_})
+# the sunburst follows the camera, and swells with the synth (and the lift, and a scan)
+for rn_ in SUN_RAYS:
+    for c_ in range(3):
+        routes.append({"source": "timeline.cam" + "XYZ"[c_], "target": "nodes/%s/position" % rn_, "amount": 1.0,
+                       "op": "add", "polarity": "unipolar", "component": c_})
+    for src_, amt_ in (("macro.synth", 1.6), ("macro.lift", 0.8), ("macro.scan", 0.8)):
+        routes.append({"source": src_, "target": "nodes/%s/emissiveBoost" % rn_, "amount": amt_, "op": "add",
+                       "polarity": "unipolar"})
 # the faint secondary bows carry no program: the synth's light and the scan reach them through the node's glow lane
 for rn in rainbow_nodes:
     if rn["name"].endswith("s"):
