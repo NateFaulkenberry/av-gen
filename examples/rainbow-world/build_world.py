@@ -624,30 +624,59 @@ for s0 in np.arange(0.0, L, 120.0):
         continue
     drift(s0 + rng.uniform(0, 60), ride_x(s0) + rng.choice((-1, 1)) * rng.uniform(7, 16), kind, rng.randint(70, 140), 4.0)
 
+# Rainbow World 2, gate 5 (the owner: "fix trees clumped together in some areas"): the scatter had trees standing
+# inside each other -- 3 pairs under 1 m apart, 9 under 3 m, 55 whose crowns overlapped by more than half. A
+# Poisson-disk pass over every tree of every family, in planting order (the deliberate rows and groves are planted
+# first, so they keep their shape): a tree is dropped if it stands closer to an earlier one than SPACING x the sum of
+# their crown radii. Crowns may still touch and overlap a little -- a grove still reads as a grove -- but no tree
+# stands in another.
+SPACING = 0.75
+_CROWN = {"great": 20.5, "blossom": 9.6, "pine": 6.0, "weeper": 11.0}
+_kept, _dropped = [], 0
+for f_ in ("great", "weeper", "blossom", "pine"):          # the landmarks' family first
+    keep_ = []
+    for q in fam[f_]:
+        c_, r_ = np.array(q[:3]), _CROWN[f_] * q[8]
+        if any(np.linalg.norm(c_ - c2) < SPACING * (r_ + r2) for c2, r2 in _kept):
+            _dropped += 1
+            continue
+        _kept.append((c_, r_))
+        keep_.append(q)
+    fam[f_] = keep_
+print("TREES spaced: %d dropped, %d kept" % (_dropped, len(_kept)))
 TREE_ASSETS = {"great": ("great_tree", "rw_canopy"), "weeper": ("weeper", "rw_weeper"), "blossom": ("blossom", "rw_blossom"),
                "pine": ("pine", "rw_pine")}
 for f, pts in fam.items():
     if not pts:
         continue
     asset, prog = TREE_ASSETS[f]
+    LEAF_PX, LEAF_CULL_PX = (130.0, 60.0, 28.0), 12.0     # projected radius, px, at which each leaf level is taken
     # the leaf cards (alpha-tested, the depth prepass's dearest geometry) thin with distance (ADR-1548: whole cards removed,
     # the rest grown, 35% at 22 m and 12% at 55 m; Stage 8: the near cards were the p95) and stop at 150 m; beyond it the canopy core,
     # tinted by the same program, is the tree -- at that distance the cards are smaller than their own gaps.
     # Rainbow World 2 (17-slow-frames.md): a fourth, thinner level from 90 m. The cards at 90-150 m were the arch holds'
     # GPU tail (about 7 ms: thousands of sub-pixel cards, every one alpha-tested in the prepass); stopping them at 90 m
     # left bare branches, a thinner level keeps the canopy's read for 6-10 ms less.
+    # Rainbow World 2, gate 5 (the owner: "tree popping ... a lot of twitchy trees"; 25-tree-popping.md): the levels
+    # switched by DISTANCE, the same for a 5 m pine and a 24 m Great Tree, and the leaves' first switch (to 35% of the
+    # cards) came at 22 m, when a Great Tree is ~440 px across the frame; the leaves stopped dead at 150 m (a 65 px
+    # canopy vanishing), and every tree near a threshold flipped back and forth as the ride wove past it. Now every
+    # level switches by SCREEN SIZE (the same apparent change for every tree, and only once it is small), each tree at
+    # its own offset (spread: a stand changes over a band, not on one frame), with a dead zone where the renderer
+    # allows one (live; an offline render carries no history).
+    STAB = {"spread": 0.35, "hysteresis": 0.2}
     nodes.append(node_points("%s_wood" % f, "%s_wood.glb" % asset, pts, {"baseColor": R(rw.P["bark"][:3]), "roughness": 0.9, "metallic": 0.0},
-                             lod={"cull": True, "minScreenRadius": 2.0, "maxDistance": 400.0, "count": 3,
-                                  "byScreenSize": False, "distance1": 70.0, "distance2": 180.0}))
+                             lod=dict({"cull": True, "minScreenRadius": 2.0, "count": 3,
+                                       "byScreenSize": True, "distance1": 80.0, "distance2": 25.0}, **STAB)))
     nodes.append(node_points("%s_core" % f, "%s_core.glb" % asset, pts, {"program": prog, "roughness": 0.95, "metallic": 0.0},
-                             lod={"cull": True, "minScreenRadius": 1.0, "count": 3, "byScreenSize": False,
-                                  "distance1": 160.0, "distance2": 450.0}))
+                             lod=dict({"cull": True, "minScreenRadius": 1.0, "count": 3, "byScreenSize": True,
+                                       "distance1": 60.0, "distance2": 20.0}, **STAB)))
     nodes.append(node_points("%s_leaves" % f, "%s_leaves.glb" % asset, pts,
                              {"program": prog, "roughness": 0.75, "metallic": 0.0, "alphaMode": "mask",
                               "alphaCutoff": 0.5, "doubleSided": True}, castsShadow=False,
-                             lod={"cull": True, "minScreenRadius": 4.0, "maxDistance": 150.0, "count": 4,
-                                  "byScreenSize": False, "distance1": 22.0, "distance2": 55.0, "distance3": 90.0,
-                                  "thinning": True}))
+                             lod=dict({"cull": True, "minScreenRadius": LEAF_CULL_PX, "count": 4,
+                                       "byScreenSize": True, "distance1": LEAF_PX[0], "distance2": LEAF_PX[1],
+                                       "distance3": LEAF_PX[2], "thinning": True}, **STAB)))
 for k in range(0, len(outcrops), 60000):
     nodes.append(node_points("outcrops%d" % k, "rock_namaqualand_boulder_03.glb", outcrops[k:k + 60000],
                              {"program": "rw_rock", "roughness": 0.85, "metallic": 0.0},
@@ -1132,7 +1161,7 @@ def dense_ground_hits(path_):
 # turns into an early, gentle detour. Repeat until the smoothed line touches nothing.
 FINAL_SIGMA = 2.0
 _base = cam_controls.copy()
-for _it in range(30):
+for _it in range(60):
     cam_controls = gsmooth(_base, np.full(n_s, FINAL_SIGMA))
     raw_rolls, raw_path, cam_rolls, cam_path = build_path()
     _worst_tree, _wt_at, _hits = dense_tree_hits(cam_path)
@@ -1225,11 +1254,9 @@ print("CLOUDS", {k: len(v) for k, v in cpts.items()})
 # of what it belongs to). Their amounts rest at 0 -- the world as built -- and the bass sets them through the `swell`
 # macro. It travels at about the ride's own speed, along an axis oblique to the knot, so the heave crosses the track
 # rather than running with it. (Finch's sum of waves, GPU Gems ch. 1, was tried with two: measured in 17 section 4.)
-SWELL = [  # (axis of travel, displacement direction, wavelength m, speed rad/s, metres at a full swell)
-    # One wave, not two (Rainbow World 2 gate 2): a second deformer measured 1.1 ms more at the 40 s hold (every
-    # scattered vertex in the depth, lit and shadow passes pays per deformer) for a shape the camera's own motion hides
-    ((0.62, 0.31, 0.72), (0.25, 0.93, 0.27), 105.0, 1.7, 1.9),
-]
+# (gate 5: the owner chose to retire the heave -- 23-modulation-inventory item 5: 1.1-2.7 ms for an effect that does
+# not read from the flight. The bass now drives colour and light on big surfaces instead. The machinery stays, empty.)
+SWELL = []  # (axis of travel, displacement direction, wavelength m, speed rad/s, metres at a full swell)
 SWELL_NODES = []
 for n_ in nodes:
     nm_ = n_["name"]
