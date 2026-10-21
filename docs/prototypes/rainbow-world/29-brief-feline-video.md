@@ -43,3 +43,9 @@ Coordinator note: "~2:29" after "~2:31" is probably 2:39, since the list runs ab
 ## 4. The ending, clarified (verbatim)
 
 "ending: bit crush, digital mosh effects, scene distortion ending"
+
+## 5. The owner on the 2:31 swell (verbatim)
+
+"that 2:31 one happens a little later organically in the song I think so it may be slightly off the down beat"
+
+Coordinator note: follow the synth stem's actual onset for this one rather than snapping it to the bar grid.
