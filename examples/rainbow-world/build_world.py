@@ -316,7 +316,6 @@ def in_face(sc, ln):
 # over about 60 m so it floats over small rises instead of tracing them, never closer than 3.5 m to the ground; its
 # up is smoothed the same way, so the roll eases; and its speed breathes with the slope -- faster going down, a
 # float over the crests -- smoothed over about 90 m so it never jerks.
-LAP = 211.0   # one lap is the song (Feline Footwear is 210.5 s): the base speed is set from it below
 cam_raw, cam_upraw, cam_lift_raw = [], [], []
 for s in cam_s:
     p, n = ride(s)
@@ -363,44 +362,7 @@ for i_ in range(len(cam_s)):
     if h_ < 3.5:
         cam_sm[i_] += cam_upraw[i_] * (3.5 - h_)
         pushed += 1
-# speed: the climb rate along the local up (gravity turns with the land), smoothed; plus the crossings' surge
-climb = np.array([np.dot(cam_sm[(i_ + 1) % len(cam_s)] - cam_sm[i_ - 1], up_sm[i_]) / (2 * CAM_STEP)
-                  for i_ in range(len(cam_s))])
-SPEED = np.clip(1.0 - 5.0 * climb, 0.78, 1.3)
-for i_, s_ in enumerate(cam_s):
-    w = 1.0
-    for s0, s1, kind_, side in plan:
-        if kind_ in ("over", "back"):
-            mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
-            w = max(w, 1.0 + 0.45 * (1.0 - band.smoothstep(half, half + 160.0, _circ(s_ - mid))))
-    SPEED[i_] *= w
-SPEED = gsmooth(SPEED, np.full(len(cam_s), 6.0))
-seg_len = np.linalg.norm(np.roll(cam_sm, -1, axis=0) - cam_sm, axis=1)
-BASE = float((seg_len / SPEED).sum() / LAP)
-print("GLIDE pushed %d samples up to 3.5 m, speed factor %.2f-%.2f, base %.1f m/s" % (pushed, SPEED.min(), SPEED.max(), BASE))
-
-
-def speed_at(s_band):
-    return float(np.interp(s_band % L, cam_s, SPEED))
-
-
-cam_pts = list(cam_sm)
-cam_ups = list(up_sm)
-cam_controls = np.array(cam_pts)
-# clearance: the ride against every other part of the band (stations more than 400 m away along the loop), so an
-# airtime arc or a big crossing never flies into another strand of the knot
-_ring_s = np.array([f_[0] for f_ in fr])
-_ring_p = np.array([np.array(f_[1]) for f_ in fr])
-_worst = 1e9
-for s_, p_ in zip(cam_s, cam_controls):
-    far = np.abs(((_ring_s - s_) + L / 2) % L - L / 2) > 400.0
-    d_ = np.linalg.norm(_ring_p[far] - p_, axis=1).min() - band.HALF_W
-    _worst = min(_worst, d_)
-print("CLEARANCE ride to other strands: %.0f m (band centre distance less its half width)" % _worst)
-cam_rolls, cam_path = knot_path.rolls_to_follow(cam_controls, cam_ups)
-nodes.append(cam_path.to_avgen_json("ride", rw.to_avgen))
-print("CAMERA path %.0f m, roll turns %d, plan %s" % (cam_path.length, cam_path.roll_turns,
-                                                     [(round(a), k) for a, b_, k, sd_ in plan[:5]]))
+print("GLIDE pushed %d samples up to 3.5 m" % pushed)
 
 
 def near_path(p, clearance):
@@ -727,6 +689,264 @@ for k, sa_ in enumerate(arch_s):
 nodes += rainbow_nodes
 print("RAINBOWS", len(rainbow_nodes))
 tpts = [q for v in fam.values() for q in v]
+
+# ---- Rainbow World 2: the flight (the owner's second camera note, 20-camera-note.md; the design is 21-camera-research.md
+# section 3). The gliding low line above is the ground line; the ride now flies over it like a plane: it soars over open
+# meadow and dives back down to skim the arches, the crossings and the trees; it banks into its turns as a coordinated
+# turn banks (lift = gravity + the turn's pull, gravity the land's own up), trades speed for height, and now and then
+# rolls -- out of a climb, or on the drop. A spring (second-order dynamics, run forward then back round the loop) gives
+# the height and the bank their weight. All baked into the spline and the timeline: seek equals play.
+LAP = 190.0          # the owner: "a little faster" -- 11% on the glide's 211 s lap (the ride loops past the song's end)
+G = 9.81
+SOAR = 30.0          # metres over the ground line at the top of a soar
+n_s = len(cam_s)
+sm1 = lambda i_: (i_ - 1) % n_s  # noqa: E731
+sp1 = lambda i_: (i_ + 1) % n_s  # noqa: E731
+
+
+def spring(x, f_per_m, zeta=1.0):
+    """t3ssel8r's second-order dynamics (y + k1 y' + k2 y'' = x), semi-implicit, over the periodic samples: run three
+    laps forward so the seam is settled, then the result backward the same way (zero phase: it anticipates)."""
+    f_ = f_per_m * CAM_STEP
+    k1, k2 = zeta / (math.pi * f_), 1.0 / (2 * math.pi * f_) ** 2
+
+    def run(v):
+        y, yd, out = v[0], 0.0, np.empty_like(v)
+        for lap_ in range(3):
+            for i_ in range(len(v)):
+                y += yd
+                yd += (v[i_] - y - k1 * yd) / k2
+                if lap_ == 2:
+                    out[i_] = y
+        return out
+    return run(run(np.asarray(x, float))[::-1])[::-1]
+
+
+def slope_limit(e, per_sample):
+    e = e.copy()
+    for _ in range(2):
+        for i_ in list(range(n_s)) * 2:
+            e[i_] = min(e[i_], e[sm1(i_)] + per_sample)
+        for i_ in list(reversed(range(n_s))) * 2:
+            e[i_] = min(e[i_], e[sp1(i_)] + per_sample)
+    return e
+
+
+# 1. the room the flight has: low into the crossings (the rim's ellipse starts 11 m up), under the bows, and round
+#    every tree -- under its canopy, or (in the open, when its crown is within reach) over it. Tree envelopes come from
+#    the asset bounds (radius, canopy bottom, top, at scale 1). Floors and caps become cones that a 12-degree climb can
+#    follow, so the flight can always meet them.
+ENVELOPE = {"great": (20.5, 9.0, 27.0), "blossom": (9.6, 10.0, 23.3), "pine": (6.0, 6.6, 25.6), "weeper": (11.0, 0.0, 13.4)}
+CLIMB = CAM_STEP * math.tan(math.radians(12.0))
+cap = np.full(n_s, SOAR + 20.0)
+cap[near_x < 6] = 0.0
+for sa_ in ARCH_S:          # under a bow: the primary's crown is ~66 m over the face
+    for i_ in range(n_s):
+        if _circ(cam_s[i_] - sa_) < 120.0:
+            cap[i_] = min(cap[i_], 16.0)
+over = np.zeros(n_s)       # the height that clears every crown near the line
+under = np.full(n_s, 1e9)  # the height that stays under every canopy near the line
+for f_, pts_ in fam.items():
+    if not pts_:
+        continue
+    Rr, lo_, top_ = ENVELOPE[f_]
+    T_ = np.array([(q[0], -q[2], q[1]) for q in pts_])       # AV Gen back to Blender
+    S_ = np.array([q[8] for q in pts_])
+    for i_ in range(n_s):
+        d_ = cam_sm[i_] - T_
+        h0 = d_ @ up_sm[i_]
+        lat = np.linalg.norm(d_ - h0[:, None] * up_sm[i_][None, :], axis=1)
+        near = (lat < Rr * S_ + 6.0) & (top_ * S_ + 4.0 - h0 > 0.0)
+        if near.any():
+            over[i_] = max(over[i_], float((top_ * S_[near] + 4.0 - h0[near]).max()))
+            under[i_] = min(under[i_], max(0.0, float((lo_ * S_[near] - 4.0 - h0[near]).min())))
+
+
+def cone_min(c_):
+    out = c_.copy()
+    for k_ in range(1, 40):
+        out = np.minimum(out, np.minimum(np.roll(c_, k_), np.roll(c_, -k_)) + k_ * CLIMB)
+    return out
+
+
+def cone_max(f_):
+    out = f_.copy()
+    for k_ in range(1, 40):
+        out = np.maximum(out, np.maximum(np.roll(f_, k_), np.roll(f_, -k_)) - k_ * CLIMB)
+    return out
+
+
+trees_ = over > 0
+floor = np.where(trees_ & (over <= SOAR + 8.0), over, 0.0)       # go over the crowns the soar can reach
+cap = np.where(trees_ & (over > SOAR + 8.0), np.minimum(cap, under), cap)
+for _ in range(20):                                               # where over and under cannot both be met: under
+    cap_c, floor_c = cone_min(cap), cone_max(floor)
+    bad = np.where(floor_c > cap_c + 1e-6)[0]
+    if not len(bad):
+        break
+    for i_ in bad:
+        for k_ in range(-40, 41):
+            j_ = (i_ + k_) % n_s
+            if floor[j_] > 0 and floor[j_] - abs(k_) * CLIMB > cap_c[i_]:
+                floor[j_] = 0.0
+                cap[j_] = min(cap[j_], under[j_])
+cap_c, floor_c = cone_min(cap), cone_max(floor)
+print("ROOM soar-able (cap >= 15 m) %.0f%%, over the crowns at %d samples, under the canopies at %d"
+      % (100 * (cap_c >= 15).mean(), int((floor > 0).sum()), int((trees_ & (floor == 0)).sum())))
+
+# 2. the soar's target: high wherever there is room; the spring gives it weight, the cones keep it clear
+target = np.where(cap_c >= 15.0, SOAR, 0.0)
+target = np.maximum(target, floor_c)
+
+
+def flight_times(speed):
+    seg_ = np.linalg.norm(np.roll(cam_flight, -1, axis=0) - cam_flight, axis=1)
+    base_ = float((seg_ / speed).sum() / LAP)
+    return np.concatenate([[0.0], np.cumsum(seg_ / (base_ * speed))[:-1]]), base_
+
+
+def solve_altitude(tgt):
+    e_ = np.clip(spring(tgt, 1.0 / 180.0), floor_c, cap_c)
+    e_ = np.clip(gsmooth(e_, np.full(n_s, 1.5)), floor_c, cap_c)
+    return np.clip(e_, 0.0, None)
+
+
+climb_g = np.array([np.dot(cam_sm[sp1(i_)] - cam_sm[sm1(i_)], up_sm[i_]) / (2 * CAM_STEP) for i_ in range(n_s)])
+surge = np.ones(n_s)
+for i_, s_ in enumerate(cam_s):
+    for s0, s1, kind_, side in plan:
+        if kind_ in ("over", "back"):
+            mid, half = 0.5 * (s0 + s1), 0.5 * (s1 - s0)
+            surge[i_] = max(surge[i_], 1.0 + 0.45 * (1.0 - band.smoothstep(half, half + 160.0, _circ(s_ - mid))))
+
+
+def speed_profile(e_, base_):
+    """The land's slope (faster down, a float over crests), the energy trade on the soar with real g, the surge."""
+    slope_ = np.clip(1.0 - 5.0 * climb_g, 0.78, 1.3)
+    v2 = base_ ** 2 - 2.0 * G * (e_ - e_.mean())
+    energy = np.sqrt(np.clip(v2, 0.45 * base_ ** 2, None)) / base_
+    return gsmooth(slope_ * energy * surge, np.full(n_s, 6.0))
+
+
+DROP = 47.85
+e_alt = solve_altitude(target.copy())
+cam_flight = cam_sm + up_sm * e_alt[:, None]
+SPEED = speed_profile(e_alt, 30.0)
+for _it in range(3):                           # settle the base speed on the lap
+    times_f, BASE = flight_times(SPEED)
+    SPEED = speed_profile(e_alt, BASE)
+times_f, BASE = flight_times(SPEED)
+i_drop = int(np.argmin(np.abs(times_f - DROP)))
+print("FLIGHT soar %.0f%% of the loop over 15 m, max %.1f m, mean %.1f m; at the drop (%d m) %.1f m; base %.1f m/s, "
+      "speed factor %.2f-%.2f" % (100.0 * (e_alt > 15).mean(), e_alt.max(), e_alt.mean(), cam_s[i_drop], e_alt[i_drop],
+                                 BASE, SPEED.min(), SPEED.max()))
+
+# 3. the bank: a coordinated turn's up from the path's lateral curvature at the ride's own speed, clamped, sprung;
+#    faded to the land's up over the crossings, where the rim's ellipse sets it
+tan_ = np.array([cam_flight[sp1(i_)] - cam_flight[sm1(i_)] for i_ in range(n_s)])
+tan_ /= np.linalg.norm(tan_, axis=1)[:, None]
+side_ = np.cross(tan_, up_sm)
+side_ /= np.linalg.norm(side_, axis=1)[:, None]
+acc = np.array([(cam_flight[sp1(i_)] - 2 * cam_flight[i_] + cam_flight[sm1(i_)]) / CAM_STEP ** 2 for i_ in range(n_s)])
+v_ = BASE * SPEED
+lat_acc = v_ ** 2 * np.einsum("ij,ij->i", acc, side_)
+bank = np.arctan2(lat_acc, G)
+bank = np.clip(bank, -math.radians(38.0), math.radians(38.0))
+bank *= np.clip((near_x - 2.0) / 3.0, 0.0, 1.0)
+bank = spring(bank, 1.0 / 200.0)
+print("BANK max %.0f deg, mean |bank| %.0f deg" % (math.degrees(np.abs(bank).max()), math.degrees(np.abs(bank).mean())))
+
+# 4. the earned rolls: one whole aileron roll, quintic-eased over 4 s, into the turn; on the drop, then out of the
+#    biggest climbs; at most three a lap, 900 m apart, never near a crossing
+roll_add = np.zeros(n_s)
+ROLLS = []
+
+
+def smootherstep(u):
+    u = min(1.0, max(0.0, u))
+    return u * u * u * (u * (6 * u - 15) + 10)
+
+
+# a roll is earned twice over: it lands on a phrase start (the 8-bar grid, 14-stem-analysis), and the land offers it --
+# the ride has climbed into it, or it is passing under a rainbow's bow (through a gap); its whole 4 s window at least
+# 9 m up
+BAR = 1.983471
+PHRASES = [0.2425 + BAR * 8 * k_ for k_ in range(1, 12)]
+cands = []
+for tm in PHRASES:
+    ic = int(np.argmin(np.abs(times_f - tm)))
+    half = int(2.0 * v_[ic] / CAM_STEP) + 1
+    win = [(ic + k_) % n_s for k_ in range(-half, half + 1)]
+    rise = e_alt[ic] - e_alt[(ic - 16) % n_s]
+    bow = any(_circ(cam_s[ic] - sa_) < 120.0 for sa_ in ARCH_S)
+    ok = e_alt[win].min() >= 9.0 and (rise > 6.0 or bow)
+    print("ROLL candidate %.1f s at %d m: alt %.0f m, window min %.0f m, rise %.0f m%s%s"
+          % (tm, cam_s[ic], e_alt[ic], e_alt[win].min(), rise, " under a bow" if bow else "", " *" if ok else ""))
+    if ok:
+        cands.append((rise + (10.0 if bow else 0.0), ic, "phrase %.1f s%s" % (tm, ", under a bow" if bow else "")))
+for score, ic, why in sorted(cands, reverse=True):
+    if len(ROLLS) >= 3 or near_x[ic] < 8:
+        continue
+    if any(_circ(cam_s[ic] - cam_s[r_[0]]) < 900.0 for r_ in ROLLS):
+        continue
+    n_r = 4.0 * v_[ic] / CAM_STEP              # samples in 4 s; the angle sampled every 15 m, under 90 degrees a step
+    sgn = 1.0 if bank[ic] >= 0 else -1.0
+    # 0 before the window, a whole turn after it: the same up vector, so the turn lives only in the window and the
+    # spline's unwrap (ADR-1542) winds it
+    for k_ in range(-int(n_r / 2) - 2, int(n_r / 2) + 3):
+        roll_add[(ic + k_) % n_s] += sgn * 2 * math.pi * smootherstep((k_ + n_r / 2) / n_r)
+    ROLLS.append((ic, why, sgn))
+print("ROLLS", [("%.1f s" % times_f[ic], "%d m" % cam_s[ic], why, "alt %.0f m" % e_alt[ic]) for ic, why, sg in ROLLS])
+
+ang = bank + roll_add
+cam_ups_f = np.cos(ang)[:, None] * up_sm + np.sin(ang)[:, None] * side_
+
+
+def speed_at(s_band):
+    return float(np.interp(s_band % L, cam_s, SPEED))
+
+
+cam_pts = list(cam_flight)
+cam_ups = list(cam_ups_f)
+cam_controls = np.array(cam_pts)
+# clearance: the ride against every other part of the band (stations more than 400 m away along the loop), so a soar
+# or a crossing never flies into another strand of the knot
+_ring_s = np.array([f_[0] for f_ in fr])
+_ring_p = np.array([np.array(f_[1]) for f_ in fr])
+_worst = 1e9
+for s_, p_ in zip(cam_s, cam_controls):
+    far = np.abs(((_ring_s - s_) + L / 2) % L - L / 2) > 400.0
+    d_ = np.linalg.norm(_ring_p[far] - p_, axis=1).min() - band.HALF_W
+    _worst = min(_worst, d_)
+print("CLEARANCE ride to other strands: %.0f m (band centre distance less its half width)" % _worst)
+
+
+def canopy_clearance(P_):
+    """The nearest canopy edge, across the ride's line, of any tree whose canopy spans the ride's height there."""
+    best = 1e9
+    for f_, pts_ in fam.items():
+        if not pts_:
+            continue
+        Rr, lo_, top_ = ENVELOPE[f_]
+        T_ = np.array([(q[0], -q[2], q[1]) for q in pts_])
+        S_ = np.array([q[8] for q in pts_])
+        for i_ in range(n_s):
+            d_ = P_[i_] - T_
+            h0 = d_ @ up_sm[i_]
+            lat = np.linalg.norm(d_ - h0[:, None] * up_sm[i_][None, :], axis=1)
+            inside = (h0 > lo_ * S_ - 2.0) & (h0 < top_ * S_ + 2.0)
+            if inside.any():
+                best = min(best, float((lat[inside] - Rr * S_[inside]).min()))
+    return best
+
+
+print("TREES clear: nearest canopy edge at the ride's height %.1f m (the glide's low line: %.1f m)"
+      % (canopy_clearance(cam_controls), canopy_clearance(cam_sm)))
+cam_rolls, cam_path = knot_path.rolls_to_follow(cam_controls, cam_ups)
+nodes.append(cam_path.to_avgen_json("ride", rw.to_avgen))
+print("CAMERA path %.0f m, roll turns %d, plan %s" % (cam_path.length, cam_path.roll_turns,
+                                                     [(round(a), k) for a, b_, k, sd_ in plan[:5]]))
+
 
 # ---- clouds: masses in the knot's free space (clear of the ride), a sea below, banks far out -----------------------
 cpts = {"hero": [], "tower": [], "bank": [], "puff": []}
