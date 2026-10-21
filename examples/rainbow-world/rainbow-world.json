@@ -4598,15 +4598,90 @@
       0.8714,
       0.7157
      ],
-     "foliage": [
-      1.0,
-      1.0,
-      1.0
-     ],
      "stone": [
       1.0,
       1.0,
       1.0
+     ],
+     "canopy_rw_canopy_0": [
+      0.0232,
+      0.117,
+      0.0343
+     ],
+     "canopy_rw_canopy_1": [
+      0.1022,
+      0.3231,
+      0.0452
+     ],
+     "canopy_rw_canopy_2": [
+      0.3231,
+      0.6038,
+      0.0578
+     ],
+     "canopy_rw_canopy_3": [
+      0.6038,
+      0.807,
+      0.1022
+     ],
+     "canopy_rw_weeper_0": [
+      0.1119,
+      0.2961,
+      0.0194
+     ],
+     "canopy_rw_weeper_1": [
+      0.2705,
+      0.5149,
+      0.0273
+     ],
+     "canopy_rw_weeper_2": [
+      0.5149,
+      0.7157,
+      0.0578
+     ],
+     "canopy_rw_weeper_3": [
+      0.7605,
+      0.855,
+      0.1441
+     ],
+     "canopy_rw_blossom_0": [
+      0.2542,
+      0.0452,
+      0.1878
+     ],
+     "canopy_rw_blossom_1": [
+      0.5841,
+      0.1195,
+      0.3419
+     ],
+     "canopy_rw_blossom_2": [
+      0.855,
+      0.2961,
+      0.5271
+     ],
+     "canopy_rw_blossom_3": [
+      1.0,
+      0.6308,
+      0.7758
+     ],
+     "canopy_rw_pine_0": [
+      0.0086,
+      0.0497,
+      0.0273
+     ],
+     "canopy_rw_pine_1": [
+      0.0176,
+      0.107,
+      0.0452
+     ],
+     "canopy_rw_pine_2": [
+      0.0497,
+      0.2086,
+      0.0612
+     ],
+     "canopy_rw_pine_3": [
+      0.159,
+      0.3763,
+      0.0844
      ],
      "floor0": [
       0.0103,
@@ -4702,9 +4777,9 @@
       0.0578
      ],
      "meadow3": [
-      0.7454,
-      0.3916,
-      0.2159
+      0.2623,
+      0.4342,
+      0.117
      ],
      "shade": [
       0.0252,
@@ -4716,15 +4791,90 @@
       0.3231,
       0.0685
      ],
-     "foliage": [
-      1.3,
-      0.95,
-      0.6
-     ],
      "stone": [
       1.3,
       0.95,
       0.7
+     ],
+     "canopy_rw_canopy_0": [
+      0.0377,
+      0.1138,
+      0.0161
+     ],
+     "canopy_rw_canopy_1": [
+      0.14,
+      0.3136,
+      0.0068
+     ],
+     "canopy_rw_canopy_2": [
+      0.3747,
+      0.5912,
+      0.0035
+     ],
+     "canopy_rw_canopy_3": [
+      0.6434,
+      0.7997,
+      0.0445
+     ],
+     "canopy_rw_weeper_0": [
+      0.1449,
+      0.2874,
+      0.0
+     ],
+     "canopy_rw_weeper_1": [
+      0.3163,
+      0.5034,
+      0.0
+     ],
+     "canopy_rw_weeper_2": [
+      0.5548,
+      0.7076,
+      0.0048
+     ],
+     "canopy_rw_weeper_3": [
+      0.7808,
+      0.8545,
+      0.0916
+     ],
+     "canopy_rw_blossom_0": [
+      0.3098,
+      0.0328,
+      0.129
+     ],
+     "canopy_rw_blossom_1": [
+      0.681,
+      0.0985,
+      0.2355
+     ],
+     "canopy_rw_blossom_2": [
+      0.9574,
+      0.2746,
+      0.4061
+     ],
+     "canopy_rw_blossom_3": [
+      1.0,
+      0.6183,
+      0.6952
+     ],
+     "canopy_rw_pine_0": [
+      0.0139,
+      0.049,
+      0.0172
+     ],
+     "canopy_rw_pine_1": [
+      0.0303,
+      0.1047,
+      0.0256
+     ],
+     "canopy_rw_pine_2": [
+      0.0746,
+      0.2031,
+      0.0304
+     ],
+     "canopy_rw_pine_3": [
+      0.1958,
+      0.3676,
+      0.0434
      ],
      "floor0": [
       0.1093,
@@ -4834,15 +4984,90 @@
       0.7913,
       1.0
      ],
-     "foliage": [
-      0.75,
-      1.0,
-      1.05
-     ],
      "stone": [
       0.8,
       0.9,
       1.05
+     ],
+     "canopy_rw_canopy_0": [
+      0.0,
+      0.0902,
+      0.0403
+     ],
+     "canopy_rw_canopy_1": [
+      0.0,
+      0.2602,
+      0.0887
+     ],
+     "canopy_rw_canopy_2": [
+      0.0309,
+      0.5052,
+      0.1569
+     ],
+     "canopy_rw_canopy_3": [
+      0.129,
+      0.6894,
+      0.2279
+     ],
+     "canopy_rw_weeper_0": [
+      0.0,
+      0.2451,
+      0.07
+     ],
+     "canopy_rw_weeper_1": [
+      0.0094,
+      0.4358,
+      0.121
+     ],
+     "canopy_rw_weeper_2": [
+      0.0837,
+      0.6171,
+      0.183
+     ],
+     "canopy_rw_weeper_3": [
+      0.2072,
+      0.7376,
+      0.2623
+     ],
+     "canopy_rw_blossom_0": [
+      0.1104,
+      0.0456,
+      0.2479
+     ],
+     "canopy_rw_blossom_1": [
+      0.278,
+      0.1107,
+      0.4761
+     ],
+     "canopy_rw_blossom_2": [
+      0.4539,
+      0.2447,
+      0.6355
+     ],
+     "canopy_rw_blossom_3": [
+      0.6191,
+      0.4803,
+      0.7193
+     ],
+     "canopy_rw_pine_0": [
+      0.0033,
+      0.037,
+      0.0227
+     ],
+     "canopy_rw_pine_1": [
+      0.0025,
+      0.0807,
+      0.0429
+     ],
+     "canopy_rw_pine_2": [
+      0.0033,
+      0.1613,
+      0.0726
+     ],
+     "canopy_rw_pine_3": [
+      0.029,
+      0.3003,
+      0.1224
      ],
      "floor0": [
       0.0284,
@@ -4952,15 +5177,90 @@
       0.2384,
       0.6445
      ],
-     "foliage": [
-      1.0,
-      0.82,
-      1.25
-     ],
      "stone": [
       1.1,
       0.88,
       1.3
+     ],
+     "canopy_rw_canopy_0": [
+      0.1183,
+      0.0268,
+      0.0538
+     ],
+     "canopy_rw_canopy_1": [
+      0.3531,
+      0.0676,
+      0.1587
+     ],
+     "canopy_rw_canopy_2": [
+      0.6763,
+      0.145,
+      0.3268
+     ],
+     "canopy_rw_canopy_3": [
+      0.8897,
+      0.2369,
+      0.4736
+     ],
+     "canopy_rw_weeper_0": [
+      0.3402,
+      0.0574,
+      0.1505
+     ],
+     "canopy_rw_weeper_1": [
+      0.5963,
+      0.1132,
+      0.2789
+     ],
+     "canopy_rw_weeper_2": [
+      0.8164,
+      0.1924,
+      0.4174
+     ],
+     "canopy_rw_weeper_3": [
+      0.9244,
+      0.2861,
+      0.5271
+     ],
+     "canopy_rw_blossom_0": [
+      0.1522,
+      0.0284,
+      0.1213
+     ],
+     "canopy_rw_blossom_1": [
+      0.3432,
+      0.0756,
+      0.2353
+     ],
+     "canopy_rw_blossom_2": [
+      0.5046,
+      0.1846,
+      0.3585
+     ],
+     "canopy_rw_blossom_3": [
+      0.6006,
+      0.3892,
+      0.5003
+     ],
+     "canopy_rw_pine_0": [
+      0.0284,
+      0.0173,
+      0.0455
+     ],
+     "canopy_rw_pine_1": [
+      0.0609,
+      0.0349,
+      0.1048
+     ],
+     "canopy_rw_pine_2": [
+      0.2094,
+      0.0502,
+      0.0977
+     ],
+     "canopy_rw_pine_3": [
+      0.3856,
+      0.0997,
+      0.1921
      ],
      "floor0": [
       0.1016,
@@ -5070,15 +5370,90 @@
       0.4342,
       0.7454
      ],
-     "foliage": [
-      1.1,
-      1.0,
-      1.15
-     ],
      "stone": [
       1.05,
       0.95,
       1.2
+     ],
+     "canopy_rw_canopy_0": [
+      0.0068,
+      0.0819,
+      0.196
+     ],
+     "canopy_rw_canopy_1": [
+      0.0,
+      0.2375,
+      0.5901
+     ],
+     "canopy_rw_canopy_2": [
+      0.0,
+      0.4845,
+      1.0
+     ],
+     "canopy_rw_canopy_3": [
+      0.0302,
+      0.6983,
+      1.0
+     ],
+     "canopy_rw_weeper_0": [
+      0.0,
+      0.2232,
+      0.573
+     ],
+     "canopy_rw_weeper_1": [
+      0.0,
+      0.4118,
+      0.9847
+     ],
+     "canopy_rw_weeper_2": [
+      0.0,
+      0.6145,
+      1.0
+     ],
+     "canopy_rw_weeper_3": [
+      0.0819,
+      0.7735,
+      1.0
+     ],
+     "canopy_rw_blossom_0": [
+      0.1881,
+      0.0417,
+      0.2189
+     ],
+     "canopy_rw_blossom_1": [
+      0.4381,
+      0.1082,
+      0.4176
+     ],
+     "canopy_rw_blossom_2": [
+      0.6609,
+      0.2607,
+      0.5959
+     ],
+     "canopy_rw_blossom_3": [
+      0.8111,
+      0.5455,
+      0.757
+     ],
+     "canopy_rw_pine_0": [
+      0.0102,
+      0.0344,
+      0.0732
+     ],
+     "canopy_rw_pine_1": [
+      0.0139,
+      0.0738,
+      0.1679
+     ],
+     "canopy_rw_pine_2": [
+      0.0149,
+      0.1484,
+      0.3443
+     ],
+     "canopy_rw_pine_3": [
+      0.0262,
+      0.2883,
+      0.622
      ],
      "floor0": [
       0.1213,
@@ -5188,15 +5563,90 @@
       0.7454,
       0.162
      ],
-     "foliage": [
-      1.7,
-      0.75,
-      1.15
-     ],
      "stone": [
       1.35,
       0.9,
       1.05
+     ],
+     "canopy_rw_canopy_0": [
+      0.23,
+      0.0575,
+      0.035
+     ],
+     "canopy_rw_canopy_1": [
+      0.6963,
+      0.1466,
+      0.0866
+     ],
+     "canopy_rw_canopy_2": [
+      1.0,
+      0.3077,
+      0.1977
+     ],
+     "canopy_rw_canopy_3": [
+      1.0,
+      0.4893,
+      0.3465
+     ],
+     "canopy_rw_weeper_0": [
+      0.6759,
+      0.1258,
+      0.0722
+     ],
+     "canopy_rw_weeper_1": [
+      1.0,
+      0.2432,
+      0.1501
+     ],
+     "canopy_rw_weeper_2": [
+      1.0,
+      0.402,
+      0.2738
+     ],
+     "canopy_rw_weeper_3": [
+      1.0,
+      0.5814,
+      0.4364
+     ],
+     "canopy_rw_blossom_0": [
+      0.326,
+      0.0508,
+      0.1459
+     ],
+     "canopy_rw_blossom_1": [
+      0.7115,
+      0.1404,
+      0.2898
+     ],
+     "canopy_rw_blossom_2": [
+      1.0,
+      0.3478,
+      0.5017
+     ],
+     "canopy_rw_blossom_3": [
+      1.0,
+      0.7344,
+      0.8294
+     ],
+     "canopy_rw_pine_0": [
+      0.0868,
+      0.0294,
+      0.0195
+     ],
+     "canopy_rw_pine_1": [
+      0.1976,
+      0.0574,
+      0.0363
+     ],
+     "canopy_rw_pine_2": [
+      0.4074,
+      0.1067,
+      0.0667
+     ],
+     "canopy_rw_pine_3": [
+      0.7568,
+      0.2087,
+      0.1392
      ],
      "floor0": [
       0.7709,
@@ -5306,15 +5756,90 @@
       1.0,
       0.7454
      ],
-     "foliage": [
-      0.55,
-      0.7,
-      1.8
-     ],
      "stone": [
       0.8,
       0.55,
       1.6
+     ],
+     "canopy_rw_canopy_0": [
+      0.0,
+      0.0844,
+      0.0885
+     ],
+     "canopy_rw_canopy_1": [
+      0.0,
+      0.2482,
+      0.2552
+     ],
+     "canopy_rw_canopy_2": [
+      0.0,
+      0.4881,
+      0.4836
+     ],
+     "canopy_rw_canopy_3": [
+      0.0,
+      0.6692,
+      0.6414
+     ],
+     "canopy_rw_weeper_0": [
+      0.0,
+      0.2362,
+      0.2413
+     ],
+     "canopy_rw_weeper_1": [
+      0.0,
+      0.4231,
+      0.4213
+     ],
+     "canopy_rw_weeper_2": [
+      0.0,
+      0.6021,
+      0.5807
+     ],
+     "canopy_rw_weeper_3": [
+      0.0,
+      0.7164,
+      0.6739
+     ],
+     "canopy_rw_blossom_0": [
+      0.0693,
+      0.0284,
+      0.3422
+     ],
+     "canopy_rw_blossom_1": [
+      0.1874,
+      0.0757,
+      0.6484
+     ],
+     "canopy_rw_blossom_2": [
+      0.3233,
+      0.1936,
+      0.7809
+     ],
+     "canopy_rw_blossom_3": [
+      0.4789,
+      0.4023,
+      0.7381
+     ],
+     "canopy_rw_pine_0": [
+      0.0,
+      0.0339,
+      0.036
+     ],
+     "canopy_rw_pine_1": [
+      0.0,
+      0.0747,
+      0.079
+     ],
+     "canopy_rw_pine_2": [
+      0.0,
+      0.151,
+      0.157
+     ],
+     "canopy_rw_pine_3": [
+      0.0,
+      0.2844,
+      0.2856
      ],
      "floor0": [
       0.0171,
@@ -5424,15 +5949,90 @@
       0.6308,
       0.807
      ],
-     "foliage": [
-      1.2,
-      1.0,
-      1.1
-     ],
      "stone": [
       1.0,
       1.05,
       1.05
+     ],
+     "canopy_rw_canopy_0": [
+      0.2203,
+      0.0925,
+      0.1444
+     ],
+     "canopy_rw_canopy_1": [
+      0.652,
+      0.2491,
+      0.4126
+     ],
+     "canopy_rw_canopy_2": [
+      1.0,
+      0.5113,
+      0.8199
+     ],
+     "canopy_rw_canopy_3": [
+      1.0,
+      0.7738,
+      1.0
+     ],
+     "canopy_rw_weeper_0": [
+      0.6239,
+      0.2233,
+      0.3858
+     ],
+     "canopy_rw_weeper_1": [
+      1.0,
+      0.4188,
+      0.6989
+     ],
+     "canopy_rw_weeper_2": [
+      1.0,
+      0.6554,
+      1.0
+     ],
+     "canopy_rw_weeper_3": [
+      1.0,
+      0.8913,
+      1.0
+     ],
+     "canopy_rw_blossom_0": [
+      0.3096,
+      0.1076,
+      0.2199
+     ],
+     "canopy_rw_blossom_1": [
+      0.693,
+      0.2652,
+      0.4577
+     ],
+     "canopy_rw_blossom_2": [
+      1.0,
+      0.5489,
+      0.7593
+     ],
+     "canopy_rw_blossom_3": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "canopy_rw_pine_0": [
+      0.0872,
+      0.0437,
+      0.0614
+     ],
+     "canopy_rw_pine_1": [
+      0.1935,
+      0.0885,
+      0.1313
+     ],
+     "canopy_rw_pine_2": [
+      0.3927,
+      0.1696,
+      0.2603
+     ],
+     "canopy_rw_pine_3": [
+      0.7344,
+      0.3284,
+      0.4935
      ],
      "floor0": [
       0.1134,
@@ -5614,83 +6214,67 @@
     "target": "material/rw_grass/op/39/constant/constant"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_canopy_0",
     "target": "material/rw_canopy/op/6/oklabRamp/constant"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_canopy_1",
     "target": "material/rw_canopy/op/6/oklabRamp/constant2"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_canopy_2",
     "target": "material/rw_canopy/op/6/oklabRamp/constant3"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_canopy_3",
     "target": "material/rw_canopy/op/6/oklabRamp/constant4"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_weeper_0",
     "target": "material/rw_weeper/op/6/oklabRamp/constant"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_weeper_1",
     "target": "material/rw_weeper/op/6/oklabRamp/constant2"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_weeper_2",
     "target": "material/rw_weeper/op/6/oklabRamp/constant3"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_weeper_3",
     "target": "material/rw_weeper/op/6/oklabRamp/constant4"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_blossom_0",
     "target": "material/rw_blossom/op/6/oklabRamp/constant"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_blossom_1",
     "target": "material/rw_blossom/op/6/oklabRamp/constant2"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_blossom_2",
     "target": "material/rw_blossom/op/6/oklabRamp/constant3"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_blossom_3",
     "target": "material/rw_blossom/op/6/oklabRamp/constant4"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_pine_0",
     "target": "material/rw_pine/op/6/oklabRamp/constant"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_pine_1",
     "target": "material/rw_pine/op/6/oklabRamp/constant2"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_pine_2",
     "target": "material/rw_pine/op/6/oklabRamp/constant3"
    },
    {
-    "role": "foliage",
-    "mode": "multiply",
+    "role": "canopy_rw_pine_3",
     "target": "material/rw_pine/op/6/oklabRamp/constant4"
    }
   ],

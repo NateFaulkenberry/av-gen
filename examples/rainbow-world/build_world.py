@@ -1086,7 +1086,7 @@ STATES = [
     # deep emerald troughs (a yellow crest read as mustard under the warm key), peach and rose clouds, long violet shadow.
     ("Golden Hour", dict(zenith=H("#1A2C8E"), horizon=H("#FF9A4C"), ground=H("#A8A0CC"), sun=H("#FFB070"), bounce=H("#9C7CD4"),
                          haze=H("#F09A68"), cloud0=H("#5A3E90"), cloud1=H("#C47E9E"), cloud2=H("#FFAE78"), cloud3=H("#FFD49C"),
-                         meadow0=H("#0E5434"), meadow1=H("#24783C"), meadow2=H("#3E9044"), meadow3=H("#E0A880"), shade=H("#2C2A86"))),
+                         meadow0=H("#0E5434"), meadow1=H("#24783C"), meadow2=H("#3E9044"), meadow3=H("#8CB060"), shade=H("#2C2A86"))),
     # After the Storm: rain-dark teal land, a navy sky clearing to bright aqua low down, slate clouds with white heads
     ("After the Storm", dict(zenith=H("#081C6A"), horizon=H("#8CE2F2"), ground=H("#8E98B8"), sun=H("#FFF4DC"), bounce=H("#9FB0C8"),
                              haze=H("#6EA6D8"), cloud0=H("#2A3058"), cloud1=H("#5A6488"), cloud2=H("#E6E2DA"), cloud3=H("#FFFFFF"),
@@ -1125,7 +1125,7 @@ FLOOR_NOON = [R(rw.hexlin(h)[:3]) for h in look.FLOOR_STOPS]
 RING_BY_LOOK = {"Bright Noon": "#FFF0DC", "Golden Hour": "#FF9A4A", "After the Storm": "#7FE6FF",
                 "Lavender Dusk": "#FF86D2", "Prism": "#FFB0E0", "Candy": "#FF7AC8", "Electric": "#C86AFF",
                 "Spring": "#FFD0E8"}
-# and the trees' and stones' tints (multiplied into their ramps, so each tree keeps its own colours under them)
+# and the stones' tints (multiplied into their ramp; the first of each pair was the trees', now FOLIAGE below)
 TINTS = {"Bright Noon": ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)), "Golden Hour": ((1.15, 1.0, 0.72), (1.2, 0.95, 0.78)),
          "After the Storm": ((0.9, 1.05, 1.1), (0.85, 0.95, 1.1)), "Lavender Dusk": ((1.0, 0.82, 1.25), (1.1, 0.88, 1.3)),
          "Prism": ((1.1, 1.0, 1.15), (1.05, 0.95, 1.2)), "Candy": ((1.7, 0.75, 1.15), (1.35, 0.9, 1.05)),
@@ -1137,9 +1137,53 @@ SKY_HAZE = {"Bright Noon": 0.4, "Golden Hour": 0.75, "After the Storm": 0.3, "La
 RING_BY_LOOK.update({"Candy": "#FFE070", "Electric": "#00FFE0"})
 for n_, c_ in STATES:
     c_["ring"] = H(RING_BY_LOOK[n_])
-    c_["foliage"] = list(TINTS[n_][0])
     c_["stone"] = list(TINTS[n_][1])
 SCALARS = {n_: {"skyHaze": SKY_HAZE[n_]} for n_, c_ in STATES}
+
+
+# The trees follow the look (coordinator, gate 4 sheets: "a dark green tree on a pink or indigo meadow"): each species'
+# own canopy ramp, its hue turned in OKLab toward the look's foliage hue by the look's weight, its lightness kept (a
+# touch darker, so a canopy still reads against the meadow) and its chroma scaled. Each species keeps its own value
+# structure and its own place relative to the others; the Blossom Puff, already pink, turns less.
+def _oklab(c):
+    r, g, b = (max(0.0, float(v)) for v in c[:3])
+    l_ = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    m_ = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    s_ = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    return (0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+            1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+            0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_)
+
+
+def _linrgb(L_, a_, b_):
+    l_ = (L_ + 0.3963377774 * a_ + 0.2158037573 * b_) ** 3
+    m_ = (L_ - 0.1055613458 * a_ - 0.0638541728 * b_) ** 3
+    s_ = (L_ - 0.0894841775 * a_ - 1.2914855480 * b_) ** 3
+    rgb = (4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+           -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+           -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_)
+    return [round(min(1.0, max(0.0, v)), 4) for v in rgb]
+
+
+# look: (foliage hue in degrees, weight toward it, chroma scale, lightness scale). A partial weight turns the hue part
+# way along the shorter arc, so a far target at a partial weight lands between (green toward pink lands on rust):
+# Spring's cherry blossom takes the whole turn
+FOLIAGE = {"Bright Noon": (0.0, 0.0, 1.0, 1.0), "Golden Hour": (110.0, 0.3, 1.1, 1.0),
+           "After the Storm": (175.0, 0.55, 0.95, 0.9), "Lavender Dusk": (330.0, 0.85, 0.85, 0.85),
+           "Prism": (285.0, 0.7, 1.0, 0.95), "Candy": (22.0, 0.9, 1.0, 1.05),
+           "Electric": (200.0, 0.9, 1.3, 0.85), "Spring": (350.0, 1.0, 0.7, 1.15)}
+CANOPY = {pr["name"]: pr["ops"][look.FX[pr["name"]]["canopy_ramp"] - 1] for pr in programs
+          if "canopy_ramp" in look.FX.get(pr["name"], {})}
+for n_, c_ in STATES:
+    hue_t, w_, cs_, ls_ = FOLIAGE[n_]
+    for prog_, op_ in CANOPY.items():
+        w2 = w_ * (0.4 if prog_ == "rw_blossom" else 1.0)
+        for k_, f_ in enumerate(("constant", "constant2", "constant3", "constant4")):
+            L_, a_, b_ = _oklab(op_[f_])
+            C_, h_ = math.hypot(a_, b_), math.degrees(math.atan2(b_, a_))
+            dh = ((hue_t - h_ + 180.0) % 360.0) - 180.0
+            h2 = math.radians(h_ + w2 * dh)
+            c_["canopy_%s_%d" % (prog_, k_)] = _linrgb(L_ * ls_, C_ * cs_ * math.cos(h2), C_ * cs_ * math.sin(h2))
 for k_, (n_, c_) in enumerate(STATES):
     # (the sky's ground colour stays pale: it is also the ambient from below, and a deep one turned every shaded face
     # navy -- tested at #2C56C4, #5C80D8 and #8AA6E6, Stage 6. The deep sky below is the cloud floor's troughs.)
@@ -1172,8 +1216,8 @@ for f_ in ("constant", "constant2", "constant3", "constant4"):
     bindings.append({"role": "stone", "mode": "multiply", "target": op_path("rw_rock", "oklabRamp") + f_})
 for prog_, roles_ in look.FX.items():
     if "canopy_ramp" in roles_:
-        for f_ in ("constant", "constant2", "constant3", "constant4"):
-            bindings.append({"role": "foliage", "mode": "multiply",
+        for k_, f_ in enumerate(("constant", "constant2", "constant3", "constant4")):
+            bindings.append({"role": "canopy_%s_%d" % (prog_, k_),
                              "target": "material/%s/op/%d/oklabRamp/%s" % (prog_, roles_["canopy_ramp"], f_)})
     if "kick_colour" in roles_:
         bindings.append({"role": "ring", "target": "material/%s/op/%d/constant/constant" % (prog_, roles_["kick_colour"])})
