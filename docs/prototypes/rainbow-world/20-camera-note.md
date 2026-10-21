@@ -6,3 +6,7 @@
 > The owner's second note on the camera, after the glide proof (verbatim, 2026-10-20):
 
 "camera looks better - could better a little faster (unless frame rates suffer) and not always so low to the ground - think of it like a plane, flying, gliding, soaring, flipping occassionally or barrel rolling - maybe deep research on how to do tweening to make the physics feel right"
+
+> The owner's verdict on the gate-4 flight proofs (verbatim, 2026-10-21; they chose the more-soar variant):
+
+"gate4-flight-proof-moresoar-22-47s.mp4 - no barrel rolls into the rainbows though and it should still smooth out some of the twitchy camera movements"

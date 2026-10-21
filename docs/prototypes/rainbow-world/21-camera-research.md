@@ -66,3 +66,52 @@ It is checked for:
 - the clearance printouts (`CLEARANCE` to other strands, `TREES clear`);
 - no dead space at the soar's apex (the meadow and the arches must still fill the frame);
 - the grass draw distance (42 m since the perf pass), seen from the soar.
+
+## 5. Revision after gate 4: more soar, no bow rolls, the twitches measured and taken out
+
+The owner chose the more-soar variant and asked for "no barrel rolls into the rainbows" and for the "twitchy camera
+movements" to be smoothed (`20-camera-note.md`). It is now the only flight; the switch is gone.
+
+**Measured first** (`scripts/camera_motion.py`: the engine's spline camera re-evaluated frame by frame at 30 fps over the
+lap -- eye at `splineT`, aim `lookAhead` metres on, up the spline normal -- and the camera's angular velocity split
+into pitch, yaw and roll, with the angular jerk and the look and up turns per frame). The sources, largest first:
+
+1. **Kinks where the face path met each rim's ellipse:** the face path rose off the face's own normal, the ellipse off
+   the band's up, at different lifts (4.5-7.5 m against 11 m), and the path was not smoothed within two samples of a
+   crossing (to keep it off the cliff). Between two 15 m controls the line turned 40-70 degrees; the camera's look and
+   up snapped there. The worst single frame turned the up 30 degrees (914 deg/s of roll, at 163.8 s).
+2. **The roll steps:** the spline interpolates roll linearly between controls, so every kink in the up the land asks
+   for is a step in roll rate -- a comb of jerk spikes every 15 m.
+3. **The bow rolls** (three, ~170 deg/s): removed by the owner's note.
+4. **The rim swing itself:** an ellipse 40 m out and 11 m up (a ~24 m radius at its side) and a 1.45x surge round it.
+
+**Fixes:**
+- the face path's lift turns onto the band's up over the last 90 m before a crossing, and the ellipse starts and ends
+  at the face path's own lift (no kink by construction);
+- the swing is 44 m out and 16 m up, its two halves' heights blended, and the surge 1.15x;
+- the path is smoothed one sample everywhere, one and a half through the crossings, then held 4.5 m off the band's
+  cross-section by push-and-resmooth (`RIM clearance` in the build log);
+- the roll is smoothed as an unwrapped angle by the zero-phase spring (one period per 320 m), so the flip over a rim is
+  a long, even turn that starts before the crossing and ends after it;
+- the bank is capped at 30 degrees and sprung over 400 m (a big glider);
+- **found on the way: the soar flew through trees.** The 158-173 s stretch passed through a Great Tree's trunk and
+  crown, and a pine stood between two controls on the line. The flight is now held 3 m clear of every crown (radius
+  from the asset bounds, canopy bottom to top) and every trunk, checked every 3 m along the spline itself, not only at
+  the controls, and 3.5 m over the meadow likewise; any hit pushes the nearby controls out as a smooth 90 m bump and
+  the spline is rebuilt until nothing touches (`TREES along the spline`, `GROUND along the spline` in the build log);
+- rolls: only on a phrase start out of a 12 m climb, 15 m up, and at least 400 m from any bow. The bows stand every
+  ~500 m, so none qualifies: the flight ships with no rolls. The rim flips (the land's own) stay.
+
+**Before / after** (whole lap, 30 fps):
+
+| | Before (gate 4 more-soar) | After |
+|---|---|---|
+| Total angular rate, peak / p95 (deg/s) | 916 / 87 | 106 / 32 |
+| Roll rate, peak / p95 | 915 / 84 | 103 / 21 |
+| Yaw rate, peak / p95 | 74 / 30 | 44 / 16 |
+| Pitch rate, peak / p95 | 58 / 29 | 33 / 22 |
+| Roll jerk p95 (deg/s^3) | 6,490 | 1,900 |
+| Up-vector turn per frame, peak / p95 (deg) | 30.5 / 2.8 | 3.4 / 1.0 |
+| Look-direction turn per frame, peak / p95 (deg) | 2.5 / 1.3 | 1.5 / 0.9 |
+
+The remaining peak is one crossing (the fourth quarter's, ~165 s), where the knot's own geometry is tightest.

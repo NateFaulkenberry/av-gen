@@ -163,11 +163,13 @@ the ramp stops and the look's tree colour on a later op.
 ## 7. The camera: a plane
 
 `21-camera-research.md` and `20-camera-note.md`. Baked into the spline and its timeline, so seek equals play:
-- soars to about 30 m over open meadow and over reachable crowns; dives under the bows and into the rim crossings;
-- banks into its turns as a coordinated turn banks (up to 29 degrees, mean 10);
-- trades speed for height with real g;
-- rolls (one aileron roll, 4 s) only on a phrase start where the land offers it -- under a bow, or out of a climb:
-  32.0 s and 79.6 s on Feline Footwear. The drop falls in a rim crossing, whose flip over the rim is the drop's move;
+- soars to about 30 m over open meadow and over reachable crowns (52% of the loop above 15 m, the owner's "more
+  soar"); dives under the bows (24 m) and toward the rim crossings;
+- banks into its turns as a coordinated turn banks, gently (capped at 30 degrees, sprung over 400 m);
+- trades speed for height with real g; surges 1.15x round a rim;
+- no barrel rolls (the owner at gate 4: none into the rainbows; the bows stand every ~500 m, so none is earned away
+  from one); the rim flips are the land's own, smoothed into long even turns;
+- held 3 m clear of every tree and 3.5 m over the meadow along the whole spline;
 - one lap 190 s.
 
 ## 8. The hierarchy (brief section 7.3)
