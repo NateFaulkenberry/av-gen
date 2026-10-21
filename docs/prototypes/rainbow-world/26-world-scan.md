@@ -52,8 +52,8 @@ it there needs a latched gate, which is an engine change (noted as a limitation)
 ## 4. The live scan latches (ADR-1574)
 
 The coordinator: "the owner plays these live, so a known tail glitch there isn't acceptable". The live project's scan
-now fires on a surge and plays its whole shape. Its envelope ignores its input for 20 s once triggered (30 s on the
-mix) and re-arms only after the trigger signal has been "off" for a while. Each trigger is one replay-safe signal
+now fires on a swell and plays its whole shape. Its envelope ignores its input for 12 s once triggered and re-arms
+only after the trigger signal has been "off" for a while. Each trigger is one replay-safe signal
 conditioned to on/off, so there is no depth to dip. A spring eases the amount in and out. The front runs on the same
 latch, so it never resets mid-scan.
 
