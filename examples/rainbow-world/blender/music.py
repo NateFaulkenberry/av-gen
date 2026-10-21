@@ -54,7 +54,7 @@ MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("scan", 0.0), ("one", 
 SCAN_REST = 980.0    # look.SCAN_REST
 SCAN_DELAY_MS = 300.0
 RAINBOWS = ("rw_rainbow",)
-SPARKLE_FIELDS = ("scanSpin", "scanShellOut", "scanShellIn")   # build_world's scan-sparkle fields
+FW_EDGE_FIELDS = []   # build_world's firework fields whose falloff edges ride the front (filled by the build)
 
 # The showcase's world scans (gate 5, the owner: "rainbow world scan only happened once and there was a glitch at the
 # end"; 26-world-scan.md). On Feline Footwear the scan fires at the song's big synth swells and section peaks, from
@@ -107,8 +107,9 @@ def front_targets(fx, scan_programs):
         for role in ("scan_mask", "scan_hue", "scan_edge_out", "scan_edge_in"):
             for c in (0, 1):
                 out.append((op_target(prog, fx[prog], role, "remap", "constant"), c))
-    for fld in SPARKLE_FIELDS:
-        out.append(("field/%s/radius" % fld, -1))
+    for fld, params in FW_EDGE_FIELDS:
+        for prm in params:
+            out.append(("field/%s/%s" % (fld, prm), -1))
     return out
 
 
@@ -294,9 +295,9 @@ def routes(fx, swell_nodes, swell):
         roles = fx[prog]
         out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))
         out.append(route("macro.scan", op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0))
-    if "glitter_gain" in fx.get("rw_glitter", {}):
-        out.append(route("macro.synth", op_target("rw_glitter", fx["rw_glitter"], "glitter_gain", "constant",
-                                                  "constant"), 4.0))   # the synth's light in the glitter
+    if "spark_gain" in fx.get("rw_spark", {}):
+        out.append(route("macro.synth", op_target("rw_spark", fx["rw_spark"], "spark_gain", "constant",
+                                                  "constant"), 3.0))   # the synth's light in the sparks
     # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) --
     # crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth). (The
     # clouds' ramp is the palette's, which replaces after the routes: the clouds flare through `cloud_glow` instead.)

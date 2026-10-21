@@ -1273,18 +1273,24 @@ for n_ in nodes:
     SWELL_NODES.append(nm_)
 print("SWELL nodes", len(SWELL_NODES))
 
-# ---- Rainbow World 2, gate 5: the scan sparkle (24-brief-scan-sparkle.md; 27-scan-sparkle.md) ----------------------
-# As the scan's front passes a tree, the tree spins once about its trunk and a burst of glitter lights round its
-# crown. Built from what the engine has, with no per-tree state and no events: three scene fields follow the
-# front -- spheres about the camera (their centres the camera's baked position, their radii the front's) -- and
-# effectors on the tree and glitter instances read them (ADR-025). A tree inside the front's sphere is turned a whole
-# turn (no change); one in its soft edge is part-way round; so as the front sweeps past, each tree spins once, eased,
-# nearer trees first (the cascade), and never again until the next scan. The glitter is a pool of tiny emissive
-# instances in every crown, at scale 0 except inside a thin shell just behind the front, where they swell, rise and
-# fade. A pure function of the transport: seek equals play.
-SPIN_SOFT = 120.0         # m: the spin happens over this much of the front's run (~0.6-1 s at its speed)
-SHELL_W, SHELL_SOFT = 90.0, 40.0    # m: the glitter's shell, just behind the front
-GLITTER_PER_TREE = 28
+# ---- Rainbow World 2, gates 5-6: the scan's fireworks (24-brief-scan-sparkle.md; 27-scan-sparkle.md) ----------------
+# The owner (gate 6): "we want the trees to spin and light up with sparkles as the effect flows through the entity
+# ... more explosive / fireworks looking". As the scan's front reaches a tree: the tree spins once about its trunk
+# (eased), lights up in its own colour, and its crown bursts like a firework shell -- a white flash at ignition, then
+# streaked sparks flying out from the crown, slowing (drag) and arcing down (gravity) as they cool from white-hot to
+# the look's colours, a few crackling as they die.
+# No events and no per-tree state: every stage is a function of how far the front has run past the tree, `a` metres,
+# read from scene fields centred on the camera (its baked position) whose falloff edges ride the front (ADR-025), and
+# effectors on the instances (ADR-1500). A pure function of the transport: seek equals play.
+#   spin   smootherstep(a / SPIN_A)              a whole turn about the trunk
+#   glow   up in 15 m, down over GLOW_A           the tree's own light (instance emissive)
+#   out    1 - (1 - a/BURST_A)^3                  the sparks' flight, decelerating
+#   drop   (a/BURST_A)^3                          their fall
+#   life   up in 6 m, down from 0.45 BURST_A      their size (streaks along the flight)
+#   heat   (1 - a/HEAT_A)^3                       white-hot to colour (the instance emissive the program reads)
+#   flash  up in 3 m, down over FLASH_A           the ignition flash
+SPIN_A, GLOW_A, BURST_A, HEAT_A, FLASH_A = 120.0, 240.0, 280.0, 60.0, 45.0
+SPARKS_PER_TREE = 44
 REST_R = look.SCAN_REST
 
 
@@ -1293,59 +1299,107 @@ def field_node(name, spec):
             "field": dict({"strength": 1.0, "falloff": {"kind": "none"}, "position": [0.0, 0.0, 0.0]}, **spec)}
 
 
-SPARKLE_FIELDS = {   # name -> (rest radius, the front's pull on it)
-    "scanSpin": REST_R, "scanShellOut": REST_R - 10.0, "scanShellIn": REST_R - 10.0 - SHELL_W}
-nodes.append(field_node("scanSpin", {"kind": "sphere", "radius": REST_R, "softness": SPIN_SOFT}))
-nodes.append(field_node("scanShellOut", {"kind": "sphere", "radius": SPARKLE_FIELDS["scanShellOut"],
-                                         "softness": SHELL_SOFT}))
-nodes.append(field_node("scanShellIn", {"kind": "sphere", "radius": SPARKLE_FIELDS["scanShellIn"],
-                                        "softness": SHELL_SOFT, "invert": True}))
-nodes.append(field_node("scanShell", {"kind": "compound", "children": ["scanShellOut", "scanShellIn"],
-                                      "combine": "multiply"}))
+def edge_field(name, kind, behind_inner, behind_outer):
+    """An eased ramp UP as the front passes: a constant field whose falloff runs from weight 0 at `behind_outer`
+    metres behind the front to 1 at `behind_inner` behind it; both edges ride the front."""
+    nodes.append(field_node(name, {"kind": "constant", "falloff": {"kind": kind, "inner": REST_R - behind_inner,
+                                                                    "outer": REST_R - behind_outer}}))
+    FW_EDGES.append((name, ("falloff/inner", "falloff/outer")))
+
+
+def ramp_field(name, a0, a1, down=False):
+    """A linear ramp, up (0 at a0 metres behind the front, 1 at a1) or down (1 at a0, 0 at a1): a sphere about the
+    camera whose radius rides the front (inverted for down). Compounds may only nest one level on the GPU, so the
+    windows below are products of these."""
+    nodes.append(field_node(name, {"kind": "sphere", "radius": REST_R - a1, "softness": a1 - a0, "invert": down}))
+    FW_EDGES.append((name, ("radius",)))
+
+
+def window(name, rise, fall_from, fall_to):
+    ramp_field(name + "In", 0.0, rise)
+    ramp_field(name + "Out", fall_from, fall_to, down=True)
+    nodes.append(field_node(name, {"kind": "compound", "children": [name + "In", name + "Out"], "combine": "multiply"}))
+
+
+FW_EDGES = []
+edge_field("fwSpin", "smooth", SPIN_A, 0.0)
+edge_field("fwOut", "easeIn", BURST_A, 0.0)
+edge_field("fwDrop", "easeOut", BURST_A, 0.0)
+ramp_field("fwHeat", 0.0, HEAT_A, down=True)
+window("fwLife", 6.0, 0.5 * BURST_A, BURST_A)
+window("fwFlash", 3.0, 0.3 * FLASH_A, FLASH_A)
+window("fwGlow", 15.0, 0.3 * GLOW_A, GLOW_A)
 for n_ in nodes:
     if n_.get("kind") == "procedural" and n_["name"].split("_")[0] in fam and \
             n_["name"].endswith(("_wood", "_core", "_leaves")):
-        # the spin: a whole turn about the trunk across the front's soft edge; and a bow: tipped 0.22 rad (13 deg)
-        # and back up across the glitter's shell, so the tree nods as the wave goes through it
         n_["procedural"].setdefault("effectors", []).extend([
-            {"field": "scanSpin", "op": "rotation", "blend": "add", "strength": round(2 * math.pi, 5),
+            {"field": "fwSpin", "op": "rotation", "blend": "add", "strength": round(2 * math.pi, 5),
              "axis": [0.0, 1.0, 0.0], "local": True},
-            {"field": "scanShell", "op": "rotation", "blend": "add", "strength": 0.22,
-             "axis": [1.0, 0.0, 0.0], "local": True}])
-# the glitter: a pool per crown (avgen coordinates, each instance turned to its tree's up)
+            {"field": "fwGlow", "op": "rotation", "blend": "add", "strength": 0.16, "axis": [1.0, 0.0, 0.0],
+             "local": True},                                     # a nod as the light goes through it
+            {"field": "fwGlow", "op": "emission", "blend": "replace", "strength": 2.2}])   # it lights up
+
+# the sparks: a pool per crown (avgen coordinates), every spark at the crown's centre, turned so its local Y is its
+# flight and its local Z is gravity (the tree's down, square to the flight); a pool per family, so the burst's reach
+# follows the crown's size
 _ENV = {"great": (20.5, 9.0, 27.0), "blossom": (9.6, 10.0, 23.3), "pine": (6.0, 6.6, 25.6), "weeper": (11.0, 0.0, 13.4)}
-glit = []
+programs.append(look.spark_program())
+programs.append(look.flash_program())
+n_sparks = 0
 for f_, pts_ in fam.items():
+    if not pts_:
+        continue
     Rr, lo_, top_ = _ENV[f_]
+    sparks, cores, scales = [], [], []
     for q in pts_:
         base_ = np.array(q[:3]); qx, qy, qz, qw = q[3:7]; sc_ = q[8]
         up_ = np.array([2 * (qx * qy - qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz + qw * qx)])
         up_ /= np.linalg.norm(up_)
-        side_a = np.cross(up_, [1.0, 0.0, 0.0])
-        if np.linalg.norm(side_a) < 1e-3:
-            side_a = np.cross(up_, [0.0, 0.0, 1.0])
-        side_a /= np.linalg.norm(side_a)
-        side_b = np.cross(up_, side_a)
-        mid, hh = 0.5 * (lo_ + top_) * sc_, 0.5 * (top_ - lo_) * sc_
-        for _k in range(GLITTER_PER_TREE):
-            while True:
-                v_ = np.array([rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1)])
-                if v_ @ v_ <= 1.0:
-                    break
-            p_ = base_ + up_ * (mid + v_[1] * hh * 1.1) + side_a * v_[0] * Rr * sc_ * 1.1 + side_b * v_[2] * Rr * sc_ * 1.1
-            glit.append([round(float(c), 3) for c in p_] + [qx, qy, qz, qw, 1.0, 1.0, 1.0])
-programs.append(look.glitter_program())
-nodes.append({"name": "scan_glitter", "kind": "procedural", "procedural": {
-    "source": {"kind": "sphere", "radius": 0.55, "segments": 6, "rings": 3},
-    "distribution": {"kind": "points", "points": glit},
-    "material": {"program": "rw_glitter", "roughness": 0.4, "metallic": 0.0},
-    "castsShadow": False,
-    "lod": {"cull": True, "minScreenRadius": 0.5, "maxDistance": 700.0},
-    "effectors": [
-        {"field": "scanShell", "op": "scale", "blend": "replace", "strength": 1.0, "scaleAxis": [1.0, 1.0, 1.0]},
-        {"field": "scanShell", "op": "positionOffset", "blend": "add", "strength": 5.0, "axis": [0.0, 1.0, 0.0],
-         "local": True}]}})
-print("SPARKLE %d glitter instances in %d crowns" % (len(glit), len(glit) // GLITTER_PER_TREE))
+        centre = base_ + up_ * (0.62 * (lo_ + top_) * sc_)
+        scales.append(sc_)
+        cores.append([round(float(c), 3) for c in centre] + [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        for _k in range(SPARKS_PER_TREE):
+            v_ = np.array([rng.gauss(0, 1), rng.gauss(0, 1), rng.gauss(0, 1)])
+            d_ = v_ / np.linalg.norm(v_) + 0.45 * up_          # a shell, lifted: more sparks go up than down
+            d_ /= np.linalg.norm(d_)
+            g_ = -up_ - np.dot(-up_, d_) * d_
+            g_ = g_ / np.linalg.norm(g_) if np.linalg.norm(g_) > 1e-4 else np.cross(d_, [1.0, 0.0, 0.0])
+            x_ = np.cross(d_, g_)
+            qq = Matrix((tuple(x_), tuple(d_), tuple(g_))).transposed().to_quaternion()
+            sparks.append((centre, d_, qq))
+    reach = 2.0 * Rr * float(np.mean(scales)) + 10.0
+    # each spark starts a little way back along its own flight, so the shell's sparks end at different reaches (a
+    # firework's stars are not a perfect sphere) and the slower ones start hidden in the crown
+    placed = []
+    for centre, d_, qq in sparks:
+        start = centre - d_ * reach * rng.uniform(0.0, 0.4)
+        placed.append([round(float(c), 3) for c in start] + [round(qq.x, 5), round(qq.y, 5), round(qq.z, 5),
+                                                             round(qq.w, 5), 1.0, 1.0, 1.0])
+    sparks = placed
+    nodes.append({"name": "fw_sparks_%s" % f_, "kind": "procedural", "procedural": {
+        "source": {"kind": "sphere", "radius": 0.75, "segments": 5, "rings": 3},
+        "distribution": {"kind": "points", "points": sparks},
+        "material": {"program": "rw_spark", "roughness": 0.4, "metallic": 0.0},
+        "castsShadow": False, "lod": {"cull": True, "minScreenRadius": 0.4, "maxDistance": 900.0},
+        "effectors": [
+            {"field": "fwOut", "op": "positionOffset", "blend": "add", "strength": round(reach, 2),
+             "axis": [0.0, 1.0, 0.0], "local": True},
+            {"field": "fwDrop", "op": "positionOffset", "blend": "add", "strength": round(0.55 * reach, 2),
+             "axis": [0.0, 0.0, 1.0], "local": True},
+            {"field": "fwLife", "op": "scale", "blend": "replace", "strength": 1.0, "scaleAxis": [0.45, 4.0, 0.45]},
+            {"field": "fwHeat", "op": "emission", "blend": "replace", "strength": 1.0}]}})
+    nodes.append({"name": "fw_flash_%s" % f_, "kind": "procedural", "procedural": {
+        "source": {"kind": "sphere", "radius": 1.0, "segments": 10, "rings": 6},
+        "distribution": {"kind": "points", "points": cores},
+        "material": {"program": "rw_flash", "roughness": 1.0, "metallic": 0.0},
+        "castsShadow": False, "lod": {"cull": True, "minScreenRadius": 0.4, "maxDistance": 900.0},
+        "effectors": [
+            {"field": "fwFlash", "op": "scale", "blend": "replace", "strength": round(0.45 * Rr * float(np.mean(scales)), 2),
+             "scaleAxis": [1.0, 1.0, 1.0]}]}})
+    n_sparks += len(sparks)
+music.FW_EDGE_FIELDS[:] = FW_EDGES
+print("FIREWORKS %d sparks and %d flash cores; fields %s" % (n_sparks, sum(len(v) for v in fam.values()),
+                                                             [f_ for f_, _p in FW_EDGES]))
 
 # ---- Rainbow World 2, gate 5: the sunburst (the owner: "effects in the sky might be better if it were like sunrays")
 # The engine's light shafts are the volumetric march's (ADR-570: placed media and their self-shadow; this world has
@@ -1553,11 +1607,11 @@ for prog_, roles_ in look.FX.items():
 # the sunburst takes the look's sun colour
 for rn_ in SUN_RAYS:
     bindings.append({"role": "sun", "target": "nodes/%s/tint" % rn_})
-# the scan glitter's four colours are the look's own, chosen to contrast: its kick colour, horizon, cloud shadow, crest
-if "glitter_ramp" in look.FX.get("rw_glitter", {}):
+# the sparks' four colours are the look's own, chosen to contrast: its kick colour, horizon, cloud shadow, crest
+if "spark_ramp" in look.FX.get("rw_spark", {}):
     for role_, f_ in zip(("ring", "horizon", "cloud0", "meadow3"), ("constant", "constant2", "constant3", "constant4")):
-        bindings.append({"role": role_, "target": "material/rw_glitter/op/%d/oklabRamp/%s"
-                         % (look.FX["rw_glitter"]["glitter_ramp"], f_)})
+        bindings.append({"role": role_, "target": "material/rw_spark/op/%d/oklabRamp/%s"
+                         % (look.FX["rw_spark"]["spark_ramp"], f_)})
 palette = {"states": [{"name": n, "colors": c, "scalars": SCALARS[n]} for n, c in STATES], "bindings": bindings,
            "selector": {"select": 0, "transition": 8.0, "lock": False, "hold": 60.0,
                         "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": list(range(len(STATES))),
@@ -1606,7 +1660,7 @@ for k_ in ride_keys:
         CAM_KEYS[c_].append({"time": k_["time"], "value": round(float(q_[c_]), 3), "interp": k_["interp"]})
 CAM_SOURCES = [{"kind": "timeline", "name": "cam" + "XYZ"[c_], "settings": {"loopLength": loop_seconds,
                                                                             "keys": CAM_KEYS[c_]}} for c_ in range(3)]
-for fld in music.SPARKLE_FIELDS:
+for fld, _params in FW_EDGES:
     for c_ in range(3):
         routes.append({"source": "timeline.cam" + "XYZ"[c_], "target": "field/%s/position" % fld, "amount": 1.0,
                        "op": "replace", "polarity": "unipolar", "component": c_})

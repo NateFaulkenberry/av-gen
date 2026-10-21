@@ -440,29 +440,44 @@ def node_points(name, asset, points, material, **extra):
 
 
 
-def glitter_program():
-    """The scan's glitter (gate 5): each grain in one of four palette colours (its instance random picks; the look's
-    kick colour, sun, cloud light and horizon -- bound by the palette), a fifth of them white-hot, twinkling on a
-    per-grain clock, glowing hot."""
-    return finish({"name": "rw_glitter", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6,
+def spark_program():
+    """The firework sparks (gate 6): each spark one of four palette colours (its instance random picks; bound by the
+    palette to the look's kick colour, horizon, cloud shadow and crest), white-hot at ignition and cooling to its
+    colour (its heat is the instance emissive the fireworks' `fwHeat` field writes), one in seven crackling -- a hard
+    strobe on its own clock -- as it cools."""
+    return finish({"name": "rw_spark", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6,
                    "emissionIntensity": 1.0, "opacity": -1, "ops": [
                        {"kind": "input", "dst": 0, "input": "instanceRandom"},
-                       {"kind": "oklabRamp", "dst": 3, "srcA": 0, "value": -1.0, "_role": "glitter_ramp",
+                       {"kind": "oklabRamp", "dst": 3, "srcA": 0, "value": -1.0, "_role": "spark_ramp",
                         "constant": [1.0, 0.85, 0.4, 1.0], "constant2": [1.0, 0.4, 0.7, 1.0],
                         "constant3": [0.4, 0.8, 1.0, 1.0], "constant4": [0.7, 1.0, 0.5, 1.0]},
-                       {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [3, 3, 3, 3]},
-                       {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.78, 0.8, 0.0, 0.0]},
-                       {"kind": "constant", "dst": 2, "constant": [1.0, 1.0, 1.0, 1.0]},
-                       {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 2, "srcC": 1},
-                       {"kind": "input", "dst": 4, "input": "time"},
-                       {"kind": "swizzle", "dst": 5, "srcA": 0, "constant": [1, 1, 1, 1]},
-                       {"kind": "remap", "dst": 4, "srcA": 4, "constant": [0.0, 1.0, 0.0, 9.0], "value": 0.0},
-                       {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},
-                       {"kind": "noise", "dst": 4, "srcA": 4, "value": 6.0, "seed": 41},
-                       {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.35, 0.75, 0.0, 0.0]},
-                       {"kind": "constant", "dst": 7, "constant": [14.0, 14.0, 14.0, 1.0], "_role": "glitter_gain"},
-                       {"kind": "multiply", "dst": 6, "srcA": 3, "srcB": 7},
-                       {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 4}]})
+                       {"kind": "input", "dst": 1, "input": "instanceEmissive"},          # heat 0..1
+                       {"kind": "power", "dst": 2, "srcA": 1, "value": 1.5},
+                       {"kind": "constant", "dst": 4, "constant": [1.0, 0.97, 0.9, 1.0]},
+                       {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 2},        # white-hot to colour
+                       {"kind": "input", "dst": 5, "input": "time"},
+                       {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [2, 2, 2, 2]},
+                       {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.0, 1.0, 0.0, 23.0], "value": 0.0},
+                       {"kind": "add", "dst": 5, "srcA": 5, "srcB": 4},
+                       {"kind": "noise", "dst": 5, "srcA": 5, "value": 4.0, "seed": 53},
+                       {"kind": "threshold", "dst": 5, "srcA": 5, "value": 0.55},           # the strobe
+                       {"kind": "swizzle", "dst": 4, "srcA": 0, "constant": [3, 3, 3, 3]},
+                       {"kind": "threshold", "dst": 4, "srcA": 4, "value": 0.86},           # the crackling seventh
+                       {"kind": "constant", "dst": 7, "constant": [1.0, 1.0, 1.0, 1.0]},
+                       {"kind": "mixBy", "dst": 5, "srcA": 7, "srcB": 5, "srcC": 4},        # steady unless crackling
+                       {"kind": "remap", "dst": 2, "srcA": 1, "constant": [0.0, 1.0, 1.5, 5.0], "value": 0.0},
+                       {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 5},
+                       {"kind": "constant", "dst": 7, "constant": [8.0, 8.0, 8.0, 1.0], "_role": "spark_gain"},
+                       {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 7},
+                       {"kind": "multiply", "dst": 6, "srcA": 3, "srcB": 2}]})
+
+
+def flash_program():
+    """The ignition flash: a white-gold core, very bright (bloom carries it)."""
+    return finish({"name": "rw_flash", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6,
+                   "emissionIntensity": 1.0, "opacity": -1, "ops": [
+                       {"kind": "constant", "dst": 3, "constant": [1.0, 0.95, 0.8, 1.0]},
+                       {"kind": "constant", "dst": 6, "constant": [30.0, 27.0, 20.0, 1.0]}]})
 
 
 def tinted_canopy_program(name, stops, height=14.0, offset=-0.75, follow_look=True):

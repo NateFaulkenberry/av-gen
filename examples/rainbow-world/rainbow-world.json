@@ -9267,7 +9267,7 @@
   },
   {
    "source": "stem.synth.rms",
-   "target": "field/scanSpin/radius",
+   "target": "field/fwSpin/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9289,7 +9289,7 @@
   },
   {
    "source": "stem.synth.rms",
-   "target": "field/scanShellOut/radius",
+   "target": "field/fwSpin/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9311,7 +9311,227 @@
   },
   {
    "source": "stem.synth.rms",
-   "target": "field/scanShellIn/radius",
+   "target": "field/fwOut/falloff/inner",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwOut/falloff/outer",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwDrop/falloff/inner",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwDrop/falloff/outer",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwHeat/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwLifeIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwLifeOut/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwFlashIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwFlashOut/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwGlowIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 450.0,
+    "trendFloor": 0.06,
+    "threshold": "binary",
+    "thresholdLevel": 1.25,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "field/fwGlowOut/radius",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10161,7 +10381,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "field/scanSpin/radius",
+   "target": "field/fwSpin/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10186,7 +10406,7 @@
   },
   {
    "source": "response.sustain",
-   "target": "field/scanShellOut/radius",
+   "target": "field/fwSpin/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10211,7 +10431,257 @@
   },
   {
    "source": "response.sustain",
-   "target": "field/scanShellIn/radius",
+   "target": "field/fwOut/falloff/inner",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwOut/falloff/outer",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwDrop/falloff/inner",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwDrop/falloff/outer",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwHeat/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwLifeIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwLifeOut/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwFlashIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwFlashOut/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwGlowIn/radius",
+   "amount": -970.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "trendSeconds": 8.0,
+    "trendFastMs": 1000.0,
+    "trendFloor": 0.1,
+    "threshold": "binary",
+    "thresholdLevel": 1.1,
+    "attackMs": 0.0,
+    "decayMs": 1500.0,
+    "envelopeRefractoryMs": 12000.0,
+    "envelopeRearm": 0.3,
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 0.14285714285714285
+   },
+   "depthSource": "stem.synth.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "response.sustain",
+   "target": "field/fwGlowOut/radius",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10300,8 +10770,8 @@
   },
   {
    "source": "macro.synth",
-   "target": "material/rw_glitter/op/13/constant/constant",
-   "amount": 4.0,
+   "target": "material/rw_spark/op/19/constant/constant",
+   "amount": 3.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
@@ -10876,7 +11346,7 @@
   },
   {
    "source": "timeline.camX",
-   "target": "field/scanSpin/position",
+   "target": "field/fwSpin/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10884,7 +11354,7 @@
   },
   {
    "source": "timeline.camY",
-   "target": "field/scanSpin/position",
+   "target": "field/fwSpin/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10892,7 +11362,7 @@
   },
   {
    "source": "timeline.camZ",
-   "target": "field/scanSpin/position",
+   "target": "field/fwSpin/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10900,7 +11370,7 @@
   },
   {
    "source": "timeline.camX",
-   "target": "field/scanShellOut/position",
+   "target": "field/fwOut/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10908,7 +11378,7 @@
   },
   {
    "source": "timeline.camY",
-   "target": "field/scanShellOut/position",
+   "target": "field/fwOut/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10916,7 +11386,7 @@
   },
   {
    "source": "timeline.camZ",
-   "target": "field/scanShellOut/position",
+   "target": "field/fwOut/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10924,7 +11394,7 @@
   },
   {
    "source": "timeline.camX",
-   "target": "field/scanShellIn/position",
+   "target": "field/fwDrop/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10932,7 +11402,7 @@
   },
   {
    "source": "timeline.camY",
-   "target": "field/scanShellIn/position",
+   "target": "field/fwDrop/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -10940,7 +11410,175 @@
   },
   {
    "source": "timeline.camZ",
-   "target": "field/scanShellIn/position",
+   "target": "field/fwDrop/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwHeat/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwHeat/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwHeat/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwLifeIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwLifeIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwLifeIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwLifeOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwLifeOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwLifeOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwFlashIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwFlashIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwFlashIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwFlashOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwFlashOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwFlashOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwGlowIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwGlowIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwGlowIn/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2
+  },
+  {
+   "source": "timeline.camX",
+   "target": "field/fwGlowOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0
+  },
+  {
+   "source": "timeline.camY",
+   "target": "field/fwGlowOut/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1
+  },
+  {
+   "source": "timeline.camZ",
+   "target": "field/fwGlowOut/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -12286,19 +12924,19 @@
    },
    {
     "role": "ring",
-    "target": "material/rw_glitter/op/2/oklabRamp/constant"
+    "target": "material/rw_spark/op/2/oklabRamp/constant"
    },
    {
     "role": "horizon",
-    "target": "material/rw_glitter/op/2/oklabRamp/constant2"
+    "target": "material/rw_spark/op/2/oklabRamp/constant2"
    },
    {
     "role": "cloud0",
-    "target": "material/rw_glitter/op/2/oklabRamp/constant3"
+    "target": "material/rw_spark/op/2/oklabRamp/constant3"
    },
    {
     "role": "meadow3",
-    "target": "material/rw_glitter/op/2/oklabRamp/constant4"
+    "target": "material/rw_spark/op/2/oklabRamp/constant4"
    }
   ],
   "selector": {
