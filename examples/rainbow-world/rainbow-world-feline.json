@@ -2020,14 +2020,6 @@
       "default": 0.0
      },
      {
-      "name": "surge",
-      "default": 0.0
-     },
-     {
-      "name": "scantrig",
-      "default": 0.0
-     },
-     {
       "name": "scan",
       "default": 0.0
      },
@@ -3281,9 +3273,10 @@
     "envelopeFallPerSecond": 0.6,
     "attackMs": 30.0
    },
-   "depthSource": "macro.synth",
-   "depthMin": 0.35,
-   "depthMax": 1.0
+   "depthSource": "stem.synth.rms",
+   "depthMin": 0.25,
+   "depthMax": 5.0,
+   "depthDefault": 0.15
   },
   {
    "source": "macro.lift",
@@ -3310,9 +3303,9 @@
     "decayMs": 3000.0
    },
    "optional": true,
-   "depthSource": "macro.synth",
-   "depthMin": 0.0,
-   "depthMax": 1.0
+   "depthSource": "stem.synth.rms",
+   "depthMin": -0.2,
+   "depthMax": 6.0
   },
   {
    "source": "audio.spectralCentroid",
@@ -3358,27 +3351,6 @@
    "op": "add",
    "polarity": "unipolar",
    "component": -1
-  },
-  {
-   "source": "stem.synth.rms",
-   "target": "macros/surge",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 8.0,
-    "offset": -0.4,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 40.0,
-    "decayMs": 5000.0
-   },
-   "optional": true,
-   "depthSource": "stem.synth.level",
-   "depthMin": -2.0,
-   "depthMax": 1.0
   },
   {
    "source": "macro.scan",
@@ -3878,7 +3850,7 @@
   },
   {
    "source": "beat.phrasePulse",
-   "target": "macros/scantrig",
+   "target": "macros/scan",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -3886,28 +3858,32 @@
    "chain": {
     "delayMs": 300.0,
     "envelope": "peakhold",
-    "envelopeHoldMs": 60.0,
-    "envelopeFallPerSecond": 20.0
-   },
-   "depthSource": "macro.surge",
-   "depthMin": 0.0,
-   "depthMax": 1.0
-  },
-  {
-   "source": "macro.scantrig",
-   "target": "macros/scan",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "threshold": "binary",
-    "thresholdLevel": 0.6,
-    "envelope": "peakhold",
     "envelopeHoldMs": 6000.0,
     "envelopeFallPerSecond": 0.33,
     "attackMs": 250.0
-   }
+   },
+   "depthSource": "stem.synth.level",
+   "depthMin": -12.0,
+   "depthMax": 1.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "stem.synth.rms",
+   "target": "macros/scan",
+   "amount": 2.5,
+   "op": "min",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "gain": 12.0,
+    "offset": -1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "attackMs": 1200.0,
+    "decayMs": 3000.0
+   },
+   "optional": true
   },
   {
    "source": "macro.one",

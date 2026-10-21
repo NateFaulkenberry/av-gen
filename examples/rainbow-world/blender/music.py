@@ -50,7 +50,7 @@ def op_target(program, roles, role, kind, field):
     return "material/%s/op/%d/%s/%s" % (program, roles[role], kind, field)
 
 
-MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("surge", 0.0), ("scantrig", 0.0), ("scan", 0.0), ("one", 1.0)]
+MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("scan", 0.0), ("one", 1.0)]
 SCAN_REST = 980.0    # look.SCAN_REST
 SCAN_DELAY_MS = 300.0
 RAINBOWS = ("rw_rainbow",)
@@ -148,7 +148,7 @@ def routes(fx, swell_nodes, swell):
         if "arch_gain" in roles:
             out.append(route("beat.phrasePulse", op_target(prog, roles, "arch_gain", "constant", "constant"), 4.0,
                              {"envelope": "linearfall", "envelopeFallPerSecond": 0.6, "attackMs": 30.0},
-                             depthSource="macro.synth", depthMin=0.35, depthMax=1.0))
+                             depthSource="stem.synth.rms", depthMin=0.25, depthMax=5.0, depthDefault=0.15))   # replayable (ADR-901); a stereo session: as a groove
             out.append(route("macro.lift", op_target(prog, roles, "arch_gain", "constant", "constant"), 1.0))
     # ---- lift: the synth's brightness over bars (its centroid; the 151-165 s rise, the riser at 183-190 s) lifts
     # the sun's glow, the bloom and the arches together, slowly
@@ -160,19 +160,11 @@ def routes(fx, swell_nodes, swell):
                                 "attackMs": 1500.0, "decayMs": 3000.0})
     for r_ in out[-2:]:
         if r_["target"] == "macros/lift" and r_["source"].startswith("stem."):
-            r_.update(depthSource="macro.synth", depthMin=0.0, depthMax=1.0)
+            r_.update(depthSource="stem.synth.rms", depthMin=-0.2, depthMax=6.0)   # replayable: not a macro
     out.append(route("macro.lift", "env/sky/sunGlow", 0.35))
     out.append(route("macro.synth", "env/sky/sunGlow", 0.25))   # the synth's light in the sky
     out.append(route("macro.lift", "post/bloom/intensity", 0.12))
     # ---- the drop: a world-scale impact, rare by construction --------------------------------------------------------
-    # `surge` is the synth's absolute loudness (rms) times how far its level stands above its own recent past (the
-    # level reads against an adaptive reference, ADR-1510, so a loud entry after a quiet stretch reads at the top for a
-    # few seconds): high only when a LOUD synth ARRIVES -- the drop at 47.85 s. The intro's calls are quiet (low rms),
-    # the groove's bed is not new (level mid-range). A phrase boundary with a surge behind it is the impact.
-    out += stem_route("synth", "rms", None, "macros/surge", 1.0,
-                      {"gain": 8.0, "offset": -0.4, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 40.0, "decayMs": 5000.0})   # slow release: the scan's hold reads it as its depth
-    out[-1].update(depthSource="stem.synth.level", depthMin=-2.0, depthMax=1.0)
     impact = {"envelope": "linearfall", "envelopeFallPerSecond": 0.25, "attackMs": 20.0}   # four seconds down
     def hit(target, amount, component=-1):
         # the impact rides the scan's own latch: everything flares together and relaxes together
@@ -195,16 +187,22 @@ def routes(fx, swell_nodes, swell):
                                  component=c))
         out.append(route("macro.scan", op_target(prog, roles, "scan_amount", "constant", "constant"), 1.0))
         out.append(route("macro.scan", op_target(prog, roles, "scan_edge_gain", "constant", "constant"), 4.0))
-    # One shot per qualifying phrase: the phrase pulse, read SCAN_DELAY_MS late (the synth enters on the drop's
-    # downbeat, so its surge is only measurable a beat-fraction after it), scaled by the surge at that instant, is a
-    # one-frame trigger; past 0.6 it latches the scan for six seconds, which then relaxes over three.
-    out.append(route("beat.phrasePulse", "macros/scantrig", 1.0,
-                     {"delayMs": SCAN_DELAY_MS, "envelope": "peakhold", "envelopeHoldMs": 60.0,
-                      "envelopeFallPerSecond": 20.0},
-                     depthSource="macro.surge", depthMin=0.0, depthMax=1.0))
-    out.append(route("macro.scantrig", "macros/scan", 1.0,
-                     {"threshold": "binary", "thresholdLevel": 0.6, "envelope": "peakhold", "envelopeHoldMs": 6000.0,
-                      "envelopeFallPerSecond": 0.33, "attackMs": 250.0}))
+    # When it fires -- seek-exact by construction: every stateful route here reads a signal the seek replay rebuilds
+    # (beat.*, stem.*), never a macro (a macro is a parameter, which the replay does not write; ADR-901). Two routes
+    # onto the one knob, combined by `min`:
+    #   A  the phrase pulse, read SCAN_DELAY_MS late (the synth enters on the drop's downbeat, so it is measurable a
+    #      beat-fraction after it), latched six seconds, then relaxing; its depth is the synth stem's LEVEL mapped so
+    #      only the top of its range counts (the level reads against the stem's adaptive reference, ADR-1510: a loud
+    #      entry after a quiet stretch reads at the top for a few seconds; the groove's bed sits mid-range);
+    #   B  the synth stem's absolute loudness (rms): the intro's calls are quiet (0.01-0.06), the drop is not.
+    # Only the drop at 47.85 s satisfies both (rainbow-world/16, the trace in section 9).
+    out.append(route("beat.phrasePulse", "macros/scan", 1.0,
+                     {"delayMs": SCAN_DELAY_MS, "envelope": "peakhold", "envelopeHoldMs": 6000.0,
+                      "envelopeFallPerSecond": 0.33, "attackMs": 250.0},
+                     depthSource="stem.synth.level", depthMin=-12.0, depthMax=1.0, depthDefault=0.0))
+    out.append(route("stem.synth.rms", "macros/scan", 2.5,
+                     {"gain": 12.0, "offset": -1.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                      "attackMs": 1200.0, "decayMs": 3000.0}, op="min", optional=True))   # (slow attack: sustained)
     # what the scan touches that has no scan ops -- the trees (masked: ops would cost in the depth prepass) --
     # crossfades its colour ramp to the spectrum, bottom to top, by the same amount (ADR-900's Replace depth). (The
     # clouds' ramp is the palette's, which replaces after the routes: the clouds flare through `cloud_glow` instead.)
