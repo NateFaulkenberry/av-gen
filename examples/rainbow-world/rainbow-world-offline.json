@@ -8176,7 +8176,7 @@
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 40.0,
+    "attackMs": 10.0,
     "decayMs": 180.0
    },
    "optional": true
@@ -8194,7 +8194,7 @@
     "clampEnabled": true,
     "clampMin": 0.0,
     "clampMax": 1.0,
-    "attackMs": 40.0,
+    "attackMs": 10.0,
     "decayMs": 180.0
    },
    "depthSource": "stem.bass.active",

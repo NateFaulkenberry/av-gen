@@ -126,12 +126,14 @@ def routes(fx, swell_nodes, swell):
     # the bass body (its followed level, conditioned so the stem's quiet floor reads 0) plus a push on each note
     # (gate 5, the owner chose 23 item 3: "breathe across their range": it sat above 0.3 for 85% of the song; now
     # only the bass's top half counts and it lets go in 180 ms, so it swings 0-1 within a bar -- median 0.31, a 0.46
-    # swing a second -- and each note pushes it)
+    # swing a second -- and each note pushes it; 29 section 11: it takes each note in 10 ms, not 40, so the clouds'
+    # breathing lands with the note -- measured on the video, they followed the bass by a steady +33 ms at 10, 45, 90
+    # and 150 s: no drift)
     out += stem_route("bass", "level", "response.bass", "macros/swell", 1.0,
                       {"gain": 2.4, "offset": -1.4, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 40.0, "decayMs": 180.0},
+                       "attackMs": 10.0, "decayMs": 180.0},
                       fb_chain={"gain": 2.4, "offset": -1.45, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                                "attackMs": 40.0, "decayMs": 180.0})
+                                "attackMs": 10.0, "decayMs": 180.0})
     out += stem_route("bass", "onset", None, "macros/swell", 0.5,
                       {"envelope": "linearfall", "envelopeFallPerSecond": 4.0, "attackMs": 10.0})
     for nm in swell_nodes:

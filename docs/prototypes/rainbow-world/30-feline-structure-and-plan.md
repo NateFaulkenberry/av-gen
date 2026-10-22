@@ -323,3 +323,14 @@ At 18eb81c1, after a fresh configure (exit 0) and a full build (exit 0):
 | `check_project_integrity.py` | 0 | 0 problems |
 
 The GPU suite was not run: no engine code changed (`git diff 58d0e92b -- src shaders` is empty).
+
+## 13. The owner's Feline revisions (29 section 11)
+
+| Note | Finding | Fix | Where |
+|---|---|---|---|
+| Intro: 1 s black, then a 5 s mosh fade-in | -- | The authored fade compressed into 1-6 s after a second of black | Feline layer |
+| Scans "a tad late" | The start was the swell's peak less the colour's rise, capped at 2.5 s. A long swell therefore started up to 2 s after it began (2:39: its stem onset is 157.0 s, its scan started at 158.95) | Every scan starts 0.25 s before its swell's own onset. The colour reaches its peak within 2.5 s | Feline layer |
+| Clouds "behind the bass by 40-50 s" | Measured on the rendered video (cloud brightness against the bass stem's envelope, cross-correlated): they followed by a steady +67, +33, +33 and +33 ms at 10, 45, 90 and 150 s. A fixed frame of lag, no drift | The swell takes each bass note in 10 ms, not 40 | Scene (both versions) |
+| A jump at about 3:03 | Not the mosh (tested: a mosh on, off for 5 s and on again shows no stale frame). The retimed ride crosses the closed loop's seam at 183.4 s, and its key pair (0.9999 at 183.40, then a "step" key at 0.0 at 183.599) was interpolated: the camera ran the whole 7 km loop backwards in 0.2 s | The seam is reached at 1.0 at the exact crossing, then restarts at 0.0 0.1 ms later (1 == 0 on a closed spline). Per-frame camera speed over the song now peaks at 48.8 m/s, a physical speed. `make_project.py` refuses to write a ride that runs backwards, a scan front that moves inward, or a step key that ramps | Feline layer |
+
+The native ride's lap is monotonic to 1.0 at 189.999 s and wraps on the loop, so the native scenes were never affected.
