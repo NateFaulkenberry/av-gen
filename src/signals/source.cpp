@@ -1,5 +1,6 @@
 #include "signals/source.hpp"
 
+#include "signals/conditioned_signal.hpp"
 #include "signals/publish_source.hpp"
 
 #include "signals/beat_grid.hpp"
@@ -1354,6 +1355,10 @@ std::unique_ptr<Source> SourceRack::create(const std::string& kind, const std::s
     if (kind == "publish") {
         // ADR-1064: chosen parameters' final values as signals (effects modulating effects).
         return std::make_unique<PublishSource>(name);
+    }
+    if (kind == "signal") {
+        // ADR-1602: a conditioned signal -- a route's chain over one or more inputs, published as signal.<name>.
+        return std::make_unique<ConditionedSignalSource>(name);
     }
     if (kind == "interpret") {
         // ADR-1020: the Sonic Garden's Visual Interpreter; its mappings publish visual.<mapping>.

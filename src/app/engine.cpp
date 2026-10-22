@@ -5116,6 +5116,12 @@ bool Engine::controlReplayNeeded() const {
     if (!states_.states.empty()) {
         return true;
     }
+    // ADR-1602: a conditioned signal holds a route's chain state of its own, which only this replay rebuilds
+    for (const auto& source : sources_.sources()) {
+        if (source->kind() == "signal") {
+            return true;
+        }
+    }
     // ADR-1573: a route that feeds a source -- the macro knobs and source settings are parameters the sources read
     for (const params::ModRoute& r : modulator_.routes()) {
         if (r.enabled && (r.target.starts_with("macros/") || r.target.starts_with("sources/"))) {
