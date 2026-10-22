@@ -40,3 +40,7 @@ envelope source triggered by it (`env.<name>`). This let Rainbow World's stem an
 events with the grid (rainbow-world/14 §5). Code: `src/app/sonic_trace_cli.cpp`; test:
 `tests/integration/test_sonic_trace_stems.cpp` (`[adr1571]`). Existing readers select columns by name, so the wider
 file changes nothing for them.
+
+Since ADR-1601 (2026-10-22) an `env.<name>` column rises on the event's own frame, at 1.0 for an instant attack. It used
+to rise one frame after the event and peak at 1 - dt/release, so `env.*` comparisons recorded before then carry that
+frame. ADR-1602 adds the `signal.*` columns and `--trace-finals` (every route target's final value).
