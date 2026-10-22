@@ -62,3 +62,12 @@ generating"). The README must say how to build it.
 ## 7. The owner on gate 1 (verbatim)
 
 "looks good so far - only thing I noticed is at 5 seconds in gate1-1m47-1m51-build-104-116s.mp4 there seems to be an issue it looks like the tree dancing / fireworks animation happens without the rainbow world scan going through them. it might be due to a build up of world scans - hard to tell from just this clip - one thing might help is just to shorten the duration of the world scan, also a bit of cloud color popping in that scene as well, might be intentional modulation, but maybe we could smooth that out"
+
+## 8. The owner's rule on shared changes (verbatim)
+
+"make sure any scene changes that we do to feline footwear get applied to their native app scenes"
+
+Coordinator note: a fix or improvement made for the Feline video that is not song-specific lands in the repository's
+Rainbow World offline and live versions (build_world.py and the projects), and make_project.py inherits it. Only the
+song-specific layer stays in the Desktop project: the 18 baked scans, the camera retiming, the looks per section, the
+energy curve, the ending and the landing.

@@ -179,3 +179,41 @@ Gate clips, after approval:
 - the ending from 2:50 (170-210.5 s).
 
 Then the full render.
+
+## 9. Gate 2: the owner's gate-1 notes (29 section 7)
+
+**Fireworks without a visible scan at 109 s.** The bug was in the Feline layer's scan baking:
+- **The keys collided.** The 1:44 scan's front had a key for reaching 450 m at 108.13 s. That was after its own
+  reset, so once the keys were sorted it fell inside the 1:47 scan's front. The front jumped to 450 m and back at
+  108.1 s while the colour was at 4%, so every tree within 450 m twirled and burst with no colour.
+- **The front stopped short.** A front that stopped at a partial reach, or jumped back to rest, left the trees just
+  inside it frozen mid-burst, or set them off as it skipped past them.
+
+The fix (the Feline layer):
+- **No reach and no jump:** every scan's front now runs from the eye all the way to rest.
+- **Colour covers the run:** the colour holds at its peak until the front is out, then releases.
+- **Sizes differ in other ways:** brightness, speed (full 162 m/s, wide 230, local 320) and length, not reach.
+- **No collisions:** a scan is over at least 0.25 s before the next one's front leaves, and the bake asserts that no
+  scan's keys interleave with another's.
+- **Retimed:** the 1:44 scan became a local ripple, and the 1:47-1:51 scan leaves out of the fill (109.3 s), so it is
+  about 120 m out on B's downbeat.
+
+The baked table is `~/Desktop/Feline Footwear/scans.txt`.
+
+**Shorter scans: a default for both versions** (the owner's rule, 29 section 8):
+- the live and offline scan holds 5 s and falls over 2 s, where it held 6.5 s and fell over 3 s;
+- the front runs out in 6 s instead of 7;
+- 7 s a scan, not 9.5.
+
+The live trigger is otherwise unchanged (the trend, the 12 s refractory time).
+
+**Cloud colour popping: the clap splashes, now smoothed in both versions.**
+- Each clap's splash used to attack in 8 ms. It now blooms over 150 ms and fades over 750 ms; the phrase splashes
+  bloom over 400 ms.
+- The patches' edges are softer (remap 0.38-0.64, where it was 0.42-0.58).
+- It was not LOD: the clouds have no flat rung.
+
+**Media:**
+- `gate2-1m47-1m51-build-104-116s.mp4`
+- `gate2-107-113s-before-left-after-right.mp4`
+- `gate2-109s-before-left-after-right.png`

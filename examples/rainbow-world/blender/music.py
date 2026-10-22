@@ -55,7 +55,8 @@ SCAN_REST = 980.0    # look.SCAN_REST
 RAINBOWS = ("rw_rainbow",)
 FW_EDGE_FIELDS = []   # build_world's firework fields whose falloff edges ride the front (filled by the build)
 
-SCAN_RUN = 7.0     # seconds: the live front's run from the eye out to rest
+SCAN_RUN = 6.0     # seconds: the front's run from the eye out to rest (162 m/s; 7 s before the owner's "shorten the
+                   # duration of the world scan", 29 section 7)
 
 
 SCAN_REFRACTORY_MS = 12000.0
@@ -229,8 +230,10 @@ def routes(fx, swell_nodes, swell):
     #   stem   the synth stem's rms, 1.25x its 8 s average (floored at 0.06 rms: the intro's calls cannot qualify)
     #   mix    on a plain stereo input, the mix's sustained (pad/synth) energy, 1.1x its 8 s average (floored at 0.1);
     #          stands aside while a synth stem is active (ADR-1570's fallback shape)
-    # The amount holds 6.5 s and falls over 3 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
-    # the same latch, so it never resets part-way through.
+    # The amount holds 5 s and falls over 2 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
+    # the same latch, so it never resets part-way through, and the colour is still up wherever the front -- and with
+    # it the trees' twirl and fireworks -- passes. (Shortened from a 6.5 s hold and a 3 s fall, 29 section 7: 7 s a
+    # scan, not 9.5.)
     def latch(extra, trend, level, hold_off):
         # the swell: the trigger signal's short-term average over its long-term one (ADR-1575; floored so an intro's
         # near-silence cannot spike it), on at `level`, held through the music's own dips for `hold_off` ms; the
@@ -240,7 +243,7 @@ def routes(fx, swell_nodes, swell):
              "envelopeRefractoryMs": SCAN_REFRACTORY_MS, "envelopeRearm": 0.3}
         c.update(extra)
         return c
-    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 6500.0, "envelopeFallPerSecond": 0.33,
+    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 5000.0, "envelopeFallPerSecond": 0.5,
                   "springHz": 0.5, "springDamping": 1.0}
     front_env = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN}
     triggers = [("stem.synth.rms", (8.0, 450.0, 0.06), 1.25, 1500.0, {"optional": True}),
@@ -299,11 +302,13 @@ def sky_routes(fx):
     if "splash_amount" not in roles:
         return out
     amt = op_target("rw_cloud", roles, "splash_amount", "constant", "constant")
-    out += stem_route("drums", "highMid", "response.snareEnv", amt, 0.7,
+    # (smoothed for the owner's "cloud color popping", 29 section 7: the claps' splashes bloom over 150 ms and fade
+    # over a beat and a half, not 8 ms and 420 ms; the phrase's blooms over 400 ms)
+    out += stem_route("drums", "highMid", "response.snareEnv", amt, 0.6,
                       {"offset": -1.3, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 8.0, "decayMs": 420.0}, fb_chain={"attackMs": 8.0, "decayMs": 380.0})
-    out.append(route("beat.phrasePulse", amt, 0.6, {"envelope": "linearfall", "envelopeFallPerSecond": 0.9,
-                                                      "attackMs": 30.0}))
+                       "attackMs": 150.0, "decayMs": 750.0}, fb_chain={"attackMs": 150.0, "decayMs": 700.0})
+    out.append(route("beat.phrasePulse", amt, 0.6, {"envelope": "linearfall", "envelopeFallPerSecond": 0.7,
+                                                      "attackMs": 400.0}))
     out.append(route("beat.phrase", op_target("rw_cloud", roles, "splash_hue", "palette", "value"), 1.0, op="replace"))
     shift = op_target("rw_cloud", roles, "splash_shift", "constant", "constant")
     out.append(route("beat.phrase", shift, 900.0, op="replace", component=0))
