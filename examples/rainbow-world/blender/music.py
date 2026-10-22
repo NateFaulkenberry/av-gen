@@ -307,10 +307,22 @@ def sky_routes(fx):
     - splashes of colour: on each clap (the drum stem's 2-6 kHz band) patches of saturated colour bloom across the
       clouds and fade within about a beat; each phrase start (bars 1 + 4k) blooms bigger and fades over two beats.
       Patches, never the whole sky (the owner's rule at gate 2: no world sweep)."""
-    out = [route("macro.swell", "field/%s/strength" % SKY_BREATH, 1.0)]
+    # The breath is the bass's NOTES (29 section 12, the owner: "hitting with real bass note hits ... smoothing this
+    # out"): each onset of the bass stem fires one breath -- up in 25 ms, down over about 0.4 s -- and nothing else
+    # moves the clouds; a re-trigger inside the same note (within 280 ms: the line's notes are 370 ms apart) is
+    # ignored (ADR-1574's refractory latch), and a note's level sets its size, so the accents swell more. The
+    # continuous level, whose small wobbles made the clouds undulate between notes, drives them only on a stereo
+    # input with no bass stem.
     roles = fx.get("rw_cloud", {})
-    if "cloud_glow" in roles:
-        out.append(route("macro.swell", op_target("rw_cloud", roles, "cloud_glow", "constant", "constant"), 0.3))
+    glow = op_target("rw_cloud", roles, "cloud_glow", "constant", "constant") if "cloud_glow" in roles else None
+    note = {"envelope": "linearfall", "envelopeFallPerSecond": 2.4, "attackMs": 25.0, "envelopeRefractoryMs": 280.0,
+            "envelopeRearm": 0.05}
+    out = []
+    for tgt, amt_ in [("field/%s/strength" % SKY_BREATH, 1.0)] + ([(glow, 0.3)] if glow else []):
+        out.append(route("stem.bass.onset", tgt, amt_, note, optional=True, depthSource="stem.bass.level",
+                         depthMin=-0.3, depthMax=1.9, depthDefault=0.3 / 2.2))
+        out.append(route("macro.swell", tgt, amt_, depthSource="stem.bass.active", depthMin=1.0, depthMax=0.0,
+                         depthDefault=0.0))
     if "splash_amount" not in roles:
         return out
     amt = op_target("rw_cloud", roles, "splash_amount", "constant", "constant")

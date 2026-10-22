@@ -334,3 +334,49 @@ The GPU suite was not run: no engine code changed (`git diff 58d0e92b -- src sha
 | A jump at about 3:03 | Not the mosh (tested: a mosh on, off for 5 s and on again shows no stale frame). The retimed ride crosses the closed loop's seam at 183.4 s, and its key pair (0.9999 at 183.40, then a "step" key at 0.0 at 183.599) was interpolated: the camera ran the whole 7 km loop backwards in 0.2 s | The seam is reached at 1.0 at the exact crossing, then restarts at 0.0 0.1 ms later (1 == 0 on a closed spline). Per-frame camera speed over the song now peaks at 48.8 m/s, a physical speed. `make_project.py` refuses to write a ride that runs backwards, a scan front that moves inward, or a step key that ramps | Feline layer |
 
 The native ride's lap is monotonic to 1.0 at 189.999 s and wraps on the loop, so the native scenes were never affected.
+
+## 14. The owner's next revisions (29 section 12)
+
+### The clouds breathe on the bass's notes
+
+The bass line is clean in its stem. In the intro it is a three-note figure, the notes 0.37 s apart, with a gap after.
+The clouds used to follow its continuous level, whose small wobbles between and within the notes made them undulate.
+
+- **Native scenes (both versions):** each onset of the bass stem fires one breath, up in 25 ms and down over about
+  0.4 s.
+  - A re-trigger within 280 ms (the same note) is ignored by ADR-1574's refractory latch.
+  - The note's level sets the breath's size, so the accents swell more.
+  - The continuous level drives the clouds only on a stereo input with no bass stem.
+  - All of it is replay-safe chain state.
+- **The Feline video:** the notes are baked from the bass stem, so they are exact.
+  - Onsets are where the 5 ms level climbs by a quarter of its 2 s peak.
+  - A note is taken if its strength is at least 0.55 of the song's loud notes and it comes at least 0.3 s after the last
+    taken. That gives 352 of 624 onsets.
+  - Each note is one breath, up in 30 ms and down over the gap to the next.
+  - Plot: `79-feline-revisions/clouds-bass-notes-0-20s-45-60s.png` (the waveform, the notes taken, the clouds'
+    envelope).
+
+### The scans from the third on
+
+**Cause.** The first two start where the ear hears their swell begin: the intro call's own rise and the drop's
+downbeat. From the third on, the scans were anchored on the synth filter's rise. In the grooves that rise comes 0.4-1.1
+s after the phrase downbeat where the synth ducks and the swell is heard to begin, so the scans were up to 1.1 s late
+(1:04: the downbeat is at 63.71 s, the scan started at 64.8).
+
+**Fix.** A swell rising within 1.5 s of a phrase downbeat now starts on that downbeat. A pickup, or a swell far from a
+downbeat (the build at 109.3, 2:39 at 157.0, 2:53 at 171.0), keeps its own onset. The 0.25 s lead added last round is
+dropped: it was compensating for this.
+
+| Scan | Swell (filter onset - peak) | Starts |
+|---|---|---|
+| 0:34 | 33.5 - 35.8 (the call) | 33.50 |
+| 0:48 | 47.85 - 48.7 (the drop) | 47.85 |
+| 0:56 | 56.2 - 56.6 | 55.78 (downbeat) |
+| 1:04 | 64.8 - 66.0 | 63.71 (downbeat) |
+| 1:20 | 80.2 - 81.4 | 79.58 (downbeat) |
+| 1:36 | 96.4 - 97.0 | 95.45 (downbeat) |
+| 1:47-1:51 | 109.3 - 111.32 | 109.30 |
+| 2:07 | 125.7 - 126.5 (a pickup) | 125.70 |
+| 2:23 | 143.8 - 144.6 | 143.05 (downbeat) |
+| 2:39 | 157.0 - 161.7 | 157.00 |
+| 2:53 | 171.0 - 172.3 | 171.00 |

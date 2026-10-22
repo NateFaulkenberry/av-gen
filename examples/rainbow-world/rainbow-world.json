@@ -12151,12 +12151,56 @@
    "component": -1
   },
   {
+   "source": "stem.bass.onset",
+   "target": "field/skyBreath/strength",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.4,
+    "attackMs": 25.0,
+    "envelopeRefractoryMs": 280.0,
+    "envelopeRearm": 0.05
+   },
+   "optional": true,
+   "depthSource": "stem.bass.level",
+   "depthMin": -0.3,
+   "depthMax": 1.9,
+   "depthDefault": 0.13636363636363635
+  },
+  {
    "source": "macro.swell",
    "target": "field/skyBreath/strength",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1
+   "component": -1,
+   "depthSource": "stem.bass.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
+  },
+  {
+   "source": "stem.bass.onset",
+   "target": "material/rw_cloud/op/26/constant/constant",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.4,
+    "attackMs": 25.0,
+    "envelopeRefractoryMs": 280.0,
+    "envelopeRearm": 0.05
+   },
+   "optional": true,
+   "depthSource": "stem.bass.level",
+   "depthMin": -0.3,
+   "depthMax": 1.9,
+   "depthDefault": 0.13636363636363635
   },
   {
    "source": "macro.swell",
@@ -12164,7 +12208,11 @@
    "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1
+   "component": -1,
+   "depthSource": "stem.bass.active",
+   "depthMin": 1.0,
+   "depthMax": 0.0,
+   "depthDefault": 0.0
   },
   {
    "source": "stem.drums.highMid",
