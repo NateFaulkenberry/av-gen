@@ -142,13 +142,19 @@ BOTTOM_HILLS = [
 _WINDOWS = {}
 
 
-def _hill_window(hills, s, reach=320.0):
-    """The hills within `reach` of s along the loop (hills are sorted by s0 once)."""
+def _hill_window(hills, s):
+    """The hills whose influence reaches s along the loop.
+
+    (29 section 14, the owner: "visible seams in the geometry". A fixed 320 m window cut long hills -- the valley's
+    170 m trough, the ridges' 130-150 m spines -- while they still stood metres high: exp(-320^2 / 2 170^2) leaves a
+    13 m hollow at 2.2 m, so the land stepped by up to two metres along the line where a hill left the window, a
+    crack across the meadow with its riser in shade, wherever a long hill's edge fell. Each hill now reaches 4.5 of
+    its own widest radius -- its skewed length, its width, whichever the rotation turns along the band -- where it
+    is under exp(-10), a hundredth of a millimetre for the tallest.)"""
     key = id(hills)
     if key not in _WINDOWS:
-        _WINDOWS[key] = sorted(hills, key=lambda h: h[0])
-    hs = _WINDOWS[key]
-    return [h for h in hs if abs((s - h[0] + 0.5 * L) % L - 0.5 * L) < reach]
+        _WINDOWS[key] = [(h, 4.5 * max(h[3] * h[5], h[3] / h[5], h[4])) for h in sorted(hills, key=lambda h: h[0])]
+    return [h for h, reach in _WINDOWS[key] if abs((s - h[0] + 0.5 * L) % L - 0.5 * L) < reach]
 
 
 SECTIONS = {  # authored terrain movements (s0 relative to the section, x0, height, rs along, rx across, skew, rotation)
@@ -307,8 +313,17 @@ def build_band(name="band_section", rings=None):
     """The band mesh. `rings` = (first, last) ring indices for one chunk of the knot (inclusive); None = all."""
     fr = frames()
     i0, i1 = rings if rings is not None else (0, NS)
+    # The seams (29 section 14, the owner: "visible seams in the geometry"): a chunk's smooth normals were its own
+    # faces' alone, so along each border the two chunks' normals differed and the shading broke in a line across the
+    # land. On the closed knot each chunk is built with one more ring at each end, its normals taken from that wider
+    # strip -- the faces on both sides of the border -- and the extra rings then dropped: both chunks give a border
+    # vertex the same normal, the full band's.
+    pad = KNOT is not None and rings is not None
+    ring_ids = list(range(i0, i1 + 1))
+    if pad:
+        ring_ids = [(i0 - 1) % NS] + ring_ids + [(i1 + 1) % NS]
     verts, uvs, zones, moss = [], [], [], []
-    for (s, p, t, u, side) in fr[i0:i1 + 1]:
+    for (s, p, t, u, side) in (fr[r] for r in ring_ids):
         for k in range(NP):
             q = PROFILE[k]
             n2 = profile_normal(k)
@@ -338,7 +353,7 @@ def build_band(name="band_section", rings=None):
     col = bm.loops.layers.color.new("zone")
     col2 = bm.loops.layers.color.new("rim2")
     faces = []
-    for i in range(i1 - i0):
+    for i in range(len(ring_ids) - 1):
         for k in range(NP):
             a = i * NP + k
             b = i * NP + (k + 1) % NP
@@ -361,10 +376,21 @@ def build_band(name="band_section", rings=None):
         for ring in (0, last):
             cap = bm.faces.new([bv[ring * NP + k] for k in (reversed(range(NP)) if ring == last else range(NP))])
             cap.smooth = False
+    custom = None
+    if pad:
+        bm.normal_update()
+        drop = [bv[k] for k in range(NP)] + [bv[(len(ring_ids) - 1) * NP + k] for k in range(NP)]
+        keep = set(bv[NP:(len(ring_ids) - 1) * NP])
+        custom = {v: v.normal.copy() for v in keep}
+        bmesh.ops.delete(bm, geom=drop, context="VERTS")
+        bm.verts.index_update()
+        custom = [custom[v] for v in bm.verts]
     bm.to_mesh(me)
     bm.free()
     for poly in me.polygons:
         poly.use_smooth = True
+    if custom is not None:
+        me.normals_split_custom_set_from_vertices([tuple(n) for n in custom])
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
     return ob, fr
