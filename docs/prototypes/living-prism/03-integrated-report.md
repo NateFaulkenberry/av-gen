@@ -506,3 +506,17 @@ All estimates include tests.
 **Temporary artifacts to clean up after review:**
 - `build/render`, `build/audio` and the `build/release` symlink in this worktree;
 - the generated Rainbow World and THE RIFT scenes (gitignored, regenerable).
+
+## 14. Owner decisions (2026-10-22, verbatim answers to §12)
+
+| # | Question | Owner's answer | Effect on the plan |
+|---|---|---|---|
+| 1 | Latency target | "best recommendation" | **adopted:** sound to light for impacts ≤ 45 ms p50, ≤ 60 ms p95, live, 30 fps (T10) |
+| 2 | Performance thresholds | "accept medium" | **T3 = Medium or better ≥ 90% of frames** at the representative windows; T1, T2, T4-T9 as proposed |
+| 3 | Kick/snare/hat phase-out | Option A, "THIS" | **P1-8 option A:** remove all three mix classes; class hits only from a drum source; one migrated scene per family shown to the owner before merge |
+| 4 | Look-changing fixes | "YES" | P0-2 (`EnvelopeSource`) and P1-11 (band auto-gain gate) proceed without shims (ADR-441) |
+| 5 | Living Prism input | "SEPERATE STEMS / CHANNELS" | the scene is designed for separated sources; feeds and per-source signals are primary; the mix is only a fallback |
+| 6 | Show tempo source | "AGREE" | MIDI clock from the playback rig for performances (the beat tracker remains the fallback) |
+| 7 | Digital Mosh Live misses | "yes" | a separate investigation ticket, outside this milestone |
+
+The owner is writing the art-direction and scene-construction specification in parallel.
