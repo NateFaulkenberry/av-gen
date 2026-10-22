@@ -291,9 +291,10 @@ def build_chandelier(out):
                 (0.2, -0.6, 2.7, 0.28, 0.1, -0.3), (-0.35, -0.45, 2.2, 0.24, -0.2, -0.3), (0.85, -0.3, 1.8, 0.22, 0.5, -0.2),
                 (-0.9, -0.1, 1.5, 0.2, -0.55, 0.0), (0.4, 0.75, 1.2, 0.18, 0.3, 0.5)]
         for x, y, ln, r, lx, ly in spec:
-            prism(bm, (x, y, 0.2), (lx, ly, 1.0), r, ln, r * 2.0, rng)
+            prism(bm, (x * 0.8, y * 0.8, 1.9), (lx, ly, 1.0), r, ln, r * 2.0, rng)
     export(xtal_obj("chandelier_xtal", "chandelier", b), out)
-    export(rock_lump("chandelier_rock", 1.6, 0.6, 7, faces=320), out)
+    # a hanging pendant of rock: it brings the crystals down from the roof into the frame
+    export(rock_lump("chandelier_rock", 1.4, 1.6, 7, faces=360, scale=(1.0, 0.9, 1.0)), out)
 
 
 def build_ember(out):
@@ -311,8 +312,9 @@ def build_arch(out):
     cu = bpy.data.curves.new("arch_curve", "CURVE")
     cu.dimensions = "3D"
     sp = cu.splines.new("BEZIER")
-    pts = [(-5.6, 0.3, -0.5, 1.5), (-4.9, 0.0, 3.6, 1.05), (-2.6, -0.3, 6.6, 0.8), (0.3, 0.0, 7.6, 0.72),
-           (3.0, 0.3, 6.7, 0.8), (5.0, 0.2, 3.8, 1.1), (5.7, -0.1, -0.5, 1.6)]
+    # asymmetric: a massive left leg, the crown off centre to the right, a slimmer right leg stepping back
+    pts = [(-6.4, 0.6, -0.8, 1.9), (-5.9, 0.2, 3.4, 1.3), (-3.9, -0.2, 6.5, 0.85), (-0.6, 0.0, 7.9, 0.62),
+           (2.6, 0.4, 7.3, 0.6), (5.0, 0.9, 4.8, 0.72), (6.3, 1.4, 1.4, 0.95), (6.7, 1.6, -0.8, 1.25)]
     sp.bezier_points.add(len(pts) - 1)
     for bp, (x, y, z, r) in zip(sp.bezier_points, pts):
         bp.co = (x, y, z)
@@ -340,12 +342,17 @@ def build_arch(out):
     down = [p for p in me.polygons if p.normal.z < -0.45 and p.center.z > 2.0]
     w = [p.area * (0.4 + p.center.z / 7.6) for p in down]
 
+    # crystal grows in patches, not as a sprinkle: seven seeds on the intrados, each a tight druse of 8-16
+    seeds = [rng.choices(down, weights=w)[0] for _ in range(7)]
+
     def b(bm):
-        for _ in range(95):
-            p = rng.choices(down, weights=w)[0]
-            n = Vector(p.normal) + Vector((rng.uniform(-.25, .25), rng.uniform(-.25, .25), rng.uniform(-.2, .05)))
-            ln = rng.uniform(0.14, 0.5)
-            prism(bm, p.center, n, rng.uniform(0.05, 0.12), ln, ln * 0.4, rng, embed=0.35)
+        for sd in seeds:
+            near = [p for p in down if (p.center - sd.center).length < 0.9]
+            for _ in range(rng.randint(8, 16)):
+                p = rng.choice(near)
+                n = Vector(p.normal) + Vector((rng.uniform(-.3, .3), rng.uniform(-.3, .3), rng.uniform(-.2, .05)))
+                ln = rng.uniform(0.18, 0.65) * (1.2 - (p.center - sd.center).length / 1.2)
+                prism(bm, p.center, n, rng.uniform(0.06, 0.14), ln, ln * 0.4, rng, embed=0.35)
     export(xtal_obj("arch_xtal", "arch", b), out)
 
 
