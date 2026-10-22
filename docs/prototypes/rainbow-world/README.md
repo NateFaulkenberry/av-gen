@@ -36,7 +36,7 @@ travelled with a fisheye camera whose gravity turns with the land. Branch `art/r
 - **Build the scenes first:** `python3 examples/rainbow-world/build.py` (Blender 5.x, about 90 s; `--scene-only` after
   the first full build). It writes `examples/rainbow-world/scene/` (gitignored): the live scene, the offline scene
   and the offline scene's video hooks. Until then both menu entries show "(needs generating)" with this command.
-- **Live:** open Examples > Live > Rainbow World (`rainbow-world.json`, no audio file), and play any music into the
+- **Live:** open Examples > Live > Worlds > Rainbow World (`rainbow-world.json`, no audio file), and play any music into the
   live input.
   - On a plain stereo input the world follows the main mix (`response.*`, the beat clock).
   - With a multichannel interface, map channels in the Live panel's Inputs table to sources keyed `drums`, `bass`

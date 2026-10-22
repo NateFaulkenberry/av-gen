@@ -110,14 +110,17 @@ TEST_CASE("The real index: Live Projects and the switcher's sets", "[examples][l
         INFO(category);
         CHECK(liveCategories.contains(category));
     }
-    // ... and none of them is also under Examples.
+    // ... and none of them is also under Offline. A heading may appear in both submenus (Worlds: Rainbow World under
+    // Live, Rainbow World (offline) under Offline); each entry still sits in exactly one.
     for (const auto& s : app::exampleSections(*all, false)) {
         INFO(s.category);
-        CHECK_FALSE(liveCategories.contains(s.category));
         for (const std::size_t i : s.entries) {
             CHECK_FALSE((*all)[i].live);
+            CHECK_FALSE(liveNames.contains((*all)[i].name));
         }
     }
+    CHECK(liveCategories.contains("Worlds"));
+    CHECK(liveNames.contains("Rainbow World"));
 
     // The switcher (ADR-1341): every live entry, Sonic Live first -- exactly the Live submenu's entries.
     const auto scenes = app::liveSceneList(*all);
