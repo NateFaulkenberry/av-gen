@@ -225,8 +225,9 @@ struct EnvelopeRig {
 TEST_CASE("Envelope follows attack, decay, hold and release timing", "[sources][envelope]") {
     EnvelopeRig rig;
     CHECK(rig.run(5) == 0.0f);                           // idle
-    CHECK_THAT(d(rig.step(true)), WithinAbs(0.0, 1e-4)); // trigger frame: the attack starts now
-    CHECK_THAT(d(rig.run(5)), WithinAbs(0.5, 1e-3));
+    // ADR-1601: the trigger frame's own millisecond is the attack's first
+    CHECK_THAT(d(rig.step(true)), WithinAbs(0.1, 1e-4));
+    CHECK_THAT(d(rig.run(4)), WithinAbs(0.5, 1e-3));
     CHECK_THAT(d(rig.run(5)), WithinAbs(1.0, 1e-3)); // peak at attackMs
     CHECK_THAT(d(rig.run(5)), WithinAbs(0.7, 1e-3)); // half way down to sustain
     CHECK_THAT(d(rig.run(5)), WithinAbs(0.4, 1e-3)); // sustain
@@ -241,7 +242,7 @@ TEST_CASE("Envelope follows attack, decay, hold and release timing", "[sources][
 TEST_CASE("Envelope retrigger continues the attack from the current level", "[sources][envelope]") {
     EnvelopeRig rig;
     rig.step(true);
-    CHECK_THAT(d(rig.run(5)), WithinAbs(0.5, 1e-3));
+    CHECK_THAT(d(rig.run(4)), WithinAbs(0.5, 1e-3));
     const float before = rig.step(true); // retrigger mid-attack
     CHECK_THAT(d(before), WithinAbs(0.6, 1e-3));
     CHECK_THAT(d(rig.step()), WithinAbs(0.7, 1e-3)); // no drop, keeps rising
@@ -273,6 +274,7 @@ TEST_CASE("Envelope resolves a trigger declared after attach and instant stages"
     f.bus.setEvent(trigger, true);
     env.update(f.bus, at(0.001, 0.001));
     f.bus.clearEvents();
+    CHECK(f.signal("env.late") == 1.0f); // ADR-1601: in full on the trigger's own frame
     env.update(f.bus, at(0.002, 0.001));
     CHECK(f.signal("env.late") > 0.9f);
 
@@ -283,6 +285,70 @@ TEST_CASE("Envelope resolves a trigger declared after attach and instant stages"
     CHECK(env.trigger() == "audio.onset");
     CHECK_FALSE(env.settingsFromJson(json{{"trigger", 1}}).has_value());
     CHECK(env.trigger() == "audio.onset");
+}
+
+// ADR-1601: the envelope takes its trigger before it steps. An instant attack shows 1.0 on the trigger's own frame
+// at any frame rate, and the decay (or release) runs from the next frame -- ADR-900's rule for a route chain. It used
+// to publish the pre-trigger level on the event frame and peak at 1 - dt/release a frame later (0.72 at 60 fps,
+// 0.44 at 30 fps for a 60 ms release: probe B1).
+TEST_CASE("Envelope: an instant attack peaks at 1 on the trigger frame at 30 and 60 fps", "[sources][envelope][adr1601]") {
+    for (const double fps : {30.0, 60.0}) {
+        CAPTURE(fps);
+        Fixture f;
+        const SignalId onset = f.bus.declare("audio.onset", 0.0f, 1.0f, true);
+        EnvelopeSource env("hit", "audio.onset");
+        env.attach(f.bus, f.params);
+        f.floatParam("sources/hit/attackMs").setBase(0.0f);
+        f.floatParam("sources/hit/decayMs").setBase(0.0f);
+        f.floatParam("sources/hit/sustain").setBase(1.0f);
+        f.floatParam("sources/hit/holdMs").setBase(0.0f);
+        f.floatParam("sources/hit/releaseMs").setBase(60.0f);
+        f.params.resetFinals();
+        FixedStepClock clock{fps};
+        std::vector<float> trace;
+        constexpr int kEventFrame = 10;
+        for (int frame = 0; frame < 20; ++frame) {
+            clock.tick();
+            f.bus.setEvent(onset, frame == kEventFrame);
+            env.update(f.bus, fromClock(clock));
+            f.bus.clearEvents();
+            trace.push_back(f.signal("env.hit"));
+        }
+        CHECK(trace[kEventFrame - 1] == 0.0f);
+        CHECK(trace[kEventFrame] == 1.0f); // the rise frame is the event frame, at full level
+        const float dtMs = static_cast<float>(1000.0 / fps);
+        CHECK_THAT(d(trace[kEventFrame + 1]), WithinAbs(1.0 - dtMs / 60.0, 1e-4)); // the release starts next frame
+        CHECK(trace[kEventFrame + 1] < trace[kEventFrame]);
+    }
+
+    // A trigger on a frame with no time on it (a seek's landing, a paused redraw) still lands an instant attack.
+    Fixture f;
+    const SignalId onset = f.bus.declare("audio.onset", 0.0f, 1.0f, true);
+    EnvelopeSource env("hit", "audio.onset");
+    env.attach(f.bus, f.params);
+    f.floatParam("sources/hit/attackMs").setBase(0.0f);
+    f.params.resetFinals();
+    f.bus.setEvent(onset, true);
+    env.update(f.bus, at(1.0, 0.0));
+    CHECK(f.signal("env.hit") == 1.0f);
+}
+
+// ADR-1601: the random source's sample-and-hold was already trigger-first; this pins it.
+TEST_CASE("Random: a new value holds from the trigger's own frame", "[sources][random][adr1601]") {
+    Fixture f;
+    const SignalId onset = f.bus.declare("audio.onset", 0.0f, 1.0f, true);
+    RandomSource rnd("pick", "audio.onset", 7);
+    rnd.attach(f.bus, f.params);
+    f.params.resetFinals();
+    rnd.update(f.bus, at(0.0, 1.0 / 30.0));
+    CHECK(f.signal("random.pick") == 0.0f);
+    f.bus.setEvent(onset, true);
+    rnd.update(f.bus, at(1.0 / 30.0, 1.0 / 30.0));
+    f.bus.clearEvents();
+    const float held = f.signal("random.pick");
+    CHECK(held > 0.0f);
+    rnd.update(f.bus, at(2.0 / 30.0, 1.0 / 30.0));
+    CHECK(f.signal("random.pick") == held);
 }
 
 // ---- Noise -----------------------------------------------------------------------------------

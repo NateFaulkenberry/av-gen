@@ -316,7 +316,15 @@ void EnvelopeSource::reset() {
 // Linear segments with full-scale slopes: attack climbs at 1/attackMs so a fresh trigger reaches
 // 1 exactly at attackMs (a retrigger continues from the current level without a jump), decay
 // falls at (1 - sustain)/decayMs, hold sits at sustain for holdMs, release falls at
-// sustain/releaseMs. One frame may cross several stages; leftover time carries over.
+// sustain/releaseMs. One frame may cross several stages; leftover time carries over, except
+// past the end of the attack (ADR-1601, ADR-900's rule).
+//
+// ADR-1601: the trigger is taken BEFORE stepping, and the attack is credited from the start of
+// the frame the trigger arrived in, as a route chain credits an event's rise (ADR-900). The frame
+// the attack completes in shows the full level and the decay runs from the next frame, so an
+// instant attack publishes 1.0 on its trigger's own frame at any frame rate. It used to step
+// first and see the trigger after, which published the pre-trigger level on the event frame and
+// 1 - dt/decay-or-release on the next: one frame late, with a frame-rate-dependent peak.
 void EnvelopeSource::update(SignalBus& bus, const SourceContext& context) {
     if (attackMs_ == nullptr) {
         return;
@@ -327,17 +335,23 @@ void EnvelopeSource::update(SignalBus& bus, const SourceContext& context) {
             triggerResolved_ = true;
         }
     }
+    if (triggerResolved_ && bus.event(triggerId_)) {
+        stage_ = Stage::Attack;
+        stageTime_ = 0.0f;
+    }
 
     float remaining = static_cast<float>(context.time.deltaTime * 1000.0);
     const float sustain = sustain_->value();
-    for (int guard = 0; remaining > 0.0f && stage_ != Stage::Idle && guard < 8; ++guard) {
+    for (int guard = 0; (remaining > 0.0f || (guard == 0 && stage_ == Stage::Attack)) && stage_ != Stage::Idle && guard < 8;
+         ++guard) {
         switch (stage_) {
         case Stage::Attack: {
             const float attack = attackMs_->value();
             const float needed = attack <= 0.0f ? 0.0f : (1.0f - level_) * attack;
             if (remaining >= needed) {
+                // The frame the rise completes in shows it in full; the decay starts next frame.
                 level_ = 1.0f;
-                remaining -= needed;
+                remaining = 0.0f;
                 stage_ = Stage::Decay;
             } else {
                 level_ += remaining / attack;
@@ -392,12 +406,6 @@ void EnvelopeSource::update(SignalBus& bus, const SourceContext& context) {
         }
     }
     level_ = std::clamp(level_, 0.0f, 1.0f);
-
-    // The trigger lands at this frame's time: the new attack starts from the level reached now.
-    if (triggerResolved_ && bus.event(triggerId_)) {
-        stage_ = Stage::Attack;
-        stageTime_ = 0.0f;
-    }
     bus.set(output_, level_);
 }
 
