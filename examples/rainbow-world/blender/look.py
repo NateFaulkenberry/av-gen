@@ -92,7 +92,8 @@ def kick_ops(out, tip, a, b):
     is kept for the big moments. Adds to `out`; `tip` is the tuft's height gradient; a, b scratch."""
     return [
         {"kind": "input", "dst": a, "input": "cameraDistance"},
-        {"kind": "remap", "dst": a, "srcA": a, "constant": [32.0, 6.0, 0.0, 1.0], "value": 1.0},
+        # (29 section 10: out to 44 m, where the grass ends, so the flash reads from the ride's usual height too)
+        {"kind": "remap", "dst": a, "srcA": a, "constant": [44.0, 10.0, 0.0, 1.0], "value": 1.0},
         {"kind": "multiply", "dst": a, "srcA": a, "srcB": tip},
         {"kind": "constant", "dst": b, "constant": R(RING_COLOUR) + [1.0], "_role": "kick_colour"},
         {"kind": "multiply", "dst": a, "srcA": a, "srcB": b},

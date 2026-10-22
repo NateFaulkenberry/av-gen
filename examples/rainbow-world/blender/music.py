@@ -98,12 +98,16 @@ def routes(fx, swell_nodes, swell):
     # (the band's analysis latency plus the chain), measured against the grid; the phase lands within 10 ms of it.
     if "kick_gain" in fx.get("rw_grass", {}):
         kick = op_target("rw_grass", fx["rw_grass"], "kick_gain", "constant", "constant")
-        pulse = {"gain": -1.0, "offset": 1.0, "curve": "power", "curveAmount": 6.0}
+        # (29 section 10, the owner: "make sure theyre clearing flashing on and off to the beat"): a square flash, not
+        # a ramp -- on at full the frame the phase turns over, held for the first eighth of the beat (62 ms), then
+        # gone in 45 ms: dark for the rest of the beat, so the eye finds the hit
+        pulse = {"gain": -1.0, "offset": 1.0, "threshold": "binary", "thresholdLevel": 0.875, "attackMs": 0.0,
+                 "decayMs": 45.0}
         # depth = -0.5 + 2.4 x the drums' level: none below 0.21 (the drums gone), 1 at 0.62, 1.4 at full drive; with
         # no drum stem the default reads depth 0 and the fallback below plays instead
-        out.append(route("beat.phase", kick, 2.2, pulse, depthSource="stem.drums.level", depthMin=-0.5, depthMax=1.9,
+        out.append(route("beat.phase", kick, 3.6, pulse, depthSource="stem.drums.level", depthMin=-0.5, depthMax=1.9,
                          depthDefault=0.5 / 2.4))
-        out.append(route("beat.phase", kick, 2.2, pulse, depthSource="stem.drums.active", depthMin=1.0, depthMax=0.0,
+        out.append(route("beat.phase", kick, 3.6, pulse, depthSource="stem.drums.active", depthMin=1.0, depthMax=0.0,
                          depthDefault=0.0))
 
     # ---- drums: hat glints in the grass ----------------------------------------------------------------------------

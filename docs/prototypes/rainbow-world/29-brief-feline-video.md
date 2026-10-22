@@ -80,3 +80,9 @@ reduce amount of world scans in feline footwear to every other one I suggested. 
 
 The owner's screenshot: a lone tree on a hill under a pink sky, no scan colour on the land, a firework burst of
 coloured streaks frozen round its crown (the "stuck" firework).
+
+## 10. The owner on the regression clips (verbatim)
+
+"looks better - lets proceed"
+
+"grass pops still feel mistimed - can we make sure theyre clearing flashing on and off to the beat. i forget If i mentioned to do a digital mosh fade in on feline footwear music video but add that for like first 8 or 9 seconds of intro, also make sure outro fades to fully black on the last frame"

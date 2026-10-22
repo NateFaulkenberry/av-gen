@@ -191,11 +191,13 @@ TEST_CASE("Rainbow World: the grass's kick pops ride the beat clock's phase, not
     int kick = 0;
     for (const json& r : live.at("routes")) {
         const std::string target = r.at("target");
-        if (target.find("rw_grass") == std::string::npos || r.at("amount").get<double>() != 2.2) {
+        if (target.find("rw_grass") == std::string::npos || r.at("source") != "beat.phase") {
             continue;
         }
-        CHECK(r.at("source") == "beat.phase");
-        CHECK(r.at("chain").at("curve") == "power");
+        // 29 section 10: a square flash on the beat -- on as the phase turns over, held an eighth of a beat, gone
+        CHECK(r.at("chain").at("threshold") == "binary");
+        CHECK(r.at("chain").at("attackMs").get<double>() == 0.0);
+        CHECK(r.at("chain").at("decayMs").get<double>() < 100.0);
         ++kick;
     }
     CHECK(kick == 2); // with the drum stem (its level the depth) and without (the fallback)

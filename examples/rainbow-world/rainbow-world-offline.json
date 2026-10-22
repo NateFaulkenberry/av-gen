@@ -8058,15 +8058,17 @@
   {
    "source": "beat.phase",
    "target": "material/rw_grass/op/41/constant/constant",
-   "amount": 2.2,
+   "amount": 3.6,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
     "gain": -1.0,
     "offset": 1.0,
-    "curve": "power",
-    "curveAmount": 6.0
+    "threshold": "binary",
+    "thresholdLevel": 0.875,
+    "attackMs": 0.0,
+    "decayMs": 45.0
    },
    "depthSource": "stem.drums.level",
    "depthMin": -0.5,
@@ -8076,15 +8078,17 @@
   {
    "source": "beat.phase",
    "target": "material/rw_grass/op/41/constant/constant",
-   "amount": 2.2,
+   "amount": 3.6,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
     "gain": -1.0,
     "offset": 1.0,
-    "curve": "power",
-    "curveAmount": 6.0
+    "threshold": "binary",
+    "thresholdLevel": 0.875,
+    "attackMs": 0.0,
+    "decayMs": 45.0
    },
    "depthSource": "stem.drums.active",
    "depthMin": 1.0,
