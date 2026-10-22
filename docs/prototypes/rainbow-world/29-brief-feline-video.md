@@ -86,3 +86,5 @@ coloured streaks frozen round its crown (the "stuck" firework).
 "looks better - lets proceed"
 
 "grass pops still feel mistimed - can we make sure theyre clearing flashing on and off to the beat. i forget If i mentioned to do a digital mosh fade in on feline footwear music video but add that for like first 8 or 9 seconds of intro, also make sure outro fades to fully black on the last frame"
+
+The owner, refining the outro (verbatim): "id say last 2 seconds of feline footwear should be faded to black - it kinda already is but then it comes back again"

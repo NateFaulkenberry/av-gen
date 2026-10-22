@@ -272,3 +272,54 @@ Plot: `78-rainbow-scan-regression/beat-sync-kick-pops-before-after.png`.
 - **The table:** `~/Desktop/Feline Footwear/scans.txt`.
 - **The opening camera:** as built up to the drop, which is the earlier clips' flight. At the first swell it is a grove
   of great trees on a hill.
+
+## 12. The owner's last notes (29 section 10), the full render and the final checks
+
+### Grass pops (scene, both versions): a square flash on the beat
+
+The pop is now:
+- on at full the frame the beat clock's phase turns over;
+- held an eighth of a beat (62 ms), then gone in 45 ms, so it is dark for the rest of the beat;
+- 3.6x where it was 2.2x, and out to 44 m where it was 32 m (where the grass ends), so it reads from the ride's usual
+  height.
+
+Measured on the rendered video (native offline, 28-42 s), with the pop brightness per frame folded onto the grid: the
+flash is on 0-100 ms after the beat and off for the rest. The kicks found in the video's own audio (the low band's
+attack) median -7 ms against the grid.
+
+The grid does not drift: the beat clock's phase turns over +8.9, +9.9, +10.4, +10.5 and +9.8 ms after it over 5-40,
+40-80, 80-120, 120-160 and 160-182 s.
+
+### Intro (the Feline layer): a Digital Mosh fade-in
+
+The world resolves out of black, pixels, datamosh, glitch blocks, a spectral split, a sort and the world's warp. It is
+the ending's chain run backwards, and it is clean by 9 s.
+
+### Outro (the Feline layer): black for the last 2 s
+
+The fade came back for two reasons:
+- the auto exposure re-metered the exposure-darkened picture back up;
+- the datamosh replayed brighter history.
+
+The fade is now the grade's gain, which multiplies the finished picture after everything else: from 202 s to 0 by
+208.5 s, then held. In the source frames all 60 frames from 208.5 s are exactly (0,0,0). In the h264 file, black
+encodes at limited range (Y 16), with codec speckle of RGB 1-2 at most.
+
+**Media** (`~/Desktop/av-gen-review/78-rainbow-scan-regression/`):
+- `feline-footwear-full.mp4` (210.5 s, 6315 frames, with audio)
+- `feline-intro-mosh-fade-in-0-10s.mp4`
+- `feline-ending-brightness-195-210s.png`
+- `grass-pops-native-28-42s.mp4` and its quarter-speed version
+- `grass-pops-on-the-beat-rendered.png`
+
+### Final checks
+
+At 18eb81c1, after a fresh configure (exit 0) and a full build (exit 0):
+
+| Check | Exit | Counts |
+|---|---|---|
+| cpu-assets (under the GPU lock) | 0 | 4413 passed, 0 failed, 29 skipped, 1 expected failure; 4443/4443 |
+| `review_examples --only "Rainbow World"` | 0 | 2 ok |
+| `check_project_integrity.py` | 0 | 0 problems |
+
+The GPU suite was not run: no engine code changed (`git diff 58d0e92b -- src shaders` is empty).
