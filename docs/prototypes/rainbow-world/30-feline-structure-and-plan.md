@@ -217,3 +217,19 @@ The live trigger is otherwise unchanged (the trend, the 12 s refractory time).
 - `gate2-1m47-1m51-build-104-116s.mp4`
 - `gate2-107-113s-before-left-after-right.mp4`
 - `gate2-109s-before-left-after-right.png`
+
+## 10. The full render and the final checks
+
+**The full render:** `~/Desktop/Feline Footwear/renders/feline-footwear.mp4`, copied to
+`~/Desktop/av-gen-review/77-feline-footwear-video/feline-footwear-full.mp4`. It is the whole song: 210.5 s, 6315
+frames, 1080p30, with audio, and 0 GPU errors.
+
+**Final checks,** at 65a00e70, after a fresh configure (exit 0) and a full build (exit 0):
+
+| Check | Exit | Counts |
+|---|---|---|
+| cpu-assets (under the GPU lock) | 0 | 4410 passed, 0 failed, 29 skipped, 1 expected failure; 4440/4440 |
+| `review_examples --only "Rainbow World"` | 0 | 2 ok (Rainbow World, Rainbow World (offline)) |
+| `check_project_integrity.py` | 0 | 0 problems |
+
+The GPU suite was not rerun: this branch changes no engine code (`git diff 48e5cc72 -- src shaders` is empty).
