@@ -451,3 +451,54 @@ lag. Both are now gone. The bass line does not change pattern at 80 s: the plot'
 | `check_project_integrity.py` | 0 | 0 problems |
 
 The GPU suite was not run: no engine code changed.
+
+## 16. The seams, and the 4K master (29 section 14)
+
+### The seams
+
+**Cause.** `band.face_height` added up only the hills within a fixed 320 m of a point along the loop. The long hills
+(the valley's 170 m trough, the 130-150 m ridge spines) were still metres high at that cutoff, so the land stepped
+along the line where each one left the window: a crack across the meadow with its riser in shade, wherever a long
+hill's edge fell. Diffing the old and new band meshes, 23 of the 48 chunks moved, by up to 3.5 m.
+
+**Ruled out** by renders of the 24 s frame:
+- the band's LOD (no rungs: the crack stays);
+- the offline scene's deformers (removed: the crack stays).
+
+**Fix** (`band.py`, the shared scene, so both versions):
+- Each hill reaches 4.5 of its own widest radius, where it is under exp(-10).
+- Each band chunk is built a ring wider at both ends, so its border normals come from the faces on both sides, and
+  the extra rings are then dropped. Neighbouring chunks now share their border normals.
+
+**Re-checked:**
+- **The flight**, every 3 m against the new surface:
+
+  | Clearance | Minimum |
+  |---|---|
+  | Meadow | 3.6 m |
+  | Tree envelopes | 2.9 m (unchanged since gate 8) |
+  | Rim | 4.1 m |
+
+  The ride's keys are byte-identical to before.
+- **The scatter** moved with the land:
+  - trees: 32 of 349, by up to 2.3 m;
+  - rocks: 38 of 259, by up to 3.2 m;
+  - grass and flowers: about 37,000.
+
+**Proof:** `81-feline-final-4k/seams-24s-*`, `seams-129s-*` and `seams-96s-*`, before and after.
+
+### The 4K master
+
+`81-feline-final-4k/feline-footwear-4k.mp4`:
+- 3840x2160, 30 fps, 6315 frames, AAC audio, both streams starting at 0;
+- 1.66 GB;
+- rendered in 84 minutes (1.2 fps), with 0 GPU errors;
+- the last 2 s black.
+
+The flags:
+- `--tier offline`
+- `--render-limits unlimited`: no distance cull, no LOD rungs
+- `--supersample 2`: the scene drawn at 7680x4320
+- `--codec h264 --quality 90`: CRF 15
+
+The project is `~/Desktop/Feline Footwear/feline-footwear-4k.json`, and its README gives the command.
