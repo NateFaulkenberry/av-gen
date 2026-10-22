@@ -88,3 +88,17 @@ coloured streaks frozen round its crown (the "stuck" firework).
 "grass pops still feel mistimed - can we make sure theyre clearing flashing on and off to the beat. i forget If i mentioned to do a digital mosh fade in on feline footwear music video but add that for like first 8 or 9 seconds of intro, also make sure outro fades to fully black on the last frame"
 
 The owner, refining the outro (verbatim): "id say last 2 seconds of feline footwear should be faded to black - it kinda already is but then it comes back again"
+
+## 11. The owner's Feline revisions (verbatim)
+
+"a few revisions for feline footwear:
+
+start with 1 second of black then start the digital mosh fade in: shorten it to 5 seconds
+start rainbow world scans like a quarter of a second earlier, they feel just a tad late compared to the synth swells
+
+cloud animations start off feeling in sync, by about 40 or 50 seconds in or so they feel behind the actual bass notes slightly - just check sync on these
+
+right exactly at about 3:03 the digital mosh fade out causes the whole sceen to do a rapid shift to a different camera view or geometry (screen shot provided) if possible let's prevent this one small glitch from happening, it's just jarring - the rest looks fine"
+
+The screenshot, about 3:03: the glitch-block datamosh over the land, behind it a different vantage (a strand band edge-on, a
+rainbow to the side, a lone tree): the camera or the geometry seems to jump under the mosh.
