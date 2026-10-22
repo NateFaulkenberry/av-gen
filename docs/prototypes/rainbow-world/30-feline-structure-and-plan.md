@@ -502,3 +502,31 @@ The flags:
 - `--codec h264 --quality 90`: CRF 15
 
 The project is `~/Desktop/Feline Footwear/feline-footwear-4k.json`, and its README gives the command.
+
+### Why a clean build changed the ride after the seam fix
+
+**What happened.** The committed projects were stale. To render the before/after stills, I rebuilt the old scene with
+`band.py` stashed, then restored the committed project files with `git checkout`. That put back the projects the build
+had just rewritten, so the commit carried the pre-fix ride.
+
+The build itself is deterministic:
+- a full build and three scene-only builds give identical projects;
+- all 83 Blender assets are byte-identical across a full rebuild.
+
+The new terrain moved the ride's speed profile by about 1.2%: the tree and ground pushes made a slightly different line.
+
+**Fix.** The projects are committed as a clean build writes them. The project's ride now equals the scene's video
+hooks' ride, key for key.
+
+**Clearances on that ride** (the build's own check, every 3 m):
+
+| Clearance | Minimum |
+|---|---|
+| Meadow | 3.6 m |
+| Tree envelopes | 2.9 m |
+| Rim | 4.2 m |
+
+**The 4K master is unaffected.** The Feline project takes its ride and camera path from the scene's video hooks, not
+from the committed project, and it was rendered against the rebuilt scene, so its ride was the new one throughout. The
+stale ride only touched the native projects: their ride keys, and the camera timelines the fireworks' fields follow,
+about 1% off the scene's spline.
