@@ -116,3 +116,11 @@ the third rainbow world scan around 56 seconds feels late by almost like a secon
 "some important bass notes are now being missed, you can actullay see some examples of it on clouds-bass-notes-0-20s-45-60s.png - some of the notes are missed - the animation looks smoother though so its almost there"
 
 The owner, two further notes (verbatim): "and clouds still look desynced by like 1:20 seconds" -- "with teh clouds it could possibly be just the timing of the animation makes it look a little laggy, instead of the cloud peaking in how big it gets with the staccato short peak of the bass note the animation time it takes to reach that size it was makes it feel a bit laggy - does that make sense" -- and "it can skip rendering clips just have it render the whole video".
+
+## 14. The owner's last Rainbow World revision (verbatim)
+
+"when you get a chance I have one last revision needed to the rainbow world scenes (live / offline) there are visible seams in the geometry, I've highlighted one example in Feline Footwear at 24 seconds in. It exists in multiple places in the geometry. Find the cause, fix it and then kick of a 4k final render of Feline Footwear with all max quality offline settings"
+
+The screenshot (about 24 s): thin blue-violet lines on a green meadow face across the twisted band -- a long crack
+running diagonally over the land, a short branch near the top where it meets the rim: sky showing through a hairline
+gap, or a seam in the shading along a mesh boundary.
