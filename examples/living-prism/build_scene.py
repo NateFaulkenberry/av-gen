@@ -25,24 +25,42 @@ import layout as L  # noqa: E402
 ROCK = {"baseColor": [0.018, 0.016, 0.03], "roughness": 0.82, "metallic": 0.0}
 FLOOR = {"baseColor": [0.014, 0.012, 0.024], "roughness": 0.7, "metallic": 0.0}
 XTAL = {  # body colour, emissive colour, emissive strength
-    "spire": ([0.30, 0.08, 0.62], [0.55, 0.12, 1.0], 0.9),
-    "fan": ([0.06, 0.12, 0.55], [0.12, 0.3, 1.0], 0.6),
-    "geode": ([0.62, 0.05, 0.32], [1.0, 0.1, 0.5], 0.8),
-    "chandelier": ([0.35, 0.18, 0.7], [0.5, 0.3, 1.0], 0.5),
-    "ember": ([0.7, 0.22, 0.04], [1.0, 0.35, 0.05], 0.7),
-    "arch": ([0.4, 0.1, 0.65], [0.7, 0.2, 1.0], 0.5),
-    "druse": ([0.4, 0.12, 0.6], [0.6, 0.2, 1.0], 0.35),
-    "shard": ([0.3, 0.3, 0.75], [0.4, 0.45, 1.0], 0.3),
+    "spire": ([0.10, 0.02, 0.22], [0.45, 0.08, 1.0], 1.1),
+    "fan": ([0.02, 0.04, 0.2], [0.08, 0.25, 1.0], 0.8),
+    "geode": ([0.2, 0.01, 0.09], [1.0, 0.08, 0.45], 1.0),
+    "chandelier": ([0.10, 0.04, 0.22], [0.45, 0.25, 1.0], 0.7),
+    "ember": ([0.25, 0.06, 0.01], [1.0, 0.32, 0.04], 0.9),
+    "arch": ([0.12, 0.03, 0.22], [0.65, 0.15, 1.0], 0.7),
+    "druse": ([0.12, 0.03, 0.2], [0.55, 0.15, 1.0], 0.5),
+    "shard": ([0.08, 0.08, 0.25], [0.35, 0.4, 1.0], 0.45),
 }
+
+# Blockout material programs: dark hued rock with broad tonal variation (no flat CG grey), and the floor. Without a
+# program the terrain draws its biome colours (green), which a grotto has no use for.
+def rock_program(name, dark, light, scale):
+    return {"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
+            "emissionIntensity": 1.0, "opacity": -1, "ops": [
+                {"kind": "input", "dst": 0, "input": "worldPosition"},
+                {"kind": "noise", "dst": 1, "srcA": 0, "value": scale, "seed": 3},
+                {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.3, 0.75, 0, 0]},
+                {"kind": "constant", "dst": 2, "constant": dark + [1.0]},
+                {"kind": "constant", "dst": 4, "constant": light + [1.0]},
+                {"kind": "mixBy", "dst": 3, "srcA": 2, "srcB": 4, "srcC": 1}]}
+
+
+PROGRAMS = [rock_program("lp_rock", [0.010, 0.008, 0.018], [0.032, 0.024, 0.05], 0.45),
+            rock_program("lp_floor", [0.008, 0.007, 0.014], [0.022, 0.017, 0.034], 0.6)]
+ROCK = dict(ROCK, program="lp_rock")
+FLOOR = dict(FLOOR, program="lp_floor")
 
 WATER = {  # ADR-1286's cinematic path: a dark absorbing mirror; SSR reflects the lit grotto
     "shallowColor": [0.004, 0.004, 0.014], "deepColor": [0.002, 0.002, 0.008], "shallow": 1.0,
     "clarity": 1.2, "edgeFade": 0.15, "maxOpacity": 0.97, "fresnel": 0.14, "reflection": 1.0,
     "reflectionTint": [0.06, 0.04, 0.16], "specular": 1.2, "roughness": 0.03,
-    "ripple": 0.12, "rippleScale": 1.4, "rippleSpeed": 0.5, "chop": 0.3, "foam": 0.0, "refraction": 0.1,
+    "ripple": 0.035, "rippleScale": 0.9, "rippleSpeed": 0.4, "chop": 0.2, "foam": 0.0, "refraction": 0.1,
     "glow": 0.0, "sparkle": 0.0,
     "ssr": 1.0, "ssrDistance": 30.0, "ssrSteps": 64.0, "ssrGain": 1.4, "streak": 0.06, "reflectionRays": 2.0,
-    "transmission": 1.0, "absorption": [2.2, 1.8, 1.0], "undulation": 0.15, "undulationScale": 0.2,
+    "transmission": 1.0, "absorption": [2.2, 1.8, 1.0], "undulation": 0.04, "undulationScale": 0.2,
     "roughnessVariation": 0.3, "tintPatches": 0.0, "glints": 0.0,
 }
 
@@ -97,42 +115,46 @@ def scene_json():
     p0, t0, _ = L.CAMERA_STATIONS[0]
     lights = [
         # the shaft: a cool violet spot from high front-left onto the pool and the spire (the only shadow caster)
-        {"name": "shaft", "id": "shaft", "type": "spot", "role": "key", "position": [-3.5, 9.0, 3.5],
-         "direction": [0.25, -0.75, -0.62], "color": [0.62, 0.55, 1.0], "intensity": 900.0, "range": 30.0,
-         "innerCone": 12.0, "outerCone": 26.0, "castsShadow": True, "volumetric": 1.0},
+        {"name": "shaft", "id": "shaft", "type": "spot", "role": "key", "position": [-3.0, 14.0, 1.5],
+         "direction": [0.18, -0.85, -0.5], "color": [0.62, 0.55, 1.0], "intensity": 260.0, "range": 34.0,
+         "innerCone": 8.0, "outerCone": 18.0, "castsShadow": True, "volumetric": 0.5},
         # the passage behind the arch: blue depth, haze lit from inside
         {"name": "passage", "id": "passage", "type": "point", "position": [-2.5, 3.0, -19.0],
          "color": [0.15, 0.4, 1.0], "intensity": 260.0, "range": 16.0, "radius": 1.5, "castsShadow": False,
-         "volumetric": 0.8},
-        {"name": "spireGlow", "id": "spireGlow", "type": "point", "position": [0.6, 1.6, -6.6],
-         "color": [0.8, 0.2, 1.0], "intensity": 70.0, "range": 9.0, "radius": 0.6, "castsShadow": False,
-         "volumetric": 0.4},
-        {"name": "geodeGlow", "id": "geodeGlow", "type": "point", "position": [7.4, 1.6, -0.2],
-         "color": [1.0, 0.2, 0.55], "intensity": 30.0, "range": 5.0, "radius": 0.4, "castsShadow": False},
-        {"name": "fanGlow", "id": "fanGlow", "type": "point", "position": [-6.4, 2.6, -0.8],
-         "color": [0.2, 0.4, 1.0], "intensity": 35.0, "range": 7.0, "radius": 0.5, "castsShadow": False},
-        {"name": "chandelierGlow", "id": "chandelierGlow", "type": "point", "position": [-1.2, 5.6, -0.8],
-         "color": [0.6, 0.35, 1.0], "intensity": 30.0, "range": 7.0, "radius": 0.5, "castsShadow": False},
-        {"name": "emberGlow", "id": "emberGlow", "type": "point", "position": [3.9, 1.2, 4.6],
-         "color": [1.0, 0.45, 0.1], "intensity": 14.0, "range": 4.0, "radius": 0.3, "castsShadow": False},
+         "volumetric": 0.6},
     ]
+    # each formation's own glow light sits at (or in) the formation, so it reads as the crystal's inner light
+    def at(name, dx, dy, dz):
+        h = next(h for h in L.HEROES if h["name"] == name)
+        r = L.hero_placement(h)
+        return [round(r[0] + dx, 3), round(r[1] + dy, 3), round(r[2] + dz, 3)]
+    for name, off, color, k, rng_, rad in (
+            ("spire", (0.1, 1.0, 1.6), [0.8, 0.2, 1.0], 60.0, 9.0, 0.6),
+            ("geode", (-0.6, 1.6, 0.3), [1.0, 0.2, 0.55], 30.0, 5.0, 0.4),
+            ("fan", (1.8, 2.4, 0.6), [0.2, 0.4, 1.0], 30.0, 7.0, 0.5),
+            ("chandelier", (0.0, -3.4, 0.0), [0.6, 0.35, 1.0], 25.0, 7.0, 0.5),
+            ("ember", (-0.6, 1.0, -0.6), [1.0, 0.45, 0.1], 14.0, 4.0, 0.3)):
+        lights.append({"name": name + "Glow", "id": name + "Glow", "type": "point", "position": at(name, *off),
+                       "color": color, "intensity": k, "range": rng_, "radius": rad, "castsShadow": False,
+                       "volumetric": 0.0})
     return {
         "format": "avgen-scene", "version": 1, "name": "The Living Prism",
         "_note": "Generated by examples/living-prism/build_scene.py from layout.py. Do not edit.",
         "camera": {"mode": 1, "position": list(p0), "target": list(t0), "fov": L.CAMERA_FOV, "orbitSpeed": 0,
                    "near": 0.1, "far": 120.0},
         "environment": {
-            "background": [0.004, 0.003, 0.012], "intensity": 0.12, "lightFromEnvironment": False,
-            "fogColor": [0.02, 0.012, 0.05], "volumeDensity": 0.025, "volumeScattering": 0.9,
+            "background": [0.004, 0.003, 0.012], "intensity": 0.04, "lightFromEnvironment": False,
+            "fogColor": [0.02, 0.012, 0.05], "volumeDensity": 0.004, "volumeScattering": 0.9,
             "volumeAbsorption": 0.3, "volumeAnisotropy": 0.4, "volumeSteps": 24, "volumeMaxDistance": 40.0,
             "volumeLocalLights": 1.0, "volumeNoise": 0.3, "volumeNoiseScale": 0.15, "volumeEmission": 0.0,
-            "fogHeight": 3.0, "fogHeightFalloff": 0.25, "fogUpperDensity": 0.4,
+            "fogHeight": 3.0, "fogHeightFalloff": 0.25, "fogUpperDensity": 0.15,
             "shadowCascades": 1, "shadowRange": 40.0, "ambientOcclusion": True, "depthPrepass": True,
             "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": [0.01, 0.006, 0.03],
                     "horizonColor": [0.02, 0.012, 0.05], "groundColor": [0.006, 0.004, 0.012],
                     "sunColor": [0.6, 0.5, 1.0], "sunDirection": [0.2, 0.9, 0.3], "haze": 0.1,
                     "sunIntensity": 0.0, "sunSize": 0.01, "sunGlow": 0.0, "intensity": 1.0}},
         "lights": lights,
+        "materialPrograms": PROGRAMS,
         "nodes": nodes,
     }
 
@@ -155,7 +177,7 @@ def project_json(scene_rel):
                        "thesis": "A compact crystal grotto over a mirror pool, played by the music: the drums strike "
                                  "the crystals, the bass moves the water and the stone, the synth colours the light."},
         "parameters": {
-            "camera/exposure/compensation": 0.0, "post/bloom/enabled": True, "post/bloom/threshold": 1.0,
+            "camera/exposure/compensation": -0.3, "post/bloom/enabled": True, "post/bloom/threshold": 1.0,
             "post/bloom/intensity": 0.35, "post/bloom/radius": 1.0, "post/tonemap/chroma-retention": 0.85,
             "post/output/vignette": 0.22, "post/grade/saturation": 1.1,
         },

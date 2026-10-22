@@ -97,13 +97,13 @@ HEROES = [
     # a split geode on the right bank, its lined cavity turned to the pool (a round silhouette, a hollow)
     {"name": "geode", "role": "secondary", "pos": (8.4, -0.6), "yaw": -72.0, "scale": 1.0, "sink": 0.55},
     # a cluster hanging from the ceiling over the near pool (points down; it doubles in the water)
-    {"name": "chandelier", "role": "secondary", "pos": (-1.2, -0.8), "yaw": 20.0, "scale": 1.0, "ceiling": True},
+    {"name": "chandelier", "role": "secondary", "pos": (3.6, -0.8), "yaw": 20.0, "scale": 0.85, "ceiling": True},
     # the warm accent: a stout, terraced block low in the right foreground (parallax for the camera)
     {"name": "ember", "role": "accent", "pos": (4.6, 5.6), "yaw": -35.0, "scale": 1.0, "sink": 0.3,
      "tilt": (0.0, -14.0)},
 ]
 # the focal structure: a rock arch over the far shore, its underside crusted with small crystal
-ARCH = {"name": "arch", "pos": (0.3, -6.0), "yaw": 4.0, "scale": 1.0, "sink": 0.6}
+ARCH = {"name": "arch", "pos": (0.0, -5.0), "yaw": 6.0, "scale": 1.0, "sink": 0.9}
 
 # supporting druse clusters on the banks and at wall bases: (variant, x, z, yaw, scale)
 CLUSTERS = [
@@ -123,7 +123,7 @@ SHARDS = [
 # boulders: dark faceted rock that frames the pool and the crystals: (variant, x, z, yaw, scale, sink)
 BOULDERS = [
     ("boulderA", -5.2, 2.6, 10, 1.3, 0.5), ("boulderB", -6.2, -4.6, 80, 1.6, 0.6), ("boulderC", 5.8, 3.4, 140, 1.4, 0.5),
-    ("boulderD", 6.0, -5.0, 200, 1.8, 0.7), ("boulderA", -2.6, 5.4, 260, 0.9, 0.35), ("boulderB", 1.2, 4.8, 320, 0.8, 0.3),
+    ("boulderD", 6.0, -5.0, 200, 1.8, 0.7), ("boulderA", -2.6, 5.4, 260, 0.9, 0.35), ("boulderB", 3.0, 7.4, 320, 0.8, 0.3),
     ("boulderC", -10.0, -2.0, 40, 2.4, 0.9), ("boulderD", 10.4, -2.6, 120, 2.2, 0.9), ("boulderA", -3.4, -6.9, 300, 1.1, 0.4),
     ("boulderB", 3.6, -6.8, 30, 1.0, 0.4), ("boulderC", -9.0, 8.2, 75, 2.0, 0.8), ("boulderD", 9.4, 8.0, 160, 2.2, 0.8),
     ("boulderA", 0.8, -11.2, 0, 1.8, 0.6), ("boulderB", -12.2, 6.0, 210, 2.6, 1.0),
@@ -178,10 +178,10 @@ CAMERA_STATIONS = [
     # (position, target, note)
     ((0.4, 1.5, 6.8), (0.3, 3.2, -7.5), "master: pool, arch and the spire through it"),
     ((-4.6, 2.6, 6.0), (3.0, 2.0, -3.0), "front left, rising: across the pool to the geode and the arch"),
-    ((-6.2, 2.1, 2.6), (5.5, 1.6, -1.0), "left bank: the fan's blades pass in the foreground, the geode across"),
+    ((-5.6, 1.9, 3.6), (5.5, 1.6, -1.0), "left bank: the fan's blades pass in the foreground, the geode across"),
     ((-4.4, 1.2, -2.2), (1.6, 3.4, -8.0), "low by the arch's left leg: the spire three-quarter"),
-    ((0.9, 1.1, 3.4), (-1.0, 4.4, -4.0), "low at the near shore: up at the chandelier, the arch beyond, both in the water"),
-    ((5.4, 2.0, 2.2), (-5.5, 2.2, -2.0), "right bank: the fan across the water"),
+    ((1.4, 1.1, 4.4), (3.4, 4.4, -2.0), "low at the near shore: up at the chandelier, the geode below it, both in the water"),
+    ((5.8, 2.2, 4.2), (-4.2, 2.4, -5.0), "right bank: the fan and the chandelier across the water"),
     ((4.6, 4.0, 6.6), (-0.8, 0.3, -3.6), "high right: down onto the pool's reflections"),
     ((2.0, 2.2, 7.8), (0.0, 3.0, -6.2), "returning to the master"),
 ]
