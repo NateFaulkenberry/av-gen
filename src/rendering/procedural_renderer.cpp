@@ -2490,8 +2490,13 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         }
         // ADR-1401: an authored finite-difference step, else 1/1000 of the mesh's radius.
         const float normalStep = object.normalStep > 0.0f ? object.normalStep : 1e-3f * mesh->radius;
+        // ADR-1590: w = 1 when a depth-only draw (the prepass, the shadow views) must run the material program for the
+        // cutout -- a masked material whose program writes opacity (ADR-1371). Otherwise the program cannot change the
+        // depth, and the depth draw skips it and the two finite-difference chain evaluations that feed its normal.
+        const bool depthCut = scene::depthDrawRunsProgram(object.material.alphaMode == scene::AlphaMode::Mask,
+                                                          programNamed(scene, object.material.program));
         u.timeInfo = glm::vec4(static_cast<float>(time.renderTime), static_cast<float>(deformerCount), normalStep,
-                               static_cast<float>(instanceCount));
+                               depthCut ? 1.0f : 0.0f);
         // ---- ADR-055 Tier 0 vegetation motion ----
         // The whole species model is resolved here, once per draw: two oscillator transfer
         // functions and a phase lag become three gains and a delay, and the vertex stage does

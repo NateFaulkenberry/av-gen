@@ -75,7 +75,7 @@ struct DeformerUniform {
 };
 
 struct ProceduralUniforms {
-    timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = instance count
+    timeInfo: vec4<f32>,  // x = render time, y = deformer count, z = normal epsilon, w = 1 when a depth-only draw runs the material program for its cutout (ADR-1590)
     fieldInfo: vec4<f32>, // x = emissive field slot (-1 none), y = emissive field amount, z = point source or LOD billboard (1/0), w = indirection enabled (1/0)
     prevInfo: vec4<f32>,  // x = last frame's render time (ADR-035 velocity: deformation motion),
                           // y = 1 when this draw has Tier 1 simulated instances (ADR-056), zw = 0
@@ -743,8 +743,15 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     // ADR-1492: read before the chain (see the handedness note above): no velocity in a depth-only pass, nor in a lit
     // pass whose velocity target nothing reads this frame (frame.styledGround.w, the live editor only).
     let skipVelocity = depthOnly || frame.styledGround.w > 0.5;
-    // A depth-only draw needs the normal only for a masked material (fs_proc_depth's cutout program reads it).
-    let needNormal = !depthOnly || (object.flags.x > 0.5 && object.flags.x < 1.5);
+    // A depth-only draw needs the normal only where fs_proc_depth runs a cutout program, which reads it: a masked
+    // material whose program writes opacity (ADR-1590, proc.timeInfo.w; uniform per draw).
+    // ADR-1591: and the finite-difference normal is needed only when something can bend the surface -- a deformer, the
+    // wind bend or an FXL displacement. Without them the chain is the instance and the object matrix, an affine map
+    // whose finite-difference normal is nRef (J^-T n) up to rounding, so the two neighbour evaluations are skipped
+    // and nRef is the normal. All three tests are uniform per draw.
+    let bends = deformerCount > 0u || proc.windSway.w > 0.5 ||
+                (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_DISPLACE) != 0u);
+    let needNormal = (!depthOnly || proc.timeInfo.w > 0.5) && bends;
     // The chain's evaluations. A mesh: the point (0), the two finite-difference neighbours when the normal is
     // wanted (1, 2), last frame's point when the velocity is (3). A point source: its centre now (0) and last frame
     // (1), world deformers only. A fiber: its centre-line point (0), world deformers only.
@@ -967,8 +974,10 @@ fn fs_proc_depth(in: ProcVertexOut) {
         // pass discards, what lies behind fails the depth test and the cleared colour shows through. The context
         // is the lit pass's, less the screen-space inputs (curvature, cavity, occlusion, footprint: 0 here), which
         // need derivatives; a cutout program should not read them. The program runs only on masked draws.
+        // ADR-1590: only a program that writes opacity can cut (proc.timeInfo.w, uniform per draw); any other leaves
+        // the material's opacity, so running it here changed nothing but the cost.
         let programIndex = materialSelect.program;
-        if (programIndex >= 0 &&
+        if (proc.timeInfo.w > 0.5 && programIndex >= 0 &&
             materialProgramAdmits(programIndex, in.instRandom, distance(frame.cameraPos.xyz, in.worldPos))) {
             var ctx = materialContextZero();
             ctx.worldPosition = in.worldPos;

@@ -195,7 +195,8 @@ static_assert(sizeof(DeformerUniform) == 64);
 // the material live in the 256-byte ObjectUniforms slot at group 1 binding 0 (same layout as
 // entities), so this block stays small and std140-trivial.
 struct ProceduralUniforms {
-    glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = instance count
+    glm::vec4 timeInfo;      // x = render time, y = deformer count, z = epsilon for normals, w = 1 when a depth-only
+                             // draw runs the material program for its cutout (ADR-1590)
     glm::vec4 fieldInfo;     // x = emissive field slot (-1 none), y = emissive field amount, z = point source (1/0), w = 0
     // x = last frame's render time (ADR-035 velocity: deformation motion).
     // y = the Tier 1 wind lookup gate (simActive), uniform across the draw.

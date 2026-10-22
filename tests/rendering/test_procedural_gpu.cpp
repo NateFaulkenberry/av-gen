@@ -228,6 +228,55 @@ TEST_CASE("A program-cut procedural does not occlude the geometry behind it (ADR
     CHECK(context->errorCount() == 0);
 }
 
+TEST_CASE("A masked procedural whose program writes no opacity is cut in depth by its texture alone (ADR-1590)",
+          "[gpu][procedural][depth][adr1590]") {
+    // The depth draws skip a program that cannot move the cutout. The texture's alpha must still cut the prepass
+    // exactly as it does with no program, and an opaque texel must still occlude.
+    auto context = makeContext();
+    auto scene = columnScene(1);
+    scene.camera.position = {0.0f, 1.0f, 8.0f};
+    scene.camera.target = {0.0f, 1.0f, 0.0f};
+    scene.procedurals[0].instances = gridInstances(1, 1, 1.0f);
+    scene.procedurals[0].material.unlit = true;
+    scene.procedurals[0].material.baseColor = {0.8f, 0.15f, 0.05f};
+    const auto unobstructed = renderOnce(*context, scene, 0.0, 96, 96);
+
+    scene::MaterialProgram tint; // writes the base colour only: no opacity register
+    tint.name = "tint";
+    scene::MaterialOp green;
+    green.kind = scene::MaterialOpKind::Constant;
+    green.dst = 0;
+    green.constant = glm::vec4(0.1f, 0.9f, 0.2f, 1.0f);
+    tint.ops = {green};
+    tint.baseColorRegister = 0;
+    REQUIRE_FALSE(tint.writesOpacity());
+    scene.materialPrograms.push_back(tint);
+    scene::TextureData texel;
+    texel.name = "texel";
+    texel.width = texel.height = 1;
+    texel.data = {255, 255, 255, 0};
+    auto foreground = columns(1, 1);
+    foreground.name = "tinted";
+    foreground.instances[0].position.z = 3.0f;
+    foreground.material.alphaMode = scene::AlphaMode::Mask;
+    foreground.material.program = "tint";
+    foreground.material.baseColorTexture.texture = scene.addTexture(std::move(texel));
+    scene.procedurals.push_back(foreground);
+    const auto cut = renderOnce(*context, scene, 0.0, 96, 96);
+    CHECK(gpu::hashImage(unobstructed) == gpu::hashImage(cut));
+    CHECK(coverage(cut).pixels > 40);
+
+    // The guard: the same texel opaque occludes, with and without the program, and the program colours it.
+    scene.textures.back().data = {255, 255, 255, 255};
+    const auto solid = renderOnce(*context, scene, 0.0, 96, 96);
+    CHECK(gpu::hashImage(solid) != gpu::hashImage(unobstructed));
+    scene.procedurals.back().material.program.clear();
+    const auto plain = renderOnce(*context, scene, 0.0, 96, 96);
+    CHECK(gpu::hashImage(plain) != gpu::hashImage(unobstructed));
+    CHECK(gpu::hashImage(plain) != gpu::hashImage(solid));
+    CHECK(context->errorCount() == 0);
+}
+
 TEST_CASE("Procedural instances render, coverage grows with count, frames are stable", "[gpu][procedural]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);

@@ -204,6 +204,9 @@ struct MaterialProgram {
     // emission without reading either has the variation applied for it, after it, as a rotation of
     // the displayed hue and a gain.
     [[nodiscard]] bool writesEmission() const;
+    // ADR-1590: the base names an opacity register (layers have none), so the program can cut a masked surface. A
+    // program that does not leaves the material's own opacity, and a depth-only draw need not run it.
+    [[nodiscard]] bool writesOpacity() const;
     [[nodiscard]] bool emissionReadsInstance() const;
     // ADR-1023: an emission the program writes depends, through the same data flow, on the
     // `materialEmission` input alone -- the material's own emissive colour x intensity. Such a program
@@ -219,6 +222,13 @@ struct MaterialProgram {
     // so a library material can be shared between scenes instead of pasted into each of them.
     static Result<MaterialProgram> loadFile(const std::filesystem::path& path);
 };
+
+// ADR-1590: whether a depth-only draw (the depth prepass, the shadow views) runs a surface's material program. Only a
+// masked surface's cutout reads it (ADR-1371), and only a program that writes opacity can move the cutout; any other
+// program leaves the material's opacity, so the depth draw skips it and the normal it would have needed.
+[[nodiscard]] inline bool depthDrawRunsProgram(bool masked, const MaterialProgram* program) {
+    return masked && program != nullptr && program->writesOpacity();
+}
 
 // CPU evaluation context/results for tests and tools.
 struct MaterialContext {

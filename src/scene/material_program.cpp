@@ -873,6 +873,8 @@ void forEachRunLayer(const std::vector<MaterialLayer>& layers, Fn&& fn) {
 
 } // namespace
 
+bool MaterialProgram::writesOpacity() const { return registerInRange(opacityRegister); }
+
 bool MaterialProgram::writesEmission() const {
     bool writes = registerInRange(emissionRegister);
     forEachRunLayer(layers, [&writes](const MaterialLayer& layer) {
