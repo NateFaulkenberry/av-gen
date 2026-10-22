@@ -71,3 +71,12 @@ Coordinator note: a fix or improvement made for the Feline video that is not son
 Rainbow World offline and live versions (build_world.py and the projects), and make_project.py inherits it. Only the
 song-specific layer stays in the Desktop project: the 18 baked scans, the camera retiming, the looks per section, the
 energy curve, the ending and the landing.
+
+## 9. The owner on the full Feline video (verbatim)
+
+"also it looks like we've introduced a regression with the changes to the rainbow world scan, after reviewing feline footwear - there is a tree in the beginning of the video with firework animation that looks stuck, trees are now randomly spinning and fireworks going off at incorrect times - the rainbow world scan seems to play in reverse at the end now - let's revert back to a good known working version (probably before my last batch of changes to make it shorter) - make sure its working in the native scenes first then lets go back and fix the feline footwear music video. if it happens to often in feline footwear reduce it to every other time (after like the first minute of the song, we should be able to hit all the intro swells - theres space between them)
+
+reduce amount of world scans in feline footwear to every other one I suggested. The camera angle at the beginning of the music video has changed compared to all the clips we were rendering before, it is too low to the ground and not in and interesting place when the first synth swell happens - also timing of the swell to the world scan felt off but we could have been due to its buggy performance. also please make sure all types of pulsing, etc are properly beat synced - the ground lights look completely off time(maybe they are modualted to something else but its hard to tell), cloud modulations look good, rainbow modulation look good,"
+
+The owner's screenshot: a lone tree on a hill under a pink sky, no scan colour on the land, a firework burst of
+coloured streaks frozen round its crown (the "stuck" firework).
