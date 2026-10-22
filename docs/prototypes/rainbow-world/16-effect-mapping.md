@@ -139,7 +139,7 @@ sun glow, bloom (+0.12) and the arches rise together, slowly.
 The showpiece (the owner at gate 2: "rare and dramatic, turning everything rainbow, holding then relaxing"; gates 5-7).
 The design and its measurements are in 26 (the scan), 27 (the fireworks) and 28 (the twirl).
 
-**What it does.** A front runs out from the camera over everything in reach, 10 m to 980 m in 7 s:
+**What it does.** A front runs out from the camera over everything in reach, 10 m to 980 m in 6 s:
 - the meadow, grass, stones and rims (scan ops in their programs) and the trees (their canopy ramps crossfade to the
   spectrum);
 - it leaves the land rainbow behind it, a cyclic OKLab spectrum by distance with the surface's own value, so the land
@@ -155,7 +155,7 @@ down, cool from white-hot and crackle, gone about 1.15 s after the front.
   front, effectors on the instances). There are no events, so seek equals play.
 
 **With it:** the arches +14 and their flow +10, cloud light +0.6, sun glow +1.2, bloom +0.35, saturation +0.25. The
-scan holds about six seconds and relaxes over three.
+scan holds about five seconds and relaxes over two (shortened at the Feline gate 1, 29 section 7); the front runs out in 6 s.
 
 **When, in the showcase.** Four baked scans at the song's big synth swells and section peaks: 47.85 s (the drop),
 111.3 s, 158.9 s and 190.7 s, as `timeline.scan` and `timeline.scanFront`.

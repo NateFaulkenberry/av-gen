@@ -341,7 +341,7 @@ def cloud_program():
                 {"kind": "constant", "dst": 4, "constant": [0.0, 0.0, 0.0, 0.0], "_role": "splash_shift"},
                 {"kind": "add", "dst": 4, "srcA": 7, "srcB": 4},
                 {"kind": "noise", "dst": 2, "srcA": 4, "value": 0.0025, "seed": 23},
-                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.42, 0.58, 0.0, 1.0], "value": 1.0},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0.38, 0.64, 0.0, 1.0], "value": 1.0},  # soft-edged patches
                 {"kind": "palette", "dst": 5, "srcA": 2, "value": 0.0, "constant": [0.5, 0.5, 0.5, 0.0],
                  "constant2": [0.5, 0.5, 0.5, 0.0], "constant3": [0.35, 0.35, 0.35, 0.0],
                  "constant4": [0.0, 0.33, 0.67, 0.0], "_role": "splash_hue"},

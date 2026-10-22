@@ -1,10 +1,11 @@
-// Rainbow World 2 (docs/prototypes/rainbow-world/16-effect-mapping.md): the committed live project and the Feline
-// Footwear showcase, checked as files -- the scene they name is generated and gitignored, so nothing here needs it.
+// Rainbow World 2 (docs/prototypes/rainbow-world/16-effect-mapping.md): the committed live project and the offline
+// version (29-brief-feline-video.md), checked as files -- the scenes they name are generated and gitignored, so
+// nothing here needs them.
 //
 //   * every stem route is optional, and every main-mix fallback stands aside while its stem is active (ADR-1570), so
 //     the live scene plays on a stereo input and follows stems wherever they exist;
-//   * the live project carries no audio file and no stems; the showcase carries the Feline mix and its three stems,
-//     and otherwise the same routes;
+//   * the live project carries no audio file and no stems; the offline version carries a mix (and no stems: it is
+//     song-agnostic), its own scene, no live ceilings, and the live routes plus the world distortion's;
 //   * the MIDI layout is the house one (CC 9 look, CC 10 look lock) plus the world's controls, unchanged;
 //   * every route parses.
 
@@ -34,7 +35,7 @@ json load(const char* name) {
 
 TEST_CASE("Rainbow World: stem routes are optional and each fallback stands aside for its stem",
           "[examples][rainbow-world][adr1570]") {
-    for (const char* file : {"rainbow-world.json", "rainbow-world-feline.json"}) {
+    for (const char* file : {"rainbow-world.json", "rainbow-world-offline.json"}) {
         INFO(file);
         const json p = load(file);
         int stemRoutes = 0;
@@ -64,64 +65,60 @@ TEST_CASE("Rainbow World: stem routes are optional and each fallback stands asid
     }
 }
 
-TEST_CASE("Rainbow World: the live project has no audio; the showcase adds the mix, three stems and its baked scans",
+TEST_CASE("Rainbow World: the live project has no audio; the offline version adds a mix, its scene and the distortion",
           "[examples][rainbow-world]") {
     const json live = load("rainbow-world.json");
-    const json show = load("rainbow-world-feline.json");
+    const json off = load("rainbow-world-offline.json");
     CHECK_FALSE(live.at("assets").contains("audio"));
     CHECK_FALSE(live.at("assets").contains("stems"));
     CHECK(live.at("sonic").at("live") == true);
-    REQUIRE(show.at("assets").contains("audio"));
-    REQUIRE(show.at("assets").at("stems").size() == 3);
-    std::set<std::string> keys;
-    for (const json& s : show.at("assets").at("stems")) {
-        keys.insert(s.at("key").get<std::string>());
-        CHECK(s.at("file").get<std::string>().find("feline-footwear (") != std::string::npos);
-        CHECK_FALSE(s.contains("offset")); // the stems are sample-aligned with the mix (rainbow-world/14 section 1)
-    }
-    CHECK(keys == std::set<std::string>{"drums", "bass", "synth"});
-    CHECK(show.at("control") == live.at("control"));
-    // The one difference (gate 5, 26-world-scan.md): the showcase's world scans are baked from the song -- two
-    // timelines, `scan` and `scanFront` -- in place of the live triggers (ADR-1574's latching surges).
-    // Everything else is the live project's.
-    const auto isScan = [](const json& r) {
-        const std::string target = r.at("target").get<std::string>();
-        const std::string source = r.at("source").get<std::string>();
-        (void)source;
-        // the land's front (remap constants) and the fireworks' fields riding it (gate 6)
-        return target == "macros/scan" || target.find("/remap/constant") != std::string::npos ||
-               (target.starts_with("field/fw") &&
-                (target.ends_with("/radius") || target.ends_with("/falloff/inner") || target.ends_with("/falloff/outer") ||
-                 target.ends_with("/waveOrigin")));
-    };
-    json liveRest = json::array();
-    json showRest = json::array();
-    for (const json& r : live.at("routes")) {
-        if (!isScan(r)) liveRest.push_back(r);
-    }
-    int baked = 0;
-    for (const json& r : show.at("routes")) {
-        if (!isScan(r)) {
-            showRest.push_back(r);
+    REQUIRE(live.contains("live")); // the live ceilings
+    // the offline version: a file to play, song-agnostic (no stems, no baked timing), full quality
+    REQUIRE(off.at("assets").contains("audio"));
+    CHECK_FALSE(off.at("assets").contains("stems"));
+    CHECK(off.at("sonic").at("live") == false);
+    CHECK_FALSE(off.contains("live"));
+    CHECK(off.at("assets").at("scene").at("path").get<std::string>().ends_with("rainbow-world-offline.scene.json"));
+    CHECK(live.at("assets").at("scene").at("path").get<std::string>().ends_with("rainbow-world.scene.json"));
+    CHECK(off.at("control") == live.at("control"));
+    CHECK(off.at("parameters") == live.at("parameters"));
+    CHECK(off.at("palette") == live.at("palette"));
+    // The routes: the live project's, the same scans (the latched live trigger, no baked timeline), plus the world
+    // distortion's (`macro.distort` onto the offline scene's deformers, which rest at 0).
+    json offRest = json::array();
+    int distort = 0;
+    for (const json& r : off.at("routes")) {
+        if (r.at("source") == "macro.distort") {
+            CHECK(r.at("target").get<std::string>().find("/deform/") != std::string::npos);
+            ++distort;
         } else {
-            CHECK(r.at("source").get<std::string>().starts_with("timeline.scan"));
-            ++baked;
+            offRest.push_back(r);
         }
+        CHECK_FALSE(r.at("source").get<std::string>().starts_with("timeline.scan"));
     }
-    CHECK(showRest == liveRest);
-    CHECK(baked > 1);
-    json showSources = json::array();
-    std::set<std::string> scanTimelines;
-    for (const json& src : show.at("sources")) {
-        const std::string name = src.value("name", "");
-        if (name == "scan" || name == "scanFront") {
-            scanTimelines.insert(name);
-        } else {
-            showSources.push_back(src);
+    CHECK(offRest == live.at("routes"));
+    CHECK(distort >= 3);
+    // the sources: the live project's, with the macro bank's `distort` knob
+    REQUIRE(off.at("sources").size() == live.at("sources").size());
+    for (std::size_t i = 0; i < live.at("sources").size(); ++i) {
+        const json& a = live.at("sources")[i];
+        json b = off.at("sources")[i];
+        if (a.value("name", "") == "macros") {
+            json knobs = json::array();
+            bool hasDistort = false;
+            for (const json& k : b.at("settings").at("knobs")) {
+                if (k.at("name") == "distort") {
+                    hasDistort = true;
+                    CHECK(k.at("default").get<double>() == 0.0);
+                } else {
+                    knobs.push_back(k);
+                }
+            }
+            CHECK(hasDistort);
+            b["settings"]["knobs"] = knobs;
         }
+        CHECK(b == a);
     }
-    CHECK(scanTimelines == std::set<std::string>{"scan", "scanFront"});
-    CHECK(showSources == live.at("sources"));
 }
 
 TEST_CASE("Rainbow World: the live scan latches on a swell, on the synth stem or the mix, never re-firing within 12 s",

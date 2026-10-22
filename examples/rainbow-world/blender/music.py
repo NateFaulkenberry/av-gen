@@ -52,49 +52,11 @@ def op_target(program, roles, role, kind, field):
 
 MACROS = [("swell", 0.0), ("synth", 0.0), ("lift", 0.0), ("scan", 0.0), ("one", 1.0)]
 SCAN_REST = 980.0    # look.SCAN_REST
-SCAN_DELAY_MS = 300.0
 RAINBOWS = ("rw_rainbow",)
 FW_EDGE_FIELDS = []   # build_world's firework fields whose falloff edges ride the front (filled by the build)
 
-# The showcase's world scans (gate 5, the owner: "rainbow world scan only happened once and there was a glitch at the
-# end"; 26-world-scan.md). On Feline Footwear the scan fires at the song's big synth swells and section peaks, from
-# the stems' own analysis (the synth stem's rms over the four bars after each phrase start against the four before;
-# 14-stem-analysis for the sections):
-#   47.85 s  the drop: the synth's entry, by far the largest rise (+0.10 rms)
-#   111.3 s  section B: the drums go to 16th hats under the full synth bed
-#   158.9 s  the synth's brightness climbing to its peak (centroid at 160.9 s)
-#   190.7 s  the riser's top: the synth's loudest phrase (0.21 rms), the drums gone
-# Irregular (63, 48, 32 s apart), never on a grid. Each is baked into two timelines -- the scan's amount and its
-# front -- so a seek lands where a play does, and nothing in the effect can reset part-way through (the gate-4 glitch
-# was the live trigger's depth, the synth level, dipping and recovering on the scan's tail).
-SCAN_TIMES = (47.85, 111.3, 158.9, 190.7)
-SCAN_RISE, SCAN_HOLD, SCAN_FALL, SCAN_RUN = 1.2, 5.3, 3.0, 7.0     # seconds: ease in, hold, ease out; the front's run
-
-
-def _ease(u):
-    u = min(1.0, max(0.0, u))
-    return u * u * (3 - 2 * u)
-
-
-def showcase_scan_sources(song_end):
-    """The `scan` (amount 0..1) and `scanFront` (1 = the front at the eye .. 0 = run out to rest) timelines."""
-    amt, front = [{"time": 0.0, "value": 0.0, "interp": "linear"}], [{"time": 0.0, "value": 0.0, "interp": "linear"}]
-    for t0 in SCAN_TIMES:
-        t0 += SCAN_DELAY_MS / 1000.0
-        for k in range(1, 9):                                   # eased in
-            amt.append({"time": round(t0 + SCAN_RISE * k / 8, 4), "value": round(_ease(k / 8), 4), "interp": "linear"})
-        for k in range(0, 13):                                  # held, then eased out
-            tt = t0 + SCAN_RISE + SCAN_HOLD + SCAN_FALL * k / 12
-            amt.append({"time": round(tt, 4), "value": round(1.0 - _ease(k / 12), 4), "interp": "linear"})
-        front.append({"time": round(t0 - 0.001, 4), "value": 0.0, "interp": "step"})
-        for k in range(0, 25):                                  # the front leaves the eye and runs out to rest,
-            u = k / 24                                          # eased both ways (gate 5: slow enough near the
-            front.append({"time": round(t0 + SCAN_RUN * u, 4), "value": round(1.0 - _ease(u), 4),   # eye for the
-                          "interp": "linear"})                                                       # trees to spin)
-    amt.append({"time": round(song_end, 4), "value": 0.0, "interp": "linear"})
-    front.append({"time": round(song_end, 4), "value": 0.0, "interp": "linear"})
-    return [{"kind": "timeline", "name": "scan", "settings": {"keys": amt}},
-            {"kind": "timeline", "name": "scanFront", "settings": {"keys": front}}]
+SCAN_RUN = 6.0     # seconds: the front's run from the eye out to rest (162 m/s; 7 s before the owner's "shorten the
+                   # duration of the world scan", 29 section 7)
 
 
 SCAN_REFRACTORY_MS = 12000.0
@@ -113,15 +75,13 @@ def front_targets(fx, scan_programs):
     return out
 
 
-def showcase_scan_routes(routes_, fx):
-    """The live triggers swapped for the showcase's baked scans (one route per front target, and the amount)."""
+def scan_hooks(fx):
+    """What a song-specific project needs to bake its own scans over the live trigger (the Feline Footwear video,
+    29-brief-feline-video.md): the routes it replaces (`macros/scan` and every front target) and how a baked front
+    timeline maps onto them (amount = -(rest - 10) per unit front: 1 = the front at the eye, 0 = run out to rest)."""
     scan_programs = [p for p in fx if "scan_mask" in fx[p]]
-    fronts = {t for t, _c in front_targets(fx, scan_programs)}
-    out = [r for r in routes_ if r["target"] != "macros/scan" and r["target"] not in fronts]
-    for tgt, c in front_targets(fx, scan_programs):
-        out.append(route("timeline.scanFront", tgt, -(SCAN_REST - 10.0), component=c))
-    out.append(route("timeline.scan", "macros/scan", 1.0))
-    return out
+    return {"amountTarget": "macros/scan", "restRadius": SCAN_REST, "frontAmount": -(SCAN_REST - 10.0),
+            "frontTargets": [[t, c] for t, c in front_targets(fx, scan_programs)]}
 
 
 def routes(fx, swell_nodes, swell):
@@ -270,8 +230,10 @@ def routes(fx, swell_nodes, swell):
     #   stem   the synth stem's rms, 1.25x its 8 s average (floored at 0.06 rms: the intro's calls cannot qualify)
     #   mix    on a plain stereo input, the mix's sustained (pad/synth) energy, 1.1x its 8 s average (floored at 0.1);
     #          stands aside while a synth stem is active (ADR-1570's fallback shape)
-    # The amount holds 6.5 s and falls over 3 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
-    # the same latch, so it never resets part-way through.
+    # The amount holds 5 s and falls over 2 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
+    # the same latch, so it never resets part-way through, and the colour is still up wherever the front -- and with
+    # it the trees' twirl and fireworks -- passes. (Shortened from a 6.5 s hold and a 3 s fall, 29 section 7: 7 s a
+    # scan, not 9.5.)
     def latch(extra, trend, level, hold_off):
         # the swell: the trigger signal's short-term average over its long-term one (ADR-1575; floored so an intro's
         # near-silence cannot spike it), on at `level`, held through the music's own dips for `hold_off` ms; the
@@ -281,7 +243,7 @@ def routes(fx, swell_nodes, swell):
              "envelopeRefractoryMs": SCAN_REFRACTORY_MS, "envelopeRearm": 0.3}
         c.update(extra)
         return c
-    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 6500.0, "envelopeFallPerSecond": 0.33,
+    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 5000.0, "envelopeFallPerSecond": 0.5,
                   "springHz": 0.5, "springDamping": 1.0}
     front_env = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN}
     triggers = [("stem.synth.rms", (8.0, 450.0, 0.06), 1.25, 1500.0, {"optional": True}),
@@ -340,11 +302,13 @@ def sky_routes(fx):
     if "splash_amount" not in roles:
         return out
     amt = op_target("rw_cloud", roles, "splash_amount", "constant", "constant")
-    out += stem_route("drums", "highMid", "response.snareEnv", amt, 0.7,
+    # (smoothed for the owner's "cloud color popping", 29 section 7: the claps' splashes bloom over 150 ms and fade
+    # over a beat and a half, not 8 ms and 420 ms; the phrase's blooms over 400 ms)
+    out += stem_route("drums", "highMid", "response.snareEnv", amt, 0.6,
                       {"offset": -1.3, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 8.0, "decayMs": 420.0}, fb_chain={"attackMs": 8.0, "decayMs": 380.0})
-    out.append(route("beat.phrasePulse", amt, 0.6, {"envelope": "linearfall", "envelopeFallPerSecond": 0.9,
-                                                      "attackMs": 30.0}))
+                       "attackMs": 150.0, "decayMs": 750.0}, fb_chain={"attackMs": 150.0, "decayMs": 700.0})
+    out.append(route("beat.phrasePulse", amt, 0.6, {"envelope": "linearfall", "envelopeFallPerSecond": 0.7,
+                                                      "attackMs": 400.0}))
     out.append(route("beat.phrase", op_target("rw_cloud", roles, "splash_hue", "palette", "value"), 1.0, op="replace"))
     shift = op_target("rw_cloud", roles, "splash_shift", "constant", "constant")
     out.append(route("beat.phrase", shift, 900.0, op="replace", component=0))
