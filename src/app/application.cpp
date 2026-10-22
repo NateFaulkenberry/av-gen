@@ -5916,6 +5916,7 @@ int Application::runLive() {
                 }
             }
             const std::size_t rungBefore = autoResolution_.rung();
+            const std::uint64_t revertsBefore = autoResolution_.stats().reverts;
             livePassGrowth_.note(renderer_->timeline().passes());
             const InteractiveResolution::Decision decision = autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs);
             if (decision.changed) {
@@ -5930,6 +5931,7 @@ int Application::runLive() {
                     reason.missWindow = paced ? autoResolution_.settings().missWindowFrames : 0;
                     reason.gpuCostMs = autoResolution_.gpuAtLastMove();
                     reason.growth = livePassGrowth_.largestGrowth();
+                    reason.revert = autoResolution_.stats().reverts != revertsBefore;
                     log::info("live quality: dropped {}", reason.text());
                     lastLiveDrop_ = std::move(reason);
                     ++liveDropSerial_;

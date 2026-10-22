@@ -532,6 +532,7 @@ int Application::runLiveProfileHeadless() {
         if (automatic) {
             // The live controller, fed the pipelined cost (headless serialises CPU and GPU).
             growth.note(f.passes);
+            const std::uint64_t revertsBefore = controller.stats().reverts;
             const auto decision = controller.note(f.gpuMs, cost);
             if (decision.changed) {
                 if (decision.rung > rung) { // ADR-1600: the drop's reason, in the record
@@ -540,6 +541,7 @@ int Application::runLiveProfileHeadless() {
                     reason.toLevel = liveQualityLevelName(ladder[decision.rung].level);
                     reason.gpuCostMs = controller.gpuAtLastMove();
                     reason.growth = growth.largestGrowth();
+                    reason.revert = controller.stats().reverts != revertsBefore;
                     record.notes.push_back(fmt::format("quality drop (warm-up frame {}): {}", warmFrames, reason.text()));
                 }
                 growth.reset();

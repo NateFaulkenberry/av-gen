@@ -348,6 +348,9 @@ TEST_CASE("live profile: the pass that grew is the drop reason's pass", "[live-p
     CHECK(r.text().find(',') == std::string::npos); // a CSV field
     r.growth = {};
     CHECK(r.text() == "High->Medium: 4 misses in 300 frames; no pass grew");
+    r.revert = true;
+    r.misses = 1;
+    CHECK(r.text() == "High->Medium (a raise reverted): 1 miss in 300 frames; no pass grew");
 }
 
 // ADR-1600: a capture is compared at the same piece time across runs, so a capturing run warms up for a fixed count.

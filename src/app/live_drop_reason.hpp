@@ -57,6 +57,7 @@ struct LiveDropReason {
     int misses = 0;        // deadline misses in the window that decided it (paced); 0 unpaced
     int missWindow = 0;    // that window, in frames
     double gpuCostMs = -1.0; // the controller's GPU reading at the decision (unpaced: what decided it)
+    bool revert = false;     // a raise on probation that missed, undone (ADR-1104/1362): one miss is enough
     PassGrowthTracker::Growth growth;
     // One line, no commas (it is also a CSV field): "High->Medium: 4 misses in 300 frames; scene +3.12 ms (12.40->15.52)".
     [[nodiscard]] std::string text() const;

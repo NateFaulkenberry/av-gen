@@ -72,7 +72,7 @@ PassGrowthTracker::Growth PassGrowthTracker::largestGrowth() const {
 }
 
 std::string LiveDropReason::text() const {
-    std::string s = fmt::format("{}->{}:", fromLevel, toLevel);
+    std::string s = fmt::format("{}->{}{}:", fromLevel, toLevel, revert ? " (a raise reverted)" : "");
     if (missWindow > 0) {
         s += fmt::format(" {} miss{} in {} frames", misses, misses == 1 ? "" : "es", missWindow);
     } else if (gpuCostMs >= 0.0) {
