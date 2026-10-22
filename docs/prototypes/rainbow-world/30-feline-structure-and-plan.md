@@ -6,7 +6,10 @@ Brief: `29-brief-feline-video.md`. Branch: `art/rainbow-world-feline`.
   It shows the drums, bass and synth levels, the synth's brightness, the phrase lines and the proposed scans.
 - **Scripts:** `scripts/feline_swells.py`, `feline_swell_table.py` and `feline_structure_plot.py`.
 
-> Status: a plan, for the coordinator's approval. Nothing is built yet.
+> Status: approved 2026-10-21 (decisions: the offline example plays the Feline mix only; 18 scans at three sizes; the
+> look table as proposed; the landing by `splineOffset` first). Built to gate 1, which has four clips in
+> `~/Desktop/av-gen-review/77-feline-footwear-video/`. The project and its generator are in `~/Desktop/Feline
+> Footwear/`.
 
 ## 1. What a "swell" is in this synth stem (measured)
 
