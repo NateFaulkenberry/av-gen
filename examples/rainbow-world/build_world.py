@@ -1233,10 +1233,22 @@ for k in range(16):  # banks on a ring round the knot
     c = Vector((centre[0] + 3800 * math.cos(aa), centre[1] + 3800 * math.sin(aa), centre[2] + rng.uniform(-300, 500)))
     cpts["bank"].append(point(c, Quaternion((0, 0, 1), rng.uniform(0, 6.28)),
                               (rng.uniform(2.0, 3.0), rng.uniform(1.4, 2.2), rng.uniform(1.4, 2.4))))
-# the floor of the cloud sea: one mesh of billows under the whole world (engine_assets.export_cloud_floor)
-nodes.append(node_points("cloud_floor", "cloud_floor.glb",
-                         [point(Vector((centre[0], centre[1], sea_z - 120.0)), Quaternion(), 1.0)],
-                         {"program": "rw_cloudfloor", "roughness": 1.0, "metallic": 0.0, "unlit": True}, castsShadow=False))
+# the floor of the cloud sea: one surface of billows under the whole world (engine_assets.export_cloud_floor), in
+# tiles about their own centres, so the culler drops the ones off the frame and the far ones simplify with their
+# borders held (ADR-1546), as the ground bands do (rainbow-world-live-perf: drawn whole, it was ~2 ms at High).
+# Rungs by the distance to a tile's centre; a tile is ~4.7 km across, so its near edge is up to ~3.3 km nearer than
+# that: the first rung starts where even the near edge is a few km off and the billows (78 m quads) are a few px.
+CF_LOD = (6000.0, 10000.0, 15000.0)
+with open(os.path.join(ASSETS, "cloud_floor_tiles.json")) as f_:
+    for tile_ in json.load(f_):
+        nodes.append(node_points(tile_["file"][:-4], tile_["file"],
+                                 [point(Vector((centre[0], centre[1], sea_z - 120.0)) + Vector(tile_["centre"]),
+                                        Quaternion(), 1.0)],
+                                 {"program": "rw_cloudfloor", "roughness": 1.0, "metallic": 0.0, "unlit": True},
+                                 castsShadow=False,
+                                 lod={"cull": True, "count": 4, "byScreenSize": False, "distance1": CF_LOD[0],
+                                      "distance2": CF_LOD[1], "distance3": CF_LOD[2], "spread": 0.0,
+                                      "lockBorder": True}))
 programs.append(look.cloud_floor_program(sea_z - 120.0))
 for kind, pts in cpts.items():
     if pts:

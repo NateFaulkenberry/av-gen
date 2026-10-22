@@ -216,10 +216,16 @@ def export_clouds(out):
         print("CLOUD", kind, len(m.data.polygons), [round(d) for d in dims])
 
 
-def export_cloud_floor(out, radius=14000.0, n=360, seed=12):
+def export_cloud_floor(out, radius=14000.0, n=360, seed=12, tiles=6):
     """The cloud sea as one continuous floor of billows under the whole world, so 'down' is never a flat colour:
     a disc of lumps (smooth union of a few hundred domes, 150-600 m across), flattening toward the rim, where it
-    meets the sky's ground colour in the haze."""
+    meets the sky's ground colour in the haze.
+
+    Exported in tiles x tiles chunks (cloud_floor_<i>_<j>.glb, listed in cloud_floor_tiles.json), each about its own
+    centre (rainbow-world-live-perf: as one 203k-triangle mesh the floor was drawn whole every frame, about 2 ms of
+    GPU at High late in the song, wherever the camera looked). Chunked, the culler drops the tiles off the frame and
+    the far ones take border-locked LOD rungs (ADR-1546), as the ground bands do. The surface is the same: every tile
+    takes the full mesh's own smooth normals as custom normals, so a seam shades exactly as the one mesh did."""
     import random as _r
     rng = _r.Random(seed)
     # two octaves: big rolling billows (500-1600 m, 120-420 m high) and cauliflower heads on them (150-450 m)
@@ -256,11 +262,39 @@ def export_cloud_floor(out, radius=14000.0, n=360, seed=12):
     me.update()
     for poly in me.polygons:
         poly.use_smooth = True
-    ob = bpy.data.objects.new("cloud_floor", me)
-    bpy.context.scene.collection.objects.link(ob)
-    ob.data.materials.append(plain_material("cloud", (1.0, 1.0, 1.0), 1.0))
-    rw.export_glb([ob], os.path.join(out, "cloud_floor.glb"))
-    print("CLOUD FLOOR", len(faces))
+    me.update()
+    normals = [tuple(v.normal) for v in me.vertices]   # the whole floor's smooth normals, seams included
+    edges = np.linspace(0, n - 1, tiles + 1).round().astype(int)
+    manifest, total = [], 0
+    for ti in range(tiles):
+        for tj in range(tiles):
+            quads = [(i, j) for i in range(edges[ti], edges[ti + 1]) for j in range(edges[tj], edges[tj + 1])
+                     if not (r[i, j] > 1.0 and r[i + 1, j + 1] > 1.0)]
+            if not quads:
+                continue
+            used = sorted({k for i, j in quads for k in (i * n + j, i * n + j + 1, (i + 1) * n + j + 1, (i + 1) * n + j)})
+            local = {k: m for m, k in enumerate(used)}
+            pts = np.array([verts[k] for k in used])
+            ctr = (pts.min(axis=0) + pts.max(axis=0)) * 0.5
+            tme = bpy.data.meshes.new("cloud_floor_%d_%d" % (ti, tj))
+            tme.from_pydata([tuple(p - ctr) for p in pts], [],
+                            [(local[i * n + j], local[i * n + j + 1], local[(i + 1) * n + j + 1], local[(i + 1) * n + j])
+                             for i, j in quads])
+            tme.update()
+            for poly in tme.polygons:
+                poly.use_smooth = True
+            tme.normals_split_custom_set_from_vertices([normals[k] for k in used])
+            tob = bpy.data.objects.new(tme.name, tme)
+            bpy.context.scene.collection.objects.link(tob)
+            tob.data.materials.append(plain_material("cloud", (1.0, 1.0, 1.0), 1.0))
+            name = "cloud_floor_%d_%d.glb" % (ti, tj)
+            rw.export_glb([tob], os.path.join(out, name))
+            manifest.append({"file": name, "centre": [float(c) for c in ctr], "quads": len(quads)})
+            total += len(quads)
+    assert total == len(faces), (total, len(faces))
+    with open(os.path.join(out, "cloud_floor_tiles.json"), "w") as f:
+        json.dump(manifest, f, indent=1)
+    print("CLOUD FLOOR", len(faces), "in", len(manifest), "tiles")
 
 
 def spectral(t):

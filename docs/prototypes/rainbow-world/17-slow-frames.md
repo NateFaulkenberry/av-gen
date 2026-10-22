@@ -319,3 +319,71 @@ This is a follow-up, not a fix, in this pass.
 - **ADR-1576 on the 48 ground bands:** +0.6 ms GPU median, +1.9 ms p95 (High pinned, 140-200 s). The trees as well
   would have been +1.2 / +8 ms, and were left out.
 - **The cloud pass:** 0, at the coarse screen-size thresholds (28 section 6).
+
+## 12. The late song, live (perf/rainbow-world-live, ADR-1590 and 1591)
+
+The finding above (section 11): from about 2:30 the live ladder could not hold High. All runs here are on AC (logged
+with `pmset` before and after each), with no other GPU or CPU work alongside. The project is the live one
+(`rainbow-world.json`), fed the Feline mix and its three stems.
+
+**Why the late song is heavy: per-vertex cost, not pixels.**
+- The camera draws only 1.0-1.6 M triangles. Render scale moves little: High to Medium saves about 2.4 ms at 144 s,
+  so about 70% of the frame does not scale with resolution.
+- Hiding families at 144-158 s (headless High, GPU median, two runs each, after ADR-1590):
+
+  | Hidden | Saving |
+  |---|---|
+  | clouds | 4.5 ms (floor 2.0, puffs 1.7, masses 0.6; still 3.3 ms at Emergency) |
+  | leaves | 3.0 ms (5.1 before ADR-1590, mostly the depth prepass) |
+  | arches | 2.4 ms (their program 0.6 of it) |
+  | wood and core | 1.7 ms |
+  | grass | 1.3 ms |
+  | bands | 1.2 ms |
+  | flowers | 0.7 ms |
+
+  Fireworks and rocks were within the noise.
+- There were two engine causes:
+  - the depth entry ran the canopy programs, through the interpreter, on every leaf fragment, though they write no
+    opacity (ADR-1590);
+  - every procedural vertex paid two chain evaluations for a finite-difference normal, though nothing in this scene
+    bends (ADR-1591).
+
+**The fixes:**
+- ADR-1590: a depth draw runs a program only where it can cut.
+- ADR-1591: a rigid procedural draw takes the analytic normal.
+- The cloud floor (one 203k-triangle mesh, drawn whole every frame) is exported in 6 x 6 tiles about their own
+  centres. The full mesh's normals carry over as custom normals. Each tile takes cull and border-locked LOD from
+  6 km (ADR-1546), in both the live and the offline scenes.
+
+**Headless High, GPU median** (two runs each; "before" is main's shaders and scene):
+
+| Window | Before | ADR-1590 + 1591 | + floor tiles |
+|---|---|---|---|
+| 144-158 s | 31.7 ms | 25.7 ms | 25.0-25.2 ms |
+| 185-199 s | 26.8-27.0 ms | 22.4 ms | 21.8-21.9 ms |
+
+The tiles save 0.5-0.6 ms, not the 1.4 ms of hiding the floor: the near tiles remain, and the cull pass grows by
+0.25 ms for 36 objects. Rungs from 3 km measured the same as from 6 km, so the conservative distances were kept.
+
+**Live, auto ladder, 1080p30** (the owner's measurement; frames per level):
+
+| Run | Ultra | High | Medium | Low | Misses |
+|---|---|---|---|---|---|
+| 140-215 s, before (2 runs) | 7 / 10 | 1515 / 1516 | 309 / 305 | 269 / 269 | 4 / 3 |
+| 140-215 s, after (2 runs) | 1831 / 1831 | 269 / 269 | 0 | 0 | 2 / 2 |
+| 15-210 s, before | 2052 | 1536 | 1992 | 269 | 11 |
+| 15-210 s, after (2 runs) | 4176 / 5165 | 1675 / 686 | 0 | 0 | 2 / 3 |
+
+**Against the bar** (High outside the scans, Medium allowed in them, 30 fps held):
+- **Before:** Low at 150-165 s, and Medium at 15-60 s and 160-200 s, outside the scans.
+- **After:** never below High anywhere in the song, scans included.
+
+**Image:**
+- ADR-1590 and the floor tiles change nothing visible.
+- ADR-1591 moves 0.03-0.15% of an offline frame's pixels by one level.
+- Stills: `~/Desktop/av-gen-review/77-rainbow-world-live-perf/` (offline before, after, and the difference x16).
+
+**Not done** (measured and ranked lower):
+- Compiling glTF entity programs for the arches: at most 0.6 ms.
+- Coarser puff LOD: the owner tuned the cloud look in gate 8.
+- Cutting trees or grass: visible.

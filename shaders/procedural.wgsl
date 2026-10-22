@@ -730,9 +730,11 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     let objectLinear = mat3x3<f32>(object.model[0].xyz, object.model[1].xyz, object.model[2].xyz);
     var handedness = determinant(objectLinear) * s.x * s.y * s.z;
     let deformerCount = u32(proc.timeInfo.y + 0.5);
+    var deforms = false; // ADR-1591: an enabled slot (a disabled one is packed with code -1 and moves nothing)
     for (var i = 0u; i < 8u; i = i + 1u) {
         if (i >= deformerCount) { break; }
         let d = proc.deformers[i];
+        deforms = deforms || deformerCode(d) >= 0;
         if (deformerCode(d) == DEFORM_PATH && d.params.x >= 0.0 && d.params.y < 0.0 && d.centerAmount.w > 0.5) {
             handedness = -handedness;
         }
@@ -745,11 +747,11 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     let skipVelocity = depthOnly || frame.styledGround.w > 0.5;
     // A depth-only draw needs the normal only where fs_proc_depth runs a cutout program, which reads it: a masked
     // material whose program writes opacity (ADR-1590, proc.timeInfo.w; uniform per draw).
-    // ADR-1591: and the finite-difference normal is needed only when something can bend the surface -- a deformer, the
+    // ADR-1591: and the finite-difference normal is needed only when something can bend the surface -- an enabled deformer, the
     // wind bend or an FXL displacement. Without them the chain is the instance and the object matrix, an affine map
     // whose finite-difference normal is nRef (J^-T n) up to rounding, so the two neighbour evaluations are skipped
     // and nRef is the normal. All three tests are uniform per draw.
-    let bends = deformerCount > 0u || proc.windSway.w > 0.5 ||
+    let bends = deforms || proc.windSway.w > 0.5 ||
                 (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_DISPLACE) != 0u);
     let needNormal = (!depthOnly || proc.timeInfo.w > 0.5) && bends;
     // The chain's evaluations. A mesh: the point (0), the two finite-difference neighbours when the normal is

@@ -339,10 +339,24 @@ TEST_CASE("Twist deformer: amount 0 is the identity, amount 1 moves the silhouet
     const Coverage baseCov = coverage(base);
     REQUIRE(baseCov.pixels > 0);
 
+    // ADR-1591: an enabled deformer takes the finite-difference normal and a rigid draw the analytic one, the same
+    // normal by two float paths, so amount 0 is the identity to rounding rather than to the bit: no pixel moves by
+    // more than one level, and few move at all. (A disabled deformer, below, leaves the draw rigid: bit-identical.)
     scene::Scene zero = plain;
     zero.procedurals[0].deformers.push_back(twist(0.0f, scene::DeformSpace::World));
     const auto zeroImg = renderOnce(*ctx, zero, 0.0);
-    CHECK(gpu::hashImage(zeroImg) == baseHash);
+    {
+        REQUIRE(zeroImg.rgba.size() == base.rgba.size());
+        int worst = 0;
+        std::size_t moved = 0;
+        for (std::size_t i = 0; i < base.rgba.size(); ++i) {
+            const int d = std::abs(static_cast<int>(zeroImg.rgba[i]) - static_cast<int>(base.rgba[i]));
+            worst = std::max(worst, d);
+            moved += d != 0 ? 1u : 0u;
+        }
+        CHECK(worst <= 1);
+        CHECK(moved * 100 < base.rgba.size()); // under 1% of channels
+    }
 
     scene::Scene twisted = plain;
     twisted.procedurals[0].deformers.push_back(twist(1.0f, scene::DeformSpace::World));
