@@ -58,3 +58,7 @@ Coordinator note: Rainbow World (offline) goes in Examples under its offline sec
 Rainbow World (live) under the Live section (ADR-1340; the index's "live": true and sonic.live). Check the examples
 index, the menu code and test_examples for both, and what a fresh checkout shows before build.py runs ("needs
 generating"). The README must say how to build it.
+
+## 7. The owner on gate 1 (verbatim)
+
+"looks good so far - only thing I noticed is at 5 seconds in gate1-1m47-1m51-build-104-116s.mp4 there seems to be an issue it looks like the tree dancing / fireworks animation happens without the rainbow world scan going through them. it might be due to a build up of world scans - hard to tell from just this clip - one thing might help is just to shorten the duration of the world scan, also a bit of cloud color popping in that scene as well, might be intentional modulation, but maybe we could smooth that out"
