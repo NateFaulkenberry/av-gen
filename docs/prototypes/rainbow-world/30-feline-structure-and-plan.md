@@ -233,3 +233,42 @@ frames, 1080p30, with audio, and 0 GPU errors.
 | `check_project_integrity.py` | 0 | 0 problems |
 
 The GPU suite was not rerun: this branch changes no engine code (`git diff 48e5cc72 -- src shaders` is empty).
+
+## 11. The scan regression (29 section 9)
+
+### The causes, each found
+
+| Symptom | Cause | Where it lived | Fix |
+|---|---|---|---|
+| A firework "stuck" round a tree; fireworks at random times; trees spinning on their own | At rest the front sits 980 m round the moving camera (the material constants stop it there). Trees 650-980 m out sat part-way through a stage: a burst frozen in the air, a glow, a part-turned or hopping tree. As the camera flew, trees crossed that shell and played their twirl and fireworks: forwards as they came nearer, backwards as they fell away. It has been there since gate 6, worst where far trees are in view | Scene (both versions) | A gate: every twirl, glow and firework effector is enabled, and the sparks and flashes drawn, only while `macro.scan` is over 0.02 (84 routes). A world at rest is exactly as built. Test-enforced |
+| The same, all through the Feline video, and the scan "playing in reverse" at its end | The Feline layer's front and colour timelines left a linear segment from one scan's end to the next one's start. The front crept inward over the gap between scans (8-30 s), so every tree on the way played its stages backwards, and the colour crept up with no front: at 26 s it was 0.026, enough to open the gate. The gate-1 and gate-2 Feline layers had it too | Feline layer | Both timelines hold at rest up to 4 ms before each scan, then jump |
+| Scans too short (the gate-2 change the owner traced it to) | The owner-approved gate-8 envelope was cut to a 5 s hold, a 2 s fall and a 6 s run | Scene (both) | Reverted to the gate-8 envelope: a 6.5 s hold, a 3 s fall and a 7 s run |
+
+The native scenes' front is monotonic: in a trace of the latch's front envelope on the Feline mix, it falls 1 to 0
+over 7 s and never rises mid-scan. The cloud-splash smoothing and the perf work (ADR-1590/1591, the cloud floor's
+tiles) stay.
+
+### Beat sync (the owner: "the ground lights look completely off time")
+
+Measured against the kick grid on the Feline stems (30 fps sonic trace, each route's output computed from the trace's
+raw columns):
+
+| Pulse | Source | Peak against the grid, median (p10-p90) | Change |
+|---|---|---|---|
+| Grass kick pops, before | the drum stem's low band (x3, clamped, attack 4 ms / decay 140 ms) | +138 ms (+125 to +151) | the band's analysis latency, plus the clamp holding the peak |
+| **Grass kick pops, after** | **`(1 - beat.phase)^6`**; depth from the drum stem's level (none after the drums stop); no stem: full | **+26 ms (+13 to +39)** | `beat.phase` itself wraps +10 ms after the grid |
+| Hat glints | the drum stem's treble, on the 8th offbeats | +10 ms in groove A; spread in B (16th hats) | none: they follow the hats, a named stem |
+| Flower shimmer (the hat part) | the same treble | as the glints | none |
+| Arches, clouds | `beat.pulse` / `beat.phase`, the clap band, the synth | -- | none (the owner: "good") |
+
+Plot: `78-rainbow-scan-regression/beat-sync-kick-pops-before-after.png`.
+
+### The Feline layer
+
+- **Scans:** every intro swell (0:34, 0:48, 0:56), then every other one of the owner's list (1:04, 1:20, 1:36,
+  1:47-1:51, 2:07, 2:23, 2:39, 2:53): 11 scans.
+- **Envelope:** each one is the native envelope, with the colour rising over its swell's rise (at most 2.5 s). The hold
+  is cut short only where the next swell comes sooner, so none overlaps.
+- **The table:** `~/Desktop/Feline Footwear/scans.txt`.
+- **The opening camera:** as built up to the drop, which is the earlier clips' flight. At the first swell it is a grove
+  of great trees on a hill.

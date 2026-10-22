@@ -152,3 +152,51 @@ TEST_CASE("Rainbow World: the MIDI layout keeps CC 9 look and CC 10 look lock", 
                                                          {7, "colour"}, {9, "palette"}, {10, "paletteLock"}};
     CHECK(ccs == expected);
 }
+
+TEST_CASE("Rainbow World: the trees' twirl and fireworks are gated by the scan, so a world at rest is as built",
+          "[examples][rainbow-world]") {
+    // 29 section 9: at rest the front sits 980 m round the moving camera, and trees 650-980 m out were caught part-way
+    // through a stage (a frozen burst, a part-turned tree) and played their twirl and fireworks as the camera flew.
+    // Every firework and twirl effector is enabled, and the sparks and flashes drawn, only while macro.scan is up.
+    for (const char* file : {"rainbow-world.json", "rainbow-world-offline.json"}) {
+        INFO(file);
+        const json p = load(file);
+        int effectors = 0;
+        int nodes = 0;
+        for (const json& r : p.at("routes")) {
+            const std::string target = r.at("target");
+            if (r.at("source") != "macro.scan" || !(target.ends_with("/enabled") || target.ends_with("/visible"))) {
+                continue;
+            }
+            CHECK(r.at("op") == "replace");
+            CHECK(r.at("chain").at("threshold") == "binary");
+            CHECK(r.at("chain").at("thresholdLevel").get<double>() > 0.0);
+            if (target.find("/effector/") != std::string::npos) {
+                ++effectors;
+            } else {
+                CHECK(target.find("/fw_") != std::string::npos);
+                ++nodes;
+            }
+        }
+        CHECK(effectors >= 48); // four families x three parts x the twirl, glow and spin effectors
+        CHECK(nodes == 8);      // a spark pool and a flash per family
+    }
+}
+
+TEST_CASE("Rainbow World: the grass's kick pops ride the beat clock's phase, not the drum stem's late band",
+          "[examples][rainbow-world]") {
+    // 29 section 9 ("the ground lights look completely off time"): the drum stem's low band peaked ~140 ms after the
+    // kick; the phase lands within a frame of it.
+    const json live = load("rainbow-world.json");
+    int kick = 0;
+    for (const json& r : live.at("routes")) {
+        const std::string target = r.at("target");
+        if (target.find("rw_grass") == std::string::npos || r.at("amount").get<double>() != 2.2) {
+            continue;
+        }
+        CHECK(r.at("source") == "beat.phase");
+        CHECK(r.at("chain").at("curve") == "power");
+        ++kick;
+    }
+    CHECK(kick == 2); // with the drum stem (its level the depth) and without (the fallback)
+}

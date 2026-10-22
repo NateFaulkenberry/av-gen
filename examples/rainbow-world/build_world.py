@@ -1480,6 +1480,28 @@ for f_, pts_ in fam.items():
              "scaleAxis": [1.0, 1.0, 1.0]}]}})
     n_sparks += len(sparks)
 music.FW_EDGE_FIELDS[:] = FW_EDGES
+# The scan's gate (29 section 9, the owner: "a tree ... with firework animation that looks stuck, trees are now
+# randomly spinning and fireworks going off at incorrect times"). Every stage is a function of how far the front has
+# run past a tree, and at rest the front sits at REST_R (980 m: the material constants' range stops it there) round
+# the moving camera. So the trees 650-980 m away were always part-way through a stage -- a glow, a burst frozen in the
+# air, a tree turned part of the way round -- and, as the camera flew, trees crossed that shell and played their
+# twirl and fireworks (forwards as they came nearer, backwards as they fell away), with no scan anywhere. The fix:
+# every twirl, glow and firework effector is enabled, and the sparks and flashes drawn, only while a scan is up
+# (`macro.scan` over 0.02), so a world at rest is exactly as built, wherever the camera is. A spin left at a whole
+# turn is the identity, so switching it off behind the front changes nothing.
+FW_GATES = []   # (target, kind): effector enables and node visibility, routed from macro.scan in the projects
+for n_ in nodes:
+    if n_.get("kind") != "procedural":
+        continue
+    nm_ = n_["name"]
+    if nm_.split("_")[0] in fam and nm_.endswith(("_wood", "_core", "_leaves")):
+        for k_, e_ in enumerate(n_["procedural"].get("effectors", [])):
+            if e_["field"].startswith("fw"):
+                FW_GATES.append("procedural/%s/effector/%d/enabled" % (nm_, k_ + 1))
+    elif nm_.startswith(("fw_sparks_", "fw_flash_")):
+        FW_GATES.append("procedural/%s/visible" % nm_)
+        n_["procedural"]["visible"] = False   # at rest, not drawn (the gate shows them)
+print("FIREWORK gates", len(FW_GATES))
 print("FIREWORKS %d sparks and %d flash cores; fields %s" % (n_sparks, sum(len(v) for v in fam.values()),
                                                              [f_ for f_, _p in FW_EDGES]))
 
@@ -1745,6 +1767,9 @@ for k_ in ride_keys:
         CAM_KEYS[c_].append({"time": k_["time"], "value": round(float(q_[c_]), 3), "interp": k_["interp"]})
 CAM_SOURCES = [{"kind": "timeline", "name": "cam" + "XYZ"[c_], "settings": {"loopLength": loop_seconds,
                                                                             "keys": CAM_KEYS[c_]}} for c_ in range(3)]
+for tgt_ in FW_GATES:
+    routes.append({"source": "macro.scan", "target": tgt_, "amount": 1.0, "op": "replace", "polarity": "unipolar",
+                   "chain": {"threshold": "binary", "thresholdLevel": 0.02}})
 for fld, _params in FW_EDGES:
     for c_ in range(3):
         routes.append({"source": "timeline.cam" + "XYZ"[c_], "target": "field/%s/position" % fld, "amount": 1.0,

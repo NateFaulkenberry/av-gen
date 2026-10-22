@@ -55,8 +55,8 @@ SCAN_REST = 980.0    # look.SCAN_REST
 RAINBOWS = ("rw_rainbow",)
 FW_EDGE_FIELDS = []   # build_world's firework fields whose falloff edges ride the front (filled by the build)
 
-SCAN_RUN = 6.0     # seconds: the front's run from the eye out to rest (162 m/s; 7 s before the owner's "shorten the
-                   # duration of the world scan", 29 section 7)
+SCAN_RUN = 7.0     # seconds: the front's run from the eye out to rest (139 m/s: the twirl and fireworks are timed at
+                   # this speed; the gate-2 6 s was reverted with the gate-8 envelope, 29 section 9)
 
 
 SCAN_REFRACTORY_MS = 12000.0
@@ -91,13 +91,20 @@ def routes(fx, swell_nodes, swell):
     scan_programs = [p for p in fx if "scan_mask" in fx[p]]
 
     # ---- drums: the kick, locally (the owner at gate 2: no world sweep on every quarter note) ----------------------
-    # the grass round the camera pops its tips on each kick: the drum stem's low band, fast attack, short decay
+    # the grass round the camera pops its tips on each kick, ON the beat: a pulse cut from the beat clock's own phase,
+    # (1 - phase)^6 -- full on the beat, a tenth by a third of the beat -- its depth the drum stem's level (no drums,
+    # no pops: the end) and, with no drum stem, full while the beat clock runs. The owner (29 section 9: "the
+    # ground lights look completely off time"): read from the drum stem's low band they peaked 100 ms after the kick
+    # (the band's analysis latency plus the chain), measured against the grid; the phase lands within 10 ms of it.
     if "kick_gain" in fx.get("rw_grass", {}):
-        out += stem_route("drums", "bass", "response.kickEnv",
-                          op_target("rw_grass", fx["rw_grass"], "kick_gain", "constant", "constant"), 2.2,
-                          {"gain": 3.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                           "attackMs": 4.0, "decayMs": 140.0},
-                          fb_chain={"attackMs": 4.0, "decayMs": 110.0})
+        kick = op_target("rw_grass", fx["rw_grass"], "kick_gain", "constant", "constant")
+        pulse = {"gain": -1.0, "offset": 1.0, "curve": "power", "curveAmount": 6.0}
+        # depth = -0.5 + 2.4 x the drums' level: none below 0.21 (the drums gone), 1 at 0.62, 1.4 at full drive; with
+        # no drum stem the default reads depth 0 and the fallback below plays instead
+        out.append(route("beat.phase", kick, 2.2, pulse, depthSource="stem.drums.level", depthMin=-0.5, depthMax=1.9,
+                         depthDefault=0.5 / 2.4))
+        out.append(route("beat.phase", kick, 2.2, pulse, depthSource="stem.drums.active", depthMin=1.0, depthMax=0.0,
+                         depthDefault=0.0))
 
     # ---- drums: hat glints in the grass ----------------------------------------------------------------------------
     if "glint_gain" in fx.get("rw_grass", {}):
@@ -230,10 +237,9 @@ def routes(fx, swell_nodes, swell):
     #   stem   the synth stem's rms, 1.25x its 8 s average (floored at 0.06 rms: the intro's calls cannot qualify)
     #   mix    on a plain stereo input, the mix's sustained (pad/synth) energy, 1.1x its 8 s average (floored at 0.1);
     #          stands aside while a synth stem is active (ADR-1570's fallback shape)
-    # The amount holds 5 s and falls over 2 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
-    # the same latch, so it never resets part-way through, and the colour is still up wherever the front -- and with
-    # it the trees' twirl and fireworks -- passes. (Shortened from a 6.5 s hold and a 3 s fall, 29 section 7: 7 s a
-    # scan, not 9.5.)
+    # The amount holds 6.5 s and falls over 3 s, eased by a spring (ADR-1041); the front runs out over SCAN_RUN on
+    # the same latch, so it never resets part-way through. (The owner-approved gate-8 envelope: the Feline gate-2
+    # shortening -- 5 s, 2 s, a 6 s run -- was reverted, 29 section 9.)
     def latch(extra, trend, level, hold_off):
         # the swell: the trigger signal's short-term average over its long-term one (ADR-1575; floored so an intro's
         # near-silence cannot spike it), on at `level`, held through the music's own dips for `hold_off` ms; the
@@ -243,7 +249,7 @@ def routes(fx, swell_nodes, swell):
              "envelopeRefractoryMs": SCAN_REFRACTORY_MS, "envelopeRearm": 0.3}
         c.update(extra)
         return c
-    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 5000.0, "envelopeFallPerSecond": 0.5,
+    amount_env = {"envelope": "peakhold", "envelopeHoldMs": 6500.0, "envelopeFallPerSecond": 0.33,
                   "springHz": 0.5, "springDamping": 1.0}
     front_env = {"envelope": "linearfall", "envelopeFallPerSecond": 1.0 / SCAN_RUN}
     triggers = [("stem.synth.rms", (8.0, 450.0, 0.06), 1.25, 1500.0, {"optional": True}),

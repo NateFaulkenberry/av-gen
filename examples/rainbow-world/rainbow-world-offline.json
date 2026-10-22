@@ -8056,32 +8056,35 @@
    }
   },
   {
-   "source": "stem.drums.bass",
+   "source": "beat.phase",
    "target": "material/rw_grass/op/41/constant/constant",
    "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "gain": 3.0,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 4.0,
-    "decayMs": 140.0
+    "gain": -1.0,
+    "offset": 1.0,
+    "curve": "power",
+    "curveAmount": 6.0
    },
-   "optional": true
+   "depthSource": "stem.drums.level",
+   "depthMin": -0.5,
+   "depthMax": 1.9,
+   "depthDefault": 0.20833333333333334
   },
   {
-   "source": "response.kickEnv",
+   "source": "beat.phase",
    "target": "material/rw_grass/op/41/constant/constant",
    "amount": 2.2,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "attackMs": 4.0,
-    "decayMs": 110.0
+    "gain": -1.0,
+    "offset": 1.0,
+    "curve": "power",
+    "curveAmount": 6.0
    },
    "depthSource": "stem.drums.active",
    "depthMin": 1.0,
@@ -8555,8 +8558,8 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "peakhold",
-    "envelopeHoldMs": 5000.0,
-    "envelopeFallPerSecond": 0.5,
+    "envelopeHoldMs": 6500.0,
+    "envelopeFallPerSecond": 0.33,
     "springHz": 0.5,
     "springDamping": 1.0
    },
@@ -8580,7 +8583,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8602,7 +8605,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8624,7 +8627,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8646,7 +8649,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8668,7 +8671,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8690,7 +8693,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8712,7 +8715,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8734,7 +8737,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8756,7 +8759,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8778,7 +8781,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8800,7 +8803,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8822,7 +8825,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8844,7 +8847,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8866,7 +8869,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8888,7 +8891,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8910,7 +8913,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8932,7 +8935,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8954,7 +8957,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8976,7 +8979,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -8998,7 +9001,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9020,7 +9023,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9042,7 +9045,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9064,7 +9067,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9086,7 +9089,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9108,7 +9111,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9130,7 +9133,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9152,7 +9155,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9174,7 +9177,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9196,7 +9199,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9218,7 +9221,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9240,7 +9243,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9262,7 +9265,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9284,7 +9287,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9306,7 +9309,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9328,7 +9331,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9350,7 +9353,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9372,7 +9375,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9394,7 +9397,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9416,7 +9419,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9438,7 +9441,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9460,7 +9463,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9482,7 +9485,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9504,7 +9507,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9526,7 +9529,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9548,7 +9551,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9570,7 +9573,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9592,7 +9595,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9614,7 +9617,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9636,7 +9639,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9658,7 +9661,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9680,7 +9683,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9702,7 +9705,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9724,7 +9727,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9746,7 +9749,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9768,7 +9771,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9790,7 +9793,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9812,7 +9815,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9834,7 +9837,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9856,7 +9859,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9878,7 +9881,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9900,7 +9903,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9922,7 +9925,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "optional": true
   },
@@ -9944,8 +9947,8 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "peakhold",
-    "envelopeHoldMs": 5000.0,
-    "envelopeFallPerSecond": 0.5,
+    "envelopeHoldMs": 6500.0,
+    "envelopeFallPerSecond": 0.33,
     "springHz": 0.5,
     "springDamping": 1.0
    },
@@ -9972,7 +9975,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -9997,7 +10000,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10022,7 +10025,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10047,7 +10050,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10072,7 +10075,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10097,7 +10100,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10122,7 +10125,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10147,7 +10150,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10172,7 +10175,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10197,7 +10200,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10222,7 +10225,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10247,7 +10250,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10272,7 +10275,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10297,7 +10300,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10322,7 +10325,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10347,7 +10350,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10372,7 +10375,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10397,7 +10400,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10422,7 +10425,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10447,7 +10450,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10472,7 +10475,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10497,7 +10500,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10522,7 +10525,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10547,7 +10550,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10572,7 +10575,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10597,7 +10600,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10622,7 +10625,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10647,7 +10650,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10672,7 +10675,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10697,7 +10700,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10722,7 +10725,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10747,7 +10750,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10772,7 +10775,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10797,7 +10800,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10822,7 +10825,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10847,7 +10850,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10872,7 +10875,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10897,7 +10900,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10922,7 +10925,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10947,7 +10950,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10972,7 +10975,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -10997,7 +11000,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11022,7 +11025,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11047,7 +11050,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11072,7 +11075,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11097,7 +11100,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11122,7 +11125,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11147,7 +11150,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11172,7 +11175,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11197,7 +11200,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11222,7 +11225,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11247,7 +11250,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11272,7 +11275,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11297,7 +11300,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11322,7 +11325,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11347,7 +11350,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11372,7 +11375,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11397,7 +11400,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11422,7 +11425,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11447,7 +11450,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11472,7 +11475,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -11497,7 +11500,7 @@
     "envelopeRefractoryMs": 12000.0,
     "envelopeRearm": 0.3,
     "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.16666666666666666
+    "envelopeFallPerSecond": 0.14285714285714285
    },
    "depthSource": "stem.synth.active",
    "depthMin": 1.0,
@@ -12230,6 +12233,930 @@
    "op": "replace",
    "polarity": "unipolar",
    "component": 2
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_wood/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_wood/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_wood/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_wood/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_wood/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_wood/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_core/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_core/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_core/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_core/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_core/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_core/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/great_leaves/effector/7/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_wood/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_wood/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_wood/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_wood/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_wood/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_wood/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_core/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_core/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_core/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_core/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_core/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_core/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/weeper_leaves/effector/7/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_wood/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_wood/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_wood/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_wood/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_wood/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_wood/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_core/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_core/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_core/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_core/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_core/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_core/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/blossom_leaves/effector/7/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_wood/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_wood/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_wood/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_wood/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_wood/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_wood/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_core/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_core/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_core/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_core/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_core/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_core/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/1/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/2/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/3/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/4/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/5/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/6/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/pine_leaves/effector/7/enabled",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_sparks_great/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_flash_great/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_sparks_weeper/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_flash_weeper/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_sparks_blossom/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_flash_blossom/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_sparks_pine/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
+  },
+  {
+   "source": "macro.scan",
+   "target": "procedural/fw_flash_pine/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.02
+   }
   },
   {
    "source": "timeline.camX",
