@@ -86,6 +86,14 @@ Rules:
   non-parameter settings of that kind (see the example); a missing `settings` uses defaults.
   Unknown kinds are skipped with a warning (forward compatibility); malformed settings are errors.
   Loading replaces the whole rack; the caller attaches it again and re-binds the modulator.
+- `"kind": "signal"` (ADR-1602) is a conditioned signal, `signal.<name>`: a route's chain whose output is a bus
+  signal, on its inputs' frame. `settings`: `inputs` (each `{ source | constant, polarity, amount, chain,
+  depthSource, depthMin, depthMax, depthDefault, gate }`, a route's front half onto a target at 0), `combine`
+  (`firstActive` (default) | `sum` | `mean` | `max`, over the ACTIVE inputs: an input is active when its source is on
+  the bus and its gate -- `gate`, else the source's own `<prefix>.active` when the bus has one -- reads above 0.5),
+  an optional output `chain`, and `event` (true: publish an event that fires with the selected input). It updates in
+  the rack's second pass, in list order with envelope/random/interpret, so a signal reading another is listed after
+  it. Use it instead of a route into a macro knob (one frame late) or a stem route with a main-mix twin.
 - `presets` is an array of `{ name, values }` where `values` maps parameter paths to arrays of
   components (a bare number or boolean is accepted as one component). Presets store base values
   only; paths unknown to the current parameter set are kept and ignored on apply. Loading

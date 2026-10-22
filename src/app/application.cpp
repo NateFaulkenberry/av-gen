@@ -215,6 +215,9 @@ std::string usageText() {
            "  --sonic-trace <f>   with --project: write the Sonic Garden signals (sonic.*, notes.*, timbre.*, response.*,\n"
            "                      visual.*, beat.*, music.*, stem.*, env.*, macro.*, signal.*) per frame as CSV,\n"
            "                      and a summary; no GPU (ADR-1020)\n"
+           "  --trace-finals      with --sonic-trace: also every route target's final value, one column per\n"
+           "                      parameter component (\"final:<path>[<c>]\"), so two projects' routing can be compared\n"
+           "                      frame by frame (ADR-1602)\n"
            "  --audit-routes <f>  with --project: write every route, timeline track, effect default\n"
            "                      route and effect with a verdict (live / dead / hazard) and the\n"
            "                      reason to <f> as JSON (\"-\" = stdout), and exit. Headless, no GPU;\n"
@@ -715,6 +718,8 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.sonicTrace = *v;
             ++i;
+        } else if (arg == "--trace-finals") {
+            options.traceFinals = true;
         } else if (arg == "--propose-reactivity") {
             auto v = need(i, "--propose-reactivity");
             if (!v) return std::unexpected(v.error());

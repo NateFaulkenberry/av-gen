@@ -1989,29 +1989,438 @@
    }
   },
   {
-   "kind": "macro",
-   "name": "macros",
+   "kind": "signal",
+   "name": "kick",
    "settings": {
-    "knobs": [
+    "combine": "firstActive",
+    "inputs": [
      {
-      "name": "swell",
-      "default": 0.0
+      "source": "beat.phase",
+      "chain": {
+       "gain": -1.0,
+       "offset": 1.0,
+       "threshold": "binary",
+       "thresholdLevel": 0.875,
+       "attackMs": 0.0,
+       "decayMs": 45.0
+      },
+      "depthSource": "stem.drums.level",
+      "depthMin": -0.5,
+      "depthMax": 1.9,
+      "gate": "stem.drums.active"
      },
      {
-      "name": "synth",
-      "default": 0.0
+      "source": "beat.phase",
+      "chain": {
+       "gain": -1.0,
+       "offset": 1.0,
+       "threshold": "binary",
+       "thresholdLevel": 0.875,
+       "attackMs": 0.0,
+       "decayMs": 45.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "glint",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.treble",
+      "chain": {
+       "offset": -0.35,
+       "gain": 1.6,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 3.0,
+       "decayMs": 110.0
+      }
      },
      {
-      "name": "lift",
-      "default": 0.0
+      "source": "response.hatEnv",
+      "chain": {
+       "attackMs": 3.0,
+       "decayMs": 90.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "bassNote",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.bass.onset",
+      "chain": {
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 2.4,
+       "attackMs": 0.0,
+       "envelopeRefractoryMs": 130.0,
+       "envelopeRearm": 0.05
+      },
+      "depthSource": "stem.bass.level",
+      "depthMin": -0.3,
+      "depthMax": 1.9,
+      "depthDefault": 0.13636363636363635
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "swell",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.bassNote",
+      "gate": "stem.bass.active"
      },
      {
-      "name": "scan",
-      "default": 0.0
+      "source": "response.bass",
+      "chain": {
+       "gain": 2.4,
+       "offset": -1.45,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 10.0,
+       "decayMs": 180.0
+      }
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "shimmer",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.treble",
+      "chain": {
+       "offset": -0.35,
+       "gain": 1.6,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 3.0,
+       "decayMs": 160.0
+      }
      },
      {
-      "name": "one",
-      "default": 1.0
+      "source": "response.hatEnv",
+      "chain": {
+       "attackMs": 3.0,
+       "decayMs": 120.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "clap",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.highMid",
+      "chain": {
+       "offset": -1.55,
+       "gain": 2.5,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 4.0,
+       "decayMs": 280.0
+      }
+     },
+     {
+      "source": "response.snareEnv",
+      "chain": {
+       "attackMs": 4.0,
+       "decayMs": 220.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "synthStem",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "stem.synth.level",
+      "amount": 0.3,
+      "chain": {
+       "gain": 2.2,
+       "offset": -0.95,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 250.0,
+       "decayMs": 900.0
+      }
+     },
+     {
+      "source": "stem.synth.rms",
+      "amount": 0.8,
+      "chain": {
+       "gain": 7.0,
+       "offset": -0.8,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 250.0,
+       "decayMs": 900.0
+      }
+     },
+     {
+      "source": "stem.synth.onset",
+      "amount": 0.35,
+      "chain": {
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 1.6,
+       "attackMs": 20.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "synth",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.synthStem",
+      "gate": "stem.synth.active"
+     },
+     {
+      "source": "response.sustain",
+      "amount": 0.9,
+      "chain": {
+       "gain": 2.0,
+       "offset": -0.75,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 250.0,
+       "decayMs": 1200.0
+      }
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "lift",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.synth.centroid",
+      "chain": {
+       "gain": 6.0,
+       "offset": -3.75,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 1500.0,
+       "decayMs": 3000.0
+      },
+      "depthSource": "stem.synth.rms",
+      "depthMin": -0.2,
+      "depthMax": 6.0
+     },
+     {
+      "source": "audio.spectralCentroid",
+      "chain": {
+       "gain": 4.0,
+       "offset": -2.0,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 1500.0,
+       "decayMs": 3000.0
+      }
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "scan",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.synth.rms",
+      "chain": {
+       "trendSeconds": 8.0,
+       "trendFastMs": 450.0,
+       "trendFloor": 0.06,
+       "threshold": "binary",
+       "thresholdLevel": 1.25,
+       "attackMs": 0.0,
+       "decayMs": 1500.0,
+       "envelopeRefractoryMs": 12000.0,
+       "envelopeRearm": 0.3,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 6500.0,
+       "envelopeFallPerSecond": 0.33,
+       "springHz": 0.5,
+       "springDamping": 1.0
+      }
+     },
+     {
+      "source": "response.sustain",
+      "chain": {
+       "trendSeconds": 8.0,
+       "trendFastMs": 1000.0,
+       "trendFloor": 0.1,
+       "threshold": "binary",
+       "thresholdLevel": 1.1,
+       "attackMs": 0.0,
+       "decayMs": 1500.0,
+       "envelopeRefractoryMs": 12000.0,
+       "envelopeRearm": 0.3,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 6500.0,
+       "envelopeFallPerSecond": 0.33,
+       "springHz": 0.5,
+       "springDamping": 1.0
+      }
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "scanFront",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.synth.rms",
+      "chain": {
+       "trendSeconds": 8.0,
+       "trendFastMs": 450.0,
+       "trendFloor": 0.06,
+       "threshold": "binary",
+       "thresholdLevel": 1.25,
+       "attackMs": 0.0,
+       "decayMs": 1500.0,
+       "envelopeRefractoryMs": 12000.0,
+       "envelopeRearm": 0.3,
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 0.14285714285714285
+      }
+     },
+     {
+      "source": "response.sustain",
+      "chain": {
+       "trendSeconds": 8.0,
+       "trendFastMs": 1000.0,
+       "trendFloor": 0.1,
+       "threshold": "binary",
+       "thresholdLevel": 1.1,
+       "attackMs": 0.0,
+       "decayMs": 1500.0,
+       "envelopeRefractoryMs": 12000.0,
+       "envelopeRearm": 0.3,
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 0.14285714285714285
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "one",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "constant": 1.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "breath",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.bassNote",
+      "gate": "stem.bass.active"
+     },
+     {
+      "source": "signal.swell"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "splash",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.highMid",
+      "chain": {
+       "offset": -1.3,
+       "gain": 2.5,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 150.0,
+       "decayMs": 750.0
+      }
+     },
+     {
+      "source": "response.snareEnv",
+      "chain": {
+       "attackMs": 150.0,
+       "decayMs": 700.0
+      }
      }
     ]
    }
@@ -8055,156 +8464,31 @@
    }
   },
   {
-   "source": "beat.phase",
+   "source": "signal.kick",
    "target": "material/rw_grass/op/41/constant/constant",
    "amount": 3.6,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": -1.0,
-    "offset": 1.0,
-    "threshold": "binary",
-    "thresholdLevel": 0.875,
-    "attackMs": 0.0,
-    "decayMs": 45.0
-   },
-   "depthSource": "stem.drums.level",
-   "depthMin": -0.5,
-   "depthMax": 1.9,
-   "depthDefault": 0.20833333333333334
+   "component": -1
   },
   {
-   "source": "beat.phase",
-   "target": "material/rw_grass/op/41/constant/constant",
-   "amount": 3.6,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": -1.0,
-    "offset": 1.0,
-    "threshold": "binary",
-    "thresholdLevel": 0.875,
-    "attackMs": 0.0,
-    "decayMs": 45.0
-   },
-   "depthSource": "stem.drums.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.drums.treble",
+   "source": "signal.glint",
    "target": "material/rw_grass/op/31/constant/constant",
    "amount": 3.2,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "offset": -0.35,
-    "gain": 1.6,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 3.0,
-    "decayMs": 110.0
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "response.hatEnv",
-   "target": "material/rw_grass/op/31/constant/constant",
-   "amount": 3.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 3.0,
-    "decayMs": 90.0
-   },
-   "depthSource": "stem.drums.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.drums.treble",
+   "source": "signal.glint",
    "target": "material/rw_grass/op/28/threshold/value",
    "amount": -0.14,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "offset": -0.35,
-    "gain": 1.6,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 3.0,
-    "decayMs": 110.0
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "response.hatEnv",
-   "target": "material/rw_grass/op/28/threshold/value",
-   "amount": -0.14,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 3.0,
-    "decayMs": 90.0
-   },
-   "depthSource": "stem.drums.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.bass.onset",
-   "target": "macros/swell",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 2.4,
-    "attackMs": 0.0,
-    "envelopeRefractoryMs": 130.0,
-    "envelopeRearm": 0.05
-   },
-   "optional": true,
-   "depthSource": "stem.bass.level",
-   "depthMin": -0.3,
-   "depthMax": 1.9,
-   "depthDefault": 0.13636363636363635
-  },
-  {
-   "source": "response.bass",
-   "target": "macros/swell",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 2.4,
-    "offset": -1.45,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 10.0,
-    "decayMs": 180.0
-   },
-   "depthSource": "stem.bass.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "macro.swell",
+   "source": "signal.swell",
    "target": "lights/cloudsea/intensity",
    "amount": 1.2,
    "op": "add",
@@ -8212,7 +8496,7 @@
    "component": -1
   },
   {
-   "source": "macro.swell",
+   "source": "signal.swell",
    "target": "palette/value",
    "amount": 0.07,
    "op": "add",
@@ -8220,7 +8504,7 @@
    "component": -1
   },
   {
-   "source": "macro.swell",
+   "source": "signal.swell",
    "target": "palette/saturation",
    "amount": 0.18,
    "op": "add",
@@ -8228,7 +8512,7 @@
    "component": -1
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "material/rw_flower/op/16/constant/constant",
    "amount": 1.6,
    "op": "add",
@@ -8236,72 +8520,20 @@
    "component": -1
   },
   {
-   "source": "stem.drums.treble",
+   "source": "signal.shimmer",
    "target": "material/rw_flower/op/16/constant/constant",
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "offset": -0.35,
-    "gain": 1.6,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 3.0,
-    "decayMs": 160.0
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "response.hatEnv",
-   "target": "material/rw_flower/op/16/constant/constant",
-   "amount": 1.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 3.0,
-    "decayMs": 120.0
-   },
-   "depthSource": "stem.drums.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.drums.highMid",
+   "source": "signal.clap",
    "target": "material/rw_rainbow/op/9/constant/constant",
    "amount": 2.5,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "offset": -1.55,
-    "gain": 2.5,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 4.0,
-    "decayMs": 280.0
-   },
-   "optional": true
-  },
-  {
-   "source": "response.snareEnv",
-   "target": "material/rw_rainbow/op/9/constant/constant",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 4.0,
-    "decayMs": 220.0
-   },
-   "depthSource": "stem.drums.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
+   "component": -1
   },
   {
    "source": "beat.phase",
@@ -8338,7 +8570,7 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "material/rw_rainbow/op/9/constant/constant",
    "amount": 3.0,
    "op": "add",
@@ -8346,83 +8578,12 @@
    "component": -1
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "material/rw_rainbow/op/11/constant/constant",
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
    "component": -1
-  },
-  {
-   "source": "stem.synth.level",
-   "target": "macros/synth",
-   "amount": 0.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 2.2,
-    "offset": -0.95,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 250.0,
-    "decayMs": 900.0
-   },
-   "optional": true
-  },
-  {
-   "source": "response.sustain",
-   "target": "macros/synth",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 2.0,
-    "offset": -0.75,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 250.0,
-    "decayMs": 1200.0
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.synth.rms",
-   "target": "macros/synth",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 7.0,
-    "offset": -0.8,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 250.0,
-    "decayMs": 900.0
-   },
-   "optional": true
-  },
-  {
-   "source": "stem.synth.onset",
-   "target": "macros/synth",
-   "amount": 0.35,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 1.6,
-    "attackMs": 20.0
-   },
-   "optional": true
   },
   {
    "source": "beat.phrasePulse",
@@ -8442,7 +8603,7 @@
    "depthDefault": 0.15
   },
   {
-   "source": "macro.lift",
+   "source": "signal.lift",
    "target": "material/rw_rainbow/op/11/constant/constant",
    "amount": 1.0,
    "op": "add",
@@ -8450,49 +8611,7 @@
    "component": -1
   },
   {
-   "source": "stem.synth.centroid",
-   "target": "macros/lift",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 6.0,
-    "offset": -3.75,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 1500.0,
-    "decayMs": 3000.0
-   },
-   "optional": true,
-   "depthSource": "stem.synth.rms",
-   "depthMin": -0.2,
-   "depthMax": 6.0
-  },
-  {
-   "source": "audio.spectralCentroid",
-   "target": "macros/lift",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "gain": 4.0,
-    "offset": -2.0,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 1500.0,
-    "decayMs": 3000.0
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "macro.lift",
+   "source": "signal.lift",
    "target": "env/sky/sunGlow",
    "amount": 0.35,
    "op": "add",
@@ -8500,7 +8619,7 @@
    "component": -1
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "env/sky/sunGlow",
    "amount": 0.6,
    "op": "add",
@@ -8508,7 +8627,7 @@
    "component": -1
   },
   {
-   "source": "macro.lift",
+   "source": "signal.lift",
    "target": "post/bloom/intensity",
    "amount": 0.12,
    "op": "add",
@@ -8516,7 +8635,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_rainbow/op/11/constant/constant",
    "amount": 14.0,
    "op": "add",
@@ -8524,7 +8643,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_rainbow/op/9/constant/constant",
    "amount": 10.0,
    "op": "add",
@@ -8532,2974 +8651,503 @@
    "component": -1
   },
   {
-   "source": "stem.synth.rms",
-   "target": "macros/scan",
-   "amount": 1.0,
-   "op": "max",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "peakhold",
-    "envelopeHoldMs": 6500.0,
-    "envelopeFallPerSecond": 0.33,
-    "springHz": 0.5,
-    "springDamping": 1.0
-   },
-   "optional": true
-  },
-  {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/28/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/29/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/36/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_ground_lip/op/37/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/12/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/12/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/13/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/13/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/20/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/20/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/21/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_grass/op/21/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/16/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/16/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/17/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/17/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/24/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/24/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/25/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 0
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "material/rw_rock/op/25/remap/constant",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": 1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwOut/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwOut/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwDrop/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwDrop/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwHeat/radius",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwLife/radius",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwLife/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwLife/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwFlash/radius",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwFlash/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwFlash/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwGlow/radius",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwGlow/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwGlow/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSpin_heavy/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSpin_heavy/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwTwist_heavy/waveOrigin",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwTwist_heavy/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwTwist_heavy/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSquash_heavy/waveOrigin",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSquash_heavy/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSquash_heavy/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSpin_light/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSpin_light/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwTwist_light/waveOrigin",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwTwist_light/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwTwist_light/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSquash_light/waveOrigin",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSquash_light/falloff/inner",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "stem.synth.rms",
+   "source": "signal.scanFront",
    "target": "field/fwTwSquash_light/falloff/outer",
    "amount": -970.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 450.0,
-    "trendFloor": 0.06,
-    "threshold": "binary",
-    "thresholdLevel": 1.25,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "optional": true
+   "component": -1
   },
   {
-   "source": "response.sustain",
-   "target": "macros/scan",
-   "amount": 1.0,
-   "op": "max",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "peakhold",
-    "envelopeHoldMs": 6500.0,
-    "envelopeFallPerSecond": 0.33,
-    "springHz": 0.5,
-    "springDamping": 1.0
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/28/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/29/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/36/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_ground_lip/op/37/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/12/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/12/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/13/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/13/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/20/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/20/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/21/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_grass/op/21/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/16/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/16/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/17/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/17/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/24/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/24/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/25/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "material/rw_rock/op/25/remap/constant",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwOut/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwOut/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwDrop/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwDrop/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwHeat/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwLife/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwLife/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwLife/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwFlash/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwFlash/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwFlash/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwGlow/radius",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwGlow/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwGlow/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSpin_heavy/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSpin_heavy/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwTwist_heavy/waveOrigin",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwTwist_heavy/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwTwist_heavy/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSquash_heavy/waveOrigin",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSquash_heavy/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSquash_heavy/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSpin_light/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSpin_light/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwTwist_light/waveOrigin",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwTwist_light/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwTwist_light/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSquash_light/waveOrigin",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSquash_light/falloff/inner",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "response.sustain",
-   "target": "field/fwTwSquash_light/falloff/outer",
-   "amount": -970.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "trendSeconds": 8.0,
-    "trendFastMs": 1000.0,
-    "trendFloor": 0.1,
-    "threshold": "binary",
-    "thresholdLevel": 1.1,
-    "attackMs": 0.0,
-    "decayMs": 1500.0,
-    "envelopeRefractoryMs": 12000.0,
-    "envelopeRearm": 0.3,
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 0.14285714285714285
-   },
-   "depthSource": "stem.synth.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_ground/op/33/constant/constant",
    "amount": 1.0,
    "op": "add",
@@ -11507,7 +9155,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_ground/op/40/constant/constant",
    "amount": 4.0,
    "op": "add",
@@ -11515,7 +9163,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_ground_lip/op/33/constant/constant",
    "amount": 1.0,
    "op": "add",
@@ -11523,7 +9171,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_ground_lip/op/40/constant/constant",
    "amount": 4.0,
    "op": "add",
@@ -11531,7 +9179,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_grass/op/17/constant/constant",
    "amount": 1.0,
    "op": "add",
@@ -11539,7 +9187,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_grass/op/24/constant/constant",
    "amount": 4.0,
    "op": "add",
@@ -11547,7 +9195,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_rock/op/21/constant/constant",
    "amount": 1.0,
    "op": "add",
@@ -11555,7 +9203,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_rock/op/28/constant/constant",
    "amount": 4.0,
    "op": "add",
@@ -11563,7 +9211,7 @@
    "component": -1
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "material/rw_spark/op/19/constant/constant",
    "amount": 3.0,
    "op": "add",
@@ -11571,535 +9219,535 @@
    "component": -1
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant",
    "amount": 0.9,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant",
    "amount": 0.14,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant2",
    "amount": 0.95,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant2",
    "amount": 0.8,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant2",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant3",
    "amount": 0.1,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant3",
    "amount": 0.75,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant3",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant4",
    "amount": 0.25,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant4",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_canopy/op/6/oklabRamp/constant4",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant",
    "amount": 0.9,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant",
    "amount": 0.14,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant2",
    "amount": 0.95,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant2",
    "amount": 0.8,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant2",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant3",
    "amount": 0.1,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant3",
    "amount": 0.75,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant3",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant4",
    "amount": 0.25,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant4",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_weeper/op/6/oklabRamp/constant4",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant",
    "amount": 0.9,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant",
    "amount": 0.14,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant2",
    "amount": 0.95,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant2",
    "amount": 0.8,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant2",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant3",
    "amount": 0.1,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant3",
    "amount": 0.75,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant3",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant4",
    "amount": 0.25,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant4",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_blossom/op/6/oklabRamp/constant4",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant",
    "amount": 0.9,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant",
    "amount": 0.14,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant2",
    "amount": 0.95,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant2",
    "amount": 0.8,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant2",
    "amount": 0.05,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant3",
    "amount": 0.1,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant3",
    "amount": 0.75,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant3",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant4",
    "amount": 0.25,
    "op": "replace",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant4",
    "amount": 0.3,
    "op": "replace",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.one",
+   "source": "signal.one",
    "target": "material/rw_pine/op/6/oklabRamp/constant4",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
    "component": 2,
-   "depthSource": "macro.scan",
+   "depthSource": "signal.scan",
    "depthMin": 0.0,
    "depthMax": 1.0
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "material/rw_cloud/op/26/constant/constant",
    "amount": 0.6,
    "op": "add",
@@ -12107,7 +9755,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "env/sky/sunGlow",
    "amount": 1.2,
    "op": "add",
@@ -12115,7 +9763,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "post/bloom/intensity",
    "amount": 0.35,
    "op": "add",
@@ -12123,7 +9771,7 @@
    "component": -1
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "post/grade/saturation",
    "amount": 0.25,
    "op": "add",
@@ -12131,7 +9779,7 @@
    "component": -1
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "material/rw_cloud/op/26/constant/constant",
    "amount": 0.3,
    "op": "add",
@@ -12139,102 +9787,28 @@
    "component": -1
   },
   {
-   "source": "stem.bass.onset",
+   "source": "signal.breath",
    "target": "field/skyBreath/strength",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 2.4,
-    "attackMs": 0.0,
-    "envelopeRefractoryMs": 130.0,
-    "envelopeRearm": 0.05
-   },
-   "optional": true,
-   "depthSource": "stem.bass.level",
-   "depthMin": -0.3,
-   "depthMax": 1.9,
-   "depthDefault": 0.13636363636363635
+   "component": -1
   },
   {
-   "source": "macro.swell",
-   "target": "field/skyBreath/strength",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "depthSource": "stem.bass.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.bass.onset",
+   "source": "signal.breath",
    "target": "material/rw_cloud/op/26/constant/constant",
    "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 2.4,
-    "attackMs": 0.0,
-    "envelopeRefractoryMs": 130.0,
-    "envelopeRearm": 0.05
-   },
-   "optional": true,
-   "depthSource": "stem.bass.level",
-   "depthMin": -0.3,
-   "depthMax": 1.9,
-   "depthDefault": 0.13636363636363635
+   "component": -1
   },
   {
-   "source": "macro.swell",
-   "target": "material/rw_cloud/op/26/constant/constant",
-   "amount": 0.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "depthSource": "stem.bass.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
-  },
-  {
-   "source": "stem.drums.highMid",
+   "source": "signal.splash",
    "target": "material/rw_cloud/op/35/constant/constant",
    "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "offset": -1.3,
-    "gain": 2.5,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 150.0,
-    "decayMs": 750.0
-   },
-   "optional": true
-  },
-  {
-   "source": "response.snareEnv",
-   "target": "material/rw_cloud/op/35/constant/constant",
-   "amount": 0.6,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "attackMs": 150.0,
-    "decayMs": 700.0
-   },
-   "depthSource": "stem.drums.active",
-   "depthMin": 1.0,
-   "depthMax": 0.0,
-   "depthDefault": 0.0
+   "component": -1
   },
   {
    "source": "beat.phrasePulse",
@@ -12274,7 +9848,7 @@
    "component": 2
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_wood/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12285,7 +9859,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_wood/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12296,7 +9870,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_wood/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12307,7 +9881,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_wood/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12318,7 +9892,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_wood/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12329,7 +9903,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_wood/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12340,7 +9914,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_core/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12351,7 +9925,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_core/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12362,7 +9936,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_core/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12373,7 +9947,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_core/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12384,7 +9958,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_core/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12395,7 +9969,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_core/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12406,7 +9980,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12417,7 +9991,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12428,7 +10002,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12439,7 +10013,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12450,7 +10024,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12461,7 +10035,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12472,7 +10046,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/great_leaves/effector/7/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12483,7 +10057,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_wood/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12494,7 +10068,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_wood/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12505,7 +10079,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_wood/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12516,7 +10090,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_wood/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12527,7 +10101,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_wood/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12538,7 +10112,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_wood/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12549,7 +10123,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_core/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12560,7 +10134,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_core/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12571,7 +10145,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_core/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12582,7 +10156,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_core/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12593,7 +10167,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_core/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12604,7 +10178,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_core/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12615,7 +10189,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12626,7 +10200,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12637,7 +10211,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12648,7 +10222,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12659,7 +10233,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12670,7 +10244,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12681,7 +10255,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/weeper_leaves/effector/7/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12692,7 +10266,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_wood/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12703,7 +10277,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_wood/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12714,7 +10288,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_wood/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12725,7 +10299,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_wood/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12736,7 +10310,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_wood/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12747,7 +10321,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_wood/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12758,7 +10332,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_core/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12769,7 +10343,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_core/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12780,7 +10354,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_core/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12791,7 +10365,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_core/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12802,7 +10376,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_core/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12813,7 +10387,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_core/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12824,7 +10398,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12835,7 +10409,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12846,7 +10420,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12857,7 +10431,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12868,7 +10442,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12879,7 +10453,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12890,7 +10464,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/blossom_leaves/effector/7/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12901,7 +10475,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_wood/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12912,7 +10486,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_wood/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12923,7 +10497,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_wood/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12934,7 +10508,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_wood/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12945,7 +10519,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_wood/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12956,7 +10530,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_wood/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12967,7 +10541,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_core/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12978,7 +10552,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_core/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -12989,7 +10563,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_core/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13000,7 +10574,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_core/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13011,7 +10585,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_core/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13022,7 +10596,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_core/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13033,7 +10607,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/1/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13044,7 +10618,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/2/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13055,7 +10629,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/3/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13066,7 +10640,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/4/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13077,7 +10651,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/5/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13088,7 +10662,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/6/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13099,7 +10673,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/pine_leaves/effector/7/enabled",
    "amount": 1.0,
    "op": "replace",
@@ -13110,7 +10684,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_sparks_great/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13121,7 +10695,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_flash_great/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13132,7 +10706,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_sparks_weeper/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13143,7 +10717,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_flash_weeper/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13154,7 +10728,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_sparks_blossom/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13165,7 +10739,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_flash_blossom/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13176,7 +10750,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_sparks_pine/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13187,7 +10761,7 @@
    }
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "procedural/fw_flash_pine/visible",
    "amount": 1.0,
    "op": "replace",
@@ -13510,35 +11084,35 @@
    "component": 2
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/sun_burst/emissiveBoost",
    "amount": 1.6,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.lift",
+   "source": "signal.lift",
    "target": "nodes/sun_burst/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/sun_burst/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_0s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_0s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13557,14 +11131,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_1s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_1s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13583,14 +11157,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_2s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_2s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13609,14 +11183,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_3s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_3s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13635,14 +11209,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_4s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_4s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13661,14 +11235,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_5s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_5s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13687,14 +11261,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_6s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_6s/emissiveBoost",
    "amount": 3.0,
    "op": "add",
@@ -13713,14 +11287,14 @@
    }
   },
   {
-   "source": "macro.synth",
+   "source": "signal.synth",
    "target": "nodes/rainbow_7s/emissiveBoost",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar"
   },
   {
-   "source": "macro.scan",
+   "source": "signal.scan",
    "target": "nodes/rainbow_7s/emissiveBoost",
    "amount": 3.0,
    "op": "add",

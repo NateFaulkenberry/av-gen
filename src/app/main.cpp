@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     // ADR-1020: the Sonic Garden's signals, the same way.
     if (options->sonicTrace) {
         return avgen::app::runSonicTraceCommand(options->project.value_or(std::filesystem::path{}), *options->sonicTrace,
-                                                options->fpsGiven ? options->offlineFps : 0.0);
+                                                options->fpsGiven ? options->offlineFps : 0.0, options->traceFinals);
     }
     avgen::log::info("avgen 0.1.0 starting ({} mode)", options->headless ? "headless" : "live");
 

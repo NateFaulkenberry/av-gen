@@ -13,6 +13,7 @@
 namespace avgen::app {
 
 // Exit codes: 0 written, 2 no --project, 3 the project did not load (or has no `sonic` block), 4 cannot write.
-int runSonicTraceCommand(const std::filesystem::path& project, const std::filesystem::path& out, double fps);
+int runSonicTraceCommand(const std::filesystem::path& project, const std::filesystem::path& out, double fps,
+                         bool finals = false);
 
 } // namespace avgen::app

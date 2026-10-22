@@ -6,12 +6,14 @@
 #include <chrono>
 #include <cstdio>
 #include <fstream>
+#include <map>
 #include <string>
 #include <vector>
 
 namespace avgen::app {
 
-int runSonicTraceCommand(const std::filesystem::path& project, const std::filesystem::path& out, double fps) {
+int runSonicTraceCommand(const std::filesystem::path& project, const std::filesystem::path& out, double fps,
+                         bool finals) {
     if (project.empty()) {
         log::error("--sonic-trace needs a project: pass --project <file.json>");
         return 2;
@@ -38,6 +40,8 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
     }
     const auto frames = static_cast<std::uint64_t>(std::ceil(duration * rate));
     std::vector<signals::SignalId> columns;
+    // ADR-1602, --trace-finals: every parameter component a route writes, by path, in path order.
+    std::vector<std::pair<params::IParameter*, std::size_t>> finalColumns;
     bool header = false;
     // Means of the medium tier over the frames with sound, for the summary.
     std::array<double, sonic::kDimensionCount> sums{};
@@ -67,12 +71,29 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
                     file << ',' << name;
                 }
             }
+            if (finals) {
+                std::map<std::string, params::IParameter*> targets;
+                for (const params::ModRoute& r : engine.modulator().routes()) {
+                    if (r.targetParam != nullptr) {
+                        targets.emplace(r.targetParam->path(), r.targetParam);
+                    }
+                }
+                for (const auto& [path, param] : targets) {
+                    for (std::size_t c = 0; c < param->componentCount(); ++c) {
+                        finalColumns.emplace_back(param, c);
+                        file << ",final:" << path << '[' << c << ']';
+                    }
+                }
+            }
             file << '\n';
             header = true;
         }
         file << fmt::format("{:.4f}", t.renderTime);
         for (const signals::SignalId id : columns) {
             file << fmt::format(",{:.4f}", bus.value(id));
+        }
+        for (const auto& [param, c] : finalColumns) {
+            file << fmt::format(",{:.6g}", param->finalComponent(c));
         }
         file << '\n';
         const sonic::SonicRuntime& rt = engine.sonicRuntime();

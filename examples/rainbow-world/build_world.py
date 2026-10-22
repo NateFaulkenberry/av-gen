@@ -1487,9 +1487,9 @@ music.FW_EDGE_FIELDS[:] = FW_EDGES
 # air, a tree turned part of the way round -- and, as the camera flew, trees crossed that shell and played their
 # twirl and fireworks (forwards as they came nearer, backwards as they fell away), with no scan anywhere. The fix:
 # every twirl, glow and firework effector is enabled, and the sparks and flashes drawn, only while a scan is up
-# (`macro.scan` over 0.02), so a world at rest is exactly as built, wherever the camera is. A spin left at a whole
+# (`signal.scan` over 0.02), so a world at rest is exactly as built, wherever the camera is. A spin left at a whole
 # turn is the identity, so switching it off behind the front changes nothing.
-FW_GATES = []   # (target, kind): effector enables and node visibility, routed from macro.scan in the projects
+FW_GATES = []   # (target, kind): effector enables and node visibility, routed from signal.scan in the projects
 for n_ in nodes:
     if n_.get("kind") != "procedural":
         continue
@@ -1768,7 +1768,7 @@ for k_ in ride_keys:
 CAM_SOURCES = [{"kind": "timeline", "name": "cam" + "XYZ"[c_], "settings": {"loopLength": loop_seconds,
                                                                             "keys": CAM_KEYS[c_]}} for c_ in range(3)]
 for tgt_ in FW_GATES:
-    routes.append({"source": "macro.scan", "target": tgt_, "amount": 1.0, "op": "replace", "polarity": "unipolar",
+    routes.append({"source": "signal.scan", "target": tgt_, "amount": 1.0, "op": "replace", "polarity": "unipolar",
                    "chain": {"threshold": "binary", "thresholdLevel": 0.02}})
 for fld, _params in FW_EDGES:
     for c_ in range(3):
@@ -1779,15 +1779,15 @@ for rn_ in SUN_RAYS:
     for c_ in range(3):
         routes.append({"source": "timeline.cam" + "XYZ"[c_], "target": "nodes/%s/position" % rn_, "amount": 1.0,
                        "op": "add", "polarity": "unipolar", "component": c_})
-    for src_, amt_ in (("macro.synth", 1.6), ("macro.lift", 0.8), ("macro.scan", 0.8)):
+    for src_, amt_ in (("signal.synth", 1.6), ("signal.lift", 0.8), ("signal.scan", 0.8)):
         routes.append({"source": src_, "target": "nodes/%s/emissiveBoost" % rn_, "amount": amt_, "op": "add",
                        "polarity": "unipolar"})
 # the faint secondary bows carry no program: the synth's light and the scan reach them through the node's glow lane
 for rn in rainbow_nodes:
     if rn["name"].endswith("s"):
-        routes.append({"source": "macro.synth", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 0.8,
+        routes.append({"source": "signal.synth", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 0.8,
                        "op": "add", "polarity": "unipolar"})
-        routes.append({"source": "macro.scan", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 3.0,
+        routes.append({"source": "signal.scan", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 3.0,
                        "op": "add", "polarity": "unipolar"})
         # and the beat (gate 5): the outer bow flashes on every beat, the inner bow's bands flash with it
         routes.append({"source": "beat.pulse", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 1.6,
@@ -1808,9 +1808,9 @@ project = {
     # shadows and the far grass; 1.5 keeps both and still holds High at 30 fps live (1 miss in 90 s, on AC). A 1k shadow
     # map made no visible or measured difference, so it is not set.
     "live": {"overrides": {"lodBias": 1.5, "reducedShadowFiltering": True}},
-    "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}},
-                {"kind": "macro", "name": "macros", "settings": {"knobs": [{"name": k_, "default": d_}
-                                                                          for k_, d_ in music.MACROS]}}] + CAM_SOURCES,
+    # the conditioned signals (ADR-1602) the music's routes read, in the order they read each other
+    "sources": [{"kind": "timeline", "name": "ride", "settings": {"loopLength": loop_seconds, "keys": ride_keys}}]
+               + music.SIGNALS + CAM_SOURCES,
     "routes": routes,
     "palette": palette,
     "control": control,
@@ -1863,9 +1863,7 @@ offline.pop("live", None)
 offline["sonicScene"]["id"] = "rainbow-world-offline"
 offline["sonicScene"]["title"] = "Rainbow World (offline)"
 offline["render"]["path"] = "renders/rainbow-world-offline.mp4"
-for src_ in offline["sources"]:
-    if src_.get("name") == "macros":
-        src_["settings"]["knobs"].append({"name": "distort", "default": 0.0})
+offline["sources"].append({"kind": "macro", "name": "macros", "settings": {"knobs": [{"name": "distort", "default": 0.0}]}})
 for nm_, k0 in DISTORT_NODES:
     for j_, (_a, _d, _wl, _sp, m_) in enumerate(DISTORT):
         offline["routes"].append({"source": "macro.distort", "target": "procedural/%s/deform/%d/amount" % (nm_, k0 + j_ + 1),

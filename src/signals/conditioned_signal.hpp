@@ -23,9 +23,10 @@
 // bit for bit, what that route would have added to its target. Inputs are then combined:
 //   firstActive  the first ACTIVE input's value (and its event): the stem/mix fallback (ADR-1570) as one signal;
 //   sum, mean, max  over the active inputs (0 with none).
-// An input is active when its source is on the bus and its gate reads above 0.5. The gate is `gate` when given, else
-// the source's own `<prefix>.active` (`stem.bass.onset` -> `stem.bass.active`) when the bus has one, else always. A
-// constant input is always active. Every input's chain runs every frame, active or not, so switching to an input
+// An input is active when its source is on the bus and its gate reads above 0.5. The gate is `gate` when given (and
+// a declared gate the bus lacks makes the input inactive: what it gates is absent), else the source's own
+// `<prefix>.active` (`stem.bass.onset` -> `stem.bass.active`) when the bus has one, else always. A constant input is
+// always active. Every input's chain runs every frame, active or not, so switching to an input
 // never starts its chain cold (a route's twin kept running the same way).
 //
 // It updates in the rack's second pass with the other readers (envelope, random, interpret), in list order, so routes,

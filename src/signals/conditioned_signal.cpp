@@ -145,7 +145,9 @@ void ConditionedSignalSource::update(SignalBus& bus, const SourceContext& contex
             y *= in.depthMin + (in.depthMax - in.depthMin) * depthValue;
         }
         in.value = y;
-        in.active = in.gateId == kInvalidSignal || bus.value(in.gateId) > 0.5f;
+        // A declared gate the bus does not carry means the thing it gates is absent: inactive. The implied
+        // `<prefix>.active`, when the bus has none, means the source has no notion of activity: active.
+        in.active = in.gateId != kInvalidSignal ? bus.value(in.gateId) > 0.5f : in.gate.empty();
     }
 
     float v = 0.0f;

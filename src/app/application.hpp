@@ -346,6 +346,7 @@ struct AppOptions {
     std::optional<std::filesystem::path> proposeReactivity;
     // ADR-1020: `--sonic-trace <out.csv>`, with --project: the Sonic Garden's signals per frame; headless, no GPU.
     std::optional<std::filesystem::path> sonicTrace;
+    bool traceFinals = false; // ADR-1602: --trace-finals, with --sonic-trace: every route target's final value too
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
     std::optional<std::string> example; // --example <name>
