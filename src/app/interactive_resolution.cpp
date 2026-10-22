@@ -557,6 +557,8 @@ double InteractiveResolution::stepRatio(std::size_t k) const {
 }
 
 void InteractiveResolution::moveTo(std::size_t rung, double medianAtLeave) {
+    missesAtLastMove_ = recentMisses(); // ADR-1600: before atLevel_ restarts the window
+    gpuAtLastMove_ = medianAtLeave;
     raisedInto_ = rung < rung_;
     atLevel_ = 0;
     lateWaiting_ = 0; // a late frame of the level being left is not the next level's

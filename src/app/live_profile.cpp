@@ -66,6 +66,9 @@ std::string liveProfileUsage() {
            "                        --size WxH             the OUTPUT in pixels (default 1920x1080)\n"
            "                        --start <s>            where in the piece measurement starts (default 0)\n"
            "                        --warmup <s>           warm-up cap, seconds (default 3; 5 with --deep)\n"
+           "                        --warmup-frames <n>    a FIXED warm-up of n frames instead of the adaptive one\n"
+           "                                               (with --capture the default is warmup x target fps, so\n"
+           "                                               captured frames land on the same piece time)\n"
            "                        --measure <s>          measured seconds (default 5; 20 with --deep)\n"
            "                        --deep                 the deep mode: longer, every diagnostic\n"
            "                        --quality <q>          auto | ultra..emergency | quality | balanced |\n"
@@ -176,6 +179,14 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
         } else if (a == "--warmup") {
             if (!number(i, "--warmup", o.warmupSeconds)) return out;
             warmupGiven = true;
+        } else if (a == "--warmup-frames") {
+            double n = 0.0;
+            if (!number(i, "--warmup-frames", n)) return out;
+            if (n < 1.0) {
+                out.error = "--warmup-frames must be at least 1";
+                return out;
+            }
+            o.warmupFrames = static_cast<int>(std::lround(n));
         } else if (a == "--measure") {
             if (!number(i, "--measure", o.measureSeconds)) return out;
             if (o.measureSeconds <= 0.0) {
@@ -270,6 +281,12 @@ LiveProfileArgs parseLiveProfileArgs(const std::vector<std::string>& argv) {
     if (o.warmupSeconds < 0.0) {
         out.error = "--warmup must not be negative";
     }
+    // ADR-1600: a capture is compared with another run's capture at the same instant of the piece, which an adaptive
+    // warm-up (it ends when the frame settles) does not give. Unless told otherwise, a capturing run warms up for a
+    // fixed number of frames: the warm-up cap at the target rate.
+    if (o.capture && o.warmupFrames == 0) {
+        o.warmupFrames = std::max(1, static_cast<int>(std::lround(o.warmupSeconds * o.targetFps)));
+    }
     if ((o.optimize || !o.compare.empty()) && o.mode == LiveProfileMode::Live) {
         // ORIGINAL and OPTIMIZED must be the same moments of the piece, which only the fixed-step clock gives.
         out.error = "--compare and --optimize run headless only (the A/B images need the fixed-step clock)";
@@ -317,9 +334,6 @@ BudgetStats budgetStats(const std::vector<double>& frameMs, double budgetMs, dou
     b.frames = frameMs.size();
     b.refreshMs = refreshMs;
     for (const double ms : frameMs) {
-        if (ms > budgetMs) {
-            ++b.overBudget;
-        }
         if (refreshMs > 0.0) {
             // Vsyncs the frame occupied, against the vsyncs the target allows. Half a refresh of slack either side,
             // because a Fifo interval of 16.4 or 17.0 ms at 120 Hz is two vsyncs, not "over budget by 0.3 ms".
@@ -328,7 +342,13 @@ BudgetStats budgetStats(const std::vector<double>& frameMs, double budgetMs, dou
             if (took > allowed) {
                 ++b.deadlineMisses;
                 b.vsyncsMissed += static_cast<std::size_t>(took - allowed);
+                // ADR-1600: live, a frame is over budget only when it missed its deadline. A strict comparison counted
+                // about half of every paced run (33.34-33.36 ms intervals against a 33.33 ms budget: vsync jitter)
+                // beside 1-13 real misses, and read as a scene that fails when it does not.
+                ++b.overBudget;
             }
+        } else if (ms > budgetMs) {
+            ++b.overBudget;
         }
     }
     if (b.frames > 0) {
@@ -1101,7 +1121,12 @@ std::string liveProfileText(const LiveProfileRecord& r) {
     }
     line("  CPU work median {:6.2f}  P95 {:6.2f} ms   waits median {:.2f} ms", r.cpuWorkMs.p50, r.cpuWorkMs.p95,
          r.waitMs.p50);
-    line("  under budget: {:.1f}%   over: {} of {}", r.budget.percentUnder, r.budget.overBudget, r.budget.frames);
+    if (r.budget.refreshMs > 0.0) {
+        line("  on time: {:.1f}%   late (missed a deadline): {} of {}", r.budget.percentUnder, r.budget.overBudget,
+             r.budget.frames);
+    } else {
+        line("  under budget: {:.1f}%   over: {} of {}", r.budget.percentUnder, r.budget.overBudget, r.budget.frames);
+    }
     if (r.budget.refreshMs > 0.0) {
         line("  deadline misses: {} ({:.1f}%), {} vsync(s) lost at {:.2f} ms per refresh", r.budget.deadlineMisses,
              r.budget.percentMissed, r.budget.vsyncsMissed, r.budget.refreshMs);

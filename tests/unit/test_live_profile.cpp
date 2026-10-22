@@ -1,5 +1,6 @@
 // ADR-1090..1093: the live profiler's logic -- no device, no window, no clock.
 
+#include "app/live_drop_reason.hpp"
 #include "app/live_profile.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -85,13 +86,22 @@ TEST_CASE("live profile: budget statistics and deadline misses in vsync terms", 
     const std::vector<double> frames{16.6, 16.8, 8.4, 25.0, 33.3, 16.6};
     const BudgetStats b = budgetStats(frames, 1000.0 / 60.0, 1000.0 / 120.0);
     CHECK(b.frames == 6);
-    CHECK(b.overBudget == 3); // 16.8, 25.0, 33.3
+    // ADR-1600: live, "over budget" is a missed deadline; 16.8 ms is vsync jitter around two refreshes, not over.
+    CHECK(b.overBudget == 2);     // 25.0, 33.3
     CHECK(b.deadlineMisses == 2); // 16.8 rounds to two vsyncs: not a miss
     CHECK(b.vsyncsMissed == 3);   // 25.0: one, 33.3: two
-    CHECK(b.percentUnder == Approx(50.0));
+    CHECK(b.percentUnder == Approx(400.0 / 6.0));
     const BudgetStats headless = budgetStats(frames, 1000.0 / 60.0, 0.0);
     CHECK(headless.deadlineMisses == 0);
     CHECK(headless.refreshMs == 0.0);
+    CHECK(headless.overBudget == 3); // headless keeps the strict comparison: 16.8, 25.0, 33.3
+
+    // The 30 fps case the Living Prism audit measured: paced intervals of 33.34-33.36 ms against 33.33 ms on a 60 Hz
+    // display used to read about half "over budget" beside a handful of real misses.
+    const std::vector<double> paced{33.34, 33.36, 33.30, 33.35, 50.0, 33.33};
+    const BudgetStats p = budgetStats(paced, 1000.0 / 30.0, 1000.0 / 60.0);
+    CHECK(p.overBudget == 1);
+    CHECK(p.deadlineMisses == 1);
 }
 
 TEST_CASE("live profile: every timeline label lands in one GPU category, unknown ones in other", "[live-profile]") {
@@ -287,4 +297,68 @@ TEST_CASE("live profile: a headless trace row puts each pass in its column and t
     // As many fields as the header names.
     const auto commas = [](const std::string& s) { return std::count(s.begin(), s.end(), ','); };
     CHECK(commas(row) == commas(header));
+}
+
+// ADR-1600: the drop reason's second half -- the pass whose median grew the most at the level being left.
+TEST_CASE("live profile: the pass that grew is the drop reason's pass", "[live-profile][adr1600]") {
+    using avgen::gpu::TimelineInterval;
+    PassGrowthTracker t(60, 300);
+    CHECK_FALSE(t.largestGrowth().valid);
+    for (int i = 0; i < 240; ++i) {
+        // the scene pass steady at 12 ms; the volume at 2 ms, then 6 ms over the last 60 frames; post flat
+        const bool heavy = i >= 180;
+        t.note({{"scene", 12.0}, {"volume.march", heavy ? 6.0 : 2.0}, {"post/bloom", 0.4}, {"shadow", 0.5},
+                {"shadow", 0.5}});
+    }
+    const auto g = t.largestGrowth();
+    REQUIRE(g.valid);
+    CHECK(g.label == "volume.march");
+    CHECK(g.beforeMs == Approx(2.0));
+    CHECK(g.nowMs == Approx(6.0));
+    CHECK(g.grownMs() == Approx(4.0));
+    // A pass that appears late counts as 0 on the frames before it ran.
+    PassGrowthTracker late(10, 100);
+    for (int i = 0; i < 40; ++i) {
+        std::vector<TimelineInterval> passes{{"scene", 10.0}};
+        if (i >= 30) {
+            passes.push_back({"particles", 1.5});
+        }
+        late.note(passes);
+    }
+    CHECK(late.largestGrowth().label == "particles");
+    CHECK(late.largestGrowth().beforeMs == Approx(0.0));
+    // Nothing grew: no pass is blamed.
+    PassGrowthTracker flat(10, 100);
+    for (int i = 0; i < 40; ++i) {
+        flat.note({{"scene", 10.0}});
+    }
+    CHECK_FALSE(flat.largestGrowth().valid);
+    // A level change forgets the old level's frames.
+    t.reset();
+    CHECK(t.frames() == 0);
+    CHECK_FALSE(t.largestGrowth().valid);
+
+    LiveDropReason r;
+    r.fromLevel = "High";
+    r.toLevel = "Medium";
+    r.misses = 4;
+    r.missWindow = 300;
+    r.growth = g;
+    CHECK(r.text() == "High->Medium: 4 misses in 300 frames; volume.march +4.00 ms (2.00->6.00)");
+    CHECK(r.text().find(',') == std::string::npos); // a CSV field
+    r.growth = {};
+    CHECK(r.text() == "High->Medium: 4 misses in 300 frames; no pass grew");
+}
+
+// ADR-1600: a capture is compared at the same piece time across runs, so a capturing run warms up for a fixed count.
+TEST_CASE("live profile: a fixed warm-up frame count, and the capture default", "[live-profile][adr1600]") {
+    CHECK(parseLiveProfileArgs({"avgen", "--live-profile"}).options.warmupFrames == 0);
+    const auto fixed = parseLiveProfileArgs({"avgen", "--live-profile", "--warmup-frames", "45"});
+    CHECK(fixed.error.empty());
+    CHECK(fixed.options.warmupFrames == 45);
+    const auto cap = parseLiveProfileArgs(
+        {"avgen", "--live-profile", "--target-fps", "30", "--warmup", "2", "--capture", "x.png"});
+    CHECK(cap.error.empty());
+    CHECK(cap.options.warmupFrames == 60);
+    CHECK_FALSE(parseLiveProfileArgs({"avgen", "--live-profile", "--warmup-frames", "0"}).error.empty());
 }

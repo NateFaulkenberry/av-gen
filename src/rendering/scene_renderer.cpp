@@ -3897,6 +3897,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
     }
     stats_.shadowCasters = static_cast<std::uint32_t>(shadowCasters.size());
+    stats_.shadows.entityCasters = stats_.shadowCasters;
     hashDiagnosticFrame(diagnosticFrame_);
     if (!diagnosticEntity_.empty()) {
         if (const RenderObjectDiagnostic* current = diagnosticObject(diagnosticEntity_); current != nullptr) {
@@ -5260,7 +5261,11 @@ void SceneRenderer::collectFrameTimings() {
     stats_.computeDispatches = clusterDispatches_ + stats_.simulation.dispatches +
                                stats_.particles.dispatches + stats_.procedural.effectorDispatches +
                                stats_.procedural.cullDispatches;
-    stats_.shadowDraws = stats_.shadows.entityDraws;
+    // ADR-1600: the procedural world's shadow draws and casters as well as the entities'. Rainbow World read "0 casters
+    // ... 0 draws" beside a 1.7 ms shadow pass, because only entities were counted. Assigned, as above.
+    const bool shadowsRan = stats_.shadows.views > 0 && !stats_.shadows.skippedNothingLit;
+    stats_.shadowDraws = stats_.shadows.entityDraws + stats_.procedural.submittedShadow.draws;
+    stats_.shadowCasters = stats_.shadows.entityCasters + (shadowsRan ? stats_.procedural.shadowCasterObjects : 0u);
 }
 
 Result<void> SceneRenderer::renderFrame(const scene::Scene& scene, const FrameTime& time,

@@ -45,6 +45,10 @@ struct LiveProfileOptions {
     std::uint32_t outputHeight = 1080;
     double startSeconds = 0.0;
     double warmupSeconds = 3.0;  // a cap: measurement starts earlier when the frame settles
+    // ADR-1600, --warmup-frames: > 0 replaces the adaptive warm-up with exactly this many frames, so the measured window
+    // (and a capture of its last frame) starts at the same piece time in every run. A capturing run defaults to
+    // warmupSeconds x targetFps.
+    int warmupFrames = 0;
     double measureSeconds = 5.0;
     bool deep = false;
     std::string quality = "auto"; // auto | ultra..emergency | quality | balanced | performance | a tier name
@@ -198,6 +202,8 @@ struct LiveProfileCold {
 struct BudgetStats {
     double budgetMs = 0.0;
     std::size_t frames = 0;
+    // Headless: frames over budgetMs. Live (refreshMs > 0, ADR-1600): frames that missed a deadline, so vsync jitter of
+    // a paced frame around the period is not "over".
     std::size_t overBudget = 0;
     double percentUnder = 0.0;
     // Live only: in vsync terms. A frame misses its deadline when it took at least one more refresh than the target's

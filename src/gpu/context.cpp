@@ -179,10 +179,17 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
     wgpu::DeviceDescriptor deviceDesc{};
     deviceDesc.label = desc.label.c_str();
     // AVGEN_DAWN_TOGGLES=a,b,...: Dawn device toggles to enable, for investigation only (e.g. dump_shaders, which
-    // logs the MSL each pipeline compiles at debug level). Unset, the device is created exactly as before.
+    // logs the MSL each pipeline compiles at debug level). Unset, only the always-disabled toggles below apply.
     std::vector<std::string> toggleNames;
     std::vector<const char*> toggles;
     wgpu::DawnTogglesDescriptor togglesDesc{};
+    // ADR-1600: Dawn quantises timestamp queries to 2^16 ns by default (`timestamp_quantization`, a browser
+    // anti-fingerprinting measure), which put every pass time on a 65.5 us grid and made any pass under one
+    // quantum read 0 or 0.066 ms. A native application has nothing to hide from itself, so it is always off.
+    static constexpr const char* kDisabledToggles[] = {"timestamp_quantization"};
+    togglesDesc.disabledToggleCount = std::size(kDisabledToggles);
+    togglesDesc.disabledToggles = kDisabledToggles;
+    deviceDesc.nextInChain = &togglesDesc;
     if (const char* env = std::getenv("AVGEN_DAWN_TOGGLES"); env != nullptr && env[0] != '\0') {
         std::string list = env;
         std::size_t start = 0;
@@ -198,7 +205,6 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
         }
         togglesDesc.enabledToggleCount = toggles.size();
         togglesDesc.enabledToggles = toggles.data();
-        deviceDesc.nextInChain = &togglesDesc;
         log::info("Dawn toggles enabled from AVGEN_DAWN_TOGGLES: {}", list);
     }
     deviceDesc.requiredFeatureCount = features.size();

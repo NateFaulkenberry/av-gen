@@ -53,6 +53,7 @@ struct ShadowStats {
     float coarsestTexel = 0.0f; // the world size of one texel of the last cascade
     double shadowMs = -1.0;       // GPU time of the depth passes (-1 = unavailable)
     std::uint32_t entityDraws = 0; // entity draws recorded across every cascade this frame
+    std::uint32_t entityCasters = 0; // ADR-1600: entities in the caster list (RenderStats::shadowCasters adds the rest)
     std::uint32_t entitiesCulled = 0; // casters a cascade's own frustum rejected (ADR-055)
     // ADR-1095: casters the projected-size floor (QualitySettings::shadowCasterMinPixels) kept out of every view.
     std::uint32_t castersBelowFloor = 0;

@@ -24,6 +24,8 @@ struct Application::LiveProfileSession {
     std::uint64_t transitionsSeen = 0; // live level changes already accounted for by the warm-up
     int lastChangeFrame = 0;
     int waitFrames = 0;
+    // ADR-1600: the last drop reason written to the trace and to the record's notes (Application::liveDropSerial_).
+    std::uint64_t dropSerialTraced = 0, dropSerialNoted = 0;
     LiveProfileRecord record;
     std::vector<LiveProfileFrame> frames;
     std::string trace; // --trace's rows (ADR-1362), written when measurement ends

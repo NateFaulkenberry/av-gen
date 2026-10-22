@@ -10,6 +10,7 @@
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "app/interactive_resolution.hpp"
+#include "app/live_drop_reason.hpp"
 #include "app/viewport_camera.hpp"
 #include "app/live_profile.hpp"
 #include "gpu/readback.hpp"
@@ -743,6 +744,11 @@ private:
     StickyWarning atBottomWarning_;
     std::uint64_t liveTransitions_ = 0;
     std::uint64_t liveTransitionsProfiled_ = 0;
+    // ADR-1600: the drop reason. Pass medians at the level in force (reset on every move), the last drop's reason, and
+    // a serial the live profile's trace uses to write it on the frame it happened.
+    PassGrowthTracker livePassGrowth_;
+    std::optional<LiveDropReason> lastLiveDrop_;
+    std::uint64_t liveDropSerial_ = 0;
 
     ViewportGesture viewportGesture_ = ViewportGesture::None;
     glm::vec2 viewportLastMouse_{0.0f};

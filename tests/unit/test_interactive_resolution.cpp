@@ -931,3 +931,18 @@ TEST_CASE("paced: when the frame gets cheaper underneath it, forgetting the back
     CHECK(forgotten < kept);
     CHECK(forgotten <= 4 * 300); // four climbs at about the ordinary hold, not a minute each
 }
+
+// ADR-1600: a drop carries the misses that decided it. recentMisses() restarts on the new level, so the controller keeps
+// the count the level being left had when the move was taken.
+TEST_CASE("paced: a drop remembers the misses that decided it", "[unit][resolution][live-quality][adr1600]") {
+    app::InteractiveResolution g;
+    g.configure(live(30));
+    for (int i = 0; i < 2000 && g.rung() == 0; ++i) {
+        g.setPacing(1000.0 / 30.0, 60.0);
+        g.note(i % 10 == 2 ? 36.0 : 29.5, i % 10 == 0 ? 50.0 : 33.4);
+    }
+    REQUIRE(g.rung() > 0);
+    CHECK(g.missesAtLastMove() >= live(30).missesToDrop);
+    CHECK(g.recentMisses() == 0); // the new level's own window starts empty
+    CHECK(g.gpuAtLastMove() > 0.0);
+}

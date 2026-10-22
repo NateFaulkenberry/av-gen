@@ -95,6 +95,9 @@ struct ProceduralStats {
     SubmittedGeometry submittedCamera;
     SubmittedGeometry submittedDepth;
     SubmittedGeometry submittedShadow;
+    // ADR-1600: casting objects some shadow view can reach this frame (the shadow list's own cull did not prove them
+    // out), so the frame's caster count includes the procedural world and not only entities.
+    std::uint32_t shadowCasterObjects = 0;
     // Pipeline, bind-group and buffer binds this renderer recorded, over every pass. It tracks what
     // it has bound and skips the rest, so `redundantBindsAvoided` is what that tracking saved.
     StateChangeCounters state;

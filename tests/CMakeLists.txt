@@ -38,6 +38,7 @@ target_sources(avgen_tests PRIVATE
     # checked for the thing a benchmark cannot show it: that it settles instead of oscillating.
     "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp"
     # ADR-1090: the live profiler's logic (statistics, categories, candidates, writers). No device.
+    "${CMAKE_SOURCE_DIR}/src/app/live_drop_reason.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/live_profile.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/live_profile_hook.cpp"
     # ADR-1108..1113: the Phase 5 optimizer's logic (contribution, heroes, A/B reading, search). No device.

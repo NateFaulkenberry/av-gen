@@ -407,6 +407,12 @@ int Application::runLiveProfileHeadless() {
     }
     renderer_->setVelocityOnDemand(true); // ADR-1492: as the live editor renders
     renderer_->setCompiledMaterials(true); // ADR-1493
+    // ADR-1600: the sky the live editor performs (ADR-233's deferral, ADR-1070's capped, spread lighting rebuild),
+    // exactly as `runLive` sets it. Without it the headless profile rebuilt the procedural sky's lighting whenever its
+    // hash moved -- 697 of about 1,060 frames and 6.2 ms of CPU a frame in Rainbow World, against 0.03 ms live -- so
+    // it measured a frame nobody performs.
+    renderer_->setInteractiveEnvironmentBudget(2.0);
+    renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
 
     if (const auto profile = liveQualityProfile()) {
         base = applyQualityProfile(base, *profile);
@@ -488,6 +494,7 @@ int Application::runLiveProfileHeadless() {
     // ---- warm-up: until the frame settles, or the cap ----
     auto warmStart = Clock::now();
     SteadyStateDetector steady(20, 0.05, 2, 40);
+    PassGrowthTracker growth; // ADR-1600
     int warmFrames = 0;
     int lastChange = 0;
     while (true) {
@@ -524,8 +531,18 @@ int Application::runLiveProfileHeadless() {
         const double cost = std::max(f.gpuMs, f.cpuWorkMs);
         if (automatic) {
             // The live controller, fed the pipelined cost (headless serialises CPU and GPU).
+            growth.note(f.passes);
             const auto decision = controller.note(f.gpuMs, cost);
             if (decision.changed) {
+                if (decision.rung > rung) { // ADR-1600: the drop's reason, in the record
+                    LiveDropReason reason;
+                    reason.fromLevel = liveQualityLevelName(ladder[rung].level);
+                    reason.toLevel = liveQualityLevelName(ladder[decision.rung].level);
+                    reason.gpuCostMs = controller.gpuAtLastMove();
+                    reason.growth = growth.largestGrowth();
+                    record.notes.push_back(fmt::format("quality drop (warm-up frame {}): {}", warmFrames, reason.text()));
+                }
+                growth.reset();
                 rung = decision.rung;
                 applyRung(rung);
                 steady = SteadyStateDetector(20, 0.05, 2, 40); // the level moved, so the frame did
@@ -537,6 +554,13 @@ int Application::runLiveProfileHeadless() {
         // Auto: still settling if the level moved in the last 60 frames; the cap stretches to three times.
         const bool moving = automatic && lastChange > 0 && warmFrames - lastChange < 60;
         const double cap = moving ? 3.0 * o.warmupSeconds : o.warmupSeconds;
+        if (o.warmupFrames > 0) { // ADR-1600: a fixed count, so the window starts at the same piece time every run
+            if (warmFrames >= o.warmupFrames) {
+                record.cold.steadyReached = settled;
+                break;
+            }
+            continue;
+        }
         if ((settled && !moving && elapsed >= std::min(1.0, o.warmupSeconds)) || elapsed >= cap) {
             record.cold.steadyReached = settled;
             break;
@@ -608,6 +632,10 @@ int Application::runLiveProfileHeadless() {
     record.notes.push_back(fmt::format("headless measured {} frames of piece time at a fixed {:.0f} fps step, from "
                                        "{:.2f} s",
                                        frames, o.targetFps, measureStartPiece));
+    if (o.warmupFrames > 0) {
+        record.notes.push_back(fmt::format("warm-up: a fixed {} frames (ADR-1600), not until the frame settled",
+                                           o.warmupFrames));
+    }
 
     // ---- verify: the top candidates, measured with the --ab machinery ----
     if (o.verifyCandidates > 0) {
@@ -690,6 +718,7 @@ int Application::runLiveProfileHeadless() {
 
 void Application::beginLiveProfile() {
     liveProfileSession_ = std::make_unique<LiveProfileSession>();
+    liveProfileSession_->dropSerialTraced = liveProfileSession_->dropSerialNoted = liveDropSerial_;
     const LiveProfileOptions& o = options_.liveProfile;
     // The projection window at the output size, in points on its display (never written to the settings file).
     // The editor window's backing scale: the display list's content scale reads 1 on this 5K display.
@@ -718,16 +747,28 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         const auto pinned = livePinnedQuality();
         const std::size_t rung = pinned ? static_cast<std::size_t>(*pinned) : autoResolution_.rung();
         if (s.trace.empty()) {
-            s.trace = "phase,t,frameMs,gpuMs,rung,level,scale,costMs,paceMs,refreshMs,compiledMaterials\n";
+            s.trace = "phase,t,frameMs,gpuMs,rung,level,scale,costMs,paceMs,refreshMs,compiledMaterials,misses,drop\n";
         }
-        s.trace += fmt::format("{},{:.4f},{:.3f},{:.3f},{},{},{:.2f},{:.3f},{:.3f},{:.3f},{}\n", s.phase == P::Warmup ? 'w' : 'm',
+        // ADR-1600: the controller's misses in the level's window, and a drop's reason on the frame it happened.
+        std::string drop;
+        if (liveDropSerial_ != s.dropSerialTraced) {
+            s.dropSerialTraced = liveDropSerial_;
+            drop = lastLiveDrop_ ? lastLiveDrop_->text() : std::string();
+        }
+        s.trace += fmt::format("{},{:.4f},{:.3f},{:.3f},{},{},{:.2f},{:.3f},{:.3f},{:.3f},{},{},{}\n", s.phase == P::Warmup ? 'w' : 'm',
                                msSince(s.phaseStart) / 1000.0, frame.frameMs, frame.gpuMs, rung,
                                liveQualityLevelName(autoResolution_.ladder()[rung].level),
                                static_cast<double>(effectiveRenderScale(autoResolution_.ladder()[rung],
                                                                         autoResolution_.settings().scaleFloor)),
                                autoResolution_.gpuCostMs(), autoResolution_.pacing().periodMs,
                                autoResolution_.pacing().refreshMs,
-                               renderer_->procedurals().compiledMaterialsActive() ? 1 : 0);
+                               renderer_->procedurals().compiledMaterialsActive() ? 1 : 0,
+                               autoResolution_.recentMisses(), drop);
+    }
+    if (liveDropSerial_ != s.dropSerialNoted && lastLiveDrop_ && (s.phase == P::Warmup || s.phase == P::Measure)) {
+        s.dropSerialNoted = liveDropSerial_;
+        s.record.notes.push_back(fmt::format("quality drop ({}, {:.2f} s in): {}", s.phase == P::Warmup ? "warm-up" : "measuring",
+                                             msSince(s.phaseStart) / 1000.0, lastLiveDrop_->text()));
     }
     switch (s.phase) {
     case P::WaitingForOutput: {
@@ -770,7 +811,10 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         // rather than measure across a level change.
         const bool moving = !livePinnedQuality() && s.lastChangeFrame > 0 && s.warmFrames - s.lastChangeFrame < 60;
         const double cap = moving ? 3.0 * o.warmupSeconds : o.warmupSeconds;
-        if ((settled && !moving && elapsed >= std::min(1.0, o.warmupSeconds)) || elapsed >= cap) {
+        const bool done = o.warmupFrames > 0 ? s.warmFrames >= o.warmupFrames // ADR-1600: a fixed count
+                                             : (settled && !moving && elapsed >= std::min(1.0, o.warmupSeconds)) ||
+                                                   elapsed >= cap;
+        if (done) {
             s.record.cold.steadyReached = settled;
             s.record.cold.warmupFrames = s.warmFrames;
             s.record.cold.warmupSeconds = elapsed;

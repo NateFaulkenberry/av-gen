@@ -5909,7 +5909,27 @@ int Application::runLive() {
                     autoResolution_.forgetBackoff();
                 }
             }
-            static_cast<void>(autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs));
+            const std::size_t rungBefore = autoResolution_.rung();
+            livePassGrowth_.note(renderer_->timeline().passes());
+            const InteractiveResolution::Decision decision = autoResolution_.note(stats.gpuFrameMs, stats.frameIntervalMs);
+            if (decision.changed) {
+                // ADR-1600: a drop says why -- the misses that decided it and the pass that grew at the level left.
+                if (decision.rung > rungBefore) {
+                    const auto& ladder = autoResolution_.ladder();
+                    LiveDropReason reason;
+                    reason.fromLevel = liveQualityLevelName(ladder[rungBefore].level);
+                    reason.toLevel = liveQualityLevelName(ladder[decision.rung].level);
+                    const bool paced = autoResolution_.pacing().periodMs > 0.0;
+                    reason.misses = paced ? autoResolution_.missesAtLastMove() : 0;
+                    reason.missWindow = paced ? autoResolution_.settings().missWindowFrames : 0;
+                    reason.gpuCostMs = autoResolution_.gpuAtLastMove();
+                    reason.growth = livePassGrowth_.largestGrowth();
+                    log::info("live quality: dropped {}", reason.text());
+                    lastLiveDrop_ = std::move(reason);
+                    ++liveDropSerial_;
+                }
+                livePassGrowth_.reset();
+            }
             // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
             // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
             prof.count(kPhScaleChanges, static_cast<double>(liveTransitions_ - liveTransitionsProfiled_));
@@ -7538,6 +7558,8 @@ void Application::serviceLiveQuality() {
     // line every frame -- each flip moved everything below it, which read as the whole panel flickering.
     view.paced = autoResolution_.pacing().periodMs > 0.0;
     view.recentMisses = autoResolution_.recentMisses();
+    view.lastDrop = lastLiveDrop_ ? lastLiveDrop_->text() : std::string(); // ADR-1600
+    view.drops = autoResolution_.stats().drops;
     {
         const auto now = std::chrono::steady_clock::now();
         const double frame = view.targetFrameMs;

@@ -516,6 +516,17 @@ void ControlPanel::drawLive(app::Engine& engine) {
         }
         ImGui::SameLine();
         ImGui::Text("  CPU %.1f ms", q.cpuMs >= 0.0 ? q.cpuMs : 0.0);
+        // ADR-1600: the drop reason.
+        if (!q.lastDrop.empty()) {
+            ImGui::TextWrapped("Last drop: %s", q.lastDrop.c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(("Why Auto last lowered the level (" + std::to_string(q.drops) +
+                         " drop(s) this session): the frames that missed their deadline in the window that decided "
+                         "it, and the GPU pass whose median grew the most at the level it left -- its recent frames "
+                         "against the level's earlier ones. \"No pass grew\" means the misses were not the GPU's "
+                         "content (ADR-1600).").c_str());
+            }
+        }
         // ---- ADR-1099..1103: the project's choices, and every lever as the frame uses it ----
         {
             static const char* profiles[] = {"Quality", "Balanced", "Performance"};

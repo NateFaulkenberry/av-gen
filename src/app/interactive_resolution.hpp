@@ -449,6 +449,10 @@ public:
     };
     // ADR-1362: deadline misses among the level's recent frames (`missWindowFrames`; always 0 when not paced).
     [[nodiscard]] int recentMisses() const;
+    // ADR-1600: the misses the level being left had when the last move was decided (recentMisses() restarts at 0 on
+    // the new level), and the GPU reading that move was taken on: the drop reason's first half.
+    [[nodiscard]] int missesAtLastMove() const { return missesAtLastMove_; }
+    [[nodiscard]] double gpuAtLastMove() const { return gpuAtLastMove_; }
     [[nodiscard]] const Stats& stats() const { return stats_; }
 
 private:
@@ -508,6 +512,8 @@ private:
     std::array<int, kLiveQualityLevels> holdScale_{1, 1, 1, 1, 1};
     bool unsustainable_ = false;
     Pacing pacing_{};
+    int missesAtLastMove_ = 0;
+    double gpuAtLastMove_ = -1.0;
 };
 
 } // namespace avgen::app

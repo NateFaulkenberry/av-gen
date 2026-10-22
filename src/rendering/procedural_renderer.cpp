@@ -2315,6 +2315,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                                  objectFullyCulledForShadows(lodSettings, shadowViewPlanes, cullCamera, model,
                                                              state.bounds, cullRadius,
                                                              scene.detailLimits.proceduralDistanceCull)));
+        if (casts && !shadowFullyCulled) {
+            ++stats_.shadowCasterObjects; // ADR-1600
+        }
         // The pass runs when EITHER list has something to say. An object the camera cannot see but
         // a cascade can now costs a cull dispatch it did not used to cost -- that is the price of
         // the second list and it is the whole of it on the CPU side.
