@@ -8164,22 +8164,24 @@
    "depthDefault": 0.0
   },
   {
-   "source": "stem.bass.level",
+   "source": "stem.bass.onset",
    "target": "macros/swell",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": -1,
    "chain": {
-    "gain": 2.4,
-    "offset": -1.4,
-    "clampEnabled": true,
-    "clampMin": 0.0,
-    "clampMax": 1.0,
-    "attackMs": 10.0,
-    "decayMs": 180.0
+    "envelope": "linearfall",
+    "envelopeFallPerSecond": 2.4,
+    "attackMs": 0.0,
+    "envelopeRefractoryMs": 130.0,
+    "envelopeRearm": 0.05
    },
-   "optional": true
+   "optional": true,
+   "depthSource": "stem.bass.level",
+   "depthMin": -0.3,
+   "depthMax": 1.9,
+   "depthDefault": 0.13636363636363635
   },
   {
    "source": "response.bass",
@@ -8201,20 +8203,6 @@
    "depthMin": 1.0,
    "depthMax": 0.0,
    "depthDefault": 0.0
-  },
-  {
-   "source": "stem.bass.onset",
-   "target": "macros/swell",
-   "amount": 0.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {
-    "envelope": "linearfall",
-    "envelopeFallPerSecond": 4.0,
-    "attackMs": 10.0
-   },
-   "optional": true
   },
   {
    "source": "macro.swell",
@@ -12161,8 +12149,8 @@
    "chain": {
     "envelope": "linearfall",
     "envelopeFallPerSecond": 2.4,
-    "attackMs": 25.0,
-    "envelopeRefractoryMs": 280.0,
+    "attackMs": 0.0,
+    "envelopeRefractoryMs": 130.0,
     "envelopeRearm": 0.05
    },
    "optional": true,
@@ -12193,8 +12181,8 @@
    "chain": {
     "envelope": "linearfall",
     "envelopeFallPerSecond": 2.4,
-    "attackMs": 25.0,
-    "envelopeRefractoryMs": 280.0,
+    "attackMs": 0.0,
+    "envelopeRefractoryMs": 130.0,
     "envelopeRearm": 0.05
    },
    "optional": true,

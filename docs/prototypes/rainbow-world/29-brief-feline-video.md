@@ -110,3 +110,7 @@ rainbow to the side, a lone tree): the camera or the geometry seems to jump unde
 clouds - smooth out reactivity to bass line if possible - the bass plays a pretty repetitive quarter not triplet line - the notes should be clearly visible to the agent (especially in the begining of the song) - we want these bigger hits, and any big feeling hits later to be what the clouds are reacting to - it looks like there might be some noise that causes the clouds to also have some smaller undulations in their animation which doesnt look as nice - so ultimately smoothing this out some - so its hitting with real bass note hits, as much as possible
 
 the third rainbow world scan around 56 seconds feels late by almost like a second, same with the one at 1:04, and subsequently every one after that also feels late, maybe by up to a second - try to match more closesly the same timing established by the first two world scans - those ones read and feel great"
+
+## 13. The owner on the clouds' notes (verbatim)
+
+"some important bass notes are now being missed, you can actullay see some examples of it on clouds-bass-notes-0-20s-45-60s.png - some of the notes are missed - the animation looks smoother though so its almost there"

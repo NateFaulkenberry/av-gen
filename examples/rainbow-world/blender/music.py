@@ -129,13 +129,19 @@ def routes(fx, swell_nodes, swell):
     # swing a second -- and each note pushes it; 29 section 11: it takes each note in 10 ms, not 40, so the clouds'
     # breathing lands with the note -- measured on the video, they followed the bass by a steady +33 ms at 10, 45, 90
     # and 150 s: no drift)
-    out += stem_route("bass", "level", "response.bass", "macros/swell", 1.0,
-                      {"gain": 2.4, "offset": -1.4, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                       "attackMs": 10.0, "decayMs": 180.0},
-                      fb_chain={"gain": 2.4, "offset": -1.45, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
-                                "attackMs": 10.0, "decayMs": 180.0})
-    out += stem_route("bass", "onset", None, "macros/swell", 0.5,
-                      {"envelope": "linearfall", "envelopeFallPerSecond": 4.0, "attackMs": 10.0})
+    # 29 sections 12-13 (the owner: "hitting with real bass note hits ... some important bass notes are now being
+    # missed"): with a bass stem the swell is its NOTES -- each onset one breath, up in 25 ms and down over about
+    # 0.4 s, the note's level its size -- not its continuous level, whose wobbles between and within the notes made
+    # the clouds (and the palette and the cloud sea) undulate. A re-trigger within 130 ms (the same note) is latched
+    # out (ADR-1574); notes 0.124 s apart (the line's closest) both breathe. Without a bass stem, the mix's bass level
+    # as before.
+    out.append(route("stem.bass.onset", "macros/swell", 1.0,
+                     NOTE_CHAIN, optional=True, depthSource="stem.bass.level", depthMin=-0.3, depthMax=1.9,
+                     depthDefault=0.3 / 2.2))
+    out.append(route("response.bass", "macros/swell", 1.0,
+                     {"gain": 2.4, "offset": -1.45, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                      "attackMs": 10.0, "decayMs": 180.0},
+                     depthSource="stem.bass.active", depthMin=1.0, depthMax=0.0, depthDefault=0.0))
     for nm in swell_nodes:
         for k, wave in enumerate(swell):
             out.append(route("macro.swell", "procedural/%s/deform/%d/amount" % (nm, k + 1), wave[-1]))
@@ -296,7 +302,12 @@ def routes(fx, swell_nodes, swell):
     return out
 
 
-SKY_BREATH = "skyBreath"   # build_world's constant field the clouds' scale effector reads (its strength is routed)
+SKY_BREATH = "skyBreath"
+# a bass note's breath (29 sections 12-13): at its peak on the note's own frame -- no attack: the owner, "the animation
+# time it takes to reach that size ... makes it feel a bit laggy" -- then a fall over about 0.4 s; a re-trigger within
+# 130 ms (the same note) latched out (ADR-1574)
+NOTE_CHAIN = {"envelope": "linearfall", "envelopeFallPerSecond": 2.4, "attackMs": 0.0, "envelopeRefractoryMs": 130.0,
+              "envelopeRearm": 0.05}   # build_world's constant field the clouds' scale effector reads (its strength is routed)
 
 
 def sky_routes(fx):
@@ -307,19 +318,13 @@ def sky_routes(fx):
     - splashes of colour: on each clap (the drum stem's 2-6 kHz band) patches of saturated colour bloom across the
       clouds and fade within about a beat; each phrase start (bars 1 + 4k) blooms bigger and fades over two beats.
       Patches, never the whole sky (the owner's rule at gate 2: no world sweep)."""
-    # The breath is the bass's NOTES (29 section 12, the owner: "hitting with real bass note hits ... smoothing this
-    # out"): each onset of the bass stem fires one breath -- up in 25 ms, down over about 0.4 s -- and nothing else
-    # moves the clouds; a re-trigger inside the same note (within 280 ms: the line's notes are 370 ms apart) is
-    # ignored (ADR-1574's refractory latch), and a note's level sets its size, so the accents swell more. The
-    # continuous level, whose small wobbles made the clouds undulate between notes, drives them only on a stereo
-    # input with no bass stem.
+    # the clouds breathe on the bass's notes, routed straight from the stem's onsets (not through macro.swell: a
+    # macro publishes the value its routes wrote the frame before, one frame late); with no bass stem, macro.swell
     roles = fx.get("rw_cloud", {})
     glow = op_target("rw_cloud", roles, "cloud_glow", "constant", "constant") if "cloud_glow" in roles else None
-    note = {"envelope": "linearfall", "envelopeFallPerSecond": 2.4, "attackMs": 25.0, "envelopeRefractoryMs": 280.0,
-            "envelopeRearm": 0.05}
     out = []
     for tgt, amt_ in [("field/%s/strength" % SKY_BREATH, 1.0)] + ([(glow, 0.3)] if glow else []):
-        out.append(route("stem.bass.onset", tgt, amt_, note, optional=True, depthSource="stem.bass.level",
+        out.append(route("stem.bass.onset", tgt, amt_, NOTE_CHAIN, optional=True, depthSource="stem.bass.level",
                          depthMin=-0.3, depthMax=1.9, depthDefault=0.3 / 2.2))
         out.append(route("macro.swell", tgt, amt_, depthSource="stem.bass.active", depthMin=1.0, depthMax=0.0,
                          depthDefault=0.0))
