@@ -420,7 +420,7 @@ The clouds' brightness is the top 45% of the frame, high-passed; for each baked 
 | Render | 45-60 s | 70-95 s |
 |---|---|---|
 | Without a lead | 35 of 36 one frame after the note | 57 of 58 one frame after the note |
-| With a one-frame lead | see the hand-back | see the hand-back |
+| With a one-frame lead (the delivered render) | 34 of 36 on the note's frame | 56 of 58 on the note's frame |
 
 The engine shows a timeline's value one frame late. The Feline bake therefore leads its notes by one frame
 (`NOTE_LEAD`).
@@ -436,3 +436,18 @@ The engine shows a timeline's value one frame late. The Feline bake therefore le
 
 The rhythm-off component was the old continuous bass level, with its small undulations between notes and a frame of
 lag. Both are now gone. The bass line does not change pattern at 80 s: the plot's 70-85 s panel takes every note.
+
+### The final render and checks
+
+**The render:** `~/Desktop/Feline Footwear/renders/feline-footwear.mp4`, 6315 frames with audio, copied to
+`79-feline-revisions/feline-footwear-full.mp4`.
+
+**Checks** at 5655bd43, after a fresh configure (exit 0) and a full build (exit 0):
+
+| Check | Exit | Counts |
+|---|---|---|
+| cpu-assets | 0 | 4413 passed, 0 failed, 29 skipped, 1 expected failure; 4443/4443 |
+| `review_examples` | 0 | 2 ok |
+| `check_project_integrity.py` | 0 | 0 problems |
+
+The GPU suite was not run: no engine code changed.
