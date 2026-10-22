@@ -281,6 +281,16 @@ TEST_CASE("signal: firstActive follows the stem while it is active and falls bac
     fallback.update(noStem, ctx);
     CHECK(noStem.value(*noStem.find("signal.clap")) == 0.7f);
     CHECK(fallback.selected() == 1);
+    // ...and a resolved input gated on a stem that is not there (a signal built from the stem's signal) stands aside.
+    ConditionedSignalSource gatedOnAbsent("clap2");
+    ConditionedSignalSource::Input viaSignal{.source = "signal.clap", .gate = "stem.drums.active"};
+    gatedOnAbsent.inputs() = {viaSignal, b};
+    gatedOnAbsent.attach(noStem, params);
+    noStem.set(mixOnly, 0.3f);
+    fallback.update(noStem, ctx);
+    gatedOnAbsent.update(noStem, ctx);
+    CHECK(gatedOnAbsent.selected() == 1);
+    CHECK(noStem.value(*noStem.find("signal.clap2")) == 0.3f);
 
     // An explicit gate, and the other combines over the active inputs.
     ConditionedSignalSource sum("both");
