@@ -380,3 +380,59 @@ dropped: it was compensating for this.
 | 2:23 | 143.8 - 144.6 | 143.05 (downbeat) |
 | 2:39 | 157.0 - 161.7 | 157.00 |
 | 2:53 | 171.0 - 172.3 | 171.00 |
+
+## 15. The clouds on every bass note, peaking on the note (29 sections 12-13)
+
+### Recall
+
+**Detection** (both the Feline bake and the plot):
+- The bass stem's level is the rms over 40 ms (two periods of the F1, so the sub's cycle does not ripple it) every
+  5 ms.
+- An attack is a climb to 1.2x its 40 ms minimum, by 8% of its 1 s peak.
+- The bigger climb wins within 0.12 s. A pluck's second hump within 0.3 s is the same note.
+- The onset is where the climb is a fifth of the way up.
+
+**Against the transcribed line** (14 section 3's patterns on the grid, kept where the stem shows an attack: 407):
+- Recall is 94.3%. The 23 misses are mostly notes pushed more than 100 ms off the grid: walk-ups and the 1:56-2:05
+  section.
+- 52 breaths fall off the transcribed line (glides and octave fills it does not list).
+- Timing against the line: median +4 ms (p10 -19, p90 +29).
+
+The previous round took 352 notes; this one takes 436.
+
+Plot: `79-feline-revisions/clouds-bass-notes-proof-8-20-45-60-70-85s.png`.
+
+### The shape: a pluck, no rise
+
+- **Feline:** each note's breath is at full on the note's own frame, then falls ease-out over the gap to the next note
+  (at most 0.45 s). A smaller note does not pull a breath down.
+- **Native scenes:** the onset route has no attack (`attackMs` 0), with a 130 ms latch in place of 280 ms.
+- **Both:**
+  - The clouds take the notes straight from the onsets, not through `macro.swell`: a macro publishes the value its
+    routes wrote the frame before, so it is one frame late.
+  - The swell (the palette, the cloud sea) is the notes too when a bass stem is present. The continuous bass level
+    drives it only without one.
+
+### Onset to peak, measured on the rendered video
+
+The clouds' brightness is the top 45% of the frame, high-passed; for each baked note, the frame where it peaks.
+
+| Render | 45-60 s | 70-95 s |
+|---|---|---|
+| Without a lead | 35 of 36 one frame after the note | 57 of 58 one frame after the note |
+| With a one-frame lead | see the hand-back | see the hand-back |
+
+The engine shows a timeline's value one frame late. The Feline bake therefore leads its notes by one frame
+(`NOTE_LEAD`).
+
+### "Desynced by 1:20" (70-95 s): every cloud modulation there
+
+- **The mp4's streams:** both start at 0, with the same duration. No offset.
+- **Breath and the bass glow:** the bass notes, now exact.
+- **Splashes:** the claps (beats 2 and 4) and the phrase starts. Beat-locked.
+- **The synth glow (+0.3):** slow, the synth bed's level smoothed over a beat.
+- **The 1:20 scan's cloud brightening (+0.6):** 79.58-89 s, one slow swell.
+- **The look:** none changes here (Prism from 47.85 s to 111.3 s).
+
+The rhythm-off component was the old continuous bass level, with its small undulations between notes and a frame of
+lag. Both are now gone. The bass line does not change pattern at 80 s: the plot's 70-85 s panel takes every note.

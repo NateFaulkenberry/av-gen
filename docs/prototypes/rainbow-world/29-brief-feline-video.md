@@ -114,3 +114,5 @@ the third rainbow world scan around 56 seconds feels late by almost like a secon
 ## 13. The owner on the clouds' notes (verbatim)
 
 "some important bass notes are now being missed, you can actullay see some examples of it on clouds-bass-notes-0-20s-45-60s.png - some of the notes are missed - the animation looks smoother though so its almost there"
+
+The owner, two further notes (verbatim): "and clouds still look desynced by like 1:20 seconds" -- "with teh clouds it could possibly be just the timing of the animation makes it look a little laggy, instead of the cloud peaking in how big it gets with the staccato short peak of the bass note the animation time it takes to reach that size it was makes it feel a bit laggy - does that make sense" -- and "it can skip rendering clips just have it render the whole video".
