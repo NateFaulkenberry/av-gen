@@ -229,6 +229,9 @@ struct PostSettings {
     float chromaRetention = 0.0f;  // 0..1 how much hue to hold in compressed highlights, so a
                                    // bright narrow-band light stays coloured instead of going
                                    // white. 0 leaves the operator's own rolloff untouched.
+    float upscaleSharpness = 0.2f; // ADR-1613 (was QualitySettings', ADR-1607): 0..1 the spatial upscaler's
+                                   // contrast-adaptive sharpening when a reduced frame is brought up to the
+                                   // output; inert at renderScale 1. `post/output/upscale-sharpness`.
 
     // ---- cinematic integration (Image/Look §52.1, §68) --------------------------------------------
     // A member of this object rather than a rival to it (§52). Zero throughout by default; see the
@@ -330,6 +333,7 @@ struct PostParameters {
     params::Parameter<float>* vignette = nullptr;
     params::Parameter<float>* grain = nullptr;
     params::Parameter<float>* chromaRetention = nullptr;
+    params::Parameter<float>* upscaleSharpness = nullptr; // ADR-1613
     // ---- cinematic integration (§52.1, §54's namespaced IDs: post/look/*) -------------------------
     params::Parameter<float>* lookAtmospheric = nullptr;
     params::Parameter<float>* lookAtmosphericDistance = nullptr;

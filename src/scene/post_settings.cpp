@@ -205,6 +205,9 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     p.grain = &params.add(f("post/output/grain", s.grain, 0.0f, 1.0f, 0.0f, 1.0f));
     p.chromaRetention =
         &params.add(f("post/tonemap/chroma-retention", s.chromaRetention, 0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-1613: the upscaler's sharpening, so a scene (and the live ladder's reduced rungs) can set it.
+    p.upscaleSharpness =
+        &params.add(f("post/output/upscale-sharpness", s.upscaleSharpness, 0.0f, 1.0f, 0.0f, 1.0f));
 
     // ---- cinematic integration (§52.1, §68). §54: a new namespace, `post/look/*`, so no existing
     // parameter ID is renamed and nothing has to migrate. Every amount here is zero by default,
@@ -283,6 +286,7 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"fisheye", p.fisheye},               {"fisheyeModel", p.fisheyeModel}, // ADR-1540
         {"sharpen", p.sharpen},               {"vignette", p.vignette},
         {"grain", p.grain},                   {"chromaRetention", p.chromaRetention},
+        {"upscaleSharpness", p.upscaleSharpness}, // ADR-1613
         {"contrast", p.contrast},             {"saturation", p.saturation},
         {"tiltShiftRotation", p.tiltShiftRotation},
         {"tiltShiftBandWidth", p.tiltShiftBandWidth},
@@ -479,6 +483,9 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.vignette = p.vignette->value();
     s.grain = p.grain->value();
     s.chromaRetention = p.chromaRetention->value();
+    if (p.upscaleSharpness != nullptr) { // ADR-1613
+        s.upscaleSharpness = p.upscaleSharpness->value();
+    }
     // Cinematic integration (§52.1). Guarded because `registerPostParameters` is what creates these
     // and an older caller may hold a `PostParameters` from before they existed; without the guard
     // that is a null dereference rather than a default.

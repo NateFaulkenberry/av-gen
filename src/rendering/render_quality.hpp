@@ -303,10 +303,10 @@ struct QualitySettings {
     // so the naive model that makes dynamic resolution attractive is wrong here by a factor of two.
     float renderScale = 1.0f;
     // ADR-1607: how a scene target smaller than the output (renderScale < 1) is brought up to it: the spatial upscaler
-    // (a bicubic reconstruction clamped against ringing, then contrast-adaptive sharpening by `upscaleSharpness`) or,
-    // off, the bilinear fetch. Nothing changes at renderScale 1.
+    // (a bicubic reconstruction clamped against ringing, then contrast-adaptive sharpening) or, off, the bilinear
+    // fetch. Nothing changes at renderScale 1. The sharpening is the scene's look, not the tier's:
+    // `post/output/upscale-sharpness` (ADR-1613).
     bool spatialUpscaler = true;
-    float upscaleSharpness = 0.2f;
 
     // ---- ADR-1024: live edge antialiasing ----------------------------------------------------------
     //

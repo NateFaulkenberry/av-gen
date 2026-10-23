@@ -462,3 +462,24 @@ TEST_CASE("bloomLevels is a live control and now round-trips (ADR-385)", "[scene
     p.bloomLevels->setBase(0);
     CHECK(p.bloomLevels->base() == 1);
 }
+
+TEST_CASE("the upscaler's sharpening is a post parameter a scene can set", "[scene][post][adr1613]") {
+    params::ParameterSet params;
+    const scene::PostSettings defaults;
+    CHECK(defaults.upscaleSharpness == 0.2f); // ADR-1607's default, unchanged
+    auto p = scene::registerPostParameters(params, defaults);
+    auto* sharp = params.find("post/output/upscale-sharpness");
+    REQUIRE(sharp != nullptr);
+    REQUIRE(p.upscaleSharpness == sharp);
+    // From a scene's post block, as a base value; the finals reach the settings the renderer reads.
+    REQUIRE(scene::applyPostJson(nlohmann::json::parse(R"({"upscaleSharpness": 0.6})"), p).has_value());
+    params.resetFinals();
+    scene::PostSettings s;
+    scene::applyPostParameters(p, s);
+    CHECK(s.upscaleSharpness == 0.6f);
+    // And from a project's parameters, like any other post parameter (a route can move it too).
+    p.upscaleSharpness->setBase(0.0f);
+    params.resetFinals();
+    scene::applyPostParameters(p, s);
+    CHECK(s.upscaleSharpness == 0.0f);
+}

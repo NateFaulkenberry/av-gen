@@ -1,6 +1,7 @@
 # ADR-1607: A reduced frame is upscaled, not stretched
 
-- Status: Accepted (eng/living-prism-p1, The Living Prism P1-6)
+- Status: Accepted (eng/living-prism-p1, The Living Prism P1-6). Amended by ADR-1613: `upscaleSharpness` is now the post
+  parameter `post/output/upscale-sharpness`.
 - Amends ADR-137 (the tonemap samples the HDR target bilinearly when `renderScale < 1`). Byte-identical at
   `renderScale` 1.
 - Code: `shaders/tonemap.wgsl` (`upscaledHdr`), `src/rendering/scene_renderer.{hpp,cpp}` (`TonemapUniforms::upscale`,
