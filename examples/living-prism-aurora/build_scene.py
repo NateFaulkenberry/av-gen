@@ -227,7 +227,7 @@ WATER = {  # long exposure (spec 7): dark body, view-stretched rough reflections
     "glints": 0.0}
 
 
-def aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves=6.5):
+def aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves=6.5, **kw):
     return {"id": name, "name": name, "type": "aurora", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "always", "style": "",
             "timing": {"delay": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "lifetime": 0.0, "repeatSeconds": 0.0,
@@ -246,6 +246,15 @@ def aurora(name, low, mid, top, height, base, radius, count, intensity, complexi
                           "turbulence": 0.35, "verticalSpeed": 0.03, "waveAmplitude": 0.6, "waveScale": waves}},
             "ground": {"color": low, "falloff": 2.0, "intensity": 0.15, "mode": "subtle", "radius": 600.0},
             "flow": {"field": "", "influence": 0.0}}
+
+
+def aurora_fx(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves, **kw):
+    """aurora() with any appearance/shape field overridden by keyword (Phase 4)."""
+    e = aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves)
+    for k, v in kw.items():
+        group = "appearance" if k in e["parameters"]["appearance"] else "shape"
+        e["parameters"][group][k] = v
+    return e
 
 
 def mesh_node(name, asset, points, material, shadow=True):
@@ -314,9 +323,16 @@ def scene_json(placed, scans):
                                                     "horizonFade": 0.6, "band": 0.15, "bandTilt": 30.0,
                                                     "daylight": 0.0}},
             # two ribbon bands with dark, starry sky between and above them (phase 2b): short curtains, undulating tops
-            aurora("auroraMain", R0["auroraLow"], R0["auroraMid"], R0["auroraTop"], 750.0, 320.0, 3000.0, 2.0, 2.6, 72.0, 0.02, 5.0),
-            aurora("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 650.0, 1350.0, 3400.0, 2.0, 2.0, 50.0,
-                   0.015, 3.5)],
+            # Phase 4 (spec 6): two layered curtain systems that sweep the sky. Both rise from below the ridgeline (the
+            # effect's base is a straight line, so the mountains hide it) and run out of the top of the frame (no rim);
+            # the green-teal main curtain has deep folds and fine rays, the pink-violet layer stands further out with
+            # its own wave scale, so pink and green regions interleave by azimuth with dark sky between.
+            aurora_fx("auroraMain", R0["auroraLow"], R0["auroraMid"], R0["auroraTop"], 1300.0, 120.0, 2600.0, 2.0,
+                      2.2, 90.0, 0.02, 6.0, waveAmplitude=1.2, turbulence=0.45, filaments=3.0, edgeBrightness=3.6,
+                      opacity=0.75, layerSpacing=0.5),
+            aurora_fx("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 2000.0, 60.0, 3300.0, 2.0,
+                      1.6, 70.0, 0.015, 3.2, waveAmplitude=1.1, turbulence=0.4, filaments=2.5, edgeBrightness=3.0,
+                      opacity=0.6, layerSpacing=0.45)],
         "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=6)],
         "nodes": nodes,
     }

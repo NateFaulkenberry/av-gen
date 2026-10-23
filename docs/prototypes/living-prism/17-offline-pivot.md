@@ -149,3 +149,31 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase3c/`
 - Cliffs now sit on the ground at their centre. Placed from the lowest corner, a cliff on a steep wall was swallowed by its uphill side.
 
 **Still open:** the cliffs read as texture on the walls rather than as the reference's dramatic rock faces. Bigger, layered rock geometry, and terrain textures through the engine, are the next steps for rock.
+
+## Phase 4 gate: the aurora (2026-10-23)
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase4/`
+
+| File | Shows |
+|---|---|
+| `phase4-frame.jpg`, `phase4-frame-rose.jpg` | the full frame in both looks |
+| `phase4-vs-reference.jpg` | the full frame beside the reference |
+| `phase4-sky-vs-reference.jpg` | the sky beside the reference's sky |
+| `phase3c-vs-4.jpg` | before and after |
+| `phase4-palette-pair.jpg` | one palette switch |
+| `phase4-motion.jpg` | the sky at t = 10, 30 and 60 s |
+
+**What changed (spec 6.1-6.3).** There are two layered curtain systems:
+- **Main:** green to teal to violet, 2600 m out, two curtains, deep folds (wave amplitude 1.2) and fine rays (complexity 90, filaments 3), with dark gaps from the wave scale (6).
+- **Second layer:** pink to violet, 3300 m out, its own wave scale (3.2), so pink and green regions interleave across the sky by azimuth instead of stacking.
+
+Both rise from below the ridgeline and run out of the top of the frame. The effect's curtain base is a straight horizontal line, and its top a rim, so the mountains hide one and the frame edge the other. Each earlier pass had shown one of them as a hard edge across the sky. The aurora now fills the upper half of the frame with dark sky between the curtains (6.3, keep dark regions), and the palette still drives every colour.
+
+**Motion (6.4):** slow flow and drift (0.015-0.02), which changes the curtains gently between t = 10, 30 and 60 s. No audio yet (Phase 7).
+
+**Offline render:** 30 frames in 9.0 s at 1080p (2x supersample, `--tier offline`): **0.30 s/frame**. The larger aurora costs no measurable render time.
+
+**Gap against the reference, and what it would take:**
+- The reference's aurora is broad ribbons arching and swirling across the sky, with bright lower edges that curve. This effect draws vertical curtains on cylinders around the camera, with a straight base, so mine read as light columns rather than sweeping arcs.
+- Getting the reference's shape needs an engine extension of the aurora effect (ADR-230): either a curtain whose base height follows a noise or path in azimuth, or a ribbon defined along a 3D path. Flagged for the owner and engineering.
+- Without it, the next art levers are colour regions (a third layer, cyan or blue) and the 6.5 lighting coupling. The palette already lights the valley through the fill lights and the crystal environment.
