@@ -208,3 +208,26 @@ Owner notes on 2b, and what changed:
 Against the 33.3 ms (30 fps) target, the GPU has about 15 ms of headroom. Against 8.33 ms it is over by about 2x.
 
 Media is in `~/Desktop/av-gen-review/82-living-prism/aurora-phase2c/`.
+
+## Phase 2d gate (2026-10-23)
+
+The owner's 2c verdict: "getting better, let's make the valley and the river wider, the fore ground crystals smaller - ensure the crystals are not rendered in the river".
+
+- **Wider river:** the near reach is 72 m wide (was 42) and swings harder, an S through the lower frame. The far river is 34 m (was 20).
+- **Wider valley floor:** every bank feature moved out. Benches are at ±85 m, the rolling bank at ±145 m, cliffs at ±210 m, the high walls at ±285 m and the outer walls at ±420 m.
+- **Smaller foreground crystals:** the near clumps are about 2/3 of their 2c scale (L1 1.7, R1 1.65), set back about 100 m toward the frame edges. The river owns the lower centre.
+- **A river clearance gate in the build:**
+  - Blender writes `footprints.json`: every family's vertices projected onto the ground, so a tip leaning over the water counts too.
+  - `layout.check_crystals` measures each formation against the water's wet edge. The edge is bisected on `height()`, where the ground meets the water level.
+  - `build_scene.py` exits non-zero if any formation is within 4 m (`RIVER_MARGIN`).
+  - It caught the far group D at 2.9 m on its first run.
+  - Clearances now: L1 13.0, R1 17.0, L2 10.2, R2 30.4, L3 30.0, R3 27.4, C1 26.0, C2 31.2, D 12.9 m.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 20.4 / 25.1 ms | 56.2 ms (one spike; p50 27.7) | Ultra | n/a |
+| Live auto | 20.2 / 20.8 ms | 35.8 ms | Ultra 274, High 177 (100% High or better) | 1 |
+
+The wider water costs about +2.5 ms GPU over 2c. That is about 13 ms of headroom against 33.3 ms, and about 2.4x over 8.33 ms.

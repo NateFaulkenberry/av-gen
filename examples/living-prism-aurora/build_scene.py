@@ -180,6 +180,12 @@ def main():
     ap.add_argument("--scene-dir", default=os.path.join(HERE, "scene"))
     ap.add_argument("--project-dir", default=HERE)
     a = ap.parse_args()
+    # phase 2d: no crystal may stand in (or lean over) the river; the build fails if one does
+    rows, bad = L.check_crystals(json.load(open(os.path.join(a.assets, "footprints.json"))))
+    print("river clearance (m, min %.1f):" % L.RIVER_MARGIN, " ".join("%s %.1f" % r for r in rows))
+    if bad:
+        sys.exit("FAIL: crystals within %.1f m of the river: %s" % (L.RIVER_MARGIN,
+                                                                 ", ".join("%s %.1f" % b for b in bad)))
     os.makedirs(a.scene_dir, exist_ok=True)
     sc = scene_json()
     for n in sc["nodes"]:

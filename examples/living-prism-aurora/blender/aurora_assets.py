@@ -11,6 +11,7 @@ The shard (the reference's crystals, 3.1): a long, irregular, tabular prism of 4
 oblique termination (one or two apex points), not a hexagonal quartz. Families give each formation its own
 silhouette (spec 4.4): a tall leaning cluster, a wide tilted pair, spires, small and distant groups.
 """
+import json
 import math
 import os
 import random
@@ -134,7 +135,13 @@ def build_family(name, out):
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=True,
                               export_yup=True, export_apply=True, export_normals=True)
     print("EXPORTED", name, len(me.polygons), "faces")
+    # the footprint for the river clearance check (layout.check_crystals): every vertex's ground projection, in AV
+    # Gen's x/z (Blender -y is AV Gen +z)
+    FOOTPRINTS[name] = [[round(v.co.x, 3), round(-v.co.y, 3)] for v in me.vertices]
     return ob
+
+
+FOOTPRINTS = {}
 
 
 # ---- the far mountains (phase 2b): three jagged ridgelines receding into the fog, built in place -----------------
@@ -276,6 +283,8 @@ def main():
     os.makedirs(out, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     objs = [build_family(n, out) for n in FAMILIES]
+    with open(os.path.join(out, "footprints.json"), "w") as f:
+        json.dump(FOOTPRINTS, f)
     build_ridges(out)
     if pdir:
         preview(objs, pdir)
