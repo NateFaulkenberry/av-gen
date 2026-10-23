@@ -41,3 +41,24 @@ the baseline's spread (one in 900); the live baseline is re-checked with both le
 - The editor's UI reads one frame late while performing; no panel depends on the same frame's update.
 - Together with ADR-1609: Rainbow World impacts 73.1 / 91.3 ms (ADR-1605) -> 59.7 / 73.9; Event Horizon 51.7 / 69.0 ->
   47.5 / 63.6. T10 (45 / 60) is still not met.
+
+## The live baseline with ADR-1609 and ADR-1610 on (2026-10-23)
+
+`tools/ci/live-perf.sh` against the committed baseline **failed** (misses 10-25 per 900 where the baseline has 1-3).
+The cause is the machine, not the levers: the 60 Hz LG UltraFine the baseline was taken on had been disconnected, so the
+projection ran on the built-in 120 Hz display, where ADR-1600's counter rounds intervals to 8.3 ms vsyncs and counts
+every interval over 37.5 ms. The baseline is therefore not comparable and was **not** updated. What was measured
+instead is an interleaved A/B on that display (`~/Desktop/av-gen-review/85-latency-levers/ab-120hz/`; `--live-only`,
+three reps per arm alternating arm by arm, 60 s gaps for the other agents, AC on every run):
+
+| misses per 900 [reps] / p99 / Medium or better | levers off | levers on |
+|---|---|---|
+| Rainbow World | 28 [30, 28, 28] / 38.5 / 100% | **23** [23, 25, 20] / 38.7 / 100% |
+| THE RIFT LIVE | 11 [5, 11, 15] / 38.0 / 70% [70, 70, 28] | 12 [15, 11, 12] / 39.2 / **39%** [36, 39, 46] |
+| Event Horizon | 21 [32, 11, 21] / 39.0 / 100% | **5** [11, 5, 1] / 36.8 / 100% |
+
+Misses are no worse with the levers (fewer on Rainbow World and Event Horizon). THE RIFT's share at Medium or better is
+lower in this sample, but both arms follow the same drops (Ultra->High in warm-up, Medium->Low at the song's heavy
+section 13-14 s in); the arms differ in whether a later raise held, and the off arm's own reps span 28-70%. Three reps
+cannot separate that from noise; it should be re-measured on the 60 Hz display with `live-perf.sh` before the baseline
+is moved.
