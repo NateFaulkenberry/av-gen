@@ -361,3 +361,50 @@ The owner's 2f verdict: "left hand side foreground crystals need to be out of th
 | Live auto | 24.8 / 29.3 ms | 37.2 ms | 100% Ultra (450 frames) | 1 |
 
 The 2f budget holds.
+
+## Phase 2h gate: clean-up (2026-10-23)
+
+The owner marked six areas on the 2g frame ("just clean up these highlighted areas first ... fix other small visual issue with other crystals"; "couple other issues I noticed in the g pass") and asked: "raise the river water level a bit more too". `phase2h-before-after.jpg` crops each area from 2g and 2h.
+
+**What caused them,** found with a new terrain sweep. `layout.terrain_sweep()` uses the engine's ground heights to measure, for every formation:
+- **hidden:** the share of its vertices the ground hides from the camera;
+- **buried:** the share of its vertices inside the ground.
+
+In 2g:
+
+| Formation | Hidden | Buried | Owner's area |
+|---|---|---|---|
+| L4 | 100% | 86% | the sliver on the left mid cluster: its tip poking out of the cliff |
+| L1b (`massL`) | 73% | 33% | the tips behind the top-left ridge |
+| L1 (fan) | 39% | 45% | the left-edge sliver: shards leaning into the hill |
+| R3 (`stub`) | 12% | 28% | the slab right of the needle |
+| R5 | 14% | 12% | the clipped shard left of the needle |
+| R1 | 25% | 25% | |
+
+The notch at the mid cluster's base was not a crystal: a scattered scan boulder stood half inside the cluster.
+
+**Fixes:**
+1. **Cliff crystals:** the backing mass is replaced by a two-column `spire2` (scale 1.7) on the cliff face where the owner's arrow points. A grid search placed it with 0% hidden and 7% buried, so it is embedded in the rock and leans out toward the river. It is 65% visible past the others, and no other formation lost visibility.
+2. **Left-edge sliver:**
+   - The fan turned to a new yaw and tilt: 6% hidden, 10% buried.
+   - The fan's steepest shards were capped at about 25° of lean, because one lay almost flat toward the camera, a slab.
+3. and 4. **The shards around the needle:**
+   - R3 changed from the broken stub (its slanted break faces read as a wedge) to a cluster, and was re-placed by search.
+   - R5 was re-placed by search; it is now 0% hidden and 0% buried.
+5. **L4** moved to z -480, setback 170: 0% hidden and buried, 51% visible past the others.
+6. **Rocks:** no scan rock or cliff may stand within 3 m of any crystal's ground footprint. This also dropped the cliff scans that crossed crystals.
+
+**Water:** every level is up another 1.5 m (3 m on 2f). The rerun clearance check caught R4 in the water, so it moved out from 75 to 100 m. Nearest now: L1 9 m, R5 13 m. The minimum is 4 m.
+
+**Sweep after the fixes:**
+- Every formation is at most 14% hidden and at most 18% buried. The far ones are partly hidden behind ridges, which is depth, not clipping.
+- Layering: the minimum visible share is 51%, and crystals cover 34.4% of the frame.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 22.6 / 23.2 ms | 64.7 ms | Ultra | n/a |
+| Live auto | 22.4 / 22.9 ms | 37.3 ms | Ultra 273, High 177 (100% High or better) | 1 |
+
+The headless frame p50 is 30.7 ms. Its p99 of 64.7 ms is the recurring single-frame spike, not investigated.

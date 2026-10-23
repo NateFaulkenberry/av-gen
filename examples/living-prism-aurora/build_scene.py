@@ -213,7 +213,7 @@ SCATTER = {  # asset: (count left, count right, scale lo, hi)
     "stone": (14, 6, 10.0, 24.0)}
 
 
-def place_scans(sizes):
+def place_scans(sizes, placed=()):
     """Points for each scan asset: the cliffs, then a sparse, seeded scatter on both banks, denser on the rocky left.
     Everything stands on the engine's ground, and nothing goes on wet ground."""
     import random
@@ -221,12 +221,18 @@ def place_scans(sizes):
     items = []
     for asset, z, side, setback, yaw, sc, sink in CLIFFS:
         items.append((asset, L.river_x(z) + side * setback, z, yaw, sc, sink))
+    # phase 2h: no rock inside a crystal's ground footprint (a boulder half inside a cluster read as a dark notch)
+    def clear_of_crystals(x, z, r):
+        return all(min(math.hypot(x - gx, z - gz) for gx, gz in ground) > r + 3.0 for _f, _p, _q, ground in placed)
+    items = [it for it in items if clear_of_crystals(it[1], it[2], 0.5 * max(sizes[it[0]][0], sizes[it[0]][2]) * it[4])]
     for asset, (nl, nr, lo, hi) in SCATTER.items():
         for side, n in ((-1, nl), (1, nr)):
             for _ in range(n):
                 z = rng.uniform(-420.0, 120.0)
                 d = rng.uniform(44.0, 120.0) * (1.0 + max(0.0, -z) / 900.0)
-                items.append((asset, L.river_x(z) + side * d, z, rng.uniform(0, 360), rng.uniform(lo, hi), 0.25))
+                x, sc = L.river_x(z) + side * d, rng.uniform(lo, hi)
+                if clear_of_crystals(x, z, 0.5 * max(sizes[asset][0], sizes[asset][2]) * sc):
+                    items.append((asset, x, z, rng.uniform(0, 360), sc, 0.25))
     # each piece sinks from the LOWEST ground under its footprint (centre and four corners), so none floats as a
     # shelf off a slope
     probes = []
@@ -264,8 +270,10 @@ def main():
     rows, cover = L.layering(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
     print("layering (frame % / visible %): " + " ".join("%s %.1f/%.0f" % r for r in rows),
           "| crystals cover %.1f%% of the frame" % cover)
+    sweep = L.terrain_sweep(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
+    print("terrain (hidden % / buried %): " + " ".join("%s %.0f/%.0f" % r for r in sweep))
     os.makedirs(a.scene_dir, exist_ok=True)
-    sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json")))))
+    sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json"))), placed))
     for n in sc["nodes"]:
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":

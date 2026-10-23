@@ -102,9 +102,10 @@ def lean(rng, out_x, deg_lo, deg_hi, spread=25):
 FAMILIES = {
     # phase 2c: the left hero is a FAN -- three tall shards leaning outward (to the left, -x), shorter ones around
     # the base leaning every way; no single central spike. dy > 0 is behind (Blender +Y = AV Gen -Z).
+    # phase 2h: no shard leans past ~25 deg (a 40 deg one lay almost flat toward the camera: a slab)
     "fan": (13, [(0, 0, 4.0, 52, 10, 16), (-7, 4, 3.6, 46, 18, 26), (5, 6, 3.2, 40, 6, 12),
-                 (-12, -3, 2.8, 26, 28, 40), (8, -5, 2.6, 22, 14, 24), (-3, -8, 2.4, 16, 20, 34),
-                 (12, 2, 2.2, 14, 26, 38)], -1),
+                 (-12, -3, 2.8, 26, 16, 24), (8, -5, 2.6, 22, 14, 24), (-3, -8, 2.4, 16, 14, 24),
+                 (12, 2, 2.2, 14, 14, 22)], -1),
     # phase 2c: the right bank's near pair -- a big upright crystal leaning outward (+x) and a second one behind it,
     # small ones at their base (the reference's lower-right pair)
     "pairR": (29, [(0, 0, 5.2, 44, 12, 18), (-9, 14, 4.4, 36, 16, 24), (-6, -4, 2.4, 13, 22, 34),

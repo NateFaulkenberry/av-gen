@@ -26,13 +26,14 @@ FAR = 6000.0
 # and three reaches now -- near, mid, and a distant reach that winds on to z = -1760, narrowing by perspective into
 # the haze under the horizon glow, to the foot of the near ridge (now at 1800 m) so it never ends at a wall
 # phase 2g (the owner: "brining water level of river up a tad"): every level +1.5 m, so the water spreads wider
-RIVER_NEAR_PATH = [(-10.0, 1.5, 240.0), (-30.0, 1.5, 150.0), (26.0, 1.3, 75.0), (44.0, 1.1, 10.0),
-                   (-10.0, 0.8, -55.0), (-32.0, 0.5, -105.0)]
-RIVER_PATH = [(-32.0, 0.5, -105.0), (-8.0, 0.0, -165.0), (24.0, -0.7, -230.0), (18.0, -1.5, -300.0),
-              (-14.0, -2.5, -370.0), (-18.0, -3.5, -450.0), (8.0, -5.0, -560.0), (10.0, -6.5, -720.0),
-              (-6.0, -8.5, -900.0)]
-RIVER_FAR_PATH = [(-6.0, -8.5, -900.0), (-24.0, -10.5, -1080.0), (8.0, -12.5, -1280.0), (30.0, -14.5, -1500.0),
-                  (24.0, -16.5, -1760.0)]
+# phase 2h (the owner: "raise the river water level a bit more too"): +1.5 m more (+3 m on 2f)
+RIVER_NEAR_PATH = [(-10.0, 3.0, 240.0), (-30.0, 3.0, 150.0), (26.0, 2.8, 75.0), (44.0, 2.6, 10.0),
+                   (-10.0, 2.3, -55.0), (-32.0, 2.0, -105.0)]
+RIVER_PATH = [(-32.0, 2.0, -105.0), (-8.0, 1.5, -165.0), (24.0, 0.8, -230.0), (18.0, 0.0, -300.0),
+              (-14.0, -1.0, -370.0), (-18.0, -2.0, -450.0), (8.0, -3.5, -560.0), (10.0, -5.0, -720.0),
+              (-6.0, -7.0, -900.0)]
+RIVER_FAR_PATH = [(-6.0, -7.0, -900.0), (-24.0, -9.0, -1080.0), (8.0, -11.0, -1280.0), (30.0, -13.0, -1500.0),
+                  (24.0, -15.0, -1760.0)]
 RIVERS = [{"name": "riverNear", "path": RIVER_NEAR_PATH, "width": 100.0, "amplitude": 2.6, "falloff": 0.6,
            "smoothing": 3},
           {"name": "river", "path": RIVER_PATH, "width": 58.0, "amplitude": 2.4, "falloff": 0.7, "smoothing": 3},
@@ -191,19 +192,19 @@ _FORMATION_SPEC = [   # (name, z, side, setback m, yaw deg, scale, family, tilt 
     # crystals need to dominate that side of the river more - vary the foreground crystals a bit more on the right"):
     # the left fan stands out on the bank near the water, free of the wall; a big full mass (massL) stands on the
     # wall behind it; the right bank mixes a pair, a needle, broken stubs, a leaning pair and a fan.
-    ("L1", -15.0, -1, 120.0, 10.0, 2.4, "fan", 4.0, 3.0),
-    ("L1b", -150.0, -1, 180.0, -20.0, 2.8, "massL", 6.0, -4.0),
+    ("L1", -15.0, -1, 120.0, 70.0, 2.4, "fan", -6.0, 3.0),
+    ("L1b", -110.0, -1, 110.0, 120.0, 1.7, "spire2", -20.0, -4.0),
     ("L2", -235.0, -1, 75.0, 40.0, 2.8, "spire", 14.0, 6.0),
     ("L3", -300.0, -1, 120.0, 115.0, 3.0, "cluster", 8.0, -10.0),
-    ("L4", -440.0, -1, 180.0, -35.0, 2.7, "spire2", 20.0, 9.0),
+    ("L4", -480.0, -1, 170.0, -35.0, 2.7, "spire2", 6.0, 9.0),
     ("L5", -700.0, -1, 100.0, 160.0, 3.4, "far", 8.0, 5.0),
     ("L6", -1050.0, -1, 150.0, 60.0, 4.0, "spire", 12.0, -6.0),
-    ("R1", -60.0, 1, 145.0, -10.0, 2.4, "pairR", 3.0, -2.0),
+    ("R1", -60.0, 1, 145.0, -50.0, 2.4, "pairR", -4.0, -2.0),
     ("R2", -185.0, 1, 90.0, -65.0, 2.6, "needle", 7.0, -8.0),
-    ("R3", -270.0, 1, 160.0, 25.0, 3.0, "stub", 4.0, 4.0),
-    ("R4", -390.0, 1, 75.0, 70.0, 2.6, "leanPair", 10.0, -12.0),
-    ("R5", -560.0, 1, 75.0, -20.0, 2.8, "fanR", 12.0, 6.0),
-    ("R6", -850.0, 1, 75.0, 100.0, 3.4, "small", 10.0, -4.0),
+    ("R3", -240.0, 1, 145.0, 80.0, 3.0, "cluster", 4.0, 4.0),
+    ("R4", -390.0, 1, 100.0, 70.0, 2.6, "leanPair", 10.0, -12.0),
+    ("R5", -560.0, 1, 75.0, 40.0, 2.8, "fanR", 6.0, 6.0),
+    ("R6", -950.0, 1, 75.0, 100.0, 3.4, "small", 10.0, -4.0),
 ]
 # A family whose shards lean to +x leans toward the river on the left bank: turn it round there (yaw + 180).
 FAMILY_OUTWARD = {"needle": 1, "stub": 1, "leanPair": 1, "fanR": 1, "massL": -1, "fan": -1, "pairR": 1, "cluster": 1, "pair": 1, "spire": 1, "spire2": 1, "small": 1, "small2": 1,
@@ -401,6 +402,42 @@ def layering(placed, footprints, cell=8):
     total = (1920 // cell) * (1080 // cell)
     return [(n, 100.0 * area[n] / total, 100.0 * owner.get(n, 0) / max(area[n], 1)) for n, _d, _h in shapes], \
         100.0 * sum(owner.values()) / total
+
+
+def terrain_sweep(placed, footprints, steps=28):
+    """Phase 2h (the owner: "fix other small visual issue with other crystals"): what the GROUND does to each
+    formation, from the engine's own heights. hidden: the share of its vertices the camera cannot see because the
+    ground rises across the line of sight (a crystal sunk behind a ridge, or a sliver cut by a hill); buried: the share
+    of its vertices inside the ground (more than the planned sink -- a crystal swallowed by a slope).
+    Returns [(formation, hidden %, buried %)]."""
+    cam = CAMERA_POS
+    rays, inside, owners = [], [], []
+    for f, pos, q, _g in placed:
+        s = f[4]
+        for a in footprints[f[5]]:
+            if a[1] < 1.0:      # the base ring: planned to sit in the ground
+                continue
+            v = _qrot(q, (s * a[0], s * a[1], s * a[2]))
+            w = [pos[i] + v[i] for i in range(3)]
+            owners.append(f[0])
+            inside.append((w[0], w[2], w[1]))
+            rays.append([(cam[0] + (w[0] - cam[0]) * t, cam[2] + (w[2] - cam[2]) * t, cam[1] + (w[1] - cam[1]) * t)
+                         for t in (k / steps * 0.97 for k in range(1, steps + 1))])
+    pts = [(x, z) for x, z, _y in inside] + [(x, z) for r in rays for x, z, _y in r]
+    hs = engine_heights(pts)
+    n = len(inside)
+    stat = {}
+    for i, o in enumerate(owners):
+        h = stat.setdefault(o, [0, 0, 0])
+        h[0] += 1
+        if hs[i] > inside[i][2]:
+            h[2] += 1
+        ray = rays[i]
+        base = n + i * steps
+        if any(hs[base + k] > ray[k][2] for k in range(steps)):
+            h[1] += 1
+    return [(f[0], 100.0 * stat[f[0]][1] / stat[f[0]][0], 100.0 * stat[f[0]][2] / stat[f[0]][0])
+            for f, *_r in placed]
 
 
 def quat_y(deg):
