@@ -231,3 +231,56 @@ The owner's 2c verdict: "getting better, let's make the valley and the river wid
 | Live auto | 20.2 / 20.8 ms | 35.8 ms | Ultra 274, High 177 (100% High or better) | 1 |
 
 The wider water costs about +2.5 ms GPU over 2c. That is about 13 ms of headroom against 33.3 ms, and about 2.4x over 8.33 ms.
+
+## Phase 2e gate (2026-10-23)
+
+The owner's 2d verdict: "midground and background crystals can be larger and also faced away from the river at different angles - the valley reads too much as bulbous hills right now - should refine these more, it alsso reads too symmetical, and looks very CG".
+
+**Mid and far crystals:**
+- They are about 1.5x larger.
+- Each formation has its own yaw, outward tilt (3-22°) and forward tilt (±12°), so none are parallel.
+- Families that lean toward +x are turned round on the left bank so they lean away from the water.
+- The left bank carries the larger crystal mass.
+
+**The cause of the bulbous hills:**
+- In the engine, the terrain noise is scaled by the minimum `roughness` of every feature reaching a point. Every wall had roughness 0, so the valley was pure smoothstep domes.
+- The outer walls were offset copies of the winding river, which knotted into round lumps at each bend.
+
+**Landform fixes:**
+- Walls now carry roughness up to 1. The noise layers are warped and mostly ridged, with stronger short octaves (spurs, gullies, rocky breaks).
+- The walls follow a damped canyon axis, and each wall's setback wobbles with its own phase so the steps aren't parallel.
+- Low buttress spurs run down from the high walls.
+- A raking violet fill from the right models the left wall's relief.
+
+**Asymmetry:**
+- The left is high, steep and rocky: a mossy toe, a rock ledge, cliffs, then a high wall up to about 160 m.
+- The right is lower and green: a broad bench, a gentle bank, and a lower wall far back.
+- The far ridges have off-centre saddles and different side lifts.
+
+**Poly Haven CC0 scans:**
+- 4 cliff and rock-face scans and 4 rocks, recorded in `assets/aurora-valley.manifest.json` with creators and licence.
+- They are decimated and shaded by the ground program.
+- The cliffs sit on the left wall; about 80 boulders and stones are scattered, denser on the left.
+- Every piece sinks from the lowest ground under its footprint and avoids wet ground.
+
+**Less CG:**
+- The ground program now breaks the surface up at three scales: dry-olive and blue-green patches, mottling, rock strata and scree flecks.
+- The moss edge is frayed by noise, rock takes the slopes and the high ground, and concavity darkens the creases.
+- Denser low fog gives the aerial perspective more steps.
+- The crystals now run violet at the base, rose and lilac in the middle and pale mint at the tip. They are still placeholders until Phase 3.
+
+**The river check now uses engine heights:**
+- Placement and the river check sample the engine's real ground (`avgen_world_preview --heights`, noise included).
+- Each crystal vertex is probed on rings of 8 directions out to 25 m.
+- Every formation is clear of wet ground for the full 25 m, except D at 13 m. The margin is 4 m.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 28.5 / 38.8 ms | 46.8 ms | Ultra | n/a |
+| Live auto | 30.3 / 36.0 ms | 37.2 ms | Ultra 274, High 177 (100% High or better) | 4 |
+
+That is up about 9-10 ms from 2d. The likely cause is the heavier ground program (three fbm noises plus a triplanar), but that is not measured. Headroom against 33.3 ms is thin; against 8.33 ms it is about 3.6x over. Perf is Phase 8 work.
+
+**Still open:** the large wall forms remain smoothish, and the scan cliffs read weakly at this distance.

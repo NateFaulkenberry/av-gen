@@ -1,0 +1,121 @@
+{
+ "scene": "The Living Prism: Aurora Valley",
+ "policy": "CC0 only, verified on the asset page; read from the asset library (gitignored, fetched by tools/fetch_polyhaven.py), never committed; the scene ships only the scripts that adapt them",
+ "assets": [
+  {
+   "id": "coastal_cliff_02",
+   "source": "https://polyhaven.com/a/coastal_cliff_02",
+   "creators": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rob Tuytel)",
+   "localPath": "assets/terrain/formations/coastal_cliff_02/coastal_cliff_02_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "cliff/outcrop"
+  },
+  {
+   "id": "namaqualand_cliff_02",
+   "source": "https://polyhaven.com/a/namaqualand_cliff_02",
+   "creators": [
+    "Dario Barresi",
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Dario Barresi, Rico Cilliers)",
+   "localPath": "assets/terrain/formations/namaqualand_cliff_02/namaqualand_cliff_02_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "cliff/outcrop"
+  },
+  {
+   "id": "rock_face_01",
+   "source": "https://polyhaven.com/a/rock_face_01",
+   "creators": [
+    "Dario Barresi"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Dario Barresi)",
+   "localPath": "assets/terrain/formations/rock_face_01/rock_face_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "cliff/outcrop"
+  },
+  {
+   "id": "coastal_cliff_04",
+   "source": "https://polyhaven.com/a/coastal_cliff_04",
+   "creators": [
+    "Rob Tuytel",
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rob Tuytel, Rico Cilliers)",
+   "localPath": "assets/terrain/formations/coastal_cliff_04/coastal_cliff_04_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "cliff/outcrop"
+  },
+  {
+   "id": "boulder_01",
+   "source": "https://polyhaven.com/a/boulder_01",
+   "creators": [
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rico Cilliers)",
+   "localPath": "assets/terrain/rocks/boulder_01/boulder_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "scattered rock"
+  },
+  {
+   "id": "rock_07",
+   "source": "https://polyhaven.com/a/rock_07",
+   "creators": [
+    "Jenelle van Heerden"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Jenelle van Heerden)",
+   "localPath": "assets/terrain/rocks/rock_07/rock_07_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "scattered rock"
+  },
+  {
+   "id": "rock_moss_set_01",
+   "source": "https://polyhaven.com/a/rock_moss_set_01",
+   "creators": [
+    "Kless Gyzen"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Kless Gyzen)",
+   "localPath": "assets/terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "scattered rock"
+  },
+  {
+   "id": "stone_01",
+   "source": "https://polyhaven.com/a/stone_01",
+   "creators": [
+    "Dario Barresi",
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Dario Barresi, Rico Cilliers)",
+   "localPath": "assets/terrain/rocks/stone_01/stone_01_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
+   "usedAs": "scattered rock"
+  }
+ ]
+}

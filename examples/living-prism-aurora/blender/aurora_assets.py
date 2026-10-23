@@ -135,20 +135,90 @@ def build_family(name, out):
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=True,
                               export_yup=True, export_apply=True, export_normals=True)
     print("EXPORTED", name, len(me.polygons), "faces")
-    # the footprint for the river clearance check (layout.check_crystals): every vertex's ground projection, in AV
-    # Gen's x/z (Blender -y is AV Gen +z)
-    FOOTPRINTS[name] = [[round(v.co.x, 3), round(-v.co.y, 3)] for v in me.vertices]
+    # the footprint for placement and the river clearance check (layout.place / check_crystals): every vertex in AV
+    # Gen's axes (Blender x, z, -y)
+    FOOTPRINTS[name] = [[round(v.co.x, 3), round(v.co.z, 3), round(-v.co.y, 3)] for v in me.vertices]
     return ob
 
 
 FOOTPRINTS = {}
 
 
+# ---- phase 2e: Poly Haven CC0 scans for the rock (assets/aurora-valley.manifest.json) -------------------------
+# Read from the asset library (tools/fetch_polyhaven.py), never modified there. Each is joined, decimated to a
+# budget, rested on z = 0 and centred, and exported as geometry only: the scene shades it with the ground's own
+# program (rock by slope, moss on what faces up), so scan and terrain read as one material.
+REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+SCANS = {  # out name: (library path, target faces)
+    "cliffA": ("terrain/formations/coastal_cliff_02/coastal_cliff_02_1k.gltf", 9000),
+    "cliffB": ("terrain/formations/namaqualand_cliff_02/namaqualand_cliff_02_1k.gltf", 9000),
+    "cliffC": ("terrain/formations/rock_face_01/rock_face_01_1k.gltf", 7000),
+    "cliffD": ("terrain/formations/coastal_cliff_04/coastal_cliff_04_1k.gltf", 9000),
+    "boulder": ("terrain/rocks/boulder_01/boulder_01_1k.gltf", 900),
+    "rock": ("terrain/rocks/rock_07/rock_07_1k.gltf", 700),
+    "mossrock": ("terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf", 1400),
+    "stone": ("terrain/rocks/stone_01/stone_01_1k.gltf", 500),
+}
+SCAN_SIZES = {}
+
+
+def build_scan(name, out):
+    rel, faces = SCANS[name]
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(REPO, "assets", rel))
+    objs = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    if len(objs) > 1:
+        bpy.ops.object.join()
+    ob = bpy.context.view_layer.objects.active
+    ob.parent = None
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    for _ in range(4):   # a scan with seams can stop short of the ratio: decimate again until within budget
+        n = len(ob.data.polygons)
+        if n <= faces * 1.2:
+            break
+        mod = ob.modifiers.new("dec", "DECIMATE")
+        mod.ratio = faces / n
+        mod.use_collapse_triangulate = True
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles(threshold=0.002)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+    me = ob.data
+    xs = [v.co.x for v in me.vertices]
+    ys = [v.co.y for v in me.vertices]
+    zs = [v.co.z for v in me.vertices]
+    off = Vector(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, min(zs)))
+    for v in me.vertices:
+        v.co -= off
+    me.materials.clear()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob.name = name
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=True,
+                              export_yup=True, export_apply=True, export_normals=True, export_materials="NONE")
+    # AV Gen extents (x, y up, z)
+    SCAN_SIZES[name] = [round(max(xs) - min(xs), 3), round(max(zs) - min(zs), 3), round(max(ys) - min(ys), 3)]
+    print("EXPORTED", name, len(me.polygons), "faces", SCAN_SIZES[name])
+    return ob
+
+
 # ---- the far mountains (phase 2b): three jagged ridgelines receding into the fog, built in place -----------------
-RIDGES = [  # (name, distance m, half-span m, peak height m, centre dip (0..1), roughness, seed)
-    ("ridgeNear", 950.0, 1500.0, 260.0, 0.7, 0.68, 3),
-    ("ridgeMid", 1600.0, 2200.0, 420.0, 0.4, 0.66, 5),
-    ("ridgeFar", 2500.0, 3200.0, 620.0, 0.2, 0.64, 9),
+RIDGES = [  # (name, distance m, half-span m, peak height m, centre dip (0..1), roughness, seed, dip x m, left lift)
+    # phase 2e (the owner: "too symmetrical"): each ridge's saddle sits off-centre, at its own x, and each rises
+    # toward one side by its own amount (the left, rocky side highest on the near ridge)
+    ("ridgeNear", 950.0, 1500.0, 260.0, 0.7, 0.70, 3, 140.0, 0.45),
+    ("ridgeMid", 1600.0, 2200.0, 420.0, 0.45, 0.66, 5, -260.0, -0.25),
+    ("ridgeFar", 2500.0, 3200.0, 620.0, 0.2, 0.62, 9, 500.0, 0.2),
 ]
 
 
@@ -171,7 +241,7 @@ def build_ridges(out):
     """Each ridge: a solid wall (front and back faces, 120 m deep) whose top is a jagged skyline; AV Gen coordinates
     are converted to Blender's on export. The near ridge dips in the middle (the reference's V), opening the
     horizon glow above the river's vanishing point."""
-    for name, dist, half, peak, dip, rough, seed in RIDGES:
+    for name, dist, half, peak, dip, rough, seed, dipx, lift in RIDGES:
         rng = random.Random(seed)
         prof = ridge_profile(9, rough, rng)
         bm = bmesh.new()
@@ -181,8 +251,8 @@ def build_ridges(out):
             u = i / (n - 1)
             x = -half + 2 * half * u
             z = -dist - 0.18 * dist * (2 * u - 1) ** 2          # the ends curve toward the camera, framing
-            centre = math.exp(-((x / (half * 0.28)) ** 2))       # the V in the middle
-            y = peak * (0.12 + 0.88 * v ** 1.6) * (1.0 - dip * centre)   # sharp peaks, deep saddles
+            centre = math.exp(-(((x - dipx) / (half * 0.28)) ** 2))   # the V, off-centre
+            y = peak * (0.12 + 0.88 * v ** 1.6) * (1.0 - dip * centre) * (1.0 - lift * x / half)
             front.append(bm.verts.new(av2bl((x, y, z))))
             back.append(bm.verts.new(av2bl((x, y * 0.95, z - 120.0))))
             base_f.append(bm.verts.new(av2bl((x, -80.0, z))))
@@ -248,11 +318,12 @@ def preview(objs, pdir):
     me.materials.append(wm)
     fam = {o.name: o for o in objs}
     conv = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0))).to_4x4()
-    for name, x, z, yaw, s, f in L.FORMATIONS:
+    for ff in L.FORMATIONS:   # NB the valley here is features only (no noise): a composition check
+        name, x, z, yaw, s, f = ff[:6]
         src = fam[f]
         o = src.copy()
         sc.collection.objects.link(o)
-        q = L.quat_y(yaw)
+        q = L.formation_quat(ff)
         mw = Matrix.Translation((x, L.height(x, z) - 0.8 * s, z)) @ Quaternion((q[3], q[0], q[1], q[2])).to_matrix().to_4x4() \
             @ Matrix.Diagonal((s, s, s, 1))
         o.matrix_world = conv @ mw @ conv.inverted()
@@ -285,6 +356,10 @@ def main():
     objs = [build_family(n, out) for n in FAMILIES]
     with open(os.path.join(out, "footprints.json"), "w") as f:
         json.dump(FOOTPRINTS, f)
+    for n in SCANS:
+        build_scan(n, out).hide_render = True
+    with open(os.path.join(out, "scans.json"), "w") as f:
+        json.dump(SCAN_SIZES, f)
     build_ridges(out)
     if pdir:
         preview(objs, pdir)

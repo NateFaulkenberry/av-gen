@@ -8,6 +8,7 @@ crystal formations, the stars and a rough aurora, with placeholder materials. Th
 gitignored; the projects are committed and are pure functions of the scripts.
 """
 import argparse
+import math
 import json
 import os
 import shutil
@@ -27,22 +28,52 @@ AURORA2_TOP = [0.30, 0.25, 0.85]
 
 
 def prog_ground():
-    return {"name": "au_ground", "baseColor": 3, "metallic": -1, "roughness": 6, "emission": -1,
-            "emissionIntensity": 1.0, "opacity": -1, "ops": [
+    """Phase 2e (the owner: "looks very CG"): moss and rock broken up at three scales -- large dry/olive patches,
+    medium mottling, rock strata and pale scree flecks -- the moss edge frayed by noise, rock taking the high ground,
+    and the creases darkened by the surface's own concavity. Also shades the Poly Haven scans."""
+    return {"name": "au_ground", "baseColor": 3, "metallic": -1, "roughness": 7, "emission": -1,
+            "emissionIntensity": 1.0, "opacity": -1, "occlusion": 5, "ops": [
                 {"kind": "input", "dst": 0, "input": "worldPosition"},
-                {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.05, "seed": 3},
-                {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.3, 0.75, 0, 0]},
-                {"kind": "constant", "dst": 2, "constant": [0.010, 0.030, 0.014, 1]},    # deep moss
-                {"kind": "constant", "dst": 3, "constant": [0.035, 0.095, 0.040, 1]},    # lit moss
-                {"kind": "mixBy", "dst": 3, "srcA": 2, "srcB": 3, "srcC": 1},
-                {"kind": "input", "dst": 4, "input": "normal"},                            # rock on steep ground
-                {"kind": "gradient", "dst": 4, "srcA": 4, "constant": [0, 1, 0, 0], "value": 1.0},
-                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.5, 0.72, 0, 0]},     # moss on all but steep
-                {"kind": "gradient", "dst": 7, "srcA": 0, "constant": [0, 1, 0, 1.6], "value": -0.05},  # and below ~30 m
-                {"kind": "add", "dst": 4, "srcA": 4, "srcB": 7},
-                {"kind": "constant", "dst": 5, "constant": [0.012, 0.014, 0.018, 1]},    # near-black rock
-                {"kind": "mixBy", "dst": 3, "srcA": 5, "srcB": 3, "srcC": 4},
-                {"kind": "remap", "dst": 6, "srcA": 4, "constant": [0, 1, 0.75, 0.9]}]}
+                {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.012, "seed": 3},          # large patches
+                {"kind": "noise", "dst": 2, "srcA": 0, "value": 0.09, "seed": 5},           # medium mottling
+                {"kind": "constant", "dst": 3, "constant": [0.010, 0.026, 0.014, 1]},      # deep moss
+                {"kind": "constant", "dst": 4, "constant": [0.042, 0.090, 0.036, 1]},      # lit moss
+                {"kind": "smoothstep", "dst": 5, "srcA": 2, "constant": [0.3, 0.75, 0, 0]},
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 5},
+                {"kind": "constant", "dst": 4, "constant": [0.062, 0.066, 0.030, 1]},      # dry olive
+                {"kind": "smoothstep", "dst": 5, "srcA": 1, "constant": [0.5, 0.75, 0, 0]},
+                {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0, 1, 0, 0.65]},
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 5},
+                {"kind": "constant", "dst": 4, "constant": [0.022, 0.060, 0.050, 1]},      # cool blue-green
+                {"kind": "smoothstep", "dst": 5, "srcA": 1, "constant": [0.45, 0.2, 0, 0]},
+                {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0, 1, 0, 0.5]},
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 5},
+                # rock: dark slate with lighter strata (triplanar, so cliffs band) and pale scree flecks
+                {"kind": "triplanar", "dst": 6, "srcA": 0, "value": 0.06, "seed": 7, "constant2": [4, 0, 0, 0]},
+                {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.35, 0.7, 0, 0]},
+                {"kind": "constant", "dst": 4, "constant": [0.012, 0.013, 0.017, 1]},
+                {"kind": "constant", "dst": 7, "constant": [0.055, 0.050, 0.048, 1]},
+                {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 7, "srcC": 6},
+                {"kind": "noise", "dst": 6, "srcA": 0, "value": 0.9, "seed": 11},
+                {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.66, 0.74, 0, 0]},
+                {"kind": "constant", "dst": 7, "constant": [0.050, 0.047, 0.046, 1]},
+                {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 7, "srcC": 6},
+                # where moss grows: flat-ish ground (edge frayed by the mottling), low ground, less high up
+                {"kind": "input", "dst": 6, "input": "normal"},
+                {"kind": "gradient", "dst": 6, "srcA": 6, "constant": [0, 1, 0, 0], "value": 1.0},
+                {"kind": "remap", "dst": 5, "srcA": 2, "constant": [0, 1, -0.12, 0.12]},
+                {"kind": "add", "dst": 6, "srcA": 6, "srcB": 5},
+                {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.72, 0.9, 0, 0]},
+                {"kind": "gradient", "dst": 7, "srcA": 0, "constant": [0, 1, 0, 1.5], "value": -0.012},  # fewer up high
+                {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+                {"kind": "gradient", "dst": 7, "srcA": 0, "constant": [0, 1, 0, 1.5], "value": -0.07},   # all moss low
+                {"kind": "add", "dst": 6, "srcA": 6, "srcB": 7},
+                {"kind": "mixBy", "dst": 3, "srcA": 4, "srcB": 3, "srcC": 6},
+                # creases: the surface's concavity darkens colour and ambient
+                {"kind": "curvatureMask", "dst": 5, "constant": [0.0, 1.0, 0, 0], "value": -6.0},
+                {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0, 1, 1, 0.35], "value": 1.0},
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+                {"kind": "remap", "dst": 7, "srcA": 6, "constant": [0, 1, 0.7, 0.95], "value": 1.0}]}
 
 
 def prog_crystal():
@@ -52,10 +83,14 @@ def prog_crystal():
                 {"kind": "input", "dst": 0, "input": "normal"},
                 {"kind": "input", "dst": 1, "input": "viewDirection"},
                 {"kind": "fresnel", "dst": 2, "srcA": 0, "srcB": 1, "value": 2.5},
-                {"kind": "constant", "dst": 3, "constant": [0.20, 0.18, 0.28, 1]},
+                {"kind": "input", "dst": 3, "input": "localPosition"},              # phase 2e: off flat pink
+                {"kind": "gradient", "dst": 3, "srcA": 3, "constant": [0, 1, 0, 0], "value": 0.022},
+                {"kind": "oklabRamp", "dst": 3, "srcA": 3, "constant": [0.12, 0.05, 0.24, 1],
+                 "constant2": [0.26, 0.09, 0.22, 1], "constant3": [0.24, 0.18, 0.36, 1],
+                 "constant4": [0.16, 0.34, 0.36, 1]},
                 {"kind": "constant", "dst": 4, "constant": [0.25, 0.9, 0.7, 1]},
                 {"kind": "multiply", "dst": 5, "srcA": 2, "srcB": 4},
-                {"kind": "constant", "dst": 6, "constant": [0.35, 0.12, 0.30, 1]},
+                {"kind": "add", "dst": 6, "srcA": 3, "srcB": 3},                    # interior = 2x the ramp
                 {"kind": "remap", "dst": 7, "srcA": 2, "constant": [0, 1, 1, 0.2]},
                 {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
                 {"kind": "add", "dst": 1, "srcA": 5, "srcB": 6}]}
@@ -101,7 +136,7 @@ def mesh_node(name, asset, points, material, shadow=True):
     return {"name": name, "kind": "procedural", "procedural": pr}
 
 
-def scene_json():
+def scene_json(placed, scans):
     nodes = [{"name": "valley", "kind": "terrain", "position": [0, 0, 0], "world": L.world_json(),
               "terrain": {"chunkSize": 200.0, "resolution": 64, "lodLevels": 3, "lodDistance": 200.0,
                           "viewDistance": 5000.0, "shadowDistance": 300.0, "skirtDepth": 3.0, "groundMottle": False,
@@ -109,11 +144,14 @@ def scene_json():
               "material": {"baseColor": [0.02, 0.05, 0.02], "roughness": 0.85, "metallic": 0.0,
                            "program": "au_ground"}}]
     xmat = {"baseColor": [0.2, 0.18, 0.28], "roughness": 0.08, "metallic": 0.0, "program": "au_crystal"}
-    for name, x, z, yaw, s, fam in L.FORMATIONS:
-        q = L.quat_y(yaw)
-        y = L.height(x, z) - 3.0 * s   # the noise layer moves the ground by up to ~7 m; sink enough to cover it
-        pt = [round(x, 3), round(y, 3), round(z, 3)] + [round(c, 6) for c in q] + [s, s, s]
-        nodes.append(mesh_node("xtal_" + name, fam + ".glb", [pt], xmat))
+    for f, pos, q, _ground in placed:
+        s = f[4]
+        pt = [round(c, 3) for c in pos] + [round(c, 6) for c in q] + [s, s, s]
+        nodes.append(mesh_node("xtal_" + f[0], f[5] + ".glb", [pt], xmat))
+    # the Poly Haven scans (phase 2e): cliffs on the rocky left, outcrops on the right, boulders on both banks
+    gmat = {"baseColor": [0.02, 0.03, 0.02], "roughness": 0.85, "metallic": 0.0, "program": "au_ground"}
+    for asset, pts in scans.items():
+        nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, gmat))
     # the far mountains: three ridges in place, receding in value through the fog (phase 2b)
     rmat = {"baseColor": [0.018, 0.020, 0.030], "roughness": 0.9, "metallic": 0.0}
     for r in ("ridgeNear", "ridgeMid", "ridgeFar"):
@@ -126,10 +164,10 @@ def scene_json():
                    "near": 0.5, "far": L.FAR},
         "environment": {
             # the air: a light peach-lavender extinction, so the ridges recede in value toward the horizon glow
-            "intensity": 0.25, "lightFromEnvironment": False, "fogColor": [0.10, 0.07, 0.10],
-            "volumeDensity": 0.00035, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 4,
+            "intensity": 0.25, "lightFromEnvironment": False, "fogColor": [0.13, 0.09, 0.12],
+            "volumeDensity": 0.0006, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 4,
             "volumeMaxDistance": 40.0, "volumeLocalLights": 0.0, "horizonDensity": 0.4,
-            "fogHeight": 60.0, "fogHeightFalloff": 0.01, "fogUpperDensity": 0.05,
+            "fogHeight": 30.0, "fogHeightFalloff": 0.018, "fogUpperDensity": 0.05,
             "fogSky": 0.0, "fogSkyDistance": 4500.0,
             "shadowCascades": 2, "shadowRange": 600.0, "ambientOcclusion": True, "depthPrepass": True,
             "sky": {"enabled": True, "background": True, "useKeyLight": False,
@@ -140,8 +178,10 @@ def scene_json():
             # the aurora's light on the valley: a broad mint fill from the sky ahead, and a dim violet from above
             {"name": "auroraFill", "id": "auroraFill", "type": "directional", "role": "key",
              "direction": [0.1, -0.45, 0.89], "color": AURORA_LOW, "intensity": 0.7, "castsShadow": True},
-            {"name": "skyFill", "id": "skyFill", "type": "directional", "direction": [-0.2, -0.95, -0.2],
-             "color": AURORA_TOP, "intensity": 0.18, "castsShadow": False}],
+            # phase 2e: the violet fill rakes low across the valley from the right, so the left wall's ledges, spurs
+            # and gullies model in light and shade instead of reading as smooth domes
+            {"name": "skyFill", "id": "skyFill", "type": "directional", "direction": [-0.85, -0.38, -0.36],
+             "color": AURORA_TOP, "intensity": 0.32, "castsShadow": False}],
         "effects": [
             {"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True, "order": 0,
              "activation": "always", "parameters": {"brightness": 1.6, "density": 0.55, "magnitudeSlope": 6.5,
@@ -174,6 +214,54 @@ def project_json(scene_rel, offline=False, root=""):
     return p
 
 
+# ---- phase 2e: the scans. Cliffs: (asset, z, side, setback from the river centre m, yaw deg, scale, sink fraction)
+CLIFFS = [("cliffD", 30.0, -1, 150.0, 80.0, 2.4, 0.3), ("cliffA", -70.0, -1, 135.0, 95.0, 3.6, 0.3),
+          ("cliffB", 95.0, -1, 120.0, 75.0, 6.0, 0.3), ("cliffA", 40.0, -1, 215.0, 100.0, 4.0, 0.3),
+          ("cliffC", -20.0, -1, 175.0, 40.0, 9.0, 0.35), ("cliffB", -250.0, -1, 185.0, 90.0, 6.0, 0.3),
+          ("cliffB", -190.0, -1, 120.0, 70.0, 5.5, 0.3), ("cliffA", -300.0, -1, 120.0, 110.0, 3.0, 0.3),
+          ("cliffD", -430.0, -1, 125.0, 85.0, 2.0, 0.3), ("cliffC", -110.0, -1, 92.0, 60.0, 7.0, 0.35),
+          ("cliffB", -150.0, 1, 165.0, -80.0, 3.2, 0.35), ("cliffC", 10.0, 1, 125.0, -100.0, 5.0, 0.4)]
+SCATTER = {  # asset: (count left, count right, scale lo, hi)
+    "boulder": (30, 14, 2.0, 8.0), "mossrock": (6, 6, 0.35, 0.9), "rock": (16, 6, 6.0, 16.0),
+    "stone": (14, 6, 10.0, 24.0)}
+
+
+def place_scans(sizes):
+    """Points for each scan asset: the cliffs, then a sparse, seeded scatter on both banks, denser on the rocky left.
+    Everything stands on the engine's ground, and nothing goes on wet ground."""
+    import random
+    rng = random.Random(2026102302)
+    items = []
+    for asset, z, side, setback, yaw, sc, sink in CLIFFS:
+        items.append((asset, L.river_x(z) + side * setback, z, yaw, sc, sink))
+    for asset, (nl, nr, lo, hi) in SCATTER.items():
+        for side, n in ((-1, nl), (1, nr)):
+            for _ in range(n):
+                z = rng.uniform(-420.0, 120.0)
+                d = rng.uniform(44.0, 120.0) * (1.0 + max(0.0, -z) / 900.0)
+                items.append((asset, L.river_x(z) + side * d, z, rng.uniform(0, 360), rng.uniform(lo, hi), 0.25))
+    # each piece sinks from the LOWEST ground under its footprint (centre and four corners), so none floats as a
+    # shelf off a slope
+    probes = []
+    for asset, x, z, yaw, sc, _sink in items:
+        w, _h, d = (c * sc * 0.45 for c in sizes[asset])
+        c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+        probes.append((x, z))
+        probes += [(x + c * u + s_ * v, z - s_ * u + c * v) for u, v in ((w, d), (-w, d), (w, -d), (-w, -d))]
+    ph = L.engine_heights(probes)
+    hs = [min(ph[i * 5:i * 5 + 5]) for i in range(len(items))]
+    pts = {}
+    for (asset, x, z, yaw, sc, sink), h in zip(items, hs):
+        lvl = L.water_level(x, z)
+        if lvl is not None and h <= lvl + 0.3:
+            continue
+        y = h - sink * sizes[asset][1] * sc
+        q = L.quat_y(yaw)
+        pts.setdefault(asset, []).append([round(x, 3), round(y, 3), round(z, 3)] + [round(c, 6) for c in q] +
+                                         [sc, sc, sc])
+    return pts
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", required=True)
@@ -181,13 +269,13 @@ def main():
     ap.add_argument("--project-dir", default=HERE)
     a = ap.parse_args()
     # phase 2d: no crystal may stand in (or lean over) the river; the build fails if one does
-    rows, bad = L.check_crystals(json.load(open(os.path.join(a.assets, "footprints.json"))))
-    print("river clearance (m, min %.1f):" % L.RIVER_MARGIN, " ".join("%s %.1f" % r for r in rows))
+    placed, rows, bad = L.check_crystals(json.load(open(os.path.join(a.assets, "footprints.json"))))
+    print("river clearance (m, min %.1f):" % L.RIVER_MARGIN, " ".join("%s %.0f" % r for r in rows))
     if bad:
         sys.exit("FAIL: crystals within %.1f m of the river: %s" % (L.RIVER_MARGIN,
                                                                  ", ".join("%s %.1f" % b for b in bad)))
     os.makedirs(a.scene_dir, exist_ok=True)
-    sc = scene_json()
+    sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json")))))
     for n in sc["nodes"]:
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":
