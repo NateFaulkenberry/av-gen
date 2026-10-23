@@ -35,6 +35,13 @@ std::vector<std::string> Feeds::keys() const {
         }
     }
     add(levels);
+    add(history);
+    if (historySpectrum) {
+        add(*historySpectrum);
+    }
+    if (historyOnsets) {
+        add(*historyOnsets);
+    }
     return out;
 }
 
@@ -54,7 +61,21 @@ bool Feeds::feedsResponse(std::string_view key) const {
 }
 
 std::string feedValue(const std::string& key) {
-    return key.empty() ? std::string("audio") : "stem." + key;
+    if (key.empty()) {
+        return "audio";
+    }
+    return feedRole(key) ? key : "stem." + key;
+}
+
+std::optional<SourceRole> feedRole(std::string_view key) {
+    if (!key.starts_with("role.")) {
+        return std::nullopt;
+    }
+    return sourceRoleFromName(key.substr(5));
+}
+
+std::string roleFeedKey(SourceRole role) {
+    return std::string("role.") + sourceRoleName(role);
 }
 
 Result<std::string> feedKey(std::string_view value) {
@@ -64,7 +85,11 @@ Result<std::string> feedKey(std::string_view value) {
     if (value.starts_with("stem.") && validStemKey(value.substr(5))) {
         return std::string(value.substr(5));
     }
-    return fail("'{}' is neither \"audio\" (the mix) nor \"stem.<key>\"", value);
+    if (feedRole(value)) {
+        return std::string(value); // ADR-1630
+    }
+    return fail("'{}' is neither \"audio\" (the mix), \"stem.<key>\" nor \"role.<drums|bass|synth|vocal|other>\"",
+                value);
 }
 
 Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>* warnings) {
@@ -74,7 +99,7 @@ Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>*
     Feeds f;
     for (const auto& [name, value] : j.items()) {
         if (!value.is_string()) {
-            return fail("feeds.{} must be a string (\"audio\" or \"stem.<key>\")", name);
+            return fail("feeds.{} must be a string (\"audio\", \"stem.<key>\" or \"role.<role>\")", name);
         }
         auto key = feedKey(value.get<std::string>());
         if (!key) {
@@ -86,6 +111,12 @@ Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>*
             f.hits = std::move(*key);
         } else if (name == "levels") {
             f.levels = std::move(*key);
+        } else if (name == "history") {
+            f.history = std::move(*key);
+        } else if (name == "historySpectrum") {
+            f.historySpectrum = std::move(*key);
+        } else if (name == "historyOnsets") {
+            f.historyOnsets = std::move(*key);
         } else if (const auto it = std::find_if(kFeedHitNames.begin(), kFeedHitNames.end(),
                                                 [&](const char* n) { return name == n; });
                    it != kFeedHitNames.end()) {
@@ -96,7 +127,9 @@ Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>*
             }
             f.hit[k] = std::move(*key);
         } else {
-            return fail("feeds.{} is not a feed (beat, hits, kick, low, snare, hat, onset, levels)", name);
+            return fail("feeds.{} is not a feed (beat, hits, kick, low, snare, hat, onset, levels, history, "
+                        "historySpectrum, historyOnsets)",
+                        name);
         }
     }
     return f;
@@ -110,6 +143,9 @@ nlohmann::json Feeds::toJson() const {
         if (hit[k]) j[kFeedHitNames[k]] = feedValue(*hit[k]);
     }
     if (!levels.empty()) j["levels"] = feedValue(levels);
+    if (!history.empty()) j["history"] = feedValue(history);
+    if (historySpectrum) j["historySpectrum"] = feedValue(*historySpectrum);
+    if (historyOnsets) j["historyOnsets"] = feedValue(*historyOnsets);
     return j;
 }
 

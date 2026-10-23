@@ -81,6 +81,14 @@ three stems: on a mix, the onset is a drum signal, not a bass or synth one.
 
 ## 4. Recommendations, ordered by impact and then cost
 
+**Implemented** on eng/stem-roles (the owner's "go for it"):
+- recommendations 1, 2 and 4 are ADR-1630;
+- recommendation 3 is ADR-1631;
+- recommendation 5 is ADR-1632;
+- recommendation 6 needed nothing.
+
+The before and after measurements are probe B5 (`probes/B5-stem-roles/`).
+
 1. **Say what a source is (high impact, small).** Add a `role` to a stem or input source (`drums`, `bass`, `synth`,
    `vocal`, `other`).
    - Run the kick/snare/hat classifier only where the role is `drums`. Other roles publish onsets, levels and register

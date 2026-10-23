@@ -1,6 +1,7 @@
 # ADR-1521: Live input sources publish the stem vocabulary, from one callback and one analysis thread
 
 - Status: Accepted (eng/stems-multichannel)
+- **Amended** by ADR-1630: an input source's `role` replaces `hits`; `--input-sources <key>@<ch>[:<role>]`.
 - Extends: ADR-021 (live input) and ADR-1025 (the 128-frame period). Uses ADR-1520's `StemAnalyzer` and vocabulary.
 - Code:
   - `src/audio/audio_input.*`: sources, taps and stats;

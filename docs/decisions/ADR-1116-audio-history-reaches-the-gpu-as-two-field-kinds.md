@@ -1,6 +1,7 @@
 # ADR-1116: Audio history reaches the GPU as two field kinds
 
 - Status: Accepted (gpu/productionization)
+- **Amended** by ADR-1631: the history can be built from a stem or input source a project's `feeds.history` names.
 - Builds on ADR-025 (fields and effectors), ADR-032 (the shared grid table at group 0 binding 15),
   ADR-097 (one reactivity system), ADR-898 (band onsets), ADR-906 (field triggers).
 - Evidence: the GPU world spike, Phase 2 and Phase 3 A (Echo Field),

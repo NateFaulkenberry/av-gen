@@ -8,7 +8,9 @@
 // left and right, make two mono sources.
 //
 // AV Gen does not know what is plugged into an input. A mixer's drum bus on input 1 is the artist's routing; the
-// label is the artist's word for it.
+// label is the artist's word for it, and so is the role (ADR-1630).
+
+#include "audio/source_role.hpp"
 
 #include <cstdint>
 #include <string>
@@ -20,8 +22,9 @@ struct InputSource {
     std::string label;
     std::uint32_t channel = 0;  // 0-based device channel; a pair is channel and channel + 1
     bool pair = false;
-    bool hits = false;          // also run the kick/snare/hat classifier
+    SourceRole role = SourceRole::Other; // ADR-1630: only `drums` runs the kick/snare/hat classifier
     float gainDb = 0.0f;        // ADR-1582: the source's trim before analysis, -24..+24 dB (on top of audio/inputGain)
+    [[nodiscard]] bool hits() const { return classifiesHits(role); }
     [[nodiscard]] bool operator==(const InputSource&) const = default;
 };
 

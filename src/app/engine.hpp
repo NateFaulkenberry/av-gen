@@ -906,6 +906,7 @@ public:
         audio::StemReport report;                         // the file check
         std::vector<audio::StemDiagnostic> mix;           // against the current mix; recomputed when it changes
         std::shared_ptr<const analysis::StemTrack> track; // null when the file could not be analysed
+        std::shared_ptr<const std::vector<float>> probe;  // ADR-1632: the stem-set check's probe (null with no track)
     };
     [[nodiscard]] const std::vector<StemState>& stems() const { return stems_; }
     // Replaces the stem list. Keys are kept as given when valid and unique; an empty, invalid or repeated key is made
@@ -915,6 +916,8 @@ public:
     void setStems(std::vector<audio::StemSource> stems);
     // Changes whenever the stem list, a stem's analysis or its offset changes.
     [[nodiscard]] std::uint64_t stemsRevision() const { return stemsRevision_; }
+    // ADR-1632: the stem-set check against the current mix (its per-stem findings are also in each StemState::mix).
+    [[nodiscard]] const audio::StemSetCheck& stemSetCheck() const { return stemSet_; }
 
     // ---- feeds (ADR-1580, ADR-1581) ---------------------------------------------------------------
     //
@@ -934,6 +937,10 @@ public:
         bool active = false;    // it has data now (live: the source is active; offline: the stem was analysed)
     };
     [[nodiscard]] FeedState feedState(const std::string& key) const;
+    // ADR-1630: the stem a feed key names (a key, or "role.<role>": the first stem of that role); null for none.
+    [[nodiscard]] const StemState* feedStem(const std::string& key) const;
+    // The input source a feed key names (by key, or the first of its role), -1 for none.
+    [[nodiscard]] int liveSourceIndex(const std::string& key) const;
     [[nodiscard]] std::uint64_t feedsRevision() const { return feedsRevision_; }
 
     // The decoded source behind a clip, for drawing its waveform. Null while it is missing.
@@ -1458,6 +1465,7 @@ private:
     // ADR-1520: the analysis stems, their bus ids (parallel to stems_), and every stem vocabulary ever declared and no
     // longer in the list (published inactive once when it left: the bus cannot undeclare a name).
     std::vector<StemState> stems_;
+    audio::StemSetCheck stemSet_; // ADR-1632
     std::vector<signals::StemSignals> stemSignals_;
     std::uint64_t stemsRevision_ = 1;
     double stemPreviousSeconds_ = -1.0; // the last instant the stems were published at (-1: none, or a jump since)
@@ -1480,13 +1488,30 @@ private:
     bool liveBeatValid_ = false;        // ...while the source is active
     mutable std::uint32_t liveGridCount_ = 0;
     [[nodiscard]] std::optional<app::MusicRuntime::BeatFields> liveGridBeat() const;
-    // The stems at `to` onto `bus` (the engine's own, or a seek replay's engine-shaped scratch bus), events since `from`.
+    // The stems at `to` onto `bus` (the engine's own, or a seek replay's engine-shaped scratch bus), events since `from`;
+    // then the role aliases (publishRoles).
     void publishStems(signals::SignalBus& bus, double from, double to) const;
+    // ---- roles (ADR-1630) ----
+    // Whether `feeds` feeds any part of the response from the source of `key` and `role` (by key or by role).
+    [[nodiscard]] static bool fedForResponse(const audio::Feeds& feeds, const std::string& key, audio::SourceRole role);
+    // Whether a stem runs the hits tier: a drums stem always (ADR-1630), any stem a response feed names (ADR-1580).
+    [[nodiscard]] bool stemHitsTier(const audio::StemSource& stem) const;
+    // Declares `role.<role>.*` once (a source of the role exists); it stays declared (the bus cannot undeclare).
+    void declareRole(audio::SourceRole role);
+    // `role.<role>.*` onto `bus`: the first active source of each declared role (inputs while open, then stems).
+    void publishRoles(signals::SignalBus& bus) const;
+    std::array<std::optional<signals::StemSignals>, audio::kSourceRoleCount> roleSignals_{};
     // ADR-1116: see audioHistory(). Rebuilt when audioRevision_ moves; the live feed only without a track.
     void updateAudioHistory(bool newFrame);
     std::shared_ptr<spatial::AudioHistory> audioHistory_; // heard through the Response controls (ADR-1361)
     std::uint64_t audioHistoryRevision_ = 0;
+    std::uint64_t audioHistoryFeeds_ = 0; // ADR-1631: the feeds revision the history was built under
     std::unique_ptr<analysis::LiveAudioHistoryFeed> liveAudioFeed_;
+    // ADR-1631: live, the input sources (index, -1 the mix) the history's rows and onsets come from, the spectrum
+    // source's newest row and the onset source's onsets since the last history row.
+    std::pair<int, int> liveHistorySources_{-1, -1};
+    std::array<float, spatial::kAudioBins> liveHistoryRow_{};
+    std::array<float, 3> liveHistoryPending_{};
     audio::ClipSources clipSources_;
     audio::MixReport audioMix_;
     // Embedded Tempo, captured when the arrangement's sources were loaded. Not derived from

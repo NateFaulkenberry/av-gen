@@ -307,6 +307,14 @@ private:
                 }
             }
         }
+        // ADR-1630: a role alias is the first active stem of its role, so it is pure in time too.
+        for (const auto& alias : engine_.roleSignals_) {
+            for (const signals::SignalId id : alias ? alias->ids() : std::vector<signals::SignalId>{}) {
+                if (id < samplable_.size()) {
+                    samplable_[id] = 1;
+                }
+            }
+        }
         for (const auto& source : engine_.sources_.sources()) {
             if (!source->pureInTime()) {
                 continue;
@@ -2571,7 +2579,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
             item["label"] = stem.source.label;
             item["file"] = assetRefJson(stem.source.file, dir);
             if (stem.source.offsetSeconds != 0.0) item["offset"] = stem.source.offsetSeconds;
-            if (stem.source.hits) item["hits"] = true;
+            if (stem.source.role != audio::SourceRole::Other) item["role"] = audio::sourceRoleName(stem.source.role); // ADR-1630
             if (stem.source.gainDb != 0.0f) item["gainDb"] = stem.source.gainDb; // ADR-1582
             list.push_back(std::move(item));
         }
@@ -3019,7 +3027,24 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                     stem.key = item.value("key", std::string{});
                     stem.label = item.value("label", std::string{});
                     stem.offsetSeconds = item.value("offset", 0.0);
-                    stem.hits = item.value("hits", false);
+                    // ADR-1630: what the stem is, explicit only (no role is `other`; nothing is inferred from the
+                    // key or the audio). `hits` is gone: a drums stem runs the classifier, no other does.
+                    if (const auto role = item.find("role"); role != item.end()) {
+                        const auto parsed = role->is_string() ? audio::sourceRoleFromName(role->get<std::string>())
+                                                              : std::nullopt;
+                        if (parsed) {
+                            stem.role = *parsed;
+                        } else {
+                            warn(fmt::format("assets.stems: stem '{}': role {} is not drums, bass, synth, vocal or other; "
+                                             "it is other",
+                                             stem.key, role->dump()));
+                        }
+                    }
+                    if (item.contains("hits")) {
+                        warn(fmt::format("assets.stems: stem '{}': \"hits\" is gone (ADR-1630); a stem with "
+                                         "\"role\": \"drums\" runs the kick/snare/hat classifier, and no other does",
+                                         stem.key));
+                    }
                     stem.gainDb = std::clamp(item.value("gainDb", 0.0f), analysis::kMinTrimDb, analysis::kMaxTrimDb);
                     stems.push_back(std::move(stem));
                 }
@@ -4451,15 +4476,18 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
     std::vector<std::size_t> todo;
     for (std::size_t i = 0; i < wanted.size(); ++i) {
         next[i].source = wanted[i];
-        // ADR-1580: a stem a response feed names runs the hits tier whatever its own flag says.
-        const bool tier = wanted[i].hits || feeds_.feedsResponse(wanted[i].key);
+        // ADR-1580: a stem a response feed names runs the hits tier whatever its role; ADR-1630: a drums stem always
+        // does, and only a drums stem publishes the classes.
+        const bool tier = stemHitsTier(wanted[i]);
         const auto same = std::find_if(stems_.begin(), stems_.end(), [&](const StemState& old) {
-            const bool oldTier = old.track ? old.track->hits() : old.source.hits || feeds_.feedsResponse(old.source.key);
-            return old.source.file == wanted[i].file && oldTier == tier && old.source.gainDb == wanted[i].gainDb;
+            const bool oldTier = old.track ? old.track->hits() : stemHitsTier(old.source);
+            return old.source.file == wanted[i].file && oldTier == tier && old.source.gainDb == wanted[i].gainDb &&
+                   old.source.hits() == wanted[i].hits();
         });
         if (same != stems_.end()) {
             next[i].report = same->report;
             next[i].track = same->track;
+            next[i].probe = same->probe;
         } else {
             todo.push_back(i);
         }
@@ -4469,11 +4497,11 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
         std::vector<std::thread> workers;
         workers.reserve(todo.size());
         for (const std::size_t i : todo) {
-            workers.emplace_back([&state = next[i], config = analyzerConfig_,
-                                  tier = next[i].source.hits || feeds_.feedsResponse(next[i].source.key)] {
+            workers.emplace_back([&state = next[i], config = analyzerConfig_, tier = stemHitsTier(next[i].source)] {
                 analysis::StemAnalysisConfig stemConfig;
                 stemConfig.analyzer = config;
                 stemConfig.hits = tier;
+                stemConfig.classes = state.source.hits(); // ADR-1630: a drums stem only
                 stemConfig.gainDb = state.source.gainDb; // ADR-1582
                 audio::StemFileFacts facts;
                 auto track = analysis::StemTrack::analyzeFile(state.source.file, stemConfig, facts);
@@ -4481,6 +4509,7 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
                                                 track ? std::string() : track.error().message);
                 if (track && state.report.ok()) {
                     state.track = std::make_shared<const analysis::StemTrack>(std::move(*track));
+                    state.probe = std::make_shared<const std::vector<float>>(std::move(facts.probe)); // ADR-1632
                 }
             });
         }
@@ -4492,16 +4521,17 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
                       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
         }
     }
-    // A key that left the list: its names stay declared (the bus cannot undeclare) and read inactive from now on.
+    // A key that left the list: its names stay declared (the bus cannot undeclare) and read inactive from now on. So
+    // do the class names of a stem that is no longer a drums stem (ADR-1630); the rest republish on the next frame.
     for (const signals::StemSignals& old : stemSignals_) {
-        if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
-            old.publishInactive(bus_);
-        }
+        old.publishInactive(bus_);
     }
     stems_ = std::move(next);
     stemSignals_.clear();
     for (const StemState& stem : stems_) {
-        stemSignals_.push_back(signals::StemSignals::declare(bus_, stem.source.key, stem.source.label));
+        stemSignals_.push_back(
+            signals::StemSignals::declare(bus_, stem.source.key, stem.source.label, stem.source.role));
+        declareRole(stem.source.role); // ADR-1630
         for (const audio::StemDiagnostic& d : stem.report.diagnostics) {
             if (d.severity != audio::StemSeverity::Info) {
                 noteBindingProblem(d.message);
@@ -4509,6 +4539,7 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
         }
     }
     refreshStemMixDiagnostics();
+    publishRoles(bus_); // ADR-1630: a role whose sources all left reads inactive now, not at the next publish
     stemPreviousSeconds_ = -1.0;
     ++stemsRevision_;
     rebuildFeeds(); // ADR-1580/1581: a feed on a stem reads its new analysis
@@ -4520,9 +4551,42 @@ void Engine::refreshStemMixDiagnostics() {
                               .durationSeconds = audioFile_ ? audioFile_->durationSeconds() : 0.0};
     for (StemState& stem : stems_) {
         stem.mix = audio::mixDiagnostics(stem.source, stem.report, mix);
+    }
+    // ADR-1632: the stem-set check -- channels, the sum against the mix, and each stem's lag. It warns; it never
+    // corrects an offset.
+    stemSet_ = audio::StemSetCheck{};
+    if (!stems_.empty() && audioFile_ && audioFile_->frameCount() > 0) {
+        const auto started = std::chrono::steady_clock::now();
+        const std::vector<float> mixProbe = audio::stemProbe(audioFile_->mono(), audioFile_->sampleRate());
+        std::vector<audio::StemSetMember> members;
+        members.reserve(stems_.size());
+        for (const StemState& stem : stems_) {
+            members.push_back({.source = &stem.source,
+                               .report = &stem.report,
+                               .probe = stem.probe ? std::span<const float>(*stem.probe) : std::span<const float>{}});
+        }
+        stemSet_ = audio::checkStemSet(members, {.sampleRate = audioFile_->sampleRate(),
+                                                 .channels = audioFile_->channels(),
+                                                 .probe = mixProbe});
+        for (std::size_t i = 0; i < stems_.size() && i < stemSet_.perStem.size(); ++i) {
+            stems_[i].mix.insert(stems_[i].mix.end(), stemSet_.perStem[i].begin(), stemSet_.perStem[i].end());
+            for (const audio::StemDiagnostic& d : stemSet_.perStem[i]) {
+                if (d.severity == audio::StemSeverity::Warning) {
+                    log::warn("{}", d.message); // and a project warning, below
+                }
+            }
+        }
+        for (const audio::StemDiagnostic& d : stemSet_.set) {
+            log::info("{} ({:.0f} ms)", d.message,
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+        }
+    }
+    for (const StemState& stem : stems_) {
         for (const audio::StemDiagnostic& d : stem.mix) {
             if (d.severity != audio::StemSeverity::Info) {
                 noteBindingProblem(d.message);
+            } else {
+                log::info("{}", d.message);
             }
         }
     }
@@ -4531,6 +4595,53 @@ void Engine::refreshStemMixDiagnostics() {
 void Engine::publishStems(signals::SignalBus& bus, double from, double to) const {
     for (std::size_t i = 0; i < stems_.size() && i < stemSignals_.size(); ++i) {
         stemSignals_[i].publishTrack(bus, stems_[i].track.get(), stems_[i].source.offsetSeconds, from, to);
+    }
+    publishRoles(bus);
+}
+
+// ---- roles (ADR-1630) -------------------------------------------------------------------------------------------
+
+bool Engine::fedForResponse(const audio::Feeds& feeds, const std::string& key, audio::SourceRole role) {
+    return feeds.feedsResponse(key) || feeds.feedsResponse(audio::roleFeedKey(role));
+}
+
+bool Engine::stemHitsTier(const audio::StemSource& stem) const {
+    return stem.hits() || fedForResponse(feeds_, stem.key, stem.role);
+}
+
+void Engine::declareRole(audio::SourceRole role) {
+    auto& slot = roleSignals_[static_cast<std::size_t>(role)];
+    if (!slot) {
+        slot = signals::StemSignals::declareRole(bus_, role);
+    }
+}
+
+void Engine::publishRoles(signals::SignalBus& bus) const {
+    // The first ACTIVE source of each role: the live input sources first (while an input is open; the stems read
+    // inactive then unless a live source of the same key publishes them), then the stems, each in list order.
+    for (std::size_t r = 0; r < roleSignals_.size(); ++r) {
+        const auto& alias = roleSignals_[r];
+        if (!alias) {
+            continue;
+        }
+        const signals::StemSignals* chosen = nullptr;
+        const auto consider = [&](const std::vector<signals::StemSignals>& list) {
+            for (const signals::StemSignals& s : list) {
+                if (chosen == nullptr && s.role == alias->role && s.active != signals::kInvalidSignal &&
+                    s.active < bus.size() && bus.value(s.active) > 0.5f) {
+                    chosen = &s;
+                }
+            }
+        };
+        if (input_ != nullptr) {
+            consider(inputSignals_);
+        }
+        consider(stemSignals_);
+        if (chosen != nullptr) {
+            alias->copyFrom(bus, *chosen);
+        } else {
+            alias->publishInactive(bus);
+        }
     }
 }
 
@@ -4580,7 +4691,8 @@ void Engine::setFeeds(audio::Feeds feeds) {
     // A stem a response feed names needs the hits tier (the causal detector); one no longer named goes back to its own.
     bool retier = false;
     for (const StemState& stem : stems_) {
-        retier = retier || before.feedsResponse(stem.source.key) != feeds_.feedsResponse(stem.source.key);
+        retier = retier || fedForResponse(before, stem.source.key, stem.source.role) !=
+                               fedForResponse(feeds_, stem.source.key, stem.source.role);
     }
     if (retier) {
         std::vector<audio::StemSource> sources;
@@ -4609,22 +4721,41 @@ Engine::FeedState Engine::feedState(const std::string& key) const {
         return out;
     }
     if (input_) {
-        for (std::size_t i = 0; i < inputSources_.size(); ++i) {
-            if (inputSources_[i].key == key) {
-                out.resolved = out.live = true;
-                out.active = inputSourceActive(i);
-                return out;
-            }
-        }
-    }
-    for (const StemState& stem : stems_) {
-        if (stem.source.key == key) {
-            out.resolved = true;
-            out.active = stem.track != nullptr;
+        if (const int i = liveSourceIndex(key); i >= 0) {
+            out.resolved = out.live = true;
+            out.active = inputSourceActive(static_cast<std::size_t>(i));
             return out;
         }
     }
+    if (const StemState* stem = feedStem(key)) {
+        out.resolved = true;
+        out.active = stem->track != nullptr;
+    }
     return out;
+}
+
+const Engine::StemState* Engine::feedStem(const std::string& key) const {
+    // ADR-1630: a role reference is the first stem of that role.
+    const auto role = audio::feedRole(key);
+    for (const StemState& stem : stems_) {
+        if (role ? stem.source.role == *role : stem.source.key == key) {
+            return &stem;
+        }
+    }
+    return nullptr;
+}
+
+int Engine::liveSourceIndex(const std::string& key) const {
+    if (key.empty()) {
+        return -1;
+    }
+    const auto role = audio::feedRole(key);
+    for (std::size_t i = 0; i < inputSources_.size(); ++i) {
+        if (role ? inputSources_[i].role == *role : inputSources_[i].key == key) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
 }
 
 std::optional<MusicRuntime::BeatFields> Engine::gridBeatAt(std::size_t frameIndex) const {
@@ -4647,24 +4778,23 @@ std::optional<MusicRuntime::BeatFields> Engine::liveGridBeat() const {
 
 void Engine::rebuildFeeds() {
     ++feedsRevision_;
-    const auto stemOf = [&](const std::string& key) -> const StemState* {
-        for (const StemState& stem : stems_) {
-            if (stem.source.key == key) {
-                return &stem;
-            }
-        }
-        return nullptr;
-    };
-    const auto liveKey = [&](const std::string& key) {
-        return std::any_of(inputSources_.begin(), inputSources_.end(),
-                           [&](const audio::InputSource& s) { return s.key == key; });
-    };
+    const auto stemOf = [&](const std::string& key) -> const StemState* { return feedStem(key); };
+    const auto liveKey = [&](const std::string& key) { return liveSourceIndex(key) >= 0; };
     const auto unresolved = [&](const char* feed, const std::string& key) {
         // ADR-1580: a key that names nothing is a project bug; the part reads the mix so a typo does not black out a
-        // show, and it is said. A live input source of that key resolves it while an input is open.
+        // show, and it is said. A live input source of that key (or role) resolves it while an input is open.
         if (!feedsQuiet_ && !liveKey(key)) {
-            noteBindingProblem(fmt::format("feeds.{}: there is no stem or input source 'stem.{}'; it follows the mix",
-                                           feed, key));
+            noteBindingProblem(fmt::format("feeds.{}: there is no stem or input source '{}'; it follows the mix", feed,
+                                           audio::feedValue(key)));
+        }
+    };
+    // ADR-1630: a class (kick, snare, hat) from a source that is not a drums source is refused, and said.
+    const auto notDrums = [&](const char* feed, const std::string& key, audio::SourceRole role) {
+        if (!feedsQuiet_) {
+            noteBindingProblem(fmt::format("feeds.{}: '{}' is a {} source; a {} comes only from a drums source "
+                                           "(ADR-1630), so it {}",
+                                           feed, audio::feedValue(key), audio::sourceRoleName(role), feed,
+                                           std::string_view(feed) == "kick" ? "does not fire" : "follows the mix"));
         }
     };
 
@@ -4709,7 +4839,7 @@ void Engine::rebuildFeeds() {
                     t += stem->source.offsetSeconds; // onto the project clock
                 }
                 grid_.beats = std::move(beats);
-                grid_.sourceKey = feeds_.beat;
+                grid_.sourceKey = stem->source.key;
                 grid_.meter = {};
                 if (track_ && !track_->empty()) {
                     const auto& cfg = track_->config();
@@ -4728,6 +4858,15 @@ void Engine::rebuildFeeds() {
         }
     }
 
+    // ---- the audio history (ADR-1631): built in updateAudioHistory; a key that names nothing is said here ----
+    if (!feeds_.spectrumSource().empty() && stemOf(feeds_.spectrumSource()) == nullptr) {
+        unresolved(feeds_.historySpectrum ? "historySpectrum" : "history", feeds_.spectrumSource());
+    }
+    if (!feeds_.onsetsSource().empty() && feeds_.onsetsSource() != feeds_.spectrumSource() &&
+        stemOf(feeds_.onsetsSource()) == nullptr) {
+        unresolved(feeds_.historyOnsets ? "historyOnsets" : "history", feeds_.onsetsSource());
+    }
+
     // ---- the response feed (ADR-1580) ----
     if (!sonic_) {
         return;
@@ -4738,13 +4877,17 @@ void Engine::rebuildFeeds() {
     if (track_ && !track_->empty() && feeds_.anyResponse() && sonic_->timbre.size() == track_->frames().size()) {
         std::vector<const StemState*> sources;
         analysis::FeedRouting routing;
-        const auto route = [&](const char* feed, const std::string& key) -> int {
+        const auto route = [&](const char* feed, const std::string& key, bool needsClasses) -> int {
             if (key.empty()) {
                 return -1;
             }
             const StemState* stem = stemOf(key);
             if (stem == nullptr) {
                 unresolved(feed, key);
+                return -1;
+            }
+            if (needsClasses && !stem->source.hits()) {
+                notDrums(feed, key, stem->source.role);
                 return -1;
             }
             const auto it = std::find(sources.begin(), sources.end(), stem);
@@ -4755,9 +4898,9 @@ void Engine::rebuildFeeds() {
             return static_cast<int>(sources.size()) - 1;
         };
         for (std::size_t k = 0; k < routing.hit.size(); ++k) {
-            routing.hit[k] = route(audio::kFeedHitNames[k], feeds_.hitSource(k));
+            routing.hit[k] = route(audio::kFeedHitNames[k], feeds_.hitSource(k), audio::feedHitIsClass(k));
         }
-        routing.levels = route("levels", feeds_.levels);
+        routing.levels = route("levels", feeds_.levels, false);
         if (routing.any()) {
             const auto& frames = track_->frames();
             std::vector<analysis::FeedFolder> folders(sources.size());
@@ -5700,9 +5843,7 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
         }
     }
     for (const signals::StemSignals& old : inputSignals_) {
-        if (std::find(taken.begin(), taken.end(), old.key) == taken.end()) {
-            old.publishInactive(bus_);
-        }
+        old.publishInactive(bus_); // a key gone, or class names a source no longer a drums source has (ADR-1630)
     }
     std::vector<std::string> previousKeys;
     for (const signals::StemSignals& old : inputSignals_) {
@@ -5711,7 +5852,8 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
     inputSources_ = std::move(wanted);
     inputSignals_.clear();
     for (const audio::InputSource& source : inputSources_) {
-        inputSignals_.push_back(signals::StemSignals::declare(bus_, source.key, source.label));
+        inputSignals_.push_back(signals::StemSignals::declare(bus_, source.key, source.label, source.role));
+        declareRole(source.role); // ADR-1630
     }
 #if defined(__APPLE__)
     // The capture path follows whether there are sources (ADR-1522): reopen the same device on the other one.
@@ -5738,6 +5880,7 @@ void Engine::setInputSources(std::vector<audio::InputSource> wanted) {
         inputLastFrame_.assign(inputSources_.size(), {});
         inputActive_.assign(inputSources_.size(), 0);
     }
+    publishRoles(bus_); // ADR-1630
     rebind();
 }
 
@@ -5799,14 +5942,15 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
     std::vector<analysis::ChannelAnalysis::Source> sources;
     for (std::size_t i = 0; i < inputSources_.size(); ++i) {
         const audio::InputSource& s = inputSources_[i];
-        const bool fed = feeds_.feedsResponse(s.key); // ADR-1580: needs the hits tier
-        const bool beat = !feeds_.beat.empty() && feeds_.beat == s.key;
+        const bool fed = fedForResponse(feeds_, s.key, s.role); // ADR-1580: needs the hits tier
+        const bool beat = liveBeatSource_ < 0 && static_cast<int>(i) == liveSourceIndex(feeds_.beat);
         if (beat) {
             liveBeatSource_ = static_cast<int>(i);
         }
         sources.push_back({.stream = input_->sourceStream(i),
                            .pair = s.pair,
-                           .hits = s.hits || fed,
+                           .hits = s.hits() || fed,
+                           .classes = s.hits(), // ADR-1630: a drums source only
                            .gainDb = s.gainDb,
                            .beat = beat,
                            .feed = fed});
@@ -5817,26 +5961,30 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
     if (feeds_.anyResponse()) {
         std::vector<std::size_t> slots;
         analysis::FeedRouting routing;
-        const auto route = [&](const std::string& key) -> int {
-            if (key.empty()) {
+        const auto route = [&](const std::string& key, bool needsClasses) -> int {
+            const int i = liveSourceIndex(key);
+            if (i < 0) {
+                return -1; // not a live source: the mix (the offline warning names it)
+            }
+            if (needsClasses && !inputSources_[static_cast<std::size_t>(i)].hits()) {
+                // ADR-1630: a class from a source that is not a drums source: refused, and said.
+                const audio::InputSource& refused = inputSources_[static_cast<std::size_t>(i)];
+                noteBindingProblem(fmt::format("feeds: input source '{}' is a {} source; a kick, snare or hat comes "
+                                               "only from a drums source (ADR-1630), so it is not fed from it",
+                                               refused.key, audio::sourceRoleName(refused.role)));
                 return -1;
             }
-            for (std::size_t i = 0; i < inputSources_.size(); ++i) {
-                if (inputSources_[i].key == key) {
-                    const auto it = std::find(slots.begin(), slots.end(), i);
-                    if (it != slots.end()) {
-                        return static_cast<int>(it - slots.begin());
-                    }
-                    slots.push_back(i);
-                    return static_cast<int>(slots.size()) - 1;
-                }
+            const auto it = std::find(slots.begin(), slots.end(), static_cast<std::size_t>(i));
+            if (it != slots.end()) {
+                return static_cast<int>(it - slots.begin());
             }
-            return -1; // not a live source: the mix (the offline warning names it)
+            slots.push_back(static_cast<std::size_t>(i));
+            return static_cast<int>(slots.size()) - 1;
         };
         for (std::size_t k = 0; k < routing.hit.size(); ++k) {
-            routing.hit[k] = route(feeds_.hitSource(k));
+            routing.hit[k] = route(feeds_.hitSource(k), audio::feedHitIsClass(k));
         }
-        routing.levels = route(feeds_.levels);
+        routing.levels = route(feeds_.levels, false);
         if (routing.any()) {
             liveFeeds_ = std::make_unique<analysis::LiveFeedMixer>(*channels_, std::move(slots), routing);
         }
@@ -5928,6 +6076,8 @@ void Engine::publishInputSources() {
     constexpr auto kStale = std::chrono::milliseconds(250);
     const auto now = std::chrono::steady_clock::now();
     const bool live = input_ && input_->connected();
+    const int historySpectrum = liveSourceIndex(feeds_.spectrumSource()); // ADR-1631
+    const int historyOnsets = liveSourceIndex(feeds_.onsetsSource());
     for (std::size_t i = 0; i < inputSignals_.size(); ++i) {
         const signals::StemSignals& ids = inputSignals_[i];
         if (live && channels_ && i < channels_->size() && channels_->acquire(i)) {
@@ -5938,6 +6088,15 @@ void Engine::publishInputSources() {
                 liveBeatValid_ = true;
             }
             ids.publish(bus_, f.frame);
+            if (static_cast<int>(i) == historySpectrum) {
+                liveHistoryRow_ = f.frame.spectrumRow; // ADR-1631
+            }
+            if (static_cast<int>(i) == historyOnsets) {
+                const std::array<float, 3> rows = analysis::sourceOnsetRows(f.frame, inputSources_[i].hits());
+                for (std::size_t k = 0; k < rows.size(); ++k) {
+                    liveHistoryPending_[k] = std::max(liveHistoryPending_[k], rows[k]); // until the next history row
+                }
+            }
             if (f.frame.onset && input_->sampleRate() > 0) {
                 // When the newest sample of the window that found it arrived, from the input's last block stamp.
                 const audio::AudioInput::BlockStamp stamp = input_->lastBlock();
@@ -7177,7 +7336,6 @@ void Engine::update(const FrameTime& time) {
     } else {
         audioSignals_.publishSilence(bus_);
     }
-    updateAudioHistory(newFrame);
     watchInputDevice();
     if (input_ != nullptr) {
         // ADR-1521: a live input's sources. An offline stem means nothing without its mix playing: inactive, unless a
@@ -7190,6 +7348,7 @@ void Engine::update(const FrameTime& time) {
             }
         }
         publishInputSources();
+        publishRoles(bus_); // ADR-1630
         reportInputSources();
         stemPreviousSeconds_ = -1.0;
     } else if (!stems_.empty()) {
@@ -7197,6 +7356,7 @@ void Engine::update(const FrameTime& time) {
         publishStems(bus_, stemPreviousSeconds_, time.renderTime);
         stemPreviousSeconds_ = time.renderTime;
     }
+    updateAudioHistory(newFrame); // after the input sources: ADR-1631's live history reads their newest hop
 
     const auto allocsNow = [] { return static_cast<std::uint32_t>(core::allocCounters().allocations); };
     const std::uint32_t allocsAtStart = allocsNow();
@@ -7751,21 +7911,76 @@ void Engine::updateAudioHistory(bool newFrame) {
     heard.attack = responseControls_.attack;
     heard.release = responseControls_.release;
     if (track_ && !track_->empty()) {
-        // The whole track: a pure function of the transport second, so a seek is exact (ADR-1116).
-        if (!audioHistory_ || audioHistoryRevision_ != audioRevision_ || liveAudioFeed_) {
-            audioHistory_ = std::make_shared<spatial::AudioHistory>(analysis::buildAudioHistory(*track_));
+        // The whole track: a pure function of the transport second, so a seek is exact (ADR-1116). ADR-1631: its
+        // spectrogram and onset rows from the stems `feeds.history` names, else the mix's; rebuilt when the mix, the
+        // stems or the feeds change.
+        if (!audioHistory_ || audioHistoryRevision_ != audioRevision_ || audioHistoryFeeds_ != feedsRevision_ ||
+            liveAudioFeed_) {
+            const auto from = [&](const std::string& key) {
+                analysis::HistoryFrom h;
+                if (const StemState* stem = key.empty() ? nullptr : feedStem(key); stem != nullptr && stem->track) {
+                    h.track = stem->track.get();
+                    h.offsetSeconds = stem->source.offsetSeconds;
+                    h.classes = stem->source.hits();
+                }
+                return h;
+            };
+            const analysis::HistoryFrom spectrum = from(feeds_.spectrumSource());
+            const analysis::HistoryFrom onsets = from(feeds_.onsetsSource());
+            const auto started = std::chrono::steady_clock::now();
+            audioHistory_ = std::make_shared<spatial::AudioHistory>(analysis::buildAudioHistory(*track_, spectrum, onsets));
+            log::info("audio history: spectrum from {}, onsets from {}: {} rows, low/mid/high/beat onsets "
+                      "{}/{}/{}/{} ({:.0f} ms, {:.1f} MB)",
+                      spectrum.track ? audio::feedValue(feeds_.spectrumSource()) : std::string("the mix"),
+                      onsets.track ? audio::feedValue(feeds_.onsetsSource()) : std::string("the mix"),
+                      audioHistory_->rowCount(), audioHistory_->onsets(spatial::OnsetSource::Low).size(),
+                      audioHistory_->onsets(spatial::OnsetSource::Mid).size(),
+                      audioHistory_->onsets(spatial::OnsetSource::High).size(),
+                      audioHistory_->onsets(spatial::OnsetSource::Beat).size(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count(),
+                      static_cast<double>(audioHistory_->bytes()) / 1e6);
             audioHistoryRevision_ = audioRevision_;
+            audioHistoryFeeds_ = feedsRevision_;
             liveAudioFeed_.reset();
         }
         audioHistory_->setResponse(heard);
         return;
     }
     if (mode_ == EngineMode::Live && runner_) {
-        if (!liveAudioFeed_) {
+        // ADR-1631: live, the rows and onsets of the input sources the history feeds name (by key or role), else the
+        // mix's. An inactive source gives silent rows and no onsets; the clock is the mix's either way.
+        const int spectrumSource = input_ ? liveSourceIndex(feeds_.spectrumSource()) : -1;
+        const int onsetsSource = input_ ? liveSourceIndex(feeds_.onsetsSource()) : -1;
+        const std::pair<int, int> sources{spectrumSource, onsetsSource};
+        if (!liveAudioFeed_ || sources != liveHistorySources_) {
             liveAudioFeed_ = std::make_unique<analysis::LiveAudioHistoryFeed>(analyzerConfig_);
+            liveHistorySources_ = sources;
+            liveHistoryPending_ = {};
         }
         if (newFrame) {
-            liveAudioFeed_->push(clock_.latest);
+            const analysis::AnalysisFrame& f = clock_.latest;
+            if (spectrumSource < 0 && onsetsSource < 0) {
+                liveAudioFeed_->push(f);
+            } else if (!f.spectrum.empty()) {
+                std::array<float, spatial::kAudioBins> row{};
+                if (spectrumSource < 0) {
+                    analysis::foldSpectrum(f, analyzerConfig_, row);
+                } else if (static_cast<std::size_t>(spectrumSource) < inputActive_.size() &&
+                           inputActive_[static_cast<std::size_t>(spectrumSource)] != 0) {
+                    row = liveHistoryRow_;
+                }
+                std::array<float, spatial::kOnsetSources> onsets{};
+                if (onsetsSource < 0) {
+                    onsets = {f.lowOnset ? std::max(f.lowOnsetStrength, 0.05f) : 0.0f,
+                              f.midOnset ? std::max(f.midOnsetStrength, 0.05f) : 0.0f,
+                              f.highOnset ? std::max(f.highOnsetStrength, 0.05f) : 0.0f, 0.0f};
+                } else {
+                    std::copy(liveHistoryPending_.begin(), liveHistoryPending_.end(), onsets.begin());
+                    liveHistoryPending_ = {};
+                }
+                onsets[3] = f.beat ? 1.0f : 0.0f; // the beat row stays the mix's
+                liveAudioFeed_->pushRaw(f.timeSeconds, row, onsets);
+            }
         }
         audioHistory_ = liveAudioFeed_->history();
         audioHistory_->setResponse(heard);

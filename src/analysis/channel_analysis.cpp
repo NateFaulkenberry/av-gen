@@ -72,7 +72,7 @@ ChannelAnalysis::ChannelAnalysis(std::vector<Source> sources, std::uint32_t samp
         if (previous && s.stream != nullptr) {
             const auto kept = std::find_if(previous->slots_.begin(), previous->slots_.end(), [&](const auto& slot) {
                 return slot && slot->source.stream == s.stream && slot->source.pair == s.pair &&
-                       slot->source.hits == s.hits;
+                       slot->source.hits == s.hits && slot->source.classes == s.classes;
             });
             if (kept != previous->slots_.end()) {
                 roles(**kept, s);
@@ -85,6 +85,7 @@ ChannelAnalysis::ChannelAnalysis(std::vector<Source> sources, std::uint32_t samp
         StemAnalysisConfig config;
         config.analyzer = base;
         config.hits = s.hits;
+        config.classes = s.classes;
         config.gainDb = s.gainDb;
         slot->analyzer = std::make_unique<StemAnalyzer>(config);
         slot->appliedGainDb = s.gainDb;

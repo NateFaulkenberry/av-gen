@@ -16,17 +16,20 @@
    {
     "key": "drums",
     "label": "Drums",
-    "file": "../../assets/audio/stems/feline-footwear (Drums).wav"
+    "file": "../../assets/audio/stems/feline-footwear (Drums).wav",
+    "role": "drums"
    },
    {
     "key": "bass",
     "label": "Bass",
-    "file": "../../assets/audio/stems/feline-footwear (Bass).wav"
+    "file": "../../assets/audio/stems/feline-footwear (Bass).wav",
+    "role": "bass"
    },
    {
     "key": "synth",
     "label": "Synth",
-    "file": "../../assets/audio/stems/feline-footwear (Synth).wav"
+    "file": "../../assets/audio/stems/feline-footwear (Synth).wav",
+    "role": "synth"
    }
   ]
  },

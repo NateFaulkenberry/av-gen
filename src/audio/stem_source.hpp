@@ -7,6 +7,7 @@
 // the project's stereo mix (assets.audio / assets.audioClips) is the only thing the audio device hears. That is why
 // stems are their own list (`assets.stems`) and not arrangement clips, which ADR-103 mixes down.
 
+#include "audio/source_role.hpp"
 #include "core/error.hpp"
 
 #include <cstdint>
@@ -29,8 +30,11 @@ struct StemSource {
     // Where the stem's first sample sits on the project timeline, seconds. Positive: the stem starts later. Explicit
     // only -- AV Gen never guesses an offset from the audio.
     double offsetSeconds = 0.0;
-    bool hits = false;              // also run the kick/snare/hat classifier (ADR-1060) on this stem
+    // ADR-1630: what the stem is. Only `drums` runs the kick/snare/hat classifier (ADR-1060) and publishes the class
+    // names; every role publishes onsets, levels and the onset register. Explicit only -- never inferred from the key.
+    SourceRole role = SourceRole::Other;
     float gainDb = 0.0f;            // ADR-1582: the stem's trim before analysis, -24..+24 dB (`gainDb`)
+    [[nodiscard]] bool hits() const { return classifiesHits(role); }
     [[nodiscard]] bool operator==(const StemSource&) const = default;
 };
 
@@ -49,6 +53,8 @@ struct StemFileFacts {
     std::size_t nonFinite = 0; // NaN / Inf samples
     bool silent = true;        // every sample is exactly 0
     std::string format;        // the file's own sample format ("s16", "s24", "f32", ...), "" when unknown
+    // ADR-1632: the stem's alignment probe (`StemProbeWriter`), for the stem-set check; empty when not taken.
+    std::vector<float> probe;
 };
 // The facts of a decoded file (tests, and anything holding the samples already).
 [[nodiscard]] StemFileFacts factsOf(const AudioFile& file);
@@ -99,5 +105,73 @@ struct MixFacts {
 
 // The file's own sample format ("u8", "s16", "s24", "s32", "f32") without decoding it, "" when unknown.
 [[nodiscard]] std::string nativeSampleFormat(const std::filesystem::path& path);
+
+// ---- the stem-set check (ADR-1632) -----------------------------------------------------------------------------
+//
+// Whether a project's stems line up with its mix, from a PROBE of each: the mono signal box-averaged down to about
+// kStemProbeHz (an integer factor of the file's rate, the same for every file of one rate). The probe is linear, so
+// the probe of a sum is the sum of the probes: a set that sums to the mix sums to the mix's probe to the same
+// residual, and a stem off by d seconds is off by d in its probe. 210 s is 3.4 MB of probe per stem.
+//
+//   rate      a stem at another rate than the mix: info (analysed at its own rate); the set's sum leaves it out
+//   channels  a stem with another channel count than the mix: info (analysed as mono; a mono stem's width reads 0)
+//   length    mixDiagnostics' span check, unchanged
+//   sum       the mix fitted as a weighted sum of the stems (one gain per stem: a mix has faders), at the stems'
+//             offsets: the residual in dB below the mix. Info -- a set may be incomplete (no vocal stem) and that is
+//             not misalignment
+//   lag       per stem, the lag within +-kStemProbeMaxLagSeconds at which it best matches what the other stems leave
+//             of the mix (normalised cross-correlation over its 16 loudest seconds: coarse at an eighth of the probe
+//             rate, then refined at the probe rate). A warning when that is not 0, naming the offset that aligns it; a
+//             warning too when it matches nothing (another song, or a lag beyond the search)
+//
+// Nothing is ever corrected: AV Gen does not guess an offset (ADR-1520). It says so, and the artist sets it.
+inline constexpr double kStemProbeHz = 4000.0;
+inline constexpr double kStemProbeMaxLagSeconds = 0.5;
+
+// The probe's decimation factor for a file at `sampleRate` (>= 1).
+[[nodiscard]] std::uint32_t stemProbeFactor(std::uint32_t sampleRate);
+
+// Streams mono samples into a probe.
+class StemProbeWriter {
+public:
+    explicit StemProbeWriter(std::uint32_t sampleRate);
+    void push(std::span<const float> mono);
+    [[nodiscard]] std::vector<float> take() { return std::move(probe_); }
+    [[nodiscard]] double rate() const { return rate_; }
+
+private:
+    std::uint32_t factor_ = 1;
+    double rate_ = 0.0;
+    double sum_ = 0.0;
+    std::uint32_t count_ = 0;
+    std::vector<float> probe_;
+};
+
+// The probe of a whole mono signal.
+[[nodiscard]] std::vector<float> stemProbe(std::span<const float> mono, std::uint32_t sampleRate);
+
+struct StemSetMember {
+    const StemSource* source = nullptr;
+    const StemReport* report = nullptr; // what decoding found (rate, channels); a stem that did not decode is skipped
+    std::span<const float> probe;       // empty: no probe (left out of the sum and the lag search)
+};
+
+struct MixProbe {
+    std::uint32_t sampleRate = 0;
+    std::uint32_t channels = 0;
+    std::span<const float> probe;
+};
+
+struct StemSetCheck {
+    std::vector<std::vector<StemDiagnostic>> perStem; // one list per member, in order
+    std::vector<StemDiagnostic> set;                  // the set as a whole (the sum)
+    double residualDb = 0.0;                          // the fitted sum's residual against the mix; 0 when not measured
+    bool measured = false;                            // the sum was measured (the mix and >= 1 stem at its rate)
+    std::vector<float> gains;                         // per member, the fitted gain (0 when left out)
+    std::vector<double> lagSeconds;                   // per member, the best lag found (0 when aligned or not searched)
+    std::vector<float> match;                         // per member, the normalised correlation at that lag (0..1)
+};
+
+[[nodiscard]] StemSetCheck checkStemSet(std::span<const StemSetMember> members, const MixProbe& mix);
 
 } // namespace avgen::audio

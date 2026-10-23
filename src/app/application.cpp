@@ -198,9 +198,10 @@ std::string usageText() {
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit (audio: id, channels per\n"
            "                      Core Audio stream, rate)\n"
-           "  --input-sources <n>[h[k]]  analyse channels 1..n of the --input device as stem.in<c>.* (h: kick/\n"
-           "                      snare/hat on all, hk: on the first k); overrides the saved channel map;\n"
-           "                      or named: <key>@<channel>[h],... (e.g. drums@2h: channel 2 as stem.drums.*)\n"
+           "  --input-sources <n>[h[k]]  analyse channels 1..n of the --input device as stem.in<c>.* (h: all\n"
+           "                      drums sources, with kick/snare/hat; hk: the first k); overrides the saved\n"
+           "                      channel map; or named: <key>@<channel>[:<role>],... (role drums, bass,\n"
+           "                      synth, vocal, other; e.g. drums@2:drums: channel 2 as stem.drums.*)\n"
            "  --input-meter <device> [s]  every input channel's peak once a second for s seconds (default\n"
            "                      20), through the multichannel capture path; device = id or name\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
@@ -215,8 +216,8 @@ std::string usageText() {
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
            "  --sonic-trace <f>   with --project: write the Sonic Garden signals (sonic.*, notes.*, timbre.*, response.*,\n"
-           "                      visual.*, beat.*, music.*, stem.*, env.*, macro.*, signal.*) per frame as CSV,\n"
-           "                      and a summary; no GPU (ADR-1020)\n"
+           "                      visual.*, beat.*, music.*, stem.*, role.*, env.*, macro.*, signal.*) per frame as\n"
+           "                      CSV, and a summary; no GPU (ADR-1020)\n"
            "  --trace-finals      with --sonic-trace: also every route target's final value, one column per\n"
            "                      parameter component (\"final:<path>[<c>]\"), so two projects' routing can be compared\n"
            "                      frame by frame (ADR-1602); with --sonic-live-log, the same columns live (ADR-1605)\n"
@@ -559,31 +560,38 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
         } else if (arg == "--list-audio-devices") {
             options.listAudioDevices = true;
         } else if (arg == "--input-sources") {
-            // ADR-1521: "<n>[h[<k>]]": n mono sources on channels 1..n; h: the hits tier on all, hk: on the first k.
+            // ADR-1521: "<n>[h[<k>]]": n mono sources on channels 1..n; h: all drums sources (ADR-1630: the role that
+            // runs the hits tier), hk: the first k.
             auto v = need(i, "--input-sources");
             if (!v) return std::unexpected(v.error());
             const std::string spec = *v;
             if (!spec.empty() && std::isdigit(static_cast<unsigned char>(spec[0])) == 0) {
-                // ADR-1605: named sources, "<key>@<channel>[h],...", channel 1-based, so a loopback run can put a
-                // channel under the vocabulary a scene reads (stem.drums.*) without touching the saved channel map.
+                // ADR-1605: named sources, "<key>@<channel>[:<role>],...", channel 1-based, so a loopback run can put a
+                // channel under the vocabulary a scene reads (stem.drums.*, role.drums.*) without touching the saved
+                // channel map. ADR-1630: the role (drums, bass, synth, vocal, other; default other) -- only drums runs
+                // the kick/snare/hat classifier.
                 std::vector<audio::InputSource> sources;
                 std::size_t start = 0;
                 while (start <= spec.size()) {
                     const std::size_t comma = std::min(spec.find(',', start), spec.size());
                     const std::string item = spec.substr(start, comma - start);
                     const std::size_t at = item.find('@');
+                    const std::size_t colon = item.find(':', at == std::string::npos ? 0 : at);
                     const std::string key = item.substr(0, at);
                     const int channel = at == std::string::npos ? 0 : std::atoi(item.c_str() + at + 1);
+                    const auto role = colon == std::string::npos
+                                          ? std::optional<audio::SourceRole>(audio::SourceRole::Other)
+                                          : audio::sourceRoleFromName(std::string_view(item).substr(colon + 1));
                     const bool keyOk = !key.empty() && std::all_of(key.begin(), key.end(), [](char c) {
                         return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
                     });
-                    if (!keyOk || channel < 1 || channel > 64) {
-                        return fail("--input-sources: expected <key>@<channel>[h],... with key [a-z0-9_]+ and "
-                                    "1 <= channel <= 64, got '{}'",
+                    if (!keyOk || channel < 1 || channel > 64 || !role) {
+                        return fail("--input-sources: expected <key>@<channel>[:<role>],... with key [a-z0-9_]+, "
+                                    "1 <= channel <= 64 and role drums, bass, synth, vocal or other, got '{}'",
                                     item);
                     }
-                    sources.push_back({.key = key, .label = key, .channel = static_cast<std::uint32_t>(channel - 1),
-                                       .hits = item.back() == 'h'});
+                    sources.push_back(
+                        {.key = key, .label = key, .channel = static_cast<std::uint32_t>(channel - 1), .role = *role});
                     start = comma + 1;
                 }
                 options.inputSources = std::move(sources);
@@ -597,7 +605,8 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             std::vector<audio::InputSource> sources;
             for (int c = 0; c < n; ++c) {
                 sources.push_back({.key = "in" + std::to_string(c + 1), .label = "Input " + std::to_string(c + 1),
-                                   .channel = static_cast<std::uint32_t>(c), .hits = c < hits});
+                                   .channel = static_cast<std::uint32_t>(c),
+                                   .role = c < hits ? audio::SourceRole::Drums : audio::SourceRole::Other});
             }
             options.inputSources = std::move(sources);
             ++i;
@@ -7775,7 +7784,8 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
                 name.starts_with("visual.") || name.starts_with("response.") || // ADR-1062
                 // ADR-1605: every path a scene can take an impact from -- the stems (ADR-1520/1521), the
                 // conditioned signals (ADR-1602), envelope sources (ADR-1601), the beat clock -- as --sonic-trace has
-                name.starts_with("stem.") || name.starts_with("signal.") || name.starts_with("env.") ||
+                name.starts_with("stem.") || name.starts_with("role.") || name.starts_with("signal.") ||
+                name.starts_with("env.") ||
                 name.starts_with("beat.") || name.starts_with("audio.onset")) {
                 liveLogColumns_.emplace_back(name, id);
             }

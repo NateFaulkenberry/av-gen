@@ -72,7 +72,7 @@ std::vector<app::ProjectionDisplay> connectedDisplays() {
 } // namespace
 
 // ADR-1521: the open input's channels, and which of them are analysed as sources (stem.<key>.*). A routing surface,
-// not a mixer: a meter, a label, mono or a linked pair, and the hits tier, per channel.
+// not a mixer: a meter, a label, mono or a linked pair, and the role (ADR-1630), per channel.
 void ControlPanel::drawLiveInputs(app::Engine& engine) {
     audio::AudioInput* input = engine.audioInput();
     if (input == nullptr) {
@@ -155,7 +155,7 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
         ImGui::TableSetupColumn("Level", ImGuiTableColumnFlags_WidthFixed, 56.0f);
         ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("Pair");
-        ImGui::TableSetupColumn("Hits");
+        ImGui::TableSetupColumn("Role", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 4.2f); // ADR-1630
         ImGui::TableSetupColumn("Gain", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 3.6f);
         ImGui::TableHeadersRow();
         for (std::uint32_t c = 0; c < channels; ++c) {
@@ -222,10 +222,15 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
                             c + 1, c + 2);
                 }
                 ImGui::TableNextColumn();
-                changed |= ImGui::Checkbox("##hits", &it->hits);
+                ImGui::SetNextItemWidth(-1.0f);
+                changed |= roleCombo("##role", it->role); // ADR-1630
                 if (ImGui::IsItemHovered()) {
-                    tooltip("Also find kicks, snares and hats on this input (stem.<key>.kick/snare/hat): for a drum "
-                            "bus. About six times the analysis cost of the rest.");
+                    tooltip("What this input carries. Drums finds kicks, snares and hats on it (stem.%s.kick/snare/hat, "
+                            "and role.drums.*: what tools/drum_signals.py's signal.kick reads first); about six times "
+                            "the analysis cost of the rest. Every other role publishes its onsets, levels and register "
+                            "only -- never a kick, snare or hat -- and role.<role>.* follows the first active source "
+                            "of each role.",
+                            it->key.c_str());
                 }
                 // ADR-1582: the source's trim. Applied while dragging (no reset), saved when released.
                 ImGui::TableNextColumn();
@@ -777,7 +782,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
         slider("sonic/response/release", "Release", 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic,
                "How long a response lingers: the feel. A multiplier on every release and decay time.");
         // ADR-1530: no kick / snare / hat meters here. The hits are still detected and published (response.*,
-        // audio.onset*); which input is the drums is the Inputs table's per-source Hits, not a panel classifier.
+        // audio.onset*); which input is the drums is the Inputs table's per-source Role (ADR-1630), not a panel classifier.
         if (ImGui::Button("Reset response")) {
             for (const char* path : {"sonic/response/sensitivity", "sonic/response/transient", "sonic/response/sustain",
                                      "sonic/response/attack", "sonic/response/release"}) {

@@ -4412,12 +4412,13 @@ void SequencePanel::drawStems(app::Engine& engine) {
                 changed = true;
             }
             ImGui::SameLine();
-            if (ImGui::Checkbox("Hits", &edit.hits)) {
-                changed = true;
-            }
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 4.5f);
+            changed |= roleCombo("role", edit.role); // ADR-1630
             if (ImGui::IsItemHovered()) {
-                tooltip("Also find kicks, snares and hats in this stem (stem.<key>.kick/snare/hat). Worth it on a "
-                        "drum stem; about six times the analysis cost of the rest.");
+                tooltip("What the stem is. Drums finds kicks, snares and hats in it (stem.<key>.kick/snare/hat, and "
+                        "role.drums.*: what tools/drum_signals.py's signal.kick reads first); about six times the "
+                        "analysis cost of the rest. Every other role publishes onsets, levels and register only -- "
+                        "never a kick, snare or hat. Never guessed from the key or the audio.");
             }
             ImGui::SameLine();
             float gain = edit.gainDb;

@@ -15,6 +15,7 @@
 // frame's latched events (ADR-1060).
 
 #include "analysis/analysis_track.hpp"
+#include "analysis/stem_analysis.hpp"
 #include "spatial/audio_history.hpp"
 
 #include <array>
@@ -29,11 +30,33 @@ void foldSpectrum(const AnalysisFrame& frame, const AnalyzerConfig& config, std:
 // The whole track, folded and stretched. Empty history (no rows) for an empty track.
 [[nodiscard]] spatial::AudioHistory buildAudioHistory(const AnalysisTrack& track);
 
+// ADR-1631: a history heard from an analysis source (a stem) instead of the mix -- its spectrogram, its onset rows, or
+// both (`feeds.history`). Null `track`: the mix's.
+struct HistoryFrom {
+    const StemTrack* track = nullptr;
+    double offsetSeconds = 0.0; // where the source's first sample sits on the project timeline
+    bool classes = false;       // a drums source (ADR-1630): its kick / snare / hat are the low / mid / high rows
+};
+// The onset rows (low, mid, high) a source's hop contributes, as strengths (0 = none). A drums source's are its
+// measured classes -- kick, snare, hat; any other source has no identity to offer, so its onset (activity) is on all
+// three rows and a field reading any of them hears it.
+[[nodiscard]] std::array<float, 3> sourceOnsetRows(const StemFrame& frame, bool classes);
+// The whole track's history with the spectrogram and the low/mid/high onset rows taken from those sources. The beat
+// row is always the mix's (ADR-1630 recommendation 6: the mix's grid stays the default). A source's spectrogram is
+// stretched over its own percentiles like the mix's, sits at its offset, and reads 0 before and after its span. A pure
+// function of the inputs, so a seek is exact as before.
+[[nodiscard]] spatial::AudioHistory buildAudioHistory(const AnalysisTrack& track, const HistoryFrom& spectrum,
+                                                      const HistoryFrom& onsets);
+
 class LiveAudioHistoryFeed {
 public:
     explicit LiveAudioHistoryFeed(const AnalyzerConfig& config);
     // Push the render frame's newest analysis frame (events already latched).
     void push(const AnalysisFrame& frame);
+    // ADR-1631: push one row from any source -- `rawRow` a `foldSpectrum` row before the stretch (a source's
+    // `StemFrame::spectrumRow`, or zeros for a silent / inactive one) -- with this frame's onsets: strengths per row
+    // (low, mid, high, beat), 0 for none. Times must increase.
+    void pushRaw(double time, std::span<const float> rawRow, const std::array<float, spatial::kOnsetSources>& onsets);
     [[nodiscard]] std::shared_ptr<spatial::AudioHistory> history() const { return history_; }
 
 private:

@@ -532,8 +532,9 @@ def main():
     off["sonic"] = {"live": False}
     root = os.path.relpath(os.path.join(HERE, "..", ".."), os.path.dirname(os.path.abspath(a.project)))
     off["assets"]["audio"] = {"path": os.path.join(root, "assets/audio/feline-footwear.wav")}
+    # ADR-1630: each stem says what it is (the drum stem runs the kick/snare/hat classifier; no other does)
     off["assets"]["stems"] = [{"key": k, "label": k.title(), "file": os.path.join(
-        root, "assets/audio/stems/feline-footwear (%s).wav" % k.title())} for k in ("drums", "bass", "synth")]
+        root, "assets/audio/stems/feline-footwear (%s).wav" % k.title()), "role": k} for k in ("drums", "bass", "synth")]
     with open(os.path.join(os.path.dirname(os.path.abspath(a.project)), "living-prism-offline.json"), "w") as f:
         json.dump(off, f, indent=1)
         f.write("\n")

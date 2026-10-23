@@ -293,7 +293,7 @@ TEST_CASE("Settings remember each device's input channel map by device id (ADR-1
     app::AppSettings s;
     s.live.audioInput = "AppleUSBAudioEngine:Universal Audio:Volt 876:1";
     s.live.inputSources["AppleUSBAudioEngine:Universal Audio:Volt 876:1"] = {
-        {.key = "drums", .label = "Drum bus", .channel = 0, .pair = true, .hits = true},
+        {.key = "drums", .label = "Drum bus", .channel = 0, .pair = true, .role = audio::SourceRole::Drums},
         {.key = "bass", .label = "Bass DI", .channel = 2, .gainDb = 9.5f}}; // ADR-1582: the trim travels with the map
     s.live.inputMain["AppleUSBAudioEngine:Universal Audio:Volt 876:1"] = {6, 7};
     const nlohmann::json j = s.toJson();

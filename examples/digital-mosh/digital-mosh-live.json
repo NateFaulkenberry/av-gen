@@ -76,7 +76,7 @@
     "combine": "firstActive",
     "inputs": [
      {
-      "source": "stem.drums.kick"
+      "source": "role.drums.kick"
      },
      {
       "source": "beat.pulse",

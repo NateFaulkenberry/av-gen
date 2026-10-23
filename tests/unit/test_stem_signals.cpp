@@ -99,8 +99,8 @@ TEST_CASE("stem check: each problem is reported against the file that has it", "
 TEST_CASE("stem signals: one stable vocabulary per key; relabel moves no id; inactive is zero with no event",
           "[stems][signals]") {
     signals::SignalBus bus;
-    const auto drums = signals::StemSignals::declare(bus, "drums", "Drums");
-    const auto names = signals::StemSignals::names("drums");
+    const auto drums = signals::StemSignals::declare(bus, "drums", "Drums", audio::SourceRole::Drums);
+    const auto names = signals::StemSignals::names("drums", audio::SourceRole::Drums);
     REQUIRE(names.size() == 19); // ADR-1604 added onsetLow, onsetMid, onsetHigh
     for (const auto& n : names) {
         CHECK(bus.find(n).has_value());
@@ -110,10 +110,10 @@ TEST_CASE("stem signals: one stable vocabulary per key; relabel moves no id; ina
     CHECK_FALSE(bus.info(drums.level).isEvent);
     CHECK(bus.info(drums.level).label == "Drums: level (against its own loudness)");
 
-    const auto again = signals::StemSignals::declare(bus, "drums", "Drum Bus");
+    const auto again = signals::StemSignals::declare(bus, "drums", "Drum Bus", audio::SourceRole::Drums);
     CHECK(again.ids() == drums.ids());
     CHECK(bus.info(drums.level).label == "Drum Bus: level (against its own loudness)");
-    const auto bass = signals::StemSignals::declare(bus, "bass", "Bass");
+    const auto bass = signals::StemSignals::declare(bus, "bass", "Bass", audio::SourceRole::Bass);
     CHECK(bass.rms != drums.rms);
 
     analysis::StemFrame f;

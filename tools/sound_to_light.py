@@ -8,7 +8,7 @@ The rig is tools/sound_to_light.sh. `avgen_sonic_probe transients` plays 80 one-
 pluck in turn, 0.6031 s apart) into BlackHole 2ch on both channels and logs each one's start on the host clock (the
 stream's first callback plus the shot's sample index; see "the reference" below). AV Gen runs the project live
 (`--live-profile --mode live`: the projection window at 1920x1080, the 30 fps target, the Auto ladder) capturing
-BlackHole, channel 2 also analysed as the drum stem (`--input-sources drums@2h`), and writes `--sonic-live-log`: one
+BlackHole, channel 2 also analysed as the drum stem (`--input-sources drums@2:drums`), and writes `--sonic-live-log`: one
 row per frame with
   frameNs    when the frame's bus was built (the engine update's live clock reading)
   presentNs  when its present call returned (the picture handed to the compositor)

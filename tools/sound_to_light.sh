@@ -43,7 +43,7 @@ probe() {
 if [ $PROBE_FIRST = 1 ]; then probe & PROBE=\$!; sleep 2; fi
 "$BIN/src/avgen" --live-profile --mode live --project "$TWIN" --target-fps 30 --size 1920x1080 --quality auto \
     --warmup 5 --measure 90 --json "$OUT/profile.json" --trace "$OUT/profile.csv" \
-    --live --input BlackHole --input-sources drums@2h --sonic-live-log "$OUT/live.csv" --trace-finals ${EXTRA_ARGS:-} \
+    --live --input BlackHole --input-sources drums@2:drums --sonic-live-log "$OUT/live.csv" --trace-finals ${EXTRA_ARGS:-} \
     > "$OUT/editor.log" 2>&1 &
 APP=\$!
 if [ $PROBE_FIRST = 0 ]; then

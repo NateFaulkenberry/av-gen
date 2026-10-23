@@ -72,9 +72,10 @@ snare and hat detector (ADR-1060), the same one behind `response.snare` and `hat
 
 **A mix has no kick signal** (ADR-1620). On real music about half of what the mix's kick detector
 called a kick was a bass note or a hat's click, so `audio.onsetLow` is gone and `response.kick`
-fires only from a drum source (a stem or an input keyed `drums`, through the Feeds row). On a mix,
-use `beat.pulse`, or the live scenes' `signal.kick`: the drum source's kick when there is one, else
-the beat clock's pulse while the mix's hat or snare detector says the drums are playing.
+fires only from a drums source (a stem or an input whose role is drums, through the Feeds row). On a
+mix, use `beat.pulse`, or the live scenes' `signal.kick`: the drums source's kick (`role.drums.kick`)
+when there is one, else the beat clock's pulse while the mix's hat or snare detector says the drums
+are playing.
 
 The centroid in Hz exists inside an analysis frame but is not published as a signal.
 
@@ -94,13 +95,26 @@ One analysis source -- an offline stem file, or a channel of a live input -- pub
 | `stem.<key>.bass` … `.treble` | 0 – 1 | | the five bands, auto-gained, as `audio.<band>` |
 | `stem.<key>.centroid` | 0 – 1 | | brightness |
 | `stem.<key>.width` | 0 – 2 | | stereo width of a stereo stem or a linked input pair; 0 for mono |
-| `stem.<key>.kick` `.snare` `.hat` | 0 – 1 | ✓ | with **Hits** on: kicks, snares and hats found in this source |
+| `stem.<key>.kick` `.snare` `.hat` | 0 – 1 | ✓ | a **drums** source only: kicks, snares and hats found in it (not on the bus for any other role) |
+| `stem.<key>.onsetLow` `.onsetMid` `.onsetHigh` | 0 – 1 | | the low, mid and high shares of the latest onset's attack |
 
 Values change once per analysis hop (about 11 ms); a render frame shows the newest, and carries every event since the
 last frame, so none is lost at 30 fps. A source with no audio reads 0 and fires nothing -- never a held value.
 
-A project's **feeds** can make a source drive the beat clock and `response.*` (the kick from the drum stem, the levels
-from the bass) without changing any route. See [Audio Input](help://audio/input).
+**By role.** `role.<role>.*` -- `role.drums.*`, `role.bass.*`, `role.synth.*`, `role.vocal.*`, `role.other.*` -- is
+the same set for the first active source of that role (a live input first, then the stems), and reads 0 when none is
+active. It exists once a source has the role, and only `role.drums` has `.kick`, `.snare` and `.hat`.
+
+| Signal | Range | Event | Meaning |
+|---|---|---|---|
+| `signal.kick` `signal.kickEnv` | 0 – 1 | ✓ / | `role.drums.kick`, else the beat clock's pulse while the drums are playing (`tools/drum_signals.py`) |
+| `signal.bassLevel` | 0 – 1 | | `role.bass.level` while a bass source is active, else `response.bass` |
+| `signal.synthLevel` | 0 – 1 | | `role.synth.level` while a synth source is active, else `response.sustain` |
+
+These three are signal sources a project adds (the generators add the ones a scene reads); they need a `sonic` block.
+
+A project's **feeds** can make a source drive the beat clock, `response.*` (the kick from the drum stem, the levels
+from the bass) and the history fields hear, without changing any route. See [Audio Input](help://audio/input).
 
 ## The beat clock
 

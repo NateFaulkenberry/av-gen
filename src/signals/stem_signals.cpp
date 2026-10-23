@@ -1,6 +1,7 @@
 #include "signals/stem_signals.hpp"
 
 #include <algorithm>
+#include <cctype>
 
 namespace avgen::signals {
 
@@ -28,9 +29,9 @@ constexpr std::array<Field, 19> kFields{{
     {"treble", 0.0f, 1.0f, false, "treble band"},
     {"centroid", 0.0f, 1.0f, false, "brightness (spectral centroid)"},
     {"width", 0.0f, 2.0f, false, "stereo width (0 for mono)"},
-    {"kick", 0.0f, 1.0f, true, "kick (hits tier)"},
-    {"snare", 0.0f, 1.0f, true, "snare / clap (hits tier)"},
-    {"hat", 0.0f, 1.0f, true, "hats (hits tier)"},
+    {"kick", 0.0f, 1.0f, true, "kick (a drums source's classifier)"},
+    {"snare", 0.0f, 1.0f, true, "snare / clap (a drums source's classifier)"},
+    {"hat", 0.0f, 1.0f, true, "hats (a drums source's classifier)"},
     // ADR-1604: the register of the latest onset (low/mid/high shares of its attack), held until the next
     {"onsetLow", 0.0f, 1.0f, false, "onset register: low share (30-250 Hz) of the latest attack"},
     {"onsetMid", 0.0f, 1.0f, false, "onset register: mid share (250 Hz-4 kHz) of the latest attack"},
@@ -44,26 +45,63 @@ std::array<SignalId*, 19> slots(StemSignals& s) {
             &s.onsetRegister[2]};
 }
 
-} // namespace
+bool isClass(std::size_t field) {
+    return field >= 13 && field <= 15; // kick, snare, hat
+}
 
-std::vector<std::string> StemSignals::names(const std::string& key) {
+std::vector<std::string> namesWith(const std::string& prefix, audio::SourceRole role) {
     std::vector<std::string> out;
     out.reserve(kFields.size());
-    for (const Field& f : kFields) {
-        out.push_back("stem." + key + "." + f.suffix);
+    for (std::size_t i = 0; i < kFields.size(); ++i) {
+        if (isClass(i) && !audio::classifiesHits(role)) {
+            continue; // ADR-1630
+        }
+        out.push_back(prefix + "." + kFields[i].suffix);
     }
     return out;
 }
 
-StemSignals StemSignals::declare(SignalBus& bus, const std::string& key, const std::string& label) {
+StemSignals declareWith(SignalBus& bus, const std::string& prefix, audio::SourceRole role) {
     StemSignals s;
-    s.key = key;
+    s.role = role;
     const auto targets = slots(s);
     for (std::size_t i = 0; i < kFields.size(); ++i) {
+        if (isClass(i) && !audio::classifiesHits(role)) {
+            continue; // ADR-1630: a class name exists only on a drums source
+        }
         const Field& f = kFields[i];
-        *targets[i] = bus.declare("stem." + key + "." + f.suffix, f.minValue, f.maxValue, f.event);
+        *targets[i] = bus.declare(prefix + "." + f.suffix, f.minValue, f.maxValue, f.event);
     }
+    return s;
+}
+
+std::string roleLabel(audio::SourceRole role) {
+    std::string name = audio::sourceRoleName(role);
+    name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+    return name + " (the first active " + audio::sourceRoleName(role) + " source)";
+}
+
+} // namespace
+
+std::vector<std::string> StemSignals::names(const std::string& key, audio::SourceRole role) {
+    return namesWith("stem." + key, role);
+}
+
+std::vector<std::string> StemSignals::roleNames(audio::SourceRole role) {
+    return namesWith(std::string("role.") + audio::sourceRoleName(role), role);
+}
+
+StemSignals StemSignals::declare(SignalBus& bus, const std::string& key, const std::string& label,
+                                 audio::SourceRole role) {
+    StemSignals s = declareWith(bus, "stem." + key, role);
+    s.key = key;
     s.relabel(bus, label);
+    return s;
+}
+
+StemSignals StemSignals::declareRole(SignalBus& bus, audio::SourceRole role) {
+    StemSignals s = declareWith(bus, std::string("role.") + audio::sourceRoleName(role), role);
+    s.relabel(bus, roleLabel(role));
     return s;
 }
 
@@ -71,7 +109,9 @@ void StemSignals::relabel(SignalBus& bus, const std::string& label) const {
     auto copy = *this;
     const auto targets = slots(copy);
     for (std::size_t i = 0; i < kFields.size(); ++i) {
-        bus.setLabel(*targets[i], (label.empty() ? key : label) + ": " + kFields[i].label);
+        if (*targets[i] != kInvalidSignal) {
+            bus.setLabel(*targets[i], (label.empty() ? key : label) + ": " + kFields[i].label);
+        }
     }
 }
 
@@ -79,9 +119,34 @@ std::vector<SignalId> StemSignals::ids() const {
     auto copy = *this;
     std::vector<SignalId> out;
     for (SignalId* id : slots(copy)) {
-        out.push_back(*id);
+        if (*id != kInvalidSignal) {
+            out.push_back(*id);
+        }
     }
     return out;
+}
+
+void StemSignals::copyFrom(SignalBus& bus, const StemSignals& source) const {
+    auto mine = *this;
+    auto theirs = source;
+    const auto to = slots(mine);
+    const auto from = slots(theirs);
+    for (std::size_t i = 0; i < to.size(); ++i) {
+        const SignalId dst = *to[i];
+        const SignalId src = *from[i];
+        if (dst == kInvalidSignal) {
+            continue;
+        }
+        if (src == kInvalidSignal) {
+            bus.info(dst).isEvent ? bus.setEvent(dst, false) : bus.set(dst, 0.0f);
+            continue;
+        }
+        if (bus.info(dst).isEvent) {
+            bus.setEvent(dst, bus.event(src), bus.value(src));
+        } else {
+            bus.set(dst, bus.value(src));
+        }
+    }
 }
 
 void StemSignals::publish(SignalBus& bus, const analysis::StemFrame& f, bool events) const {
@@ -108,6 +173,9 @@ void StemSignals::publish(SignalBus& bus, const analysis::StemFrame& f, bool eve
 void StemSignals::publishInactive(SignalBus& bus) const {
     auto copy = *this;
     for (SignalId* id : slots(copy)) {
+        if (*id == kInvalidSignal) {
+            continue;
+        }
         if (bus.info(*id).isEvent) {
             bus.setEvent(*id, false);
         } else {

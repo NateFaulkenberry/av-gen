@@ -85,7 +85,7 @@ json AppSettings::toJson() const {
             for (const audio::InputSource& s : sources) {
                 json item{{"key", s.key}, {"label", s.label}, {"channel", s.channel + 1}};
                 if (s.pair) item["pair"] = true;
-                if (s.hits) item["hits"] = true;
+                if (s.role != audio::SourceRole::Other) item["role"] = audio::sourceRoleName(s.role); // ADR-1630
                 if (s.gainDb != 0.0f) item["gainDb"] = s.gainDb;
                 list.push_back(std::move(item));
             }
@@ -190,11 +190,14 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
                     if (channel < 1) {
                         continue; // lenient like the rest of `live`: a bad row is dropped, not the file
                     }
+                    // ADR-1630: the role, explicit only (an unknown one or none is `other`; `hits` is gone and not
+                    // read: a drums source runs the classifier).
+                    const auto role = audio::sourceRoleFromName(item.value("role", std::string{}));
                     sources.push_back({.key = item.value("key", std::string{}),
                                        .label = item.value("label", std::string{}),
                                        .channel = static_cast<std::uint32_t>(channel - 1),
                                        .pair = item.value("pair", false),
-                                       .hits = item.value("hits", false),
+                                       .role = role.value_or(audio::SourceRole::Other),
                                        .gainDb = std::clamp(item.value("gainDb", 0.0f), -24.0f, 24.0f)});
                 }
                 out.live.inputSources[device] = std::move(sources);

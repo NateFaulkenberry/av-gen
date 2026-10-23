@@ -365,7 +365,7 @@ params::liveness::SignalFacts SceneLivenessFacts::signal(std::string_view name) 
         (name == "response.kick" || name == "response.kickEnv")) {
         facts.silentBecause = fmt::format(
             "'{}' fires only from a drum source (ADR-1620) and this project's feeds name none for the kick: on a mix "
-            "use beat.pulse, or a signal choosing stem.drums.kick first (tools/drum_signals.py's signal.kick)",
+            "use beat.pulse, or a signal choosing role.drums.kick first (tools/drum_signals.py's signal.kick)",
             name);
     }
     const auto median = [](std::vector<float>& v) {

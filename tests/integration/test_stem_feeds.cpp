@@ -26,15 +26,18 @@ using nlohmann::json;
 namespace {
 
 json stem(const testsupport::StemFixture& fx, const std::string& key, const std::string& file, double offset = 0.0,
-          float gainDb = 0.0f) {
+          float gainDb = 0.0f, const std::string& role = "") {
     json e = {{"key", key}, {"label", key}, {"file", fx.file(file).string()}};
     if (offset != 0.0) e["offset"] = offset;
     if (gainDb != 0.0f) e["gainDb"] = gainDb;
+    if (!role.empty()) e["role"] = role; // ADR-1630
     return e;
 }
 
+// The three stems with their roles (ADR-1630): the drum stem is a drums source, so it runs the classifier.
 json standardStems(const testsupport::StemFixture& fx) {
-    return json::array({stem(fx, "drums", "drums.wav"), stem(fx, "bass", "bass.wav"), stem(fx, "synth", "synth.wav")});
+    return json::array({stem(fx, "drums", "drums.wav", 0.0, 0.0f, "drums"), stem(fx, "bass", "bass.wav", 0.0, 0.0f, "bass"),
+                        stem(fx, "synth", "synth.wav", 0.0, 0.0f, "synth")});
 }
 
 // The fixture's mix, a `sonic` block (so response.* runs), the stems and the feeds given.
@@ -125,10 +128,11 @@ TEST_CASE("feeds: hits from the drum stem are the drums' hits; levels from it fo
                                          {{"hits", "stem.drums"}, {"levels", "stem.drums"}}))
                 .has_value());
     CHECK(fed.projectWarnings().empty());
-    // The fed stem runs the hits tier although it does not ask for it.
+    // ADR-1630: a drums stem runs the hits tier by its role, fed or not; the bass stem, named by no feed, does not.
     REQUIRE(fed.stems()[0].track != nullptr);
     CHECK(fed.stems()[0].track->hits());
-    CHECK_FALSE(mix.stems()[0].track->hits());
+    CHECK(mix.stems()[0].track->hits());
+    CHECK_FALSE(mix.stems()[1].track->hits());
     constexpr double fps = 60.0;
     const Trace m = play(mix, 19.9, fps);
     const Trace f = play(fed, 19.9, fps);
@@ -171,7 +175,7 @@ TEST_CASE("feeds: a stem outside its span feeds nothing; a key that names nothin
           "[feeds][stems][engine]") {
     const auto& fx = testsupport::requireStemFixture();
     json stems = standardStems(fx);
-    stems.push_back(stem(fx, "late", "drums.wav", 12.0));
+    stems.push_back(stem(fx, "late", "drums.wav", 12.0, 0.0f, "drums")); // ADR-1630: a kick needs a drums source
     app::Engine late(app::EngineMode::Offline);
     REQUIRE(late.loadProject(writeProject(fx, "late", stems, {{"kick", "stem.late"}})).has_value());
     const auto kicks = rises(play(late, 15.0, 60.0).at("response.kickEnv"), 60.0);

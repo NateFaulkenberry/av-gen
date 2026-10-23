@@ -188,7 +188,7 @@
     "combine": "firstActive",
     "inputs": [
      {
-      "source": "stem.drums.kick"
+      "source": "role.drums.kick"
      },
      {
       "source": "beat.pulse",
@@ -206,7 +206,7 @@
     "combine": "firstActive",
     "inputs": [
      {
-      "source": "stem.drums.kick",
+      "source": "role.drums.kick",
       "chain": {
        "attackMs": 0.0,
        "decayMs": 160.0

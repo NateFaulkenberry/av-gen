@@ -21,6 +21,7 @@
 #include "audio/audio_file.hpp"
 #include "audio/stem_source.hpp"
 #include "core/error.hpp"
+#include "spatial/audio_history.hpp"
 
 #include <filesystem>
 
@@ -47,7 +48,7 @@ struct StemFrame {
     // high (4-16 kHz) shares of the power its hop gained, summing to 1 -- held until the next, so a frame reads the
     // onset's own.
     std::array<float, 3> onsetRegister{};
-    bool kick = false, snare = false, hat = false; // hits tier only
+    bool kick = false, snare = false, hat = false; // hits tier with `classes` only (a drums-role source, ADR-1630)
     float kickStrength = 0.0f, snareStrength = 0.0f, hatStrength = 0.0f;
     bool stereo = false;        // the source carried a side channel (a stereo stem, a linked input pair)
     // ADR-1581: the mix's beat trackers' input, the Analyzer's linear-flux onset strength and picked onset, so a
@@ -56,6 +57,9 @@ struct StemFrame {
     bool beatOnset = false;
     // ADR-1580: what the response model reads of this hop (hits tier only; `valid` false otherwise).
     ResponseFeed feed;
+    // ADR-1631: this hop's spectrum folded onto the audio history's log-frequency axis (`foldSpectrum`: kAudioBins bins,
+    // 32 Hz-16 kHz), raw -- before the history's stretch -- so a field can hear this source instead of the mix.
+    std::array<float, spatial::kAudioBins> spectrumRow{};
     [[nodiscard]] bool operator==(const StemFrame&) const = default;
 };
 
@@ -89,6 +93,9 @@ struct StemAnalysisConfig {
     AnalyzerConfig analyzer{};
     StemOnsetConfig onset{};
     bool hits = false;
+    // ADR-1630: with `hits`, whether the classifier's kick/snare/hat reach the frame. A drums-role source only; another
+    // role that a response feed names runs the hits tier for the feed's levels and onsets, never for a class name.
+    bool classes = true;
     // ADR-1582: the source's trim, dB, applied to its samples before anything is measured. 0 touches no sample.
     float gainDb = 0.0f;
 };

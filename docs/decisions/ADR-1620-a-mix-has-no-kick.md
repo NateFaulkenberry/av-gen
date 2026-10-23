@@ -2,6 +2,8 @@
 
 - Status: Accepted (eng/mix-hit-phaseout, The Living Prism P1-8, **option B**: the owner's decision of 2026-10-23,
   `docs/prototypes/living-prism/16-hit-phaseout-option-b-brief.md`; merge after the owner's approval)
+- **Amended** by ADR-1630: `signal.kick` reads `role.drums.kick` (the first active drums-role source), not the key
+  `drums`.
 - Supersedes in part:
   - ADR-1060: the mix's causal kick as `response.kick` and as live `audio.onsetLow`;
   - ADR-1062: `response.kick` on the mix;

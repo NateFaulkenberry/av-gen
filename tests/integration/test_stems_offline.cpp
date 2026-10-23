@@ -212,7 +212,7 @@ TEST_CASE("stems: a seek lands every stem signal and a stem route's envelope whe
         frame(scrubbed, target + 1, 60.0);
         INFO("target frame " << target);
         for (const char* key : {"drums", "bass", "synth", "pad"}) {
-            for (const auto& name : signals::StemSignals::names(key)) {
+            for (const auto& name : signals::StemSignals::names(key, audio::SourceRole::Other)) {
                 INFO(name);
                 CHECK(scrubbed.signals().value(id(scrubbed, name)) == played.signals().value(id(played, name)));
             }

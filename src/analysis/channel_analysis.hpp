@@ -55,6 +55,7 @@ public:
         audio::AnalysisStream* stream = nullptr; // null: the source's channel is absent; it is never active
         bool pair = false;
         bool hits = false;
+        bool classes = true; // ADR-1630: with `hits`, publish kick/snare/hat (a drums-role source only)
         float gainDb = 0.0f; // ADR-1582: the trim, before analysis
         bool beat = false;   // ADR-1581: run the causal beat tracker (the beat feed's source)
         bool feed = false;   // ADR-1580: queue every hop's response feed (a response feed's source; needs `hits`)

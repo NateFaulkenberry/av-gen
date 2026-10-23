@@ -51,8 +51,14 @@ beat tracking behaves differently. See [Beats and tempo](help://audio/beats).
 
 A project plays one mix. Beside it you can add **stems** -- the drum, bass or synth bounce of the same song -- which
 AV Gen analyses but never plays: open **Audio...** on the Sequence strip and use **Stems (analysis only)**. Each stem
-publishes `stem.<key>.*` (level, onset, the bands, and with **Hits** its kicks, snares and hats), so a route can follow
-the bass alone while the picture still plays the whole song. See the [Signal Reference](help://audio/signals).
+publishes `stem.<key>.*` (level, onset, the bands, and on a **drums** stem its kicks, snares and hats), so a route
+can follow the bass alone while the picture still plays the whole song. See the [Signal Reference](help://audio/signals).
+
+- **The role** says what the stem is: **drums**, **bass**, **synth**, **vocal** or **other** (the default). Only a
+  drums stem looks for kicks, snares and hats, always; a bass or synth stem publishes its onsets and levels, never a
+  "kick" a bass note could fake. `role.<role>.*` follows the first active source of each role, so a scene that reads
+  `role.drums.kick` -- or the live scenes' `signal.kick` -- works whatever the drum stem's key is. AV Gen never guesses
+  the role from the key or the audio.
 
 - **The key** (`drums`, `synth_lead`) is the signal name. It is made from the label once and kept: rename the label
   freely; change the key only if you mean to move every route on it.
@@ -62,17 +68,22 @@ the bass alone while the picture still plays the whole song. See the [Signal Ref
   mix; it is analysed at its own (nothing is resampled).
 - **Problems** are listed on the stem and in the project warnings, naming the file: a file that will not decode, a
   silent file, damaged samples, a stem shorter or longer than the mix. Outside a stem's span its signals read 0.
+- **The stem-set check** compares the stems with the mix when the project loads: their sample rate and channels
+  (said, not a problem), how closely they sum to the mix, and whether each one lines up. A stem that matches the mix
+  best some milliseconds off its offset is a warning that names the offset that aligns it; AV Gen does not change it
+  for you.
 
 ## Several sources from one interface
 
 On an interface with more than two inputs, the **Live** panel lists every input channel under **Audio input** with a
 meter. Tick a channel to analyse it on its own as `stem.<key>.*`, beside the main mix; label it (Drum bus, Bass DI);
-tick **Pair** to treat it and the next channel as one stereo source; tick **Hits** on a drum channel. The map is
-remembered for that interface on this machine.
+tick **Pair** to treat it and the next channel as one stereo source; set its **Role** (drums on the drum bus: only a
+drums source finds kicks, snares and hats). The map is remembered for that interface on this machine.
 
 AV Gen cannot know what is plugged in: the drum bus is only on input 1 if your mixer sends it there. Give each
 part its own physical output on the mixer (a group or aux bus, pre-fader if the main fader should not change it) and
-cable it to its own interface input. A stem key used offline (`drums`) works live when an input has the same key.
+cable it to its own interface input. A stem key used offline (`drums`) works live when an input has the same key, and
+anything read by role (`role.drums.*`, `signal.kick`) works live when an input has that role, whatever its key.
 
 When the interface is unplugged the panel says **Disconnected**, its sources read 0, and nothing else is opened in its
 place; it is reopened when it comes back. `avgen --list-audio-devices` prints every device's channels per stream;
@@ -96,16 +107,22 @@ the Inputs table and under the Stems section, lets a source drive them instead:
 - **Beat**: the beat clock from this source. A clean kick or drum bus gives a steadier grid than a full mix. A running
   MIDI clock still wins.
 - **Hits**: `response.kick`, `low`, `snare`, `hat` and `onset` (and their envelopes) from this source. The bass line in
-  the mix no longer fires `response.low`.
+  the mix no longer fires `response.low`. The kick, snare and hat come only from a **drums** source; named on another
+  role they are refused (a project warning).
 - **Levels**: `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient` and `flux` from this source,
   read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
-  with every hit.
+  with every hit. For one level per part, read `signal.bassLevel` or `signal.synthLevel` instead.
+- **History**: what spectrum and onset fields hear (Resonator, the generative fields): this source's spectrogram and
+  onsets instead of the mix's. A drums source's kicks, snares and hats are the fields' low, mid and high onsets; any
+  other source's onsets are on all three. The beat stays the mix's.
+
+Each list offers the roles first (**role: drums**: the first source of that role, whatever its key), then every key.
 
 Every route keeps working: a route on `response.kick` now follows the drum stem's kicks. On **Main mix** the kick does
 not fire at all (ADR-1620: it comes only from a drum source); the snare and hat are the mix's. A source a feed uses gets the
 kick/snare/hat analysis automatically. A fed source that goes quiet, or a stem outside its span, feeds nothing. It is
 not swapped for the mix. The same key works offline (a stem) and live (an input source with that key). The choice is
-saved in the project as `"feeds"` (see `docs/audio.md`).
+saved in the project as `"feeds"` (see `docs/audio.md`); a role is saved as `"role.drums"`.
 
 ## Input gain
 

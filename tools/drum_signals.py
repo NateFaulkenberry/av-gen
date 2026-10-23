@@ -1,21 +1,36 @@
-"""The kick a live scene reads after ADR-1620 (option B): one conditioned signal (ADR-1602), the drum source's kick when
-there is one, else the beat clock's pulse while the drums are audibly playing.
+"""The source-aware signals a scene reads (ADR-1620, ADR-1630): one conditioned signal per musical idea (ADR-1602) --
+the source of that ROLE when one is active, else the mix's stand-in.
 
-ADR-1620 removed the mix's kick (`response.kick` and its envelope fire only from a source a project's feeds name;
-`audio.onsetLow` left the bus): measured on Feline Footwear against its drum stem, the mix's kick detector was 0.54
-precise -- about half its kicks were bass notes and hat clicks. The mix's snare and hat (0.93 and 0.85) stay as they
-were. A scene that wants "the kick" reads `signal.kick`:
+Sources are found by role, never by key (ADR-1630). A stem or live input source says what it is (`"role": "drums"`,
+`bass`, `synth`, `vocal`, `other`), and `role.<role>.*` publishes the first active source of that role. So these
+signals follow a drum bus keyed `drums`, `kit` or `in3` alike.
+
+**The kick (ADR-1620, option B).** A mix has no kick: measured on Feline Footwear against its drum stem, the mix's kick
+detector was 0.54 precise, and about half its kicks were bass notes and hat clicks. The mix's snare and hat (0.93 and
+0.85) stay as they were. A scene that wants "the kick" reads `signal.kick`:
 
   signal.drumming         1 while the mix's own hat or snare detector has fired within the last DRUMMING_HOLD_MS: the
                           drums are audibly playing. The beat clock runs on through a breakdown, a drumless intro or
                           outro; this gate is what stops the kick stand-in there.
-  signal.kick      event  stem.drums.kick while a drum source keyed `drums` is active (an offline stem, or a live
-                          input with the hits analysis), else `beat.pulse` x 0.7 while signal.drumming.
+  signal.kick      event  role.drums.kick while a drums-role source is active (an offline stem, or a live input; a
+                          drums source always runs the kick/snare/hat classifier), else `beat.pulse` x 0.7 while
+                          signal.drumming.
   signal.kickEnv          the same as an envelope (the response model's kick release, 160 ms), for routes that read a
                           level
 
 0.7 is the mix kick's median strength on Feline (0.69), so a route tuned on the old hit lands at the size it was tuned
-at. The mix input reads response.* (hat, snare), so a project using it needs a `sonic` block.
+at.
+
+**Per-role levels (ADR-1630).** One level per part, so a scene names the idea once instead of routing `feeds.levels`
+(which moves every `response.*` level to one source):
+
+  signal.bassLevel        role.bass.level while a bass source is active, else response.bass (the mix's 30-150 Hz body)
+  signal.synthLevel       role.synth.level while a synth source is active, else response.sustain (the mix's sustained,
+                          non-percussive energy: the nearest the mix has to a pad or lead)
+
+A level is a level, never an identity: these read activity, not a class.
+
+Every mix input reads response.*, so a project using any of these needs a `sonic` block.
 
 `sources(names)` returns the source blocks for the names a project uses, dependencies first, to put BEFORE any source
 that reads them. `used(obj)` finds the names a project document (or any JSON-like object) reads.
@@ -27,6 +42,8 @@ import re
 KICK_RELEASE_MS = 160.0     # ResponseSettings::hitRelease[Kick]
 KICK_SCALE = 0.7            # the mix kick's median strength on Feline Footwear
 DRUMMING_HOLD_MS = 750.0    # how long after a hat or snare the drums still count as playing
+
+ROLES = ("drums", "bass", "synth", "vocal", "other")  # audio::SourceRole, in its order
 
 
 def _drumming():
@@ -48,14 +65,27 @@ def _kick(env):
         return i
 
     settings = {"combine": "firstActive", "inputs": [
-        inp("stem.drums.kick"),  # active while stem.drums.active (found by name); absent on a plain mix
+        inp("role.drums.kick"),  # active while role.drums.active (found by name); absent with no drums source
         inp("beat.pulse", amount=KICK_SCALE, gate="signal.drumming")]}
     if not env:
         settings["event"] = True
     return {"kind": "signal", "name": "kickEnv" if env else "kick", "settings": settings}
 
 
-NAMES = ("kick", "kickEnv")
+# role -> the mix's stand-in for its level
+_LEVEL_FALLBACK = {"bass": "response.bass", "synth": "response.sustain"}
+
+
+def _level(role):
+    return {"kind": "signal", "name": role + "Level", "settings": {
+        "combine": "firstActive",
+        "inputs": [{"source": f"role.{role}.level"},  # active while role.<role>.active
+                   {"source": _LEVEL_FALLBACK[role]}]}}
+
+
+KICK_NAMES = ("kick", "kickEnv")
+LEVEL_NAMES = tuple(r + "Level" for r in _LEVEL_FALLBACK)
+NAMES = KICK_NAMES + LEVEL_NAMES
 SIGNAL = {n: "signal." + n for n in NAMES}
 
 
@@ -64,17 +94,20 @@ def sources(names):
     names = set(names)
     unknown = names - set(NAMES)
     if unknown:
-        raise KeyError(f"not a drum signal: {sorted(unknown)}")
-    if not names:
-        return []
-    return [_drumming()] + [_kick(n == "kickEnv") for n in NAMES if n in names]
+        raise KeyError(f"not a source-aware signal: {sorted(unknown)}")
+    out = []
+    if names & set(KICK_NAMES):
+        out.append(_drumming())
+        out += [_kick(n == "kickEnv") for n in KICK_NAMES if n in names]
+    out += [_level(n[:-len("Level")]) for n in LEVEL_NAMES if n in names]
+    return out
 
 
-_PATTERN = re.compile(r"\bsignal\.(kick|kickEnv)\b")
+_PATTERN = re.compile(r"\bsignal\.(" + "|".join(NAMES) + r")\b")
 
 
 def used(obj):
-    """The drum signal names a JSON-like object reads (any string value naming `signal.kick` or `signal.kickEnv`)."""
+    """The signal names (of NAMES) a JSON-like object reads (any string value naming `signal.<name>`)."""
     found = set()
 
     def walk(o):

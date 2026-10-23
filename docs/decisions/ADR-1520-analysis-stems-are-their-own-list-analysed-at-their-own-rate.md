@@ -1,6 +1,8 @@
 # ADR-1520: Analysis stems are their own list, analysed at their own rate, and published as `stem.<key>.*`
 
 - Status: Accepted (eng/stems-multichannel)
+- **Amended** by ADR-1630: a stem's `role` replaces `hits` (only a drums stem classifies, always); by ADR-1632: the
+  stem-set check.
 - Brief: `docs/prototypes/stems-multichannel/00-brief.md` §5-6. Research and plan: `02-research-report.md`,
   `03-implementation-plan.md`.
 - Code:

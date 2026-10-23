@@ -1,11 +1,13 @@
 #include "analysis/stem_analysis.hpp"
 
+#include "analysis/audio_history_builder.hpp"
 #include "analysis/causal_onsets.hpp"
 
 #include "sonic/response.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <utility>
 
 namespace avgen::analysis {
@@ -169,10 +171,14 @@ bool StemAnalyzer::pop(StemFrame& out) {
     out.level = followLevel(f.rms);
     out.beatOnsetStrength = f.onsetStrength;
     out.beatOnset = f.onset;
+    foldSpectrum(f, analyzer_.config(), out.spectrumRow); // ADR-1631
     if (config_.hits) {
         causal_.process(scratch_, binHz_, hopSeconds_);
         const CausalOnsets& c = scratch_.causal;
         out.feed = ResponseFeed::fromCausal(c);
+        if (!config_.classes) {
+            return true; // ADR-1630: not a drums source; no class name
+        }
         out.kick = c.hit[static_cast<std::size_t>(HitClass::Kick)];
         out.kickStrength = c.strength[static_cast<std::size_t>(HitClass::Kick)];
         out.snare = c.hit[static_cast<std::size_t>(HitClass::Snare)];
@@ -226,6 +232,7 @@ Result<StemTrack> StemTrack::analyzeFile(const std::filesystem::path& path, Stem
     StemTrack track;
     track.hits_ = config.hits;
     std::unique_ptr<StemAnalyzer> analyzer;
+    std::optional<audio::StemProbeWriter> probe; // ADR-1632: the stem-set check's probe
     std::vector<float> mono;
     std::vector<float> side;
     StemFrame frame;
@@ -233,6 +240,7 @@ Result<StemTrack> StemTrack::analyzeFile(const std::filesystem::path& path, Stem
         if (!analyzer) {
             config.analyzer.sampleRate = f.sampleRate;
             analyzer = std::make_unique<StemAnalyzer>(config);
+            probe.emplace(f.sampleRate);
             const AnalyzerConfig& cfg = analyzer->config().analyzer;
             track.sampleRate_ = f.sampleRate;
             track.hopSeconds_ = static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
@@ -263,6 +271,7 @@ Result<StemTrack> StemTrack::analyzeFile(const std::filesystem::path& path, Stem
             }
         }
         analyzer->push(mono, side);
+        probe->push(mono);
         while (analyzer->pop(frame)) {
             track.frames_.push_back(frame);
         }
@@ -274,6 +283,9 @@ Result<StemTrack> StemTrack::analyzeFile(const std::filesystem::path& path, Stem
     facts.channels = decoded->channels;
     facts.frames = decoded->frames;
     facts.silent = facts.silent && facts.nonFinite == 0;
+    if (probe) {
+        facts.probe = probe->take();
+    }
     track.duration_ = static_cast<double>(decoded->frames) / static_cast<double>(decoded->sampleRate);
     return track;
 }

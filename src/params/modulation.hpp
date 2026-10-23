@@ -49,7 +49,7 @@ struct ModRoute {
     // max 0 and default 0 plays at full depth with no drum stem in the project or on the input, and stands aside
     // while one is active.
     std::optional<float> depthDefault;
-    // ADR-1570: a route on a signal that may not exist here -- `stem.drums.kick` in a live scene that also plays on
+    // ADR-1570: a route on a signal that may not exist here -- `role.drums.kick` in a live scene that also plays on
     // a plain stereo input. An unknown SOURCE is then the expected state, not a binding problem: the route stays
     // unresolved and silent and nothing is reported. (An unknown target is still reported.)
     bool optional = false;
