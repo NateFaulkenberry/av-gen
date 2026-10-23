@@ -370,6 +370,10 @@ public:
     // object updated this frame refracts and is visible.
     void setRefractionPhase(bool on) { refractionPhase_ = on; }
     [[nodiscard]] bool refractionPhase() const { return refractionPhase_; }
+    // ADR-1640: whether a material's dispersion reaches the shader (QualitySettings::refractionDispersion). Read by
+    // `update` when it packs the object slots, so set it before. Off, a dispersive material packs dispersion 0 and
+    // draws the single read.
+    void setRefractionDispersion(bool on) { refractionDispersion_ = on; }
     [[nodiscard]] bool hasRefractive() const;
     void drawRefractive(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                         const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
@@ -460,6 +464,7 @@ private:
                   bool depthOnly, bool shadowPass, bool refractPass = false);
     bool refractionPhase_ = false;
     bool refractDepthLayDown_ = false; // ADR-1603: drawRefractive's first (depth-only) round
+    bool refractionDispersion_ = true;  // ADR-1640
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

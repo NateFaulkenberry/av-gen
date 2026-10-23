@@ -131,6 +131,8 @@ Result<void> readRefraction(const json& j, Refraction& out) {
             if (auto r = number(out.opacity); !r) return r;
         } else if (key == "thickness") {
             if (auto r = number(out.thickness); !r) return r;
+        } else if (key == "dispersion") { // ADR-1640
+            if (auto r = number(out.dispersion); !r) return r;
         } else if (key == "absorption") {
             if (it->is_number() && std::isfinite(it->get<double>())) {
                 out.absorption = glm::vec3(it->get<float>());
@@ -142,23 +144,27 @@ Result<void> readRefraction(const json& j, Refraction& out) {
                 return fail("refraction 'absorption' must be a number or [r, g, b]");
             }
         } else {
-            return fail("refraction has no key '{}' (strength, opacity, thickness, absorption)", key);
+            return fail("refraction has no key '{}' (strength, opacity, thickness, absorption, dispersion)", key);
         }
     }
     return {};
 }
 
 json refractionToJson(const Refraction& r) {
-    return json{{"strength", r.strength},
-                {"opacity", r.opacity},
-                {"thickness", r.thickness},
-                {"absorption", json::array({r.absorption.x, r.absorption.y, r.absorption.z})}};
+    json j{{"strength", r.strength},
+           {"opacity", r.opacity},
+           {"thickness", r.thickness},
+           {"absorption", json::array({r.absorption.x, r.absorption.y, r.absorption.z})}};
+    if (r.dispersion != 0.0f) { // ADR-1640: written only when authored, so a block from before it saves unchanged
+        j["dispersion"] = r.dispersion;
+    }
+    return j;
 }
 
 bool refractionIsDefault(const Refraction& r) {
     const Refraction d{};
     return r.strength == d.strength && r.opacity == d.opacity && r.thickness == d.thickness &&
-           r.absorption == d.absorption;
+           r.absorption == d.absorption && r.dispersion == d.dispersion;
 }
 
 Result<void> readMaterialOptics(const json& m, Material& out) {
@@ -226,6 +232,7 @@ MaterialOpticsParameters registerMaterialOpticsParameters(params::ParameterSet& 
     out.refractionStrength = add("refraction", "strength", rest.refraction.strength, 0.0f, 0.5f, 0.0f, 0.15f);
     out.refractionOpacity = add("refraction", "opacity", rest.refraction.opacity, 0.0f, 1.0f, 0.0f, 1.0f);
     out.refractionThickness = add("refraction", "thickness", rest.refraction.thickness, 0.0f, 100.0f, 0.0f, 10.0f);
+    out.refractionDispersion = add("refraction", "dispersion", rest.refraction.dispersion, 0.0f, 2.0f, 0.0f, 0.6f);
     return out;
 }
 
@@ -242,6 +249,7 @@ void applyMaterialOpticsParameters(const MaterialOpticsParameters& p, Material& 
     copy(p.refractionStrength, live.refraction.strength);
     copy(p.refractionOpacity, live.refraction.opacity);
     copy(p.refractionThickness, live.refraction.thickness);
+    copy(p.refractionDispersion, live.refraction.dispersion);
 }
 
 glm::vec3 thinFilmTint(float cosView, float thicknessNm, float filmIor, float substrateF0, float metallic) {

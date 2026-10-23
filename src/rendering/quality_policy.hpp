@@ -108,7 +108,8 @@ struct QualityPolicy {
                !settings.materialProgramsOff &&
                settings.sdfShadowScale == 1 && // ADR-1165: every shadow texel of a raymarched caster marched
                settings.astralTier == 0 &&     // ADR-1222: every particle, the full march, the exact seek
-               settings.refraction && settings.waterSsrScale == 1.0f; // ADR-1603
+               settings.refraction && settings.waterSsrScale == 1.0f && // ADR-1603
+               settings.refractionDispersion;                            // ADR-1640
     }
 };
 

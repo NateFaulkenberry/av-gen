@@ -228,7 +228,7 @@ struct ObjectUniforms {
     optics: vec4<f32>,         // x = film thickness (nm, 0 = off), y = film ior, z = anisotropy strength
                                // (0 = off), w = anisotropy rotation (radians)
     // ADR-1603: screen-space refraction, read by procedural.wgsl's fs_proc_refract only. x = strength (0 = off),
-    // y = opacity, z = thickness (m); refraction1.rgb = absorption per metre.
+    // y = opacity, z = thickness (m), w = dispersion (ADR-1640, 0 = one read); refraction1.rgb = absorption per metre.
     refraction0: vec4<f32>,
     refraction1: vec4<f32>,
 };

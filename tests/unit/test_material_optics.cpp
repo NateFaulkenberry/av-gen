@@ -407,7 +407,54 @@ TEST_CASE("The refraction block reads, round-trips and packs to zero when off", 
     // packing: off is exactly zero whatever the other fields say
     scene::Material off = m;
     off.refraction.strength = 0.0f;
-    CHECK(rendering::packRefraction(off).lane0 == glm::vec4(0.0f));
-    CHECK(rendering::packRefraction(off).lane1 == glm::vec4(0.0f));
-    CHECK(rendering::packRefraction(m).lane0 == glm::vec4(0.04f, 0.2f, 3.0f, 0.0f));
+    CHECK(rendering::packRefraction(off, true).lane0 == glm::vec4(0.0f));
+    CHECK(rendering::packRefraction(off, true).lane1 == glm::vec4(0.0f));
+    CHECK(rendering::packRefraction(m, true).lane0 == glm::vec4(0.04f, 0.2f, 3.0f, 0.0f));
+}
+
+// ADR-1640: the dispersion key -- read, round-tripped, written only when authored, a parameter, and packed into lane0.w
+// only while the ladder allows it.
+TEST_CASE("Refraction dispersion reads, round-trips, and packs only while allowed", "[material][refraction][adr1640]") {
+    scene::Material m;
+    CHECK(m.refraction.dispersion == 0.0f);
+    REQUIRE(scene::readMaterialOptics(
+                nlohmann::json::parse(R"({"refraction": {"strength": 0.05, "opacity": 0.1, "dispersion": 0.35}})"), m)
+                .has_value());
+    CHECK(m.refraction.dispersion == 0.35f);
+    nlohmann::json written = nlohmann::json::object();
+    scene::writeMaterialOptics(m, written);
+    REQUIRE(written["refraction"].contains("dispersion"));
+    scene::Material back;
+    REQUIRE(scene::readMaterialOptics(written, back).has_value());
+    CHECK(back.refraction.dispersion == 0.35f);
+    CHECK(scene::refractionToJson(back.refraction) == scene::refractionToJson(m.refraction));
+    // a block without dispersion writes the four keys it wrote before ADR-1640
+    scene::Material plain = m;
+    plain.refraction.dispersion = 0.0f;
+    CHECK_FALSE(scene::refractionToJson(plain.refraction).contains("dispersion"));
+    CHECK(scene::refractionToJson(plain.refraction).size() == 4);
+    // dispersion alone is authored (written), though it does nothing while strength is 0
+    scene::Material onlyDispersion;
+    onlyDispersion.refraction.dispersion = 0.2f;
+    CHECK_FALSE(scene::refractionIsDefault(onlyDispersion.refraction));
+    CHECK(rendering::packRefraction(onlyDispersion, true).lane0 == glm::vec4(0.0f));
+    CHECK_FALSE(scene::readRefraction(nlohmann::json{{"dispersion", "lots"}}, plain.refraction).has_value());
+    // packed into lane0.w, clamped to 2, and 0 when the ladder takes it away
+    CHECK(rendering::packRefraction(m, true).lane0 == glm::vec4(0.05f, 0.1f, 2.0f, 0.35f));
+    CHECK(rendering::packRefraction(m, false).lane0 == glm::vec4(0.05f, 0.1f, 2.0f, 0.0f));
+    CHECK(rendering::packRefraction(plain, true).lane0 == rendering::packRefraction(plain, false).lane0);
+    scene::Material wild = m;
+    wild.refraction.dispersion = 9.0f;
+    CHECK(rendering::packRefraction(wild, true).lane0.w == 2.0f);
+    // its parameter
+    params::ParameterSet ps;
+    const auto p = scene::registerMaterialOpticsParameters(ps, "crystal/", "Crystal", m, nullptr);
+    REQUIRE(p.refractionDispersion != nullptr);
+    CHECK(ps.findAs<float>("crystal/material/refraction/dispersion") == p.refractionDispersion);
+    CHECK(p.refractionDispersion->value() == 0.35f);
+    p.refractionDispersion->setBase(0.6f);
+    ps.resetFinals();
+    scene::Material live = m;
+    scene::applyMaterialOpticsParameters(p, live);
+    CHECK(live.refraction.dispersion == 0.6f);
 }

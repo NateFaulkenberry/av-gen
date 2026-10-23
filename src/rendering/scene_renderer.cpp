@@ -1864,6 +1864,7 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"astral3", [](QualitySettings& q) { q.astralTier = 3; }, "astralTier=3 (ADR-1222: 50%, 8 taps, no shards)"},
         {"astral4", [](QualitySettings& q) { q.astralTier = 4; }, "astralTier=4 (ADR-1222: 33%, no god rays, no shards)"},
         {"norefraction", [](QualitySettings& q) { q.refraction = false; }, "refraction=false (ADR-1603: refractive surfaces opaque, no phase)"},
+        {"nodispersion", [](QualitySettings& q) { q.refractionDispersion = false; }, "refractionDispersion=false (ADR-1640: the single refraction read)"},
         {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
         {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
         {"bilinearupscale", [](QualitySettings& q) { q.spatialUpscaler = false; }, "spatialUpscaler=false (ADR-1607: the bilinear fetch)"},
@@ -4132,6 +4133,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // no light that casts) is how the renderer says there is nothing to cast into, and the
         // ecology's shadow indirect draws are then not recorded at all.
         procedurals_->setShadowViews(viewPlanes);
+        procedurals_->setRefractionDispersion(qualitySettings_.refractionDispersion); // ADR-1640: before the packing
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
         // ADR-1603: the refraction phase runs when the ladder allows it and a refractive surface is in view. Set before

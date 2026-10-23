@@ -475,7 +475,7 @@ struct ObjectUniforms {
                             // (-1..1, 0 = off), w = anisotropy rotation (radians)
     // ADR-1603: screen-space refraction (rendering/optics_pack.hpp packRefraction). x == 0 is off, and only
     // procedural draws read it: x = strength (UV per unit view-space normal), y = opacity, z = thickness (m);
-    // refraction1.rgb = absorption per metre.
+    // refraction1.rgb = absorption per metre. ADR-1640: w = dispersion (0 = the single read).
     glm::vec4 refraction0{0.0f};
     glm::vec4 refraction1{0.0f};
 };

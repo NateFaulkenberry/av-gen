@@ -363,6 +363,9 @@ struct QualitySettings {
     // ADR-1603: the refraction phase (refractive procedural surfaces read the refraction copy). Off, they draw as their
     // opaque material. The live ladder turns it off at Low and Emergency.
     bool refraction = true;
+    // ADR-1640: a refractive material's chromatic dispersion (seven spectral reads of the copy along its offset). Off, every
+    // refractive surface takes the single read. The live ladder turns it off from Medium; offline it is always on.
+    bool refractionDispersion = true;
     // ADR-1603: the cinematic water's screen-space reflection (ADR-1286), as a fraction of its authored `ssrSteps` and
     // `reflectionRays` (at least one each); 0 turns the SSR off (the environment reflection alone). 1 = as authored.
     float waterSsrScale = 1.0f;

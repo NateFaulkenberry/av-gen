@@ -59,6 +59,36 @@ cards are removed and the survivors grown to keep the leaf area, as imported glt
 Local-space deformers act on the source shape before instancing (each column twists about its
 own axis); world-space deformers act on the final world position (a wave across the whole hall).
 
+## Refraction and dispersion (ADR-1603, ADR-1640)
+
+A procedural material (a node's `material`, and a GLB mesh's parts through it) can be see-through glass:
+
+```json
+"material": {
+  "baseColor": [0.3, 0.5, 0.9],
+  "refraction": {"strength": 0.05, "opacity": 0.15, "thickness": 2.0, "absorption": [0.6, 0.2, 0.05],
+                 "dispersion": 0.35}
+}
+```
+
+| key | default | meaning |
+|---|---|---|
+| `strength` | 0 (off) | how far the frame behind is read off-pixel, in screen UV per unit of view-space normal (0..0.5) |
+| `opacity` | 0.15 | the share of the surface's own shaded colour over what it transmits |
+| `thickness` | 2.0 | metres: the longest path the absorption runs over (the linear depth behind minus the surface's own) |
+| `absorption` | 0 | per metre, a number or `[r, g, b]`: `exp(-absorption x path)` tints what is seen through |
+| `dispersion` | 0 (one read) | chromatic dispersion (ADR-1640): the frame behind is read at seven wavelengths from 650 to 450 nm along the same offset, red least far and blue most (Cauchy, 1/lambda^2 about 550 nm), the two ends `dispersion` x the offset apart, and blended into red, green and blue by wavelength. 0.1-0.3 reads as a prism fringe at edges; up to 2. A thin bright line behind a strongly dispersive surface splits into separate coloured copies once the spread is wider than about seven pixels |
+
+The screen-space refraction reads one copy of the lit opaque frame, so glass seen through glass shows the frame as it
+stood before either. Dispersion only shows where the surface bends the view (its normal turns from the camera) and
+something with an edge is behind it; a face square to the camera has no offset and no fringe. Parameters:
+`<prefix>material/refraction/{strength,opacity,thickness,dispersion}`.
+
+The live ladder takes dispersion away from Medium (`QualitySettings::refractionDispersion`, the single read; lever
+`nodispersion`, ceiling key `refractionDispersion`) and the whole phase at Low (the surface draws as its opaque material,
+so author `baseColor` and emission as its opaque look). Offline both are always on. The cinematic water has its own
+`refraction` and no dispersion.
+
 ## Material parts
 
 Multi-material mesh sources in procedural composition nodes expose additional parameter paths:

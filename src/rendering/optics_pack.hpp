@@ -30,16 +30,19 @@ namespace avgen::rendering {
 }
 
 // ADR-1603: the refraction lanes. A material with refraction off packs to exactly zero (the bytes of a material from
-// before ADR-1603), whatever its other fields say.
+// before ADR-1603), whatever its other fields say. ADR-1640: lane0.w is the dispersion, 0 (the single read) when the
+// material authors none or the ladder has taken it away (`dispersionAllowed`, QualitySettings::refractionDispersion),
+// so a material without dispersion packs the bytes it packed before ADR-1640.
 struct PackedRefraction {
-    glm::vec4 lane0{0.0f}; // x = strength, y = opacity, z = thickness (m)
+    glm::vec4 lane0{0.0f}; // x = strength, y = opacity, z = thickness (m), w = dispersion (ADR-1640)
     glm::vec4 lane1{0.0f}; // rgb = absorption per metre
 };
-[[nodiscard]] inline PackedRefraction packRefraction(const scene::Material& m) {
+[[nodiscard]] inline PackedRefraction packRefraction(const scene::Material& m, bool dispersionAllowed) {
     PackedRefraction out;
     if (m.refraction.enabled()) {
+        const float dispersion = dispersionAllowed ? std::clamp(m.refraction.dispersion, 0.0f, 2.0f) : 0.0f;
         out.lane0 = glm::vec4(std::min(m.refraction.strength, 0.5f), std::clamp(m.refraction.opacity, 0.0f, 1.0f),
-                              std::max(m.refraction.thickness, 0.0f), 0.0f);
+                              std::max(m.refraction.thickness, 0.0f), dispersion);
         out.lane1 = glm::vec4(glm::max(m.refraction.absorption, glm::vec3(0.0f)), 0.0f);
     }
     return out;

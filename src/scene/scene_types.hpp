@@ -263,6 +263,10 @@ struct Refraction {
     float opacity = 0.15f;               // the share of the surface's own shaded colour over what it transmits
     float thickness = 2.0f;              // metres: the longest path the absorption is applied over
     glm::vec3 absorption{0.0f};          // per metre, per channel (0 = clear)
+    // ADR-1640: chromatic dispersion. The copy is read across a spectrum (650 to 450 nm, Cauchy-weighted about 550 nm:
+    // red reads least far, blue most), the two ends this fraction of the offset apart. 0 (the default) is the single
+    // read; the live ladder takes it away from Medium (QualitySettings::refractionDispersion).
+    float dispersion = 0.0f;
     [[nodiscard]] bool enabled() const { return strength > 0.0f; }
 };
 

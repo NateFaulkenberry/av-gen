@@ -10,6 +10,7 @@
 //   "anisotropy": {"strength": 0.8, "rotation": 0.0}    // -1..1 (0 = off); radians
 //   "refraction": {"strength": 0.04, "opacity": 0.15, "thickness": 2.0, "absorption": [0.6, 0.2, 0.05]}
 //                                                       // ADR-1603: procedural surfaces; strength 0 = off
+//                 (+ "dispersion": 0.2 -- ADR-1640: the spectrum's spread as a fraction of the offset; 0 = one read)
 //
 // The parameters sit under the owner's prefix, `<prefix>material/thinFilm/thickness`,
 // `<prefix>material/thinFilm/ior`, `<prefix>material/anisotropy/strength` and
@@ -65,6 +66,7 @@ struct MaterialOpticsParameters {
     params::Parameter<float>* refractionStrength = nullptr;
     params::Parameter<float>* refractionOpacity = nullptr;
     params::Parameter<float>* refractionThickness = nullptr;
+    params::Parameter<float>* refractionDispersion = nullptr; // ADR-1640: `<prefix>material/refraction/dispersion`
 };
 
 // Registers `<prefix>material/thinFilm/{thickness,ior}` and `<prefix>material/anisotropy/{strength,

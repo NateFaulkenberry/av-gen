@@ -2771,7 +2771,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             obj.toon2 = toon[2];
         }
         obj.optics = packOptics(m); // ADR-1143
-        const PackedRefraction refraction = packRefraction(m); // ADR-1603
+        const PackedRefraction refraction = packRefraction(m, refractionDispersion_); // ADR-1603, ADR-1640
         obj.refraction0 = refraction.lane0;
         obj.refraction1 = refraction.lane1;
         std::uint32_t mask = 0;

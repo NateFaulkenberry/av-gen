@@ -286,6 +286,7 @@ struct LiveQualityRung {
     std::uint32_t astralTier = 0;       // ADR-1222: floor on QualitySettings::astralTier (higher = fewer particles)
     bool refraction = true;             // ADR-1603: QualitySettings::refraction (off: refractive surfaces opaque)
     float waterSsrScale = 1.0f;         // ADR-1603: ceiling on QualitySettings::waterSsrScale (0 = no water SSR)
+    bool refractionDispersion = true;   // ADR-1640: QualitySettings::refractionDispersion (off: the single read)
     [[nodiscard]] bool operator==(const LiveQualityRung&) const = default;
 };
 

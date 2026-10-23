@@ -1042,3 +1042,41 @@ TEST_CASE("the ladders give up refraction at Low and the water's SSR by Emergenc
     CHECK_FALSE(back->refraction);
     CHECK(back->waterSsrScale == 0.5f);
 }
+
+// ADR-1640: dispersion falls back to the single read from Medium on every table (the phase itself stays to Low), and
+// the priority ladder's post group, a lever and a ceiling's JSON carry it.
+TEST_CASE("the ladders give up refraction dispersion from Medium", "[unit][resolution][adr1640]") {
+    for (const auto strategy :
+         {LiveQualityStrategy::Balanced, LiveQualityStrategy::ResolutionFirst, LiveQualityStrategy::EffectsFirst}) {
+        const auto& ladder = app::liveQualityLadder(strategy);
+        CHECK(ladder[0].refractionDispersion);
+        CHECK(ladder[1].refractionDispersion);
+        for (std::size_t k = 2; k < ladder.size(); ++k) {
+            CHECK_FALSE(ladder[k].refractionDispersion);
+        }
+        CHECK(ladder[2].refraction); // the phase outlives the dispersion by one rung
+    }
+    rendering::QualitySettings base;
+    CHECK(base.refractionDispersion); // offline: always on
+    const auto& balanced = app::liveQualityLadder(LiveQualityStrategy::Balanced);
+    CHECK(app::applyLiveRung(base, base, balanced[1], 0.38f).refractionDispersion);
+    CHECK_FALSE(app::applyLiveRung(base, base, balanced[2], 0.38f).refractionDispersion);
+    base.refractionDispersion = false; // a ceiling, never better than the base
+    CHECK_FALSE(app::applyLiveRung(base, base, balanced[0], 0.38f).refractionDispersion);
+
+    std::string error;
+    const auto priority = app::ladderFromPriority({"post"}, error);
+    REQUIRE(priority.has_value());
+    CHECK((*priority)[0].refractionDispersion);
+    CHECK_FALSE((*priority)[1].refractionDispersion);
+    CHECK((*priority)[1].refraction);
+
+    app::LiveQualityRung c{};
+    CHECK(app::ceilingJsonText(c).find("refractionDispersion") == std::string::npos);
+    REQUIRE(app::applyLeverToCeiling(c, "nodispersion"));
+    CHECK(c.refraction);
+    const auto back = app::ceilingFromJsonText(app::ceilingJsonText(c), error);
+    REQUIRE(back.has_value());
+    CHECK_FALSE(back->refractionDispersion);
+    CHECK(back->refraction);
+}
