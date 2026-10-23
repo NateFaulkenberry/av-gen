@@ -1,0 +1,206 @@
+{
+ "format": "avgen-live-baseline",
+ "version": 1,
+ "machine": "Apple M2 Max, macOS, 60 Hz display (the owner's)",
+ "revision": "c7a211f5-dirty",
+ "conditions": "Release; 1920x1080; 30 fps target; Feline Footwear muted (--no-audio) from 60 s; live Auto --warmup 5 --measure 30 x 3 interleaved reps; headless Ultra --warmup-frames 150 --measure 15; AC power; tools/gpu-lock.sh",
+ "thresholds": {
+  "T1": "misses/900 median <= 5",
+  "T2": "p99 median <= 40 ms",
+  "T3": "Medium or better >= 90% (owner, 03 \u00a714)",
+  "T4": "headless Ultra GPU p50 <= 29.3, p95 <= 1.5 x p50",
+  "T9": "misses > worst rep + 2 or p99 > worst rep + 2 ms fails"
+ },
+ "written": "2026-10-23",
+ "scenes": {
+  "rainbow-world": {
+   "project": "examples/rainbow-world/rainbow-world.json",
+   "reps": [
+    {
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.350625,
+     "p99": 38.793708,
+     "max": 50.744167,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "c7a211f5dd98"
+    },
+    {
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.3515,
+     "p99": 38.800208,
+     "max": 46.744917,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "c7a211f5dd98"
+    },
+    {
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.360417,
+     "p99": 39.071542,
+     "max": 49.064125,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "c7a211f5dd98"
+    }
+   ],
+   "failedRuns": [],
+   "missesMedian": 1.0,
+   "missesWorst": 1.0,
+   "p99Median": 38.800208,
+   "p99Worst": 39.071542,
+   "mediumOrBetter": 1.0,
+   "headless": {
+    "gpuP50": 18.497550999999998,
+    "gpuP95": 23.934427,
+    "cpuWorkP50": 4.483499999999999
+   },
+   "thresholds": {
+    "T1": true,
+    "T2": true,
+    "T3": true,
+    "T4": true
+   }
+  },
+  "rift-live": {
+   "project": "examples/bioluminescent/rift-live.json",
+   "reps": [
+    {
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.336292,
+     "p99": 37.022792,
+     "max": 51.125834,
+     "mediumOrBetter": 0.701111111111111,
+     "levels": {
+      "High": 0.3689,
+      "Low": 0.2989,
+      "Medium": 0.3322
+     },
+     "revision": "c7a211f5dd98"
+    },
+    {
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.332125,
+     "p99": 37.113209,
+     "max": 51.429292,
+     "mediumOrBetter": 0.701111111111111,
+     "levels": {
+      "High": 0.3689,
+      "Low": 0.2989,
+      "Medium": 0.3322
+     },
+     "revision": "c7a211f5dd98"
+    },
+    {
+     "frames": 899,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0011123470522802,
+     "p50": 33.342792,
+     "p99": 37.562417,
+     "max": 51.352167,
+     "mediumOrBetter": 0.7007786429365962,
+     "levels": {
+      "High": 0.3682,
+      "Low": 0.2992,
+      "Medium": 0.3326
+     },
+     "revision": "c7a211f5dd98"
+    }
+   ],
+   "failedRuns": [],
+   "missesMedian": 1.0,
+   "missesWorst": 1.0011123470522802,
+   "p99Median": 37.113209,
+   "p99Worst": 37.562417,
+   "mediumOrBetter": 0.701111111111111,
+   "headless": {
+    "gpuP50": 37.934587,
+    "gpuP95": 45.024688,
+    "cpuWorkP50": 9.211583999999995
+   },
+   "thresholds": {
+    "T1": true,
+    "T2": true,
+    "T3": false,
+    "T4": false
+   }
+  },
+  "event-horizon": {
+   "project": "examples/sonic-vfx/event-horizon.json",
+   "reps": [
+    {
+     "frames": 900,
+     "deadlineMisses": 3,
+     "missesPer900": 3.0,
+     "p50": 33.270625,
+     "p99": 40.179125,
+     "max": 53.524542,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "c7a211f5dd98"
+    },
+    {
+     "frames": 900,
+     "deadlineMisses": 3,
+     "missesPer900": 3.0,
+     "p50": 33.285583,
+     "p99": 39.618417,
+     "max": 57.243792,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "c7a211f5dd98"
+    },
+    {
+     "frames": 901,
+     "deadlineMisses": 3,
+     "missesPer900": 2.9966703662597114,
+     "p50": 33.296833,
+     "p99": 40.307417,
+     "max": 50.708667,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "c7a211f5dd98"
+    }
+   ],
+   "failedRuns": [],
+   "missesMedian": 3.0,
+   "missesWorst": 3.0,
+   "p99Median": 40.179125,
+   "p99Worst": 40.307417,
+   "mediumOrBetter": 1.0,
+   "headless": {
+    "gpuP50": 9.210317,
+    "gpuP95": 16.40404,
+    "cpuWorkP50": 2.841458000000001
+   },
+   "thresholds": {
+    "T1": true,
+    "T2": false,
+    "T3": true,
+    "T4": false
+   }
+  }
+ }
+}

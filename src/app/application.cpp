@@ -73,6 +73,7 @@
 #include <functional>
 #include <numbers>
 #include <sstream>
+#include <set>
 #include <string>
 #include <thread>
 #include <utility>
@@ -198,7 +199,8 @@ std::string usageText() {
            "  --list-audio-devices, --list-midi   enumerate inputs and exit (audio: id, channels per\n"
            "                      Core Audio stream, rate)\n"
            "  --input-sources <n>[h[k]]  analyse channels 1..n of the --input device as stem.in<c>.* (h: kick/\n"
-           "                      snare/hat on all, hk: on the first k); overrides the saved channel map\n"
+           "                      snare/hat on all, hk: on the first k); overrides the saved channel map;\n"
+           "                      or named: <key>@<channel>[h],... (e.g. drums@2h: channel 2 as stem.drums.*)\n"
            "  --input-meter <device> [s]  every input channel's peak once a second for s seconds (default\n"
            "                      20), through the multichannel capture path; device = id or name\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
@@ -217,7 +219,7 @@ std::string usageText() {
            "                      and a summary; no GPU (ADR-1020)\n"
            "  --trace-finals      with --sonic-trace: also every route target's final value, one column per\n"
            "                      parameter component (\"final:<path>[<c>]\"), so two projects' routing can be compared\n"
-           "                      frame by frame (ADR-1602)\n"
+           "                      frame by frame (ADR-1602); with --sonic-live-log, the same columns live (ADR-1605)\n"
            "  --audit-routes <f>  with --project: write every route, timeline track, effect default\n"
            "                      route and effect with a verdict (live / dead / hazard) and the\n"
            "                      reason to <f> as JSON (\"-\" = stdout), and exit. Headless, no GPU;\n"
@@ -557,6 +559,33 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             auto v = need(i, "--input-sources");
             if (!v) return std::unexpected(v.error());
             const std::string spec = *v;
+            if (!spec.empty() && std::isdigit(static_cast<unsigned char>(spec[0])) == 0) {
+                // ADR-1605: named sources, "<key>@<channel>[h],...", channel 1-based, so a loopback run can put a
+                // channel under the vocabulary a scene reads (stem.drums.*) without touching the saved channel map.
+                std::vector<audio::InputSource> sources;
+                std::size_t start = 0;
+                while (start <= spec.size()) {
+                    const std::size_t comma = std::min(spec.find(',', start), spec.size());
+                    const std::string item = spec.substr(start, comma - start);
+                    const std::size_t at = item.find('@');
+                    const std::string key = item.substr(0, at);
+                    const int channel = at == std::string::npos ? 0 : std::atoi(item.c_str() + at + 1);
+                    const bool keyOk = !key.empty() && std::all_of(key.begin(), key.end(), [](char c) {
+                        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+                    });
+                    if (!keyOk || channel < 1 || channel > 64) {
+                        return fail("--input-sources: expected <key>@<channel>[h],... with key [a-z0-9_]+ and "
+                                    "1 <= channel <= 64, got '{}'",
+                                    item);
+                    }
+                    sources.push_back({.key = key, .label = key, .channel = static_cast<std::uint32_t>(channel - 1),
+                                       .hits = item.back() == 'h'});
+                    start = comma + 1;
+                }
+                options.inputSources = std::move(sources);
+                ++i;
+                continue;
+            }
             const int n = std::atoi(spec.c_str());
             if (n < 1 || n > 64) return fail("--input-sources: expected <n>[h[<k>]] with 1 <= n <= 64, got '{}'", spec);
             const auto h = spec.find('h');
@@ -2318,6 +2347,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     }
     if (options.sonicLiveLog && !options.headless) {
         liveLog_ = std::make_unique<std::ofstream>(*options.sonicLiveLog);
+        engine_->setKeepFrameEvents(true); // ADR-1605: events are logged on the frame they fired
         if (!*liveLog_) {
             log::error("--sonic-live-log: cannot write '{}'", *options.sonicLiveLog);
             liveLog_.reset();
@@ -7683,14 +7713,36 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
             const auto& info = bus.info(id);
             const std::string& name = info.name;
             if (name.starts_with("sonic.") || name.starts_with("timbre.") || name.starts_with("notes.") ||
-                name.starts_with("visual.") || name.starts_with("response.")) { // ADR-1062
+                name.starts_with("visual.") || name.starts_with("response.") || // ADR-1062
+                // ADR-1605: every path a scene can take an impact from -- the stems (ADR-1520/1521), the
+                // conditioned signals (ADR-1602), envelope sources (ADR-1601), the beat clock -- as --sonic-trace has
+                name.starts_with("stem.") || name.starts_with("signal.") || name.starts_with("env.") ||
+                name.starts_with("beat.") || name.starts_with("audio.onset")) {
                 liveLogColumns_.emplace_back(name, id);
             }
         }
+        if (options_.traceFinals) {
+            std::set<std::string> targets;
+            for (const params::ModRoute& r : engine_->modulator().routes()) {
+                if (r.targetParam != nullptr) {
+                    targets.insert(r.targetParam->path());
+                }
+            }
+            for (const std::string& path : targets) {
+                if (const params::IParameter* p = engine_->params().find(path); p != nullptr) {
+                    for (std::size_t c = 0; c < p->componentCount(); ++c) {
+                        liveLogFinals_.emplace_back(path, c);
+                    }
+                }
+            }
+        }
         *liveLog_ << "frame,liveSeconds,frameNs,presentNs,gpuMs,midiMessages,notesReceived,held,audioFrames,"
-                     "audioDropped,snapshotToFrameMs";
+                     "audioDropped,snapshotToFrameMs,gpuEndRaw,gpuCompleted";
         for (const auto& [name, id] : liveLogColumns_) {
             *liveLog_ << ',' << name;
+        }
+        for (const auto& [path, c] : liveLogFinals_) {
+            *liveLog_ << ",final:" << path << '[' << c << ']';
         }
         *liveLog_ << '\n';
     }
@@ -7699,8 +7751,25 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
               << engine_->liveSonicFrameNs() << ',' << presentNs
               << ',' << fmt::format("{:.3f}", gpuMs) << ',' << st.midiMessages << ',' << st.notes << ',' << st.held
               << ',' << st.audioFrames << ',' << st.audioDropped << ',' << fmt::format("{:.3f}", st.snapshotToFrameMs);
+    {
+        // ADR-1605: the newest completed frame's last GPU timestamp, as the driver resolved it, and how many frames
+        // have landed. The readback is a non-stalling ring, so this is an earlier frame's end, not this one's; the
+        // analysis joins it to the frame it belongs to (on Apple GPUs the timestamps are on the host clock).
+        const gpu::FrameTimeline& tl = renderer_->timeline();
+        const auto& ts = tl.timestamps(); // an unwritten slot reads 0, so the frame's end is the largest
+        *liveLog_ << ',' << (ts.empty() ? std::uint64_t{0} : *std::max_element(ts.begin(), ts.end())) << ','
+                  << tl.completedFrames();
+    }
+    const std::vector<float>& fired = engine_->frameEvents();
     for (const auto& [name, id] : liveLogColumns_) {
-        *liveLog_ << ',' << fmt::format("{:.5g}", static_cast<double>(bus.value(id)));
+        // ADR-1605: an event is cleared at the end of its update, so it is read from what that update fired
+        const float v = bus.info(id).isEvent ? (id < fired.size() ? fired[id] : 0.0f) : bus.value(id);
+        *liveLog_ << ',' << fmt::format("{:.5g}", static_cast<double>(v));
+    }
+    for (const auto& [path, c] : liveLogFinals_) {
+        const params::IParameter* p = engine_->params().find(path);
+        *liveLog_ << ',' << (p != nullptr && c < p->componentCount() ? fmt::format("{:.6g}", p->finalComponent(c))
+                                                                      : std::string());
     }
     *liveLog_ << '\n';
 }

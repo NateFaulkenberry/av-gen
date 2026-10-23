@@ -545,6 +545,10 @@ public:
     // Seconds on the live clock at the start of the current frame.
     [[nodiscard]] double liveSonicSeconds() const { return liveFrameSeconds_; }
     [[nodiscard]] std::uint64_t liveSonicFrameNs() const { return liveFrameNs_; }
+    // ADR-1605: the events the last update fired, kept past its end-of-frame clearEvents() for a per-frame log (the
+    // --sonic-live-log). Indexed by SignalId: the event's strength, or 0 when it did not fire. Off unless asked for.
+    void setKeepFrameEvents(bool keep) { keepFrameEvents_ = keep; }
+    [[nodiscard]] const std::vector<float>& frameEvents() const { return frameEvents_; }
     // Tempo source (saved in the project's "control" block as "tempoSource").
     void setTempoSource(TempoSource source);
     [[nodiscard]] TempoSource tempoSource() const { return tempoSource_; }
@@ -1526,6 +1530,8 @@ private:
     sonic::SonicSetup liveDefaults_;  // the character when live input runs under a project with no `sonic` block
     double liveFrameSeconds_ = 0.0;
     std::uint64_t liveFrameNs_ = 0;
+    bool keepFrameEvents_ = false;   // ADR-1605
+    std::vector<float> frameEvents_; // ADR-1605
     // Starts the runner just built, with the live timbre tap installed (live mode).
     void startRunner();
     double lastRenderTime_ = 0.0;

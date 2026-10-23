@@ -934,3 +934,18 @@ disk in both arms so this isolates the two changes rather than the whole diff:
 13% off the editor canvas's GPU frame while submitting 10.5% *more* geometry than before, because
 one change bought a per-pixel term and the other spent part of it on the geometry the ladder had
 been quietly withholding.
+
+## The live baseline and its regression check (2026-10-23, ADR-1608)
+
+The reference live scenes' numbers are kept in `docs/perf/live-baseline.json`. Before merging a change to the
+renderer, the ladder or a reference scene, on AC power:
+
+```sh
+tools/ci/live-perf.sh            # run (3 interleaved reps, live Auto + headless Ultra, under the GPU lock) and check
+python3 tools/live_perf_baseline.py check --out ci-results/live-perf --scenes rift-live   # re-judge, or a subset
+python3 tools/live_perf_baseline.py write --out <a run you reviewed>                     # move the baseline, on purpose
+```
+
+Exit 1 names the scene and why: a T1-T4 threshold the baseline met and the run lost, or a T9 regression (misses or
+p99 past the baseline's worst repetition + 2). Local only: it needs `assets/audio/feline-footwear.wav` and the
+generated scenes. Sound-to-light latency has its own rig, `tools/sound_to_light.sh` (ADR-1605).

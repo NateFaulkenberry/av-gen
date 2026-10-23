@@ -394,8 +394,15 @@ Result<CaptureFormat> CoreAudioCapture::open(CaptureSink& sink) {
     for (const std::uint32_t n : s.openedStreams) {
         streams += (streams.empty() ? "" : "+") + std::to_string(n);
     }
-    log::info("audio input '{}' (Core Audio, {}): {} ch in {} stream(s) ({}), {:.0f} Hz", name_, uid_, s.channels,
-              s.openedStreams.size(), streams, hardware.mSampleRate);
+    // ADR-1605: the buffer this process got (Core Audio keeps one per client process), which is the capture's latency.
+    UInt32 period = 0;
+    {
+        AudioObjectPropertyAddress a{kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal, kMain};
+        UInt32 size = sizeof(period);
+        AudioObjectGetPropertyData(s.device, &a, 0, nullptr, &size, &period);
+    }
+    log::info("audio input '{}' (Core Audio, {}): {} ch in {} stream(s) ({}), {:.0f} Hz, {}-frame buffer (asked {})",
+              name_, uid_, s.channels, s.openedStreams.size(), streams, hardware.mSampleRate, period, periodFrames_);
     return CaptureFormat{static_cast<std::uint32_t>(hardware.mSampleRate), s.channels};
 }
 

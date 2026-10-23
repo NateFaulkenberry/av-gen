@@ -7400,6 +7400,16 @@ void Engine::update(const FrameTime& time) {
         base.beat[3] = bus_.value(timeSignals_.progress);
         shaderLayers_.update(time, base);
     }
+    if (keepFrameEvents_) {
+        // ADR-1605: what fired this frame, before it is cleared (a fired event of strength 0 reads as a tiny pulse).
+        frameEvents_.assign(bus_.size(), 0.0f);
+        for (std::size_t i = 0; i < bus_.size(); ++i) {
+            const auto id = static_cast<signals::SignalId>(i);
+            if (bus_.event(id)) {
+                frameEvents_[i] = bus_.value(id) != 0.0f ? bus_.value(id) : 1e-3f;
+            }
+        }
+    }
     bus_.clearEvents();
 
     probeStage(probe2::frame().updOtherMs); // TEMPORARY: phase 2

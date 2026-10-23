@@ -14,6 +14,9 @@
 //   controller  a performer's controller on Digital Ocean's map: pads 36-40 and CC 1/2 sweeps over a held note.
 //   stress      Digital Ocean's reliability run: every pad 36-41 hammered at 4 Hz, palette/night CC sweeps, ~62 s.
 //   latency   24 notes, 0.8 s apart, a sharp attack each: MIDI -> bus, audio -> bus.
+//   transients  ADR-1605, sound to light: 80 one-shot transients, four families in turn (kick, snare, hat, pluck),
+//             0.6031 s apart (the 3.1 ms walks the hop and frame phases). Each logs a `shot` row: the host time its
+//             first sample left the probe (the stream's start time plus its sample index), its family as `key`.
 //   sweep     one held note; a low-pass cutoff sweeps 120 Hz -> 9 kHz and back (the brief's §17 / PART 17).
 //   drive     one held note; the drive rises from clean to hard clipping (§18 / PART 18).
 //   demo      a short phrase: low soft notes, high bright notes, chords, an arpeggio, a sweep, distortion.
@@ -36,6 +39,7 @@
 // low-pass or band-pass state-variable filter), so the checklist sounds like the brief's list (PART 22): pad,
 // pluck, lead, FM, distorted, filtered, resonant, noisy, sustained, percussive.
 
+#include "audio/capture_coreaudio.hpp"
 #include "control/midi.hpp"
 #include "sonic/live.hpp"
 
@@ -115,6 +119,15 @@ struct Synth {
     std::vector<float> recording;
     std::atomic<std::size_t> recorded{0};
     std::atomic<std::uint64_t> firstCallbackNs{0}; // host time of recording sample 0
+    // ADR-1605: one-shot transients. The player sets `shotPending` to a family; the audio thread starts it at the next
+    // sample and publishes the stream sample it started at (`shotStartFrame`), so its host time is exact on the
+    // stream's own clock.
+    std::array<std::vector<float>, 4> shots;
+    std::atomic<int> shotPending{-1};
+    std::atomic<std::int64_t> shotStartFrame{-1};
+    std::uint64_t streamFrame = 0; // audio thread
+    int shotPlaying = -1;           // audio thread
+    std::size_t shotPos = 0;        // audio thread
 };
 
 float polyBlep(float t, float dt) {
@@ -243,7 +256,22 @@ void render(Synth& s, float* out, ma_uint32 frames, ma_uint32 channels) {
             const float filtered = bandPass ? k * v1 : v2;
             mix += (post ? std::tanh(drive * filtered * 1.5f) * norm : filtered) * v.env;
         }
-        const float sample = std::tanh(mix * level);
+        if (const int pending = s.shotPending.exchange(-1, std::memory_order_acq_rel); pending >= 0) {
+            s.shotPlaying = pending;
+            s.shotPos = 0;
+            s.shotStartFrame.store(static_cast<std::int64_t>(s.streamFrame), std::memory_order_release);
+        }
+        float shot = 0.0f;
+        if (s.shotPlaying >= 0) {
+            const auto& buffer = s.shots[static_cast<std::size_t>(s.shotPlaying)];
+            if (s.shotPos < buffer.size()) {
+                shot = buffer[s.shotPos++];
+            } else {
+                s.shotPlaying = -1;
+            }
+        }
+        ++s.streamFrame;
+        const float sample = std::tanh(mix * level) + shot;
         for (ma_uint32 c = 0; c < channels; ++c) {
             out[i * channels + c] = sample;
         }
@@ -593,9 +621,85 @@ double patchesGesture(Player& p, double t) {
     return u;
 }
 
+// ADR-1605: the four transient families, 48 kHz mono, peak about 0.7.
+void buildShots(Synth& s) {
+    constexpr float sr = 48000.0f;
+    std::uint32_t noise = 0x1234567u;
+    const auto white = [&noise]() {
+        noise ^= noise << 13;
+        noise ^= noise >> 17;
+        noise ^= noise << 5;
+        return static_cast<float>(noise) / 2147483648.0f - 1.0f;
+    };
+    // kick: a 150 -> 50 Hz sine sweep under a 2 ms click
+    {
+        auto& b = s.shots[0];
+        b.resize(static_cast<std::size_t>(0.25f * sr));
+        float phase = 0.0f;
+        for (std::size_t i = 0; i < b.size(); ++i) {
+            const float t = static_cast<float>(i) / sr;
+            phase += (50.0f + 100.0f * std::exp(-t / 0.03f)) / sr;
+            b[i] = 0.7f * std::sin(2.0f * kPi * phase) * std::exp(-t / 0.12f) + 0.3f * white() * std::exp(-t / 0.002f);
+        }
+    }
+    // snare: high-passed noise and a 190 Hz body
+    {
+        auto& b = s.shots[1];
+        b.resize(static_cast<std::size_t>(0.2f * sr));
+        float last = 0.0f;
+        for (std::size_t i = 0; i < b.size(); ++i) {
+            const float t = static_cast<float>(i) / sr;
+            const float w = white();
+            b[i] = 0.45f * (w - last) * std::exp(-t / 0.06f) + 0.3f * std::sin(2.0f * kPi * 190.0f * t) * std::exp(-t / 0.05f);
+            last = w;
+        }
+    }
+    // hat: second-differenced noise, 8 ms
+    {
+        auto& b = s.shots[2];
+        b.resize(static_cast<std::size_t>(0.05f * sr));
+        float l1 = 0.0f, l2 = 0.0f;
+        for (std::size_t i = 0; i < b.size(); ++i) {
+            const float t = static_cast<float>(i) / sr;
+            const float w = white();
+            b[i] = 0.35f * (w - 2.0f * l1 + l2) * std::exp(-t / 0.008f);
+            l2 = l1;
+            l1 = w;
+        }
+    }
+    // pluck: a 220 Hz saw, 2 ms attack, 0.25 s decay
+    {
+        auto& b = s.shots[3];
+        b.resize(static_cast<std::size_t>(0.5f * sr));
+        float phase = 0.0f;
+        for (std::size_t i = 0; i < b.size(); ++i) {
+            const float t = static_cast<float>(i) / sr;
+            phase += 220.0f / sr;
+            phase -= std::floor(phase);
+            b[i] = 0.5f * (2.0f * phase - 1.0f) * std::min(1.0f, t / 0.002f) * std::exp(-t / 0.25f);
+        }
+    }
+}
+
 void scenario(const std::string& name, Player& p) {
     Synth& s = p.synth;
-    if (name == "latency") {
+    if (name == "transients") {
+        buildShots(s);
+        for (int i = 0; i < 80; ++i) {
+            const double t = 1.0 + 0.6031 * i;
+            const int family = i % 4;
+            p.waitUntil(t);
+            s.shotStartFrame.store(-1, std::memory_order_release);
+            s.shotPending.store(family, std::memory_order_release);
+            while (s.shotStartFrame.load(std::memory_order_acquire) < 0) {
+                std::this_thread::sleep_for(std::chrono::microseconds(200));
+            }
+            const auto frame = static_cast<double>(s.shotStartFrame.load());
+            const std::uint64_t ns = s.firstCallbackNs.load() + static_cast<std::uint64_t>(frame / 48000.0 * 1e9);
+            p.log.out << ns << ",shot," << family << ",1,0,0\n";
+        }
+        p.waitUntil(1.0 + 0.6031 * 80 + 1.0);
+    } else if (name == "latency") {
         s.cutoff.store(6000.0f);
         // 0.8 s is exactly 75 analysis hops (512 at 48 kHz) and 48 frames at 60 Hz, so a plain 0.8 s grid would
         // put every note at the same hop and frame phase and measure one offset 24 times. The extra 3.1 ms per note
@@ -881,7 +985,7 @@ bool writeWav(const std::string& path, const std::vector<float>& samples, std::s
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: avgen_sonic_probe <latency|sweep|drive|demo|silence|low|high|chords|arp|"
+        std::fprintf(stderr, "usage: avgen_sonic_probe <transients|latency|sweep|drive|demo|silence|low|high|chords|arp|"
                              "distorted|patches|play|tour|controller|stress|resonator> [--out f.csv] [--scenes n] "
                              "[--wav f.wav] [--device BlackHole] [--lead-in s] [--period frames] [--record-seconds s]\n");
         return 2;
@@ -933,10 +1037,14 @@ int main(int argc, char** argv) {
     ma_context_get_devices(&context, &playback, &playbackCount, &capture, &captureCount);
     const ma_device_id* id = nullptr;
     std::string chosen;
+    std::string uid;
     for (ma_uint32 i = 0; i < playbackCount; ++i) {
         if (std::strstr(playback[i].name, deviceName.c_str()) != nullptr) {
             id = &playback[i].id;
             chosen = playback[i].name;
+#if defined(__APPLE__)
+            uid = playback[i].id.coreaudio; // the Core Audio device UID
+#endif
             break;
         }
     }
@@ -952,6 +1060,14 @@ int main(int argc, char** argv) {
     config.playback.channels = 2;
     config.playback.pDeviceID = id;
     config.sampleRate = 48000;
+    // ADR-1550: miniaudio sets the device's buffer to the period it is given, and BlackHole may be running inside the
+    // owner's Multi-Output Device: then keep its current buffer size rather than resize it under the other client.
+    const ma_uint32 wanted = period;
+    period = uid.empty() ? period : avgen::audio::courteousPeriodFrames(uid, period);
+    if (period != wanted) {
+        std::fprintf(stderr, "probe: '%s' is running elsewhere at %u frames; not resizing it to %u\n", chosen.c_str(),
+                     period, wanted);
+    }
     config.periodSizeInFrames = period;
     config.dataCallback = &callback;
     config.pUserData = &synth;

@@ -539,6 +539,9 @@ private:
     bool liveSonicWasOn_ = false;
     std::unique_ptr<std::ofstream> liveLog_;
     std::vector<std::pair<std::string, signals::SignalId>> liveLogColumns_;
+    // ADR-1605, --trace-finals with --sonic-live-log: every route target's final, by path and component (looked up
+    // by path each row, so a reload cannot leave a dangling parameter behind).
+    std::vector<std::pair<std::string, std::size_t>> liveLogFinals_;
     std::uint64_t liveLogFrames_ = 0;
     std::unique_ptr<std::ofstream> liveCaptureIndex_;
     std::uint64_t liveCaptureFrames_ = 0;
