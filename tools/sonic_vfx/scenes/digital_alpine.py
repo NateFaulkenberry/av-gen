@@ -93,7 +93,7 @@ DESIGN = {
         ["level", "response.level", "AUDIO TOPOGRAPHY: the waves rolling out through the mountains grow taller"],
         ["kick", "signal.kick", "the low sun flares across every facet that faces it; rings of light land on the "
          "water"],
-        ["snare", "signal.snare", "a flash along the horizon"],
+        ["snare", "response.snare", "a flash along the horizon"],
         ["brightness", "sonic.brightness.slow", "the whole palette drifts warmer or cooler"],
         ["intensity", "response.intensity", "STRUCTURE: the ranges rise as the piece builds"],
         ["pitch class", "notes.class.0", "twelve lanterns round the shore, one per pitch class, with their reflections"],

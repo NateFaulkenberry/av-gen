@@ -21,7 +21,7 @@ bool sonicFamily(std::string_view name) {
 } // namespace
 
 bool SignalEventDeriver::derivable(std::string_view name) {
-    return name == "audio.onset" || name == "audio.beat" || sonicFamily(name);
+    return name == "audio.onset" || name == "audio.beat" || name == "audio.onsetMid" || name == "audio.onsetHigh" || sonicFamily(name);
 }
 
 void SignalEventDeriver::clear() {
@@ -45,9 +45,13 @@ std::optional<std::vector<world::TriggerOnset>> SignalEventDeriver::derive(std::
                 out.push_back({f.timeSeconds, std::min(1.0f, f.onsetStrength * 0.5f)});
             } else if (name == "audio.beat" && f.beat) {
                 out.push_back({f.timeSeconds, 1.0f});
+            } else if (name == "audio.onsetMid" && f.midOnset) {
+                out.push_back({f.timeSeconds, std::max(0.05f, f.midOnsetStrength)});
+            } else if (name == "audio.onsetHigh" && f.highOnset) {
+                out.push_back({f.timeSeconds, std::max(0.05f, f.highOnsetStrength)});
             }
         }
-        if (name != "audio.onset" && name != "audio.beat") {
+        if (name != "audio.onset" && name != "audio.beat" && name != "audio.onsetMid" && name != "audio.onsetHigh") {
             return std::nullopt;
         }
         return out;
@@ -99,7 +103,7 @@ void SignalEventDeriver::walkSonic(const analysis::AnalysisTrack* track, const S
         const double hop =
             static_cast<double>(track->config().hopSize) / static_cast<double>(track->config().sampleRate);
         for (std::size_t i = 0; i < frames.size(); ++i) {
-            // ADR-1580/1620: the project's feeds, as the engine steps them (a drum class comes only from one).
+            // ADR-1580/1620: the project's feeds, as the engine steps them (the kick comes only from one).
             runtime.step(setup, setup.timbre[i], hop, setup.feed.size() == frames.size() ? &setup.feed[i] : nullptr);
             runtime.publish(&setup, bus, frames[i].timeSeconds);
             harvest(frames[i].timeSeconds);

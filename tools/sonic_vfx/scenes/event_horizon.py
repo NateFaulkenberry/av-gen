@@ -70,9 +70,9 @@ DESIGN = {
         ["bass", "response.bass", "the hole's mass: the lens and the shadow swell, the sky bends more, and the star "
          "flares and bleeds faster into its stream"],
         ["kick", "signal.kick", "the photon ring flashes, the jets fire and a shock ripple races out from the hole"],
-        ["snare", "signal.snare", "a flare erupts from the hot spot on the approaching side, and the star sheds a "
+        ["snare", "response.snare", "a flare erupts from the hot spot on the approaching side, and the star sheds a "
          "burst of plasma"],
-        ["hat", "signal.hat", "sparks glint across the disk"],
+        ["hat", "response.hat", "sparks glint across the disk"],
         ["density", "notes.density", "busy playing churns the gas (turbulence, finer streaks)"],
         ["tension", "notes.tension", "dissonance splits the lens's colours"],
         ["brightness", "sonic.brightness", "a bright timbre turns the inner edge from gold to blue-white"],

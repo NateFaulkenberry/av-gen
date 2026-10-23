@@ -137,10 +137,10 @@ TEST_CASE("feeds: hits from the drum stem are the drums' hits; levels from it fo
     const auto mixLow = rises(m.at("response.lowEnv"), fps);
     const auto fedLow = rises(f.at("response.lowEnv"), fps);
     const auto fedKick = rises(f.at("response.kickEnv"), fps);
-    // ADR-1620: the mix has no drum class: with no feed there is no kick at all, the stem's kicks only with one.
+    // ADR-1620: the mix has no kick: with no feed there is none at all, the stem's kicks only with one. The mix's
+    // snare and hat still fire.
     CHECK(rises(m.at("response.kickEnv"), fps).empty());
-    CHECK(rises(m.at("response.snareEnv"), fps).empty());
-    CHECK(rises(m.at("response.hatEnv"), fps).empty());
+    CHECK_FALSE(rises(m.at("response.hatEnv"), fps).empty());
     INFO("mix low in 7.9-9.9: " << within(mixLow, 7.9, 9.9) << ", fed low " << within(fedLow, 7.9, 9.9));
     CHECK(within(mixLow, 7.9, 9.9) >= 1);
     CHECK(within(fedLow, 8.05, 9.95) == 0);
@@ -284,13 +284,13 @@ TEST_CASE("feeds: the block and the stem trim survive a save; a project without 
 }
 
 
-TEST_CASE("feeds: a route on a drum class is dead with no drum source and live with one (ADR-1620)",
+TEST_CASE("feeds: a route on the kick is dead with no drum source and live with one (ADR-1620)",
           "[feeds][stems][engine][liveness][adr1620]") {
     const auto& fx = testsupport::requireStemFixture();
     const auto audit = [&](const char* name, const json& feeds) {
         app::Engine e(app::EngineMode::Offline);
         REQUIRE(e.loadProject(writeProject(fx, name, standardStems(fx), feeds)).has_value());
-        for (const char* source : {"response.kick", "response.hatEnv", "response.onset"}) {
+        for (const char* source : {"response.kick", "response.kickEnv", "response.snare"}) {
             params::ModRoute r;
             r.source = source;
             r.target = "camera/height";
@@ -303,7 +303,7 @@ TEST_CASE("feeds: a route on a drum class is dead with no drum source and live w
     const auto rule = [](const scene::AuditEntry& entry) {
         return entry.findings.empty() ? std::string() : entry.findings.front().rule;
     };
-    // The mix: the drum classes cannot fire, so their routes are dead and say why; the onset is live.
+    // The mix: the kick cannot fire, so its routes are dead and say why; the mix's snare is live.
     const scene::RouteAudit mix = audit("liveness-mix", json());
     REQUIRE(mix.routes.size() == 3);
     CHECK(mix.routes[0].verdict == params::liveness::Verdict::Dead);

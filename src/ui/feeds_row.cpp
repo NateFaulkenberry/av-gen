@@ -73,8 +73,8 @@ void drawFeedsRow(app::Engine& engine) {
     if (ImGui::IsItemHovered()) {
         tooltip("Which source drives the beat clock (beat.*, bars, music.*) and feeds response.* -- the hits (kick, "
                 "low, snare, hat, onset) and the levels (bass, level, sustain, ...). Main mix is how every project "
-                "works without this; the mix gives low and onset but no kick, snare or hat (ADR-1620: those come only "
-                "from a drum source). A source here gets the hits analysis. An inactive source feeds nothing; a "
+                "works without this; the mix has no kick (ADR-1620: it comes only from a drum source). A source here gets "
+                "the hits analysis. An inactive source feeds nothing; a "
                 "missing one falls back to the mix. Saved in the project as \"feeds\".");
     }
     ImGui::SameLine();
@@ -93,16 +93,14 @@ void drawFeedsRow(app::Engine& engine) {
         if (custom) {
             std::string list;
             for (std::size_t k = 0; k < feeds.hit.size(); ++k) {
-                const bool drum = k == 0 || k == 2 || k == 3; // ADR-1620: a drum class has no mix
                 list += std::string(audio::kFeedHitNames[k]) + ": " +
-                        (feeds.hitSource(k).empty() ? std::string(drum ? "none (silent)" : "main mix")
+                        (feeds.hitSource(k).empty() ? std::string(k == 0 ? "none (silent: ADR-1620)" : "main mix")
                                                     : feeds.hitSource(k)) +
                         "\n";
             }
             tooltip("Per class (from the project file):\n%sChoosing an entry sets all five.", list.c_str());
         } else {
-            tooltip("response.kick, low, snare, hat and onset (and their envelopes) from this source. On Main mix, "
-                    "low and onset come from the mix and kick, snare and hat are silent (ADR-1620).");
+            tooltip("response.kick, low, snare, hat and onset (and their envelopes) from this source.");
         }
     }
     ImGui::SameLine();

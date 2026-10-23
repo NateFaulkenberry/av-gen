@@ -6,10 +6,10 @@ engineer's response model (VFX-ARCHITECTURE.md §1.1: `response.*`, the per-note
 
 Two vocabularies:
 
-  ENGINE = "response"  the engineer's response model (ADR-1060..1062): conditioned levels, the per-note MIDI signals,
-                       and the live Effect Library trigger source `signal`. ADR-1620: kick, snare and hat are the drum
-                       signals of tools/drum_signals.py (`signal.kick` ...: the drum source's class when a drums source
-                       is active, else the beat clock or the mix's onset), which kit.Scene installs as sources.
+  ENGINE = "response"  the engineer's response model (ADR-1060..1062): live snare/hat, conditioned levels, the
+                       per-note MIDI signals, and the live Effect Library trigger source `signal`. ADR-1620: the kick
+                       is tools/drum_signals.py's `signal.kick` (a drums source's kick, else the beat clock's pulse
+                       while the drums play), which kit.Scene installs as a source.
   ENGINE = "adr1061"   4bc1a762: live kick/snare/hat (`audio.onsetLow/Mid/High`, ADR-1061) and the Effect Library's
                        live `signal` trigger source (ADR-1060), before the response model: levels and per-note facts
                        still fall back to the Sonic Character and the context.
@@ -25,15 +25,13 @@ ENGINE = os.environ.get("SONIC_VFX_ENGINE", "response")
 # Every value is a bus signal name. `E` marks an event (a one-frame pulse whose value is the strength): route it through
 # an envelope chain, or use its `Env` twin.
 RESPONSE = {
-    # ---- hits (events) and their shaped envelopes (0..1). ADR-1620: a mix has no kick, snare or hat; these are the
-    #      drum signals (tools/drum_signals.py): the drums source's class, else beat.pulse (kick), the pulse on the
-    #      backbeat (snare) and response.onset (hat)
-    "kick": "signal.kick", "kickEnv": "signal.kickEnv",
-    "snare": "signal.snare", "snareEnv": "signal.snareEnv",
-    "hat": "signal.hat", "hatEnv": "signal.hatEnv",
+    # ---- hits (events) and their shaped envelopes (0..1)
+    "kick": "signal.kick", "kickEnv": "signal.kickEnv",          # ADR-1620: the mix has no kick (drum_signals.py)
+    "snare": "response.snare", "snareEnv": "response.snareEnv",
+    "hat": "response.hat", "hatEnv": "response.hatEnv",
     "low": "response.low", "lowEnv": "response.lowEnv",          # any low attack: a kick or a bass note
     "onset": "response.onset", "onsetEnv": "response.onsetEnv",  # any attack, level-free
-    "onsetRate": "response.onsetRate",                           # onsets a second / 12: granular activity
+    "hatRate": "response.hatRate",                               # hats a second / 12: granular activity
     # ---- levels (0..1, read against the music's own loudness over the last minute -- ADR-1510: a track's body sits
     #      around 0.5-0.7, a breakdown low, a drop high -- and conditioned by the Live panel's sensitivity)
     "bass": "response.bass",              # 30-150 Hz, the body (held between hits): displacement, pressure
@@ -84,7 +82,7 @@ LEGACY_OVERRIDES = {
     "hat": "audio.onset", "hatEnv": "audio.onset",
     "low": "audio.onset", "lowEnv": "audio.onset",
     "onset": "audio.onset", "onsetEnv": "audio.onset",
-    "onsetRate": "audio.onsetRate",
+    "hatRate": "audio.onsetRate",
     "bass": "audio.bass", "level": "audio.rms", "transient": "sonic.transient",
     "sustain": "sonic.energy.slow", "flux": "audio.spectralFlux", "melodic": "notes.motion",
     "pitchAny": "notes.pitch", "intensity": "sonic.energy.slow",

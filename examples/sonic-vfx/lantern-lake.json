@@ -140,18 +140,31 @@
  "sources": [
   {
    "kind": "signal",
-   "name": "busy",
+   "name": "drumming",
    "settings": {
-    "combine": "firstActive",
+    "combine": "max",
     "inputs": [
      {
-      "source": "response.onsetRate",
+      "source": "response.hat",
       "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.05
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
+      }
+     },
+     {
+      "source": "response.snare",
+      "chain": {
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
       }
      }
-    ]
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 0.01
+    }
    }
   },
   {
@@ -166,23 +179,7 @@
      {
       "source": "beat.pulse",
       "amount": 0.7,
-      "gate": "signal.busy"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "hat",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.hat"
-     },
-     {
-      "source": "response.onset"
+      "gate": "signal.drumming"
      }
     ],
     "event": true
@@ -478,7 +475,7 @@
    }
   },
   {
-   "source": "signal.hat",
+   "source": "response.hat",
    "target": "particles/fireflies/burst",
    "amount": 16.0,
    "op": "add",
@@ -489,7 +486,7 @@
    }
   },
   {
-   "source": "response.onsetRate",
+   "source": "response.hatRate",
    "target": "particles/fireflies/spawnRate",
    "amount": 30.0,
    "op": "add",
@@ -686,7 +683,7 @@
    ],
    [
     "hat",
-    "signal.hat",
+    "response.hat",
     "fireflies blink at the jetty"
    ],
    [

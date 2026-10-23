@@ -60,8 +60,8 @@ DESIGN = {
     "vocabulary": [
         ["kick", "signal.kick", "the creatures hop, a ripple left to right, landing on a spring"],
         ["bass", "response.bass", "the creatures squash and stretch; the camera bobs"],
-        ["snare", "signal.snare", "the giant flower's petals flick; a confetti puff"],
-        ["hat", "signal.hat", "sparkles round the flower"],
+        ["snare", "response.snare", "the giant flower's petals flick; a confetti puff"],
+        ["hat", "response.hat", "sparkles round the flower"],
         ["mids", "audio.mid", "the clouds sway; the creatures turn their heads"],
         ["brightness", "sonic.brightness.slow", "the time of day: the sky and the sun's strength"],
         ["sustained", "response.sustain", "the giant flower blooms open"],

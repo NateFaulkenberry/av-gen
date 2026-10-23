@@ -4,10 +4,11 @@ Sonic Garden VFX expansion, deliverable 2 (engineering agent, 2026-10-02). Repro
 value from memory of a paper rather than from a checked source, I say so. Section 9 maps the findings onto what AV Gen
 already has; the design that follows from them is in `../VFX-ARCHITECTURE.md`.
 
-> **Since ADR-1620 (2026-10-23):** the kick, snare and hat classes discussed below no longer run on a mix. Measured on
-> real music against a separated drum stem, half the mix's kicks were bass notes and hat clicks, so the classes come
-> only from a drum source (a stem or a drum input, `stem.drums.*`, or `response.*` through `feeds`). On a mix the scenes
-> read `tools/drum_signals.py`'s `signal.kick/snare/hat`: the beat clock's pulse, its backbeat and the broadband onset.
+> **Since ADR-1620 (2026-10-23):** the kick class discussed below no longer runs on a mix: measured on real music
+> against a separated drum stem, half the mix's kicks were bass notes and hat clicks. The kick comes only from a drum
+> source (`stem.drums.kick`, or `response.kick` through `feeds`); on a mix the scenes read `tools/drum_signals.py`'s
+> `signal.kick`, the beat clock's pulse while the mix's hat and snare say the drums are playing. The snare and hat are
+> unchanged.
 
 ## 1. Onset and transient detection
 

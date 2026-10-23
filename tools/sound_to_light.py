@@ -58,7 +58,9 @@ PATHS = [
     ("env on response.onset", "env.s2lHit", None),
     ("route env (response.onset)", "final:post/grade/contrast[0]", None),
     ("route env (stem.drums.onset)", "final:post/tonemap/chroma-retention[0]", None),
-    # (ADR-1620: response.kick/snare/hat fire only from a drum source the feeds name; the mix has none)
+    # (ADR-1620: response.kick fires only from a drum source the feeds name; the mix has none)
+    ("response.snare", "response.snare", ["snare"]),
+    ("response.hat", "response.hat", ["hat"]),
     ("stem.drums.kick", "stem.drums.kick", ["kick"]),
     ("stem.drums.snare", "stem.drums.snare", ["snare"]),
     ("stem.drums.hat", "stem.drums.hat", ["hat"]),

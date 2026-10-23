@@ -19,13 +19,6 @@ macro-routed effect lands one frame earlier and each twin pair is one route. Not
 transport (routes, `beat.*`, the material `time` input), so a seek lands where a play does.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))))), "tools"))
-import drum_signals  # noqa: E402  (ADR-1620)
-
 STEMS = ("drums", "bass", "synth")
 
 # the kick ring's travel: radius = R0 + RING_REACH * beat.phase (metres). One beat is 0.496 s at Feline's 121 BPM, so
@@ -67,14 +60,6 @@ def signal(name, inputs, combine="firstActive", chain=None):
         s["chain"] = chain
     SIGNALS.append({"kind": "signal", "name": name, "settings": s})
     return "signal." + name
-
-
-def snare_env():
-    """ADR-1620: `signal.snareEnv` (tools/drum_signals.py: a drums source's snare, else the backbeat), declared once,
-    before the signals that read it."""
-    if not any(s.get("name") == "snareEnv" for s in SIGNALS):
-        SIGNALS[:0] = drum_signals.sources(["snareEnv"])
-    return drum_signals.SIGNAL["snareEnv"]
 
 
 UNIT = {"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}   # a macro knob's own range, kept by the signals that
@@ -159,8 +144,7 @@ def routes(fx, swell_nodes, swell):
         roles = fx["rw_grass"]
         glint = {"offset": -0.35, "gain": 1.6, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                  "attackMs": 3.0, "decayMs": 110.0}
-        # ADR-1620: with no drum stem, the mix's onsets (it has no hat class any more)
-        hats = stem_signal("glint", "drums", "treble", "response.onsetEnv", glint, {"attackMs": 3.0, "decayMs": 90.0})
+        hats = stem_signal("glint", "drums", "treble", "response.hatEnv", glint, {"attackMs": 3.0, "decayMs": 90.0})
         out.append(route(hats, op_target("rw_grass", roles, "glint_gain", "constant", "constant"), 3.2))
         out.append(route(hats, op_target("rw_grass", roles, "glint_threshold", "threshold", "value"), -0.14))
 
@@ -199,7 +183,7 @@ def routes(fx, swell_nodes, swell):
     if "shimmer_gain" in fx.get("rw_flower", {}):
         sh = op_target("rw_flower", fx["rw_flower"], "shimmer_gain", "constant", "constant")
         out.append(route("signal.synth", sh, 1.6))
-        out.append(route(stem_signal("shimmer", "drums", "treble", "response.onsetEnv",
+        out.append(route(stem_signal("shimmer", "drums", "treble", "response.hatEnv",
                                      {"offset": -0.35, "gain": 1.6, "clampEnabled": True, "clampMin": 0.0,
                                       "clampMax": 1.0, "attackMs": 3.0, "decayMs": 160.0},
                                      {"attackMs": 3.0, "decayMs": 120.0}), sh, 1.2))
@@ -211,9 +195,7 @@ def routes(fx, swell_nodes, swell):
         if "flow_gain" not in roles:
             continue
         # the clap brightens the flow bands: the backbeat travels along the bow
-        # ADR-1620: with no drum stem, tools/drum_signals.py's snare envelope (the beat clock's backbeat on a mix: it has
-        # no snare class any more)
-        out.append(route(stem_signal("clap", "drums", "highMid", snare_env(),
+        out.append(route(stem_signal("clap", "drums", "highMid", "response.snareEnv",
                                      {"offset": -1.55, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0,
                                       "clampMax": 1.0, "attackMs": 4.0, "decayMs": 280.0},
                                      {"attackMs": 4.0, "decayMs": 220.0}),
@@ -381,7 +363,7 @@ def sky_routes(fx):
     amt = op_target("rw_cloud", roles, "splash_amount", "constant", "constant")
     # (smoothed for the owner's "cloud color popping", 29 section 7: the claps' splashes bloom over 150 ms and fade
     # over a beat and a half, not 8 ms and 420 ms; the phrase's blooms over 400 ms)
-    out.append(route(stem_signal("splash", "drums", "highMid", snare_env(),
+    out.append(route(stem_signal("splash", "drums", "highMid", "response.snareEnv",
                                  {"offset": -1.3, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                                   "attackMs": 150.0, "decayMs": 750.0}, {"attackMs": 150.0, "decayMs": 700.0}),
                      amt, 0.6))

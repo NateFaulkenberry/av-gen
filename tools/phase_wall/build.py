@@ -568,16 +568,16 @@ def music(s, net, g):
     # the routes from response.bass / level / sustain / intensity are scaled x1.5 from what they were tuned at
     s.route(A("response.sustain", G + "coupling", 4.5, attackMs=3000, decayMs=6000),
             A("response.bass", G + "frequency", 0.375, attackMs=300, decayMs=1500),
-            A("signal.hat", G + "noise", 0.12, attackMs=40, decayMs=400),
+            A("response.hat", G + "noise", 0.12, attackMs=40, decayMs=400),
             A("response.intensity", G + "phaseLag", 0.5, attackMs=6000, decayMs=12000),
             A("response.level", "scene/bands/rotation", 0.22, integrate=True),
             # the light: the bass warms the cores slowly, the hats run the streaks
             A("response.bass", op_path(g, "core"), 1.0, op="multiply", gain=0.75, offset=0.75, attackMs=200,
               decayMs=900),
             # density (hats a second, 0..0.65 measured): a busy mix lights the bands, a breakdown lets them settle
-            A("response.onsetRate", op_path(g, "core"), 1.0, op="multiply", gain=1.5, offset=0.45, attackMs=600,
+            A("response.hatRate", op_path(g, "core"), 1.0, op="multiply", gain=1.5, offset=0.45, attackMs=600,
               decayMs=2500),
-            A("signal.hat", op_path(g, "glint"), 1.0, op="multiply", gain=3.0, offset=0.04, attackMs=8,
+            A("response.hat", op_path(g, "glint"), 1.0, op="multiply", gain=3.0, offset=0.04, attackMs=8,
               decayMs=260),
             # the held sound swells the membrane
             A("response.sustain", "field/breath/strength", 4.5, attackMs=2500, decayMs=5000))

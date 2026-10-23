@@ -66,8 +66,8 @@ DESIGN = {
     "vocabulary": [
         ["bass", "response.bass", "the funnel winds: rotation, width and the debris skirt; the wind in the wheat"],
         ["kick", "signal.kick", "thunder: the cloud flashes from within, a gust bends the field, the camera nudges"],
-        ["snare", "signal.snare", "a lightning strike under the cloud that lights the whole prairie and the rain"],
-        ["hat", "signal.hat", "rain: its density and streak length"],
+        ["snare", "response.snare", "a lightning strike under the cloud that lights the whole prairie and the rain"],
+        ["hat", "response.hat", "rain: its density and streak length"],
         ["melodic", "response.note", "light crawls inside the cloud base at the pitch's place, low "
          "notes left, high notes right"],
         ["velocity", "notes.lastVelocity", "how bright a note's light and a strike are"],
@@ -282,9 +282,9 @@ def build():
             R("snare", "particles/rain/emissive", 4.0, attackMs=0, decayMs=200),
             R("snare", "camera/exposure/compensation", 0.6, attackMs=0, decayMs=260))
     # hat: rain -- density and streak length
-    s.route(R("onsetRate", "particles/rain/spawnRate", 5000.0, **MEDIUM),
+    s.route(R("hatRate", "particles/rain/spawnRate", 5000.0, **MEDIUM),
             R("hat", "particles/rain/burst", 900.0, attackMs=0, decayMs=40),
-            R("onsetRate", "particles/rain/stretch", 0.8, **MEDIUM))
+            R("hatRate", "particles/rain/stretch", 0.8, **MEDIUM))
     # melodic: each note lights the cloud base at its place (low notes left), its brightness the velocity
     s.places("cl", "lastPitch", [c for _, c in CLOUD_LIGHTS], 0.045, event="noteOn")
     for k in range(len(CLOUD_LIGHTS)):

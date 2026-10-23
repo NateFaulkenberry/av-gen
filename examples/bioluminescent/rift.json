@@ -33,86 +33,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "busy",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "response.onsetRate",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.05
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "backbeat",
-   "settings": {
-    "combine": "sum",
-    "inputs": [
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.125
-      }
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.375
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.625
-      }
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.875
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "signal.busy"
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 1.5
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "snare",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.snare"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.9,
-      "gate": "signal.backbeat"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "lfo",
    "name": "driftA",
    "settings": {
@@ -238,10 +158,10 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "audio.onsetMid",
    "target": "particles/swarm/spawnRate",
    "op": "add",
-   "amount": 4680.0,
+   "amount": 6000.0,
    "chain": {
     "envelope": "peakhold",
     "envelopeHoldMs": 40,

@@ -154,63 +154,30 @@
  "sources": [
   {
    "kind": "signal",
-   "name": "busy",
+   "name": "drumming",
    "settings": {
-    "combine": "firstActive",
+    "combine": "max",
     "inputs": [
      {
-      "source": "response.onsetRate",
+      "source": "response.hat",
       "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.05
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "backbeat",
-   "settings": {
-    "combine": "sum",
-    "inputs": [
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.125
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
       }
      },
      {
-      "source": "beat.bar",
+      "source": "response.snare",
       "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.375
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.625
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
       }
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.875
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "signal.busy"
      }
     ],
     "chain": {
      "threshold": "binary",
-     "thresholdLevel": 1.5
+     "thresholdLevel": 0.01
     }
    }
   },
@@ -226,7 +193,7 @@
      {
       "source": "beat.pulse",
       "amount": 0.7,
-      "gate": "signal.busy"
+      "gate": "signal.drumming"
      }
     ],
     "event": true
@@ -252,43 +219,9 @@
        "decayMs": 160.0
       },
       "amount": 0.7,
-      "gate": "signal.busy"
+      "gate": "signal.drumming"
      }
     ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "snare",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.snare"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.9,
-      "gate": "signal.backbeat"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "hat",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.hat"
-     },
-     {
-      "source": "response.onset"
-     }
-    ],
-    "event": true
    }
   },
   {
@@ -988,7 +921,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "particles/flare/burst",
    "amount": 260.0,
    "op": "add",
@@ -999,7 +932,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "particles/stream/burst",
    "amount": 900.0,
    "op": "add",
@@ -1010,7 +943,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "particles/streamers/burst",
    "amount": 12.0,
    "op": "add",
@@ -1021,7 +954,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "post/bloom/intensity",
    "amount": 0.22,
    "op": "add",
@@ -1032,7 +965,7 @@
    }
   },
   {
-   "source": "signal.hat",
+   "source": "response.hat",
    "target": "particles/sparks/burst",
    "amount": 45.0,
    "op": "add",
@@ -5859,12 +5792,12 @@
    ],
    [
     "snare",
-    "signal.snare",
+    "response.snare",
     "a flare erupts from the hot spot on the approaching side, and the star sheds a burst of plasma"
    ],
    [
     "hat",
-    "signal.hat",
+    "response.hat",
     "sparks glint across the disk"
    ],
    [

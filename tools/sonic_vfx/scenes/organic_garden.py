@@ -55,8 +55,8 @@ DESIGN = {
     "vocabulary": [
         ["bass", "response.bass", "the garden breathes: the lantern swells, the jelly-trees' bells swim"],
         ["kick", "signal.kick", "the lantern blooms open on a spring; a spore puff from its heart"],
-        ["snare", "signal.snare", "the mushrooms puff spores; their dots flash"],
-        ["hat", "signal.hat", "the vines' tips sparkle; cilia shimmer"],
+        ["snare", "response.snare", "the mushrooms puff spores; their dots flash"],
+        ["hat", "response.hat", "the vines' tips sparkle; cilia shimmer"],
         ["mids", "audio.mid", "the current: tentacles and tendrils sway harder"],
         ["brightness", "sonic.brightness", "the glow turns from coral to mint; the petals sharpen"],
         ["sustained", "response.sustain", "the lantern grows taller"],

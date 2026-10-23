@@ -1,7 +1,7 @@
 # ADR-1060: Causal onsets: kick, snare, hat, a low attack and a broadband onset, the same live and from a file
 
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion, brief §11)
-- **Superseded in part** by ADR-1620: on a mix the causal kick, snare and hat no longer reach `response.*` or the bus (`audio.onsetLow/Mid/High` are gone); the detector stays as the per-source classifier.
+- **Superseded in part** by ADR-1620: on a mix the causal kick no longer reaches `response.kick` or the bus (`audio.onsetLow` is gone); the detector, and the mix's snare and hat, are unchanged.
 - **Code:** `src/analysis/causal_onsets.{hpp,cpp}`. `AnalysisFrame::causal` and the live event carry
   (`onsetStamp`...`liveSerial`, `LiveEventLatch`) are in `analysis/analyzer.*`. Also `AnalysisRunner` and
   `AnalysisTrack::analyze`, and `Engine::publishFrame` (the latch).

@@ -55,7 +55,7 @@ DESIGN = {
         ["note", "response.note", "the stars flare as they ignite"],
         ["bass", "response.bass", "the cloud's density and glow"],
         ["kick", "signal.kick", "a shock front through the gas"],
-        ["hat", "signal.hat", "the starfield twinkles"],
+        ["hat", "response.hat", "the starfield twinkles"],
         ["sustained", "response.sustain", "ionisation: the pillars' rims brighten"],
         ["tension", "notes.tension", "the cloud churns"],
         ["silence", "(no input)", "dark pillars on the glowing gas; the stars unlit"],

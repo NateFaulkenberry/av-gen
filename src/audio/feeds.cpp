@@ -2,7 +2,6 @@
 
 #include "audio/stem_source.hpp"
 
-#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -54,11 +53,6 @@ bool Feeds::feedsResponse(std::string_view key) const {
     return false;
 }
 
-bool Feeds::drumClassFed(std::size_t k) const {
-    const bool drum = k == 0 || k == 2 || k == 3; // kFeedHitNames: kick, low, snare, hat, onset
-    return drum && k < hit.size() && !hitSource(k).empty();
-}
-
 std::string feedValue(const std::string& key) {
     return key.empty() ? std::string("audio") : "stem." + key;
 }
@@ -96,10 +90,9 @@ Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>*
                                                 [&](const char* n) { return name == n; });
                    it != kFeedHitNames.end()) {
             const auto k = static_cast<std::size_t>(it - kFeedHitNames.begin());
-            if (key->empty() && (k == 0 || k == 2 || k == 3) && warnings != nullptr) {
-                warnings->push_back(fmt::format("feeds.{} is \"audio\", but the mix has no {} (ADR-1620: kick, snare "
-                                                "and hat come only from a drum source); it feeds nothing",
-                                                name, name));
+            if (k == 0 && key->empty() && warnings != nullptr) {
+                warnings->push_back("feeds.kick is \"audio\", but the mix has no kick (ADR-1620: the kick comes only "
+                                    "from a drum source); it feeds nothing");
             }
             f.hit[k] = std::move(*key);
         } else {

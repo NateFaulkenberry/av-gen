@@ -196,7 +196,7 @@
         "layer": "clap",
         "level": "meso",
         "owner": "lantern-cap",
-        "reason": "lantern-cap is the clap owner: a short flare on each hit in lantern-gills's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "lantern-cap is the clap owner: a short flare on each clap in lantern-gills's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 0.4650000035762787,
           "chain": {
@@ -228,7 +228,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onset",
+          "source": "audio.onsetMid",
           "target": "nodes/lantern-gills/emissiveBoost"
         }
       },
@@ -238,7 +238,7 @@
         "layer": "clap",
         "level": "meso",
         "owner": "lantern-cap",
-        "reason": "lantern-cap is the clap owner: a short flare on each hit in lantern-cap's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "lantern-cap is the clap owner: a short flare on each clap in lantern-cap's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 0.4650000035762787,
           "chain": {
@@ -270,7 +270,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onset",
+          "source": "audio.onsetMid",
           "target": "nodes/lantern-cap/emissiveBoost"
         }
       },
@@ -522,7 +522,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onset",
+          "source": "audio.onsetHigh",
           "target": "nodes/meadow/scatter/shelf/emissionGain"
         }
       },
@@ -564,7 +564,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onset",
+          "source": "audio.onsetMid",
           "target": "nodes/meadow/scatter/lamps/emissionGain"
         }
       },
@@ -801,7 +801,7 @@
           "enabled": true,
           "op": "multiply",
           "polarity": "unipolar",
-          "source": "audio.onset",
+          "source": "audio.onsetHigh",
           "target": "particles/spores/emissive"
         }
       },
@@ -1116,7 +1116,7 @@
           "enabled": true,
           "op": "multiply",
           "polarity": "unipolar",
-          "source": "audio.onset",
+          "source": "audio.onsetHigh",
           "target": "nodes/meadow/water/sparkle"
         }
       },
@@ -1287,7 +1287,8 @@
     },
     "bySource": {
       "audio.midLevel": 1,
-      "audio.onset": 6,
+      "audio.onsetHigh": 3,
+      "audio.onsetMid": 3,
       "beat.pulse": 5,
       "lfo.two-bar-breath": 4,
       "music.downbeat": 2,
@@ -1310,13 +1311,13 @@
         "evidence": "snares/claps 0.9/s on average, 1.0/s at most",
         "name": "clap",
         "present": true,
-        "signal": "audio.onset"
+        "signal": "audio.onsetMid"
       },
       {
         "evidence": "hats 2.0/s on average, 2.0/s at most",
         "name": "hats",
         "present": true,
-        "signal": "audio.onset"
+        "signal": "audio.onsetHigh"
       },
       {
         "evidence": "a beat of 0.500 s (120.0 BPM)",

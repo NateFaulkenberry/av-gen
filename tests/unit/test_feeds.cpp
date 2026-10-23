@@ -31,7 +31,7 @@ using nlohmann::json;
 
 namespace {
 
-analysis::TimedFeed hop(double t, float levelDb, int hitClass = -1, float strength = 0.0f) {
+analysis::TimedFeed hop(double t, float levelDb, int hitClass = -1, float strength = 0.0f, float drumness = 1.0f) {
     analysis::TimedFeed h;
     h.seconds = t;
     h.feed.valid = true;
@@ -42,6 +42,7 @@ analysis::TimedFeed hop(double t, float levelDb, int hitClass = -1, float streng
         const auto k = static_cast<std::size_t>(hitClass);
         h.feed.hit[k] = true;
         h.feed.strength[k] = strength;
+        h.feed.drumness[k] = drumness;
     }
     return h;
 }
@@ -49,19 +50,14 @@ analysis::TimedFeed hop(double t, float levelDb, int hitClass = -1, float streng
 } // namespace
 
 TEST_CASE("feeds: the project block parses, round-trips, and refuses what is not a feed", "[feeds]") {
-    const json j = {{"beat", "stem.drums"}, {"hits", "stem.drums"}, {"kick", "stem.kick_in"}, {"onset", "audio"},
+    const json j = {{"beat", "stem.drums"}, {"hits", "stem.drums"}, {"kick", "stem.kick_in"}, {"hat", "audio"},
                     {"levels", "audio"}};
-    std::vector<std::string> warnings;
-    auto f = audio::Feeds::fromJson(j, &warnings);
+    auto f = audio::Feeds::fromJson(j);
     REQUIRE(f.has_value());
-    CHECK(warnings.empty());
     CHECK(f->beat == "drums");
     CHECK(f->hitSource(0) == "kick_in");
     CHECK(f->hitSource(1) == "drums"); // low: from hits
-    CHECK(f->hitSource(4).empty());    // onset: the mix, over hits
-    CHECK(f->drumClassFed(0));
-    CHECK(f->drumClassFed(3));         // hat: from hits
-    CHECK_FALSE(f->drumClassFed(4));   // onset is not a drum class
+    CHECK(f->hitSource(3).empty());    // hat: the mix, over hits
     CHECK(f->levels.empty());
     CHECK(f->feedsResponse("drums"));
     CHECK(f->feedsResponse("kick_in"));
@@ -69,7 +65,7 @@ TEST_CASE("feeds: the project block parses, round-trips, and refuses what is not
     CHECK(f->anyResponse());
     // Written back: every stated key, the mix as "audio"; "levels": "audio" is the default and is not written.
     const json out = f->toJson();
-    CHECK(out == json{{"beat", "stem.drums"}, {"hits", "stem.drums"}, {"kick", "stem.kick_in"}, {"onset", "audio"}});
+    CHECK(out == json{{"beat", "stem.drums"}, {"hits", "stem.drums"}, {"kick", "stem.kick_in"}, {"hat", "audio"}});
     REQUIRE(audio::Feeds::fromJson(out).has_value());
     CHECK(*audio::Feeds::fromJson(out) == *audio::Feeds::fromJson(out));
     CHECK(audio::Feeds{}.toJson().empty());
@@ -82,60 +78,15 @@ TEST_CASE("feeds: the project block parses, round-trips, and refuses what is not
     CHECK_FALSE(audio::Feeds::fromJson(json::array()).has_value());
 }
 
-TEST_CASE("feeds: a drum class has no mix; naming \"audio\" for one warns and feeds it nothing", "[feeds][adr1620]") {
-    // No block: no drum class has a source (low and onset read the mix).
-    for (std::size_t k = 0; k < audio::kFeedHitNames.size(); ++k) {
-        CHECK_FALSE(audio::Feeds{}.drumClassFed(k));
-    }
-    std::vector<std::string> warnings;
-    auto f = audio::Feeds::fromJson(json{{"hits", "stem.drums"}, {"hat", "audio"}, {"snare", "audio"}}, &warnings);
-    REQUIRE(f.has_value());
-    CHECK(warnings.size() == 2);
-    CHECK(f->drumClassFed(0));        // kick: the drums
-    CHECK_FALSE(f->drumClassFed(2));  // snare: "audio" is nothing
-    CHECK_FALSE(f->drumClassFed(3));  // hat
-    // "hits": "audio" says nothing wrong: low and onset are the mix's, and the drum classes are simply unfed.
-    warnings.clear();
-    auto g = audio::Feeds::fromJson(json{{"hits", "audio"}}, &warnings);
-    REQUIRE(g.has_value());
-    CHECK(warnings.empty());
-    CHECK_FALSE(g->drumClassFed(0));
-}
-
-TEST_CASE("feeds: the mix's feed carries no drum class; a source's carries every class", "[feeds][adr1620]") {
-    analysis::CausalOnsets c;
-    c.valid = true;
-    c.hit = {true, true, true, true, true};
-    c.strength = {0.9f, 0.8f, 0.7f, 0.6f, 0.5f};
-    c.onsetRegister = {0.2f, 0.3f, 0.5f};
-    const analysis::ResponseFeed mix = analysis::ResponseFeed::fromMix(c);
-    const analysis::ResponseFeed source = analysis::ResponseFeed::fromCausal(c);
-    for (std::size_t k = 0; k < analysis::kHitClassCount; ++k) {
-        INFO(k);
-        CHECK(source.hit[k]);
-        CHECK(mix.hit[k] == !analysis::isDrumClass(k));
-    }
-    CHECK(mix.strength[1] == 0.8f);
-    CHECK(mix.onsetRegister == source.onsetRegister);
-    // Merged with a drum source routed for the drum classes, the drum classes are the source's.
-    analysis::FeedRouting r;
-    r.hit = {0, -1, 0, 0, -1};
-    const std::vector<analysis::ResponseFeed> sources{source};
-    const analysis::ResponseFeed m = analysis::mergeFeeds(mix, sources, r);
-    CHECK(m.hit[0]);
-    CHECK(m.hit[2]);
-    CHECK(m.hit[3]);
-    CHECK(analysis::mergeFeeds(mix, sources, analysis::FeedRouting{}) == mix); // unrouted: still none
-}
-
 TEST_CASE("feeds: the fold ORs a window's events at their strongest and keeps the newest levels", "[feeds]") {
     analysis::FeedFolder folder;
-    const std::vector<analysis::TimedFeed> first{hop(0.01, -20.0f), hop(0.02, -18.0f, 0, 0.4f),
-                                                 hop(0.03, -17.0f, 0, 0.7f), hop(0.04, -16.0f, 2, 0.5f)};
+    const std::vector<analysis::TimedFeed> first{hop(0.01, -20.0f), hop(0.02, -18.0f, 0, 0.4f, 1.0f),
+                                                 hop(0.03, -17.0f, 0, 0.7f, 0.8f), hop(0.04, -16.0f, 2, 0.5f, 0.6f)};
     const analysis::ResponseFeed a = folder.fold(first, 0.045);
     CHECK(a.valid);
     CHECK(a.hit[0]);
     CHECK(a.strength[0] == 0.7f);
+    CHECK(a.drumness[0] == 0.8f); // the least of the window's
     CHECK(a.hit[2]);
     CHECK_FALSE(a.hit[3]);
     CHECK(a.levelDb == -16.0f); // the newest
@@ -157,6 +108,7 @@ TEST_CASE("feeds: the merge replaces only the routed parts; no routing is the mi
     mix.valid = true;
     mix.hit = {true, true, false, true, true};
     mix.strength = {0.9f, 0.8f, 0.0f, 0.3f, 0.5f};
+    mix.drumness = {1.0f, 1.0f, 1.0f, 0.7f, 1.0f};
     mix.levelDb = -12.0f;
     mix.bassDb = -15.0f;
     mix.onsetRatio = 2.0f;
@@ -181,10 +133,9 @@ TEST_CASE("feeds: the merge replaces only the routed parts; no routing is the mi
     CHECK(l.hit[3]); // levels do not move hits
 }
 
-TEST_CASE("feeds: the response model on the mix is fromMix; fed its own onsets as a source it has the drum classes",
+TEST_CASE("feeds: the response model on the mix's own feed is the model as it was, less the kick",
           "[feeds][sonic][adr1620]") {
-    // The fixture's mix, analysed with the causal detector as the file path does, stepped three ways: the default (the
-    // mix), the mix's feed stated, and the same onsets as a drum source.
+    // The fixture's mix, analysed with the causal detector as the file path does, stepped both ways.
     const auto& fx = testsupport::requireStemFixture();
     auto file = audio::AudioFile::load(fx.file("mix.wav"));
     REQUIRE(file.has_value());
@@ -203,24 +154,49 @@ TEST_CASE("feeds: the response model on the mix is fromMix; fed its own onsets a
         t.causal.valid = f.feed.valid;
         t.causal.hit = f.feed.hit;
         t.causal.strength = f.feed.strength;
+        t.causal.drumness = f.feed.drumness;
         t.causal.levelDb = f.feed.levelDb;
         t.causal.bassDb = f.feed.bassDb;
-        t.causal.onsetRegister = f.feed.onsetRegister;
         t.causal.ratio[static_cast<std::size_t>(analysis::HitClass::Onset)] = f.feed.onsetRatio;
         a.step(t, track.hopSeconds(), c, s);
         b.step(t, analysis::ResponseFeed::fromMix(t.causal), track.hopSeconds(), c, s);
-        fed.step(t, analysis::ResponseFeed::fromCausal(t.causal), track.hopSeconds(), c, s);
-        REQUIRE(a.envelope(sonic::ResponseHit::Onset) == b.envelope(sonic::ResponseHit::Onset));
-        REQUIRE(a.envelope(sonic::ResponseHit::Onset) == fed.envelope(sonic::ResponseHit::Onset));
+        fed.step(t, analysis::ResponseFeed::fromCausal(t.causal), track.hopSeconds(), c, s); // the same as a source
+        for (const auto h : {sonic::ResponseHit::Snare, sonic::ResponseHit::Hat, sonic::ResponseHit::Onset}) {
+            REQUIRE(a.envelope(h) == b.envelope(h));
+            REQUIRE(a.envelope(h) == fed.envelope(h)); // ADR-1620: the mix's snare and hat are the detector's, unchanged
+        }
         REQUIRE(a.referenceDb() == b.referenceDb());
     }
-    for (const auto h : {sonic::ResponseHit::Kick, sonic::ResponseHit::Snare, sonic::ResponseHit::Hat}) {
-        CHECK(a.hits(h) == 0);
-        CHECK(b.hits(h) == 0);
-    }
+    // ADR-1620: the mix has no kick; the same onsets fed as a drum source do.
+    CHECK(a.hits(sonic::ResponseHit::Kick) == 0);
+    CHECK(b.hits(sonic::ResponseHit::Kick) == 0);
     CHECK(fed.hits(sonic::ResponseHit::Kick) > 10);
-    CHECK(a.hits(sonic::ResponseHit::Onset) > 10);
-    CHECK(a.hits(sonic::ResponseHit::Low) == fed.hits(sonic::ResponseHit::Low));
+    CHECK(a.hits(sonic::ResponseHit::Snare) > 0);
+    CHECK(a.hits(sonic::ResponseHit::Snare) == fed.hits(sonic::ResponseHit::Snare));
+    CHECK(a.hits(sonic::ResponseHit::Hat) == fed.hits(sonic::ResponseHit::Hat));
+}
+
+TEST_CASE("feeds: the mix has no kick; \"kick\": \"audio\" warns and feeds it nothing", "[feeds][adr1620]") {
+    CHECK_FALSE(audio::Feeds{}.kickFed());
+    std::vector<std::string> warnings;
+    auto f = audio::Feeds::fromJson(json{{"hits", "stem.drums"}, {"kick", "audio"}, {"hat", "audio"}}, &warnings);
+    REQUIRE(f.has_value());
+    CHECK(warnings.size() == 1); // the kick's; "hat": "audio" is the mix's hat, as before
+    CHECK_FALSE(f->kickFed());
+    CHECK(f->hitSource(2) == "drums");
+    auto g = audio::Feeds::fromJson(json{{"hits", "stem.drums"}}, &warnings);
+    REQUIRE(g.has_value());
+    CHECK(g->kickFed());
+    analysis::CausalOnsets c;
+    c.valid = true;
+    c.hit = {true, true, true, true, true};
+    c.strength = {0.9f, 0.8f, 0.7f, 0.6f, 0.5f};
+    const analysis::ResponseFeed mix = analysis::ResponseFeed::fromMix(c);
+    CHECK_FALSE(mix.hit[0]);
+    CHECK(mix.strength[0] == 0.0f);
+    for (std::size_t k = 1; k < analysis::kHitClassCount; ++k) {
+        CHECK(mix.hit[k]);
+    }
 }
 
 TEST_CASE("feeds: a stem's trim is exactly nothing at 0 dB and brings a quiet stem's hits back", "[feeds][stems]") {

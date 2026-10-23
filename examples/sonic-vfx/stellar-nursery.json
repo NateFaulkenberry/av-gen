@@ -185,18 +185,31 @@
  "sources": [
   {
    "kind": "signal",
-   "name": "busy",
+   "name": "drumming",
    "settings": {
-    "combine": "firstActive",
+    "combine": "max",
     "inputs": [
      {
-      "source": "response.onsetRate",
+      "source": "response.hat",
       "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.05
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
+      }
+     },
+     {
+      "source": "response.snare",
+      "chain": {
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
       }
      }
-    ]
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 0.01
+    }
    }
   },
   {
@@ -219,25 +232,9 @@
        "decayMs": 160.0
       },
       "amount": 0.7,
-      "gate": "signal.busy"
+      "gate": "signal.drumming"
      }
     ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "hat",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.hat"
-     },
-     {
-      "source": "response.onset"
-     }
-    ],
-    "event": true
    }
   },
   {
@@ -906,7 +903,7 @@
    }
   },
   {
-   "source": "signal.hat",
+   "source": "response.hat",
    "target": "fx/stars/twinkle",
    "amount": 1.5,
    "op": "add",
@@ -1091,7 +1088,7 @@
    ],
    [
     "hat",
-    "signal.hat",
+    "response.hat",
     "the starfield twinkles"
    ],
    [

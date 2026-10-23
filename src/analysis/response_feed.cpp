@@ -11,6 +11,7 @@ ResponseFeed ResponseFeed::fromCausal(const CausalOnsets& c) {
         f.hit[k] = c.valid && c.hit[k]; // a hit needs the frame it was decided on
     }
     f.strength = c.strength;
+    f.drumness = c.drumness;
     f.onsetRatio = c.ratio[static_cast<std::size_t>(HitClass::Onset)];
     f.levelDb = c.levelDb;
     f.bassDb = c.bassDb;
@@ -20,12 +21,9 @@ ResponseFeed ResponseFeed::fromCausal(const CausalOnsets& c) {
 
 ResponseFeed ResponseFeed::fromMix(const CausalOnsets& c) {
     ResponseFeed f = fromCausal(c);
-    for (std::size_t k = 0; k < kHitClassCount; ++k) {
-        if (isDrumClass(k)) {
-            f.hit[k] = false;
-            f.strength[k] = 0.0f;
-        }
-    }
+    constexpr auto kKick = static_cast<std::size_t>(HitClass::Kick);
+    f.hit[kKick] = false;
+    f.strength[kKick] = 0.0f;
     return f;
 }
 
@@ -49,7 +47,8 @@ ResponseFeed FeedFolder::fold(std::span<const TimedFeed> hops, double to, bool a
             if (!h.feed.hit[k]) {
                 continue;
             }
-            // The strongest event in the window.
+            // The strongest event in the window, with the least drumness of any (the response model's pending rule).
+            out.drumness[k] = out.hit[k] ? std::min(out.drumness[k], h.feed.drumness[k]) : h.feed.drumness[k];
             if (k == static_cast<std::size_t>(HitClass::Onset) && h.feed.strength[k] >= out.strength[k]) {
                 out.onsetRegister = h.feed.onsetRegister; // ADR-1604: the strongest onset's register
             }
@@ -84,6 +83,7 @@ ResponseFeed mergeFeeds(const ResponseFeed& mix, std::span<const ResponseFeed> s
         if (const ResponseFeed* s = source(routing.hit[k])) {
             out.hit[k] = s->valid && s->hit[k];
             out.strength[k] = s->strength[k];
+            out.drumness[k] = s->drumness[k];
             if (k == static_cast<std::size_t>(HitClass::Onset)) {
                 out.onsetRegister = s->onsetRegister; // ADR-1604: the onset's register comes with it
             }

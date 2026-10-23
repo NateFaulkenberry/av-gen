@@ -86,21 +86,22 @@ Counts inTrack(double until) {
 
 } // namespace
 
-TEST_CASE("The flat-master features are on the bus under their own names, and the band onsets are not",
+TEST_CASE("The flat-master features and band onsets are on the bus under their own names, but the low one",
           "[integration][signals][flatmaster]") {
     app::Engine engine(app::EngineMode::Offline);
     for (const char* name : {"audio.bassLevel", "audio.lowMidLevel", "audio.midLevel", "audio.highMidLevel",
-                             "audio.trebleLevel", "audio.energy", "audio.onsetRate", "audio.width"}) {
+                             "audio.trebleLevel", "audio.energy", "audio.onsetRate", "audio.width",
+                             "audio.onsetMid", "audio.onsetHigh"}) {
         INFO(name);
         REQUIRE(engine.signals().find(name).has_value());
     }
+    CHECK_FALSE(engine.signals().find("audio.onsetLow").has_value()); // ADR-1620: the mix has no kick
     // The auto-gained bands are still there, unchanged in name.
     for (const char* name : {"audio.bass", "audio.lowMid", "audio.mid", "audio.highMid", "audio.treble"}) {
         CHECK(engine.signals().find(name).has_value());
     }
-    // ADR-1620: ADR-898's band onsets (a mix's kick, snare and hat) left the bus.
-    for (const char* name : {"audio.onsetLow", "audio.onsetMid", "audio.onsetHigh"}) {
-        CHECK_FALSE(engine.signals().find(name).has_value());
+    for (const char* name : {"audio.onsetMid", "audio.onsetHigh"}) {
+        CHECK(engine.signals().info(*engine.signals().find(name)).isEvent);
     }
 
     REQUIRE(engine.loadAudio(grooveWav()).has_value());
@@ -170,7 +171,8 @@ TEST_CASE("Every new signal is pickable as a route source under a readable name"
     const std::vector<std::string> items = ui::routeSourceItems(engine.signals());
     REQUIRE(items.size() == engine.signals().size());
     const std::vector<std::pair<const char*, const char*>> expected{
-        {"audio.onsetRate", "density"},
+        {"audio.onsetMid", "snare"},
+        {"audio.onsetHigh", "hats"},         {"audio.onsetRate", "density"},
         {"audio.energy", "energy"},          {"audio.bassLevel", "bass level"},
         {"audio.trebleLevel", "treble level"}, {"audio.width", "stereo width"},
         {"section.index", "section number"}, {"section.progress", "progress"},
@@ -192,9 +194,9 @@ TEST_CASE("Every new signal is pickable as a route source under a readable name"
     ai::ToolRegistry registry;
     ai::registerEngineTools(registry);
     ai::ToolContext ctx(engine);
-    const ai::ToolResult r = registry.invoke("signal.list", nlohmann::json{{"query", "density"}}, ctx);
+    const ai::ToolResult r = registry.invoke("signal.list", nlohmann::json{{"query", "snare"}}, ctx);
     REQUIRE(r.success);
     REQUIRE(r.value["signals"].size() >= 1);
-    CHECK(r.value["signals"][0]["name"] == "audio.onsetRate");
-    CHECK(r.value["signals"][0]["label"] == "density (percussive hits per second)");
+    CHECK(r.value["signals"][0]["name"] == "audio.onsetMid");
+    CHECK(r.value["signals"][0]["label"] == "snare / clap (mid-band onset)");
 }

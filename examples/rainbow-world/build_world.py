@@ -1737,9 +1737,8 @@ palette = {"states": [{"name": n, "colors": c, "scalars": SCALARS[n]} for n, c i
 #                     (palette/select 0-7)
 #   CC 10 look lock   hold the current look (palette/lock); unlocked, the look advances on phrase boundaries
 #                     (beat.phrasePulse) or a big change in the music, holding each at least 60 s
-# Audio (live input, no file): the beat clock's kick ring and the claps (a drum stem's, else the backbeat: ADR-1620)
-# light the rainbows, response.level blooms the air, the hats (a drum stem's treble, else the mix's onsets) glint the
-# grass, response.bass lifts the warm bounce light from the cloud sea.
+# Audio (live input, no file): response.sustain and response.kick light the rainbows, response.level blooms the air,
+# response.hat lifts saturation, response.bass lifts the warm bounce light from the cloud sea.
 CC = [(1, "glow"), (2, "lens"), (5, "haze"), (6, "light"), (7, "colour"), (9, "palette"), (10, "paletteLock")]
 control = {"midi": {"enabled": True, "filter": "*", "bindings": [
     {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": sig} for n, sig in CC]}}

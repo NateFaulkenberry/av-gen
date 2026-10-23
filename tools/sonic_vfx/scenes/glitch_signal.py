@@ -72,8 +72,8 @@ DESIGN = {
     "vocabulary": [
         ["bass", "response.bass", "the RGB split widens; the walls push apart; the horizon flares"],
         ["kick", "signal.kick", "a ring of distortion comes out of the horizon through the frame; the lit pixels flash"],
-        ["snare", "signal.snare", "MESO: the frame tears; the rows shear sideways"],
-        ["hat", "signal.hat", "MICRO: glitch blocks flicker; sparks of pixels"],
+        ["snare", "response.snare", "MESO: the frame tears; the rows shear sideways"],
+        ["hat", "response.hat", "MICRO: glitch blocks flicker; sparks of pixels"],
         ["onset", "response.onset", "MESO: channels swap in the glitch blocks"],
         ["mids", "audio.mid", "the data ribbons stream faster; the rows' stagger drifts"],
         ["highs", "audio.treble", "the scanlines deepen; the pixel rain thickens"],

@@ -140,63 +140,30 @@
  "sources": [
   {
    "kind": "signal",
-   "name": "busy",
+   "name": "drumming",
    "settings": {
-    "combine": "firstActive",
+    "combine": "max",
     "inputs": [
      {
-      "source": "response.onsetRate",
+      "source": "response.hat",
       "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.05
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "backbeat",
-   "settings": {
-    "combine": "sum",
-    "inputs": [
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.125
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
       }
      },
      {
-      "source": "beat.bar",
+      "source": "response.snare",
       "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.375
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.625
+       "envelope": "peakhold",
+       "envelopeHoldMs": 750.0,
+       "envelopeFallPerSecond": 1000.0
       }
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.875
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "signal.busy"
      }
     ],
     "chain": {
      "threshold": "binary",
-     "thresholdLevel": 1.5
+     "thresholdLevel": 0.01
     }
    }
   },
@@ -212,41 +179,7 @@
      {
       "source": "beat.pulse",
       "amount": 0.7,
-      "gate": "signal.busy"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "snare",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.snare"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.9,
-      "gate": "signal.backbeat"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "hat",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.hat"
-     },
-     {
-      "source": "response.onset"
+      "gate": "signal.drumming"
      }
     ],
     "event": true
@@ -894,7 +827,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "lights/slot/intensity",
    "amount": 6.0,
    "op": "add",
@@ -905,7 +838,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "particles/rain/emissive",
    "amount": 4.0,
    "op": "add",
@@ -916,7 +849,7 @@
    }
   },
   {
-   "source": "signal.snare",
+   "source": "response.snare",
    "target": "camera/exposure/compensation",
    "amount": 0.6,
    "op": "add",
@@ -927,7 +860,7 @@
    }
   },
   {
-   "source": "response.onsetRate",
+   "source": "response.hatRate",
    "target": "particles/rain/spawnRate",
    "amount": 5000.0,
    "op": "add",
@@ -938,7 +871,7 @@
    }
   },
   {
-   "source": "signal.hat",
+   "source": "response.hat",
    "target": "particles/rain/burst",
    "amount": 900.0,
    "op": "add",
@@ -949,7 +882,7 @@
    }
   },
   {
-   "source": "response.onsetRate",
+   "source": "response.hatRate",
    "target": "particles/rain/stretch",
    "amount": 0.8,
    "op": "add",
@@ -1308,12 +1241,12 @@
    ],
    [
     "snare",
-    "signal.snare",
+    "response.snare",
     "a lightning strike under the cloud that lights the whole prairie and the rain"
    ],
    [
     "hat",
-    "signal.hat",
+    "response.hat",
     "rain: its density and streak length"
    ],
    [
@@ -1538,7 +1471,7 @@
    },
    "trigger": {
     "source": "signal",
-    "name": "signal.snare",
+    "name": "response.snare",
     "threshold": 0.25
    }
   }

@@ -328,13 +328,13 @@ def flow_music(s, prog=None):
     s.route(common.audio("response.bass", "field/baseFlow/strength", 1.0, op="multiply", gain=0.9, offset=0.7,
                          attackMs=250, decayMs=1500),
             common.audio("signal.kick", "field/kickPush/strength", 1.5, attackMs=5, decayMs=200),
-            common.audio("signal.snare", "field/shedding/strength", 0.6, attackMs=30, decayMs=1500))
+            common.audio("response.snare", "field/shedding/strength", 0.6, attackMs=30, decayMs=1500))
     names = {f["name"] for f in s.nodes if f.get("kind") == "field"}
     if "gust" in names:
         s.route(common.audio("response.sustain", "field/gust/strength", 1.2, attackMs=3000, decayMs=6000),
-                common.audio("signal.hat", "field/chop/strength", 0.8, attackMs=40, decayMs=400))
+                common.audio("response.hat", "field/chop/strength", 0.8, attackMs=40, decayMs=400))
     if prog is not None and "pulse" in prog.at:
-        s.route(common.audio("signal.hat", prog.path("pulse"), 1.0, op="multiply", gain=2.0, offset=1.0,
+        s.route(common.audio("response.hat", prog.path("pulse"), 1.0, op="multiply", gain=2.0, offset=1.0,
                              attackMs=30, decayMs=300))
     common.instrument(s, MIDI_CC, MIDI_NOTES)
     s.route(R("control.strength", "field/baseFlow/strength", 1.0, **common.CC),

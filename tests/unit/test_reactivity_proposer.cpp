@@ -164,7 +164,7 @@ TEST_CASE("The proposal answers the music at three levels, each hero on its own 
 
     // ---- meso: the heroes, most important first, take the kick, the clap, the bar, the breath ----
     CHECK(only(plan, "nodes/elder-gills/emissiveBoost").route.source == "beat.pulse");
-    CHECK(only(plan, "nodes/lantern-gills/emissiveBoost").route.source == "audio.onset");
+    CHECK(only(plan, "nodes/lantern-gills/emissiveBoost").route.source == "audio.onsetMid");
     CHECK(only(plan, "nodes/spire-gills/emissiveBoost").route.source == "music.downbeat");
     CHECK(only(plan, "nodes/moss-gills/emissiveBoost").route.source == "lfo.two-bar-breath");
     // Each hero's own triple of source, timing and amplitude: no two heroes share all three.
@@ -201,9 +201,9 @@ TEST_CASE("The proposal answers the music at three levels, each hero on its own 
     CHECK(fungi.route.chain.decayMs >= 250.0f);
     CHECK(fungi.route.chain.decayMs <= 400.0f);
     const PlanRoute& lamps = only(plan, "nodes/meadow/scatter/lamps/emissionGain");
-    CHECK(lamps.route.source == "audio.onset");
+    CHECK(lamps.route.source == "audio.onsetMid");
     CHECK(lamps.route.chain.attackMs <= 10.0f);
-    CHECK(only(plan, "nodes/meadow/scatter/shelf/emissionGain").route.source == "audio.onset");
+    CHECK(only(plan, "nodes/meadow/scatter/shelf/emissionGain").route.source == "audio.onsetHigh");
     CHECK(only(plan, "nodes/meadow/scatter/shelf/emissionGain").level == ReactiveLevel::Micro);
     // The faint layer is left alone; the dark one was never offered.
     CHECK(routesTo(plan, "nodes/meadow/scatter/grass/emissionGain").empty());
@@ -291,10 +291,10 @@ TEST_CASE("The proposal follows what the music offers: no claps, no audio, no se
     Glade glade;
     const ReactiveCatalog catalog = glade.facts().capabilities.reactive();
 
-    SECTION("no claps: nothing answers the clap layer, and the lamps take the bar") {
+    SECTION("no claps: nothing reads the snare band, and the lamps take the bar") {
         const ReactivityProposal p = proposeReactivity(catalog, gladeMusic(false));
         for (const PlanRoute& r : p.plan.routes) {
-            CHECK(r.layer != "clap");
+            CHECK(r.route.source != "audio.onsetMid");
         }
         CHECK(only(p.plan, "nodes/meadow/scatter/lamps/emissionGain").route.source == "music.downbeat");
         CHECK(only(p.plan, "nodes/lantern-gills/emissiveBoost").route.source == "music.downbeat");

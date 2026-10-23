@@ -61,20 +61,20 @@ moves `audio.energy` and the band levels.
 
 ## Kick, snare and hats
 
-A mix has no kick, snare or hat signal (ADR-1620). Measured on real music against a separated drum stem, about half
-of what a detector on the full mix called a kick was a bass note or a hat's click, so the classes come only from a
-drum source:
+| Signal | Range | Event | Meaning |
+|---|---|---|---|
+| `audio.onsetMid` | 0 – 1 | yes | snare or clap: an attack in 2 – 6 kHz |
+| `audio.onsetHigh` | 0 – 1 | yes | hats: an attack in 6 – 16 kHz |
 
-- **A drum stem or a drum input** keyed `drums` publishes `stem.drums.kick`, `snare` and `hat` (with the hits
-  analysis on), and a project's **Feeds** row can route them to `response.kick`, `snare` and `hat` (see
-  [Audio Input](help://audio/input)).
-- **On a mix**, use `response.onset` (any attack, with its register in `response.onsetLow/Mid/High`), the beat clock
-  (`beat.pulse`, `beat.phase`, `beat.bar`), or a signal source (`signal.*`) that takes the drum stem's class when it
-  is there and a stand-in otherwise. The live scenes use `signal.kick` (the drums' kick, else the beat's pulse while
-  the music is playing), `signal.snare` (else the pulse on beats 2 and 4) and `signal.hat` (else any onset).
+With a loaded file they come from the whole-track analysis, and each carries its strength against
+the strongest of its band in the surrounding second. With live input they come from the causal
+snare and hat detector (ADR-1060), the same one behind `response.snare` and `hat`.
 
-`response.kick`, `snare` and `hat` stay in the route picker for a project whose feeds name a drum source; with none,
-they never fire and the route audit reports a route on them as dead.
+**A mix has no kick signal** (ADR-1620). On real music about half of what the mix's kick detector
+called a kick was a bass note or a hat's click, so `audio.onsetLow` is gone and `response.kick`
+fires only from a drum source (a stem or an input keyed `drums`, through the Feeds row). On a mix,
+use `beat.pulse`, or the live scenes' `signal.kick`: the drum source's kick when there is one, else
+the beat clock's pulse while the mix's hat or snare detector says the drums are playing.
 
 The centroid in Hz exists inside an analysis frame but is not published as a signal.
 

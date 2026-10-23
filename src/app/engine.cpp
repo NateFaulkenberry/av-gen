@@ -1364,12 +1364,9 @@ scene::LivenessInputs Engine::livenessInputs() const {
     // ADR-916: the tear rule asks whether anything lifts a water's tear amount.
     in.modulator = &modulator_;
     in.timeline = &timeline_;
-    // ADR-1620: a drum class is heard only through a feed whose source resolves.
-    in.judgeDrumClasses = true;
-    for (const auto [slot, k] : {std::pair{0, 0}, std::pair{1, 2}, std::pair{2, 3}}) { // kick, snare, hat
-        const std::string& key = feeds_.hitSource(static_cast<std::size_t>(k));
-        in.drumClassFed[static_cast<std::size_t>(slot)] = !key.empty() && feedState(key).resolved;
-    }
+    // ADR-1620: the kick is heard only through a feed whose source resolves.
+    in.judgeKick = true;
+    in.kickFed = feeds_.kickFed() && feedState(feeds_.hitSource(0)).resolved;
     return in;
 }
 

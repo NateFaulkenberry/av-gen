@@ -327,7 +327,7 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
     SECTION("a lamp layer flares on the clap") {
         const params::ModRoute* r = p.route("nodes/meadow/scatter/lamps/emissionGain");
         REQUIRE(r != nullptr);
-        CHECK(r->source == "audio.onset");
+        CHECK(r->source == "audio.onsetMid");
         const Arm a = armAt(h, p, "nodes/meadow/scatter/lamps/emissionGain", clap + r->chain.delayMs / 1000.0 + 0.02, true, "lamps-clap");
         INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
         CHECK(a.diff.changed > 5);

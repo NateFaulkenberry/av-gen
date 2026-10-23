@@ -143,118 +143,7 @@
    0.00651
   ]
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "busy",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "response.onsetRate",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.05
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "backbeat",
-   "settings": {
-    "combine": "sum",
-    "inputs": [
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.125
-      }
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.375
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.625
-      }
-     },
-     {
-      "source": "beat.bar",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.875
-      },
-      "amount": -1.0
-     },
-     {
-      "source": "signal.busy"
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 1.5
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "snareEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.snare",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 120.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 120.0
-      },
-      "amount": 0.9,
-      "gate": "signal.backbeat"
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "hatEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.drums.hat",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 60.0
-      }
-     },
-     {
-      "source": "response.onset",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 60.0
-      }
-     }
-    ]
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.bass",
@@ -574,7 +463,7 @@
    }
   },
   {
-   "source": "signal.hatEnv",
+   "source": "response.hatEnv",
    "target": "material/wdSurface/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -587,7 +476,7 @@
    }
   },
   {
-   "source": "signal.snareEnv",
+   "source": "response.snareEnv",
    "target": "material/wdSurface/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",

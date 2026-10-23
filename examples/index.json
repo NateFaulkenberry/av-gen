@@ -9,7 +9,7 @@
     },
     {
       "category": "Digital Mosh",
-      "description": "Play live audio (a full mix) plus a MIDI controller: CC 1 sets the sensitivity, drum pads 36-43 force a stage (Dream to Recovery). A painted Dali/Tanguy dream that the music corrupts like a datamosh, then restores. The Live panel's Response controls set what it hears: Sensitivity how loud the music reads (a quiet input drives the arc less), Transients the hits (on a mix the kick and snare follow the beat clock; a drum input keyed drums gives the real ones). See docs/prototypes/digital-mosh/03-implementation.md.",
+      "description": "Play live audio (a full mix) plus a MIDI controller: CC 1 sets the sensitivity, drum pads 36-43 force a stage (Dream to Recovery). A painted Dali/Tanguy dream that the music corrupts like a datamosh, then restores. The Live panel's Response controls set what it hears: Sensitivity how loud the music reads (a quiet input drives the arc less), Transients the snare and hat (on a mix the kick follows the beat clock while the drums play; a drum input keyed drums gives the real one). See docs/prototypes/digital-mosh/03-implementation.md.",
       "live": true,
       "name": "Digital Mosh Live",
       "project": "digital-mosh/digital-mosh-live.json"

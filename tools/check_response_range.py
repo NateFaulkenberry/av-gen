@@ -33,12 +33,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TRACKS = {"feline": "feline-footwear.wav", "trench": "trench.wav", "hyperborea": "hyperborea.wav"}
 LEVELS = ["bass", "level", "sustain", "levelSlow", "intensity"]
-ENVELOPES = ["onsetEnv", "lowEnv"]  # for comparison (ADR-1620: a mix has no kick or hat class)
+ENVELOPES = ["lowEnv", "hatEnv"]  # for comparison (ADR-1620: a mix has no kick)
 
 # The targets (ADR-1510). Every level: not a constant near the top (a capped share of frames above 0.9, p50 at
 # most 0.75-0.8), not dead (p50 at least 0.3-0.4), a real spread between p10 and p90 -- and not a second kick
 # envelope: the RIPPLE, the median over 0.5 s windows of the signal's range inside the window, is bounded (a body that
-# drops to zero between two kicks fails here as a pinned one fails above). onsetEnv's ripple is printed beside them for
+# drops to zero between two kicks fails here as a pinned one fails above). lowEnv's ripple is printed beside them for
 # scale (about 0.5-0.6 on these tracks). The levels rest high on a track that holds one loudness and dip at its
 # breakdowns, so p10 is bounded loosely.
 TARGETS = {

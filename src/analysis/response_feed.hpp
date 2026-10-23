@@ -2,14 +2,10 @@
 
 // What the response model reads from one analysis hop, and where it comes from (ADR-1580).
 //
-// `sonic::ResponseModel` reads six things of a hop's causal onsets (ADR-1060): per hit class whether it fired and its
-// strength, and the hop's broadband onset ratio, level, bass level and onset register. A `ResponseFeed` is exactly
-// those. By default every hop's feed is the mix's (`fromMix(frame.causal)`).
-//
-// ADR-1620: the mix has no drum classes. `fromMix` carries the mix's `low` and `onset` hits and its levels, and never a
-// kick, snare or hat: those come only from a source a project's feeds name (a drum stem offline, a drum input live),
-// through `fromCausal` on that source's onsets and `mergeFeeds`. The detector still decides them on the mix (it is one
-// detector for every stream); nothing on the mix reads them.
+// `sonic::ResponseModel` reads seven things of a hop's causal onsets (ADR-1060): per hit class whether it fired, its
+// strength and its drumness, and the hop's broadband onset ratio, level and bass level. A `ResponseFeed` is exactly
+// those. By default every hop's feed is the mix's (`fromCausal(frame.causal)`), which is the model's input as it was
+// before feeds existed, float for float.
 //
 // A project's `feeds` block may route a hit class (kick, low, snare, hat, onset) and the level family (bass, level,
 // levelSlow, intensity, sustain, transient, flux: one source, so that their adaptive loudness reference, ADR-1510, is
@@ -33,6 +29,7 @@ struct ResponseFeed {
     bool valid = false;                           // the levels are measured (the detector ran)
     std::array<bool, kHitClassCount> hit{};       // decided on this hop (only ever on a valid one)
     std::array<float, kHitClassCount> strength{};
+    std::array<float, kHitClassCount> drumness{};
     float onsetRatio = 0.0f; // the broadband (Onset) ratio
     float levelDb = -120.0f;
     float bassDb = -120.0f;
@@ -41,7 +38,9 @@ struct ResponseFeed {
 
     // A source's onsets: every class it decided.
     [[nodiscard]] static ResponseFeed fromCausal(const CausalOnsets& c);
-    // The mix's onsets (ADR-1620): `fromCausal` with no kick, snare or hat.
+    // The mix's onsets (ADR-1620): `fromCausal` with no kick. A kick comes only from a source the feeds name (a drum
+    // stem, a drum input); on a mix about half the detector's kicks were bass notes and hat clicks. The snare and hat
+    // stay the mix's.
     [[nodiscard]] static ResponseFeed fromMix(const CausalOnsets& c);
     // A source that has no data now: no hit, the levels at -120 dBFS (below any gate), measured.
     [[nodiscard]] static ResponseFeed inactive();
@@ -86,12 +85,6 @@ public:
     // feed is routed, step on the mix's onsets.
     virtual bool feedAt(double seconds, const CausalOnsets& mix, ResponseFeed& out) = 0;
 };
-
-// Whether hit class `k` is a drum class (kick, snare, hat): one that comes only from a fed source (ADR-1620).
-[[nodiscard]] constexpr bool isDrumClass(std::size_t k) {
-    return k == static_cast<std::size_t>(HitClass::Kick) || k == static_cast<std::size_t>(HitClass::Snare) ||
-           k == static_cast<std::size_t>(HitClass::Hat);
-}
 
 // The feed the response model steps on: the mix's (`fromMix`), with each routed part replaced by its source's.
 [[nodiscard]] ResponseFeed mergeFeeds(const ResponseFeed& mix, std::span<const ResponseFeed> sources,

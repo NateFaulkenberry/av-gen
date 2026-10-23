@@ -1,6 +1,6 @@
 // ADR-1570: a route can be optional (an unknown source is the expected state, not a binding problem), and a depth
 // signal can have a default that stands in while the bus does not carry it. Together they make a stem route and its
-// live fallback: `stem.drums.kick` (optional) and `response.onset` (depth `stem.drums.active`, 1 -> 0, default 0).
+// live fallback: `stem.drums.kick` (optional) and `response.kick` (depth `stem.drums.active`, 1 -> 0, default 0).
 
 #include "params/liveness.hpp"
 #include "params/modulation.hpp"
@@ -22,7 +22,7 @@ struct Fixture {
     signals::SignalBus bus;
     ParameterSet params;
     Modulator modulator;
-    signals::SignalId mixOnset = bus.declare("response.onset");
+    signals::SignalId mixKick = bus.declare("response.kick");
     Parameter<float>& glow =
         params.add(ParamDesc<float>{.path = "ring/glow", .defaultValue = 0.0f, .hardMin = 0.0f, .hardMax = 10.0f});
 };
@@ -38,7 +38,7 @@ ModRoute stemRoute() {
 
 ModRoute fallbackRoute() {
     ModRoute r;
-    r.source = "response.onset";
+    r.source = "response.kick";
     r.target = "ring/glow";
     r.amount = 1.0f;
     r.depthSource = "stem.drums.active";
@@ -59,7 +59,7 @@ TEST_CASE("With no stem on the bus the optional route is silent and unreported, 
     f.modulator.addRoute(fallbackRoute());
     const auto bound = f.modulator.bind(f.bus, f.params);
     CHECK(bound.has_value()); // neither route is a binding problem
-    f.bus.set(f.mixOnset, 0.7f);
+    f.bus.set(f.mixKick, 0.7f);
     f.modulator.evaluate(f.bus, f.params, 1.0 / 30.0);
     CHECK_THAT(v(f.glow.value()), WithinAbs(0.7, 1e-6));
 
@@ -69,7 +69,7 @@ TEST_CASE("With no stem on the bus the optional route is silent and unreported, 
     strict.depthDefault.reset();
     g.modulator.addRoute(strict);
     CHECK_FALSE(g.modulator.bind(g.bus, g.params).has_value());
-    g.bus.set(g.mixOnset, 0.7f);
+    g.bus.set(g.mixKick, 0.7f);
     g.modulator.evaluate(g.bus, g.params, 1.0 / 30.0);
     CHECK(g.glow.value() == 0.0f);
 
@@ -92,7 +92,7 @@ TEST_CASE("Once the stem is declared and active, the stem route drives and the f
     const signals::SignalId active = f.bus.declare("stem.drums.active");
     REQUIRE(f.modulator.bind(f.bus, f.params).has_value());
 
-    f.bus.set(f.mixOnset, 0.7f);
+    f.bus.set(f.mixKick, 0.7f);
     f.bus.set(kick, 0.4f);
     f.bus.set(active, 1.0f);
     f.modulator.evaluate(f.bus, f.params, 1.0 / 30.0);

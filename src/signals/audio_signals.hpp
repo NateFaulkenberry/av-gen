@@ -35,7 +35,10 @@ struct AudioSignals {
     SignalId energy = kInvalidSignal;    // audio.energy: the loudness-independent composite, 0..1
     SignalId onsetRate = kInvalidSignal; // audio.onsetRate: percussive onsets per second (density)
     SignalId width = kInvalidSignal;     // audio.width: stereo side/mid RMS, 0 for mono
-    // ADR-1620: ADR-898's band onsets (audio.onsetLow/Mid/High) left the bus; the frames keep them for internal readers.
+    // ---- ADR-898: band-limited onsets (events; strength = against the band's recent strongest) ----
+    // (ADR-1620: audio.onsetLow, the kick, left the bus)
+    SignalId onsetMid = kInvalidSignal;  // audio.onsetMid: snare / clap
+    SignalId onsetHigh = kInvalidSignal; // audio.onsetHigh: hats
 
     static AudioSignals declare(SignalBus& bus);
 
@@ -45,7 +48,7 @@ struct AudioSignals {
     // Publishes silence (all zeros, no event).
     void publishSilence(SignalBus& bus) const;
 
-    // Drops this frame's event pulses (onset, beat) and keeps every level.
+    // Drops this frame's event pulses (onset, beat, the band onsets) and keeps every level.
     void clearEvents(SignalBus& bus) const;
 };
 

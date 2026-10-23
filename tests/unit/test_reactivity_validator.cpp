@@ -93,8 +93,8 @@ TEST_CASE("A route that cannot reach the picture is refused through the liveness
         route("lit", "beat.pulse", "nodes/meadow/scatter/fungi/emissionGain", 0.3f, 90.0f),
         route("nowave", "section.energy", "nodes/meadow/scatter/shelf/emissiveFieldAmount"), // names no field
         route("wave", "section.energy", "nodes/meadow/scatter/fungi/emissiveFieldAmount"),
-        route("typo", "audio.onset", "nodes/elder-gils/emissiveBoost"),                 // no such parameter
-        route("gills", "audio.onset", "nodes/elder-gills/emissiveBoost", 0.5f, 40.0f),
+        route("typo", "audio.onsetMid", "nodes/elder-gils/emissiveBoost"),                 // no such parameter
+        route("gills", "audio.onsetMid", "nodes/elder-gills/emissiveBoost", 0.5f, 40.0f),
         route("nosignal", "audio.kickDrum", "nodes/lantern-gills/emissiveBoost"),          // no such signal
     }));
     INFO(describe(c.validation));
@@ -163,7 +163,7 @@ TEST_CASE("Everything on the kick is flagged as one source; a plan whose layers 
     CHECK(flagged.front()->details["source"] == "beat.pulse");
     CHECK(flagged.front()->details["routes"] == 5);
     // The control: the same targets, each on its own layer of the music.
-    const std::vector<std::string> sources{"beat.pulse", "audio.onset", "music.downbeat", "audio.beat",
+    const std::vector<std::string> sources{"beat.pulse", "audio.onsetMid", "music.downbeat", "audio.onsetHigh",
                                            "beat.pulse"};
     std::vector<PlanRoute> apart;
     for (std::size_t i = 0; i < targets.size(); ++i) {
@@ -181,7 +181,7 @@ TEST_CASE("Routes on one source that reach their targets at one instant are flag
         route("a", "music.downbeat", "nodes/elder-gills/emissiveBoost"),
         route("b", "music.downbeat", "nodes/lantern-gills/emissiveBoost"),
         route("c", "music.downbeat", "nodes/spire-gills/emissiveBoost"),
-        route("d", "audio.beat", "nodes/meadow/scatter/shelf/emissionGain", 0.18f, 30.0f),
+        route("d", "audio.onsetHigh", "nodes/meadow/scatter/shelf/emissionGain", 0.18f, 30.0f),
     }));
     INFO(describe(lockstep.validation));
     const auto flagged = with(lockstep.validation, IssueCode::OnePhase);
@@ -191,7 +191,7 @@ TEST_CASE("Routes on one source that reach their targets at one instant are flag
         route("a", "music.downbeat", "nodes/elder-gills/emissiveBoost", 0.3f, 0.0f),
         route("b", "music.downbeat", "nodes/lantern-gills/emissiveBoost", 0.3f, 120.0f),
         route("c", "music.downbeat", "nodes/spire-gills/emissiveBoost", 0.3f, 240.0f),
-        route("d", "audio.beat", "nodes/meadow/scatter/shelf/emissionGain"),
+        route("d", "audio.onsetHigh", "nodes/meadow/scatter/shelf/emissionGain"),
     }));
     INFO(describe(staggered.validation));
     CHECK(with(staggered.validation, IssueCode::OnePhase).empty());
@@ -199,7 +199,7 @@ TEST_CASE("Routes on one source that reach their targets at one instant are flag
     const Compilation allAtOnce = glade.compile(planOf({
         route("a", "music.downbeat", "nodes/elder-gills/emissiveBoost"),
         route("b", "beat.pulse", "nodes/lantern-gills/emissiveBoost"),
-        route("c", "audio.beat", "nodes/meadow/scatter/shelf/emissionGain", 0.18f),
+        route("c", "audio.onsetHigh", "nodes/meadow/scatter/shelf/emissionGain", 0.18f),
     }));
     INFO(describe(allAtOnce.validation));
     const auto planWide = with(allAtOnce.validation, IssueCode::OnePhase);
@@ -213,8 +213,8 @@ TEST_CASE("An entity answering too many signals, or pushed past its safe range, 
     SECTION("four signals on one hero") {
         const Compilation c = glade.compile(planOf({
             route("a", "beat.pulse", "nodes/elder-gills/emissiveBoost"),
-            route("b", "audio.onset", "nodes/elder-cap/emissiveBoost", 0.3f, 30.0f),
-            route("c", "audio.beat", "particles/elder-spores/emissive", 0.1f, 60.0f),
+            route("b", "audio.onsetMid", "nodes/elder-cap/emissiveBoost", 0.3f, 30.0f),
+            route("c", "audio.onsetHigh", "particles/elder-spores/emissive", 0.1f, 60.0f),
             route("d", "music.downbeat", "nodes/elder-stem/emissiveBoost", 0.3f, 90.0f),
         }));
         INFO(describe(c.validation));
@@ -236,7 +236,7 @@ TEST_CASE("An entity answering too many signals, or pushed past its safe range, 
         CHECK(with(fits.validation, IssueCode::OverSaturated, "fits").empty());
         const Compilation stacked = glade.compile(planOf({
             route("s1", "beat.pulse", "nodes/meadow/scatter/fungi/emissionGain", 0.3f),
-            route("s2", "audio.onset", "nodes/meadow/scatter/fungi/emissionGain", 0.3f, 50.0f),
+            route("s2", "audio.onsetMid", "nodes/meadow/scatter/fungi/emissionGain", 0.3f, 50.0f),
         }));
         INFO(describe(stacked.validation));
         CHECK_FALSE(with(stacked.validation, IssueCode::OverSaturated).empty());
@@ -260,13 +260,13 @@ TEST_CASE("The reports' traps: a one-frame or unsmoothed depth, a hue from the a
     Glade glade;
     PlanRoute eventDepth = route("eventDepth", "beat.pulse", "nodes/elder-gills/emissiveBoost");
     eventDepth.route.depthSource = "music.downbeat";
-    PlanRoute rmsDepth = route("rmsDepth", "audio.onset", "nodes/lantern-gills/emissiveBoost", 0.3f, 20.0f);
+    PlanRoute rmsDepth = route("rmsDepth", "audio.onsetMid", "nodes/lantern-gills/emissiveBoost", 0.3f, 20.0f);
     rmsDepth.route.depthSource = "audio.rms";
     PlanRoute goodDepth = route("goodDepth", "music.downbeat", "nodes/spire-gills/emissiveBoost", 0.3f, 60.0f);
     goodDepth.route.depthSource = "section.energy";
     goodDepth.route.depthMin = 0.3f;
-    PlanRoute audioHue = route("audioHue", "audio.beat", "nodes/meadow/scatter/fungi/hueOffset", 0.05f);
-    PlanRoute dark = route("dark", "audio.beat", "particles/spores/emissive", 1.0f, 40.0f);
+    PlanRoute audioHue = route("audioHue", "audio.onsetHigh", "nodes/meadow/scatter/fungi/hueOffset", 0.05f);
+    PlanRoute dark = route("dark", "audio.onsetHigh", "particles/spores/emissive", 1.0f, 40.0f);
     dark.route.op = params::ModOp::Multiply; // no remap: 0 between hats
     PlanRoute lifted = route("lifted", "beat.pulse", "nodes/meadow/water/sparkle", 1.0f, 150.0f);
     lifted.route.op = params::ModOp::Multiply;

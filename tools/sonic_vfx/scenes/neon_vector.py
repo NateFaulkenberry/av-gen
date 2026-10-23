@@ -64,9 +64,9 @@ DESIGN = {
     "vocabulary": [
         ["bass", "response.bass", "the near rows swell under the camera; the monoliths stretch taller"],
         ["kick", "signal.kick", "the plain heaves and lurches forward; a zoom punch; the monoliths' lines flash"],
-        ["snare", "signal.snare", "construction: three flat colour shapes snap into the sky in sequence; the lines "
+        ["snare", "response.snare", "construction: three flat colour shapes snap into the sky in sequence; the lines "
          "flash"],
-        ["hat", "signal.hat", "fine jitter on every line"],
+        ["hat", "response.hat", "fine jitter on every line"],
         ["bands", "audio.lowMid", "the spectrum lies across the landscape in depth: low mids and mids swell the "
          "middle rows, high mids the far rows"],
         ["mids", "audio.mid", "the horizon circle's rings breathe and turn"],

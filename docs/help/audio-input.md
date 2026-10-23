@@ -96,14 +96,13 @@ the Inputs table and under the Stems section, lets a source drive them instead:
 - **Beat**: the beat clock from this source. A clean kick or drum bus gives a steadier grid than a full mix. A running
   MIDI clock still wins.
 - **Hits**: `response.kick`, `low`, `snare`, `hat` and `onset` (and their envelopes) from this source. The bass line in
-  the mix no longer fires `response.low`. On **Main mix**, `low` and `onset` come from the mix and `kick`, `snare` and
-  `hat` do not fire at all: they come only from a drum source (ADR-1620).
+  the mix no longer fires `response.low`.
 - **Levels**: `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient` and `flux` from this source,
   read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
   with every hit.
 
-A route on `response.kick` follows the drum stem's kicks while a feed names it, and is silent (and reported dead by the
-route audit) without one. A source a feed uses gets the
+Every route keeps working: a route on `response.kick` now follows the drum stem's kicks. On **Main mix** the kick does
+not fire at all (ADR-1620: it comes only from a drum source); the snare and hat are the mix's. A source a feed uses gets the
 kick/snare/hat analysis automatically. A fed source that goes quiet, or a stem outside its span, feeds nothing. It is
 not swapped for the mix. The same key works offline (a stem) and live (an input source with that key). The choice is
 saved in the project as `"feeds"` (see `docs/audio.md`).

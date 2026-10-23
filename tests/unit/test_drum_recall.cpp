@@ -130,14 +130,8 @@ TEST_CASE("A pad bed, a bass line and a lead with no drums fire almost no drum",
 
 namespace {
 
-// The response model's drum events over a piece with its MIDI, published at 60 fps as the engine does, and the
-// detector's own drum decisions on the same frames.
-struct Drums {
-    std::array<int, 3> response{}; // response.kick/snare/hat events
-    std::array<int, 3> detector{}; // the causal detector's kick/snare/hat decisions
-};
-
-Drums responseDrums(const testsupport::Melodic& m) {
+// The response model's drum events over a piece with its MIDI, published at 60 fps as the engine does.
+std::array<int, 3> responseDrums(const testsupport::Melodic& m) {
     const auto track = analysis::AnalysisTrack::analyze(m.file, analysis::AnalyzerConfig{});
     sonic::SonicSetup setup;
     setup.notes = m.notes;
@@ -146,41 +140,32 @@ Drums responseDrums(const testsupport::Melodic& m) {
     sonic::SonicRuntime rt;
     rt.declare(bus);
     const auto kick = *bus.find("response.kick"), snare = *bus.find("response.snare"), hat = *bus.find("response.hat");
-    Drums n;
+    std::array<int, 3> n{};
     const double end = track.frames().back().timeSeconds;
     for (int f = 0; f <= static_cast<int>(end * 60.0); ++f) {
         rt.advance(setup, track, f / 60.0);
         rt.publish(&setup, bus, f / 60.0);
-        n.response[0] += bus.event(kick) ? 1 : 0;
-        n.response[1] += bus.event(snare) ? 1 : 0;
-        n.response[2] += bus.event(hat) ? 1 : 0;
+        n[0] += bus.event(kick) ? 1 : 0;
+        n[1] += bus.event(snare) ? 1 : 0;
+        n[2] += bus.event(hat) ? 1 : 0;
         bus.clearEvents();
-    }
-    for (const auto& fr : track.frames()) {
-        n.detector[0] += fr.causal.hit[static_cast<std::size_t>(HitClass::Kick)] ? 1 : 0;
-        n.detector[1] += fr.causal.hit[static_cast<std::size_t>(HitClass::Snare)] ? 1 : 0;
-        n.detector[2] += fr.causal.hit[static_cast<std::size_t>(HitClass::Hat)] ? 1 : 0;
     }
     return n;
 }
 
 } // namespace
 
-TEST_CASE("A pluck arpeggio and keys stabs on a mix fire no response drum; the detector's gates hold", "[sonic][adr1620]") {
-    // ADR-1620: a mix has no drum classes, so melodic material cannot fire one through the response at all (ADR-1068's
-    // MIDI demotion, which only ever corrected the mix, is gone). The detector itself still runs on every stream -- it is
-    // the per-source classifier for drum stems and inputs -- and ADR-1068's timbre gates (hat tilt, snare noise share)
-    // keep its own false drums on melodic material low.
+TEST_CASE("A pluck arpeggio and keys stabs played over MIDI fire almost no drums", "[sonic][adr1068]") {
     for (const bool arp : {true, false}) {
         const testsupport::Melodic m = testsupport::makeMelodic(arp);
-        const Drums n = responseDrums(m);
-        INFO((arp ? "arp" : "chords") << ": " << m.attacks << " note attacks; detector kicks " << n.detector[0]
-                                      << " snares " << n.detector[1] << " hats " << n.detector[2]);
-        std::printf("%s: %zu attacks -> detector kicks %d, snares %d, hats %d\n", arp ? "arp" : "chords", m.attacks,
-                    n.detector[0], n.detector[1], n.detector[2]);
-        CHECK(n.response == std::array<int, 3>{0, 0, 0});
-        CHECK(n.detector[0] <= static_cast<int>(m.attacks) / 10);
-        CHECK(n.detector[1] <= static_cast<int>(m.attacks) / 5);
-        CHECK(n.detector[2] <= static_cast<int>(m.attacks) / 5);
+        const auto n = responseDrums(m);
+        INFO((arp ? "arp" : "chords") << ": " << m.attacks << " note attacks; kicks " << n[0] << " snares " << n[1]
+                                      << " hats " << n[2]);
+        std::printf("%s: %zu attacks -> kicks %d, snares %d, hats %d\n", arp ? "arp" : "chords", m.attacks, n[0],
+                    n[1], n[2]);
+        // The art agent's target: drum false positives at 10% or fewer of the note attacks, per class.
+        CHECK(n[0] <= static_cast<int>(m.attacks) / 10);
+        CHECK(n[1] <= static_cast<int>(m.attacks) / 10);
+        CHECK(n[2] <= static_cast<int>(m.attacks) / 10);
     }
 }

@@ -1,7 +1,6 @@
 # ADR-1068: A note is not a drum: timbre gates, and a MIDI note-on demotes a noise-poor hit
 
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion; the art agent's second finding)
-- **Superseded in part** by ADR-1620: the MIDI demotion (`midiDrumness`) is gone with the mix's drum classes; the timbre gates stay in the detector.
 - **Code:**
   - `CausalOnsets::{snareNoise, hatNoise, hatTilt, drumness}` and the gates in `src/analysis/causal_onsets.cpp`;
   - the demotion in `ResponseModel::publish`;

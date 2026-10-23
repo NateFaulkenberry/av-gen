@@ -64,8 +64,8 @@ DESIGN = {
          "strengthen (slowly)"],
         ["onsets", "response.onsetEnv", "the rays reach further for a moment"],
         ["mids", "audio.mid", "the wind sea roughens"],
-        ["snare", "signal.snare", "spray off the near swell"],
-        ["hats / highs", "signal.hatEnv, audio.treble", "the sun path's marks and the crest strokes flare; mint enters the lit faces"],
+        ["snare", "response.snare", "spray off the near swell"],
+        ["hats / highs", "response.hatEnv, audio.treble", "the sun path's marks and the crest strokes flare; mint enters the lit faces"],
         ["sustain", "response.sustain", "the sky's middle turns pink, the clouds' lit undersides warm, the halo "
          "swells"],
         ["brightness", "sonic.brightness.slow", "a slight warm or cool drift of the whole grade"],

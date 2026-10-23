@@ -57,7 +57,7 @@ DESIGN = {
         ["sustained", "response.sustain", "the lanterns glow brighter and the dusk lingers"],
         ["bass", "response.bass", "a slow swell beneath: the reflection heaves"],
         ["kick", "signal.kick", "a ripple runs through the reflection"],
-        ["hat", "signal.hat", "fireflies blink at the jetty"],
+        ["hat", "response.hat", "fireflies blink at the jetty"],
         ["silence", "(no input)", "a still lake: the old lanterns drift up into the dark, doubled below"],
     ],
     "tier": "light: two particle twins, a few procedural copies, one DF shimmer column; no march",
@@ -276,7 +276,7 @@ def build():
             R("kick", "fx/swell/scale", 0.6, attackMs=0, decayMs=500))
     # hat: fireflies
     s.route(R("hat", "particles/fireflies/burst", 16.0, attackMs=0, decayMs=40),
-            R("onsetRate", "particles/fireflies/spawnRate", 30.0, **MEDIUM),
+            R("hatRate", "particles/fireflies/spawnRate", 30.0, **MEDIUM),
             R("sustain", "post/bloom/intensity", 0.1, **SLOW),
             R("kick", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
 

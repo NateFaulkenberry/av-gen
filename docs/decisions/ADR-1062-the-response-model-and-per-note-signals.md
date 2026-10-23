@@ -1,7 +1,7 @@
 # ADR-1062: The response model: signals by kind on one conditioning chain, the performer's five controls, and per-note MIDI
 
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion, brief §9-11)
-- **Superseded in part** by ADR-1620: `response.kick/snare/hat` fire only from a drum source the feeds name; `response.hatRate` is `response.onsetRate`.
+- **Superseded in part** by ADR-1620: `response.kick` fires only from a drum source the feeds name; the snare and hat are unchanged.
 - **Superseded in part** by ADR-1510 (2026-10-19): the levels are no longer read on the fixed `floorDb`/`rangeDb`
   window but against an adaptive loudness reference.
 - **Amended** by ADR-1530 (2026-10-19): the Live panel's Response group no longer shows the kick / snare / hat / note

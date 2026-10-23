@@ -18797,7 +18797,7 @@
       "op": "multiply",
       "planItem": "reactivity/hats.river-motes",
       "polarity": "unipolar",
-      "source": "audio.onsetHigh",
+      "source": "audio.onset",
       "target": "particles/river-motes/emissive"
     },
     {
@@ -18832,7 +18832,7 @@
       "op": "multiply",
       "planItem": "reactivity/hats.spores",
       "polarity": "unipolar",
-      "source": "audio.onsetHigh",
+      "source": "audio.onset",
       "target": "particles/spores/emissive"
     },
     {
@@ -18867,7 +18867,7 @@
       "op": "multiply",
       "planItem": "reactivity/hats.tree-fireflies",
       "polarity": "unipolar",
-      "source": "audio.onsetHigh",
+      "source": "audio.onset",
       "target": "particles/tree-fireflies/emissive"
     },
     {
@@ -18998,7 +18998,7 @@
       "op": "multiply",
       "planItem": "reactivity/hats.water-sparkle",
       "polarity": "unipolar",
-      "source": "audio.onsetHigh",
+      "source": "audio.onset",
       "target": "nodes/valley/water/sparkle"
     },
     {
@@ -47353,7 +47353,7 @@
             "enabled": true,
             "op": "multiply",
             "polarity": "unipolar",
-            "source": "audio.onsetHigh",
+            "source": "audio.onset",
             "target": "particles/river-motes/emissive"
           }
         },
@@ -47395,7 +47395,7 @@
             "enabled": true,
             "op": "multiply",
             "polarity": "unipolar",
-            "source": "audio.onsetHigh",
+            "source": "audio.onset",
             "target": "particles/spores/emissive"
           }
         },
@@ -47437,7 +47437,7 @@
             "enabled": true,
             "op": "multiply",
             "polarity": "unipolar",
-            "source": "audio.onsetHigh",
+            "source": "audio.onset",
             "target": "particles/tree-fireflies/emissive"
           }
         },
@@ -47635,7 +47635,7 @@
             "enabled": true,
             "op": "multiply",
             "polarity": "unipolar",
-            "source": "audio.onsetHigh",
+            "source": "audio.onset",
             "target": "nodes/valley/water/sparkle"
           }
         },

@@ -1,7 +1,7 @@
 # ADR-1580: A project's feeds route each response hit class and the level family to a source
 
 - Status: Accepted (eng/stems-feed)
-- **Amended** by ADR-1620: `hits` on the mix gives `low` and `onset` only; a drum class (kick, snare, hat) has no mix, and naming `"audio"` for one is a load warning.
+- **Amended** by ADR-1620: `hits` on the mix gives no kick; `"kick": "audio"` is a load warning.
 - Plan: `docs/prototypes/stems-multichannel/08-feed-plan.md` (approved with the owner's answers, 2026-10-20).
 - Code:
   - `src/audio/feeds.*`: the `feeds` block;

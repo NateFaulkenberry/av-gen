@@ -288,7 +288,7 @@ json planRouteSchema() {
           {"layer", "the musical layer it answers, in words: kick, clap, hats, bar, section energy, ..."},
           {"reason", "why this answers that, in a sentence a person reads"},
           {"route",
-           {{"source", "a signal on the bus (beat.pulse = the beat a kick lands on, audio.onset = any hit, "
+           {{"source", "a signal on the bus (beat.pulse = the beat a kick lands on, audio.onsetMid = clap, audio.onsetHigh = hats, "
                        "music.downbeat, beat.bar, section.energy, audio.energy, ...) or a plan source's signal"},
             {"target", "a parameter path from the reactive catalogue"},
             {"component", "-1 = all"},
