@@ -355,11 +355,24 @@ def build_chandelier(out):
 
 
 def build_ember(out):
+    """The warm accent: a cluster of stout, terraced prisms (the macro amethyst's growth steps), broken at different
+    heights, leaning apart -- many mid-size facets instead of a few big ones, so it reads as crystal, not a block."""
     rng = random.Random(53)
 
     def b(bm):
-        stepped_prism(bm, (0, 0, 0.0), (0.0, 0.0, 1.0), 0.95, 1.9, rng, steps=3)
-        prism(bm, (-0.9, 0.4, 0.0), (-0.5, 0.2, 1.0), 0.35, 0.9, 0.3, rng, oblique=0.5)
+        spec = [(0.0, 0.0, 0.62, 1.5, 0.0, 0.0), (0.7, 0.25, 0.45, 1.1, 0.35, 0.1), (-0.6, 0.35, 0.5, 1.25, -0.3, 0.15),
+                (0.25, -0.6, 0.4, 0.8, 0.1, -0.35), (-0.45, -0.5, 0.33, 0.7, -0.3, -0.3), (0.95, -0.35, 0.28, 0.55, 0.6, -0.2)]
+        for x, y, r, ln, lx, ly in spec:
+            ax = Vector((lx, ly, 1.0)).normalized()
+            prism(bm, (x, y, 0.0), ax, r, ln, r * 0.35, rng, jitter=0.1, taper=0.92, oblique=0.7, embed=0.3)
+            u, v, a_ = basis(ax)
+            # two or three growth terraces stepping down one side, each a short, narrower prism
+            side = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)).normalized()
+            for k in range(rng.randint(2, 3)):
+                f = 0.72 - 0.16 * k
+                base = Vector((x, y, 0.0)) + side * r * (0.45 + 0.2 * k) + a_ * ln * (0.15 + 0.12 * k)
+                prism(bm, base, (ax + side * 0.12).normalized(), r * f, ln * (0.55 - 0.12 * k), r * 0.2, rng,
+                      jitter=0.08, taper=0.95, oblique=0.6, embed=0.4)
     export(xtal_obj("ember_xtal", "ember", b), out)
     export(rock_lump("ember_rock", 1.4, 0.4, 9, faces=300), out)
 
