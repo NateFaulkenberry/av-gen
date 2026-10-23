@@ -103,13 +103,15 @@ FAMILIES = {
     # phase 2c: the left hero is a FAN -- three tall shards leaning outward (to the left, -x), shorter ones around
     # the base leaning every way; no single central spike. dy > 0 is behind (Blender +Y = AV Gen -Z).
     # phase 2h: no shard leans past ~25 deg (a 40 deg one lay almost flat toward the camera: a slab)
+    # phase 2i (the owner: "remove the little crystal on the lefet side of the bank"): the three small front shards
+    # are gone
     "fan": (13, [(0, 0, 4.0, 52, 10, 16), (-7, 4, 3.6, 46, 18, 26), (5, 6, 3.2, 40, 6, 12),
-                 (-12, -3, 2.8, 26, 16, 24), (8, -5, 2.6, 22, 14, 24), (-3, -8, 2.4, 16, 14, 24),
-                 (12, 2, 2.2, 14, 14, 22)], -1),
+                 (-12, -3, 2.8, 26, 16, 24)], -1),
     # phase 2c: the right bank's near pair -- a big upright crystal leaning outward (+x) and a second one behind it,
     # small ones at their base (the reference's lower-right pair)
-    "pairR": (29, [(0, 0, 5.2, 44, 12, 18), (-9, 14, 4.4, 36, 16, 24), (-6, -4, 2.4, 13, 22, 34),
-                   (9, -3, 2.0, 10, 30, 44)], 1),
+    # phase 2h: the base shards lean at most ~20 deg (a 44 deg one bent out sideways: the owner's "boot")
+    "pairR": (29, [(0, 0, 5.2, 44, 12, 18), (-9, 14, 4.4, 36, 16, 24), (-6, -4, 2.4, 13, 12, 20),
+                   (9, -3, 2.0, 10, 10, 18)], 1),
 
     # phase 2g (the owner: "vary the foreground crystals a bit more on the right hand side"): new silhouettes --
     # a single tall needle, a stub of broken columns, a hard-leaning pair, a right-hand fan. A 7th value of 1 in a
@@ -120,6 +122,10 @@ FAMILIES = {
     "leanPair": (61, [(0, 0, 4.6, 46, 30, 36), (7, 5, 3.6, 34, 38, 46), (-4, -4, 2.0, 12, 16, 26)], 1),
     "fanR": (67, [(0, 0, 3.8, 48, 8, 14), (7, 4, 3.4, 40, 18, 26), (-5, 6, 3.0, 34, 4, 10),
                   (11, -3, 2.6, 24, 30, 42), (-9, -4, 2.4, 18, 14, 24), (4, -8, 2.2, 14, 22, 34)], 1),
+    # phase 2i (the owner: "it's not reading at distinct crystals in a group"): separate columns of different heights,
+    # spaced so each pointed termination and silhouette stands apart (gaps of a column's width or more), each tilted
+    # its own way
+    "groupR": (73, [(0, 0, 3.2, 50, 3, 7), (14, 7, 2.6, 36, 16, 22), (-13, 5, 2.4, 30, 12, 18)], 1),
     # phase 2g: the left bank's dominant mass -- a big full cluster to stand on the wall
     "massL": (71, [(0, 0, 5.0, 58, 6, 12), (-8, 5, 4.4, 50, 14, 22), (7, 4, 4.0, 42, 4, 10), (-14, -2, 3.6, 36, 22, 30),
                    (12, -4, 3.2, 30, 16, 26), (-4, -9, 3.0, 24, 26, 38), (16, 6, 2.6, 20, 30, 44),

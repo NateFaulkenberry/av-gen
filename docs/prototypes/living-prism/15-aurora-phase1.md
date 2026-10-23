@@ -408,3 +408,41 @@ The notch at the mid cluster's base was not a crystal: a scattered scan boulder 
 | Live auto | 22.4 / 22.9 ms | 37.3 ms | Ultra 273, High 177 (100% High or better) | 1 |
 
 The headless frame p50 is 30.7 ms. Its p99 of 64.7 ms is the recurring single-frame spike, not investigated.
+
+## Phase 2i gate (2026-10-23)
+
+These are the owner's left-side tweaks on 2h, plus notes added during the pass: water near L5's base, smoother banks, less lumpy peaks, the little crystal, and the right group. `phase2i-before-after.jpg` crops all eleven areas.
+
+**Crystals:**
+- **Fan (L1):** moved in from the frame edge (z -15, setback 122, scale 2.4 → 1.9), so it now has about 90 px of breathing room.
+- **Fan shards:** the three small front shards are removed, which takes out the little crystal at its base.
+- **Cliff crystal (L1b):** moved down the slope to z -190, setback 120, with a natural outward lean of +12°. It fills the empty dark area.
+- **R1's "boot":** its two base shards lean at most about 20° (one leaned 44°).
+- **Right group (R3):** a new `groupR` family of three separate columns (50, 36 and 30 m), spaced a column's width or more apart, each with its own pointed tip and tilt.
+
+**Terrain:**
+- **Hard floor corner:** `ledgeL` falloff 0.45 → 0.9 and width 30 → 48 m, so the step meets the floor as a slope.
+- **Lumpy peaks:**
+  - The high walls' and spurs' falloffs went from below 1 (a broad, domed top) to 1.2-1.8 (a peaked crest).
+  - A sharp ridged octave (frequency 0.02, 14 m, ridged 1.0, warp 12) notches the crests.
+  - This is geometry only; the ground program is unchanged at 20 ops.
+- **Shoreline:** each reach has a zero-height companion feature, 35 m wider, with roughness 0. The engine scales the rocky noise by the lowest roughness reaching a point, so the noise fades across a band around the waterline, and the bank runs down to the water as the river's own smooth cut.
+
+**Water:**
+- The near reach is up 0.5 m. The fall downstream is flatter, ramping to +5 m from z -720 on, so the mid and far water stands up near L5's base (6 m clearance).
+- The smoother banks let the water spread further. The clearance check then caught L1 (0 m) and L5 (2 m), so I lowered the downstream ramp by 1 m and set L1's setback to 122.
+- R5 moved out from 75 m to 100 m.
+
+**Checks:**
+- **River clearance:** L5 6 m; all others 25 m.
+- **Terrain sweep:** at most 11% hidden and 12% buried.
+- **Layering:** minimum 32% visible (R5); every other formation 51% or more. Crystals cover 25.7% of the frame.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 24.0 / 25.9 ms | 77.0 ms | Ultra | n/a |
+| Live auto | 23.7 / 24.9 ms | 36.5 ms | Ultra 274, High 177 (100% High or better) | 1 |
+
+The headless frame p50 is 33.0 ms. Its p99 is the recurring single-frame spike, not investigated.

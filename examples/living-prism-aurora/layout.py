@@ -27,13 +27,16 @@ FAR = 6000.0
 # the haze under the horizon glow, to the foot of the near ridge (now at 1800 m) so it never ends at a wall
 # phase 2g (the owner: "brining water level of river up a tad"): every level +1.5 m, so the water spreads wider
 # phase 2h (the owner: "raise the river water level a bit more too"): +1.5 m more (+3 m on 2f)
-RIVER_NEAR_PATH = [(-10.0, 3.0, 240.0), (-30.0, 3.0, 150.0), (26.0, 2.8, 75.0), (44.0, 2.6, 10.0),
-                   (-10.0, 2.3, -55.0), (-32.0, 2.0, -105.0)]
-RIVER_PATH = [(-32.0, 2.0, -105.0), (-8.0, 1.5, -165.0), (24.0, 0.8, -230.0), (18.0, 0.0, -300.0),
-              (-14.0, -1.0, -370.0), (-18.0, -2.0, -450.0), (8.0, -3.5, -560.0), (10.0, -5.0, -720.0),
-              (-6.0, -7.0, -900.0)]
-RIVER_FAR_PATH = [(-6.0, -7.0, -900.0), (-24.0, -9.0, -1080.0), (8.0, -11.0, -1280.0), (30.0, -13.0, -1500.0),
-                  (24.0, -15.0, -1760.0)]
+# phase 2i (the owner: "bring the water heigh up further still so its just near the base of this cystal" -- L5): the
+# near reach +0.5 m, then a flatter fall downstream: +0.5 m at z -105 rising to +5 m from z -720 on (after the shoreline smoothing let the water spread), so the mid and far
+# water stands up near L5's base (6 m) while the near reach stays clear of L1
+RIVER_NEAR_PATH = [(-10.0, 3.5, 240.0), (-30.0, 3.5, 150.0), (26.0, 3.3, 75.0), (44.0, 3.1, 10.0),
+                   (-10.0, 2.8, -55.0), (-32.0, 2.5, -105.0)]
+RIVER_PATH = [(-32.0, 2.5, -105.0), (-8.0, 2.4, -165.0), (24.0, 2.2, -230.0), (18.0, 1.9, -300.0),
+              (-14.0, 1.5, -370.0), (-18.0, 1.0, -450.0), (8.0, 0.4, -560.0), (10.0, 0.0, -720.0),
+              (-6.0, -2.0, -900.0)]
+RIVER_FAR_PATH = [(-6.0, -2.0, -900.0), (-24.0, -4.0, -1080.0), (8.0, -6.0, -1280.0), (30.0, -8.0, -1500.0),
+                  (24.0, -10.0, -1760.0)]
 RIVERS = [{"name": "riverNear", "path": RIVER_NEAR_PATH, "width": 100.0, "amplitude": 2.6, "falloff": 0.6,
            "smoothing": 3},
           {"name": "river", "path": RIVER_PATH, "width": 58.0, "amplitude": 2.4, "falloff": 0.7, "smoothing": 3},
@@ -67,14 +70,14 @@ WALLS = [  # (name, path, amplitude, width, falloff, roughness). Phase 2e (the o
     # ledge, then cliffs stepping up to a high wall. RIGHT is the lower, greener side: a broad bench, a gentle bank, a
     # lower wall far back. A feature's roughness lets the rocky noise layers (world_json) through: 0 is smooth.
     ("toeL", _offset(_ALL_RIVER, -100.0), 5.0, 30.0, 1.0, 0.35),
-    ("ledgeL", _offset(_AXIS, -115.0, 18.0, 0.4), 22.0, 30.0, 0.45, 1.0),      # a flat-topped rock step (falloff < 1)
+    ("ledgeL", _offset(_AXIS, -115.0, 18.0, 0.4), 22.0, 48.0, 0.9, 1.0),      # a rock step; phase 2h: falloff 0.45 -> 0.9, width 30 -> 48 (the owner: "fix the 90 degree angle looking valley floor, should be smoother")
     ("cliffL", _offset(_AXIS, -175.0, 26.0, 2.1), 70.0, 45.0, 0.4, 1.0),
-    ("highL", _offset(_AXIS, -250.0, 34.0, 4.0), 120.0, 75.0, 0.55, 1.0),
-    ("outerL", _offset(_AXIS, -400.0, 50.0, 1.1), 140.0, 160.0, 0.8, 1.0),
+    ("highL", _offset(_AXIS, -250.0, 34.0, 4.0), 120.0, 75.0, 1.5, 1.0),
+    ("outerL", _offset(_AXIS, -400.0, 50.0, 1.1), 140.0, 160.0, 1.4, 1.0),
     ("benchR", _offset(_ALL_RIVER, 130.0), 7.0, 60.0, 0.5, 0.3),  # the broad green bench
     ("bankR", _offset(_AXIS, 185.0, 24.0, 3.3), 24.0, 80.0, 1.3, 0.7),       # a gentle green rise
-    ("wallR", _offset(_AXIS, 270.0, 30.0, 5.2), 62.0, 70.0, 0.6, 1.0),
-    ("highR", _offset(_AXIS, 380.0, 45.0, 0.7), 85.0, 130.0, 0.8, 1.0),
+    ("wallR", _offset(_AXIS, 270.0, 30.0, 5.2), 62.0, 70.0, 1.2, 1.0),
+    ("highR", _offset(_AXIS, 380.0, 45.0, 0.7), 85.0, 130.0, 1.4, 1.0),
 ]
 
 
@@ -92,8 +95,11 @@ _SPURS = [(60.0, -1, 270.0, 120.0, 25.0, 55.0, 22.0), (-40.0, -1, 280.0, 135.0, 
           (-380.0, -1, 260.0, 120.0, 20.0, 55.0, 24.0), (-500.0, -1, 280.0, 140.0, 0.0, 60.0, 26.0),
           (-90.0, 1, 330.0, 200.0, -30.0, 40.0, 26.0), (-230.0, 1, 340.0, 190.0, 25.0, 45.0, 28.0),
           (-420.0, 1, 320.0, 180.0, -20.0, 40.0, 26.0)]
-WALLS += [("spur%d" % i, [(_axis_x(z) + side * d0, 0.0, z), (_axis_x(z + sk) + side * d1, 0.0, z + sk)], amp * 0.4, w, 0.7,
+WALLS += [("spur%d" % i, [(_axis_x(z) + side * d0, 0.0, z), (_axis_x(z + sk) + side * d1, 0.0, z + sk)], amp * 0.4, w, 1.8,
            1.0) for i, (z, side, d0, d1, sk, amp, w) in enumerate(_SPURS)]
+# phase 2i (the owner: "make these background peaks less lumpy looking at the top"): the high walls' and spurs'
+# falloffs went from < 1 (a broadened, domed top) to 1.2-1.8 (a peaked crest), and LAYERS gained a sharp ridged octave
+# that notches the crests.
 MOUNTAINS = []   # the far ridges are meshes now (blender/aurora_assets.py: ridges), layered in the fog
 WORLD_SIZE = (4000.0, 8000.0)
 
@@ -155,6 +161,14 @@ def world_json():
     feats = [{"name": r["name"], "kind": "river", "path": [list(p) for p in r["path"]], "width": r["width"],
               "amplitude": r["amplitude"], "falloff": r["falloff"], "roughness": 0.0, "smoothing": r["smoothing"],
               "water": True, "waterDepth": 0.0} for r in RIVERS]
+    # phase 2i (the owner: "smooths out the river banks some where the water meets the land so its not as jagged"): a
+    # zero-height companion of each reach, 35 m wider, whose only job is roughness 0 -- the engine scales the rocky
+    # noise by the lowest roughness reaching a point, so the noise fades out across a band around the waterline and
+    # the bank runs down to the water as the river's own smooth cut
+    for r in RIVERS:
+        feats.append({"name": r["name"] + "Shore", "kind": "ridge", "path": [list(p) for p in r["path"]],
+                      "width": r["width"] + 35.0, "amplitude": 0.0, "falloff": 0.4, "roughness": 0.0,
+                      "smoothing": r["smoothing"]})
     for name, path, amp, width, fo, rough in WALLS + MOUNTAINS:
         feats.append({"name": name, "kind": "ridge", "path": [list(p) for p in path], "width": width,
                       "amplitude": amp, "falloff": fo, "roughness": rough, "smoothing": 2})
@@ -170,6 +184,7 @@ LAYERS = [{"frequency": 0.004, "amplitude": 30.0, "ridged": 0.3, "warp": 80.0},
           {"frequency": 0.011, "amplitude": 26.0, "ridged": 0.85, "warp": 25.0},
           {"frequency": 0.028, "amplitude": 20.0, "ridged": 0.9, "warp": 8.0},   # spurs and gullies
           {"frequency": 0.07, "amplitude": 8.0, "ridged": 0.8, "warp": 3.0},    # rocky breaks
+          {"frequency": 0.02, "amplitude": 14.0, "ridged": 1.0, "warp": 12.0},  # phase 2i: crest notches
           {"frequency": 0.2, "amplitude": 1.2, "ridged": 0.0, "warp": 0.0}]
 
 
@@ -192,8 +207,8 @@ _FORMATION_SPEC = [   # (name, z, side, setback m, yaw deg, scale, family, tilt 
     # crystals need to dominate that side of the river more - vary the foreground crystals a bit more on the right"):
     # the left fan stands out on the bank near the water, free of the wall; a big full mass (massL) stands on the
     # wall behind it; the right bank mixes a pair, a needle, broken stubs, a leaning pair and a fan.
-    ("L1", -15.0, -1, 120.0, 70.0, 2.4, "fan", -6.0, 3.0),
-    ("L1b", -110.0, -1, 110.0, 120.0, 1.7, "spire2", -20.0, -4.0),
+    ("L1", -15.0, -1, 122.0, 70.0, 1.9, "fan", -6.0, 3.0),
+    ("L1b", -190.0, -1, 120.0, 120.0, 1.9, "spire2", 12.0, -4.0),
     ("L2", -235.0, -1, 75.0, 40.0, 2.8, "spire", 14.0, 6.0),
     ("L3", -300.0, -1, 120.0, 115.0, 3.0, "cluster", 8.0, -10.0),
     ("L4", -480.0, -1, 170.0, -35.0, 2.7, "spire2", 6.0, 9.0),
@@ -201,13 +216,13 @@ _FORMATION_SPEC = [   # (name, z, side, setback m, yaw deg, scale, family, tilt 
     ("L6", -1050.0, -1, 150.0, 60.0, 4.0, "spire", 12.0, -6.0),
     ("R1", -60.0, 1, 145.0, -50.0, 2.4, "pairR", -4.0, -2.0),
     ("R2", -185.0, 1, 90.0, -65.0, 2.6, "needle", 7.0, -8.0),
-    ("R3", -240.0, 1, 145.0, 80.0, 3.0, "cluster", 4.0, 4.0),
+    ("R3", -240.0, 1, 145.0, 80.0, 3.0, "groupR", 4.0, 4.0),
     ("R4", -390.0, 1, 100.0, 70.0, 2.6, "leanPair", 10.0, -12.0),
-    ("R5", -560.0, 1, 75.0, 40.0, 2.8, "fanR", 6.0, 6.0),
+    ("R5", -560.0, 1, 100.0, 40.0, 2.8, "fanR", 6.0, 6.0),
     ("R6", -950.0, 1, 75.0, 100.0, 3.4, "small", 10.0, -4.0),
 ]
 # A family whose shards lean to +x leans toward the river on the left bank: turn it round there (yaw + 180).
-FAMILY_OUTWARD = {"needle": 1, "stub": 1, "leanPair": 1, "fanR": 1, "massL": -1, "fan": -1, "pairR": 1, "cluster": 1, "pair": 1, "spire": 1, "spire2": 1, "small": 1, "small2": 1,
+FAMILY_OUTWARD = {"groupR": 1, "needle": 1, "stub": 1, "leanPair": 1, "fanR": 1, "massL": -1, "fan": -1, "pairR": 1, "cluster": 1, "pair": 1, "spire": 1, "spire2": 1, "small": 1, "small2": 1,
                   "far": 1}
 _CENTRE = _chaikin(_ALL_RIVER, 3)
 
