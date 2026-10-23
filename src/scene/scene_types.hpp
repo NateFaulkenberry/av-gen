@@ -253,6 +253,19 @@ struct Anisotropy {
     [[nodiscard]] bool enabled() const { return strength != 0.0f; }
 };
 
+// ADR-1603: screen-space refraction. A refractive procedural surface is drawn after the shared refraction copy (the lit
+// opaque frame, ADR-1286's copy generalised) and shows what is behind it, offset along its view-space normal and
+// absorbed per channel over the path through it (the linear depth behind minus its own, at most `thickness` metres).
+// Off at strength 0 (the default). Where the live ladder turns refraction off (Low and Emergency) the surface draws
+// as the opaque material it is authored as, so its identity -- its colour, its emission -- is the fallback.
+struct Refraction {
+    float strength = 0.0f;               // screen-space offset per unit of view-space normal, in UV (0 = off)
+    float opacity = 0.15f;               // the share of the surface's own shaded colour over what it transmits
+    float thickness = 2.0f;              // metres: the longest path the absorption is applied over
+    glm::vec3 absorption{0.0f};          // per metre, per channel (0 = clear)
+    [[nodiscard]] bool enabled() const { return strength > 0.0f; }
+};
+
 // ADR-1152: a guilloche engraving -- line fields cut into the surface, after THE ASTRAL FORGE prototype's
 // engraving (prototypes/astral-forge/shaders/latent.wgsl engraveUV, surface.wgsl grooveFamily). Each
 // layer is one family of lines in object space:
@@ -336,6 +349,7 @@ struct Material {
     WireLines wire;                      // ADR-1073: edges drawn as lines (off by default)
     ThinFilm thinFilm;                   // ADR-1143: interference colour (off by default)
     Anisotropy anisotropy;               // ADR-1143: stretched highlight (off by default)
+    Refraction refraction;               // ADR-1603: screen-space refraction (off by default)
     Engraving engraving;                 // ADR-1152: guilloche line fields (off by default; SDF objects)
     SurfaceRegions regions;              // ADR-1149: per-region temper and polish (off by default; SDF objects)
 };

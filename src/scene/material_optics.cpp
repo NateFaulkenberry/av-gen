@@ -112,7 +112,61 @@ json anisotropyToJson(const Anisotropy& a) { return blockToJson(a, kAnisotropy);
 bool thinFilmIsDefault(const ThinFilm& t) { return blockIsDefault(t, kThinFilm); }
 bool anisotropyIsDefault(const Anisotropy& a) { return blockIsDefault(a, kAnisotropy); }
 
+Result<void> readRefraction(const json& j, Refraction& out) {
+    if (!j.is_object()) {
+        return fail("'refraction' must be an object");
+    }
+    for (auto it = j.begin(); it != j.end(); ++it) {
+        const std::string& key = it.key();
+        const auto number = [&](float& field) -> Result<void> {
+            if (!it->is_number() || !std::isfinite(it->get<double>())) {
+                return fail("refraction '{}' must be a finite number", key);
+            }
+            field = it->get<float>();
+            return {};
+        };
+        if (key == "strength") {
+            if (auto r = number(out.strength); !r) return r;
+        } else if (key == "opacity") {
+            if (auto r = number(out.opacity); !r) return r;
+        } else if (key == "thickness") {
+            if (auto r = number(out.thickness); !r) return r;
+        } else if (key == "absorption") {
+            if (it->is_number() && std::isfinite(it->get<double>())) {
+                out.absorption = glm::vec3(it->get<float>());
+            } else if (it->is_array() && it->size() == 3 &&
+                       std::all_of(it->begin(), it->end(),
+                                   [](const json& v) { return v.is_number() && std::isfinite(v.get<double>()); })) {
+                out.absorption = {(*it)[0].get<float>(), (*it)[1].get<float>(), (*it)[2].get<float>()};
+            } else {
+                return fail("refraction 'absorption' must be a number or [r, g, b]");
+            }
+        } else {
+            return fail("refraction has no key '{}' (strength, opacity, thickness, absorption)", key);
+        }
+    }
+    return {};
+}
+
+json refractionToJson(const Refraction& r) {
+    return json{{"strength", r.strength},
+                {"opacity", r.opacity},
+                {"thickness", r.thickness},
+                {"absorption", json::array({r.absorption.x, r.absorption.y, r.absorption.z})}};
+}
+
+bool refractionIsDefault(const Refraction& r) {
+    const Refraction d{};
+    return r.strength == d.strength && r.opacity == d.opacity && r.thickness == d.thickness &&
+           r.absorption == d.absorption;
+}
+
 Result<void> readMaterialOptics(const json& m, Material& out) {
+    if (m.contains("refraction")) {
+        if (auto r = readRefraction(m.at("refraction"), out.refraction); !r) {
+            return r;
+        }
+    }
     if (m.contains("thinFilm")) {
         if (auto r = readThinFilm(m.at("thinFilm"), out.thinFilm); !r) {
             return r;
@@ -132,6 +186,9 @@ void writeMaterialOptics(const Material& material, json& m) {
     }
     if (!anisotropyIsDefault(material.anisotropy)) {
         m["anisotropy"] = anisotropyToJson(material.anisotropy);
+    }
+    if (!refractionIsDefault(material.refraction)) {
+        m["refraction"] = refractionToJson(material.refraction);
     }
 }
 
@@ -166,6 +223,9 @@ MaterialOpticsParameters registerMaterialOpticsParameters(params::ParameterSet& 
     out.thinFilmIor = addThin(kThinFilm[1]);
     out.anisotropyStrength = addAniso(kAnisotropy[0]);
     out.anisotropyRotation = addAniso(kAnisotropy[1]);
+    out.refractionStrength = add("refraction", "strength", rest.refraction.strength, 0.0f, 0.5f, 0.0f, 0.15f);
+    out.refractionOpacity = add("refraction", "opacity", rest.refraction.opacity, 0.0f, 1.0f, 0.0f, 1.0f);
+    out.refractionThickness = add("refraction", "thickness", rest.refraction.thickness, 0.0f, 100.0f, 0.0f, 10.0f);
     return out;
 }
 
@@ -179,6 +239,9 @@ void applyMaterialOpticsParameters(const MaterialOpticsParameters& p, Material& 
     copy(p.thinFilmIor, live.thinFilm.ior);
     copy(p.anisotropyStrength, live.anisotropy.strength);
     copy(p.anisotropyRotation, live.anisotropy.rotation);
+    copy(p.refractionStrength, live.refraction.strength);
+    copy(p.refractionOpacity, live.refraction.opacity);
+    copy(p.refractionThickness, live.refraction.thickness);
 }
 
 glm::vec3 thinFilmTint(float cosView, float thicknessNm, float filmIor, float substrateF0, float metallic) {

@@ -373,7 +373,13 @@ struct ProceduralRenderer::Impl {
     // ADR-1562: with `startInto`, the compile is started into it (init() of the SceneRenderer waits) and an empty
     // pipeline is returned.
     Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull,
-                                                bool depthOnly = false, wgpu::RenderPipeline* startInto = nullptr);
+                                                bool depthOnly = false, wgpu::RenderPipeline* startInto = nullptr,
+                                                const char* fragmentEntry = nullptr);
+    // ADR-1603: the refraction pipelines, built the first time a frame needs them (no cost to a scene without one).
+    wgpu::ShaderModule litModule;
+    wgpu::RenderPipeline pipelineRefractCull;
+    wgpu::RenderPipeline pipelineRefractNoCull;
+    bool ensureRefractPipelines();
     // `start`: the five render pipelines are started rather than created (init); a reload creates them.
     Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false);
     Result<wgpu::RenderPipeline> createWirePipeline(const wgpu::ShaderModule& module, bool occlude,
@@ -1146,7 +1152,29 @@ void ProceduralRenderer::setShadowViews(std::span<const FrustumPlanes> views) {
                                                        std::min<std::size_t>(views.size(), kMaxShadowCullViews)));
 }
 
+bool ProceduralRenderer::Impl::ensureRefractPipelines() {
+    if (pipelineRefractCull && pipelineRefractNoCull) {
+        return true;
+    }
+    if (!litModule) {
+        return false;
+    }
+    auto cull = createPipeline(litModule, true, false, nullptr, "fs_proc_refract");
+    auto noCull = createPipeline(litModule, false, false, nullptr, "fs_proc_refract");
+    if (!cull || !noCull) {
+        log::warn("procedural: the refraction pipelines failed ({}); refractive surfaces draw opaque",
+                  !cull ? cull.error().message : noCull.error().message);
+        return false;
+    }
+    pipelineRefractCull = *cull;
+    pipelineRefractNoCull = *noCull;
+    return true;
+}
+
 Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule& module, bool start) {
+    litModule = module; // ADR-1603: the refraction pipelines are built from it on demand
+    pipelineRefractCull = nullptr;
+    pipelineRefractNoCull = nullptr;
     if (start) {
         // ADR-1562: the heaviest pipelines in the renderer; compiled in parallel with everything after them.
         for (auto r : {createPipeline(module, true, false, &pipelineCull), createPipeline(module, false, false, &pipelineNoCull),
@@ -1317,13 +1345,14 @@ Result<void> ProceduralRenderer::Impl::createCullPipelines(const wgpu::ShaderMod
 
 Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu::ShaderModule& module, bool cull,
                                                                       bool depthOnly,
-                                                                      wgpu::RenderPipeline* startInto) {
+                                                                      wgpu::RenderPipeline* startInto,
+                                                                      const char* fragmentEntry) {
     VertexLayoutStorage vertex;
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, colorFormat, nullptr);
     wgpu::FragmentState fragment{};
     fragment.module = module;
-    fragment.entryPoint = depthOnly ? "fs_proc_depth" : "fs_proc";
+    fragment.entryPoint = fragmentEntry != nullptr ? fragmentEntry : (depthOnly ? "fs_proc_depth" : "fs_proc");
     fragment.targetCount = depthOnly ? 0 : kSceneTargetCount;
     fragment.targets = depthOnly ? nullptr : colorTargets.data();
     wgpu::DepthStencilState depth{};
@@ -1331,7 +1360,9 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     depth.depthWriteEnabled = wgpu::OptionalBool::True;
     depth.depthCompare = depthOnly ? wgpu::CompareFunction::Less : wgpu::CompareFunction::LessEqual;
 
-    const char* label = depthOnly ? "procedural-depth" : (cull ? "procedural-opaque" : "procedural-opaque-twosided");
+    const char* label = fragmentEntry != nullptr ? (cull ? "procedural-refract" : "procedural-refract-twosided")
+                        : depthOnly                ? "procedural-depth"
+                        : (cull ? "procedural-opaque" : "procedural-opaque-twosided");
     wgpu::RenderPipelineDescriptor desc{};
     desc.label = label;
     desc.layout = pipelineLayout;
@@ -2318,6 +2349,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         if (casts && !shadowFullyCulled) {
             ++stats_.shadowCasterObjects; // ADR-1600
         }
+        if (object.material.refraction.enabled() && !fullyCulled) {
+            ++stats_.refractiveObjects; // ADR-1603
+        }
         // The pass runs when EITHER list has something to say. An object the camera cannot see but
         // a cascade can now costs a cull dispatch it did not used to cost -- that is the price of
         // the second list and it is the whole of it on the CPU side.
@@ -2691,6 +2725,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             obj.toon2 = toon[2];
         }
         obj.optics = packOptics(m); // ADR-1143
+        const PackedRefraction refraction = packRefraction(m); // ADR-1603
+        obj.refraction0 = refraction.lane0;
+        obj.refraction1 = refraction.lane1;
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < scene.textures.size() && !scene.textures[ref.texture].isHdr();
@@ -2927,9 +2964,21 @@ void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene&
     drawImpl(pass, scene, materialBindGroup, false, false);
 }
 
+bool ProceduralRenderer::hasRefractive() const {
+    return stats_.refractiveObjects > 0;
+}
+
+void ProceduralRenderer::drawRefractive(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
+    if (!refractionPhase_ || !impl_->ensureRefractPipelines()) {
+        return;
+    }
+    drawImpl(pass, scene, materialBindGroup, false, false, true);
+}
+
 void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                                   const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
-                                  bool depthOnly, bool shadowPass) {
+                                  bool depthOnly, bool shadowPass, bool refractPass) {
     Impl& im = *impl_;
     if (!im.initialised || im.items.empty()) {
         return;
@@ -2949,9 +2998,11 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
                                    : depthOnly ? stats_.submittedDepth
                                                : stats_.submittedCamera;
     // ADR-1493: the compiled-materials variant's lit pipelines when one is ready for this frame's programs.
-    const Impl::MaterialVariant* variant = depthOnly ? nullptr : im.activeVariant();
-    const wgpu::RenderPipeline& litCull = variant != nullptr ? variant->cull : im.pipelineCull;
-    const wgpu::RenderPipeline& litNoCull = variant != nullptr ? variant->noCull : im.pipelineNoCull;
+    const Impl::MaterialVariant* variant = depthOnly || refractPass ? nullptr : im.activeVariant();
+    const wgpu::RenderPipeline& litCull =
+        refractPass ? im.pipelineRefractCull : (variant != nullptr ? variant->cull : im.pipelineCull);
+    const wgpu::RenderPipeline& litNoCull =
+        refractPass ? im.pipelineRefractNoCull : (variant != nullptr ? variant->noCull : im.pipelineNoCull);
     const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
         if (p.Get() != boundPipeline.Get()) {
             pass.SetPipeline(p);
@@ -2993,6 +3044,13 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         const auto& object = scene.procedurals[item.objectIndex];
         if (shadowPass && !object.castsShadow) {
             continue;
+        }
+        // ADR-1603: in the refraction phase a refractive object is drawn by drawRefractive alone (and still casts).
+        if (!shadowPass && refractionPhase_ && object.material.refraction.enabled() != refractPass) {
+            continue;
+        }
+        if (refractPass) {
+            ++stats_.refractiveDraws;
         }
         // ADR-1073: `wire/fill` 0 -- the lines alone; the surface draws in no pass.
         if (object.material.wire.hidesSurface()) {

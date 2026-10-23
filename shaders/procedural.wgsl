@@ -911,6 +911,42 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
 
 @fragment
 fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    return procShade(in, frontFacing);
+}
+
+// ADR-1603: the refraction phase. A refractive surface (object.refraction0.x > 0) drawn after the refraction copy
+// shows what is behind it: the copy read at the pixel offset along the surface's view-space normal, absorbed per
+// channel over the path to what is behind (the linear depth there minus the surface's own, at most refraction0.z
+// metres), under `opacity` of its own shaded colour and its Fresnel reflectance. Drawn by fs_proc (no copy: the
+// ladder turned refraction off, or the phase did not run), the same surface is its opaque material.
+@group(0) @binding(18) var refractionCopy: texture_2d<f32>;
+@group(0) @binding(19) var refractionSampler: sampler;
+
+@fragment
+fn fs_proc_refract(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    var out = procShade(in, frontFacing);
+    let strength = object.refraction0.x;
+    let opacity = object.refraction0.y;
+    let maxThickness = object.refraction0.z;
+    let n = normalize(select(-in.normal, in.normal, frontFacing));
+    let toEye = frame.cameraPos.xyz - in.worldPos;
+    let v = normalize(toEye);
+    let screenUv = in.clip.xy * frame.targetSize.zw;
+    // the view-space normal's screen components: right and up (a screen's v runs down)
+    let offset = vec2<f32>(dot(n, frame.cameraRight.xyz), -dot(n, frame.cameraUp.xyz)) * strength;
+    let uv = clamp(screenUv - offset, vec2<f32>(0.0), vec2<f32>(1.0));
+    let texel = vec2<i32>(clamp(uv * frame.targetSize.xy, vec2<f32>(0.0), frame.targetSize.xy - vec2<f32>(1.0)));
+    let behind = textureLoad(sceneLinearDepth, texel, 0).r;
+    let own = max(dot(-toEye, frame.cameraForward.xyz), 1e-4);
+    let path = clamp(behind - own, 0.0, maxThickness);
+    let absorb = exp(-object.refraction1.rgb * path);
+    let transmitted = textureSampleLevel(refractionCopy, refractionSampler, uv, 0.0).rgb * absorb;
+    let fresnel = 0.04 + 0.96 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
+    out.color = vec4<f32>(mix(transmitted * (1.0 - fresnel), out.color.rgb, opacity), out.color.a);
+    return out;
+}
+
+fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
     let emissiveMul = in.instEmissive.rgb;
     var info: MaterialInstanceInfo;
     // ADR-905: the emissive field is a gain on everything the surface emits, after its program --

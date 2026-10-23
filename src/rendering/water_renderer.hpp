@@ -84,6 +84,10 @@ inline constexpr std::uint32_t kMaxWaterMaterials = 8;
 // world, which is what the vertex's speed lane is a fraction of.
 [[nodiscard]] WaterUniforms waterUniformsFrom(const scene::WaterSettings& settings, float flowTime,
                                               float fastest, bool linearDepthValid);
+// ADR-1603: the live ladder's lever on the cinematic SSR. `scale` < 1 takes that fraction of the authored steps and
+// rays (at least 8 steps, the shader's own floor, and one ray); 0 turns the SSR off (the environment reflection alone).
+// 1 leaves the uniforms exactly as packed.
+void applyWaterSsrScale(WaterUniforms& u, float scale);
 
 // ADR-916. `water.wgsl` with its tears compiled out: every line from a `---- tears (ADR-916) begin ----`
 // marker through the next `end` marker removed. A surface with no tears is drawn with a pipeline built

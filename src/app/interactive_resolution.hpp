@@ -254,6 +254,8 @@ struct LiveQualityRung {
     float particleSpawnScale = 1.0f;    // ceiling on QualitySettings::particleSpawnScale
     std::uint32_t sdfShadowScale = 1;   // ADR-1165: floor on QualitySettings::sdfShadowScale (higher = coarser)
     std::uint32_t astralTier = 0;       // ADR-1222: floor on QualitySettings::astralTier (higher = fewer particles)
+    bool refraction = true;             // ADR-1603: QualitySettings::refraction (off: refractive surfaces opaque)
+    float waterSsrScale = 1.0f;         // ADR-1603: ceiling on QualitySettings::waterSsrScale (0 = no water SSR)
     [[nodiscard]] bool operator==(const LiveQualityRung&) const = default;
 };
 

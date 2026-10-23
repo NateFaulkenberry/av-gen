@@ -119,6 +119,18 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     return u;
 }
 
+void applyWaterSsrScale(WaterUniforms& u, float scale) {
+    if (!(scale < 1.0f)) {
+        return;
+    }
+    if (scale <= 0.0f) {
+        u.cineA.x = 0.0f;
+        return;
+    }
+    u.cineB.z = std::max(8.0f, std::round(u.cineB.z * scale));
+    u.cineC.y = std::max(1.0f, std::round(u.cineC.y * scale));
+}
+
 Result<void> WaterRenderer::init(gpu::Context& context, gpu::ShaderLibrary& shaders,
                                  wgpu::TextureFormat hdrFormat, wgpu::TextureFormat depthFormat,
                                  const wgpu::BindGroupLayout& frameLayout,

@@ -245,7 +245,7 @@ Result<void> SceneRenderer::init() {
         // (ADR-033/034), and 11 is the shadow mask shaders/shadows.wgsl reads (ADR-087); a pass
         // whose shader does not mention them simply never reads them. ADR-918 adds 16 and 17, the
         // fog's sky map and its sampler.
-        std::array<wgpu::BindGroupLayoutEntry, 16> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 18> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -296,6 +296,10 @@ Result<void> SceneRenderer::init() {
         entries[15].binding = 17;
         entries[15].visibility = wgpu::ShaderStage::Fragment;
         entries[15].sampler.type = wgpu::SamplerBindingType::Filtering;
+        entries[16] = entries[14];
+        entries[16].binding = 18; // ADR-1603: the refraction copy (a placeholder outside the refraction phase)
+        entries[17] = entries[15];
+        entries[17].binding = 19; // ADR-1603: its sampler, linear and clamped
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "frame-layout";
         desc.entryCount = entries.size();
@@ -1013,6 +1017,9 @@ Result<void> SceneRenderer::createLightResources() {
         sd.minFilter = wgpu::FilterMode::Linear;
         sd.mipmapFilter = wgpu::MipmapFilterMode::Nearest;
         fogSkySampler_ = device.CreateSampler(&sd);
+        sd.label = "refraction-sampler"; // ADR-1603
+        sd.addressModeU = wgpu::AddressMode::ClampToEdge;
+        refractionSampler_ = device.CreateSampler(&sd);
     }
     lightStaging_.resize(kMaxSceneLights);
     clusterStaging_.assign(kClusterBufferWords, 0u);
@@ -1023,8 +1030,9 @@ void SceneRenderer::rebuildFrameBindGroups() {
     const auto& device = context_.device();
     auto make = [&](const wgpu::Buffer& frameBuffer, const wgpu::TextureView& shadowAtlas,
                     const wgpu::TextureView& aoView, const wgpu::TextureView& depthView,
-                    const wgpu::TextureView& maskView, const wgpu::TextureView& fogSkyView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 16> entries{};
+                    const wgpu::TextureView& maskView, const wgpu::TextureView& fogSkyView, const char* label,
+                    const wgpu::TextureView* refraction = nullptr) {
+        std::array<wgpu::BindGroupEntry, 18> entries{};
         entries[0].binding = 0;
         entries[0].buffer = frameBuffer;
         entries[0].size = sizeof(FrameUniforms);
@@ -1062,6 +1070,10 @@ void SceneRenderer::rebuildFrameBindGroups() {
         entries[14].textureView = fogSkyView;
         entries[15].binding = 17;
         entries[15].sampler = fogSkySampler_;
+        entries[16].binding = 18; // ADR-1603
+        entries[16].textureView = refraction != nullptr ? *refraction : fogSkyPlaceholder_.view;
+        entries[17].binding = 19;
+        entries[17].sampler = refractionSampler_;
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = frameLayout_;
@@ -1072,6 +1084,12 @@ void SceneRenderer::rebuildFrameBindGroups() {
     const wgpu::TextureView sceneDepth = linearDepth_.valid() ? linearDepth_.view : linearDepthDefault_.view;
     frameBindGroup_ = make(frameUniforms_, shadows_->atlasView(), ao_->output(), sceneDepth,
                            shadowMask_->output(), fogSkyMap_.view, "frame-bind-group");
+    // ADR-1603: the same group with the refraction copy, for the draws after it was taken.
+    frameBindGroupRefract_ =
+        refractionCopyView_ ? make(frameUniforms_, shadows_->atlasView(), ao_->output(), sceneDepth,
+                                   shadowMask_->output(), fogSkyMap_.view, "frame-bind-group-refract",
+                                   &refractionCopyView_)
+                            : frameBindGroup_;
     // The prepass, the shadow passes, the linear-depth pass and the AO passes all write something
     // the shading pass reads, so their copy binds placeholders in those slots. Ambient occlusion
     // reads the linear depth through its own group instead.
@@ -1845,6 +1863,9 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"astral2", [](QualitySettings& q) { q.astralTier = 2; }, "astralTier=2 (ADR-1222: 70% of the particles, 12 god-ray taps)"},
         {"astral3", [](QualitySettings& q) { q.astralTier = 3; }, "astralTier=3 (ADR-1222: 50%, 8 taps, no shards)"},
         {"astral4", [](QualitySettings& q) { q.astralTier = 4; }, "astralTier=4 (ADR-1222: 33%, no god rays, no shards)"},
+        {"norefraction", [](QualitySettings& q) { q.refraction = false; }, "refraction=false (ADR-1603: refractive surfaces opaque, no phase)"},
+        {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
+        {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
         {"sdfshadowfull", [](QualitySettings& q) { q.sdfShadowScale = 1; },
          "sdfShadowScale=1 (raymarched SDF casters marched at the shadow map's own resolution)"},
         {"sdfshadowhalf", [](QualitySettings& q) { q.sdfShadowScale = 2; },
@@ -3984,7 +4005,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     const bool shardsWantDepth = std::any_of(scene.particles.begin(), scene.particles.end(), [](const scene::ParticleSystem& p) {
         return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
     });
-    const bool needsDepthPrepass = ao_->active() || (qualitySettings_.contactShadows && scene.environment.contactShadows) ||
+    // ADR-1603: a refractive procedural surface reads the linear depth behind it (its absorption path).
+    const bool refractionWanted =
+        qualitySettings_.refraction &&
+        std::any_of(scene.procedurals.begin(), scene.procedurals.end(),
+                    [](const scene::ProceduralGeometry& p) { return p.material.refraction.enabled(); });
+    const bool needsDepthPrepass = refractionWanted || ao_->active() ||
+                                   (qualitySettings_.contactShadows && scene.environment.contactShadows) ||
                                    scene.environment.depthPrepass || // ADR-1406
                                    shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth ||
                                    std::any_of(environments_.begin(), environments_.end(), // ADR-1200: the seam
@@ -4003,6 +4030,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
             waterUniforms_.push_back(
                 waterUniformsFrom(surface.settings, flowTime, surface.fastestFlow, needsDepthPrepass));
+            // ADR-1603: the ladder's lever on the cinematic water's SSR -- fewer steps and rays, none at 0.
+            applyWaterSsrScale(waterUniforms_.back(), qualitySettings_.waterSsrScale);
         }
         water_->upload(queue, waterUniforms_);
     }
@@ -4099,6 +4128,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         procedurals_->setShadowViews(viewPlanes);
         procedurals_->update(encoder, scene, identity, time, fields_.get(), splines_.get());
         stats_.procedural = procedurals_->stats();
+        // ADR-1603: the refraction phase runs when the ladder allows it and a refractive surface is in view. Set before
+        // the prepass, which leaves those surfaces out (the depth behind them is what their absorption reads).
+        procedurals_->setRefractionPhase(refractionWanted && procedurals_->hasRefractive());
     }
     stage(cpu.proceduralMs);
 
@@ -4541,31 +4573,36 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // When a water material this frame is cinematic, the pass is split here (as it is around the SDF
         // raymarch): the frame so far -- opaque world, sky, atmosphere -- is copied, and the water reflects
         // and refracts the copy. No cinematic water, no split: the frame is the one it always was.
-        if (!water.empty() && water_->ready() && water_->anyCinematic()) {
+        // ADR-1603: one refraction phase for the cinematic water and the refractive procedural surfaces: one split,
+        // one copy, then the water, then the refractive surfaces (each reads the frame as it stood before either).
+        const bool cinematicWater = !water.empty() && water_->ready() && water_->anyCinematic();
+        const bool refractiveSurfaces = procedurals_->refractionPhase();
+        if (cinematicWater || refractiveSurfaces) {
             rp.End();
             const wgpu::Texture& src = hdr_.colorTexture();
-            if (!waterSceneCopy_ || waterSceneCopy_.GetWidth() != hdr_.width() ||
-                waterSceneCopy_.GetHeight() != hdr_.height()) {
+            if (!refractionCopy_ || refractionCopy_.GetWidth() != hdr_.width() ||
+                refractionCopy_.GetHeight() != hdr_.height()) {
                 wgpu::TextureDescriptor td{};
-                td.label = "water-scene-copy";
+                td.label = "refraction-copy";
                 td.size = {hdr_.width(), hdr_.height(), 1};
                 td.format = kHdrFormat;
                 td.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
-                waterSceneCopy_ = context_.device().CreateTexture(&td);
-                waterSceneCopyView_ = waterSceneCopy_.CreateView();
-                water_->setSceneColor(waterSceneCopyView_);
+                refractionCopy_ = context_.device().CreateTexture(&td);
+                refractionCopyView_ = refractionCopy_.CreateView();
+                water_->setSceneColor(refractionCopyView_);
+                rebuildFrameBindGroups(); // frameBindGroupRefract_ binds the new copy
             }
             wgpu::TexelCopyTextureInfo from{};
             from.texture = src;
             wgpu::TexelCopyTextureInfo to{};
-            to.texture = waterSceneCopy_;
+            to.texture = refractionCopy_;
             const wgpu::Extent3D extent{hdr_.width(), hdr_.height(), 1};
             encoder.CopyTextureToTexture(&from, &to, &extent);
             for (auto& attachment : attachments) {
                 attachment.loadOp = wgpu::LoadOp::Load;
             }
             depth.depthLoadOp = wgpu::LoadOp::Load;
-            pass.label = "scene-pass-after-water-copy";
+            pass.label = "scene-pass-after-refraction-copy";
             pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
             rp = encoder.BeginRenderPass(&pass);
             rp.SetBindGroup(0, frameBindGroup_);
@@ -4595,6 +4632,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 ++stats_.state.indexBufferBinds;
                 ++stats_.drawCalls;
             }
+        }
+        // ADR-1603: the refractive procedural surfaces, through the frame group that binds the copy.
+        if (refractiveSurfaces) {
+            rp.SetBindGroup(0, frameBindGroupRefract_);
+            procedurals_->drawRefractive(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
         }
         // ADR-1073: wire lines, over every opaque surface and the sky, before the grid and the particles.
         procedurals_->drawWire(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });

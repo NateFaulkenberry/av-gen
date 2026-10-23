@@ -8,6 +8,8 @@
 //
 //   "thinFilm":   {"thickness": 60.0, "ior": 2.4}       // nm; 0 = off
 //   "anisotropy": {"strength": 0.8, "rotation": 0.0}    // -1..1 (0 = off); radians
+//   "refraction": {"strength": 0.04, "opacity": 0.15, "thickness": 2.0, "absorption": [0.6, 0.2, 0.05]}
+//                                                       // ADR-1603: procedural surfaces; strength 0 = off
 //
 // The parameters sit under the owner's prefix, `<prefix>material/thinFilm/thickness`,
 // `<prefix>material/thinFilm/ior`, `<prefix>material/anisotropy/strength` and
@@ -43,6 +45,10 @@ namespace avgen::scene {
 // every scene that never authored one saves exactly the file it had.
 [[nodiscard]] bool thinFilmIsDefault(const ThinFilm& t);
 [[nodiscard]] bool anisotropyIsDefault(const Anisotropy& a);
+// ADR-1603: the `"refraction"` block (absorption is a number or [r, g, b]).
+[[nodiscard]] Result<void> readRefraction(const nlohmann::json& j, Refraction& out);
+[[nodiscard]] nlohmann::json refractionToJson(const Refraction& r);
+[[nodiscard]] bool refractionIsDefault(const Refraction& r);
 
 // Reads both optional blocks of a material object `m` (a JSON object), when present. The error names
 // the block and the key.
@@ -55,6 +61,10 @@ struct MaterialOpticsParameters {
     params::Parameter<float>* thinFilmIor = nullptr;
     params::Parameter<float>* anisotropyStrength = nullptr;
     params::Parameter<float>* anisotropyRotation = nullptr;
+    // ADR-1603: `<prefix>material/refraction/{strength,opacity,thickness}` (absorption is the file's)
+    params::Parameter<float>* refractionStrength = nullptr;
+    params::Parameter<float>* refractionOpacity = nullptr;
+    params::Parameter<float>* refractionThickness = nullptr;
 };
 
 // Registers `<prefix>material/thinFilm/{thickness,ior}` and `<prefix>material/anisotropy/{strength,

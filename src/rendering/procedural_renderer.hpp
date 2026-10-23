@@ -98,6 +98,9 @@ struct ProceduralStats {
     // ADR-1600: casting objects some shadow view can reach this frame (the shadow list's own cull did not prove them
     // out), so the frame's caster count includes the procedural world and not only entities.
     std::uint32_t shadowCasterObjects = 0;
+    // ADR-1603: visible objects whose material refracts (drawn in the refraction phase when it runs).
+    std::uint32_t refractiveObjects = 0;
+    std::uint32_t refractiveDraws = 0;
     // Pipeline, bind-group and buffer binds this renderer recorded, over every pass. It tracks what
     // it has bound and skips the rest, so `redundantBindsAvoided` is what that tracking saved.
     StateChangeCounters state;
@@ -360,6 +363,16 @@ public:
                     const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     void drawDepthOnly(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
+    // ADR-1603: the refraction phase. While `setRefractionPhase(true)`, `draw` and `drawDepthOnly` leave out every
+    // object whose material refracts (shadows still cast), and `drawRefractive` -- after the refraction copy, with the
+    // frame group that binds it -- draws them with `fs_proc_refract`. Off (the default, and the ladder's Low and
+    // Emergency), a refractive object draws in the lit pass as its opaque material. `hasRefractive()`: whether any
+    // object updated this frame refracts and is visible.
+    void setRefractionPhase(bool on) { refractionPhase_ = on; }
+    [[nodiscard]] bool refractionPhase() const { return refractionPhase_; }
+    [[nodiscard]] bool hasRefractive() const;
+    void drawRefractive(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
+                        const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup);
     // ADR-1073: every object whose material asks for wire lines, its edge list drawn instanced over the
     // frame (blended, depth-tested unless `wire/occlude` is off, no depth write). Call inside the scene
     // pass after the opaque geometry and the sky.
@@ -444,7 +457,8 @@ public:
 private:
     void drawImpl(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                   const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
-                  bool depthOnly, bool shadowPass);
+                  bool depthOnly, bool shadowPass, bool refractPass = false);
+    bool refractionPhase_ = false;
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

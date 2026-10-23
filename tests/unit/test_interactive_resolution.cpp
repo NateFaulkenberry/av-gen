@@ -946,3 +946,36 @@ TEST_CASE("paced: a drop remembers the misses that decided it", "[unit][resoluti
     CHECK(g.recentMisses() == 0); // the new level's own window starts empty
     CHECK(g.gpuAtLastMove() > 0.0);
 }
+
+// ADR-1603: the refraction and water-SSR levers. Every table keeps both at Ultra, High and Medium, halves the water's SSR
+// and turns refraction off at Low, and turns both off at Emergency; ceilings and the priority ladder carry them.
+TEST_CASE("the ladders give up refraction at Low and the water's SSR by Emergency", "[unit][resolution][adr1603]") {
+    for (const auto strategy :
+         {LiveQualityStrategy::Balanced, LiveQualityStrategy::ResolutionFirst, LiveQualityStrategy::EffectsFirst}) {
+        const auto& ladder = app::liveQualityLadder(strategy);
+        for (std::size_t k = 0; k < 3; ++k) {
+            CHECK(ladder[k].refraction);
+            CHECK(ladder[k].waterSsrScale == 1.0f);
+        }
+        CHECK_FALSE(ladder[3].refraction);
+        CHECK(ladder[3].waterSsrScale == 0.5f);
+        CHECK_FALSE(ladder[4].refraction);
+        CHECK(ladder[4].waterSsrScale == 0.0f);
+    }
+    rendering::QualitySettings base;
+    const auto low = app::applyLiveRung(base, base, app::liveQualityLadder(LiveQualityStrategy::Balanced)[3], 0.38f);
+    CHECK_FALSE(low.refraction);
+    CHECK(low.waterSsrScale == 0.5f);
+    // A ceiling is never better than the base: a base with refraction off stays off at Ultra.
+    base.refraction = false;
+    CHECK_FALSE(app::applyLiveRung(base, base, app::liveQualityLadder(LiveQualityStrategy::Balanced)[0], 0.38f).refraction);
+    // As a project ceiling, by its JSON and by lever.
+    app::LiveQualityRung c{};
+    REQUIRE(app::applyLeverToCeiling(c, "norefraction"));
+    REQUIRE(app::applyLeverToCeiling(c, "waterssrhalf"));
+    std::string error;
+    const auto back = app::ceilingFromJsonText(app::ceilingJsonText(c), error);
+    REQUIRE(back.has_value());
+    CHECK_FALSE(back->refraction);
+    CHECK(back->waterSsrScale == 0.5f);
+}

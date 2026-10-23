@@ -376,3 +376,38 @@ TEST_CASE("The CPU path tracer says it traces thin film and anisotropy as the ba
     CHECK(find(clean, "thin-film material") == nullptr);
     CHECK(find(clean, "anisotropic material") == nullptr);
 }
+
+// ADR-1603: the refraction block -- read, written only when authored, its parameters, and its packing.
+TEST_CASE("The refraction block reads, round-trips and packs to zero when off", "[material][refraction][adr1603]") {
+    scene::Material m;
+    CHECK_FALSE(m.refraction.enabled());
+    REQUIRE(scene::readMaterialOptics(nlohmann::json::parse(
+                                          R"({"refraction": {"strength": 0.04, "opacity": 0.2, "thickness": 3,
+                                                             "absorption": [0.6, 0.2, 0.05]}})"),
+                                      m)
+                .has_value());
+    CHECK(m.refraction.enabled());
+    CHECK(m.refraction.opacity == 0.2f);
+    CHECK(m.refraction.absorption == glm::vec3(0.6f, 0.2f, 0.05f));
+    nlohmann::json written = nlohmann::json::object();
+    scene::writeMaterialOptics(m, written);
+    scene::Material back;
+    REQUIRE(scene::readMaterialOptics(written, back).has_value());
+    CHECK(scene::refractionToJson(back.refraction) == scene::refractionToJson(m.refraction));
+    // a scalar absorption is grey; unknown keys and bad types fail and say where
+    scene::Refraction grey;
+    REQUIRE(scene::readRefraction(nlohmann::json{{"absorption", 0.5}}, grey).has_value());
+    CHECK(grey.absorption == glm::vec3(0.5f));
+    CHECK_FALSE(scene::readRefraction(nlohmann::json{{"ior", 1.5}}, grey).has_value());
+    CHECK_FALSE(scene::readRefraction(nlohmann::json{{"absorption", "red"}}, grey).has_value());
+    // an unauthored block writes nothing: every existing scene saves the file it had
+    nlohmann::json none = nlohmann::json::object();
+    scene::writeMaterialOptics(scene::Material{}, none);
+    CHECK_FALSE(none.contains("refraction"));
+    // packing: off is exactly zero whatever the other fields say
+    scene::Material off = m;
+    off.refraction.strength = 0.0f;
+    CHECK(rendering::packRefraction(off).lane0 == glm::vec4(0.0f));
+    CHECK(rendering::packRefraction(off).lane1 == glm::vec4(0.0f));
+    CHECK(rendering::packRefraction(m).lane0 == glm::vec4(0.04f, 0.2f, 3.0f, 0.0f));
+}

@@ -227,6 +227,10 @@ struct ObjectUniforms {
     // not ask: x == 0 and z == 0 are the two gates, and shadeSurface takes the paths it always took.
     optics: vec4<f32>,         // x = film thickness (nm, 0 = off), y = film ior, z = anisotropy strength
                                // (0 = off), w = anisotropy rotation (radians)
+    // ADR-1603: screen-space refraction, read by procedural.wgsl's fs_proc_refract only. x = strength (0 = off),
+    // y = opacity, z = thickness (m); refraction1.rgb = absorption per metre.
+    refraction0: vec4<f32>,
+    refraction1: vec4<f32>,
 };
 
 // ADR-703 (FXL): one owner's folded effect state, 16 lanes. Mirrors world::EntityFxRecord; the

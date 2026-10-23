@@ -29,4 +29,20 @@ namespace avgen::rendering {
     return out;
 }
 
+// ADR-1603: the refraction lanes. A material with refraction off packs to exactly zero (the bytes of a material from
+// before ADR-1603), whatever its other fields say.
+struct PackedRefraction {
+    glm::vec4 lane0{0.0f}; // x = strength, y = opacity, z = thickness (m)
+    glm::vec4 lane1{0.0f}; // rgb = absorption per metre
+};
+[[nodiscard]] inline PackedRefraction packRefraction(const scene::Material& m) {
+    PackedRefraction out;
+    if (m.refraction.enabled()) {
+        out.lane0 = glm::vec4(std::min(m.refraction.strength, 0.5f), std::clamp(m.refraction.opacity, 0.0f, 1.0f),
+                              std::max(m.refraction.thickness, 0.0f), 0.0f);
+        out.lane1 = glm::vec4(glm::max(m.refraction.absorption, glm::vec3(0.0f)), 0.0f);
+    }
+    return out;
+}
+
 } // namespace avgen::rendering

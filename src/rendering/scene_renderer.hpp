@@ -473,8 +473,13 @@ struct ObjectUniforms {
     // every material that does not ask shades exactly as before.
     glm::vec4 optics{0.0f}; // x = film thickness (nm, 0 = off), y = film ior, z = anisotropy strength
                             // (-1..1, 0 = off), w = anisotropy rotation (radians)
+    // ADR-1603: screen-space refraction (rendering/optics_pack.hpp packRefraction). x == 0 is off, and only
+    // procedural draws read it: x = strength (UV per unit view-space normal), y = opacity, z = thickness (m);
+    // refraction1.rgb = absorption per metre.
+    glm::vec4 refraction0{0.0f};
+    glm::vec4 refraction1{0.0f};
 };
-static_assert(sizeof(ObjectUniforms) == 528);
+static_assert(sizeof(ObjectUniforms) == 560);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -1080,9 +1085,13 @@ private:
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;
-    // ADR-1286: the lit opaque frame as it stood before the water, for the cinematic water path.
-    wgpu::Texture waterSceneCopy_;
-    wgpu::TextureView waterSceneCopyView_;
+    // ADR-1286, ADR-1603: the refraction copy -- the lit opaque frame as it stood before the refraction phase (the
+    // cinematic water and the refractive procedural surfaces), one copy for both. Bound to the water's own group and,
+    // through `frameBindGroupRefract_`, to frame binding 18.
+    wgpu::Texture refractionCopy_;
+    wgpu::TextureView refractionCopyView_;
+    wgpu::Sampler refractionSampler_;      // frame binding 19: linear, clamped
+    wgpu::BindGroup frameBindGroupRefract_; // the frame group with the copy at 18 (the others bind a placeholder)
     AuxTarget normalRough_;
     AuxTarget velocity_;
     AuxTarget emission_;

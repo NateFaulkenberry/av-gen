@@ -97,6 +97,13 @@ constexpr LiveQualityRung astral(LiveQualityRung r, std::uint32_t tier) {
     r.astralTier = tier;
     return r;
 }
+// ADR-1603: the refraction phase goes at Low (its surfaces draw as their opaque materials, identity kept), and the
+// cinematic water's SSR halves at Low and goes at Emergency (the environment reflection stays).
+constexpr LiveQualityRung refraction(LiveQualityRung r, bool on, float waterSsr) {
+    r.refraction = on;
+    r.waterSsrScale = waterSsr;
+    return r;
+}
 constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, float particleMetres, float lod) {
     r.shadowCasterMinPixels = casterPixels;
     r.particleCullDistance = particleMetres;
@@ -108,28 +115,28 @@ constexpr LiveQualityLadder kResolutionFirst{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
     astral(volumes(rung(L::Medium, 0.71f), 0.25f), 2),
-    astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3),
-    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4), 4),
+    refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f),
+    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f),
 };
 
 constexpr LiveQualityLadder kBalanced{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
     astral(noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)), 2),
-    astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3),
-    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4), 4),
+    refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f),
+    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f),
 };
 
 constexpr LiveQualityLadder kEffectsFirst{
     rung(L::Ultra, 1.0f),
     cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2),
     astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)), 2),
-    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
-               80.0f, 1.5f), 4), 3),
-    astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4), 4),
+    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
+               80.0f, 1.5f), 4), 3), false, 0.5f),
+    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f),
 };
 
 // ADR-1099: the profiles, rows of the same family. QUALITY is the tier. BALANCED spends nothing on what is small or far
@@ -157,7 +164,8 @@ int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
            (a.shadowCasterMinPixels != b.shadowCasterMinPixels ? 1 : 0) +
            (a.postEffectQuality != b.postEffectQuality ? 1 : 0) +
            (a.particleCullDistance != b.particleCullDistance ? 1 : 0) +
-           (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0) + (a.astralTier != b.astralTier ? 1 : 0);
+           (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0) + (a.astralTier != b.astralTier ? 1 : 0) +
+           (a.refraction != b.refraction ? 1 : 0) + (a.waterSsrScale != b.waterSsrScale ? 1 : 0); // ADR-1603
 }
 } // namespace
 
@@ -189,6 +197,8 @@ void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::Quali
     q.particleSpawnScale = std::min(base.particleSpawnScale, rung.particleSpawnScale);
     q.sdfShadowScale = std::max(base.sdfShadowScale, rung.sdfShadowScale); // ADR-1165
     q.astralTier = std::max(base.astralTier, rung.astralTier);             // ADR-1222
+    q.refraction = base.refraction && rung.refraction;                      // ADR-1603
+    q.waterSsrScale = std::min(base.waterSsrScale, rung.waterSsrScale);
 }
 } // namespace
 
@@ -747,9 +757,11 @@ void giveUp(LiveQualityRung& r, std::string_view group, int depth) {
         r.volumeStepScale = full ? 0.5f : 1.0f;
     } else if (group == "post") {
         r.postEffectQuality = 0.5f;
+        r.waterSsrScale = full ? 0.0f : 0.5f; // ADR-1603: the screen-space effects go with the post group
         if (full) {
             r.motionBlur = false;
             r.depthOfField = false;
+            r.refraction = false;
         }
     } else if (group == "lod") {
         r.lodBias = full ? 2.0f : 1.5f;
@@ -816,6 +828,9 @@ bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
     else if (lever == "volumesteps") c.volumeStepScale = std::min(c.volumeStepScale, 0.5f);
     else if (lever == "volumepreview") { c.volumeResolutionScale = std::min(c.volumeResolutionScale, 0.25f); c.volumeStepScale = std::min(c.volumeStepScale, 0.5f); }
     else if (lever == "posttaps") c.postEffectQuality = std::min(c.postEffectQuality, 0.5f);
+    else if (lever == "norefraction") c.refraction = false;                                   // ADR-1603
+    else if (lever == "waterssrhalf") c.waterSsrScale = std::min(c.waterSsrScale, 0.5f);
+    else if (lever == "nowaterssr") c.waterSsrScale = 0.0f;
     else if (lever == "nomotionblur") c.motionBlur = false;
     else if (lever == "nodof") c.depthOfField = false;
     else if (lever == "castercull") c.shadowCasterMinPixels = std::max(c.shadowCasterMinPixels, 24.0f);
@@ -855,6 +870,8 @@ std::string ceilingJsonText(const LiveQualityRung& c) {
     if (c.particleSpawnScale != n.particleSpawnScale) j["particleSpawnScale"] = c.particleSpawnScale;
     if (c.sdfShadowScale != n.sdfShadowScale) j["sdfShadowScale"] = c.sdfShadowScale;
     if (c.astralTier != n.astralTier) j["astralTier"] = c.astralTier; // ADR-1222
+    if (c.refraction != n.refraction) j["refraction"] = c.refraction;   // ADR-1603
+    if (c.waterSsrScale != n.waterSsrScale) j["waterSsrScale"] = c.waterSsrScale;
     return j.dump();
 }
 
@@ -885,6 +902,8 @@ std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std:
         else if (key == "particleSpawnScale" && num) c.particleSpawnScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
         else if (key == "sdfShadowScale" && num) c.sdfShadowScale = std::clamp(v.get<std::uint32_t>(), 1u, 8u);
         else if (key == "astralTier" && num) c.astralTier = std::clamp(v.get<std::uint32_t>(), 0u, 4u); // ADR-1222
+        else if (key == "refraction" && flag) c.refraction = v.get<bool>();                             // ADR-1603
+        else if (key == "waterSsrScale" && num) c.waterSsrScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
         else {
             error = "'" + key + "' is not a quality ceiling (or has the wrong type)";
             return std::nullopt;

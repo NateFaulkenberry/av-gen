@@ -355,6 +355,12 @@ struct QualitySettings {
     // 2..4 = the live ladder's rungs, each simulating fewer particles (70%, 50%, 33%) with fewer god-ray taps, and no
     // shards from 3. A floor: higher is cheaper. The art direction never changes with it, only its sampling.
     std::uint32_t astralTier = 1;
+    // ADR-1603: the refraction phase (refractive procedural surfaces read the refraction copy). Off, they draw as their
+    // opaque material. The live ladder turns it off at Low and Emergency.
+    bool refraction = true;
+    // ADR-1603: the cinematic water's screen-space reflection (ADR-1286), as a fraction of its authored `ssrSteps` and
+    // `reflectionRays` (at least one each); 0 turns the SSR off (the environment reflection alone). 1 = as authored.
+    float waterSsrScale = 1.0f;
 
     // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
     // drift apart.
