@@ -11593,11 +11593,11 @@
        "attackMs": 0.0,
        "decayMs": 160.0
       },
-      "amount": 0.8,
-      "depthSource": "control.impact",
-      "depthMin": 1.0,
-      "depthMax": 2.0,
-      "depthDefault": 0.0
+      "amount": 1.0,
+      "depthSource": "response.onsetLow",
+      "depthMin": 0.0,
+      "depthMax": 1.2,
+      "depthDefault": 0.5
      }
     ]
    }
@@ -11669,22 +11669,23 @@
       "depthDefault": 0.0
      },
      {
-      "source": "response.onsetEnv",
+      "source": "response.onset",
       "chain": {
-       "clampEnabled": true,
-       "clampMin": 0.0,
-       "clampMax": 1.0,
-       "gain": 2.0,
-       "offset": -1.1,
        "attackMs": 4.0,
        "decayMs": 300.0
       },
-      "depthSource": "control.impact",
-      "depthMin": 1.0,
-      "depthMax": 2.0,
+      "amount": 0.8,
+      "depthSource": "response.onsetHigh",
+      "depthMin": -0.6,
+      "depthMax": 1.2,
       "depthDefault": 0.0
      }
-    ]
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
    }
   },
   {
