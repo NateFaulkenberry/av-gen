@@ -84,19 +84,24 @@
       0.85
      ],
      "crystalDeep": [
-      0.1,
-      0.04,
+      0.06,
+      0.03,
       0.22
      ],
      "crystalBody": [
-      0.34,
-      0.14,
-      0.4
+      0.95,
+      0.22,
+      0.62
      ],
      "crystalFracture": [
       0.72,
       1.0,
       0.94
+     ],
+     "crystalBlue": [
+      0.22,
+      0.45,
+      1.0
      ]
     }
    },
@@ -134,18 +139,23 @@
       0.88
      ],
      "crystalDeep": [
-      0.2,
-      0.03,
-      0.14
+      0.14,
+      0.02,
+      0.16
      ],
      "crystalBody": [
-      0.46,
-      0.12,
-      0.3
+      1.0,
+      0.25,
+      0.55
      ],
      "crystalFracture": [
       1.0,
       0.78,
+      0.95
+     ],
+     "crystalBlue": [
+      0.25,
+      0.75,
       0.95
      ]
     }
@@ -219,14 +229,12 @@
     "target": "material/au_crystal/op/22/oklabRamp/constant2"
    },
    {
-    "role": "aurora2Low",
-    "target": "material/au_crystal/op/22/oklabRamp/constant3",
-    "gain": 0.55
+    "role": "crystalDeep",
+    "target": "material/au_crystal/op/22/oklabRamp/constant3"
    },
    {
-    "role": "auroraMid",
-    "target": "material/au_crystal/op/22/oklabRamp/constant4",
-    "gain": 0.65
+    "role": "crystalBlue",
+    "target": "material/au_crystal/op/22/oklabRamp/constant4"
    },
    {
     "role": "crystalFracture",

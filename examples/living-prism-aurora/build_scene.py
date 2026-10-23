@@ -88,16 +88,16 @@ def c4(rgb, a=1.0):
 # effects, the crystals' environment, interior, edge and fracture colours, the aurora fill lights, the water's
 # reflection tints. One state change moves the whole world; the states are the looks.
 ROLES = ["auroraLow", "auroraMid", "auroraTop", "aurora2Low", "aurora2Mid", "aurora2Top", "crystalDeep", "crystalBody",
-         "crystalFracture"]
+         "crystalFracture", "crystalBlue"]
 LOOKS = [
     ("Green Veil", {"auroraLow": [0.10, 0.95, 0.55], "auroraMid": [0.12, 0.70, 0.75], "auroraTop": [0.55, 0.30, 0.95],
                     "aurora2Low": [0.95, 0.35, 0.75], "aurora2Mid": [0.65, 0.35, 0.95], "aurora2Top": [0.30, 0.25, 0.85],
-                    "crystalDeep": [0.10, 0.04, 0.22], "crystalBody": [0.34, 0.14, 0.40],
-                    "crystalFracture": [0.72, 1.0, 0.94]}),
+                    "crystalDeep": [0.06, 0.03, 0.22], "crystalBody": [0.95, 0.22, 0.62],
+                    "crystalFracture": [0.72, 1.0, 0.94], "crystalBlue": [0.22, 0.45, 1.0]}),
     ("Rose Veil", {"auroraLow": [0.98, 0.25, 0.62], "auroraMid": [0.85, 0.30, 0.90], "auroraTop": [0.42, 0.22, 0.95],
                    "aurora2Low": [0.20, 0.90, 0.70], "aurora2Mid": [0.22, 0.62, 0.92], "aurora2Top": [0.30, 0.28, 0.88],
-                   "crystalDeep": [0.20, 0.03, 0.14], "crystalBody": [0.46, 0.12, 0.30],
-                   "crystalFracture": [1.0, 0.78, 0.95]}),
+                   "crystalDeep": [0.14, 0.02, 0.16], "crystalBody": [1.0, 0.25, 0.55],
+                   "crystalFracture": [1.0, 0.78, 0.95], "crystalBlue": [0.25, 0.75, 0.95]}),
 ]
 LOOK = int(os.environ.get("AU_LOOK", "0"))
 R0 = dict(LOOKS[LOOK][1])
@@ -128,23 +128,25 @@ def crystal_program():
          k3=c4(R0["aurora2Low"]), k4=c4(R0["auroraTop"]))                     # r4: the environment colour
     p.op("remap", 5, a=2, k=[0, 1, 0.12, 1.0])
     p.op("multiply", 5, a=5, b=4)
-    p.op("constant", 6, label="envGain", k=[0.55, 0.55, 0.55, 1])
+    p.op("constant", 6, label="envGain", k=[0.35, 0.35, 0.35, 1])
     p.op("multiply", 5, a=5, b=6)                                             # r5: the emission so far
     p.op("input", 6, input="localPosition")
-    p.op("gradient", 6, a=6, k=[0, 1, 0, 0], f=0.02)                          # base to tip
+    p.op("gradient", 6, a=6, k=[0, 1, 0, 0], f=0.008)                         # base to tip (gentle: the clouds lead)
     p.op("remap", 7, a=2, k=[0, 1, 0, 0.4])
     p.op("add", 6, a=6, b=7)                                                  # the view shifts it: depth
     p.op("input", 7, input="localPosition")                                    # a cloudy, nebula-like interior
     p.op("noise", 7, a=7, f=0.07, seed=29)
-    p.op("remap", 7, a=7, k=[0, 1, -0.45, 0.45])
+    p.op("remap", 7, a=7, k=[0, 1, -0.2, 1.1])
     p.op("add", 6, a=6, b=7)
+    # 17 (offline): the reference's interior -- a dark navy stone with saturated pink and blue clouds through all of it
+    # (navy, pink, navy, blue: the noise bands them; no fade to a pale tip)
     p.op("oklabRamp", 6, a=6, label="interior", k=c4(R0["crystalDeep"]), k2=c4(R0["crystalBody"]),
-         k3=c4([c * 0.55 for c in R0["aurora2Low"]]), k4=c4([c * 0.65 for c in R0["auroraMid"]]))
+         k3=c4(R0["crystalDeep"]), k4=c4(R0["crystalBlue"]))
     p.op("remap", 7, a=2, k=[0, 1, 1, 0.25], f=1.0)                           # seen where the facet faces us
     p.op("multiply", 6, a=6, b=7)
     p.op("remap", 7, a=3, k=[0, 1, 0.4, 1.5])                                 # each facet its own brightness
     p.op("multiply", 6, a=6, b=7)
-    p.op("constant", 7, label="interiorGain", k=[0.85, 0.85, 0.85, 1])
+    p.op("constant", 7, label="interiorGain", k=[1.6, 1.6, 1.6, 1])
     p.op("multiply", 6, a=6, b=7)
     p.op("add", 5, a=5, b=6)
     p.op("input", 6, input="localPosition")                                    # fractures
@@ -170,10 +172,13 @@ def crystal_program():
 
 
 XTAL_P = crystal_program()
-# the heroes refract (spec 5.3): the two largest formations; Phase 3 A/B decides (AU_REFRACT=0 builds without)
+# the heroes refract (spec 5.3). 17 (offline): every hero formation, stronger distortion, deep coloured absorption (green
+# goes first: the stone transmits violet-pink, as the reference's does), less of the surface over the transmission.
+# AU_REFRACT=0 builds without. Distant formations stay opaque: a refractive crystal behind another refractive one is
+# missing from the single-layer copy (17: an engine change).
 REFRACTION = os.environ.get("AU_REFRACT", "1") == "1"
-REFRACT_HEROES = {"L1": {"strength": 0.05, "opacity": 0.35, "thickness": 1.5, "absorption": [0.35, 0.45, 0.25]},
-                  "R1": {"strength": 0.05, "opacity": 0.35, "thickness": 1.5, "absorption": [0.35, 0.45, 0.25]}}
+_RF = {"strength": 0.12, "opacity": 0.3, "thickness": 4.0, "absorption": [0.15, 0.6, 0.05]}
+REFRACT_HEROES = {n: dict(_RF) for n in ("L1", "L1b", "L2", "L3", "R1", "R2", "R3", "R4")}
 
 
 def xmat(name):
@@ -204,8 +209,8 @@ def palette_json():
          {"role": "auroraTop", "target": P.path("env", "constant4")},
          {"role": "crystalDeep", "target": P.path("interior", "constant")},
          {"role": "crystalBody", "target": P.path("interior", "constant2")},
-         {"role": "aurora2Low", "target": P.path("interior", "constant3"), "gain": 0.55},
-         {"role": "auroraMid", "target": P.path("interior", "constant4"), "gain": 0.65},
+         {"role": "crystalDeep", "target": P.path("interior", "constant3")},
+         {"role": "crystalBlue", "target": P.path("interior", "constant4")},
          {"role": "crystalFracture", "target": P.path("fracture"), "gain": 1.1}]
     for f in L.FORMATIONS:   # the facet edges: bright ones in the low aurora colour, dim ones in the mid
         b.append({"role": "auroraLow", "target": "procedural/edgeA_%s/material/emissiveColor" % f[0]})
