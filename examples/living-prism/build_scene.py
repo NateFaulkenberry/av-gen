@@ -25,6 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import layout as L  # noqa: E402
 import palette as PAL  # noqa: E402
+import music  # noqa: E402
 
 LOOKS = PAL.looks_linear()
 UV = dict(LOOKS[0][1])  # the home look (Ultraviolet) is the rest state
@@ -96,6 +97,10 @@ def rock_program():
     p.op("multiply", 6, a=5, b=6)
     p.op("constant", 5, label="seamGain", k=[0.45, 0.45, 0.45, 1])
     p.op("multiply", 6, a=6, b=5)
+    p.op("field", 5, field="front")                                     # the travelling front of light (Stage 4)
+    p.op("constant", 4, label="frontColor", k=c4([v * 2.6 for v in UV["fill"]]))
+    p.op("multiply", 5, a=5, b=4)
+    p.op("add", 6, a=6, b=5)
     return p, p.json(3, emission=6, roughness=7)
 
 
@@ -112,7 +117,10 @@ def floor_program():
     p.op("remap", 5, a=4, k=[0, 1, 1, 0.45], f=1.0)
     p.op("multiply", 3, a=3, b=5)
     p.op("remap", 6, a=4, k=[0, 1, 0.82, 0.12], f=1.0)
-    return p, p.json(3, roughness=6)
+    p.op("field", 5, field="front")
+    p.op("constant", 4, label="frontColor", k=c4([v * 1.2 for v in UV["fill"]]))
+    p.op("multiply", 5, a=5, b=4)
+    return p, p.json(3, emission=5, roughness=6)
 
 
 def crystal_program(name, hero):
@@ -153,6 +161,11 @@ def crystal_program(name, hero):
         p.op("multiply", 2, a=2, b=6)
         p.op("remap", 2, a=2, k=[0, 1, 0, 0.6])
         p.op("add", 1, a=1, b=2)
+    p.op("field", 2, field="front")                                      # the front lights each crystal it
+    p.op("multiply", 2, a=2, b=0)                                        # crosses, in its own colour
+    p.op("constant", 5, label="frontGain", k=[3.2, 3.2, 3.2, 1])
+    p.op("multiply", 2, a=2, b=5)
+    p.op("add", 1, a=1, b=2)
     p.op("remap", 3, a=3, k=[0, 1, 0.03, 0.18])                         # roughness per facet: crisp highlights
     return p, p.json(7, emission=1, roughness=3)
 
@@ -294,8 +307,22 @@ def scene_json():
         "environment": env,
         "lights": lights,
         "materialPrograms": PROGRAMS,
-        "nodes": nodes,
+        "nodes": nodes + [front_field()],
     }
+
+
+def front_field():
+    """The kick's front: a thin spherical shell of light leaving the spire's base; its radius and strength are
+    routed from signal.front (music.py), so it is a function of the music, not of a clock."""
+    h = next(h for h in L.HEROES if h["name"] == "spire")
+    r = L.hero_placement(h)
+    c = [r[0], r[1] + 0.6, r[2]]
+    # a field node (its parameters register as field/front/..., which the routes write)
+    return {"name": "front", "kind": "field", "position": [0.0, 0.0, 0.0], "field": {
+        "kind": "wave", "enabled": True, "space": "world", "position": c, "point": c,
+        "strength": 1.0, "waveGeometry": "spherical", "waveShape": "pulse", "amplitude": 0.0,
+        "wavelength": 2.2, "waveSpeed": 0.0, "waveWidth": 0.0, "waveOrigin": 13.0,
+        "falloff": {"kind": "smoothstep", "inner": 3.0, "outer": 15.0}}}
 
 
 def crystal_nodes():
@@ -310,6 +337,8 @@ def crystal_nodes():
 def palette_json():
     b = [{"role": "shadow", "target": ROCK_P.path("shadow")}, {"role": "rockLit", "target": ROCK_P.path("rockLit")},
          {"role": "seam", "target": ROCK_P.path("seam")},
+         {"role": "fill", "target": ROCK_P.path("frontColor"), "gain": 2.6},
+         {"role": "fill", "target": FLOOR_P.path("frontColor"), "gain": 1.2},
          {"role": "shadow", "target": FLOOR_P.path("shadow"), "gain": 0.8},
          {"role": "rockLit", "target": FLOOR_P.path("rockLit"), "gain": 0.55},
          {"role": "key", "target": "lights/shaft/color"}, {"role": "deep", "target": "lights/passage/color"},
@@ -325,7 +354,15 @@ def palette_json():
         b.append({"role": XNODE[key][0], "target": "procedural/%s/material/emissiveColor" % node})
     states = [{"name": name, "colors": {r: roles[r] for r in PAL.ROLES}} for name, roles in LOOKS]
     # no automatic advance: a look changes on a performer's CC 9 (and, from Stage 4, on a musical reason)
-    return {"states": states, "bindings": b, "selector": {"select": 0, "transition": 6.0, "lock": False, "hold": 60.0}}
+    # A look changes only for a musical reason: on a phrase boundary where the music's character has moved (the
+    # selector's change detector over energy, brightness and density), never more often than every 45 s; CC 10
+    # locks the performer's choice. Order: from the home look toward the warm and back through the cool.
+    sel = {"select": 0, "transition": 6.0, "lock": False, "hold": 45.0,
+           "advance": {"signal": "beat.phrasePulse", "threshold": 0.5, "order": [0, 4, 1, 3, 2, 5],
+                       "change": {"signals": ["sonic.energy", "sonic.brightness", "sonic.density"], "fast": 3.0,
+                                  "slow": 24.0, "threshold": 0.07, "rearm": 0.03, "primaryTimeout": 40.0,
+                                  "maxHold": 150.0}}}
+    return {"states": states, "bindings": b, "selector": sel}
 
 
 def project_json(scene_rel):
@@ -338,6 +375,9 @@ def project_json(scene_rel):
                                                                       "keys": keys}})
         routes.append({"source": "timeline." + key, "target": "camera/position" if idx == 1 else "camera/target",
                        "amount": 1.0, "op": "replace", "polarity": "unipolar", "component": comp})
+    sources += music.signals()
+    small = sorted({v + "_xtal" for v, *_ in L.CLUSTERS})
+    routes += music.routes(ROCK_P, FLOOR_P, HERO_P, XTAL_P, {"secondary_small": small})
     n = len(LOOKS)
     routes += [{"source": "control.palette", "target": "palette/select", "amount": float(n - 1), "op": "add",
                 "polarity": "unipolar", "chain": {"attackMs": 150, "decayMs": 150}},
@@ -359,6 +399,8 @@ def project_json(scene_rel):
         "routes": routes,
         "palette": palette_json(),
         "control": {"midi": {"enabled": True, "filter": "*", "bindings": [
+            {"source": "*", "channel": -1, "kind": "cc", "number": 1, "signal": "impact"},
+            {"source": "*", "channel": -1, "kind": "cc", "number": 2, "signal": "world"},
             {"source": "*", "channel": -1, "kind": "cc", "number": 9, "signal": "palette"},
             {"source": "*", "channel": -1, "kind": "cc", "number": 10, "signal": "paletteLock"}]}},
         "render": {"width": 1920, "height": 1080, "fps": 30},
@@ -386,6 +428,18 @@ def main():
     rel = os.path.relpath(path, os.path.dirname(os.path.abspath(a.project)))
     with open(a.project, "w") as f:
         json.dump(project_json(rel), f, indent=1)
+        f.write("\n")
+    # the offline companion: the same world playing Feline Footwear's mix, analysed from its three stems (they are
+    # analysed, never played: ADR-1520). Gitignored assets; the project names them relative to the repository.
+    off = project_json(rel)
+    off["app"]["name"] = "The Living Prism (offline, Feline Footwear)"
+    off["sonic"] = {"live": False}
+    root = os.path.relpath(os.path.join(HERE, "..", ".."), os.path.dirname(os.path.abspath(a.project)))
+    off["assets"]["audio"] = {"path": os.path.join(root, "assets/audio/feline-footwear.wav")}
+    off["assets"]["stems"] = [{"key": k, "label": k.title(), "file": os.path.join(
+        root, "assets/audio/stems/feline-footwear (%s).wav" % k.title())} for k in ("drums", "bass", "synth")]
+    with open(os.path.join(os.path.dirname(os.path.abspath(a.project)), "living-prism-offline.json"), "w") as f:
+        json.dump(off, f, indent=1)
         f.write("\n")
     print("wrote %s (%d nodes, %d meshes, %d programs, %d ops max) and %s" % (
         path, len(sc["nodes"]), len(used), len(PROGRAMS), max(len(p["ops"]) for p in PROGRAMS), a.project))
