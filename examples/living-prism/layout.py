@@ -27,8 +27,8 @@ PASSAGE = [((1.0, 2.0, -12.5), 4.0), ((-1.5, 2.6, -19.0), 3.4), ((-6.5, 3.2, -24
 # The floor and the pool: a terrain node. Flat base, mounds for relief, one river feature (two points: an elongated
 # pool) whose water surface is y = 0.
 FLOOR_BASE = 0.5
-POOL = {"name": "pool", "kind": "river", "path": [(-3.8, 0.0, -1.2), (3.6, 0.0, -2.6)],
-        "width": 5.5, "amplitude": 1.4, "falloff": 0.6}
+POOL = {"name": "pool", "kind": "river", "path": [(-3.0, 0.0, -2.2), (3.0, 0.0, -3.2)],
+        "width": 4.4, "amplitude": 1.4, "falloff": 0.6}
 MOUNDS = [  # (name, (x, z), amplitude, width, falloff)
     ("shelf", (0.5, -8.6), 0.7, 4.0, 1.0),      # the primary formation's shelf behind the pool
     ("leftbank", (-9.0, -1.0), 0.6, 4.5, 1.0),
@@ -176,14 +176,14 @@ CAMERA_FOV = 52.0          # vertical degrees: no wide-angle distortion
 CAMERA_LOOP = 48 * 4 * 60.0 / 121.0   # 48 bars of the test track (95.21 s); live, it simply loops
 CAMERA_STATIONS = [
     # (position, target, note)
-    ((0.4, 1.5, 6.8), (0.3, 3.2, -7.5), "master: pool, arch and the spire through it"),
-    ((-4.6, 2.6, 6.0), (3.0, 2.0, -3.0), "front left, rising: across the pool to the geode and the arch"),
+    ((0.4, 1.4, 5.0), (0.3, 3.0, -7.5), "master: pool, arch and the spire through it"),
+    ((-4.4, 2.5, 5.0), (3.0, 2.0, -3.0), "front left, rising: across the pool to the geode and the arch"),
     ((-5.6, 1.9, 3.6), (5.5, 1.6, -1.0), "left bank: the fan's blades pass in the foreground, the geode across"),
     ((-4.4, 1.2, -2.2), (1.6, 3.4, -8.0), "low by the arch's left leg: the spire three-quarter"),
     ((1.4, 1.1, 4.4), (3.4, 4.4, -2.0), "low at the near shore: up at the chandelier, the geode below it, both in the water"),
     ((5.8, 2.2, 4.2), (-4.2, 2.4, -5.0), "right bank: the fan and the chandelier across the water"),
-    ((4.6, 4.0, 6.6), (-0.8, 0.3, -3.6), "high right: down onto the pool's reflections"),
-    ((2.0, 2.2, 7.8), (0.0, 3.0, -6.2), "returning to the master"),
+    ((4.6, 3.4, 6.6), (-0.8, 1.0, -4.2), "high right: down onto the pool's reflections"),
+    ((2.0, 2.1, 6.4), (0.0, 2.9, -6.2), "returning to the master"),
 ]
 
 

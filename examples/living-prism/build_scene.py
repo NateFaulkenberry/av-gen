@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""The Living Prism: write the scene and the live project from layout.py and the generated meshes.
+"""The Living Prism: write the scene and the live project from layout.py, palette.py and the generated meshes.
 
     python3 examples/living-prism/build_scene.py --assets build/living-prism/assets
         [--scene-dir examples/living-prism/scene] [--project examples/living-prism/living-prism.json]
 
-Stage 2 (the blockout): simple materials, the pool on the cinematic water (ADR-1286), blockout lights, the camera
-route baked into six looping timelines (seek equals play; the loop's seam is C1). No audio routes yet.
-The scene and its meshes (scene/) are generated and gitignored; the project is committed and is a pure function of
-the scripts.
+Stage 3: the materials (four programs), the lighting and the palette looks.
+  - lp_rock    dark faceted rock: tone noise + a per-facet value, luminous voronoi seams in some regions only
+  - lp_floor   the floor: the rock's tones, a wet dark glossy band at the waterline
+  - lp_hero    the translucent-candidate heroes (spire, fan, ember): a dark body per facet, an emissive core
+               strongest low and facing the viewer, a pale fresnel rim, bright terminations, selected bright facets
+  - lp_xtal    dense crystal (druses, crust, chandelier, geode lining, arch crust, shards, the geode's rim band)
+Each crystal node's own emissiveColor is a palette role (the program reads it as `materialEmission`), so one program
+serves every formation and the palette recolours them all; the rock's tones and seam colour are program constants
+the palette writes. The scene and its meshes (scene/) are generated and gitignored; the project is committed and is
+a pure function of the scripts.
 """
 import argparse
 import json
@@ -18,66 +24,185 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import layout as L  # noqa: E402
+import palette as PAL  # noqa: E402
 
-# ---------------------------------------------------------------------------------------------------------------
-# Blockout materials (linear RGB). Stage 3 replaces these with material programs bound to the palette roles
-# (docs/prototypes/living-prism/05-stage1-plan.md section 4); the colours here are the Ultraviolet look's.
-ROCK = {"baseColor": [0.018, 0.016, 0.03], "roughness": 0.82, "metallic": 0.0}
-FLOOR = {"baseColor": [0.014, 0.012, 0.024], "roughness": 0.7, "metallic": 0.0}
-XTAL = {  # body colour, emissive colour, emissive strength
-    "spire": ([0.10, 0.02, 0.22], [0.45, 0.08, 1.0], 1.1),
-    "fan": ([0.02, 0.04, 0.2], [0.08, 0.25, 1.0], 0.8),
-    "geode": ([0.2, 0.01, 0.09], [1.0, 0.08, 0.45], 1.0),
-    "chandelier": ([0.10, 0.04, 0.22], [0.45, 0.25, 1.0], 0.7),
-    "ember": ([0.25, 0.06, 0.01], [1.0, 0.32, 0.04], 0.9),
-    "arch": ([0.12, 0.03, 0.22], [0.65, 0.15, 1.0], 0.7),
-    "druse": ([0.12, 0.03, 0.2], [0.55, 0.15, 1.0], 0.5),
-    "shard": ([0.08, 0.08, 0.25], [0.35, 0.4, 1.0], 0.45),
-}
+LOOKS = PAL.looks_linear()
+UV = dict(LOOKS[0][1])  # the home look (Ultraviolet) is the rest state
 
-# Blockout material programs: dark hued rock with broad tonal variation (no flat CG grey), and the floor. Without a
-# program the terrain draws its biome colours (green), which a grotto has no use for.
-def rock_program(name, dark, light, scale):
-    return {"name": name, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1,
-            "emissionIntensity": 1.0, "opacity": -1, "ops": [
-                {"kind": "input", "dst": 0, "input": "worldPosition"},
-                {"kind": "noise", "dst": 1, "srcA": 0, "value": scale, "seed": 3},
-                {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.3, 0.75, 0, 0]},
-                {"kind": "constant", "dst": 2, "constant": dark + [1.0]},
-                {"kind": "constant", "dst": 4, "constant": light + [1.0]},
-                {"kind": "mixBy", "dst": 3, "srcA": 2, "srcB": 4, "srcC": 1}]}
+# Screen-space refraction (ADR-1603, P1-4, eng/living-prism-p1): authored here, written only when the engine reads it.
+# Strength 0 = off; at Low and Emergency the ladder draws these heroes as the opaque material below.
+REFRACTION = os.environ.get("LP_REFRACTION", "0") == "1"
+REFRACT = {"spire": {"strength": 0.035, "opacity": 0.35, "thickness": 1.2, "absorption": [1.2, 2.2, 0.4]},
+           "fan": {"strength": 0.03, "opacity": 0.3, "thickness": 0.6, "absorption": [2.0, 1.2, 0.3]}}
 
 
-PROGRAMS = [rock_program("lp_rock", [0.010, 0.008, 0.018], [0.032, 0.024, 0.05], 0.45),
-            rock_program("lp_floor", [0.008, 0.007, 0.014], [0.022, 0.017, 0.034], 0.6)]
-ROCK = dict(ROCK, program="lp_rock")
-FLOOR = dict(FLOOR, program="lp_floor")
+class Prog:
+    """A material program with labelled ops, so palette bindings and routes name ops, not indices."""
+
+    def __init__(self, name, intensity=1.0):
+        self.name, self.ops, self.labels, self.out = name, [], {}, {}
+        self.intensity = intensity
+
+    def op(self, kind, dst, label=None, **kw):
+        o = {"kind": kind, "dst": dst}
+        for k, v in kw.items():
+            o[{"a": "srcA", "b": "srcB", "c": "srcC", "f": "value", "k": "constant", "k2": "constant2"}.get(k, k)] = v
+        if label:
+            self.labels[label] = len(self.ops)
+        self.ops.append(o)
+        return len(self.ops) - 1
+
+    def path(self, label, field="constant"):
+        i = self.labels[label]   # op paths are 1-based (material_params.cpp opPath, ADR-232)
+        return "material/%s/op/%d/%s/%s" % (self.name, i + 1, self.ops[i]["kind"], field)
+
+    def json(self, base, emission=-1, roughness=-1):
+        return {"name": self.name, "baseColor": base, "metallic": -1, "roughness": roughness, "emission": emission,
+                "emissionIntensity": self.intensity, "opacity": -1, "ops": self.ops}
+
+
+def c4(rgb, a=1.0):
+    return [round(v, 4) for v in rgb] + [a]
+
+
+def rock_program():
+    p = Prog("lp_rock")
+    p.op("input", 0, input="worldPosition")
+    p.op("noise", 1, a=0, f=0.45, seed=3)
+    p.op("smoothstep", 1, a=1, k=[0.3, 0.75, 0, 0])
+    p.op("input", 2, input="normal")
+    p.op("quantize", 2, a=2, f=3.0, k=[0.37, 0.21, 0.53, 0], seed=7)   # .w: a uniform random per facet
+    p.op("swizzle", 2, a=2, k=[3, 3, 3, 3])
+    p.op("remap", 7, a=2, k=[0, 1, 0.55, 0.92], f=1.0)                  # roughness per facet: some facets glint
+    p.op("remap", 2, a=2, k=[0, 1, 0, 0.6])
+    p.op("add", 1, a=1, b=2)
+    p.op("remap", 1, a=1, k=[0, 1.6, 0, 1], f=1.0)
+    p.op("constant", 3, label="shadow", k=c4(UV["shadow"]))
+    p.op("constant", 4, label="rockLit", k=c4(UV["rockLit"]))
+    p.op("mixBy", 3, a=3, b=4, c=1)
+    # seams: straight mineral cracks (voronoi cell edges, F2 - F1 near 0), thin, and only inside sparse regions (about
+    # a tenth of the rock): light gathers in a few cracks instead of netting every surface
+    p.op("voronoiEdge", 5, a=0, f=0.42, seed=11)
+    p.op("swizzle", 5, a=5, k=[0, 0, 0, 0])   # voronoiEdge is (F2-F1, F1, cell, F2): keep the edge distance only
+    p.op("smoothstep", 5, a=5, k=[0.0, 0.022, 0, 0])
+    p.op("remap", 5, a=5, k=[0, 1, 1, 0], f=1.0)
+    p.op("noise", 6, a=0, f=0.7, seed=31)                        # break the net into crack segments
+    p.op("smoothstep", 6, a=6, k=[0.47, 0.6, 0, 0])
+    p.op("multiply", 5, a=5, b=6)
+    p.op("noise", 6, a=0, f=0.08, seed=21)
+    p.op("smoothstep", 6, a=6, k=[0.66, 0.72, 0, 0], label="seamMask")
+    p.op("multiply", 5, a=5, b=6)
+    p.op("constant", 6, label="seam", k=c4(UV["seam"]))
+    p.op("multiply", 6, a=5, b=6)
+    p.op("constant", 5, label="seamGain", k=[0.45, 0.45, 0.45, 1])
+    p.op("multiply", 6, a=6, b=5)
+    return p, p.json(3, emission=6, roughness=7)
+
+
+def floor_program():
+    p = Prog("lp_floor")
+    p.op("input", 0, input="worldPosition")
+    p.op("noise", 1, a=0, f=0.6, seed=4)
+    p.op("smoothstep", 1, a=1, k=[0.3, 0.75, 0, 0])
+    p.op("constant", 2, label="shadow", k=c4([v * 0.8 for v in UV["shadow"]]))
+    p.op("constant", 3, label="rockLit", k=c4([v * 0.55 for v in UV["rockLit"]]))
+    p.op("mixBy", 3, a=2, b=3, c=1)
+    # the waterline: wet (darker, glossy) below 0.45 m, so the shore picks up the crystals' light
+    p.op("gradient", 4, a=0, k=[0, 1, 0, 1.4], f=-3.0)
+    p.op("remap", 5, a=4, k=[0, 1, 1, 0.45], f=1.0)
+    p.op("multiply", 3, a=3, b=5)
+    p.op("remap", 6, a=4, k=[0, 1, 0.82, 0.12], f=1.0)
+    return p, p.json(3, roughness=6)
+
+
+def crystal_program(name, hero):
+    """The crystal look on an opaque surface. r0 = the node's role colour (materialEmission)."""
+    p = Prog(name)
+    p.op("input", 0, input="materialEmission")
+    p.op("input", 1, input="normal")
+    p.op("quantize", 3, a=1, f=3.0, k=[0.31, 0.47, 0.23, 0], seed=5)
+    p.op("swizzle", 3, a=3, k=[3, 3, 3, 3])                              # r3: the facet's random
+    p.op("input", 2, input="viewDirection")
+    p.op("fresnel", 5, a=1, b=2, f=2.5)                                  # r5: rim
+    p.op("constant", 6, k=[1, 1, 1, 1])
+    p.op("mix", 6, a=0, b=6, f=0.3, label="tipMix")                     # r6: tip colour, C toward white
+    p.op("remap", 7, a=0, k=[0, 1, 0, 0.06 if hero else 0.08])           # r7: a dark, saturated body
+    p.op("remap", 2, a=3, k=[0, 1, 0.35, 1.65])
+    p.op("multiply", 7, a=7, b=2)
+    p.op("remap", 1, a=5, k=[0, 1, 1, 0.1], f=1.0)                       # r1: facing the viewer
+    if hero:
+        p.op("input", 4, input="localPosition")
+        p.op("gradient", 4, a=4, k=[0, 1, 0, 0], f=0.19)                 # r4: base 0 -> tip 1 (~5 m)
+        p.op("remap", 2, a=4, k=[0, 1, 1.35, 0.3], f=1.0)                # the core sits low
+        p.op("multiply", 1, a=1, b=2)
+    p.op("power", 2, a=3, f=2.0)                                         # facets differ strongly: some dark,
+    p.op("remap", 2, a=2, k=[0, 1, 0.12, 1.5])                           # some lit from inside
+    p.op("multiply", 1, a=1, b=2)
+    p.op("multiply", 1, a=1, b=0, label="core")                          # core emission = C x weight
+    p.op("smoothstep", 2, a=5, k=[0.5, 1.0, 0, 0])
+    p.op("multiply", 2, a=2, b=6)
+    p.op("remap", 2, a=2, k=[0, 1, 0, 0.55])
+    p.op("add", 1, a=1, b=2, label="rim")
+    p.op("smoothstep", 2, a=3, k=[0.86, 0.92, 0, 0], label="sparkle")    # ~8% of facets are bright mirrors
+    p.op("multiply", 2, a=2, b=6)
+    p.op("constant", 5, label="sparkleGain", k=[1.6, 1.6, 1.6, 1])
+    p.op("multiply", 2, a=2, b=5)
+    p.op("add", 1, a=1, b=2)
+    if hero:
+        p.op("smoothstep", 2, a=4, k=[0.78, 1.0, 0, 0])                  # luminous terminations
+        p.op("multiply", 2, a=2, b=6)
+        p.op("remap", 2, a=2, k=[0, 1, 0, 0.6])
+        p.op("add", 1, a=1, b=2)
+    p.op("remap", 3, a=3, k=[0, 1, 0.03, 0.18])                         # roughness per facet: crisp highlights
+    return p, p.json(7, emission=1, roughness=3)
+
+
+ROCK_P, ROCK_J = rock_program()
+FLOOR_P, FLOOR_J = floor_program()
+HERO_P, HERO_J = crystal_program("lp_hero", True)
+XTAL_P, XTAL_J = crystal_program("lp_xtal", False)
+PROGRAMS = [ROCK_J, FLOOR_J, HERO_J, XTAL_J]
+ROCK = {"baseColor": [0.02, 0.016, 0.03], "roughness": 0.8, "metallic": 0.0, "program": "lp_rock"}
+FLOOR = {"baseColor": [0.014, 0.012, 0.024], "roughness": 0.7, "metallic": 0.0, "program": "lp_floor"}
+
+# crystal nodes: (palette role, emissive strength, program); strengths set the hierarchy (heroes > crust)
+XNODE = {"spire": ("primary", 1.7, "lp_hero"), "fan": ("secondary", 1.3, "lp_hero"), "ember": ("accent", 0.75, "lp_hero"),
+         "geode": ("tertiary", 1.9, "lp_xtal"), "geodecap": ("tertiary", 1.2, "lp_xtal"),
+         "chandelier": ("secondary", 1.5, "lp_xtal"), "arch": ("primary", 1.3, "lp_xtal"),
+         "druse": ("secondary", 0.8, "lp_xtal"), "crust": ("core", 0.45, "lp_xtal"), "shard": ("core", 0.6, "lp_xtal"),
+         "geoderim": ("tertiary", 0.1, "lp_xtal")}
 
 WATER = {  # ADR-1286's cinematic path: a dark absorbing mirror; SSR reflects the lit grotto
     "shallowColor": [0.004, 0.004, 0.014], "deepColor": [0.002, 0.002, 0.008], "shallow": 1.0,
-    "clarity": 1.2, "edgeFade": 0.15, "maxOpacity": 0.97, "fresnel": 0.14, "reflection": 1.0,
-    "reflectionTint": [0.06, 0.04, 0.16], "specular": 1.2, "roughness": 0.03,
-    "ripple": 0.035, "rippleScale": 0.9, "rippleSpeed": 0.4, "chop": 0.2, "foam": 0.0, "refraction": 0.1,
+    "clarity": 1.2, "edgeFade": 0.15, "maxOpacity": 0.97, "fresnel": 0.16, "reflection": 1.0,
+    "reflectionTint": [0.06, 0.04, 0.16], "specular": 1.4, "roughness": 0.025,
+    "ripple": 0.02, "rippleScale": 0.8, "rippleSpeed": 0.35, "chop": 0.15, "foam": 0.0, "refraction": 0.08,
     "glow": 0.0, "sparkle": 0.0,
-    "ssr": 1.0, "ssrDistance": 30.0, "ssrSteps": 64.0, "ssrGain": 1.4, "streak": 0.06, "reflectionRays": 2.0,
-    "transmission": 1.0, "absorption": [2.2, 1.8, 1.0], "undulation": 0.04, "undulationScale": 0.2,
-    "roughnessVariation": 0.3, "tintPatches": 0.0, "glints": 0.0,
+    "ssr": 1.0, "ssrDistance": 30.0, "ssrSteps": 64.0, "ssrGain": 1.5, "streak": 0.04, "reflectionRays": 2.0,
+    "transmission": 1.0, "absorption": [2.2, 1.8, 1.0], "undulation": 0.02, "undulationScale": 0.2,
+    "roughnessVariation": 0.25, "tintPatches": 0.0, "glints": 0.0,
 }
+# the haze: it carries the shaft and the passage's depth; Stage 3's A/B decides its cost (06/08)
+HAZE = os.environ.get("LP_HAZE", "1") == "1"
 
 
-def mesh_node(name, asset, points, material, shadow=True, lod=None):
+def mesh_node(name, asset, points, material, shadow=True):
     pr = {"source": {"kind": "mesh", "asset": asset}, "distribution": {"kind": "points", "points": points},
           "material": dict(material)}
     if not shadow:
         pr["castsShadow"] = False
-    if lod:
-        pr["lod"] = lod
     return {"name": name, "kind": "procedural", "procedural": pr}
 
 
-def xtal_mat(key):
-    base, emis, k = XTAL[key]
-    return {"baseColor": base, "emissiveColor": emis, "emissiveIntensity": k, "roughness": 0.12, "metallic": 0.0}
+def xmat(key, hero_name=None):
+    role, k, prog = XNODE[key]
+    m = {"baseColor": [0.05, 0.02, 0.08], "emissiveColor": UV[role], "emissiveIntensity": k, "roughness": 0.1,
+         "metallic": 0.0, "program": prog}
+    if prog == "lp_hero":
+        m["thinFilm"] = {"thickness": 420.0, "ior": 1.45}   # a faint interference sheen on the facets
+    if REFRACTION and hero_name in REFRACT:
+        m["refraction"] = dict(REFRACT[hero_name])
+    return m
 
 
 def scene_json():
@@ -87,25 +212,30 @@ def scene_json():
                           "water": WATER},
               "material": dict(FLOOR)}]
     nodes.append(mesh_node("shell", "shell.glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]], ROCK, shadow=False))
+    nodes.append(mesh_node("crust_xtal", "crust_xtal.glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]], xmat("crust"),
+                           shadow=False))
     for h in L.HEROES:
         rec = L.hero_placement(h)
-        nodes.append(mesh_node(h["name"] + "_xtal", h["name"] + "_xtal.glb", [rec], xtal_mat(h["name"])))
+        nodes.append(mesh_node(h["name"] + "_xtal", h["name"] + "_xtal.glb", [rec], xmat(h["name"], h["name"])))
         nodes.append(mesh_node(h["name"] + "_rock", h["name"] + "_rock.glb", [rec], ROCK))
+        if h["name"] == "geode":
+            nodes.append(mesh_node("geode_rim", "geode_rim.glb", [rec], xmat("geoderim")))
+            nodes.append(mesh_node("geodecap_xtal", "geodecap_xtal.glb", [rec], xmat("geodecap")))
     a = L.ARCH
     rec = L.placement(*a["pos"], a["yaw"], a["scale"], a["sink"])
     nodes.append(mesh_node("arch_rock", "arch_rock.glb", [rec], ROCK))
-    nodes.append(mesh_node("arch_xtal", "arch_xtal.glb", [rec], xtal_mat("arch")))
+    nodes.append(mesh_node("arch_xtal", "arch_xtal.glb", [rec], xmat("arch")))
     groups = {}
     for v, x, z, yaw, s in L.CLUSTERS:
         groups.setdefault(v, []).append(L.placement(x, z, yaw, s, 0.12 * s))
     for v, pts in sorted(groups.items()):
-        nodes.append(mesh_node(v + "_xtal", v + "_xtal.glb", pts, xtal_mat("druse")))
+        nodes.append(mesh_node(v + "_xtal", v + "_xtal.glb", pts, xmat("druse")))
         nodes.append(mesh_node(v + "_rock", v + "_rock.glb", pts, ROCK))
     groups = {}
     for v, x, z, yaw, s, lean in L.SHARDS:
         groups.setdefault(v, []).append(L.placement(x, z, yaw, s, 0.1 * s, (lean, 0.0)))
     for v, pts in sorted(groups.items()):
-        nodes.append(mesh_node(v + "_xtal", v + "_xtal.glb", pts, xtal_mat("shard"), shadow=False))
+        nodes.append(mesh_node(v + "_xtal", v + "_xtal.glb", pts, xmat("shard"), shadow=False))
     groups = {}
     for v, x, z, yaw, s, sink in L.BOULDERS:
         groups.setdefault(v, []).append(L.placement(x, z, yaw, s, sink))
@@ -114,49 +244,88 @@ def scene_json():
 
     p0, t0, _ = L.CAMERA_STATIONS[0]
     lights = [
-        # the shaft: a cool violet spot from high front-left onto the pool and the spire (the only shadow caster)
+        # the shaft: a narrow spot from above the roof (the shell casts no shadow) down onto the spire and the water
         {"name": "shaft", "id": "shaft", "type": "spot", "role": "key", "position": [-3.0, 14.0, 1.5],
-         "direction": [0.18, -0.85, -0.5], "color": [0.62, 0.55, 1.0], "intensity": 260.0, "range": 34.0,
-         "innerCone": 8.0, "outerCone": 18.0, "castsShadow": True, "volumetric": 0.5},
-        # the passage behind the arch: blue depth, haze lit from inside
+         "direction": [0.18, -0.85, -0.5], "color": UV["key"], "intensity": 300.0, "range": 34.0,
+         "innerCone": 6.0, "outerCone": 14.0, "castsShadow": True, "volumetric": 1.0},
+        # the passage behind the arch: the depth cue
         {"name": "passage", "id": "passage", "type": "point", "position": [-2.5, 3.0, -19.0],
-         "color": [0.15, 0.4, 1.0], "intensity": 260.0, "range": 16.0, "radius": 1.5, "castsShadow": False,
-         "volumetric": 0.6},
+         "color": UV["deep"], "intensity": 320.0, "range": 16.0, "radius": 1.5, "castsShadow": False,
+         "volumetric": 0.7},
+        # the roof wash: a broad, weak light under the roof so its rock and crust read (no dead space above)
+        {"name": "roofwash", "id": "roofwash", "type": "point", "position": [0.5, 5.4, -0.5], "color": UV["fill"],
+         "intensity": 90.0, "range": 14.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
+        {"name": "backwash", "id": "backwash", "type": "point", "position": [0.0, 6.5, -7.5], "color": UV["deep"],
+         "intensity": 45.0, "range": 12.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
+        {"name": "frontwash", "id": "frontwash", "type": "point", "position": [-1.0, 3.6, 5.0], "color": UV["deep"],
+         "intensity": 3.0, "range": 8.0, "radius": 2.0, "castsShadow": False, "volumetric": 0.0},
     ]
-    # each formation's own glow light sits at (or in) the formation, so it reads as the crystal's inner light
+
     def at(name, dx, dy, dz):
         h = next(h for h in L.HEROES if h["name"] == name)
         r = L.hero_placement(h)
         return [round(r[0] + dx, 3), round(r[1] + dy, 3), round(r[2] + dz, 3)]
-    for name, off, color, k, rng_, rad in (
-            ("spire", (0.1, 1.0, 1.6), [0.8, 0.2, 1.0], 60.0, 9.0, 0.6),
-            ("geode", (-0.6, 1.6, 0.3), [1.0, 0.2, 0.55], 30.0, 5.0, 0.4),
-            ("fan", (1.8, 2.4, 0.6), [0.2, 0.4, 1.0], 30.0, 7.0, 0.5),
-            ("chandelier", (0.0, -3.4, 0.0), [0.6, 0.35, 1.0], 25.0, 7.0, 0.5),
-            ("ember", (-0.6, 1.0, -0.6), [1.0, 0.45, 0.1], 14.0, 4.0, 0.3)):
+    for name, off, role, k, rng_, rad in (
+            ("spire", (0.1, 1.0, 1.6), "primary", 50.0, 9.0, 0.6),
+            ("geode", (-0.4, 1.4, 0.4), "tertiary", 26.0, 4.5, 0.4),
+            ("fan", (1.8, 2.4, 0.6), "secondary", 26.0, 7.0, 0.5),
+            ("chandelier", (0.0, -3.4, 0.0), "secondary", 22.0, 7.0, 0.5),
+            ("ember", (0.9, 0.35, -1.1), "accent", 10.0, 4.0, 0.3)):
         lights.append({"name": name + "Glow", "id": name + "Glow", "type": "point", "position": at(name, *off),
-                       "color": color, "intensity": k, "range": rng_, "radius": rad, "castsShadow": False,
+                       "color": UV[role], "intensity": k, "range": rng_, "radius": rad, "castsShadow": False,
                        "volumetric": 0.0})
+    env = {
+        "background": [0.004, 0.003, 0.012], "intensity": 0.04, "lightFromEnvironment": False,
+        "fogColor": [round(v * 0.3, 4) for v in UV["haze"]],
+        "volumeDensity": 0.005 if HAZE else 0.0, "volumeScattering": 0.9,
+        "volumeAbsorption": 0.3, "volumeAnisotropy": 0.45, "volumeSteps": 12, "volumeMaxDistance": 30.0,
+        "volumeLocalLights": 1.0, "volumeNoise": 0.35, "volumeNoiseScale": 0.18, "volumeEmission": 0.0,
+        "fogHeight": 3.0, "fogHeightFalloff": 0.25, "fogUpperDensity": 0.15,
+        "shadowCascades": 1, "shadowRange": 40.0, "ambientOcclusion": True, "depthPrepass": True,
+        "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": [0.01, 0.006, 0.03],
+                "horizonColor": [0.02, 0.012, 0.05], "groundColor": [0.006, 0.004, 0.012],
+                "sunColor": [0.6, 0.5, 1.0], "sunDirection": [0.2, 0.9, 0.3], "haze": 0.1,
+                "sunIntensity": 0.0, "sunSize": 0.01, "sunGlow": 0.0, "intensity": 1.0}}
     return {
         "format": "avgen-scene", "version": 1, "name": "The Living Prism",
-        "_note": "Generated by examples/living-prism/build_scene.py from layout.py. Do not edit.",
+        "_note": "Generated by examples/living-prism/build_scene.py from layout.py and palette.py. Do not edit.",
         "camera": {"mode": 1, "position": list(p0), "target": list(t0), "fov": L.CAMERA_FOV, "orbitSpeed": 0,
                    "near": 0.1, "far": 120.0},
-        "environment": {
-            "background": [0.004, 0.003, 0.012], "intensity": 0.04, "lightFromEnvironment": False,
-            "fogColor": [0.02, 0.012, 0.05], "volumeDensity": 0.004, "volumeScattering": 0.9,
-            "volumeAbsorption": 0.3, "volumeAnisotropy": 0.4, "volumeSteps": 24, "volumeMaxDistance": 40.0,
-            "volumeLocalLights": 1.0, "volumeNoise": 0.3, "volumeNoiseScale": 0.15, "volumeEmission": 0.0,
-            "fogHeight": 3.0, "fogHeightFalloff": 0.25, "fogUpperDensity": 0.15,
-            "shadowCascades": 1, "shadowRange": 40.0, "ambientOcclusion": True, "depthPrepass": True,
-            "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": [0.01, 0.006, 0.03],
-                    "horizonColor": [0.02, 0.012, 0.05], "groundColor": [0.006, 0.004, 0.012],
-                    "sunColor": [0.6, 0.5, 1.0], "sunDirection": [0.2, 0.9, 0.3], "haze": 0.1,
-                    "sunIntensity": 0.0, "sunSize": 0.01, "sunGlow": 0.0, "intensity": 1.0}},
+        "environment": env,
         "lights": lights,
         "materialPrograms": PROGRAMS,
         "nodes": nodes,
     }
+
+
+def crystal_nodes():
+    """[(node name, XNODE key)] for every crystal node the scene draws."""
+    out = [("crust_xtal", "crust"), ("arch_xtal", "arch"), ("geode_rim", "geoderim"), ("geodecap_xtal", "geodecap")]
+    out += [(h["name"] + "_xtal", h["name"]) for h in L.HEROES]
+    out += [(v + "_xtal", "druse") for v in sorted({c[0] for c in L.CLUSTERS})]
+    out += [(v + "_xtal", "shard") for v in sorted({c[0] for c in L.SHARDS})]
+    return out
+
+
+def palette_json():
+    b = [{"role": "shadow", "target": ROCK_P.path("shadow")}, {"role": "rockLit", "target": ROCK_P.path("rockLit")},
+         {"role": "seam", "target": ROCK_P.path("seam")},
+         {"role": "shadow", "target": FLOOR_P.path("shadow"), "gain": 0.8},
+         {"role": "rockLit", "target": FLOOR_P.path("rockLit"), "gain": 0.55},
+         {"role": "key", "target": "lights/shaft/color"}, {"role": "deep", "target": "lights/passage/color"},
+         {"role": "fill", "target": "lights/roofwash/color"}, {"role": "deep", "target": "lights/backwash/color"}, {"role": "deep", "target": "lights/frontwash/color"},
+         {"role": "primary", "target": "lights/spireGlow/color"}, {"role": "tertiary", "target": "lights/geodeGlow/color"},
+         {"role": "secondary", "target": "lights/fanGlow/color"},
+         {"role": "secondary", "target": "lights/chandelierGlow/color"},
+         {"role": "accent", "target": "lights/emberGlow/color"},
+         {"role": "haze", "target": "scene/fogColor", "gain": 0.3},
+         {"role": "water", "target": "nodes/floor/water/shallowColor", "gain": 0.04},
+         {"role": "water", "target": "nodes/floor/water/deepColor", "gain": 0.02}]
+    for node, key in crystal_nodes():
+        b.append({"role": XNODE[key][0], "target": "procedural/%s/material/emissiveColor" % node})
+    states = [{"name": name, "colors": {r: roles[r] for r in PAL.ROLES}} for name, roles in LOOKS]
+    # no automatic advance: a look changes on a performer's CC 9 (and, from Stage 4, on a musical reason)
+    return {"states": states, "bindings": b, "selector": {"select": 0, "transition": 6.0, "lock": False, "hold": 60.0}}
 
 
 def project_json(scene_rel):
@@ -169,6 +338,11 @@ def project_json(scene_rel):
                                                                       "keys": keys}})
         routes.append({"source": "timeline." + key, "target": "camera/position" if idx == 1 else "camera/target",
                        "amount": 1.0, "op": "replace", "polarity": "unipolar", "component": comp})
+    n = len(LOOKS)
+    routes += [{"source": "control.palette", "target": "palette/select", "amount": float(n - 1), "op": "add",
+                "polarity": "unipolar", "chain": {"attackMs": 150, "decayMs": 150}},
+               {"source": "control.paletteLock", "target": "palette/lock", "amount": 1.0, "op": "add",
+                "polarity": "unipolar", "chain": {"attackMs": 150, "decayMs": 150}}]
     return {
         "format": "avgen-project", "version": 4, "app": {"name": "The Living Prism"},
         "assets": {"scene": {"kind": "composition", "path": scene_rel}},
@@ -177,12 +351,16 @@ def project_json(scene_rel):
                        "thesis": "A compact crystal grotto over a mirror pool, played by the music: the drums strike "
                                  "the crystals, the bass moves the water and the stone, the synth colours the light."},
         "parameters": {
-            "camera/exposure/compensation": -0.3, "post/bloom/enabled": True, "post/bloom/threshold": 1.0,
-            "post/bloom/intensity": 0.35, "post/bloom/radius": 1.0, "post/tonemap/chroma-retention": 0.85,
-            "post/output/vignette": 0.22, "post/grade/saturation": 1.1,
+            "camera/exposure/compensation": -0.2, "post/bloom/enabled": True, "post/bloom/threshold": 1.1,
+            "post/bloom/intensity": 0.32, "post/bloom/radius": 0.9, "post/tonemap/chroma-retention": 0.9,
+            "post/output/vignette": 0.25, "post/grade/saturation": 1.2, "post/grade/contrast": 1.08,
         },
         "sources": sources,
         "routes": routes,
+        "palette": palette_json(),
+        "control": {"midi": {"enabled": True, "filter": "*", "bindings": [
+            {"source": "*", "channel": -1, "kind": "cc", "number": 9, "signal": "palette"},
+            {"source": "*", "channel": -1, "kind": "cc", "number": 10, "signal": "paletteLock"}]}},
         "render": {"width": 1920, "height": 1080, "fps": 30},
     }
 
@@ -209,7 +387,8 @@ def main():
     with open(a.project, "w") as f:
         json.dump(project_json(rel), f, indent=1)
         f.write("\n")
-    print("wrote %s (%d nodes, %d meshes) and %s" % (path, len(sc["nodes"]), len(used), a.project))
+    print("wrote %s (%d nodes, %d meshes, %d programs, %d ops max) and %s" % (
+        path, len(sc["nodes"]), len(used), len(PROGRAMS), max(len(p["ops"]) for p in PROGRAMS), a.project))
     print("station times:", L.station_times())
 
 
