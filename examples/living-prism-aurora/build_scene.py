@@ -70,13 +70,13 @@ WATER = {  # long exposure (spec 7): dark body, view-stretched rough reflections
     "glints": 0.0}
 
 
-def aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow):
+def aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves=6.5):
     return {"id": name, "name": name, "type": "aurora", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "always", "style": "",
             "timing": {"delay": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "lifetime": 0.0, "repeatSeconds": 0.0,
                        "windowSeconds": 6.0, "windowStart": 0.0},
             "parameters": {
-                "appearance": {"edgeBrightness": 3.2, "emission": 1.0, "filaments": 2.0, "horizonGlow": 0.0,
+                "appearance": {"edgeBrightness": 3.2, "emission": 0.25, "filaments": 2.0, "horizonGlow": 0.0,
                                "intensity": intensity, "lowColor": low, "midColor": mid, "topColor": top,
                                "opacity": 0.95, "sparkle": 0.15},
                 "audio": {"bass": 0.0, "beat": 0.0, "glints": 0.0, "high": 0.0, "lowMid": 0.0, "mid": 0.0,
@@ -86,7 +86,7 @@ def aurora(name, low, mid, top, height, base, radius, count, intensity, complexi
                 "shape": {"anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0], "baseHeight": base,
                           "complexity": complexity, "curtainCount": count, "curtainHeight": height,
                           "driftSpeed": 0.05, "flowSpeed": flow, "layerSpacing": 0.35, "radius": radius,
-                          "turbulence": 0.35, "verticalSpeed": 0.03, "waveAmplitude": 0.35, "waveScale": 2.0}},
+                          "turbulence": 0.35, "verticalSpeed": 0.03, "waveAmplitude": 0.3, "waveScale": waves}},
             "ground": {"color": low, "falloff": 2.0, "intensity": 0.15, "mode": "subtle", "radius": 600.0},
             "flow": {"field": "", "influence": 0.0}}
 
@@ -124,7 +124,7 @@ def scene_json():
             "fogSky": 0.0, "fogSkyDistance": 4500.0,
             "shadowCascades": 2, "shadowRange": 600.0, "ambientOcclusion": True, "depthPrepass": True,
             "sky": {"enabled": True, "background": True, "useKeyLight": False,
-                    "zenithColor": [0.006, 0.010, 0.030], "horizonColor": [0.10, 0.055, 0.085],
+                    "zenithColor": [0.006, 0.010, 0.030], "horizonColor": [0.05, 0.028, 0.045],
                     "groundColor": [0.01, 0.012, 0.02], "sunColor": [0.6, 0.6, 0.9], "sunDirection": [0, -1, 0],
                     "haze": 0.12, "sunIntensity": 0.0, "sunSize": 0.01, "sunGlow": 0.0, "intensity": 1.0}},
         "lights": [
@@ -139,9 +139,9 @@ def scene_json():
                                                     "colorSpread": 0.3, "twinkle": 0.2, "twinkleRate": 1.0,
                                                     "horizonFade": 0.6, "band": 0.15, "bandTilt": 30.0,
                                                     "daylight": 0.0}},
-            aurora("auroraMain", AURORA_LOW, AURORA_MID, AURORA_TOP, 1900.0, 150.0, 4200.0, 3.0, 4.5, 44.0, 0.02),
-            aurora("auroraPink", AURORA2_LOW, AURORA2_MID, AURORA2_TOP, 1500.0, 500.0, 5400.0, 2.0, 3.0, 30.0,
-                   0.015)],
+            aurora("auroraMain", AURORA_LOW, AURORA_MID, AURORA_TOP, 1700.0, 260.0, 3000.0, 3.0, 2.6, 72.0, 0.02, 6.5),
+            aurora("auroraPink", AURORA2_LOW, AURORA2_MID, AURORA2_TOP, 1400.0, 700.0, 3800.0, 2.0, 1.8, 50.0,
+                   0.015, 5.0)],
         "materialPrograms": [prog_ground(), prog_crystal()],
         "nodes": nodes,
     }
@@ -152,8 +152,8 @@ def project_json(scene_rel, offline=False, root=""):
          "app": {"name": "The Living Prism: Aurora Valley" + (" (offline)" if offline else "")},
          "assets": {"scene": {"kind": "composition", "path": scene_rel}},
          "sonic": {"live": not offline},
-         "parameters": {"camera/exposure/compensation": 0.0, "post/bloom/enabled": True, "post/bloom/threshold": 0.9,
-                        "post/bloom/intensity": 0.4, "post/bloom/radius": 1.2, "post/tonemap/chroma-retention": 0.8,
+         "parameters": {"camera/exposure/compensation": 0.0, "post/bloom/enabled": True, "post/bloom/threshold": 1.4,
+                        "post/bloom/intensity": 0.3, "post/bloom/radius": 0.8, "post/tonemap/chroma-retention": 0.8,
                         "post/output/vignette": 0.3, "post/grade/saturation": 1.0},
          "sources": [], "routes": [],
          "render": {"width": 1920, "height": 1080, "fps": 30}}

@@ -36,9 +36,9 @@
  "parameters": {
   "camera/exposure/compensation": 0.0,
   "post/bloom/enabled": true,
-  "post/bloom/threshold": 0.9,
-  "post/bloom/intensity": 0.4,
-  "post/bloom/radius": 1.2,
+  "post/bloom/threshold": 1.4,
+  "post/bloom/intensity": 0.3,
+  "post/bloom/radius": 0.8,
   "post/tonemap/chroma-retention": 0.8,
   "post/output/vignette": 0.3,
   "post/grade/saturation": 1.0
