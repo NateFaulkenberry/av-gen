@@ -86,12 +86,11 @@ Counts inTrack(double until) {
 
 } // namespace
 
-TEST_CASE("The flat-master features and band onsets are on the bus under their own names",
+TEST_CASE("The flat-master features are on the bus under their own names, and the band onsets are not",
           "[integration][signals][flatmaster]") {
     app::Engine engine(app::EngineMode::Offline);
     for (const char* name : {"audio.bassLevel", "audio.lowMidLevel", "audio.midLevel", "audio.highMidLevel",
-                             "audio.trebleLevel", "audio.energy", "audio.onsetRate", "audio.width",
-                             "audio.onsetLow", "audio.onsetMid", "audio.onsetHigh"}) {
+                             "audio.trebleLevel", "audio.energy", "audio.onsetRate", "audio.width"}) {
         INFO(name);
         REQUIRE(engine.signals().find(name).has_value());
     }
@@ -99,8 +98,9 @@ TEST_CASE("The flat-master features and band onsets are on the bus under their o
     for (const char* name : {"audio.bass", "audio.lowMid", "audio.mid", "audio.highMid", "audio.treble"}) {
         CHECK(engine.signals().find(name).has_value());
     }
+    // ADR-1620: ADR-898's band onsets (a mix's kick, snare and hat) left the bus.
     for (const char* name : {"audio.onsetLow", "audio.onsetMid", "audio.onsetHigh"}) {
-        CHECK(engine.signals().info(*engine.signals().find(name)).isEvent);
+        CHECK_FALSE(engine.signals().find(name).has_value());
     }
 
     REQUIRE(engine.loadAudio(grooveWav()).has_value());
@@ -141,38 +141,6 @@ TEST_CASE("No band onset or beat is lost between two render frames, at 30 fps or
     }
 }
 
-TEST_CASE("A route on audio.onsetLow pulses a parameter on the kicks and not in the pull-back",
-          "[integration][signals][onsets]") {
-    app::Engine engine(app::EngineMode::Offline);
-    REQUIRE(engine.loadAudio(grooveWav()).has_value());
-    params::ModRoute route{.source = "audio.onsetLow", .target = "camera/height", .amount = 4.0f};
-    route.chain.envelope = params::EnvelopeMode::PeakHold;
-    route.chain.envelopeHoldMs = 30.0f;
-    route.chain.envelopeFallPerSecond = 20.0f;
-    engine.modulator().addRoute(route);
-    engine.rebind();
-    auto* height = engine.params().find("camera/height");
-    REQUIRE(height != nullptr);
-    const float base = height->baseComponent(0);
-    FixedStepClock clock(60.0);
-    float grooving = base;
-    float pullBack = base;
-    // Bars 6 and 7 (0-based) have no kick: 0.5 s lead-in + 12 s .. + 16 s at 120 BPM.
-    for (int i = 0; i < 60 * 20; ++i) {
-        const FrameTime t = engine.tick(clock);
-        engine.update(t);
-        const float h = height->finalComponent(0);
-        if (t.renderTime > 2.0 && t.renderTime < 10.0) {
-            grooving = std::max(grooving, h);
-        }
-        if (t.renderTime > 12.8 && t.renderTime < 16.3) {
-            pullBack = std::max(pullBack, h);
-        }
-    }
-    CHECK(grooving > base + 0.2f);
-    CHECK(pullBack < base + 0.05f);
-}
-
 TEST_CASE("audio.get_analysis reports musical time and the flat-master measures", "[integration][signals][ai]") {
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadAudio(grooveWav()).has_value());
@@ -202,8 +170,7 @@ TEST_CASE("Every new signal is pickable as a route source under a readable name"
     const std::vector<std::string> items = ui::routeSourceItems(engine.signals());
     REQUIRE(items.size() == engine.signals().size());
     const std::vector<std::pair<const char*, const char*>> expected{
-        {"audio.onsetLow", "kick"},          {"audio.onsetMid", "snare"},
-        {"audio.onsetHigh", "hats"},         {"audio.onsetRate", "density"},
+        {"audio.onsetRate", "density"},
         {"audio.energy", "energy"},          {"audio.bassLevel", "bass level"},
         {"audio.trebleLevel", "treble level"}, {"audio.width", "stereo width"},
         {"section.index", "section number"}, {"section.progress", "progress"},
@@ -225,9 +192,9 @@ TEST_CASE("Every new signal is pickable as a route source under a readable name"
     ai::ToolRegistry registry;
     ai::registerEngineTools(registry);
     ai::ToolContext ctx(engine);
-    const ai::ToolResult r = registry.invoke("signal.list", nlohmann::json{{"query", "kick"}}, ctx);
+    const ai::ToolResult r = registry.invoke("signal.list", nlohmann::json{{"query", "density"}}, ctx);
     REQUIRE(r.success);
     REQUIRE(r.value["signals"].size() >= 1);
-    CHECK(r.value["signals"][0]["name"] == "audio.onsetLow");
-    CHECK(r.value["signals"][0]["label"] == "kick (low-band onset)");
+    CHECK(r.value["signals"][0]["name"] == "audio.onsetRate");
+    CHECK(r.value["signals"][0]["label"] == "density (percussive hits per second)");
 }

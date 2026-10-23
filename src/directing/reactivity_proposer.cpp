@@ -35,8 +35,11 @@ struct Template {
     std::string what;    // "a heartbeat on each kick"
 };
 
-Template kick() { return {"kick", "audio.onsetLow", ModOp::Add, 0.60f, 0, 1, 1, 1, 5.0f, 300.0f, true, "a heartbeat on each kick"}; }
-Template clap() { return {"clap", "audio.onsetMid", ModOp::Add, 0.50f, 0, 1, 1, 1, 5.0f, 180.0f, true, "a short flare on each clap"}; }
+// ADR-1620: a mix has no drum classes. The kick layer's heartbeat is the beat clock's pulse (a kick lands on the beat;
+// the mix's kick detector fired on bass notes and hat clicks about half the time), and the clap's and the hats' answers
+// are the broadband onset, which fires on any drum hit and nothing else nearly as often.
+Template kick() { return {"kick", "beat.pulse", ModOp::Add, 0.60f, 0, 1, 1, 1, 5.0f, 300.0f, true, "a heartbeat on each beat"}; }
+Template clap() { return {"clap", "audio.onset", ModOp::Add, 0.50f, 0, 1, 1, 1, 5.0f, 180.0f, true, "a short flare on each hit"}; }
 Template bar() { return {"bar", "music.downbeat", ModOp::Add, 0.45f, 0, 1, 1, 1, 80.0f, 1200.0f, true, "a slow swell on each bar's downbeat"}; }
 Template breath(const std::string& signal) {
     return {"breath", signal, ModOp::Multiply, 1.0f, 0.0f, 1.0f, 0.88f, 1.15f, 0.0f, 0.0f, true, "a breath across every two bars"};
@@ -56,7 +59,7 @@ Template gusts(const std::string& signal) {
 Template sectionFlare() {
     return {"section", "section.change", ModOp::Add, 0.80f, 0, 1, 1, 1, 40.0f, 1800.0f, true, "relighting at each new section"};
 }
-Template hats() { return {"hats", "audio.onsetHigh", ModOp::Add, 0.18f, 0, 1, 1, 1, 8.0f, 200.0f, true, "a flicker on the hats"}; }
+Template hats() { return {"hats", "audio.onset", ModOp::Add, 0.18f, 0, 1, 1, 1, 8.0f, 200.0f, true, "a flicker on the hits"}; }
 
 // The same template as an echo on a Multiply target (a light, spores): the event lifts it from 1.
 Template asMultiply(Template t, float lift) {
@@ -294,15 +297,15 @@ std::vector<MusicalLayer> musicalLayers(const MusicalContext& music) {
     std::vector<MusicalLayer> out;
     MusicalLayer k = rate(&analysis::SpanProfile::kickRate, 0.5f, "kicks");
     k.name = "kick";
-    k.signal = "audio.onsetLow";
+    k.signal = "beat.pulse"; // ADR-1620
     out.push_back(k);
     MusicalLayer c = rate(&analysis::SpanProfile::snareRate, 0.5f, "snares/claps");
     c.name = "clap";
-    c.signal = "audio.onsetMid";
+    c.signal = "audio.onset";
     out.push_back(c);
     MusicalLayer h = rate(&analysis::SpanProfile::hatRate, 0.8f, "hats");
     h.name = "hats";
-    h.signal = "audio.onsetHigh";
+    h.signal = "audio.onset";
     out.push_back(h);
     const std::string grid = beat > 0.0 ? fmt::format("a beat of {:.3f} s ({:.1f} BPM)", beat, 60.0 / beat) : "no beat grid";
     out.push_back({"bar", "music.downbeat", beat > 0.0, grid});

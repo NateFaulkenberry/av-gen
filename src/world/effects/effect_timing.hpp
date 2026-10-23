@@ -89,7 +89,7 @@ struct Trigger {
     float threshold = 1.0f;  // Onset: the onset strength (flux over its adaptive threshold) to reach;
                              // Signal: the event's strength to reach (0 when the file leaves it out)
     std::string name;        // MusicEvent: the event's name; TimelineMarker: the marker's name; Signal: the
-                             // bus signal's name (`response.kick`, `notes.noteOn`, `audio.onsetLow`, ...)
+                             // bus signal's name (`response.onset`, `notes.noteOn`, `signal.kick`, ...)
     double period = 2.0;     // Repeat: seconds between firings
     double phase = 0.0;      // Repeat: the first firing
     std::string entity;      // Proximity: the other entity

@@ -269,7 +269,7 @@ TEST_CASE("The Director panel lists a proposal's route and source items, and the
     // Add a route the validator refuses, so a row is marked blocked with the reason.
     PlanRoute dark;
     dark.key = "dark";
-    dark.route.source = "audio.onsetLow";
+    dark.route.source = "beat.pulse";
     dark.route.target = "nodes/meadow/scatter/stones/emissionGain";
     Plan plan = c.plan;
     plan.routes.push_back(dark);

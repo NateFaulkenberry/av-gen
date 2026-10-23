@@ -2824,7 +2824,7 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
             if (ImGui::IsItemHovered()) {
                 tooltip("The audio under this section, measured independently of loudness: the energy\n"
                         "composite (audio.energy), percussive hits per second (audio.onsetRate), kicks\n"
-                        "per second (audio.onsetLow) and the mean spectral centroid.");
+                        "per second (the file's low-band onsets) and the mean spectral centroid.");
             }
         }
     }

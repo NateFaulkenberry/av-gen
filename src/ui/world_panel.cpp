@@ -137,7 +137,7 @@ std::vector<Influence> directInfluencesOf(app::Engine& engine, const std::string
         Influence i;
         i.kind = Influence::Kind::Route;
         i.source = r.source;
-        // "audio.onsetLow  -  kick (low-band onset)": the name the route stores and what it is, as
+        // "response.onset  -  onset (any attack, level-free)": the name the route stores and what it is, as
         // the Modulation panel's picker lists it, so "why is this moving?" answers in words.
         if (const auto id = engine.signals().find(r.source)) {
             i.source = routeSourceItem(engine.signals().info(*id));

@@ -1364,6 +1364,12 @@ scene::LivenessInputs Engine::livenessInputs() const {
     // ADR-916: the tear rule asks whether anything lifts a water's tear amount.
     in.modulator = &modulator_;
     in.timeline = &timeline_;
+    // ADR-1620: a drum class is heard only through a feed whose source resolves.
+    in.judgeDrumClasses = true;
+    for (const auto [slot, k] : {std::pair{0, 0}, std::pair{1, 2}, std::pair{2, 3}}) { // kick, snare, hat
+        const std::string& key = feeds_.hitSource(static_cast<std::size_t>(k));
+        in.drumClassFed[static_cast<std::size_t>(slot)] = !key.empty() && feedState(key).resolved;
+    }
     return in;
 }
 
@@ -2923,8 +2929,12 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         ~LoudAgain() { quiet = false; }
     } loudAgain{feedsQuiet_};
     if (const auto block = doc.find("feeds"); block != doc.end()) {
-        if (auto parsed = audio::Feeds::fromJson(*block)) {
+        std::vector<std::string> feedWarnings;
+        if (auto parsed = audio::Feeds::fromJson(*block, &feedWarnings)) {
             feeds_ = std::move(*parsed);
+            for (const std::string& w : feedWarnings) {
+                warn(w);
+            }
         } else {
             warn(parsed.error().message + "; the mix feeds everything");
         }
@@ -4772,7 +4782,7 @@ void Engine::rebuildFeeds() {
                     now[s] = folders[s].fold(window, t, inSpan);
                 }
                 sonic_->feed.push_back(analysis::mergeFeeds(
-                    analysis::ResponseFeed::fromCausal(sonic_->timbre[i].causal), now, routing));
+                    analysis::ResponseFeed::fromMix(sonic_->timbre[i].causal), now, routing));
             }
             sonic_->feedKey = std::hash<std::string>{}(feeds_.toJson().dump()) ^ (stemsRevision_ * 0x9e3779b97f4a7c15ull);
             if (sonic_->feedKey == 0) {

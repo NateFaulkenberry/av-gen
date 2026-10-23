@@ -28,7 +28,7 @@
         "layer": "kick",
         "level": "meso",
         "owner": "elder-cap",
-        "reason": "elder-cap is the kick owner: a heartbeat on each kick in elder-gills's glow, at 100% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "elder-cap is the kick owner: a heartbeat on each beat in elder-gills's glow, at 100% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 0.6000000238418579,
           "chain": {
@@ -60,7 +60,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetLow",
+          "source": "beat.pulse",
           "target": "nodes/elder-gills/emissiveBoost"
         }
       },
@@ -70,7 +70,7 @@
         "layer": "kick",
         "level": "meso",
         "owner": "elder-cap",
-        "reason": "elder-cap is the kick owner: a heartbeat on each kick in elder-cap's glow, at 100% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "elder-cap is the kick owner: a heartbeat on each beat in elder-cap's glow, at 100% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 0.6000000238418579,
           "chain": {
@@ -102,7 +102,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetLow",
+          "source": "beat.pulse",
           "target": "nodes/elder-cap/emissiveBoost"
         }
       },
@@ -144,7 +144,7 @@
           "enabled": true,
           "op": "multiply",
           "polarity": "unipolar",
-          "source": "audio.onsetLow",
+          "source": "beat.pulse",
           "target": "particles/elder-spores/emissive"
         }
       },
@@ -154,7 +154,7 @@
         "layer": "kick",
         "level": "meso",
         "owner": "elder-cap",
-        "reason": "The light beside elder-cap echoes it 50 ms later: the ground answers a heartbeat on each kick. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "The light beside elder-cap echoes it 50 ms later: the ground answers a heartbeat on each beat. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 1.0,
           "chain": {
@@ -186,7 +186,7 @@
           "enabled": true,
           "op": "multiply",
           "polarity": "unipolar",
-          "source": "audio.onsetLow",
+          "source": "beat.pulse",
           "target": "lightrig/Glade/elder-practical/intensity"
         }
       },
@@ -196,7 +196,7 @@
         "layer": "clap",
         "level": "meso",
         "owner": "lantern-cap",
-        "reason": "lantern-cap is the clap owner: a short flare on each clap in lantern-gills's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "lantern-cap is the clap owner: a short flare on each hit in lantern-gills's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 0.4650000035762787,
           "chain": {
@@ -228,7 +228,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetMid",
+          "source": "audio.onset",
           "target": "nodes/lantern-gills/emissiveBoost"
         }
       },
@@ -238,7 +238,7 @@
         "layer": "clap",
         "level": "meso",
         "owner": "lantern-cap",
-        "reason": "lantern-cap is the clap owner: a short flare on each clap in lantern-cap's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
+        "reason": "lantern-cap is the clap owner: a short flare on each hit in lantern-cap's glow, at 93% of the lead hero's amplitude; its parts answer 35 ms apart, so the hero reads as one body. Its depth follows the section: 35% in the quietest, in full in the loudest.",
         "route": {
           "amount": 0.4650000035762787,
           "chain": {
@@ -270,7 +270,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetMid",
+          "source": "audio.onset",
           "target": "nodes/lantern-cap/emissiveBoost"
         }
       },
@@ -480,7 +480,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetLow",
+          "source": "beat.pulse",
           "target": "nodes/meadow/scatter/fungi/emissionGain"
         }
       },
@@ -522,7 +522,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetHigh",
+          "source": "audio.onset",
           "target": "nodes/meadow/scatter/shelf/emissionGain"
         }
       },
@@ -564,7 +564,7 @@
           "enabled": true,
           "op": "add",
           "polarity": "unipolar",
-          "source": "audio.onsetMid",
+          "source": "audio.onset",
           "target": "nodes/meadow/scatter/lamps/emissionGain"
         }
       },
@@ -801,7 +801,7 @@
           "enabled": true,
           "op": "multiply",
           "polarity": "unipolar",
-          "source": "audio.onsetHigh",
+          "source": "audio.onset",
           "target": "particles/spores/emissive"
         }
       },
@@ -1116,7 +1116,7 @@
           "enabled": true,
           "op": "multiply",
           "polarity": "unipolar",
-          "source": "audio.onsetHigh",
+          "source": "audio.onset",
           "target": "nodes/meadow/water/sparkle"
         }
       },
@@ -1287,9 +1287,8 @@
     },
     "bySource": {
       "audio.midLevel": 1,
-      "audio.onsetHigh": 3,
-      "audio.onsetLow": 5,
-      "audio.onsetMid": 3,
+      "audio.onset": 6,
+      "beat.pulse": 5,
       "lfo.two-bar-breath": 4,
       "music.downbeat": 2,
       "section.energy": 7,
@@ -1305,19 +1304,19 @@
         "evidence": "kicks 1.9/s on average, 2.0/s at most",
         "name": "kick",
         "present": true,
-        "signal": "audio.onsetLow"
+        "signal": "beat.pulse"
       },
       {
         "evidence": "snares/claps 0.9/s on average, 1.0/s at most",
         "name": "clap",
         "present": true,
-        "signal": "audio.onsetMid"
+        "signal": "audio.onset"
       },
       {
         "evidence": "hats 2.0/s on average, 2.0/s at most",
         "name": "hats",
         "present": true,
-        "signal": "audio.onsetHigh"
+        "signal": "audio.onset"
       },
       {
         "evidence": "a beat of 0.500 s (120.0 BPM)",

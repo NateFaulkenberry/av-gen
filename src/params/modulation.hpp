@@ -45,7 +45,7 @@ struct ModRoute {
     float depthMax = 1.0f;
     // ADR-1570: the value the depth signal is taken to have while the bus does not carry it at all. Unset (the
     // default), a depth signal the bus lacks leaves the route unresolved, as before. Set, the route binds and reads
-    // this instead -- the shape of a fallback: a route on `response.kick` with depth `stem.drums.active`, min 1,
+    // this instead -- the shape of a fallback: a route on `response.onset` with depth `stem.drums.active`, min 1,
     // max 0 and default 0 plays at full depth with no drum stem in the project or on the input, and stands aside
     // while one is active.
     std::optional<float> depthDefault;

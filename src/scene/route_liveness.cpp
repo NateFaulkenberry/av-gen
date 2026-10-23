@@ -360,6 +360,19 @@ params::liveness::SignalFacts SceneLivenessFacts::signal(std::string_view name) 
     } else if (in_.judgeSilence && !in_.hasAudio && !in_.hasTempo && startsWith("beat.")) {
         facts.silentBecause = fmt::format("the project has no audio and no tempo, so '{}' never moves", name);
     }
+    // ADR-1620: a drum class comes only from a drum source the feeds name.
+    if (in_.judgeDrumClasses && facts.silentBecause.empty()) {
+        constexpr std::array<std::string_view, 3> kDrum{"kick", "snare", "hat"};
+        for (std::size_t k = 0; k < kDrum.size(); ++k) {
+            const std::string hit = fmt::format("response.{}", kDrum[k]);
+            if ((name == hit || name == hit + "Env") && !in_.drumClassFed[k]) {
+                facts.silentBecause = fmt::format(
+                    "'{}' fires only from a drum source (ADR-1620) and this project's feeds name none for the {}: on a "
+                    "mix use response.onset (with its register), beat.pulse, or a signal choosing stem.drums.{} first",
+                    name, kDrum[k], kDrum[k]);
+            }
+        }
+    }
     const auto median = [](std::vector<float>& v) {
         if (v.empty()) {
             return 0.0f;
@@ -859,8 +872,14 @@ std::optional<Finding> SceneLivenessFacts::effectNeverFires(const world::EffectI
                 e.owner.kind == world::EffectTarget::Entity ? std::string_view(e.owner.name) : std::string_view();
             std::array<double, 1> last{};
             const double end = duration > 0.0 ? duration : 1e9;
-            // A Signal trigger's events come from the host (derived or recorded), which the audit does not run.
-            if (e.timing.trigger.source != world::TriggerSource::Proximity &&
+            // A Signal trigger's events come from the host (derived or recorded), which the audit does not run --
+            // except that a signal this project cannot move never fires (ADR-1620: an unfed drum class).
+            if (e.timing.trigger.source == world::TriggerSource::Signal) {
+                if (const auto f = signal(e.timing.trigger.name); !f.silentBecause.empty()) {
+                    never(f.silentBecause);
+                }
+            }
+            if (!result && e.timing.trigger.source != world::TriggerSource::Proximity &&
                 e.timing.trigger.source != world::TriggerSource::Signal &&
                 c.triggers->lastTriggers(e.timing.trigger, owner, end, last) == 0) {
                 const char* why = c.triggers->silence(e.timing.trigger, owner);

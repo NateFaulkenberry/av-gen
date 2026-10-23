@@ -58,7 +58,7 @@ struct ReactivityOptions {
 // One layer of the music, as the proposer found it.
 struct MusicalLayer {
     std::string name;     // "kick", "clap", "hats", "bar", "breath", "phrase", "lead", "bass", "section"
-    std::string signal;   // what a route reads: "audio.onsetLow", ...
+    std::string signal;   // what a route reads: "beat.pulse", ...
     bool present = false;
     std::string evidence; // "kicks 2.2/s at most", "no measured audio"
 };

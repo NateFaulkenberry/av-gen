@@ -80,7 +80,7 @@ void compileReactivity(const Plan& plan, const Validation& v, Staging& staged, c
 [[nodiscard]] std::optional<nlohmann::json> reactivityContent(const ContentRef& ref, const Staging& staged);
 bool removeReactivityContent(const ContentRef& ref, Staging& staged);
 
-// One line for the diff and the panel: "audio.onsetLow -> nodes/elder-2-gills/emissiveBoost: add 0.60,
+// One line for the diff and the panel: "beat.pulse -> nodes/elder-2-gills/emissiveBoost: add 0.60,
 // delay 0 ms, attack 5 ms, decay 300 ms, depth section.energy 0.30..1.08".
 [[nodiscard]] std::string describeRoute(const params::ModRoute& route);
 

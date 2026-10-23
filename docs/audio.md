@@ -142,8 +142,8 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 | Key | Routes | Default |
 |---|---|---|
 | `beat` | the beat clock: `beat.*`, the metre (bar 1, phrases), `music.*`, the timeline's beat markers and snap, the Director's and the camera director's grid, effect triggers | `"audio"` |
-| `hits` | every response hit class not named below: `response.kick`, `low`, `snare`, `hat`, `onset` and their `*Env` | `"audio"` |
-| `kick` `low` `snare` `hat` `onset` | that one class, over `hits` (`"audio"` puts one class back on the mix) | `hits` |
+| `hits` | every response hit class not named below: `response.kick`, `low`, `snare`, `hat`, `onset` and their `*Env` | `"audio"`: `low` and `onset` from the mix, no drum class |
+| `kick` `low` `snare` `hat` `onset` | that one class, over `hits` (`"audio"` puts `low` or `onset` back on the mix; for a drum class it is a load warning and feeds nothing) | `hits` |
 | `levels` | `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient`, `flux` (one source: they share one loudness reference, ADR-1510) | `"audio"` |
 
 **Values:**
@@ -153,6 +153,11 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 - Anything else is a load warning, and then the mix feeds everything.
 
 **Rules:**
+- **The drum classes need a drum source (ADR-1620):** `response.kick`, `snare` and `hat` (and their `*Env`) fire only
+  from a source `hits` or their own key names. The mix has none: on a mix use `response.onset` (with its register,
+  ADR-1604), `beat.pulse`/`beat.phase`, or a `signal.*` source that takes `stem.drums.<class>` first and a stand-in
+  otherwise (`tools/drum_signals.py` writes the ones the live scenes use). A route on an unfed drum class is reported
+  dead by `--audit-routes`. `response.onsetRate` (was `hatRate`) counts the onset feed's onsets a second.
 - **Not fed by a source:** `response.melodic`, `pitch` and `note` stay on the mix and MIDI. `audio.*` is always the
   mix's measurement, `audio.beat` and `audio.tempo` included.
 - **Needs a `sonic` block:** `response.*` runs only with a `sonic` block (or live Sonic input). `beat` needs none.

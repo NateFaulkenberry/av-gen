@@ -2,6 +2,7 @@
 
 #include "audio/stem_source.hpp"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -53,6 +54,11 @@ bool Feeds::feedsResponse(std::string_view key) const {
     return false;
 }
 
+bool Feeds::drumClassFed(std::size_t k) const {
+    const bool drum = k == 0 || k == 2 || k == 3; // kFeedHitNames: kick, low, snare, hat, onset
+    return drum && k < hit.size() && !hitSource(k).empty();
+}
+
 std::string feedValue(const std::string& key) {
     return key.empty() ? std::string("audio") : "stem." + key;
 }
@@ -67,7 +73,7 @@ Result<std::string> feedKey(std::string_view value) {
     return fail("'{}' is neither \"audio\" (the mix) nor \"stem.<key>\"", value);
 }
 
-Result<Feeds> Feeds::fromJson(const nlohmann::json& j) {
+Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>* warnings) {
     if (!j.is_object()) {
         return fail("'feeds' must be an object");
     }
@@ -89,7 +95,13 @@ Result<Feeds> Feeds::fromJson(const nlohmann::json& j) {
         } else if (const auto it = std::find_if(kFeedHitNames.begin(), kFeedHitNames.end(),
                                                 [&](const char* n) { return name == n; });
                    it != kFeedHitNames.end()) {
-            f.hit[static_cast<std::size_t>(it - kFeedHitNames.begin())] = std::move(*key);
+            const auto k = static_cast<std::size_t>(it - kFeedHitNames.begin());
+            if (key->empty() && (k == 0 || k == 2 || k == 3) && warnings != nullptr) {
+                warnings->push_back(fmt::format("feeds.{} is \"audio\", but the mix has no {} (ADR-1620: kick, snare "
+                                                "and hat come only from a drum source); it feeds nothing",
+                                                name, name));
+            }
+            f.hit[k] = std::move(*key);
         } else {
             return fail("feeds.{} is not a feed (beat, hits, kick, low, snare, hat, onset, levels)", name);
         }

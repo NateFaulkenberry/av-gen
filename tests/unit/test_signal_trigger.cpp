@@ -47,10 +47,10 @@ sonic::NoteTrack notesAt(std::initializer_list<std::pair<double, float>> starts)
 } // namespace
 
 TEST_CASE("A signal trigger reads and writes its block, and needs a name", "[effects][adr1061]") {
-    const auto t = world::triggerFromJson(nlohmann::json{{"source", "signal"}, {"name", "response.kick"}});
+    const auto t = world::triggerFromJson(nlohmann::json{{"source", "signal"}, {"name", "response.onset"}});
     REQUIRE(t);
     CHECK(t->source == world::TriggerSource::Signal);
-    CHECK(t->name == "response.kick");
+    CHECK(t->name == "response.onset");
     CHECK(t->threshold == 0.0f); // any event fires unless the file asks for more
     const auto back = world::triggerFromJson(world::triggerToJson(*t));
     REQUIRE(back);
@@ -64,12 +64,12 @@ TEST_CASE("A signal trigger reads and writes its block, and needs a name", "[eff
 
 TEST_CASE("A derived signal answers by time alone, newest first, at its threshold", "[effects][adr1061]") {
     world::TriggerClock clock;
-    const world::Trigger trig = signalTrigger("response.kick", 0.5f);
+    const world::Trigger trig = signalTrigger("response.onset", 0.5f);
     std::array<double, 4> out{};
     // Asking registers the name; the host then resolves it.
     CHECK(clock.lastTriggers(trig, {}, 1.0, out) == 0);
-    REQUIRE(clock.pendingSignals() == std::vector<std::string>{"response.kick"});
-    clock.setDerivedSignal("response.kick", {{0.5, 0.9f}, {1.0, 0.2f}, {1.5, 0.7f}, {2.0, 0.6f}});
+    REQUIRE(clock.pendingSignals() == std::vector<std::string>{"response.onset"});
+    clock.setDerivedSignal("response.onset", {{0.5, 0.9f}, {1.0, 0.2f}, {1.5, 0.7f}, {2.0, 0.6f}});
     CHECK(clock.pendingSignals().empty());
     // Pure: the same second gives the same answer whatever was asked before (a seek is a question).
     REQUIRE(clock.lastTriggers(trig, {}, 1.75, out) == 2);
@@ -80,7 +80,7 @@ TEST_CASE("A derived signal answers by time alone, newest first, at its threshol
     REQUIRE(clock.lastTriggers(trig, {}, 1.75, out) == 2);
     CHECK(out[0] == 1.5);
     CHECK(clock.silence(trig, {}) == nullptr);
-    CHECK(clock.silence(signalTrigger("response.kick", 0.95f), {}) != nullptr);
+    CHECK(clock.silence(signalTrigger("response.onset", 0.95f), {}) != nullptr);
 }
 
 TEST_CASE("A recorded signal keeps what fired, and a backward jump forgets the future", "[effects][adr1061]") {
@@ -115,17 +115,20 @@ TEST_CASE("Audio events are derived from the analysis frames with the bus's stre
     const testsupport::Groove g = testsupport::makeGroove(spec);
     const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(g.file, analysis::AnalyzerConfig{});
     sonic::SignalEventDeriver deriver;
-    const auto lows = deriver.derive("audio.onsetLow", &track, nullptr);
-    REQUIRE(lows);
+    const auto onsets = deriver.derive("audio.onset", &track, nullptr);
+    REQUIRE(onsets);
     std::size_t expected = 0;
     for (const auto& f : track.frames()) {
-        expected += f.lowOnset ? 1 : 0;
+        expected += f.onset ? 1 : 0;
     }
-    CHECK(lows->size() == expected);
-    CHECK_FALSE(lows->empty());
-    for (const auto& o : *lows) {
-        CHECK(o.strength >= 0.05f);
+    CHECK(onsets->size() == expected);
+    CHECK_FALSE(onsets->empty());
+    for (const auto& o : *onsets) {
+        CHECK(o.strength <= 1.0f);
     }
+    // ADR-1620: the band onsets are off the bus, so nothing derives them.
+    CHECK_FALSE(sonic::SignalEventDeriver::derivable("audio.onsetLow"));
+    CHECK_FALSE(deriver.derive("audio.onsetLow", &track, nullptr));
     CHECK_FALSE(deriver.derive("audio.rms", &track, nullptr)); // continuous, not an event
     CHECK_FALSE(deriver.derive("lfo.wobble", &track, nullptr)); // not a function of the piece: recorded
     CHECK_FALSE(sonic::SignalEventDeriver::derivable("macro.knob"));

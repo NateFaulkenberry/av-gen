@@ -117,7 +117,7 @@ inline constexpr std::string_view kIntermediatePrefixes[] = {
 }
 
 // A route source as the Modulation panel's picker lists it: the signal's name, and beside it what the
-// signal is when the bus carries a label -- "audio.onsetLow  -  kick (low-band onset)". The name
+// signal is when the bus carries a label -- "response.onset  -  onset (any attack, level-free)". The name
 // leads, so typing it still finds it, and the label is what a person scanning the list for "kick" or
 // "density" or "section" sees (the owner's rule: anything usable must be findable by what it is).
 [[nodiscard]] inline std::string routeSourceItem(const signals::SignalInfo& info) {

@@ -61,15 +61,20 @@ moves `audio.energy` and the band levels.
 
 ## Kick, snare and hats
 
-| Signal | Range | Event | Meaning |
-|---|---|---|---|
-| `audio.onsetLow` | 0 – 1 | yes | the kick: a percussive attack in 100 – 300 Hz, told apart from a bass note |
-| `audio.onsetMid` | 0 – 1 | yes | snare or clap: an attack in 2 – 6 kHz |
-| `audio.onsetHigh` | 0 – 1 | yes | hats: an attack in 6 – 16 kHz |
+A mix has no kick, snare or hat signal (ADR-1620). Measured on real music against a separated drum stem, about half
+of what a detector on the full mix called a kick was a bass note or a hat's click, so the classes come only from a
+drum source:
 
-With a loaded file they come from the whole-track analysis, and each carries its strength against
-the strongest of its band in the surrounding second. With live input they come from the causal
-kick, snare and hat detector (ADR-1060), the same one behind `response.kick`, `snare` and `hat`.
+- **A drum stem or a drum input** keyed `drums` publishes `stem.drums.kick`, `snare` and `hat` (with the hits
+  analysis on), and a project's **Feeds** row can route them to `response.kick`, `snare` and `hat` (see
+  [Audio Input](help://audio/input)).
+- **On a mix**, use `response.onset` (any attack, with its register in `response.onsetLow/Mid/High`), the beat clock
+  (`beat.pulse`, `beat.phase`, `beat.bar`), or a signal source (`signal.*`) that takes the drum stem's class when it
+  is there and a stand-in otherwise. The live scenes use `signal.kick` (the drums' kick, else the beat's pulse while
+  the music is playing), `signal.snare` (else the pulse on beats 2 and 4) and `signal.hat` (else any onset).
+
+`response.kick`, `snare` and `hat` stay in the route picker for a project whose feeds name a drum source; with none,
+they never fire and the route audit reports a route on them as dead.
 
 The centroid in Hz exists inside an analysis frame but is not published as a signal.
 

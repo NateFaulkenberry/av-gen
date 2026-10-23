@@ -27,7 +27,7 @@ PlanRoute kickRoute() {
     r.owner = "elder-cap";
     r.layer = "kick";
     r.reason = "the elder's heartbeat";
-    r.route.source = "audio.onsetLow";
+    r.route.source = "beat.pulse";
     r.route.target = "nodes/elder-gills/emissiveBoost";
     r.route.op = params::ModOp::Add;
     r.route.amount = 0.6f;
