@@ -1,0 +1,19 @@
+s2l: 80 of 80 transients in the log, 2826 frames, interval p50 33.3 p99 35.3 ms, GPU p50 28.3 ms; probe period 512 (reference corrected by 10.7 ms)
+path                             n miss  fa | bus50 bus95 | prs50 prs95 | gpu50 gpu95 | lt~50 lt~95
+response.onset                  80    0   0 |  22.2  40.2 |  25.1  43.0 |  53.0  70.5 |  61.3  78.9
+response.onsetEnv               80    0   0 |  22.2  40.2 |  25.1  43.0 |  53.0  70.5 |  61.3  78.9
+audio.onset                     80    0  23 |  22.2  40.2 |  25.1  43.0 |  53.0  70.5 |  61.3  78.9
+stem.drums.onset                80    0   0 |  31.9  46.5 |  35.0  49.5 |  64.1  77.7 |  72.5  86.1
+signal on response.onset        80    0   0 |  22.2  40.2 |  25.1  43.0 |  53.0  70.5 |  61.3  78.9
+signal on stem.drums.onset      80    0   0 |  31.9  46.5 |  35.0  49.5 |  64.1  77.7 |  72.5  86.1
+env on response.onset           80    0   0 |  22.2  40.2 |  25.1  43.0 |  53.0  70.5 |  61.3  78.9
+route env (response.onset)      80    0   0 |  22.2  40.2 |  25.1  43.0 |  53.0  70.5 |  61.3  78.9
+route env (stem.drums.onset)    80    0   0 |  31.9  46.5 |  35.0  49.5 |  64.1  77.7 |  72.5  86.1
+response.kick                   20    0   0 |  51.3  69.8 |  54.4  73.0 |  82.1 102.0 |  90.4 110.3
+response.snare                  20    0   0 |  80.9  91.5 |  83.8  94.3 | 111.4 121.6 | 119.7 130.0
+response.hat                    20    0   0 |  20.5  34.7 |  23.7  37.9 |  51.5  66.3 |  59.9  74.6
+stem.drums.kick                 20    0   0 |  48.6  67.9 |  51.7  70.9 |  79.0  98.5 |  87.3 106.8
+stem.drums.snare                20    0   0 |  78.2  90.6 |  81.0  93.5 | 108.8 121.1 | 117.1 129.4
+stem.drums.hat                  20    0   0 |  18.5  31.5 |  21.8  34.5 |  49.1  65.0 |  57.4  73.3
+RW signal.glint                 19    1   0 |  29.8  43.0 |  32.6  46.0 |  59.2  75.9 |  67.5  84.2
+ms from the sound. fa = rises 300 ms before a shot (nothing played). gpu = present + the GPU span; lt~ = gpu + half a refresh (the mean wait for the next vsync); a whole refresh is the bound (JSON).

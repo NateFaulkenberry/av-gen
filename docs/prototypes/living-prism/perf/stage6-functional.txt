@@ -1,0 +1,25 @@
+== stems (exit 0)
+  drums alone 0.3-8      hit 0.40/1.00 front 0.40/1.00 accent 0.28/1.00 glint 0.24/1.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00
+  typical 65.7-85.5      hit 0.42/1.00 front 0.48/1.00 accent 0.26/1.00 glint 0.43/1.00 bass 0.56/1.00 synth 0.61/0.79 bright 0.27/0.50 energy 0.65/0.68 section 0.68/0.70
+  drums stopped 184-194  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.42/1.00 synth 0.63/0.76 bright 0.38/0.54 energy 0.35/0.60 section 0.62/0.68
+  last second 209-210.4  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.01/0.01 section 0.22/0.23
+== nodrums (exit 0)
+  drums alone 0.3-8      hit 0.00/0.22 front 0.44/0.93 accent 0.00/0.68 glint 0.10/1.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00
+  typical 65.7-85.5      hit 0.00/0.97 front 0.23/0.83 accent 0.00/0.80 glint 0.18/1.00 bass 0.56/1.00 synth 0.61/0.79 bright 0.27/0.50 energy 0.16/0.18 section 0.20/0.24
+  drums stopped 184-194  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/1.00 bass 0.42/1.00 synth 0.63/0.76 bright 0.38/0.54 energy 0.22/0.23 section 0.19/0.20
+  last second 209-210.4  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.01/0.01 section 0.09/0.09
+== silentdrums (exit 0)
+  drums alone 0.3-8      hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00
+  typical 65.7-85.5      hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.56/1.00 synth 0.61/0.79 bright 0.27/0.50 energy 0.16/0.18 section 0.20/0.24
+  drums stopped 184-194  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.42/1.00 synth 0.63/0.76 bright 0.38/0.54 energy 0.22/0.23 section 0.19/0.20
+  last second 209-210.4  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.01/0.01 section 0.09/0.09
+== stereo (exit 0)
+  drums alone 0.3-8      hit 0.00/0.22 front 0.44/0.93 accent 0.00/0.68 glint 0.10/1.00 bass 0.90/1.00 synth 0.00/0.00 bright 0.22/0.70 energy 0.53/0.73 section 0.12/0.32
+  typical 65.7-85.5      hit 0.00/0.97 front 0.23/0.83 accent 0.00/0.80 glint 0.18/1.00 bass 0.51/0.73 synth 0.35/0.47 bright 0.12/0.16 energy 0.55/0.58 section 0.60/0.64
+  drums stopped 184-194  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/1.00 bass 0.10/0.35 synth 0.10/0.28 bright 0.16/0.30 energy 0.32/0.48 section 0.50/0.54
+  last second 209-210.4  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.57/0.58 energy 0.01/0.01 section 0.18/0.19
+== silence (exit 0)
+  drums alone 0.3-8      hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00
+  typical 65.7-85.5      hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00
+  drums stopped 184-194  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00
+  last second 209-210.4  hit 0.00/0.00 front 0.00/0.00 accent 0.00/0.00 glint 0.00/0.00 bass 0.00/0.00 synth 0.00/0.00 bright 0.00/0.00 energy 0.00/0.00 section 0.00/0.00

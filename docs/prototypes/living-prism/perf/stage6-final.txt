@@ -1,0 +1,40 @@
+heavy-live-r1          gpu p50  28.7 p95  29.5 | frame p50  33.3 p99  39.7 | miss 3 {'High': 177, 'Ultra': 424}
+    scene 21.27, depth 0.65, shadow 0.62, ao 0.50, volume.march 5.14
+heavy-live-r2          gpu p50  28.7 p95  29.5 | frame p50  33.4 p99  40.0 | miss 2 {'High': 177, 'Ultra': 423}
+    scene 21.20, depth 0.64, shadow 0.62, ao 0.50, volume.march 5.15
+heavy-live-r3          gpu p50  28.6 p95  29.5 | frame p50  33.3 p99  40.1 | miss 1 {'High': 177, 'Ultra': 424}
+    scene 21.14, depth 0.64, shadow 0.62, ao 0.50, volume.march 5.15
+heavy-ultra-norefr     gpu p50  25.1 p95  26.7 | frame p50  27.9 p99  34.2 | miss None 
+    scene 17.43, depth 0.68, shadow 0.63, ao 0.52, volume.march 5.23
+heavy-ultra-nossr      gpu p50  29.1 p95  29.8 | frame p50  32.1 p99  38.5 | miss None 
+    scene 21.57, depth 0.65, shadow 0.61, ao 0.51, volume.march 5.23
+heavy-ultra            gpu p50  29.3 p95  30.3 | frame p50  32.5 p99  39.2 | miss None 
+    scene 21.72, depth 0.65, shadow 0.62, ao 0.52, volume.march 5.23
+heavy2-emergency       gpu p50  14.6 p95  18.9 | frame p50  20.2 p99  28.2 | miss None 
+    scene 10.88, depth 1.24, shadow 0.56, volume.march 0.90, tonemap 0.32
+heavy2-live-r1         gpu p50  29.5 p95  30.5 | frame p50  33.3 p99  40.4 | miss 3 {'High': 177, 'Ultra': 424}
+    scene 22.15, depth 0.67, shadow 0.58, ao 0.52, volume.march 5.03
+heavy2-live-r2         gpu p50  29.6 p95  30.6 | frame p50  33.2 p99  39.7 | miss 1 {'Ultra': 601}
+    scene 22.16, depth 0.68, shadow 0.59, ao 0.53, volume.march 5.10
+heavy2-live-r3         gpu p50  29.5 p95  30.6 | frame p50  33.3 p99  39.5 | miss 2 {'High': 177, 'Ultra': 424}
+    scene 22.20, depth 0.68, shadow 0.58, ao 0.52, volume.march 5.03
+heavy2-low             gpu p50  14.8 p95  18.7 | frame p50  20.0 p99  28.0 | miss None 
+    scene 10.86, depth 0.87, shadow 0.79, volume.march 1.23
+heavy2-ultra-norefr    gpu p50  26.8 p95  27.4 | frame p50  30.2 p99  36.7 | miss None 
+    scene 19.41, depth 0.69, shadow 0.59, ao 0.52, volume.march 5.09
+heavy2-ultra-nossr     gpu p50  28.7 p95  29.8 | frame p50  30.8 p99  36.6 | miss None 
+    scene 21.30, depth 0.66, shadow 0.60, ao 0.53, volume.march 5.09
+heavy2-ultra           gpu p50  29.6 p95  30.6 | frame p50  32.3 p99  38.8 | miss None 
+    scene 22.13, depth 0.68, shadow 0.58, ao 0.53, volume.march 5.09
+typ-live-r1            gpu p50  29.3 p95  30.4 | frame p50  33.3 p99  39.9 | miss 2 {'High': 177, 'Ultra': 423}
+    scene 21.95, depth 0.69, shadow 0.59, ao 0.52, volume.march 5.02
+typ-live-r2            gpu p50  29.3 p95  30.3 | frame p50  33.3 p99  39.7 | miss 2 {'High': 177, 'Ultra': 424}
+    scene 21.91, depth 0.70, shadow 0.56, ao 0.52, volume.march 5.02
+typ-live-r3            gpu p50  29.2 p95  30.4 | frame p50  33.3 p99  39.5 | miss 2 {'High': 177, 'Ultra': 424}
+    scene 21.92, depth 0.71, shadow 0.57, ao 0.53, volume.march 5.01
+typ-ultra-norefr       gpu p50  26.9 p95  27.4 | frame p50  29.1 p99  35.5 | miss None 
+    scene 19.41, depth 0.70, shadow 0.61, ao 0.53, volume.march 5.05
+typ-ultra-nossr        gpu p50  28.7 p95  29.6 | frame p50  30.8 p99  37.4 | miss None 
+    scene 21.23, depth 0.69, shadow 0.60, ao 0.53, volume.march 5.06
+typ-ultra              gpu p50  29.7 p95  30.6 | frame p50  32.4 p99  41.1 | miss None 
+    scene 22.30, depth 0.69, shadow 0.59, ao 0.53, volume.march 5.06

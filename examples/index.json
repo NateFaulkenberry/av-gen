@@ -729,6 +729,21 @@
       "name": "Rainbow World (offline)",
       "project": "rainbow-world/rainbow-world-offline.json",
       "generate": "python3 examples/rainbow-world/build.py   (needs Blender 5.x and the six CC0 Poly Haven rocks in assets/terrain/rocks: tools/fetch_polyhaven.py)"
+    },
+    {
+      "category": "Worlds",
+      "description": "Play live audio (any mix) and, optionally, a MIDI controller: CC 1 impacts (boost), CC 2 world response (boost), CC 9 look (Ultraviolet, Glacier, Solar Mineral, Opaline, Abyssal, Wild Spectrum), CC 10 look lock (unlocked, the look moves on at phrase boundaries when the music's character changes). The Living Prism: a compact crystal grotto round a black mirror pool, seen through a crusted rock arch, with glass crystal heroes that refract the grotto behind them. The music plays the crystals: each kick flashes the great spire and sends a ring of light out across the shore, the rock and every crystal; the claps light the cracked geode, the arch's crust and the rock's mineral seams; the hats glint in the facets; the bass moves the leaning blades, the hanging cluster, the water and the blue passage; the synth lights the small crystals and colours the tips; and on each phrase a run of light travels the arch from foot to foot. A slow, restrained camera loops the pool. It follows drum, bass and synth stems when a multichannel input maps channels to them (Live panel, Inputs), and the main mix otherwise. The Living Prism (offline), under Offline > Worlds, plays Feline Footwear from its stems for renders. Run examples/living-prism/build.py first (Blender 5.x; it writes the scene). See docs/prototypes/living-prism/.",
+      "live": true,
+      "name": "The Living Prism",
+      "project": "living-prism/living-prism.json",
+      "generate": "python3 examples/living-prism/build.py   (needs Blender 5.x; every mesh is generated, no downloads)"
+    },
+    {
+      "category": "Worlds",
+      "description": "The Living Prism at full quality, for renders: the crystal grotto round its mirror pool, playing the Feline Footwear mix analysed from its drum, bass and synth stems -- kick fronts from the spire, claps in the geode and the arch, the bass in the blades and the water, the synth in the small crystals, a run of light along the arch on each phrase, and looks that change with the music. The same reactivity as the live version, with the mix as fallback where a stem is missing. Run examples/living-prism/build.py first (Blender 5.x; it writes the scene). See docs/prototypes/living-prism/.",
+      "name": "The Living Prism (offline)",
+      "project": "living-prism/living-prism-offline.json",
+      "generate": "python3 examples/living-prism/build.py   (needs Blender 5.x; every mesh is generated, no downloads)"
     }
   ]
 }
