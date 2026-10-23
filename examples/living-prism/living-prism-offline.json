@@ -11817,16 +11817,20 @@
        "offset": -2.6,
        "attackMs": 1500.0,
        "decayMs": 2500.0
-      }
+      },
+      "depthSource": "stem.synth.level",
+      "depthMin": 0.0,
+      "depthMax": 1.6,
+      "depthDefault": 0.0
      },
      {
-      "source": "audio.centroid",
+      "source": "sonic.brightness.slow",
       "chain": {
        "clampEnabled": true,
        "clampMin": 0.0,
        "clampMax": 1.0,
-       "gain": 3.0,
-       "offset": -1.2,
+       "gain": 4.0,
+       "offset": -1.7,
        "attackMs": 1500.0,
        "decayMs": 2500.0
       }
