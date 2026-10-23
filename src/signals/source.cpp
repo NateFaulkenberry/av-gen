@@ -931,6 +931,8 @@ bool ControlSource::addChannel(const std::string& channel, bool isEvent) {
     channels_.push_back(channel);
     events_.push_back(isEvent);
     values_.push_back(0.0f);
+    rests_.push_back(0.0f);
+    moved_.push_back(false);
     pending_.push_back(-1.0f);
     outputs_.push_back(kInvalidSignal);
     needsAttach_ = true;
@@ -955,7 +957,39 @@ void ControlSource::set(const std::string& channel, float value) {
     for (std::size_t i = 0; i < channels_.size(); ++i) {
         if (channels_[i] == channel) {
             values_[i] = std::clamp(value, 0.0f, 1.0f);
+            moved_[i] = true;
             return;
+        }
+    }
+}
+
+void ControlSource::setRest(const std::string& channel, float rest) {
+    addChannel(channel, false);
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel && !events_[i]) {
+            rests_[i] = std::clamp(rest, 0.0f, 1.0f);
+            if (!moved_[i]) {
+                values_[i] = rests_[i];
+            }
+            return;
+        }
+    }
+}
+
+float ControlSource::rest(const std::string& channel) const {
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (channels_[i] == channel) {
+            return rests_[i];
+        }
+    }
+    return 0.0f;
+}
+
+void ControlSource::resetToRest() {
+    for (std::size_t i = 0; i < channels_.size(); ++i) {
+        if (!events_[i]) {
+            values_[i] = rests_[i];
+            moved_[i] = false;
         }
     }
 }

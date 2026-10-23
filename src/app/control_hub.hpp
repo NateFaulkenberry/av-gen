@@ -101,7 +101,7 @@ public:
 
 private:
     void applyTarget(Engine& engine, const control::BindingTarget& target, const control::Match& match);
-    static float currentNormalised(Engine& engine, const control::BindingTarget& target); // ADR-1606
+    float currentNormalised(Engine& engine, const control::BindingTarget& target) const; // ADR-1606, ADR-1612
     // Query replies and feedback.
     [[nodiscard]] control::OscSender* replySender(const control::OscMessage& request);
     [[nodiscard]] control::OscMessage parameterMessage(const params::IParameter& parameter) const;

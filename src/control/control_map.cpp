@@ -154,6 +154,17 @@ nlohmann::json ControlMap::toJson() const {
     if (midiPickup) {
         out["midi"]["pickup"] = true; // ADR-1606: written only when on, so every existing project saves as it was
     }
+    if (!channelRests.empty()) { // ADR-1612: likewise
+        nlohmann::json channels = nlohmann::json::array();
+        for (const auto& c : channelRests) {
+            nlohmann::json e{{"name", c.name}, {"rest", c.rest}};
+            if (c.pickup) {
+                e["pickup"] = true;
+            }
+            channels.push_back(std::move(e));
+        }
+        out["channels"] = std::move(channels);
+    }
     return out;
 }
 
@@ -243,7 +254,45 @@ Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
             }
         }
     }
+    if (const auto it = j.find("channels"); it != j.end()) { // ADR-1612
+        if (!it->is_array()) {
+            return fail("control.channels must be an array of {name, rest[, pickup]}");
+        }
+        for (const auto& e : *it) {
+            if (!e.is_object() || !e.contains("name") || !e["name"].is_string() || e["name"].get<std::string>().empty()) {
+                return fail("control.channels: every entry needs a 'name'");
+            }
+            ChannelRest c;
+            c.name = e["name"].get<std::string>();
+            if (c.name.starts_with("control.")) {
+                return fail("control.channels: '{}' is named without the 'control.' prefix", c.name);
+            }
+            if (!e.contains("rest") || !e["rest"].is_number()) {
+                return fail("control.channels '{}' needs a numeric 'rest' (0..1)", c.name);
+            }
+            c.rest = e["rest"].get<float>();
+            if (!(c.rest >= 0.0f && c.rest <= 1.0f)) {
+                return fail("control.channels '{}': rest {} is outside 0..1", c.name, c.rest);
+            }
+            c.pickup = e.value("pickup", false);
+            for (const auto& other : m.channelRests) {
+                if (other.name == c.name) {
+                    return fail("control.channels: '{}' is declared twice", c.name);
+                }
+            }
+            m.channelRests.push_back(std::move(c));
+        }
+    }
     return m;
+}
+
+const ChannelRest* ControlMap::restFor(std::string_view channel) const {
+    for (const auto& c : channelRests) {
+        if (c.name == channel) {
+            return &c;
+        }
+    }
+    return nullptr;
 }
 
 std::vector<ControlMap::Channel> ControlMap::channels() const {
@@ -257,8 +306,13 @@ std::vector<ControlMap::Channel> ControlMap::channels() const {
                 return;
             }
         }
-        out.push_back({name, event});
+        const ChannelRest* rest = event ? nullptr : restFor(name);
+        out.push_back({name, event, rest != nullptr ? rest->rest : 0.0f});
     };
+    // ADR-1612: a declared channel exists (at its rest) even before a binding or OSC names it.
+    for (const auto& c : channelRests) {
+        add(c.name, false);
+    }
     for (const auto& b : midi) {
         add(b.target.signal, b.kind == MidiBindKind::NoteEvent);
     }
@@ -378,6 +432,10 @@ std::optional<DirectCommand> parseDirectOsc(const OscMessage& message, std::stri
         if (cmd.values.empty()) {
             cmd.values.push_back(1.0f);
         }
+        return cmd;
+    }
+    if (verb == "control" && rest == "reset") { // ADR-1612: every control channel back to its rest
+        cmd.kind = K::ControlReset;
         return cmd;
     }
     if (verb == "state") {

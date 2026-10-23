@@ -22,6 +22,7 @@ Direct scheme (no binding needed; prefix `/avgen` by default):
 | `/avgen/preset/morph` | `s` a, `s` b, `f` t | morphs between two presets |
 | `/avgen/transport/play`, `pause`, `stop`, `toggle` | | transport |
 | `/avgen/transport/seek` | `f` seconds | seek |
+| `/avgen/control/reset` | -- | every control channel back to its rest (ADR-1612) |
 
 Bindings (`control.osc.bindings`) map any address or pattern (`/fader/*`) and argument index to
 a control channel and/or a parameter with an input range (`inMin`/`inMax`, e.g. 0..127) and a
@@ -56,7 +57,16 @@ continuous binding: `cc`, `pitchBend`, `pressure`) keeps a knob from jumping a p
 else moved -- a preset recall, a scene state, a project load, the UI. The knob is ignored until it
 reaches the parameter's current value (within 2% of its range) or passes through it, then it
 follows; if the parameter moves under it again, it lets go again. Control-signal targets have
-nothing to take over from and ignore it. The hub counts the held moves (`pickupHeld`).
+nothing to take over from and ignore it, unless the channel declares a rest (below). The hub counts the held moves
+(`pickupHeld`).
+
+**Channel rests (ADR-1612).** A continuous channel can declare the value it holds until its knob first moves:
+`"channels": [ { "name": "glow", "rest": 0.5, "pickup": true } ]` in the control block. Undeclared channels rest at 0,
+as before. A knob that should cut as well as boost rests at 0.5 and is read through a `bipolar` route (0.5 -> 0, 0 ->
+-1, 1 -> +1), so the scene looks as authored until the performer touches it. Every channel returns to its rest when a
+project loads and on `<prefix>/control/reset`. With `"pickup": true` on the channel (or a pickup binding, or
+`control.midi.pickup`), the rest is something to take over from: the knob is held until it reaches the channel's value,
+then follows; after a reset it lets go until it comes back.
 
 ### MIDI clock as the tempo source
 
@@ -88,7 +98,8 @@ switching back is instant.
   "midi": { "enabled": true, "filter": "*",
             "bindings": [ { "kind": "cc", "channel": -1, "number": 1, "signal": "mod" },
                           { "kind": "noteEvent", "number": 36, "signal": "kick" },
-                          { "kind": "note", "number": 40, "toggle": true, "parameter": "post/bloom/enabled" } ] }
+                          { "kind": "note", "number": 40, "toggle": true, "parameter": "post/bloom/enabled" } ] },
+  "channels": [ { "name": "mod", "rest": 0.5, "pickup": true } ]
 }
 ```
 

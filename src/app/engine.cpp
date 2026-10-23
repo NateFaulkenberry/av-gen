@@ -605,6 +605,9 @@ void Engine::ensureControlSource() {
     auto* control = dynamic_cast<signals::ControlSource*>(existing);
     for (const auto& channel : controlHub_.map().channels()) {
         control->addChannel(channel.name, channel.event);
+        if (!channel.event) {
+            control->setRest(channel.name, channel.rest); // ADR-1612 (0 when undeclared: as before)
+        }
     }
 }
 
@@ -3304,6 +3307,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     stage(6);
     outputs_ = doc.contains("outputs") && doc["outputs"].is_array() ? doc["outputs"] : nlohmann::json::array();
     ensureControlSource();
+    controlSource().resetToRest(); // ADR-1612: a loaded project starts with its knobs at rest
     sources_.attach(bus_, params_);
     if (doc.contains("shaders")) {
         if (auto r = shaderLayers_.fromJson(doc["shaders"]); !r) {

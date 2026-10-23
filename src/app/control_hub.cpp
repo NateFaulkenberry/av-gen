@@ -159,7 +159,7 @@ void ControlHub::applyTarget(Engine& engine, const control::BindingTarget& targe
 }
 
 // ADR-1606: where a binding's target stands now, 0..1 on the binding's own scale (-1 when it has none to read).
-float ControlHub::currentNormalised(Engine& engine, const control::BindingTarget& target) {
+float ControlHub::currentNormalised(Engine& engine, const control::BindingTarget& target) const {
     if (!target.parameter.empty()) {
         if (const auto* p = engine.params().find(target.parameter); p != nullptr && p->componentCount() > 0) {
             const std::size_t c = target.component < 0 ? 0 : static_cast<std::size_t>(target.component);
@@ -168,7 +168,11 @@ float ControlHub::currentNormalised(Engine& engine, const control::BindingTarget
             }
         }
     }
-    // A control signal only ever moves with its knob (or OSC), so it has nothing to take over from.
+    // A control signal only moves with its knob (or OSC); with a declared rest (ADR-1612) there is a value to take over
+    // from -- the rest, until the knob reaches it.
+    if (!target.signal.empty() && map_.restFor(target.signal) != nullptr) {
+        return engine.controlSource().value(target.signal);
+    }
     return -1.0f;
 }
 
@@ -196,7 +200,9 @@ void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) 
             const bool continuous = binding.kind == control::MidiBindKind::ControlChange ||
                                     binding.kind == control::MidiBindKind::PitchBend ||
                                     binding.kind == control::MidiBindKind::ChannelPressure;
-            if (continuous && !match->event && (binding.pickup || map_.midiPickup)) {
+            const control::ChannelRest* rest =
+                binding.target.signal.empty() ? nullptr : map_.restFor(binding.target.signal); // ADR-1612
+            if (continuous && !match->event && (binding.pickup || map_.midiPickup || (rest != nullptr && rest->pickup))) {
                 const float current = currentNormalised(engine, binding.target);
                 if (current >= 0.0f && !control::pickupAccepts(binding.pickupState, match->value, current)) {
                     ++pickupHeld_;
@@ -253,6 +259,10 @@ void ControlHub::applyOsc(Engine& engine, const control::OscMessage& message) {
                 break;
             case K::PresetMorph:
                 engine.morphPresets(cmd->path, cmd->second, std::clamp(cmd->values.front(), 0.0f, 1.0f));
+                break;
+            case K::ControlReset: // ADR-1612
+                engine.controlSource().resetToRest();
+                matched = true;
                 break;
             case K::StateGo:
                 matched = engine.goToState(cmd->path, !cmd->values.empty() && cmd->values.front() > 0.5f);

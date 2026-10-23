@@ -308,6 +308,12 @@ public:
     // Fires an event channel on the next update (strength 0..1); creates it when unknown.
     void pulse(const std::string& channel, float strength = 1.0f);
     [[nodiscard]] float value(const std::string& channel) const; // last set value (0 when unknown)
+    // ADR-1612: a continuous channel's rest, the value it holds until set() first moves it (and after resetToRest).
+    // Declares the channel when unknown; moves the value to the new rest only while the channel has not been moved.
+    void setRest(const std::string& channel, float rest);
+    [[nodiscard]] float rest(const std::string& channel) const; // 0 when unknown or undeclared
+    // Every continuous channel back to its rest, as if no knob had moved (a project load, `<prefix>/control/reset`).
+    void resetToRest();
     // True when set()/pulse() created channels since the last attach(); cleared by attach().
     [[nodiscard]] bool needsAttach() const { return needsAttach_; }
 
@@ -315,6 +321,8 @@ private:
     std::vector<std::string> channels_;
     std::vector<bool> events_;
     std::vector<float> values_;
+    std::vector<float> rests_;      // ADR-1612
+    std::vector<bool> moved_;       // ADR-1612: set() has written it since the last rest
     std::vector<float> pending_;    // event strength queued for the next update (-1 = none)
     std::vector<SignalId> outputs_;
     bool needsAttach_ = false;
