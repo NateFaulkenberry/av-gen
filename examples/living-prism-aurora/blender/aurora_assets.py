@@ -38,7 +38,7 @@ def basis(axis):
     return u, a.cross(u).normalized(), a
 
 
-def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, chisel=None, embed=0.12):
+def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, chisel=None, embed=0.12, broken=False):
     """One crystal shard into bm. width: its cross-section's larger radius; flat: thickness / width."""
     sides = sides or 6                                      # phase 2c: hexagonal columns, always
     flat = flat if flat is not None else rng.uniform(0.82, 0.98)   # nearly round: a column, never a slab
@@ -54,6 +54,18 @@ def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, c
         return [bm.verts.new(c + u * (math.cos(t) * r * sc) + v * (math.sin(t) * r * sc * flat))
                 for t, r in zip(angles, rs)]
     r0 = ring(base - a * (embed * length), 1.0)
+    if broken:   # phase 2g: a broken stub -- the column snapped off on a slanted plane, no termination
+        r1 = ring(base + a * length, 1.0)
+        cut = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)).normalized()
+        top = base + a * length
+        for vv in r1:
+            vv.co += a * ((vv.co - top).dot(cut) * rng.uniform(0.5, 0.9))
+        for i in range(sides):
+            j = (i + 1) % sides
+            bm.faces.new((r0[i], r0[j], r1[j], r1[i]))
+        bm.faces.new(r1)
+        bm.faces.new(list(reversed(r0)))
+        return
     r1 = ring(base + a * (length - tip), rng.uniform(0.88, 1.0))
     off = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.25
     top = base + a * length + off
@@ -98,6 +110,19 @@ FAMILIES = {
     "pairR": (29, [(0, 0, 5.2, 44, 12, 18), (-9, 14, 4.4, 36, 16, 24), (-6, -4, 2.4, 13, 22, 34),
                    (9, -3, 2.0, 10, 30, 44)], 1),
 
+    # phase 2g (the owner: "vary the foreground crystals a bit more on the right hand side"): new silhouettes --
+    # a single tall needle, a stub of broken columns, a hard-leaning pair, a right-hand fan. A 7th value of 1 in a
+    # shard row makes it a broken stub.
+    "needle": (53, [(0, 0, 3.0, 62, 2, 6), (4, 3, 1.8, 14, 20, 30)], 1),
+    "stub": (59, [(0, 0, 5.6, 16, 4, 12, 1), (7, 4, 4.4, 11, 14, 24, 1), (-6, 3, 3.8, 9, 10, 22, 1),
+                  (3, -6, 2.6, 18, 24, 34), (-4, -5, 2.0, 10, 30, 42)], 1),
+    "leanPair": (61, [(0, 0, 4.6, 46, 30, 36), (7, 5, 3.6, 34, 38, 46), (-4, -4, 2.0, 12, 16, 26)], 1),
+    "fanR": (67, [(0, 0, 3.8, 48, 8, 14), (7, 4, 3.4, 40, 18, 26), (-5, 6, 3.0, 34, 4, 10),
+                  (11, -3, 2.6, 24, 30, 42), (-9, -4, 2.4, 18, 14, 24), (4, -8, 2.2, 14, 22, 34)], 1),
+    # phase 2g: the left bank's dominant mass -- a big full cluster to stand on the wall
+    "massL": (71, [(0, 0, 5.0, 58, 6, 12), (-8, 5, 4.4, 50, 14, 22), (7, 4, 4.0, 42, 4, 10), (-14, -2, 3.6, 36, 22, 30),
+                   (12, -4, 3.2, 30, 16, 26), (-4, -9, 3.0, 24, 26, 38), (16, 6, 2.6, 20, 30, 44),
+                   (-18, 8, 2.4, 16, 32, 46), (5, 11, 2.2, 14, 10, 24)], -1),
     # name: (seed, [(dx, dy, width, length, lean_lo, lean_hi)], outward +x)
     "cluster": (11, [(0, 0, 4.6, 40, 4, 10), (5, 3, 3.6, 30, 14, 24), (-4, 2, 3.2, 26, 8, 18), (3, -5, 3.0, 22, 20, 34),
                      (-6, -4, 2.6, 17, 24, 38), (8, -2, 2.4, 14, 30, 45), (-2, 6, 2.2, 12, 18, 30)], 1),
@@ -114,9 +139,11 @@ def build_family(name, out):
     seed, spec, outward = FAMILIES[name]
     rng = random.Random(seed)
     bm = bmesh.new()
-    for dx, dy, w, ln, lo, hi in spec:
+    for row in spec:
+        dx, dy, w, ln, lo, hi = row[:6]
         shard._apex = None
-        shard(bm, (dx, dy, 0.0), lean(rng, outward, lo * 0.8, hi * 0.8), w * 1.6, ln, rng)
+        shard(bm, (dx, dy, 0.0), lean(rng, outward, lo * 0.8, hi * 0.8), w * 1.6, ln, rng,
+              broken=len(row) > 6 and row[6] == 1)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)

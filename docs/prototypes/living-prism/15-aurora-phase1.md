@@ -325,3 +325,39 @@ The triplanar and the fourth fbm were not the cost. Replacing them alone saved a
 | Live auto | 23.5 / 25.9 ms (2e: 30.3 / 36.0) | 39.7 ms | Ultra 273, High 177 (100% High or better) | 1 |
 
 That leaves about 10 ms of headroom against 33.3 ms. Against 8.33 ms it is still about 2.8x over.
+
+## Phase 2g gate (2026-10-23)
+
+The owner's 2f verdict: "left hand side foreground crystals need to be out of the canyon wall a bit more, crystals need to dominate that side of the river more - vary the foreground crystals a bit more on the right hand side - they look very similar, trying brining water level of river up a tad to make it look a bit wider".
+
+**Left bank:**
+- The foreground fan (L1, scale 2.4) stands out on the bank, as near the water as the clearance check allows (setback 120 m, 6 m from the wet edge).
+- A new full mass, `massL` (9 shards, scale 2.8), stands on the wall behind and down-valley of it. Its share is 47% (hull floor); it reads as the backing mass.
+- L2 and L3 are larger (2.8 and 3.0).
+- The left bank's crystals cover about 28% of the frame.
+
+**Right bank, new silhouettes** from `blender/aurora_assets.py`:
+- `needle`: a single tall column with a small companion.
+- `stub`: broken columns snapped on a slanted plane, a new `broken` mode in the shard builder.
+- `leanPair`: two columns leaning hard.
+- `fanR`: a right-hand fan.
+- The bank now reads R1 pair, R2 needle, R3 stub, R4 leaning pair, R5 fan, R6 small.
+
+**The river:**
+- Every reach's level is up 1.5 m, so the water spreads wider across the floor.
+- The clearance check was rerun at the new wet edge. It caught L1 inside the water at its old setback, and L5 inside it in the search's best candidate; both were moved.
+- Clearances now: L1 6, R4 9, L5 18, R5 18 m; the rest are clear past 25 m.
+
+**Layering:** the setbacks come from the seeded search (`build/aurora/tune3.py`).
+- Visible shares: L1 100, L1b 47, L2 100, L3 72, L4 100, L5 94, L6 91, R1 100, R2 100, R3 63, R4 100, R5 51, R6 89.
+- Crystals cover 38.5% of the frame (2f: 29.8%).
+- `phase2g-layering.jpg` labels each outline.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 23.1 / 26.1 ms | 60.8 ms (one spike; p50 30.5) | Ultra | n/a |
+| Live auto | 24.8 / 29.3 ms | 37.2 ms | 100% Ultra (450 frames) | 1 |
+
+The 2f budget holds.

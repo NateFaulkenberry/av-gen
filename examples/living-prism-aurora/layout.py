@@ -25,13 +25,14 @@ FAR = 6000.0
 # phase 2f (the owner: "river is still not wide enough and looks like it just comes to an abrupt end"): wider again,
 # and three reaches now -- near, mid, and a distant reach that winds on to z = -1760, narrowing by perspective into
 # the haze under the horizon glow, to the foot of the near ridge (now at 1800 m) so it never ends at a wall
-RIVER_NEAR_PATH = [(-10.0, 0.0, 240.0), (-30.0, 0.0, 150.0), (26.0, -0.2, 75.0), (44.0, -0.4, 10.0),
-                   (-10.0, -0.7, -55.0), (-32.0, -1.0, -105.0)]
-RIVER_PATH = [(-32.0, -1.0, -105.0), (-8.0, -1.5, -165.0), (24.0, -2.2, -230.0), (18.0, -3.0, -300.0),
-              (-14.0, -4.0, -370.0), (-18.0, -5.0, -450.0), (8.0, -6.5, -560.0), (10.0, -8.0, -720.0),
-              (-6.0, -10.0, -900.0)]
-RIVER_FAR_PATH = [(-6.0, -10.0, -900.0), (-24.0, -12.0, -1080.0), (8.0, -14.0, -1280.0), (30.0, -16.0, -1500.0),
-                  (24.0, -18.0, -1760.0)]
+# phase 2g (the owner: "brining water level of river up a tad"): every level +1.5 m, so the water spreads wider
+RIVER_NEAR_PATH = [(-10.0, 1.5, 240.0), (-30.0, 1.5, 150.0), (26.0, 1.3, 75.0), (44.0, 1.1, 10.0),
+                   (-10.0, 0.8, -55.0), (-32.0, 0.5, -105.0)]
+RIVER_PATH = [(-32.0, 0.5, -105.0), (-8.0, 0.0, -165.0), (24.0, -0.7, -230.0), (18.0, -1.5, -300.0),
+              (-14.0, -2.5, -370.0), (-18.0, -3.5, -450.0), (8.0, -5.0, -560.0), (10.0, -6.5, -720.0),
+              (-6.0, -8.5, -900.0)]
+RIVER_FAR_PATH = [(-6.0, -8.5, -900.0), (-24.0, -10.5, -1080.0), (8.0, -12.5, -1280.0), (30.0, -14.5, -1500.0),
+                  (24.0, -16.5, -1760.0)]
 RIVERS = [{"name": "riverNear", "path": RIVER_NEAR_PATH, "width": 100.0, "amplitude": 2.6, "falloff": 0.6,
            "smoothing": 3},
           {"name": "river", "path": RIVER_PATH, "width": 58.0, "amplitude": 2.4, "falloff": 0.7, "smoothing": 3},
@@ -186,21 +187,26 @@ _FORMATION_SPEC = [   # (name, z, side, setback m, yaw deg, scale, family, tilt 
     # side of river can be made larger - crystals should fill up more of the scene ... right bank more crystals too"):
     # twelve formations, larger, alternating near the water and out on the slopes so each depth layer's silhouette
     # stands clear of the one in front (layering() measures it). Each leans away from the river at its own angle.
-    ("L1", -15.0, -1, 125.0, 10.0, 2.0, "fan", 4.0, 3.0),
-    ("L2", -150.0, -1, 100.0, 40.0, 2.4, "spire", 14.0, 6.0),
-    ("L3", -300.0, -1, 165.0, 115.0, 2.7, "cluster", 8.0, -10.0),    # out on the slope, clear of L2's sightline
-    ("L4", -440.0, -1, 85.0, -35.0, 2.5, "spire2", 20.0, 9.0),
-    ("L5", -700.0, -1, 100.0, 160.0, 3.2, "far", 8.0, 5.0),
-    ("L6", -1050.0, -1, 150.0, 60.0, 4.0, "spire", 12.0, -6.0),        # the distant pair over the vanishing river
-    ("R1", -60.0, 1, 165.0, -10.0, 2.4, "pairR", 3.0, -2.0),
-    ("R2", -185.0, 1, 160.0, -65.0, 2.7, "spire2", 9.0, -8.0),
-    ("R3", -270.0, 1, 120.0, 25.0, 2.8, "cluster", 12.0, 4.0),
-    ("R4", -390.0, 1, 160.0, 70.0, 2.5, "pair", 16.0, -12.0),
-    ("R5", -560.0, 1, 100.0, -20.0, 2.8, "spire", 18.0, 6.0),
-    ("R6", -850.0, 1, 70.0, 100.0, 3.4, "small", 10.0, -4.0),
+    # phase 2g (the owner: "left hand side foreground crystals need to be out of the canyon wall a bit more,
+    # crystals need to dominate that side of the river more - vary the foreground crystals a bit more on the right"):
+    # the left fan stands out on the bank near the water, free of the wall; a big full mass (massL) stands on the
+    # wall behind it; the right bank mixes a pair, a needle, broken stubs, a leaning pair and a fan.
+    ("L1", -15.0, -1, 120.0, 10.0, 2.4, "fan", 4.0, 3.0),
+    ("L1b", -150.0, -1, 180.0, -20.0, 2.8, "massL", 6.0, -4.0),
+    ("L2", -235.0, -1, 75.0, 40.0, 2.8, "spire", 14.0, 6.0),
+    ("L3", -300.0, -1, 120.0, 115.0, 3.0, "cluster", 8.0, -10.0),
+    ("L4", -440.0, -1, 180.0, -35.0, 2.7, "spire2", 20.0, 9.0),
+    ("L5", -700.0, -1, 100.0, 160.0, 3.4, "far", 8.0, 5.0),
+    ("L6", -1050.0, -1, 150.0, 60.0, 4.0, "spire", 12.0, -6.0),
+    ("R1", -60.0, 1, 145.0, -10.0, 2.4, "pairR", 3.0, -2.0),
+    ("R2", -185.0, 1, 90.0, -65.0, 2.6, "needle", 7.0, -8.0),
+    ("R3", -270.0, 1, 160.0, 25.0, 3.0, "stub", 4.0, 4.0),
+    ("R4", -390.0, 1, 75.0, 70.0, 2.6, "leanPair", 10.0, -12.0),
+    ("R5", -560.0, 1, 75.0, -20.0, 2.8, "fanR", 12.0, 6.0),
+    ("R6", -850.0, 1, 75.0, 100.0, 3.4, "small", 10.0, -4.0),
 ]
 # A family whose shards lean to +x leans toward the river on the left bank: turn it round there (yaw + 180).
-FAMILY_OUTWARD = {"fan": -1, "pairR": 1, "cluster": 1, "pair": 1, "spire": 1, "spire2": 1, "small": 1, "small2": 1,
+FAMILY_OUTWARD = {"needle": 1, "stub": 1, "leanPair": 1, "fanR": 1, "massL": -1, "fan": -1, "pairR": 1, "cluster": 1, "pair": 1, "spire": 1, "spire2": 1, "small": 1, "small2": 1,
                   "far": 1}
 _CENTRE = _chaikin(_ALL_RIVER, 3)
 
