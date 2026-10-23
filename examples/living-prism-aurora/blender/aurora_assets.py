@@ -336,7 +336,8 @@ def build_scan(name, out):
     off = Vector(((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, min(zs)))
     for v in me.vertices:
         v.co -= off
-    me.materials.clear()
+    # phase 3c+ (17: textures on the rock): the scan keeps its own Poly Haven CC0 PBR textures (1k albedo, normal,
+    # roughness), embedded in the GLB; the scene tints them rather than shading them with the ground program
     for p in me.polygons:
         p.use_smooth = True
     ob.name = name
@@ -345,7 +346,8 @@ def build_scan(name, out):
     ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=True,
-                              export_yup=True, export_apply=True, export_normals=True, export_materials="NONE")
+                              export_yup=True, export_apply=True, export_normals=True, export_materials="EXPORT",
+                              export_image_format="JPEG")
     # AV Gen extents (x, y up, z)
     SCAN_SIZES[name] = [round(max(xs) - min(xs), 3), round(max(zs) - min(zs), 3), round(max(ys) - min(ys), 3)]
     print("EXPORTED", name, len(me.polygons), "faces", SCAN_SIZES[name])

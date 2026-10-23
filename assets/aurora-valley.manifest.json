@@ -13,8 +13,8 @@
    "attribution": "not required (credit given: Poly Haven, Rob Tuytel)",
    "localPath": "assets/terrain/formations/coastal_cliff_02/coastal_cliff_02_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "cliff/outcrop"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "cliff/outcrop; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "namaqualand_cliff_02",
@@ -28,8 +28,8 @@
    "attribution": "not required (credit given: Poly Haven, Dario Barresi, Rico Cilliers)",
    "localPath": "assets/terrain/formations/namaqualand_cliff_02/namaqualand_cliff_02_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "cliff/outcrop"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "cliff/outcrop; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "rock_face_01",
@@ -42,8 +42,8 @@
    "attribution": "not required (credit given: Poly Haven, Dario Barresi)",
    "localPath": "assets/terrain/formations/rock_face_01/rock_face_01_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "cliff/outcrop"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "cliff/outcrop; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "coastal_cliff_04",
@@ -57,8 +57,8 @@
    "attribution": "not required (credit given: Poly Haven, Rob Tuytel, Rico Cilliers)",
    "localPath": "assets/terrain/formations/coastal_cliff_04/coastal_cliff_04_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "cliff/outcrop"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "cliff/outcrop; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "boulder_01",
@@ -71,8 +71,8 @@
    "attribution": "not required (credit given: Poly Haven, Rico Cilliers)",
    "localPath": "assets/terrain/rocks/boulder_01/boulder_01_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "scattered rock"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "scattered rock; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "rock_07",
@@ -85,8 +85,8 @@
    "attribution": "not required (credit given: Poly Haven, Jenelle van Heerden)",
    "localPath": "assets/terrain/rocks/rock_07/rock_07_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "scattered rock"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "scattered rock; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "rock_moss_set_01",
@@ -99,8 +99,8 @@
    "attribution": "not required (credit given: Poly Haven, Kless Gyzen)",
    "localPath": "assets/terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "scattered rock"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "scattered rock; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   },
   {
    "id": "stone_01",
@@ -114,8 +114,9 @@
    "attribution": "not required (credit given: Poly Haven, Dario Barresi, Rico Cilliers)",
    "localPath": "assets/terrain/rocks/stone_01/stone_01_1k.gltf",
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
-   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0, exported as geometry only (no textures); shaded by the scene's ground program",
-   "usedAs": "scattered rock"
+   "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
+   "usedAs": "scattered rock; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
   }
- ]
+ ],
+ "textures": "the Poly Haven scans' own CC0 textures; terrain textures need an engine change (programs take no texture inputs, ADR-030) -- the terrain is shaded procedurally"
 }

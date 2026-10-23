@@ -272,9 +272,11 @@ def scene_json(placed, scans):
                                    {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": k,
                                     "roughness": 1.0, "metallic": 0.0}, shadow=False))
     # the Poly Haven scans (phase 2e): cliffs on the rocky left, outcrops on the right, boulders on both banks
-    gmat = {"baseColor": [0.02, 0.03, 0.02], "roughness": 0.85, "metallic": 0.0, "program": "au_ground"}
-    for asset, pts in scans.items():   # phase 2f perf: no scan casts a shadow (measured ~1.8 ms in 2e)
-        nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, gmat, shadow=False))
+    # 17 (offline): the scans carry their own Poly Haven CC0 PBR textures; the material only tints them into the night
+    # (a cool, dark lavender) -- no program, so the scanned albedo, normal and roughness detail reads. Shadows on.
+    tmat = {"baseColor": [0.55, 0.5, 0.66], "roughness": 1.0, "metallic": 0.0}
+    for asset, pts in scans.items():
+        nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, tmat, shadow=True))
     # the far mountains: three ridges in place, receding in value through the fog (phase 2b)
     rmat = {"baseColor": [0.018, 0.020, 0.030], "roughness": 0.9, "metallic": 0.0}
     for r in ("ridgeNear", "ridgeMid", "ridgeFar"):
@@ -351,13 +353,127 @@ SCATTER = {  # asset: (count left, count right, scale lo, hi)
     "stone": (14, 6, 10.0, 24.0)}
 
 
-def place_scans(sizes, placed=()):
+def auto_cliffs(sizes, placed, footprints, count=11, seed=2026102317):
+    """17 (richer rock): textured scan cliffs where the camera sees bare canyon wall. Candidates on both walls (every
+    35 m down the valley, 150-300 m from the river) are projected through the camera; one is kept only if its
+    on-screen box is in frame, clear of every crystal's outline, and its top is visible past the terrain (a ray
+    against the engine's heights). Then up to `count`, greedily, none overlapping another by more than a fifth.
+    Returns CLIFFS-style rows (asset, z, side, setback, yaw, scale, sink)."""
+    import random
+    rng = random.Random(seed)
+    hulls = []
+    for f, pos, q, _g in placed:
+        sc = f[4]
+        pts = [L._project([pos[i] + v[i] for i in range(3)])
+               for v in (L._qrot(q, (sc * a[0], sc * a[1], sc * a[2])) for a in footprints[f[5]])]
+        hulls.append(L._hull([(round(x), round(y)) for x, y, _z in pts]))
+    cands = []
+    assets = ["cliffA", "cliffB", "cliffD"]
+    for z in range(-60, -780, -35):
+        for side in (-1, 1):
+            for sb in (150, 190, 230, 280):
+                a = rng.choice(assets)
+                w, h, d = sizes[a]
+                sc = rng.uniform(70.0, 120.0) / w
+                yaw = (90.0 if side < 0 else -90.0) + rng.uniform(-25, 25)
+                x = L.river_x(z) + side * sb
+                cands.append((a, z, side, sb, yaw, sc, x))
+    hs = L.engine_heights([(c[6], c[1]) for c in cands])
+    boxes = []
+    for c, gy in zip(cands, hs):
+        a, z, side, sb, yaw, sc, x = c
+        w, h, d = (v * sc for v in sizes[a])
+        cy, sy = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+        corners = [(x + cy * u + sy * v, gy + hh, z - sy * u + cy * v)
+                   for u in (-w / 2, w / 2) for v in (-d / 2, d / 2) for hh in (0.0, h * 0.7)]
+        pr = [L._project(p) for p in corners]
+        if min(p[2] for p in pr) <= 1:
+            continue
+        x0, x1 = min(p[0] for p in pr), max(p[0] for p in pr)
+        y0, y1 = min(p[1] for p in pr), max(p[1] for p in pr)
+        cx, cyy = (x0 + x1) / 2, (y0 + y1) / 2
+        if not (60 < cx < 1860 and 120 < cyy < 900) or (x1 - x0) < 40:
+            continue
+        probe = [(cx, cyy), (x0 + (x1 - x0) * 0.25, cyy), (x0 + (x1 - x0) * 0.75, cyy), (cx, y0 + (y1 - y0) * 0.3)]
+        if any(len(hl) > 2 and L._inside(hl, px, py) for hl in hulls for px, py in probe):
+            continue
+        boxes.append((c, gy, h, (x0, y0, x1, y1)))
+    # the top centre must be visible past the terrain
+    cam = L.CAMERA_POS
+    rays = []
+    for c, gy, h, _b in boxes:
+        tx, ty, tz = c[6], gy + h * 0.6, c[1]
+        rays.append([(cam[0] + (tx - cam[0]) * t, cam[2] + (tz - cam[2]) * t, cam[1] + (ty - cam[1]) * t)
+                     for t in (k / 24 * 0.95 for k in range(1, 25))])
+    rh = L.engine_heights([(rx, rz) for r in rays for rx, rz, _y in r])
+    visible = [b for i, b in enumerate(boxes) if all(rh[i * 24 + k] <= rays[i][k][2] for k in range(24))]
+
+    def overlap(p, q):
+        ix = max(0, min(p[2], q[2]) - max(p[0], q[0]))
+        iy = max(0, min(p[3], q[3]) - max(p[1], q[1]))
+        return ix * iy / max(1.0, min((p[2] - p[0]) * (p[3] - p[1]), (q[2] - q[0]) * (q[3] - q[1])))
+    chosen = []
+    for b in sorted(visible, key=lambda b: -(b[3][2] - b[3][0]) * (b[3][3] - b[3][1])):
+        if all(overlap(b[3], o[3]) < 0.2 for o in chosen):
+            chosen.append(b)
+        if len(chosen) >= count:
+            break
+    return [(c[0], c[1], c[2], c[3], c[4], c[5], 0.25) for c, _gy, _h, _bb in chosen]
+
+
+def auto_outcrops(sizes, placed, footprints, count=8, seed=2026102318):
+    """17 (richer rock): big textured rock outcrops (12-30 m) on the open foreground banks -- the reference's
+    foreground is rock and moss -- in frame, in the lower half, clear of every crystal's outline, off wet ground."""
+    import random
+    rng = random.Random(seed)
+    hulls = []
+    for f, pos, q, _g in placed:
+        sc = f[4]
+        pts = [L._project([pos[i] + v[i] for i in range(3)])
+               for v in (L._qrot(q, (sc * a[0], sc * a[1], sc * a[2])) for a in footprints[f[5]])]
+        hulls.append(L._hull([(round(x), round(y)) for x, y, _z in pts]))
+    cands = []
+    for z in range(120, -320, -20):
+        for side in (-1, 1):
+            for off in (60, 85, 110, 140):
+                a = rng.choice(["boulder", "mossrock", "boulder"])
+                target = rng.uniform(12.0, 30.0)
+                sc = target / max(sizes[a][0], sizes[a][2])
+                cands.append((a, z, side, off, rng.uniform(0, 360), sc, L.river_x(z) + side * off))
+    hs = L.engine_heights([(c[6], c[1]) for c in cands])
+    picked, boxes = [], []
+    for c, gy in zip(cands, hs):
+        lvl = L.water_level(c[6], c[1])
+        if lvl is not None and gy <= lvl + 1.0:
+            continue
+        r = 0.5 * max(sizes[c[0]][0], sizes[c[0]][2]) * c[5]
+        px, py, pz = L._project((c[6], gy + r * 0.5, c[1]))
+        if pz <= 1 or not (40 < px < 1880 and 560 < py < 1060):
+            continue
+        if any(len(hl) > 2 and L._inside(hl, px, py) for hl in hulls):
+            continue
+        rad = r / pz * 1080 / (2 * math.tan(math.radians(L.CAMERA_FOV) / 2))
+        if any(math.hypot(px - bx, py - by) < (rad + br) * 1.6 for bx, by, br in boxes):
+            continue
+        boxes.append((px, py, rad))
+        picked.append((c[0], c[1], c[2], c[3], c[4], c[5], 0.3))
+        if len(picked) >= count:
+            break
+    print("outcrops placed by view: %d" % len(picked))
+    return picked
+
+
+def place_scans(sizes, placed=(), footprints=None):
     """Points for each scan asset: the cliffs, then a sparse, seeded scatter on both banks, denser on the rocky left.
     Everything stands on the engine's ground, and nothing goes on wet ground."""
     import random
     rng = random.Random(2026102302)
     items = []
-    for asset, z, side, setback, yaw, sc, sink in CLIFFS:
+    cliffs = CLIFFS + (auto_cliffs(sizes, placed, footprints) if footprints else [])
+    if footprints:
+        cliffs += auto_outcrops(sizes, placed, footprints)
+    print("cliffs placed by view: %d" % (len(cliffs) - len(CLIFFS)))
+    for asset, z, side, setback, yaw, sc, sink in cliffs:
         items.append((asset, L.river_x(z) + side * setback, z, yaw, sc, sink))
     # phase 2h: no rock inside a crystal's ground footprint (a boulder half inside a cluster read as a dark notch)
     def clear_of_crystals(x, z, r):
@@ -380,7 +496,9 @@ def place_scans(sizes, placed=()):
         probes.append((x, z))
         probes += [(x + c * u + s_ * v, z - s_ * u + c * v) for u, v in ((w, d), (-w, d), (w, -d), (-w, -d))]
     ph = L.engine_heights(probes)
-    hs = [min(ph[i * 5:i * 5 + 5]) for i in range(len(items))]
+    # a cliff sits on the ground at its centre (it stands proud of the slope; from the lowest corner the uphill side
+    # swallowed it); everything else from the lowest corner, so nothing floats
+    hs = [ph[i * 5] if items[i][0].startswith("cliff") else min(ph[i * 5:i * 5 + 5]) for i in range(len(items))]
     pts = {}
     for (asset, x, z, yaw, sc, sink), h in zip(items, hs):
         lvl = L.water_level(x, z)
@@ -411,7 +529,8 @@ def main():
     sweep = L.terrain_sweep(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
     print("terrain (hidden % / buried %): " + " ".join("%s %.0f/%.0f" % r for r in sweep))
     os.makedirs(a.scene_dir, exist_ok=True)
-    sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json"))), placed))
+    sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json"))), placed,
+                                       json.load(open(os.path.join(a.assets, "footprints.json")))))
     for n in sc["nodes"]:
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":

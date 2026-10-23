@@ -136,3 +136,16 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase3c/`
 **Offline render:** 1080p, 2x supersample, `--tier offline`: 30 frames in 8.5 s, **0.28 s/frame**.
 
 **Checks:** clearance minimum 9 m (L5); terrain sweep at most 15% hidden and 22% buried (R5).
+
+## Rock pass (2026-10-23)
+
+**Textures.** The Poly Haven CC0 scans now keep their own 1k PBR textures (albedo, normal, roughness), embedded in the build GLBs. The GLBs are gitignored, and the manifest is updated. The scene tints them a cool lavender-grey with no program, so the scanned detail reads.
+
+**Terrain textures need an engine change (flagged).** Material programs take no texture inputs (ADR-030), so the terrain stays procedurally shaded. Real rock and moss PBR on the terrain needs either a texture input for programs or a triplanar texture layer on terrain materials.
+
+**Richer rock, placed by view:**
+- `build_scene.auto_cliffs`: candidate cliffs on both walls are projected through the camera and kept only where the camera sees bare wall. Each must be clear of every crystal outline, with its top visible past the terrain.
+- `auto_outcrops`: 12-30 m textured boulders and moss-rocks on the open foreground banks.
+- Cliffs now sit on the ground at their centre. Placed from the lowest corner, a cliff on a steep wall was swallowed by its uphill side.
+
+**Still open:** the cliffs read as texture on the walls rather than as the reference's dramatic rock faces. Bigger, layered rock geometry, and terrain textures through the engine, are the next steps for rock.
