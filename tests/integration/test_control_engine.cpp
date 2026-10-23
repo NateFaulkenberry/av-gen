@@ -467,3 +467,48 @@ TEST_CASE("OSC feedback pushes parameter changes to the feedback host but never 
     CHECK_FALSE(waitForOsc(rx, received, [](const auto& r) { return !r.empty(); }, 100));
     CHECK(engine.control().status().feedbackSent == 3);
 }
+
+// ADR-1606: soft takeover. A knob bound with pickup does not jump a parameter that something else moved: it waits for
+// the knob to reach (or pass) the value, then follows.
+TEST_CASE("MIDI pickup: a knob takes over a parameter only when it reaches its value", "[integration][control][adr1606]") {
+    app::Engine engine(app::EngineMode::Offline);
+    control::ControlMap map;
+    map.oscEnabled = false;
+    map.midiEnabled = false;
+    control::MidiBinding knob;
+    knob.kind = control::MidiBindKind::ControlChange;
+    knob.number = 7;
+    knob.target.parameter = "orb/scale";
+    knob.target.min = 0.0f;
+    knob.target.max = 2.0f;
+    knob.pickup = true;
+    map.midi.push_back(knob);
+    engine.control().setMap(map);
+    FixedStepClock clock(60.0);
+    engine.update(engine.tick(clock));
+    auto* scale = engine.params().find("orb/scale");
+    REQUIRE(scale != nullptr);
+    scale->setBaseComponent(0, 1.0f); // the value a preset recall would leave: 0.5 on the knob's scale
+    const auto cc = [&](int v) {
+        const std::array<std::uint8_t, 3> m{0xB0, 7, static_cast<std::uint8_t>(v)};
+        engine.control().injectMidi(m);
+        engine.update(engine.tick(clock));
+        return scale->baseComponent(0);
+    };
+    CHECK(cc(10) == 1.0f);  // far below: ignored, no jump
+    CHECK(cc(40) == 1.0f);  // still below
+    CHECK_THAT(cc(70), WithinAbs(70.0 / 127.0 * 2.0, 1e-5)); // passed through 0.5: picked up, follows
+    CHECK_THAT(cc(90), WithinAbs(90.0 / 127.0 * 2.0, 1e-5));
+    // Something else moves it again (a state, the UI): the knob lets go until it comes back.
+    scale->setBaseComponent(0, 0.4f); // 0.2 on the knob's scale
+    CHECK_THAT(cc(100), WithinAbs(0.4, 1e-6));
+    CHECK_THAT(cc(26), WithinAbs(26.0 / 127.0 * 2.0, 1e-5)); // within the tolerance of 0.2: picked up
+    CHECK(engine.control().status().pickupHeld == 3);
+
+    // Without pickup the same knob jumps, as before.
+    control::ControlMap plain = map;
+    plain.midi[0].pickup = false;
+    engine.control().setMap(plain);
+    scale->setBaseComponent(0, 1.0f);
+    CHECK_THAT(cc(10), WithinAbs(10.0 / 127.0 * 2.0, 1e-5));
+}

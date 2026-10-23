@@ -44,15 +44,29 @@ struct BindingTarget {
     float max = 1.0f;
 };
 
+// ADR-1606: soft takeover ("pickup"). After something other than the knob moves its target -- a preset recall, a state,
+// a project load, the UI -- the knob does not jump the value to wherever it physically sits: it is ignored until it
+// reaches the target's current value (within `tolerance`) or passes through it, and follows from then on. The state is
+// the binding's, at runtime; `pickupAccepts` is the whole rule, pure for the tests.
+struct PickupState {
+    bool latched = false;      // following the knob
+    float lastSent = -1.0f;    // the value (0..1) this binding last applied, -1 none
+    float lastIncoming = -1.0f; // the knob's last position (0..1), -1 none
+};
+// Whether a knob at `incoming` (0..1) may set a target that now reads `current` (0..1). Updates `state`.
+[[nodiscard]] bool pickupAccepts(PickupState& state, float incoming, float current, float tolerance = 0.02f);
+
 struct MidiBinding {
     std::string source = "*";    // substring of the source name ("*" = any)
     int channel = -1;            // 0..15, -1 = any
     MidiBindKind kind = MidiBindKind::ControlChange;
     int number = -1;             // controller / note / program number (-1 = any for Note/NoteEvent)
     bool toggle = false;         // Note: note-on flips 0/1 instead of following velocity
+    bool pickup = false;         // ADR-1606: soft takeover for this binding (continuous kinds)
     BindingTarget target;
     // Runtime (not serialised): toggle state.
     bool toggleState = false;
+    PickupState pickupState;     // ADR-1606
 };
 
 struct OscBinding {
@@ -75,6 +89,7 @@ struct ControlMap {
     bool feedbackEnabled = false; // push parameter changes to feedbackHost:feedbackPort
     bool midiEnabled = true;
     std::string midiFilter = "*";
+    bool midiPickup = false;     // ADR-1606: soft takeover for every continuous binding (CC, pitch bend, pressure)
     std::vector<MidiBinding> midi;
     std::vector<OscBinding> osc;
 

@@ -101,6 +101,24 @@ std::optional<MidiBindKind> midiBindKindFromName(std::string_view name) {
     return std::nullopt;
 }
 
+bool pickupAccepts(PickupState& state, float incoming, float current, float tolerance) {
+    // Something else moved the target since this binding last set it: let go until the knob comes back to it.
+    if (state.latched && state.lastSent >= 0.0f && std::abs(current - state.lastSent) > 1e-3f) {
+        state.latched = false;
+    }
+    if (!state.latched) {
+        const bool near = std::abs(incoming - current) <= tolerance;
+        // A fast knob can step over the value between two messages: passing through it picks it up too.
+        const bool crossed = state.lastIncoming >= 0.0f && (state.lastIncoming - current) * (incoming - current) <= 0.0f;
+        state.latched = near || crossed;
+    }
+    state.lastIncoming = incoming;
+    if (state.latched) {
+        state.lastSent = incoming;
+    }
+    return state.latched;
+}
+
 nlohmann::json ControlMap::toJson() const {
     nlohmann::json midiJson = nlohmann::json::array();
     for (const auto& b : midi) {
@@ -111,6 +129,9 @@ nlohmann::json ControlMap::toJson() const {
         j["number"] = b.number;
         if (b.toggle) {
             j["toggle"] = true;
+        }
+        if (b.pickup) {
+            j["pickup"] = true; // ADR-1606
         }
         midiJson.push_back(std::move(j));
     }
@@ -126,10 +147,14 @@ nlohmann::json ControlMap::toJson() const {
         j["inMax"] = b.inMax;
         oscJson.push_back(std::move(j));
     }
-    return nlohmann::json{{"osc", {{"enabled", oscEnabled}, {"port", oscPort}, {"bind", oscBind}, {"prefix", oscPrefix}, {"direct", directOsc},
-                                   {"feedbackHost", feedbackHost}, {"feedbackPort", feedbackPort}, {"feedback", feedbackEnabled},
-                                   {"bindings", std::move(oscJson)}}},
-                          {"midi", {{"enabled", midiEnabled}, {"filter", midiFilter}, {"bindings", std::move(midiJson)}}}};
+    nlohmann::json out{{"osc", {{"enabled", oscEnabled}, {"port", oscPort}, {"bind", oscBind}, {"prefix", oscPrefix}, {"direct", directOsc},
+                                {"feedbackHost", feedbackHost}, {"feedbackPort", feedbackPort}, {"feedback", feedbackEnabled},
+                                {"bindings", std::move(oscJson)}}},
+                       {"midi", {{"enabled", midiEnabled}, {"filter", midiFilter}, {"bindings", std::move(midiJson)}}}};
+    if (midiPickup) {
+        out["midi"]["pickup"] = true; // ADR-1606: written only when on, so every existing project saves as it was
+    }
+    return out;
 }
 
 Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
@@ -191,6 +216,7 @@ Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
         }
         m.midiEnabled = mj.value("enabled", true);
         m.midiFilter = mj.value("filter", std::string("*"));
+        m.midiPickup = mj.value("pickup", false); // ADR-1606
         if (mj.contains("bindings")) {
             if (!mj["bindings"].is_array()) {
                 return fail("control.midi.bindings must be an array");
@@ -212,6 +238,7 @@ Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
                 b.kind = *k;
                 b.number = e.value("number", -1);
                 b.toggle = e.value("toggle", false);
+                b.pickup = e.value("pickup", false); // ADR-1606
                 m.midi.push_back(std::move(b));
             }
         }

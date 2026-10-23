@@ -158,6 +158,20 @@ void ControlHub::applyTarget(Engine& engine, const control::BindingTarget& targe
     }
 }
 
+// ADR-1606: where a binding's target stands now, 0..1 on the binding's own scale (-1 when it has none to read).
+float ControlHub::currentNormalised(Engine& engine, const control::BindingTarget& target) {
+    if (!target.parameter.empty()) {
+        if (const auto* p = engine.params().find(target.parameter); p != nullptr && p->componentCount() > 0) {
+            const std::size_t c = target.component < 0 ? 0 : static_cast<std::size_t>(target.component);
+            if (c < p->componentCount() && target.max != target.min) {
+                return std::clamp((p->baseComponent(c) - target.min) / (target.max - target.min), 0.0f, 1.0f);
+            }
+        }
+    }
+    // A control signal only ever moves with its knob (or OSC), so it has nothing to take over from.
+    return -1.0f;
+}
+
 void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) {
     using K = control::MidiKind;
     if (message.kind == K::Clock || message.kind == K::Start || message.kind == K::Continue ||
@@ -177,8 +191,19 @@ void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) 
     }
     for (auto& binding : map_.midi) {
         if (auto match = control::matchMidi(binding, message)) {
-            applyTarget(engine, binding.target, *match);
             matched = true;
+            // ADR-1606: soft takeover -- a continuous binding waits for the knob to reach the target's value.
+            const bool continuous = binding.kind == control::MidiBindKind::ControlChange ||
+                                    binding.kind == control::MidiBindKind::PitchBend ||
+                                    binding.kind == control::MidiBindKind::ChannelPressure;
+            if (continuous && !match->event && (binding.pickup || map_.midiPickup)) {
+                const float current = currentNormalised(engine, binding.target);
+                if (current >= 0.0f && !control::pickupAccepts(binding.pickupState, match->value, current)) {
+                    ++pickupHeld_;
+                    continue;
+                }
+            }
+            applyTarget(engine, binding.target, *match);
         }
     }
     ++(matched ? applied_ : unmatched_);
@@ -438,6 +463,7 @@ ControlHub::Status ControlHub::status() const {
     s.midiSources = midi_.connectedSources();
     s.midi = midi_.stats();
     s.applied = applied_;
+    s.pickupHeld = pickupHeld_;
     s.unmatched = unmatched_;
     s.feedbackOpen = feedback_.isOpen();
     s.feedbackError = feedbackError_;

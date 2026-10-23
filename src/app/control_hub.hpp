@@ -85,6 +85,7 @@ public:
         std::vector<std::string> midiSources;
         control::MidiInput::Stats midi;
         std::uint64_t applied = 0;   // messages applied since start
+        std::uint64_t pickupHeld = 0; // ADR-1606: knob moves held back by soft takeover
         std::uint64_t unmatched = 0; // messages no binding or direct command consumed
         bool feedbackOpen = false;   // a feedback sender is open on map().feedbackHost
         std::string feedbackError;
@@ -100,6 +101,7 @@ public:
 
 private:
     void applyTarget(Engine& engine, const control::BindingTarget& target, const control::Match& match);
+    static float currentNormalised(Engine& engine, const control::BindingTarget& target); // ADR-1606
     // Query replies and feedback.
     [[nodiscard]] control::OscSender* replySender(const control::OscMessage& request);
     [[nodiscard]] control::OscMessage parameterMessage(const params::IParameter& parameter) const;
@@ -130,6 +132,7 @@ private:
     std::unordered_map<std::string, std::vector<float>> feedbackCache_; // path -> last seen base components
     std::unordered_set<std::string> oscWritten_; // paths written through OSC this frame (no echo)
     std::uint64_t applied_ = 0;
+    std::uint64_t pickupHeld_ = 0; // ADR-1606: knob moves ignored while waiting to pick up
     std::uint64_t unmatched_ = 0;
     std::uint64_t feedbackSent_ = 0;
     std::uint64_t clockMessages_ = 0;

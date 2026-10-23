@@ -51,6 +51,13 @@ note flip 0/1. Values are normalised to 0..1, then mapped to the target's `min..
 target is a parameter. The Control tab shows the last message received and can bind it to a
 channel or parameter ("learn").
 
+**Soft takeover (pickup, ADR-1606).** `"pickup": true` on a binding (or on `control.midi` for every
+continuous binding: `cc`, `pitchBend`, `pressure`) keeps a knob from jumping a parameter something
+else moved -- a preset recall, a scene state, a project load, the UI. The knob is ignored until it
+reaches the parameter's current value (within 2% of its range) or passes through it, then it
+follows; if the parameter moves under it again, it lets go again. Control-signal targets have
+nothing to take over from and ignore it. The hub counts the held moves (`pickupHeld`).
+
 ### MIDI clock as the tempo source
 
 System real-time messages (Clock at 24 ppqn, Start, Continue, Stop) never bind or count as

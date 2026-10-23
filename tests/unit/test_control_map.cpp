@@ -266,3 +266,30 @@ TEST_CASE("Control maps round-trip the OSC feedback settings", "[control][map][j
     CHECK_FALSE(old->feedbackEnabled);
     CHECK_FALSE(ControlMap::fromJson(nlohmann::json{{"osc", {{"feedbackPort", 70000}}}}).has_value());
 }
+
+TEST_CASE("pickup: the rule, and the project keys", "[control][adr1606]") {
+    PickupState s;
+    CHECK_FALSE(pickupAccepts(s, 0.1f, 0.5f));
+    CHECK_FALSE(pickupAccepts(s, 0.3f, 0.5f));
+    CHECK(pickupAccepts(s, 0.6f, 0.5f));       // crossed 0.5 between two messages
+    CHECK(pickupAccepts(s, 0.7f, 0.6f));       // follows (0.6 is what it sent)
+    CHECK_FALSE(pickupAccepts(s, 0.8f, 0.2f)); // moved under it: let go
+    CHECK(pickupAccepts(s, 0.21f, 0.2f));      // within the tolerance
+    PickupState t;
+    CHECK(pickupAccepts(t, 0.5f, 0.505f));     // a first message at the value picks up at once
+
+    ControlMap m;
+    MidiBinding b;
+    b.number = 3;
+    b.target.parameter = "orb/scale";
+    b.pickup = true;
+    m.midi.push_back(b);
+    m.midiPickup = true;
+    const auto back = ControlMap::fromJson(m.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->midiPickup);
+    CHECK(back->midi[0].pickup);
+    // off, nothing is written: every existing project saves as it did
+    const ControlMap off;
+    CHECK_FALSE(off.toJson()["midi"].contains("pickup"));
+}
