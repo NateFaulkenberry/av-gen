@@ -330,8 +330,10 @@ def project_json(scene_rel, offline=False, root=""):
          "render": {"width": 1920, "height": 1080, "fps": 30}}
     if offline:
         p["assets"]["audio"] = {"path": os.path.join(root, "assets/audio/feline-footwear.wav")}
+        # each stem says what it is (ADR-1630): impacts will come from role.drums.* / signal.kick (Phase 7)
         p["assets"]["stems"] = [{"key": k, "label": k.title(), "file": os.path.join(
-            root, "assets/audio/stems/feline-footwear (%s).wav" % k.title())} for k in ("drums", "bass", "synth")]
+            root, "assets/audio/stems/feline-footwear (%s).wav" % k.title()), "role": k}
+            for k in ("drums", "bass", "synth")]
     return p
 
 
