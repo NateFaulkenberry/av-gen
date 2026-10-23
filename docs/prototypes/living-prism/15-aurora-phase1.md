@@ -284,3 +284,44 @@ The owner's 2d verdict: "midground and background crystals can be larger and als
 That is up about 9-10 ms from 2d. The likely cause is the heavier ground program (three fbm noises plus a triplanar), but that is not measured. Headroom against 33.3 ms is thin; against 8.33 ms it is about 3.6x over. Perf is Phase 8 work.
 
 **Still open:** the large wall forms remain smoothish, and the scan cliffs read weakly at this distance.
+
+## Phase 2f gate (2026-10-23)
+
+The owner's 2e verdict: "layout still needs work - mid ground crystals on left side of river blocking background crystals, crystals on right side of river can be made larger - crystals should fill up more of the scene. river is still not wide enough and looks like it just comes to an abrupt end". Later: "right bank more crystals too".
+
+**Crystals:**
+- There are now 12 formations, 6 per bank, at scale 2.0-4.0 (2e: 9 formations at 1.5-2.6).
+- The right bank has six larger ones: R1 2.4, R2 2.7, R3 2.8, R4 2.5, R5 2.8, R6 3.4.
+- Each bank alternates near the water and out on the slope, so each depth layer stands clear of the one in front. Each formation leans away from the river at its own angle.
+- `layout.layering()` projects every formation through the camera and reports its frame share and the share no nearer formation covers.
+- The setbacks came from a seeded search (`build/aurora/tune2.py`) that maximises the worst visible share, then the frame cover.
+- Visible shares: L1 100, L2 100, L3 85, L4 100, L5 100, L6 93, R1 100, R2 77, R3 98, R4 83, R5 100, R6 100.
+- Crystals cover 29.8% of the frame (2e: about 18%).
+- These are convex-hull floors that ignore terrain occlusion.
+- `phase2f-layering.jpg` draws the outlines on the frame.
+
+**The river:**
+- It is wider: near 100 m (was 72), mid 58 m (was 34).
+- A third, distant reach (44 m) winds on from z = -900 to -1760, narrowing by perspective into the haze under the horizon glow.
+- The near ridge moved back from 950 m to 1850 m, so the water no longer ends at a wall. The mid and far ridges moved to 2350 and 2850 m, inside the aurora shells' radius.
+- The far clip is 6000 m and the world is 8000 m deep.
+- The river check passes: every formation is clear for the full 25 m, except L4 at 13 m. The margin is 4 m.
+
+**The 2e GPU cost: found and cut.** All runs are headless Ultra on AC, with the GPU's pass timestamps. Each "without" figure comes from a scene variant with that one thing removed.
+
+| Cause (2d to 2e) | Measured | Cut |
+|---|---|---|
+| Ground program, 15 to 41 ops | about 6 ms with it vs without (scene pass 21.0 vs 14.8 ms) | 20 ops: two OKLab ramps replace the constant-and-mix chains, the strata reuse the mottling noise, no scree flecks. Program cost is now 2.9 ms (23.3 vs 20.4 ms without programs), about the profiler's floor for a program covering the frame |
+| Scan shadows | shadow pass 0.17 to 1.99 ms | no scan casts a shadow: 0.25 ms |
+| Scan depth | depth 0.37 to 1.16 ms | cliffs decimated from 9k to 4k faces: 0.85 ms |
+
+The triplanar and the fourth fbm were not the cost. Replacing them alone saved about 0.3 ms. Compiled programs scale with op count.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 23.3 / 25.0 ms (2e: 28.5 / 38.8) | 30.2 ms | Ultra | n/a |
+| Live auto | 23.5 / 25.9 ms (2e: 30.3 / 36.0) | 39.7 ms | Ultra 273, High 177 (100% High or better) | 1 |
+
+That leaves about 10 ms of headroom against 33.3 ms. Against 8.33 ms it is still about 2.8x over.

@@ -150,10 +150,10 @@ FOOTPRINTS = {}
 # program (rock by slope, moss on what faces up), so scan and terrain read as one material.
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 SCANS = {  # out name: (library path, target faces)
-    "cliffA": ("terrain/formations/coastal_cliff_02/coastal_cliff_02_1k.gltf", 9000),
-    "cliffB": ("terrain/formations/namaqualand_cliff_02/namaqualand_cliff_02_1k.gltf", 9000),
-    "cliffC": ("terrain/formations/rock_face_01/rock_face_01_1k.gltf", 7000),
-    "cliffD": ("terrain/formations/coastal_cliff_04/coastal_cliff_04_1k.gltf", 9000),
+    "cliffA": ("terrain/formations/coastal_cliff_02/coastal_cliff_02_1k.gltf", 4000),   # phase 2f perf: 9k -> 4k
+    "cliffB": ("terrain/formations/namaqualand_cliff_02/namaqualand_cliff_02_1k.gltf", 4000),
+    "cliffC": ("terrain/formations/rock_face_01/rock_face_01_1k.gltf", 3000),
+    "cliffD": ("terrain/formations/coastal_cliff_04/coastal_cliff_04_1k.gltf", 4000),
     "boulder": ("terrain/rocks/boulder_01/boulder_01_1k.gltf", 900),
     "rock": ("terrain/rocks/rock_07/rock_07_1k.gltf", 700),
     "mossrock": ("terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf", 1400),
@@ -216,9 +216,11 @@ def build_scan(name, out):
 RIDGES = [  # (name, distance m, half-span m, peak height m, centre dip (0..1), roughness, seed, dip x m, left lift)
     # phase 2e (the owner: "too symmetrical"): each ridge's saddle sits off-centre, at its own x, and each rises
     # toward one side by its own amount (the left, rocky side highest on the near ridge)
-    ("ridgeNear", 950.0, 1500.0, 260.0, 0.7, 0.70, 3, 140.0, 0.45),
-    ("ridgeMid", 1600.0, 2200.0, 420.0, 0.45, 0.66, 5, -260.0, -0.25),
-    ("ridgeFar", 2500.0, 3200.0, 620.0, 0.2, 0.62, 9, 500.0, 0.2),
+    # phase 2f: pushed back (the river now winds on to z = -1760), heights scaled to keep their angles; the near
+    # saddle sits over the distant river
+    ("ridgeNear", 1850.0, 2600.0, 470.0, 0.75, 0.70, 3, 60.0, 0.45),
+    ("ridgeMid", 2350.0, 3000.0, 600.0, 0.45, 0.66, 5, -420.0, -0.25),
+    ("ridgeFar", 2850.0, 3600.0, 700.0, 0.2, 0.62, 9, 600.0, 0.2),
 ]
 
 

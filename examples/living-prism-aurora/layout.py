@@ -16,23 +16,30 @@ import tempfile
 CAMERA_POS = (0.0, 80.0, 170.0)
 CAMERA_TARGET = (0.0, 22.0, -250.0)
 CAMERA_FOV = 52.0
-FAR = 4000.0
+FAR = 6000.0
 
 # ---- the river (spec 4.3): wide and swirling near the camera, narrowing as it winds away. Two water features: the
 # near reach (wide, tight swings) and the far river; they share the point where they meet, at one level.
 # phase 2d (the owner: "make the valley and the river wider"): the near reach is much wider and swings harder (an
 # S through the lower frame, as the reference's), the far river wider too
-RIVER_NEAR_PATH = [(-10.0, 0.0, 240.0), (-26.0, 0.0, 150.0), (22.0, -0.2, 75.0), (38.0, -0.4, 10.0),
-                   (-8.0, -0.7, -55.0), (-28.0, -1.0, -105.0)]
-RIVER_PATH = [(-28.0, -1.0, -105.0), (-8.0, -1.5, -165.0), (20.0, -2.2, -225.0), (16.0, -3.0, -295.0),
-              (-12.0, -4.0, -365.0), (-16.0, -5.0, -445.0), (6.0, -6.5, -555.0), (2.0, -8.0, -710.0),
-              (0.0, -10.0, -900.0)]
-RIVERS = [{"name": "riverNear", "path": RIVER_NEAR_PATH, "width": 72.0, "amplitude": 2.6, "falloff": 0.6,
+# phase 2f (the owner: "river is still not wide enough and looks like it just comes to an abrupt end"): wider again,
+# and three reaches now -- near, mid, and a distant reach that winds on to z = -1760, narrowing by perspective into
+# the haze under the horizon glow, to the foot of the near ridge (now at 1800 m) so it never ends at a wall
+RIVER_NEAR_PATH = [(-10.0, 0.0, 240.0), (-30.0, 0.0, 150.0), (26.0, -0.2, 75.0), (44.0, -0.4, 10.0),
+                   (-10.0, -0.7, -55.0), (-32.0, -1.0, -105.0)]
+RIVER_PATH = [(-32.0, -1.0, -105.0), (-8.0, -1.5, -165.0), (24.0, -2.2, -230.0), (18.0, -3.0, -300.0),
+              (-14.0, -4.0, -370.0), (-18.0, -5.0, -450.0), (8.0, -6.5, -560.0), (10.0, -8.0, -720.0),
+              (-6.0, -10.0, -900.0)]
+RIVER_FAR_PATH = [(-6.0, -10.0, -900.0), (-24.0, -12.0, -1080.0), (8.0, -14.0, -1280.0), (30.0, -16.0, -1500.0),
+                  (24.0, -18.0, -1760.0)]
+RIVERS = [{"name": "riverNear", "path": RIVER_NEAR_PATH, "width": 100.0, "amplitude": 2.6, "falloff": 0.6,
            "smoothing": 3},
-          {"name": "river", "path": RIVER_PATH, "width": 34.0, "amplitude": 2.4, "falloff": 0.7, "smoothing": 3}]
+          {"name": "river", "path": RIVER_PATH, "width": 58.0, "amplitude": 2.4, "falloff": 0.7, "smoothing": 3},
+          {"name": "riverFar", "path": RIVER_FAR_PATH, "width": 44.0, "amplitude": 2.4, "falloff": 0.7,
+           "smoothing": 3}]
 RIVER = RIVERS[1]
 FLOOR = 1.0   # the canyon floor's base height, above the water
-_ALL_RIVER = RIVER_NEAR_PATH + RIVER_PATH[1:]
+_ALL_RIVER = RIVER_NEAR_PATH + RIVER_PATH[1:] + RIVER_FAR_PATH[1:]
 _CANYON = [p for p in _ALL_RIVER if p[2] <= 110.0]   # the walls start just ahead of the camera
 # phase 2e: the walls follow a damped canyon axis (a third of the river's swing), not every bend of the water --
 # an offset copy of a winding path knots into round knobs at each bend, the "bulbous hills"
@@ -57,12 +64,12 @@ WALLS = [  # (name, path, amplitude, width, falloff, roughness). Phase 2e (the o
     # ... too symmetrical"): the two sides differ. LEFT is the high, steep, rocky side: a narrow mossy toe, a rock
     # ledge, then cliffs stepping up to a high wall. RIGHT is the lower, greener side: a broad bench, a gentle bank, a
     # lower wall far back. A feature's roughness lets the rocky noise layers (world_json) through: 0 is smooth.
-    ("toeL", _offset(_ALL_RIVER, -70.0), 5.0, 30.0, 1.0, 0.35),
+    ("toeL", _offset(_ALL_RIVER, -100.0), 5.0, 30.0, 1.0, 0.35),
     ("ledgeL", _offset(_AXIS, -115.0, 18.0, 0.4), 22.0, 30.0, 0.45, 1.0),      # a flat-topped rock step (falloff < 1)
     ("cliffL", _offset(_AXIS, -175.0, 26.0, 2.1), 70.0, 45.0, 0.4, 1.0),
     ("highL", _offset(_AXIS, -250.0, 34.0, 4.0), 120.0, 75.0, 0.55, 1.0),
     ("outerL", _offset(_AXIS, -400.0, 50.0, 1.1), 140.0, 160.0, 0.8, 1.0),
-    ("benchR", _offset(_ALL_RIVER, 100.0), 7.0, 60.0, 0.5, 0.3),  # the broad green bench
+    ("benchR", _offset(_ALL_RIVER, 130.0), 7.0, 60.0, 0.5, 0.3),  # the broad green bench
     ("bankR", _offset(_AXIS, 185.0, 24.0, 3.3), 24.0, 80.0, 1.3, 0.7),       # a gentle green rise
     ("wallR", _offset(_AXIS, 270.0, 30.0, 5.2), 62.0, 70.0, 0.6, 1.0),
     ("highR", _offset(_AXIS, 380.0, 45.0, 0.7), 85.0, 130.0, 0.8, 1.0),
@@ -86,7 +93,7 @@ _SPURS = [(60.0, -1, 270.0, 120.0, 25.0, 55.0, 22.0), (-40.0, -1, 280.0, 135.0, 
 WALLS += [("spur%d" % i, [(_axis_x(z) + side * d0, 0.0, z), (_axis_x(z + sk) + side * d1, 0.0, z + sk)], amp * 0.4, w, 0.7,
            1.0) for i, (z, side, d0, d1, sk, amp, w) in enumerate(_SPURS)]
 MOUNTAINS = []   # the far ridges are meshes now (blender/aurora_assets.py: ridges), layered in the fog
-WORLD_SIZE = (4000.0, 6000.0)
+WORLD_SIZE = (4000.0, 8000.0)
 
 
 
@@ -175,19 +182,22 @@ LAYERS = [{"frequency": 0.004, "amplitude": 30.0, "ridged": 0.3, "warp": 80.0},
 # right) and are set back and staggered in depth, so the river corridor and the far crystals stay visible past them.
 # (name, z, side -1 left / +1 right, setback m, yaw deg, scale, family)
 _FORMATION_SPEC = [   # (name, z, side, setback m, yaw deg, scale, family, tilt out deg, tilt fwd deg)
-    # phase 2d: the near clumps smaller, toward the frame edges, so the river owns the lower centre.
-    # phase 2e (the owner: "midground and background crystals can be larger and also faced away from the river at
-    # different angles"): the mid and far formations ~1.5x, each tilted away from the river by its own amount and
-    # turned to its own yaw, none parallel; the left (rocky) bank carries the bigger crystal mass.
-    ("L1", -15.0, -1, 105.0, 10.0, 1.7, "fan", 4.0, 3.0),
-    ("R1", -60.0, 1, 100.0, -10.0, 1.65, "pairR", 3.0, -2.0),
-    ("L2", -140.0, -1, 82.0, 40.0, 2.3, "spire", 14.0, 6.0),
-    ("R2", -205.0, 1, 74.0, -65.0, 1.9, "spire2", 9.0, -8.0),
-    ("L3", -265.0, -1, 70.0, 115.0, 2.6, "cluster", 6.0, -10.0),
-    ("R3", -350.0, 1, 66.0, 25.0, 1.7, "small2", 18.0, 4.0),
-    ("C1", -420.0, -1, 70.0, -35.0, 2.4, "spire2", 22.0, 9.0),
-    ("C2", -520.0, 1, 64.0, 70.0, 2.0, "small", 11.0, -12.0),
-    ("D", -690.0, -1, 72.0, 160.0, 2.6, "far", 8.0, 5.0),
+    # phase 2f (the owner: "mid ground crystals on left side of river blocking background crystals, crystals on right
+    # side of river can be made larger - crystals should fill up more of the scene ... right bank more crystals too"):
+    # twelve formations, larger, alternating near the water and out on the slopes so each depth layer's silhouette
+    # stands clear of the one in front (layering() measures it). Each leans away from the river at its own angle.
+    ("L1", -15.0, -1, 125.0, 10.0, 2.0, "fan", 4.0, 3.0),
+    ("L2", -150.0, -1, 100.0, 40.0, 2.4, "spire", 14.0, 6.0),
+    ("L3", -300.0, -1, 165.0, 115.0, 2.7, "cluster", 8.0, -10.0),    # out on the slope, clear of L2's sightline
+    ("L4", -440.0, -1, 85.0, -35.0, 2.5, "spire2", 20.0, 9.0),
+    ("L5", -700.0, -1, 100.0, 160.0, 3.2, "far", 8.0, 5.0),
+    ("L6", -1050.0, -1, 150.0, 60.0, 4.0, "spire", 12.0, -6.0),        # the distant pair over the vanishing river
+    ("R1", -60.0, 1, 165.0, -10.0, 2.4, "pairR", 3.0, -2.0),
+    ("R2", -185.0, 1, 160.0, -65.0, 2.7, "spire2", 9.0, -8.0),
+    ("R3", -270.0, 1, 120.0, 25.0, 2.8, "cluster", 12.0, 4.0),
+    ("R4", -390.0, 1, 160.0, 70.0, 2.5, "pair", 16.0, -12.0),
+    ("R5", -560.0, 1, 100.0, -20.0, 2.8, "spire", 18.0, 6.0),
+    ("R6", -850.0, 1, 70.0, 100.0, 3.4, "small", 10.0, -4.0),
 ]
 # A family whose shards lean to +x leans toward the river on the left bank: turn it round there (yaw + 180).
 FAMILY_OUTWARD = {"fan": -1, "pairR": 1, "cluster": 1, "pair": 1, "spire": 1, "spire2": 1, "small": 1, "small2": 1,
@@ -322,6 +332,69 @@ def check_crystals(footprints, margin=RIVER_MARGIN):
         if clear < margin:
             bad.append((f[0], clear))
     return placed, rows, bad
+
+
+# ---- the layering check (phase 2f): what each formation shows of itself past the ones in front of it ------------
+def _project(p):
+    cx, cy, cz = CAMERA_POS
+    f = [CAMERA_TARGET[i] - CAMERA_POS[i] for i in range(3)]
+    n = math.sqrt(sum(c * c for c in f))
+    f = [c / n for c in f]
+    r = [-f[2], 0.0, f[0]]
+    n = math.hypot(r[0], r[2])
+    r = [r[0] / n, 0.0, r[2] / n]
+    u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+    d = [p[0] - cx, p[1] - cy, p[2] - cz]
+    z = sum(a * b for a, b in zip(d, f))
+    t = math.tan(math.radians(CAMERA_FOV) / 2)
+    x = sum(a * b for a, b in zip(d, r)) / (z * t * 16 / 9)
+    y = sum(a * b for a, b in zip(d, u)) / (z * t)
+    return (0.5 + 0.5 * x) * 1920, (0.5 - 0.5 * y) * 1080, z
+
+
+def _hull(pts):
+    pts = sorted(set(pts))
+    if len(pts) < 3:
+        return pts
+    def half(seq):
+        h = []
+        for p in seq:
+            while len(h) >= 2 and ((h[-1][0] - h[-2][0]) * (p[1] - h[-2][1]) - (h[-1][1] - h[-2][1]) * (p[0] - h[-2][0])) <= 0:
+                h.pop()
+            h.append(p)
+        return h
+    lo, hi = half(pts), half(reversed(pts))
+    return lo[:-1] + hi[:-1]
+
+
+def _inside(poly, x, y):
+    c = False
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            c = not c
+    return c
+
+
+def layering(placed, footprints, cell=8):
+    """Per formation: its on-screen area (the convex hull of its projected vertices, % of the frame) and the share of
+    that area no nearer formation covers. Hulls overstate a cluster's own area, so the visible share is a floor."""
+    shapes = []
+    for f, pos, q, _g in placed:
+        s = f[4]
+        pts = [_project([pos[i] + v[i] for i in range(3)])
+               for v in (_qrot(q, (s * a[0], s * a[1], s * a[2])) for a in footprints[f[5]])]
+        shapes.append((f[0], sum(p[2] for p in pts) / len(pts), _hull([(round(p[0]), round(p[1])) for p in pts])))
+    owner, area = {}, {n: 0 for n, _d, _h in shapes}
+    for gx in range(0, 1920, cell):
+        for gy in range(0, 1080, cell):
+            hits = [(d, n) for n, d, h in shapes if len(h) > 2 and _inside(h, gx, gy)]
+            for _d, n in hits:
+                area[n] += 1
+            if hits:
+                owner[min(hits)[1]] = owner.get(min(hits)[1], 0) + 1
+    total = (1920 // cell) * (1080 // cell)
+    return [(n, 100.0 * area[n] / total, 100.0 * owner.get(n, 0) / max(area[n], 1)) for n, _d, _h in shapes], \
+        100.0 * sum(owner.values()) / total
 
 
 def quat_y(deg):
