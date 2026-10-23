@@ -293,3 +293,40 @@ TEST_CASE("pickup: the rule, and the project keys", "[control][adr1606]") {
     const ControlMap off;
     CHECK_FALSE(off.toJson()["midi"].contains("pickup"));
 }
+
+TEST_CASE("channel rests: the project keys, their checks, and the channels they declare", "[control][adr1612]") {
+    ControlMap m;
+    m.channelRests.push_back({"glow", 0.5f, true});
+    m.channelRests.push_back({"haze", 0.25f, false});
+    const auto back = ControlMap::fromJson(m.toJson());
+    REQUIRE(back.has_value());
+    REQUIRE(back->channelRests.size() == 2);
+    CHECK(back->channelRests[0].name == "glow");
+    CHECK(back->channelRests[0].rest == 0.5f);
+    CHECK(back->channelRests[0].pickup);
+    CHECK_FALSE(back->channelRests[1].pickup);
+    REQUIRE(back->restFor("haze") != nullptr);
+    CHECK(back->restFor("nope") == nullptr);
+    // A declared channel exists before any binding names it, at its rest.
+    const auto channels = back->channels();
+    REQUIRE(channels.size() == 2);
+    CHECK(channels[0].name == "glow");
+    CHECK(channels[0].rest == 0.5f);
+    // None declared: nothing written, so every existing project saves as it did.
+    CHECK_FALSE(ControlMap{}.toJson().contains("channels"));
+    // Refused, said: out of range, prefixed, unnamed, twice, no rest.
+    using J = nlohmann::json;
+    CHECK_FALSE(ControlMap::fromJson(J{{"channels", J::array({{{"name", "a"}, {"rest", 1.5}}})}}).has_value());
+    CHECK_FALSE(ControlMap::fromJson(J{{"channels", J::array({{{"name", "control.a"}, {"rest", 0.5}}})}}).has_value());
+    CHECK_FALSE(ControlMap::fromJson(J{{"channels", J::array({{{"rest", 0.5}}})}}).has_value());
+    CHECK_FALSE(ControlMap::fromJson(J{{"channels", J::array({{{"name", "a"}}})}}).has_value());
+    CHECK_FALSE(ControlMap::fromJson(J{{"channels", J::array({{{"name", "a"}, {"rest", 0.5}},
+                                                                {{"name", "a"}, {"rest", 0.2}}})}})
+                     .has_value());
+    // The reset address.
+    OscMessage reset;
+    reset.address = "/avgen/control/reset";
+    const auto cmd = parseDirectOsc(reset, "/avgen");
+    REQUIRE(cmd.has_value());
+    CHECK(cmd->kind == DirectCommand::Kind::ControlReset);
+}

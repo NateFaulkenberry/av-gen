@@ -36,6 +36,7 @@ import shlex
 import statistics
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -99,12 +100,16 @@ def run(a):
             scenes.append(scene)
     avgen = os.path.join(a.bin, "src", "avgen")
     plan = [(scene, "live", rep) for rep in range(1, a.reps + 1) for scene in scenes]  # interleaved
-    plan += [(scene, "headless", 1) for scene in scenes]
+    if not a.live_only:
+        plan += [(scene, "headless", 1) for scene in scenes]
     extra = shlex.split(a.extra) if a.extra else []
     if extra:
         say("-- extra arguments on every run: %s" % a.extra)
     exits = {}
-    for scene, mode, rep in plan:
+    for index, (scene, mode, rep) in enumerate(plan):
+        if index > 0 and a.gap > 0:
+            time.sleep(a.gap)  # leave the GPU lock to the other agents between runs
+        rep += a.rep_offset
         name = "%s-%s-r%d" % (scene, mode, rep)
         args = ["--live-profile", "--mode", mode, "--project", SCENES[scene][0]] + COMMON
         args += ["--quality", "auto", "--warmup", "5", "--measure", "30"] if mode == "live" else \
@@ -270,7 +275,11 @@ def main():
     ap.add_argument("--bin", default=os.path.join(ROOT, "build", "release"))
     ap.add_argument("--baseline", default=DEFAULT_BASELINE)
     ap.add_argument("--scenes", help="comma-separated subset of: " + ", ".join(SCENES))
-    ap.add_argument("--extra", help="arguments appended to every avgen run (an injected regression)")
+    ap.add_argument("--extra", help="arguments appended to every avgen run (an injected regression, an A/B arm)")
+    ap.add_argument("--gap", type=float, default=0.0, help="seconds between runs, so other GPU users get the lock")
+    ap.add_argument("--live-only", action="store_true", help="skip the headless Ultra runs (T4 is then unjudged)")
+    ap.add_argument("--rep-offset", type=int, default=0, help="number this run's reps from offset+1 (to interleave "
+                    "two arms rep by rep into one directory each)")
     a = ap.parse_args()
     a.out = os.path.abspath(a.out)
     a.bin = os.path.abspath(a.bin)

@@ -39,6 +39,38 @@ LivePaceStep livePaceStep(double nowMs, double deadlineMs, double periodMs) {
     return {0.0, deadlineMs + periodMs};
 }
 
+double liveVsyncShiftMs(double deadlineMs, double leadMs, double vsyncMs, double refreshMs, double maxStepMs) {
+    if (!(deadlineMs > 0.0) || !(leadMs > 0.0) || !(refreshMs > 0.0) || !(maxStepMs > 0.0)) {
+        return 0.0;
+    }
+    const double end = deadlineMs + leadMs;
+    double gap = std::fmod(vsyncMs - end, refreshMs); // to the next vsync at or after the end
+    if (gap < 0.0) {
+        gap += refreshMs;
+    }
+    const double shift = gap <= refreshMs * 0.5 ? gap : gap - refreshMs;
+    return std::clamp(shift, -maxStepMs, maxStepMs);
+}
+
+void LiveLeadEstimate::add(double submitOffsetMs, double gpuSpanMs) {
+    if (!(submitOffsetMs >= 0.0) || !(gpuSpanMs > 0.0)) {
+        return;
+    }
+    leads_[next_] = submitOffsetMs + gpuSpanMs;
+    next_ = (next_ + 1) % kFrames;
+    count_ = std::min(count_ + 1, kFrames);
+}
+
+double LiveLeadEstimate::leadMs() const {
+    if (!ready()) {
+        return 0.0;
+    }
+    std::array<double, kFrames> sorted = leads_;
+    std::sort(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(count_));
+    const auto at = static_cast<std::size_t>(0.95 * static_cast<double>(count_ - 1) + 0.5);
+    return sorted[at] + kMarginMs;
+}
+
 // ---- the ladders (ADR-1083, ADR-1084) -------------------------------------------------------------
 //
 // Every value is a ceiling on the live tier's own (see `applyLiveRung`). The realtime tier marches

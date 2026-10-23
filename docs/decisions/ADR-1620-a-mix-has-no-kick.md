@@ -1,6 +1,6 @@
 # ADR-1620: A mix has no kick; the kick comes only from a drum source, and scenes stand the beat in for it
 
-- Status: Proposed (eng/mix-hit-phaseout, The Living Prism P1-8, **option B**: the owner's decision of 2026-10-23,
+- Status: Accepted (eng/mix-hit-phaseout, The Living Prism P1-8, **option B**: the owner's decision of 2026-10-23,
   `docs/prototypes/living-prism/16-hit-phaseout-option-b-brief.md`; merge after the owner's approval)
 - Supersedes in part:
   - ADR-1060: the mix's causal kick as `response.kick` and as live `audio.onsetLow`;

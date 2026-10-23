@@ -1,7 +1,7 @@
 #!/bin/bash
 # Sound to light (ADR-1605): a live run of a project on BlackHole loopback, the probe's transients played into it.
 #
-#   tools/sound_to_light.sh <project.json> <out-dir> [build-dir] [probe-period-frames]
+#   [EXTRA_ARGS="--live-vsync-align off"] tools/sound_to_light.sh <project.json> <out-dir> [build-dir] [probe-period]
 #
 # A real-device measurement (ADR-1550): opt-in, never part of a suite; needs the BlackHole 2ch driver and holds the GPU
 # lock for the whole run. AV Gen runs the project as `--live-profile --mode live` does (the projection window at
@@ -43,7 +43,7 @@ probe() {
 if [ $PROBE_FIRST = 1 ]; then probe & PROBE=\$!; sleep 2; fi
 "$BIN/src/avgen" --live-profile --mode live --project "$TWIN" --target-fps 30 --size 1920x1080 --quality auto \
     --warmup 5 --measure 90 --json "$OUT/profile.json" --trace "$OUT/profile.csv" \
-    --live --input BlackHole --input-sources drums@2h --sonic-live-log "$OUT/live.csv" --trace-finals \
+    --live --input BlackHole --input-sources drums@2h --sonic-live-log "$OUT/live.csv" --trace-finals ${EXTRA_ARGS:-} \
     > "$OUT/editor.log" 2>&1 &
 APP=\$!
 if [ $PROBE_FIRST = 0 ]; then

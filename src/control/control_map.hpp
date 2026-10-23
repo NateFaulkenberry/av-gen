@@ -7,7 +7,8 @@
 //   2. The direct OSC scheme needs no binding: "<prefix>/param/<path> f..." sets a parameter,
 //      "<prefix>/signal/<channel> f" sets a control signal, "<prefix>/pulse/<channel> [f]" fires
 //      one, "<prefix>/preset/recall s", "<prefix>/preset/morph s s f", "<prefix>/transport/play|
-//      pause|stop|toggle", "<prefix>/transport/seek f". Prefix defaults to "/avgen".
+//      pause|stop|toggle", "<prefix>/transport/seek f", "<prefix>/control/reset" (ADR-1612). Prefix defaults
+//      to "/avgen".
 //   3. Query and feedback (follow-up): "<prefix>/query s<path>" (or "<prefix>/query/<path>")
 //      answers "<prefix>/param/<path> f..." to the sender (or the feedback host);
 //      "<prefix>/query/all" answers every serialised parameter in bundles; "<prefix>/query/
@@ -78,6 +79,16 @@ struct OscBinding {
     BindingTarget target;
 };
 
+// ADR-1612: a control channel's rest -- the value `control.<name>` holds until its knob first moves, and returns to on a
+// reset (a project load, `<prefix>/control/reset`). A knob that should cut as well as boost rests in its middle (0.5,
+// read through a bipolar route). With `pickup` (or a pickup binding, or `control.midi.pickup`) the knob is held until it
+// reaches the channel's value, as ADR-1606 holds a parameter's: the rest is something to take over from.
+struct ChannelRest {
+    std::string name;            // without "control."
+    float rest = 0.0f;           // 0..1
+    bool pickup = false;
+};
+
 struct ControlMap {
     bool oscEnabled = true;
     std::uint16_t oscPort = 9000;
@@ -92,8 +103,11 @@ struct ControlMap {
     bool midiPickup = false;     // ADR-1606: soft takeover for every continuous binding (CC, pitch bend, pressure)
     std::vector<MidiBinding> midi;
     std::vector<OscBinding> osc;
+    std::vector<ChannelRest> channelRests; // ADR-1612: "channels" in the project's control block; written when set
 
     [[nodiscard]] nlohmann::json toJson() const;
+    // ADR-1612: the declared rest of a channel, or null.
+    [[nodiscard]] const ChannelRest* restFor(std::string_view channel) const;
     static Result<ControlMap> fromJson(const nlohmann::json& j);
     [[nodiscard]] bool empty() const { return midi.empty() && osc.empty(); }
     // Every signal channel named by a binding (deduplicated) with its event flag, so the control
@@ -101,6 +115,7 @@ struct ControlMap {
     struct Channel {
         std::string name;
         bool event = false;
+        float rest = 0.0f; // ADR-1612
     };
     [[nodiscard]] std::vector<Channel> channels() const;
 };
@@ -118,7 +133,7 @@ struct Match {
 struct DirectCommand {
     enum class Kind : std::uint8_t {
         SetParameter, SetSignal, Pulse, PresetRecall, PresetMorph, Play, Pause, Stop, Toggle, Seek,
-        Query, QueryAll, QueryPresets, StateGo
+        Query, QueryAll, QueryPresets, StateGo, ControlReset
     } kind = Kind::SetParameter;
     std::string path;            // parameter path / channel / preset name (or preset A) / queried path
     std::string second;          // preset B for morph

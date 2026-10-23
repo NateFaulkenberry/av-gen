@@ -287,6 +287,10 @@ std::string usageText() {
            "                      12% headroom (default: the setting, 60) (ADR-1080)\n"
            "  --live-frame-cap <on|off>  pace the live editor's frames at the target (a whole number of\n"
            "                      vsyncs) (default: the setting, on) (ADR-1107)\n"
+           "  --live-vsync-align <on|off>  with the cap, slew its phase so a frame's GPU ends just before a\n"
+           "                      vsync (default on) (ADR-1609)\n"
+           "  --live-late-latch <on|off>  with live input, build the editor UI before the engine update so the\n"
+           "                      audio is read as late as possible in the frame (default on) (ADR-1610)\n"
            "  --adaptive-floor <s>  the lowest scale the ladder may reach, 0.38-1 (ADR-1024/1083)\n"
            "  --live-aa <fxaa|off>  the live viewport's edge antialiasing (default: the setting, fxaa);\n"
            "                      given, it also applies to a headless playback run (ADR-1024)\n"
@@ -1034,6 +1038,22 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
                 return fail("--live-frame-cap expects on or off, got '{}'", *v);
             }
             options.liveFrameCap = *v == "on";
+            ++i;
+        } else if (arg == "--live-late-latch") {
+            auto v = need(i, "--live-late-latch");
+            if (!v) return std::unexpected(v.error());
+            if (*v != "on" && *v != "off") {
+                return fail("--live-late-latch expects on or off, got '{}'", *v);
+            }
+            options.liveLateLatch = *v == "on";
+            ++i;
+        } else if (arg == "--live-vsync-align") {
+            auto v = need(i, "--live-vsync-align");
+            if (!v) return std::unexpected(v.error());
+            if (*v != "on" && *v != "off") {
+                return fail("--live-vsync-align expects on or off, got '{}'", *v);
+            }
+            options.liveVsyncAlign = *v == "on";
             ++i;
         } else if (arg == "--adaptive-floor") {
             auto v = need(i, "--adaptive-floor");
@@ -4957,6 +4977,7 @@ int Application::runLive() {
         double pacePeriodMs = 0.0; // the cap's period this frame, 0 = not capped (ADR-1362 reads it)
         {
             const bool capOn = options_.liveFrameCap.value_or(settings_.liveFrameCap) && !job_ && !abRunning;
+            const bool alignOn = capOn && options_.liveVsyncAlign.value_or(true);
             if (capOn && --paceRefreshAge <= 0) {
                 paceRefreshAge = 120;
                 int index = window_ != nullptr ? window_->displayIndex() : -1;
@@ -4969,6 +4990,13 @@ int Application::runLive() {
                 for (const auto& d : platform::Window::displays()) {
                     if (d.index == index || (index < 0 && d.primary)) {
                         paceRefreshHz = d.refreshRate;
+                        // ADR-1609: the vsync of the display the pace is taken from (also read, unaligned, for the
+                        // --sonic-live-log's light column).
+                        if (index != vsyncDisplayIndex_ || vsyncClock_ == nullptr) {
+                            vsyncDisplayIndex_ = index;
+                            vsyncClock_ = platform::VsyncClock::forDisplayAt(d.x + d.width / 2, d.y + d.height / 2);
+                            liveLead_.reset();
+                        }
                     }
                 }
             }
@@ -4977,6 +5005,16 @@ int Application::runLive() {
             const double nowMs = std::chrono::duration<double, std::milli>(frameStart.time_since_epoch()).count();
             const LivePaceStep step = livePaceStep(nowMs, paceDeadlineMs, period);
             paceDeadlineMs = step.nextDeadlineMs;
+            // ADR-1609: slew the grid's phase so the next frame's GPU end lands just before a vsync.
+            lastVsyncShiftMs_ = 0.0;
+            if (alignOn && period > 0.0 && vsyncClock_ != nullptr && vsyncClock_->available() && liveLead_.ready()) {
+                const double refreshMs = vsyncClock_->periodNs() > 0 ? static_cast<double>(vsyncClock_->periodNs()) / 1e6
+                                                                      : (paceRefreshHz > 0.0 ? 1000.0 / paceRefreshHz : 0.0);
+                const double vsyncMs =
+                    nowMs - static_cast<double>(static_cast<std::int64_t>(sonic::hostNowNs() - vsyncClock_->lastVsyncNs())) / 1e6;
+                lastVsyncShiftMs_ = liveVsyncShiftMs(paceDeadlineMs, liveLead_.leadMs(), vsyncMs, refreshMs, 0.5);
+                paceDeadlineMs += lastVsyncShiftMs_;
+            }
             if (step.waitMs > 0.0) {
                 std::this_thread::sleep_until(
                     frameStart + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -4985,6 +5023,7 @@ int Application::runLive() {
                                  .count();
             }
         }
+        const auto frameWake = std::chrono::steady_clock::now(); // ADR-1609: the lead is measured from here
         if (abRunning) {
             const int perBlock = std::max(1, options_.uiAbFrames);
             const auto arms = static_cast<int>(abGroups.size());
@@ -5365,6 +5404,55 @@ int Application::runLive() {
             }
         }
 
+        // The editor's UI for this frame. ADR-1610 (late latch): while live input drives the scene, it is built here,
+        // before the engine update, so the update -- which takes the newest audio analysis, MIDI and signals -- runs as
+        // late in the CPU frame as it can, just before the render records. The UI then reads the previous frame's
+        // engine state (one frame, as its meters always were) and its edits reach this frame's update instead of the
+        // next. Off for scripted UI runs, captures, A/B measurements and render jobs, which time the old order.
+        auto buildUi = [&]() {
+            {
+                core::PhaseProfiler::AllocScope scope(prof, kPhUi, kPhAllocUi);
+                imgui_->newFrame();
+                // A panel that is closed is not drawn at all, so focusing it does nothing: the capture
+                // comes back showing whichever tab happened to be in front, and it looks like a
+                // successful capture of the wrong panel. Opened *before* the draw, raised after it.
+                if (options_.captureUi) {
+                    for (const std::string& name : options_.captureUiPanels) {
+                        if (bool* open = panel_->layout().slot(name); open != nullptr) {
+                            *open = true;
+                        }
+                    }
+                }
+                // Whether there is a baked cut to protect, refreshed each frame: the Auto-director can
+                // be enabled or stood down while the panel is open, and a lock offered for a cut that
+                // no longer exists is a control that guards nothing.
+                panel_->cameraDirected = cameraDirection_.directed;
+                // ADR-440. Before the panels rather than after, so the title and the menus agree with
+                // the modal about whether there is anything to lose, and so the widget-activity signal
+                // it reads is the previous frame's -- the window it is asking about.
+                sampleProjectDirtyIfIdle();
+                panel_->draw(*engine_, stats);
+                // After the panels, so the modal is submitted last and is on top of everything it is
+                // blocking (ADR-440). Inside the ImGui frame, because that is the only place a popup
+                // exists.
+                serviceCloseGate();
+                // Raised *after* the panels are submitted, because ImGui cannot focus a window it has
+                // not seen this frame. The focus lands on the next frame, which is why the capture frame
+                // defaults to well after the layout settles.
+                if (options_.captureUi) {
+                    for (const std::string& name : options_.captureUiPanels) {
+                        ImGui::SetWindowFocus(name.c_str());
+                    }
+                }
+            }
+        };
+        const bool uiBuiltEarly = options_.liveLateLatch.value_or(true) && engine_->liveSonic() && !uiScript_.active() &&
+                                  !options_.captureUi && !abRunning && !job_;
+        if (uiBuiltEarly) {
+            buildUi();
+        }
+        lastLateLatch_ = uiBuiltEarly;
+
         // The panel edited these in place during the last frame's UI; carry them to the copy the
         // project file is written from, and take a loaded project's copy back (ADR-225).
         syncDirectorSettings();
@@ -5549,40 +5637,8 @@ int Application::runLive() {
         // to the event routing rather than the widgets.
         static const bool uiSelfTest = std::getenv("AVGEN_UI_SELFTEST") != nullptr;
         uiSelfTestEvents_ = uiSelfTest;
-        {
-            core::PhaseProfiler::AllocScope scope(prof, kPhUi, kPhAllocUi);
-            imgui_->newFrame();
-            // A panel that is closed is not drawn at all, so focusing it does nothing: the capture
-            // comes back showing whichever tab happened to be in front, and it looks like a
-            // successful capture of the wrong panel. Opened *before* the draw, raised after it.
-            if (options_.captureUi) {
-                for (const std::string& name : options_.captureUiPanels) {
-                    if (bool* open = panel_->layout().slot(name); open != nullptr) {
-                        *open = true;
-                    }
-                }
-            }
-            // Whether there is a baked cut to protect, refreshed each frame: the Auto-director can
-            // be enabled or stood down while the panel is open, and a lock offered for a cut that
-            // no longer exists is a control that guards nothing.
-            panel_->cameraDirected = cameraDirection_.directed;
-            // ADR-440. Before the panels rather than after, so the title and the menus agree with
-            // the modal about whether there is anything to lose, and so the widget-activity signal
-            // it reads is the previous frame's -- the window it is asking about.
-            sampleProjectDirtyIfIdle();
-            panel_->draw(*engine_, stats);
-            // After the panels, so the modal is submitted last and is on top of everything it is
-            // blocking (ADR-440). Inside the ImGui frame, because that is the only place a popup
-            // exists.
-            serviceCloseGate();
-            // Raised *after* the panels are submitted, because ImGui cannot focus a window it has
-            // not seen this frame. The focus lands on the next frame, which is why the capture frame
-            // defaults to well after the layout settles.
-            if (options_.captureUi) {
-                for (const std::string& name : options_.captureUiPanels) {
-                    ImGui::SetWindowFocus(name.c_str());
-                }
-            }
+        if (!uiBuiltEarly) {
+            buildUi();
         }
         // TEMPORARY (ui-responsiveness phase 2). The frame's UI state is now decided: the playhead
         // has been drawn wherever this frame's input put it and every widget has taken its new
@@ -5735,6 +5791,9 @@ int Application::runLive() {
             wgpu::CommandBuffer commands = encoder.Finish();
             context_->queue().Submit(1, &commands);
         }
+        // ADR-1609: this frame's start -> submit, with the newest landed GPU span (the readback lags a frame or two).
+        liveLead_.add(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameWake).count(),
+                      renderer_->timeline().frameMs());
         // The editor, as a picture. After Submit so Dear ImGui's draw has actually happened, and
         // before `present()` because the swapchain texture is only ours until then. This is the one
         // capture that contains the interface: `--capture` re-renders the scene and shows the world
@@ -7737,7 +7796,7 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
             }
         }
         *liveLog_ << "frame,liveSeconds,frameNs,presentNs,gpuMs,midiMessages,notesReceived,held,audioFrames,"
-                     "audioDropped,snapshotToFrameMs,gpuEndRaw,gpuCompleted";
+                     "audioDropped,snapshotToFrameMs,gpuEndRaw,gpuCompleted,vsyncNs,vsyncPeriodNs,leadMs,vsyncShiftMs";
         for (const auto& [name, id] : liveLogColumns_) {
             *liveLog_ << ',' << name;
         }
@@ -7759,6 +7818,11 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
         const auto& ts = tl.timestamps(); // an unwritten slot reads 0, so the frame's end is the largest
         *liveLog_ << ',' << (ts.empty() ? std::uint64_t{0} : *std::max_element(ts.begin(), ts.end())) << ','
                   << tl.completedFrames();
+        // ADR-1609: the display's most recent vsync and period (the analysis puts the light on the vsync grid), the
+        // pacer's lead and the shift it applied.
+        *liveLog_ << ',' << (vsyncClock_ ? vsyncClock_->lastVsyncNs() : 0) << ','
+                  << (vsyncClock_ ? vsyncClock_->periodNs() : 0) << ',' << fmt::format("{:.3f}", liveLead_.leadMs())
+                  << ',' << fmt::format("{:.3f}", lastVsyncShiftMs_);
     }
     const std::vector<float>& fired = engine_->frameEvents();
     for (const auto& [name, id] : liveLogColumns_) {

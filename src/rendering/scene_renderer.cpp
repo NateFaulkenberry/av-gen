@@ -3970,7 +3970,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // is the bilinear one (byte-identical).
     tonemap.upscale[0] = qualitySettings_.spatialUpscaler && (hdr_.width() < target.width || hdr_.height() < target.height) ? 1.0f
                                                                                                              : 0.0f;
-    tonemap.upscale[1] = qualitySettings_.upscaleSharpness;
+    tonemap.upscale[1] = scene.post.upscaleSharpness; // ADR-1613: a post parameter
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;

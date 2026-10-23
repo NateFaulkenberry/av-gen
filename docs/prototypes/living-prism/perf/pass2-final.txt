@@ -1,0 +1,28 @@
+heavy-emergency        gpu p50  13.5 p95  15.8 | frame p50  15.6 p99  20.8 | miss None 
+    scene 10.17, depth 1.28, shadow 0.56, volume.march 0.71
+heavy-live-r1          gpu p50  28.9 p95  30.0 | frame p50  33.3 p99  36.9 | miss 1 {'High': 177, 'Ultra': 424}
+    scene 22.40, depth 0.92, shadow 0.60, ao 0.53, volume.march 3.88
+heavy-live-r2          gpu p50  28.8 p95  30.0 | frame p50  33.3 p99  36.7 | miss 1 {'Ultra': 600}
+    scene 22.32, depth 0.93, shadow 0.60, ao 0.53, volume.march 3.91
+heavy-live-r3          gpu p50  28.9 p95  30.0 | frame p50  33.3 p99  39.8 | miss 3 {'Ultra': 600}
+    scene 22.35, depth 0.93, shadow 0.61, ao 0.53, volume.march 3.90
+heavy-low              gpu p50  14.0 p95  15.7 | frame p50  16.0 p99  22.9 | miss None 
+    scene 10.50, depth 1.04, shadow 0.75, volume.march 0.84
+heavy-ultra-norefr     gpu p50  25.8 p95  26.5 | frame p50  27.9 p99  33.2 | miss None 
+    scene 19.33, depth 0.95, shadow 0.61, ao 0.53, volume.march 3.89
+heavy-ultra-nossr      gpu p50  28.1 p95  29.1 | frame p50  30.3 p99  32.5 | miss None 
+    scene 21.62, depth 0.93, shadow 0.61, ao 0.53, volume.march 3.90
+heavy-ultra            gpu p50  28.7 p95  30.1 | frame p50  30.9 p99  35.3 | miss None 
+    scene 22.24, depth 0.93, shadow 0.61, ao 0.53, volume.march 3.90
+typ-live-r1            gpu p50  29.1 p95  30.0 | frame p50  33.3 p99  36.1 | miss 1 {'Ultra': 601}
+    scene 22.63, depth 0.93, shadow 0.56, ao 0.53, volume.march 3.90
+typ-live-r2            gpu p50  28.7 p95  29.8 | frame p50  33.3 p99  36.8 | miss 1 {'High': 177, 'Ultra': 423}
+    scene 22.31, depth 0.93, shadow 0.61, ao 0.53, volume.march 3.88
+typ-live-r3            gpu p50  28.7 p95  29.8 | frame p50  33.3 p99  36.6 | miss 1 {'High': 177, 'Ultra': 424}
+    scene 22.25, depth 0.94, shadow 0.62, ao 0.53, volume.march 3.87
+typ-ultra-norefr       gpu p50  26.1 p95  26.5 | frame p50  28.2 p99  31.9 | miss None 
+    scene 19.59, depth 0.97, shadow 0.60, ao 0.53, volume.march 3.89
+typ-ultra-nossr        gpu p50  28.2 p95  29.1 | frame p50  30.4 p99  35.9 | miss None 
+    scene 21.76, depth 0.93, shadow 0.60, ao 0.53, volume.march 3.90
+typ-ultra              gpu p50  29.1 p95  30.0 | frame p50  31.3 p99  34.9 | miss None 
+    scene 22.62, depth 0.92, shadow 0.58, ao 0.53, volume.march 3.90

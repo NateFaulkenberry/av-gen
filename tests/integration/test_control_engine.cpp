@@ -512,3 +512,63 @@ TEST_CASE("MIDI pickup: a knob takes over a parameter only when it reaches its v
     scale->setBaseComponent(0, 1.0f);
     CHECK_THAT(cc(10), WithinAbs(10.0 / 127.0 * 2.0, 1e-5));
 }
+
+TEST_CASE("a control channel holds its rest until its knob moves, returns to it on a reset, and a pickup knob waits "
+          "for it",
+          "[integration][control][adr1612]") {
+    app::Engine engine(app::EngineMode::Offline);
+    control::ControlMap map;
+    map.oscEnabled = false;
+    map.midiEnabled = false;
+    map.channelRests.push_back({"glow", 0.5f, true});
+    map.channelRests.push_back({"haze", 0.25f, false});
+    control::MidiBinding glow;
+    glow.kind = control::MidiBindKind::ControlChange;
+    glow.number = 1;
+    glow.target.signal = "glow";
+    map.midi.push_back(glow);
+    control::MidiBinding haze = glow;
+    haze.number = 2;
+    haze.target.signal = "haze";
+    map.midi.push_back(haze);
+    engine.control().setMap(map);
+    FixedStepClock clock(60.0);
+    engine.update(engine.tick(clock));
+    const auto bus = [&](const char* name) {
+        const auto id = engine.signals().find(name);
+        REQUIRE(id.has_value());
+        return engine.signals().value(*id);
+    };
+    // Before any knob: the rests, not 0 -- a bipolar route reads 0.5 as "no change".
+    CHECK(bus("control.glow") == 0.5f);
+    CHECK(bus("control.haze") == 0.25f);
+    const auto cc = [&](int number, int v) {
+        const std::array<std::uint8_t, 3> m{0xB0, static_cast<std::uint8_t>(number), static_cast<std::uint8_t>(v)};
+        engine.control().injectMidi(m);
+        engine.update(engine.tick(clock));
+    };
+    // No pickup: the first move takes over at once (0 attenuates as far as 1 boosts).
+    cc(2, 0);
+    CHECK(bus("control.haze") == 0.0f);
+    // Pickup: the knob sitting at 0.1 does nothing until it reaches the rest, then follows.
+    cc(1, 13);
+    CHECK(bus("control.glow") == 0.5f);
+    cc(1, 50);
+    CHECK(bus("control.glow") == 0.5f);
+    cc(1, 70); // passed through 0.5
+    CHECK_THAT(bus("control.glow"), WithinAbs(70.0 / 127.0, 1e-5));
+    cc(1, 20);
+    CHECK_THAT(bus("control.glow"), WithinAbs(20.0 / 127.0, 1e-5));
+    CHECK(engine.control().status().pickupHeld == 2);
+    // A reset: every channel back to rest; the pickup knob lets go until it comes back.
+    control::OscMessage reset;
+    reset.address = "/avgen/control/reset";
+    engine.control().injectOsc(reset);
+    engine.update(engine.tick(clock));
+    CHECK(bus("control.glow") == 0.5f);
+    CHECK(bus("control.haze") == 0.25f);
+    cc(1, 10);
+    CHECK(bus("control.glow") == 0.5f);
+    cc(1, 64);
+    CHECK_THAT(bus("control.glow"), WithinAbs(64.0 / 127.0, 1e-5));
+}

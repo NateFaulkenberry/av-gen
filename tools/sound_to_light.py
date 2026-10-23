@@ -123,6 +123,7 @@ def load_frames(path):
     for r in rows:
         try:
             frames.append({"frameNs": int(r["frameNs"]), "presentNs": int(r["presentNs"]),
+                           "vsyncNs": int(r.get("vsyncNs") or 0), "vsyncPeriodNs": int(r.get("vsyncPeriodNs") or 0),
                            "gpuEndRaw": int(r.get("gpuEndRaw") or 0), "gpuMs": num(r.get("gpuMs")),
                            "snapMs": num(r.get("snapshotToFrameMs")), "row": r})
         except (KeyError, ValueError, TypeError):
@@ -144,6 +145,11 @@ def estimate_gpu_end(frames):
             last = f["gpuMs"]
         if last is not None:
             f["gpuEndNs"] = f["presentNs"] + int(last * 1e6)
+            # ADR-1609: on the display's own vsync grid (the log carries its latest vsync and period), the light is the
+            # first vsync at or after the GPU's end -- measured phase, not an assumed half refresh.
+            if f["vsyncNs"] > 0 and f["vsyncPeriodNs"] > 0:
+                k = -(-(f["gpuEndNs"] - f["vsyncNs"]) // f["vsyncPeriodNs"])  # ceil
+                f["lightNs"] = f["vsyncNs"] + k * f["vsyncPeriodNs"]
 
 
 def epoch_offset_ms(frames):
@@ -152,7 +158,7 @@ def epoch_offset_ms(frames):
     return pct(d, 0.5)
 
 
-def summarise(bus, present, gpu, refresh_ms):
+def summarise(bus, present, gpu, refresh_ms, light=None):
     s = {"n": len(present), "busP50": pct(bus, 0.5), "busP95": pct(bus, 0.95),
          "presentP50": pct(present, 0.5), "presentP95": pct(present, 0.95)}
     if gpu:
@@ -162,6 +168,8 @@ def summarise(bus, present, gpu, refresh_ms):
                   "lightEstP95": pct([x + refresh_ms / 2 for x in gpu], 0.95),
                   "lightUpperP50": pct([x + refresh_ms for x in gpu], 0.5),
                   "lightUpperP95": pct([x + refresh_ms for x in gpu], 0.95)})
+    if light:
+        s.update({"lightN": len(light), "lightP50": pct(light, 0.5), "lightP95": pct(light, 0.95)})
     return s
 
 
@@ -227,13 +235,16 @@ def collect(run_dir, refresh_ms, lists):
                 continue
             fr = frames[i]
             sound = ns + correction_ns
-            m = entry["fam"].setdefault(fam, {k: [] for k in ("bus", "present", "gpu", "updateToPresent", "gpuSpan")})
+            m = entry["fam"].setdefault(fam, {k: [] for k in ("bus", "present", "gpu", "updateToPresent", "gpuSpan", "light", "vsyncWait")})
             m["bus"].append((fr["frameNs"] - sound) / 1e6)
             m["present"].append((fr["presentNs"] - sound) / 1e6)
             m["updateToPresent"].append((fr["presentNs"] - fr["frameNs"]) / 1e6)
             if "gpuEndNs" in fr:
                 m["gpu"].append((fr["gpuEndNs"] - sound) / 1e6)
                 m["gpuSpan"].append((fr["gpuEndNs"] - fr["presentNs"]) / 1e6)
+            if "lightNs" in fr:
+                m["light"].append((fr["lightNs"] - sound) / 1e6)
+                m["vsyncWait"].append((fr["lightNs"] - fr["gpuEndNs"]) / 1e6)
     return {"dir": run_dir, "probePeriodFrames": period, "referenceCorrectionMs": correction_ns / 1e6,
             "shotsPlayed": played, "shots": len(shots), "frames": len(frames),
             "frameIntervalP50": pct(intervals, 0.5), "frameIntervalP99": pct(intervals, 0.99),
@@ -248,20 +259,20 @@ def analyse(run_dirs, json_out, refresh_hz):
     results = {}
     for name, e in lists.items():
         per_family = {}
-        pooled = {k: [] for k in ("bus", "present", "gpu", "updateToPresent", "gpuSpan")}
+        pooled = {k: [] for k in ("bus", "present", "gpu", "updateToPresent", "gpuSpan", "light", "vsyncWait")}
         for fam in FAMILIES:
             if fam not in e["fam"]:
                 continue
             m = e["fam"][fam]
-            per_family[fam] = summarise(m["bus"], m["present"], m["gpu"], refresh_ms)
+            per_family[fam] = summarise(m["bus"], m["present"], m["gpu"], refresh_ms, m["light"])
             for k in pooled:
                 pooled[k] += m[k]
         results[name] = {"column": e["column"], "shots": e["tested"], "missed": e["missed"],
                          "falseAlarms": e["falseAlarms"], **summarise(pooled["bus"], pooled["present"], pooled["gpu"],
-                                                                      refresh_ms),
+                                                                      refresh_ms, pooled["light"]),
                          "families": per_family,
                          "components": {k: {"p50": pct(pooled[k], 0.5), "p95": pct(pooled[k], 0.95)}
-                                        for k in ("updateToPresent", "gpuSpan") if pooled[k]}}
+                                        for k in ("updateToPresent", "gpuSpan", "vsyncWait") if pooled[k]}}
     out = {"runs": runs, "refreshMs": refresh_ms, "paths": results}
     print_table(out)
     if json_out:
@@ -282,17 +293,18 @@ def print_table(out):
                   r["frameIntervalP50"], r["frameIntervalP99"], f1(r["gpuMsP50"]).strip(), r["probePeriodFrames"],
                   r["referenceCorrectionMs"]))
     print("%-30s %3s %4s %3s | %5s %5s | %5s %5s | %5s %5s | %5s %5s" % (
-        "path", "n", "miss", "fa", "bus50", "bus95", "prs50", "prs95", "gpu50", "gpu95", "lt~50", "lt~95"))
+        "path", "n", "miss", "fa", "bus50", "bus95", "prs50", "prs95", "gpu50", "gpu95", "lt50", "lt95"))
     for name, r in out["paths"].items():
         if not r.get("n"):
             print("%-30s %3d %4s     never rose" % (name, 0, r.get("missed", "-")))
             continue
         print("%-30s %3d %4d %3d | %s %s | %s %s | %s %s | %s %s" % (
             name, r["n"], r["missed"], r["falseAlarms"], f1(r["busP50"]), f1(r["busP95"]), f1(r["presentP50"]),
-            f1(r["presentP95"]), f1(r.get("gpuP50")), f1(r.get("gpuP95")), f1(r.get("lightEstP50")),
-            f1(r.get("lightEstP95"))))
+            f1(r["presentP95"]), f1(r.get("gpuP50")), f1(r.get("gpuP95")),
+            f1(r.get("lightP50", r.get("lightEstP50"))), f1(r.get("lightP95", r.get("lightEstP95")))))
     print("ms from the sound. fa = rises 300 ms before a shot (nothing played). gpu = present + the GPU span; "
-          "lt~ = gpu + half a refresh (the mean wait for the next vsync); a whole refresh is the bound (JSON).")
+          "lt = the first vsync after the GPU end, on the display's vsync grid when the log has it (ADR-1609), else "
+          "gpu + half a refresh.")
 
 
 def main():
