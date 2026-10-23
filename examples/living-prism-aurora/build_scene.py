@@ -37,7 +37,9 @@ def prog_ground():
                 {"kind": "mixBy", "dst": 3, "srcA": 2, "srcB": 3, "srcC": 1},
                 {"kind": "input", "dst": 4, "input": "normal"},                            # rock on steep ground
                 {"kind": "gradient", "dst": 4, "srcA": 4, "constant": [0, 1, 0, 0], "value": 1.0},
-                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.62, 0.8, 0, 0]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.5, 0.72, 0, 0]},     # moss on all but steep
+                {"kind": "gradient", "dst": 7, "srcA": 0, "constant": [0, 1, 0, 1.6], "value": -0.05},  # and below ~30 m
+                {"kind": "add", "dst": 4, "srcA": 4, "srcB": 7},
                 {"kind": "constant", "dst": 5, "constant": [0.012, 0.014, 0.018, 1]},    # near-black rock
                 {"kind": "mixBy", "dst": 3, "srcA": 5, "srcB": 3, "srcC": 4},
                 {"kind": "remap", "dst": 6, "srcA": 4, "constant": [0, 1, 0.75, 0.9]}]}

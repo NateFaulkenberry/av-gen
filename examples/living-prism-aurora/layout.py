@@ -43,16 +43,18 @@ def _offset(path, d):
     return out
 
 
-WALLS = [  # (name, path, amplitude, width, falloff). A falloff below 1 makes the slope steep (a cliff, rock) and
-    # the top flat (moss); the benches the crystals stand on are low shelves just above the water
-    ("benchL", _offset(_ALL_RIVER, 46.0), 3.0, 22.0, 1.0),
-    ("benchR", _offset(_ALL_RIVER, -46.0), 3.0, 22.0, 1.0),
-    ("cliffL", _offset(_CANYON, 110.0), 70.0, 52.0, 0.45),
-    ("cliffR", _offset(_CANYON, -110.0), 76.0, 52.0, 0.45),
-    ("highL", _offset(_CANYON, 190.0), 85.0, 90.0, 0.55),
-    ("highR", _offset(_CANYON, -190.0), 90.0, 90.0, 0.55),
-    ("outerL", _offset(_CANYON, 330.0), 105.0, 150.0, 0.6),
-    ("outerR", _offset(_CANYON, -330.0), 110.0, 150.0, 0.6),
+WALLS = [  # (name, path, amplitude, width, falloff). Phase 2c (the owner): the banks roll down smoothly and gradually
+    # to the water through mossy benches; the walls rise behind them, steep (rock) only higher up
+    ("benchL", _offset(_ALL_RIVER, 50.0), 4.0, 34.0, 1.0),
+    ("benchR", _offset(_ALL_RIVER, -50.0), 4.0, 34.0, 1.0),
+    ("bankL", _offset(_CANYON, 95.0), 26.0, 70.0, 1.0),      # the rolling green bank between bench and wall
+    ("bankR", _offset(_CANYON, -95.0), 28.0, 70.0, 1.0),
+    ("cliffL", _offset(_CANYON, 150.0), 62.0, 60.0, 0.6),
+    ("cliffR", _offset(_CANYON, -150.0), 66.0, 60.0, 0.6),
+    ("highL", _offset(_CANYON, 220.0), 85.0, 90.0, 0.7),
+    ("highR", _offset(_CANYON, -220.0), 90.0, 90.0, 0.7),
+    ("outerL", _offset(_CANYON, 350.0), 105.0, 150.0, 0.8),
+    ("outerR", _offset(_CANYON, -350.0), 110.0, 150.0, 0.8),
 ]
 MOUNTAINS = []   # the far ridges are meshes now (blender/aurora_assets.py: ridges), layered in the fog
 WORLD_SIZE = (4000.0, 6000.0)
@@ -135,14 +137,16 @@ def world_json():
 # formations dominate. The right bank follows the reference: its crystals lean outward (away from the river, to the
 # right) and are set back and staggered in depth, so the river corridor and the far crystals stay visible past them.
 # (name, z, side -1 left / +1 right, setback m, yaw deg, scale, family)
-_FORMATION_SPEC = [
-    ("L1", 75.0, -1, 60.0, 25.0, 2.7, "cluster"),   # the hero: fills the left third, rising into the aurora
-    ("R1", 10.0, 1, 52.0, -15.0, 2.6, "pair"),     # the right pair: large, close, leaning out to the right
-    ("L2", -120.0, -1, 45.0, 40.0, 1.6, "spire"),
-    ("R2", -235.0, 1, 52.0, -10.0, 1.6, "spire2"),
-    ("C1", -360.0, -1, 44.0, 15.0, 1.4, "small"),
-    ("C2", -470.0, 1, 48.0, -20.0, 1.4, "small2"),
-    ("D", -680.0, -1, 40.0, 0.0, 1.6, "far"),       # the horizon group
+_FORMATION_SPEC = [   # phase 2c: the near clumps stand back from the camera, grand by scale, with bank in front
+    ("L1", -15.0, -1, 56.0, 10.0, 2.5, "fan"),      # the hero fan, left of the river, rising into the aurora
+    ("R1", -55.0, 1, 56.0, -10.0, 2.5, "pairR"),    # the right pair: upright, leaning outward, one behind
+    ("L2", -135.0, -1, 50.0, 30.0, 1.6, "spire"),
+    ("R2", -190.0, 1, 52.0, -10.0, 1.5, "spire2"),
+    ("L3", -265.0, -1, 46.0, 20.0, 1.4, "small"),    # mid-ground spires, receding down both banks
+    ("R3", -335.0, 1, 46.0, -25.0, 1.35, "spire2"),
+    ("C1", -415.0, -1, 44.0, 15.0, 1.3, "spire"),
+    ("C2", -500.0, 1, 46.0, -20.0, 1.3, "small2"),
+    ("D", -690.0, -1, 40.0, 0.0, 1.6, "far"),       # the horizon group
 ]
 _CENTRE = _chaikin(_ALL_RIVER, 3)
 

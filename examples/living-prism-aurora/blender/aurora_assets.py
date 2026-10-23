@@ -39,14 +39,14 @@ def basis(axis):
 
 def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, chisel=None, embed=0.12):
     """One crystal shard into bm. width: its cross-section's larger radius; flat: thickness / width."""
-    sides = sides or rng.choice((4, 5, 5, 6))
-    flat = flat if flat is not None else rng.uniform(0.6, 0.9)
-    tip = tip if tip is not None else rng.uniform(0.25, 0.5) * length
-    chisel = rng.random() < 0.4 if chisel is None else chisel
+    sides = sides or 6                                      # phase 2c: hexagonal columns, always
+    flat = flat if flat is not None else rng.uniform(0.82, 0.98)   # nearly round: a column, never a slab
+    tip = tip if tip is not None else rng.uniform(0.18, 0.3) * length
+    chisel = False if chisel is None else chisel   # pointed terminations only (a chisel read as a wedge)
     u, v, a = basis(axis)
     spin = rng.uniform(0, math.tau)
-    angles = sorted(spin + math.tau * (i + rng.uniform(-0.18, 0.18)) / sides for i in range(sides))
-    rs = [width * rng.uniform(0.75, 1.15) for _ in range(sides)]
+    angles = sorted(spin + math.tau * (i + rng.uniform(-0.08, 0.08)) / sides for i in range(sides))
+    rs = [width * rng.uniform(0.88, 1.08) for _ in range(sides)]
     base = Vector(base)
 
     def ring(c, sc):
@@ -54,7 +54,7 @@ def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, c
                 for t, r in zip(angles, rs)]
     r0 = ring(base - a * (embed * length), 1.0)
     r1 = ring(base + a * (length - tip), rng.uniform(0.88, 1.0))
-    off = (u * rng.uniform(-1, 1) + v * rng.uniform(-0.5, 0.5)) * width * 0.7
+    off = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.25
     top = base + a * length + off
     if chisel:   # a two-point (chisel) termination: two apices on a short ridge
         e = u * width * 0.35
@@ -87,6 +87,16 @@ def lean(rng, out_x, deg_lo, deg_hi, spread=25):
 
 
 FAMILIES = {
+    # phase 2c: the left hero is a FAN -- three tall shards leaning outward (to the left, -x), shorter ones around
+    # the base leaning every way; no single central spike. dy > 0 is behind (Blender +Y = AV Gen -Z).
+    "fan": (13, [(0, 0, 4.0, 52, 10, 16), (-7, 4, 3.6, 46, 18, 26), (5, 6, 3.2, 40, 6, 12),
+                 (-12, -3, 2.8, 26, 28, 40), (8, -5, 2.6, 22, 14, 24), (-3, -8, 2.4, 16, 20, 34),
+                 (12, 2, 2.2, 14, 26, 38)], -1),
+    # phase 2c: the right bank's near pair -- a big upright crystal leaning outward (+x) and a second one behind it,
+    # small ones at their base (the reference's lower-right pair)
+    "pairR": (29, [(0, 0, 5.2, 44, 12, 18), (-9, 14, 4.4, 36, 16, 24), (-6, -4, 2.4, 13, 22, 34),
+                   (9, -3, 2.0, 10, 30, 44)], 1),
+
     # name: (seed, [(dx, dy, width, length, lean_lo, lean_hi)], outward +x)
     "cluster": (11, [(0, 0, 4.6, 40, 4, 10), (5, 3, 3.6, 30, 14, 24), (-4, 2, 3.2, 26, 8, 18), (3, -5, 3.0, 22, 20, 34),
                      (-6, -4, 2.6, 17, 24, 38), (8, -2, 2.4, 14, 30, 45), (-2, 6, 2.2, 12, 18, 30)], 1),

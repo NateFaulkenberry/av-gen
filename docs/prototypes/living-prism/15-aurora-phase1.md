@@ -186,3 +186,25 @@ view, few hero objects and no haze.
 | Circuits | generated | — | lines |
 
 **Not fetched:** nothing yet. Any new asset will be recorded here with its licence first.
+
+## Phase 2c gate (2026-10-23)
+
+Owner notes on 2b, and what changed:
+
+- **Left near cluster** is now a fan (family `fan`, 7 columns) pushed left of the river, set back 56 m.
+- **Right near formation** (`pairR`) is upright and leans outward, with a second crystal standing behind it.
+- **More mid-distance crystals:** 9 formations, staggered on alternate banks down to z = -690.
+- **Smooth banks:** the canyon meets the river gradually through moss benches (±50 m), then a rolling bank (±95 m), with cliffs only further out (±150 m and beyond). The ground shader puts moss below about 30 m and on gentle slopes.
+- **Every formation is crystalline:** the shard builder makes pointed hexagonal prisms only. The chisel and slab shapes are gone.
+- **Space before the first clump:** the near clumps moved to z = -15 and z = -55 (the camera is at z = 170). The lower edge of the frame is now bank and river.
+
+**Perf** (1080p, AC power):
+
+| Run | GPU p50 / p95 | Frame p99 | Quality levels | Misses |
+|---|---|---|---|---|
+| Headless Ultra | 17.8 / 23.1 ms | 29.9 ms | Ultra | n/a |
+| Live auto | 17.7 / 18.1 ms | 35.6 ms | Ultra 274, High 177 (100% High or better) | 0 |
+
+Against the 33.3 ms (30 fps) target, the GPU has about 15 ms of headroom. Against 8.33 ms it is over by about 2x.
+
+Media is in `~/Desktop/av-gen-review/82-living-prism/aurora-phase2c/`.
