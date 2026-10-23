@@ -1,5 +1,6 @@
 // stems-multichannel M2: stem keys, the stem file check, and the stem.<key>.* vocabulary.
 
+#include "analysis/causal_onsets.hpp"
 #include "analysis/stem_analysis.hpp"
 #include "audio/audio_file.hpp"
 #include "audio/stem_source.hpp"
@@ -100,7 +101,7 @@ TEST_CASE("stem signals: one stable vocabulary per key; relabel moves no id; ina
     signals::SignalBus bus;
     const auto drums = signals::StemSignals::declare(bus, "drums", "Drums");
     const auto names = signals::StemSignals::names("drums");
-    REQUIRE(names.size() == 16);
+    REQUIRE(names.size() == 19); // ADR-1604 added onsetLow, onsetMid, onsetHigh
     for (const auto& n : names) {
         CHECK(bus.find(n).has_value());
     }
@@ -136,4 +137,42 @@ TEST_CASE("stem signals: one stable vocabulary per key; relabel moves no id; ina
         CHECK(bus.value(id) == 0.0f);
         CHECK_FALSE(bus.event(id));
     }
+}
+
+// ADR-1604: the register of an onset: how the power its hop gained divides between low, mid and high.
+TEST_CASE("onset register: the low, mid and high shares of an attack's gained power", "[stems][signals][adr1604]") {
+    const float binHz = 48000.0f / 2048.0f; // 23.4 Hz
+    std::vector<float> before(1025, 0.1f);
+    std::vector<float> now = before;
+    CHECK(analysis::registerShares(now, before, binHz) == std::array<float, 3>{0.0f, 0.0f, 0.0f}); // nothing gained
+    for (std::size_t k = 2; k < 10; ++k) {
+        now[k] = 1.0f; // 47-211 Hz: a kick's body
+    }
+    auto r = analysis::registerShares(now, before, binHz);
+    CHECK(r[0] == 1.0f);
+    CHECK(r[1] == 0.0f);
+    now = before;
+    for (std::size_t k = 200; k < 600; ++k) {
+        now[k] = 0.5f; // 4.7-14 kHz: a hat
+    }
+    r = analysis::registerShares(now, before, binHz);
+    CHECK(r[2] == 1.0f);
+    // Energy-weighted: a loud body under a faint broadband click reads low.
+    now = before;
+    for (std::size_t k = 2; k < 10; ++k) {
+        now[k] = 2.0f;
+    }
+    for (std::size_t k = 10; k < 683; ++k) {
+        now[k] = 0.15f;
+    }
+    r = analysis::registerShares(now, before, binHz);
+    CHECK(r[0] > 0.6f);
+    CHECK(r[0] + r[1] + r[2] > 0.999f);
+    // A band that lost power does not take a negative share.
+    now = before;
+    now[3] = 0.0f;
+    now[300] = 0.6f;
+    r = analysis::registerShares(now, before, binHz);
+    CHECK(r[0] == 0.0f);
+    CHECK(r[2] == 1.0f);
 }

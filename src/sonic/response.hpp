@@ -106,6 +106,9 @@ struct ResponseSignals {
                       flux = signals::kInvalidSignal, hatRate = signals::kInvalidSignal,
                       melodic = signals::kInvalidSignal, pitch = signals::kInvalidSignal,
                       intensity = signals::kInvalidSignal, levelSlow = signals::kInvalidSignal; // ADR-1361
+    // ADR-1604: response.onsetLow/Mid/High, the register of the latest onset hit, held until the next
+    std::array<signals::SignalId, 3> onsetRegister{signals::kInvalidSignal, signals::kInvalidSignal,
+                                                   signals::kInvalidSignal};
 };
 
 class ResponseModel {
@@ -151,6 +154,7 @@ private:
     double heardSeconds_ = 0.0, sinceHeard_ = 0.0; // gated sound heard; time since the first of it
     bool levelsPrimed_ = false;
     float hatRate_ = 0.0f, melodic_ = 0.0f;
+    std::array<float, 3> onsetRegister_{}; // ADR-1604
     float lastSemitone_ = -1.0f, audioPitch_ = -1.0f;
     bool primed_ = false;
 };

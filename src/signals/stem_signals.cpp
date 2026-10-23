@@ -14,7 +14,7 @@ struct Field {
     bool event;
     const char* label;
 };
-constexpr std::array<Field, 16> kFields{{
+constexpr std::array<Field, 19> kFields{{
     {"active", 0.0f, 1.0f, false, "has audio now (0 = no data: outside the stem, absent or disconnected)"},
     {"rms", 0.0f, 1.0f, false, "loudness (RMS, unsmoothed)"},
     {"peak", 0.0f, 1.0f, false, "peak"},
@@ -31,12 +31,17 @@ constexpr std::array<Field, 16> kFields{{
     {"kick", 0.0f, 1.0f, true, "kick (hits tier)"},
     {"snare", 0.0f, 1.0f, true, "snare / clap (hits tier)"},
     {"hat", 0.0f, 1.0f, true, "hats (hits tier)"},
+    // ADR-1604: the register of the latest onset (low/mid/high shares of its attack), held until the next
+    {"onsetLow", 0.0f, 1.0f, false, "onset register: low share (30-250 Hz) of the latest attack"},
+    {"onsetMid", 0.0f, 1.0f, false, "onset register: mid share (250 Hz-4 kHz) of the latest attack"},
+    {"onsetHigh", 0.0f, 1.0f, false, "onset register: high share (4-16 kHz) of the latest attack"},
 }};
 
-std::array<SignalId*, 16> slots(StemSignals& s) {
+std::array<SignalId*, 19> slots(StemSignals& s) {
     return {&s.active, &s.rms,      &s.peak,     &s.level,    &s.onset,    &s.onsetStrength,
             &s.bands[0], &s.bands[1], &s.bands[2], &s.bands[3], &s.bands[4], &s.centroid,
-            &s.width,    &s.kick,     &s.snare,    &s.hat};
+            &s.width,    &s.kick,     &s.snare,    &s.hat,      &s.onsetRegister[0], &s.onsetRegister[1],
+            &s.onsetRegister[2]};
 }
 
 } // namespace
@@ -90,6 +95,9 @@ void StemSignals::publish(SignalBus& bus, const analysis::StemFrame& f, bool eve
     }
     bus.set(centroid, f.centroid);
     bus.set(width, f.stereo ? f.width : 0.0f);
+    for (std::size_t b = 0; b < onsetRegister.size(); ++b) {
+        bus.set(onsetRegister[b], f.onsetRegister[b]); // ADR-1604
+    }
     // An event fires with its strength, floored so a quiet one still moves an event route (as audio.onsetLow does).
     bus.setEvent(onset, events && f.onset, std::clamp(f.onsetStrength * 0.5f, 0.05f, 1.0f));
     bus.setEvent(kick, events && f.kick, std::max(0.05f, f.kickStrength));

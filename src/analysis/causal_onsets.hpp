@@ -75,7 +75,18 @@ struct CausalOnsets {
     float levelDb = -120.0f;   // 30 Hz-16 kHz power in dBFS
     float snareDb = -120.0f;   // 1.5-5 kHz power in dBFS
     float hatDb = -120.0f;     // 7-16 kHz power in dBFS
+    // ADR-1604: the register of this hop's attack -- how the power that arrived since the previous hop divides between
+    // low (30-250 Hz), mid (250 Hz-4 kHz) and high (4-16 kHz), summing to 1 (all 0 when no band gained). Known on the
+    // onset's own hop, before any class is decided.
+    std::array<float, 3> onsetRegister{};
 };
+
+// ADR-1604: the low/mid/high shares of the power gained between two magnitude spectra (bin k at k x binHz): each
+// band's increase in summed squared magnitude, floored at 0 and normalised to sum to 1; all 0 when no band gained.
+// Energy-weighted, so a kick's body outweighs its click and a snare's noise outweighs its body. Shared by the mix's
+// causal onsets and the stems.
+[[nodiscard]] std::array<float, 3> registerShares(std::span<const float> now, std::span<const float> previous,
+                                                  float binHz);
 
 // Turns a ratio into events: fires when the ratio reaches `fire` while armed, rising, and at least `refractory`
 // seconds after the last hit; re-arms below `rearm` x fire. Strength = floor + (1 - floor)(1 - fire/ratio): a hit

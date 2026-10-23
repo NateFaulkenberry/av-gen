@@ -192,6 +192,14 @@ void ResponseModel::declare(signals::SignalBus& bus) {
     // ADR-1361: declared last, after every older id.
     ids_.levelSlow = bus.declare("response.levelSlow");
     bus.setLabel(ids_.levelSlow, "level, slow (over about 3 s: when a rest becomes silence)");
+    // ADR-1604: the onset's register, declared after every older id.
+    constexpr std::array<const char*, 3> kRegister{"Low", "Mid", "High"};
+    constexpr std::array<const char*, 3> kRegisterLabel{"low (30-250 Hz)", "mid (250 Hz-4 kHz)", "high (4-16 kHz)"};
+    for (std::size_t b = 0; b < 3; ++b) {
+        ids_.onsetRegister[b] = bus.declare(std::string("response.onset") + kRegister[b]);
+        bus.setLabel(ids_.onsetRegister[b], std::string("onset register: the ") + kRegisterLabel[b] +
+                                                " share of the latest onset's attack (held until the next)");
+    }
 }
 
 void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseControls& c, const ResponseSettings& s) {
@@ -229,6 +237,9 @@ void ResponseModel::step(const TimbreFeatures& f, const analysis::ResponseFeed& 
             pending_[h] = true;
             pendingStrength_[h] = std::max(pendingStrength_[h], shaped);
             pendingDrumness_[h] = std::min(pendingDrumness_[h], o.drumness[k]);
+            if (h == static_cast<std::size_t>(ResponseHit::Onset)) {
+                onsetRegister_ = o.onsetRegister; // ADR-1604: known on the onset's own hop
+            }
             env_[h] = std::max(env_[h], shaped);
             ++count_[h];
             if (h == static_cast<std::size_t>(ResponseHit::Hat)) {
@@ -393,6 +404,9 @@ void ResponseModel::publish(signals::SignalBus& bus, const NoteTrack& notes, dou
     bus.set(ids_.pitch, midiPitch >= 0.0f ? midiPitch : std::max(audioPitch_, 0.0f));
     bus.set(ids_.intensity, intensity_);
     bus.set(ids_.levelSlow, levelSlow_);
+    for (std::size_t b = 0; b < 3; ++b) {
+        bus.set(ids_.onsetRegister[b], onsetRegister_[b]); // ADR-1604
+    }
 }
 
 void ResponseModel::publishZeros(signals::SignalBus& bus) {
@@ -404,7 +418,8 @@ void ResponseModel::publishZeros(signals::SignalBus& bus) {
         bus.set(ids_.env[h], 0.0f);
     }
     for (const signals::SignalId id : {ids_.bass, ids_.level, ids_.transient, ids_.sustain, ids_.flux, ids_.hatRate,
-                                       ids_.melodic, ids_.pitch, ids_.intensity, ids_.levelSlow}) {
+                                       ids_.melodic, ids_.pitch, ids_.intensity, ids_.levelSlow,
+                                       ids_.onsetRegister[0], ids_.onsetRegister[1], ids_.onsetRegister[2]}) {
         bus.set(id, 0.0f);
     }
 }

@@ -16,6 +16,9 @@
 //   stem.<key>.centroid        0..1  log-normalised spectral centroid
 //   stem.<key>.width           0..2  side/mid RMS of a stereo stem or a linked pair; 0 for mono
 //   stem.<key>.kick .snare .hat event  the ADR-1060 causal classifier, on sources with `hits` only
+//   stem.<key>.onsetLow .onsetMid .onsetHigh  0..1  ADR-1604: the register of the latest onset -- the low (30-250 Hz),
+//                                    mid and high (4-16 kHz) shares of its attack, summing to 1 -- from its own hop on,
+//                                    held until the next onset
 //
 // Cadence: values change once per analysis hop (512 samples, 10.7 ms at 48 kHz); a render frame publishes the newest
 // hop at or before its instant, and ORs the events of every hop since the previous frame (none is lost at 30 fps).
@@ -43,6 +46,8 @@ struct StemSignals {
     SignalId kick = kInvalidSignal;
     SignalId snare = kInvalidSignal;
     SignalId hat = kInvalidSignal;
+    // ADR-1604: stem.<key>.onsetLow / onsetMid / onsetHigh
+    std::array<SignalId, 3> onsetRegister{kInvalidSignal, kInvalidSignal, kInvalidSignal};
 
     // Declares (idempotently) every signal of `key` and labels them with `label` ("Drums: level (...)").
     static StemSignals declare(SignalBus& bus, const std::string& key, const std::string& label);

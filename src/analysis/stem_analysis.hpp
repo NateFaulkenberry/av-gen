@@ -43,6 +43,10 @@ struct StemFrame {
     float width = 0.0f;         // side/mid RMS, meaningful when `stereo`
     std::array<float, 5> bands{}; // bass, lowMid, mid, highMid, treble -- auto-gained (running max) like audio.<band>
     bool onset = false;         // an attack in this hop (see `StemOnsetConfig`)
+    // ADR-1604: the register of the latest onset at or before this hop -- the low (30-250 Hz), mid (250 Hz-4 kHz) and
+    // high (4-16 kHz) shares of the power its hop gained, summing to 1 -- held until the next, so a frame reads the
+    // onset's own.
+    std::array<float, 3> onsetRegister{};
     bool kick = false, snare = false, hat = false; // hits tier only
     float kickStrength = 0.0f, snareStrength = 0.0f, hatStrength = 0.0f;
     bool stereo = false;        // the source carried a side channel (a stereo stem, a linked input pair)
@@ -131,6 +135,8 @@ private:
     std::vector<float> medianScratch_;
     float lastFlux_ = 0.0f;
     double lastOnsetTime_ = -1.0;
+    std::vector<float> previousMagnitude_; // ADR-1604: the previous hop's magnitudes (the register's baseline)
+    std::array<float, 3> lastRegister_{};  // ADR-1604: the latest onset's register
     std::size_t onsetBins_ = 0;
     float binHz_ = 0.0f;
     double hopSeconds_ = 0.0;

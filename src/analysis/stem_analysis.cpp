@@ -1,5 +1,7 @@
 #include "analysis/stem_analysis.hpp"
 
+#include "analysis/causal_onsets.hpp"
+
 #include "sonic/response.hpp"
 
 #include <algorithm>
@@ -77,6 +79,8 @@ void StemAnalyzer::reset(std::uint64_t startFrame) {
     fluxCount_ = 0;
     lastFlux_ = 0.0f;
     lastOnsetTime_ = -1.0;
+    lastRegister_ = {};
+    previousMagnitude_.clear();
 }
 
 float StemAnalyzer::followLevel(float rms) {
@@ -137,10 +141,13 @@ void StemAnalyzer::detectOnset(const AnalysisFrame& f, StemFrame& out) {
     out.onset = out.onsetStrength >= 1.0f && flux >= lastFlux_ && refractory;
     if (out.onset) {
         lastOnsetTime_ = f.timeSeconds;
+        lastRegister_ = registerShares(f.magnitude, previousMagnitude_, binHz_); // ADR-1604
     }
+    out.onsetRegister = lastRegister_;
     fluxHistory_[fluxCount_ % fluxHistory_.size()] = flux;
     ++fluxCount_;
     lastFlux_ = flux;
+    previousMagnitude_.assign(f.magnitude.begin(), f.magnitude.end()); // ADR-1604
 }
 
 bool StemAnalyzer::pop(StemFrame& out) {

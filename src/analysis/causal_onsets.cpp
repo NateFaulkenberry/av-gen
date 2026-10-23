@@ -220,6 +220,33 @@ void CausalOnsetDetector::decideKick(CausalOnsets& out, double hop) {
     kicks_.push_back(t);
 }
 
+std::array<float, 3> registerShares(std::span<const float> now, std::span<const float> previous, float binHz) {
+    std::array<float, 3> out{};
+    const std::size_t bins = std::min(now.size(), previous.size());
+    if (!(binHz > 0.0f) || bins < 2) {
+        return out;
+    }
+    constexpr std::array<std::array<float, 2>, 3> kBands{{{30.0f, 250.0f}, {250.0f, 4000.0f}, {4000.0f, 16000.0f}}};
+    float total = 0.0f;
+    for (std::size_t b = 0; b < kBands.size(); ++b) {
+        const auto lo = std::max<std::size_t>(1, static_cast<std::size_t>(std::ceil(kBands[b][0] / binHz)));
+        const auto hi = std::min(bins, static_cast<std::size_t>(std::ceil(kBands[b][1] / binHz)));
+        double gained = 0.0;
+        for (std::size_t k = lo; k < hi; ++k) {
+            gained += static_cast<double>(now[k]) * now[k] - static_cast<double>(previous[k]) * previous[k];
+        }
+        out[b] = std::max(0.0f, static_cast<float>(gained));
+        total += out[b];
+    }
+    if (!(total > 0.0f)) {
+        return {};
+    }
+    for (float& v : out) {
+        v /= total;
+    }
+    return out;
+}
+
 void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopSeconds) {
     CausalOnsets out;
     const std::size_t bins = frame.magnitude.size();
@@ -254,6 +281,9 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
         const auto prev = [&](std::size_t i) { return std::log1p(gain * previous_[i]); };
         const float ref = std::max(prev(k), std::max(prev(k > 0 ? k - 1 : k), prev(k + 1 < bins ? k + 1 : k)));
         flux_[k] = std::max(0.0f, std::log1p(gain * std::max(m[k], 0.0f)) - ref);
+    }
+    if (!first) {
+        out.onsetRegister = registerShares(m, previous_, binHz); // ADR-1604
     }
     for (std::size_t k = 0; k < bins; ++k) {
         previous_[k] = std::max(m[k], 0.0f);

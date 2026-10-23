@@ -15,6 +15,7 @@ ResponseFeed ResponseFeed::fromCausal(const CausalOnsets& c) {
     f.onsetRatio = c.ratio[static_cast<std::size_t>(HitClass::Onset)];
     f.levelDb = c.levelDb;
     f.bassDb = c.bassDb;
+    f.onsetRegister = c.onsetRegister; // ADR-1604
     return f;
 }
 
@@ -40,6 +41,9 @@ ResponseFeed FeedFolder::fold(std::span<const TimedFeed> hops, double to, bool a
             }
             // The strongest event in the window, with the least drumness of any (the response model's pending rule).
             out.drumness[k] = out.hit[k] ? std::min(out.drumness[k], h.feed.drumness[k]) : h.feed.drumness[k];
+            if (k == static_cast<std::size_t>(HitClass::Onset) && h.feed.strength[k] >= out.strength[k]) {
+                out.onsetRegister = h.feed.onsetRegister; // ADR-1604: the strongest onset's register
+            }
             out.strength[k] = std::max(out.strength[k], h.feed.strength[k]);
             out.hit[k] = true;
         }
@@ -72,6 +76,9 @@ ResponseFeed mergeFeeds(const ResponseFeed& mix, std::span<const ResponseFeed> s
             out.hit[k] = s->valid && s->hit[k];
             out.strength[k] = s->strength[k];
             out.drumness[k] = s->drumness[k];
+            if (k == static_cast<std::size_t>(HitClass::Onset)) {
+                out.onsetRegister = s->onsetRegister; // ADR-1604: the onset's register comes with it
+            }
         }
     }
     return out;
