@@ -379,6 +379,9 @@ struct ProceduralRenderer::Impl {
     wgpu::ShaderModule litModule;
     wgpu::RenderPipeline pipelineRefractCull;
     wgpu::RenderPipeline pipelineRefractNoCull;
+    // ADR-1603: the refractive surfaces' own depth, laid inside the scene pass before they shade (their colour targets
+    // write-masked off), so each refracting pixel is shaded once however many crystals overlap it.
+    wgpu::RenderPipeline pipelineRefractDepth;
     bool ensureRefractPipelines();
     // `start`: the five render pipelines are started rather than created (init); a reload creates them.
     Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false);
@@ -1153,7 +1156,7 @@ void ProceduralRenderer::setShadowViews(std::span<const FrustumPlanes> views) {
 }
 
 bool ProceduralRenderer::Impl::ensureRefractPipelines() {
-    if (pipelineRefractCull && pipelineRefractNoCull) {
+    if (pipelineRefractCull && pipelineRefractNoCull && pipelineRefractDepth) {
         return true;
     }
     if (!litModule) {
@@ -1168,6 +1171,48 @@ bool ProceduralRenderer::Impl::ensureRefractPipelines() {
     }
     pipelineRefractCull = *cull;
     pipelineRefractNoCull = *noCull;
+    // The depth lay-down: the depth prepass's stages, inside a pass with the scene's colour targets, writing none.
+    VertexLayoutStorage vertex;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat, nullptr, wgpu::ColorWriteMask::None, wgpu::ColorWriteMask::None);
+    wgpu::FragmentState fragment{};
+    fragment.module = litModule;
+    fragment.entryPoint = "fs_proc_depth";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::Less;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "procedural-refract-depth";
+    desc.layout = pipelineLayout;
+    desc.vertex.module = litModule;
+    desc.vertex.entryPoint = "vs_proc_depth";
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &vertex.layout;
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.multisample.count = sampleCount;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    context.device().PushErrorScope(wgpu::ErrorFilter::Validation);
+    pipelineRefractDepth = gpu::createRenderPipeline(context.device(), &desc);
+    std::string error;
+    auto future = context.device().PopErrorScope(
+        wgpu::CallbackMode::WaitAnyOnly, [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+            if (type != wgpu::ErrorType::NoError) {
+                error = gpu::Context::toString(msg);
+            }
+        });
+    context.waitFor(future);
+    if (!error.empty() || !pipelineRefractDepth) {
+        log::warn("procedural: the refraction depth pipeline failed ({}); refractive surfaces draw opaque", error);
+        pipelineRefractDepth = nullptr;
+        return false;
+    }
     return true;
 }
 
@@ -1175,6 +1220,7 @@ Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule&
     litModule = module; // ADR-1603: the refraction pipelines are built from it on demand
     pipelineRefractCull = nullptr;
     pipelineRefractNoCull = nullptr;
+    pipelineRefractDepth = nullptr;
     if (start) {
         // ADR-1562: the heaviest pipelines in the renderer; compiled in parallel with everything after them.
         for (auto r : {createPipeline(module, true, false, &pipelineCull), createPipeline(module, false, false, &pipelineNoCull),
@@ -2973,6 +3019,9 @@ void ProceduralRenderer::drawRefractive(wgpu::RenderPassEncoder& pass, const sce
     if (!refractionPhase_ || !impl_->ensureRefractPipelines()) {
         return;
     }
+    refractDepthLayDown_ = true; // their depth first (one shade a pixel), then their colour
+    drawImpl(pass, scene, materialBindGroup, false, false, true);
+    refractDepthLayDown_ = false;
     drawImpl(pass, scene, materialBindGroup, false, false, true);
 }
 
@@ -2999,10 +3048,13 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
                                                : stats_.submittedCamera;
     // ADR-1493: the compiled-materials variant's lit pipelines when one is ready for this frame's programs.
     const Impl::MaterialVariant* variant = depthOnly || refractPass ? nullptr : im.activeVariant();
+    const bool layDown = refractPass && refractDepthLayDown_;
     const wgpu::RenderPipeline& litCull =
-        refractPass ? im.pipelineRefractCull : (variant != nullptr ? variant->cull : im.pipelineCull);
+        layDown ? im.pipelineRefractDepth
+                : (refractPass ? im.pipelineRefractCull : (variant != nullptr ? variant->cull : im.pipelineCull));
     const wgpu::RenderPipeline& litNoCull =
-        refractPass ? im.pipelineRefractNoCull : (variant != nullptr ? variant->noCull : im.pipelineNoCull);
+        layDown ? im.pipelineRefractDepth
+                : (refractPass ? im.pipelineRefractNoCull : (variant != nullptr ? variant->noCull : im.pipelineNoCull));
     const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
         if (p.Get() != boundPipeline.Get()) {
             pass.SetPipeline(p);
@@ -3049,7 +3101,7 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         if (!shadowPass && refractionPhase_ && object.material.refraction.enabled() != refractPass) {
             continue;
         }
-        if (refractPass) {
+        if (refractPass && !refractDepthLayDown_) {
             ++stats_.refractiveDraws;
         }
         // ADR-1073: `wire/fill` 0 -- the lines alone; the surface draws in no pass.

@@ -459,6 +459,7 @@ private:
                   const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup,
                   bool depthOnly, bool shadowPass, bool refractPass = false);
     bool refractionPhase_ = false;
+    bool refractDepthLayDown_ = false; // ADR-1603: drawRefractive's first (depth-only) round
 
     struct Impl;
     std::unique_ptr<Impl> impl_;
