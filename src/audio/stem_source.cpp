@@ -397,10 +397,10 @@ StemSetCheck checkStemSet(std::span<const StemSetMember> members, const MixProbe
         for (std::int64_t c = -coarseLags; c <= coarseLags; ++c) {
             double xy = 0.0;
             double yy = 0.0;
-            for (std::size_t b = 0; b < cx.size(); ++b) {
-                const float* ys = cy[b].data() + (c + coarseLags);
+            for (std::size_t bl = 0; bl < cx.size(); ++bl) {
+                const float* ys = cy[bl].data() + (c + coarseLags);
                 for (std::size_t k = 0; k < coarseBlock; ++k) {
-                    xy += static_cast<double>(cx[b][k]) * static_cast<double>(ys[k]);
+                    xy += static_cast<double>(cx[bl][k]) * static_cast<double>(ys[k]);
                     yy += static_cast<double>(ys[k]) * static_cast<double>(ys[k]);
                 }
             }
