@@ -104,7 +104,62 @@ arch.
 
 ## 4. First perf read
 
-PERF_PLACEHOLDER
+**Provisional:**
+- P0-1 (unquantised timestamps, the headless sky fix) has not landed. Pass times sit on the 65.5 µs grid, and
+  sub-millisecond differences are noise.
+- The blockout has no audio-driven effects yet, so the windows exercise camera state only.
+
+**Conditions:**
+- AC power throughout (`build/prism/perf1/conditions.log`).
+- Apple M2 Max, Release at `18b28e14` plus this branch's scene.
+- 1080p output, 30 fps target, warm-up 5 s, measured 20 s.
+- Feline Footwear's clock with `--no-audio`.
+- One repetition each (a first read, not a baseline).
+
+**The windows (section 3 of 05):**
+- Typical starts at 65.7 s (route 65.7 s).
+- Heaviest starts at 123.22 s (route 28.0 s).
+
+| Run | GPU p50 / p95 (ms) | Frame p50 / p99 (ms) | CPU work p50 | Ladder (measured frames) | Misses /601 |
+|---|---|---|---|---|---|
+| Typical, headless Ultra | 31.5 / 32.0 | 34.3 / 40.7 (serial) | 1.9 | Ultra fixed | n/a |
+| Heaviest, headless Ultra | 28.9 / 30.8 | 32.6 / 39.8 (serial) | 1.9 | Ultra fixed | n/a |
+| Heaviest, headless Medium | 14.4 / 18.5 | 18.8 / 27.4 | 3.7 | Medium fixed | n/a |
+| **Typical, live auto** | 18.9 / 32.8 | **33.3 / 39.7** | 4.9 | **High 465, Ultra 136** | **1** |
+| **Heaviest, live auto** | 28.7 / 30.2 | **33.3 / 39.0** | 5.4 | **Ultra 424, High 177** | **3** |
+
+**Against the thresholds (03 §11):**
+- **T3** (Medium or better at least 90% of frames): **met**, 100% at High or Ultra in both windows.
+- **T1** (at most 5 misses per 900): **met**, 1 and 3 per 601.
+- **T2** (p99 interval at most 40 ms): **met**, 39.7 and 39.0, with little margin.
+- For comparison, Rainbow World's live GPU p50 is 23.5 ms (`rainbow-world/17` §8). The blockout is already in that
+  range before any effects.
+
+**Where the time goes** (heaviest window, headless Ultra, GPU medians in ms):
+
+| Pass | Base | Water's cinematic path off | Water removed | Volume off |
+|---|---|---|---|---|
+| scene (opaque, forward) | 12.65 | 12.52 | 12.52 | 13.37 |
+| volume march | **13.76** | 13.76 | 13.76 | 0 |
+| shadows + AO + depth | 1.70 | 1.63 | 1.63 | 1.77 |
+| post | 0.33 | 0.33 | 0.33 | 0.33 |
+| **GPU p50** | **28.9** | 28.7 | 28.5 | **15.5** |
+
+**What the costs show:**
+- **The pool's SSR and transmission cost about 0.1-0.4 ms.** The whole water costs the same. This is inside the
+  quantisation noise, so the pool needs no ladder lever yet. The missing lever (section 6) is a correctness gap, not a
+  cost problem today.
+- **The haze is almost half the Ultra frame (13.8 ms)** for a density of 0.004 that is barely visible. The live
+  ladder already scales it (`volumeResolutionScale`, `volumeStepScale`), which is why live holds Ultra and High. The
+  profiler's top candidate is `volumequarter`, an estimated 6.2-8.8 ms. Stage 3 should decide whether the haze earns
+  that, or whether the shaft and the passage glow are carried by cheaper means (fewer steps, a shorter
+  `volumeMaxDistance` (40 m now, while the grotto is 30 m), or local volumes).
+- **The scene pass, 12.5 ms for 50k triangles plus terrain, is pixel-bound** (the profiler estimates 4.2-5.7 ms saved
+  at scale 0.85). Candidates for Stage 3:
+  - the terrain's 74k tris, mostly outside the shell;
+  - seven clustered lights over every pixel.
+
+  This needs per-pass timing that P0-1 makes trustworthy before any change is made on its evidence.
 
 ## 5. Known weaknesses (for Stages 3 and 5)
 
