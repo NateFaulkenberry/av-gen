@@ -111,7 +111,7 @@ double meanSignal(Play p, const std::string& name) {
 
 } // namespace
 
-TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fracture", "[live][digital-mosh][adr1361]") {
+TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the hits", "[live][digital-mosh][adr1361][adr1620]") {
     Play p{.project = example("digital-mosh/digital-mosh-live.json")};
     p.response = {{"sensitivity", 0.2f}};
     const double dull = meanParam(p, "macros/energy");
@@ -141,14 +141,22 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the fractur
     CHECK(std::abs(quiet - loud) < 0.25 * loud);
     CHECK(lifted > quiet);
 
-    // The kick's fracture light (the Dream's rhythm gate opened): more Transients, harder kicks.
+    // The hats' glints on the ground (the Dream's rhythm gate opened): more Transients, harder hits. ADR-1620: on a mix
+    // the hats are the broadband onset, which Transients curves; the kick's fracture is the beat clock's pulse, which
+    // it does not (at Transients 0 nothing is busy, and the kick stands aside too).
     Play k{.project = example("digital-mosh/digital-mosh-live.json"), .hold = {{"macros/gRhythm", 1.0f}}};
     k.response = {{"transient", 0.2f}};
-    const double soft = meanParam(k, "lights/fracture/intensity");
+    const double soft = meanParam(k, "material/ground/emissionIntensity");
     k.response = {{"transient", 0.8f}};
-    const double hard = meanParam(k, "lights/fracture/intensity");
-    INFO("fracture: " << soft << " / " << hard);
+    const double hard = meanParam(k, "material/ground/emissionIntensity");
+    INFO("hat glints: " << soft << " / " << hard);
     CHECK(soft < hard);
+    k.response = {{"transient", 0.0f}};
+    const double none = meanParam(k, "lights/fracture/intensity");
+    k.response = {{"transient", 0.5f}};
+    const double some = meanParam(k, "lights/fracture/intensity");
+    INFO("fracture at Transients 0 / 0.5: " << none << " / " << some);
+    CHECK(none < some);
 }
 
 TEST_CASE("Sonic Live: the garden's loudness and strikes are the Response's", "[live][sonic][adr1361]") {

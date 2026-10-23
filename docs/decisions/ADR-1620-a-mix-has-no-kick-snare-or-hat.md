@@ -170,6 +170,10 @@ from main only by the renames, the added drum sources and (offline) the amounts 
 - A live scene on a mix pulses its kick and snare on the beat clock, so the tracker's octave and phase errors (§2.1)
   now show in every scene; a MIDI clock is the mitigation for shows. A drum input keyed `drums` with the hits analysis
   on gives every scene its true classes with no edit.
+- The Live panel's **Transients** no longer sizes a scene's kick and snare on a mix: they are the beat clock's pulse.
+  It still curves every onset (the hats, `response.onset`), and at Transients 0 nothing is busy, so the kick and
+  snare stand aside too. (Digital Mosh Live's test now checks the hats' glints; the Director's GPU proof finds its
+  hero glow on a beat of the grid and at rest just before the next.)
 - A drum input keyed `drums` WITHOUT the hits analysis is active but never fires a class: the drum signals pick it and
   stay silent. Turn its hits on, or name it in `feeds`.
 - The derived event list of a Sonic signal trigger (`SignalEventDeriver`) now steps the project's feeds as the engine

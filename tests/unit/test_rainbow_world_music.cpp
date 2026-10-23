@@ -73,6 +73,13 @@ TEST_CASE("Rainbow World: every stem feature is a signal whose mix fallback stan
             avgen::signals::ConditionedSignalSource parsed(src.at("name"));
             REQUIRE(parsed.settingsFromJson(src.at("settings")).has_value());
             const auto& in = parsed.inputs();
+            // ADR-1620: tools/drum_signals.py's snare envelope, whose mix stand-in is the beat gated by the backbeat
+            if (src.at("name") == "snareEnv") {
+                REQUIRE(in.size() == 2);
+                CHECK(in[0].source == "stem.drums.snare");
+                CHECK(in[1].gate == "signal.backbeat");
+                continue;
+            }
             // a stem twin: the stem first, the main mix after it, chosen by the stem's activity (ADR-1570's fallback)
             if (parsed.combine() == avgen::signals::ConditionedSignalSource::Combine::FirstActive && in.size() == 2 &&
                 (in[0].source.starts_with("stem.") || in[0].gate.starts_with("stem."))) {
@@ -83,7 +90,7 @@ TEST_CASE("Rainbow World: every stem feature is a signal whose mix fallback stan
                 stems.insert(stem.substr(5, stem.find('.', 5) - 5));
             }
         }
-        CHECK(signals == 14);
+        CHECK(signals == 17); // ADR-1602's 14, and ADR-1620's busy, backbeat and snareEnv (the claps' mix fallback)
         CHECK(twins >= 9);
         CHECK(stems == std::set<std::string>{"drums", "bass", "synth"});
     }

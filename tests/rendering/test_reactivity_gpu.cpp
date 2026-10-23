@@ -164,6 +164,17 @@ struct Proof {
         FAIL("no onset after " << after);
         return 0.0;
     }
+    // The first beat of the engine's grid after `after` seconds (ADR-1620: the Director's kick layer is the beat
+    // clock's pulse, `beat.pulse`, which fires on these).
+    [[nodiscard]] double firstBeat(double after) const {
+        for (const double b : engine.beatGrid().beats.beatTimes) {
+            if (b > after) {
+                return b;
+            }
+        }
+        FAIL("no beat after " << after);
+        return 0.0;
+    }
 };
 
 struct Arm {
@@ -204,12 +215,12 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
     const song::SectionTimeline sections = testsupport::gladeSections();
     const double dropStart = sections.sections[4].startSeconds;
     const double inTheDrop = dropStart + 7.0;           // past every arc's glide
-    const double kick = p.firstOnset(&analysis::AnalysisFrame::lowOnset, 10.0);
+    const double kick = p.firstBeat(10.0); // ADR-1620: the kick layer is the beat clock's pulse
     const double clap = p.firstOnset(&analysis::AnalysisFrame::midOnset, 10.0);
     const double hat = p.firstOnset(&analysis::AnalysisFrame::highOnset, 10.0);
     INFO("kick " << kick << " s, clap " << clap << " s, hat " << hat << " s, drop " << dropStart << " s");
 
-    SECTION("a hero's glow on the kick, and nothing in the kickless break") {
+    SECTION("a hero's glow on the beat, and nothing just before the next one") {
         const params::ModRoute* r = p.route("nodes/elder-gills/emissiveBoost");
         REQUIRE(r != nullptr);
         CHECK(r->source == "beat.pulse");
@@ -217,11 +228,15 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
         INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
         CHECK(a.diff.changed > 40);
         CHECK(a.diff.lumaOn() > a.diff.lumaOff() * 1.1);
-        // The break (bars 13-14) has no kick: 1.8 s after the last one the route has let go.
-        const double breakStart = sections.sections[2].startSeconds;
-        const Arm rest = armAt(h, p, "nodes/elder-gills/emissiveBoost", breakStart + 1.8, true, "hero-rest");
-        INFO("in the break: changed " << rest.diff.changed);
-        CHECK(rest.diff.changed == 0);
+        // ADR-1620: the pulse is the beat clock's, which runs on through a kickless break; just before the next beat
+        // the route has mostly let go (its 300 ms decay): the glow it adds there is a small part of the beat's.
+        const double next = p.firstBeat(kick + 0.01);
+        const Arm rest = armAt(h, p, "nodes/elder-gills/emissiveBoost", next - 0.03, true, "hero-rest");
+        const double lift = a.diff.lumaOn() - a.diff.lumaOff();
+        const double tail = rest.diff.lumaOn() - rest.diff.lumaOff();
+        INFO("before the next beat (" << next << " s): changed " << rest.diff.changed << ", lift " << tail << " of "
+                                       << lift);
+        CHECK(tail * 3.0 < lift);
     }
     SECTION("a scatter layer's glow on the kick, 90 ms after the heroes") {
         const params::ModRoute* r = p.route("nodes/meadow/scatter/fungi/emissionGain");
