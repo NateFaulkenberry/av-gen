@@ -11,7 +11,7 @@ The drivers (05 section 5, made real), measured on Feline Footwear's drum stem (
   glint    the hats: the drum stem's treble, fast in and out
   bass     the bass notes: each note a weighty push (the bass stem's onsets, a linear fall, its level as depth)
   synth    the synth's light: its level over about a second (it is pumped by the kick, so smoothed through it)
-  bright   the synth's brightness: its centroid over about two seconds
+  bright   the synth's brightness: its centroid over about two seconds, while it sounds (mix: sonic.brightness)
   energy   the three stems' overall level over several seconds (the mix's level as fallback)
   section  energy accumulated over a phrase: the slow evolution
 MIDI: CC 1 boosts the impacts (hit, front, accent, glint) up to 2x, CC 2 the world's broad response (section);
@@ -70,8 +70,11 @@ def signals():
         _stem("stem.synth.level", dict(clampc, gain=2.4, offset=-1.0, attackMs=250.0, decayMs=1000.0)),
         {"source": "response.sustain", "chain": dict(clampc, gain=2.4, offset=-0.95, attackMs=250.0, decayMs=1200.0)}])
     sig("bright", [
-        _stem("stem.synth.centroid", dict(clampc, gain=5.0, offset=-2.6, attackMs=1500.0, decayMs=2500.0)),
-        {"source": "audio.centroid", "chain": dict(clampc, gain=3.0, offset=-1.2, attackMs=1500.0, decayMs=2500.0)}])
+        # the synth's brightness only while the synth sounds (its level as depth: a silent synth has no colour)
+        _stem("stem.synth.centroid", dict(clampc, gain=5.0, offset=-2.6, attackMs=1500.0, decayMs=2500.0),
+              depthSource="stem.synth.level", depthMin=0.0, depthMax=1.6, depthDefault=0.0),
+        {"source": "sonic.brightness.slow", "chain": dict(clampc, gain=4.0, offset=-1.7, attackMs=1500.0,
+                                                          decayMs=2500.0)}])
     sig("energyStem", [
         {"source": "stem.drums.level", "amount": 0.35}, {"source": "stem.bass.level", "amount": 0.3},
         {"source": "stem.synth.level", "amount": 0.35}], combine="sum")
