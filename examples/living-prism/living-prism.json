@@ -12729,10 +12729,6 @@
     "target": "lights/backwash/color"
    },
    {
-    "role": "deep",
-    "target": "lights/frontwash/color"
-   },
-   {
     "role": "primary",
     "target": "lights/spireGlow/color"
    },

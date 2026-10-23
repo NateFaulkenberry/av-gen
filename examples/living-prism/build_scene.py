@@ -263,15 +263,13 @@ def scene_json():
          "innerCone": 6.0, "outerCone": 14.0, "castsShadow": True, "volumetric": 1.0},
         # the passage behind the arch: the depth cue
         {"name": "passage", "id": "passage", "type": "point", "position": [-2.5, 3.0, -19.0],
-         "color": UV["deep"], "intensity": 320.0, "range": 16.0, "radius": 1.5, "castsShadow": False,
+         "color": UV["deep"], "intensity": 320.0, "range": 12.0, "radius": 1.5, "castsShadow": False,
          "volumetric": 0.7},
         # the roof wash: a broad, weak light under the roof so its rock and crust read (no dead space above)
         {"name": "roofwash", "id": "roofwash", "type": "point", "position": [0.5, 5.4, -0.5], "color": UV["fill"],
-         "intensity": 90.0, "range": 14.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
+         "intensity": 90.0, "range": 10.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
         {"name": "backwash", "id": "backwash", "type": "point", "position": [0.0, 6.5, -7.5], "color": UV["deep"],
-         "intensity": 45.0, "range": 12.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
-        {"name": "frontwash", "id": "frontwash", "type": "point", "position": [-1.0, 3.6, 5.0], "color": UV["deep"],
-         "intensity": 3.0, "range": 8.0, "radius": 2.0, "castsShadow": False, "volumetric": 0.0},
+         "intensity": 45.0, "range": 9.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
     ]
 
     def at(name, dx, dy, dz):
@@ -285,13 +283,13 @@ def scene_json():
             ("chandelier", (0.0, -3.4, 0.0), "secondary", 22.0, 7.0, 0.5),
             ("ember", (0.9, 0.35, -1.1), "accent", 10.0, 4.0, 0.3)):
         lights.append({"name": name + "Glow", "id": name + "Glow", "type": "point", "position": at(name, *off),
-                       "color": UV[role], "intensity": k, "range": rng_, "radius": rad, "castsShadow": False,
+                       "color": UV[role], "intensity": k, "range": min(rng_, 6.0), "radius": rad, "castsShadow": False,
                        "volumetric": 0.0})
     env = {
         "background": [0.004, 0.003, 0.012], "intensity": 0.04, "lightFromEnvironment": False,
         "fogColor": [round(v * 0.3, 4) for v in UV["haze"]],
         "volumeDensity": 0.005 if HAZE else 0.0, "volumeScattering": 0.9,
-        "volumeAbsorption": 0.3, "volumeAnisotropy": 0.45, "volumeSteps": 12, "volumeMaxDistance": 30.0,
+        "volumeAbsorption": 0.3, "volumeAnisotropy": 0.45, "volumeSteps": 8, "volumeMaxDistance": 30.0,
         "volumeLocalLights": 1.0, "volumeNoise": 0.35, "volumeNoiseScale": 0.18, "volumeEmission": 0.0,
         "fogHeight": 3.0, "fogHeightFalloff": 0.25, "fogUpperDensity": 0.15,
         "shadowCascades": 1, "shadowRange": 40.0, "ambientOcclusion": True, "depthPrepass": True,
@@ -353,7 +351,7 @@ def palette_json():
          {"role": "shadow", "target": FLOOR_P.path("shadow"), "gain": 0.8},
          {"role": "rockLit", "target": FLOOR_P.path("rockLit"), "gain": 0.55},
          {"role": "key", "target": "lights/shaft/color"}, {"role": "deep", "target": "lights/passage/color"},
-         {"role": "fill", "target": "lights/roofwash/color"}, {"role": "deep", "target": "lights/backwash/color"}, {"role": "deep", "target": "lights/frontwash/color"},
+         {"role": "fill", "target": "lights/roofwash/color"}, {"role": "deep", "target": "lights/backwash/color"},
          {"role": "primary", "target": "lights/spireGlow/color"}, {"role": "tertiary", "target": "lights/geodeGlow/color"},
          {"role": "secondary", "target": "lights/fanGlow/color"},
          {"role": "secondary", "target": "lights/chandelierGlow/color"},
