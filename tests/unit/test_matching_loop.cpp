@@ -162,6 +162,9 @@ TEST_CASE("§27: every-frame search is not necessary, measured", "[loop][phaseC]
     double shipping = 0.0;
     std::uint64_t everyFrameSwitches = 0;
     std::uint64_t shippingSwitches = 0;
+    std::uint64_t everyFrameSearches = 0;
+    std::uint64_t shippingSearches = 0;
+    std::uint64_t aboveLockSearches = 0;
     for (const float interval : {0.0f, 0.033f, 0.1f, 0.25f}) {
         entity::MatchSettings settings;
         settings.searchInterval = interval;
@@ -172,10 +175,15 @@ TEST_CASE("§27: every-frame search is not necessary, measured", "[loop][phaseC]
         if (interval == 0.0f) {
             everyFrame = r.microsPerFrame;
             everyFrameSwitches = r.switches;
+            everyFrameSearches = r.searches;
         }
         if (interval == 0.1f) {
             shipping = r.microsPerFrame;
             shippingSwitches = r.switches;
+            shippingSearches = r.searches;
+        }
+        if (interval == 0.25f) {
+            aboveLockSearches = r.searches;
         }
     }
 
@@ -203,8 +211,16 @@ TEST_CASE("§27: every-frame search is not necessary, measured", "[loop][phaseC]
     //
     // Asserted as the current behaviour, so that fixing the shadowing fails here and says so
     // rather than silently changing what every number above means.
+    //
+    // The assertion is on the counts, which are deterministic. The microseconds are a wall clock: they are reported
+    // (above) but not asserted, because a timing comparison of two 3 us loops failed on a loaded machine about half the
+    // time on every binary, main's included (2026-10-22, Living Prism P1: 2 of 3 runs at 2.7-4.6 us/frame).
     CHECK(everyFrameSwitches == shippingSwitches);
-    CHECK(std::abs(everyFrame - shipping) < 0.2 * everyFrame);
+    CHECK(everyFrameSearches == shippingSearches); // the lock shadows the interval: the same searches
+    CHECK(aboveLockSearches < shippingSearches);   // above the lock the interval takes over
+    if (std::abs(everyFrame - shipping) >= 0.2 * everyFrame) {
+        WARN("the every-frame and shipping loops differed by more than 20% in time this run (not asserted: a wall clock)");
+    }
 }
 
 TEST_CASE("§28: hysteresis stops thrashing without refusing to adapt", "[loop][phaseC][aliens]") {
