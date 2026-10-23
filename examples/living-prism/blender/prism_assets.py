@@ -248,38 +248,95 @@ def build_fan(out):
 
 
 def build_geode(out):
-    """A split geode: a thick rock half-shell open to the front (-Y), its inside lined with small prisms."""
-    R, T = 1.9, 0.35
+    """A cracked geode: an egg of rock broken open along a jagged line, its wall showing a pale chalcedony band, its
+    cavity lined with prisms that grow larger toward the bottom; the broken-off cap lies beside it, lining up.
+    The opening faces Blender -Y (AV Gen +Z), tilted up so the cavity reads from the route's eye height."""
+    R, T = 1.9, 0.42
     rng = random.Random(31)
-    # the shell: an icosphere, the front cap removed, given thickness, then faceted
-    bm = bmesh.new()
-    bmesh.ops.create_icosphere(bm, subdivisions=4, radius=R)
-    cut = [f for f in bm.faces if f.calc_center_median().y < -R * 0.25]
-    bmesh.ops.delete(bm, geom=cut, context="FACES")
-    for v in bm.verts:
-        v.co.z += R * 0.8
-    shell = new_obj("geode_rock", bm, mat("rock", ROCK_RGB))
-    s = shell.modifiers.new("solid", "SOLIDIFY")
-    s.thickness = T
-    s.offset = 1.0
-    apply_mods(shell)
-    facet(shell, 0.28, 0.9, faces=900)
-    export(shell, out)
+    tilt = Matrix.Rotation(math.radians(-28), 4, "X")  # opening tilted up toward the viewer
+
+    def crack(d):
+        # the break: a plane through the front, made jagged by two low harmonics of the angle round the opening
+        ang = math.atan2(d.z, d.x)
+        return d.y < -0.18 + 0.16 * math.sin(3 * ang + 0.7) + 0.09 * math.sin(7 * ang + 2.1)
+
+    def shell(name, keep_cut, centre, rot):
+        bm = bmesh.new()
+        bmesh.ops.create_icosphere(bm, subdivisions=4, radius=1.0)
+        for v in bm.verts:  # an egg, a little lumpy
+            n = v.co.normalized()
+            v.co = Vector((n.x * R, n.y * R, n.z * R * 0.88)) * (1 + 0.06 * math.sin(4 * n.x + 1) * math.cos(3 * n.z))
+        dead = [f for f in bm.faces if crack(f.calc_center_median().normalized()) != keep_cut]
+        bmesh.ops.delete(bm, geom=dead, context="FACES")
+        for v in bm.verts:
+            v.co = rot @ v.co + Vector(centre)
+        ob = new_obj(name, bm, mat("rock", ROCK_RGB))
+        ob.data.materials.append(mat("chalcedony", (0.75, 0.7, 0.85)))
+        so = ob.modifiers.new("solid", "SOLIDIFY")
+        so.thickness = T
+        so.offset = -1.0
+        so.use_rim = True
+        so.material_offset_rim = 1
+        apply_mods(ob)
+        return ob
+
+    body = shell("geode_body", False, (0, 0, R * 0.78), tilt)
+    cap = shell("geode_cap", True, (0, 0, 0), Matrix.Identity(4))
+    # the cap lies to the side, broken face up, partly sunk
+    cap.data.transform(Matrix.Translation((1.9, -1.4, 0.15)) @ Matrix.Rotation(math.radians(160), 4, "X") @
+                       Matrix.Rotation(math.radians(30), 4, "Z") @ Matrix.Translation((0, R * 0.6, 0)))
+    ob = join([body, cap], "geode_all")
+    # split the chalcedony rim from the rock
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    ob.active_material_index = 1
+    bpy.ops.object.material_slot_select()
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    rim = [o for o in bpy.context.selected_objects if o != ob][0]
+    rim.name = "geode_rim"
+    ob.name = "geode_rock"
+    for o in (ob, rim):
+        o.data.materials.clear()
+    ob.data.materials.append(mat("rock", ROCK_RGB))
+    rim.data.materials.append(mat("chalcedony", (0.75, 0.7, 0.85)))
+    facet(ob, 0.22, 0.9, faces=1400)
+    for p in rim.data.polygons:
+        p.use_smooth = False
+    export(ob, out)
+    export(rim, out)
 
     def b(bm2):
-        n = 260
-        for i in range(n):  # Fibonacci points on the inner surface's back hemisphere, pointing to the centre
-            yv = 1 - 2 * (i + 0.5) / n
-            r = math.sqrt(max(0.0, 1 - yv * yv))
-            th = math.pi * (3 - math.sqrt(5)) * i
-            d = Vector((math.cos(th) * r, yv, math.sin(th) * r))
-            if d.y < -0.2:
-                continue
-            p = d * (R - 0.02) + Vector((0, 0, R * 0.8))
-            ln = rng.uniform(0.18, 0.5)
-            prism(bm2, p, -d + Vector((rng.uniform(-.2, .2), rng.uniform(-.2, .2), rng.uniform(-.2, .2))),
-                  rng.uniform(0.05, 0.11), ln, ln * 0.35, rng, embed=0.3)
-    export(xtal_obj("geode_xtal", "geode", b), out)
+        def lining(centre, rot, keep_cut, n, up_bias):
+            for i in range(n):
+                yv = 1 - 2 * (i + 0.5) / n
+                r = math.sqrt(max(0.0, 1 - yv * yv))
+                th = math.pi * (3 - math.sqrt(5)) * i
+                d = Vector((math.cos(th) * r, yv, math.sin(th) * r))
+                if crack(d) != keep_cut:
+                    continue
+                inner = d * (R - T) * Vector((1, 1, 0.88)) if False else Vector((d.x * (R - T), d.y * (R - T),
+                                                                                 d.z * (R - T) * 0.88))
+                depth = 0.5 + 0.5 * (-d.z if up_bias else d.z)   # bigger toward the bottom of the bowl
+                ln = rng.uniform(0.15, 0.35) + 0.45 * depth * rng.random()
+                p = rot @ inner + Vector(centre)
+                ax = rot @ (-d + Vector((rng.uniform(-.25, .25), rng.uniform(-.25, .25), rng.uniform(-.25, .25))))
+                prism(bm2, p, ax, rng.uniform(0.05, 0.1) + 0.06 * depth, ln, ln * 0.35, rng, embed=0.35)
+        lining((0, 0, R * 0.78), tilt, False, 520, True)
+    xt = xtal_obj("geode_xtal", "geode", b)
+    export(xt, out)
+    # the cap's lining: a small druse on its broken face
+    rngc = random.Random(37)
+
+    def bc(bm3):
+        for _ in range(26):
+            ang, rr = rngc.uniform(0, math.tau), rngc.uniform(0, 0.9)
+            p = Vector((1.9 + math.cos(ang) * rr, -1.4 + math.sin(ang) * rr * 0.7, 0.45))
+            ln = rngc.uniform(0.12, 0.4)
+            prism(bm3, p, (rngc.uniform(-.3, .3), rngc.uniform(-.3, .3), 1), rngc.uniform(0.04, 0.09), ln, ln * 0.4,
+                  rngc, embed=0.4)
+    export(xtal_obj("geodecap_xtal", "geode", bc), out)
 
 
 def build_chandelier(out):
@@ -308,47 +365,55 @@ def build_ember(out):
 
 
 def build_arch(out):
-    """A natural rock bridge spanning ~11 m, crown ~7.5 m, thick at the legs; small crystal on its underside."""
-    cu = bpy.data.curves.new("arch_curve", "CURVE")
-    cu.dimensions = "3D"
-    sp = cu.splines.new("BEZIER")
-    # asymmetric: a massive left leg, the crown off centre to the right, a slimmer right leg stepping back
-    pts = [(-6.4, 0.6, -0.8, 1.9), (-5.9, 0.2, 3.4, 1.3), (-3.9, -0.2, 6.5, 0.85), (-0.6, 0.0, 7.9, 0.62),
-           (2.6, 0.4, 7.3, 0.6), (5.0, 0.9, 4.8, 0.72), (6.3, 1.4, 1.4, 0.95), (6.7, 1.6, -0.8, 1.25)]
-    sp.bezier_points.add(len(pts) - 1)
-    for bp, (x, y, z, r) in zip(sp.bezier_points, pts):
-        bp.co = (x, y, z)
-        bp.handle_left_type = bp.handle_right_type = "AUTO"
-        bp.radius = r
-    cu.bevel_depth = 1.0
-    cu.use_fill_caps = True
-    cu.bevel_resolution = 4
-    cu.resolution_u = 16
-    ob = bpy.data.objects.new("arch_rock", cu)
-    bpy.context.scene.collection.objects.link(ob)
-    bpy.context.view_layer.objects.active = ob
-    ob.select_set(True)
-    bpy.ops.object.convert(target="MESH")
-    ob = bpy.context.view_layer.objects.active
-    ob.name = "arch_rock"
+    """A natural mineral bridge: lumps of rock strung along an asymmetric span, fused (voxel remesh), weathered at two
+    scales and faceted. A heavy, flared left foot, a thinner right one stepping back, a deck thicker front to back than
+    it is tall; seven patches of druse on the underside."""
+    rng = random.Random(59)
+    ctrl = [Vector(p) for p in ((-6.6, 0.8, -0.6), (-6.0, 0.3, 3.0), (-4.2, -0.2, 6.0), (-1.2, 0.1, 7.6),
+                                (2.0, 0.6, 7.4), (4.6, 1.2, 5.6), (6.2, 1.8, 2.6), (6.9, 2.2, -0.6))]
+    rads = [1.7, 1.05, 0.72, 0.58, 0.55, 0.62, 0.75, 1.05]
+
+    def cat(t):
+        n = len(ctrl) - 1
+        sg = min(int(t * n), n - 1)
+        u = t * n - sg
+        p0, p1, p2, p3 = ctrl[max(sg - 1, 0)], ctrl[sg], ctrl[sg + 1], ctrl[min(sg + 2, n)]
+        u2, u3 = u * u, u * u * u
+        pos = 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u3)
+        r = rads[sg] + (rads[sg + 1] - rads[sg]) * u
+        return pos, r
+    lumps = []
+    for k in range(46):
+        t = k / 45
+        pos, r = cat(t)
+        rr = r * rng.uniform(0.85, 1.15)
+        off = Vector((rng.uniform(-.15, .15), rng.uniform(-.3, .3), rng.uniform(-.12, .12))) * r
+        lumps.append(ico("arch_l%d" % k, rr, (rng.uniform(0.9, 1.2), rng.uniform(1.25, 1.6), rng.uniform(0.8, 0.95)),
+                         pos + off, subdiv=3))
+    for x, y, rr in ((-7.3, 1.2, 1.5), (-6.2, -0.6, 1.1), (7.3, 2.5, 1.1)):   # flared feet, sunk
+        lumps.append(ico("arch_f%d" % len(lumps), rr, (1.2, 1.0, 0.6), (x, y, -0.4), subdiv=3))
+    ob = join(lumps, "arch_rock")
     ob.data.materials.clear()
     ob.data.materials.append(mat("rock", ROCK_RGB))
-    facet(ob, 0.55, 1.1, faces=1600, voxel=0.12)
+    m = ob.modifiers.new("remesh", "REMESH")
+    m.mode = "VOXEL"
+    m.voxel_size = 0.14
+    sm = ob.modifiers.new("smooth", "SMOOTH")
+    sm.factor = 1.0
+    sm.iterations = 12
+    apply_mods(ob)
+    facet(ob, 0.4, 2.2, kind="CLOUDS")          # broad weathering
+    facet(ob, 0.22, 0.6, faces=2600)            # breakage, then the facets
     export(ob, out)
-    # druse on the underside: faces facing down, area-weighted picks
-    rng = random.Random(61)
     me = ob.data
-    # the intrados only: faces that look down and in toward the span's centre, densest at the crown
-    down = [p for p in me.polygons if p.normal.z < -0.45 and p.center.z > 2.0]
+    down = [p for p in me.polygons if p.normal.z < -0.45 and p.center.z > 2.2]
     w = [p.area * (0.4 + p.center.z / 7.6) for p in down]
-
-    # crystal grows in patches, not as a sprinkle: seven seeds on the intrados, each a tight druse of 8-16
     seeds = [rng.choices(down, weights=w)[0] for _ in range(7)]
 
     def b(bm):
         for sd in seeds:
             near = [p for p in down if (p.center - sd.center).length < 0.9]
-            for _ in range(rng.randint(8, 16)):
+            for _ in range(rng.randint(9, 18)):
                 p = rng.choice(near)
                 n = Vector(p.normal) + Vector((rng.uniform(-.3, .3), rng.uniform(-.3, .3), rng.uniform(-.2, .05)))
                 ln = rng.uniform(0.18, 0.65) * (1.2 - (p.center - sd.center).length / 1.2)
@@ -412,6 +477,32 @@ def build_shell(out):
     air.data.materials.clear()
     air.data.materials.append(mat("rock", ROCK_RGB))
     export(air, out)
+    # crust: druse patches on the roof and the upper walls, so the frame's upper third has structure (no dead space)
+    rng = random.Random(101)
+    roof = [p for p in air.data.polygons if p.normal.z < -0.45 and p.center.z > 5.5 and p.center.y > -13.0]
+    wall = [p for p in air.data.polygons if abs(p.normal.z) < 0.35 and 3.2 < p.center.z < 7.5 and p.center.y > -13.0]
+    seeds = []
+    for pool, n, dmin in ((roof, 16, 3.2), (wall, 12, 3.0)):
+        tries = 0
+        got = 0
+        while got < n and tries < 4000:
+            tries += 1
+            c = rng.choice(pool)
+            if all((c.center - q.center).length > dmin for q in seeds):
+                seeds.append(c)
+                got += 1
+    allf = roof + wall
+
+    def b(bm):
+        for sd in seeds:
+            near = [p for p in allf if (p.center - sd.center).length < 1.3]
+            big = rng.uniform(0.7, 1.4)
+            for _ in range(rng.randint(10, 24)):
+                p = rng.choice(near)
+                n = Vector(p.normal) + Vector((rng.uniform(-.35, .35), rng.uniform(-.35, .35), rng.uniform(-.35, .35)))
+                ln = big * rng.uniform(0.2, 0.75) * (1.3 - (p.center - sd.center).length / 1.3)
+                prism(bm, p.center, n, rng.uniform(0.05, 0.13) * big, ln, ln * 0.4, rng, embed=0.4)
+    export(xtal_obj("crust_xtal", "druse", b), out)
 
 
 # ------------------------------------------------------------------------------------------------- preview
@@ -439,10 +530,14 @@ def preview(out, pdir):
         return ob
 
     imp("shell")
+    imp("crust_xtal")
     for h in L.HEROES:
         rec = L.hero_placement(h)
         place(h["name"] + "_xtal", rec)
         place(h["name"] + "_rock", rec)
+        if h["name"] == "geode":
+            place("geode_rim", rec)
+            place("geodecap_xtal", rec)
     rec = L.placement(*L.ARCH["pos"], L.ARCH["yaw"], L.ARCH["scale"], L.ARCH["sink"])
     place("arch_rock", rec)
     place("arch_xtal", rec)
