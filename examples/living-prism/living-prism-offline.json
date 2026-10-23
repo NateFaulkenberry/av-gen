@@ -12132,6 +12132,14 @@
    "component": -1
   },
   {
+   "source": "signal.synth",
+   "target": "particles/motes/spawnRate",
+   "amount": 120.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1
+  },
+  {
    "source": "signal.bright",
    "target": "material/lp_xtal/op/8/mix/value",
    "amount": 0.25,

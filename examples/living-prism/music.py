@@ -127,6 +127,7 @@ def routes(rock, floor, hero, xtal, crystal_nodes):
         r("synth", em(node), 0.5)
     r("synth", em("crust_xtal"), 0.55)
     r("synth", "lights/roofwash/intensity", 70.0)
+    r("synth", "particles/motes/spawnRate", 120.0)
     r("bright", xtal.path("tipMix", "value"), 0.25)
     r("bright", hero.path("tipMix", "value"), 0.2)
     r("bright", "post/grade/saturation", 0.12)

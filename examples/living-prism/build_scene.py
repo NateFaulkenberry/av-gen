@@ -90,7 +90,7 @@ def rock_program():
     p.op("noise", 6, a=0, f=0.7, seed=31)                        # break the net into crack segments
     p.op("smoothstep", 6, a=6, k=[0.47, 0.6, 0, 0])
     p.op("multiply", 5, a=5, b=6)
-    p.op("noise", 6, a=0, f=0.08, seed=21)
+    p.op("noise", 6, a=0, f=0.08, seed=24)
     p.op("smoothstep", 6, a=6, k=[0.66, 0.72, 0, 0], label="seamMask")
     p.op("multiply", 5, a=5, b=6)
     p.op("constant", 6, label="seam", k=c4(UV["seam"]))
@@ -159,7 +159,7 @@ def crystal_program(name, hero):
     if hero:
         p.op("smoothstep", 2, a=4, k=[0.78, 1.0, 0, 0])                  # luminous terminations
         p.op("multiply", 2, a=2, b=6)
-        p.op("remap", 2, a=2, k=[0, 1, 0, 0.6])
+        p.op("remap", 2, a=2, k=[0, 1, 0, 0.4])
         p.op("add", 1, a=1, b=2)
     p.op("field", 2, field="front")                                      # the front lights each crystal it
     p.op("multiply", 2, a=2, b=0)                                        # crosses, in its own colour
@@ -307,7 +307,7 @@ def scene_json():
         "environment": env,
         "lights": lights,
         "materialPrograms": PROGRAMS,
-        "nodes": nodes + [front_field()],
+        "nodes": nodes + [front_field(), motes()],
     }
 
 
@@ -323,6 +323,17 @@ def front_field():
         "strength": 1.0, "waveGeometry": "spherical", "waveShape": "pulse", "amplitude": 0.0,
         "wavelength": 2.2, "waveSpeed": 0.0, "waveWidth": 0.0, "waveOrigin": 13.0,
         "falloff": {"kind": "smoothstep", "inner": 3.0, "outer": 15.0}}}
+
+
+def motes():
+    """Fine detail: a sparse drift of crystal motes in the air of the focal area (well under 1% of the frame), rising
+    slowly on the turbulence; their spawn and brightness follow the synth (music.py)."""
+    return {"name": "motes", "kind": "particles", "particles": {
+        "enabled": True, "capacity": 4000, "seed": 17, "shape": "box", "position": [0.0, 2.6, -4.0],
+        "extent": [9.0, 2.6, 5.5], "spawnRate": 90.0, "lifetimeMin": 5.0, "lifetimeMax": 9.0, "spread": 1.0,
+        "speedMin": 0.02, "speedMax": 0.12, "gravity": [0.0, 0.035, 0.0], "drag": 0.3, "turbulence": 0.25,
+        "turbulenceScale": 0.4, "turbulenceSpeed": 0.15, "sizeStart": 0.022, "sizeEnd": 0.0,
+        "colorStart": [0.85, 0.7, 1.0, 1.0], "colorEnd": [0.5, 0.35, 1.0, 0.0], "emissive": 2.5, "blend": "additive"}}
 
 
 def crystal_nodes():
