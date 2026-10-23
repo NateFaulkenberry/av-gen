@@ -116,20 +116,6 @@
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
    "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
    "usedAs": "scattered rock; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
-  },
-  {
-   "id": "Moss002",
-   "source": "https://ambientcg.com/view?id=Moss002",
-   "creators": [
-    "ambientCG (Lennart Demes)"
-   ],
-   "license": "CC0 1.0",
-   "licenseUrl": "https://docs.ambientcg.com/license/",
-   "attribution": "not required (credit given: ambientCG)",
-   "localPath": "assets/nature/moss/Moss002/ (2K JPG: Color, NormalGL, Roughness, AO, Displacement)",
-   "fetchedBy": "curl https://ambientcg.com/get?file=Moss002_2K-JPG.zip (2026-10-23), into the gitignored asset folder",
-   "modifications": "none to the files; build_scene.build_moss_carpet embeds Color and NormalGL in the generated moss_carpet.glb (gitignored build output, never committed)",
-   "usedAs": "5d: the moss carpet draped on the owner's mossy areas and around every crystal base, until terrain textures (ADR-1642) land"
   }
  ],
  "textures": "the Poly Haven scans' own CC0 textures; terrain textures need an engine change (programs take no texture inputs, ADR-030) -- the terrain is shaded procedurally"

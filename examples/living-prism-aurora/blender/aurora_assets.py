@@ -162,9 +162,10 @@ FAMILIES = {
 
 
 def family_view(name):
-    """The direction to the camera in the family's own frame (Blender axes), from the first formation that uses it."""
+    """The direction to the camera in a formation's own frame (Blender axes). `name` is a formation (5e) or a family
+    (the first formation that uses it)."""
     for f in L.FORMATIONS:
-        if f[5] == name:
+        if f[0] == name or f[5] == name:
             q = L.formation_quat(f)
             x, z = f[1], f[2]
             d = [L.CAMERA_POS[0] - x, L.CAMERA_POS[1] - L.height(x, z), L.CAMERA_POS[2] - z]
@@ -172,6 +173,22 @@ def family_view(name):
             lv = L._qrot(qi, d)
             return Vector((lv[0], -lv[2], lv[1])).normalized()
     return None
+
+
+def edges_for_formations(out, min_px=1.6, rr0=0.11):
+    """5e: one edge mesh per formation (<formation>_edgeA.glb), its prisms widened so they are never under `min_px`
+    pixels at the formation's distance from the camera at 1080p; the widening goes to edges.json (the scene dims the
+    glow by it)."""
+    for f in L.FORMATIONS:
+        name, x, z, _yaw, s, fam = f[:6]
+        d = math.dist(L.CAMERA_POS, (x, L.height(x, z), z))
+        px = 2.0 * d * math.tan(math.radians(L.CAMERA_FOV) / 2) / 1080.0
+        rr = max(rr0, 0.5 * min_px * px / s)
+        EDGE_WIDEN[name] = round(rr / rr0, 3)
+        bm, seed = FAMILY_BM[fam]
+        build_edges(bm, name, out, random.Random(seed + 1000), rr=rr)
+    with open(os.path.join(out, "edges.json"), "w") as fh:
+        json.dump(EDGE_WIDEN, fh)
 
 
 def build_edges(bm, name, out, rng, rr=0.11, sharp=18.0, ridges=0.15):
@@ -257,7 +274,7 @@ def build_family(name, out):
             shard._apex = None
             shard(bm, b0, bax, w * 1.6 * rng.uniform(0.38, 0.5), ln * rng.uniform(0.32, 0.45), rng, embed=0.25)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    build_edges(bm, name, out, random.Random(seed + 1000))
+    FAMILY_BM[name] = (bm.copy(), seed)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -282,6 +299,8 @@ def build_family(name, out):
 
 
 FOOTPRINTS = {}
+FAMILY_BM = {}
+EDGE_WIDEN = {}
 
 
 # ---- phase 2e: Poly Haven CC0 scans for the rock (assets/aurora-valley.manifest.json) -------------------------
@@ -297,9 +316,54 @@ SCANS = {  # out name: (library path, target faces)
     "boulder": ("terrain/rocks/boulder_01/boulder_01_1k.gltf", 900),
     "rock": ("terrain/rocks/rock_07/rock_07_1k.gltf", 700),
     "mossrock": ("terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf", 1400),
+    "mossrock2": ("terrain/rocks/rock_moss_set_02/rock_moss_set_02_1k.gltf", 1400),   # 5e: moss-covered rock
     "stone": ("terrain/rocks/stone_01/stone_01_1k.gltf", 500),
 }
 SCAN_SIZES = {}
+
+# ---- 5e (the owner: "go with more of a bushy look (more like the reference art)"): bush masses -------------------
+# The library's Poly Haven shrubs (assets/nature/plants/shrub_01..04) are 0.5-2.5 m alpha-dithered leaf cards: sub-pixel
+# or shimmering at this camera's 150-500 m. The reference's bushes read as dense rounded foliage masses, so these are
+# built: a cluster of noise-displaced lobes, lumpy like foliage, flattened at the base. Unit radius, geometry only
+# (the scene shades them with au_bush).
+BUSHES = ("bushA", "bushB", "bushC", "bushD")
+
+
+def build_bush(name, out, seed):
+    from mathutils import noise
+    rng = random.Random(seed)
+    bm = bmesh.new()
+    lobes = rng.randrange(6, 11)
+    for k in range(lobes):
+        a = rng.uniform(0, math.tau)
+        d = rng.uniform(0.0, 0.55) if k else 0.0
+        r = rng.uniform(0.38, 0.62) if k else 0.6
+        c = Vector((d * math.cos(a), d * math.sin(a), rng.uniform(0.2, 0.5)))
+        res = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=r)
+        off = Vector((rng.uniform(0, 50), rng.uniform(0, 50), rng.uniform(0, 50)))
+        for v in res["verts"]:
+            n = v.co.normalized()
+            disp = 0.16 * noise.noise(v.co * 3.2 + off) + 0.07 * noise.noise(v.co * 8.0 + off)
+            v.co = c + v.co + n * disp * r
+            if v.co.z < 0.0:
+                v.co.z *= 0.25          # a flattened base, seated on the ground
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=True,
+                              export_yup=True, export_apply=True, export_normals=True, export_materials="NONE")
+    ob.hide_render = True
+    print("EXPORTED", name, len(me.polygons), "faces")
+
 
 def build_scan(name, out):
     rel, faces = SCANS[name]
@@ -499,8 +563,11 @@ def main():
     objs = [build_family(n, out) for n in FAMILIES]
     with open(os.path.join(out, "footprints.json"), "w") as f:
         json.dump(FOOTPRINTS, f)
+    edges_for_formations(out)
     for n in SCANS:
         build_scan(n, out).hide_render = True
+    for k, n in enumerate(BUSHES):
+        build_bush(n, out, 7300 + k)
     with open(os.path.join(out, "scans.json"), "w") as f:
         json.dump(SCAN_SIZES, f)
     build_ridges(out)

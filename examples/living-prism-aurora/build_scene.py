@@ -119,6 +119,10 @@ LOOK = int(os.environ.get("AU_LOOK", "0"))
 R0 = dict(LOOKS[LOOK][1])
 
 
+EDGE_WIDEN = {}   # formation -> its edge prisms' widening (from <assets>/edges.json, written by Blender)
+IG = 1.8   # the interior's gain, carried in its ramp stops and their palette bindings (5e)
+
+
 def crystal_program():
     """Phase 3, reworked in 3c against the reference: facets fall into three classes by a per-facet random (the
     quantised normal), so neighbouring faces differ strongly in value and colour:
@@ -151,8 +155,9 @@ def crystal_program():
     p.op("remap", 7, a=7, k=[0, 1, -0.9, 1.9])                                # steep: patches, not a wash
     p.op("remap", 1, a=2, k=[0, 1, 0, 0.35])                                  # the view shifts it: depth
     p.op("add", 7, a=7, b=1)
-    p.op("oklabRamp", 7, a=7, label="interior", k=c4(R0["crystalDeep"]), k2=c4(R0["crystalBody"]),
-         k3=c4(R0["crystalBlue"]), k4=c4(R0["auroraMid"]))
+    p.op("oklabRamp", 7, a=7, label="interior", k=c4([c * IG for c in R0["crystalDeep"]]),
+         k2=c4([c * IG for c in R0["crystalBody"]]), k3=c4([c * IG for c in R0["crystalBlue"]]),
+         k4=c4([c * IG for c in R0["auroraMid"]]))   # (the interior gain IG is in the stops: 5e freed its ops)
     p.op("remap", 1, a=2, k=[0, 1, 1, 0.25], f=1.0)                           # seen where the facet faces us
     p.op("multiply", 7, a=7, b=1)
     p.op("smoothstep", 1, a=3, k=[0.26, 0.34, 0, 0])                          # the dark facets: 5%
@@ -160,26 +165,29 @@ def crystal_program():
     p.op("multiply", 7, a=7, b=1)
     p.op("remap", 1, a=6, k=[0, 1, 1, 0.2], f=1.0)                            # the mirrors: little interior
     p.op("multiply", 7, a=7, b=1)
-    p.op("constant", 1, label="interiorGain", k=[1.8, 1.8, 1.8, 1])
-    p.op("multiply", 7, a=7, b=1)
     p.op("add", 5, a=5, b=7)
     p.op("input", 7, input="localPosition")                                    # fractures: dense, thin, branching
     p.op("voronoiEdge", 1, a=7, f=0.16, seed=13)
     p.op("swizzle", 1, a=1, k=[0, 0, 0, 0])            # F2 - F1 into every channel (the others tinted it red)
-    p.op("smoothstep", 1, a=1, k=[0.0, 0.012, 0, 0])
+    # 5e anti-aliasing (the owner: "why do all the crystals look aliased and jagged lines"): the line's width is the
+    # authored 0.012 (Voronoi units) or ~1.5 px, whichever is wider (footprint = world units per pixel; x 0.16 / ~2.5
+    # scale x 1.5 px ~ 0.1); the edge is a smoothstep over that width, and the line's energy falls as authored/actual,
+    # so cracks thin out and fade on distant crystals instead of breaking into stairs
+    p.op("input", 6, input="footprint")
+    p.op("remap", 6, a=6, k=[0, 1, 0.012, 0.112])                             # width = 0.012 + 0.1 x footprint
+    p.op("power", 6, a=6, f=-1.0)                                             # 1 / width
+    p.op("multiply", 1, a=1, b=6)
+    p.op("smoothstep", 1, a=1, k=[0.0, 1.0, 0, 0])
     p.op("remap", 1, a=1, k=[0, 1, 1, 0], f=1.0)
+    p.op("remap", 6, a=6, k=[0, 1, 0, 0.012])                                 # energy: authored / actual width
+    p.op("multiply", 1, a=1, b=6)
     p.op("noise", 7, a=7, f=0.05, seed=17)
     p.op("smoothstep", 7, a=7, k=[0.46, 0.54, 0, 0])                         # in runs over about half the stone
     p.op("multiply", 1, a=1, b=7)
     p.op("constant", 7, label="fracture", k=c4([c * 1.4 for c in R0["crystalFracture"]]))
     p.op("multiply", 1, a=1, b=7)
     p.op("add", 5, a=5, b=1)
-    p.op("input", 7, input="localPosition")                                    # inclusions
-    p.op("quantize", 7, a=7, f=7.0, seed=21)
-    p.op("swizzle", 7, a=7, k=[3, 3, 3, 3])
-    p.op("smoothstep", 7, a=7, k=[0.988, 0.996, 0, 0])
-    p.op("multiply", 7, a=7, b=4)
-    p.op("add", 5, a=5, b=7)
+    # (5e: the inclusions -- hard-thresholded hash cells -- are gone: unfilterable squares, a source of the aliasing)
     p.op("remap", 6, a=6, k=[0, 1, 0.3, 0.025], f=1.0)                        # roughness: the mirrors glossy
     assert len(p.ops) <= 48, len(p.ops)
     return p
@@ -222,10 +230,10 @@ def palette_json():
          {"role": "auroraMid", "target": P.path("env", "constant2")},
          {"role": "aurora2Low", "target": P.path("env", "constant3")},
          {"role": "auroraTop", "target": P.path("env", "constant4")},
-         {"role": "crystalDeep", "target": P.path("interior", "constant")},
-         {"role": "crystalBody", "target": P.path("interior", "constant2")},
-         {"role": "crystalBlue", "target": P.path("interior", "constant3")},
-         {"role": "auroraMid", "target": P.path("interior", "constant4")},
+         {"role": "crystalDeep", "target": P.path("interior", "constant"), "gain": IG},
+         {"role": "crystalBody", "target": P.path("interior", "constant2"), "gain": IG},
+         {"role": "crystalBlue", "target": P.path("interior", "constant3"), "gain": IG},
+         {"role": "auroraMid", "target": P.path("interior", "constant4"), "gain": IG},
          {"role": "crystalFracture", "target": P.path("fracture"), "gain": 1.4},
          # 5b (spec 6.5): the aurora lights the valley -- the ground's sky-facing glow, the distance haze, the hero
          # crystals' faint light on the ground near them
@@ -233,7 +241,8 @@ def palette_json():
           "gain": GROUND_AURORA},
          {"role": "aurora2Low", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[1],
           "gain": GROUND_AURORA},
-         {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA}]
+         {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA},
+         {"role": "auroraLow", "target": "material/au_bush/op/%d/constant/constant" % BUSH_RIM_OP, "gain": BUSH_RIM}]
     if CIRCUITS:
         b.append({"role": "auroraLow", "target": "procedural/circuits/material/emissiveColor"})
     for i, n in enumerate(sorted(REFRACT_HEROES)):
@@ -343,106 +352,6 @@ def write_glb(path, positions, normals, indices):
 CIRCUITS = os.environ.get("AU_CIRCUITS", "0") == "1"   # 5c: off (the owner: "lets nix the circuitry lines for now")
 
 
-def write_glb_textured(path, positions, normals, uvs, indices, color_jpg, normal_jpg):
-    """A GLB with one textured mesh (positions, normals, uvs, uint32 indices; base colour and normal JPEGs embedded)."""
-    import struct
-    chunks, views, acc = [], [], []
-
-    def add(data, target=None):
-        off = sum(len(c) for c in chunks)
-        chunks.append(data + b"\0" * (-len(data) % 4))
-        v = {"buffer": 0, "byteOffset": off, "byteLength": len(data)}
-        if target:
-            v["target"] = target
-        views.append(v)
-        return len(views) - 1
-    vp = add(b"".join(struct.pack("<3f", *p) for p in positions), 34962)
-    vn = add(b"".join(struct.pack("<3f", *n) for n in normals), 34962)
-    vt = add(b"".join(struct.pack("<2f", *t) for t in uvs), 34962)
-    vi = add(b"".join(struct.pack("<I", i) for i in indices), 34963)
-    vc = add(open(color_jpg, "rb").read())
-    vnm = add(open(normal_jpg, "rb").read())
-    acc = [{"bufferView": vp, "componentType": 5126, "count": len(positions), "type": "VEC3",
-            "min": [min(p[k] for p in positions) for k in range(3)],
-            "max": [max(p[k] for p in positions) for k in range(3)]},
-           {"bufferView": vn, "componentType": 5126, "count": len(normals), "type": "VEC3"},
-           {"bufferView": vt, "componentType": 5126, "count": len(uvs), "type": "VEC2"},
-           {"bufferView": vi, "componentType": 5125, "count": len(indices), "type": "SCALAR"}]
-    binb = b"".join(chunks)
-    gl = {"asset": {"version": "2.0", "generator": "living-prism-aurora build_scene"},
-          "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
-          "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2}, "indices": 3,
-                                      "material": 0}]}],
-          "materials": [{"name": "moss002", "pbrMetallicRoughness": {"baseColorTexture": {"index": 0},
-                                                                     "metallicFactor": 0.0, "roughnessFactor": 1.0},
-                         "normalTexture": {"index": 1}}],
-          "samplers": [{"magFilter": 9729, "minFilter": 9987, "wrapS": 10497, "wrapT": 10497}],
-          "images": [{"bufferView": vc, "mimeType": "image/jpeg"}, {"bufferView": vnm, "mimeType": "image/jpeg"}],
-          "textures": [{"source": 0, "sampler": 0}, {"source": 1, "sampler": 0}],
-          "buffers": [{"byteLength": len(binb)}], "bufferViews": views, "accessors": acc}
-    js = json.dumps(gl).encode()
-    js += b" " * (-len(js) % 4)
-    with open(path, "wb") as f:
-        f.write(struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(binb)))
-        f.write(struct.pack("<II", len(js), 0x4E4F534A) + js)
-        f.write(struct.pack("<II", len(binb), 0x004E4942) + binb)
-
-
-MOSS_DIR = os.path.join(HERE, "..", "..", "assets", "nature", "moss", "Moss002")
-
-
-def build_moss_carpet(path, spots, cell=1.0, lift=0.12, tile=2.0, seed=2026102326):
-    """5d moss as a carpet that follows the ground: every moss spot (x, z, radius) is rasterised into one world grid
-    (a union of discs, the edge frayed by noise), and the marked cells become one mesh draped on the engine's heights,
-    UV-mapped in world space (one moss tile per `tile` m) and textured with ambientCG Moss002 (CC0). Wet cells are
-    left out. One GLB, no overlaps, no rims."""
-    import random
-    rng = random.Random(seed)
-    cells = set()
-    for x, z, r in spots:
-        rr = r * rng.uniform(0.8, 1.1)
-        for i in range(int((x - rr) // cell) - 1, int((x + rr) // cell) + 2):
-            for j in range(int((z - rr) // cell) - 1, int((z + rr) // cell) + 2):
-                cx, cz = (i + 0.5) * cell, (j + 0.5) * cell
-                ang = math.atan2(cz - z, cx - x)
-                edge = rr * (1.0 + 0.18 * math.sin(3 * ang + x) + 0.1 * math.sin(7 * ang + z))
-                if math.hypot(cx - x, cz - z) <= edge:
-                    cells.add((i, j))
-    verts = sorted({(i + di, j + dj) for i, j in cells for di in (0, 1) for dj in (0, 1)})
-    hs = L.engine_heights([(i * cell, j * cell) for i, j in verts])
-    hmap = dict(zip(verts, hs))
-    keep = []
-    for i, j in cells:
-        cx, cz = (i + 0.5) * cell, (j + 0.5) * cell
-        lvl = L.water_level(cx, cz)
-        if lvl is not None and min(hmap[(i + a, j + b)] for a in (0, 1) for b in (0, 1)) <= lvl + 0.25:
-            continue
-        keep.append((i, j))
-    idx, P, N, T, I = {}, [], [], [], []
-    for i, j in keep:
-        quad = []
-        for a, b in ((0, 0), (1, 0), (1, 1), (0, 1)):
-            key = (i + a, j + b)
-            if key not in idx:
-                idx[key] = len(P)
-                x, z = key[0] * cell, key[1] * cell
-                h = hmap[key]
-                hx0 = hmap.get((key[0] - 1, key[1]), h)
-                hx1 = hmap.get((key[0] + 1, key[1]), h)
-                hz0 = hmap.get((key[0], key[1] - 1), h)
-                hz1 = hmap.get((key[0], key[1] + 1), h)
-                nx, ny, nz = -(hx1 - hx0), 2 * cell, -(hz1 - hz0)
-                nl = math.sqrt(nx * nx + ny * ny + nz * nz)
-                P.append((x, h + lift, z))
-                N.append((nx / nl, ny / nl, nz / nl))
-                T.append((x / tile, z / tile))
-            quad.append(idx[key])
-        I += [quad[0], quad[2], quad[1], quad[0], quad[3], quad[2]]
-    write_glb_textured(path, P, N, T, I, os.path.join(MOSS_DIR, "Moss002_2K-JPG_Color.jpg"),
-                       os.path.join(MOSS_DIR, "Moss002_2K-JPG_NormalGL.jpg"))
-    print("moss carpet: %d cells, %.0f m2" % (len(keep), len(keep) * cell * cell))
-
-
 def build_circuits(path, placed, seed=2026102320):
     """5b (spec 8): a restrained network of luminous pathways on the near banks, following the river. Each trace runs
     along the river at a set offset from its centreline, jogs sideways at a few points (the circuit idiom) and may
@@ -539,7 +448,7 @@ def crystal_lights(placed):
     return out
 
 
-def scene_json(placed, scans, moss=None):
+def scene_json(placed, scans, bushes=None):
     nodes = [{"name": "valley", "kind": "terrain", "position": [0, 0, 0], "world": L.world_json(),
               "terrain": {"chunkSize": 200.0, "resolution": 64, "lodLevels": 3, "lodDistance": 200.0,
                           "viewDistance": 6000.0, "shadowDistance": 300.0, "skirtDepth": 3.0, "groundMottle": False,
@@ -550,8 +459,11 @@ def scene_json(placed, scans, moss=None):
         s = f[4]
         pt = [round(c, 3) for c in pos] + [round(c, 6) for c in q] + [s, s, s]
         nodes.append(mesh_node("xtal_" + f[0], f[5] + ".glb", [pt], xmat(f[0])))
-        for key, k in (("edgeA", 2.6),):   # the glowing edges: silhouettes and a few ridges (3c), aurora role
-            nodes.append(mesh_node("%s_%s" % (key, f[0]), "%s_%s.glb" % (f[5], key), [pt],
+        # the glowing edges: silhouettes and a few ridges (3c). 5e: one mesh per formation, widened to a minimum
+        # on-screen width; its glow falls by the same ratio (EDGE_WIDEN from Blender), so a widened line is not brighter
+        widen = EDGE_WIDEN.get(f[0], 1.0)
+        for key, k in (("edgeA", 2.6 / widen),):
+            nodes.append(mesh_node("%s_%s" % (key, f[0]), "%s_%s.glb" % (f[0], key), [pt],
                                    {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": k,
                                     "roughness": 1.0, "metallic": 0.0}, shadow=False))
     # the Poly Haven scans (phase 2e): cliffs on the rocky left, outcrops on the right, boulders on both banks
@@ -560,10 +472,13 @@ def scene_json(placed, scans, moss=None):
     tmat = {"baseColor": [0.8, 0.74, 0.86], "roughness": 1.0, "metallic": 0.0}   # 5d: lighter, so the masses read
     for asset, pts in scans.items():
         nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, tmat, shadow=True))
-    # 5d: the moss carpet (ambientCG Moss002, CC0) on the owner's mossy areas and around every crystal base
-    if moss:
-        nodes.append(mesh_node("moss", "moss_carpet.glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]],
-                               {"baseColor": [0.8, 0.85, 0.75], "roughness": 1.0, "metallic": 0.0}, shadow=False))
+    # 5e (the owner: "nix the moss idea go with more of a bushy look"): bush masses on the owner's areas and around
+    # every crystal base, shaded by au_bush
+    for asset, pts in (bushes or {}).items():
+        if pts:
+            nodes.append(mesh_node("bush_" + asset, asset + ".glb", pts,
+                                   {"baseColor": [0.02, 0.05, 0.02], "roughness": 0.9, "metallic": 0.0,
+                                    "program": "au_bush"}, shadow=True))
     # 5b (spec 8): the circuit pathways on the near banks, emissive in the low aurora colour (palette-bound).
     # 5c: off unless AU_CIRCUITS=1
     if CIRCUITS:
@@ -618,7 +533,7 @@ def scene_json(placed, scans, moss=None):
             aurora_fx("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 2000.0, 60.0, 3300.0, 2.0,
                       1.6, 70.0, 0.015, 3.2, waveAmplitude=1.1, turbulence=0.4, filaments=2.5, edgeBrightness=3.0,
                       opacity=0.6, layerSpacing=0.45)],
-        "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=6)],
+        "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=6), prog_bush()],
         "nodes": nodes,
     }
 
@@ -654,7 +569,7 @@ SCATTER = {  # asset: (count left, count right, scale lo, hi)
     "stone": (14, 6, 10.0, 24.0)}
 
 
-def auto_cliffs(sizes, placed, footprints, count=11, seed=2026102317):
+def auto_cliffs(sizes, placed, footprints, count=30, seed=2026102317):
     """17 (richer rock): textured scan cliffs where the camera sees bare canyon wall. Candidates on both walls (every
     35 m down the valley, 150-300 m from the river) are projected through the camera; one is kept only if its
     on-screen box is in frame, clear of every crystal's outline, and its top is visible past the terrain (a ray
@@ -667,15 +582,17 @@ def auto_cliffs(sizes, placed, footprints, count=11, seed=2026102317):
         sc = f[4]
         pts = [L._project([pos[i] + v[i] for i in range(3)])
                for v in (L._qrot(q, (sc * a[0], sc * a[1], sc * a[2])) for a in footprints[f[5]])]
-        hulls.append(L._hull([(round(x), round(y)) for x, y, _z in pts]))
+        hulls.append((L._hull([(round(x), round(y)) for x, y, _z in pts]), min(z for _x, _y, z in pts)))
     cands = []
     assets = ["cliffA", "cliffB", "cliffD"]
-    for z in range(-60, -780, -35):
+    # 5e (the owner: "start working on making more of the original cliffs look like rocky cliffs"): the walls behind
+    # the crystals take rock faces too, larger, closer and further along
+    for z in range(60, -900, -30):
         for side in (-1, 1):
-            for sb in (150, 190, 230, 280):
+            for sb in (120, 150, 190, 230, 280, 330):
                 a = rng.choice(assets)
                 w, h, d = sizes[a]
-                sc = rng.uniform(70.0, 120.0) / w
+                sc = rng.uniform(120.0, 220.0) / w
                 yaw = (90.0 if side < 0 else -90.0) + rng.uniform(-25, 25)
                 x = L.river_x(z) + side * sb
                 cands.append((a, z, side, sb, yaw, sc, x))
@@ -696,7 +613,9 @@ def auto_cliffs(sizes, placed, footprints, count=11, seed=2026102317):
         if not (60 < cx < 1860 and 120 < cyy < 900) or (x1 - x0) < 40:
             continue
         probe = [(cx, cyy), (x0 + (x1 - x0) * 0.25, cyy), (x0 + (x1 - x0) * 0.75, cyy), (cx, y0 + (y1 - y0) * 0.3)]
-        if any(len(hl) > 2 and L._inside(hl, px, py) for hl in hulls for px, py in probe):
+        # only a cliff standing IN FRONT of a crystal is refused; one behind it is wall
+        depth = min(p[2] for p in pr)
+        if any(len(hl) > 2 and L._inside(hl, px, py) and depth < hz for hl, hz in hulls for px, py in probe):
             continue
         boxes.append((c, gy, h, (x0, y0, x1, y1)))
     # the top centre must be visible past the terrain
@@ -715,7 +634,7 @@ def auto_cliffs(sizes, placed, footprints, count=11, seed=2026102317):
         return ix * iy / max(1.0, min((p[2] - p[0]) * (p[3] - p[1]), (q[2] - q[0]) * (q[3] - q[1])))
     chosen = []
     for b in sorted(visible, key=lambda b: -(b[3][2] - b[3][0]) * (b[3][3] - b[3][1])):
-        if all(overlap(b[3], o[3]) < 0.2 for o in chosen):
+        if all(overlap(b[3], o[3]) < 0.35 for o in chosen):
             chosen.append(b)
         if len(chosen) >= count:
             break
@@ -767,8 +686,8 @@ def auto_outcrops(sizes, placed, footprints, count=8, seed=2026102318):
 # ---- 5d: the owner's marks on the 5c frame (1920x1080 pixels of layout.CAMERA_5C) ----------------------------------
 # red boxes: cliff-like rock masses that butt up against and fit between the crystals
 ROCK_BOXES = {"a": (507, 537, 742, 687), "b": (1072, 505, 1215, 568), "c": (1265, 587, 1465, 738)}
-# blue ellipses: mossy green earth (centre x, centre y, half width, half height)
-MOSS_AREAS = [(465, 812, 175, 100), (875, 530, 70, 90), (1034, 492, 46, 55), (1188, 642, 101, 75),
+# blue ellipses: green cover -- 5d moss, 5e bushes (centre x, centre y, half width, half height)
+COVER_AREAS = [(465, 812, 175, 100), (875, 530, 70, 90), (1034, 492, 46, 55), (1188, 642, 101, 75),
               (1810, 590, 100, 75), (1675, 851, 225, 149)]
 
 
@@ -798,14 +717,13 @@ def owner_rocks(sizes, seed=2026102324):
     return items
 
 
-def moss_points(placed, footprints, sizes=None, seed=2026102325):
-    """Moss spots (x, z, radius): over each blue area (pixels inside the ellipse raycast through the 5c camera), and
-    ringed around every crystal's base where the stone meets the earth. build_moss_carpet turns them into one draped,
-    textured mesh."""
+def cover_spots(placed, footprints, sizes=None, seed=2026102325):
+    """Ground-cover spots (x, z, radius): over each of the owner's blue areas (pixels inside the ellipse raycast through
+    the 5c camera), and ringed around every crystal's base where the stone meets the earth (5d; 5e: bushes)."""
     import random
     rng = random.Random(seed)
     spots = []
-    for cx, cy, rx, ry in MOSS_AREAS:
+    for cx, cy, rx, ry in COVER_AREAS:
         n = int(30 + rx * ry / 350)   # dense: overlapping pads form a carpet
         pix = []
         while len(pix) < n:
@@ -825,7 +743,93 @@ def moss_points(placed, footprints, sizes=None, seed=2026102325):
     return spots
 
 
-def place_scans(sizes, placed=(), footprints=None):
+BUSHES = ("bushA", "bushB", "bushC", "bushD")
+
+
+def between_spots(placed, seed=2026102328):
+    """5e (the owner: "fill in more in between the crystals with rocky cliffs, moss covered rocks, green bushy
+    bushes"): along each bank, spots between neighbouring formations' bases (and a little either side of the line),
+    each one a bush cluster, a moss-covered rock or a rock mass -- the crystals rising out of rock and foliage.
+    Returns ([bush spots (x, z, r)], [scan items (asset, x, z, yaw, scale, sink)])."""
+    import random
+    rng = random.Random(seed)
+    bush, rocks = [], []
+    for side in (-1, 1):
+        bank = sorted((p for p in placed if p[0][6] == side), key=lambda p: -p[1][2])
+        for p, q in zip(bank, bank[1:]):
+            (x0, _y0, z0), (x1, _y1, z1) = p[1], q[1]
+            n = int(min(14, max(4, math.hypot(x1 - x0, z1 - z0) / 18)))
+            for k in range(n):
+                t = (k + 0.5) / n
+                x = x0 + (x1 - x0) * t + rng.uniform(-22, 22)
+                z = z0 + (z1 - z0) * t + rng.uniform(-14, 14)
+                roll = rng.random()
+                if roll < 0.5:
+                    bush.append((x, z, rng.uniform(6.0, 12.0)))
+                elif roll < 0.8:
+                    a = rng.choice(["mossrock", "mossrock2"])
+                    rocks.append((a, x, z, rng.uniform(0, 360), rng.uniform(0.9, 1.8), 0.25))
+                else:
+                    a = rng.choice(["cliffB", "cliffC", "boulder"])
+                    sc = {"cliffB": rng.uniform(0.5, 0.9), "cliffC": rng.uniform(2.0, 3.5),
+                          "boulder": rng.uniform(5.0, 9.0)}[a]
+                    rocks.append((a, x, z, rng.uniform(0, 360), sc, 0.2))
+    return bush, rocks
+
+
+def bush_points(spots, seed=2026102327):
+    """5e: bush masses (unit-radius Blender meshes, bushA-D) at the cover spots -- one to three per spot, overlapping
+    into rounded masses, varied in size, squash and turn, seated a little into the ground; none on wet ground."""
+    import random
+    rng = random.Random(seed)
+    cand = []
+    for x, z, r in spots:
+        for _ in range(rng.choice([1, 2, 2, 3])):
+            a = rng.uniform(0, math.tau)
+            d = rng.uniform(0, r * 0.6)
+            cand.append((x + d * math.cos(a), z + d * math.sin(a), r * rng.uniform(0.35, 0.65)))
+    hs = L.engine_heights([(x, z) for x, z, _r in cand])
+    pts = {k: [] for k in BUSHES}
+    for (x, z, sc), h in zip(cand, hs):
+        lvl = L.water_level(x, z)
+        if lvl is not None and h <= lvl + 0.4:
+            continue
+        q = L.quat_y(rng.uniform(0, 360))
+        sy = sc * rng.uniform(0.6, 0.9)
+        pts[rng.choice(BUSHES)].append([round(x, 3), round(h - 0.2 * sy, 3), round(z, 3)] + [round(c, 6) for c in q] +
+                                        [round(sc, 3), round(sy, 3), round(sc * rng.uniform(0.85, 1.15), 3)])
+    print("bushes: %d" % sum(len(v) for v in pts.values()))
+    return pts
+
+
+def prog_bush():
+    """5e: dense dark-green foliage. A per-instance shade (instanceRandom) and a leafy clump noise vary the green;
+    the tops are lighter; a soft rim of the low aurora colour on the up-facing foliage (palette: BUSH_RIM)."""
+    return {"name": "au_bush", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6,
+            "emissionIntensity": 1.0, "opacity": -1, "ops": [
+                {"kind": "input", "dst": 0, "input": "worldPosition"},
+                {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.9, "seed": 31},            # leaf clumps
+                {"kind": "input", "dst": 2, "input": "instanceRandom"},
+                {"kind": "mix", "dst": 2, "srcA": 1, "srcB": 2, "value": 0.45},
+                {"kind": "oklabRamp", "dst": 3, "srcA": 2, "constant": [0.004, 0.016, 0.006, 1],
+                 "constant2": [0.010, 0.040, 0.012, 1], "constant3": [0.020, 0.070, 0.018, 1],
+                 "constant4": [0.040, 0.095, 0.022, 1]},                                     # dark to bright green
+                {"kind": "input", "dst": 4, "input": "normal"},
+                {"kind": "gradient", "dst": 5, "srcA": 4, "constant": [0, 1, 0, 0.45], "value": 0.55},
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},                         # lighter tops
+                {"kind": "add", "dst": 3, "srcA": 3, "srcB": 3},
+                {"kind": "gradient", "dst": 5, "srcA": 4, "constant": [0, 1, 0, 0], "value": 1.0},
+                {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.75, 1.0, 0, 0]},
+                {"kind": "constant", "dst": 6, "constant": [c * BUSH_RIM for c in R0["auroraLow"]] + [1]},
+                {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 5},
+                {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 1}]}
+
+
+BUSH_RIM = 0.02          # the aurora's rim on the bushes' tops (emission, x the low aurora colour)
+BUSH_RIM_OP = 12         # 1-based op index of that colour constant in au_bush (palette target)
+
+
+def place_scans(sizes, placed=(), footprints=None, extra=()):
     """Points for each scan asset: the cliffs, then a sparse, seeded scatter on both banks, denser on the rocky left.
     Everything stands on the engine's ground, and nothing goes on wet ground."""
     import random
@@ -851,6 +855,8 @@ def place_scans(sizes, placed=(), footprints=None):
                 if clear_of_crystals(x, z, 0.5 * max(sizes[asset][0], sizes[asset][2]) * sc):
                     items.append((asset, x, z, rng.uniform(0, 360), sc, 0.25))
     items += owner   # 5d: the owner's rock masses go between the crystals (not filtered by the footprints)
+    # 5e: the between-crystal rocks, a step clear of the crystals' footprints
+    items += [it for it in extra if clear_of_crystals(it[1], it[2], 1.0)]
     # each piece sinks from the LOWEST ground under its footprint (centre and four corners), so none floats as a
     # shelf off a slope
     probes = []
@@ -863,6 +869,36 @@ def place_scans(sizes, placed=(), footprints=None):
     # a cliff sits on the ground at its centre (it stands proud of the slope; from the lowest corner the uphill side
     # swallowed it); everything else from the lowest corner, so nothing floats
     hs = [ph[i * 5] if items[i][0].startswith("cliff") else min(ph[i * 5:i * 5 + 5]) for i in range(len(items))]
+    # 5e audit (the owner: "make sure it's all representative of actual land scapes"): a cliff must be SUPPORTED --
+    # its base buried at its lowest corner (no floating lip), and its top tucked into the slope uphill of it (a scan
+    # standing proud of the wall shows its ragged, open-backed edges against the ridge). Sink it until both hold, at
+    # most 65% of its height; a cliff that still stands proud is dropped.
+    up = []
+    for asset, x, z, yaw, sc, _sink in items:
+        side = 1.0 if x > L.river_x(z) else -1.0
+        back = 0.5 * max(sizes[asset][0], sizes[asset][2]) * sc + 12.0
+        up.append((x + side * back, z))
+    uh = L.engine_heights(up)
+    keep, hs2, dropped = [], [], 0
+    for it, h, i in zip(items, hs, range(len(items))):
+        asset, x, z, yaw, sc, sink = it
+        if not asset.startswith("cliff"):
+            keep.append(it)
+            hs2.append(h)
+            continue
+        height = sizes[asset][1] * sc
+        lowest = min(ph[i * 5:i * 5 + 5])
+        base = min(h - sink * height, lowest - 0.3)              # buried at the lowest corner
+        top_max = uh[i] + 0.1 * height                           # tucked into the slope behind
+        if base + height > top_max:
+            base = top_max - height
+        if base < h - 0.65 * height:
+            dropped += 1
+            continue
+        keep.append((asset, x, z, yaw, sc, (h - base) / height))
+        hs2.append(h)
+    print("cliffs dropped by the support audit: %d" % dropped)
+    items, hs = keep, hs2
     pts = {}
     for (asset, x, z, yaw, sc, sink), h in zip(items, hs):
         lvl = L.water_level(x, z)
@@ -895,11 +931,11 @@ def main():
     sweep = L.terrain_sweep(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
     print("terrain (hidden % / buried %): " + " ".join("%s %.0f/%.0f" % r for r in sweep))
     os.makedirs(a.scene_dir, exist_ok=True)
-    build_moss_carpet(os.path.join(a.assets, "moss_carpet.glb"),
-                      moss_points(placed, json.load(open(os.path.join(a.assets, "footprints.json")))))
-    moss = True
+    EDGE_WIDEN.update(json.load(open(os.path.join(a.assets, "edges.json"))))
+    fill_bush, fill_rocks = between_spots(placed)
+    bushes = bush_points(cover_spots(placed, json.load(open(os.path.join(a.assets, "footprints.json")))) + fill_bush)
     sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json"))), placed,
-                                       json.load(open(os.path.join(a.assets, "footprints.json")))), moss)
+                                       json.load(open(os.path.join(a.assets, "footprints.json"))), fill_rocks), bushes)
     for n in sc["nodes"]:
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":

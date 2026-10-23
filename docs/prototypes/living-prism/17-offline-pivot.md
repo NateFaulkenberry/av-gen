@@ -300,3 +300,55 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5d/`
 **Offline render:** 30 frames in 10.4 s at 1080p (2x supersample, `--tier offline`): **0.35 s/frame**.
 
 **When ADR-1642 (terrain texture inputs) lands:** move the moss from the carpet mesh into the terrain material.
+
+## Phase 5e gate (2026-10-23)
+
+The owner's notes on 5d, verbatim:
+- "the moss texture is not reading correctly to me - nix the moss idea go with more of a bushy look (more like the reference art)"
+- "start working on making more of the original cliffs look like rocky cliffs"
+- "fill in more in between the crystals with rocky cliffs, moss covered rocks, green bushy bushes"
+- "why do all the crystals look aliased and jagged lines"
+- "some of the terrain geometry looks questionably drawn, lets make sure it's all representative of actual land scapes"
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5e/`. All PNG, so there are no JPEG artefacts in the crops.
+
+| File | Shows |
+|---|---|
+| `phase5e-frame.png` (4K downsampled to 1080), `phase5e-frame-4k.png`, `phase5e-frame-rose.png` | the full frame |
+| `phase5e-bushes-left.png`, `phase5e-bushes-right.png` | the bushes against 5d |
+| `phase5e-aliasing-hero.png` | the hero crystal: 5d gate, 5e at 1x, 5e final |
+| `phase5e-terrain-audit.png` | the floating cliff lumps before and after |
+
+**The moss carpet is removed:** the code, the mesh, the ambientCG texture files and the manifest entry.
+
+**Bushes.**
+- I checked the library first. The Poly Haven shrubs (`assets/nature/plants/shrub_01-04`) are 0.5-2.5 m alpha-dithered leaf cards, sub-pixel or shimmering at 150-500 m.
+- So the bushes are built in Blender (`build_bush`): four rounded foliage masses of 6-10 noise-displaced lobes each, with flattened bases.
+- They are shaded by a new program, `au_bush`: a dark, saturated green varied per instance and by a leafy clump noise, lighter tops, and a soft rim of the low aurora colour on top (palette-bound).
+- About 1,370 instances, overlapping into masses: on the owner's six areas, around every crystal base, and between the crystals.
+
+**Between the crystals.** `between_spots` fills along each bank between neighbouring formations with bush clusters (50%), Poly Haven moss-covered rocks (30%: `rock_moss_set_01` and the newly added `rock_moss_set_02`), and rock masses (cliff scans and boulders, 20%).
+
+**Rocky walls.** View-placed cliff scans may now stand behind crystals as well as beside them (only a cliff in front of a crystal is refused). They are larger (120-220 m), more of them, and further down the valley.
+
+**The terrain audit (the floating lumps).**
+- Cause: view-placed cliffs stood proud of the slope, so their scans' ragged, open-backed edges silhouetted against the ridge.
+- Every cliff is now support-checked. Its base is buried at its lowest corner (no floating lip), and its top is tucked under the slope uphill of it. It is sunk until both hold, at most 65% of its height, and a cliff that still stands proud is dropped.
+- 15 of 26 view-placed cliffs were dropped.
+- Trade-off: the walls read as continuous land again, with fewer rock faces. Rock texture on the steep terrain (ADR-1642) is the clean route to "rocky cliffs" on the walls themselves.
+
+**Aliasing.**
+- **Was the 5d frame supersampled?** Yes. The log says `render scale 2.00: scene target 3840x2160 -> output 1920x1080`, so 2x alone was not enough for 1-3 px lines.
+- **Edge prisms:** one mesh per formation, widened so a line is never under 1.6 px at its distance (×1.0 to ×2.2, `edges.json`), with the glow divided by the same factor so a widened line is not brighter.
+- **Cracks:** the line's width is the authored width or about 1.5 px (from the `footprint` input), whichever is wider, its edge a smoothstep over that width, and its energy scaled down as it widens. Cracks fade on distant crystals instead of breaking into stairs.
+- **Inclusions (the speckle stars inside the crystals):** removed. They were hard-thresholded hash cells, which cannot be filtered.
+- **Supersample:** `--supersample` is capped at 2 in the engine. The gate and final renders are now 4K at 2x supersample (an effective 4x per axis at 1080p), downsampled to 1080p with Lanczos for the gate.
+
+**Render time:**
+
+| Render | Time |
+|---|---|
+| 4K at 2x supersample (7680x4320 internal), 30 frames | 36.2 s: **1.21 s/frame** |
+| 1080p at 2x | about 0.35 s/frame |
+
+**Checks:** clearance minimum 9 m; layering minimum 51%; terrain sweep at most 15% hidden and 22% buried.
