@@ -14,8 +14,11 @@
 #include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/format.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <vector>
 #include <memory>
 
 using namespace avgen;
@@ -177,4 +180,59 @@ TEST_CASE("The water SSR lever scales the cinematic steps and rays, and turns th
     rendering::WaterUniforms off = u;
     rendering::applyWaterSsrScale(off, 0.0f);
     CHECK(off.cineA.x == 0.0f);
+}
+
+// Hidden ([.]): the small-fixture cost of the refraction phase at 1080p with unquantised timestamps (ADR-1600). Run it
+// by name; it measures and WARNs, asserting only that it measured.
+TEST_CASE("Refraction phase cost on a small fixture (measure)", "[.][gpu][refraction][measure][adr1603]") {
+    Rig rig;
+    if (!rig.renderer.timeline().available()) {
+        SKIP("timestamp queries unavailable");
+    }
+    const auto measure = [&](const scene::Scene& s, bool refraction) {
+        std::vector<double> gpu, sceneMs;
+        rendering::QualitySettings q = rig.renderer.qualitySettings();
+        q.refraction = refraction;
+        rig.renderer.setQualitySettings(q);
+        for (int i = 0; i < 140; ++i) {
+            FrameTime t{};
+            t.renderTime = i / 30.0;
+            REQUIRE(rig.renderer.renderFrame(s, t, 1920, 1080).has_value());
+            if (i >= 20) {
+                gpu.push_back(rig.renderer.stats().gpuFrameMs);
+                sceneMs.push_back(rig.renderer.timeline().msFor("scene"));
+            }
+        }
+        std::sort(gpu.begin(), gpu.end());
+        std::sort(sceneMs.begin(), sceneMs.end());
+        return std::pair{gpu[gpu.size() / 2], sceneMs[sceneMs.size() / 2]};
+    };
+    // the crystal enlarged to cover about a third of the frame
+    scene::Scene s = crystalScene(true);
+    s.procedurals[1].source.radius = 2.5f;
+    s.procedurals[1].meshHash = 13;
+    s.procedurals[1].material.refraction.absorption = {0.4f, 0.8f, 0.2f};
+    s.procedurals[1].material.refraction.opacity = 0.25f;
+    static_cast<void>(measure(s, true)); // the clocks up and the pipelines built
+    std::vector<double> gpuOff, gpuOn, sceneOff, sceneOn;
+    for (int rep = 0; rep < 4; ++rep) { // interleaved, so a clock drift lands on both arms
+        const auto a = measure(s, false);
+        const auto b = measure(s, true);
+        gpuOff.push_back(a.first);
+        sceneOff.push_back(a.second);
+        gpuOn.push_back(b.first);
+        sceneOn.push_back(b.second);
+    }
+    const auto list = [](const std::vector<double>& v) {
+        std::string out;
+        for (const double x : v) {
+            out += fmt::format(" {:.2f}", x);
+        }
+        return out;
+    };
+    WARN("1080p, a crystal over about a third of the frame, 4 interleaved reps of 120 frames (medians, ms): GPU off"
+         << list(gpuOff) << " | on" << list(gpuOn) << "; the scene label off" << list(sceneOff) << " | on"
+         << list(sceneOn));
+    const auto on = std::pair{gpuOn[0], sceneOn[0]};
+    CHECK(on.first > 0.0);
 }
