@@ -104,17 +104,16 @@ R0 = dict(LOOKS[LOOK][1])
 
 
 def crystal_program():
-    """Phase 3 (spec 5.2): one crystal material, its colours from the aurora roles. Layers, all into the emission:
-      - facet structure: a per-facet random (quantised normal) varies the environment and the interior's brightness,
-        so each face reads on its own (the heroes' thin film adds a view-dependent sheen on top);
-      - environment: the aurora colour a facet would see -- up-facing facets the high (violet/pink) part, side-facing
-        the low (green) part, shuffled per facet -- weighted by Fresnel (reflection) with a floor (scatter);
-      - interior with depth: a base-to-tip OKLab gradient shifted by the view angle and the facet (a parallax-like
-        read of colour inside the stone), seen where the facet faces the camera;
-      - fractures: object-space Voronoi cell edges, thin, only where a slow noise selects them, in the look's pale fracture
-        colour (embedded: they move with the crystal and are absent on most of it);
-      - inclusions: rare hashed cells inside the stone that light up in the environment colour.
-    The body (baseColor) stays near-black: the contrast between dark facets and lit ones is the point (5.2)."""
+    """Phase 3, reworked in 3c against the reference: facets fall into three classes by a per-facet random (the
+    quantised normal), so neighbouring faces differ strongly in value and colour:
+      - DARK facets (about a third): near-black, the interior at 5%;
+      - MIRROR facets (about a quarter): a strong reflection of the aurora colour they face and a low roughness, so the
+        lights give sharp highlights; little interior;
+      - NEBULA facets (the rest): the interior -- a steep, high-contrast object-space noise through a navy, pink, blue,
+        cyan OKLab ramp, so it breaks into vivid patches rather than an even wash; shifted by the view for depth.
+    Over all of them: the environment's Fresnel rim, a network of thin bright fractures (object-space Voronoi
+    edges, branching across facets, in runs over about half the stone) and rare inclusions. Colours from the aurora palette roles.
+    The glowing edges are geometry (build_edges); the body (baseColor) is near-black."""
     p = Prog("au_crystal", 1.0)
     p.op("input", 0, input="normal")
     p.op("input", 1, input="viewDirection")
@@ -126,47 +125,46 @@ def crystal_program():
     p.op("add", 4, a=4, b=5)
     p.op("oklabRamp", 4, a=4, label="env", k=c4(R0["auroraLow"]), k2=c4(R0["auroraMid"]),
          k3=c4(R0["aurora2Low"]), k4=c4(R0["auroraTop"]))                     # r4: the environment colour
-    p.op("remap", 5, a=2, k=[0, 1, 0.12, 1.0])
-    p.op("multiply", 5, a=5, b=4)
-    p.op("constant", 6, label="envGain", k=[0.35, 0.35, 0.35, 1])
-    p.op("multiply", 5, a=5, b=6)                                             # r5: the emission so far
-    p.op("input", 6, input="localPosition")
-    p.op("gradient", 6, a=6, k=[0, 1, 0, 0], f=0.008)                         # base to tip (gentle: the clouds lead)
-    p.op("remap", 7, a=2, k=[0, 1, 0, 0.4])
-    p.op("add", 6, a=6, b=7)                                                  # the view shifts it: depth
-    p.op("input", 7, input="localPosition")                                    # a cloudy, nebula-like interior
+    p.op("smoothstep", 6, a=3, k=[0.72, 0.8, 0, 0])                          # r6: the mirror facets
+    p.op("remap", 7, a=2, k=[0, 1, 0.03, 0.3])                                # Fresnel rim everywhere
+    p.op("remap", 5, a=6, k=[0, 1, 0, 0.9])                                   # + the mirrors' full reflection
+    p.op("add", 7, a=7, b=5)
+    p.op("multiply", 5, a=4, b=7)                                             # r5: the emission so far
+    p.op("input", 7, input="localPosition")                                    # the nebula interior
     p.op("noise", 7, a=7, f=0.07, seed=29)
-    p.op("remap", 7, a=7, k=[0, 1, -0.2, 1.1])
-    p.op("add", 6, a=6, b=7)
-    # 17 (offline): the reference's interior -- a dark navy stone with saturated pink and blue clouds through all of it
-    # (navy, pink, navy, blue: the noise bands them; no fade to a pale tip)
-    p.op("oklabRamp", 6, a=6, label="interior", k=c4(R0["crystalDeep"]), k2=c4(R0["crystalBody"]),
-         k3=c4(R0["crystalDeep"]), k4=c4(R0["crystalBlue"]))
-    p.op("remap", 7, a=2, k=[0, 1, 1, 0.25], f=1.0)                           # seen where the facet faces us
-    p.op("multiply", 6, a=6, b=7)
-    p.op("remap", 7, a=3, k=[0, 1, 0.4, 1.5])                                 # each facet its own brightness
-    p.op("multiply", 6, a=6, b=7)
-    p.op("constant", 7, label="interiorGain", k=[1.6, 1.6, 1.6, 1])
-    p.op("multiply", 6, a=6, b=7)
-    p.op("add", 5, a=5, b=6)
-    p.op("input", 6, input="localPosition")                                    # fractures
-    p.op("voronoiEdge", 7, a=6, f=0.09, seed=13)
-    p.op("swizzle", 7, a=7, k=[0, 0, 0, 0])            # F2 - F1 into every channel (the others tinted it red)
-    p.op("smoothstep", 7, a=7, k=[0.0, 0.018, 0, 0])
-    p.op("remap", 7, a=7, k=[0, 1, 1, 0], f=1.0)
-    p.op("noise", 6, a=6, f=0.05, seed=17)
-    p.op("smoothstep", 6, a=6, k=[0.5, 0.62, 0, 0])      # cracks on about a third of the stone
-    p.op("multiply", 7, a=7, b=6)
-    p.op("constant", 6, label="fracture", k=c4([c * 1.1 for c in R0["crystalFracture"]]))
-    p.op("multiply", 7, a=7, b=6)
+    p.op("remap", 7, a=7, k=[0, 1, -0.9, 1.9])                                # steep: patches, not a wash
+    p.op("remap", 1, a=2, k=[0, 1, 0, 0.35])                                  # the view shifts it: depth
+    p.op("add", 7, a=7, b=1)
+    p.op("oklabRamp", 7, a=7, label="interior", k=c4(R0["crystalDeep"]), k2=c4(R0["crystalBody"]),
+         k3=c4(R0["crystalBlue"]), k4=c4(R0["auroraMid"]))
+    p.op("remap", 1, a=2, k=[0, 1, 1, 0.25], f=1.0)                           # seen where the facet faces us
+    p.op("multiply", 7, a=7, b=1)
+    p.op("smoothstep", 1, a=3, k=[0.26, 0.34, 0, 0])                          # the dark facets: 5%
+    p.op("remap", 1, a=1, k=[0, 1, 0.05, 1.0])
+    p.op("multiply", 7, a=7, b=1)
+    p.op("remap", 1, a=6, k=[0, 1, 1, 0.2], f=1.0)                            # the mirrors: little interior
+    p.op("multiply", 7, a=7, b=1)
+    p.op("constant", 1, label="interiorGain", k=[1.8, 1.8, 1.8, 1])
+    p.op("multiply", 7, a=7, b=1)
     p.op("add", 5, a=5, b=7)
-    p.op("input", 6, input="localPosition")                                    # inclusions
-    p.op("quantize", 6, a=6, f=7.0, seed=21)
-    p.op("swizzle", 6, a=6, k=[3, 3, 3, 3])
-    p.op("smoothstep", 6, a=6, k=[0.988, 0.996, 0, 0])
-    p.op("multiply", 6, a=6, b=4)
-    p.op("remap", 6, a=6, k=[0, 1, 0, 3.0])
-    p.op("add", 5, a=5, b=6)
+    p.op("input", 7, input="localPosition")                                    # fractures: dense, thin, branching
+    p.op("voronoiEdge", 1, a=7, f=0.16, seed=13)
+    p.op("swizzle", 1, a=1, k=[0, 0, 0, 0])            # F2 - F1 into every channel (the others tinted it red)
+    p.op("smoothstep", 1, a=1, k=[0.0, 0.012, 0, 0])
+    p.op("remap", 1, a=1, k=[0, 1, 1, 0], f=1.0)
+    p.op("noise", 7, a=7, f=0.05, seed=17)
+    p.op("smoothstep", 7, a=7, k=[0.46, 0.54, 0, 0])                         # in runs over about half the stone
+    p.op("multiply", 1, a=1, b=7)
+    p.op("constant", 7, label="fracture", k=c4([c * 1.4 for c in R0["crystalFracture"]]))
+    p.op("multiply", 1, a=1, b=7)
+    p.op("add", 5, a=5, b=1)
+    p.op("input", 7, input="localPosition")                                    # inclusions
+    p.op("quantize", 7, a=7, f=7.0, seed=21)
+    p.op("swizzle", 7, a=7, k=[3, 3, 3, 3])
+    p.op("smoothstep", 7, a=7, k=[0.988, 0.996, 0, 0])
+    p.op("multiply", 7, a=7, b=4)
+    p.op("add", 5, a=5, b=7)
+    p.op("remap", 6, a=6, k=[0, 1, 0.3, 0.025], f=1.0)                        # roughness: the mirrors glossy
     assert len(p.ops) <= 48, len(p.ops)
     return p
 
@@ -209,12 +207,11 @@ def palette_json():
          {"role": "auroraTop", "target": P.path("env", "constant4")},
          {"role": "crystalDeep", "target": P.path("interior", "constant")},
          {"role": "crystalBody", "target": P.path("interior", "constant2")},
-         {"role": "crystalDeep", "target": P.path("interior", "constant3")},
-         {"role": "crystalBlue", "target": P.path("interior", "constant4")},
-         {"role": "crystalFracture", "target": P.path("fracture"), "gain": 1.1}]
-    for f in L.FORMATIONS:   # the facet edges: bright ones in the low aurora colour, dim ones in the mid
+         {"role": "crystalBlue", "target": P.path("interior", "constant3")},
+         {"role": "auroraMid", "target": P.path("interior", "constant4")},
+         {"role": "crystalFracture", "target": P.path("fracture"), "gain": 1.4}]
+    for f in L.FORMATIONS:   # the glowing edges, in the low aurora colour
         b.append({"role": "auroraLow", "target": "procedural/edgeA_%s/material/emissiveColor" % f[0]})
-        b.append({"role": "auroraMid", "target": "procedural/edgeB_%s/material/emissiveColor" % f[0]})
     states = [{"name": n, "colors": {r: roles[r] for r in ROLES}} for n, roles in LOOKS]
     return {"states": states, "bindings": b, "selector": {"select": LOOK, "transition": 6.0, "lock": False}}
 
@@ -270,7 +267,7 @@ def scene_json(placed, scans):
         s = f[4]
         pt = [round(c, 3) for c in pos] + [round(c, 6) for c in q] + [s, s, s]
         nodes.append(mesh_node("xtal_" + f[0], f[5] + ".glb", [pt], xmat(f[0])))
-        for key, k in (("edgeA", 2.2), ("edgeB", 0.35)):   # phase 3: the glowing facet edges (aurora roles)
+        for key, k in (("edgeA", 2.6),):   # the glowing edges: silhouettes and a few ridges (3c), aurora role
             nodes.append(mesh_node("%s_%s" % (key, f[0]), "%s_%s.glb" % (f[5], key), [pt],
                                    {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": k,
                                     "roughness": 1.0, "metallic": 0.0}, shadow=False))
@@ -318,7 +315,7 @@ def scene_json(placed, scans):
             aurora("auroraMain", R0["auroraLow"], R0["auroraMid"], R0["auroraTop"], 750.0, 320.0, 3000.0, 2.0, 2.6, 72.0, 0.02, 5.0),
             aurora("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 650.0, 1350.0, 3400.0, 2.0, 2.0, 50.0,
                    0.015, 3.5)],
-        "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=-1)],
+        "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=6)],
         "nodes": nodes,
     }
 

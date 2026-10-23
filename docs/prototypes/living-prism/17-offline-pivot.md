@@ -106,3 +106,33 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase3b/`
 - Dispersion, and crystal seen through crystal: engine changes (above).
 - The reference's crack network is denser and sharper.
 - The rock, aurora, river and circuits are the next phases at offline quality.
+
+## Phase 3c: the crystal pass against the reference (2026-10-23)
+
+The owner approved the plan. Dispersion goes to the engineering agent (an ADR-1603 extension); crystal-through-crystal refraction comes later.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase3c/`
+
+| File | Shows |
+|---|---|
+| `phase3c-hero-vs-reference.jpg` | the reference's crystals beside the heroes |
+| `phase3b-vs-3c-heroes.jpg` | 3b against 3c, same crops |
+| `phase3c-mid-vs-reference.jpg` | the mid groups beside the reference's mid crystals |
+| `phase3c-frame.jpg`, `phase3c-frame-rose.jpg` | the full frame in both looks |
+
+1. **Selective edges.** Prisms now run only along the silhouette edges as the camera sees each formation (one face toward it, the other away) and about 15% of the other ridges. Each is tapered toward its ends, so its strength varies along its length. The dim set is gone: every other facet boundary reads by value contrast alone.
+2. **Facet contrast.** A per-facet random sorts the faces into three classes:
+   - **Dark** (about a third): near-black, the interior at 5%.
+   - **Mirror** (about a quarter): the aurora colour they face, reflected at full strength; roughness 0.025, so the lights give sharp highlights; little interior.
+   - **Nebula** (the rest): a steep, high-contrast object-space noise through a navy, pink, blue and teal OKLab ramp, so the interior breaks into vivid patches instead of an even lilac wash.
+
+   The program also writes roughness now. It is 48 ops.
+3. **Cracks.** Object-space Voronoi edges at twice the frequency, thinner, branching across facets, in runs over about half the stone. Over most of the stone they read as a honeycomb net, so they are kept partial.
+4. **Shapes.**
+   - The hexagon's corners are jittered well off regular (±0.22 of a sixth of a turn), so the faces differ in width; the radii vary 0.8-1.12.
+   - The cross-section is sometimes tabular.
+   - Tips are 30-45% of the length (was 18-30%), with a narrower second stage: long, sharp blades.
+
+**Offline render:** 1080p, 2x supersample, `--tier offline`: 30 frames in 8.5 s, **0.28 s/frame**.
+
+**Checks:** clearance minimum 9 m (L5); terrain sweep at most 15% hidden and 22% buried (R5).

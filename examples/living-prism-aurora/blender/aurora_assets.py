@@ -41,13 +41,14 @@ def basis(axis):
 def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, chisel=None, embed=0.12, broken=False):
     """One crystal shard into bm. width: its cross-section's larger radius; flat: thickness / width."""
     sides = sides or 6                                      # phase 2c: hexagonal columns, always
-    flat = flat if flat is not None else rng.uniform(0.82, 0.98)   # nearly round: a column, never a slab
-    tip = tip if tip is not None else rng.uniform(0.18, 0.3) * length
+    flat = flat if flat is not None else rng.uniform(0.7, 0.95)    # 3c: some tabular, never a slab
+    tip = tip if tip is not None else rng.uniform(0.3, 0.45) * length  # 3c: long, sharp blade tips
     chisel = False if chisel is None else chisel   # pointed terminations only (a chisel read as a wedge)
     u, v, a = basis(axis)
     spin = rng.uniform(0, math.tau)
-    angles = sorted(spin + math.tau * (i + rng.uniform(-0.08, 0.08)) / sides for i in range(sides))
-    rs = [width * rng.uniform(0.88, 1.08) for _ in range(sides)]
+    # 3c: the faces differ in width (corner angles jittered well off the regular hexagon), the radii too
+    angles = sorted(spin + math.tau * (i + rng.uniform(-0.22, 0.22)) / sides for i in range(sides))
+    rs = [width * rng.uniform(0.8, 1.12) for _ in range(sides)]
     base = Vector(base)
 
     def ring(c, sc):
@@ -95,12 +96,12 @@ def shard_body(bm, base, a, u, v, width, length, tip, flat, angles, rs, rng, emb
         return out
     kink = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.07
     chips = set(rng.sample(range(len(angles)), rng.choice([0, 1, 1, 2])))
-    off = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.25
+    off = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.15
     lifts = [rng.uniform(-0.12, 0.12) * tip for _ in angles]
     rings = [ring(base - a * (embed * length), 1.0),
              ring(base + a * (length * rng.uniform(0.42, 0.6)) + kink, rng.uniform(0.96, 1.03)),
              ring(base + a * (length - tip), rng.uniform(0.88, 0.97), chips=chips),
-             ring(base + a * (length - tip * 0.42) + off * 0.55, rng.uniform(0.4, 0.52), lift=lifts)]
+             ring(base + a * (length - tip * 0.5) + off * 0.4, rng.uniform(0.3, 0.42), lift=lifts)]
     for r0, r1 in zip(rings, rings[1:]):
         for i in range(n):
             j = (i + 1) % n
@@ -173,12 +174,13 @@ def family_view(name):
     return None
 
 
-def build_edges(bm, name, out, rng, rr=0.105, sharp=18.0):
-    """Phase 3 (spec 5.2, glowing edges): thin triangular prisms along every sharp facet edge (dihedral > `sharp`
-    degrees), lifted just proud of the surface. About 40% go to <name>_edgeA (bright), the rest to <name>_edgeB
-    (dim), so the outlines are selective rather than a uniform wireframe. Geometry, not a shader: the renderer has
-    no per-pixel edge distance, and at the fixed camera a 0.21 m prism x the formation's scale is 1-3 px."""
-    sets = {"edgeA": bmesh.new(), "edgeB": bmesh.new()}
+def build_edges(bm, name, out, rng, rr=0.11, sharp=18.0, ridges=0.15):
+    """Phase 3 (spec 5.2, glowing edges), 3c selective: thin prisms along the SILHOUETTE edges as the camera sees the
+    formation (one face toward the camera, the other away) and about 15% of the other sharp ridges, each tapered toward
+    its ends (thinnest a third of the middle) so its strength varies along its length. Every other facet boundary
+    reads by value contrast alone. Written to <name>_edgeA.glb. Geometry, not a shader: the renderer has no per-pixel
+    edge distance."""
+    tb = bmesh.new()
     ci = bm.verts.layers.int.get("ci")
     view = family_view(name)
     for e in bm.edges:
@@ -187,47 +189,49 @@ def build_edges(bm, name, out, rng, rr=0.105, sharp=18.0):
         n0, n1 = e.link_faces[0].normal, e.link_faces[1].normal
         if n0.length == 0 or n1.length == 0 or math.degrees(n0.angle(n1)) < sharp:
             continue
-        # one line per chamfered corner: of a corner's two vertical edges (ring places 2k+1, 2k+2), keep the first
         k0, k1 = (e.verts[0][ci], e.verts[1][ci]) if ci is not None else (0, 0)
         if k0 and k0 == k1 and k0 % 2 == 0:
             continue
-        # only edges the camera can see: a back edge shows through a refracting hero as wireframe
-        if view is not None and n0.dot(view) < 0.02 and n1.dot(view) < 0.02:
-            continue
+        if view is not None:
+            d0, d1 = n0.dot(view), n1.dot(view)
+            if d0 < 0.02 and d1 < 0.02:
+                continue
+            silhouette = (d0 > 0.02) != (d1 > 0.02)
+            if not silhouette and rng.random() > ridges:
+                continue
         a, b = e.verts[0].co.copy(), e.verts[1].co.copy()
         d = b - a
         if d.length < 1e-4:
             continue
-        lift = (n0 + n1).normalized() * rr * 1.0
+        lift = (n0 + n1).normalized() * rr
         ref = Vector((0, 0, 1)) if abs(d.normalized().z) < 0.9 else Vector((1, 0, 0))
         p = d.cross(ref).normalized()
         q = d.normalized().cross(p)
-        tb = sets["edgeA" if rng.random() < 0.4 else "edgeB"]
-        ra, rb = [], []
-        for k in range(3):
-            t = math.tau * k / 3
-            o = (p * math.cos(t) + q * math.sin(t)) * rr
-            ra.append(tb.verts.new(a + lift + o))
-            rb.append(tb.verts.new(b + lift + o))
-        for k in range(3):
-            j = (k + 1) % 3
-            tb.faces.new((ra[k], ra[j], rb[j], rb[k]))
-    for key, tb in sets.items():
-        bmesh.ops.recalc_face_normals(tb, faces=tb.faces)
-        me = bpy.data.meshes.new(name + "_" + key)
-        tb.to_mesh(me)
-        tb.free()
-        ob = bpy.data.objects.new(name + "_" + key, me)
-        bpy.context.scene.collection.objects.link(ob)
-        for o in bpy.context.selected_objects:
-            o.select_set(False)
-        ob.select_set(True)
-        bpy.context.view_layer.objects.active = ob
-        bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + "_" + key + ".glb"), export_format="GLB",
-                                  use_selection=True, export_yup=True, export_apply=True, export_normals=True,
-                                  export_materials="NONE")
-        ob.hide_render = True
-        print("EXPORTED", name + "_" + key, len(me.polygons), "faces")
+        prof = [0.3, 1.0, 1.0, 0.3]                      # tapered: thin, full, full, thin
+        rings = []
+        for k, sc in enumerate(prof):
+            c = a + d * (k / (len(prof) - 1)) + lift
+            rings.append([tb.verts.new(c + (p * math.cos(math.tau * j / 3) + q * math.sin(math.tau * j / 3)) * rr * sc)
+                          for j in range(3)])
+        for r0, r1 in zip(rings, rings[1:]):
+            for j in range(3):
+                jj = (j + 1) % 3
+                tb.faces.new((r0[j], r0[jj], r1[jj], r1[j]))
+    bmesh.ops.recalc_face_normals(tb, faces=tb.faces)
+    me = bpy.data.meshes.new(name + "_edgeA")
+    tb.to_mesh(me)
+    tb.free()
+    ob = bpy.data.objects.new(name + "_edgeA", me)
+    bpy.context.scene.collection.objects.link(ob)
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + "_edgeA.glb"), export_format="GLB",
+                              use_selection=True, export_yup=True, export_apply=True, export_normals=True,
+                              export_materials="NONE")
+    ob.hide_render = True
+    print("EXPORTED", name + "_edgeA", len(me.polygons), "faces")
 
 
 def build_family(name, out):
