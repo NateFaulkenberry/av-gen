@@ -49,9 +49,9 @@ DESIGN = {
         ["melodic", "response.note", "the bay at the pitch's place flares (low notes near the "
          "door, high notes near the apse)"],
         ["bass", "response.bass", "the structure sways (an SDF warp) and the lines thicken"],
-        ["kick", "response.kick", "the image breaks for a moment: it splits along the nave, a shock runs from the rose"],
-        ["snare", "response.snare", "frame corruption: mosh blocks and a magenta channel shift"],
-        ["hat", "response.hat", "data motes flicker"],
+        ["kick", "signal.kick", "the image breaks for a moment: it splits along the nave, a shock runs from the rose"],
+        ["snare", "signal.snare", "frame corruption: mosh blocks and a magenta channel shift"],
+        ["hat", "signal.hat", "data motes flicker"],
         ["phrase", "notes.phrase", "a scan sweep crosses the frame and rebuilds it"],
         ["velocity", "notes.lastVelocity", "how hard a note flares its bay"],
         ["density", "notes.density", "fragmentation: more, smaller mosh blocks"],

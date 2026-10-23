@@ -141,6 +141,127 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kickEnv",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      }
+     },
+     {
+      "source": "beat.pulse",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      },
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -585,7 +706,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "material/abZooid/op/14/constant/constant",
    "amount": 2.5,
    "op": "add",
@@ -796,7 +917,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "post/shock/amount",
    "amount": 26.0,
    "op": "add",
@@ -807,7 +928,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "post/shock/radius",
    "amount": -1.1,
    "op": "replace",
@@ -819,7 +940,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "particles/glints/burst",
    "amount": 30.0,
    "op": "add",
@@ -1001,17 +1122,17 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "a pressure wave ripples the water"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "a flare through the colony"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "marine snow glints"
    ],
    [

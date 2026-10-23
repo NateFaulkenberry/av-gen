@@ -132,7 +132,122 @@
   "temporal/mosh/enabled": false,
   "post/tonemap/operator": 4
  },
- "sources": [],
+ "sources": [
+  {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  }
+ ],
  "routes": [
   {
    "source": "response.bass",
@@ -174,7 +289,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "post/radial/amount",
    "amount": 0.1,
    "op": "add",
@@ -185,7 +300,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "camera/lens/focalLength",
    "amount": 10.0,
    "op": "add",
@@ -196,7 +311,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "lights/end/intensity",
    "amount": 30000.0,
    "op": "add",
@@ -207,7 +322,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/endLight/material/emissive",
    "amount": 50.0,
    "op": "add",
@@ -218,7 +333,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "material/cgSpace/op/6/hueShift/value",
    "amount": 1.1,
    "op": "add",
@@ -252,7 +367,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "sdf/corridor/look/edge/intensity",
    "amount": 1.2,
    "op": "add",
@@ -685,12 +800,12 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "a zoom punch toward the light; the light flares"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "the whole colour sequence jumps a step round the wheel and stays there"
    ],
    [

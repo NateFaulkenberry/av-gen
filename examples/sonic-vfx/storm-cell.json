@@ -139,6 +139,120 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -736,7 +850,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "lights/thunder/intensity",
    "amount": 3000000.0,
    "op": "add",
@@ -747,7 +861,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/wheat/deform/1/amount",
    "amount": 0.35,
    "op": "add",
@@ -758,7 +872,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/wheat/deform/2/amount",
    "amount": 0.12,
    "op": "add",
@@ -769,7 +883,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "post/lens/chromaticAberration",
    "amount": 0.01,
    "op": "add",
@@ -780,7 +894,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "lights/slot/intensity",
    "amount": 6.0,
    "op": "add",
@@ -791,7 +905,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/rain/emissive",
    "amount": 4.0,
    "op": "add",
@@ -802,7 +916,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "camera/exposure/compensation",
    "amount": 0.6,
    "op": "add",
@@ -813,7 +927,7 @@
    }
   },
   {
-   "source": "response.hatRate",
+   "source": "response.onsetRate",
    "target": "particles/rain/spawnRate",
    "amount": 5000.0,
    "op": "add",
@@ -824,7 +938,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "particles/rain/burst",
    "amount": 900.0,
    "op": "add",
@@ -835,7 +949,7 @@
    }
   },
   {
-   "source": "response.hatRate",
+   "source": "response.onsetRate",
    "target": "particles/rain/stretch",
    "amount": 0.8,
    "op": "add",
@@ -1189,17 +1303,17 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "thunder: the cloud flashes from within, a gust bends the field, the camera nudges"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "a lightning strike under the cloud that lights the whole prairie and the rain"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "rain: its density and streak length"
    ],
    [
@@ -1424,7 +1538,7 @@
    },
    "trigger": {
     "source": "signal",
-    "name": "response.snare",
+    "name": "signal.snare",
     "threshold": 0.25
    }
   }

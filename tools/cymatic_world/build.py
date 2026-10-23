@@ -1358,7 +1358,7 @@ def build_world():
             R("sonic.roughness.slow", F + "source/3/amplitude", 0.45, attackMs=1500, decayMs=3000),
             R("response.bass", D(1), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
             R("response.sustain", D(2), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
-            R("response.hat", ("field/%s/resonance/source/1/amplitude" % FIELD_FINE) if MERGE_FINE else D(3), 1.0,
+            R("signal.hat", ("field/%s/resonance/source/1/amplitude" % FIELD_FINE) if MERGE_FINE else D(3), 1.0,
               op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))

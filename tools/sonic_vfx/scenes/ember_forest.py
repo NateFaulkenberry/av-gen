@@ -64,10 +64,10 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "how many embers and how bright"],
         ["bass", "response.bass", "the wind breathes on the coals: the beds and the log glow up, embers stream "
          "off downwind, the smoke stirs"],
-        ["kick", "response.kick", "a snag cracks: a throw of sparks from the base of the near snag and its cracks "
+        ["kick", "signal.kick", "a snag cracks: a throw of sparks from the base of the near snag and its cracks "
          "flash"],
-        ["snare", "response.snare", "a tree torches: flame bursts up a midground trunk and lights the smoke"],
-        ["hat", "response.hat", "glints off the coal"],
+        ["snare", "signal.snare", "a tree torches: flame bursts up a midground trunk and lights the smoke"],
+        ["hat", "signal.hat", "glints off the coal"],
         ["sustained", "response.sustain", "the fire front on the ridge grows and its glow climbs the sky"],
         ["silence", "(no input)", "a still, smoking forest under a cold sky; the coals breathe faintly; ash falls"],
     ],

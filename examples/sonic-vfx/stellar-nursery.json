@@ -184,6 +184,63 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kickEnv",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      }
+     },
+     {
+      "source": "beat.pulse",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      },
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -826,7 +883,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "post/shock/amount",
    "amount": 40.0,
    "op": "add",
@@ -837,7 +894,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "post/shock/radius",
    "amount": -1.6,
    "op": "replace",
@@ -849,7 +906,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "fx/stars/twinkle",
    "amount": 1.5,
    "op": "add",
@@ -1029,12 +1086,12 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "a shock front through the gas"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "the starfield twinkles"
    ],
    [

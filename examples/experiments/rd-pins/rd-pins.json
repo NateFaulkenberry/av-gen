@@ -134,6 +134,22 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -168,7 +184,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "material/rdPins/op/10/constant/constant",
    "amount": 1.0,
    "op": "multiply",

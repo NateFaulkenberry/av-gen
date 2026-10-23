@@ -91,9 +91,9 @@ DESIGN = {
         ["high mids", "audio.highMid", "the distant range lights"],
         ["highs", "audio.treble", "glints scatter on the water; the sun's glow brightens"],
         ["level", "response.level", "AUDIO TOPOGRAPHY: the waves rolling out through the mountains grow taller"],
-        ["kick", "response.kick", "the low sun flares across every facet that faces it; rings of light land on the "
+        ["kick", "signal.kick", "the low sun flares across every facet that faces it; rings of light land on the "
          "water"],
-        ["snare", "response.snare", "a flash along the horizon"],
+        ["snare", "signal.snare", "a flash along the horizon"],
         ["brightness", "sonic.brightness.slow", "the whole palette drifts warmer or cooler"],
         ["intensity", "response.intensity", "STRUCTURE: the ranges rise as the piece builds"],
         ["pitch class", "notes.class.0", "twelve lanterns round the shore, one per pitch class, with their reflections"],

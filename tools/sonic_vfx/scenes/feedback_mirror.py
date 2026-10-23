@@ -64,9 +64,9 @@ DESIGN = {
         ["interval", "notes.interval", "a rising step twists the corridor one way, a falling one the other"],
         ["sustained", "response.sustain", "the echoes last longer: the corridor reaches further"],
         ["bass", "response.bass", "the corridor deepens and twists: each screen falls further in, turned further"],
-        ["kick", "response.kick", "a zoom punch: the corridor jumps inward; the bezel and the core flash"],
-        ["snare", "response.snare", "an RGB split across the frame"],
-        ["hat", "response.hat", "grain and a flicker in the scanlines"],
+        ["kick", "signal.kick", "a zoom punch: the corridor jumps inward; the bezel and the core flash"],
+        ["snare", "signal.snare", "an RGB split across the frame"],
+        ["hat", "signal.hat", "grain and a flicker in the scanlines"],
         ["chord", "notes.polyphony", "the hue step: a chord colours the corridor faster round the circle, "
          "dissonance further"],
         ["brightness", "sonic.brightness", "a bright timbre also walks the corridor's colour further round"],

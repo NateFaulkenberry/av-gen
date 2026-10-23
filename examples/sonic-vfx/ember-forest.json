@@ -138,6 +138,120 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -290,7 +404,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "particles/crack/burst",
    "amount": 30.0,
    "op": "add",
@@ -301,7 +415,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "material/efBark/op/12/constant/constant",
    "amount": 3.0,
    "op": "add",
@@ -313,7 +427,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "material/efBark/op/12/constant/constant",
    "amount": 1.0546,
    "op": "add",
@@ -325,7 +439,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "material/efBark/op/12/constant/constant",
    "amount": 0.1538,
    "op": "add",
@@ -337,7 +451,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/torch/burst",
    "amount": 90.0,
    "op": "add",
@@ -348,7 +462,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "lights/torchLight/intensity",
    "amount": 900.0,
    "op": "add",
@@ -359,7 +473,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "particles/glints/burst",
    "amount": 30.0,
    "op": "add",
@@ -403,7 +517,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "post/lens/chromaticAberration",
    "amount": 0.006,
    "op": "add",
@@ -565,17 +679,17 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "a snag cracks: a throw of sparks from the base of the near snag and its cracks flash"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "a tree torches: flame bursts up a midground trunk and lights the smoke"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "glints off the coal"
    ],
    [

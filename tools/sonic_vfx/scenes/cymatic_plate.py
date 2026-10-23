@@ -53,9 +53,9 @@ DESIGN = {
         ["sustained", "notes.held", "a held note sharpens the figure (the nodal lines narrow); silence scatters the "
          "sand"],
         ["velocity", "response.noteEnv", "the sand flashes and leaps with the note's strength"],
-        ["kick", "response.kick", "the whole bed leaps, scatters and settles back onto its lines"],
-        ["snare", "response.snare", "a burst of sand from the nodes"],
-        ["hat", "response.hat", "granular glitter"],
+        ["kick", "signal.kick", "the whole bed leaps, scatters and settles back onto its lines"],
+        ["snare", "signal.snare", "a burst of sand from the nodes"],
+        ["hat", "signal.hat", "granular glitter"],
         ["bass", "response.bass", "the plate flexes and the sand swells on its lines"],
         ["tension", "notes.tension", "the figure jitters"],
     ],

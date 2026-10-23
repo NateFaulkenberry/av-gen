@@ -32,6 +32,8 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE.parent.parent / "tools"))
+import drum_signals  # noqa: E402  (ADR-1620: the snare as a signal: a drum source's, else the backbeat)
 import cp1  # noqa: E402  (placement helpers: candidates, records, value_noise, basis, quat_from_matrix)
 import grounding  # noqa: E402  (seating on the drawn ground; the camera's corridor)
 import land  # noqa: E402
@@ -686,8 +688,11 @@ def macros():
 # ones times those ratios (1.38, 1.21). The offline project keeps its audio.* routes.
 RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 LIVE_SOURCES = {"audio.energy": "visual.hEnergy", "audio.bass": "visual.hBass", "audio.trebleLevel": "visual.hTreble",
-                "audio.mid": "visual.hMid", "audio.onsetMid": "response.snare"}
-LIVE_HIT_SCALE = {"audio.onsetMid": 0.78}   # a response snare's mean strength is 0.95 to the onset's 0.745
+                "audio.mid": "visual.hMid"}
+# ADR-1620: the mix has no snare (ADR-898's band onsets left the bus, the response model's snare comes only from a
+# drum source). Both projects read tools/drum_signals.py's `signal.snare` -- a drums source's snare, else the beat
+# clock's backbeat -- at the old live amount (the onset's x 0.78: a response snare's mean strength was 0.95 to the
+# onset's 0.745, and the drum signal keeps the response scale).
 
 
 def heard(name, band, level, gain):
@@ -709,7 +714,6 @@ def respond(route):
     if route.get("amount", 0.0) == 0.0 or src not in LIVE_SOURCES:
         return route  # the zero defaults, and everything that does not listen
     route["source"] = LIVE_SOURCES[src]
-    route["amount"] = round(route["amount"] * LIVE_HIT_SCALE.get(src, 1.0), 5)
     return route
 
 
@@ -739,7 +743,7 @@ def routes(length, live=False):
     r.append({"source": "audio.trebleLevel", "target": "particles/spores/spawnRate", "op": "add", "amount": 1600.0,
               "chain": {"attackMs": 80, "decayMs": 900}})
     # the snare throws a burst of the swarm (only where the stage lets the swarm fly at all: it multiplies)
-    r.append({"source": "audio.onsetMid", "target": "particles/swarm/spawnRate", "op": "add", "amount": 6000.0,
+    r.append({"source": "signal.snare", "target": "particles/swarm/spawnRate", "op": "add", "amount": 4680.0,
               "chain": {"envelope": "peakhold", "envelopeHoldMs": 40, "envelopeFallPerSecond": 4.0},
               "depthSource": "macro.energy", "depthMin": 0.0, "depthMax": 1.0})
     # mids breathe the siphonophore chains
@@ -790,6 +794,7 @@ def project(name, audio, length, live=False):
         "states": states(),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/rift.mp4"},
     }
+    p["sources"] = drum_signals.sources(drum_signals.used(p["routes"])) + p["sources"]  # ADR-1620
     if audio:
         p["assets"]["audio"] = {"path": audio}
     if not live:

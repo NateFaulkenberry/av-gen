@@ -153,6 +153,145 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kickEnv",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      }
+     },
+     {
+      "source": "beat.pulse",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      },
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -760,7 +899,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "fx/bh/photonRing",
    "amount": 26.0,
    "op": "add",
@@ -771,7 +910,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "particles/jetUp/burst",
    "amount": 160.0,
    "op": "add",
@@ -782,7 +921,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "particles/jetDown/burst",
    "amount": 160.0,
    "op": "add",
@@ -793,7 +932,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "particles/jetUp/emissive",
    "amount": 2.5,
    "op": "add",
@@ -804,7 +943,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "particles/jetDown/emissive",
    "amount": 2.5,
    "op": "add",
@@ -815,7 +954,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "post/lens/chromaticAberration",
    "amount": 0.06,
    "op": "add",
@@ -826,7 +965,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "post/shock/amount",
    "amount": 34.0,
    "op": "add",
@@ -837,7 +976,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "post/shock/radius",
    "amount": -1.4,
    "op": "replace",
@@ -849,7 +988,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/flare/burst",
    "amount": 260.0,
    "op": "add",
@@ -860,7 +999,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/stream/burst",
    "amount": 900.0,
    "op": "add",
@@ -871,7 +1010,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/streamers/burst",
    "amount": 12.0,
    "op": "add",
@@ -882,7 +1021,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "post/bloom/intensity",
    "amount": 0.22,
    "op": "add",
@@ -893,7 +1032,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "particles/sparks/burst",
    "amount": 45.0,
    "op": "add",
@@ -5715,17 +5854,17 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "the photon ring flashes, the jets fire and a shock ripple races out from the hole"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "a flare erupts from the hot spot on the approaching side, and the star sheds a burst of plasma"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "sparks glint across the disk"
    ],
    [

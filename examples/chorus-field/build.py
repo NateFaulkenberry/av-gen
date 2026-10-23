@@ -13,6 +13,9 @@ import math
 import os
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tools"))
+import drum_signals  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUDIO = "../../assets/audio/trench.wav"
 
@@ -607,10 +610,10 @@ def p5_chorus():
         route("audio.bass", d + "2/amount", 1.0, op="multiply", attackMs=200, decayMs=1500, gain=2.0,
               clampEnabled=True, clampMin=0.2, clampMax=1.4),
         # kick -> a travelling shockwave through the field.
-        route("audio.onsetLow", d + "6/amount", 14.0, op="add", envelope="peakhold", envelopeHoldMs=60,
+        route("signal.kick", d + "6/amount", 14.0, op="add", envelope="peakhold", envelopeHoldMs=60,
               envelopeFallPerSecond=3.0),
         # snare -> tearing: a short burst of curl.
-        route("audio.onsetMid", d + "3/amount", 1.4, op="add", envelope="peakhold", envelopeHoldMs=40,
+        route("signal.snare", d + "3/amount", 1.4, op="add", envelope="peakhold", envelopeHoldMs=40,
               envelopeFallPerSecond=6.0),
         # mid -> coherence (calms the curl).
         route("audio.mid", d + "3/amount", -0.12, op="add", attackMs=100, decayMs=600),
@@ -788,9 +791,9 @@ def p8_god_trench():
               curve="power", curveAmount=4.0, clampEnabled=True, clampMin=0.0, clampMax=1.0),
         route("audio.mid", "field/eyeL/position", -3.0, op="add", component=0, attackMs=1500, decayMs=3000),
         route("audio.mid", "field/eyeR/position", 3.0, op="add", component=0, attackMs=1500, decayMs=3000),
-        route("audio.onsetLow", d + "5/amount", 10.0, op="add", envelope="peakhold", envelopeHoldMs=60,
+        route("signal.kick", d + "5/amount", 10.0, op="add", envelope="peakhold", envelopeHoldMs=60,
               envelopeFallPerSecond=3.0),
-        route("audio.onsetMid", d + "2/amount", 1.2, op="add", envelope="peakhold", envelopeHoldMs=40,
+        route("signal.snare", d + "2/amount", 1.2, op="add", envelope="peakhold", envelopeHoldMs=40,
               envelopeFallPerSecond=6.0),
         # ---- the camera: phrase-scale, sprung, no shake, driven by the same normalised bass ----
         # G = the normalised bass mapped so it is 0 below 60% of its running peak and 1 at it. A fast copy of G
@@ -866,6 +869,12 @@ def main(argv):
         with open(os.path.join(HERE, base + ".json"), "w") as f:
             pr = project("Chorus Field " + base, base + ".scene.json")
             pr["routes"] += routes
+            # ADR-1620: the kick and snare are tools/drum_signals.py's signals (a drums source's, else the beat
+            # clock's pulse and backbeat); ADR-898's band onsets left the bus
+            drums = drum_signals.sources(drum_signals.used(routes))
+            if drums:
+                pr["sources"] = drums + pr.get("sources", [])
+                pr.setdefault("sonic", {})  # their mix inputs read response.onsetRate
             json.dump(pr, f, indent=1)
         print("wrote", base)
 

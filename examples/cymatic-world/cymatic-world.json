@@ -147,6 +147,157 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kickEnv",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      }
+     },
+     {
+      "source": "beat.pulse",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 160.0
+      },
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snareEnv",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 120.0
+      }
+     },
+     {
+      "source": "beat.pulse",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 120.0
+      },
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hatEnv",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 60.0
+      }
+     },
+     {
+      "source": "response.onset",
+      "chain": {
+       "attackMs": 0.0,
+       "decayMs": 60.0
+      }
+     }
+    ]
+   }
+  },
+  {
    "kind": "lfo",
    "name": "famPlate",
    "settings": {
@@ -374,7 +525,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "field/cymaticFine/resonance/source/1/amplitude",
    "amount": 1.0,
    "op": "multiply",
@@ -482,7 +633,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "material/cwGround/op/26/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
@@ -495,7 +646,7 @@
    }
   },
   {
-   "source": "response.kickEnv",
+   "source": "signal.kickEnv",
    "target": "material/cwGround/op/26/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
@@ -508,7 +659,7 @@
    }
   },
   {
-   "source": "response.snareEnv",
+   "source": "signal.snareEnv",
    "target": "material/cwGround/op/15/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -521,7 +672,7 @@
    }
   },
   {
-   "source": "response.hatEnv",
+   "source": "signal.hatEnv",
    "target": "material/cwGround/op/41/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
@@ -534,7 +685,7 @@
    }
   },
   {
-   "source": "response.hatEnv",
+   "source": "signal.hatEnv",
    "target": "material/cwGround/op/41/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",

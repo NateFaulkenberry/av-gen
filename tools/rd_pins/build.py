@@ -423,13 +423,13 @@ def instrument(s, g):
             A("response.bass", E, 4.5, attackMs=250, decayMs=1200),
             A("response.bass", D + "1/amount", 1.05, attackMs=400, decayMs=2500),
             A("audio.mid", shift, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=120, decayMs=700),
-            A("response.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
-            A("response.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),
+            A("signal.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
+            A("signal.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),
             # density (hats a second, 0..0.65 measured on the test tracks): a busy mix lights the contours, a held
             # note or a breakdown lets them settle
-            A("response.hatRate", hot, 1.0, op="multiply", gain=1.8, offset=0.55, attackMs=600, decayMs=2500),
-            A("response.hatRate", ring, 1.0, op="multiply", gain=1.2, offset=0.7, attackMs=600, decayMs=2500),
-            A("response.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
+            A("response.onsetRate", hot, 1.0, op="multiply", gain=1.8, offset=0.55, attackMs=600, decayMs=2500),
+            A("response.onsetRate", ring, 1.0, op="multiply", gain=1.2, offset=0.7, attackMs=600, decayMs=2500),
+            A("signal.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
     CC = common.CC
     s.route(R("control.pattern", "field/pool/strength", 1.2, **CC),
             R("control.seeding", "field/brush/strength", 3.0, **CC),

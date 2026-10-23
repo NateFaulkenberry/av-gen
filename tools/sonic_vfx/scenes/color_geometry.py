@@ -69,8 +69,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "STRUCTURE: the corridor's spacing breathes like an accordion round the viewer"],
-        ["kick", "response.kick", "a zoom punch toward the light; the light flares"],
-        ["snare", "response.snare", "the whole colour sequence jumps a step round the wheel and stays there"],
+        ["kick", "signal.kick", "a zoom punch toward the light; the light flares"],
+        ["snare", "signal.snare", "the whole colour sequence jumps a step round the wheel and stays there"],
         ["mids", "audio.mid", "the corridor winds its twist"],
         ["highs", "audio.treble", "a fine light traces every edge"],
         ["brightness", "sonic.brightness.slow", "the colour range cools as the sound brightens"],

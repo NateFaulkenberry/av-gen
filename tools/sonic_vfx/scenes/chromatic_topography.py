@@ -82,8 +82,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the river rises up its banks and brightens"],
-        ["kick", "response.kick", "the contour lines flash white across the land; the river surges"],
-        ["snare", "response.snare", "the groves bloom (their colours flare)"],
+        ["kick", "signal.kick", "the contour lines flash white across the land; the river surges"],
+        ["snare", "signal.snare", "the groves bloom (their colours flare)"],
         ["mids", "audio.mid", "the contour lines flow up the slopes"],
         ["low mids", "audio.lowMid", "the round trees glow"],
         ["highs", "audio.treble", "pollen sparks over the river; the contour lines brighten"],

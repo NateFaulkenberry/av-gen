@@ -138,7 +138,122 @@
   "camera/focus/mode": 0,
   "camera/lens/focusDistance": 2.429
  },
- "sources": [],
+ "sources": [
+  {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  }
+ ],
  "routes": [
   {
    "source": "response.bass",
@@ -307,7 +422,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/bell/source/rotation",
    "amount": -34.0,
    "op": "add",
@@ -321,7 +436,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/bell/distribution/radius",
    "amount": 0.08,
    "op": "add",
@@ -332,7 +447,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "particles/puff/burst",
    "amount": 160.0,
    "op": "add",
@@ -343,7 +458,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "lights/heartLight/intensity",
    "amount": 10.0,
    "op": "add",
@@ -354,7 +469,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/mushSpores/burst",
    "amount": 220.0,
    "op": "add",
@@ -365,7 +480,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "procedural/caps/material/emissive",
    "amount": 2.0,
    "op": "add",
@@ -387,7 +502,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/vineTip0/material/emissive",
    "amount": 6.0,
    "op": "add",
@@ -409,7 +524,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/vineTip1/material/emissive",
    "amount": 6.0,
    "op": "add",
@@ -431,7 +546,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/vineTip2/material/emissive",
    "amount": 6.0,
    "op": "add",
@@ -453,7 +568,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/vineTip3/material/emissive",
    "amount": 6.0,
    "op": "add",
@@ -475,7 +590,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/vineTip4/material/emissive",
    "amount": 6.0,
    "op": "add",
@@ -1070,7 +1185,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/radA/wire/intensity",
    "amount": 4.0,
    "op": "add",
@@ -1103,7 +1218,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/radACore/material/emissive",
    "amount": 10.0,
    "op": "add",
@@ -1114,7 +1229,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/radB/wire/intensity",
    "amount": 4.0,
    "op": "add",
@@ -1147,7 +1262,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/radBCore/material/emissive",
    "amount": 10.0,
    "op": "add",
@@ -1158,7 +1273,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "procedural/radC/wire/intensity",
    "amount": 4.0,
    "op": "add",
@@ -1191,7 +1306,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/radCCore/material/emissive",
    "amount": 10.0,
    "op": "add",
@@ -1542,17 +1657,17 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "the lantern blooms open on a spring; a spore puff from its heart"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "the mushrooms puff spores; their dots flash"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "the vines' tips sparkle; cilia shimmer"
    ],
    [

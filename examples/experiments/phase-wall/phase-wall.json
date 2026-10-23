@@ -136,6 +136,22 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -182,7 +198,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "grid/net/noise",
    "amount": 0.12,
    "op": "add",
@@ -231,7 +247,7 @@
    }
   },
   {
-   "source": "response.hatRate",
+   "source": "response.onsetRate",
    "target": "material/bladeSphere/op/30/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -245,7 +261,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "material/bladeSphere/op/40/constant/constant",
    "amount": 1.0,
    "op": "multiply",

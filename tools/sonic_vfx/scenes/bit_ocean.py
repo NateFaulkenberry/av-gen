@@ -83,9 +83,9 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "every kelp plant bends at once; the brain coral pulses; the sunlight swells"],
-        ["kick", "response.kick", "the coins and gems flash; a ring ripples out through the water"],
-        ["snare", "response.snare", "a swarm of bubbles bursts round you; the fish schools turn and dart"],
-        ["hat", "response.hat", "sparkles glint in the water"],
+        ["kick", "signal.kick", "the coins and gems flash; a ring ripples out through the water"],
+        ["snare", "signal.snare", "a swarm of bubbles bursts round you; the fish schools turn and dart"],
+        ["hat", "signal.hat", "sparkles glint in the water"],
         ["mids", "audio.mid", "the fish swim faster; the bubble streams thicken"],
         ["highs", "audio.treble", "tiny sparkling creatures (sparks) swarm"],
         ["beat", "beat.pulse", "the jellies pump"],

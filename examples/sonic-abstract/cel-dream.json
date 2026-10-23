@@ -145,6 +145,120 @@
  },
  "sources": [
   {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -378,7 +492,7 @@
  ],
  "routes": [
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "nodes/blob1/position",
    "amount": 0.75,
    "op": "add",
@@ -393,7 +507,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "nodes/blob2/position",
    "amount": 0.75,
    "op": "add",
@@ -408,7 +522,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "nodes/blob3/position",
    "amount": 0.75,
    "op": "add",
@@ -423,7 +537,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "nodes/blob4/position",
    "amount": 0.75,
    "op": "add",
@@ -438,7 +552,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "nodes/blob5/position",
    "amount": 0.75,
    "op": "add",
@@ -645,7 +759,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "procedural/petals/transform/scale",
    "amount": 0.22,
    "op": "add",
@@ -658,7 +772,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/confetti/burst",
    "amount": 140.0,
    "op": "add",
@@ -669,7 +783,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "particles/sparkle/burst",
    "amount": 18.0,
    "op": "add",
@@ -1117,7 +1231,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/spout/burst",
    "amount": 160.0,
    "op": "add",
@@ -1688,7 +1802,7 @@
   "vocabulary": [
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "the creatures hop, a ripple left to right, landing on a spring"
    ],
    [
@@ -1698,12 +1812,12 @@
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "the giant flower's petals flick; a confetti puff"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "sparkles round the flower"
    ],
    [

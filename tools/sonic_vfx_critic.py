@@ -647,7 +647,8 @@ def measure(args):
                            "Where the picture follows %s it modulates %.1fx slower than the hits." % (name, 1 / mr),
                            r, region=name)
         # specificity: do the kick and the hat move different places?
-        k, h = av.get("response.kickEnv"), av.get("response.hatEnv")
+        # (ADR-1620: the drum signals, signal.kickEnv/hatEnv, where a scene has them)
+        k, h = av.get("signal.kickEnv"), av.get("signal.hatEnv")
         if k and h and k.get("map") and h.get("map") and k.get("z", 0) >= 3 and h.get("z", 0) >= 3:
             sim = corr(np.array(k["map"]), np.array(h["map"]))
             if sim > 0.8:
@@ -719,11 +720,11 @@ def inputs(args):
     feats = {"hz": hz, "t0": float(tt[0]),
              "low": [round(float(v), 4) for v in pick("response.bass", "sonic.energy")],
              "lowmid": [round(float(v), 4) for v in pick("response.sustain", "sonic.energy.slow")],
-             "mid": [round(float(v), 4) for v in pick("response.snareEnv")],
-             "high": [round(float(v), 4) for v in pick("response.hatEnv")],
+             "mid": [round(float(v), 4) for v in pick("signal.snareEnv")],
+             "high": [round(float(v), 4) for v in pick("signal.hatEnv", "response.onsetEnv")],
              "onset": [round(float(v), 4) for v in pick("response.onsetEnv", "response.transient")]}
     F = hz
-    kicks = [round(float(tt[i]), 3) for i in events_of(pick("response.kickEnv"), F)]
+    kicks = [round(float(tt[i]), 3) for i in events_of(pick("signal.kickEnv"), F)]  # ADR-1620: no mix kick
     notes = [round(float(tt[i]), 3) for i in events_of(pick("response.noteEnv"), F)]
     routes = []
     for r in (doc.get("routes") or []):

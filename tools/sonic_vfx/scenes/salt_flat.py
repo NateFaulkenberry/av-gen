@@ -76,9 +76,9 @@ DESIGN = {
          "low and left, high notes high and right), all from one radiant"],
         ["velocity", "notes.lastVelocity", "the meteor's brightness"],
         ["bass", "response.bass", "heat shimmer along the horizon; the haze thickens"],
-        ["kick", "response.kick", "a ring of light runs out across the salt from the monolith's base"],
-        ["snare", "response.snare", "the monolith's outline flares white"],
-        ["hat", "response.hat", "salt crystals glint across the near crust; grains blow low across the flat"],
+        ["kick", "signal.kick", "a ring of light runs out across the salt from the monolith's base"],
+        ["snare", "signal.snare", "the monolith's outline flares white"],
+        ["hat", "signal.hat", "salt crystals glint across the near crust; grains blow low across the flat"],
         ["silence", "(no input)", "a still rose dusk: the sky settles, nothing moves but the drift"],
     ],
     "tier": "light: one shadowed sun, a thin uniform haze (no march detail), one DF shimmer column",
@@ -321,7 +321,7 @@ def build():
     # hat: salt grains blowing
     s.route(R("hat", "particles/glints/burst", 160.0, attackMs=0, decayMs=30),
             R("hat", "particles/salt/burst", 50.0, attackMs=0, decayMs=40),
-            R("hatRate", "particles/salt/spawnRate", 240.0, **MEDIUM))
+            R("onsetRate", "particles/salt/spawnRate", 240.0, **MEDIUM))
     # snare: the monolith's outline flares (the kick's ring fires on its own trigger)
     for c in range(3):
         s.route(R("snare", "material/sfMonolith/op/%d/constant/constant" % OP_RIM, 9.0, comp=c, attackMs=0,

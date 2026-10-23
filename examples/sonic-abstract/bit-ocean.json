@@ -144,7 +144,122 @@
   "post/outline/normalThreshold": 0.5,
   "post/outline/objectEdges": 1.0
  },
- "sources": [],
+ "sources": [
+  {
+   "kind": "signal",
+   "name": "busy",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "response.onsetRate",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.05
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "backbeat",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.125
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.375
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.625
+      }
+     },
+     {
+      "source": "beat.bar",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.875
+      },
+      "amount": -1.0
+     },
+     {
+      "source": "signal.busy"
+     }
+    ],
+    "chain": {
+     "threshold": "binary",
+     "thresholdLevel": 1.5
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "kick",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.kick"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.7,
+      "gate": "signal.busy"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "snare",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.snare"
+     },
+     {
+      "source": "beat.pulse",
+      "amount": 0.9,
+      "gate": "signal.backbeat"
+     }
+    ],
+    "event": true
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "hat",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.drums.hat"
+     },
+     {
+      "source": "response.onset"
+     }
+    ],
+    "event": true
+   }
+  }
+ ],
  "routes": [
   {
    "source": "response.bass",
@@ -302,7 +417,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/coins/material/emissive",
    "amount": 2.4,
    "op": "add",
@@ -313,7 +428,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/gemsruins/material/emissive",
    "amount": 2.4,
    "op": "add",
@@ -324,7 +439,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/gemsdeep/material/emissive",
    "amount": 2.4,
    "op": "add",
@@ -335,7 +450,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "post/shock/amount",
    "amount": 18.0,
    "op": "add",
@@ -349,7 +464,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "post/shock/radius",
    "amount": 1.3,
    "op": "add",
@@ -368,7 +483,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "particles/burst/burst",
    "amount": 160.0,
    "op": "add",
@@ -379,7 +494,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "procedural/schoolA/transform/rotation",
    "amount": 18.0,
    "op": "add",
@@ -393,7 +508,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "procedural/schoolB/transform/rotation",
    "amount": -18.0,
    "op": "add",
@@ -407,7 +522,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "signal.snare",
    "target": "procedural/schoolC/transform/rotation",
    "amount": 18.0,
    "op": "add",
@@ -421,7 +536,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "signal.hat",
    "target": "particles/sparkle/burst",
    "amount": 40.0,
    "op": "add",
@@ -1126,7 +1241,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/guideBody/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1165,7 +1280,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/guideBelly/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1204,7 +1319,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/guideFins/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1243,7 +1358,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/guideEyes/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1282,7 +1397,7 @@
    }
   },
   {
-   "source": "response.kick",
+   "source": "signal.kick",
    "target": "procedural/guidePupils/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -4238,17 +4353,17 @@
    ],
    [
     "kick",
-    "response.kick",
+    "signal.kick",
     "the coins and gems flash; a ring ripples out through the water"
    ],
    [
     "snare",
-    "response.snare",
+    "signal.snare",
     "a swarm of bubbles bursts round you; the fish schools turn and dart"
    ],
    [
     "hat",
-    "response.hat",
+    "signal.hat",
     "sparkles glint in the water"
    ],
    [

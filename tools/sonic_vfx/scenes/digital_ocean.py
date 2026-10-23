@@ -58,14 +58,14 @@ DESIGN = {
          "afternoon and electric blue; a breakdown sinks it back to the violet sunset; the water's bands tighten"],
         ["bass", "tide (spectrum field) + response.bass", "TIDEWRITING: the bass's last ~15 s roll in as swell; the "
          "water's body deepens and the crest light lifts"],
-        ["kick", "kickFront (onset field) + response.kickEnv", "a lifted front rolls in; crest light, foam and the "
+        ["kick", "kickFront (onset field) + signal.kickEnv", "a lifted front rolls in; crest light, foam and the "
          "sun rays flash"],
         ["level", "response.level", "the swell grows and quickens (an integrated phase: no crest jumps), the rays "
          "strengthen (slowly)"],
         ["onsets", "response.onsetEnv", "the rays reach further for a moment"],
         ["mids", "audio.mid", "the wind sea roughens"],
-        ["snare", "response.snare", "spray off the near swell"],
-        ["hats / highs", "response.hatEnv, audio.treble", "the sun path's marks and the crest strokes flare; mint enters the lit faces"],
+        ["snare", "signal.snare", "spray off the near swell"],
+        ["hats / highs", "signal.hatEnv, audio.treble", "the sun path's marks and the crest strokes flare; mint enters the lit faces"],
         ["sustain", "response.sustain", "the sky's middle turns pink, the clouds' lit undersides warm, the halo "
          "swells"],
         ["brightness", "sonic.brightness.slow", "a slight warm or cool drift of the whole grade"],

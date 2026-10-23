@@ -78,9 +78,9 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "STRUCTURE: the passage widens and narrows; the outer rings expand"],
-        ["kick", "response.kick", "a wave of light runs down the passage from you to the sun; a surge forward"],
-        ["snare", "response.snare", "the gates' stars bloom open and flash vermilion; sparks stream past"],
-        ["hat", "response.hat", "the beads glint"],
+        ["kick", "signal.kick", "a wave of light runs down the passage from you to the sun; a surge forward"],
+        ["snare", "signal.snare", "the gates' stars bloom open and flash vermilion; sparks stream past"],
+        ["hat", "signal.hat", "the beads glint"],
         ["highs", "audio.treble", "sparks stream past along the walls"],
         ["mids", "audio.mid", "the whole lattice turns (the twist's phase)"],
         ["brightness", "sonic.brightness", "gold turns toward ivory and white"],

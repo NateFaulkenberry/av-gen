@@ -52,7 +52,7 @@ def tour_table(out, rows, abstract=False):
     # (the last row is the recording's start time, written after `end`: the tour ends at the `end` row)
     ends = [int(e["hostNs"]) for e in events if e["kind"] == "end"]
     end_ns = ends[-1] if ends else max(int(e["hostNs"]) for e in events)
-    lines = ["| # | scene | frames | interval p50 / p99 ms | GPU p50 / p95 ms | notes | noteEnv max | kickEnv max |"
+    lines = ["| # | scene | frames | interval p50 / p99 ms | GPU p50 / p95 ms | notes | noteEnv max | onsetEnv max |"
              " sustain max |", "|---|---|---|---|---|---|---|---|---|"]
     for i, (t0, k) in enumerate(cuts):
         t1 = cuts[i + 1][0] if i + 1 < len(cuts) else end_ns
@@ -70,7 +70,7 @@ def tour_table(out, rows, abstract=False):
         notes = int(seg[-1].get("notesReceived") or 0) - int(seg[0].get("notesReceived") or 0)
         lines.append("| %d | %s | %d | %.1f / %.1f | %.1f / %.1f | %d | %.2f | %.2f | %.2f |" % (
             k, names[k % len(names)], len(seg), pct(dt, 0.5), pct(dt, 0.99), pct(gpu, 0.5), pct(gpu, 0.95), notes,
-            mx("response.noteEnv"), mx("response.kickEnv"), mx("response.sustain")))
+            mx("response.noteEnv"), mx("response.onsetEnv"), mx("response.sustain")))
     md = os.path.join(out, "tour.md")
     open(md, "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))

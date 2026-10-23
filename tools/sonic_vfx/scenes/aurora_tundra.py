@@ -53,9 +53,9 @@ DESIGN = {
          "(consonant), teal, violet, rose (dissonant)"],
         ["melodic", "response.note", "a ripple runs through the curtains and their edges flare"],
         ["bass", "response.bass", "the curtains reach lower and taller"],
-        ["kick", "response.kick", "a surge of brightness through the curtains"],
-        ["snare", "response.snare", "the ice cracks with light"],
-        ["hat", "response.hat", "diamond dust glitters in the air"],
+        ["kick", "signal.kick", "a surge of brightness through the curtains"],
+        ["snare", "signal.snare", "the ice cracks with light"],
+        ["hat", "signal.hat", "diamond dust glitters in the air"],
         ["velocity", "notes.lastVelocity", "how big a note's ripple is"],
         ["silence", "(no input)", "a faint green arc drifting over the trees, the stars, the still ice"],
     ],
@@ -266,7 +266,7 @@ def build():
                   decayMs=320))
     # hat: diamond dust
     s.route(R("hat", "particles/dust/burst", 70.0, attackMs=0, decayMs=40),
-            R("hatRate", "particles/dust/spawnRate", 260.0, **MEDIUM),
+            R("onsetRate", "particles/dust/spawnRate", 260.0, **MEDIUM),
             R("visual.mood", "post/bloom/intensity", 0.1, **SLOW),
             R("kick", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
 
