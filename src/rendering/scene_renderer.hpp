@@ -1092,6 +1092,7 @@ private:
     wgpu::TextureView refractionCopyView_;
     wgpu::Sampler refractionSampler_;      // frame binding 19: linear, clamped
     wgpu::BindGroup frameBindGroupRefract_; // the frame group with the copy at 18 (the others bind a placeholder)
+    bool refractionLogged_ = false;         // the phase's state as last logged
     AuxTarget normalRough_;
     AuxTarget velocity_;
     AuxTarget emission_;

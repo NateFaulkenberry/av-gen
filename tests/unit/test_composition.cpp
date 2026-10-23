@@ -3813,7 +3813,7 @@ TEST_CASE("An orbit camera circles its pivot, and weight 0 is the old orbit", "[
 }
 
 TEST_CASE("an authored material's cutout, double-sidedness and unlit reach a mesh whose asset has a material (ADR-1283)",
-          "[composition][procedural][adr1283]") {
+          "[composition][procedural][adr1283][adr1603]") {
     const std::filesystem::path asset =
         std::filesystem::path(AVGEN_SOURCE_DIR) / "assets/quaternius/glTF/Mushroom_Common.gltf";
     if (!std::filesystem::exists(asset)) {
@@ -3827,7 +3827,9 @@ TEST_CASE("an authored material's cutout, double-sidedness and unlit reach a mes
             "source": { "kind": "mesh", "asset": "@ASSET@" },
             "distribution": { "kind": "single" },
             "material": { "baseColor": [0.2, 0.3, 0.4], "alphaMode": "mask", "alphaCutoff": 0.35,
-                          "doubleSided": true, "unlit": true } } },
+                          "doubleSided": true, "unlit": true,
+                          "refraction": { "strength": 0.03, "absorption": [0.4, 0.8, 0.2] },
+                          "thinFilm": { "thickness": 300.0 } } } },
         { "name": "plain", "kind": "procedural", "procedural": {
             "source": { "kind": "mesh", "asset": "@ASSET@" },
             "distribution": { "kind": "single" },
@@ -3862,6 +3864,11 @@ TEST_CASE("an authored material's cutout, double-sidedness and unlit reach a mes
     CHECK(card->material.doubleSided);
     CHECK(card->material.unlit);
     CHECK(std::abs(card->material.baseColor.r - 0.2f) < 1e-6f);
+    // ADR-1603: the authored optics too (they were dropped, and a refractive crystal GLB drew opaque)
+    CHECK(card->material.refraction.enabled());
+    CHECK(card->material.refraction.absorption == glm::vec3(0.4f, 0.8f, 0.2f));
+    CHECK(card->material.thinFilm.thickness == 300.0f);
+    CHECK_FALSE(plain->material.refraction.enabled());
     // an author who sets none of them keeps the asset's own
     CHECK(plain->material.alphaMode == scene::AlphaMode::Opaque);
     CHECK_FALSE(plain->material.unlit);

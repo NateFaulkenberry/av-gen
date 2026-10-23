@@ -4131,6 +4131,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-1603: the refraction phase runs when the ladder allows it and a refractive surface is in view. Set before
         // the prepass, which leaves those surfaces out (the depth behind them is what their absorption reads).
         procedurals_->setRefractionPhase(refractionWanted && procedurals_->hasRefractive());
+        if (procedurals_->refractionPhase() != refractionLogged_) {
+            refractionLogged_ = procedurals_->refractionPhase();
+            log::info("refraction phase {} ({} refractive surface(s) in view; ADR-1603)", refractionLogged_ ? "on" : "off",
+                      procedurals_->stats().refractiveObjects);
+        }
     }
     stage(cpu.proceduralMs);
 

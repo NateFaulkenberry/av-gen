@@ -7469,6 +7469,17 @@ void Composition::rebuild() {
                         if (authored.baseColorTexture.valid()) {
                             resolved.baseColorTexture = authored.baseColorTexture;
                         }
+                        // ADR-1603: and the author's optics -- refraction, thin film, anisotropy -- which a GLB cannot
+                        // carry; dropping them here made a refractive crystal mesh draw opaque.
+                        if (authored.refraction.enabled()) {
+                            resolved.refraction = authored.refraction;
+                        }
+                        if (authored.thinFilm.enabled()) {
+                            resolved.thinFilm = authored.thinFilm;
+                        }
+                        if (authored.anisotropy.enabled()) {
+                            resolved.anisotropy = authored.anisotropy;
+                        }
                     }
                     return resolved;
                 };
