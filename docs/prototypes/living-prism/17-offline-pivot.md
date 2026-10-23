@@ -212,3 +212,33 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5/`
 **Not done yet: environmental integration (spec 6.5).**
 - In place already: the palette drives the aurora, both fill lights, the crystals' environment colour and the water.
 - Not yet done: a stronger aurora-coloured light on the terrain (the ground term), and the aurora colours in the moss and rock.
+
+## Phase 5b gate: environmental integration and circuits (2026-10-23)
+
+The owner approved Phase 5. A water flow-streak engine extension (ADR-1643) is queued after the aurora ribbons; I adopt it when it lands.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5b/`
+
+| File | Shows |
+|---|---|
+| `phase5b-vs-reference-green.jpg`, `phase5b-vs-reference-rose.jpg` | the full frame beside the reference, in both looks |
+| `phase5-vs-5b.jpg` | before and after |
+| `phase5b-frame.jpg`, `phase5b-frame-rose.jpg` | the full frame in both looks |
+
+**The aurora as light on the valley (spec 6.5).** All palette-bound, so one switch moves it with the sky:
+- **Ground:** `au_ground` gained a soft emissive term (now 28 ops). Sky-facing ground (by the normal's upward component, smoothstep 0.3-1) glows in the aurora's colours, the two aurora roles mixed by the large patch noise. The gain is 0.035 of the role colour (`GROUND_AURORA`).
+- **Distance haze:** the fog colour is bound to the aurora's top colour (gain 0.15, `FOG_AURORA`). The distance, including the far river reach, now reads violet instead of grey haze.
+- **Crystal light:** each of the eight hero formations has a faint point light (range 90 m, no shadows), alternating between the crystal body colour and the low aurora colour. It is subtle, as intended.
+
+**Circuits (spec 8), `build_scene.build_circuits`:**
+- A restrained network on the near banks: about 25 traces running along the river at 70-140 m from its centreline, with circuit jogs, a few branches, and node disks at the ends.
+- The traces are draped on the engine's ground every 2 m and lifted 0.25 m. They are kept off wet ground and out of crystal footprints.
+- They are 0.7 m-wide emissive ribbons in one generated GLB (written directly by the build), bound to the low aurora colour.
+- No audio yet (Phase 7 can pulse them along their length).
+
+**Offline render:** unchanged in practice, about 0.3 s/frame at 1080p.
+
+**Open:**
+- The left foreground bank reads a little flat mauve under the aurora light.
+- The crystal point lights are barely visible.
+- The fine flow lines in the water wait for ADR-1643.
