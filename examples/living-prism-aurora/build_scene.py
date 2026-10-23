@@ -33,7 +33,7 @@ def prog_ground():
                 {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.05, "seed": 3},
                 {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.3, 0.75, 0, 0]},
                 {"kind": "constant", "dst": 2, "constant": [0.010, 0.030, 0.014, 1]},    # deep moss
-                {"kind": "constant", "dst": 3, "constant": [0.022, 0.060, 0.026, 1]},    # lit moss
+                {"kind": "constant", "dst": 3, "constant": [0.035, 0.095, 0.040, 1]},    # lit moss
                 {"kind": "mixBy", "dst": 3, "srcA": 2, "srcB": 3, "srcC": 1},
                 {"kind": "input", "dst": 4, "input": "normal"},                            # rock on steep ground
                 {"kind": "gradient", "dst": 4, "srcA": 4, "constant": [0, 1, 0, 0], "value": 1.0},
@@ -86,7 +86,7 @@ def aurora(name, low, mid, top, height, base, radius, count, intensity, complexi
                 "shape": {"anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0], "baseHeight": base,
                           "complexity": complexity, "curtainCount": count, "curtainHeight": height,
                           "driftSpeed": 0.05, "flowSpeed": flow, "layerSpacing": 0.35, "radius": radius,
-                          "turbulence": 0.35, "verticalSpeed": 0.03, "waveAmplitude": 0.3, "waveScale": waves}},
+                          "turbulence": 0.35, "verticalSpeed": 0.03, "waveAmplitude": 0.6, "waveScale": waves}},
             "ground": {"color": low, "falloff": 2.0, "intensity": 0.15, "mode": "subtle", "radius": 600.0},
             "flow": {"field": "", "influence": 0.0}}
 
@@ -109,9 +109,13 @@ def scene_json():
     xmat = {"baseColor": [0.2, 0.18, 0.28], "roughness": 0.08, "metallic": 0.0, "program": "au_crystal"}
     for name, x, z, yaw, s, fam in L.FORMATIONS:
         q = L.quat_y(yaw)
-        y = L.height(x, z) - 0.8 * s
+        y = L.height(x, z) - 3.0 * s   # the noise layer moves the ground by up to ~7 m; sink enough to cover it
         pt = [round(x, 3), round(y, 3), round(z, 3)] + [round(c, 6) for c in q] + [s, s, s]
         nodes.append(mesh_node("xtal_" + name, fam + ".glb", [pt], xmat))
+    # the far mountains: three ridges in place, receding in value through the fog (phase 2b)
+    rmat = {"baseColor": [0.018, 0.020, 0.030], "roughness": 0.9, "metallic": 0.0}
+    for r in ("ridgeNear", "ridgeMid", "ridgeFar"):
+        nodes.append(mesh_node(r, r + ".glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]], rmat, shadow=False))
     p0, t0 = L.CAMERA_POS, L.CAMERA_TARGET
     return {
         "format": "avgen-scene", "version": 1, "name": "The Living Prism: Aurora Valley",
@@ -119,18 +123,21 @@ def scene_json():
         "camera": {"mode": 1, "position": list(p0), "target": list(t0), "fov": L.CAMERA_FOV, "orbitSpeed": 0,
                    "near": 0.5, "far": L.FAR},
         "environment": {
-            "intensity": 0.25, "lightFromEnvironment": False, "fogColor": [0.06, 0.07, 0.12],
-            "volumeDensity": 0.0, "fogHeight": 60.0, "fogHeightFalloff": 0.01, "fogUpperDensity": 0.05,
+            # the air: a light peach-lavender extinction, so the ridges recede in value toward the horizon glow
+            "intensity": 0.25, "lightFromEnvironment": False, "fogColor": [0.10, 0.07, 0.10],
+            "volumeDensity": 0.00035, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 4,
+            "volumeMaxDistance": 40.0, "volumeLocalLights": 0.0, "horizonDensity": 0.4,
+            "fogHeight": 60.0, "fogHeightFalloff": 0.01, "fogUpperDensity": 0.05,
             "fogSky": 0.0, "fogSkyDistance": 4500.0,
             "shadowCascades": 2, "shadowRange": 600.0, "ambientOcclusion": True, "depthPrepass": True,
             "sky": {"enabled": True, "background": True, "useKeyLight": False,
-                    "zenithColor": [0.006, 0.010, 0.030], "horizonColor": [0.05, 0.028, 0.045],
+                    "zenithColor": [0.006, 0.010, 0.030], "horizonColor": [0.42, 0.20, 0.18],
                     "groundColor": [0.01, 0.012, 0.02], "sunColor": [0.6, 0.6, 0.9], "sunDirection": [0, -1, 0],
-                    "haze": 0.12, "sunIntensity": 0.0, "sunSize": 0.01, "sunGlow": 0.0, "intensity": 1.0}},
+                    "haze": 0.05, "sunIntensity": 0.0, "sunSize": 0.01, "sunGlow": 0.0, "intensity": 1.0}},
         "lights": [
             # the aurora's light on the valley: a broad mint fill from the sky ahead, and a dim violet from above
             {"name": "auroraFill", "id": "auroraFill", "type": "directional", "role": "key",
-             "direction": [0.1, -0.45, 0.89], "color": AURORA_LOW, "intensity": 0.35, "castsShadow": True},
+             "direction": [0.1, -0.45, 0.89], "color": AURORA_LOW, "intensity": 0.7, "castsShadow": True},
             {"name": "skyFill", "id": "skyFill", "type": "directional", "direction": [-0.2, -0.95, -0.2],
              "color": AURORA_TOP, "intensity": 0.18, "castsShadow": False}],
         "effects": [
@@ -139,9 +146,10 @@ def scene_json():
                                                     "colorSpread": 0.3, "twinkle": 0.2, "twinkleRate": 1.0,
                                                     "horizonFade": 0.6, "band": 0.15, "bandTilt": 30.0,
                                                     "daylight": 0.0}},
-            aurora("auroraMain", AURORA_LOW, AURORA_MID, AURORA_TOP, 1700.0, 260.0, 3000.0, 3.0, 2.6, 72.0, 0.02, 6.5),
-            aurora("auroraPink", AURORA2_LOW, AURORA2_MID, AURORA2_TOP, 1400.0, 700.0, 3800.0, 2.0, 1.8, 50.0,
-                   0.015, 5.0)],
+            # two ribbon bands with dark, starry sky between and above them (phase 2b): short curtains, undulating tops
+            aurora("auroraMain", AURORA_LOW, AURORA_MID, AURORA_TOP, 750.0, 320.0, 3000.0, 2.0, 2.6, 72.0, 0.02, 5.0),
+            aurora("auroraPink", AURORA2_LOW, AURORA2_MID, AURORA2_TOP, 650.0, 1350.0, 3400.0, 2.0, 2.0, 50.0,
+                   0.015, 3.5)],
         "materialPrograms": [prog_ground(), prog_crystal()],
         "nodes": nodes,
     }

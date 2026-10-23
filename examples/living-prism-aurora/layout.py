@@ -7,21 +7,30 @@ and a crystal placed "on the ground" here stands on the ground the engine draws.
 """
 import math
 
-# ---- the camera: static, high, looking down the valley (spec 4.1) ------------------------------------------------
-CAMERA_POS = (4.0, 34.0, 60.0)
-CAMERA_TARGET = (-2.0, 20.0, -300.0)
-CAMERA_FOV = 50.0
+# ---- the camera: static, high, looking down the canyon (spec 4.1; phase 2b: higher and a little more down-looking,
+# so the wide near river fills the lower frame as the reference's does)
+CAMERA_POS = (0.0, 80.0, 170.0)
+CAMERA_TARGET = (0.0, 22.0, -250.0)
+CAMERA_FOV = 52.0
 FAR = 4000.0
 
-# ---- the river: one winding water feature, descending gently into the distance (spec 4.3) ------------------------
-RIVER_PATH = [(-6.0, 0.0, 70.0), (8.0, -0.4, 10.0), (14.0, -0.9, -50.0), (-14.0, -1.6, -120.0), (-20.0, -2.4, -190.0),
-              (12.0, -3.4, -280.0), (18.0, -4.4, -360.0), (-8.0, -6.0, -470.0), (2.0, -8.0, -620.0),
-              (0.0, -10.0, -820.0)]
-RIVER = {"name": "river", "kind": "river", "path": RIVER_PATH, "width": 24.0, "amplitude": 2.6, "falloff": 0.7,
-         "smoothing": 3}
-FLOOR = 1.2   # the valley floor's base height, above the water
+# ---- the river (spec 4.3): wide and swirling near the camera, narrowing as it winds away. Two water features: the
+# near reach (wide, tight swings) and the far river; they share the point where they meet, at one level.
+RIVER_NEAR_PATH = [(-4.0, 0.0, 240.0), (-8.0, 0.0, 150.0), (16.0, -0.2, 70.0), (26.0, -0.4, 10.0), (-10.0, -0.7, -50.0),
+                   (-22.0, -1.0, -95.0)]
+RIVER_PATH = [(-22.0, -1.0, -95.0), (-6.0, -1.5, -150.0), (16.0, -2.2, -210.0), (14.0, -3.0, -280.0),
+              (-10.0, -4.0, -350.0), (-14.0, -5.0, -430.0), (6.0, -6.5, -540.0), (2.0, -8.0, -700.0),
+              (0.0, -10.0, -900.0)]
+RIVERS = [{"name": "riverNear", "path": RIVER_NEAR_PATH, "width": 42.0, "amplitude": 2.6, "falloff": 0.6,
+           "smoothing": 3},
+          {"name": "river", "path": RIVER_PATH, "width": 20.0, "amplitude": 2.4, "falloff": 0.7, "smoothing": 3}]
+RIVER = RIVERS[1]
+FLOOR = 1.0   # the canyon floor's base height, above the water
+_ALL_RIVER = RIVER_NEAR_PATH + RIVER_PATH[1:]
+_CANYON = [p for p in _ALL_RIVER if p[2] <= 110.0]   # the walls start just ahead of the camera
 
-# ---- the valley: two walls following the river at a distance, and the far mountains ------------------------------
+
+# ---- the canyon (phase 2b): steep rock walls close to the river, moss on the benches and the tops ------------------
 def _offset(path, d):
     """The river path shifted sideways by d metres (left is negative x relative to the flow)."""
     out = []
@@ -34,24 +43,18 @@ def _offset(path, d):
     return out
 
 
-WALLS = [  # (name, path, amplitude, width, falloff): flat banks within ~55 m of the river, then low walls and high
-    # ground -- kept low so the sky keeps the upper 45% of the frame (the reference's horizon sits at ~43%)
-    ("wallL", _offset(RIVER_PATH, 150.0), 34.0, 105.0, 1.0),
-    ("wallR", _offset(RIVER_PATH, -150.0), 38.0, 105.0, 1.0),
-    ("highL", _offset(RIVER_PATH, 280.0), 80.0, 150.0, 1.0),
-    ("highR", _offset(RIVER_PATH, -280.0), 86.0, 150.0, 1.0),
-    ("outerL", _offset(RIVER_PATH, 470.0), 140.0, 220.0, 1.0),
-    ("outerR", _offset(RIVER_PATH, -470.0), 150.0, 220.0, 1.0),
-    ("benchL", _offset(RIVER_PATH, 40.0), 3.5, 24.0, 1.0),    # a low shelf the crystals stand on
-    ("benchR", _offset(RIVER_PATH, -40.0), 4.0, 24.0, 1.0),
+WALLS = [  # (name, path, amplitude, width, falloff). A falloff below 1 makes the slope steep (a cliff, rock) and
+    # the top flat (moss); the benches the crystals stand on are low shelves just above the water
+    ("benchL", _offset(_ALL_RIVER, 46.0), 3.0, 22.0, 1.0),
+    ("benchR", _offset(_ALL_RIVER, -46.0), 3.0, 22.0, 1.0),
+    ("cliffL", _offset(_CANYON, 110.0), 70.0, 52.0, 0.45),
+    ("cliffR", _offset(_CANYON, -110.0), 76.0, 52.0, 0.45),
+    ("highL", _offset(_CANYON, 190.0), 85.0, 90.0, 0.55),
+    ("highR", _offset(_CANYON, -190.0), 90.0, 90.0, 0.55),
+    ("outerL", _offset(_CANYON, 330.0), 105.0, 150.0, 0.6),
+    ("outerR", _offset(_CANYON, -330.0), 110.0, 150.0, 0.6),
 ]
-MOUNTAINS = [  # far ridges, layered, converging on the river's vanishing point, leaving a gap of horizon glow there
-    ("rangeNear", [(-900.0, 0.0, -800.0), (-230.0, 0.0, -1100.0)], 135.0, 260.0, 1.0),
-    ("rangeNearR", [(230.0, 0.0, -1150.0), (900.0, 0.0, -850.0)], 145.0, 260.0, 1.0),
-    ("rangeMid", [(-1300.0, 0.0, -1500.0), (-200.0, 0.0, -1800.0), (300.0, 0.0, -1750.0), (1300.0, 0.0, -1450.0)],
-     185.0, 320.0, 1.0),
-    ("rangeFar", [(-1600.0, 0.0, -2300.0), (0.0, 0.0, -2600.0), (1600.0, 0.0, -2300.0)], 260.0, 400.0, 1.0),
-]
+MOUNTAINS = []   # the far ridges are meshes now (blender/aurora_assets.py: ridges), layered in the fog
 WORLD_SIZE = (4000.0, 6000.0)
 
 
@@ -69,7 +72,8 @@ def _chaikin(pts, iters):
     return pts
 
 
-_RIVER_S = _chaikin(RIVER_PATH, RIVER["smoothing"])
+_RIVERS_S = [(_chaikin(r["path"], r["smoothing"]), r) for r in RIVERS]
+_RIVER_S = _RIVERS_S[1][0]
 
 
 def _closest(path, x, z):
@@ -98,22 +102,26 @@ def height(x, z):
     for _, path, amp, width, fo in WALLS + MOUNTAINS:
         d, _l = _closest(path, x, z)
         h += amp * _w(d, width, fo)
-    d, level = _closest(_RIVER_S, x, z)
-    w = _w(d, RIVER["width"], RIVER["falloff"])
-    if w > 0:
-        h = min(h, h + (min(h, level - RIVER["amplitude"]) - h) * w)
-    return h
+    cut = h   # each water cuts with its own weight; the terrain takes the deepest (ADR-830)
+    for path, r in _RIVERS_S:
+        d, level = _closest(path, x, z)
+        w = _w(d, r["width"], r["falloff"])
+        if w > 0:
+            cut = min(cut, h + (min(h, level - r["amplitude"]) - h) * w)
+    return cut
 
 
 def world_json():
-    feats = [{"name": "river", "kind": "river", "path": [list(p) for p in RIVER_PATH], "width": RIVER["width"],
-              "amplitude": RIVER["amplitude"], "falloff": RIVER["falloff"], "roughness": 0.0,
-              "smoothing": RIVER["smoothing"], "water": True, "waterDepth": 0.0}]
+    feats = [{"name": r["name"], "kind": "river", "path": [list(p) for p in r["path"]], "width": r["width"],
+              "amplitude": r["amplitude"], "falloff": r["falloff"], "roughness": 0.0, "smoothing": r["smoothing"],
+              "water": True, "waterDepth": 0.0} for r in RIVERS]
     for name, path, amp, width, fo in WALLS + MOUNTAINS:
         feats.append({"name": name, "kind": "ridge", "path": [list(p) for p in path], "width": width,
                       "amplitude": amp, "falloff": fo, "roughness": 0.0, "smoothing": 2})
     return {"name": "living-prism-aurora", "seed": 20261023, "size": list(WORLD_SIZE), "baseHeight": FLOOR,
-            "erosion": 0.0, "seaLevel": -1000.0, "layers": [{"frequency": 0.01, "amplitude": 0.0}],
+            "erosion": 0.35, "seaLevel": -1000.0,
+            # rocky irregularity on the walls (a few metres; the formations sink enough to cover it)
+            "layers": [{"frequency": 0.018, "amplitude": 7.0}, {"frequency": 0.06, "amplitude": 2.5}],
             "features": feats}
 
 
@@ -123,15 +131,33 @@ def world_json():
 # ---- the crystal formations: about seven, about twenty-two tips (spec 4.4) -----------------------------------------
 # (name, x, z, yaw degrees, scale, family). Families are built in Blender: cluster (tall leaning shards), pair (wide
 # tilted prisms), spire (one or two tall), small (distant tips). Positions sit on the benches beside the river.
-FORMATIONS = [
-    ("L1", -44.0, -30.0, 20.0, 1.25, "cluster"),     # the hero: near left, leaning out over the river
-    ("R1", 50.0, -72.0, -30.0, 1.9, "pair"),        # the wide right pair
-    ("L2", -48.0, -165.0, 40.0, 1.35, "spire"),     # the first bend, left
-    ("R2", 58.0, -250.0, -10.0, 1.5, "spire2"),     # the second bend, right
-    ("C1", -36.0, -330.0, 15.0, 1.2, "small"),      # mid-distance, left
-    ("C2", 42.0, -420.0, -25.0, 1.3, "small2"),     # mid-distance, right
-    ("D", -44.0, -640.0, 0.0, 1.5, "far"),          # the horizon group
+# phase 2b: placed by depth and setback from the river's centreline, so each stands on its bench. The near
+# formations dominate. The right bank follows the reference: its crystals lean outward (away from the river, to the
+# right) and are set back and staggered in depth, so the river corridor and the far crystals stay visible past them.
+# (name, z, side -1 left / +1 right, setback m, yaw deg, scale, family)
+_FORMATION_SPEC = [
+    ("L1", 75.0, -1, 60.0, 25.0, 2.7, "cluster"),   # the hero: fills the left third, rising into the aurora
+    ("R1", 10.0, 1, 52.0, -15.0, 2.6, "pair"),     # the right pair: large, close, leaning out to the right
+    ("L2", -120.0, -1, 45.0, 40.0, 1.6, "spire"),
+    ("R2", -235.0, 1, 52.0, -10.0, 1.6, "spire2"),
+    ("C1", -360.0, -1, 44.0, 15.0, 1.4, "small"),
+    ("C2", -470.0, 1, 48.0, -20.0, 1.4, "small2"),
+    ("D", -680.0, -1, 40.0, 0.0, 1.6, "far"),       # the horizon group
 ]
+_CENTRE = _chaikin(_ALL_RIVER, 3)
+
+
+def river_x(z):
+    """The river centreline's x at depth z (linear between the smoothed path's points)."""
+    for a, b in zip(_CENTRE, _CENTRE[1:]):
+        if (a[2] - z) * (b[2] - z) <= 0 and a[2] != b[2]:
+            t = (z - a[2]) / (b[2] - a[2])
+            return a[0] + t * (b[0] - a[0])
+    return min(_CENTRE, key=lambda p: abs(p[2] - z))[0]
+
+
+FORMATIONS = [(n, round(river_x(z) + side * setback, 2), z, yaw, sc, fam)
+              for n, z, side, setback, yaw, sc, fam in _FORMATION_SPEC]
 
 
 def quat_y(deg):

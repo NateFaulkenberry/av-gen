@@ -90,11 +90,11 @@ FAMILIES = {
     # name: (seed, [(dx, dy, width, length, lean_lo, lean_hi)], outward +x)
     "cluster": (11, [(0, 0, 4.6, 40, 4, 10), (5, 3, 3.6, 30, 14, 24), (-4, 2, 3.2, 26, 8, 18), (3, -5, 3.0, 22, 20, 34),
                      (-6, -4, 2.6, 17, 24, 38), (8, -2, 2.4, 14, 30, 45), (-2, 6, 2.2, 12, 18, 30)], 1),
-    "pair": (23, [(0, 0, 6.4, 28, 26, 34), (8, 3, 5.6, 24, 34, 42), (-5, 4, 3.0, 13, 14, 24), (10, -4, 2.6, 10, 40, 52)], -1),
+    "pair": (23, [(0, 0, 6.4, 28, 26, 34), (8, 3, 5.6, 24, 34, 42), (-5, 4, 3.0, 13, 14, 24), (10, -4, 2.6, 10, 40, 52)], 1),
     "spire": (31, [(0, 0, 3.8, 30, 4, 10), (5, 2, 2.8, 19, 14, 22)], 1),
-    "spire2": (37, [(0, 0, 4.2, 34, 6, 12), (-5, 3, 2.6, 15, 18, 28)], -1),
+    "spire2": (37, [(0, 0, 4.2, 34, 6, 12), (-5, 3, 2.6, 15, 18, 28)], 1),
     "small": (41, [(0, 0, 2.6, 16, 6, 14), (4, 3, 2.2, 12, 14, 24), (-3, 3, 1.8, 9, 18, 30)], 1),
-    "small2": (43, [(0, 0, 2.8, 18, 6, 14), (-4, 2, 2.0, 11, 16, 26)], -1),
+    "small2": (43, [(0, 0, 2.8, 18, 6, 14), (-4, 2, 2.0, 11, 16, 26)], 1),
     "far": (47, [(0, 0, 4.0, 28, 2, 8), (9, 4, 3.4, 22, 8, 14), (-8, 2, 3.0, 18, 6, 14), (16, -3, 2.6, 15, 12, 20)], 1),
 }
 
@@ -127,6 +127,69 @@ def build_family(name, out):
     return ob
 
 
+# ---- the far mountains (phase 2b): three jagged ridgelines receding into the fog, built in place -----------------
+RIDGES = [  # (name, distance m, half-span m, peak height m, centre dip (0..1), roughness, seed)
+    ("ridgeNear", 950.0, 1500.0, 260.0, 0.7, 0.68, 3),
+    ("ridgeMid", 1600.0, 2200.0, 420.0, 0.4, 0.66, 5),
+    ("ridgeFar", 2500.0, 3200.0, 620.0, 0.2, 0.64, 9),
+]
+
+
+def ridge_profile(n, rough, rng):
+    """Midpoint displacement: a jagged skyline, 2^n + 1 samples in 0..1."""
+    m = 2 ** n + 1
+    h = [0.0] * m
+    h[0], h[-1] = rng.uniform(0.3, 0.7), rng.uniform(0.3, 0.7)
+    step, amp = m - 1, 0.6
+    while step > 1:
+        half = step // 2
+        for i in range(half, m - 1, step):
+            h[i] = 0.5 * (h[i - half] + h[i + half]) + rng.uniform(-amp, amp)
+        step, amp = half, amp * rough
+    lo, hi = min(h), max(h)
+    return [(v - lo) / (hi - lo) for v in h]
+
+
+def build_ridges(out):
+    """Each ridge: a solid wall (front and back faces, 120 m deep) whose top is a jagged skyline; AV Gen coordinates
+    are converted to Blender's on export. The near ridge dips in the middle (the reference's V), opening the
+    horizon glow above the river's vanishing point."""
+    for name, dist, half, peak, dip, rough, seed in RIDGES:
+        rng = random.Random(seed)
+        prof = ridge_profile(9, rough, rng)
+        bm = bmesh.new()
+        n = len(prof)
+        front, back, base_f, base_b = [], [], [], []
+        for i, v in enumerate(prof):
+            u = i / (n - 1)
+            x = -half + 2 * half * u
+            z = -dist - 0.18 * dist * (2 * u - 1) ** 2          # the ends curve toward the camera, framing
+            centre = math.exp(-((x / (half * 0.28)) ** 2))       # the V in the middle
+            y = peak * (0.12 + 0.88 * v ** 1.6) * (1.0 - dip * centre)   # sharp peaks, deep saddles
+            front.append(bm.verts.new(av2bl((x, y, z))))
+            back.append(bm.verts.new(av2bl((x, y * 0.95, z - 120.0))))
+            base_f.append(bm.verts.new(av2bl((x, -80.0, z))))
+            base_b.append(bm.verts.new(av2bl((x, -80.0, z - 120.0))))
+        for i in range(n - 1):
+            bm.faces.new((base_f[i], base_f[i + 1], front[i + 1], front[i]))
+            bm.faces.new((front[i], front[i + 1], back[i + 1], back[i]))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        for p in me.polygons:
+            p.use_smooth = False
+        ob = bpy.data.objects.new(name, me)
+        bpy.context.scene.collection.objects.link(ob)
+        for o in bpy.context.selected_objects:
+            o.select_set(False)
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB",
+                                  use_selection=True, export_yup=True, export_apply=True, export_normals=True)
+        print("EXPORTED", name, len(me.polygons), "faces")
+
+
 def av2bl(v):
     return Vector((v[0], -v[2], v[1]))
 
@@ -137,7 +200,7 @@ def preview(objs, pdir):
     # the valley as a height field, coarse far away (the camera's view only)
     bm = bmesh.new()
     xs = [x for x in range(-800, 801, 10)]
-    zs = list(range(80, -3000, -12))
+    zs = list(range(260, -3000, -12))
     grid = [[bm.verts.new(av2bl((x, L.height(x, z), z))) for x in xs] for z in zs]
     for i in range(len(zs) - 1):
         for j in range(len(xs) - 1):
@@ -152,9 +215,10 @@ def preview(objs, pdir):
     me.materials.append(m)
     # the water: a sheet at each river point's level, a coarse stand-in
     bm = bmesh.new()
-    for a, b in zip(L._RIVER_S, L._RIVER_S[1:]):
+    for rs, rr in L._RIVERS_S:
+      for a, b in zip(rs, rs[1:]):
         d = Vector((b[0] - a[0], 0, b[2] - a[2])).normalized()
-        n = Vector((-d.z, 0, d.x)) * 8.0
+        n = Vector((-d.z, 0, d.x)) * rr["width"] * 0.5
         q = [bm.verts.new(av2bl((p[0] + s * n.x, p[1] + 0.05, p[2] + s * n.z))) for p, s in ((a, -1), (a, 1), (b, 1), (b, -1))]
         bm.faces.new(q)
     me = bpy.data.meshes.new("water")
@@ -202,6 +266,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     objs = [build_family(n, out) for n in FAMILIES]
+    build_ridges(out)
     if pdir:
         preview(objs, pdir)
 
