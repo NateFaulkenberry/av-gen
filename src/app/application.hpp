@@ -9,6 +9,7 @@
 #include "app/edit_system.hpp"
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
+#include "platform/vsync_clock.hpp"
 #include "app/interactive_resolution.hpp"
 #include "app/live_drop_reason.hpp"
 #include "app/viewport_camera.hpp"
@@ -172,6 +173,10 @@ struct AppOptions {
     int liveTargetFps = 0;
     // --live-frame-cap <on|off> (ADR-1107): pace the live loop at the target. Unset = the setting.
     std::optional<bool> liveFrameCap;
+    // --live-vsync-align <on|off> (ADR-1609): place the paced frame's GPU end just before a vsync. Default on.
+    std::optional<bool> liveVsyncAlign;
+    // --live-late-latch <on|off> (ADR-1610): with live input, the UI is built before the engine update. Default on.
+    std::optional<bool> liveLateLatch;
     // --adaptive-floor <scale>: the lowest scale the ladder may reach (ADR-1024). 0 = use the
     // setting.
     float adaptiveFloor = 0.0f;
@@ -543,6 +548,12 @@ private:
     // by path each row, so a reload cannot leave a dangling parameter behind).
     std::vector<std::pair<std::string, std::size_t>> liveLogFinals_;
     std::uint64_t liveLogFrames_ = 0;
+    // ADR-1609: the paced display's vsync, the frame's lead (start -> GPU end) and the phase shift last applied.
+    std::unique_ptr<platform::VsyncClock> vsyncClock_;
+    int vsyncDisplayIndex_ = -2;
+    LiveLeadEstimate liveLead_;
+    double lastVsyncShiftMs_ = 0.0;
+    bool lastLateLatch_ = false; // ADR-1610: this frame built its UI before the update
     std::unique_ptr<std::ofstream> liveCaptureIndex_;
     std::uint64_t liveCaptureFrames_ = 0;
     void captureLiveFrame(const FrameTime& time);

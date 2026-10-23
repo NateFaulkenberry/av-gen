@@ -160,6 +160,36 @@ struct LivePaceStep {
 };
 [[nodiscard]] LivePaceStep livePaceStep(double nowMs, double deadlineMs, double periodMs);
 
+// ADR-1609: vsync-aware pacing. Under Fifo a frame is shown at the first vsync after its GPU finishes, so with the
+// grid's phase left where it fell a frame waited a uniform 0-1 refresh for it (8.3 ms on average at 60 Hz) after its
+// GPU was done. The grid's phase is slewed instead so that a frame's start + its lead (start -> GPU end, with margin)
+// lands just before a vsync. Only the phase moves, by at most `maxStepMs` a frame, so the period, the grid and the
+// controller's miss logic (ADR-1107/1362) are as they were: an interval changes by a fraction of a millisecond.
+//
+// `deadlineMs` is the next frame's start, `vsyncMs` any vsync (on the same clock), `refreshMs` the display's period.
+// Returns the shift to add to the deadline: the smaller of "later, so the end lands on the next vsync" and "earlier, so
+// it lands on the one before", clamped to +-maxStepMs. 0 when an input is unknown.
+[[nodiscard]] double liveVsyncShiftMs(double deadlineMs, double leadMs, double vsyncMs, double refreshMs,
+                                      double maxStepMs);
+
+// ADR-1609: a frame's lead, start -> GPU end: the CPU's start -> submit plus the GPU span, as the 95th percentile of the
+// recent frames plus a margin, so the occasional slow frame still finishes before its vsync rather than one later.
+class LiveLeadEstimate {
+public:
+    static constexpr std::size_t kFrames = 60;
+    static constexpr double kMarginMs = 2.0; // and the compositor's own deadline, which nothing here can see
+    void add(double submitOffsetMs, double gpuSpanMs);
+    void reset() { count_ = 0; next_ = 0; }
+    [[nodiscard]] bool ready() const { return count_ >= 15; }
+    // The 95th percentile of the recent leads + kMarginMs; 0 until ready.
+    [[nodiscard]] double leadMs() const;
+
+private:
+    std::array<double, kFrames> leads_{};
+    std::size_t count_ = 0;
+    std::size_t next_ = 0;
+};
+
 // ---- the ladder (ADR-1083, ADR-1084) -------------------------------------------------------------------
 
 enum class LiveQualityLevel : std::uint8_t { Ultra, High, Medium, Low, Emergency };

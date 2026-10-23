@@ -17,6 +17,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 using namespace avgen;
@@ -582,6 +583,68 @@ TEST_CASE("the frame cap's steps hold a fixed grid: no drift from oversleeping, 
         now += 9.0;
     }
     CHECK((now - 9.0 - start) == Catch::Approx(600 * period + 0.4).margin(0.01));
+}
+
+// ---- ADR-1609: vsync-aware pacing ---------------------------------------------------------------------------------
+
+TEST_CASE("the vsync shift moves the grid's phase so a frame's end lands just before a vsync, a little at a time",
+          "[unit][resolution][live-quality][adr1609]") {
+    using app::liveVsyncShiftMs;
+    const double refresh = 1000.0 / 60.0;
+    // Unknowns: no shift.
+    CHECK(liveVsyncShiftMs(0.0, 20.0, 5.0, refresh, 0.5) == 0.0);
+    CHECK(liveVsyncShiftMs(100.0, 0.0, 5.0, refresh, 0.5) == 0.0);
+    CHECK(liveVsyncShiftMs(100.0, 20.0, 5.0, 0.0, 0.5) == 0.0);
+    // End at 120, vsyncs at 5 + k*refresh: the next after 120 is 121.667 -> later by 1.667, clamped to the step.
+    CHECK(liveVsyncShiftMs(100.0, 20.0, 5.0, refresh, 0.5) == Catch::Approx(0.5));
+    CHECK(liveVsyncShiftMs(100.0, 20.0, 5.0, refresh, 10.0) == Catch::Approx(5.0 + 7 * refresh - 120.0));
+    // End just after a vsync (121.667 + 2): the one before is closer -> earlier by 2.
+    CHECK(liveVsyncShiftMs(100.0, 21.667 + 2.0, 5.0, refresh, 10.0) == Catch::Approx(-2.0).margin(0.01));
+    // On a vsync: no shift; a vsync given far in the past or future is the same grid.
+    CHECK(liveVsyncShiftMs(100.0, 5.0 + 7 * refresh - 100.0, 5.0, refresh, 1.0) == Catch::Approx(0.0).margin(1e-9));
+    CHECK(liveVsyncShiftMs(100.0, 20.0, 5.0 - 600 * refresh, refresh, 10.0) ==
+          Catch::Approx(liveVsyncShiftMs(100.0, 20.0, 5.0, refresh, 10.0)));
+
+    // Closed loop on the ADR-1107 grid: a 30 fps period on a 60 Hz display, any starting phase. With the shift applied
+    // to every next deadline, the end converges to just before a vsync and every period stays within the step of the
+    // grid's -- the controller sees the same intervals.
+    const double period = 2 * refresh;
+    const double lead = 27.3;
+    for (double phase : {0.0, 3.1, 8.0, 12.9, 16.0}) {
+        double deadline = 1000.0 + phase;
+        double prev = deadline;
+        for (int i = 0; i < 80; ++i) {
+            double next = deadline + period;
+            next += liveVsyncShiftMs(next, lead, 0.0, refresh, 0.5);
+            CHECK(std::abs((next - prev) - period) <= 0.5 + 1e-9);
+            prev = next;
+            deadline = next;
+        }
+        double gap = std::fmod(-(deadline + lead), refresh);
+        gap = gap < 0 ? gap + refresh : gap;
+        CHECK((gap < 0.01 || gap > refresh - 0.01));
+    }
+}
+
+TEST_CASE("the lead is the 95th percentile of start-to-GPU-end plus a margin, once there are enough frames",
+          "[unit][resolution][live-quality][adr1609]") {
+    app::LiveLeadEstimate lead;
+    CHECK(lead.leadMs() == 0.0);
+    for (int i = 0; i < 14; ++i) {
+        lead.add(10.0, 20.0);
+    }
+    CHECK_FALSE(lead.ready());
+    lead.add(10.0, 20.0);
+    CHECK(lead.ready());
+    CHECK(lead.leadMs() == Catch::Approx(30.0 + app::LiveLeadEstimate::kMarginMs));
+    // A rejected sample (no GPU span yet) changes nothing; slow frames lift the percentile.
+    lead.add(10.0, -1.0);
+    for (int i = 0; i < 60; ++i) {
+        lead.add(10.0, i % 10 == 0 ? 30.0 : 20.0);
+    }
+    CHECK(lead.leadMs() == Catch::Approx(40.0 + app::LiveLeadEstimate::kMarginMs));
+    lead.reset();
+    CHECK_FALSE(lead.ready());
 }
 
 // ---- ADR-1362: paced to the target, misses decide ------------------------------------------------------------------
