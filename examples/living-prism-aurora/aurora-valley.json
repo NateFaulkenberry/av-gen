@@ -25,6 +25,302 @@
  },
  "sources": [],
  "routes": [],
+ "palette": {
+  "states": [
+   {
+    "name": "Green Veil",
+    "colors": {
+     "auroraLow": [
+      0.1,
+      0.95,
+      0.55
+     ],
+     "auroraMid": [
+      0.12,
+      0.7,
+      0.75
+     ],
+     "auroraTop": [
+      0.55,
+      0.3,
+      0.95
+     ],
+     "aurora2Low": [
+      0.95,
+      0.35,
+      0.75
+     ],
+     "aurora2Mid": [
+      0.65,
+      0.35,
+      0.95
+     ],
+     "aurora2Top": [
+      0.3,
+      0.25,
+      0.85
+     ],
+     "crystalDeep": [
+      0.1,
+      0.04,
+      0.22
+     ],
+     "crystalBody": [
+      0.34,
+      0.14,
+      0.4
+     ],
+     "crystalFracture": [
+      0.72,
+      1.0,
+      0.94
+     ]
+    }
+   },
+   {
+    "name": "Rose Veil",
+    "colors": {
+     "auroraLow": [
+      0.98,
+      0.25,
+      0.62
+     ],
+     "auroraMid": [
+      0.85,
+      0.3,
+      0.9
+     ],
+     "auroraTop": [
+      0.42,
+      0.22,
+      0.95
+     ],
+     "aurora2Low": [
+      0.2,
+      0.9,
+      0.7
+     ],
+     "aurora2Mid": [
+      0.22,
+      0.62,
+      0.92
+     ],
+     "aurora2Top": [
+      0.3,
+      0.28,
+      0.88
+     ],
+     "crystalDeep": [
+      0.2,
+      0.03,
+      0.14
+     ],
+     "crystalBody": [
+      0.46,
+      0.12,
+      0.3
+     ],
+     "crystalFracture": [
+      1.0,
+      0.78,
+      0.95
+     ]
+    }
+   }
+  ],
+  "bindings": [
+   {
+    "role": "auroraLow",
+    "target": "fx/auroraMain/lowColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "fx/auroraMain/midColor"
+   },
+   {
+    "role": "auroraTop",
+    "target": "fx/auroraMain/topColor"
+   },
+   {
+    "role": "aurora2Low",
+    "target": "fx/auroraPink/lowColor"
+   },
+   {
+    "role": "aurora2Mid",
+    "target": "fx/auroraPink/midColor"
+   },
+   {
+    "role": "aurora2Top",
+    "target": "fx/auroraPink/topColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "lights/auroraFill/color"
+   },
+   {
+    "role": "auroraTop",
+    "target": "lights/skyFill/color"
+   },
+   {
+    "role": "auroraMid",
+    "target": "nodes/valley/water/shallowColor",
+    "gain": 0.012
+   },
+   {
+    "role": "auroraTop",
+    "target": "nodes/valley/water/deepColor",
+    "gain": 0.004
+   },
+   {
+    "role": "auroraLow",
+    "target": "material/au_crystal/op/9/oklabRamp/constant"
+   },
+   {
+    "role": "auroraMid",
+    "target": "material/au_crystal/op/9/oklabRamp/constant2"
+   },
+   {
+    "role": "aurora2Low",
+    "target": "material/au_crystal/op/9/oklabRamp/constant3"
+   },
+   {
+    "role": "auroraTop",
+    "target": "material/au_crystal/op/9/oklabRamp/constant4"
+   },
+   {
+    "role": "crystalDeep",
+    "target": "material/au_crystal/op/22/oklabRamp/constant"
+   },
+   {
+    "role": "crystalBody",
+    "target": "material/au_crystal/op/22/oklabRamp/constant2"
+   },
+   {
+    "role": "aurora2Low",
+    "target": "material/au_crystal/op/22/oklabRamp/constant3",
+    "gain": 0.55
+   },
+   {
+    "role": "auroraMid",
+    "target": "material/au_crystal/op/22/oklabRamp/constant4",
+    "gain": 0.65
+   },
+   {
+    "role": "crystalFracture",
+    "target": "material/au_crystal/op/38/constant/constant",
+    "gain": 1.1
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L1/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L1/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L1b/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L1b/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L2/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L2/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L3/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L3/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L4/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L4/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L5/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L5/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_L6/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_L6/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_R1/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_R1/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_R2/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_R2/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_R3/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_R3/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_R4/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_R4/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_R5/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_R5/material/emissiveColor"
+   },
+   {
+    "role": "auroraLow",
+    "target": "procedural/edgeA_R6/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/edgeB_R6/material/emissiveColor"
+   }
+  ],
+  "selector": {
+   "select": 0,
+   "transition": 6.0,
+   "lock": false
+  }
+ },
  "render": {
   "width": 1920,
   "height": 1080,

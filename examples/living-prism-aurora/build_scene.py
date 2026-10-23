@@ -18,15 +18,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import layout as L  # noqa: E402
 
-# the reference's palette (15 section 1): pastel accents over dark slate
-AURORA_LOW = [0.10, 0.95, 0.55]      # mint-green at the curtains' base
-AURORA_MID = [0.12, 0.70, 0.75]      # teal
-AURORA_TOP = [0.55, 0.30, 0.95]      # violet
-AURORA2_LOW = [0.95, 0.35, 0.75]     # the pink-violet layer
-AURORA2_MID = [0.65, 0.35, 0.95]
-AURORA2_TOP = [0.30, 0.25, 0.85]
-
-
 def prog_ground():
     """Phase 2e (the owner: "looks very CG"): moss and rock broken up at two noise scales, the moss edge frayed by the
     mottling, rock on the slopes and up high, creases darkened by the surface's own concavity. Also shades the scans.
@@ -63,24 +54,164 @@ def prog_ground():
                 {"kind": "remap", "dst": 7, "srcA": 6, "constant": [0, 1, 0.7, 0.95], "value": 1.0}]}
 
 
-def prog_crystal():
-    """Placeholder crystal (Phase 3 replaces it): a pale body, an aurora-mint rim, a soft pink interior."""
-    return {"name": "au_crystal", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 1,
-            "emissionIntensity": 1.0, "opacity": -1, "ops": [
-                {"kind": "input", "dst": 0, "input": "normal"},
-                {"kind": "input", "dst": 1, "input": "viewDirection"},
-                {"kind": "fresnel", "dst": 2, "srcA": 0, "srcB": 1, "value": 2.5},
-                {"kind": "input", "dst": 3, "input": "localPosition"},              # phase 2e: off flat pink
-                {"kind": "gradient", "dst": 3, "srcA": 3, "constant": [0, 1, 0, 0], "value": 0.022},
-                {"kind": "oklabRamp", "dst": 3, "srcA": 3, "constant": [0.12, 0.05, 0.24, 1],
-                 "constant2": [0.26, 0.09, 0.22, 1], "constant3": [0.24, 0.18, 0.36, 1],
-                 "constant4": [0.16, 0.34, 0.36, 1]},
-                {"kind": "constant", "dst": 4, "constant": [0.25, 0.9, 0.7, 1]},
-                {"kind": "multiply", "dst": 5, "srcA": 2, "srcB": 4},
-                {"kind": "add", "dst": 6, "srcA": 3, "srcB": 3},                    # interior = 2x the ramp
-                {"kind": "remap", "dst": 7, "srcA": 2, "constant": [0, 1, 1, 0.2]},
-                {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
-                {"kind": "add", "dst": 1, "srcA": 5, "srcB": 6}]}
+class Prog:
+    """A material program with labelled ops, so palette bindings name ops, not indices (from the grotto)."""
+
+    def __init__(self, name, intensity=1.0):
+        self.name, self.ops, self.labels, self.intensity = name, [], {}, intensity
+
+    def op(self, kind, dst, label=None, **kw):
+        o = {"kind": kind, "dst": dst}
+        for k, v in kw.items():
+            o[{"a": "srcA", "b": "srcB", "c": "srcC", "f": "value", "k": "constant", "k2": "constant2",
+               "k3": "constant3", "k4": "constant4"}.get(k, k)] = v
+        if label:
+            self.labels[label] = len(self.ops)
+        self.ops.append(o)
+        return len(self.ops) - 1
+
+    def path(self, label, field="constant"):
+        i = self.labels[label]   # op paths are 1-based (material_params.cpp opPath, ADR-232)
+        return "material/%s/op/%d/%s/%s" % (self.name, i + 1, self.ops[i]["kind"], field)
+
+    def json(self, base=-1, emission=-1, roughness=-1):
+        return {"name": self.name, "baseColor": base, "metallic": -1, "roughness": roughness, "emission": emission,
+                "emissionIntensity": self.intensity, "opacity": -1, "ops": self.ops}
+
+
+def c4(rgb, a=1.0):
+    return [round(v, 4) for v in rgb] + [a]
+
+
+# ---- the aurora palette (spec 5.4, 6.3): the shared representation of the aurora's colour --------------------------
+# Every system that should answer the aurora reads these roles through palette bindings (palette_json): both aurora
+# effects, the crystals' environment, interior, edge and fracture colours, the aurora fill lights, the water's
+# reflection tints. One state change moves the whole world; the states are the looks.
+ROLES = ["auroraLow", "auroraMid", "auroraTop", "aurora2Low", "aurora2Mid", "aurora2Top", "crystalDeep", "crystalBody",
+         "crystalFracture"]
+LOOKS = [
+    ("Green Veil", {"auroraLow": [0.10, 0.95, 0.55], "auroraMid": [0.12, 0.70, 0.75], "auroraTop": [0.55, 0.30, 0.95],
+                    "aurora2Low": [0.95, 0.35, 0.75], "aurora2Mid": [0.65, 0.35, 0.95], "aurora2Top": [0.30, 0.25, 0.85],
+                    "crystalDeep": [0.10, 0.04, 0.22], "crystalBody": [0.34, 0.14, 0.40],
+                    "crystalFracture": [0.72, 1.0, 0.94]}),
+    ("Rose Veil", {"auroraLow": [0.98, 0.25, 0.62], "auroraMid": [0.85, 0.30, 0.90], "auroraTop": [0.42, 0.22, 0.95],
+                   "aurora2Low": [0.20, 0.90, 0.70], "aurora2Mid": [0.22, 0.62, 0.92], "aurora2Top": [0.30, 0.28, 0.88],
+                   "crystalDeep": [0.20, 0.03, 0.14], "crystalBody": [0.46, 0.12, 0.30],
+                   "crystalFracture": [1.0, 0.78, 0.95]}),
+]
+LOOK = int(os.environ.get("AU_LOOK", "0"))
+R0 = dict(LOOKS[LOOK][1])
+
+
+def crystal_program():
+    """Phase 3 (spec 5.2): one crystal material, its colours from the aurora roles. Layers, all into the emission:
+      - facet structure: a per-facet random (quantised normal) varies the environment and the interior's brightness,
+        so each face reads on its own (the heroes' thin film adds a view-dependent sheen on top);
+      - environment: the aurora colour a facet would see -- up-facing facets the high (violet/pink) part, side-facing
+        the low (green) part, shuffled per facet -- weighted by Fresnel (reflection) with a floor (scatter);
+      - interior with depth: a base-to-tip OKLab gradient shifted by the view angle and the facet (a parallax-like
+        read of colour inside the stone), seen where the facet faces the camera;
+      - fractures: object-space Voronoi cell edges, thin, only where a slow noise selects them, in the look's pale fracture
+        colour (embedded: they move with the crystal and are absent on most of it);
+      - inclusions: rare hashed cells inside the stone that light up in the environment colour.
+    The body (baseColor) stays near-black: the contrast between dark facets and lit ones is the point (5.2)."""
+    p = Prog("au_crystal", 1.0)
+    p.op("input", 0, input="normal")
+    p.op("input", 1, input="viewDirection")
+    p.op("fresnel", 2, a=0, b=1, f=3.0)                                       # r2: grazing
+    p.op("quantize", 3, a=0, f=3.0, k=[0.31, 0.47, 0.23, 0], seed=5)
+    p.op("swizzle", 3, a=3, k=[3, 3, 3, 3])                                   # r3: the facet's random
+    p.op("gradient", 4, a=0, k=[0, 1, 0, 0.3], f=0.6)                         # side 0.3 (low/mid), up 0.9 (top)
+    p.op("remap", 5, a=3, k=[0, 1, -0.3, 0.3])
+    p.op("add", 4, a=4, b=5)
+    p.op("oklabRamp", 4, a=4, label="env", k=c4(R0["auroraLow"]), k2=c4(R0["auroraMid"]),
+         k3=c4(R0["aurora2Low"]), k4=c4(R0["auroraTop"]))                     # r4: the environment colour
+    p.op("remap", 5, a=2, k=[0, 1, 0.12, 1.0])
+    p.op("multiply", 5, a=5, b=4)
+    p.op("constant", 6, label="envGain", k=[0.55, 0.55, 0.55, 1])
+    p.op("multiply", 5, a=5, b=6)                                             # r5: the emission so far
+    p.op("input", 6, input="localPosition")
+    p.op("gradient", 6, a=6, k=[0, 1, 0, 0], f=0.02)                          # base to tip
+    p.op("remap", 7, a=2, k=[0, 1, 0, 0.4])
+    p.op("add", 6, a=6, b=7)                                                  # the view shifts it: depth
+    p.op("input", 7, input="localPosition")                                    # a cloudy, nebula-like interior
+    p.op("noise", 7, a=7, f=0.07, seed=29)
+    p.op("remap", 7, a=7, k=[0, 1, -0.45, 0.45])
+    p.op("add", 6, a=6, b=7)
+    p.op("oklabRamp", 6, a=6, label="interior", k=c4(R0["crystalDeep"]), k2=c4(R0["crystalBody"]),
+         k3=c4([c * 0.55 for c in R0["aurora2Low"]]), k4=c4([c * 0.65 for c in R0["auroraMid"]]))
+    p.op("remap", 7, a=2, k=[0, 1, 1, 0.25], f=1.0)                           # seen where the facet faces us
+    p.op("multiply", 6, a=6, b=7)
+    p.op("remap", 7, a=3, k=[0, 1, 0.4, 1.5])                                 # each facet its own brightness
+    p.op("multiply", 6, a=6, b=7)
+    p.op("constant", 7, label="interiorGain", k=[0.85, 0.85, 0.85, 1])
+    p.op("multiply", 6, a=6, b=7)
+    p.op("add", 5, a=5, b=6)
+    p.op("input", 6, input="localPosition")                                    # fractures
+    p.op("voronoiEdge", 7, a=6, f=0.09, seed=13)
+    p.op("swizzle", 7, a=7, k=[0, 0, 0, 0])            # F2 - F1 into every channel (the others tinted it red)
+    p.op("smoothstep", 7, a=7, k=[0.0, 0.018, 0, 0])
+    p.op("remap", 7, a=7, k=[0, 1, 1, 0], f=1.0)
+    p.op("noise", 6, a=6, f=0.05, seed=17)
+    p.op("smoothstep", 6, a=6, k=[0.5, 0.62, 0, 0])      # cracks on about a third of the stone
+    p.op("multiply", 7, a=7, b=6)
+    p.op("constant", 6, label="fracture", k=c4([c * 1.1 for c in R0["crystalFracture"]]))
+    p.op("multiply", 7, a=7, b=6)
+    p.op("add", 5, a=5, b=7)
+    p.op("input", 6, input="localPosition")                                    # inclusions
+    p.op("quantize", 6, a=6, f=7.0, seed=21)
+    p.op("swizzle", 6, a=6, k=[3, 3, 3, 3])
+    p.op("smoothstep", 6, a=6, k=[0.988, 0.996, 0, 0])
+    p.op("multiply", 6, a=6, b=4)
+    p.op("remap", 6, a=6, k=[0, 1, 0, 3.0])
+    p.op("add", 5, a=5, b=6)
+    assert len(p.ops) <= 48, len(p.ops)
+    return p
+
+
+XTAL_P = crystal_program()
+# the heroes refract (spec 5.3): the two largest formations; Phase 3 A/B decides (AU_REFRACT=0 builds without)
+REFRACTION = os.environ.get("AU_REFRACT", "1") == "1"
+REFRACT_HEROES = {"L1": {"strength": 0.05, "opacity": 0.35, "thickness": 1.5, "absorption": [0.35, 0.45, 0.25]},
+                  "R1": {"strength": 0.05, "opacity": 0.35, "thickness": 1.5, "absorption": [0.35, 0.45, 0.25]}}
+
+
+def xmat(name):
+    m = {"baseColor": [0.012, 0.008, 0.02], "roughness": 0.06, "metallic": 0.0, "program": "au_crystal"}
+    if name in REFRACT_HEROES:
+        m["thinFilm"] = {"thickness": 420.0, "ior": 1.45}
+        if REFRACTION:
+            m["refraction"] = dict(REFRACT_HEROES[name])
+    return m
+
+
+def palette_json():
+    P = XTAL_P
+    b = [{"role": "auroraLow", "target": "fx/auroraMain/lowColor"},
+         {"role": "auroraMid", "target": "fx/auroraMain/midColor"},
+         {"role": "auroraTop", "target": "fx/auroraMain/topColor"},
+         {"role": "aurora2Low", "target": "fx/auroraPink/lowColor"},
+         {"role": "aurora2Mid", "target": "fx/auroraPink/midColor"},
+         {"role": "aurora2Top", "target": "fx/auroraPink/topColor"},
+         {"role": "auroraLow", "target": "lights/auroraFill/color"},
+         {"role": "auroraTop", "target": "lights/skyFill/color"},
+         # the water's own body takes a trace of the aurora (its reflection of the sky is the live aurora already)
+         {"role": "auroraMid", "target": "nodes/valley/water/shallowColor", "gain": 0.012},
+         {"role": "auroraTop", "target": "nodes/valley/water/deepColor", "gain": 0.004},
+         {"role": "auroraLow", "target": P.path("env", "constant")},
+         {"role": "auroraMid", "target": P.path("env", "constant2")},
+         {"role": "aurora2Low", "target": P.path("env", "constant3")},
+         {"role": "auroraTop", "target": P.path("env", "constant4")},
+         {"role": "crystalDeep", "target": P.path("interior", "constant")},
+         {"role": "crystalBody", "target": P.path("interior", "constant2")},
+         {"role": "aurora2Low", "target": P.path("interior", "constant3"), "gain": 0.55},
+         {"role": "auroraMid", "target": P.path("interior", "constant4"), "gain": 0.65},
+         {"role": "crystalFracture", "target": P.path("fracture"), "gain": 1.1}]
+    for f in L.FORMATIONS:   # the facet edges: bright ones in the low aurora colour, dim ones in the mid
+        b.append({"role": "auroraLow", "target": "procedural/edgeA_%s/material/emissiveColor" % f[0]})
+        b.append({"role": "auroraMid", "target": "procedural/edgeB_%s/material/emissiveColor" % f[0]})
+    states = [{"name": n, "colors": {r: roles[r] for r in ROLES}} for n, roles in LOOKS]
+    return {"states": states, "bindings": b, "selector": {"select": LOOK, "transition": 6.0, "lock": False}}
 
 
 WATER = {  # long exposure (spec 7): dark body, view-stretched rough reflections, aurora-coloured streak patches
@@ -130,11 +261,14 @@ def scene_json(placed, scans):
                           "water": WATER},
               "material": {"baseColor": [0.02, 0.05, 0.02], "roughness": 0.85, "metallic": 0.0,
                            "program": "au_ground"}}]
-    xmat = {"baseColor": [0.2, 0.18, 0.28], "roughness": 0.08, "metallic": 0.0, "program": "au_crystal"}
     for f, pos, q, _ground in placed:
         s = f[4]
         pt = [round(c, 3) for c in pos] + [round(c, 6) for c in q] + [s, s, s]
-        nodes.append(mesh_node("xtal_" + f[0], f[5] + ".glb", [pt], xmat))
+        nodes.append(mesh_node("xtal_" + f[0], f[5] + ".glb", [pt], xmat(f[0])))
+        for key, k in (("edgeA", 2.2), ("edgeB", 0.35)):   # phase 3: the glowing facet edges (aurora roles)
+            nodes.append(mesh_node("%s_%s" % (key, f[0]), "%s_%s.glb" % (f[5], key), [pt],
+                                   {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": k,
+                                    "roughness": 1.0, "metallic": 0.0}, shadow=False))
     # the Poly Haven scans (phase 2e): cliffs on the rocky left, outcrops on the right, boulders on both banks
     gmat = {"baseColor": [0.02, 0.03, 0.02], "roughness": 0.85, "metallic": 0.0, "program": "au_ground"}
     for asset, pts in scans.items():   # phase 2f perf: no scan casts a shadow (measured ~1.8 ms in 2e)
@@ -164,11 +298,11 @@ def scene_json(placed, scans):
         "lights": [
             # the aurora's light on the valley: a broad mint fill from the sky ahead, and a dim violet from above
             {"name": "auroraFill", "id": "auroraFill", "type": "directional", "role": "key",
-             "direction": [0.1, -0.45, 0.89], "color": AURORA_LOW, "intensity": 0.7, "castsShadow": True},
+             "direction": [0.1, -0.45, 0.89], "color": R0["auroraLow"], "intensity": 0.7, "castsShadow": True},
             # phase 2e: the violet fill rakes low across the valley from the right, so the left wall's ledges, spurs
             # and gullies model in light and shade instead of reading as smooth domes
             {"name": "skyFill", "id": "skyFill", "type": "directional", "direction": [-0.85, -0.38, -0.36],
-             "color": AURORA_TOP, "intensity": 0.32, "castsShadow": False}],
+             "color": R0["auroraTop"], "intensity": 0.32, "castsShadow": False}],
         "effects": [
             {"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True, "order": 0,
              "activation": "always", "parameters": {"brightness": 1.6, "density": 0.55, "magnitudeSlope": 6.5,
@@ -176,10 +310,10 @@ def scene_json(placed, scans):
                                                     "horizonFade": 0.6, "band": 0.15, "bandTilt": 30.0,
                                                     "daylight": 0.0}},
             # two ribbon bands with dark, starry sky between and above them (phase 2b): short curtains, undulating tops
-            aurora("auroraMain", AURORA_LOW, AURORA_MID, AURORA_TOP, 750.0, 320.0, 3000.0, 2.0, 2.6, 72.0, 0.02, 5.0),
-            aurora("auroraPink", AURORA2_LOW, AURORA2_MID, AURORA2_TOP, 650.0, 1350.0, 3400.0, 2.0, 2.0, 50.0,
+            aurora("auroraMain", R0["auroraLow"], R0["auroraMid"], R0["auroraTop"], 750.0, 320.0, 3000.0, 2.0, 2.6, 72.0, 0.02, 5.0),
+            aurora("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 650.0, 1350.0, 3400.0, 2.0, 2.0, 50.0,
                    0.015, 3.5)],
-        "materialPrograms": [prog_ground(), prog_crystal()],
+        "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=-1)],
         "nodes": nodes,
     }
 
@@ -192,7 +326,7 @@ def project_json(scene_rel, offline=False, root=""):
          "parameters": {"camera/exposure/compensation": 0.0, "post/bloom/enabled": True, "post/bloom/threshold": 1.4,
                         "post/bloom/intensity": 0.3, "post/bloom/radius": 0.8, "post/tonemap/chroma-retention": 0.8,
                         "post/output/vignette": 0.3, "post/grade/saturation": 1.0},
-         "sources": [], "routes": [],
+         "sources": [], "routes": [], "palette": palette_json(),
          "render": {"width": 1920, "height": 1080, "fps": 30}}
     if offline:
         p["assets"]["audio"] = {"path": os.path.join(root, "assets/audio/feline-footwear.wav")}

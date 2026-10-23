@@ -66,31 +66,49 @@ def shard(bm, base, axis, width, length, rng, sides=None, flat=None, tip=None, c
         bm.faces.new(r1)
         bm.faces.new(list(reversed(r0)))
         return
-    r1 = ring(base + a * (length - tip), rng.uniform(0.88, 1.0))
+    shard_body(bm, base, a, u, v, width, length, tip, flat, angles, rs, rng, embed)
+
+
+def shard_body(bm, base, a, u, v, width, length, tip, flat, angles, rs, rng, embed):
+    """Phase 3 (spec 5.1): the hero shard. Every corner of the hexagon is chamfered (two vertices a little apart),
+    so each long primary face is flanked by a narrow secondary facet that catches light on its own; a mid ring kinks
+    the column (the primary faces break into two planes); one or two corners of the upper ring are chipped; the
+    termination is two-staged (a ring at about half the tip, its corners at irregular heights) to a skewed apex."""
+    d = rng.uniform(0.07, 0.11)                  # the chamfer, radians either side of a corner
+    corners = []
+    for t, r in zip(angles, rs):
+        corners += [(t - d, r * math.cos(d)), (t + d, r * math.cos(d))]
+    n = len(corners)
+
+    ci = bm.verts.layers.int.get("ci") or bm.verts.layers.int.new("ci")
+
+    def ring(c, sc, jitter=0.0, chips=(), lift=None):
+        out = []
+        for k, (t, r) in enumerate(corners):
+            rr = r * sc * (0.78 if k // 2 in chips else 1.0)
+            p = c + u * (math.cos(t) * rr) + v * (math.sin(t) * rr * flat)
+            if lift is not None:
+                p = p + a * lift[k // 2]
+            vv = bm.verts.new(p)
+            vv[ci] = k + 1      # 1-based place in the chamfered ring (0: not a ring vertex)
+            out.append(vv)
+        return out
+    kink = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.07
+    chips = set(rng.sample(range(len(angles)), rng.choice([0, 1, 1, 2])))
     off = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * width * 0.25
-    top = base + a * length + off
-    if chisel:   # a two-point (chisel) termination: two apices on a short ridge
-        e = u * width * 0.35
-        p1, p2 = bm.verts.new(top - e), bm.verts.new(top + e * 0.6 - a * tip * 0.15)
-    for i in range(sides):
-        j = (i + 1) % sides
-        bm.faces.new((r0[i], r0[j], r1[j], r1[i]))
-        if chisel:
-            # split the ring between the two apices by which side of the ridge each vertex lies
-            pa = p1 if (r1[i].co - top).dot(u) < 0 else p2
-            pb = p1 if (r1[j].co - top).dot(u) < 0 else p2
-            if pa is pb:
-                bm.faces.new((r1[i], r1[j], pa))
-            else:
-                bm.faces.new((r1[i], r1[j], pb, pa))
-        else:
-            apex = getattr(shard, "_apex", None)
-            if i == 0:
-                shard._apex = bm.verts.new(top)
-            bm.faces.new((r1[i], r1[j], shard._apex))
-    if chisel:
-        pass
-    bm.faces.new(list(reversed(r0)))
+    lifts = [rng.uniform(-0.12, 0.12) * tip for _ in angles]
+    rings = [ring(base - a * (embed * length), 1.0),
+             ring(base + a * (length * rng.uniform(0.42, 0.6)) + kink, rng.uniform(0.96, 1.03)),
+             ring(base + a * (length - tip), rng.uniform(0.88, 0.97), chips=chips),
+             ring(base + a * (length - tip * 0.42) + off * 0.55, rng.uniform(0.4, 0.52), lift=lifts)]
+    for r0, r1 in zip(rings, rings[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((r0[i], r0[j], r1[j], r1[i]))
+    apex = bm.verts.new(base + a * length + off)
+    for i in range(n):
+        bm.faces.new((rings[-1][i], rings[-1][(i + 1) % n], apex))
+    bm.faces.new(list(reversed(rings[0])))
 
 
 def lean(rng, out_x, deg_lo, deg_hi, spread=25):
@@ -142,6 +160,76 @@ FAMILIES = {
 }
 
 
+def family_view(name):
+    """The direction to the camera in the family's own frame (Blender axes), from the first formation that uses it."""
+    for f in L.FORMATIONS:
+        if f[5] == name:
+            q = L.formation_quat(f)
+            x, z = f[1], f[2]
+            d = [L.CAMERA_POS[0] - x, L.CAMERA_POS[1] - L.height(x, z), L.CAMERA_POS[2] - z]
+            qi = (-q[0], -q[1], -q[2], q[3])
+            lv = L._qrot(qi, d)
+            return Vector((lv[0], -lv[2], lv[1])).normalized()
+    return None
+
+
+def build_edges(bm, name, out, rng, rr=0.105, sharp=18.0):
+    """Phase 3 (spec 5.2, glowing edges): thin triangular prisms along every sharp facet edge (dihedral > `sharp`
+    degrees), lifted just proud of the surface. About 40% go to <name>_edgeA (bright), the rest to <name>_edgeB
+    (dim), so the outlines are selective rather than a uniform wireframe. Geometry, not a shader: the renderer has
+    no per-pixel edge distance, and at the fixed camera a 0.21 m prism x the formation's scale is 1-3 px."""
+    sets = {"edgeA": bmesh.new(), "edgeB": bmesh.new()}
+    ci = bm.verts.layers.int.get("ci")
+    view = family_view(name)
+    for e in bm.edges:
+        if len(e.link_faces) != 2:
+            continue
+        n0, n1 = e.link_faces[0].normal, e.link_faces[1].normal
+        if n0.length == 0 or n1.length == 0 or math.degrees(n0.angle(n1)) < sharp:
+            continue
+        # one line per chamfered corner: of a corner's two vertical edges (ring places 2k+1, 2k+2), keep the first
+        k0, k1 = (e.verts[0][ci], e.verts[1][ci]) if ci is not None else (0, 0)
+        if k0 and k0 == k1 and k0 % 2 == 0:
+            continue
+        # only edges the camera can see: a back edge shows through a refracting hero as wireframe
+        if view is not None and n0.dot(view) < 0.02 and n1.dot(view) < 0.02:
+            continue
+        a, b = e.verts[0].co.copy(), e.verts[1].co.copy()
+        d = b - a
+        if d.length < 1e-4:
+            continue
+        lift = (n0 + n1).normalized() * rr * 1.0
+        ref = Vector((0, 0, 1)) if abs(d.normalized().z) < 0.9 else Vector((1, 0, 0))
+        p = d.cross(ref).normalized()
+        q = d.normalized().cross(p)
+        tb = sets["edgeA" if rng.random() < 0.4 else "edgeB"]
+        ra, rb = [], []
+        for k in range(3):
+            t = math.tau * k / 3
+            o = (p * math.cos(t) + q * math.sin(t)) * rr
+            ra.append(tb.verts.new(a + lift + o))
+            rb.append(tb.verts.new(b + lift + o))
+        for k in range(3):
+            j = (k + 1) % 3
+            tb.faces.new((ra[k], ra[j], rb[j], rb[k]))
+    for key, tb in sets.items():
+        bmesh.ops.recalc_face_normals(tb, faces=tb.faces)
+        me = bpy.data.meshes.new(name + "_" + key)
+        tb.to_mesh(me)
+        tb.free()
+        ob = bpy.data.objects.new(name + "_" + key, me)
+        bpy.context.scene.collection.objects.link(ob)
+        for o in bpy.context.selected_objects:
+            o.select_set(False)
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + "_" + key + ".glb"), export_format="GLB",
+                                  use_selection=True, export_yup=True, export_apply=True, export_normals=True,
+                                  export_materials="NONE")
+        ob.hide_render = True
+        print("EXPORTED", name + "_" + key, len(me.polygons), "faces")
+
+
 def build_family(name, out):
     seed, spec, outward = FAMILIES[name]
     rng = random.Random(seed)
@@ -149,9 +237,23 @@ def build_family(name, out):
     for row in spec:
         dx, dy, w, ln, lo, hi = row[:6]
         shard._apex = None
-        shard(bm, (dx, dy, 0.0), lean(rng, outward, lo * 0.8, hi * 0.8), w * 1.6, ln, rng,
-              broken=len(row) > 6 and row[6] == 1)
+        ax = lean(rng, outward, lo * 0.8, hi * 0.8)
+        shard(bm, (dx, dy, 0.0), ax, w * 1.6, ln, rng, broken=len(row) > 6 and row[6] == 1)
+        # phase 3 (spec 5.1, asymmetric branching): a long shard grows a side crystal from a third to half its height,
+        # leaning 16-26 deg further out than its parent, on one side
+        # (a strongly leaning parent grows none: its branch would stick out sideways, the owner's "boot")
+        if ln >= 30 and hi <= 20 and rng.random() < 0.65:
+            pa = Vector(ax).normalized()
+            pu, pv, _ = basis(pa)
+            ang = rng.uniform(0, math.tau)
+            rad = (pu * math.cos(ang) + pv * math.sin(ang)).normalized()
+            h = ln * rng.uniform(0.3, 0.5)
+            b0 = Vector((dx, dy, 0.0)) + pa * h + rad * (w * 1.6 * 0.55)
+            bax = (pa + rad * math.tan(math.radians(rng.uniform(16, 26)))).normalized()
+            shard._apex = None
+            shard(bm, b0, bax, w * 1.6 * rng.uniform(0.38, 0.5), ln * rng.uniform(0.32, 0.45), rng, embed=0.25)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    build_edges(bm, name, out, random.Random(seed + 1000))
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
