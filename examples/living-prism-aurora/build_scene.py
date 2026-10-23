@@ -191,7 +191,8 @@ XTAL_P = crystal_program()
 # AU_REFRACT=0 builds without. Distant formations stay opaque: a refractive crystal behind another refractive one is
 # missing from the single-layer copy (17: an engine change).
 REFRACTION = os.environ.get("AU_REFRACT", "1") == "1"
-_RF = {"strength": 0.12, "opacity": 0.3, "thickness": 4.0, "absorption": [0.15, 0.6, 0.05]}
+_RF = {"strength": 0.12, "opacity": 0.3, "thickness": 4.0, "absorption": [0.15, 0.6, 0.05],
+       "dispersion": 0.2}   # 5d: chromatic dispersion (ADR-1640; 0.1-0.3 at this strength, >0.5 splits thin lines)
 REFRACT_HEROES = {n: dict(_RF) for n in ("L1", "L1b", "L2", "L3", "R1", "R2", "R3", "R4")}
 
 
@@ -342,6 +343,106 @@ def write_glb(path, positions, normals, indices):
 CIRCUITS = os.environ.get("AU_CIRCUITS", "0") == "1"   # 5c: off (the owner: "lets nix the circuitry lines for now")
 
 
+def write_glb_textured(path, positions, normals, uvs, indices, color_jpg, normal_jpg):
+    """A GLB with one textured mesh (positions, normals, uvs, uint32 indices; base colour and normal JPEGs embedded)."""
+    import struct
+    chunks, views, acc = [], [], []
+
+    def add(data, target=None):
+        off = sum(len(c) for c in chunks)
+        chunks.append(data + b"\0" * (-len(data) % 4))
+        v = {"buffer": 0, "byteOffset": off, "byteLength": len(data)}
+        if target:
+            v["target"] = target
+        views.append(v)
+        return len(views) - 1
+    vp = add(b"".join(struct.pack("<3f", *p) for p in positions), 34962)
+    vn = add(b"".join(struct.pack("<3f", *n) for n in normals), 34962)
+    vt = add(b"".join(struct.pack("<2f", *t) for t in uvs), 34962)
+    vi = add(b"".join(struct.pack("<I", i) for i in indices), 34963)
+    vc = add(open(color_jpg, "rb").read())
+    vnm = add(open(normal_jpg, "rb").read())
+    acc = [{"bufferView": vp, "componentType": 5126, "count": len(positions), "type": "VEC3",
+            "min": [min(p[k] for p in positions) for k in range(3)],
+            "max": [max(p[k] for p in positions) for k in range(3)]},
+           {"bufferView": vn, "componentType": 5126, "count": len(normals), "type": "VEC3"},
+           {"bufferView": vt, "componentType": 5126, "count": len(uvs), "type": "VEC2"},
+           {"bufferView": vi, "componentType": 5125, "count": len(indices), "type": "SCALAR"}]
+    binb = b"".join(chunks)
+    gl = {"asset": {"version": "2.0", "generator": "living-prism-aurora build_scene"},
+          "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
+          "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2}, "indices": 3,
+                                      "material": 0}]}],
+          "materials": [{"name": "moss002", "pbrMetallicRoughness": {"baseColorTexture": {"index": 0},
+                                                                     "metallicFactor": 0.0, "roughnessFactor": 1.0},
+                         "normalTexture": {"index": 1}}],
+          "samplers": [{"magFilter": 9729, "minFilter": 9987, "wrapS": 10497, "wrapT": 10497}],
+          "images": [{"bufferView": vc, "mimeType": "image/jpeg"}, {"bufferView": vnm, "mimeType": "image/jpeg"}],
+          "textures": [{"source": 0, "sampler": 0}, {"source": 1, "sampler": 0}],
+          "buffers": [{"byteLength": len(binb)}], "bufferViews": views, "accessors": acc}
+    js = json.dumps(gl).encode()
+    js += b" " * (-len(js) % 4)
+    with open(path, "wb") as f:
+        f.write(struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(binb)))
+        f.write(struct.pack("<II", len(js), 0x4E4F534A) + js)
+        f.write(struct.pack("<II", len(binb), 0x004E4942) + binb)
+
+
+MOSS_DIR = os.path.join(HERE, "..", "..", "assets", "nature", "moss", "Moss002")
+
+
+def build_moss_carpet(path, spots, cell=1.0, lift=0.12, tile=2.0, seed=2026102326):
+    """5d moss as a carpet that follows the ground: every moss spot (x, z, radius) is rasterised into one world grid
+    (a union of discs, the edge frayed by noise), and the marked cells become one mesh draped on the engine's heights,
+    UV-mapped in world space (one moss tile per `tile` m) and textured with ambientCG Moss002 (CC0). Wet cells are
+    left out. One GLB, no overlaps, no rims."""
+    import random
+    rng = random.Random(seed)
+    cells = set()
+    for x, z, r in spots:
+        rr = r * rng.uniform(0.8, 1.1)
+        for i in range(int((x - rr) // cell) - 1, int((x + rr) // cell) + 2):
+            for j in range(int((z - rr) // cell) - 1, int((z + rr) // cell) + 2):
+                cx, cz = (i + 0.5) * cell, (j + 0.5) * cell
+                ang = math.atan2(cz - z, cx - x)
+                edge = rr * (1.0 + 0.18 * math.sin(3 * ang + x) + 0.1 * math.sin(7 * ang + z))
+                if math.hypot(cx - x, cz - z) <= edge:
+                    cells.add((i, j))
+    verts = sorted({(i + di, j + dj) for i, j in cells for di in (0, 1) for dj in (0, 1)})
+    hs = L.engine_heights([(i * cell, j * cell) for i, j in verts])
+    hmap = dict(zip(verts, hs))
+    keep = []
+    for i, j in cells:
+        cx, cz = (i + 0.5) * cell, (j + 0.5) * cell
+        lvl = L.water_level(cx, cz)
+        if lvl is not None and min(hmap[(i + a, j + b)] for a in (0, 1) for b in (0, 1)) <= lvl + 0.25:
+            continue
+        keep.append((i, j))
+    idx, P, N, T, I = {}, [], [], [], []
+    for i, j in keep:
+        quad = []
+        for a, b in ((0, 0), (1, 0), (1, 1), (0, 1)):
+            key = (i + a, j + b)
+            if key not in idx:
+                idx[key] = len(P)
+                x, z = key[0] * cell, key[1] * cell
+                h = hmap[key]
+                hx0 = hmap.get((key[0] - 1, key[1]), h)
+                hx1 = hmap.get((key[0] + 1, key[1]), h)
+                hz0 = hmap.get((key[0], key[1] - 1), h)
+                hz1 = hmap.get((key[0], key[1] + 1), h)
+                nx, ny, nz = -(hx1 - hx0), 2 * cell, -(hz1 - hz0)
+                nl = math.sqrt(nx * nx + ny * ny + nz * nz)
+                P.append((x, h + lift, z))
+                N.append((nx / nl, ny / nl, nz / nl))
+                T.append((x / tile, z / tile))
+            quad.append(idx[key])
+        I += [quad[0], quad[2], quad[1], quad[0], quad[3], quad[2]]
+    write_glb_textured(path, P, N, T, I, os.path.join(MOSS_DIR, "Moss002_2K-JPG_Color.jpg"),
+                       os.path.join(MOSS_DIR, "Moss002_2K-JPG_NormalGL.jpg"))
+    print("moss carpet: %d cells, %.0f m2" % (len(keep), len(keep) * cell * cell))
+
+
 def build_circuits(path, placed, seed=2026102320):
     """5b (spec 8): a restrained network of luminous pathways on the near banks, following the river. Each trace runs
     along the river at a set offset from its centreline, jogs sideways at a few points (the circuit idiom) and may
@@ -438,7 +539,7 @@ def crystal_lights(placed):
     return out
 
 
-def scene_json(placed, scans):
+def scene_json(placed, scans, moss=None):
     nodes = [{"name": "valley", "kind": "terrain", "position": [0, 0, 0], "world": L.world_json(),
               "terrain": {"chunkSize": 200.0, "resolution": 64, "lodLevels": 3, "lodDistance": 200.0,
                           "viewDistance": 6000.0, "shadowDistance": 300.0, "skirtDepth": 3.0, "groundMottle": False,
@@ -456,9 +557,13 @@ def scene_json(placed, scans):
     # the Poly Haven scans (phase 2e): cliffs on the rocky left, outcrops on the right, boulders on both banks
     # 17 (offline): the scans carry their own Poly Haven CC0 PBR textures; the material only tints them into the night
     # (a cool, dark lavender) -- no program, so the scanned albedo, normal and roughness detail reads. Shadows on.
-    tmat = {"baseColor": [0.55, 0.5, 0.66], "roughness": 1.0, "metallic": 0.0}
+    tmat = {"baseColor": [0.8, 0.74, 0.86], "roughness": 1.0, "metallic": 0.0}   # 5d: lighter, so the masses read
     for asset, pts in scans.items():
         nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, tmat, shadow=True))
+    # 5d: the moss carpet (ambientCG Moss002, CC0) on the owner's mossy areas and around every crystal base
+    if moss:
+        nodes.append(mesh_node("moss", "moss_carpet.glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]],
+                               {"baseColor": [0.8, 0.85, 0.75], "roughness": 1.0, "metallic": 0.0}, shadow=False))
     # 5b (spec 8): the circuit pathways on the near banks, emissive in the low aurora colour (palette-bound).
     # 5c: off unless AU_CIRCUITS=1
     if CIRCUITS:
@@ -659,6 +764,67 @@ def auto_outcrops(sizes, placed, footprints, count=8, seed=2026102318):
     return picked
 
 
+# ---- 5d: the owner's marks on the 5c frame (1920x1080 pixels of layout.CAMERA_5C) ----------------------------------
+# red boxes: cliff-like rock masses that butt up against and fit between the crystals
+ROCK_BOXES = {"a": (507, 537, 742, 687), "b": (1072, 505, 1215, 568), "c": (1265, 587, 1465, 738)}
+# blue ellipses: mossy green earth (centre x, centre y, half width, half height)
+MOSS_AREAS = [(465, 812, 175, 100), (875, 530, 70, 90), (1034, 492, 46, 55), (1188, 642, 101, 75),
+              (1810, 590, 100, 75), (1675, 851, 225, 149)]
+
+
+def owner_rocks(sizes, seed=2026102324):
+    """Rock masses across each red box: the box's ground footprint (its corners and centre raycast through the 5c
+    camera) gets two or three big scans -- cliffs and mossy rock -- side by side, each scaled to about a third of the
+    box's width and turned to face the camera, seated into the ground at its centre."""
+    import random
+    rng = random.Random(seed)
+    items = []
+    for key, (x0, y0, x1, y1) in sorted(ROCK_BOXES.items()):
+        cols = 3 if (x1 - x0) > 180 else 2
+        pix = [((x0 + (x1 - x0) * (i + 0.5) / cols), (y0 + y1) / 2 + rng.uniform(-0.15, 0.15) * (y1 - y0))
+               for i in range(cols)]
+        ends = L.screen_to_ground([(x0, (y0 + y1) / 2), (x1, (y0 + y1) / 2)] + pix)
+        if None in ends[:2]:
+            continue
+        width = math.hypot(ends[1][0] - ends[0][0], ends[1][2] - ends[0][2])
+        for hit in ends[2:]:
+            if hit is None:
+                continue
+            a = rng.choice(["cliffA", "cliffD", "cliffB"])
+            sc = width / cols * rng.uniform(1.6, 2.1) / max(sizes[a][0], sizes[a][2])   # masses, not rocks
+            yaw = math.degrees(math.atan2(L.CAMERA_POS[0] - hit[0], L.CAMERA_POS[2] - hit[2])) + rng.uniform(-30, 30)
+            items.append((a, hit[0], hit[2], yaw, sc, 0.12))
+    print("owner rocks: %d" % len(items))
+    return items
+
+
+def moss_points(placed, footprints, sizes=None, seed=2026102325):
+    """Moss spots (x, z, radius): over each blue area (pixels inside the ellipse raycast through the 5c camera), and
+    ringed around every crystal's base where the stone meets the earth. build_moss_carpet turns them into one draped,
+    textured mesh."""
+    import random
+    rng = random.Random(seed)
+    spots = []
+    for cx, cy, rx, ry in MOSS_AREAS:
+        n = int(30 + rx * ry / 350)   # dense: overlapping pads form a carpet
+        pix = []
+        while len(pix) < n:
+            u, v = rng.uniform(-1, 1), rng.uniform(-1, 1)
+            if u * u + v * v <= 1:
+                pix.append((cx + u * rx, cy + v * ry))
+        for hit in L.screen_to_ground(pix):
+            if hit is not None:
+                spots.append((hit[0], hit[2], rng.uniform(6.0, 13.0)))
+    for f, pos, q, _g in placed:                            # around every crystal's base
+        s = f[4]
+        base = [L._qrot(q, (s * a[0], 0.0, s * a[2])) for a in footprints[f[5]] if a[1] < 0.5]
+        for v in rng.sample(base, min(len(base), 24)):
+            d = math.hypot(v[0], v[2]) or 1.0
+            out = rng.uniform(0.6, 4.0)
+            spots.append((pos[0] + v[0] + v[0] / d * out, pos[2] + v[2] + v[2] / d * out, rng.uniform(2.5, 5.5)))
+    return spots
+
+
 def place_scans(sizes, placed=(), footprints=None):
     """Points for each scan asset: the cliffs, then a sparse, seeded scatter on both banks, denser on the rocky left.
     Everything stands on the engine's ground, and nothing goes on wet ground."""
@@ -671,6 +837,7 @@ def place_scans(sizes, placed=(), footprints=None):
     print("cliffs placed by view: %d" % (len(cliffs) - len(CLIFFS)))
     for asset, z, side, setback, yaw, sc, sink in cliffs:
         items.append((asset, L.river_x(z) + side * setback, z, yaw, sc, sink))
+    owner = owner_rocks(sizes) if footprints else []
     # phase 2h: no rock inside a crystal's ground footprint (a boulder half inside a cluster read as a dark notch)
     def clear_of_crystals(x, z, r):
         return all(min(math.hypot(x - gx, z - gz) for gx, gz in ground) > r + 3.0 for _f, _p, _q, ground in placed)
@@ -683,6 +850,7 @@ def place_scans(sizes, placed=(), footprints=None):
                 x, sc = L.river_x(z) + side * d, rng.uniform(lo, hi)
                 if clear_of_crystals(x, z, 0.5 * max(sizes[asset][0], sizes[asset][2]) * sc):
                     items.append((asset, x, z, rng.uniform(0, 360), sc, 0.25))
+    items += owner   # 5d: the owner's rock masses go between the crystals (not filtered by the footprints)
     # each piece sinks from the LOWEST ground under its footprint (centre and four corners), so none floats as a
     # shelf off a slope
     probes = []
@@ -727,8 +895,11 @@ def main():
     sweep = L.terrain_sweep(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
     print("terrain (hidden % / buried %): " + " ".join("%s %.0f/%.0f" % r for r in sweep))
     os.makedirs(a.scene_dir, exist_ok=True)
+    build_moss_carpet(os.path.join(a.assets, "moss_carpet.glb"),
+                      moss_points(placed, json.load(open(os.path.join(a.assets, "footprints.json")))))
+    moss = True
     sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json"))), placed,
-                                       json.load(open(os.path.join(a.assets, "footprints.json")))))
+                                       json.load(open(os.path.join(a.assets, "footprints.json")))), moss)
     for n in sc["nodes"]:
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":

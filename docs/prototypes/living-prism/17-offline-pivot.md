@@ -266,3 +266,37 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5c/`
   - the ground term: cut, as above;
   - the pink crystal light beside L1: all eight crystal lights halved, to 700, still subtle.
 - **Distance haze:** kept violet. It sits against the reference's pink-peach horizon well enough. The far river carries it instead of grey.
+
+## Phase 5d gate (2026-10-23)
+
+The owner's 5c notes, verbatim: "the lighting of the banks etc, doesnt bother me we dont have to keep trying to match the reference material that closely. here are some revisions I'd like though. I've add an arrow, let's move the camera up so the bototm of the scene is about here. The red square highlighted areas lets fill with more rocky features, cliff like structures, we should have some assets that work - not just tiny rocks, but things that butt up and fit between the crystals. let's also find a good quality moss texture and start covering the ground with moss - areas circled in blue are where I want mossy green earth (or whatever color it ends up being under the sky lighting). moss should be used to cover up places where crystals meet the earth to make them blend better"
+
+The coordinator relayed the annotation coordinates, since the screenshot was not on disk. Dispersion (ADR-1640) merged to main 44362df9; the branch is rebased onto it.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5d/`
+
+| File | Shows |
+|---|---|
+| `phase5d-frame.jpg`, `phase5d-frame-rose.jpg` | the full frame in both looks |
+| `phase5c-vs-5d.jpg` | before and after |
+| `phase5d-details.jpg` | the rock masses and the moss carpet |
+| `phase5d-dispersion.jpg` | dispersion on the heroes |
+
+**Camera.** It tilts up 7.3° (the target y 22 → 76), so the 5c frame's y = 915 line is the new bottom edge. The 5c camera is kept as `layout.CAMERA_5C`, because the owner's marks are in its pixels.
+
+**Rock masses (the red boxes).**
+- `build_scene.ROCK_BOXES` holds the three boxes. `layout.screen_to_ground()` raycasts them through the 5c camera onto the engine's ground.
+- Each box gets two or three textured Poly Haven cliff scans, side by side, scaled about 1.6-2.1x a third of the box's world width, facing the camera and seated at their centre.
+- They are deliberately not filtered by the crystal footprints: they butt up against the crystals and fit between them.
+
+**Moss (the blue ellipses and every crystal base).**
+- Texture: ambientCG Moss002 (CC0), 2K, in the gitignored asset folder, recorded in `assets/aurora-valley.manifest.json`.
+- The terrain cannot sample textures until ADR-1642, so the moss is a carpet. `build_scene.build_moss_carpet` rasterises every moss spot into one 1 m world grid: a union of noisy discs over the owner's six areas (pixels inside each ellipse raycast through the 5c camera) and a ring at every crystal's base.
+- The marked cells become one mesh draped on the engine's heights 0.12 m up, UV-mapped in world space (one tile per 2 m), with the moss colour and normal maps embedded. It covers about 37,600 m², leaves wet cells out, and has no overlaps or rims.
+- Tried first and removed: individual domed moss pads. They stacked like shingles with lit rims.
+
+**Dispersion (ADR-1640).** `"dispersion": 0.2` on the eight refractive heroes, within the engineer's guidance of 0.1-0.3 at strength 0.12. Spectral fringes now show where the glass bends the world.
+
+**Offline render:** 30 frames in 10.4 s at 1080p (2x supersample, `--tier offline`): **0.35 s/frame**.
+
+**When ADR-1642 (terrain texture inputs) lands:** move the moss from the carpet mesh into the terrain material.

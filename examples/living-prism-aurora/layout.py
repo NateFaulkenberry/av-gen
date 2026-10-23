@@ -14,7 +14,11 @@ import tempfile
 # ---- the camera: static, high, looking down the canyon (spec 4.1; phase 2b: higher and a little more down-looking,
 # so the wide near river fills the lower frame as the reference's does)
 CAMERA_POS = (0.0, 80.0, 170.0)
-CAMERA_TARGET = (0.0, 22.0, -250.0)
+# 5d (the owner: "let's move the camera up so the bottom of the scene is about here" -- the 5c frame's y = 915): the
+# camera tilts up 7.3 deg, so that line is the new bottom edge (more valley and sky, less near water)
+CAMERA_TARGET = (0.0, 76.0, -250.0)
+# the 5c camera, kept: the owner marked the 5c frame, so screen_to_ground() maps those marks through it
+CAMERA_5C = ((0.0, 80.0, 170.0), (0.0, 22.0, -250.0))
 CAMERA_FOV = 52.0
 FAR = 6000.0
 
@@ -453,6 +457,48 @@ def terrain_sweep(placed, footprints, steps=28):
             h[1] += 1
     return [(f[0], 100.0 * stat[f[0]][1] / stat[f[0]][0], 100.0 * stat[f[0]][2] / stat[f[0]][0])
             for f, *_r in placed]
+
+
+def screen_to_ground(pixels, camera=None, step=4.0, reach=1600.0):
+    """Where rays through 1920x1080 pixels of `camera` (default the 5c camera) first meet the engine's ground: a list
+    of (x, y, z) or None. Batched: one engine_heights call for every ray's samples."""
+    cpos, ctgt = camera or CAMERA_5C
+    f = [ctgt[i] - cpos[i] for i in range(3)]
+    n = math.sqrt(sum(c * c for c in f))
+    f = [c / n for c in f]
+    r = [-f[2], 0.0, f[0]]
+    n = math.hypot(r[0], r[2])
+    r = [r[0] / n, 0.0, r[2] / n]
+    u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]
+    t = math.tan(math.radians(CAMERA_FOV) / 2)
+    ks = [k * step for k in range(1, int(reach / step))]
+    rays, pts = [], []
+    for px, py in pixels:
+        x = (px / 1920 - 0.5) * 2 * t * 16 / 9
+        y = (0.5 - py / 1080) * 2 * t
+        d = [f[i] + x * r[i] + y * u[i] for i in range(3)]
+        n = math.sqrt(sum(c * c for c in d))
+        d = [c / n for c in d]
+        rays.append(d)
+        pts += [(cpos[0] + d[0] * k, cpos[2] + d[2] * k) for k in ks]
+    hs = engine_heights(pts)
+    out = []
+    for i, d in enumerate(rays):
+        hit = None
+        for j, k in enumerate(ks):
+            if cpos[1] + d[1] * k <= hs[i * len(ks) + j]:
+                hit = (cpos[0] + d[0] * k, hs[i * len(ks) + j], cpos[2] + d[2] * k)
+                break
+        out.append(hit)
+    return out
+
+
+def ground_normal(x, z, h=None, e=1.5):
+    """The engine ground's normal at (x, z), by central differences."""
+    hx0, hx1, hz0, hz1 = engine_heights([(x - e, z), (x + e, z), (x, z - e), (x, z + e)])
+    nx, ny, nz = -(hx1 - hx0), 2 * e, -(hz1 - hz0)
+    n = math.sqrt(nx * nx + ny * ny + nz * nz)
+    return nx / n, ny / n, nz / n
 
 
 def quat_y(deg):

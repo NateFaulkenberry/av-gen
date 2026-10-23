@@ -301,7 +301,6 @@ SCANS = {  # out name: (library path, target faces)
 }
 SCAN_SIZES = {}
 
-
 def build_scan(name, out):
     rel, faces = SCANS[name]
     before = set(bpy.data.objects)
