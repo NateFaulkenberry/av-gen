@@ -1,0 +1,33 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "The Living Prism: Aurora Valley"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "scene/aurora-valley.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true
+ },
+ "parameters": {
+  "camera/exposure/compensation": 0.0,
+  "post/bloom/enabled": true,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/intensity": 0.4,
+  "post/bloom/radius": 1.2,
+  "post/tonemap/chroma-retention": 0.8,
+  "post/output/vignette": 0.3,
+  "post/grade/saturation": 1.0
+ },
+ "sources": [],
+ "routes": [],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30
+ }
+}

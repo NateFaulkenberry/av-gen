@@ -1,0 +1,53 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "The Living Prism: Aurora Valley (offline)"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "scene/aurora-valley.scene.json"
+  },
+  "audio": {
+   "path": "../../assets/audio/feline-footwear.wav"
+  },
+  "stems": [
+   {
+    "key": "drums",
+    "label": "Drums",
+    "file": "../../assets/audio/stems/feline-footwear (Drums).wav"
+   },
+   {
+    "key": "bass",
+    "label": "Bass",
+    "file": "../../assets/audio/stems/feline-footwear (Bass).wav"
+   },
+   {
+    "key": "synth",
+    "label": "Synth",
+    "file": "../../assets/audio/stems/feline-footwear (Synth).wav"
+   }
+  ]
+ },
+ "sonic": {
+  "live": false
+ },
+ "parameters": {
+  "camera/exposure/compensation": 0.0,
+  "post/bloom/enabled": true,
+  "post/bloom/threshold": 0.9,
+  "post/bloom/intensity": 0.4,
+  "post/bloom/radius": 1.2,
+  "post/tonemap/chroma-retention": 0.8,
+  "post/output/vignette": 0.3,
+  "post/grade/saturation": 1.0
+ },
+ "sources": [],
+ "routes": [],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30
+ }
+}
