@@ -37,7 +37,7 @@ for s in p["assets"]["stems"]:
 V["silentdrums"] = p
 p = copy.deepcopy(base); p["assets"].pop("stems"); V["stereo"] = p
 p = copy.deepcopy(base); p["assets"].pop("stems"); p["assets"]["audio"]["path"] = silent; V["silence"] = p
-SIG = ["hit", "front", "accent", "glint", "bass", "synth", "bright", "energy", "section"]
+SIG = ["hit", "front", "accent", "glint", "bass", "synth", "bright", "energy", "section", "arc"]
 W = {"drums alone 0.3-8": (0.3, 8), "typical 65.7-85.5": (65.7, 85.5), "drums stopped 184-194": (184, 194),
      "last second 209-210.4": (209, 210.4)}
 for k, p in V.items():
