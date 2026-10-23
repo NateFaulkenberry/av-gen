@@ -30,11 +30,12 @@ import music  # noqa: E402
 LOOKS = PAL.looks_linear()
 UV = dict(LOOKS[0][1])  # the home look (Ultraviolet) is the rest state
 
-# Screen-space refraction (ADR-1603, P1-4, eng/living-prism-p1): authored here, written only when the engine reads it.
+# Screen-space refraction (ADR-1603, on main): on the two translucent heroes; LP_REFRACTION=0 builds without it.
 # Strength 0 = off; at Low and Emergency the ladder draws these heroes as the opaque material below.
-REFRACTION = os.environ.get("LP_REFRACTION", "0") == "1"
-REFRACT = {"spire": {"strength": 0.035, "opacity": 0.35, "thickness": 1.2, "absorption": [1.2, 2.2, 0.4]},
-           "fan": {"strength": 0.03, "opacity": 0.3, "thickness": 0.6, "absorption": [2.0, 1.2, 0.3]}}
+REFRACTION = os.environ.get("LP_REFRACTION", "1") == "1"
+# opacity 0.4: the core's glow keeps its identity while the passage and the rock show through (08 section 6)
+REFRACT = {"spire": {"strength": 0.035, "opacity": 0.4, "thickness": 1.2, "absorption": [1.2, 2.2, 0.4]},
+           "fan": {"strength": 0.03, "opacity": 0.4, "thickness": 0.6, "absorption": [2.0, 1.2, 0.3]}}
 
 
 class Prog:

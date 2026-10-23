@@ -43,7 +43,9 @@ def signals():
 
     sig("hit", [
         _stem("stem.drums.bass", dict(clampc, gain=2.2, offset=-0.45, attackMs=0.0, decayMs=160.0), **IMPACT_DEPTH),
-        dict({"source": "response.onset", "chain": {"attackMs": 0.0, "decayMs": 160.0}, "amount": 0.8}, **IMPACT_DEPTH)])
+        # the mix: any onset, weighted by its low register (ADR-1604), so kick-like attacks flash and hats do not
+        {"source": "response.onset", "chain": {"attackMs": 0.0, "decayMs": 160.0}, "amount": 1.0,
+         "depthSource": "response.onsetLow", "depthMin": 0.0, "depthMax": 1.2, "depthDefault": 0.5}])
     sig("front", [
         _stem("stem.drums.bass", dict(clampc, gain=2.2, offset=-0.45, envelope="linearfall",
                                        envelopeFallPerSecond=1.8, envelopeRefractoryMs=300.0, envelopeRearm=0.25),
@@ -53,9 +55,10 @@ def signals():
         chain=dict(clampc))
     sig("accent", [
         _stem("stem.drums.highMid", dict(clampc, gain=2.6, offset=-1.25, attackMs=4.0, decayMs=300.0), **IMPACT_DEPTH),
-        # on a mix there is no clap to claim: the strongest broadband onsets only, a little
-        dict({"source": "response.onsetEnv", "chain": dict(clampc, gain=2.0, offset=-1.1, attackMs=4.0, decayMs=300.0)},
-             **IMPACT_DEPTH)])
+        # the mix: onsets weighted by their high register (ADR-1604) -- approximate on a mix, so a little
+        {"source": "response.onset", "chain": {"attackMs": 4.0, "decayMs": 300.0}, "amount": 0.8,
+         "depthSource": "response.onsetHigh", "depthMin": -0.6, "depthMax": 1.2, "depthDefault": 0.0}],
+        chain=dict(clampc))
     sig("glint", [
         _stem("stem.drums.treble", dict(clampc, gain=2.6, offset=-0.4, attackMs=3.0, decayMs=110.0), **IMPACT_DEPTH),
         dict({"source": "audio.treble", "chain": dict(clampc, gain=2.0, offset=-0.8, attackMs=3.0, decayMs=110.0)},
