@@ -302,6 +302,11 @@ struct QualitySettings {
     // resolution-dependent -- 640x400 is 0.26x the pixels of 1280x800 and 0.66x the scene time --
     // so the naive model that makes dynamic resolution attractive is wrong here by a factor of two.
     float renderScale = 1.0f;
+    // ADR-1607: how a scene target smaller than the output (renderScale < 1) is brought up to it: the spatial upscaler
+    // (a bicubic reconstruction clamped against ringing, then contrast-adaptive sharpening by `upscaleSharpness`) or,
+    // off, the bilinear fetch. Nothing changes at renderScale 1.
+    bool spatialUpscaler = true;
+    float upscaleSharpness = 0.2f;
 
     // ---- ADR-1024: live edge antialiasing ----------------------------------------------------------
     //

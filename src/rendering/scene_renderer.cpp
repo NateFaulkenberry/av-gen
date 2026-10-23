@@ -1866,6 +1866,7 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"norefraction", [](QualitySettings& q) { q.refraction = false; }, "refraction=false (ADR-1603: refractive surfaces opaque, no phase)"},
         {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
         {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
+        {"bilinearupscale", [](QualitySettings& q) { q.spatialUpscaler = false; }, "spatialUpscaler=false (ADR-1607: the bilinear fetch)"},
         {"sdfshadowfull", [](QualitySettings& q) { q.sdfShadowScale = 1; },
          "sdfShadowScale=1 (raymarched SDF casters marched at the shadow map's own resolution)"},
         {"sdfshadowhalf", [](QualitySettings& q) { q.sdfShadowScale = 2; },
@@ -3965,6 +3966,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     tonemap.size[1] = static_cast<float>(hdr_.height());
     tonemap.seed = static_cast<float>(time.frameNonce() % 1024);
     tonemap.chromaRetention = scene.post.chromaRetention;
+    // ADR-1607: the upscaler runs only when the scene target is smaller than the output; at a matched size the fetch
+    // is the bilinear one (byte-identical).
+    tonemap.upscale[0] = qualitySettings_.spatialUpscaler && (hdr_.width() < target.width || hdr_.height() < target.height) ? 1.0f
+                                                                                                             : 0.0f;
+    tonemap.upscale[1] = qualitySettings_.upscaleSharpness;
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;

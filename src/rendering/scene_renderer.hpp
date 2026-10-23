@@ -507,8 +507,9 @@ struct TonemapUniforms {
     float size[2];
     float seed;
     float chromaRetention;
+    float upscale[4]; // ADR-1607: x = the spatial upscaler on (a smaller scene target), y = sharpness
 };
-static_assert(sizeof(TonemapUniforms) == 32);
+static_assert(sizeof(TonemapUniforms) == 48);
 
 // Image-based-lighting inputs shared by the PBR and skybox passes.
 struct IblResources {

@@ -8,6 +8,9 @@ struct TonemapUniforms {
     size: vec2<f32>,
     seed: f32,
     chromaRetention: f32,  // 0 = the operator's own highlight rolloff, 1 = hold the source hue
+    // ADR-1607: the spatial upscaler. x = 1 when the scene target is smaller than the output and the upscaler is on
+    // (0: the bilinear fetch, exactly as before); y = the sharpening amount, 0..1.
+    upscale: vec4<f32>,
 };
 
 @group(0) @binding(0) var hdrTexture: texture_2d<f32>;
@@ -136,12 +139,81 @@ fn hash12(p: vec2<f32>) -> f32 {
     return fract(sin(h) * 43758.5453123);
 }
 
+// ---- ADR-1607: the spatial upscaler, after FSR 1 (EASU's job, RCAS's sharpening), in one pass ----------------------
+//
+// The scene target is `renderScale` of the output when the live ladder lowered it. Bilinear is soft and its edges
+// stair. This reconstructs with a Catmull-Rom (bicubic) kernel in nine bilinear taps (the bilinear trick of Jimenez /
+// Sousa), clamped to the 2x2 texels around the sample -- EASU's anti-ringing rule, so a bright edge does not overshoot
+// into a halo -- then sharpens contrast-adaptively as RCAS/CAS do, in a tone-compressed space x/(1+x) so the HDR
+// highlights neither ring nor dominate the weights. FSR 1 itself is a 12-tap edge-directed Lanczos plus a separate
+// RCAS pass; this is the one-pass relative, cheaper and without its direction analysis. Off (or at a matched size) the
+// fetch is the bilinear one it always was, byte for byte.
+fn hdrAt(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(hdrTexture, hdrSampler, uv, 0.0).rgb;
+}
+
+fn compress(c: vec3<f32>) -> vec3<f32> {
+    return c / (vec3<f32>(1.0) + c);
+}
+
+fn upscaledHdr(uv: vec2<f32>) -> vec3<f32> {
+    let src = vec2<f32>(textureDimensions(hdrTexture));
+    let inv = vec2<f32>(1.0) / src;
+    let pos = uv * src;
+    let tc = floor(pos - vec2<f32>(0.5)) + vec2<f32>(0.5);
+    let f = pos - tc;
+    let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+    let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+    let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+    let w3 = f * f * (-0.5 + 0.5 * f);
+    let w12 = w1 + w2;
+    let p0 = (tc - vec2<f32>(1.0)) * inv;
+    let p3 = (tc + vec2<f32>(2.0)) * inv;
+    let p12 = (tc + w2 / w12) * inv;
+    var c = hdrAt(vec2<f32>(p0.x, p0.y)) * (w0.x * w0.y) + hdrAt(vec2<f32>(p12.x, p0.y)) * (w12.x * w0.y) +
+            hdrAt(vec2<f32>(p3.x, p0.y)) * (w3.x * w0.y) + hdrAt(vec2<f32>(p0.x, p12.y)) * (w0.x * w12.y) +
+            hdrAt(vec2<f32>(p12.x, p12.y)) * (w12.x * w12.y) + hdrAt(vec2<f32>(p3.x, p12.y)) * (w3.x * w12.y) +
+            hdrAt(vec2<f32>(p0.x, p3.y)) * (w0.x * w3.y) + hdrAt(vec2<f32>(p12.x, p3.y)) * (w12.x * w3.y) +
+            hdrAt(vec2<f32>(p3.x, p3.y)) * (w3.x * w3.y);
+    // EASU's anti-ringing: no brighter or darker than the four texels the sample sits between
+    let base = vec2<i32>(floor(pos - vec2<f32>(0.5)));
+    let hi = vec2<i32>(src) - vec2<i32>(1);
+    let a = textureLoad(hdrTexture, clamp(base, vec2<i32>(0), hi), 0).rgb;
+    let b = textureLoad(hdrTexture, clamp(base + vec2<i32>(1, 0), vec2<i32>(0), hi), 0).rgb;
+    let d = textureLoad(hdrTexture, clamp(base + vec2<i32>(0, 1), vec2<i32>(0), hi), 0).rgb;
+    let e = textureLoad(hdrTexture, clamp(base + vec2<i32>(1, 1), vec2<i32>(0), hi), 0).rgb;
+    c = clamp(c, min(min(a, b), min(d, e)), max(max(a, b), max(d, e)));
+    // RCAS-style contrast-adaptive sharpening over the cross one source texel away
+    let sharpness = clamp(tonemap.upscale.y, 0.0, 1.0);
+    if (sharpness <= 0.0) {
+        return c;
+    }
+    let pc = compress(c);
+    let pn = compress(hdrAt(uv - vec2<f32>(0.0, inv.y)));
+    let ps = compress(hdrAt(uv + vec2<f32>(0.0, inv.y)));
+    let pw = compress(hdrAt(uv - vec2<f32>(inv.x, 0.0)));
+    let pe = compress(hdrAt(uv + vec2<f32>(inv.x, 0.0)));
+    let mn = min(pc, min(min(pn, ps), min(pw, pe)));
+    let mx = max(pc, max(max(pn, ps), max(pw, pe)));
+    let amp = sqrt(clamp(min(mn, vec3<f32>(1.0) - mx) / max(mx, vec3<f32>(1e-4)), vec3<f32>(0.0), vec3<f32>(1.0)));
+    let w = -amp * mix(0.125, 0.2, sharpness);
+    let sharpened = clamp((pc + w * (pn + ps + pw + pe)) / (vec3<f32>(1.0) + 4.0 * w), vec3<f32>(0.0),
+                          vec3<f32>(0.9999));
+    return sharpened / (vec3<f32>(1.0) - sharpened);
+}
+
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     // Kept for the vignette below, which needs the frame's aspect. It is the *scene* target's size,
     // which is the right one: the vignette is a property of the framing, not of the output buffer.
     let size = vec2<f32>(textureDimensions(hdrTexture));
-    let hdr = textureSampleLevel(hdrTexture, hdrSampler, in.uv, 0.0).rgb * tonemap.exposure;
+    var source: vec3<f32>;
+    if (tonemap.upscale.x > 0.5) {
+        source = upscaledHdr(in.uv); // ADR-1607
+    } else {
+        source = textureSampleLevel(hdrTexture, hdrSampler, in.uv, 0.0).rgb;
+    }
+    let hdr = source * tonemap.exposure;
     var mapped: vec3<f32>;
     let op = i32(tonemap.operatorId + 0.5);
     if (op == 1) {
