@@ -216,15 +216,33 @@ def palette_json():
     return {"states": states, "bindings": b, "selector": {"select": LOOK, "transition": 6.0, "lock": False}}
 
 
-WATER = {  # long exposure (spec 7): dark body, view-stretched rough reflections, aurora-coloured streak patches
-    "shallowColor": [0.003, 0.006, 0.010], "deepColor": [0.001, 0.002, 0.005], "shallow": 1.0, "clarity": 1.0,
-    "edgeFade": 0.4, "maxOpacity": 0.97, "fresnel": 0.35, "reflection": 1.6, "reflectionTint": [0.6, 0.85, 0.9],
-    "specular": 1.0, "roughness": 0.12, "ripple": 0.25, "rippleScale": 0.35, "rippleSpeed": 0.6, "chop": 0.1,
-    "foam": 0.0, "refraction": 0.1, "glow": 0.0, "sparkle": 0.0,
-    "ssr": 1.0, "ssrDistance": 400.0, "ssrSteps": 48.0, "ssrGain": 1.5, "streak": 0.45, "reflectionRays": 3.0,
-    "transmission": 0.6, "absorption": [2.0, 1.5, 1.0], "undulation": 0.3, "undulationScale": 0.04,
-    "roughnessVariation": 0.5, "tintPatches": 0.8, "reflectionTint2": [0.9, 0.45, 0.8], "tintPatchScale": 0.03,
-    "glints": 0.0}
+WATER = None   # built per look in water() (Phase 5): its reflection tints are not palette-bindable
+
+
+def water():
+    """Phase 5 (spec 7): the river as a long exposure. A nearly still surface (no chop, faint ripples), so the aurora
+    no longer breaks into hundreds of small glints; a broad flow-aligned swell at a long wavelength, which stretches
+    the reflection into bands along the river's course; reflections spread along the view (streak) and filtered by
+    many rays and by calm and rough regions -- the aurora and the crystals reflect as soft vertical smears; broad
+    patches of the second aurora colour over the first. Dark body, dark bed. Offline, so the SSR is long and wide."""
+    return {
+        "shallowColor": [0.004, 0.006, 0.012], "deepColor": [0.001, 0.002, 0.006], "shallow": 1.0, "clarity": 0.8,
+        "edgeFade": 0.5, "maxOpacity": 0.98, "fresnel": 0.3, "reflection": 0.9,
+        "reflectionTint": [0.55 + 0.45 * c for c in R0["auroraTop"]],
+        "specular": 0.6, "roughness": 0.12, "ripple": 0.05, "rippleScale": 0.15, "rippleSpeed": 0.3, "chop": 0.0,
+        "foam": 0.0, "refraction": 0.05, "sparkle": 0.0,
+        # luminous flowing bands: the under-surface glow's patches drift with the current, so they follow the river;
+        # large and half the channel, in the second aurora colour
+        "glow": 1.4, "glowColor": [0.3 + 0.7 * c for c in R0["aurora2Low"]], "glowScale": 0.025,
+        "glowCoverage": 0.5, "glowDepth": 0.2,   # (smaller patches, 0.05, read as blotchy camouflage)
+        "ssr": 0.5, "ssrDistance": 1500.0, "ssrSteps": 96.0, "ssrGain": 1.3, "streak": 1.6, "reflectionRays": 10.0,
+        "transmission": 0.6, "absorption": [2.0, 1.5, 1.0], "undulation": 0.8, "undulationScale": 0.02,
+        "roughnessVariation": 0.6, "tintPatches": 1.0, "reflectionTint2": [0.3 + 0.7 * c for c in R0["aurora2Low"]],
+        "tintPatchScale": 0.03, "glints": 2.0,
+        # (no tears: their seams drew as dashed lines down the river, like road markings)
+        }
+
+
 
 
 def aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves=6.5, **kw):
@@ -269,7 +287,7 @@ def scene_json(placed, scans):
     nodes = [{"name": "valley", "kind": "terrain", "position": [0, 0, 0], "world": L.world_json(),
               "terrain": {"chunkSize": 200.0, "resolution": 64, "lodLevels": 3, "lodDistance": 200.0,
                           "viewDistance": 6000.0, "shadowDistance": 300.0, "skirtDepth": 3.0, "groundMottle": False,
-                          "water": WATER},
+                          "water": water()},
               "material": {"baseColor": [0.02, 0.05, 0.02], "roughness": 0.85, "metallic": 0.0,
                            "program": "au_ground"}}]
     for f, pos, q, _ground in placed:

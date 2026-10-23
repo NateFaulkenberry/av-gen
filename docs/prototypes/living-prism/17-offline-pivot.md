@@ -177,3 +177,38 @@ Both rise from below the ridgeline and run out of the top of the frame. The effe
 - The reference's aurora is broad ribbons arching and swirling across the sky, with bright lower edges that curve. This effect draws vertical curtains on cylinders around the camera, with a straight base, so mine read as light columns rather than sweeping arcs.
 - Getting the reference's shape needs an engine extension of the aurora effect (ADR-230): either a curtain whose base height follows a noise or path in azimuth, or a ribbon defined along a 3D path. Flagged for the owner and engineering.
 - Without it, the next art levers are colour regions (a third layer, cyan or blue) and the 6.5 lighting coupling. The palette already lights the valley through the fill lights and the crystal environment.
+
+## Phase 5 gate: the river (2026-10-23)
+
+The owner approved the plan ("go for it"). The aurora ribbon extension (ADR-230) and terrain texture inputs go to an engineering agent after dispersion; I adopt each as it merges.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5/`
+
+| File | Shows |
+|---|---|
+| `phase5-river-vs-reference.jpg` | the river beside the reference's, in both looks |
+| `phase4-vs-5-river.jpg` | before and after |
+| `phase5-frame.jpg`, `phase5-frame-rose.jpg`, `phase5-vs-reference.jpg` | the full frame |
+
+**The water (spec 7), `build_scene.water()`, built per look:**
+- **No mint glints.** The surface is nearly still (ripple 0.05, no chop), so the aurora no longer breaks into hundreds of small glints.
+- **Long-exposure reflection.** A broad, flow-aligned swell at a long wavelength (undulation 0.8 at 0.02/m) stretches the reflection along the river's course. The reflection is spread along the view (streak 1.6), filtered by 10 rays per pixel and by calm and rough regions (roughness variation 0.6), with a 1500 m SSR at 96 steps. The aurora reflects as a soft streak down the river: mint in Green Veil, pink in Rose Veil.
+- **Flowing colour.** Luminous flowing bands: the under-surface glow's patches drift with the current, so they follow the river's shape. They are large (0.025/m), cover half the channel, and take the second aurora colour: pink in Green Veil, teal in Rose Veil.
+- **Dark base.** The body and bed are near-black. The SSR is at half strength so the environment reflection, in a lavender tint from the aurora's top colour, carries the rest.
+- **Tints.** The reflection tints are not palette-bindable (only the water body colours are), so each look's build sets them from its own aurora colours.
+
+**Tried and rejected:**
+- `tears` (stretched along the valley): their seams drew as dashed lines down the river, like road markings.
+- Smaller glow patches (0.05/m): blotchy camouflage spots.
+
+**Temporal stability (7.4).** Over a 1 s clip (30 frames, 1080p offline), the near river changes by a mean of 0.11/255 between consecutive frames (min 0.10, max 0.11). There is no flicker or crawl, only the slow drift. No temporal accumulation is used.
+
+**Offline render:** 30 frames in 9.7 s at 1080p (2x supersample): **0.32 s/frame**.
+
+**Gaps:**
+- The reference's water has fine, directional streak lines in several colours (pink, teal, lavender, white highlights). Mine has broad flowing bands and one soft aurora streak, without the fine flow lines. The engine has no flow-aligned streak texture for the water (tears follow a fixed direction and read as dashes).
+- The far reach still reads grey (the horizon haze reflected).
+
+**Not done yet: environmental integration (spec 6.5).**
+- In place already: the palette drives the aurora, both fill lights, the crystals' environment colour and the water.
+- Not yet done: a stronger aurora-coloured light on the terrain (the ground term), and the aurora colours in the moss and rock.
