@@ -11913,6 +11913,33 @@
      }
     ]
    }
+  },
+  {
+   "kind": "signal",
+   "name": "arc",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "beat.phrasePulse",
+      "chain": {
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 0.8,
+       "envelopeRefractoryMs": 2000.0,
+       "envelopeRearm": 0.1
+      },
+      "depthSource": "signal.section",
+      "depthMin": 0.15,
+      "depthMax": 1.6,
+      "depthDefault": 0.5
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
   }
  ],
  "routes": [
@@ -12018,7 +12045,7 @@
   },
   {
    "source": "signal.accent",
-   "target": "procedural/arch_xtal/material/emissive",
+   "target": "procedural/archdruse_xtal/material/emissive",
    "amount": 1.4,
    "op": "add",
    "polarity": "unipolar",
@@ -12042,7 +12069,7 @@
   },
   {
    "source": "signal.glint",
-   "target": "material/lp_xtal/op/23/constant/constant",
+   "target": "material/lp_xtal/op/34/constant/constant",
    "amount": 2.6,
    "op": "add",
    "polarity": "unipolar",
@@ -12050,7 +12077,7 @@
   },
   {
    "source": "signal.glint",
-   "target": "material/lp_hero/op/27/constant/constant",
+   "target": "material/lp_hero/op/38/constant/constant",
    "amount": 1.2,
    "op": "add",
    "polarity": "unipolar",
@@ -12146,7 +12173,7 @@
   },
   {
    "source": "signal.bright",
-   "target": "material/lp_xtal/op/8/mix/value",
+   "target": "material/lp_xtal/op/13/mix/value",
    "amount": 0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -12154,7 +12181,7 @@
   },
   {
    "source": "signal.bright",
-   "target": "material/lp_hero/op/8/mix/value",
+   "target": "material/lp_hero/op/13/mix/value",
    "amount": 0.2,
    "op": "add",
    "polarity": "unipolar",
@@ -12202,7 +12229,7 @@
   },
   {
    "source": "signal.section",
-   "target": "procedural/arch_xtal/material/emissive",
+   "target": "procedural/archdruse_xtal/material/emissive",
    "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
@@ -12217,10 +12244,58 @@
    "component": -1
   },
   {
-   "source": "signal.section",
-   "target": "lights/backwash/intensity",
-   "amount": 40.0,
-   "op": "add",
+   "source": "signal.arc",
+   "target": "material/lp_arch/op/38/smoothstep/constant",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "gain": -1.2,
+    "offset": 1.08
+   }
+  },
+  {
+   "source": "signal.arc",
+   "target": "material/lp_arch/op/38/smoothstep/constant",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "gain": -1.2,
+    "offset": 1.2
+   }
+  },
+  {
+   "source": "signal.arc",
+   "target": "material/lp_arch/op/39/smoothstep/constant",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "gain": -1.2,
+    "offset": 1.2
+   }
+  },
+  {
+   "source": "signal.arc",
+   "target": "material/lp_arch/op/39/smoothstep/constant",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "gain": -1.2,
+    "offset": 1.25
+   }
+  },
+  {
+   "source": "signal.arc",
+   "target": "material/lp_arch/op/43/constant/constant",
+   "amount": 5.0,
+   "op": "replace",
    "polarity": "unipolar",
    "component": -1
   },
@@ -12715,8 +12790,18 @@
    },
    {
     "role": "fill",
-    "target": "material/lp_rock/op/29/constant/constant",
+    "target": "material/lp_rock/op/39/constant/constant",
     "gain": 2.6
+   },
+   {
+    "role": "fill",
+    "target": "material/lp_rock/op/31/constant/constant",
+    "gain": 0.15
+   },
+   {
+    "role": "primary",
+    "target": "material/lp_rock/op/35/constant/constant",
+    "gain": 0.032
    },
    {
     "role": "fill",
@@ -12744,10 +12829,6 @@
    {
     "role": "fill",
     "target": "lights/roofwash/color"
-   },
-   {
-    "role": "deep",
-    "target": "lights/backwash/color"
    },
    {
     "role": "primary",
@@ -12790,7 +12871,7 @@
    },
    {
     "role": "primary",
-    "target": "procedural/arch_xtal/material/emissiveColor"
+    "target": "procedural/archdruse_xtal/material/emissiveColor"
    },
    {
     "role": "tertiary",

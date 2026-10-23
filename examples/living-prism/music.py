@@ -86,10 +86,16 @@ def signals():
          "chain": dict(clampc, gain=2.0, offset=-0.7, attackMs=2000.0, decayMs=5000.0)},
         {"source": "response.level", "chain": dict(clampc, gain=2.5, offset=-1.15, attackMs=2000.0, decayMs=5000.0)}])
     sig("section", [dict({"source": "signal.energy", "chain": {"attackMs": 8000.0, "decayMs": 16000.0}}, **WORLD_DEPTH)])
+    # the arch's signature (owner decision 6): a run of light along the span on each phrase boundary, as strong as
+    # the music has built (section as depth: quiet phrases barely run, built ones blaze); 1 -> 0 over 1.25 s
+    sig("arc", [{"source": "beat.phrasePulse", "chain": {"envelope": "linearfall", "envelopeFallPerSecond": 0.8,
+                                                         "envelopeRefractoryMs": 2000.0, "envelopeRearm": 0.1},
+                 "depthSource": "signal.section", "depthMin": 0.15, "depthMax": 1.6, "depthDefault": 0.5}],
+        chain=dict(clampc))
     return S
 
 
-def routes(rock, floor, hero, xtal, crystal_nodes):
+def routes(rock, floor, hero, xtal, crystal_nodes, arch=None):
     """Every route reads a signal. `crystal_nodes` maps a role to its crystal nodes."""
     R = []
 
@@ -114,7 +120,7 @@ def routes(rock, floor, hero, xtal, crystal_nodes):
     r("front", "field/front/amplitude", 1.0, op="replace")
     # the clap: the geode and the arch's crust answer, and the rock's seams flicker
     r("accent", em("geode_xtal"), 2.6)
-    r("accent", em("arch_xtal"), 1.4)
+    r("accent", em("archdruse_xtal"), 1.4)
     r("accent", "lights/geodeGlow/intensity", 40.0)
     r("accent", rock.path("seamGain"), 0.9)
     # the hats: the dense crystal's mirror facets glint
@@ -143,7 +149,11 @@ def routes(rock, floor, hero, xtal, crystal_nodes):
     r("accent", rock.path("seamGain"), 0.4, chain={"attackMs": 80.0, "decayMs": 3000.0})
     # 6. the phrase: as the music builds, the whole grotto grows richer -- bloom, the primary's light, the haze
     r("section", em("spire_xtal"), 0.7)
-    r("section", em("arch_xtal"), 0.5)
+    r("section", em("archdruse_xtal"), 0.5)
     r("section", "post/bloom/intensity", 0.18)
-    r("section", "lights/backwash/intensity", 40.0)
+    # 7. the arch's run: a band at pos = 1.2 (1 - arc) travels the span 0 -> 1 (instanceIndex), its trail 0.12
+    if arch is not None:
+        for label, comp, off in (("arcLead", 0, 1.08), ("arcLead", 1, 1.2), ("arcTail", 0, 1.2), ("arcTail", 1, 1.25)):
+            r("arc", arch.path(label), 1.0, op="replace", component=comp, chain={"gain": -1.2, "offset": off})
+        r("arc", arch.path("arcGain"), 5.0, op="replace")
     return R

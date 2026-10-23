@@ -110,6 +110,71 @@ def prism(bm, base, axis, radius, length, tip, rng, sides=6, jitter=0.12, flat=1
     bm.faces.new(list(reversed(r0)))
 
 
+def gem(bm, base, axis, radius, length, tip, rng, chips=3, subs=0, sides=6, jitter=0.1, flat=1.0, taper=0.9,
+        oblique=0.3, embed=0.15):
+    """A jewel-quality crystal (pass 2): a prism with a two-tier termination (a shoulder ring, then the apex: twelve
+    tip facets instead of six), edges chipped by plane cuts (each chip a new small facet that catches light on its
+    own), and `subs` small sub-crystals sprouting from its sides. Built in its own bmesh, then appended to `bm`."""
+    t = bmesh.new()
+    u, v, a = basis(axis)
+    basev = Vector(base)
+    spin = rng.uniform(0, math.tau)
+    rs = [radius * (1.0 + rng.uniform(-jitter, jitter)) for _ in range(sides)]
+
+    def ring(center, scale, twist=0.0):
+        out = []
+        for i in range(sides):
+            ang = spin + twist + math.tau * i / sides
+            d = u * (math.cos(ang) * rs[i] * scale * flat) + v * (math.sin(ang) * rs[i] * scale)
+            out.append(t.verts.new(center + d))
+        return out
+    off = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)) * radius * oblique
+    r0 = ring(basev - a * (embed * length), 1.0)
+    r1 = ring(basev + a * length, taper)
+    sh = rng.uniform(0.35, 0.55)
+    r2 = ring(basev + a * (length + tip * sh) + off * sh, taper * rng.uniform(0.42, 0.6), math.pi / sides)
+    apex = t.verts.new(basev + a * (length + tip) + off)
+    for i in range(sides):
+        j = (i + 1) % sides
+        t.faces.new((r0[i], r0[j], r1[j], r1[i]))
+        t.faces.new((r1[i], r1[j], r2[i]))          # the shoulder: alternating triangles between the two rings
+        t.faces.new((r1[j], r2[j], r2[i]))
+        t.faces.new((r2[i], r2[j], apex))
+    t.faces.new(list(reversed(r0)))
+    centre = basev + a * (length * 0.5)
+    for _ in range(chips):
+        # a corner of the body or the shoulder, never the apex (a cut there truncates the crystal); taken from the
+        # current vertices, since an earlier chip may have removed some
+        upper = [x for x in t.verts if length * 0.3 < a.dot(x.co - basev) < length + tip * 0.6
+                 and (x.co - basev - a * a.dot(x.co - basev)).length > radius * 0.5]
+        if not upper:
+            break
+        vt = rng.choice(upper)
+        n = (vt.co - (centre + a * a.dot(vt.co - centre) * 0.6)).normalized()
+        n = (n + Vector((rng.uniform(-.3, .3), rng.uniform(-.3, .3), rng.uniform(-.3, .3)))).normalized()
+        depth = radius * rng.uniform(0.07, 0.16)
+        geom = t.verts[:] + t.edges[:] + t.faces[:]
+        res = bmesh.ops.bisect_plane(t, geom=geom, dist=1e-6, plane_co=vt.co - n * depth, plane_no=n,
+                                     clear_outer=True)
+        cut = [e for e in res["geom_cut"] if isinstance(e, bmesh.types.BMEdge)]
+        if cut:
+            bmesh.ops.holes_fill(t, edges=cut, sides=0)
+    bmesh.ops.recalc_face_normals(t, faces=t.faces)
+    me = bpy.data.meshes.new("_gem")
+    t.to_mesh(me)
+    t.free()
+    bm.from_mesh(me)
+    bpy.data.meshes.remove(me)
+    for _ in range(subs):
+        h = rng.uniform(0.05, 0.5) * length
+        side = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)).normalized()
+        p0 = basev + a * h + side * radius * 0.55
+        ax = (side * rng.uniform(0.35, 0.65) + a).normalized()     # leaning 20-35 degrees off the parent
+        sr = radius * rng.uniform(0.32, 0.48)
+        sl = length * rng.uniform(0.18, 0.38)
+        gem(bm, p0, ax, sr, sl, sr * 1.7, rng, chips=1, subs=0, embed=0.5)
+
+
 def stepped_prism(bm, base, axis, radius, length, rng, steps=3):
     """A stout prism with terraced growth plates down one side and a low, truncated termination (the ember)."""
     u, v, a = basis(axis)
@@ -222,12 +287,12 @@ def build_spire(out):
     rng = random.Random(11)
 
     def b(bm):
-        prism(bm, (0, 0, 0.6), (0.03, 0.02, 1), 0.55, 5.0, 1.1, rng, jitter=0.08, oblique=0.15)
+        gem(bm, (0, 0, 0.6), (0.03, 0.02, 1), 0.55, 5.0, 1.1, rng, chips=5, subs=4, jitter=0.08, oblique=0.15)
         spec = [(-0.9, 0.3, 3.6, 0.42, -0.35, 0.1), (0.85, 0.2, 3.1, 0.38, 0.4, 0.05), (-0.3, 0.75, 4.1, 0.34, -0.1, 0.35),
                 (0.45, 0.8, 2.6, 0.3, 0.25, 0.4), (-1.25, -0.25, 2.0, 0.3, -0.6, -0.15), (1.3, -0.35, 1.7, 0.26, 0.65, -0.2),
                 (0.0, -0.75, 1.3, 0.24, 0.05, -0.6), (-0.65, -0.55, 1.0, 0.18, -0.4, -0.5), (1.6, 0.6, 1.2, 0.2, 0.8, 0.3)]
         for x, y, ln, r, lx, ly in spec:
-            prism(bm, (x, y, 0.35), (lx, ly, 1.0), r, ln, r * 1.8, rng)
+            gem(bm, (x, y, 0.35), (lx, ly, 1.0), r, ln, r * 1.8, rng, chips=3, subs=2 if r > 0.3 else 1)
     export(xtal_obj("spire_xtal", "spire", b), out)
     export(rock_lump("spire_rock", 2.0, 0.45, 3, faces=420, scale=(1.1, 0.9, 1)), out)
 
@@ -242,7 +307,7 @@ def build_fan(out):
         for x, y, ln, r, tilt, az in spec:
             t, z = math.radians(tilt), math.radians(az)
             ax = (math.sin(t) * math.cos(z), math.sin(t) * math.sin(z), math.cos(t))
-            prism(bm, (x, y, 0.4), ax, r, ln, r * 1.5, rng, flat=0.32, jitter=0.06, oblique=0.5)
+            gem(bm, (x, y, 0.4), ax, r, ln, r * 1.5, rng, chips=4, subs=2, flat=0.32, jitter=0.06, oblique=0.5)
     export(xtal_obj("fan_xtal", "fan", b), out)
     export(rock_lump("fan_rock", 1.8, 0.55, 5, faces=380, scale=(1.0, 1.2, 1)), out)
 
@@ -348,7 +413,7 @@ def build_chandelier(out):
                 (0.2, -0.6, 2.7, 0.28, 0.1, -0.3), (-0.35, -0.45, 2.2, 0.24, -0.2, -0.3), (0.85, -0.3, 1.8, 0.22, 0.5, -0.2),
                 (-0.9, -0.1, 1.5, 0.2, -0.55, 0.0), (0.4, 0.75, 1.2, 0.18, 0.3, 0.5)]
         for x, y, ln, r, lx, ly in spec:
-            prism(bm, (x * 0.8, y * 0.8, 1.9), (lx, ly, 1.0), r, ln, r * 2.0, rng)
+            gem(bm, (x * 0.8, y * 0.8, 1.9), (lx, ly, 1.0), r, ln, r * 2.0, rng, chips=3, subs=1)
     export(xtal_obj("chandelier_xtal", "chandelier", b), out)
     # a hanging pendant of rock: it brings the crystals down from the roof into the frame
     export(rock_lump("chandelier_rock", 1.4, 1.6, 7, faces=360, scale=(1.0, 0.9, 1.0)), out)
@@ -364,7 +429,8 @@ def build_ember(out):
                 (0.25, -0.6, 0.4, 0.8, 0.1, -0.35), (-0.45, -0.5, 0.33, 0.7, -0.3, -0.3), (0.95, -0.35, 0.28, 0.55, 0.6, -0.2)]
         for x, y, r, ln, lx, ly in spec:
             ax = Vector((lx, ly, 1.0)).normalized()
-            prism(bm, (x, y, 0.0), ax, r, ln, r * 0.35, rng, jitter=0.1, taper=0.92, oblique=0.7, embed=0.3)
+            gem(bm, (x, y, 0.0), ax, r, ln, r * 0.35, rng, chips=3, subs=0, jitter=0.1, taper=0.92, oblique=0.7,
+                embed=0.3)
             u, v, a_ = basis(ax)
             # two or three growth terraces stepping down one side, each a short, narrower prism
             side = (u * rng.uniform(-1, 1) + v * rng.uniform(-1, 1)).normalized()
@@ -418,20 +484,35 @@ def build_arch(out):
     facet(ob, 0.4, 2.2, kind="CLOUDS")          # broad weathering
     facet(ob, 0.22, 0.6, faces=2600)            # breakage, then the facets
     export(ob, out)
+    # pass 2: the arch's crust is ONE small druse instanced along the underside, its placements ordered by their
+    # distance along the span (the arc parameter), so `instanceIndex` is the path distance a travelling light reads
     me = ob.data
-    down = [p for p in me.polygons if p.normal.z < -0.45 and p.center.z > 2.2]
-    w = [p.area * (0.4 + p.center.z / 7.6) for p in down]
-    seeds = [rng.choices(down, weights=w)[0] for _ in range(7)]
+    samples = [cat(k / 400)[0] for k in range(401)]
+    under = [p for p in me.polygons if p.normal.z < -0.25 and p.center.z > 1.2]
+    w = [p.area for p in under]
+    recs = []
+    for _ in range(84):
+        p = rng.choices(under, weights=w)[0]
+        c = Vector(p.center)
+        k = min(range(401), key=lambda i: (samples[i] - c).length)
+        n = (Vector(p.normal) + Vector((rng.uniform(-.25, .25), rng.uniform(-.25, .25), rng.uniform(-.15, .05))))
+        n.normalize()
+        recs.append({"t": k / 400, "pos": list(c - n * 0.05), "normal": list(n), "scale": rng.uniform(0.55, 1.15),
+                     "spin": rng.uniform(0, 360)})
+    recs.sort(key=lambda r: r["t"])
+    import json as _json
+    with open(os.path.join(out, "arch_crust.json"), "w") as f:
+        _json.dump(recs, f)
+    rngd = random.Random(67)
 
     def b(bm):
-        for sd in seeds:
-            near = [p for p in down if (p.center - sd.center).length < 0.9]
-            for _ in range(rng.randint(9, 18)):
-                p = rng.choice(near)
-                n = Vector(p.normal) + Vector((rng.uniform(-.3, .3), rng.uniform(-.3, .3), rng.uniform(-.2, .05)))
-                ln = rng.uniform(0.18, 0.65) * (1.2 - (p.center - sd.center).length / 1.2)
-                prism(bm, p.center, n, rng.uniform(0.06, 0.14), ln, ln * 0.4, rng, embed=0.35)
-    export(xtal_obj("arch_xtal", "arch", b), out)
+        for _ in range(9):
+            ang, rr = rngd.uniform(0, math.tau), rngd.uniform(0, 0.22)
+            x, y = math.cos(ang) * rr, math.sin(ang) * rr
+            ln = rngd.uniform(0.18, 0.55) * (1.0 - rr)
+            gem(bm, (x, y, 0.05), (x * 1.5 + rngd.uniform(-.2, .2), y * 1.5 + rngd.uniform(-.2, .2), 1.0),
+                rngd.uniform(0.05, 0.11), ln, ln * 0.4, rngd, chips=1, embed=0.4)
+    export(xtal_obj("archdruse_xtal", "arch", b), out)
 
 
 def build_druses(out):
@@ -446,7 +527,7 @@ def build_druses(out):
                 x, y = math.cos(ang) * rr, math.sin(ang) * rr
                 ax = (x * 1.2 + rng.uniform(-.2, .2), y * 1.2 + rng.uniform(-.2, .2), 1.0)
                 ln = rng.uniform(0.3, 1.25) * (1.0 - rr)
-                prism(bm, (x, y, 0.15), ax, rng.uniform(0.07, 0.17), ln, ln * 0.35, rng)
+                gem(bm, (x, y, 0.15), ax, rng.uniform(0.07, 0.17), ln, ln * 0.35, rng, chips=1)
         export(xtal_obj("druse%s_xtal" % k, "druse", b), out)
         export(rock_lump("druse%s_rock" % k, 0.7, 0.45, seed, faces=140), out)
 
@@ -514,7 +595,7 @@ def build_shell(out):
                 p = rng.choice(near)
                 n = Vector(p.normal) + Vector((rng.uniform(-.35, .35), rng.uniform(-.35, .35), rng.uniform(-.35, .35)))
                 ln = big * rng.uniform(0.2, 0.75) * (1.3 - (p.center - sd.center).length / 1.3)
-                prism(bm, p.center, n, rng.uniform(0.05, 0.13) * big, ln, ln * 0.4, rng, embed=0.4)
+                prism(bm, p.center - n * 0.06, n, rng.uniform(0.05, 0.13) * big, ln, ln * 0.4, rng, embed=0.6)
     export(xtal_obj("crust_xtal", "druse", b), out)
 
 
@@ -553,7 +634,7 @@ def preview(out, pdir):
             place("geodecap_xtal", rec)
     rec = L.placement(*L.ARCH["pos"], L.ARCH["yaw"], L.ARCH["scale"], L.ARCH["sink"])
     place("arch_rock", rec)
-    place("arch_xtal", rec)
+    pass  # the arch crust is instanced in the engine (arch_crust.json)
     for v, x, z, yaw, s in L.CLUSTERS:
         rec = L.placement(x, z, yaw, s, 0.12 * s)
         place(v + "_xtal", rec)

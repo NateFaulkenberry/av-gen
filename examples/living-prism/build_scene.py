@@ -34,8 +34,11 @@ UV = dict(LOOKS[0][1])  # the home look (Ultraviolet) is the rest state
 # Strength 0 = off; at Low and Emergency the ladder draws these heroes as the opaque material below.
 REFRACTION = os.environ.get("LP_REFRACTION", "1") == "1"
 # opacity 0.4: the core's glow keeps its identity while the passage and the rock show through (08 section 6)
-REFRACT = {"spire": {"strength": 0.035, "opacity": 0.4, "thickness": 1.2, "absorption": [1.2, 2.2, 0.4]},
-           "fan": {"strength": 0.03, "opacity": 0.4, "thickness": 0.6, "absorption": [2.0, 1.2, 0.3]}}
+# pass 2 (the owner: iridescent glass): three heroes refract, mostly clear (opacity 0.28); a light, near-neutral
+# absorption so the colour comes from the palette's share of the surface, not from a fixed tint
+REFRACT = {"spire": {"strength": 0.05, "opacity": 0.28, "thickness": 1.5, "absorption": [0.35, 0.5, 0.25]},
+           "fan": {"strength": 0.045, "opacity": 0.28, "thickness": 0.7, "absorption": [0.4, 0.35, 0.2]},
+           "chandelier": {"strength": 0.045, "opacity": 0.3, "thickness": 1.0, "absorption": [0.35, 0.45, 0.25]}}
 
 
 class Prog:
@@ -98,6 +101,18 @@ def rock_program():
     p.op("multiply", 6, a=5, b=6)
     p.op("constant", 5, label="seamGain", k=[0.45, 0.45, 0.45, 1])
     p.op("multiply", 6, a=6, b=5)
+    # pass 2: rim light on the rock's silhouettes (the roof's forms read; the crust sits in lit rock) and a coloured
+    # bounce on the low rock from the pool and the crystals -- emission, not lights: a few ops instead of light cost
+    p.op("input", 4, input="normal")
+    p.op("input", 5, input="viewDirection")
+    p.op("fresnel", 5, a=4, b=5, f=3.0)
+    p.op("constant", 4, label="rimColor", k=c4([v * 0.15 for v in UV["fill"]]))
+    p.op("multiply", 5, a=5, b=4)
+    p.op("add", 6, a=6, b=5)
+    p.op("gradient", 4, a=0, k=[0, 1, 0, 1.0], f=-0.22)
+    p.op("constant", 5, label="bounce", k=c4([v * 0.032 for v in UV["primary"]]))
+    p.op("multiply", 4, a=4, b=5)
+    p.op("add", 6, a=6, b=4)
     p.op("field", 5, field="front")                                     # the travelling front of light (Stage 4)
     p.op("constant", 4, label="frontColor", k=c4([v * 2.6 for v in UV["fill"]]))
     p.op("multiply", 5, a=5, b=4)
@@ -124,50 +139,76 @@ def floor_program():
     return p, p.json(3, emission=5, roughness=6)
 
 
-def crystal_program(name, hero):
-    """The crystal look on an opaque surface. r0 = the node's role colour (materialEmission)."""
+def crystal_program(name, hero, arch=False):
+    """Pass 2: crystal as iridescent glass (the owner's decision 1). r0 = the node's role colour (materialEmission).
+    The surface's own light is now mostly edges and glints, so the refraction behind it reads:
+      - a dark, saturated body per facet (the opaque fallback at Low/Emergency keeps this);
+      - an iridescent rim: the pale tip colour turned round the hue wheel by the view angle and the facet (thin-film-like,
+        OKLCH hueShift), on grazing facets only;
+      - glitter: a view-dependent noise over normal and view direction, so facets flash as the camera moves;
+      - emissive cores as accents only: about a third of the facets, low on the heroes and facing the viewer;
+      - the hats' mirror facets (sparkleGain) and the kick's front, as before;
+      - arch=True: the light that travels along the arch (instanceIndex = the crust's place along the span)."""
     p = Prog(name)
     p.op("input", 0, input="materialEmission")
     p.op("input", 1, input="normal")
     p.op("quantize", 3, a=1, f=3.0, k=[0.31, 0.47, 0.23, 0], seed=5)
     p.op("swizzle", 3, a=3, k=[3, 3, 3, 3])                              # r3: the facet's random
     p.op("input", 2, input="viewDirection")
-    p.op("fresnel", 5, a=1, b=2, f=2.5)                                  # r5: rim
+    p.op("fresnel", 5, a=1, b=2, f=2.5)                                  # r5: grazing
+    p.op("remap", 2, a=2, k=[0, 1, 0, 7.0])                              # glitter: noise over (7 V + 5 N)
+    p.op("remap", 4, a=1, k=[0, 1, 0, 5.0])
+    p.op("add", 2, a=2, b=4)
+    p.op("noise", 2, a=2, f=1.0, seed=9)
+    p.op("smoothstep", 2, a=2, k=[0.68, 0.73, 0, 0], label="glitter")
     p.op("constant", 6, k=[1, 1, 1, 1])
-    p.op("mix", 6, a=0, b=6, f=0.3, label="tipMix")                     # r6: tip colour, C toward white
-    p.op("remap", 7, a=0, k=[0, 1, 0, 0.06 if hero else 0.08])           # r7: a dark, saturated body
-    p.op("remap", 2, a=3, k=[0, 1, 0.35, 1.65])
-    p.op("multiply", 7, a=7, b=2)
-    p.op("remap", 1, a=5, k=[0, 1, 1, 0.1], f=1.0)                       # r1: facing the viewer
+    p.op("mix", 6, a=0, b=6, f=0.45, label="tipMix")                     # r6: the pale tip colour
+    p.op("remap", 7, a=0, k=[0, 1, 0, 0.05 if hero else 0.07])           # r7: the body
+    p.op("remap", 4, a=3, k=[0, 1, 0.35, 1.65])
+    p.op("multiply", 7, a=7, b=4)
+    p.op("multiply", 1, a=2, b=6)                                        # r1 (emission) = glitter
+    p.op("remap", 1, a=1, k=[0, 1, 0, 3.0 if hero else 2.0])
+    p.op("remap", 4, a=3, k=[0, 1, 0, 0.35])                             # iridescence: hue turned by facet + view
+    p.op("remap", 2, a=5, k=[0, 1, 0, 0.9])
+    p.op("add", 4, a=4, b=2)
+    p.op("hueShift", 2, a=6, b=4, f=0.0, label="irid")
+    p.op("smoothstep", 4, a=5, k=[0.3, 1.0, 0, 0])
+    p.op("remap", 4, a=4, k=[0, 1, 0, 0.9 if hero else 0.6], label="rimGain")
+    p.op("multiply", 2, a=2, b=4)
+    p.op("add", 1, a=1, b=2)
+    p.op("remap", 2, a=5, k=[0, 1, 1, 0.1], f=1.0)                       # cores: facing, selected facets only
+    p.op("smoothstep", 4, a=3, k=[0.55, 0.85, 0, 0])
+    p.op("multiply", 2, a=2, b=4)
     if hero:
         p.op("input", 4, input="localPosition")
-        p.op("gradient", 4, a=4, k=[0, 1, 0, 0], f=0.19)                 # r4: base 0 -> tip 1 (~5 m)
-        p.op("remap", 2, a=4, k=[0, 1, 1.35, 0.3], f=1.0)                # the core sits low
-        p.op("multiply", 1, a=1, b=2)
-    p.op("power", 2, a=3, f=2.0)                                         # facets differ strongly: some dark,
-    p.op("remap", 2, a=2, k=[0, 1, 0.12, 1.5])                           # some lit from inside
-    p.op("multiply", 1, a=1, b=2)
-    p.op("multiply", 1, a=1, b=0, label="core")                          # core emission = C x weight
-    p.op("smoothstep", 2, a=5, k=[0.5, 1.0, 0, 0])
-    p.op("multiply", 2, a=2, b=6)
-    p.op("remap", 2, a=2, k=[0, 1, 0, 0.55])
-    p.op("add", 1, a=1, b=2, label="rim")
-    p.op("smoothstep", 2, a=3, k=[0.86, 0.92, 0, 0], label="sparkle")    # ~8% of facets are bright mirrors
-    p.op("multiply", 2, a=2, b=6)
-    p.op("constant", 5, label="sparkleGain", k=[1.6, 1.6, 1.6, 1])
-    p.op("multiply", 2, a=2, b=5)
+        p.op("gradient", 4, a=4, k=[0, 1, 0, 0], f=0.19)
+        p.op("remap", 4, a=4, k=[0, 1, 1.35, 0.3], f=1.0)
+        p.op("multiply", 2, a=2, b=4)
+    p.op("multiply", 2, a=2, b=0, label="core")
     p.op("add", 1, a=1, b=2)
-    if hero:
-        p.op("smoothstep", 2, a=4, k=[0.78, 1.0, 0, 0])                  # luminous terminations
-        p.op("multiply", 2, a=2, b=6)
-        p.op("remap", 2, a=2, k=[0, 1, 0, 0.4])
+    p.op("smoothstep", 2, a=3, k=[0.86, 0.92, 0, 0], label="sparkle")    # the hats' mirror facets
+    p.op("multiply", 2, a=2, b=6)
+    p.op("constant", 4, label="sparkleGain", k=[1.6, 1.6, 1.6, 1])
+    p.op("multiply", 2, a=2, b=4)
+    p.op("add", 1, a=1, b=2)
+    if not arch:   # (the arch's rock carries the front; its crust carries the arch's own light instead)
+        p.op("field", 2, field="front")                                  # the kick's front, in the crystal's colour
+        p.op("remap", 2, a=2, k=[0, 1, 0, 3.2])
+        p.op("multiply", 2, a=2, b=0)
         p.op("add", 1, a=1, b=2)
-    p.op("field", 2, field="front")                                      # the front lights each crystal it
-    p.op("multiply", 2, a=2, b=0)                                        # crosses, in its own colour
-    p.op("constant", 5, label="frontGain", k=[3.2, 3.2, 3.2, 1])
-    p.op("multiply", 2, a=2, b=5)
-    p.op("add", 1, a=1, b=2)
-    p.op("remap", 3, a=3, k=[0, 1, 0.03, 0.18])                         # roughness per facet: crisp highlights
+    if arch:
+        # the arch's signature: a bright band at arcPos along the span (instanceIndex), its strength arcGain
+        p.op("input", 2, input="instanceIndex")
+        p.op("smoothstep", 4, a=2, k=[-0.12, 0.0, 0, 0], label="arcLead")
+        p.op("smoothstep", 2, a=2, k=[0.0, 0.05, 0, 0], label="arcTail")
+        p.op("remap", 2, a=2, k=[0, 1, 1, 0], f=1.0)
+        p.op("multiply", 2, a=2, b=4)
+        p.op("multiply", 2, a=2, b=6)
+        p.op("constant", 4, label="arcGain", k=[0.0, 0.0, 0.0, 1])
+        p.op("multiply", 2, a=2, b=4)
+        p.op("add", 1, a=1, b=2)
+    p.op("remap", 3, a=3, k=[0, 1, 0.02, 0.12])                         # crisp highlights
+    assert len(p.ops) <= 48, (name, len(p.ops))
     return p, p.json(7, emission=1, roughness=3)
 
 
@@ -175,24 +216,25 @@ ROCK_P, ROCK_J = rock_program()
 FLOOR_P, FLOOR_J = floor_program()
 HERO_P, HERO_J = crystal_program("lp_hero", True)
 XTAL_P, XTAL_J = crystal_program("lp_xtal", False)
-PROGRAMS = [ROCK_J, FLOOR_J, HERO_J, XTAL_J]
+ARCH_P, ARCH_J = crystal_program("lp_arch", False, arch=True)
+PROGRAMS = [ROCK_J, FLOOR_J, HERO_J, XTAL_J, ARCH_J]
 ROCK = {"baseColor": [0.02, 0.016, 0.03], "roughness": 0.8, "metallic": 0.0, "program": "lp_rock"}
 FLOOR = {"baseColor": [0.014, 0.012, 0.024], "roughness": 0.7, "metallic": 0.0, "program": "lp_floor"}
 
 # crystal nodes: (palette role, emissive strength, program); strengths set the hierarchy (heroes > crust)
 XNODE = {"spire": ("primary", 1.7, "lp_hero"), "fan": ("secondary", 1.3, "lp_hero"), "ember": ("accent", 0.75, "lp_hero"),
          "geode": ("tertiary", 1.9, "lp_xtal"), "geodecap": ("tertiary", 1.2, "lp_xtal"),
-         "chandelier": ("secondary", 1.5, "lp_xtal"), "arch": ("primary", 1.3, "lp_xtal"),
+         "chandelier": ("secondary", 1.5, "lp_hero"), "arch": ("primary", 1.3, "lp_arch"),
          "druse": ("secondary", 0.8, "lp_xtal"), "crust": ("core", 0.45, "lp_xtal"), "shard": ("core", 0.6, "lp_xtal"),
          "geoderim": ("tertiary", 0.1, "lp_xtal")}
 
 WATER = {  # ADR-1286's cinematic path: a dark absorbing mirror; SSR reflects the lit grotto
     "shallowColor": [0.004, 0.004, 0.014], "deepColor": [0.002, 0.002, 0.008], "shallow": 1.0,
-    "clarity": 1.2, "edgeFade": 0.15, "maxOpacity": 0.97, "fresnel": 0.16, "reflection": 1.0,
+    "clarity": 1.2, "edgeFade": 0.15, "maxOpacity": 0.97, "fresnel": 0.2, "reflection": 1.4,
     "reflectionTint": [0.06, 0.04, 0.16], "specular": 1.4, "roughness": 0.025,
     "ripple": 0.02, "rippleScale": 0.8, "rippleSpeed": 0.35, "chop": 0.15, "foam": 0.0, "refraction": 0.08,
     "glow": 0.0, "sparkle": 0.0,
-    "ssr": 1.0, "ssrDistance": 30.0, "ssrSteps": 64.0, "ssrGain": 1.5, "streak": 0.04, "reflectionRays": 2.0,
+    "ssr": 1.0, "ssrDistance": 30.0, "ssrSteps": 64.0, "ssrGain": 2.2, "streak": 0.04, "reflectionRays": 2.0,
     "transmission": 1.0, "absorption": [2.2, 1.8, 1.0], "undulation": 0.02, "undulationScale": 0.2,
     "roughnessVariation": 0.25, "tintPatches": 0.0, "glints": 0.0,
 }
@@ -238,7 +280,7 @@ def scene_json():
     a = L.ARCH
     rec = L.placement(*a["pos"], a["yaw"], a["scale"], a["sink"])
     nodes.append(mesh_node("arch_rock", "arch_rock.glb", [rec], ROCK))
-    nodes.append(mesh_node("arch_xtal", "arch_xtal.glb", [rec], xmat("arch")))
+    nodes.append(mesh_node("archdruse_xtal", "archdruse_xtal.glb", arch_crust(rec), xmat("arch"), shadow=False))
     groups = {}
     for v, x, z, yaw, s in L.CLUSTERS:
         groups.setdefault(v, []).append(L.placement(x, z, yaw, s, 0.12 * s))
@@ -269,8 +311,6 @@ def scene_json():
         # the roof wash: a broad, weak light under the roof so its rock and crust read (no dead space above)
         {"name": "roofwash", "id": "roofwash", "type": "point", "position": [0.5, 5.4, -0.5], "color": UV["fill"],
          "intensity": 90.0, "range": 10.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
-        {"name": "backwash", "id": "backwash", "type": "point", "position": [0.0, 6.5, -7.5], "color": UV["deep"],
-         "intensity": 45.0, "range": 9.0, "radius": 3.0, "castsShadow": False, "volumetric": 0.0},
     ]
 
     def at(name, dx, dy, dz):
@@ -290,7 +330,7 @@ def scene_json():
         "background": [0.004, 0.003, 0.012], "intensity": 0.04, "lightFromEnvironment": False,
         "fogColor": [round(v * 0.3, 4) for v in UV["haze"]],
         "volumeDensity": 0.005 if HAZE else 0.0, "volumeScattering": 0.9,
-        "volumeAbsorption": 0.3, "volumeAnisotropy": 0.45, "volumeSteps": 8, "volumeMaxDistance": 30.0,
+        "volumeAbsorption": 0.3, "volumeAnisotropy": 0.45, "volumeSteps": 6, "volumeMaxDistance": 26.0,
         "volumeLocalLights": 1.0, "volumeNoise": 0.35, "volumeNoiseScale": 0.18, "volumeEmission": 0.0,
         "fogHeight": 3.0, "fogHeightFalloff": 0.25, "fogUpperDensity": 0.15,
         "shadowCascades": 1, "shadowRange": 40.0, "ambientOcclusion": True, "depthPrepass": True,
@@ -308,6 +348,47 @@ def scene_json():
         "materialPrograms": PROGRAMS,
         "nodes": nodes + [front_field(), motes()],
     }
+
+
+def _qmul(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz)
+
+
+def _qrot(q, v):
+    x, y, z, w = _qmul(_qmul(q, (v[0], v[1], v[2], 0.0)), (-q[0], -q[1], -q[2], q[3]))
+    return (x, y, z)
+
+
+def arch_crust(rec):
+    """The arch's crust: one small druse, instanced at the placements Blender wrote (arch_crust.json, arch-local,
+    Blender axes), already ordered along the span, so instanceIndex runs 0 -> 1 from the left foot to the right."""
+    import math
+    with open(os.path.join(ASSETS, "arch_crust.json")) as f:
+        recs = json.load(f)
+    ap, aq, asc = rec[:3], tuple(rec[3:7]), rec[7]
+    pts = []
+    for r in recs:
+        lp = (r["pos"][0], r["pos"][2], -r["pos"][1])          # Blender (x, y, z up) -> AV Gen (x, z, -y)
+        n = (r["normal"][0], r["normal"][2], -r["normal"][1])
+        # the rotation taking +Y (the druse's up) to n, then a spin about n
+        c = n[1]
+        axis = (n[2], 0.0, -n[0])
+        al = math.sqrt(axis[0] ** 2 + axis[2] ** 2)
+        if al < 1e-6:
+            qa = (0.0, 0.0, 0.0, 1.0) if c > 0 else (1.0, 0.0, 0.0, 0.0)
+        else:
+            h = math.acos(max(-1.0, min(1.0, c))) / 2
+            qa = (axis[0] / al * math.sin(h), 0.0, axis[2] / al * math.sin(h), math.cos(h))
+        hs = math.radians(r["spin"]) / 2
+        q = _qmul(aq, _qmul(qa, (0.0, math.sin(hs), 0.0, math.cos(hs))))
+        wp = _qrot(aq, (lp[0] * asc, lp[1] * asc, lp[2] * asc))
+        sc = r["scale"] * asc
+        pts.append([round(ap[0] + wp[0], 4), round(ap[1] + wp[1], 4), round(ap[2] + wp[2], 4)] +
+                   [round(v, 6) for v in q] + [round(sc, 4)] * 3)
+    return pts
 
 
 def front_field():
@@ -337,7 +418,7 @@ def motes():
 
 def crystal_nodes():
     """[(node name, XNODE key)] for every crystal node the scene draws."""
-    out = [("crust_xtal", "crust"), ("arch_xtal", "arch"), ("geode_rim", "geoderim"), ("geodecap_xtal", "geodecap")]
+    out = [("crust_xtal", "crust"), ("archdruse_xtal", "arch"), ("geode_rim", "geoderim"), ("geodecap_xtal", "geodecap")]
     out += [(h["name"] + "_xtal", h["name"]) for h in L.HEROES]
     out += [(v + "_xtal", "druse") for v in sorted({c[0] for c in L.CLUSTERS})]
     out += [(v + "_xtal", "shard") for v in sorted({c[0] for c in L.SHARDS})]
@@ -348,11 +429,13 @@ def palette_json():
     b = [{"role": "shadow", "target": ROCK_P.path("shadow")}, {"role": "rockLit", "target": ROCK_P.path("rockLit")},
          {"role": "seam", "target": ROCK_P.path("seam")},
          {"role": "fill", "target": ROCK_P.path("frontColor"), "gain": 2.6},
+         {"role": "fill", "target": ROCK_P.path("rimColor"), "gain": 0.15},
+         {"role": "primary", "target": ROCK_P.path("bounce"), "gain": 0.032},
          {"role": "fill", "target": FLOOR_P.path("frontColor"), "gain": 1.2},
          {"role": "shadow", "target": FLOOR_P.path("shadow"), "gain": 0.8},
          {"role": "rockLit", "target": FLOOR_P.path("rockLit"), "gain": 0.55},
          {"role": "key", "target": "lights/shaft/color"}, {"role": "deep", "target": "lights/passage/color"},
-         {"role": "fill", "target": "lights/roofwash/color"}, {"role": "deep", "target": "lights/backwash/color"},
+         {"role": "fill", "target": "lights/roofwash/color"},
          {"role": "primary", "target": "lights/spireGlow/color"}, {"role": "tertiary", "target": "lights/geodeGlow/color"},
          {"role": "secondary", "target": "lights/fanGlow/color"},
          {"role": "secondary", "target": "lights/chandelierGlow/color"},
@@ -387,7 +470,7 @@ def project_json(scene_rel):
                        "amount": 1.0, "op": "replace", "polarity": "unipolar", "component": comp})
     sources += music.signals()
     small = sorted({v + "_xtal" for v, *_ in L.CLUSTERS})
-    routes += music.routes(ROCK_P, FLOOR_P, HERO_P, XTAL_P, {"secondary_small": small})
+    routes += music.routes(ROCK_P, FLOOR_P, HERO_P, XTAL_P, {"secondary_small": small}, ARCH_P)
     n = len(LOOKS)
     routes += [{"source": "control.palette", "target": "palette/select", "amount": float(n - 1), "op": "add",
                 "polarity": "unipolar", "chain": {"attackMs": 150, "decayMs": 150}},
@@ -423,6 +506,8 @@ def main():
     ap.add_argument("--scene-dir", default=os.path.join(HERE, "scene"))
     ap.add_argument("--project", default=os.path.join(HERE, "living-prism.json"))
     a = ap.parse_args()
+    global ASSETS
+    ASSETS = a.assets
     os.makedirs(a.scene_dir, exist_ok=True)
     sc = scene_json()
     used = set()
@@ -430,6 +515,7 @@ def main():
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":
             used.add(src["asset"])
+    used.discard(None)
     for f in sorted(used):
         shutil.copy(os.path.join(a.assets, f), os.path.join(a.scene_dir, f))
     path = os.path.join(a.scene_dir, "living-prism.scene.json")
