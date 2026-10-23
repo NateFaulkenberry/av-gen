@@ -242,3 +242,27 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5b/`
 - The left foreground bank reads a little flat mauve under the aurora light.
 - The crystal point lights are barely visible.
 - The fine flow lines in the water wait for ADR-1643.
+
+## Phase 5c gate (2026-10-23)
+
+The owner's 5b verdict, verbatim: "Yeah send it back lets nix the circuitry lines for now".
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5c/`
+
+| File | Shows |
+|---|---|
+| `phase5c-vs-reference-green.jpg`, `phase5c-vs-reference-rose.jpg` | the full frame beside the reference, in both looks |
+| `phase5b-vs-5c.jpg` | before and after |
+| `phase5c-frame.jpg`, `phase5c-frame-rose.jpg` | the full frame in both looks |
+
+**Circuits removed.** The generator stays in `build_scene.py` behind `AU_CIRCUITS=1`, off by default. With the flag unset there is no node, no GLB and no palette binding, so the projects and the scene carry nothing of it.
+
+**The green valley restored.** The aurora colour now lives in the sky, the water and the crystals, as in the reference:
+- **Ground aurora light:** 0.035 → 0.008 of the role colour, and only on sky-facing crests (normal.y 0.78-1) as a soft rim.
+- **Moss:** a rich, dark, fertile green (deep, lit, cool green, only a trace of olive).
+- **Rock:** grey-brown banded instead of blue-grey.
+- **The left bank's flat mauve.** Three sources added up there:
+  - the violet raking fill: now half the intensity (0.16) and half its palette gain, tinted halfway toward the moss green;
+  - the ground term: cut, as above;
+  - the pink crystal light beside L1: all eight crystal lights halved, to 700, still subtle.
+- **Distance haze:** kept violet. It sits against the reference's pink-peach horizon well enough. The far river carries it instead of grey.

@@ -192,7 +192,8 @@
    },
    {
     "role": "auroraTop",
-    "target": "lights/skyFill/color"
+    "target": "lights/skyFill/color",
+    "gain": 0.5
    },
    {
     "role": "auroraMid",
@@ -244,21 +245,17 @@
    {
     "role": "auroraLow",
     "target": "material/au_ground/op/24/constant/constant",
-    "gain": 0.035
+    "gain": 0.008
    },
    {
     "role": "aurora2Low",
     "target": "material/au_ground/op/25/constant/constant",
-    "gain": 0.035
+    "gain": 0.008
    },
    {
     "role": "auroraTop",
     "target": "scene/fogColor",
     "gain": 0.15
-   },
-   {
-    "role": "auroraLow",
-    "target": "procedural/circuits/material/emissiveColor"
    },
    {
     "role": "crystalBody",

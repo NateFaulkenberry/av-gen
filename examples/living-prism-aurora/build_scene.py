@@ -30,12 +30,13 @@ def prog_ground():
                 {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.012, "seed": 3},          # large patches
                 {"kind": "noise", "dst": 2, "srcA": 0, "value": 0.09, "seed": 5},           # mottling
                 {"kind": "mix", "dst": 3, "srcA": 1, "srcB": 2, "value": 0.35},
-                {"kind": "oklabRamp", "dst": 3, "srcA": 3, "constant": [0.020, 0.055, 0.045, 1],   # blue-green
-                 "constant2": [0.010, 0.026, 0.014, 1], "constant3": [0.042, 0.090, 0.036, 1],    # deep, lit moss
-                 "constant4": [0.062, 0.066, 0.030, 1]},                                          # dry olive
-                {"kind": "oklabRamp", "dst": 4, "srcA": 2, "constant": [0.012, 0.013, 0.017, 1],   # rock, banded
-                 "constant2": [0.020, 0.020, 0.024, 1], "constant3": [0.042, 0.039, 0.038, 1],
-                 "constant4": [0.058, 0.053, 0.050, 1]},
+                # 5c: a rich, dark, fertile green -- deep moss, lit moss, a cooler green; only a trace of olive
+                {"kind": "oklabRamp", "dst": 3, "srcA": 3, "constant": [0.014, 0.050, 0.030, 1],   # cool green
+                 "constant2": [0.008, 0.030, 0.012, 1], "constant3": [0.030, 0.105, 0.032, 1],    # deep, lit moss
+                 "constant4": [0.045, 0.080, 0.028, 1]},                                          # moss-olive
+                {"kind": "oklabRamp", "dst": 4, "srcA": 2, "constant": [0.016, 0.014, 0.012, 1],   # rock, banded,
+                 "constant2": [0.026, 0.023, 0.019, 1], "constant3": [0.045, 0.040, 0.034, 1],    # 5c: grey-brown
+                 "constant4": [0.062, 0.055, 0.047, 1]},
                 # where moss grows: flat-ish ground (edge frayed by the mottling), low ground, less high up
                 {"kind": "input", "dst": 6, "input": "normal"},
                 {"kind": "gradient", "dst": 6, "srcA": 6, "constant": [0, 1, 0, 0], "value": 1.0},
@@ -56,7 +57,7 @@ def prog_ground():
                 # colours (the two aurora roles mixed by the large patch noise), palette-bound (GROUND_AURORA_*)
                 {"kind": "input", "dst": 4, "input": "normal"},
                 {"kind": "gradient", "dst": 4, "srcA": 4, "constant": [0, 1, 0, 0], "value": 1.0},
-                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.3, 1.0, 0, 0]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.78, 1.0, 0, 0]},   # 5c: crests only
                 {"kind": "constant", "dst": 5, "constant": [c * GROUND_AURORA for c in R0["auroraLow"]] + [1]},
                 {"kind": "constant", "dst": 2, "constant": [c * GROUND_AURORA for c in R0["aurora2Low"]] + [1]},
                 {"kind": "smoothstep", "dst": 6, "srcA": 1, "constant": [0.35, 0.65, 0, 0]},
@@ -65,7 +66,7 @@ def prog_ground():
 
 
 FOG_AURORA = 0.15               # 5b: the distance haze in the aurora's top colour (the far river carries it)
-GROUND_AURORA = 0.035            # the aurora's light on sky-facing ground (emission, x the role colour)
+GROUND_AURORA = 0.008            # 5c: a soft rim on sky-facing crests only (0.035 washed the moss mauve)
 GROUND_AURORA_OPS = (24, 25)     # 1-based op indices of its two colour constants in au_ground (palette targets)
 
 
@@ -212,7 +213,7 @@ def palette_json():
          {"role": "aurora2Mid", "target": "fx/auroraPink/midColor"},
          {"role": "aurora2Top", "target": "fx/auroraPink/topColor"},
          {"role": "auroraLow", "target": "lights/auroraFill/color"},
-         {"role": "auroraTop", "target": "lights/skyFill/color"},
+         {"role": "auroraTop", "target": "lights/skyFill/color", "gain": 0.5},   # 5c: half (it washed the moss mauve)
          # the water's own body takes a trace of the aurora (its reflection of the sky is the live aurora already)
          {"role": "auroraMid", "target": "nodes/valley/water/shallowColor", "gain": 0.012},
          {"role": "auroraTop", "target": "nodes/valley/water/deepColor", "gain": 0.004},
@@ -232,7 +233,8 @@ def palette_json():
          {"role": "aurora2Low", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[1],
           "gain": GROUND_AURORA},
          {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA}]
-    b.append({"role": "auroraLow", "target": "procedural/circuits/material/emissiveColor"})
+    if CIRCUITS:
+        b.append({"role": "auroraLow", "target": "procedural/circuits/material/emissiveColor"})
     for i, n in enumerate(sorted(REFRACT_HEROES)):
         b.append({"role": "crystalBody" if i % 2 == 0 else "auroraLow", "target": "lights/glow%s/color" % n})
     for f in L.FORMATIONS:   # the glowing edges, in the low aurora colour
@@ -337,6 +339,9 @@ def write_glb(path, positions, normals, indices):
         f.write(struct.pack("<II", len(binb), 0x004E4942) + binb)
 
 
+CIRCUITS = os.environ.get("AU_CIRCUITS", "0") == "1"   # 5c: off (the owner: "lets nix the circuitry lines for now")
+
+
 def build_circuits(path, placed, seed=2026102320):
     """5b (spec 8): a restrained network of luminous pathways on the near banks, following the river. Each trace runs
     along the river at a set offset from its centreline, jogs sideways at a few points (the circuit idiom) and may
@@ -428,7 +433,7 @@ def crystal_lights(placed):
     for i, (f, pos, _q, _g) in enumerate(p for p in placed if p[0][0] in REFRACT_HEROES):
         col = R0["crystalBody"] if sorted(REFRACT_HEROES).index(f[0]) % 2 == 0 else R0["auroraLow"]
         out.append({"name": "glow" + f[0], "id": "glow" + f[0], "type": "point",
-                    "position": [pos[0], pos[1] + 12.0 * f[4], pos[2]], "color": col, "intensity": 1500.0,
+                    "position": [pos[0], pos[1] + 12.0 * f[4], pos[2]], "color": col, "intensity": 700.0,
                     "range": 90.0, "radius": 6.0, "castsShadow": False, "volumetric": 0.0})
     return out
 
@@ -454,10 +459,12 @@ def scene_json(placed, scans):
     tmat = {"baseColor": [0.55, 0.5, 0.66], "roughness": 1.0, "metallic": 0.0}
     for asset, pts in scans.items():
         nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, tmat, shadow=True))
-    # 5b (spec 8): the circuit pathways on the near banks, emissive in the low aurora colour (palette-bound)
-    nodes.append(mesh_node("circuits", "circuits.glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]],
-                           {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": 1.6,
-                            "roughness": 1.0, "metallic": 0.0}, shadow=False))
+    # 5b (spec 8): the circuit pathways on the near banks, emissive in the low aurora colour (palette-bound).
+    # 5c: off unless AU_CIRCUITS=1
+    if CIRCUITS:
+        nodes.append(mesh_node("circuits", "circuits.glb", [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]],
+                               {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": 1.6,
+                                "roughness": 1.0, "metallic": 0.0}, shadow=False))
     # the far mountains: three ridges in place, receding in value through the fog (phase 2b)
     rmat = {"baseColor": [0.018, 0.020, 0.030], "roughness": 0.9, "metallic": 0.0}
     for r in ("ridgeNear", "ridgeMid", "ridgeFar"):
@@ -487,7 +494,8 @@ def scene_json(placed, scans):
             # phase 2e: the violet fill rakes low across the valley from the right, so the left wall's ledges, spurs
             # and gullies model in light and shade instead of reading as smooth domes
             {"name": "skyFill", "id": "skyFill", "type": "directional", "direction": [-0.85, -0.38, -0.36],
-             "color": R0["auroraTop"], "intensity": 0.32, "castsShadow": False}] + crystal_lights(placed),
+             "color": [0.5 * c + 0.5 * m for c, m in zip(R0["auroraTop"], [0.35, 0.75, 0.45])], "intensity": 0.16,
+             "castsShadow": False}] + crystal_lights(placed),
         "effects": [
             {"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True, "order": 0,
              "activation": "always", "parameters": {"brightness": 1.6, "density": 0.55, "magnitudeSlope": 6.5,
@@ -711,7 +719,8 @@ def main():
     if bad:
         sys.exit("FAIL: crystals within %.1f m of the river: %s" % (L.RIVER_MARGIN,
                                                                  ", ".join("%s %.1f" % b for b in bad)))
-    build_circuits(os.path.join(a.assets, "circuits.glb"), placed)
+    if CIRCUITS:
+        build_circuits(os.path.join(a.assets, "circuits.glb"), placed)
     rows, cover = L.layering(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
     print("layering (frame % / visible %): " + " ".join("%s %.1f/%.0f" % r for r in rows),
           "| crystals cover %.1f%% of the frame" % cover)
