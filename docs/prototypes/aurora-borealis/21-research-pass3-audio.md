@@ -1,258 +1,198 @@
 # Aurora Borealis 21: Sabertooth audio, synchronization and per-instrument events (Research Agent A, pass 3)
 
-Brief: `20-brief-sabertooth.md` (Subagent A) and `20b-brief-river-light.md`. Branch `scene/aurora-borealis` at
-5ac8ea63. This is research only: no production code changed. Agent B's `22-research-pass3-scene.md` did not exist when
-this was written, so the scene-side targets below have descriptive names. Bind them in one pass once B's names exist.
+Brief: `20-brief-sabertooth.md` (Subagent A) and `20b-brief-river-light.md`. Branch `scene/aurora-borealis`. This is
+research only: no production code changed. Agent B's `22-research-pass3-scene.md` did not exist when this was written,
+so the scene-side targets below have descriptive names. Bind them in one pass once B's names exist.
 
-- **Binary:** `build/release/src/avgen` in this worktree. It was built before the pass-2 tail, which changed only
-  generators and docs. Every run here is CPU-only (`--sonic-trace`, no GPU), so `tools/gpu-lock.sh` was not needed.
+**Revision 2 (2026-10-24, 19:35): the re-bounced set.** The first version of this report found that seven stems ran 3%
+slower than the mix. The owner then re-bounced Cloud Diving, Kick, Moog, Snare, Toms and tone block (19:25-19:30) and
+BASS (19:31), at 83 BPM with 3% Varispeed, the same as the mix. Everything below is re-measured on those files. §10
+keeps the first version's finding as history. The 49,440 Hz relabel copies it proposed were never put in the
+repository, and the scratch copies are deleted.
+
+- **Binary:** `build/release/src/avgen` in this worktree. Every run here is CPU-only (`--sonic-trace`, no GPU), so
+  `tools/gpu-lock.sh` was not needed.
 - **Evidence:** `~/Desktop/av-gen-review/aurora-borealis/pass3-research-a/`:
   - **Probe generators:** `make_probe.py` and `make_probe2.py`. Their projects are in `proj/`.
-  - **Analysis scripts:** `wavio.py` is a numpy WAV reader; the rest are listed in §9.
-  - **Outputs:** each script writes `*-out.txt`. The traces are in `trace/`.
+  - **Analysis scripts:** `wavio.py` (a numpy WAV reader), `tr.py` (trace and truth helpers) and the per-question
+    scripts listed in §9.
+  - **Outputs:** `*-out.txt` beside the scripts, and the traces in `trace/`.
   - **Event lists:** `events-<instrument>.txt`.
-  - **Plots:** nine, `01-overview-mix-time.png` through `09-event-raster.png`.
-- **Conditions:** the Mac was on battery, not AC, during this work (`pmset`: "Battery Power", 65%). No number here
-  depends on it: they are offline traces and audio analysis, with no GPU or live timing.
+  - **Plots:** `01-overview-rebounce.png` through `09-event-raster.png`.
+  - **Checksums:** `sha256-rebounce.txt` for the ten files.
+  - **The first version:** its outputs, plots and traces are kept in `v1/`.
+- **Conditions:** the Mac was on battery, not AC (`pmset`: "Battery Power"). No number here depends on it: they are
+  offline traces and audio analysis, with no GPU or live timing.
 
 ## 0. Summary
 
-1. **The stems are not in sync with the mix. They are at a different speed.**
-   - **Two speeds:** `Sabertooth.wav`, `Crash.wav` and `HH.wav` run at **85.49 BPM**. The other seven (BASS, Cloud
-     Diving, Kick, Moog, Snare, Toms, tone block) run at **83.00 BPM**.
-   - **The 2.1 s is tempo, not tail.** Both sets are exactly 25 bars: 70.1836 s against 72.2892 s, a ratio of
-     1.030000.
-   - **Pitch moves with it:** the mix is +0.51 semitones above the seven stems (Moog and Cloud Diving both measure
-     +0.509; 3% is +0.512). So it is Logic's Varispeed (speed *and* pitch +3%), not a tempo change re-rendered at
-     the same pitch.
-   - **The metadata is wrong.** Every file's LIST chunk says "Tempo: 83.0", including the three that run at 85.49.
-     The bext origin is **Logic Pro**, not Ableton.
-   - **The drift, loaded as delivered:** a kick stem event lands +0.29 s late at 10 s, +1.04 s at 35 s and
-     +1.96 s at 65 s. That is +30.0 ms per second (§1.3).
-2. **The engine's stem-set check (ADR-1632) flags all nine stems, but it cannot name the cause.**
-   - **What it says:** every stem "does not match the mix within ±500 ms (correlation 0.00-0.05)", and the stems
-     "sum to the mix with a residual 0.0 dB below it".
-   - **Why it cannot say more:** it searches for a constant lag, and this is a constant *ratio*.
-   - **Even resampled, the mix is not a linear sum of the stems.** I resampled the seven stems exactly by 1/1.03.
-     The check then aligns Bass at +6.5 ms (correlation 0.70) and Kick at +38 ms (0.36), but the residual stays at
-     0.2 dB.
-   - **So the sample-level check cannot confirm this set, and event-level timing is the evidence (§1.4):**
-     - once mapped, every stem's events land within ±10 ms of the mix's own transients;
-     - the lag is constant over the whole 70 s to within ±6 samples.
-3. **The fix that changes no sample:** make the seven 83 BPM stems declare a 49,440 Hz rate (48,000 × 1.03).
-   - **How it works:** AV Gen analyses every stem at its own rate, and frame times are seconds (ADR-1520). So a stem
-     whose header says 49,440 Hz is the varispeeded stem, with no resampling. Only the 4 bytes of the fmt chunk's
-     rate fields differ.
-   - **Measured with these copies:**
-     - Kick: 120/120 onsets against the mix clock, at -4 ms (median), with a drift slope of 0.00 ms/s;
-     - the Kick-fed beat clock reads 85.51 BPM;
-     - the beat pulses fall +5.8 ms after the 85.49 grid in both halves of the song.
-   - **The proper fix is a re-bounce,** which only the owner can do (§8, Q1). Bounce the seven stems with the same
-     Varispeed setting as the mix, or bounce the mix, Crash and HH without it.
-4. **Load every stem by key and read `stem.<key>.onset` directly. No classifier is needed.**
-   - **Each stem is one instrument,** so its onset *is* the event.
-   - **The classifier would hurt:**
-     - On the Kick stem it fires the kick class 120/120, but **+29 ms late** (three hops).
-     - It mislabels everything else: on Snare, 48 snare classes plus 48 hats and 8 kicks; on Crash, 10 snares and
-       25 hats; on HH, 396 hats and 61 snares.
-   - **Proposed roles:** `drums` for Kick only, so that `role.drums` and the feeds keep working; `synth` for Cloud
-     Diving; `bass` for BASS; `other` for the rest.
-   - **No stem limit:**
-     - nothing in the code caps the stem count (one analysis thread per stem);
-     - ten stems analyse in 232 ms with no drums role, 521-551 ms with one and 851 ms with five drums stems;
-     - the timbre pass (1.1 s) costs more than all of them.
-5. **The detectors, measured against the audio (mix clock, 240 fps trace; full table in §3):**
+1. **The re-bounced set is in sync.**
+   - **All ten files** are 48 kHz 24-bit stereo, 3,368,815 frames (70.1836 s), 25 bars at 85.49 BPM.
+   - **The lag is constant and the drift is zero.** Cross-correlated against the mix at sample level in ten 7 s
+     windows, every stem with something to lock to sits at **0 samples** in every window (Kick ±1). BASS sits at +1 to
+     +3 samples (≤ 0.06 ms).
+   - **Cloud Diving is a pad,** with no sample-level lock. Its envelope correlates best within 20 ms of 0 (r 0.49
+     either way).
+   - **Through the engine:** kick drift is 0 (-4.5 ms in the first half, -4.0 in the second, against the mix's own
+     transient). The Kick-fed beat clock reads 85.51 BPM, with pulses +4.7 / +4.9 ms after the grid in the two halves.
+2. **⚠ `Moog.wav` is the bass part. The Moog part is missing.**
+   - **The evidence:** the new `Moog.wav` (19:29:58) and `BASS.wav` (19:31:49) carry the same audio, differing by at
+     most 0.0006. Peak, RMS, centroid, onsets and side/mid all match.
+   - **What they contain:** both rise +29 dB at the old bass note onsets, and only +14 dB at the old Moog notes. The
+     overview plot shows the bass riff in both rows.
+   - **The old Moog file is gone:** the Desktop original was replaced, so my copy was too. Only the v1 analysis of it
+     survives (`v1/`).
+   - **What it blocks:** every left-mountain mapping, until the owner re-bounces the Moog track (§8 Q1). It also makes
+     the stem-set check fit a duplicate (see 3).
+3. **The engine's stem-set check (ADR-1632) is now meaningful.**
+   - **The residual is 7.2 dB below the mix** (was 0.0 dB), and Kick, Snare, Toms and BASS pass with no warning.
+   - **The remaining warnings are expected:** Crash 0.05, HH 0.02, Cloud Diving 0.07 and tone block 0.14 "do not
+     match". They are quiet, processed or pad parts, and my windowed cross-correlation shows them at lag 0.
+   - **The duplicated Moog reads "8.2 ms later (0.35; -0.99 at its offset)".** That is an artefact of fitting two
+     identical stems. Without it, the check reads the same 7.2 dB with no Moog warning.
+4. **Read every stem by key, `stem.<key>.onset`, with no classifier** (unchanged from v1, re-measured).
+   - On Kick, the kick class is **+33 ms late** (p90 +42).
+   - On Snare, it adds 49 hats and 7 kicks.
+   - On Toms, it adds 21 hats and 9 kicks.
+   - **Proposed roles:** `drums` for Kick only, `synth` for Cloud Diving, `bass` for BASS, `other` for the rest.
+   - **No limit on stem count:** nine stems analyse in 225 ms with no drums role, 767 ms with one and 905 ms with five.
+5. **Events on the re-bounced files** (mix clock, 240 fps trace; full detail in §3):
 
-   | Instrument | Events | Detector | Quality | Cause of the misses or false fires |
+   | Instrument | Events | Detector | Quality | Change since v1 |
    |---|---|---|---|---|
-   | Kick | 120 | onset | 120/120, 0 doubles, -4 ms | |
-   | Snare | 48 | onset with a 100 ms refractory | 48/48 | the raw onset double-fires on 25 of 48 hits, at 58-62 ms |
-   | **Crash** | **12** | onset with a refractory of 100 ms or more | 12/12, 0 false | the raw onset fires 13: one double at 25.32 |
-   | Toms | 28 note starts in 6 fills | onset | the note starts | buzz-roll notes, not single hits |
-   | Tone block | 176 accents | onset | every accent ≥ -5 dB, none of the 249 ghost notes | |
-   | **Moog** | 24 played notes | an rms *rise* detector, 26 fires, 24 true | | the raw onset fires 321 times, on every 8th-note echo and timbre wobble |
-   | Cloud Diving | 15 swells | 0 onsets (correct) | | |
-   | HH | 374 sixteenths, 29 open hats (once a bar) | | | |
-   | Bass | 217 of 314 notes | | | |
+   | **Crash** | **12** | onset with a refractory of 100 ms or more | 12/12, 0 false | unchanged (same file) |
+   | Kick | 121 | onset | 121/121 | adds the downbeat at t = 0, published at 0.033 s |
+   | Snare | 48 | onset with a 100 ms refractory | 48/48 | **the raw onset double-fires on 40 of 48** (was 25) |
+   | Toms | 28 note starts | onset with a 100 ms refractory | | the raw onset now fires 38 (10 doubles); starts within 9 ms of v1 |
+   | Tone block | 176 accents | onset | | identical to v1 |
+   | Cloud Diving | 15 swells | rms envelope | | **2x louder (use gain 4); a reverb tail instead of a hard cut; 22 onsets now fire at swell starts** |
+   | Moog | — | — | — | **not measurable: no Moog audio** |
 
-6. **Kick and snare always land together.**
-   - **47 of 48 snares fall within 20 ms of a kick.** The snare is on beats 2 and 4, and the kick plays every beat
-     plus 16th pickups.
-   - **All 12 crashes coincide with a kick,** and 7 of them with a snare as well.
-   - **For the river,** this means a Kick beam and a Snare beam launch on the same frame twice a bar. The shared
-     beam system must keep them legible when they start together (§5.3).
+6. **Kick and snare still always land together:** 47 of 48 snares fall within 20 ms of a kick, and all 12 crashes do.
 7. **Timing, offline:**
-   - **Onsets publish 1-6 ms early.** The analysis frame is time-stamped at its window centre.
-   - **At 30 fps,** a transient shows on a frame -10 to +30 ms from the true onset (p50 +10.5 ms).
-   - **What adds lag:** stacked smoothing, the classifier (+29 to +37 ms) and `macro.*` (+1 frame). Nothing else on
-     the proposed paths does.
-   - **Live,** with the stems as separate channels, every onset path is the measured 58 ms p50 / 82 ms p95 to light
-     (PROGRESS). The class paths are 87-111 ms.
+   - **Onsets publish 1-9 ms early.** The analysis frame is time-stamped at its window centre.
+   - **At 30 fps,** a transient shows on a frame -11 to +29 ms from the true onset (median +5 to +14 ms).
+   - **What adds lag:** stacked smoothing, the classifier (+33 to +42 ms) and `macro.*` (+1 frame). Nothing else on the
+     proposed paths does.
+   - **Live,** with separate channels, the onset path is 58 ms p50 / 82 ms p95 to light (PROGRESS). The class paths
+     are 87-111 ms.
 
 ## 1. Inventory and synchronization
 
-### 1.1 The ten files (`inventory-out.txt`)
+### 1.1 The ten files (`inventory2-out.txt`, `sha256-rebounce.txt`)
 
-All are 48 kHz, 24-bit PCM, with the chunks JUNK, fmt, data, LGWV, ResU, cue, LIST and bext. Every bext
-TimeReference is 178,213,012 and the origin is "Logic Pro". Every LIST chunk reads "Tempo: 83.0". The casing and
-spaces match the brief exactly; nothing is missing.
+All are 48 kHz, 24-bit PCM, stereo, 3,368,815 frames (70.1836 s). The bext origin is Logic Pro, the TimeReference
+is 178,213,012 on all ten, and every LIST chunk reads "Tempo: 83.0". The playing speed is 85.49 BPM (83 × 1.03, the
+Varispeed). The casing matches the brief, and nothing is missing by name.
 
-| File | Ch | Frames | Duration | Peak / RMS dBFS | Bounced | Real tempo | First / last sound (> -60 dBFS) | Note |
-|---|---|---|---|---|---|---|---|---|
-| `Sabertooth.wav` (mix) | 2 | 3,368,815 | 70.1836 s | -0.30 / -11.70 | 18:21:05 | **85.49** | 0.00 / 70.18 (cut at -12 dB, not faded) | +0.51 st vs the stems |
-| `Crash.wav` | 2 | 3,368,815 | 70.1836 s | -4.38 / -31.59 | 18:27:03 | **85.49** | 2.81 / 62.16 | at the mix's speed |
-| `HH.wav` | 2 | 3,368,815 | 70.1836 s | -4.47 / -33.16 | 18:25:02 | **85.49** | 2.81 / 70.09 | at the mix's speed |
-| `BASS.wav` | 2 (L = R) | 3,469,880 | 72.2892 s | -0.36 / -17.06 | 18:23:58 batch | 83.00 | 2.36 / 72.29 | mono content in stereo |
-| `Cloud Diving.wav` | 2 | 3,469,880 | 72.2892 s | -6.05 / -24.21 | batch | 83.00 | 2.94 / 70.42 | wide (side/mid -0.8 dB) |
-| `Kick.wav` | 2 (L = R) | 3,469,880 | 72.2892 s | -6.27 / -23.18 | batch | 83.00 | 0.00 / 71.54 | |
-| `Moog.wav` | **1** | 3,469,880 | 72.2892 s | -9.08 / -25.40 | batch | 83.00 | 3.66 / 71.71 | mono |
-| `Snare.wav` | 2 (L = R) | 3,469,880 | 72.2892 s | -2.48 / -28.83 | batch | 83.00 | 3.62 / 72.01 | |
-| `Toms.wav` | 2 | 3,469,880 | 72.2892 s | -7.79 / -33.83 | batch | 82.97 | 1.08 / 72.29 | fills only |
-| `tone block.wav` | **1** | 3,469,880 | 72.2892 s | -1.58 / -28.16 | batch | 83.00 | 3.26 / 71.36 | mono |
+| File | Bounced | Peak / RMS dBFS | First / last sound (> -60 dBFS) | Side/mid | Note |
+|---|---|---|---|---|---|
+| `Sabertooth.wav` (mix) | 18:21:05 | -0.30 / -11.70 | 0.00 / 70.18 (cut, not faded) | -12.1 dB | unchanged |
+| `Crash.wav` | 18:27:03 | -4.38 / -31.59 | 2.81 / 62.16 | -1.4 | unchanged |
+| `HH.wav` | 18:25:02 | -4.47 / -33.16 | 2.81 / 70.09 | -9.9 | unchanged |
+| `Kick.wav` | 19:27:44 | -0.39 / **-15.58** | 0.00 / 69.63 | -78.7 | 7.6 dB louder than the old bounce |
+| `Snare.wav` | 19:28:25 | -1.28 / -24.04 | 3.51 / 69.98 | -69.0 | |
+| `Toms.wav` | 19:28:50 | -3.51 / -29.30 | 1.05 / 70.18 | -5.5 | |
+| `tone block.wav` | 19:25:24 | -1.49 / -28.60 | 2.65 / 69.44 | -6.9 | now stereo |
+| `Cloud Diving.wav` | 19:30:19 | -0.63 / **-18.41** | 2.81 / 69.70 | -2.6 | 5.8 dB louder; reverb tails |
+| `BASS.wav` | 19:31:49 | -0.40 / -13.35 | 2.29 / 70.18 | -37.5 | |
+| **`Moog.wav`** | 19:29:58 | -0.40 / -13.35 | 2.29 / 70.18 | -37.5 | **the same audio as BASS (§0.2)** |
 
-- **The batch stems' last 2.1 s is music, not tail** (`tail-out.txt`): Bass, Kick, Snare and Toms all play to the
-  file's end.
-- **What the 2.1 s is:** the seven stems are the same 25 bars, played 3% slower.
+- **Tempo** (onset autocorrelation over 8 beats, `tempo2-out.txt`): the mix, Kick, Snare, HH and tone block are
+  701.9 ms per beat (85.49 BPM), BASS 701.8 and Toms 702.1. Each comes to 25.00 bars.
+- **Pitch against the mix** (`pitch2-out.txt`): Cloud Diving is +0.000 semitones (it was +0.509 before the re-bounce).
 
-### 1.2 Proving the speed difference (`tempo-out.txt`, `pitch-out.txt`)
+### 1.2 Alignment
 
-- **Tempo:** the beat period comes from the onset-envelope autocorrelation over 8 beats.
-  - The mix's low band, high band and broadband all give 701.9 ms (85.49 BPM). So does HH.
-  - Kick, Snare, BASS and tone block give 722.9 ms (83.00); Toms gives 723.1 ms.
-  - Every file comes to 25.00 bars.
-- **Pitch:** the cross-correlation of log-frequency spectra puts the mix +0.509 semitones above Moog and above Cloud
-  Diving. Bass reads +0.68 and tone block +0.19 (noisier, broadband and percussive); HH is noise.
-- **So the cause is Varispeed:** speed and pitch +3%.
+**Windowed sample-level cross-correlation** (`winlag2.py` → `winlag2-out.txt`: no resampling, ±24,000 samples searched,
+ten 7 s windows):
 
-### 1.3 The engine's check on the files as delivered (probe `asis-roles`, `trace/asis-roles.log`)
-
-```
-stem 'Kick' (Kick.wav): it does not match the mix within +-500 ms of its offset (correlation 0.05) ... (all 9 alike, 0.00-0.05)
-stems: 9 of 9 sum to the mix with a residual 0.0 dB below it
-```
-
-- **Drift through the engine:** I paired each kick onset with the mix's kick of the same index. The engine minus
-  the mix clock is +288 ms at 10 s, +1,042 ms at 35 s and +1,956 ms at 65 s, a slope of **+29.99 ms/s**
-  (`drift-engine-out.txt`).
-- **No offset can fix it:** ADR-1632's lag search assumes a constant lag. A constant offset would have to be 0 s at
-  the start and 2.1 s at the end.
-
-### 1.4 Once the seven stems are varispeeded, they align
-
-**Independent check:** I FFT-resampled the seven stems exactly from 3,469,880 to 3,368,815 frames
-(`varispeed_fit.py`), then cross-correlated each against the mix in 7 s windows at sample level (`winlag-out.txt`).
-
-| Stem | Lag in every 7 s window, samples at 48 kHz (|correlation|) |
+| Stem | Lag in every window, samples (correlation) |
 |---|---|
-| BASS | +302 to +314 (0.52-0.68), every window |
-| Snare | +134 to +142 (0.09-0.13) |
-| Moog | +28 to +30 (0.11-0.29); one window +62 |
-| tone block | +11 to +12 (0.03-0.08) |
-| Kick | +1,489 to +1,503 (negative correlation, -0.29 to -0.36: a waveform-period match, see the event check below) |
-| Crash, HH (not resampled) | **0** in every window, at low correlation (0.02-0.08) |
-| Cloud Diving | no stable lag (a pad: nothing to lock to) |
+| Kick | **0 or ±1** (0.51-0.61) |
+| Snare | **0** (0.12-0.16) |
+| Toms | **0** in every window where it plays (0.05-0.12) |
+| tone block | **0** (0.03-0.08) |
+| HH | **0** (0.02-0.03) |
+| Crash | **0** in each window with a hit (0.05-0.08) |
+| BASS (= `Moog.wav`) | **+3, +3, +3, +2, +2, +2, +1, +2, +2, +2** (0.60-0.75): ≤ 0.06 ms, 2 samples over the song |
+| Cloud Diving | no stable sample lag (a pad, 0.03-0.08). On its 300-3,000 Hz log envelope it reads +20 ms, r 0.492, and 0.492 at 0 (`cloudlag2-out.txt`): flat, aligned within the envelope's 10 ms resolution |
 
-- **The lag is constant over the song** to within ±6 samples for every stem that correlates. So the ratio is exactly
-  1.03, and there is no drift.
-- **The per-stem lags differ by up to 6.4 ms** (BASS +306 samples). They are processing in the mix bus: the mix is
-  not a linear sum of these stems.
-  - A least-squares fit with one gain per stem leaves 0.17 dB of residual; Feline left 42.5 dB.
-  - The fit gives BASS a negative gain.
-- **Event level, the timing that matters to a light.** Kick and snare onsets, taken sample-accurately from the clean
-  stems and mapped by t/1.03, against the mix's own transient in the instrument's band (`kickevt-out.txt`):
-  - the kick is at -4.4 ms (median; -4.5 first half, -4.3 second half);
-  - the snare is at -1.0 ms (median).
-- **The engine's check on the resampled copies:**
-  - **Bass:** "lines up 6.5 ms later (0.70)".
-  - **Kick:** "38.2 ms later (0.36)". That is the same waveform-period match, and it is wrong at event level.
-  - **The rest:** "does not match (0.00-0.12)".
-  - **The residual:** 0.2 dB.
-- **The check's verdict on this set is therefore not meaningful.** Crash and HH are exactly aligned (lag 0 in every
-  window), yet they still read "does not match" (0.02 and 0.04). The other stems do not leave a residual the check
-  can fit.
-  - **Expect two standing warnings in any Sabertooth project** (Crash and HH) until a re-bounce from one session.
-    They are harmless.
+- **Event level** (`kickevt2-out.txt`, the clean stem's transients against the mix's own transient in the band):
+  - kick -4.2 ms median (-4.5 first half, -4.0 second half);
+  - snare -0.7 ms.
+- **Through the engine** (probe `probe2`, `"feeds": {"beat": "stem.kick"}`):
+  - "the beat clock follows stem 'kick': 85.51 bpm";
+  - pulses +4.8 ms after the 85.49 grid (p10/p90 +3.1/+6.5), +4.7 in the first half and +4.9 in the second;
+  - the nearest kick lands 5.0 ms before each pulse.
+- **The mix's own beat grid still locks at 114.44 BPM** (4/3 of the tempo): 106 of its 134 pulses are more than 50 ms
+  from a kick. Feed the beat from the Kick stem.
 
-### 1.5 The rate-relabelled stems (probe `relabel-prop`; `relabel.py`)
+### 1.3 The engine's stem-set check (`trace/asis-roles.log`, `trace/nomoog.log`)
 
-- **What the copies are:** the seven batch stems with the fmt chunk's `sampleRate` and `byteRate` set for 49,440 Hz.
-  `relabel.py` checks every byte: 4 bytes differ (offsets 96-97 and 100-101), and the data chunk is untouched.
-- **What the engine says:** "49440 Hz beside a 48000 Hz mix; analysed at its own rate (nothing is resampled)". That
-  is info severity.
-- **The cost:** the check leaves these stems out of its sum ("2 of 9 sum to the mix"). So only the Crash and HH
-  warnings remain.
-- **Analysis at 49.44 kHz:**
-  - the hop is 512 / 49,440 = 10.36 ms, against the mix's 10.67;
-  - the window is 41.4 ms;
-  - bands in Hz read the stem 3% higher, which is exactly the pitch the listener hears in the mix.
-- **Kick through the engine:** 120 onsets before 70.18 s. The engine minus the mix clock is -4, -3 and -3 ms at 10,
-  35 and 65 s, a slope of **0.00 ms/s**.
-- **The Kick-fed beat clock** (probe `feedkick`, `"feeds": {"beat": "stem.kick"}`):
-  - "85.51 bpm, 98 beats";
-  - pulses +5.8 ms after the 85.49 grid (p10/p90 +4.1/+7.5), the same in both halves;
-  - the nearest kick lands 6.3 ms before each pulse.
+```
+stems: 9 of 9 sum to the mix with a residual 7.2 dB below it
+stem 'Crash' ... does not match the mix within +-500 ms (correlation 0.05)
+stem 'HH' ... (0.02)   stem 'Cloud Diving' ... (0.07)   stem 'Tone Block' ... (0.14)
+stem 'Moog' (Moog.wav): it lines up with the mix 8.2 ms later ... (correlation 0.35 there, -0.99 at its offset)
+```
+
+- **Kick, Snare, Toms and BASS** give no warning.
+- **Without the duplicated Moog** (probe `nomoog`): the same 7.2 dB residual, and only the four expected warnings.
+- **The four "does not match" warnings are uninformative here.** Each of those stems sits at lag 0 in every window.
+  - The check normalises each stem against what the other stems leave of the mix.
+  - At a 7.2 dB residual (Feline's was 42.5), the mix's processing leaves too much for quiet or pad stems to stand
+    out.
+  - Expect these four standing warnings in any Sabertooth project.
+- **Why the -0.99:** two identical stems make the least-squares fit put opposite gains on them. Once a real Moog
+  bounce replaces the file, this warning should go.
 
 ## 2. Loading through the existing workflow
 
-### 2.1 Where the files are (owner decision, done)
+### 2.1 Where the files are
 
-The ten files are copied byte for byte (`cmp`-verified) to the owner's main checkout:
-`/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/audio/stems/sabertooth/<exact name>`.
-
-- **Ignored:** `.gitignore` covers `assets/audio/stems/*.wav`, but not a subfolder. So I added
-  `/assets/audio/stems/sabertooth/` with a comment to the shared `.git/info/exclude`. It applies to the main checkout
-  and every worktree, and it commits nothing.
-  - `git check-ignore -v` names that rule for the new paths, and `git status` is clean in both checkouts.
-- **The folders were writable** (`drwxr-xr-x`) before I wrote.
-- **This worktree links to the copies.** It has per-file symlinks at `assets/audio/stems/sabertooth/*.wav`, the same
-  way the Feline stems are linked.
-  - `tools/link-worktree-assets.sh` will link them in any new worktree, because it walks subfolders.
-- **Nothing is committed.** The originals in `~/Desktop/sabertooth/` are untouched.
+- **The copy:** the ten files are byte-for-byte copies of `~/Desktop/sabertooth/`, re-copied after the re-bounce and
+  checked with `cmp` and SHA-256 (10/10 OK). They are in the owner's main checkout:
+  `/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/audio/stems/sabertooth/<exact name>`.
+- **Ignored:** `.gitignore` covers `assets/audio/stems/*.wav`, but not a subfolder. So `/assets/audio/stems/sabertooth/`
+  is in the shared `.git/info/exclude`, with a comment; it applies to every worktree and commits nothing.
+  - `git check-ignore` names that rule, and `git status` is clean in both checkouts.
+- **This worktree links to the copies** with per-file symlinks at `assets/audio/stems/sabertooth/*.wav` (all ten
+  resolve). `tools/link-worktree-assets.sh` will link them in any new worktree.
+- **The 49,440 Hz relabel copies from v1 were never created in the repository,** and the scratch copies are deleted.
 
 ### 2.2 Proposed project setup (a Sabertooth twin beside the Feline projects)
 
-- **The generator:** follow `examples/aurora-borealis/music.py`'s `apply()`, with a Sabertooth variant. Paths are
-  relative to `examples/aurora-borealis/`.
-- **The varispeed stems:** until the owner re-bounces, the seven batch stems are read from header-relabelled copies.
-  - **Where:** in the same ignored folder, e.g. `assets/audio/stems/sabertooth/varispeed/<name>.wav`.
-  - **How to make them:** `python3 relabel.py <that folder>`, run on the main checkout's copies, then symlink them
-    into the worktree.
-  - I have not created them in the repository. They exist only in my scratchpad.
+Paths are relative to `examples/aurora-borealis/`, following `music.py`'s `apply()`. Every file is used as delivered.
 
 ```json
 "assets": {
   "audio": "../../assets/audio/stems/sabertooth/Sabertooth.wav",
   "stems": [
-    {"key": "kick",      "label": "Kick",         "role": "drums", "file": "../../assets/audio/stems/sabertooth/varispeed/Kick.wav"},
-    {"key": "snare",     "label": "Snare",        "role": "other", "file": ".../varispeed/Snare.wav"},
-    {"key": "toms",      "label": "Toms",         "role": "other", "file": ".../varispeed/Toms.wav"},
+    {"key": "kick",      "label": "Kick",         "role": "drums", "file": "../../assets/audio/stems/sabertooth/Kick.wav"},
+    {"key": "snare",     "label": "Snare",        "role": "other", "file": "../../assets/audio/stems/sabertooth/Snare.wav"},
+    {"key": "toms",      "label": "Toms",         "role": "other", "file": "../../assets/audio/stems/sabertooth/Toms.wav"},
     {"key": "crash",     "label": "Crash",        "role": "other", "file": "../../assets/audio/stems/sabertooth/Crash.wav"},
     {"key": "hh",        "label": "HH",           "role": "other", "file": "../../assets/audio/stems/sabertooth/HH.wav"},
-    {"key": "bass",      "label": "Bass",         "role": "bass",  "file": ".../varispeed/BASS.wav"},
-    {"key": "cloud",     "label": "Cloud Diving", "role": "synth", "file": ".../varispeed/Cloud Diving.wav"},
-    {"key": "moog",      "label": "Moog",         "role": "other", "file": ".../varispeed/Moog.wav"},
-    {"key": "toneblock", "label": "Tone Block",   "role": "other", "file": ".../varispeed/tone block.wav"}
+    {"key": "bass",      "label": "Bass",         "role": "bass",  "file": "../../assets/audio/stems/sabertooth/BASS.wav"},
+    {"key": "cloud",     "label": "Cloud Diving", "role": "synth", "file": "../../assets/audio/stems/sabertooth/Cloud Diving.wav"},
+    {"key": "moog",      "label": "Moog",         "role": "other", "file": "../../assets/audio/stems/sabertooth/Moog.wav"},
+    {"key": "toneblock", "label": "Tone Block",   "role": "other", "file": "../../assets/audio/stems/sabertooth/tone block.wav"}
   ]
 },
 "feeds": {"beat": "stem.kick"}
 ```
 
-**Why these roles and keys:**
+**Why this setup:**
 - **Routes read `stem.<key>.*`, not `role.*`.**
-  - Five roles cannot tell ten instruments apart: `role.other` is just the first `other` stem (Snare here).
-  - Live input channels publish the same `stem.<key>.*` under their key (ADR-1521). Channels keyed `kick`, `snare`,
-    ... drive the same signals later, with no change.
-  - Pass 1's "read `role.*`" rule was for a three-stem band; it does not carry to a ten-stem kit.
-- **Kick has the drums role, so the existing scene keeps working.**
-  - `role.drums.kick` exists, so `signal.kick` and `kickRecent` still resolve, and the Feline twin is untouched.
-  - The proposed signals do not use the class.
-  - It costs about 300 ms of load (the classifier on one 70 s stem).
-- **Moog is `other`, so that `role.synth` stays Cloud Diving.** Listing Moog after Cloud Diving as a second `synth`
-  would work too.
-- **Mono stems are fine:** Moog and tone block are analysed as mono, and their `width` reads 0.
-- **`feeds.beat` comes from the Kick stem.** The mix's own grid locks at **114.44 BPM**, which is 4/3 of the tempo:
-  105 of its 134 pulses are more than 50 ms from a kick (`beat-out.txt`). A `hits` feed is not needed.
-- **`sonic`:** keep the scene's existing block, which serves the mix-only fallback.
+  - Five roles cannot tell ten instruments apart: `role.other` is just the first `other` stem.
+  - Live channels keyed the same way publish the same names (ADR-1521).
+- **Kick has the drums role,** so `role.drums.kick` exists and the existing drum signals still resolve. The proposed
+  signals never use the class.
+- **`feeds.beat` comes from the Kick stem,** because the mix's own grid locks at the wrong tempo (§1.2).
+- **Keep the scene's existing `sonic` block** for the mix-only fallback.
+- **Until the Moog is re-bounced,** leave the `moog` entry in. It loads, and its signals are wired, but it plays the
+  bass. Or drop it, to silence the -0.99 warning.
 
 ### 2.3 What a non-drums stem publishes
 
@@ -268,35 +208,31 @@ It never publishes kick, snare or hat (ADR-1630).
 - log-spectral flux below 16 kHz;
 - an adaptive threshold: the median of the last 11 hops × 1.5, + 0.002;
 - a rising edge;
-- a fixed 60 ms minimum interval. Snare and crash decays re-fire at exactly that interval (58-62 ms), so every
-  transient signal below adds its own refractory in the chain.
+- a fixed 60 ms minimum interval. Snare, toms and crash decays re-fire at that interval, so every transient signal
+  needs its own refractory in the chain.
 
-### 2.4 The classifier on single-instrument stems (probe `relabel-drums`, `classes-out.txt`)
+### 2.4 The classifier on single-instrument stems (probe `relabel-drums`, which is now every file as delivered with five drums stems; `classes-out.txt`)
 
-| Stem (all role drums) | Onsets | kick class | snare class | hat class |
+| Stem | Onsets | kick class | snare class | hat class |
 |---|---|---|---|---|
-| Kick | 120 | 120, **+29 ms** after the onset (p90 +33) | 0 | 0 |
-| Snare | 73 | 8 (wrong) | 48, **+37 ms** | 48 (wrong, on the onset) |
-| Toms | 28 | 4 | 4 | 21 |
-| Crash | 13 | 0 | 10 | 25 |
-| HH | 375 | 0 | 61 (wrong) | 396 |
+| Kick | 121 | 120, **+33 ms** after the onset (p90 +42) | 0 | 0 |
+| Snare | 88 | 7 (wrong) | 47, **+42 ms** | 49 (wrong) |
+| Toms | 38 | 9 (wrong) | 0 | 21 (wrong) |
+| Crash, HH (unchanged files; v1) | 13 / 375 | 0 / 0 | 10 / 61 (wrong) | 25 / 396 |
 
-**Verdict:** the classifier is unnecessary on every stem and harmful on most of them: late, and wrong labels.
+**Verdict:** unnecessary on every stem, and late and wrong on most of them.
 
-## 3. Per-instrument events, on the real audio
+## 3. Per-instrument events, on the re-bounced audio
 
 **Method:**
-- `--sonic-trace` at 240 fps on the relabelled set, so each 10.4 ms hop gets its own frame.
+- `--sonic-trace` at 240 fps, so each 10.67 ms hop gets its own frame.
 - Events were read through `signal.*` envelopes (attack 0, a fall of 1,000 a second).
-- The truth is a sample-level rise detector on the audio itself (`tr.py`, `events_all.py`), checked visually in the
-  plots.
+- The truth is a sample-level rise detector on the audio (`tr.py`, `events_all.py`), checked against the plots.
 - All times are on `Sabertooth.wav`'s clock. Lists: `events-*.txt`.
 
-### 3.1 Crash: 12 hits (`02-crash-hits.png`, `crash-out.txt`, `analyse2-out.txt`)
+### 3.1 Crash: 12 hits (the same file as v1; `02-crash-hits.png`, `analyse2-out.txt`)
 
-**Every crash time** (the engine's onset, mix clock; truth within ±11 ms):
-
-| # | s | Bar.beat (85.49 BPM, from t = 0) | Peak (stem.crash.peak) | Context |
+| # | s | Bar.beat (85.49 BPM, from t = 0) | Peak | Context |
 |---|---|---|---|---|
 | 1 | **2.808** | 2.1 | 0.26 | the full band enters |
 | 2 | **23.158** | 9.2 | 0.42 | phrase start, after silence |
@@ -311,177 +247,155 @@ It never publishes kick, snare or hat (ADR-1630).
 | 11 | **58.254** | 21.3 | 0.18 | re-hit 1.41 s later |
 | 12 | **58.958** | 22.0 | 0.28 | re-hit 0.70 s later |
 
-**What the stem does:**
-- Each crash rings 3-4 s.
-- The re-hits land on the decay of the previous hit (+8 to +20 dB jumps).
-- The shortest gap is one beat (0.70 s). There are no crashes after 62 s.
+- **The raw onset fires 13:** one double at 25.325, 63 ms after a hit.
+- **With a refractory of 100, 200, 300 or 500 ms** it fires exactly these 12, with 0 false fires and a median offset
+  of +0.5 ms against the audio.
+- **Recommended refractory: 300 ms.** The shortest real gap is 0.70 s.
+- **Do not gate by `onsetStrength` ≥ 4:** that loses 3 of the 12.
+- **Strength:** `stem.crash.peak` on the onset frame is 86% of the hit's 50 ms peak. Phrase starts reach 0.41-0.42,
+  re-hits 0.17-0.28.
 
-**Detector:** `stem.crash.onset` plus a latch.
-- **The raw onset** fires 13 times: one double at 25.325, 63 ms after the 25.262 hit.
-- **With a refractory of 100, 200, 300 or 500 ms** it fires exactly the 12, with 0 false fires and a median offset of
-  +0.5 ms.
-- **Recommended refractory: 300 ms.** It is well under the 700 ms minimum gap, so no real hit can be missed.
-- **Do not gate by `onsetStrength` ≥ 4:** that loses 3 of the 12 (25.26, 36.50, 47.73).
-- **Strength:** the phrase-start crashes peak at 0.41-0.42, the re-hits at 0.17-0.28. `stem.crash.peak` on the onset
-  frame (attack 0) gives 86% of the hit's 50 ms peak, so a held peak can size a star.
+### 3.2 Kick and Snare (`events_all-out.txt`, `size-out.txt`)
 
-### 3.2 Kick and Snare (`events_all-out.txt`, `06-snare-doubles.png`)
-
-- **Kick:** 120 hits (4.8 a bar).
-  - **Where they fall:** 98 on the beat, 20 on the "a" (the 16th before a beat, gap 0.17-0.18 s) and 2 on the "e".
-  - **The onset:** 120/120, 0 doubles, offset p10/50/90 -9.4 / -4.2 / +0.1 ms.
-  - **Size:** every kick has the same velocity (peak 0.45-0.49), so there is nothing to size by.
-- **Snare:** 48 hits, every one on beat 2 or 4 (gap 1.40 s).
-  - **The raw onset** fires 73 times: 25 doubles, all at 58-62 ms (the minimum interval, re-firing on the snare's
-    rattle).
-  - **With a refractory of 100 or 150 ms** it fires 48/48, at -3.4 ms (median).
-  - **Peak spread:** 1.6x (0.46-0.73), held from the onset frame.
+- **Kick:** 121 hits (98 on the beat, 20 on the "a" 16th before a beat, and the rest on the "e").
+  - **The onset:** 121/121, 0 doubles. The median offset is -9.1 ms against the stem's -40 dB crossing, and -4.2 ms
+    against the mix's own transient (§1.2).
+  - **The downbeat at t = 0** is published at 0.033 s, because the detector has no history on the file's first hop.
+    The old bounce missed it altogether.
+  - **Peak:** 0.92-0.96, all the same velocity.
+- **Snare:** 48 hits, all on beats 2 and 4.
+  - **The raw onset fires 88: 40 doubles** at 62-75 ms (the re-bounced snare rings longer).
+  - **With a refractory of 100 or 150 ms** it fires 48/48, at -5.6 ms.
+  - **Peak:** 0.76-0.84, a spread of only 1.1x (heavily compressed). A size depth adds little.
 - **Coincidence:** 47 of 48 snares fall within 20 ms of a kick (`coincide-out.txt`).
 
-### 3.3 Moog: plucked notes with an 8th-note echo, then legato (`04-moog.png`)
+### 3.3 Toms: six fills of buzz-roll notes (`03-toms.png`)
 
-**Articulation:**
-- **Discrete played notes.** Each is a sharp attack, then a staircase decay. The 0.346 s steps are 8th-note delay
-  repeats, about -5 dB each, still audible 2-3 s later.
-- **From about 51 s,** longer notes with legato steps.
-- **24 played notes** in all (`events-moog.txt`, rise A; 2 of its 26 fires, at 14.68 and 35.13, are extras):
-  3.55, 8.78, 9.18, 14.43, 19.30, 20.37, 21.79, 23.88, 25.98, 28.78, 31.28, 32.65, 34.76, 36.90, 41.43, 42.80, 47.73,
-  51.23, 53.35, 55.10, 58.96, 60.37, 64.58 and 66.02.
+- **The 28 note starts** (`stem.toms.onset` with a 100 ms refractory; the raw onset fires 38, the extra 10 being
+  doubles under 100 ms). Every start is within 9 ms of v1:
 
-**Detectors** (`analyse2-out.txt`; truth = 38 rises, of which about 14 are echo repeats):
+  | Fill | Note starts (s) |
+  |---|---|
+  | 1 | 1.05, 1.23, 1.57, 1.92, 2.45, 2.63 |
+  | 2 | 24.03, 24.39, 24.56, 24.91 |
+  | 3 | 35.25, 35.61, 35.79, 36.14, 36.31 |
+  | 4 | 41.75, 41.93 |
+  | 5 | 45.97, 46.15, 46.50, 46.84, 47.36, 47.54 |
+  | 6 | 68.95, 69.30, 69.48, 69.82, 70.01 |
 
-| Detector | Fires | On a played note | Comment |
-|---|---|---|---|
-| raw `stem.moog.onset` | 321 | 33 | fires on every echo step and timbre wobble (58-71 ms trains). Unusable |
-| onset gated by `onsetStrength` ≥ 3 / 5 / 8 | 27 / 12 / 5 | 14 / 9 / 5 | loses notes |
-| onset gated by an rms rise | 13-55 | 7-13 | the onset precedes the gate opening |
-| **rms rise A:** `stem.moog.rms` trend 0.25 s / 15 ms, floor 0.003, ×1.6, latched 150 ms | **26** | **24 notes + 9.18** | **recommended**; -4.8 ms |
-| rms rise C: the same at ×2.2 | 22 | 22, precision 1.00 | stricter: misses 9.18 and 20.37 (legato) |
+- **Peak:** 0.15-0.41, a spread of 1.9x, carried on the onset frame. Each fill's last one or two notes are the loudest
+  (0.37-0.41). The first fill climbs from 0.15 to 0.39.
+- **The rms-rise gate keeps only 10** of the 28, so it is not wanted.
+- **For a body glow,** use `stem.toms.level`.
 
-**The sustain:** `stem.moog.level` with a 20 ms attack and 600 ms decay follows each note's body and decay
-(`09-event-raster.png`, lower panel). It is the "gently illuminated for the duration of a note" layer.
+### 3.4 Tone block: 176 accents (`05-toneblock.png`)
 
-### 3.4 Toms: six fills of roll-notes (`03-toms.png`)
+- **The same 176 accents as v1** (all within 30 ms). The pattern is syncopated 16ths, never on the beat, about 7 a
+  bar.
+- **The onset catches every accent and none of the 258 ghost notes,** at -6.0 ms.
+- **Peak:** 0.34-0.55, a 1.6x spread (2.2x before the re-bounce).
+- **The rests:** silent before 2.65 s, at 23.6-25.4 s and at 45.0-48.0 s. These are where the tom fills are, so the
+  two right-side instruments trade bars.
+- **They rarely coincide:** 16 of 176 tone-block accents and 9 of 28 tom notes fall on a kick.
 
-**What a tom note is:** not a single hit. Each is a 0.2-1.3 s buzz roll, with the amplitude fluttering every 20-30
-ms. The fills step up in level, and the **last note of every fill is the loudest**.
-- **Peak:** 0.21-0.23 on the last note, 0.07-0.16 on the rest. The spread is 2.0x, and the onset frame carries the
-  full peak.
+### 3.5 Moog: not measurable on this set
 
-**The 28 note starts** (`stem.toms.onset`, which the 100/150 ms refractory leaves unchanged):
+`Moog.wav` contains the bass part (§0.2; `04-moog-file-is-bass.png`). On it, rise A fires 114 times and the onset
+222 times: the bass riff.
 
-| Fill | Note starts (s) |
-|---|---|
-| 1 | 1.05, 1.23, 1.58, 1.93, 2.45, **2.63** |
-| 2 | 24.04, 24.38, 24.55, **24.91** |
-| 3 | 35.26, 35.62, 35.79, 36.13, **36.32** |
-| 4 | 41.76, **41.93** |
-| 5 | 45.96, 46.15, 46.49, 46.84, 47.37, **47.55** |
-| 6 | 68.95, 69.30, 69.48, 69.82, **70.01** |
+**From the old Moog bounce** (v1, 83 BPM; `v1/`), the articulation is known:
+- about 24 played notes, each a plucked attack with 8th-note echo repeats (0.35 s, about -5 dB each);
+- legato steps from about 51 s;
+- the raw onset is unusable there, at 321 fires.
 
-The bold note in each fill is its loudest, the last.
+**The detector for the real Moog:**
+- **`stem.moog.rms` trend 0.25 s / 15 ms, floor 0.003, ×1.6, latched 150 ms ("rise A").** On v1 it caught all 24 notes
+  plus 2 extras (14.68 and 35.13 s, both on echo steps right after a note).
+- **×2.2 ("rise C")** was fully precise, but missed 2 legato notes.
+- **Decision: the catch-all ×1.6.** The extras are an echo re-lighting the same glint, not a visibly wrong event.
+- **Re-check it on the re-bounced Moog:** the new bounces run 6-12 dB hotter, but the trend ratio is level-free.
 
-- **The onset catches the note starts,** not the roll's flutter. My 78-rise "truth" counted the flutter and is not a
-  fair reference.
-- **The rms-rise gate keeps only 16,** so it is not wanted here.
-- **For sustain, use `stem.toms.level`:** it climbs per note through a fill.
-
-### 3.5 Tone block: 176 accents, syncopated (`05-toneblock.png`)
-
-- **The pattern:** a 16th-note pattern, never on the beat (0 / 21 / 71 / 88 on the 16ths 1 / e / & / a), about 7
-  accents a bar.
-- **The accents and the ghosts:** the accents are ≥ -5 dB. 249 ghost notes sit 10-31 dB below them.
-- **The onset catches exactly the accents:** 176/176 of those ≥ -5 dB, 0 of the ghosts, at -5.4 ms. The adaptive
-  threshold is a built-in accent filter.
-- **Peak:** 0.35-0.79 (2.2x spread), held from the onset frame.
-- **The rests:** silent before 3.1 s, at 23.6-25.4 s and at 45.0-48.0 s. These are **exactly where the toms fills
-  are**, so the two right-side instruments trade bars.
-- **They rarely coincide:** only 16 of 176 tone-block accents, and 9 of 28 tom notes, fall on a kick.
+**The sustain:** `stem.moog.level`, 20 ms attack / 600 ms decay.
 
 ### 3.6 Cloud Diving: 15 swells (`08-cloud-diving-envelopes.png`, `cloud-out.txt`)
 
-**The swells** start at 2.97, 8.70, 14.20, 19.83, 25.43, 31.00, 36.73, 42.30, 47.90 (to 53.5, the long one), 54.27,
-59.07, 63.40, 64.30, 65.40 and 67.77.
-- The first eleven are full swells, one every 2 bars (5.6 s).
-- Their rise to 90% takes 0.5-2.5 s, they hold for 2-3 s, and they **end abruptly** (cut, not faded).
-- The last four (63-68 s) are short stabs at 0.3-0.7 of the level.
+- **The re-bounce changed this stem the most.**
+  - **Level:** RMS p50 0.11, p95 0.19 and max 0.24, about 2x louder. So **use gain 4** (gain 8 or 10 would clip the
+    plateaus).
+  - **Shape:** each swell now ends in a reverb tail of about 2 s instead of a hard cut.
+  - **Onsets:** `stem.cloud.onset` now fires 22 times, at the swell starts. Pass 1 found that onset events are wrong
+    for swells, and they are not used.
+- **The swells** (start - end at rms × 4 > 0.03; peak):
 
-**Levels:** rms p50 0.063, p95 0.10, max 0.14. Use a gain of about 8 so that p95 is about 0.8 (gain 10 clips the
-plateaus). It has no onsets, correctly.
+  | Start - end (s) | Peak | Start - end (s) | Peak |
+  |---|---|---|---|
+  | 2.87-6.20 | 0.88 | 36.57-40.03 | 0.98 |
+  | 8.50-11.93 | 0.71 | 42.13-45.63 | 0.88 |
+  | 14.10-17.50 | 0.82 | 47.77-53.93 | 0.90 |
+  | 19.70-23.27 | 0.92 | 54.10-55.93 | 0.71 |
+  | 25.33-28.63 | 0.97 | 58.97-61.03 | 0.79 |
+  | 30.90-34.33 | 0.85 | stabs 63.2, 64.1, 65.3, 67.7 | 0.34-0.69 |
 
-**Smoothing** (per-frame change at 30 fps inside the swells, after their first second; lag is to 50% of each swell's
-peak):
+  The rise to 90% takes 0.8-2.6 s.
+- **Smoothing** (per-frame change at 30 fps inside the swells, after their first second; lag to 50% of each swell's
+  peak):
 
-| `stem.cloud.rms` × 10, attack / decay ms | Jitter p50 / p99 per frame | Lag to 50% | Level left 0.5 s after the cut |
-|---|---|---|---|
-| raw | 0.058 / 0.311 | 0 | 0 |
-| 80 / 400 | 0.013 / 0.069 | 33 ms | 0.23 |
-| 150 / 600 | 0.009 / 0.044 | 67 ms | 0.37 |
-| **300 / 1200** | **0.005 / 0.028** | **100 ms** | **0.61** |
-| 600 / 2000 | 0.004 / 0.021 | 167 ms | 0.74 |
-| 1500 / 4000 | 0.004 / 0.012 | (never peaks within a swell) | 0.87 |
+  | `stem.cloud.rms` × 4, attack / decay ms | Jitter p50 / p99 | Lag | Level left 0.5 s after the end |
+  |---|---|---|---|
+  | raw | 0.033 / 0.215 | 0 | 0.01 |
+  | 80 / 400 | 0.011 / 0.056 | 33 ms | 0.09 |
+  | 150 / 600 | 0.008 / 0.036 | 33 ms | 0.19 |
+  | **300 / 1200** | **0.005 / 0.022** | **100 ms** | **0.43** |
+  | 600 / 2000 | 0.004 / 0.016 | 133 ms | 0.60 |
+  | **1500 / 4000** | **0.003 / 0.009** | (slow by design) | 0.78 |
 
-- **For intensity, width and folds: 250-300 ms attack and 1,000-1,200 ms decay.**
-  - It costs 100 ms against rises of 0.5-2.5 s, which is invisible.
-  - It turns the abrupt cut into a roughly 1 s relaxation, which the brief wants.
-  - Its p99 step of 0.028 a frame is no flicker.
-- **For the hue / palette blend: 1,500 / 4,000 ms.** Its p99 is 0.012, inside pass 2's palette bar (step p99 < 0.02).
-  It reads as a slow "how much has the synth been swelling" value: 0.25-0.7 across the song.
-- **`stem.cloud.level`** (the adaptive level) is smoother (raw p99 0.080), but it reads each swell against the
-  stem's own loudness. Use rms for absolute size.
-- **The spring stage on top (1 Hz) was worse:** p99 0.54. Not recommended.
+- **Recommendation:**
+  - **Intensity, width and folds: 300 / 1200.**
+  - **Hue: 1500 / 4000.** Its p99 is 0.009, inside pass 2's palette bar (step p99 < 0.02).
+  - The same choices as v1. Only the gain changed.
 
-### 3.7 Bass and HH, for the later decision (`hh-bass-out.txt`)
+### 3.7 Bass and HH, for the later decision (`events_all-out.txt`, `v1/hh-bass-out.txt`)
 
-- **HH:**
-  - **Closed hats:** 374, steady 16ths from 2.8 s to the end (5.3 a second), 20 dB decay in about 28 ms. Per hit,
-    this is the "continuous stream of flashes" the brief forbids.
-  - **Open hats:** 29, once a bar at 1.75 beats into the bar (the "a" of beat 2; at 2.0 in 6 bars).
-  - **The candidate:** that open hat is the one legible HH pattern, a once-a-bar micro-glint. The detector would
-    need a sustained-energy test (an HH onset whose rms is still up 100 ms later). I have not built or measured it.
-  - **The onset is good:** 365/365, 0.97 precise, at -1.3 ms.
-- **Bass:**
-  - **The notes:** 314 rises (4.5 a second, 16th riffs in 2-bar phrases). The onset catches 217 of them: every one
-    ≥ 0 dB, 92 of 169 between -5 and 0 dB, and few repeated notes closer than 100 ms. It is precise (0.97), at
-    -6.3 ms.
-  - **The rests:** silences of more than 1 s at 10.7-12.6, 22.1-23.9, 44.8-46.5, 50.7-52.8, 61.6-63.2 and
-    67.4-68.8 s, and others.
-  - **The candidate:** a slow `stem.bass.rms` envelope (150/800 ms, pass 1's `bassBody` shape) for river flow
-    energy. Hits would be too dense.
+- **HH** (unchanged file):
+  - 374 closed hats, steady 16ths at 5.3 a second. Per hit, this is a flash stream: do not use it.
+  - 29 open hats, once a bar at 1.75 beats in. They are the one legible pattern, a candidate for a once-a-bar
+    micro-glint, with a sustained-energy detector I have not built.
+- **Bass** (re-bounced):
+  - 312 note rises (4.45 a second, 16th riffs in 2-bar phrases), now with a reverb tail.
+  - The onset with a 100 ms refractory catches 210 of them (precise 0.98), at -8.6 ms.
+  - It rests at the phrase ends.
+  - **The candidate:** a slow `stem.bass.rms` envelope (150/800 ms) for river flow energy, at gain about 3 (rms p95
+    about 0.25).
 
 ## 4. Timing
 
 ### 4.1 Granularity and where an onset lands
 
-- **The analysis hop:** 512 samples at the file's rate. That is 10.67 ms on the mix, Crash and HH, and 10.36 ms on
-  the relabelled stems, with a 2,048-sample window (42.7 / 41.4 ms).
+- **The analysis hop:** 512 samples at 48 kHz (10.67 ms), with a 2,048-sample window (42.7 ms), time-stamped at the
+  window centre.
 - **Publishing (ADR-1520):** each frame takes the newest analysis frame at or before the playhead, and ORs the events
   since the last frame.
-- **The time stamp is the window centre.** So an onset is stamped up to half a window before the transient. Measured
-  against the true transient, the onset leads by:
+- **The onset leads the stem's true transient by:**
 
-  | Kick | Snare | Crash | HH | Tone block | Bass | Moog rise |
-  |---|---|---|---|---|---|---|
-  | -4.2 ms | -3.4 | +0.5 | -1.3 | -5.4 | -6.3 | -4.8 |
+  | Kick | Snare | Crash | HH | Tone block | Bass |
+  |---|---|---|---|---|---|
+  | -9.1 ms (-4.2 against the mix's transient) | -5.6 | +0.5 | -1.3 | -6.0 | -8.6 |
 
-- **At 30 fps** (probe 2, `frame30-out.txt`), the frame that shows the event minus the true transient is:
+- **At 30 fps** (`frame30-out.txt`), the frame that shows the event minus the true transient is:
 
-  | | min | p50 | p90 | max |
+  | | p10 | p50 | p90 | max |
   |---|---|---|---|---|
-  | Kick | -10.3 | +10.5 | +23.0 | +29.5 ms |
-  | Snare | -3.5 | +13.1 | +25.7 | +29.5 ms |
-  | Crash | -6.3 | +10.6 | +28.5 | +30.3 ms |
-  | HH | -9.3 | +14.0 | +26.7 | +33.4 ms |
+  | Kick | -8.6 | +5.4 | +20.0 | +26.0 ms |
+  | Snare | -6.2 | +8.3 | +22.4 | +27.4 ms |
+  | Crash | +5.1 | +10.4 | +24.8 | +29.3 ms |
+  | HH | -0.6 | +14.0 | +26.7 | +33.4 ms |
 
-  That is the frame quantisation (0-33 ms) less the window lead. A 30 fps offline render cannot do better without
-  sub-frame event times.
-- **The mix against the stems:** the mix's own kick transient sits -4.4 ms from the mapped stem, the snare -1.0 ms.
-- **Over the full 70 s:**
-  - kick drift is 0.00 ms/s through the engine with the relabelled stems;
-  - the beat pulses are +5.9 / +5.8 ms against the grid in the first and second halves;
-  - the windowed lags hold to ±6 samples.
-
-  **Nothing drifts.**
+  The kick's minimum of -28 ms is the t = 0 hit. This window is the frame quantisation less the window lead. A 30 fps
+  offline render cannot do better.
+- **Over the full 70 s nothing drifts:**
+  - every windowed lag is 0 (BASS +1 to +3 samples);
+  - kick event offsets are -4.5 / -4.0 ms in the two halves;
+  - beat pulses are +4.7 / +4.9 ms.
 
 ### 4.2 What delays a visual attack (the proposed paths avoid all of it)
 
@@ -489,38 +403,32 @@ peak):
 |---|---|---|
 | `stem.<key>.onset` → `signal.*` with attack 0 | **same frame** (ADR-1602) | every transient |
 | envelope refractory / re-arm (ADR-1574) | none (it blocks re-triggers only) | every transient |
-| rms trend detector (Moog, rise A) | measured -4.8 ms against the note's true attack | Moog notes |
-| the classifier (`.kick/.snare/.hat`) | **+29 to +37 ms** offline (three hops), +30 to +44 ms live | none |
+| rms trend detector (Moog, rise A) | v1: -4.8 ms against the note's true attack | Moog notes |
+| the classifier | **+33 to +42 ms** offline, +30 to +44 ms live | none |
 | attack > 0 on an event | + the attack, to full value | only designed swells |
 | `macro.*` | +1 frame | none |
-| the beat grid (Kick-fed) | +5.8 ms after the grid; the kick is 6 ms earlier | beat counting and indexing, not the accent itself |
+| the beat grid (Kick-fed) | +4.8 ms after the grid; the kick is 5 ms earlier | counting and indexing only |
 
 ### 4.3 Live, when the stems become separate channels
 
-- **The accent paths:** each channel keyed as in §2.2 publishes the same `stem.<key>.*` (ADR-1521). So every accent
-  rides the onset path, measured on this scene at **58.2 / 81.6 ms p50 / p95 to light**: 24.0 / 40.2 ms to the bus,
-  then the frame (PROGRESS, sound to light).
-- **The class paths would be 87-111 ms.** That is why none is proposed.
-- **Ten sources** at about 16 µs per hop each, plus one drums source at +80-100 µs, come to about 0.26 ms per 10.7 ms
-  hop on the analysis thread (about 2.5% of a core).
-- **The device:** it needs 10 or more input channels (or a BlackHole 16ch loopback) and one shared clock.
-- **The live beat tracker** on the kick channel: pass 2 measured that it is no faster than the onset path. So the
-  grid is for counting, not for accents.
-- **The varispeed problem does not exist live** (it is real audio on one clock). Two warnings:
-  - Played live, the stems must be the same speed as the mix.
-  - **Offline and live differ by a constant:** offline the light shows -10 to +30 ms from the sound; live it is 58 ms
-    p50.
+- **The accent paths:** each channel keyed as in §2.2 publishes the same `stem.<key>.*` (ADR-1521). So each accent
+  rides the onset path: **58.2 / 81.6 ms p50 / p95 to light** on this scene (PROGRESS). The class paths would be 87-111
+  ms.
+- **Ten sources** cost about 0.26 ms per 10.7 ms hop on the analysis thread (about 2.5% of a core).
+- **The device:** it needs 10 or more input channels (or BlackHole 16ch) on one clock.
+- **The live beat tracker** is no faster than the onset path (pass 2), so the grid is for counting only.
+- **Offline and live differ by a constant:** offline the light shows -10 to +30 ms from the sound; live it is 58 ms
+  p50.
 
 ### 4.4 Rules for the bindings
 
 - **Every transient:**
   - `stem.<key>.onset` (or the Moog rise) → a latching envelope with **attack 0**, its own refractory and a designed
     decay;
-  - size from the stem's `peak`, held from the onset frame (attack 0);
+  - size from `peak`, held from the onset frame;
   - no route chain.
 - **Smoothing only where designed:** the Cloud Diving intensity, the hue and the Moog sustain.
-- **No `.level` as an accent depth.** Pass 1 learned that it re-adds the wobble.
-- **No classes and no `macro.*` on a path.**
+- **No classes, no `macro.*`, and no `.level` as an accent depth.**
 
 ## 5. Proposed mapping
 
@@ -528,126 +436,108 @@ peak):
 
 **Notes on the table:**
 - Times are in ms. *Release* is the envelope's fall to 0. *Refr* is the latch's refractory.
-- **Signal names** are proposals in the existing `signal.*` style. **Targets** are descriptive, for B to bind.
-- Every input carries its stem's isolation depth (a control channel resting at 1, ADR-1612), as `music.py` does per
-  part.
+- Signal names are proposals in the existing `signal.*` style. Targets are descriptive, for B to bind.
+- Every input carries its stem's isolation depth (a control channel resting at 1, ADR-1612).
+- **Size depths are re-scaled to the re-bounced peaks.**
 
-| File | Key / role | Signal (definition) | Visual role (brief) | Attack | Release | Refr | Cap / bound | Measured on Sabertooth |
+| File | Key / role | Signal (definition) | Visual role (brief) | Attack | Release | Refr | Cap / bound | Measured |
 |---|---|---|---|---|---|---|---|---|
-| `Cloud Diving.wav` (varispeed) | `cloud` / synth | `cloudSwell` = `stem.cloud.rms` {gain 8, clamp, attack 300, decay 1200} | aurora intensity, curtain width / height, fold amplitude, inner detail, persistence | 300 | 1200 | none | adds to a non-zero baseline (quiet passages keep the aurora); ≤ the pass-2 flash budget | 15 swells; p99 step 0.028 a frame; 100 ms to 50% |
-| | | `cloudHue` = `stem.cloud.rms` {gain 8, clamp, attack 1500, decay 4000} | dominant hue / palette blend (with the scene's existing `paletteAxis`) | 1500 | 4000 | none | a blend, never a jump; p99 step ≤ 0.02 | 0.25-0.7 over the song; p99 0.012 |
-| `Crash.wav` | `crash` / other | `crashStar` = `stem.crash.onset` {linearfall, attack 0, **refr 300**, rearm 0.05}; size `crashSize` = `stem.crash.peak` {attack 0, decay 300} | shooting star launch; environment flash (aurora near the path, facets, river glint) | 0 | the star's own timeline (≈ 0.5-0.7 s streak); wash ≈ 400 | 300 | **2 stars alive at most** (re-hits come 0.70 s apart); a new crash takes the oldest slot | **12 hits** (§3.1), 0 false, +0.5 ms |
-| `Moog.wav` (varispeed, mono) | `moog` / other | `moogNote` = `stem.moog.rms` {trend 0.25 s / 15 ms, floor 0.003, binary 1.6} → {linearfall, attack 0, refr 150} | LEFT mountains: a glint burst on a deterministic facet subset per note | 0 | 300-500 | 150 | one burst per note; subset index from a note counter or `beat.count` | 26 fires = 24 notes + 2 extras, -4.8 ms |
-| | | `moogGlow` = `stem.moog.level` {attack 20, decay 600} | LEFT: a sustained gentle glow on the lit subset while the note rings (echo tail) | 20 | 600 | none | ≤ 0.3 of the glint peak | follows the 0.35 s echo steps |
-| `Kick.wav` (varispeed) | `kick` / **drums** | `kickBeam` = `stem.kick.onset` {linearfall, attack 0, **refr 100**} | river beam launch (hot colour) + ripple | 0 | the beam's travel (B: ≈ 0.6-0.7 s, about a beat) | 100 | pool of 2-3 beams (the 16th pickups put two kicks 0.175 s apart); summed glow clamped | 120/120, 0 doubles, -4.2 ms |
-| `Snare.wav` (varispeed) | `snare` / other | `snareBeam` = `stem.snare.onset` {linearfall, attack 0, **refr 100**}; size from `stem.snare.peak` | river beam launch (second colour, shorter and sharper) + ripple | 0 | shorter than the kick's (B: ≈ 0.4-0.5 s) | 100 | pool of 1-2; **coincides with a kick on 47 of 48 hits**: must read beside a simultaneous kick beam | 48/48 (the raw onset: 73), -3.4 ms |
-| `Toms.wav` (varispeed) | `toms` / other | `tomHit` = `stem.toms.onset` {linearfall, attack 0, refr 100}, depth `tomSize` = `stem.toms.peak` {attack 0, decay 300} (depthMin 0.4, depthMax 1.3) | RIGHT mountains: substantial accents on prominent planes; the last (loudest) note of a fill the biggest | 0 | 400-600 | 100 | one subset per note, rotating; ≤ the flash budget | 28 notes in 6 fills; peak spread 2.0x |
-| | | `tomBody` = `stem.toms.level` {attack 30, decay 500} | RIGHT: a broader restrained glow building through a fill | 30 | 500 | none | | rises per note |
-| `tone block.wav` (varispeed, mono) | `toneblock` / other | `blockTick` = `stem.toneblock.onset` {linearfall, attack 0, refr 80}, depth `blockSize` = `stem.toneblock.peak` {attack 0, decay 200} | RIGHT mountains: small sharp edge glints, stepping through a facet sequence (the 16th pattern) | 0 | 120-200 | 80 | small-area only; a sequence index stepped per tick | 176 accents (about 2.5 a second), 0 ghosts, -5.4 ms |
-| `BASS.wav` (varispeed) | `bass` / bass | (reserved) `bassFlow` = `stem.bass.rms` {gain 4, clamp, attack 150, decay 800} | optional: river flow energy | 150 | 800 | | must not touch the aurora's colour | 217 onsets / 314 notes; rests > 1 s |
-| `HH.wav` | `hh` / other | (reserved) open-hat glint: an HH onset with sustained rms (not built) | optional: a once-a-bar micro-glint | 0 | 150 | 500 | small area | 374 closed (do not use per hit); 29 open, once a bar |
-| `Sabertooth.wav` | (mix) | plays; feeds the scene's existing `sonic` / `response` fallbacks | | | | | | |
-| | | `beat.*` from `feeds.beat = stem.kick` | `beat.count` for subset rotation (pass 2 R3); `beat.phase` | | | | | 85.51 BPM, +5.8 ms |
+| `Cloud Diving.wav` | `cloud` / synth | `cloudSwell` = `stem.cloud.rms` {**gain 4**, clamp, attack 300, decay 1200} | aurora intensity, curtain width / height, fold amplitude, inner detail, persistence | 300 | 1200 | none | adds to a non-zero baseline; within the pass-2 flash budget | 15 swells, peaks 0.71-0.98; p99 step 0.022 |
+| | | `cloudHue` = `stem.cloud.rms` {gain 4, clamp, attack 1500, decay 4000} | dominant hue / palette blend | 1500 | 4000 | none | a blend, never a jump | p99 step 0.009 |
+| `Crash.wav` | `crash` / other | `crashStar` = `stem.crash.onset` {linearfall, attack 0, **refr 300**, rearm 0.05}; size `stem.crash.peak` {attack 0, decay 300} | shooting star + environment flash | 0 | the star's own timeline (≈ 0.5-0.7 s); wash ≈ 400 | 300 | **2 stars alive at most**; a new crash takes the oldest slot | **12 hits** (§3.1), 0 false |
+| `Moog.wav` (**needs the real Moog bounce**) | `moog` / other | `moogNote` = `stem.moog.rms` {trend 0.25 s / 15 ms, floor 0.003, binary **1.6**} → {linearfall, attack 0, refr 150} | LEFT mountains: a glint burst on a deterministic facet subset per note | 0 | 300-500 | 150 | one burst per note | v1: 24/24 notes + 2 echo extras, -4.8 ms |
+| | | `moogGlow` = `stem.moog.level` {attack 20, decay 600} | LEFT: a gentle sustain glow while the note rings | 20 | 600 | none | ≤ 0.3 of the glint peak | |
+| `Kick.wav` | `kick` / **drums** | `kickBeam` = `stem.kick.onset` {linearfall, attack 0, **refr 100**} | river beam launch (hot colour) + ripple | 0 | the beam's travel (≈ one beat, 0.70 s) | 100 | pool of 2-3 (16th pickups 0.18 s before a beat); summed glow clamped | 121/121 |
+| `Snare.wav` | `snare` / other | `snareBeam` = `stem.snare.onset` {linearfall, attack 0, **refr 100**} | river beam launch (second colour, shorter and sharper) + ripple | 0 | shorter (≈ 0.4-0.5 s) | 100 (**required**: 40 doubles otherwise) | pool 1-2; launches with a kick on 47 of 48 | 48/48 |
+| `Toms.wav` | `toms` / other | `tomHit` = `stem.toms.onset` {linearfall, attack 0, **refr 100**}, depth `stem.toms.peak` {attack 0, decay 300} remapped 0.15-0.41 → 0.4-1.3 | RIGHT: substantial accents; a fill's last notes the biggest | 0 | 400-600 | 100 | one rotating subset per note | 28 notes, 6 fills |
+| | | `tomBody` = `stem.toms.level` {attack 30, decay 500} | RIGHT: a broader glow through a fill | 30 | 500 | none | | |
+| `tone block.wav` | `toneblock` / other | `blockTick` = `stem.toneblock.onset` {linearfall, attack 0, refr 80}, depth `stem.toneblock.peak` {attack 0, decay 200} remapped 0.34-0.55 → 0.5-1.0 | RIGHT: small sharp glints stepping through a facet sequence | 0 | 120-200 | 80 | small area | 176 accents, 0 ghosts |
+| `BASS.wav` | `bass` / bass | (reserved) `bassFlow` = `stem.bass.rms` {gain 3, clamp, attack 150, decay 800} | optional: river flow energy | 150 | 800 | | not the aurora's colour | 312 notes; onset 210 |
+| `HH.wav` | `hh` / other | (reserved) open-hat glint (not built) | optional: once-a-bar micro-glint | 0 | 150 | 500 | small area | 29 open hats |
+| `Sabertooth.wav` | (mix) | plays; feeds the existing `sonic` / `response` fallbacks; `beat.*` from `feeds.beat = stem.kick` | `beat.count` for subset rotation | | | | | 85.51 BPM, +4.8 ms |
 
-### 5.2 The mix-only fallback (`mixonly-out.txt`: the mix's detectors against the stems' truth)
+### 5.2 The mix-only fallback (v1 `mixonly-out.txt`; the mix is unchanged)
 
-| Mix signal | Fires | Against the stems |
-|---|---|---|
-| `response.kick` | 0 | none: a mix has no kick (ADR-1620) |
-| `response.snare` | 20 | recall 0.31 against the snare |
-| `response.hat` | 344 | 0.92 / 0.87 against HH |
-| `response.onset` | 286 | catches 94% of kicks, but only 40% of its fires are kicks |
-| beat grid | | 114.44 BPM, wrong |
-| crash | | **nothing finds the crashes** (`response.onset` precision 0.04) |
+| Mix signal | Against the stems |
+|---|---|
+| `response.kick` | 0 fires: a mix has no kick (ADR-1620) |
+| `response.snare` | recall 0.31 |
+| `response.hat` | 0.92 / 0.87 against HH |
+| crash | nothing finds the crashes (`response.onset` precision 0.04) |
+| beat grid | 114 BPM, wrong |
 
 **Proposal:**
-- **Scene choice:** make each transient signal `firstActive` on its stem only, with no mix input. On a mix-only run,
-  the stars, beams and glints simply do not fire.
-- **What still plays:** the aurora runs on the existing mix context (`response.sustain`, `sonic.*`), and the scene
-  keeps its baseline motion.
-- **Why not a mix stand-in:** one would fire on the wrong instrument, which the brief's per-instrument identity
-  forbids.
-- **One exception:** the kick beam could fall back to `response.onset` gated by a high `onsetLow` share. It is
-  unmeasured here, and I recommend against it.
+- Make every transient signal stem-only, with no mix input, so a mix-only run fires no stars, beams or glints.
+- The aurora keeps the existing mix context.
+- A mix stand-in would fire on the wrong instrument.
 
 ### 5.3 Overlap rules this music needs
 
-- **Kick and snare launch together on beats 2 and 4** (47/48). Give them distinct launch shapes or positions, for
-  example:
-  - a different speed;
-  - the snare starting further downstream;
-  - or a different lateral offset.
-
-  Otherwise the snare reads as a brighter kick. The sum must stay inside the clamp.
-- **Kick density:** 1.71 a second, with 16th pickups 0.175 s before a beat.
-  - A beam that lives about one beat (0.70 s) keeps 1-2 alive.
-  - Pass 2's ring-of-two with a 1.8 s life would drop most kicks. That rule was tuned to Feline's 0.50 s gaps and
-    should be retired.
-- **Crash:** groups of three (+1.41 s, +0.70 s). A star of 0.5-0.7 s plus a trail never needs more than two slots.
-- **Right side:** toms and tone block trade bars (tone block rests during the fills). Moog on the left overlaps both
-  freely: 9 of its 26 notes fall on kicks.
+- **Kick and snare launch together on beats 2 and 4.** Give the snare a distinct launch (speed, position or lateral
+  offset) inside the summed clamp.
+- **Kick density:** 1.72 a second, with pickups 0.18 s before a beat.
+  - A beam that lives about a beat keeps 1-2 alive.
+  - Retire pass 2's ring-of-two with a 1.8 s life: it would drop most kicks.
+- **Crash:** groups of three (+1.41 s, +0.70 s). Two star slots suffice.
+- **Right side:** toms and tone block trade bars. Moog on the left overlaps both.
 
 ## 6. Cost
 
-- **Load:** 9 stems in 0.52-0.55 s with Kick as drums (0.23 s with none). That is less than the timbre pass (1.1 s).
-  The stem-set check takes 20-90 ms.
-- **Memory:** about 1.2 MB of probe and about 1.7 MB of spectrum rows per 70 s stem (ADR-1631/1632 rates).
-- **Per frame:** the proposed signals are about 12 chains, ns each (pass 1: 51 sources cost 0.01 ms).
-- **Seek:** the replay rebuilds from 0 on each seek (ADR-1573). A 70 s song makes it 4 times cheaper than Feline.
+- **Load:** 9 stems in 0.77 s with Kick as drums (0.23 s with none). The timbre pass is 1.1 s, and the stem-set
+  check 80-93 ms.
+- **Memory:** about 1.2 MB of probe plus 1.7 MB of spectrum rows per 70 s stem.
+- **Per frame:** about 12 chains, ns each.
+- **Seek:** the replay from 0 on a 70 s song is about 4 times cheaper than Feline's.
 
 ## 7. Risks
 
-1. **The relabelled stems are a workaround.**
-   - **The check is blind to them:** a re-bounce that changed something else would not be caught.
-   - **The two standing warnings are uninformative:** Crash and HH "do not match" because the mix is not a linear sum.
-   - **The fix:** the owner's re-bounce (Q1). Until then, the event-level checks in §1.4 are the verification. A
-     scene test should pin `stem.kick.onset` against the 85.49 BPM grid (≤ 10 ms, no slope).
-2. **The relabelled copies must be regenerated if the source changes.** They are 4-byte-header copies of the files in
-   `stems/sabertooth/`.
-3. **The Moog detector depends on a trend ratio.** Rise A has 2 extras in 26 and may misfire on an unseen performance.
-   - Rise C (×2.2) is the strict alternative: precision 1.00, but it misses 2 legato notes.
-   - Live, the same chain runs on the channel, unchanged.
-4. **The 30 fps window:** offline the light lands -10 to +30 ms from the sound (p50 +10.5). Nothing on the scene's
-   side can tighten it.
-5. **Snare and crash double fires:** every transient needs its refractory. Without it, the raw onset fires 25 snare
-   doubles and a crash double.
-6. **The mix-only twin loses every per-instrument accent.** That is by design (§5.2).
-7. **Battery:** this work ran on battery; nothing here was timed on the GPU. B's and the implementer's GPU numbers
-   need AC and the 60 Hz LG.
+1. **The Moog part is missing** (§0.2). The left-mountain mappings cannot be tuned until it arrives.
+2. **Four standing "does not match" warnings** (Crash, HH, Cloud Diving, tone block) are uninformative. Alignment is
+   proven by the windowed lags. A scene test should pin `stem.kick.onset` against the 85.49 BPM grid (≤ 10 ms, no
+   slope).
+3. **Re-bounces change levels.** These were 6-12 dB hotter, and the snare rings longer (40 doubles without a
+   refractory).
+   - Every gain and size range in §5.1 is for these files.
+   - The trend and onset detectors are level-free; gains and size remaps are not.
+4. **The 30 fps window:** offline the light lands -10 to +30 ms from the sound.
+5. **The first downbeat** (t = 0) is published at 0.033 s.
+6. **Battery:** nothing here was GPU-timed; B's and the implementer's GPU numbers need AC and the 60 Hz LG.
 
 ## 8. Open questions for the coordinator / owner
 
-1. **Re-bounce, or keep the 49,440 Hz relabel?** The mix, Crash and HH are 3% faster and +0.5 semitones higher than
-   the other seven.
-   - **Was the Varispeed intentional?** If it was, ideally bounce the seven stems with it on. If it was not, bounce
-     the mix, Crash and HH with it off, and the scene follows the slower speed.
-   - **Either way,** one session's bounce makes the stem-set check meaningful again.
-2. **Create the relabelled copies** under `assets/audio/stems/sabertooth/varispeed/` now, ignored? The owner's
-   copy-assets permission arguably covers derived files; I did not assume it.
-3. **Moog: rise A (catches all 24 notes, 2 extras) or rise C (strict, misses 2 legato notes)?**
-4. **HH open-hat micro-glint:** worth building the sustained-energy detector once the primary mappings work?
+1. **Re-bounce `Moog.wav`.** The 19:29:58 file contains the bass part, the same audio as `BASS.wav`.
+2. **HH open-hat micro-glint:** worth building once the primary mappings work?
+
+The Moog detector question from v1 is decided: the catch-all ×1.6, to re-check on the real bounce.
 
 ## 9. Reproduce
 
 ```sh
-R=~/Desktop/av-gen-review/aurora-borealis/pass3-research-a; BIN=<worktree>/build/release/src/avgen
-SP=<a scratch dir>; mkdir -p $SP/relabel $SP/resampled
-cd $R
-python3 inventory.py; python3 tail.py; python3 tempo.py; python3 pitch.py      # §1.1-1.2
-python3 sync.py; python3 envsync.py; python3 batchlag.py; python3 scaled.py     # constant-lag search fails; t/1.03 aligns
-python3 varispeed_fit.py   # writes resampled npy to the scratchpad path inside it (edit SP there)
-python3 winlag.py; python3 kickevt.py                                          # §1.4
-python3 relabel.py $SP/relabel; python3 write_resampled.py $SP                 # copies for the probes
-python3 make_probe.py $SP proj
-for p in asis-roles asis-other relabel-drums relabel-prop resampled feedkick; do
+R=~/Desktop/av-gen-review/aurora-borealis/pass3-research-a; BIN=<worktree>/build/release/src/avgen; cd $R
+python3 inventory.py; python3 tempo.py; python3 pitch.py; python3 overview.py        # §1.1
+python3 winlag2.py; python3 kickevt.py                                               # §1.2
+python3 make_probe.py <scratch> proj; python3 make_probe2.py proj/probe2.json        # every file as delivered
+for p in asis-roles asis-other relabel-drums; do                                     # (relabel-drums = five drums roles)
   $BIN --project proj/$p.json --sonic-trace trace/$p-240.csv --fps 240 > trace/$p.log 2>&1; done
-python3 make_probe2.py proj/probe2.json
-$BIN --project proj/probe2.json --sonic-trace trace/probe2-240.csv --fps 240
+$BIN --project proj/probe2.json --sonic-trace trace/probe2-240.csv --fps 240 > trace/probe2.log 2>&1
 $BIN --project proj/probe2.json --sonic-trace trace/probe2-30.csv --fps 30
-python3 events_all.py; python3 crash.py; python3 detail.py; python3 strength_gate.py; python3 analyse2.py
+python3 events_all.py; python3 crash.py; python3 analyse2.py; python3 detail.py
 python3 classes.py; python3 beat.py; python3 cloud.py; python3 raster.py
-python3 overview.py; python3 crashplot.py; python3 detailplot.py               # plots 01-09
+python3 crashplot.py; python3 detailplot.py
 ```
 
-`drift-engine-out.txt`, `size-out.txt`, `coincide-out.txt`, `frame30-out.txt`, `mixonly-out.txt` and
-`hh-bass-out.txt` came from inline snippets of the same `tr.py` helpers; each output file states what it measured.
+`size-out.txt`, `coincide-out.txt`, `frame30-out.txt`, `cloudlag2-out.txt` and `nomoog.log` came from inline snippets
+of the same `tr.py` helpers; each output states what it measured.
+
+## 10. History: the first delivery (v1, before the re-bounce)
+
+- **Two speeds:** the first delivery had the mix, Crash and HH at 85.49 BPM (70.18 s) and the seven batch stems at
+  83.00 BPM (72.29 s).
+- **What showed it:**
+  - the same 25 bars, a ratio of exactly 1.03;
+  - the mix +0.51 semitones above the stems (Varispeed);
+  - the engine's kick drifting +30.0 ms/s (+1.96 s by 65 s);
+  - the stem-set check reading "does not match" on all nine, at 0.0 dB.
+- **The cause:** the seven stems were bounced without the mix's Varispeed.
+- **The interim proposal,** a 49,440 Hz header relabel, measured 0 drift but was overtaken by the owner's re-bounce.
+- **The data:** v1's outputs, plots and traces are in `v1/`.
