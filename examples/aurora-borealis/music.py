@@ -73,9 +73,13 @@ def sources():
             inp("role.synth.rms", dict(gain=8.0, offset=-0.1, **UNIT, **SLOW), 0.4, part="synth")], combine="sum"),
         sig("arrangement", [inp("signal.arrangementStem", gate="role.synth.active"),
                             inp("sonic.density.slow", dict(**remap(0.60, 0.88), **UNIT, **SLOW))], chain=UNIT),
+        # how present the synth is, smoothed: the depth of its brightness. The raw per-frame rms as that depth made
+        # palette/position jump a median 0.087 a frame in groove B (12-research-pass2-signals.md s2.6)
+        sig("synthPresence", [inp("role.synth.rms", dict(gain=12.0, offset=-0.2, **UNIT, attackMs=600.0,
+                                                         decayMs=2000.0))]),
         sig("synthBright", [
-            inp("role.synth.centroid", dict(gain=5.0, offset=-2.6, **UNIT, **SLOW),
-                depthSource="role.synth.rms", depthMin=-0.2, depthMax=12.0),
+            inp("role.synth.centroid", dict(gain=6.25, offset=-3.25, **UNIT, **SLOW),
+                depthSource="signal.synthPresence", depthMin=0.0, depthMax=1.0),
             inp("sonic.brightness.slow", dict(**remap(0.45, 0.62), **UNIT, **SLOW))], chain=UNIT),
         sig("synthBedStem", [
             inp("role.synth.level", dict(gain=2.2, offset=-0.95, **UNIT, attackMs=250.0, decayMs=900.0), 0.3,

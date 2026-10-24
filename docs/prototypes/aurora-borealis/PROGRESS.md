@@ -112,3 +112,23 @@ measured so far (ADR-1605).
   rather than a regression.
 - The first cpu-assets run found a real bug, now fixed (commit 02d93bf6): the directing compiler read a freed effect
   record (`source` held across `insertEffect`).
+
+## Pass 2: the palette flicker fix (12 s2.6, owner approved)
+
+- `signal.synthPresence` = `role.synth.rms` {gain 12, offset -0.2, clamp, attack 600, decay 2000} is the depth of
+  `signal.synthBright` (was the raw per-frame rms, depthMax 12).
+- The centroid mapping is scaled by 1.25 (gain 6.25, offset -3.25: the old curve x 1.25), so the lift reaches the top.
+  Raising only the gain to 6.2, as 12 suggested, saturated the grooves (A 0.91, B 0.98) and flattened the ordering.
+  The presence envelope is 600/2000 rather than 300/1500: at 300/1500 groove B's palette p99 was 0.0102.
+- Measured with `--sonic-trace --trace-finals` on the stems, the same build before and after:
+
+  | | groove B step p50 / p99 / max | whole-song p99 / max |
+  |---|---|---|
+  | `palette/position` before | 0.088 / 0.414 / 0.592 | 0.362 |
+  | `palette/position` after | **0.0019 / 0.0090 / 0.0139** | 0.0141 / 0.0325 |
+  | `synthBright` after | 0.0018 / 0.0067 / 0.0103 | 0.0094 / 0.0201 |
+
+  Section medians of `palette/position` after (before): intro 0.90 (0.90), calls 1.48 (1.42), groove A 2.18 (2.19),
+  groove B 2.41 (2.56), lift 2.88 (2.93), pedal 2.55 (2.57), riser 2.05 (2.37), outro 1.90 (2.06). Same ordering.
+- Test: `[aurora-borealis]` now also checks `synthBright`'s groove B step p99 < 0.02.
+- Stills: `~/Desktop/av-gen-review/aurora-borealis/pass2-palette-flicker/pair-t{140,160}.png` (before above).

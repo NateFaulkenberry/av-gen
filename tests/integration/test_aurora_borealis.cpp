@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -264,6 +265,20 @@ TEST_CASE("Aurora Borealis: the signals on the Feline Footwear stems (S2, S4-S6)
     CHECK(sectionMedian(t, "signal.arrangement", 194.6, 210.0) <= 0.45);  // synth alone
     CHECK(sectionMedian(t, "signal.synthBright", 151.0, 166.9) >= 0.8);   // the lift
     CHECK(sectionMedian(t, "signal.synthBright", 20.1, 39.9) <= 0.1);     // the calls
+    // no flicker (12-research-pass2-signals.md s2.6): the brightness that moves the palette changes smoothly, frame
+    // to frame, through groove B (it was p99 0.36 a frame with the raw rms as its depth)
+    {
+        const std::size_t c = t.col("signal.synthBright");
+        std::vector<double> steps;
+        for (std::size_t i = 1; i < t.rows.size(); ++i) {
+            if (t.rows[i][time] >= 111.3 && t.rows[i][time] < 151.0) {
+                steps.push_back(std::abs(t.rows[i][c] - t.rows[i - 1][c]));
+            }
+        }
+        std::sort(steps.begin(), steps.end());
+        REQUIRE_FALSE(steps.empty());
+        CHECK(steps[steps.size() * 99 / 100] < 0.02);
+    }
     // the palette moves through its looks: low in the intro, high in the lift
     CHECK(sectionMedian(t, "signal.paletteAxis", 0.2, 8.2) < 0.3);
     CHECK(sectionMedian(t, "signal.paletteAxis", 151.0, 166.9) > 0.85);

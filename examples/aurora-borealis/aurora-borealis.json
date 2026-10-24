@@ -7462,6 +7462,27 @@
   },
   {
    "kind": "signal",
+   "name": "synthPresence",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "role.synth.rms",
+      "chain": {
+       "gain": 12.0,
+       "offset": -0.2,
+       "clampEnabled": true,
+       "clampMin": 0.0,
+       "clampMax": 1.0,
+       "attackMs": 600.0,
+       "decayMs": 2000.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
    "name": "synthBright",
    "settings": {
     "combine": "firstActive",
@@ -7469,17 +7490,17 @@
      {
       "source": "role.synth.centroid",
       "chain": {
-       "gain": 5.0,
-       "offset": -2.6,
+       "gain": 6.25,
+       "offset": -3.25,
        "clampEnabled": true,
        "clampMin": 0.0,
        "clampMax": 1.0,
        "attackMs": 1500.0,
        "decayMs": 3000.0
       },
-      "depthSource": "role.synth.rms",
-      "depthMin": -0.2,
-      "depthMax": 12.0
+      "depthSource": "signal.synthPresence",
+      "depthMin": 0.0,
+      "depthMax": 1.0
      },
      {
       "source": "sonic.brightness.slow",
