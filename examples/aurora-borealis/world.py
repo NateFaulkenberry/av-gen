@@ -250,8 +250,8 @@ def detail(x, z, th, o, side):
     ww = wall_weight(th, o, side)
     flat = 2.5 * mx.smooth(15.0, 70.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
     # rocky shoulders: large ridged facets from 30 m up the shore (the waterline itself stays a gentle slope)
-    flat += (16.0 + 0.06 * min(o, 600.0)) * mx.smooth(30.0, 120.0, o) * (
-        mx.fbm(x / 110.0, z / 110.0, 27, 3, ridged=True) - 0.25)
+    flat += (22.0 + 0.07 * min(o, 600.0)) * mx.smooth(30.0, 110.0, o) * (
+        mx.fbm(x / 95.0, z / 95.0, 27 + (0 if side > 0 else 4), 3, ridged=True) - 0.25)
     # and a coarser set of rock buttresses, so every stretch of the near slopes has large readable facets
     flat += (12.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
         mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 2, ridged=True) - 0.3)
@@ -384,16 +384,104 @@ def range_tris(name, r0, r1, nr, nth, base, amp, wl, seed, peak, keep):
     return mx.polar_range(r0, r1, nr, nth, h, seed=seed)
 
 
+# ---- Gate B: baked edge masks (research A probe F) (TEXCOORD_0 = (metres to this facet's chosen edge, that edge's importance)) ----------
+import json as _json
+import struct as _struct
+
+
+def _key(p):
+    return (round(p[0], 2), round(p[1], 2), round(p[2], 2))
+
+
+def edge_uvs(tris):
+    """Per triangle: the one edge most worth lighting -- a convex crease (ridge) with a large dihedral angle, raised
+    for height -- and every vertex's distance to it in metres (affine across the facet, so the rasteriser's
+    interpolation is exact). A facet with no such edge gets u = 1e4."""
+    nrm = [mx.unit(mx.cross(mx.sub(b, a), mx.sub(c, a))) for a, b, c in tris]
+    edges = {}
+    for t, tri in enumerate(tris):
+        for e in range(3):
+            k = tuple(sorted((_key(tri[e]), _key(tri[(e + 1) % 3]))))
+            edges.setdefault(k, []).append((t, e))
+    imp = [[0.0, 0.0, 0.0] for _ in tris]
+    for k, users in edges.items():
+        if len(users) != 2:
+            continue
+        (t0, e0), (t1, e1) = users
+        n0, n1 = nrm[t0], nrm[t1]
+        cosang = max(-1.0, min(1.0, n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2]))
+        ang = math.degrees(math.acos(cosang))
+        opp = tris[t1][(e1 + 2) % 3]
+        a = tris[t0][e0]
+        convex = (opp[0] - a[0]) * n0[0] + (opp[1] - a[1]) * n0[1] + (opp[2] - a[2]) * n0[2] < 0.0
+        if not convex:
+            continue
+        y = 0.5 * (k[0][1] + k[1][1])
+        w = mx.smooth(14.0, 40.0, ang) * (0.35 + 0.65 * mx.smooth(20.0, 260.0, y))
+        imp[t0][e0] = w
+        imp[t1][e1] = w
+    uvs = []
+    for t, tri in enumerate(tris):
+        e = max(range(3), key=lambda i: imp[t][i])
+        w = imp[t][e]
+        if w < 0.08:
+            uvs += [(1.0e4, 0.0)] * 3
+            continue
+        p, q = tri[e], tri[(e + 1) % 3]
+        d = mx.sub(q, p)
+        L = math.sqrt(d[0] ** 2 + d[1] ** 2 + d[2] ** 2) or 1.0
+        out = []
+        for v in tri:
+            r = mx.sub(v, p)
+            c = mx.cross(r, d)
+            out.append((math.sqrt(c[0] ** 2 + c[1] ** 2 + c[2] ** 2) / L, w))
+        uvs += out
+    return uvs
+
+
+def write_faceted_uv(path, tris, name):
+    pos, nrm = mx.faceted(tris)
+    uvs = edge_uvs(tris)
+    n = len(pos)
+    pb = b"".join(_struct.pack("<3f", *p) for p in pos)
+    nb = b"".join(_struct.pack("<3f", *v) for v in nrm)
+    ub = b"".join(_struct.pack("<2f", *u) for u in uvs)
+    ib = _struct.pack("<%dI" % n, *range(n))
+    blob = pb + nb + ub + ib
+    lo = [min(p[k] for p in pos) for k in range(3)]
+    hi = [max(p[k] for p in pos) for k in range(3)]
+    o1, o2, o3 = len(pb), len(pb) + len(nb), len(pb) + len(nb) + len(ub)
+    g = {"asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0, "name": name}],
+         "materials": [{"name": name}],
+         "meshes": [{"name": name, "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2},
+                                                   "indices": 3, "material": 0, "mode": 4}]}],
+         "buffers": [{"byteLength": len(blob)}],
+         "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(pb), "target": 34962},
+                         {"buffer": 0, "byteOffset": o1, "byteLength": len(nb), "target": 34962},
+                         {"buffer": 0, "byteOffset": o2, "byteLength": len(ub), "target": 34962},
+                         {"buffer": 0, "byteOffset": o3, "byteLength": len(ib), "target": 34963}],
+         "accessors": [{"bufferView": 0, "componentType": 5126, "count": n, "type": "VEC3", "min": lo, "max": hi},
+                       {"bufferView": 1, "componentType": 5126, "count": n, "type": "VEC3"},
+                       {"bufferView": 2, "componentType": 5126, "count": n, "type": "VEC2"},
+                       {"bufferView": 3, "componentType": 5125, "count": n, "type": "SCALAR"}]}
+    js = _json.dumps(g, separators=(",", ":")).encode()
+    js += b" " * ((4 - len(js) % 4) % 4)
+    with open(path, "wb") as f:
+        f.write(_struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(blob)))
+        f.write(_struct.pack("<II", len(js), 0x4E4F534A) + js)
+        f.write(_struct.pack("<II", len(blob), 0x004E4942) + blob)
+
+
 def generate(mesh_dir):
-    """Write every GLB; return {name: triangle count}."""
+    """Write every GLB, each with its edge mask in TEXCOORD_0; return {name: triangle count}."""
     os.makedirs(mesh_dir, exist_ok=True)
     out = {}
     tris = valley_band()
-    mx.write_faceted(os.path.join(mesh_dir, "ab-valley.glb"), tris, "valley")
+    write_faceted_uv(os.path.join(mesh_dir, "ab-valley.glb"), tris, "valley")
     out["valley"] = len(tris)
     for spec in RANGES:
         t = range_tris(*spec)
-        mx.write_faceted(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
+        write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
         out[spec[0]] = len(t)
     return out
 

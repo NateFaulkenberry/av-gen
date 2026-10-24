@@ -76,8 +76,18 @@ def camera_tracks():
     def track(target, keys):
         return {"target": target, "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
                 "loopLength": period, "keys": keys}
+    # Gate F: the comet crosses from 30 degrees one side of the camera's heading to 35 the other; the heading changes
+    # round the loop, so the path's azimuths are keyed from the camera track (a step every few seconds)
+    ka, kb = [], []
+    for i in range(0, KEYS_PER_LOOP + 1, 2):
+        p0, p1 = kp[i]["value"], kt[i]["value"]
+        head = math.degrees(math.atan2(p1[0] - p0[0], p1[2] - p0[2]))
+        ka.append({"time": kp[i]["time"], "value": round(head + 30.0, 2), "interp": "step"})
+        kb.append({"time": kp[i]["time"], "value": round(head - 35.0, 2), "interp": "step"})
+    tracks_comet = [track("fx/comet/startAzimuth", ka), track("fx/comet/endAzimuth", kb)]
     camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"], "fov": 50.0, "orbitSpeed": 0.0}
-    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)], camera, period
+    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)] + tracks_comet, \
+        camera, period
 
 
 def scene_doc(camera):
@@ -99,7 +109,8 @@ def project_doc(tracks, period):
                                              "release": 1.0}},
         "parameters": look.parameters(),
         "live": {"overrides": {"lodBias": 1.0}},
-        "effects": [look.aurora_effect(), look.stars_effect()],
+        "effects": [look.aurora_effect(), look.stars_effect(), look.river_pulse("A", "signal.pulseA"),
+                    look.river_pulse("B", "signal.pulseB"), look.comet_effect()],
         "palette": look.palette(),
         "timeline": {"enabled": True, "cues": [], "tracks": tracks},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/aurora-borealis.mp4"},

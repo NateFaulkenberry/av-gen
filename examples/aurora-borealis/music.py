@@ -103,10 +103,10 @@ def sources():
             chain={"envelope": "linearfall", "envelopeFallPerSecond": 3.0, "attackMs": 0.0,
                    "envelopeRefractoryMs": 200.0, "envelopeRearm": 0.05}),
         sig("snareFold", [
-            inp("role.drums.snare", {"attackMs": 40.0, "envelope": "linearfall", "envelopeFallPerSecond": 3.5},
-                part="drums"),
-            inp("response.snare", {"attackMs": 40.0, "envelope": "linearfall", "envelopeFallPerSecond": 3.5},
-                part="drums")]),
+            inp("role.drums.snare", {"attackMs": 0.0, "envelope": "linearfall", "envelopeFallPerSecond": 3.5,
+                                     "envelopeRefractoryMs": 150.0, "envelopeRearm": 0.05}, part="drums"),
+            inp("response.snare", {"attackMs": 0.0, "envelope": "linearfall", "envelopeFallPerSecond": 3.5,
+                                   "envelopeRefractoryMs": 150.0, "envelopeRearm": 0.05}, part="drums")]),
         sig("bassSize", [inp("role.bass.peak", dict(gain=1.5, **UNIT, attackMs=0.0, decayMs=500.0))]),
         sig("bassHitRaw", [inp("role.bass.onset", note, depthSource="signal.bassSize", depthMin=0.4, depthMax=1.3)]),
         sig("bassHit", [inp("signal.bassHitRaw", part="bass")]),
@@ -120,10 +120,51 @@ def sources():
                                                 "envelopeFallPerSecond": 0.6, "envelopeRefractoryMs": 6000.0,
                                                 "envelopeRearm": 0.3},
                           gate="role.synth.active", part="synth")], chain=UNIT),
+        # ---- Gate D: the river pulses, a ring of two (12 s3.3): A launches on a kick; B only once A is half-way down;
+        # each latched for its 1.8 s life, so at most two fronts are ever alive
+        sig("pulseA", [inp("signal.kickWave", {"threshold": "binary", "thresholdLevel": 0.95})],
+            chain={"attackMs": 0.0, "envelope": "linearfall", "envelopeFallPerSecond": 1.0 / 1.8,
+                   "envelopeRefractoryMs": 1800.0, "envelopeRearm": 0.05}),
+        sig("aHalf", [{"constant": 1.0}, inp("signal.pulseA", amount=-2.0)], combine="sum",
+            chain={"threshold": "binary", "thresholdLevel": 0.01}),
+        sig("pulseB", [inp("signal.kickWave", {"threshold": "binary", "thresholdLevel": 0.95}, gate="signal.aHalf")],
+            chain={"attackMs": 0.0, "envelope": "linearfall", "envelopeFallPerSecond": 1.0 / 1.8,
+                   "envelopeRefractoryMs": 1800.0, "envelopeRearm": 0.05}),
+        # ---- Gate F: the comet (12 s3.5): about five a song, never two alive
+        sig("arrHigh", [inp("signal.arrangement", {"threshold": "binary", "thresholdLevel": 0.85})]),
+        sig("arrMid", [inp("signal.arrangement", {"threshold": "binary", "thresholdLevel": 0.6})]),
+        sig("cDrop", [inp("role.synth.rms", trend(8.0, 500.0, 0.03, 2.5))]),
+        sig("cTexture", [inp("response.hatRate", trend(8.0, 500.0, 0.08, 1.8), gate="signal.arrHigh")]),
+        sig("kickHeld", [inp("role.drums.kick", {"envelope": "peakhold", "envelopeHoldMs": 2500.0,
+                                                 "envelopeFallPerSecond": 1000.0})]),
+        sig("cDrumsOut", [{"constant": 1.0}, inp("signal.kickHeld", amount=-1.0)], combine="sum",
+            chain={"threshold": "binary", "thresholdLevel": 0.5}),
+        sig("cDrumsOutG", [inp("signal.cDrumsOut", gate="signal.arrMid")]),
+        sig("cometCue", [inp("signal.cDrop"), inp("signal.cTexture"), inp("signal.cDrumsOutG")], combine="max",
+            chain=latch(20000.0, 0.5, 0.3)),
+        sig("cueRecent", [inp("signal.cometCue", {"envelope": "peakhold", "envelopeHoldMs": 36000.0,
+                                                  "envelopeFallPerSecond": 1000.0})]),
+        sig("cueQuiet", [{"constant": 1.0}, inp("signal.cueRecent", amount=-1.0)], combine="sum",
+            chain={"threshold": "binary", "thresholdLevel": 0.5}),
+        sig("quietFull", [inp("signal.cueQuiet", gate="signal.arrHigh")]),
+        sig("cFallback", [inp("beat.phrasePulse", gate="signal.quietFull")], chain=latch(36000.0, 0.5, 0.05)),
+        sig("comet", [inp("signal.cometCue"), inp("signal.cFallback")], combine="max", chain=latch(8000.0, 0.4, 0.3)),
+        sig("cometGlow", [inp("signal.comet", {"attackMs": 300.0, "envelope": "linearfall",
+                                               "envelopeFallPerSecond": 0.5})]),
         # ---- the light
         sig("auroraLight", [inp("signal.arrangement", amount=0.55), inp("signal.kickWave", amount=0.28),
                             inp("signal.bassHit", amount=0.16), inp("signal.swell", amount=0.25)], combine="sum"),
     ]
+
+
+def trend(slow_s, fast_ms, floor, level):
+    return {"trendSeconds": slow_s, "trendFastMs": fast_ms, "trendFloor": floor, "threshold": "binary",
+            "thresholdLevel": level}
+
+
+def latch(refr_ms, fall, rearm):
+    return {"attackMs": 0.0, "envelope": "linearfall", "envelopeFallPerSecond": fall,
+            "envelopeRefractoryMs": refr_ms, "envelopeRearm": rearm}
 
 
 def R(src, target, amount):
@@ -156,6 +197,23 @@ def routes():
         R("signal.kickWave", "post/bloom/intensity", 0.06),
         # the kick's wave: a front climbs the ribbons from the lower rims as the envelope falls (ADR-1652, E3)
         R("signal.kickWave", A + "pulse", 1.0),
+        # Gate B, the ridge edges: bass sets their breadth, the kick and the snare brief accents, the comet a glow
+        R("signal.bassBody", look.ROCK.path("edgeGlow"), 0.4),
+        R("signal.kickWave", look.ROCK.path("edgeGlow"), 0.5),
+        R("signal.snareFold", look.ROCK.path("edgeGlow"), 0.35),
+        R("signal.cometGlow", look.ROCK.path("edgeGlow"), 0.5),
+        # Gate C, the moving water: bass and the synth's bed set the streaks' strength (a floor keeps them moving);
+        # the drums a small disturbance (ripple <= 0.3 of the base distortion)
+        R("signal.bassBody", W + "streaks/amount", 0.6),
+        R("signal.synthBed", W + "streaks/amount", 0.6),
+        R("signal.snareFold", W + "ripple", 0.003),
+        R("signal.kickWave", W + "ripple", 0.002),
+        # Gate D: the snare flares the live fronts; bass widens them (no new pulse)
+        R("signal.snareFold", "fx/riverPulseA/edgeIntensity", 0.8),
+        R("signal.snareFold", "fx/riverPulseB/edgeIntensity", 0.8),
+        # Gate F: the comet's environment wash, inside auroraLight's range
+        R("signal.cometGlow", A + "intensity", 0.5),
+        R("signal.cometGlow", W + "glow", 0.3),
         # swell: the ribbons spread
         R("signal.swell", A + "ribbonWidth", 0.015),
     ]

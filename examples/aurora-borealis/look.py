@@ -80,10 +80,11 @@ class Prog:
 HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 30.0, 950.0, 0.55    # decametres (op constants clamp to +-1000): 400 m to 9 km
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
 AURORA_WRAP_POWER = 4.0
+EDGE_GLOW = 0.5   # the edges' resting glow (Gate B); the music adds to it (music.py)
 
 
 def rock() -> Prog:
-    """Every landform, unlit (30 ops). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
+    """Every landform, unlit (45 ops; the material-op ceiling is 48). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
     glow; high sky-facing facets pale to lavender; then the distance haze."""
     p = Prog("abRock")
     c4 = lambda h: hexrgb(h) + [1.0]   # noqa: E731
@@ -114,6 +115,23 @@ def rock() -> Prog:
       .op("constant", 7, constant=c4(RIM) , label="rim")                                        # palette
       .op("multiply", 6, srcA=6, srcB=7)
       .op("add", 3, srcA=3, srcB=6)
+      # Gate B, the ridge edges: TEXCOORD_0 = (metres to this facet's chosen crease, that crease's importance), baked by
+      # world.edge_uvs; a ~2 px anti-aliased line (metres over the pixel footprint), faded out by 4.5 km
+      .op("input", 0, input="uv")
+      .op("input", 1, input="footprint")
+      .op("power", 1, srcA=1, value=-1.0)
+      .op("multiply", 5, srcA=0, srcB=1)
+      .op("smoothstep", 5, srcA=5, constant=[1.6, 0.0, 0.0, 0.0])
+      .op("swizzle", 5, srcA=5, constant=[0.0, 0.0, 0.0, 0.0])
+      .op("swizzle", 6, srcA=0, constant=[1.0, 1.0, 1.0, 1.0])
+      .op("multiply", 5, srcA=5, srcB=6)
+      .op("smoothstep", 6, srcA=2, constant=[450.0, 40.0, 0.0, 0.0])
+      .op("multiply", 5, srcA=5, srcB=6)
+      .op("constant", 6, constant=lit, label="edgeColor")                                       # palette
+      .op("multiply", 5, srcA=5, srcB=6)
+      .op("constant", 6, constant=[EDGE_GLOW, EDGE_GLOW, EDGE_GLOW, 1.0], label="edgeGlow")   # routes; 0 = off
+      .op("multiply", 5, srcA=5, srcB=6)
+      .op("add", 3, srcA=3, srcB=5)
       .op("constant", 6, constant=c4(HAZE), label="haze")
       .op("smoothstep", 7, srcA=2, constant=[HAZE_NEAR, HAZE_FAR, 0.0, 0.0])
       .op("power", 7, srcA=7, value=HAZE_CURVE)
@@ -183,6 +201,64 @@ def aurora_effect():
             # light), so this only tints the river's body a trace
             "ground": {"color": c["auroraMid"], "falloff": 2.0, "intensity": 0.05, "mode": "subtle", "radius": 600.0},
             "flow": {"field": "", "influence": 0.0}}
+
+
+def _timing(**kw):
+    t = {"delay": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "lifetime": 0.0, "repeatSeconds": 0.0, "windowSeconds": 6.0,
+         "windowStart": 0.0}
+    t.update(kw)
+    return t
+
+
+def river_pulse(slot, signal, speed=750.0, intensity=0.8, name=None):
+    """Gate D: a front of light that leaves the camera and runs down the river (research A s5.3): a directional
+    groundPulse from the camera at the water's height, a few metres tall, so it lights the water and the first metres
+    of the shore slope wherever the river goes. Triggered by its slot of the ring of two (music.py)."""
+    c = look_colors(REST_LOOK)
+    return {"id": name or ("riverPulse" + slot), "name": name or ("riverPulse" + slot), "type": "groundPulse",
+            "owner": {"kind": "world"}, "enabled": True, "order": 0, "activation": "trigger",
+            "trigger": {"source": "signal", "name": signal, "threshold": 0.5}, "style": "",
+            "timing": _timing(fadeOut=0.6, lifetime=4.0),
+            "parameters": {
+                "appearance": {"color": c["waterGlow"], "edgeColor": c["auroraLow"], "edgeIntensity": 1.6,
+                               "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
+                               "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
+                "propagation": {"kind": "directional", "direction": "cameraVelocity", "beamRadius": 350.0,
+                                "startOffset": 120.0, "speed": speed, "range": 3000.0, "frontWidth": 90.0,
+                                "trailLength": 500.0, "falloff": 1.6, "verticalExtent": 5.0, "verticalGrowth": 0.004,
+                                "ringCount": 0.0, "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 1.0,
+                                "explicitDirection": [0.0, 0.0, -1.0]},
+                "response": {"emissive": 1.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
+                "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
+                "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
+                            "size": 0.3, "speed": 0.6}}}
+
+
+CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the pulse's origin sits on the water
+
+
+def comet_effect(start_az=30.0, end_az=-35.0):
+    """Gate F: one comet, triggered by signal.comet (about five a song, never two alive), crossing above the aurora's
+    band in the palette's lavender, violet and magenta (research A s7.3)."""
+    return {"id": "comet", "name": "comet", "type": "comet", "owner": {"kind": "world"}, "enabled": True, "order": 0,
+            "activation": "trigger", "trigger": {"source": "signal", "name": "signal.comet", "threshold": 0.5},
+            "style": "", "timing": _timing(fadeIn=0.4, fadeOut=1.5, lifetime=9.0),
+            "ground": {"color": hexrgb("#b38cff"), "falloff": 2.0, "intensity": 0.4, "mode": "subtle",
+                       "radius": 600.0},
+            "parameters": {
+                "appearance": {"coreColor": hexrgb("#f4e8ff"), "coreIntensity": 16.0, "flowSpeed": 0.35,
+                               "haloColor": hexrgb("#b38cff"), "haloIntensity": 2.0, "haloSize": 120.0,
+                               "headSize": 24.0, "tailColor": hexrgb("#d36cff"), "tailFalloff": 1.8,
+                               "tailIntensity": 4.5, "tailLength": 2600.0, "tailWidth": 60.0, "wispAmount": 50.0,
+                               "wispScale": 0.002},
+                "path": {"acceleration": 0.0, "anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0],
+                         "arcLift": 200.0, "curvature": 0.0, "distance": 5000.0, "endAzimuth": end_az,
+                         "endElevation": 13.0, "speedScale": 1.0, "startAzimuth": start_az, "startElevation": 30.0,
+                         "travelSeconds": 6.5},
+                "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
+                            "speed": 0.2},
+                "sparkle": {"density": 0.01, "enabled": True, "fadeDistance": 85.0, "intensity": 5.0, "seed": 1,
+                            "size": 0.13, "speed": 1.3}}}
 
 
 def stars_effect():
@@ -274,5 +350,6 @@ def palette():
         {"role": "auroraMid", "target": w + "streaks/color2"},
         {"role": "waterGlow", "target": w + "streaks/color3"},
         {"role": "auroraLow", "target": ROCK.path("rim"), "gain": 0.1},
+        {"role": "auroraLow", "target": ROCK.path("edgeColor"), "gain": 0.8},
     ]
     return {"states": states, "bindings": bindings, "position": float(REST_LOOK), "saturation": 1.0, "value": 1.0}
