@@ -84,7 +84,7 @@ EDGE_GLOW = 0.5   # the edges' resting glow (Gate B); the music adds to it (musi
 
 
 def rock() -> Prog:
-    """Every landform, unlit (45 ops; the material-op ceiling is 48). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
+    """Every landform, unlit (47 ops; the material-op ceiling is 48). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
     glow; high sky-facing facets pale to lavender; then the distance haze."""
     p = Prog("abRock")
     c4 = lambda h: hexrgb(h) + [1.0]   # noqa: E731
@@ -119,6 +119,10 @@ def rock() -> Prog:
       # world.edge_uvs; a ~2 px anti-aliased line (metres over the pixel footprint), faded out by 4.5 km
       .op("input", 0, input="uv")
       .op("input", 1, input="footprint")
+      # floored before the reciprocal: a zero footprint made inf, u = 0 times inf made NaN, and the bloom spread one
+      # NaN pixel over the whole frame (two black frames in ten seconds of the first Gate B build)
+      .op("constant", 6, constant=[1.0e-3, 1.0e-3, 1.0e-3, 1.0e-3])
+      .op("add", 1, srcA=1, srcB=6)
       .op("power", 1, srcA=1, value=-1.0)
       .op("multiply", 5, srcA=0, srcB=1)
       .op("smoothstep", 5, srcA=5, constant=[1.6, 0.0, 0.0, 0.0])
@@ -174,7 +178,9 @@ def environment():
 
 # ---- the aurora ----------------------------------------------------------------------------------------------------
 RIBBONS = {"ribbons": True, "ribbonAltitude": 600.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
-           "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 1.0}
+           "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 1.0,
+           # E3's travelling kick front, gentler than its default 2x so the kick stays under the flash budget
+           "pulseGain": 1.0, "pulseThicken": 0.3}
 
 
 def aurora_effect():
@@ -210,7 +216,7 @@ def _timing(**kw):
     return t
 
 
-def river_pulse(slot, signal, speed=750.0, intensity=0.6, name=None):
+def river_pulse(slot, signal, speed=750.0, intensity=0.3, name=None):
     """Gate D: a front of light that leaves the camera and runs down the river (research A s5.3): a directional
     groundPulse from the camera at the water's height, a few metres tall, so it lights the water and the first metres
     of the shore slope wherever the river goes. Triggered by its slot of the ring of two (music.py, signal.pulseAEv/BEv)."""
@@ -220,7 +226,7 @@ def river_pulse(slot, signal, speed=750.0, intensity=0.6, name=None):
             "trigger": {"source": "signal", "name": signal, "threshold": 0.5}, "style": "",
             "timing": _timing(fadeOut=0.6, lifetime=4.0),
             "parameters": {
-                "appearance": {"color": c["waterGlow"], "edgeColor": c["auroraLow"], "edgeIntensity": 1.6,
+                "appearance": {"color": c["waterGlow"], "edgeColor": c["auroraLow"], "edgeIntensity": 0.9,
                                "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
                                "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
                 "propagation": {"kind": "directional", "direction": "cameraVelocity", "beamRadius": 350.0,

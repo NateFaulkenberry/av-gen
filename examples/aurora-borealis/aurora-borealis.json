@@ -153,7 +153,9 @@
      "ribbonEdge": 0.3,
      "ribbonSteps": 48.0,
      "ribbonDistance": 24000.0,
-     "ribbonCoverage": 1.0
+     "ribbonCoverage": 1.0,
+     "pulseGain": 1.0,
+     "pulseThicken": 0.3
     }
    },
    "ground": {
@@ -242,8 +244,8 @@
       0.26225,
       1.0
      ],
-     "edgeIntensity": 1.6,
-     "intensity": 0.6,
+     "edgeIntensity": 0.9,
+     "intensity": 0.3,
      "rainbow": false,
      "rainbowBrightness": 1.0,
      "rainbowSaturation": 0.85,
@@ -331,8 +333,8 @@
       0.26225,
       1.0
      ],
-     "edgeIntensity": 1.6,
-     "intensity": 0.6,
+     "edgeIntensity": 0.9,
+     "intensity": 0.3,
      "rainbow": false,
      "rainbowBrightness": 1.0,
      "rainbowSaturation": 0.85,
@@ -649,7 +651,7 @@
    },
    {
     "role": "auroraLow",
-    "target": "material/abRock/op/37/constant/constant",
+    "target": "material/abRock/op/39/constant/constant",
     "gain": 0.8
    }
   ],
@@ -15291,7 +15293,9 @@
     "chain": {
      "clampEnabled": true,
      "clampMin": 0.0,
-     "clampMax": 1.0
+     "clampMax": 1.0,
+     "attackMs": 600.0,
+     "decayMs": 1200.0
     }
    }
   },
@@ -15719,7 +15723,7 @@
      },
      {
       "source": "signal.kickWave",
-      "amount": 0.28
+      "amount": 0.15
      },
      {
       "source": "signal.bassHit",
@@ -15807,7 +15811,7 @@
   {
    "source": "signal.bassHit",
    "target": "fx/aurora/ribbonEdge",
-   "amount": 0.22,
+   "amount": 0.12,
    "op": "add",
    "polarity": "unipolar"
   },
@@ -15828,7 +15832,7 @@
   {
    "source": "signal.bassHit",
    "target": "nodes/river/water/reflection",
-   "amount": 0.3,
+   "amount": 0.15,
    "op": "add",
    "polarity": "unipolar"
   },
@@ -15855,28 +15859,28 @@
   },
   {
    "source": "signal.bassBody",
-   "target": "material/abRock/op/39/constant/constant",
+   "target": "material/abRock/op/41/constant/constant",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "signal.kickWave",
-   "target": "material/abRock/op/39/constant/constant",
-   "amount": 0.5,
+   "target": "material/abRock/op/41/constant/constant",
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "signal.snareFold",
-   "target": "material/abRock/op/39/constant/constant",
+   "target": "material/abRock/op/41/constant/constant",
    "amount": 0.35,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "signal.cometGlow",
-   "target": "material/abRock/op/39/constant/constant",
+   "target": "material/abRock/op/41/constant/constant",
    "amount": 0.5,
    "op": "add",
    "polarity": "unipolar"
@@ -15912,14 +15916,14 @@
   {
    "source": "signal.snareFold",
    "target": "fx/riverPulseA/edgeIntensity",
-   "amount": 0.8,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "signal.snareFold",
    "target": "fx/riverPulseB/edgeIntensity",
-   "amount": 0.8,
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar"
   },

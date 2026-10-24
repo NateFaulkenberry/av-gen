@@ -119,7 +119,10 @@ def sources():
                                                 "decayMs": 400.0, "envelope": "peakhold", "envelopeHoldMs": 1500.0,
                                                 "envelopeFallPerSecond": 0.6, "envelopeRefractoryMs": 6000.0,
                                                 "envelopeRearm": 0.3},
-                          gate="role.synth.active", part="synth")], chain=UNIT),
+                          gate="role.synth.active", part="synth")],
+            # a swell is a slow event: it ramps in over 0.6 s (instant, it moved the whole sky in two frames: the flash
+            # audit's worst window at 151 s)
+            chain=dict(UNIT, attackMs=600.0, decayMs=1200.0)),
         # ---- Gate D: the river pulses, a ring of two (12 s3.3): A launches on a kick; B only once A is half-way down;
         # each latched for its 1.8 s life, so at most two fronts are ever alive
         sig("pulseA", [inp("signal.kickWave", {"threshold": "binary", "thresholdLevel": 0.95})],
@@ -161,7 +164,7 @@ def sources():
         sig("pulseBEv", [inp("beat.pulse", gate="signal.pulseBOn")], event=True),
         sig("cometEv", [inp("beat.pulse", gate="signal.cometOn")], event=True),
         # ---- the light
-        sig("auroraLight", [inp("signal.arrangement", amount=0.55), inp("signal.kickWave", amount=0.28),
+        sig("auroraLight", [inp("signal.arrangement", amount=0.55), inp("signal.kickWave", amount=0.15),
                             inp("signal.bassHit", amount=0.16), inp("signal.swell", amount=0.25)], combine="sum"),
     ]
 
@@ -197,10 +200,10 @@ def routes():
         R("signal.auroraLight", look.ROCK.path("auroraGlow"), 0.75),
         R("signal.auroraLight", W + "glow", 0.5),
         # bass: the lower rims' undulation, the folds, the river's reflection
-        R("signal.bassHit", A + "ribbonEdge", 0.22),
+        R("signal.bassHit", A + "ribbonEdge", 0.12),
         R("signal.bassBody", A + "ribbonSwirl", 0.45),
         R("signal.bassBody", W + "reflection", 0.25),
-        R("signal.bassHit", W + "reflection", 0.3),
+        R("signal.bassHit", W + "reflection", 0.15),
         # drums: the snare's bright fold; the kick's small bloom and its wave through the ribbons
         R("signal.snareFold", A + "edgeBrightness", 2.4),
         R("signal.kickWave", "post/bloom/intensity", 0.06),
@@ -208,7 +211,7 @@ def routes():
         R("signal.kickWave", A + "pulse", 1.0),
         # Gate B, the ridge edges: bass sets their breadth, the kick and the snare brief accents, the comet a glow
         R("signal.bassBody", look.ROCK.path("edgeGlow"), 0.4),
-        R("signal.kickWave", look.ROCK.path("edgeGlow"), 0.5),
+        R("signal.kickWave", look.ROCK.path("edgeGlow"), 0.3),
         R("signal.snareFold", look.ROCK.path("edgeGlow"), 0.35),
         R("signal.cometGlow", look.ROCK.path("edgeGlow"), 0.5),
         # Gate C, the moving water: bass and the synth's bed set the streaks' strength (a floor keeps them moving);
@@ -218,8 +221,8 @@ def routes():
         R("signal.snareFold", W + "ripple", 0.003),
         R("signal.kickWave", W + "ripple", 0.002),
         # Gate D: the snare flares the live fronts; bass widens them (no new pulse)
-        R("signal.snareFold", "fx/riverPulseA/edgeIntensity", 0.8),
-        R("signal.snareFold", "fx/riverPulseB/edgeIntensity", 0.8),
+        R("signal.snareFold", "fx/riverPulseA/edgeIntensity", 0.45),
+        R("signal.snareFold", "fx/riverPulseB/edgeIntensity", 0.45),
         # Gate F: the comet's environment wash, inside auroraLight's range
         R("signal.cometGlow", A + "intensity", 0.5),
         R("signal.cometGlow", W + "glow", 0.3),

@@ -85,7 +85,10 @@ def camera_tracks():
         ka.append({"time": kp[i]["time"], "value": round(head + 30.0, 2), "interp": "step"})
         kb.append({"time": kp[i]["time"], "value": round(head - 35.0, 2), "interp": "step"})
     tracks_comet = [track("fx/comet/startAzimuth", ka), track("fx/comet/endAzimuth", kb)]
-    camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"], "fov": 50.0, "orbitSpeed": 0.0}
+    # explicit clip planes: the automatic far plane is 50x the world's radius (about 1,000 km here), and at that ratio the
+    # sky's direction, unprojected from the far plane, came out NaN on some frames and the bloom blacked the whole frame
+    camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"], "fov": 50.0, "orbitSpeed": 0.0,
+              "near": 1.0, "far": 45000.0}
     return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)] + tracks_comet, \
         camera, period
 
