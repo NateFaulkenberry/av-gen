@@ -369,6 +369,9 @@ struct QualitySettings {
     // ADR-1603: the cinematic water's screen-space reflection (ADR-1286), as a fraction of its authored `ssrSteps` and
     // `reflectionRays` (at least one each); 0 turns the SSR off (the environment reflection alone). 1 = as authored.
     float waterSsrScale = 1.0f;
+    // ADR-1651: the aurora ribbons' planes (ADR-1641 `ribbonSteps`), as a fraction of the authored count (never under
+    // the march's own floor of 8). 1 = as authored; nothing else reads it, so a scene with no ribbons is unchanged.
+    float auroraStepScale = 1.0f;
 
     // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
     // drift apart.

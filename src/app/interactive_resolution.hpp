@@ -287,6 +287,7 @@ struct LiveQualityRung {
     bool refraction = true;             // ADR-1603: QualitySettings::refraction (off: refractive surfaces opaque)
     float waterSsrScale = 1.0f;         // ADR-1603: ceiling on QualitySettings::waterSsrScale (0 = no water SSR)
     bool refractionDispersion = true;   // ADR-1640: QualitySettings::refractionDispersion (off: the single read)
+    float auroraStepScale = 1.0f;       // ADR-1651: ceiling on QualitySettings::auroraStepScale (the ribbons' planes)
     [[nodiscard]] bool operator==(const LiveQualityRung&) const = default;
 };
 

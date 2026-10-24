@@ -1938,6 +1938,8 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"nodispersion", [](QualitySettings& q) { q.refractionDispersion = false; }, "refractionDispersion=false (ADR-1640: the single refraction read)"},
         {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
         {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
+        {"auroraplanes75", [](QualitySettings& q) { q.auroraStepScale = 0.75f; }, "auroraStepScale=0.75 (ADR-1651: 3/4 of the aurora ribbons' planes)"},
+        {"auroraplaneshalf", [](QualitySettings& q) { q.auroraStepScale = 0.5f; }, "auroraStepScale=0.5 (ADR-1651: half the aurora ribbons' planes)"},
         {"bilinearupscale", [](QualitySettings& q) { q.spatialUpscaler = false; }, "spatialUpscaler=false (ADR-1607: the bilinear fetch)"},
         {"sdfshadowfull", [](QualitySettings& q) { q.sdfShadowScale = 1; },
          "sdfShadowScale=1 (raymarched SDF casters marched at the shadow map's own resolution)"},
@@ -3516,6 +3518,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         for (std::uint32_t i = 0; i < auroras; ++i) {
             frame.auroras[i] = atmos.auroras[i];
+            // ADR-1651: the live ladder's lever on the ribbons' planes; a no-op on curtains and at 1.
+            world::applyAuroraStepScale(frame.auroras[i], qualitySettings_.auroraStepScale);
         }
         frame.skyGround = atmos.ground;
         stats_.comets = comets;

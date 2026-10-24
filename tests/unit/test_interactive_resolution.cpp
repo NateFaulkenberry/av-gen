@@ -1080,3 +1080,52 @@ TEST_CASE("the ladders give up refraction dispersion from Medium", "[unit][resol
     CHECK_FALSE(back->refractionDispersion);
     CHECK(back->refraction);
 }
+
+// ADR-1651: the aurora ribbons' plane lever. Ultra keeps every plane on every table; Balanced takes 3/4 at Medium and
+// 1/2 from Low; the other two tables give them up later (resolution first) or sooner (effects first); never back up a
+// level. Ceilings, levers, the priority ladder's volumes group and a ceiling's JSON carry it; and it is not counted in
+// the controller's expected gain (a scene without ribbons gains nothing from it).
+TEST_CASE("the ladders thin the aurora ribbons' planes from Medium (Balanced)", "[unit][resolution][adr1651]") {
+    const auto& balanced = app::liveQualityLadder(LiveQualityStrategy::Balanced);
+    CHECK(balanced[0].auroraStepScale == 1.0f);
+    CHECK(balanced[1].auroraStepScale == 1.0f);
+    CHECK(balanced[2].auroraStepScale == 0.75f);
+    CHECK(balanced[3].auroraStepScale == 0.5f);
+    CHECK(balanced[4].auroraStepScale == 0.5f);
+    for (const auto strategy :
+         {LiveQualityStrategy::Balanced, LiveQualityStrategy::ResolutionFirst, LiveQualityStrategy::EffectsFirst}) {
+        const auto& ladder = app::liveQualityLadder(strategy);
+        CHECK(ladder[0].auroraStepScale == 1.0f);
+        CHECK(ladder[4].auroraStepScale == 0.5f);
+        for (std::size_t k = 1; k < ladder.size(); ++k) {
+            CHECK(ladder[k].auroraStepScale <= ladder[k - 1].auroraStepScale);
+        }
+    }
+    CHECK(app::liveQualityLadder(LiveQualityStrategy::ResolutionFirst)[2].auroraStepScale == 1.0f);
+    CHECK(app::liveQualityLadder(LiveQualityStrategy::EffectsFirst)[1].auroraStepScale == 0.75f);
+
+    rendering::QualitySettings base; // offline/neutral: every plane
+    CHECK(base.auroraStepScale == 1.0f);
+    CHECK(app::applyLiveRung(base, base, balanced[0], 0.38f).auroraStepScale == 1.0f);
+    CHECK(app::applyLiveRung(base, base, balanced[2], 0.38f).auroraStepScale == 0.75f);
+    CHECK(app::applyLiveRung(base, base, balanced[3], 0.38f).auroraStepScale == 0.5f);
+    // a ceiling, never a raise
+    base.auroraStepScale = 0.6f;
+    CHECK(app::applyLiveRung(base, base, balanced[2], 0.38f).auroraStepScale == 0.6f);
+
+    app::LiveQualityRung c{};
+    REQUIRE(app::applyLeverToCeiling(c, "auroraplanes75"));
+    CHECK(c.auroraStepScale == 0.75f);
+    REQUIRE(app::applyLeverToCeiling(c, "auroraplaneshalf"));
+    std::string error;
+    const auto back = app::ceilingFromJsonText(app::ceilingJsonText(c), error);
+    REQUIRE(back.has_value());
+    CHECK(back->auroraStepScale == 0.5f);
+    rendering::QualitySettings q;
+    CHECK(app::applyCeiling(q, *back).auroraStepScale == 0.5f);
+
+    const auto prioritised = app::ladderFromPriority({"volumes"}, error);
+    REQUIRE(prioritised.has_value());
+    CHECK((*prioritised)[1].auroraStepScale == 0.75f);
+    CHECK((*prioritised)[2].auroraStepScale == 0.5f);
+}

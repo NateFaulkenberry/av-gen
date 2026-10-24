@@ -130,6 +130,23 @@ constexpr EffectField kFields[] = {
                GET(e.aurora.shape.ribbonDistance), SETF(e.aurora.shape.ribbonDistance))
         .json("shape/ribbonDistance").fmt("%.0f m").log().floorAt(1.0f)
         .tooltip("How far away a ribbon fades into the sky (towards the horizon)."),
+    // ---- ADR-1652: a travelling pulse through the ribbons (route an envelope onto "pulse").
+    floatField("pulse", "Pulse", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.aurora.shape.pulse), SETF(e.aurora.shape.pulse))
+        .json("shape/pulse").clampTo(0.0f, 1.0f)
+        .tooltip("A front of light climbing the ribbons: at 1 it stands on the lower edges, and as the value\n"
+                 "falls to 0 it rises a curtain height and fades. Route an envelope here (the kick)."),
+    floatField("pulseGain", "Pulse brightness", 0.0f, 16.0f, 0.0f, 6.0f, GET(e.aurora.shape.pulseGain),
+               SETF(e.aurora.shape.pulseGain))
+        .json("shape/pulseGain").clampTo(0.0f, 16.0f)
+        .tooltip("How much brighter the ribbons are where the pulse passes (at Pulse 1)."),
+    floatField("pulseThicken", "Pulse widening", 0.0f, 8.0f, 0.0f, 3.0f, GET(e.aurora.shape.pulseThicken),
+               SETF(e.aurora.shape.pulseThicken))
+        .json("shape/pulseThicken").clampTo(0.0f, 8.0f)
+        .tooltip("How much wider the sheets swell where the pulse passes (at Pulse 1)."),
+    floatField("pulseWidth", "Pulse width", 0.02f, 1.0f, 0.05f, 0.5f, GET(e.aurora.shape.pulseWidth),
+               SETF(e.aurora.shape.pulseWidth))
+        .json("shape/pulseWidth").clampTo(0.02f, 1.0f)
+        .tooltip("How tall the travelling front is, in curtain heights."),
 
     floatField("emission", "Bloom weight", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.aurora.appearance.emission),
                SETF(e.aurora.appearance.emission)).json("appearance/emission").sec("Appearance"),

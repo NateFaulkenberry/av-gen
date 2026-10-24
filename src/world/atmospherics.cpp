@@ -226,6 +226,11 @@ Result<void> AuroraShape::validate() const {
         return fail("an aurora's ribbons march 8..128 planes; each one is a sample per sky pixel");
     }
     if (!(ribbonDistance > 0.0f) || !finite(ribbonDistance)) { return fail("aurora ribbon distance must be positive"); }
+    // ADR-1652
+    if (!(pulse >= 0.0f && pulse <= 1.0f)) { return fail("aurora pulse must be in [0, 1]"); }
+    if (!(pulseGain >= 0.0f && pulseGain <= 16.0f)) { return fail("aurora pulse gain must be in [0, 16]"); }
+    if (!(pulseThicken >= 0.0f && pulseThicken <= 8.0f)) { return fail("aurora pulse widening must be in [0, 8]"); }
+    if (!(pulseWidth >= 0.02f && pulseWidth <= 1.0f)) { return fail("aurora pulse width must be in [0.02, 1]"); }
     return {};
 }
 
@@ -764,6 +769,11 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
                               std::max(s.ribbonScale, 1.0f));
         g.ribbon1 = glm::vec4(std::clamp(s.ribbonWidth, 0.005f, 0.5f), std::max(s.ribbonSwirl, 0.0f),
                               std::max(s.ribbonEdge, 0.0f), std::max(s.ribbonDistance, 1.0f));
+        // ADR-1652: the travelling pulse. All zero at pulse 0, so the march reads the bytes it read before.
+        if (s.pulse > 0.0f) {
+            g.ribbon2 = glm::vec4(std::clamp(s.pulse, 0.0f, 1.0f), std::clamp(s.pulseGain, 0.0f, 16.0f),
+                                  std::clamp(s.pulseThicken, 0.0f, 8.0f), std::clamp(s.pulseWidth, 0.02f, 1.0f));
+        }
     }
 
     // The spectrum, or a flat 0.5 when there is no music. 0.5 is the value the shader's height
@@ -783,6 +793,12 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
     g.band2 = glm::vec4(bands[8], bands[9], bands[10], bands[11]);
     g.band3 = glm::vec4(bands[12], bands[13], bands[14], bands[15]);
     return g;
+}
+void applyAuroraStepScale(AuroraGpu& g, float scale) {
+    if (!(scale < 1.0f) || g.ribbon0.x <= 0.5f) {
+        return;
+    }
+    g.ribbon0.z = std::max(8.0f, std::round(g.ribbon0.z * std::max(scale, 0.0f)));
 }
 // ADR-566: pack + tag, in ONE place, because they are one operation and two callers need it.
 //
