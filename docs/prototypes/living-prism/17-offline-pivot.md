@@ -352,3 +352,69 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5e/`. All PNG, so th
 | 1080p at 2x | about 0.35 s/frame |
 
 **Checks:** clearance minimum 9 m; layering minimum 51%; terrain sweep at most 15% hidden and 22% buried.
+
+## Standing rule: consistent renders (the owner, verbatim: "consistent renders please")
+
+Every image in a gate comes from one build, rendered in one run with identical settings:
+- 4K (3840x2160) at `--supersample 2`, `--tier offline`, `--render-limits unlimited`;
+- the same time t (10.000 s) and the scene camera;
+- downsampled to 1080 with Lanczos.
+
+Both looks and every crop come from those same renders. A before/after pair uses the same settings on both sides, and the "before" is re-rendered when it was made any other way. The build SHA, settings and t go into each image's caption.
+
+`build/aurora/gate.sh <dir>` does this: one build of both looks, one run, and `stamp.txt`.
+
+Why the rule exists: in 5e, `phase5e-frame-rose.png` was rendered at 19:47, before the cliff support check existed, and `phase5e-frame.png` at 19:52, after the check had dropped 15 cliffs. So the rocks "went missing" between the looks. No palette binding hides geometry.
+
+## Phase 5f (2026-10-23)
+
+The owner's notes, verbatim:
+- "okay but we loose all the speckles inside the crystals thats not acceptable also the bushes do not look good please use a more realistic texture that matches the reference art"
+- "the entire ground should be covered in bushy texture, go beyond just the areas I originally highlighted, all crystals should appear as though their bases are covered by bushes, all ground = bushes, rocky features for the ledges - why did you remove some from the left hand side?"
+- "try to add an assortment of smaller rocks along the sides of the river bed in aesthetically pleasing areas too"
+- "it can make river rocks larger if they are hard to read"
+- "try to prevent it from mistakenly adding stuff like this though"
+- "dont have it stop until walls are reading as rock / moss covered rock textures and the ground is bushy and filling the scene"
+
+**Speckles.** Restored as geometry (`build_stars`): small octahedra just under the faces each formation shows the camera, at about 0.35 per m², sized never under about 1.6 px at the formation's distance and dimmed by the square of that widening. The crystal program had no op budget for filtered stars.
+
+**Bushes.**
+- Poly Haven CC0 `shrub_02` (modelled leaves with their own textures), `fern_02` for low clumps, and a 5k-face copy of `shrub_02` past 250 m.
+- `ground_cover` raycasts a jittered 22 px screen grid of the camera onto the engine's ground, and every gentle hit (normal.y ≥ 0.72) gets bushes sized to its screen share. That covers all visible ground, plus the owner's areas, every crystal base and the gaps between the crystals: about 3,100 instances.
+
+**No debris on the skyline.** No foliage where the ground one or two grid rows up is sky or much further away (a crest), or above 55 m.
+
+**Rock on the walls.**
+- Every steep hit, and every gentle wall top above the bush line, gets a rock-face, cliff or mossy-rock scan facing down its slope.
+- Rock sits at its centre's height on steep ground; from the lowest corner, the uphill side swallowed it.
+- No rock on the skyline rows, or in front of a crystal: inside its screen outline and nearer than 40 m behind it.
+
+**Left cliffs reseated, not dropped.** A wall cliff that stands proud is moved up into the wall (0-150 m) and shrunk if needed (×1, 0.8, 0.6), taking the first supported variant. Three cannot be seated: cliffA at (-221, -660), cliffB at (-115, -132), cliffB at (-142, -616).
+
+**Backed by land.** Every placed piece's top must have ground behind it on the camera ray (within 600 m). Otherwise it is sunk 30% more, or dropped. This removed the flat slab on the top-left skyline.
+
+**River rocks.**
+- Groups of 4-9 boulders, stones and mossy rocks, 4-15 m, at the inside of the river's bends.
+- They sit at the waterline, found past 40% of the reach's width because the raised water leaves a shallow bed, and only where they land on screen. Foliage keeps a little clear of them.
+- They are still modest at 1080p.
+
+**Right far ridges.** Every far ridge rolls off on the right of the river, from about 45% of the half-view at its distance to near nothing at the frame edge. The right walls are lower.
+
+**ADR-1642 prepared.**
+- CC0 textures in the gitignored `assets/nature/textures/`, recorded in the manifest: Poly Haven `rock_face`, `mossy_rock` and `forest_leaves_02`, 2K.
+- `prog_ground_textured` (three triplanar colour reads and one triplanar normal, mixed by slope and noise) is built when `AU_TERRAIN_TEX=1`, to the preview's schema. It stays off until the merge.
+
+**5f gate** (`~/Desktop/av-gen-review/82-living-prism/aurora-phase5f/`; all from one run, build f2a4909a, 4K at 2x, t = 10, captions stamped):
+
+| File | Shows |
+|---|---|
+| `phase5f-frame-green.png`, `phase5f-frame-rose.png`, `phase5f-frame-green-4k.png` | the full frame |
+| `phase5f-speckles.png` | the hero crystal before and after |
+| `phase5f-left-side.png` | the left side before and after |
+| `phase5f-skyline.png` | the left skyline before and after |
+| `phase5f-right-ridge.png` | the right far ridge before and after |
+| `phase5f-bushes.png` | the bushes and river rocks |
+
+- The "before" frames were rendered at the same settings and are labelled with their build.
+- The two looks differ only in colour: their edge maps differ on 0.64% of pixels, the aurora curtains' own hue edges.
+- Render time: 4K at 2x supersample, 15 frames in 27.2 s: **1.81 s/frame**, inside the 2 s budget.
