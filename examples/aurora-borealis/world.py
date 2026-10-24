@@ -30,18 +30,21 @@ from sonic_vfx import meshes as mx  # noqa: E402
 TAU = 2.0 * math.pi
 
 # ---- the river --------------------------------------------------------------------------------------------------
-R0 = 1300.0
-A3, P3 = 0.075, 0.6
-A5, P5 = 0.035, 2.1
+R0 = 3000.0
+# a rounded triangle: with A3 = 0.10 each side's midpoint has zero curvature, so the loop has three long, nearly
+# straight reaches the camera can look down (11-research-pass2-render.md s2.3); two small harmonics add the meanders
+A3 = 0.10
+A8, P8 = 0.016, 0.7
+A13, P13 = 0.007, 2.3
 
 
 def rc(th):
-    return R0 * (1.0 + A3 * math.sin(3.0 * th + P3) + A5 * math.sin(5.0 * th + P5))
+    return R0 * (1.0 - A3 * math.cos(3.0 * th) + A8 * math.sin(8.0 * th + P8) + A13 * math.sin(13.0 * th + P13))
 
 
 def half_width(th):
-    """Half the river's width (m): 56-80, wider on the long reaches."""
-    return 68.0 + 12.0 * math.sin(2.0 * th + 1.0)
+    """Half the river's width (m): 58-86."""
+    return 72.0 + 14.0 * math.sin(2.0 * th + 1.0)
 
 
 def centre(th):
@@ -57,19 +60,32 @@ def periodic_noise(th, cycles, seed, octaves=3):
 # ---- the valley's profile across its band -------------------------------------------------------------------------
 def valley_height(th, o, side):
     """Height (m) at `o` metres from the water's edge (negative: under the water), on `side` (+1 outer, -1 inner).
-    The valley's own walls: a rock lip at the water and then the slope, rising at once (no flat strip of shore) to a
-    first ridgeline 60-140 m up. The layered ridges in depth are the spurs below and the outer ranges."""
+    No lip: one continuous shore slope of 7-15 degrees through the waterline (the bed continues it below), easing to
+    about 8 degrees out to the valley floor's edge `fl`, then the wall. The outer bank stands higher and steeper than
+    the inner, so the two sides have distinct silhouettes."""
     s = 0 if side > 0 else 1
+    s0 = math.tan(math.radians(7.0 + 8.0 * periodic_noise(th, 13, 3 + s)))
     if o < 0.0:
-        return max(-6.0, o * 0.6)
-    lip = 1.5 + 2.5 * periodic_noise(th, 13, 3 + s)
-    wall_h = 35.0 + 55.0 * periodic_noise(th, 5, 9 + s)
-    run = 200.0 + 200.0 * periodic_noise(th, 4, 13 + s)
-    return lip * mx.smooth(0.0, 6.0, o) + wall_h * mx.smooth(0.0, run, o) ** 0.85
+        return max(-8.0, o * s0)
+    fl = floor_edge(th, side)
+    if side > 0:
+        wall_h = 190.0 + 140.0 * periodic_noise(th, 5, 9 + s)
+    else:
+        wall_h = 110.0 + 110.0 * periodic_noise(th, 5, 9 + s)
+    run = 350.0 + 250.0 * periodic_noise(th, 4, 13 + s)
+    low = s0 * min(o, 60.0) + 0.14 * max(o - 60.0, 0.0)
+    return low + wall_h * mx.smooth(fl, fl + run, o) ** 1.3
+
+
+def floor_edge(th, side):
+    """Where the valley floor's lower slopes end and the wall begins (m from the water): 200-420."""
+    s = 0 if side > 0 else 1
+    return 200.0 + 220.0 * periodic_noise(th, 6, 31 + s)
 
 
 def wall_weight(th, o, side):
-    return mx.smooth(0.0, 120.0, o)
+    fl = floor_edge(th, side)
+    return 0.15 * mx.smooth(40.0, 200.0, o) + 0.85 * mx.smooth(fl - 80.0, fl + 200.0, o)
 
 
 # ---- the hero peaks: (theta deg, side, metres from the water's edge, height, radius, elongation, ridge azimuth deg
@@ -108,16 +124,16 @@ def _peak_frames():
 # alternating banks with jittered size and set-back. Looking down the river they overlap as they recede -- near, middle
 # and far ridges stacked in depth -- which is the layered "river in a valley" read (the Living Prism aurora valley's
 # composition, in this scene's faceted language). Each is a long low pyramid whose ridge points at the water.
-def _spurs(count=64):
+def _spurs(count=140):
     out = []
     for i in range(count):
         side = 1 if i % 2 == 0 else -1
         jit = mx._hash(i, 3, 91)
         deg = (i + 0.35 * (jit - 0.5)) * 360.0 / count
-        off = 260.0 + 520.0 * mx._hash(i, 5, 93)            # set back from the water's edge (m): near to far
+        off = 450.0 + 650.0 * mx._hash(i, 5, 93)            # set back from the water's edge (m): near to far
         # summit height grows with the set-back, so from the river each rises about 8-12 degrees and the farther
         # ones show over the nearer: layers in depth, never a wall over the camera
-        h = 30.0 + off * (0.13 + 0.07 * mx._hash(i, 7, 95))
+        h = (30.0 + off * (0.13 + 0.07 * mx._hash(i, 7, 95))) * (1.15 if side > 0 else 0.85)
         rad = 120.0 + 0.25 * off
         elong = 1.8 + 1.0 * mx._hash(i, 11, 99)
         az = 90.0 + 30.0 * (mx._hash(i, 13, 101) - 0.5)     # across the river: the ridge points at the water
@@ -156,7 +172,7 @@ def detail(x, z, th, o, side):
     (their crests and gullies are what give the facets their different orientations). Nothing at the water's edge,
     so the bank meets it cleanly."""
     ww = wall_weight(th, o, side)
-    flat = 2.5 * mx.smooth(3.0, 30.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
+    flat = 2.5 * mx.smooth(15.0, 70.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
     spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 230.0, z / 230.0, 23, 4, ridged=True) - 0.35)
     return flat + spur
 
@@ -165,26 +181,31 @@ def land_height(x, z, th, o, side):
     h = valley_height(th, o, side) + detail(x, z, th, o, side)
     if o > 4.0:
         # a peak or spur rises only on its own bank, and its foot meets the water as the wall does
-        h = max(h, peak_height(x, z, side) * mx.smooth(4.0, 90.0, o) ** 0.7)
+        fl = floor_edge(th, side)   # spurs and peaks stand behind the valley floor, never in the water
+        h = max(h, peak_height(x, z, side) * mx.smooth(fl - 150.0, fl + 120.0, o) ** 0.7)
     return h
 
 
 # ---- the valley band ------------------------------------------------------------------------------------------------
 # (offset from the water's edge in m, columns round the loop). Near rows are dense (about 17 m facets along the bank),
 # the far ones coarse; the last outer row sinks so the band's edge tucks under the first range.
-OUTER_ROWS = [(-16, 480), (0, 480), (9, 480), (22, 480), (40, 480), (64, 400), (96, 400), (138, 320), (190, 320),
-              (256, 260), (340, 260), (450, 200), (590, 200), (760, 160), (960, 140), (1180, 120)]
-INNER_NEAR = [(-16, 480), (0, 480), (9, 480), (22, 480), (40, 480), (64, 400), (96, 400), (138, 320), (190, 320),
-              (256, 260), (340, 260), (450, 200)]
+OUTER_ROWS = [(-30, 900), (-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+              (300, 450), (400, 450), (520, 360), (680, 300), (880, 250), (1100, 210), (1350, 180)]
+INNER_NEAR = [(-30, 900), (-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+              (300, 450), (400, 450), (520, 360)]
 INNER_FAR = [(0.50, 160), (0.66, 120), (0.80, 90), (0.91, 60)]   # fractions of the way to the centre
 
 
-def _row(offset_fn, n, seed, jitter=0.3, sink=0.0):
+def _row(offset_fn, n, seed, jitter=0.3, sink=0.0, ojit=0.0):
     pts = []
     for j in range(n):
         jt = (mx._hash(j, seed, 77) - 0.5) * 2.0 * jitter
         th = TAU * (j + jt) / n
         r, o, side = offset_fn(th, j)
+        if ojit:   # break the rows' parallel strips: each vertex moves along its row's normal
+            d = (mx._hash(j, seed, 79) - 0.5) * 2.0 * ojit
+            r += d * side
+            o += d
         x, z = r * math.sin(th), r * math.cos(th)
         y = land_height(x, z, th, o, side) - sink
         pts.append((x, y, z))
@@ -221,10 +242,12 @@ def valley_band():
     for idx, (o, n) in enumerate(OUTER_ROWS):
         last = idx == len(OUTER_ROWS) - 1
         f = (lambda o_: (lambda th, j: (rc(th) + half_width(th) + o_, o_, +1)))(o)
-        rows_out.append(_row(f, n, 100 + idx, jitter=0.0 if o < 0 else 0.3, sink=40.0 if last else 0.0))
+        rows_out.append(_row(f, n, 100 + idx, jitter=0.0 if o < 0 else 0.35, sink=40.0 if last else 0.0,
+                             ojit=0.0 if (o < 0 or last) else 0.4 * (OUTER_ROWS[idx + 1][0] - o)))
     for idx, (o, n) in enumerate(INNER_NEAR):
         f = (lambda o_: (lambda th, j: (rc(th) - half_width(th) - o_, o_, -1)))(o)
-        rows_in.append(_row(f, n, 200 + idx, jitter=0.0 if o < 0 else 0.3))
+        nxt = INNER_NEAR[idx + 1][0] if idx + 1 < len(INNER_NEAR) else o + 150
+        rows_in.append(_row(f, n, 200 + idx, jitter=0.0 if o < 0 else 0.35, ojit=0.0 if o < 0 else 0.4 * (nxt - o)))
     for idx, (fr, n) in enumerate(INNER_FAR):
         def f(th, j, fr=fr):
             edge = rc(th) - half_width(th)
@@ -264,9 +287,9 @@ def _crest(t, peak, keep_outer):
 
 # (name, r0, r1, rings, columns, base height, relief, wavelength, seed, crest position, keep the outer side up)
 RANGES = [
-    ("near", 1950.0, 3500.0, 7, 150, 120.0, 320.0, 650.0, 3, 0.45, False),
-    ("far", 3200.0, 5600.0, 7, 120, 230.0, 480.0, 950.0, 7, 0.5, False),
-    ("distant", 5200.0, 9800.0, 6, 96, 380.0, 760.0, 1500.0, 13, 0.55, True),
+    ("near", 4300.0, 7000.0, 7, 300, 180.0, 420.0, 900.0, 3, 0.45, False),
+    ("far", 6500.0, 11000.0, 7, 240, 300.0, 600.0, 1300.0, 7, 0.5, False),
+    ("distant", 10500.0, 19000.0, 6, 180, 500.0, 1000.0, 2100.0, 13, 0.55, True),
 ]
 
 

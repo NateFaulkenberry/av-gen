@@ -77,7 +77,7 @@ class Prog:
                                             field)
 
 
-HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 25.0, 650.0, 0.55    # decametres (op constants clamp to +-1000): 400 m to 9 km
+HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 30.0, 950.0, 0.55    # decametres (op constants clamp to +-1000): 400 m to 9 km
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
 AURORA_WRAP_POWER = 4.0
 
@@ -190,8 +190,8 @@ def stars_effect():
             "activation": "always", "style": "",
             "timing": {"delay": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "lifetime": 0.0, "repeatSeconds": 0.0,
                        "windowSeconds": 6.0, "windowStart": 0.0},
-            "parameters": {"brightness": 1.4, "density": 0.55, "magnitudeSlope": 5.0, "colorSpread": 0.45,
-                           "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.45, "band": 0.6, "bandTilt": 35.0,
+            "parameters": {"brightness": 1.4, "density": 0.03, "magnitudeSlope": 5.0, "colorSpread": 0.45,
+                           "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.45, "band": 1.4, "bandTilt": 1.0,
                            "daylight": 0.0}}
 
 
@@ -211,14 +211,14 @@ def water():
         "shallowColor": hexrgb("#0a0a24"), "deepColor": hexrgb(WATER_DEEP), "shallow": 2.0, "clarity": 1.0,
         "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 1.1,
         "reflectionTint": [0.85, 0.86, 1.0], "specular": 0.3, "roughness": 0.03,
-        "ripple": 0.0, "rippleScale": 0.05, "rippleSpeed": 0.25, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
+        "ripple": 0.01, "rippleScale": 0.03, "rippleSpeed": 1.0, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
         "sparkle": 0.0, "glow": 0.15, "glowColor": c["waterGlow"], "glowScale": 0.012, "glowCoverage": 0.45,
         "glowDepth": 0.2,
         "ssr": 0.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.0, "streak": 2.0,
-        "reflectionRays": 1.0, "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.0,
+        "reflectionRays": 1.0, "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.03,
         "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
-        "flowStreaks": 1.2, "streakLines": 260.0, "streakLength": 30.0, "streakDensity": 0.45, "streakSpeed": 1.0,
-        "streakHighlight": 0.8, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],
+        "flowStreaks": 1.2, "streakLines": 260.0, "streakLength": 50.0, "streakDensity": 0.45, "streakSpeed": 1.8,
+        "streakHighlight": 1.0, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],
         "streakColor3": c["waterGlow"],
     }
 
@@ -227,7 +227,7 @@ def river_feature():
     """The river's course for the water's flow (the streaks run along it): the centreline, with no cut (the land is
     the GLB banks) and its surface at the sea's level."""
     import world
-    pts = [world.centre(world.TAU * i / 240) for i in range(241)]
+    pts = [world.centre(world.TAU * i / 255) for i in range(256)]   # 256 points at most
     return {"name": "river", "kind": "river", "path": [[round(p[0], 2), 0.0, round(p[2], 2)] for p in pts],
             "width": 80.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
             "waterDepth": 0.0, "smoothing": 0}
@@ -237,11 +237,13 @@ def water_node():
     """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
     there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
     return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, 0.0],
-            "world": {"name": "aurora-river", "seed": 1, "size": [3400.0, 3400.0], "baseHeight": -6.0,
+            "world": {"name": "aurora-river", "seed": 1, "size": [7400.0, 7400.0], "baseHeight": -6.0,
                       "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
-            "terrain": {"chunkSize": 200.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
-                        "viewDistance": 2600.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,
-                        "groundGlow": 0.0, "water": water()},
+            "terrain": {"chunkSize": 400.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
+                        "viewDistance": 6000.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,
+                        "groundGlow": 0.0, "water": water(),
+                        # the river's real speed (it was about 0.02 m/s, so nothing in the water moved: 11 s4)
+                        "flow": {"speedOverride": 3.0, "bankShear": 0.5, "meander": 0.12, "turbulence": 0.3}},
             "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb("#020208"), "emissiveIntensity": 1.0,
                          "roughness": 1.0, "metallic": 0.0, "unlit": True}}
 

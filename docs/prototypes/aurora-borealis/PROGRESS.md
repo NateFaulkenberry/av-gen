@@ -132,3 +132,37 @@ measured so far (ADR-1605).
   groove B 2.41 (2.56), lift 2.88 (2.93), pedal 2.55 (2.57), riser 2.05 (2.37), outro 1.90 (2.06). Same ordering.
 - Test: `[aurora-borealis]` now also checks `synthBright`'s groove B step p99 < 0.02.
 - Stills: `~/Desktop/av-gen-review/aurora-borealis/pass2-palette-flicker/pair-t{140,160}.png` (before above).
+
+## Pass 2, Gate A: composition (STOP for owner review)
+
+Built per 13 and 11 s2.3 (probe E's read):
+- **One river curve:** the rounded-triangle loop `rc = R0 (1 - 0.10 cos 3θ + 0.016 sin(8θ+0.7) + 0.007 sin(13θ+2.3))`,
+  R0 3000 m, half-width 72 ± 14 m. The land rows, the water's river course (255 points), the camera arc table and
+  (later) the pulses and edges all derive from it. Loop 880.7 s at 22 m/s.
+- **No lip:** a continuous 7-15° shore slope through the waterline (the bed continues it to -8 m), about 8° lower
+  slopes to a floor edge at 200-420 m, then the wall. Outer bank 190-330 m and steeper, inner 110-220 m and rolling.
+  The near rows' vertices jitter by ±40% of the row spacing. 140 spurs set back 450-1100 m, gated behind the floor,
+  ×1.15 outer and ×0.85 inner. The outer rings are scaled to 4.3-7, 6.5-11 and 10.5-19 km; haze 300 m-9.5 km.
+- **Camera:** 95 m, pitch +2.5°, target 2 km ahead, 24 mm, 500 keys from the arc table, roll kept.
+- **Water terrain:** 7.4 km, `chunkSize` 400, view distance 6 km. The nav grid is skipped as too large (a harmless warning).
+- **A's two no-code defects:** the river's real speed (`terrain.flow.speedOverride` 3.0 m/s, bankShear 0.5, meander
+  0.12, turbulence 0.3; `rippleSpeed` 1.0, ripple 0.01 at scale 0.03, undulation 0.03, streaks 50 m at speed 1.8) and
+  the Milky Way (bandTilt 1.0 rad, density 0.03, band 1.4).
+- Triangles: 39,920 (was 24,192).
+
+**Headless Ultra 1080p A/B**, interleaved, 3 reps per window, AC power, same build. GPU p50 by rep, then the median:
+
+| | t 60 s | t 140 s | CPU work p50 (60 / 140) |
+|---|---|---|---|
+| before (pass 1 look) | 14.39, 13.68, 13.00 → **13.68** | 14.90, 14.75, 13.35 → **14.75** | 3.35 / 3.79 |
+| after (Gate A) | 13.83, 14.22, 12.34 → **13.83** | 13.26, 13.57, 13.11 → **13.26** | 3.46 / 2.25 |
+
+Media: `~/Desktop/av-gen-review/aurora-borealis/gateA/`:
+- `pair-t{20,50,100,140,160,200}.png`: before above, after below, same build, same song times (the camera path
+  changes with the layout);
+- `sheet-after.png`;
+- `clip-40-60s.mp4`: 20 s with sound;
+- `topdown-map.png`: the land's heights, the river and the camera path with minute marks.
+
+**Open for the owner:** the river still turns out of view behind the bends in some views (A's risk 1). The levers are
+camera height (85-95 m), a target further ahead, and smaller meander amplitudes.

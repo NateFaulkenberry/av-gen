@@ -32,12 +32,12 @@ SCENE_DIR = os.path.join(HERE, "scene")
 PROJECT = os.path.join(HERE, "aurora-borealis.json")
 SCENE_FILE = "aurora-borealis.scene.json"
 
-CAM_H = 28.0              # metres above the water
-CAM_SPEED = 19.0          # metres a second along the river
-AHEAD = 540.0             # the target this far ahead on the centreline
-PITCH_DEG = 9.0           # the view pitched up so the horizon sits low and the sky takes the frame
+CAM_H = 95.0              # metres above the water
+CAM_SPEED = 22.0          # metres a second along the river
+AHEAD = 2000.0            # the target this far ahead on the centreline
+PITCH_DEG = 2.5           # the view pitched up so the horizon sits low and the sky takes the frame
 SWAY = 0.22               # the camera drifts across the river by this fraction of its half-width
-KEYS_PER_LOOP = 300
+KEYS_PER_LOOP = 500
 
 
 def camera_tracks():
