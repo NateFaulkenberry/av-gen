@@ -200,6 +200,14 @@
       "project": "sonic-vfx/event-horizon.json"
     },
     {
+      "category": "Sonic VFX",
+      "description": "Play the Feline Footwear stems (drums, bass, synth) or, live, any input whose channels are given those roles; optionally a MIDI controller: CC 21 drums, CC 22 bass, CC 23 synth (each part's contribution, resting at full). A slow flight down a winding mirror river through a valley of faceted indigo mountains at dusk, under an enormous sky of layered aurora ribbons. The aurora is the hero and it lights the land: the facets that face it and the river take its colour. Context sets the colour, events set the accents: how much of the band is playing and how bright the synth is move one palette through dusk indigo, violet, electric blue and rose; the synth's bed widens the ribbons and lights the horizon; the hat rate draws out the fine rays; each kick sends a wave of light through the ribbons and the land, the snare brightens their lower folds, each bass note lifts the rims and deepens the river's reflection. On a mix alone every signal falls back to the mix's analysis. Run examples/aurora-borealis/build.py first (pure Python, a few seconds). See docs/prototypes/aurora-borealis/.",
+      "live": true,
+      "name": "Sonic VFX - Aurora Borealis",
+      "project": "aurora-borealis/aurora-borealis.json",
+      "generate": "python3 examples/aurora-borealis/build.py   (pure Python; writes examples/aurora-borealis/scene/)"
+    },
+    {
       "category": "Sonic Garden",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard (pad, bell, bass or percussion). The Sonic Garden played live: the same Sonic Character and worlds as the file version; its loudness, strikes and note gestures follow the Live panel's Response controls. Opening it turns live input on; pick devices in View > Live. See docs/prototypes/sonic-garden/LIVE-QUICKSTART.md.",
       "live": true,
@@ -707,14 +715,6 @@
       "live": true,
       "name": "Phase Hall",
       "project": "experiments/phase-wall/phase-wall.json"
-    },
-    {
-      "category": "Worlds",
-      "description": "Play the Feline Footwear stems (drums, bass, synth) or, live, any input whose channels are given those roles; optionally a MIDI controller: CC 21 drums, CC 22 bass, CC 23 synth (each part's contribution, resting at full). A slow flight down a winding mirror river through a valley of faceted indigo mountains at dusk, under an enormous sky of layered aurora ribbons. The aurora is the hero and it lights the land: the facets that face it and the river take its colour. Context sets the colour, events set the accents: how much of the band is playing and how bright the synth is move one palette through dusk indigo, violet, electric blue and rose; the synth's bed widens the ribbons and lights the horizon; the hat rate draws out the fine rays; each kick sends a wave of light through the ribbons and the land, the snare brightens their lower folds, each bass note lifts the rims and deepens the river's reflection. On a mix alone every signal falls back to the mix's analysis. Run examples/aurora-borealis/build.py first (pure Python, a few seconds). See docs/prototypes/aurora-borealis/.",
-      "live": true,
-      "name": "Aurora Borealis",
-      "project": "aurora-borealis/aurora-borealis.json",
-      "generate": "python3 examples/aurora-borealis/build.py   (pure Python; writes examples/aurora-borealis/scene/)"
     },
     {
       "category": "Worlds",

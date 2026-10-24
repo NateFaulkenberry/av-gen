@@ -2,7 +2,7 @@
 
 A live scene: a slow flight down a winding mirror river through a valley of faceted indigo mountains at dusk, under a
 sky of layered aurora ribbons. It follows the Feline Footwear drum, bass and synth stems (or, live, any input whose
-channels are given the roles `drums`, `bass` and `synth`), and the mix alone otherwise. Examples > Live > Aurora
+channels are given the roles `drums`, `bass` and `synth`), and the mix alone otherwise. Examples > Live > Sonic VFX > Aurora
 Borealis.
 
 ## Build it

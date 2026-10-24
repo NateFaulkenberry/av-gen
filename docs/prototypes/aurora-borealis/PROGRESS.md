@@ -216,3 +216,10 @@ Media: `~/Desktop/av-gen-review/aurora-borealis/gateA2/`:
   - `several-bends-t100-t140-t200.png`;
   - `clip-40-60s.mp4`;
   - `topdown-map.png`: straights in green, bends in orange, the camera path in yellow.
+
+### Menu: under Sonic VFX (owner request)
+
+The index entry is now category "Sonic VFX", named "Sonic VFX - Aurora Borealis" (the Live panel strips the prefix),
+directly after "Sonic VFX - Event Horizon". The project files stay in examples/aurora-borealis/. The Sonic VFX menu
+test now expects seven offered scenes. Merged main 250564e9 (the Digital Ocean cut) in the same step.
+`check_project_integrity.py` reports 0 problems, and the `[examples]` and `[aurora-borealis]` tests pass.
