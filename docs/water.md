@@ -211,6 +211,47 @@ terrain 'valley': 256 chunks (21 with water), 589824 triangles at LOD 0, built i
   water 'west-tarn-bed': pond 0 m, half width 30.0 m, descent 0.0 m, 0.07 m/s, heading (0.71, 0.71)
 ```
 
+## Flow streaks (ADR-1643)
+
+A long exposure of moving water: fine streak lines drawn out along the river, in palette colours, curving with every
+bend. The streak lines are the river's own flow lines: the lanes of position across the channel that the surface
+already carries. So they follow the course exactly and converge where it narrows. Each lane is lit in stretches carried
+downstream at the river's speed.
+
+```json
+"water": { "flowStreaks": 2.5, "streakLines": 320, "streakLength": 25, "streakDensity": 0.55, "streakHighlight": 1.2,
+           "streakColor1": [0.95, 0.45, 0.8], "streakColor2": [0.3, 0.95, 0.85], "streakColor3": [0.7, 0.55, 1.0] }
+```
+
+| key | default | meaning |
+|---|---|---|
+| `flowStreaks` | 0 (off) | brightness (0..20). Above 0 the surface is drawn by the cinematic pipeline with the streaks in |
+| `streakLines` | 160 | lanes from bank to bank (4..2000). The channel's width / lines is a streak's width |
+| `streakLength` | 12 | metres a lit stretch runs along the flow, roughly |
+| `streakDensity` | 0.35 | the share of each lane's length that is lit (0..1) |
+| `streakSpeed` | 1 | how fast they travel, times the water's speed |
+| `streakHighlight` | 0.5 | white at the brightest lanes' cores |
+| `streakColor1/2/3` | pink, teal, lavender | the lanes' colours |
+| `streakColorScale` | 0.02 | cycles per metre at which the lanes' colours drift, so the two banks differ |
+
+**Parameters** (routable, so a palette or the music can drive them):
+- `nodes/<terrain>/water/streaks/amount`;
+- `nodes/<terrain>/water/streaks/color1`, `color2` and `color3`.
+
+**Where they appear:**
+- Flowing water only: a still pond has no current to draw out.
+- They stay off the banks' very edge.
+- A narrow band down the centreline (about 6% of the channel) is left calm. The vertex carries 1 - |across|, and its
+  interpolation across the centreline is a sawtooth that would zigzag the lanes there.
+
+**How they render:**
+- A lane narrower than about a 1080p pixel fades to its mean, so a distant reach reads as a soft colour, not crawling
+  lines.
+- The motion uses ADR-914's bounded cycle, so it is stable for any length of film.
+
+**Cost:** off, nothing. The code is compiled out, and a cinematic surface without streaks is drawn by a shader without
+it. On, about 0.1 ms on the QA river at 1080p.
+
 ## Things that float
 
 A `float` block on a **procedural** node makes its instances drift on water instead of standing on

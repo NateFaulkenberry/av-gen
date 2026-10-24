@@ -161,3 +161,30 @@ TEST_CASE("a detached composition's water follows its authored values, not the s
     CHECK(after.glow == authored.glow);
     CHECK(after.ripple == authored.ripple);
 }
+
+// ADR-1643: the flow streaks' brightness and three colours are parameters, and they reach the surface.
+TEST_CASE("the water's flow streaks are parameters that reach the surface", "[unit][water][parameters][adr1643]") {
+    assets::AssetRegistry registry;
+    auto loaded = scene::Composition::fromJson(terrainScene(1.25f), registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    comp.attach(params, modulator);
+    comp.update(FrameTime{});
+    REQUIRE(comp.scene().waters.size() == 1);
+    CHECK(comp.scene().waters[0].settings.flowStreaks == 0.0f);
+    auto* amount = params.findAs<float>("nodes/sea/water/streaks/amount");
+    auto* color2 = params.findAs<glm::vec3>("nodes/sea/water/streaks/color2");
+    REQUIRE(amount != nullptr);
+    REQUIRE(color2 != nullptr);
+    REQUIRE(params.find("nodes/sea/water/streaks/color1") != nullptr);
+    REQUIRE(params.find("nodes/sea/water/streaks/color3") != nullptr);
+    amount->setBase(1.5f);
+    color2->setBase(glm::vec3(0.1f, 0.2f, 0.3f));
+    params.resetFinals();
+    comp.update(FrameTime{});
+    CHECK(comp.scene().waters[0].settings.flowStreaks == 1.5f);
+    CHECK(comp.scene().waters[0].settings.streakColor2 == glm::vec3(0.1f, 0.2f, 0.3f));
+    CHECK(comp.scene().waters[0].settings.cinematic());
+}

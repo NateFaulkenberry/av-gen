@@ -69,10 +69,14 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              // ADR-1286
                              s.ssr, s.ssrDistance, s.ssrSteps, s.ssrGain, s.transmission, s.undulation,
                              s.undulationScale, s.roughnessVariation, s.streak, s.reflectionRays,
-                             s.tintPatches, s.tintPatchScale, s.glints};
+                             s.tintPatches, s.tintPatchScale, s.glints,
+                             // ADR-1643
+                             s.flowStreaks, s.streakDensity, s.streakLength, s.streakLines, s.streakSpeed,
+                             s.streakHighlight, s.streakColorScale};
     bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
               finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
-              finite3(s.emissiveColor) && finite3(s.absorption) && finite3(s.reflectionTint2);
+              finite3(s.emissiveColor) && finite3(s.absorption) && finite3(s.reflectionTint2) &&
+              finite3(s.streakColor1) && finite3(s.streakColor2) && finite3(s.streakColor3);
     for (const float v : scalars) {
         ok = ok && std::isfinite(v);
     }
@@ -116,6 +120,13 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     u.cineAbsorb = glm::vec4(s.absorption, 0.0f);
     u.cineC = glm::vec4(s.streak, s.reflectionRays, s.tintPatches, s.glints);
     u.cineTint2 = glm::vec4(s.reflectionTint2, std::max(s.tintPatchScale, 1e-3f));
+    // ADR-1643. Read only by the streaks pipeline, which draws a surface only when `flowStreaks` > 0.
+    u.streakA = glm::vec4(s.flowStreaks, std::clamp(s.streakDensity, 0.0f, 1.0f), std::max(s.streakLength, 0.5f),
+                          std::clamp(s.streakLines, 4.0f, 2000.0f));
+    u.streakB = glm::vec4(s.streakSpeed, s.streakHighlight, std::max(s.streakColorScale, 1e-3f), 0.0f);
+    u.streakColor1 = glm::vec4(s.streakColor1, 0.0f);
+    u.streakColor2 = glm::vec4(s.streakColor2, 0.0f);
+    u.streakColor3 = glm::vec4(s.streakColor3, 0.0f);
     return u;
 }
 
@@ -270,7 +281,22 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     }
     // ADR-1286: the cinematic block is compiled out of both of the older pipelines, so they are the
     // shaders they were; the full source (tears and cinematic) is the third.
-    auto tornSource = waterSourceWithout(*source, "cinematic (ADR-1286)");
+    // ADR-1643: the flow streaks are compiled out of all three of those, so each is the shader it was; the full
+    // source (tears, cinematic and streaks) is the fourth, which draws only a surface with streaks.
+    auto noStreaks = waterSourceWithout(*source, "flow streaks (ADR-1643)");
+    if (!noStreaks) {
+        return std::unexpected(noStreaks.error());
+    }
+    auto streaksModule = shaders.compile(*source, "water.wgsl (cinematic, flow streaks)");
+    if (!streaksModule) {
+        return std::unexpected(streaksModule.error());
+    }
+    auto streaks = buildPipeline(*streaksModule, "water-cinematic-streaks", cinePipelineLayout_);
+    if (!streaks) {
+        return std::unexpected(streaks.error());
+    }
+    streaksPipeline_ = *streaks;
+    auto tornSource = waterSourceWithout(*noStreaks, "cinematic (ADR-1286)");
     if (!tornSource) {
         return std::unexpected(tornSource.error());
     }
@@ -278,7 +304,7 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     if (!plainSource) {
         return std::unexpected(plainSource.error());
     }
-    auto cineModule = shaders.compile(*source, "water.wgsl (cinematic)");
+    auto cineModule = shaders.compile(*noStreaks, "water.wgsl (cinematic)");
     if (!cineModule) {
         return std::unexpected(cineModule.error());
     }
@@ -399,7 +425,8 @@ void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUnif
         torn_[i] = materials[i].tears.x > 0.0f; // ADR-916: which pipeline draws this slot
         // ADR-1286: the same test as WaterSettings::cinematic, on the packed record
         cine_[i] = materials[i].cineA.x > 0.0f || materials[i].cineA.z > 0.0f || materials[i].cineA.w > 0.0f ||
-                   materials[i].cineB.x > 0.0f || materials[i].cineC.z > 0.0f;
+                   materials[i].cineB.x > 0.0f || materials[i].cineC.z > 0.0f || materials[i].streakA.x > 0.0f;
+        streaks_[i] = materials[i].streakA.x > 0.0f; // ADR-1643
     }
     queue.WriteBuffer(uniforms_, 0, staging_.data(), static_cast<std::size_t>(uploaded_) * kStride);
 }

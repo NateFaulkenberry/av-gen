@@ -125,3 +125,57 @@ TEST_CASE("cinematic water settings refuse nonsense and say which key", "[unit][
     }
 }
 
+
+// ADR-1643: the flow streaks -- off by default, a cinematic setting when on, read and written (only when authored),
+// refused out of range, and four of them parameters a route or a palette can drive.
+TEST_CASE("water flow streaks are off by default, round-trip, and are written only when authored",
+          "[unit][water][adr1643]") {
+    const scene::WaterSettings defaults;
+    CHECK(defaults.flowStreaks == 0.0f);
+    CHECK_FALSE(defaults.cinematic());
+    scene::WaterSettings on;
+    on.flowStreaks = 1.0f;
+    CHECK(on.cinematic());
+
+    assets::AssetRegistry registry;
+    const json authored = {{"flowStreaks", 2.0},     {"streakDensity", 0.5},   {"streakLength", 20.0},
+                           {"streakLines", 300.0},   {"streakSpeed", 1.5},     {"streakHighlight", 1.0},
+                           {"streakColorScale", 0.05}, {"streakColor1", {1.0, 0.4, 0.8}},
+                           {"streakColor2", {0.2, 0.9, 0.8}}, {"streakColor3", {0.7, 0.5, 1.0}}};
+    auto loaded = scene::Composition::fromJson(terrainWith(authored), registry);
+    REQUIRE(loaded.has_value());
+    const scene::WaterSettings& w = waterOf(**loaded);
+    CHECK(w.cinematic());
+    CHECK(w.flowStreaks == 2.0f);
+    CHECK(w.streakLines == 300.0f);
+    CHECK(w.streakColor2 == glm::vec3(0.2f, 0.9f, 0.8f));
+    const json written = (*loaded)->toJson();
+    const json& wj = written["nodes"][0]["terrain"]["water"];
+    REQUIRE(wj.contains("flowStreaks"));
+    auto again = scene::Composition::fromJson(written, registry);
+    REQUIRE(again.has_value());
+    const scene::WaterSettings& b = waterOf(**again);
+    CHECK(b.flowStreaks == w.flowStreaks);
+    CHECK(b.streakDensity == w.streakDensity);
+    CHECK(b.streakLength == w.streakLength);
+    CHECK(b.streakLines == w.streakLines);
+    CHECK(b.streakSpeed == w.streakSpeed);
+    CHECK(b.streakHighlight == w.streakHighlight);
+    CHECK(b.streakColorScale == w.streakColorScale);
+    CHECK(b.streakColor1 == w.streakColor1);
+    CHECK(b.streakColor3 == w.streakColor3);
+
+    // a scene that never authored them saves no streak key
+    auto plain = scene::Composition::fromJson(terrainWith(json::object({{"glow", 0.5}})), registry);
+    REQUIRE(plain.has_value());
+    CHECK_FALSE((*plain)->toJson()["nodes"][0]["terrain"]["water"].contains("flowStreaks"));
+
+    // out of range is refused, naming the key
+    for (const auto& [key, value] : {std::pair{"flowStreaks", -1.0}, std::pair{"streakDensity", 1.5},
+                                     std::pair{"streakLength", 0.1}, std::pair{"streakLines", 2.0},
+                                     std::pair{"streakSpeed", 9.0}, std::pair{"streakColorScale", 0.0}}) {
+        auto bad = scene::Composition::fromJson(terrainWith(json::object({{key, value}})), registry);
+        REQUIRE_FALSE(bad.has_value());
+        CHECK(bad.error().message.find(key) != std::string::npos);
+    }
+}

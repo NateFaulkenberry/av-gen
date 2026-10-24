@@ -135,9 +135,26 @@ struct WaterSettings {
     float tintPatchScale = 0.05f; // their frequency, cycles per metre
     float glints = 0.0f;         // fine sparks in the colour of what the reflection found (0..50)
 
+    // ---- flow streaks (ADR-1643) -----------------------------------------------------------------
+    // A long exposure of moving water: fine streak lines along the river's own flow lines (the lanes of the channel
+    // position its vertices carry, so they curve with every bend and narrow with the channel), lit in stretches
+    // carried downstream at the river's speed, in three palette colours with white cores. 0 (the default) draws
+    // none, with the streak code compiled out; above 0 the surface is drawn by the cinematic pipeline with the
+    // streaks in. Flowing water only: a still body has no current to draw out.
+    float flowStreaks = 0.0f;    // brightness of the streaks (0 = off; 0..20)
+    float streakDensity = 0.35f; // the share of each lane's length that is lit (0..1)
+    float streakLength = 12.0f;  // metres a lit stretch runs along the flow, roughly (0.5..200)
+    float streakLines = 160.0f;  // lanes from bank to bank (4..2000): the channel's width / lines is a streak's width
+    float streakSpeed = 1.0f;    // how fast they travel, as a multiple of the water's own speed (0..8)
+    float streakHighlight = 0.5f; // white at the brightest cores (0..4)
+    float streakColorScale = 0.02f; // cycles per metre at which the lanes' colours drift (0.001..10)
+    glm::vec3 streakColor1{1.0f, 0.45f, 0.8f};  // pink
+    glm::vec3 streakColor2{0.25f, 0.95f, 0.85f}; // teal
+    glm::vec3 streakColor3{0.7f, 0.55f, 1.0f};  // lavender
+
     [[nodiscard]] bool cinematic() const {
         return ssr > 0.0f || transmission > 0.0f || undulation > 0.0f || roughnessVariation > 0.0f ||
-               tintPatches > 0.0f;
+               tintPatches > 0.0f || flowStreaks > 0.0f;
     }
 
     [[nodiscard]] Result<void> validate() const;

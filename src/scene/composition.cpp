@@ -5819,6 +5819,15 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             &params_->add(vec3Desc(base + "water/shallowColor", w.shallowColor, 0.0f, 8.0f, 0.0f, 1.0f));
         node.waterDeepColorParam =
             &params_->add(vec3Desc(base + "water/deepColor", w.deepColor, 0.0f, 8.0f, 0.0f, 1.0f));
+        // ADR-1643: the flow streaks' brightness and colours, the four a scene's palette and music move.
+        node.waterStreaksParam =
+            &params_->add(floatDesc(base + "water/streaks/amount", w.flowStreaks, 0.0f, 20.0f, 0.0f, 4.0f));
+        node.waterStreakColor1Param =
+            &params_->add(vec3Desc(base + "water/streaks/color1", w.streakColor1, 0.0f, 20.0f, 0.0f, 1.0f));
+        node.waterStreakColor2Param =
+            &params_->add(vec3Desc(base + "water/streaks/color2", w.streakColor2, 0.0f, 20.0f, 0.0f, 1.0f));
+        node.waterStreakColor3Param =
+            &params_->add(vec3Desc(base + "water/streaks/color3", w.streakColor3, 0.0f, 20.0f, 0.0f, 1.0f));
         // ADR-916: the tears, every one of them a control, under their own heading -- the Parameters
         // panel shows "<terrain>/water/tears", the World panel's Inspector "tears/..." under "water" --
         // each labelled for what it does to the picture.
@@ -5886,6 +5895,10 @@ void nullWaterParameters(CompositionNode& node) {
     node.waterShallowDepthParam = nullptr;
     node.waterShallowColorParam = nullptr;
     node.waterDeepColorParam = nullptr;
+    node.waterStreaksParam = nullptr; // ADR-1643
+    node.waterStreakColor1Param = nullptr;
+    node.waterStreakColor2Param = nullptr;
+    node.waterStreakColor3Param = nullptr;
     node.waterTearParams = {};
 }
 
@@ -5984,7 +5997,8 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
                   "water/foam", "water/cascade", "water/glowColor", "water/clarity", "water/maxOpacity",
                   "water/fresnel",
                   "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
-                  "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/tears/amount",
+                  "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/streaks/amount",
+                  "water/streaks/color1", "water/streaks/color2", "water/streaks/color3", "water/tears/amount",
                   "water/tears/shear", "water/tears/coverage", "water/tears/cell", "water/tears/spacing",
                   "water/tears/stretch", "water/tears/followWind", "water/tears/direction",
                   "water/tears/drift", "water/tears/wind"}) {
@@ -9786,6 +9800,10 @@ void Composition::updateWaterSurfaces() {
         if (node.waterShallowDepthParam != nullptr) w.shallow = node.waterShallowDepthParam->value();
         if (node.waterShallowColorParam != nullptr) w.shallowColor = node.waterShallowColorParam->value();
         if (node.waterDeepColorParam != nullptr) w.deepColor = node.waterDeepColorParam->value();
+        if (node.waterStreaksParam != nullptr) w.flowStreaks = node.waterStreaksParam->value(); // ADR-1643
+        if (node.waterStreakColor1Param != nullptr) w.streakColor1 = node.waterStreakColor1Param->value();
+        if (node.waterStreakColor2Param != nullptr) w.streakColor2 = node.waterStreakColor2Param->value();
+        if (node.waterStreakColor3Param != nullptr) w.streakColor3 = node.waterStreakColor3Param->value();
         // ADR-916: every tear control. The seven a route cannot drive are copied the same way, so an
         // edit in the panel or a project's saved value reaches the surface like any other.
         const CompositionNode::WaterTearParameters& tp = node.waterTearParams;
@@ -11068,6 +11086,29 @@ nlohmann::json Composition::toJson() const {
                                       {"reflectionTint2", vecToJson(ts.water.reflectionTint2)},
                                       {"tintPatchScale", ts.water.tintPatchScale},
                                       {"glints", ts.water.glints}}}};
+            {
+                // ADR-1643: the flow streaks, written only when one of them is authored, so every scene saved
+                // before them saves the file it had.
+                const world::WaterSettings d{};
+                const world::WaterSettings& w = ts.water;
+                if (w.flowStreaks != d.flowStreaks || w.streakDensity != d.streakDensity ||
+                    w.streakLength != d.streakLength || w.streakLines != d.streakLines ||
+                    w.streakSpeed != d.streakSpeed || w.streakHighlight != d.streakHighlight ||
+                    w.streakColorScale != d.streakColorScale || w.streakColor1 != d.streakColor1 ||
+                    w.streakColor2 != d.streakColor2 || w.streakColor3 != d.streakColor3) {
+                    json& wj = n["terrain"]["water"];
+                    wj["flowStreaks"] = w.flowStreaks;
+                    wj["streakDensity"] = w.streakDensity;
+                    wj["streakLength"] = w.streakLength;
+                    wj["streakLines"] = w.streakLines;
+                    wj["streakSpeed"] = w.streakSpeed;
+                    wj["streakHighlight"] = w.streakHighlight;
+                    wj["streakColorScale"] = w.streakColorScale;
+                    wj["streakColor1"] = vecToJson(w.streakColor1);
+                    wj["streakColor2"] = vecToJson(w.streakColor2);
+                    wj["streakColor3"] = vecToJson(w.streakColor3);
+                }
+            }
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -13050,7 +13091,15 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"roughnessVariation", &w.roughnessVariation},
                               TerrainFloat{"streak", &w.streak}, TerrainFloat{"reflectionRays", &w.reflectionRays},
                               TerrainFloat{"tintPatches", &w.tintPatches},
-                              TerrainFloat{"tintPatchScale", &w.tintPatchScale}, TerrainFloat{"glints", &w.glints}}) {
+                              TerrainFloat{"tintPatchScale", &w.tintPatchScale}, TerrainFloat{"glints", &w.glints},
+                              // ADR-1643: the flow streaks
+                              TerrainFloat{"flowStreaks", &w.flowStreaks},
+                              TerrainFloat{"streakDensity", &w.streakDensity},
+                              TerrainFloat{"streakLength", &w.streakLength},
+                              TerrainFloat{"streakLines", &w.streakLines},
+                              TerrainFloat{"streakSpeed", &w.streakSpeed},
+                              TerrainFloat{"streakHighlight", &w.streakHighlight},
+                              TerrainFloat{"streakColorScale", &w.streakColorScale}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
@@ -13080,7 +13129,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                                           std::pair{"glowColor", &w.glowColor},
                                                           std::pair{"sparkleColor", &w.sparkleColor},
                                                           std::pair{"absorption", &w.absorption},
-                                                          std::pair{"reflectionTint2", &w.reflectionTint2}}) {
+                                                          std::pair{"reflectionTint2", &w.reflectionTint2},
+                                                          std::pair{"streakColor1", &w.streakColor1},
+                                                          std::pair{"streakColor2", &w.streakColor2},
+                                                          std::pair{"streakColor3", &w.streakColor3}}) {
                             auto v = readVec<3>(wj, key, *target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);

@@ -153,6 +153,28 @@ Result<void> WaterSettings::validate() const {
     if (!(tintPatchScale > 0.0f && tintPatchScale <= 10.0f)) {
         return fail("water: tintPatchScale must be in (0, 10] cycles per metre");
     }
+    // ADR-1643
+    if (!(flowStreaks >= 0.0f && flowStreaks <= 20.0f)) {
+        return fail("water: flowStreaks must be in [0, 20]");
+    }
+    if (!(streakDensity >= 0.0f && streakDensity <= 1.0f)) {
+        return fail("water: streakDensity must be in [0, 1]");
+    }
+    if (!(streakLength >= 0.5f && streakLength <= 200.0f)) {
+        return fail("water: streakLength must be in [0.5, 200] metres");
+    }
+    if (!(streakLines >= 4.0f && streakLines <= 2000.0f)) {
+        return fail("water: streakLines must be in [4, 2000]");
+    }
+    if (!(streakSpeed >= 0.0f && streakSpeed <= 8.0f)) {
+        return fail("water: streakSpeed must be in [0, 8]");
+    }
+    if (!(streakHighlight >= 0.0f && streakHighlight <= 4.0f)) {
+        return fail("water: streakHighlight must be in [0, 4]");
+    }
+    if (!(streakColorScale >= 0.001f && streakColorScale <= 10.0f)) {
+        return fail("water: streakColorScale must be in [0.001, 10] cycles per metre");
+    }
     if (!(glints >= 0.0f && glints <= 50.0f)) {
         return fail("water: glints must be in [0, 50]");
     }

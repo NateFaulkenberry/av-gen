@@ -63,6 +63,13 @@ struct WaterUniforms {
     cineC: vec4<f32>,          // x = streak (normal spread along the view), y = reflection rays, z = tint patches, w = glints
     cineTint2: vec4<f32>,      // rgb = the second reflection tint (the patches), w = patch scale (cycles/m)
     // ---- cinematic (ADR-1286) end ----
+    // ---- flow streaks (ADR-1643) begin ----
+    streakA: vec4<f32>,        // x = amount, y = density, z = length (m), w = lanes bank to bank
+    streakB: vec4<f32>,        // x = speed (x the water's), y = highlight, z = colour scale (cycles/m), w = 0
+    streakColor1: vec4<f32>,   // rgb
+    streakColor2: vec4<f32>,
+    streakColor3: vec4<f32>,
+    // ---- flow streaks (ADR-1643) end ----
 };
 
 @group(2) @binding(0) var<uniform> water: WaterUniforms;
@@ -313,6 +320,61 @@ fn flowPhases(t: f32, period: f32, desync: f32, salt: u32) -> FlowPhases {
 fn flowDesync(p: vec2<f32>) -> f32 {
     return noiseD(p * (1.0 / 80.0) + vec2<f32>(-71.3, 23.9)).x + 1.0;
 }
+// ---- flow streaks (ADR-1643) begin ----
+// A long exposure of moving water: fine lines of light drawn out along the current. A river's flow lines are the
+// lines of constant position across its channel, and the surface already carries that position (uv.y: 1 at the
+// centreline, 0 at the bank, from the same query as the flow), so the streaks are lanes of it: they follow the river
+// round every bend exactly and converge where it narrows, as a long exposure's streaks do, with nothing rotated --
+// noise sampled in coordinates turned to the local flow swings metres at a kilometre out for a degree of turn.
+// `streakLines` lanes run bank to bank, each lit in stretches about `streakLength` long (a noise carried along the
+// flow with the ADR-914 cycle, so its offset never grows), at a per-lane colour among the three palette colours,
+// the brightest lanes cored white. A low-frequency world noise meanders the lanes so they are not ruled lines. A
+// lane narrower than about a pixel fades to its mean, as every other layer of this surface does; still water
+// (no current to draw out) has none.
+fn waterFlowStreaks(p: vec2<f32>, dir: vec2<f32>, speed: f32, speedFraction: f32, t: f32, desync: f32,
+                    channel: f32, side: f32, laneDeriv: f32) -> vec3<f32> {
+    let amount = water.streakA.x;
+    let density = clamp(water.streakA.y, 0.0, 1.0);
+    let len = max(water.streakA.z, 0.5);
+    let lines = max(water.streakA.w, 1.0);
+    // Lane coordinate: from the centreline to each bank, `lines / 2` lanes, meandering by up to half a lane.
+    let meander = noiseD(p * (1.0 / (len * 3.0)) + vec2<f32>(13.1, -7.7)).x * 0.5;
+    let u = side * (1.0 - clamp(channel, 0.0, 1.0)) * lines * 0.5 + meander;
+    let lane = floor(u);
+    let inLane = abs(fract(u) - 0.5) * 2.0; // 0 on the lane's line, 1 between lanes
+    let laneHash = waterHash(vec2<f32>(lane, 17.0));
+    let laneHash2 = waterHash(vec2<f32>(lane, 91.0));
+    // A thin bright line in each lane, thinner for a fainter lane.
+    let profile = 1.0 - smoothstep(0.0, mix(0.25, 0.6, laneHash2), inLane);
+    // Where along the flow a lane is lit: a noise at the lane's own offset, carried downstream.
+    let ph = flowPhases(t, kFlowPeriod, desync + 0.37, 9u);
+    let v = dir * (speed * water.streakB.x);
+    let laneOffset = vec2<f32>(laneHash * 97.0, laneHash2 * 61.0);
+    let q0 = (p - v * ph.travel.x) * (1.0 / len) + laneOffset + ph.jump0;
+    let q1 = (p - v * ph.travel.y) * (1.0 / len) + laneOffset + ph.jump1;
+    let along = (noiseD(q0).x * ph.weight.x + noiseD(q1).x * ph.weight.y) * 0.7; // about unit spread
+    // `density` is the share of the lanes' length that is lit (0.5 = half, 0.1 = sparse).
+    let z = mix(1.6, -1.6, density);
+    let lit = smoothstep(z, z + 0.6, along);
+    // Fade to the mean where a lane is narrower than about a pixel (laneDeriv = lanes per pixel).
+    let resolved = 1.0 - smoothstep(0.5, 1.2, laneDeriv);
+    let line = mix(density * 0.3, profile * lit, resolved);
+    // The lane's colour: its own hash, drifted across the river by a coarse world noise so the two banks differ.
+    let hue = fract(laneHash + noiseD(p * water.streakB.z + vec2<f32>(5.3, 2.9)).x * 0.35);
+    var col = mix(water.streakColor1.rgb, water.streakColor2.rgb, clamp(hue * 3.0, 0.0, 1.0));
+    col = mix(col, water.streakColor3.rgb, clamp(hue * 3.0 - 1.0, 0.0, 1.0));
+    col = mix(col, water.streakColor1.rgb, clamp(hue * 3.0 - 2.0, 0.0, 1.0));
+    let core = select(0.0, 1.0, laneHash2 > 0.82) * profile * profile * lit * water.streakB.y * resolved;
+    let bright = mix(0.5, 1.0, laneHash);
+    // Kept off the very edge of the water, and off water with no current. And off a narrow band down the centreline:
+    // the surface carries 1 - |across| per vertex, and interpolating an absolute value over a triangle that straddles
+    // the centreline is a sawtooth about a quad wide, so the lanes there would zigzag. The band (about 6% of the
+    // channel at the terrain's usual resolution) is left calm.
+    let banks = smoothstep(0.02, 0.12, channel) * smoothstep(0.01, 0.06, speedFraction) *
+                smoothstep(0.03, 0.07, 1.0 - channel);
+    return (col * line * bright + vec3<f32>(core)) * amount * banks;
+}
+// ---- flow streaks (ADR-1643) end ----
 // ---- tears (ADR-916) begin ----
 // Deliberate tears: thin, stepped seams across the water in which the ripples are compressed into
 // dense parallel stripes. The owner's reference is the accident ADR-914 removed -- ripples sheared by
@@ -661,6 +723,24 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // Where this part of the surface is in the advection cycle (ADR-914), shared by every effect
     // below that travels, each at its own offset into it.
     let desync = flowDesync(in.worldPos.xz);
+    // ---- flow streaks (ADR-1643) begin ----
+    // Streak lanes per pixel, from the derivative of the channel coordinate (taken here, in uniform control flow),
+    // in reference pixels (ADR-915) so a supersampled render resolves the lanes a 1080p one does.
+    let streakLaneDeriv = fwidth(in.uv.y) * max(water.streakA.w, 1.0) * 0.5 * refScale;
+    // Which bank this side of the centreline belongs to. uv.y is 1 - |across|, unsigned, so lanes counted from it
+    // mirror at the centreline (a V where they meet). Its world gradient points towards the centreline, so its sign
+    // against the flow's left says the side: solved from the screen derivatives of uv.y and of the position.
+    var streakSide = 1.0;
+    {
+        let dc = vec2<f32>(dpdx(in.uv.y), dpdy(in.uv.y));
+        let det = dPdx.x * dPdy.y - dPdx.y * dPdy.x;
+        if (abs(det) > 1e-12) {
+            let g = vec2<f32>(dc.x * dPdy.y - dc.y * dPdx.y, dPdx.x * dc.y - dPdy.x * dc.x) / det;
+            let flowLeft = vec2<f32>(-in.flow.z, in.flow.x);
+            streakSide = select(-1.0, 1.0, dot(g, flowLeft) >= 0.0);
+        }
+    }
+    // ---- flow streaks (ADR-1643) end ----
     // ---- cascade (ADR-985) begin ----
     // The face's own up, from the derivatives (so here, in uniform control flow), and how steep it is down
     // its flow: exactly 0 under 20 degrees or across the flow, 1 past 30 along it. A camera below a falls
@@ -1050,6 +1130,14 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ---- cinematic (ADR-1286) begin ----
     color = color + cineGlint;
     // ---- cinematic (ADR-1286) end ----
+    // ---- flow streaks (ADR-1643) begin ----
+    var streakLight = vec3<f32>(0.0);
+    if (water.streakA.x > 0.0 && !underwater) {
+        streakLight = waterFlowStreaks(in.worldPos.xz, dir, speed, speedFraction, t, desync, in.uv.y, streakSide,
+                                       streakLaneDeriv);
+    }
+    color = color + streakLight;
+    // ---- flow streaks (ADR-1643) end ----
     // Ambient occlusion from the banks: water in a cut channel is darker than water in the open,
     // and the AO buffer already knows which is which.
     let occlusion = sampleAmbientOcclusion(screenUv, viewDepth, vec3<f32>(0.0, 1.0, 0.0));
@@ -1078,6 +1166,9 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ---- cinematic (ADR-1286) begin ----
     out.emission = vec4<f32>(out.emission.rgb + cineGlint * alpha, 1.0);
     // ---- cinematic (ADR-1286) end ----
+    // ---- flow streaks (ADR-1643) begin ----
+    out.emission = vec4<f32>(out.emission.rgb + streakLight * alpha, 1.0);
+    // ---- flow streaks (ADR-1643) end ----
     out.ids = packIds(object.ids.x, object.ids.y);
     return out;
 }

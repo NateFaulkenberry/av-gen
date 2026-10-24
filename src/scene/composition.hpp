@@ -534,6 +534,12 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
+    // ADR-1643: the flow streaks' brightness and three colours (routable, so a palette can drive them), under
+    // `nodes/<terrain>/water/streaks/`.
+    params::Parameter<float>* waterStreaksParam = nullptr;
+    params::Parameter<glm::vec3>* waterStreakColor1Param = nullptr;
+    params::Parameter<glm::vec3>* waterStreakColor2Param = nullptr;
+    params::Parameter<glm::vec3>* waterStreakColor3Param = nullptr;
     // ADR-916: the water's tears, all under `nodes/<terrain>/water/tears/`, so both panels head them
     // "tears" and label each for what it does to the picture. The amount, shear and coverage are
     // routable. The other seven are controls a route cannot drive (`modulatable = false`); why, is in

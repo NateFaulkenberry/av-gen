@@ -69,8 +69,14 @@ struct WaterUniforms {
     glm::vec4 cineAbsorb{0.0f};   // absorption rgb per metre, 0
     glm::vec4 cineC{0.0f};        // streak, reflection rays, tint patches, glints
     glm::vec4 cineTint2{0.0f};    // second reflection tint rgb, patch scale
+    // ADR-1643, appended. Read only by the streaks pipeline.
+    glm::vec4 streakA{0.0f};      // amount, density, length (m), lanes bank to bank
+    glm::vec4 streakB{0.0f};      // speed (x the water's), highlight, colour scale (cycles/m), 0
+    glm::vec4 streakColor1{0.0f}; // rgb, 0
+    glm::vec4 streakColor2{0.0f};
+    glm::vec4 streakColor3{0.0f};
 };
-static_assert(sizeof(WaterUniforms) == 320);
+static_assert(sizeof(WaterUniforms) == 400);
 // The part of the record a shader without the cinematic block reads (its binding's minimum size).
 inline constexpr std::uint64_t kWaterUniformsPlainSize = 240;
 
@@ -139,18 +145,20 @@ public:
     // (the compiler builds the shared ripple path differently once the tear's data flows through it).
     [[nodiscard]] const wgpu::RenderPipeline& pipeline(std::size_t slot) const {
         if (slot < cine_.size() && cine_[slot] && cineBindGroup_) {
-            return cinePipeline_;
+            // ADR-1643: the flow streaks, compiled into a fourth pipeline only a surface with streaks is drawn by.
+            return slot < streaks_.size() && streaks_[slot] ? streaksPipeline_ : cinePipeline_;
         }
         return slot < torn_.size() && torn_[slot] ? pipeline_ : plainPipeline_;
     }
     [[nodiscard]] bool ready() const {
-        return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_) && static_cast<bool>(cinePipeline_);
+        return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_) && static_cast<bool>(cinePipeline_) &&
+               static_cast<bool>(streaksPipeline_);
     }
     [[nodiscard]] std::uint32_t materialCount() const { return uploaded_; }
 
 private:
     // Dynamic uniform offsets must be a multiple of the device's minimum alignment, which is 256
-    // on every backend this runs on. 320 bytes of record (ADR-1286), padded.
+    // on every backend this runs on. 400 bytes of record (ADR-1286, ADR-1643), padded.
     static constexpr std::uint32_t kStride = 512;
     static_assert(kStride % 256 == 0);
     static_assert(sizeof(WaterUniforms) <= kStride);
@@ -170,10 +178,12 @@ private:
     wgpu::BindGroupLayout cineLayout_;
     wgpu::PipelineLayout cinePipelineLayout_;
     wgpu::RenderPipeline cinePipeline_;
+    wgpu::RenderPipeline streaksPipeline_; // ADR-1643: the cinematic pipeline with the flow streaks in
     wgpu::BindGroup cineBindGroup_;
     wgpu::Sampler cineSampler_;
     std::array<bool, kMaxWaterMaterials> cine_{};
     std::array<bool, kMaxWaterMaterials> torn_{};
+    std::array<bool, kMaxWaterMaterials> streaks_{}; // ADR-1643
     wgpu::Buffer uniforms_;
     wgpu::BindGroup bindGroup_;
     std::uint32_t uploaded_ = 0;
