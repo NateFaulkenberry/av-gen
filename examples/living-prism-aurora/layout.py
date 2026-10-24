@@ -80,8 +80,9 @@ WALLS = [  # (name, path, amplitude, width, falloff, roughness). Phase 2e (the o
     ("outerL", _offset(_AXIS, -400.0, 50.0, 1.1), 140.0, 160.0, 1.4, 1.0),
     ("benchR", _offset(_ALL_RIVER, 130.0), 7.0, 60.0, 0.5, 0.3),  # the broad green bench
     ("bankR", _offset(_AXIS, 185.0, 24.0, 3.3), 24.0, 80.0, 1.3, 0.7),       # a gentle green rise
-    ("wallR", _offset(_AXIS, 270.0, 30.0, 5.2), 62.0, 70.0, 1.2, 1.0),
-    ("highR", _offset(_AXIS, 380.0, 45.0, 0.7), 85.0, 130.0, 1.4, 1.0),
+    # 5f: the right walls lower (the owner's jutting rise behind the right hero)
+    ("wallR", _offset(_AXIS, 270.0, 30.0, 5.2), 45.0, 70.0, 1.2, 1.0),
+    ("highR", _offset(_AXIS, 380.0, 45.0, 0.7), 40.0, 130.0, 1.4, 1.0),
 ]
 
 

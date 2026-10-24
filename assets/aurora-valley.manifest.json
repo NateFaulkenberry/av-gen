@@ -116,6 +116,92 @@
    "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
    "modifications": "examples/living-prism-aurora/blender/aurora_assets.py build_scan: joined, decimated to a face budget, rested on z = 0; exported WITH the scan's own 1k PBR textures (albedo, normal, roughness) embedded as JPEG in the build GLB (gitignored, never committed); tinted in the scene",
    "usedAs": "scattered rock; 17: textured cliffs placed by view (build_scene.auto_cliffs) and foreground outcrops (auto_outcrops)"
+  },
+  {
+   "id": "rock_face",
+   "source": "https://polyhaven.com/a/rock_face",
+   "creators": [
+    "Greg Zaal",
+    "Dario Barresi"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Greg Zaal, Dario Barresi)",
+   "localPath": "assets/nature/textures/rock_face/ (2K JPG: diffuse, nor_gl, rough)",
+   "fetchedBy": "Poly Haven API files endpoint, 2026-10-23, into the gitignored asset folder",
+   "modifications": "none",
+   "usedAs": "terrain texture for ADR-1642 (AU_TERRAIN_TEX=1, off until the merge): rock_face on steep ground, mossy_rock between, forest_leaves_02 on the flats"
+  },
+  {
+   "id": "mossy_rock",
+   "source": "https://polyhaven.com/a/mossy_rock",
+   "creators": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rob Tuytel)",
+   "localPath": "assets/nature/textures/mossy_rock/ (2K JPG: diffuse, nor_gl, rough)",
+   "fetchedBy": "Poly Haven API files endpoint, 2026-10-23, into the gitignored asset folder",
+   "modifications": "none",
+   "usedAs": "terrain texture for ADR-1642 (AU_TERRAIN_TEX=1, off until the merge): rock_face on steep ground, mossy_rock between, forest_leaves_02 on the flats"
+  },
+  {
+   "id": "forest_leaves_02",
+   "source": "https://polyhaven.com/a/forest_leaves_02",
+   "creators": [
+    "Rob Tuytel"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rob Tuytel)",
+   "localPath": "assets/nature/textures/forest_leaves_02/ (2K JPG: diffuse, nor_gl, rough)",
+   "fetchedBy": "Poly Haven API files endpoint, 2026-10-23, into the gitignored asset folder",
+   "modifications": "none",
+   "usedAs": "terrain texture for ADR-1642 (AU_TERRAIN_TEX=1, off until the merge): rock_face on steep ground, mossy_rock between, forest_leaves_02 on the flats"
+  },
+  {
+   "id": "shrub_02",
+   "source": "https://polyhaven.com/a/shrub_02",
+   "creators": [
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rico Cilliers)",
+   "localPath": "assets/nature/plants/shrub_02/shrub_02_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "aurora_assets.py build_scan: joined, rested on z = 0, exported with its own textures (shrub_02 also as a 5k-face far copy)",
+   "usedAs": "5f bushes (all gentle ground)"
+  },
+  {
+   "id": "fern_02",
+   "source": "https://polyhaven.com/a/fern_02",
+   "creators": [
+    "Rob Tuytel",
+    "Rico Cilliers"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Rob Tuytel, Rico Cilliers)",
+   "localPath": "assets/nature/plants/fern_02/fern_02_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "aurora_assets.py build_scan: joined, rested on z = 0, exported with its own textures (shrub_02 also as a 5k-face far copy)",
+   "usedAs": "5f low leafy clumps"
+  },
+  {
+   "id": "rock_moss_set_02",
+   "source": "https://polyhaven.com/a/rock_moss_set_02",
+   "creators": [
+    "Kless Gyzen"
+   ],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://polyhaven.com/license",
+   "attribution": "not required (credit given: Poly Haven, Kless Gyzen)",
+   "localPath": "assets/terrain/rocks/rock_moss_set_02/rock_moss_set_02_1k.gltf",
+   "fetchedBy": "tools/fetch_polyhaven.py (1k glTF, already in the asset library)",
+   "modifications": "aurora_assets.py build_scan: joined, rested on z = 0, exported with its own textures (shrub_02 also as a 5k-face far copy)",
+   "usedAs": "5e/5f moss-covered rock between the crystals and on the ledges"
   }
  ],
  "textures": "the Poly Haven scans' own CC0 textures; terrain textures need an engine change (programs take no texture inputs, ADR-030) -- the terrain is shaded procedurally"

@@ -66,6 +66,41 @@ def prog_ground():
 
 
 FOG_AURORA = 0.15               # 5b: the distance haze in the aurora's top colour (the far river carries it)
+# ---- ADR-1642 (terrain texture inputs, preview; not merged yet): AU_TERRAIN_TEX=1 builds the textured ground.
+# Written to the preview's schema (program `textures`, ops `textureTriplanar` / `textureTriplanarNormal`) and unverified
+# until the merge; off by default, so nothing the current engine reads changes. Poly Haven CC0, 2K, in the gitignored
+# assets/nature/textures/ (manifest): rock_face on steep ground, mossy_rock between, forest_leaves_02 on the flats.
+TERRAIN_TEX = os.environ.get("AU_TERRAIN_TEX", "0") == "1"
+TEX_DIR = os.path.join(HERE, "..", "..", "assets", "nature", "textures")
+TERRAIN_TEXTURES = [("rock", "rock_face/rock_face_diff_2k.jpg", "srgb"),
+                    ("rockN", "rock_face/rock_face_nor_gl_2k.jpg", "linear"),
+                    ("mossy", "mossy_rock/mossy_rock_diff_2k.jpg", "srgb"),
+                    ("leaves", "forest_leaves_02/forest_leaves_02_diffuse_2k.jpg", "srgb")]
+
+
+def prog_ground_textured():
+    """The ground with real rock and mossy-rock texture on the slopes and a leafy floor (ADR-1642): three triplanar
+    colour reads and one triplanar normal, mixed by slope (the normal's up component) and a large patch noise."""
+    return {"name": "au_ground", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1, "normal": 7,
+            "emissionIntensity": 1.0, "opacity": -1,
+            "textures": [{"name": n, "path": os.path.basename(pth), "colorSpace": cs} for n, pth, cs in TERRAIN_TEXTURES],
+            "ops": [
+                {"kind": "input", "dst": 0, "input": "worldPosition"},
+                {"kind": "textureTriplanar", "dst": 3, "srcA": 0, "texture": "rock", "value": 0.08},
+                {"kind": "textureTriplanar", "dst": 4, "srcA": 0, "texture": "mossy", "value": 0.1},
+                {"kind": "textureTriplanar", "dst": 5, "srcA": 0, "texture": "leaves", "value": 0.25},
+                {"kind": "textureTriplanarNormal", "dst": 7, "srcA": 0, "texture": "rockN", "value": 0.08},
+                {"kind": "input", "dst": 1, "input": "normal"},
+                {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [0, 1, 0, 0], "value": 1.0},
+                {"kind": "noise", "dst": 2, "srcA": 0, "value": 0.02, "seed": 3},
+                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0, 1, -0.1, 0.1]},
+                {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
+                {"kind": "smoothstep", "dst": 6, "srcA": 1, "constant": [0.55, 0.72, 0, 0]},   # rock -> mossy rock
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 6},
+                {"kind": "smoothstep", "dst": 6, "srcA": 1, "constant": [0.78, 0.9, 0, 0]},    # -> the leafy floor
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 6}]}
+
+
 GROUND_AURORA = 0.008            # 5c: a soft rim on sky-facing crests only (0.035 washed the moss mauve)
 GROUND_AURORA_OPS = (24, 25)     # 1-based op indices of its two colour constants in au_ground (palette targets)
 
@@ -241,14 +276,14 @@ def palette_json():
           "gain": GROUND_AURORA},
          {"role": "aurora2Low", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[1],
           "gain": GROUND_AURORA},
-         {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA},
-         {"role": "auroraLow", "target": "material/au_bush/op/%d/constant/constant" % BUSH_RIM_OP, "gain": BUSH_RIM}]
+         {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA}]
     if CIRCUITS:
         b.append({"role": "auroraLow", "target": "procedural/circuits/material/emissiveColor"})
     for i, n in enumerate(sorted(REFRACT_HEROES)):
         b.append({"role": "crystalBody" if i % 2 == 0 else "auroraLow", "target": "lights/glow%s/color" % n})
     for f in L.FORMATIONS:   # the glowing edges, in the low aurora colour
         b.append({"role": "auroraLow", "target": "procedural/edgeA_%s/material/emissiveColor" % f[0]})
+        b.append({"role": "auroraMid", "target": "procedural/stars_%s/material/emissiveColor" % f[0]})
     states = [{"name": n, "colors": {r: roles[r] for r in ROLES}} for n, roles in LOOKS]
     return {"states": states, "bindings": b, "selector": {"select": LOOK, "transition": 6.0, "lock": False}}
 
@@ -462,6 +497,12 @@ def scene_json(placed, scans, bushes=None):
         # the glowing edges: silhouettes and a few ridges (3c). 5e: one mesh per formation, widened to a minimum
         # on-screen width; its glow falls by the same ratio (EDGE_WIDEN from Blender), so a widened line is not brighter
         widen = EDGE_WIDEN.get(f[0], 1.0)
+        # 5f: the speckles (stars) under the visible faces, palette-bound like the old inclusions; dimmed by the
+        # square of their widening, so a distant star is not a brighter blob
+        nodes.append(mesh_node("stars_" + f[0], "%s_stars.glb" % f[0], [pt],
+                               {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraMid"],
+                                "emissiveIntensity": 3.0 / (widen * widen), "roughness": 1.0, "metallic": 0.0},
+                               shadow=False))
         for key, k in (("edgeA", 2.6 / widen),):
             nodes.append(mesh_node("%s_%s" % (key, f[0]), "%s_%s.glb" % (f[0], key), [pt],
                                    {"baseColor": [0, 0, 0], "emissiveColor": R0["auroraLow"], "emissiveIntensity": k,
@@ -469,16 +510,16 @@ def scene_json(placed, scans, bushes=None):
     # the Poly Haven scans (phase 2e): cliffs on the rocky left, outcrops on the right, boulders on both banks
     # 17 (offline): the scans carry their own Poly Haven CC0 PBR textures; the material only tints them into the night
     # (a cool, dark lavender) -- no program, so the scanned albedo, normal and roughness detail reads. Shadows on.
-    tmat = {"baseColor": [0.8, 0.74, 0.86], "roughness": 1.0, "metallic": 0.0}   # 5d: lighter, so the masses read
+    tmat = {"baseColor": [1.1, 1.02, 1.15], "roughness": 1.0, "metallic": 0.0}   # 5f: lighter again: rock must read
     for asset, pts in scans.items():
         nodes.append(mesh_node("scan_" + asset, asset + ".glb", pts, tmat, shadow=True))
     # 5e (the owner: "nix the moss idea go with more of a bushy look"): bush masses on the owner's areas and around
     # every crystal base, shaded by au_bush
     for asset, pts in (bushes or {}).items():
-        if pts:
+        if pts:   # 5f: the plants' own textures, tinted toward the reference's dark green
             nodes.append(mesh_node("bush_" + asset, asset + ".glb", pts,
-                                   {"baseColor": [0.02, 0.05, 0.02], "roughness": 0.9, "metallic": 0.0,
-                                    "program": "au_bush"}, shadow=True))
+                                   {"baseColor": [0.9, 1.15, 0.8], "roughness": 1.0, "metallic": 0.0},
+                                   shadow=True))
     # 5b (spec 8): the circuit pathways on the near banks, emissive in the low aurora colour (palette-bound).
     # 5c: off unless AU_CIRCUITS=1
     if CIRCUITS:
@@ -533,7 +574,8 @@ def scene_json(placed, scans, bushes=None):
             aurora_fx("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 2000.0, 60.0, 3300.0, 2.0,
                       1.6, 70.0, 0.015, 3.2, waveAmplitude=1.1, turbulence=0.4, filaments=2.5, edgeBrightness=3.0,
                       opacity=0.6, layerSpacing=0.45)],
-        "materialPrograms": [prog_ground(), XTAL_P.json(base=-1, emission=5, roughness=6), prog_bush()],
+        "materialPrograms": [prog_ground_textured() if TERRAIN_TEX else prog_ground(),
+                             XTAL_P.json(base=-1, emission=5, roughness=6)],
         "nodes": nodes,
     }
 
@@ -743,7 +785,7 @@ def cover_spots(placed, footprints, sizes=None, seed=2026102325):
     return spots
 
 
-BUSHES = ("bushA", "bushB", "bushC", "bushD")
+BUSHES = ("shrubA", "shrubA", "shrubA", "fernA")   # 5f: Poly Haven shrub_02 masses, fern_02 low clumps
 
 
 def between_spots(placed, seed=2026102328):
@@ -777,59 +819,182 @@ def between_spots(placed, seed=2026102328):
     return bush, rocks
 
 
+SCAN_SIZES = {}
+RIVER_ROCKS = []   # (x, z, radius): foliage keeps clear of them, so the shoreline rocks read
+
+
+def ground_cover(placed=(), footprints=None, step=22, seed=2026102330):
+    """5f (the owner: "the entire ground should be covered in bushy texture ... all ground = bushes, rocky features for
+    the ledges"): a jittered screen grid (every `step` px of the CURRENT camera) raycast onto the engine's ground. Each
+    hit on gentle ground (normal.y >= 0.72) becomes a bush spot sized to its share of the screen at that distance, so
+    the cover is even on screen (dense near, larger far); steep hits become rock-ledge spots. Wet ground is skipped.
+    Returns ([bush spots (x, z, r)], [ledge spots (x, z, nx, nz, r)])."""
+    import random
+    rng = random.Random(seed)
+    grid = [(gx, gy) for gy in range(int(step / 2), 1080, step) for gx in range(int(step / 2), 1920, step)]
+    pix = [(gx + rng.uniform(-0.45, 0.45) * step, gy + rng.uniform(-0.45, 0.45) * step) for gx, gy in grid]
+    hits = L.screen_to_ground(pix, camera=(L.CAMERA_POS, L.CAMERA_TARGET), step=3.0, reach=2400.0)
+    at = {g: h for g, h in zip(grid, hits)}
+    # crystal outlines on screen (current camera), dilated: no ledge rock may stand in one
+    hulls = []
+    for f, pos, q, _g in placed:
+        sc = f[4]
+        pr = [L._project([pos[i] + v[i] for i in range(3)])
+              for v in (L._qrot(q, (sc * a[0], sc * a[1], sc * a[2])) for a in footprints[f[5]])]
+        cx = sum(p[0] for p in pr) / len(pr)
+        cy = sum(p[1] for p in pr) / len(pr)
+        hulls.append((L._hull([(round(cx + (p[0] - cx) * 1.25), round(cy + (p[1] - cy) * 1.25)) for p in pr]),
+                      min(p[2] for p in pr)))
+    flags = []
+    for (gx, gy), h in zip(grid, hits):
+        if h is None:
+            continue
+        # near the skyline: the ground one or two rows up is sky, or much further away (a crest)
+        dh = math.dist(L.CAMERA_POS, h)
+        silhouette = False
+        for k in (1, 2):
+            above = at.get((gx, gy - k * step), "edge")
+            if above is None or (above != "edge" and math.dist(L.CAMERA_POS, above) > 1.3 * dh):
+                silhouette = True
+        # in front of a crystal: inside its outline and not well behind it (rock behind a crystal is wall)
+        in_crystal = any(len(hl) > 2 and L._inside(hl, gx, gy) and dh < hz + 40.0 for hl, hz in hulls)
+        flags.append((silhouette, in_crystal))
+    pts = [h for h in hits if h is not None]
+    e = 2.0
+    nh = L.engine_heights([q for h in pts for q in ((h[0] - e, h[2]), (h[0] + e, h[2]), (h[0], h[2] - e),
+                                                     (h[0], h[2] + e))])
+    tanh = math.tan(math.radians(L.CAMERA_FOV) / 2)
+    bush, ledge = [], []
+    for i, h in enumerate(pts):
+        x, y, z = h
+        lvl = L.water_level(x, z)
+        if lvl is not None and y <= lvl + 0.4:
+            continue
+        hx0, hx1, hz0, hz1 = nh[i * 4:i * 4 + 4]
+        nx, ny, nz = -(hx1 - hx0), 2 * e, -(hz1 - hz0)
+        nl = math.sqrt(nx * nx + ny * ny + nz * nz)
+        nx, ny, nz = nx / nl, ny / nl, nz / nl
+        d = math.dist(L.CAMERA_POS, h)
+        r = 1.5 * step * 2.0 * d * tanh / 1080.0   # (overlapping: ~3 spots' width each)
+        silhouette, in_crystal = flags[i]
+        if ny >= 0.72:
+            # (5f, the owner: "try to prevent it from mistakenly adding stuff like this": no foliage on the skyline
+            # or the wall tops -- a plant there reads as twigs against the sky)
+            if not silhouette and y < 55.0:
+                bush.append((x, z, r))
+            elif not silhouette and not in_crystal:   # gentle wall tops (above the bush line) are rock too
+                ledge.append((x, z, nx, nz, r))
+        elif not silhouette and not in_crystal:   # rock on the ledges: never on the skyline, never over a crystal
+            ledge.append((x, z, nx, nz, r))
+    print("ground cover: %d bush spots, %d ledge spots" % (len(bush), len(ledge)))
+    return bush, ledge
+
+
+def river_rocks(seed=2026102332, groups=16):
+    """5f (the owner: "try to add an assortment of smaller rocks along the sides of the river bed in aesthetically
+    pleasing areas too"): groups of 4-9 rocks (boulders, stones, mossy rocks, 1-6 m) on the INSIDE of the river's bends
+    -- the points and curves -- strung along the waterline, some in the shallows and some on the bank, with open
+    stretches between the groups. The waterline is found on the engine's heights along the bend's normal."""
+    import random
+    rng = random.Random(seed)
+    c = [p for p in L._CENTRE if -650.0 < p[2] < 40.0]
+    bends = []
+    for i in range(2, len(c) - 2):
+        a, b, d = c[i - 2], c[i], c[i + 2]
+        t1 = (b[0] - a[0], b[2] - a[2]); t2 = (d[0] - b[0], d[2] - b[2])
+        cross = t1[0] * t2[1] - t1[1] * t2[0]
+        bends.append((abs(cross) / (math.hypot(*t1) * math.hypot(*t2) + 1e-6), i, cross))
+    bends.sort(reverse=True)
+    picks = []
+    for k, i, cross in bends:
+        if all(abs(c[i][2] - c[j][2]) > 45.0 for j, _ in picks):
+            picks.append((i, cross))
+        if len(picks) >= groups:
+            break
+    probes, meta = [], []
+    for i, cross in picks:
+        p, q = c[i], c[min(i + 1, len(c) - 1)]
+        tx, tz = q[0] - p[0], q[2] - p[2]
+        n = math.hypot(tx, tz) or 1.0
+        tx, tz = tx / n, tz / n
+        side = 1.0 if cross > 0 else -1.0                  # the inside of the bend
+        nx, nz = -tz * side, tx * side
+        meta.append((p, tx, tz, nx, nz))
+        probes += [(p[0] + nx * d, p[2] + nz * d) for d in range(4, 120, 2)]
+    width = lambda z: 100.0 if z > -105.0 else (58.0 if z > -900.0 else 44.0)
+    hs = L.engine_heights(probes)
+    out = []
+    for g, (p, tx, tz, nx, nz) in enumerate(meta):
+        lvl = L.water_level(p[0], p[2]) or p[1]
+        row = hs[g * 58:(g + 1) * 58]
+        # the waterline: the first dry ground past ~40% of the reach's width (the raised water leaves a shallow bed
+        # inside the channel that a plain first-dry search mistakes for the bank)
+        start = 0.4 * width(p[2])
+        edge = next((4 + 2 * j for j, h in enumerate(row) if 4 + 2 * j >= start and h > lvl + 0.5), None)
+        if edge is None:
+            continue
+        sx, sy, sz = L._project((p[0] + nx * edge, lvl, p[2] + nz * edge))
+        if sz <= 1 or not (0 < sx < 1920 and 0 < sy < 1080):
+            continue
+        for _ in range(rng.randrange(4, 10)):
+            along = rng.gauss(0.0, 9.0)
+            across = edge + rng.uniform(-7.0, 3.0)             # in the shallows to the bank's foot
+            a = rng.choice(["boulder", "boulder", "stone", "rock", "mossrock2"])
+            size = rng.choice([4.0, 5.5, 7.0, 8.5, 10.0, 12.0, 15.0])   # (the owner: larger, so the groups read)
+            sc = size / max(SCAN_SIZES[a][0], SCAN_SIZES[a][2])
+            out.append((a, p[0] + tx * along + nx * across, p[2] + tz * along + nz * across, rng.uniform(0, 360), sc,
+                        0.3))
+    print("river rocks: %d in %d groups" % (len(out), len(meta)))
+    return out
+
+
+def ledge_rocks(ledge, seed=2026102331):
+    """5f: rock on the steep ledges -- a rock-face or cliff scan per ledge spot, sized to the spot, turned to face down
+    the slope (its normal's horizontal direction), seated into it."""
+    import random
+    rng = random.Random(seed)
+    out = []
+    for x, z, nx, nz, r in ledge:
+        a = rng.choice(["cliffC", "cliffB", "mossrock2", "mossrock", "mossrock2"])   # rock and mossy rock
+        sc = 4.5 * r / max(SCAN_SIZES[a][0], SCAN_SIZES[a][2])
+        yaw = math.degrees(math.atan2(nx, nz)) + rng.uniform(-20, 20)
+        out.append((a, x, z, yaw, sc, 0.25))
+    return out
+
+
 def bush_points(spots, seed=2026102327):
-    """5e: bush masses (unit-radius Blender meshes, bushA-D) at the cover spots -- one to three per spot, overlapping
-    into rounded masses, varied in size, squash and turn, seated a little into the ground; none on wet ground."""
+    """Bush masses at the cover spots -- one to three per spot, overlapping into masses, varied in size, squash and turn,
+    seated a little into the ground; none on wet ground. 5f: Poly Haven shrub_02 (and fern_02 low clumps), CC0."""
     import random
     rng = random.Random(seed)
     cand = []
     for x, z, r in spots:
-        for _ in range(rng.choice([1, 2, 2, 3])):
+        for _ in range(2 if r > 9.0 else rng.choice([2, 2, 3])):
             a = rng.uniform(0, math.tau)
             d = rng.uniform(0, r * 0.6)
-            cand.append((x + d * math.cos(a), z + d * math.sin(a), r * rng.uniform(0.35, 0.65)))
+            cand.append((x + d * math.cos(a), z + d * math.sin(a), r * rng.uniform(0.55, 0.9)))
     hs = L.engine_heights([(x, z) for x, z, _r in cand])
-    pts = {k: [] for k in BUSHES}
-    for (x, z, sc), h in zip(cand, hs):
+    pts = {k: [] for k in set(BUSHES) | {"shrubFar"}}
+    for (x, z, r), h in zip(cand, hs):
         lvl = L.water_level(x, z)
         if lvl is not None and h <= lvl + 0.4:
             continue
+        if any(math.hypot(x - rx, z - rz) < rad + 0.7 * r + 3.0 for rx, rz, rad in RIVER_ROCKS):
+            continue
         q = L.quat_y(rng.uniform(0, 360))
-        sy = sc * rng.uniform(0.6, 0.9)
-        pts[rng.choice(BUSHES)].append([round(x, 3), round(h - 0.2 * sy, 3), round(z, 3)] + [round(c, 6) for c in q] +
-                                        [round(sc, 3), round(sy, 3), round(sc * rng.uniform(0.85, 1.15), 3)])
+        k = rng.choice(BUSHES)
+        if k == "shrubA" and math.dist(L.CAMERA_POS, (x, h, z)) > 250.0:
+            k = "shrubFar"
+        w = max(SCAN_SIZES[k][0], SCAN_SIZES[k][2])
+        sc = 2.0 * r / w * (1.6 if k == "fernA" else 1.0)
+        sy = sc * rng.uniform(0.9, 1.25)
+        pts[k].append([round(x, 3), round(h - 0.08 * SCAN_SIZES[k][1] * sy, 3), round(z, 3)] +
+                      [round(c, 6) for c in q] + [round(sc, 3), round(sy, 3), round(sc * rng.uniform(0.85, 1.15), 3)])
     print("bushes: %d" % sum(len(v) for v in pts.values()))
     return pts
 
 
-def prog_bush():
-    """5e: dense dark-green foliage. A per-instance shade (instanceRandom) and a leafy clump noise vary the green;
-    the tops are lighter; a soft rim of the low aurora colour on the up-facing foliage (palette: BUSH_RIM)."""
-    return {"name": "au_bush", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 6,
-            "emissionIntensity": 1.0, "opacity": -1, "ops": [
-                {"kind": "input", "dst": 0, "input": "worldPosition"},
-                {"kind": "noise", "dst": 1, "srcA": 0, "value": 0.9, "seed": 31},            # leaf clumps
-                {"kind": "input", "dst": 2, "input": "instanceRandom"},
-                {"kind": "mix", "dst": 2, "srcA": 1, "srcB": 2, "value": 0.45},
-                {"kind": "oklabRamp", "dst": 3, "srcA": 2, "constant": [0.004, 0.016, 0.006, 1],
-                 "constant2": [0.010, 0.040, 0.012, 1], "constant3": [0.020, 0.070, 0.018, 1],
-                 "constant4": [0.040, 0.095, 0.022, 1]},                                     # dark to bright green
-                {"kind": "input", "dst": 4, "input": "normal"},
-                {"kind": "gradient", "dst": 5, "srcA": 4, "constant": [0, 1, 0, 0.45], "value": 0.55},
-                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},                         # lighter tops
-                {"kind": "add", "dst": 3, "srcA": 3, "srcB": 3},
-                {"kind": "gradient", "dst": 5, "srcA": 4, "constant": [0, 1, 0, 0], "value": 1.0},
-                {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.75, 1.0, 0, 0]},
-                {"kind": "constant", "dst": 6, "constant": [c * BUSH_RIM for c in R0["auroraLow"]] + [1]},
-                {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 5},
-                {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 1}]}
-
-
-BUSH_RIM = 0.02          # the aurora's rim on the bushes' tops (emission, x the low aurora colour)
-BUSH_RIM_OP = 12         # 1-based op index of that colour constant in au_bush (palette target)
-
-
-def place_scans(sizes, placed=(), footprints=None, extra=()):
+def place_scans(sizes, placed=(), footprints=None, extra=(), seated_extra=()):
     """Points for each scan asset: the cliffs, then a sparse, seeded scatter on both banks, denser on the rocky left.
     Everything stands on the engine's ground, and nothing goes on wet ground."""
     import random
@@ -869,35 +1034,114 @@ def place_scans(sizes, placed=(), footprints=None, extra=()):
     # a cliff sits on the ground at its centre (it stands proud of the slope; from the lowest corner the uphill side
     # swallowed it); everything else from the lowest corner, so nothing floats
     hs = [ph[i * 5] if items[i][0].startswith("cliff") else min(ph[i * 5:i * 5 + 5]) for i in range(len(items))]
-    # 5e audit (the owner: "make sure it's all representative of actual land scapes"): a cliff must be SUPPORTED --
-    # its base buried at its lowest corner (no floating lip), and its top tucked into the slope uphill of it (a scan
-    # standing proud of the wall shows its ragged, open-backed edges against the ridge). Sink it until both hold, at
-    # most 65% of its height; a cliff that still stands proud is dropped.
-    up = []
-    for asset, x, z, yaw, sc, _sink in items:
+    # 5e/5f support audit (the owner: "make sure it's all representative of actual land scapes" -- and, 5f, "why did
+    # you remove some from the left hand side?"): a cliff must be SUPPORTED -- its base buried at its lowest corner and
+    # its top tucked into the slope uphill of it. A cliff that stands proud is not dropped but RESEATED: moved up into
+    # the wall (outward from the river, 0-90 m) and, if needed, made smaller (x1, 0.8, 0.6), taking the first variant
+    # that is supported with at most 80% of its height buried. Only one with no supported variant is dropped (listed).
+    VAR = [(dx, f) for f in (1.0, 0.8, 0.6) for dx in (0.0, 25.0, 50.0, 80.0, 115.0, 150.0)]
+    cl = [i for i, it in enumerate(items) if it[0].startswith("cliff")]
+    probe = []
+    for i in cl:
+        asset, x, z, yaw, sc, _sink = items[i]
         side = 1.0 if x > L.river_x(z) else -1.0
-        back = 0.5 * max(sizes[asset][0], sizes[asset][2]) * sc + 12.0
-        up.append((x + side * back, z))
-    uh = L.engine_heights(up)
-    keep, hs2, dropped = [], [], 0
-    for it, h, i in zip(items, hs, range(len(items))):
-        asset, x, z, yaw, sc, sink = it
-        if not asset.startswith("cliff"):
+        for dx, f in VAR:
+            xx, s2 = x + side * dx, sc * f
+            w, _h, d = (c * s2 * 0.45 for c in sizes[asset])
+            c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+            back = 0.5 * max(sizes[asset][0], sizes[asset][2]) * s2 + 12.0
+            probe += [(xx, z)] + [(xx + c * u + s_ * v, z - s_ * u + c * v) for u, v in ((w, d), (-w, d), (w, -d),
+                                                                                       (-w, -d))] + [(xx + side * back, z)]
+    ph2 = L.engine_heights(probe)
+    k = 0
+    seated, dropped = {}, []
+    for i in cl:
+        asset, x, z, yaw, sc, sink = items[i]
+        side = 1.0 if x > L.river_x(z) else -1.0
+        best = None
+        for dx, f in VAR:
+            hc, corners, up_h = ph2[k], ph2[k + 1:k + 5], ph2[k + 5]
+            k += 6
+            if best is not None:
+                continue
+            height = sizes[asset][1] * sc * f
+            base = min(hc - sink * height, min(corners) - 0.3)
+            if base + height > up_h + 0.25 * height:
+                base = up_h + 0.25 * height - height
+            if base >= hc - 0.8 * height:
+                best = (asset, x + side * dx, z, yaw, sc * f, (hc - base) / height, hc)
+        if best is None:
+            dropped.append("%s at (%.0f, %.0f)" % (asset, x, z))
+        else:
+            seated[i] = best
+    # 5f: a seated cliff must also be BACKED by land, not sky -- the ray from the camera through its top must meet
+    # the ground behind it (within 600 m); a cliff whose top is a skyline is sunk 30% more or, failing that, dropped
+    rays = []
+    for i, (asset, x, z, yaw, sc, sink, hc) in seated.items():
+        height = sizes[asset][1] * sc
+        top = (x, hc - sink * height + height, z)
+        d = math.dist(L.CAMERA_POS, top)
+        rays.append([(L.CAMERA_POS[0] + (top[0] - L.CAMERA_POS[0]) * t, L.CAMERA_POS[2] + (top[2] - L.CAMERA_POS[2]) * t,
+                      L.CAMERA_POS[1] + (top[1] - L.CAMERA_POS[1]) * t)
+                     for t in (1.0 + 600.0 / d * k / 20 for k in range(1, 21))])
+    rh = L.engine_heights([(rx, rz) for r in rays for rx, rz, _y in r])
+    for j, i in enumerate(list(seated)):
+        backed = any(rh[j * 20 + k] >= rays[j][k][2] for k in range(20))
+        if not backed:
+            asset, x, z, yaw, sc, sink, hc = seated[i]
+            if sink + 0.3 <= 0.85:
+                seated[i] = (asset, x, z, yaw, sc, sink + 0.3, hc)
+            else:
+                dropped.append("%s at (%.0f, %.0f) [skyline]" % (asset, x, z))
+                del seated[i]
+    print("cliffs reseated: %d, dropped: %d %s" % (len(seated), len(dropped), dropped))
+    keep, hs2 = [], []
+    for i, (it, h) in enumerate(zip(items, hs)):
+        if not it[0].startswith("cliff"):
             keep.append(it)
             hs2.append(h)
-            continue
+        elif i in seated:
+            keep.append(seated[i][:6])
+            hs2.append(seated[i][6])
+    items, hs = keep, hs2
+    # 5f: ledge rocks and river-edge rocks lie on their ground -- seated from the lowest of five probes, no wall audit
+    if seated_extra:
+        pr = []
+        for asset, x, z, yaw, sc, _sink in seated_extra:
+            w, _h, d = (c * sc * 0.45 for c in sizes[asset])
+            c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+            pr += [(x, z)] + [(x + c * u + s_ * v, z - s_ * u + c * v) for u, v in ((w, d), (-w, d), (w, -d), (-w, -d))]
+        eh = L.engine_heights(pr)
+        items += list(seated_extra)
+        # a rock on a steep ledge sits at its centre's height (from the lowest corner the uphill side swallowed it);
+        # a rock on gentle ground or at the waterline from its lowest corner
+        for i, it in enumerate(seated_extra):
+            g = eh[i * 5:i * 5 + 5]
+            hs.append(g[0] - 0.15 * (max(g) - min(g)) if max(g) - min(g) > 0.4 * sizes[it[0]][1] * it[4] else min(g))
+    # 5f: every piece -- not only the wall cliffs -- must be backed by land: the ray from the camera through its top
+    # meets the ground behind it within 600 m. A piece whose top is a skyline is sunk to put its top 30% lower, or
+    # dropped if that would bury more than 85% of it.
+    rays = []
+    for (asset, x, z, yaw, sc, sink), h in zip(items, hs):
         height = sizes[asset][1] * sc
-        lowest = min(ph[i * 5:i * 5 + 5])
-        base = min(h - sink * height, lowest - 0.3)              # buried at the lowest corner
-        top_max = uh[i] + 0.1 * height                           # tucked into the slope behind
-        if base + height > top_max:
-            base = top_max - height
-        if base < h - 0.65 * height:
-            dropped += 1
-            continue
-        keep.append((asset, x, z, yaw, sc, (h - base) / height))
-        hs2.append(h)
-    print("cliffs dropped by the support audit: %d" % dropped)
+        top = (x, h - sink * height + height, z)
+        d = max(math.dist(L.CAMERA_POS, top), 1.0)
+        rays.append([(L.CAMERA_POS[0] + (top[0] - L.CAMERA_POS[0]) * t, L.CAMERA_POS[2] + (top[2] - L.CAMERA_POS[2]) * t,
+                      L.CAMERA_POS[1] + (top[1] - L.CAMERA_POS[1]) * t)
+                     for t in (1.0 + 600.0 / d * k / 16 for k in range(1, 17))])
+    rh = L.engine_heights([(rx, rz) for r in rays for rx, rz, _y in r])
+    keep, hs2, sky = [], [], 0
+    for j, (it, h) in enumerate(zip(items, hs)):
+        if any(rh[j * 16 + k] >= rays[j][k][2] for k in range(16)):
+            keep.append(it)
+            hs2.append(h)
+        elif it[5] + 0.3 <= 0.85:
+            keep.append(it[:5] + (it[5] + 0.3,))
+            hs2.append(h)
+            sky += 1
+        else:
+            sky += 1
+    print("skyline test: %d pieces sunk or dropped" % sky)
     items, hs = keep, hs2
     pts = {}
     for (asset, x, z, yaw, sc, sink), h in zip(items, hs):
@@ -932,14 +1176,24 @@ def main():
     print("terrain (hidden % / buried %): " + " ".join("%s %.0f/%.0f" % r for r in sweep))
     os.makedirs(a.scene_dir, exist_ok=True)
     EDGE_WIDEN.update(json.load(open(os.path.join(a.assets, "edges.json"))))
+    SCAN_SIZES.update(json.load(open(os.path.join(a.assets, "scans.json"))))
     fill_bush, fill_rocks = between_spots(placed)
-    bushes = bush_points(cover_spots(placed, json.load(open(os.path.join(a.assets, "footprints.json")))) + fill_bush)
+    cover_bush, ledge = ground_cover(placed, json.load(open(os.path.join(a.assets, "footprints.json"))))
+    rr = river_rocks()
+    seated = ledge_rocks(ledge) + rr
+    RIVER_ROCKS[:] = [(x, z, 0.5 * max(SCAN_SIZES[a][0], SCAN_SIZES[a][2]) * sc) for a, x, z, _y, sc, _s in rr]
+    bushes = bush_points(cover_spots(placed, json.load(open(os.path.join(a.assets, "footprints.json")))) + fill_bush +
+                         cover_bush)
     sc = scene_json(placed, place_scans(json.load(open(os.path.join(a.assets, "scans.json"))), placed,
-                                       json.load(open(os.path.join(a.assets, "footprints.json"))), fill_rocks), bushes)
+                                       json.load(open(os.path.join(a.assets, "footprints.json"))), fill_rocks,
+                                       seated), bushes)
     for n in sc["nodes"]:
         src = n.get("procedural", {}).get("source", {})
         if src.get("kind") == "mesh":
             shutil.copy(os.path.join(a.assets, src["asset"]), os.path.join(a.scene_dir, src["asset"]))
+    if TERRAIN_TEX:   # the textures beside the scene (ADR-1642 resolves program texture paths there)
+        for _n, pth, _cs in TERRAIN_TEXTURES:
+            shutil.copy(os.path.join(TEX_DIR, pth), os.path.join(a.scene_dir, os.path.basename(pth)))
     path = os.path.join(a.scene_dir, "aurora-valley.scene.json")
     json.dump(sc, open(path, "w"), indent=1)
     rel = os.path.relpath(path, a.project_dir)

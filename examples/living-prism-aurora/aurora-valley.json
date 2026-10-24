@@ -239,11 +239,6 @@
     "gain": 0.15
    },
    {
-    "role": "auroraLow",
-    "target": "material/au_bush/op/12/constant/constant",
-    "gain": 0.02
-   },
-   {
     "role": "crystalBody",
     "target": "lights/glowL1/color"
    },
@@ -280,52 +275,104 @@
     "target": "procedural/edgeA_L1/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_L1/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_L1b/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/stars_L1b/material/emissiveColor"
    },
    {
     "role": "auroraLow",
     "target": "procedural/edgeA_L2/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_L2/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_L3/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/stars_L3/material/emissiveColor"
    },
    {
     "role": "auroraLow",
     "target": "procedural/edgeA_L4/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_L4/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_L5/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/stars_L5/material/emissiveColor"
    },
    {
     "role": "auroraLow",
     "target": "procedural/edgeA_L6/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_L6/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_R1/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/stars_R1/material/emissiveColor"
    },
    {
     "role": "auroraLow",
     "target": "procedural/edgeA_R2/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_R2/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_R3/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/stars_R3/material/emissiveColor"
    },
    {
     "role": "auroraLow",
     "target": "procedural/edgeA_R4/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_R4/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_R5/material/emissiveColor"
    },
    {
+    "role": "auroraMid",
+    "target": "procedural/stars_R5/material/emissiveColor"
+   },
+   {
     "role": "auroraLow",
     "target": "procedural/edgeA_R6/material/emissiveColor"
+   },
+   {
+    "role": "auroraMid",
+    "target": "procedural/stars_R6/material/emissiveColor"
    }
   ],
   "selector": {

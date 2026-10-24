@@ -187,8 +187,48 @@ def edges_for_formations(out, min_px=1.6, rr0=0.11):
         EDGE_WIDEN[name] = round(rr / rr0, 3)
         bm, seed = FAMILY_BM[fam]
         build_edges(bm, name, out, random.Random(seed + 1000), rr=rr)
+        build_stars(bm, name, out, random.Random(seed + 2000), size=max(0.07, 0.5 * 1.6 * px / s))
     with open(os.path.join(out, "edges.json"), "w") as fh:
         json.dump(EDGE_WIDEN, fh)
+
+
+def build_stars(bm, name, out, rng, size, per_m2=0.35):
+    """5f (the owner: "we loose all the speckles inside the crystals thats not acceptable"): the speckles as geometry --
+    small octahedra just under the faces the camera sees, never under ~1.6 px (`size` comes from the formation's
+    distance), so they read as stars without the stair-stepping of the old hashed cells. <name>_stars.glb."""
+    view = family_view(name)
+    tb = bmesh.new()
+    n = 0
+    for f in bm.faces:
+        if view is not None and f.normal.dot(view) < 0.05:
+            continue
+        k = f.calc_area() * per_m2
+        cnt = int(k) + (1 if rng.random() < k - int(k) else 0)
+        vs = [v.co for v in f.verts]
+        for _ in range(cnt):
+            w = [rng.random() for _ in vs]
+            t = sum(w)
+            pnt = sum((v * (wi / t) for v, wi in zip(vs, w)), Vector((0, 0, 0))) - f.normal * size * 0.6
+            r = size * rng.uniform(0.6, 1.3)
+            pts = [tb.verts.new(pnt + Vector(d) * r) for d in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0),
+                                                                 (0, 0, 1), (0, 0, -1))]
+            for a_, b_, c_ in ((0, 2, 4), (2, 1, 4), (1, 3, 4), (3, 0, 4), (2, 0, 5), (1, 2, 5), (3, 1, 5), (0, 3, 5)):
+                tb.faces.new((pts[a_], pts[b_], pts[c_]))
+            n += 1
+    me = bpy.data.meshes.new(name + "_stars")
+    tb.to_mesh(me)
+    tb.free()
+    ob = bpy.data.objects.new(name + "_stars", me)
+    bpy.context.scene.collection.objects.link(ob)
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + "_stars.glb"), export_format="GLB",
+                              use_selection=True, export_yup=True, export_apply=True, export_normals=True,
+                              export_materials="NONE")
+    ob.hide_render = True
+    print("EXPORTED", name + "_stars", n, "stars")
 
 
 def build_edges(bm, name, out, rng, rr=0.11, sharp=18.0, ridges=0.15):
@@ -317,53 +357,14 @@ SCANS = {  # out name: (library path, target faces)
     "rock": ("terrain/rocks/rock_07/rock_07_1k.gltf", 700),
     "mossrock": ("terrain/rocks/rock_moss_set_01/rock_moss_set_01_1k.gltf", 1400),
     "mossrock2": ("terrain/rocks/rock_moss_set_02/rock_moss_set_02_1k.gltf", 1400),   # 5e: moss-covered rock
+    # 5f (the owner: "the bushes do not look good please use a more realistic texture"): Poly Haven CC0 plants with
+    # modelled leaves and their own textures (not decimated: the leaves are the detail)
+    "shrubA": ("nature/plants/shrub_02/shrub_02_1k.gltf", 100000),
+    "fernA": ("nature/plants/fern_02/fern_02_1k.gltf", 100000),
+    "shrubFar": ("nature/plants/shrub_02/shrub_02_1k.gltf", 5000),   # 5f: the same shrub, lighter, past ~250 m
     "stone": ("terrain/rocks/stone_01/stone_01_1k.gltf", 500),
 }
 SCAN_SIZES = {}
-
-# ---- 5e (the owner: "go with more of a bushy look (more like the reference art)"): bush masses -------------------
-# The library's Poly Haven shrubs (assets/nature/plants/shrub_01..04) are 0.5-2.5 m alpha-dithered leaf cards: sub-pixel
-# or shimmering at this camera's 150-500 m. The reference's bushes read as dense rounded foliage masses, so these are
-# built: a cluster of noise-displaced lobes, lumpy like foliage, flattened at the base. Unit radius, geometry only
-# (the scene shades them with au_bush).
-BUSHES = ("bushA", "bushB", "bushC", "bushD")
-
-
-def build_bush(name, out, seed):
-    from mathutils import noise
-    rng = random.Random(seed)
-    bm = bmesh.new()
-    lobes = rng.randrange(6, 11)
-    for k in range(lobes):
-        a = rng.uniform(0, math.tau)
-        d = rng.uniform(0.0, 0.55) if k else 0.0
-        r = rng.uniform(0.38, 0.62) if k else 0.6
-        c = Vector((d * math.cos(a), d * math.sin(a), rng.uniform(0.2, 0.5)))
-        res = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=r)
-        off = Vector((rng.uniform(0, 50), rng.uniform(0, 50), rng.uniform(0, 50)))
-        for v in res["verts"]:
-            n = v.co.normalized()
-            disp = 0.16 * noise.noise(v.co * 3.2 + off) + 0.07 * noise.noise(v.co * 8.0 + off)
-            v.co = c + v.co + n * disp * r
-            if v.co.z < 0.0:
-                v.co.z *= 0.25          # a flattened base, seated on the ground
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    for p in me.polygons:
-        p.use_smooth = True
-    ob = bpy.data.objects.new(name, me)
-    bpy.context.scene.collection.objects.link(ob)
-    for o in bpy.context.selected_objects:
-        o.select_set(False)
-    ob.select_set(True)
-    bpy.context.view_layer.objects.active = ob
-    bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=True,
-                              export_yup=True, export_apply=True, export_normals=True, export_materials="NONE")
-    ob.hide_render = True
-    print("EXPORTED", name, len(me.polygons), "faces")
-
 
 def build_scan(name, out):
     rel, faces = SCANS[name]
@@ -460,6 +461,11 @@ def build_ridges(out):
             z = -dist - 0.18 * dist * (2 * u - 1) ** 2          # the ends curve toward the camera, framing
             centre = math.exp(-(((x - dipx) / (half * 0.28)) ** 2))   # the V, off-centre
             y = peak * (0.12 + 0.88 * v ** 1.6) * (1.0 - dip * centre) * (1.0 - lift * x / half)
+            # 5f (the owner: "roll them off where the red line suggests ... get rid of the highlighted portion thats
+            # jutting out"): right of the river every far ridge descends from ~45% of the half-view at its distance
+            # to near nothing at the frame's right edge -- a diagonal roll-off, no peaks behind the right hero
+            ro = min(max((x / dist - 0.42) / (0.88 - 0.42), 0.0), 1.0)
+            y *= 1.0 - 0.88 * ro * ro * (3.0 - 2.0 * ro)
             front.append(bm.verts.new(av2bl((x, y, z))))
             back.append(bm.verts.new(av2bl((x, y * 0.95, z - 120.0))))
             base_f.append(bm.verts.new(av2bl((x, -80.0, z))))
@@ -566,8 +572,6 @@ def main():
     edges_for_formations(out)
     for n in SCANS:
         build_scan(n, out).hide_render = True
-    for k, n in enumerate(BUSHES):
-        build_bush(n, out, 7300 + k)
     with open(os.path.join(out, "scans.json"), "w") as f:
         json.dump(SCAN_SIZES, f)
     build_ridges(out)
