@@ -947,6 +947,8 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
                     water.reflectTint.rgb;
     }
     reflected = reflected * water.reflectTint.w;
+    // ---- cinematic (ADR-1286) begin ----
+    // (ADR-1650: inside the cinematic markers too, because it reads the cinematic frame copy and its uniforms.)
     // ---- sky mirror (ADR-1650) begin ----
     // The sky the frame itself drew, in the water. The screen-space march below cannot find the sky (its depth is
     // 1e7, so no step ever lands behind it), and the environment cube has no aurora, comet or anything else the sky
@@ -977,6 +979,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         }
     }
     // ---- sky mirror (ADR-1650) end ----
+    // ---- cinematic (ADR-1286) end ----
 
     // ---- the moon's own glint -----------------------------------------------------------------
     // Directional lights only, with the shared shadow lookup, so a reach of river under a hill goes
