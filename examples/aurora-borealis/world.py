@@ -57,26 +57,19 @@ def periodic_noise(th, cycles, seed, octaves=3):
 # ---- the valley's profile across its band -------------------------------------------------------------------------
 def valley_height(th, o, side):
     """Height (m) at `o` metres from the water's edge (negative: under the water), on `side` (+1 outer, -1 inner).
-    A low dark rock ledge at the water, a strip of flat ground, then the valley wall rising to its ridgeline. Every
-    dimension varies along the loop (slow periodic noise), and differently on the two sides, so neither repeats."""
+    The valley's own walls: a rock lip at the water and then the slope, rising at once (no flat strip of shore) to a
+    first ridgeline 60-140 m up. The layered ridges in depth are the spurs below and the outer ranges."""
     s = 0 if side > 0 else 1
     if o < 0.0:
-        return max(-6.0, o * 0.45)
-    bank_h = 2.0 + 5.0 * periodic_noise(th, 13, 3 + s)
-    bank_w = 12.0 + 20.0 * periodic_noise(th, 9, 5 + s)
-    foot = bank_w + 15.0 + 100.0 * periodic_noise(th, 6, 7 + s)          # where the wall starts
-    wall_h = 90.0 + 140.0 * periodic_noise(th, 5, 9 + s)
-    run = 220.0 + 300.0 * periodic_noise(th, 4, 13 + s)
-    h = bank_h * mx.smooth(0.0, bank_w, o) ** 0.6
-    h += wall_h * mx.smooth(foot, foot + run, o) ** 1.25
-    return h
+        return max(-6.0, o * 0.6)
+    lip = 1.5 + 2.5 * periodic_noise(th, 13, 3 + s)
+    wall_h = 35.0 + 55.0 * periodic_noise(th, 5, 9 + s)
+    run = 200.0 + 200.0 * periodic_noise(th, 4, 13 + s)
+    return lip * mx.smooth(0.0, 6.0, o) + wall_h * mx.smooth(0.0, run, o) ** 0.85
 
 
 def wall_weight(th, o, side):
-    s = 0 if side > 0 else 1
-    bank_w = 12.0 + 20.0 * periodic_noise(th, 9, 5 + s)
-    foot = bank_w + 15.0 + 100.0 * periodic_noise(th, 6, 7 + s)
-    return mx.smooth(foot - 40.0, foot + 220.0, o)
+    return mx.smooth(0.0, 120.0, o)
 
 
 # ---- the hero peaks: (theta deg, side, metres from the water's edge, height, radius, elongation, ridge azimuth deg
@@ -107,18 +100,42 @@ def _peak_frames():
         t = (math.cos(th), -math.sin(th))
         a = math.radians(az)
         u = (t[0] * math.cos(a) - t[1] * math.sin(a), t[0] * math.sin(a) + t[1] * math.cos(a))
-        out.append((cx, cz, u, h, rad, elong, seed))
+        out.append((cx, cz, u, h, rad, elong, seed, side))
     return out
 
 
+# ---- the spurs: ridges running down from the valley walls toward the river, every few degrees round the loop,
+# alternating banks with jittered size and set-back. Looking down the river they overlap as they recede -- near, middle
+# and far ridges stacked in depth -- which is the layered "river in a valley" read (the Living Prism aurora valley's
+# composition, in this scene's faceted language). Each is a long low pyramid whose ridge points at the water.
+def _spurs(count=64):
+    out = []
+    for i in range(count):
+        side = 1 if i % 2 == 0 else -1
+        jit = mx._hash(i, 3, 91)
+        deg = (i + 0.35 * (jit - 0.5)) * 360.0 / count
+        off = 260.0 + 520.0 * mx._hash(i, 5, 93)            # set back from the water's edge (m): near to far
+        # summit height grows with the set-back, so from the river each rises about 8-12 degrees and the farther
+        # ones show over the nearer: layers in depth, never a wall over the camera
+        h = 30.0 + off * (0.13 + 0.07 * mx._hash(i, 7, 95))
+        rad = 120.0 + 0.25 * off
+        elong = 1.8 + 1.0 * mx._hash(i, 11, 99)
+        az = 90.0 + 30.0 * (mx._hash(i, 13, 101) - 0.5)     # across the river: the ridge points at the water
+        out.append((deg, side, off, h, rad, elong, az, 100 + i))
+    return out
+
+
+PEAKS = PEAKS + _spurs()
 PEAK_FRAMES = _peak_frames()
 
 
-def peak_height(x, z):
+def peak_height(x, z, side=0):
     """The hero peaks at (x, z): elongated, part-pyramidal cones (an L-infinity norm mixed into the round one gives
     them a few large planar faces), the summit pushed along the ridge, the crest broken by a little ridged noise."""
     best = -1e9
-    for cx, cz, u, h, rad, elong, seed in PEAK_FRAMES:
+    for cx, cz, u, h, rad, elong, seed, pside in PEAK_FRAMES:
+        if side and pside != side:
+            continue
         dx, dz = x - cx, z - cz
         if abs(dx) > rad * elong * 1.2 + 20 or abs(dz) > rad * elong * 1.2 + 20:
             continue
@@ -146,8 +163,9 @@ def detail(x, z, th, o, side):
 
 def land_height(x, z, th, o, side):
     h = valley_height(th, o, side) + detail(x, z, th, o, side)
-    if o > 10.0:
-        h = max(h, peak_height(x, z))
+    if o > 4.0:
+        # a peak or spur rises only on its own bank, and its foot meets the water as the wall does
+        h = max(h, peak_height(x, z, side) * mx.smooth(4.0, 90.0, o) ** 0.7)
     return h
 
 

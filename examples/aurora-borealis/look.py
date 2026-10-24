@@ -20,13 +20,14 @@ sys.path.insert(0, os.path.join(REPO, "tools"))
 from sonic_vfx.kit import hexrgb  # noqa: E402
 
 # ---- the fixed colours (sRGB hex; the engine takes linear) ----------------------------------------------------------
-ZENITH = "#000004"          # deep indigo, nearly black
-HORIZON = "#1d1640"         # the dusk band: muted violet
+ZENITH = "#04061c"          # deep indigo, nearly black
+HORIZON = "#2a2466"         # the dusk band: muted violet
 SKY_GROUND = "#05040f"
-SHADOW = "#030210"          # facets facing away from the sky
+SHADOW = "#02020c"          # facets facing away from the sky
 SKYLIT = "#0c0a2a"          # facets facing up: blue-violet
-CREST = "#6a62ae"           # the pale lavender on high, sky-facing facets (a hint of snow light, never white)
-HAZE = "#4a3f8e"            # distance haze: the horizon's colour, a little darker
+CREST = "#6a62ae"
+RIM = "#8a70ff"              # the glass rim: facets turned edge-on to the eye catch the aurora's colour           # the pale lavender on high, sky-facing facets (a hint of snow light, never white)
+HAZE = "#3e3a8c"            # distance haze: the horizon's colour, a little darker
 WATER_DEEP = "#03030c"
 
 # where the aurora light comes from: up, and toward the side of the sky the ribbons favour (world -z, +x)
@@ -42,7 +43,7 @@ LOOKS = [
                      "facetLit": "#a070f0", "waterGlow": "#6a40c0"}),
     ("Electric", {"auroraLow": "#ff6ad0", "auroraMid": "#3f7cff", "auroraTop": "#5a2ad0",
                   "facetLit": "#7a8cff", "waterGlow": "#4060e0"}),
-    ("Rose Lift", {"auroraLow": "#ff96dc", "auroraMid": "#ff58c0", "auroraTop": "#8a3ae8",
+    ("Rose Lift", {"auroraLow": "#ff6fd0", "auroraMid": "#ff58c0", "auroraTop": "#8a3ae8",
                    "facetLit": "#e080d8", "waterGlow": "#d060b0"}),
 ]
 REST_LOOK = 1                # the colours authored into the effect and program (the palette replaces them)
@@ -76,13 +77,13 @@ class Prog:
                                             field)
 
 
-HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 20.0, 500.0, 0.7    # decametres (op constants clamp to +-1000): 400 m to 9 km
+HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 25.0, 650.0, 0.55    # decametres (op constants clamp to +-1000): 400 m to 9 km
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
-AURORA_WRAP_POWER = 3.0
+AURORA_WRAP_POWER = 4.0
 
 
 def rock() -> Prog:
-    """Every landform, unlit (28 ops). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
+    """Every landform, unlit (30 ops). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
     glow; high sky-facing facets pale to lavender; then the distance haze."""
     p = Prog("abRock")
     c4 = lambda h: hexrgb(h) + [1.0]   # noqa: E731
@@ -96,7 +97,7 @@ def rock() -> Prog:
       .op("power", 3, srcA=3, value=AURORA_WRAP_POWER)
       .op("constant", 4, constant=lit, label="facetLit")                                        # palette
       .op("multiply", 3, srcA=3, srcB=4)
-      .op("constant", 4, constant=[1.1, 1.1, 1.1, 1.0], label="auroraGlow")                  # the glow (routes)
+      .op("constant", 4, constant=[1.5, 1.5, 1.5, 1.0], label="auroraGlow")                  # the glow (routes)
       .op("multiply", 3, srcA=3, srcB=4)
       .op("gradient", 4, srcA=1, constant=[0.0, 1.0, 0.0, 0.0], value=1.0)                      # sky-facing
       .op("constant", 5, constant=c4(SKYLIT), label="skyLit")
@@ -109,7 +110,9 @@ def rock() -> Prog:
       .op("multiply", 5, srcA=5, srcB=4)
       .op("constant", 6, constant=c4(CREST), label="crest")
       .op("mixBy", 3, srcA=3, srcB=6, srcC=5)
-      .op("input", 6, input="materialEmission")                                                 # per-node accents
+      .op("fresnel", 6, value=6.0)                                                              # glassy rim
+      .op("constant", 7, constant=c4(RIM) , label="rim")                                        # palette
+      .op("multiply", 6, srcA=6, srcB=7)
       .op("add", 3, srcA=3, srcB=6)
       .op("constant", 6, constant=c4(HAZE), label="haze")
       .op("smoothstep", 7, srcA=2, constant=[HAZE_NEAR, HAZE_FAR, 0.0, 0.0])
@@ -146,7 +149,7 @@ def environment():
         # the depth prepass saves more overdraw than it costs (01 s3.4); AO is pure cost in an unlit scene
         "depthPrepass": True, "ambientOcclusion": False, "contactShadows": False,
         "sky": {"enabled": True, "zenithColor": hexrgb(ZENITH), "horizonColor": hexrgb(HORIZON),
-                "groundColor": hexrgb(SKY_GROUND), "haze": 0.2, "sunIntensity": 0.0, "intensity": 1.0,
+                "groundColor": hexrgb(SKY_GROUND), "haze": 0.35, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
 
@@ -163,8 +166,8 @@ def aurora_effect():
             "timing": {"delay": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "lifetime": 0.0, "repeatSeconds": 0.0,
                        "windowSeconds": 6.0, "windowStart": 0.0},
             "parameters": {
-                "appearance": {"edgeBrightness": 3.6, "emission": 0.6, "filaments": 2.5, "horizonGlow": 0.3,
-                               "intensity": 3.6, "lowColor": c["auroraLow"], "midColor": c["auroraMid"],
+                "appearance": {"edgeBrightness": 5.0, "emission": 0.6, "filaments": 5.0, "horizonGlow": 0.55,
+                               "intensity": 3.0, "lowColor": c["auroraLow"], "midColor": c["auroraMid"],
                                "topColor": c["auroraTop"], "opacity": 0.85, "sparkle": 0.2},
                 # ADR-939's own mix response off: every musical input comes through the stem routes (music.py)
                 "audio": {"bass": 0.0, "beat": 0.0, "glints": 0.0, "high": 0.0, "lowMid": 0.0, "mid": 0.0,
@@ -172,7 +175,7 @@ def aurora_effect():
                 "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
                             "speed": 0.0},
                 "shape": dict({"anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0], "baseHeight": 0.0,
-                               "complexity": 50.0, "curtainCount": 3.0, "curtainHeight": 900.0,
+                               "complexity": 90.0, "curtainCount": 3.0, "curtainHeight": 900.0,
                                "driftSpeed": 0.05, "flowSpeed": 0.015, "layerSpacing": 0.35, "radius": 6000.0,
                                "turbulence": 0.3, "verticalSpeed": 0.03, "waveAmplitude": 0.5, "waveScale": 4.0},
                               **RIBBONS)},
@@ -187,8 +190,8 @@ def stars_effect():
             "activation": "always", "style": "",
             "timing": {"delay": 0.0, "fadeIn": 0.0, "fadeOut": 0.0, "lifetime": 0.0, "repeatSeconds": 0.0,
                        "windowSeconds": 6.0, "windowStart": 0.0},
-            "parameters": {"brightness": 0.7, "density": 0.3, "magnitudeSlope": 6.5, "colorSpread": 0.35,
-                           "twinkle": 0.2, "twinkleRate": 1.2, "horizonFade": 0.7, "band": 0.15, "bandTilt": 25.0,
+            "parameters": {"brightness": 1.4, "density": 0.55, "magnitudeSlope": 5.0, "colorSpread": 0.45,
+                           "twinkle": 0.25, "twinkleRate": 1.2, "horizonFade": 0.45, "band": 0.6, "bandTilt": 35.0,
                            "daylight": 0.0}}
 
 
@@ -197,22 +200,37 @@ WATER_NODE = "river"
 
 
 def water():
+    """A long exposure: no ripple or chop, so the surface is glass; no SSR march (its one jittered ray, spread by the
+    view streak, drew a lattice of dark dashes over the water; measured), the sky mirror alone reads the rendered frame
+    -- sky, aurora and the ranges beyond half its reach -- and the streak smears it along the view; reflections stretched along the view; fine lanes
+    of light drawn out along the current (ADR-1643 flow streaks) in the palette's aurora colours; and the sky mirror
+    (ADR-1650, E1), so the aurora itself is smeared into the river."""
     c = look_colors(REST_LOOK)
     return {
         "enabled": True,
         "shallowColor": hexrgb("#0a0a24"), "deepColor": hexrgb(WATER_DEEP), "shallow": 2.0, "clarity": 1.0,
-        "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 1.15,
-        "reflectionTint": [0.82, 0.84, 1.0], "specular": 0.5, "roughness": 0.06,
-        "ripple": 0.2, "rippleScale": 0.05, "rippleSpeed": 0.25, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
-        "sparkle": 0.0, "glow": 0.25, "glowColor": c["waterGlow"], "glowScale": 0.012, "glowCoverage": 0.45,
+        "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 1.1,
+        "reflectionTint": [0.85, 0.86, 1.0], "specular": 0.3, "roughness": 0.03,
+        "ripple": 0.0, "rippleScale": 0.05, "rippleSpeed": 0.25, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
+        "sparkle": 0.0, "glow": 0.15, "glowColor": c["waterGlow"], "glowScale": 0.012, "glowCoverage": 0.45,
         "glowDepth": 0.2,
-        # cinematic water (ADR-1286): SSR 16 steps x 1 ray for the banks and the near ranges; beyond half its reach
-        # the sky mirror (ADR-1650, E1) reads the rendered sky and aurora at the reflection's vanishing point, so the
-        # aurora is in the river; long reflections streaked along the view
-        "ssr": 1.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.1, "streak": 1.2, "reflectionRays": 1.0,
-        "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.2, "undulationScale": 0.012,
-        "roughnessVariation": 0.4, "tintPatches": 0.0, "glints": 0.0,
+        "ssr": 0.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.0, "streak": 2.0,
+        "reflectionRays": 1.0, "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.0,
+        "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
+        "flowStreaks": 1.2, "streakLines": 260.0, "streakLength": 30.0, "streakDensity": 0.45, "streakSpeed": 1.0,
+        "streakHighlight": 0.8, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],
+        "streakColor3": c["waterGlow"],
     }
+
+
+def river_feature():
+    """The river's course for the water's flow (the streaks run along it): the centreline, with no cut (the land is
+    the GLB banks) and its surface at the sea's level."""
+    import world
+    pts = [world.centre(world.TAU * i / 240) for i in range(241)]
+    return {"name": "river", "kind": "river", "path": [[round(p[0], 2), 0.0, round(p[2], 2)] for p in pts],
+            "width": 80.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
+            "waterDepth": 0.0, "smoothing": 0}
 
 
 def water_node():
@@ -220,7 +238,7 @@ def water_node():
     there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
     return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, 0.0],
             "world": {"name": "aurora-river", "seed": 1, "size": [3400.0, 3400.0], "baseHeight": -6.0,
-                      "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": []},
+                      "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
             "terrain": {"chunkSize": 200.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
                         "viewDistance": 2600.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,
                         "groundGlow": 0.0, "water": water()},
@@ -250,5 +268,9 @@ def palette():
         {"role": "auroraTop", "target": "fx/aurora/topColor"},
         {"role": "facetLit", "target": ROCK.path("facetLit")},
         {"role": "waterGlow", "target": w + "glowColor"},
+        {"role": "auroraLow", "target": w + "streaks/color1"},
+        {"role": "auroraMid", "target": w + "streaks/color2"},
+        {"role": "waterGlow", "target": w + "streaks/color3"},
+        {"role": "auroraLow", "target": ROCK.path("rim"), "gain": 0.1},
     ]
     return {"states": states, "bindings": bindings, "position": float(REST_LOOK), "saturation": 1.0, "value": 1.0}

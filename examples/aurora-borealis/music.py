@@ -135,11 +135,11 @@ def routes():
         R("signal.arrangement", A + "curtainHeight", 380.0),
         R("signal.synthBed", A + "horizonGlow", 0.35),
         R("signal.synthBed", A + "ribbonWidth", 0.02),
-        R("signal.arrangement", "fx/stars/brightness", -0.45),
+        R("signal.arrangement", "fx/stars/brightness", -0.5),
         R("signal.hatDrive", A + "filaments", 1.6),
         R("signal.hatDrive", A + "sparkle", 0.35),
         # the light: the aurora and the facets facing it (the same signal, proportional amounts), the river's glow
-        R("signal.auroraLight", A + "intensity", 1.4),
+        R("signal.auroraLight", A + "intensity", 1.2),
         R("signal.auroraLight", look.ROCK.path("auroraGlow"), 0.75),
         R("signal.auroraLight", W + "glow", 0.5),
         # bass: the lower rims' undulation, the folds, the river's reflection
