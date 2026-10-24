@@ -465,3 +465,22 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase4b/`, one run (build
 - The upper right of the sky is empty dark (the reference has arcs there too).
 
 Both are tunable: the second layer's altitude, scale and colours, or a third ribbon layer, which is affordable offline.
+
+## Phase 5h gate: river flow streaks (2026-10-24)
+
+ADR-1643 merged to main cc4a974d, and the branch is rebased onto it. The river now carries the long-exposure streak lines from the demo settings: amount 2.5, 320 lanes, 25 m, density 0.55, highlight 1.2.
+
+- **Streak colours:** pink, teal and lavender, from the aurora roles `aurora2Low`, `auroraMid` and `auroraTop`, bound to `nodes/valley/water/streaks/color1/2/3`, so they follow the looks. The cores are white.
+- **Glow:** the under-surface glow bands are halved, so the streaks lead.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5h/`, one run (build ea23c84d, 4K at 2x, t = 10, stamped).
+
+| File | Shows |
+|---|---|
+| `phase5h-frame-green.png`, `phase5h-frame-rose.png` | the full frame in both looks |
+| `phase5h-river-vs-reference.png` | the river beside the reference's |
+| `phase4b-vs-5h-river.png` | the river before and after, same settings |
+
+**Render time:** 4K at 2x, 15 frames in 30.0 s: **2.0 s/frame**, at the budget.
+
+**Open (for the engineer):** ADR-1643 leaves a calm band down the centreline (about 6% of the channel). Against these dense, bright streaks it reads as a dark line down the middle of the far reach, like a road marking.
