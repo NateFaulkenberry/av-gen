@@ -286,7 +286,10 @@ def palette_json():
              "gain": GROUND_AURORA},
             {"role": "aurora2Low", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[1],
              "gain": GROUND_AURORA}]),
-         {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA}]
+         {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA},
+         {"role": "aurora2Low", "target": "nodes/valley/water/streaks/color1"},
+         {"role": "auroraMid", "target": "nodes/valley/water/streaks/color2"},
+         {"role": "auroraTop", "target": "nodes/valley/water/streaks/color3"}]
     if CIRCUITS:
         b.append({"role": "auroraLow", "target": "procedural/circuits/material/emissiveColor"})
     for i, n in enumerate(sorted(REFRACT_HEROES)):
@@ -315,13 +318,18 @@ def water():
         "foam": 0.0, "refraction": 0.05, "sparkle": 0.0,
         # luminous flowing bands: the under-surface glow's patches drift with the current, so they follow the river;
         # large and half the channel, in the second aurora colour
-        "glow": 1.4, "glowColor": [0.3 + 0.7 * c for c in R0["aurora2Low"]], "glowScale": 0.025,
+        "glow": 0.7, "glowColor": [0.3 + 0.7 * c for c in R0["aurora2Low"]], "glowScale": 0.025,   # 5h: under the streaks
         "glowCoverage": 0.5, "glowDepth": 0.2,   # (smaller patches, 0.05, read as blotchy camouflage)
         "ssr": 0.5, "ssrDistance": 1500.0, "ssrSteps": 96.0, "ssrGain": 1.3, "streak": 1.6, "reflectionRays": 10.0,
         "transmission": 0.6, "absorption": [2.0, 1.5, 1.0], "undulation": 0.8, "undulationScale": 0.02,
         "roughnessVariation": 0.6, "tintPatches": 1.0, "reflectionTint2": [0.3 + 0.7 * c for c in R0["aurora2Low"]],
         "tintPatchScale": 0.03, "glints": 2.0,
         # (no tears: their seams drew as dashed lines down the river, like road markings)
+        # 5h (ADR-1643, main cc4a974d): the long-exposure streak lines, the river's own flow lanes lit in stretches that
+        # travel downstream -- pink, teal and lavender from the aurora roles (palette-bound), white at the cores
+        "flowStreaks": 2.5, "streakLines": 320.0, "streakLength": 25.0, "streakDensity": 0.55, "streakHighlight": 1.2,
+        "streakColor1": list(R0["aurora2Low"]), "streakColor2": list(R0["auroraMid"]),
+        "streakColor3": list(R0["auroraTop"]),
         }
 
 

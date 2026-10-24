@@ -234,6 +234,18 @@
     "gain": 0.15
    },
    {
+    "role": "aurora2Low",
+    "target": "nodes/valley/water/streaks/color1"
+   },
+   {
+    "role": "auroraMid",
+    "target": "nodes/valley/water/streaks/color2"
+   },
+   {
+    "role": "auroraTop",
+    "target": "nodes/valley/water/streaks/color3"
+   },
+   {
     "role": "crystalBody",
     "target": "lights/glowL1/color"
    },
