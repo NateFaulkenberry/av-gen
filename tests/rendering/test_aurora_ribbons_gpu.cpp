@@ -207,9 +207,10 @@ TEST_CASE("the aurora's ribbon coverage fills the gaps between the sheets (ADR-1
     const gpu::Image8 covered = h.render(full);
     const SkyCover a = cover(gaps, background);
     const SkyCover b = cover(covered, background);
-    INFO("coverage 0: " << a.lit << " lit, coverage 1: " << b.lit << " lit of " << a.total);
-    CHECK(b.lit > a.lit + a.lit / 4); // more of the sky carries sheets
-    CHECK(b.dark > b.total / 20);     // and they are still sheets, with sky between them
+    INFO("coverage 0: " << a.lit << " lit, " << a.dark << " bare; coverage 1: " << b.lit << " lit, " << b.dark
+                        << " bare, of " << a.total);
+    CHECK(b.dark < a.dark - a.dark / 4); // the bare sky between the ribbons shrinks
+    CHECK(b.lit >= a.lit);               // and nothing that was lit goes out
     CHECK(h.ctx->errorCount() == 0);
 }
 

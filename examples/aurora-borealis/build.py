@@ -35,7 +35,7 @@ SCENE_FILE = "aurora-borealis.scene.json"
 CAM_H = 16.0              # metres above the water
 CAM_SPEED = 19.0          # metres a second along the river
 AHEAD = 540.0             # the target this far ahead on the centreline
-PITCH_DEG = 6.0           # the view pitched up so the horizon sits low and the sky takes the frame
+PITCH_DEG = 9.0           # the view pitched up so the horizon sits low and the sky takes the frame
 SWAY = 0.22               # the camera drifts across the river by this fraction of its half-width
 KEYS_PER_LOOP = 300
 

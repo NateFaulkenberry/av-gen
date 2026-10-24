@@ -131,7 +131,7 @@ def routes():
     W = "nodes/%s/water/" % look.WATER_NODE
     return [
         # context: the palette, how tall the curtains stand, the horizon's air, the stars, the fine rays
-        R("signal.paletteAxis", "palette/position", float(len(look.LOOKS) - 1)),
+        R("signal.paletteAxis", "palette/position", float(len(look.LOOKS) - 1) - look.REST_POSITION),
         R("signal.arrangement", A + "curtainHeight", 380.0),
         R("signal.synthBed", A + "horizonGlow", 0.35),
         R("signal.synthBed", A + "ribbonWidth", 0.02),
@@ -139,7 +139,7 @@ def routes():
         R("signal.hatDrive", A + "filaments", 1.6),
         R("signal.hatDrive", A + "sparkle", 0.35),
         # the light: the aurora and the facets facing it (the same signal, proportional amounts), the river's glow
-        R("signal.auroraLight", A + "intensity", 3.4),
+        R("signal.auroraLight", A + "intensity", 2.2),
         R("signal.auroraLight", look.ROCK.path("auroraGlow"), 0.75),
         R("signal.auroraLight", W + "glow", 0.5),
         # bass: the lower rims' undulation, the folds, the river's reflection
@@ -171,4 +171,4 @@ def apply(doc):
     doc["sources"] = sources()
     doc["routes"] = routes()
     doc["control"] = control()
-    doc["palette"]["position"] = 0.0   # silence sits on the first look; the music moves along the axis
+    doc["palette"]["position"] = look.REST_POSITION   # silence: between dusk indigo and the violet veil

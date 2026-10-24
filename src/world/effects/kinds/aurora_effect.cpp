@@ -130,8 +130,8 @@ constexpr EffectField kFields[] = {
                GET(e.aurora.shape.ribbonDistance), SETF(e.aurora.shape.ribbonDistance))
         .json("shape/ribbonDistance").fmt("%.0f m").log().floorAt(1.0f)
         .tooltip("How far away a ribbon fades into the sky (towards the horizon)."),
-    // ADR-1660: the gaps between the ribbons are a low-frequency noise in world space, so a camera that stays in one
-    // region can sit under empty sky for minutes; this narrows them.
+    // ADR-1660: a ribbon is one level line of the footprint noise; this moves the level toward the noise's mean, where
+    // the line is long, so a camera that stays in one region is not under empty sky for minutes.
     floatField("ribbonCoverage", "Coverage", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.aurora.shape.ribbonCoverage),
                SETF(e.aurora.shape.ribbonCoverage))
         .json("shape/ribbonCoverage").clampTo(0.0f, 1.0f)

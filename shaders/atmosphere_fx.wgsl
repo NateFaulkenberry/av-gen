@@ -441,9 +441,7 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
         let q = p.xz / scale + off;
         // Gaps between the ribbons first (it reads only q): the dark sky between them is the silhouette, and most
         // samples land there, so they skip the folding below.
-        // ADR-1660: coverage lowers both thresholds (0 is exactly ADR-1641's).
-        let presence = smoothstep(0.22 - 0.32 * a.audio3.y, 0.55 - 0.32 * a.audio3.y,
-                                  atmosFbm2(q * 0.45 + vec2<f32>(3.1, 1.7), 2));
+        let presence = smoothstep(0.22, 0.55, atmosFbm2(q * 0.45 + vec2<f32>(3.1, 1.7), 2));
         if (presence <= 1.0e-3) {
             continue;
         }
@@ -452,7 +450,10 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
         let w1 = atmosFbm2(q * 0.8 + vec2<f32>(churn * 0.2, 1.3), 2);
         let w2 = atmosFbm2(q * 0.8 + vec2<f32>(5.2, 7.1 - churn * 0.2), 2);
         let qw = q + swirl * (vec2<f32>(w1, w2) - 0.5);
-        let line = abs(2.0 * atmosFbm2(qw, 2) - 1.0) * 1.8;
+        // ADR-1660: the sheet stands on the footprint's level `0.5 - 0.125 x coverage`. A two-octave fbm averages
+        // 0.375, so at 0.5 (coverage 0, ADR-1641 exactly) its level line is a few closed loops round the peaks; towards
+        // the mean it is a long line that winds through the whole sky.
+        let line = abs(2.0 * (atmosFbm2(qw, 2) + 0.125 * a.audio3.y) - 1.0) * 1.8;
         let sheet = 1.0 - smoothstep(0.0, widthEff, line);
         if (sheet <= 1.0e-3) {
             continue;

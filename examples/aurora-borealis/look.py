@@ -23,29 +23,30 @@ from sonic_vfx.kit import hexrgb  # noqa: E402
 ZENITH = "#000004"          # deep indigo, nearly black
 HORIZON = "#1d1640"         # the dusk band: muted violet
 SKY_GROUND = "#05040f"
-SHADOW = "#040312"          # facets facing away from the sky
-SKYLIT = "#14113e"          # facets facing up: blue-violet
+SHADOW = "#030210"          # facets facing away from the sky
+SKYLIT = "#0c0a2a"          # facets facing up: blue-violet
 CREST = "#6a62ae"           # the pale lavender on high, sky-facing facets (a hint of snow light, never white)
-HAZE = "#3a3178"            # distance haze: the horizon's colour, a little darker
+HAZE = "#4a3f8e"            # distance haze: the horizon's colour, a little darker
 WATER_DEEP = "#03030c"
 
 # where the aurora light comes from: up, and toward the side of the sky the ribbons favour (world -z, +x)
-AURORA_DIR = (0.52, 0.45, -0.73)
+AURORA_DIR = (0.55, 0.38, -0.74)
 
 # ---- the palette: the curated states the music blends between (music.py drives palette/position along them) --------
 # roles: auroraLow (the bright lower rims), auroraMid (the body), auroraTop (the fading tops), facetLit (the land's
 # aurora-lit facets), waterGlow (the river's under-glow and its first streak colour)
 LOOKS = [
     ("Dusk Indigo", {"auroraLow": "#8a6cff", "auroraMid": "#4636c8", "auroraTop": "#20186e",
-                     "facetLit": "#4a3c9c", "waterGlow": "#3a2c90"}),
+                     "facetLit": "#6a54d8", "waterGlow": "#3a2c90"}),
     ("Violet Veil", {"auroraLow": "#d58cff", "auroraMid": "#7a48f0", "auroraTop": "#2b2aa8",
-                     "facetLit": "#7a58c8", "waterGlow": "#6a40c0"}),
+                     "facetLit": "#a070f0", "waterGlow": "#6a40c0"}),
     ("Electric", {"auroraLow": "#ff6ad0", "auroraMid": "#3f7cff", "auroraTop": "#5a2ad0",
-                  "facetLit": "#6a6ae0", "waterGlow": "#4060e0"}),
+                  "facetLit": "#7a8cff", "waterGlow": "#4060e0"}),
     ("Rose Lift", {"auroraLow": "#ffc0ec", "auroraMid": "#ff58c0", "auroraTop": "#8a3ae8",
-                   "facetLit": "#c070c8", "waterGlow": "#d060b0"}),
+                   "facetLit": "#e080d8", "waterGlow": "#d060b0"}),
 ]
-REST_LOOK = 1                # what the scene shows with no music: the violet veil
+REST_LOOK = 1                # the colours authored into the effect and program (the palette replaces them)
+REST_POSITION = 0.6          # palette/position with no music: between dusk indigo and the violet veil
 
 
 def look_colors(i):
@@ -75,9 +76,9 @@ class Prog:
                                             field)
 
 
-HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 15.0, 650.0, 0.75    # decametres (op constants clamp to +-1000): 400 m to 9 km
+HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 20.0, 500.0, 0.7    # decametres (op constants clamp to +-1000): 400 m to 9 km
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
-AURORA_WRAP_POWER = 2.5
+AURORA_WRAP_POWER = 3.0
 
 
 def rock() -> Prog:
@@ -95,7 +96,7 @@ def rock() -> Prog:
       .op("power", 3, srcA=3, value=AURORA_WRAP_POWER)
       .op("constant", 4, constant=lit, label="facetLit")                                        # palette
       .op("multiply", 3, srcA=3, srcB=4)
-      .op("constant", 4, constant=[0.6, 0.6, 0.6, 1.0], label="auroraGlow")                  # the glow (routes)
+      .op("constant", 4, constant=[1.1, 1.1, 1.1, 1.0], label="auroraGlow")                  # the glow (routes)
       .op("multiply", 3, srcA=3, srcB=4)
       .op("gradient", 4, srcA=1, constant=[0.0, 1.0, 0.0, 0.0], value=1.0)                      # sky-facing
       .op("constant", 5, constant=c4(SKYLIT), label="skyLit")
@@ -152,7 +153,7 @@ def environment():
 
 # ---- the aurora ----------------------------------------------------------------------------------------------------
 RIBBONS = {"ribbons": True, "ribbonAltitude": 600.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
-           "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 0.7}
+           "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 1.0}
 
 
 def aurora_effect():
@@ -163,7 +164,7 @@ def aurora_effect():
                        "windowSeconds": 6.0, "windowStart": 0.0},
             "parameters": {
                 "appearance": {"edgeBrightness": 3.6, "emission": 0.6, "filaments": 2.5, "horizonGlow": 0.3,
-                               "intensity": 3.2, "lowColor": c["auroraLow"], "midColor": c["auroraMid"],
+                               "intensity": 3.6, "lowColor": c["auroraLow"], "midColor": c["auroraMid"],
                                "topColor": c["auroraTop"], "opacity": 0.85, "sparkle": 0.2},
                 # ADR-939's own mix response off: every musical input comes through the stem routes (music.py)
                 "audio": {"bass": 0.0, "beat": 0.0, "glints": 0.0, "high": 0.0, "lowMid": 0.0, "mid": 0.0,
