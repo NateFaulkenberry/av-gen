@@ -183,3 +183,6 @@ __pycache__/
 # Rainbow World (docs/prototypes/rainbow-world/04-production-plan.md section 3): downloads, milestone .blend files and
 # large generated meshes. assets/rainbow-world.manifest.json is the part the repository keeps.
 /assets/rainbow-world/
+# Aurora Borealis: the generated scene (examples/aurora-borealis/build.py writes it; about 2 MB of GLB)
+/examples/aurora-borealis/scene/
+/examples/aurora-borealis/__pycache__/

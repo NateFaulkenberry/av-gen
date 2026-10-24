@@ -192,6 +192,27 @@ TEST_CASE("the aurora's ribbons draw sheets with dark sky between them, steadily
     CHECK(h.ctx->errorCount() == 0);
 }
 
+TEST_CASE("the aurora's ribbon coverage fills the gaps between the sheets (ADR-1660)",
+          "[gpu][atmospherics][aurora][adr1660]") {
+    Harness h;
+    const gpu::Image8 curtains = h.render(aurora(false));
+    const int background = luma(curtains.pixel(kWidth / 2, 2));
+    const gpu::Image8 gaps = h.render(aurora(true));
+    world::EffectInstance zero = aurora(true);
+    zero.aurora.shape.ribbonCoverage = 0.0f;
+    // 0 is ADR-1641's sky exactly
+    CHECK(gpu::hashImage(h.render(zero)) == gpu::hashImage(gaps));
+    world::EffectInstance full = aurora(true);
+    full.aurora.shape.ribbonCoverage = 1.0f;
+    const gpu::Image8 covered = h.render(full);
+    const SkyCover a = cover(gaps, background);
+    const SkyCover b = cover(covered, background);
+    INFO("coverage 0: " << a.lit << " lit, coverage 1: " << b.lit << " lit of " << a.total);
+    CHECK(b.lit > a.lit + a.lit / 4); // more of the sky carries sheets
+    CHECK(b.dark > b.total / 20);     // and they are still sheets, with sky between them
+    CHECK(h.ctx->errorCount() == 0);
+}
+
 // Hidden ([.]): the ribbons' cost at 1080p (honest timestamps, ADR-1600): no aurora, the curtains (three shells),
 // ribbons at 24 and at 48 planes, interleaved over 4 reps of 100 frames; the GPU frame's median.
 TEST_CASE("aurora ribbons: cost (measure)", "[.][gpu][atmospherics][aurora][measure][adr1641]") {

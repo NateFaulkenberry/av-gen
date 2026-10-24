@@ -226,6 +226,9 @@ Result<void> AuroraShape::validate() const {
         return fail("an aurora's ribbons march 8..128 planes; each one is a sample per sky pixel");
     }
     if (!(ribbonDistance > 0.0f) || !finite(ribbonDistance)) { return fail("aurora ribbon distance must be positive"); }
+    if (ribbonCoverage < 0.0f || ribbonCoverage > 1.0f || !finite(ribbonCoverage)) {
+        return fail("aurora ribbon coverage must be in [0, 1]");
+    }
     return {};
 }
 
@@ -764,6 +767,7 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
                               std::max(s.ribbonScale, 1.0f));
         g.ribbon1 = glm::vec4(std::clamp(s.ribbonWidth, 0.005f, 0.5f), std::max(s.ribbonSwirl, 0.0f),
                               std::max(s.ribbonEdge, 0.0f), std::max(s.ribbonDistance, 1.0f));
+        g.audio3.y = std::clamp(s.ribbonCoverage, 0.0f, 1.0f); // ADR-1660: a free lane, zero while ribbons are off
     }
 
     // The spectrum, or a flat 0.5 when there is no music. 0.5 is the value the shader's height

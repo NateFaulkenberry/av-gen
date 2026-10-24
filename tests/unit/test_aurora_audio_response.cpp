@@ -283,6 +283,22 @@ TEST_CASE("aurora ribbons pack only when on, validate, and round-trip (ADR-1641)
     CHECK(on.ribbon0 == glm::vec4(1.0f, 1500.0f, 128.0f, e.aurora.shape.ribbonScale));
     CHECK(on.ribbon1.x == e.aurora.shape.ribbonWidth);
     CHECK(on.ribbon1.w == e.aurora.shape.ribbonDistance);
+    CHECK(on.audio3.y == 0.0f); // ADR-1660: coverage 0 packs nothing new
+    {
+        world::EffectInstance c = e;
+        c.aurora.shape.ribbonCoverage = 0.7f;
+        std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> cov{};
+        const std::array<world::EffectInstance, 1> cs{c};
+        REQUIRE(world::resolveAtmosphericEffects(cs, ctx, comets, cov).auroras == 1);
+        CHECK(world::packAurora(cov[0], {}).audio3.y == 0.7f);
+        world::EffectInstance curtains = c;
+        curtains.aurora.shape.ribbons = false; // the lane stays zero while the ribbons are off
+        const std::array<world::EffectInstance, 1> cc{curtains};
+        REQUIRE(world::resolveAtmosphericEffects(cc, ctx, comets, cov).auroras == 1);
+        CHECK(world::packAurora(cov[0], {}).audio3.y == 0.0f);
+        c.aurora.shape.ribbonCoverage = 1.5f;
+        CHECK_FALSE(c.validate().has_value());
+    }
     // the curtains' lanes are the same either way
     CHECK(on.config == off.config);
     CHECK(on.low == off.low);
@@ -303,11 +319,12 @@ TEST_CASE("aurora ribbons pack only when on, validate, and round-trip (ADR-1641)
     CHECK(back->aurora.shape.ribbonSteps == 64.0f);
     nlohmann::json old = j;
     for (const char* key : {"ribbons", "ribbonAltitude", "ribbonScale", "ribbonWidth", "ribbonSwirl", "ribbonEdge",
-                            "ribbonSteps", "ribbonDistance"}) {
+                            "ribbonSteps", "ribbonDistance", "ribbonCoverage"}) {
         old["parameters"]["shape"].erase(key);
     }
     auto legacy = world::EffectInstance::fromJson(old);
     REQUIRE(legacy.has_value());
     CHECK_FALSE(legacy->aurora.shape.ribbons);
     CHECK(legacy->aurora.shape.ribbonSteps == 48.0f);
+    CHECK(legacy->aurora.shape.ribbonCoverage == 0.0f);
 }

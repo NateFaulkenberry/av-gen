@@ -250,6 +250,9 @@ struct AuroraShape {
     float ribbonEdge = 0.35f;        // how far the lower rim rises and falls, as a fraction of the curtain height
     float ribbonSteps = 48.0f;       // horizontal planes marched (8..128): more is smoother, each one a sample
     float ribbonDistance = 60000.0f; // metres: how far away a ribbon fades into the sky
+    // ADR-1660: how much of the sky the ribbons may fill (0..1). 0 is ADR-1641's gaps exactly; 1 lowers the
+    // threshold of the low-frequency gap noise so the sheets reach across nearly all of it.
+    float ribbonCoverage = 0.0f;
     [[nodiscard]] Result<void> validate() const;
 };
 

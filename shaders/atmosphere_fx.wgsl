@@ -441,7 +441,9 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
         let q = p.xz / scale + off;
         // Gaps between the ribbons first (it reads only q): the dark sky between them is the silhouette, and most
         // samples land there, so they skip the folding below.
-        let presence = smoothstep(0.22, 0.55, atmosFbm2(q * 0.45 + vec2<f32>(3.1, 1.7), 2));
+        // ADR-1660: coverage lowers both thresholds (0 is exactly ADR-1641's).
+        let presence = smoothstep(0.22 - 0.32 * a.audio3.y, 0.55 - 0.32 * a.audio3.y,
+                                  atmosFbm2(q * 0.45 + vec2<f32>(3.1, 1.7), 2));
         if (presence <= 1.0e-3) {
             continue;
         }
