@@ -101,3 +101,14 @@ measured so far (ADR-1605).
   frames.
 - The grid path of the kick wave is unmeasured live (needs a drum loop on the loopback, 02 s5 risk 1).
 - `ribbonCoverage` (ADR-1660) is not routed; a phrase-gated coverage change would be a cheap musical lever.
+
+## Suites (final commit 02d93bf6, same build)
+
+- `AVGEN_GPU_LOCK_TIMEOUT=14400 tools/gpu-lock.sh tools/ci/run-suite.sh cpu-assets`: **PASS, exit 0**. 4,464 passed,
+  0 failed, 29 skipped, 1 expected failure.
+- `AVGEN_GPU_LOCK_TIMEOUT=14400 tools/ci/run-suite.sh gpu`: **PASS, exit 0**. 702 passed, 0 failed, 1 skipped.
+  The run before it failed once on `Render job readback ring matches the synchronous path frame for frame` (a hash
+  mismatch). That case passed 5 of 5 in isolation and in both full runs either side of it, so I take it for a flake
+  rather than a regression.
+- The first cpu-assets run found a real bug, now fixed (commit 02d93bf6): the directing compiler read a freed effect
+  record (`source` held across `insertEffect`).
