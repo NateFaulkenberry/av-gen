@@ -66,11 +66,10 @@ def prog_ground():
 
 
 FOG_AURORA = 0.15               # 5b: the distance haze in the aurora's top colour (the far river carries it)
-# ---- ADR-1642 (terrain texture inputs, preview; not merged yet): AU_TERRAIN_TEX=1 builds the textured ground.
-# Written to the preview's schema (program `textures`, ops `textureTriplanar` / `textureTriplanarNormal`) and unverified
-# until the merge; off by default, so nothing the current engine reads changes. Poly Haven CC0, 2K, in the gitignored
+# ---- ADR-1642 (terrain texture inputs, merged to main 2d211c8e): the textured ground, the default (AU_TERRAIN_TEX=0
+# builds the procedural ground instead). Poly Haven CC0, 2K, in the gitignored
 # assets/nature/textures/ (manifest): rock_face on steep ground, mossy_rock between, forest_leaves_02 on the flats.
-TERRAIN_TEX = os.environ.get("AU_TERRAIN_TEX", "0") == "1"
+TERRAIN_TEX = os.environ.get("AU_TERRAIN_TEX", "1") == "1"   # 5g: merged (main 2d211c8e), on by default
 TEX_DIR = os.path.join(HERE, "..", "..", "assets", "nature", "textures")
 TERRAIN_TEXTURES = [("rock", "rock_face/rock_face_diff_2k.jpg", "srgb"),
                     ("rockN", "rock_face/rock_face_nor_gl_2k.jpg", "linear"),
@@ -80,27 +79,36 @@ TERRAIN_TEXTURES = [("rock", "rock_face/rock_face_diff_2k.jpg", "srgb"),
 
 def prog_ground_textured():
     """The ground with real rock and mossy-rock texture on the slopes and a leafy floor (ADR-1642): three triplanar
-    colour reads and one triplanar normal, mixed by slope (the normal's up component) and a large patch noise."""
-    return {"name": "au_ground", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": -1, "normal": 7,
+    colour reads and one triplanar normal (rock), mixed by slope (the normal's up component) and a large patch noise;
+    the 5c aurora rim on the crests kept (emission)."""
+    return {"name": "au_ground", "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 5, "normal": 7,
             "emissionIntensity": 1.0, "opacity": -1,
             "textures": [{"name": n, "path": os.path.basename(pth), "colorSpace": cs} for n, pth, cs in TERRAIN_TEXTURES],
             "ops": [
+                {"kind": "textureTriplanar", "dst": 3, "texture": "rock", "value": 0.025, "constant2": [6, 0, 0, 0]},
+                {"kind": "textureTriplanar", "dst": 4, "texture": "mossy", "value": 0.04, "constant2": [6, 0, 0, 0]},
+                {"kind": "textureTriplanar", "dst": 2, "texture": "leaves", "value": 0.2},
+                {"kind": "textureTriplanarNormal", "dst": 7, "texture": "rockN", "value": 0.025,
+                 "constant2": [6, 0, 0, 1.6]},
                 {"kind": "input", "dst": 0, "input": "worldPosition"},
-                {"kind": "textureTriplanar", "dst": 3, "srcA": 0, "texture": "rock", "value": 0.08},
-                {"kind": "textureTriplanar", "dst": 4, "srcA": 0, "texture": "mossy", "value": 0.1},
-                {"kind": "textureTriplanar", "dst": 5, "srcA": 0, "texture": "leaves", "value": 0.25},
-                {"kind": "textureTriplanarNormal", "dst": 7, "srcA": 0, "texture": "rockN", "value": 0.08},
                 {"kind": "input", "dst": 1, "input": "normal"},
                 {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [0, 1, 0, 0], "value": 1.0},
-                {"kind": "noise", "dst": 2, "srcA": 0, "value": 0.02, "seed": 3},
-                {"kind": "remap", "dst": 2, "srcA": 2, "constant": [0, 1, -0.1, 0.1]},
-                {"kind": "add", "dst": 1, "srcA": 1, "srcB": 2},
+                {"kind": "noise", "dst": 6, "srcA": 0, "value": 0.02, "seed": 3},
+                {"kind": "remap", "dst": 6, "srcA": 6, "constant": [0, 1, -0.1, 0.1]},
+                {"kind": "add", "dst": 1, "srcA": 1, "srcB": 6},
                 {"kind": "smoothstep", "dst": 6, "srcA": 1, "constant": [0.55, 0.72, 0, 0]},   # rock -> mossy rock
                 {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 6},
                 {"kind": "smoothstep", "dst": 6, "srcA": 1, "constant": [0.78, 0.9, 0, 0]},    # -> the leafy floor
-                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 5, "srcC": 6}]}
+                {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 2, "srcC": 6},
+                {"kind": "constant", "dst": 4, "constant": [TEX_TINT] * 3 + [1]},
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},
+                # the aurora rim on sky-facing crests (5c), palette-bound like the procedural ground's
+                {"kind": "smoothstep", "dst": 5, "srcA": 1, "constant": [0.78, 1.0, 0, 0]},
+                {"kind": "constant", "dst": 4, "constant": [c * GROUND_AURORA for c in R0["auroraLow"]] + [1]},
+                {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4}]}
 
 
+TEX_TINT = 1.1    # the textures' albedo into the night (they are daylight scans; the haze eats the rest)
 GROUND_AURORA = 0.008            # 5c: a soft rim on sky-facing crests only (0.035 washed the moss mauve)
 GROUND_AURORA_OPS = (24, 25)     # 1-based op indices of its two colour constants in au_ground (palette targets)
 
@@ -272,10 +280,12 @@ def palette_json():
          {"role": "crystalFracture", "target": P.path("fracture"), "gain": 1.4},
          # 5b (spec 6.5): the aurora lights the valley -- the ground's sky-facing glow, the distance haze, the hero
          # crystals' faint light on the ground near them
-         {"role": "auroraLow", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[0],
-          "gain": GROUND_AURORA},
-         {"role": "aurora2Low", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[1],
-          "gain": GROUND_AURORA},
+         *([{"role": "auroraLow", "target": "material/au_ground/op/18/constant/constant", "gain": GROUND_AURORA}]
+           if TERRAIN_TEX else
+           [{"role": "auroraLow", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[0],
+             "gain": GROUND_AURORA},
+            {"role": "aurora2Low", "target": "material/au_ground/op/%d/constant/constant" % GROUND_AURORA_OPS[1],
+             "gain": GROUND_AURORA}]),
          {"role": "auroraTop", "target": "scene/fogColor", "gain": FOG_AURORA}]
     if CIRCUITS:
         b.append({"role": "auroraLow", "target": "procedural/circuits/material/emissiveColor"})
@@ -539,7 +549,7 @@ def scene_json(placed, scans, bushes=None):
         "environment": {
             # the air: a light peach-lavender extinction, so the ridges recede in value toward the horizon glow
             "intensity": 0.25, "lightFromEnvironment": False, "fogColor": [c * FOG_AURORA for c in R0["auroraTop"]],
-            "volumeDensity": 0.0006, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 4,
+            "volumeDensity": 0.00042, "volumeAbsorption": 1.0, "volumeScattering": 0.0, "volumeSteps": 4,
             "volumeMaxDistance": 40.0, "volumeLocalLights": 0.0, "horizonDensity": 0.4,
             "fogHeight": 30.0, "fogHeightFalloff": 0.018, "fogUpperDensity": 0.05,
             "fogSky": 0.0, "fogSkyDistance": 4500.0,

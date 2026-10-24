@@ -248,12 +248,7 @@
    },
    {
     "role": "auroraLow",
-    "target": "material/au_ground/op/24/constant/constant",
-    "gain": 0.008
-   },
-   {
-    "role": "aurora2Low",
-    "target": "material/au_ground/op/25/constant/constant",
+    "target": "material/au_ground/op/18/constant/constant",
     "gain": 0.008
    },
    {
