@@ -1186,6 +1186,17 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
             {"reflectionTint2", [&](scene::WaterSettings& w) { w.reflectionTint2.b = nan; }},
             {"tintPatchScale", [&](scene::WaterSettings& w) { w.tintPatchScale = nan; }},
             {"glints", [&](scene::WaterSettings& w) { w.glints = inf; }},
+            // ADR-1643: the flow streaks.
+            {"flowStreaks", [&](scene::WaterSettings& w) { w.flowStreaks = nan; }},
+            {"streakDensity", [&](scene::WaterSettings& w) { w.streakDensity = nan; }},
+            {"streakLength", [&](scene::WaterSettings& w) { w.streakLength = inf; }},
+            {"streakLines", [&](scene::WaterSettings& w) { w.streakLines = nan; }},
+            {"streakSpeed", [&](scene::WaterSettings& w) { w.streakSpeed = nan; }},
+            {"streakHighlight", [&](scene::WaterSettings& w) { w.streakHighlight = nan; }},
+            {"streakColorScale", [&](scene::WaterSettings& w) { w.streakColorScale = inf; }},
+            {"streakColor1", [&](scene::WaterSettings& w) { w.streakColor1.r = nan; }},
+            {"streakColor2", [&](scene::WaterSettings& w) { w.streakColor2.g = nan; }},
+            {"streakColor3", [&](scene::WaterSettings& w) { w.streakColor3.b = nan; }},
         };
         for (const Poison& poison : poisons) {
             scene::WaterSettings poisoned = healthy;
@@ -1199,9 +1210,10 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
         // of WaterSettings (`shallow` is poisoned by the section above), and the struct's size says how
         // many of each there are. A float added to WaterSettings without a poison here changes the size
         // and fails this, which is how the nine tear fields were found to need one.
-        // 22 of the surface's, 9 of ADR-916's tears, ADR-985's cascade, 13 of ADR-1286's cinematic path
-        constexpr std::size_t kScalarFloats = 45;
-        constexpr std::size_t kColours = 9; // and ADR-1286's absorption and second reflection tint
+        // 22 of the surface's, 9 of ADR-916's tears, ADR-985's cascade, 13 of ADR-1286's cinematic path, 7 of
+        // ADR-1643's flow streaks
+        constexpr std::size_t kScalarFloats = 52;
+        constexpr std::size_t kColours = 12; // and ADR-1286's absorption and second reflection tint, ADR-1643's three
         CHECK(poisons.size() + 1 == kScalarFloats + kColours);
         // Two bools (`enabled`, `tearFollowsWind`), each padded out to a float's alignment.
         CHECK(sizeof(scene::WaterSettings) == sizeof(float) * (kScalarFloats + 3 * kColours) + 2 * alignof(float));
