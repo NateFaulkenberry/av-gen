@@ -119,6 +119,8 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::VoronoiEdge, "voronoiEdge"},
     {MaterialOpKind::Quantize, "quantize"}, // ADR-1162
     {MaterialOpKind::OklabRamp, "oklabRamp"}, // ADR-1470
+    {MaterialOpKind::TextureTriplanar, "textureTriplanar"},             // ADR-1642
+    {MaterialOpKind::TextureTriplanarNormal, "textureTriplanarNormal"}, // ADR-1642
 };
 
 struct InputName {
@@ -303,6 +305,7 @@ Result<MaterialOp> opFromJson(const json& j, std::size_t index) {
     AVGEN_MAT_READ(op.constant4, "constant4", readVec4);
     AVGEN_MAT_READ(op.seed, "seed", readU32);
     AVGEN_MAT_READ(op.field, "field", readString);
+    AVGEN_MAT_READ(op.texture, "texture", readString); // ADR-1642
     if (j.contains("input")) {
         auto inputName = readString(j, "input", "");
         if (!inputName) {
@@ -359,6 +362,9 @@ json opToJson(const MaterialOp& op) {
     }
     if (!op.field.empty()) {
         j["field"] = op.field;
+    }
+    if (!op.texture.empty()) { // ADR-1642
+        j["texture"] = op.texture;
     }
     return j;
 }
@@ -545,8 +551,66 @@ bool outputRegisterOk(int r) {
     return r >= -1 && r < kMaterialRegisters;
 }
 
+// ADR-1642: the texture ops, exactly as shaders/material.wgsl's matTextureOp (which samples mip `lod`; this reference
+// reads level 0, so parity is compared at a zero footprint). The three planes' uv and their world tangent (U) and
+// image-up (B) axes are chosen so U x B is each face's outward normal, for an OpenGL-convention normal map.
+constexpr float kTexturePlaneSkip = 1e-3f; // a plane weighing less is not sampled (the shader skips it too)
+
+glm::vec4 textureOpValue(const MaterialOp& op, const MaterialContext& ctx, const MaterialProgram& program) {
+    const bool isNormal = op.kind == MaterialOpKind::TextureTriplanarNormal;
+    const glm::vec4 missing = isNormal ? glm::vec4(0.0f, 0.0f, 1.0f, 1.0f) : glm::vec4(1.0f);
+    const MaterialTexture* texture = program.textureNamed(op.texture);
+    if (texture == nullptr || ctx.textures == nullptr) {
+        return missing;
+    }
+    const glm::vec3 p = ctx.worldPosition * op.value + glm::vec3(op.constant);
+    const glm::vec3 n = safeNormalize(ctx.normal, glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::vec3 w = triplanarWeights(n, op.constant2.x);
+    const glm::vec3 sg(n.x >= 0.0f ? 1.0f : -1.0f, n.y >= 0.0f ? 1.0f : -1.0f, n.z >= 0.0f ? 1.0f : -1.0f);
+    const std::array<glm::vec2, 3> uv{glm::vec2(-p.z * sg.x, -p.y), glm::vec2(p.x * sg.y, p.z),
+                                      glm::vec2(p.x * sg.z, -p.y)};
+    const std::array<glm::vec3, 3> tangentU{glm::vec3(0.0f, 0.0f, -sg.x), glm::vec3(sg.y, 0.0f, 0.0f),
+                                            glm::vec3(sg.z, 0.0f, 0.0f)};
+    const std::array<glm::vec3, 3> imageUp{glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
+                                           glm::vec3(0.0f, 1.0f, 0.0f)};
+    const float green = op.constant2.y < 0.0f ? -1.0f : 1.0f;
+    const float strength = op.constant2.w != 0.0f ? op.constant2.w : 1.0f;
+    glm::vec4 colour(0.0f);
+    glm::vec3 perturb(0.0f);
+    for (int i = 0; i < 3; ++i) {
+        if (!(w[i] >= kTexturePlaneSkip)) {
+            continue;
+        }
+        const std::optional<glm::vec4> s = ctx.textures->sample(*texture, uv[static_cast<std::size_t>(i)]);
+        if (!s) {
+            return missing;
+        }
+        if (isNormal) {
+            const glm::vec2 t = glm::vec2(*s) * 2.0f - 1.0f;
+            perturb += w[i] * strength * (t.x * tangentU[static_cast<std::size_t>(i)] +
+                                          green * t.y * imageUp[static_cast<std::size_t>(i)]);
+        } else {
+            colour += w[i] * *s;
+        }
+    }
+    if (!isNormal) {
+        return colour;
+    }
+    const glm::vec3 nw = safeNormalize(n + perturb, n);
+    // Into the frame the shader applies a tangent-space normal in: (tangent, bitangent, normal), not orthonormal.
+    const glm::vec3 t = ctx.tangent;
+    const glm::vec3 b = ctx.bitangent;
+    const float det = glm::dot(t, glm::cross(b, n));
+    if (!(std::abs(det) > 1e-10f)) {
+        return glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    }
+    const glm::vec3 ts(glm::dot(glm::cross(b, n), nw) / det, glm::dot(glm::cross(n, t), nw) / det,
+                       glm::dot(glm::cross(t, b), nw) / det);
+    return glm::vec4(safeNormalize(ts, glm::vec3(0.0f, 0.0f, 1.0f)), 1.0f);
+}
+
 glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
-                     const std::array<glm::vec4, kMaterialRegisters>& regs) {
+                     const std::array<glm::vec4, kMaterialRegisters>& regs, const MaterialProgram& program) {
     const glm::vec4& a = regs[static_cast<std::size_t>(op.srcA)];
     const glm::vec4& b = regs[static_cast<std::size_t>(op.srcB)];
     const glm::vec4& c = regs[static_cast<std::size_t>(op.srcC)];
@@ -700,6 +764,9 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
     }
     case MaterialOpKind::OklabRamp:
         return oklabRamp4(op.constant, op.constant2, op.constant3, op.constant4, a.x, f < 0.0f);
+    case MaterialOpKind::TextureTriplanar:
+    case MaterialOpKind::TextureTriplanarNormal:
+        return textureOpValue(op, ctx, program); // ADR-1642
     }
     return glm::vec4(0.0f);
 }
@@ -707,7 +774,7 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
 // Runs `ops` over `regs`, skipping disabled ops and (as a program that failed validation would)
 // ops with out-of-range registers. `budget` is the shared kMaxMaterialOps allowance.
 void runOps(const std::vector<MaterialOp>& ops, const MaterialContext& ctx,
-            std::array<glm::vec4, kMaterialRegisters>& regs, int& budget) {
+            std::array<glm::vec4, kMaterialRegisters>& regs, int& budget, const MaterialProgram& program) {
     for (const MaterialOp& op : ops) {
         if (!op.enabled) {
             continue;
@@ -720,7 +787,7 @@ void runOps(const std::vector<MaterialOp>& ops, const MaterialContext& ctx,
             !registerInRange(op.srcC)) {
             continue;
         }
-        regs[static_cast<std::size_t>(op.dst)] = evaluateOp(op, ctx, regs);
+        regs[static_cast<std::size_t>(op.dst)] = evaluateOp(op, ctx, regs, program);
     }
 }
 
@@ -825,6 +892,8 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::CurvatureMask:
     case MaterialOpKind::EdgeWear:
     case MaterialOpKind::DecalBox:
+    case MaterialOpKind::TextureTriplanar:       // ADR-1642: the world position and normal only
+    case MaterialOpKind::TextureTriplanarNormal:
         return {};
     case MaterialOpKind::Gradient:
     case MaterialOpKind::Noise:
@@ -961,6 +1030,11 @@ Result<void> MaterialProgram::validate() const {
             if (op.kind == MaterialOpKind::Field && op.field.empty()) {
                 return fail("material '{}': {}op {} (field) needs a field name", name, where, i);
             }
+            if ((op.kind == MaterialOpKind::TextureTriplanar || op.kind == MaterialOpKind::TextureTriplanarNormal) &&
+                textureNamed(op.texture) == nullptr) {
+                return fail("material '{}': {}op {} ({}) names texture '{}', which is not in its 'textures'", name,
+                            where, i, materialOpKindName(op.kind), op.texture);
+            }
         }
         return Result<void>{};
     };
@@ -987,6 +1061,39 @@ Result<void> MaterialProgram::validate() const {
     if (fieldNames.size() > static_cast<std::size_t>(kMaxMaterialFields)) {
         return fail("material '{}': at most {} distinct fields across the base and its layers (got {})", name,
                     kMaxMaterialFields, fieldNames.size());
+    }
+    // ADR-1642: texture ops are sampled before the loop into a fixed set of slots, like fields.
+    int textureOps = 0;
+    const auto countTextureOps = [&textureOps](const std::vector<MaterialOp>& list) {
+        for (const MaterialOp& op : list) {
+            if (op.enabled &&
+                (op.kind == MaterialOpKind::TextureTriplanar || op.kind == MaterialOpKind::TextureTriplanarNormal)) {
+                ++textureOps;
+            }
+        }
+    };
+    countTextureOps(ops);
+    for (const MaterialLayer& layer : layers) {
+        if (layer.enabled) {
+            countTextureOps(layer.ops);
+        }
+    }
+    if (textureOps > kMaxMaterialTextureOps) {
+        return fail("material '{}': at most {} texture ops across the base and its layers (got {})", name,
+                    kMaxMaterialTextureOps, textureOps);
+    }
+    if (textures.size() > static_cast<std::size_t>(kMaxMaterialTextures)) {
+        return fail("material '{}': at most {} textures (got {})", name, kMaxMaterialTextures, textures.size());
+    }
+    for (std::size_t i = 0; i < textures.size(); ++i) {
+        if (textures[i].name.empty() || textures[i].path.empty()) {
+            return fail("material '{}': texture {} needs a 'name' and a 'path'", name, i);
+        }
+        for (std::size_t k = 0; k < i; ++k) {
+            if (textures[k].name == textures[i].name) {
+                return fail("material '{}': two textures are named '{}'", name, textures[i].name);
+            }
+        }
     }
     if (!outputRegisterOk(baseColorRegister) || !outputRegisterOk(metallicRegister) ||
         !outputRegisterOk(roughnessRegister) || !outputRegisterOk(emissionRegister) ||
@@ -1028,6 +1135,9 @@ std::uint64_t MaterialProgram::structuralHash() const {
             h.u32(op.seed);
             h.u32(static_cast<std::uint32_t>(op.input));
             h.str(op.field);
+            if (!op.texture.empty()) { // ADR-1642: hashed only when named, so every older program keeps its hash
+                h.str(op.texture);
+            }
         }
     };
     h.str(name);
@@ -1066,7 +1176,38 @@ std::uint64_t MaterialProgram::structuralHash() const {
         h.i32(layer.normalRegister);
         h.i32(layer.occlusionRegister);
     }
+    if (!textures.empty()) { // ADR-1642
+        h.u32(static_cast<std::uint32_t>(textures.size()));
+        for (const MaterialTexture& t : textures) {
+            h.str(t.name);
+            h.str(t.path);
+            h.boolean(t.srgb);
+        }
+    }
     return h.value();
+}
+
+const MaterialTexture* MaterialProgram::textureNamed(std::string_view textureName) const {
+    for (const MaterialTexture& t : textures) {
+        if (t.name == textureName) {
+            return &t;
+        }
+    }
+    return nullptr;
+}
+
+std::string materialTextureKey(const MaterialTexture& texture) {
+    return texture.resolvedPath.lexically_normal().string() + (texture.srgb ? "|srgb" : "|linear");
+}
+
+void resolveMaterialTexturePaths(std::vector<MaterialTexture>& list, const std::filesystem::path& base) {
+    for (MaterialTexture& t : list) {
+        if (!t.resolvedPath.empty() || t.path.empty()) {
+            continue;
+        }
+        const std::filesystem::path authored = t.path;
+        t.resolvedPath = (authored.is_relative() && !base.empty() ? base / authored : authored).lexically_normal();
+    }
 }
 
 json MaterialProgram::toJson() const {
@@ -1100,6 +1241,13 @@ json MaterialProgram::toJson() const {
             layerArray.push_back(layerToJson(layer));
         }
         j["layers"] = std::move(layerArray);
+    }
+    if (!textures.empty()) { // ADR-1642: written only when used, so every older program round-trips unchanged
+        json arr = json::array();
+        for (const MaterialTexture& t : textures) {
+            arr.push_back(json{{"name", t.name}, {"path", t.path}, {"colorSpace", t.srgb ? "srgb" : "linear"}});
+        }
+        j["textures"] = std::move(arr);
     }
     if (gate.active()) {
         json g = json::object();
@@ -1148,6 +1296,39 @@ Result<MaterialProgram> MaterialProgram::fromJson(const json& j) {
                 return std::unexpected(layer.error());
             }
             p.layers.push_back(std::move(*layer));
+        }
+    }
+    if (j.contains("textures")) { // ADR-1642
+        const json& arr = j.at("textures");
+        if (!arr.is_array()) {
+            return fail("'textures' must be an array of {\"name\", \"path\", \"colorSpace\"}");
+        }
+        for (std::size_t i = 0; i < arr.size(); ++i) {
+            const json& t = arr.at(i);
+            if (!t.is_object()) {
+                return fail("texture {} must be an object", i);
+            }
+            for (auto it = t.begin(); it != t.end(); ++it) {
+                if (it.key() != "name" && it.key() != "path" && it.key() != "colorSpace") {
+                    return fail("texture {} has no key '{}' (name, path, colorSpace)", i, it.key());
+                }
+            }
+            MaterialTexture tex;
+            auto texName = readString(t, "name", "");
+            auto texPath = readString(t, "path", "");
+            auto space = readString(t, "colorSpace", "srgb");
+            if (!texName || !texPath || !space) {
+                return fail("texture {}: 'name', 'path' and 'colorSpace' must be strings", i);
+            }
+            tex.name = *texName;
+            tex.path = *texPath;
+            if (*space != "srgb" && *space != "linear") {
+                return fail("texture '{}': colorSpace must be \"srgb\" (colour) or \"linear\" (normal, roughness, "
+                            "masks), not '{}'",
+                            tex.name, *space);
+            }
+            tex.srgb = *space == "srgb";
+            p.textures.push_back(std::move(tex));
         }
     }
     AVGEN_MAT_READ(p.baseColorRegister, "baseColor", readInt);
@@ -1202,6 +1383,7 @@ Result<MaterialProgram> MaterialProgram::loadFile(const std::filesystem::path& p
     if (!program) {
         return fail("material file '{}': {}", path.string(), program.error().message);
     }
+    resolveMaterialTexturePaths(program->textures, path.parent_path()); // ADR-1642: beside the file
     if (!parsed.is_object() || !parsed.contains("name")) {
         // A file that does not name itself is named by its path, minus the ".material" the library
         // files carry, rather than taking fromJson's generic default and colliding with the next one.
@@ -1227,7 +1409,7 @@ MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const Mat
     }
     MaterialContext local = ctx;
     int budget = kMaxMaterialOps;
-    runOps(program.ops, local, result.registers, budget);
+    runOps(program.ops, local, result.registers, budget, program);
 
     const auto reg = [&result](int r) { return result.registers[static_cast<std::size_t>(r)]; };
     if (registerInRange(program.baseColorRegister)) {
@@ -1263,7 +1445,7 @@ MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const Mat
         }
         ++layerCount;
         local.height = result.height;
-        runOps(layer.ops, local, result.registers, budget);
+        runOps(layer.ops, local, result.registers, budget, program);
         const float mask = registerInRange(layer.maskRegister) ? saturate1(reg(layer.maskRegister).x) : 1.0f;
         const float layerHeight = registerInRange(layer.heightRegister) ? reg(layer.heightRegister).x : 0.0f;
         const float t = heightBlendWeight(result.height, layerHeight, mask, layer.blendRange);
@@ -1296,9 +1478,12 @@ MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const Mat
 // ---- GPU packing ---------------------------------------------------------------------------------
 
 MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
-                                                const std::vector<std::pair<std::string, int>>& slots) {
+                                                const std::vector<std::pair<std::string, int>>& slots,
+                                                const MaterialTextureLayerFn& textureLayerOf) {
     MaterialProgramGpu gpu{};
     gpu.fieldSlots = glm::ivec4(-1);
+    gpu.textureOps = glm::ivec4(-1); // ADR-1642
+    int textureOps = 0;
     std::vector<std::string> fieldNames; // distinct field names, in order of first use
     gpu.outputs = glm::ivec4(program.baseColorRegister, program.metallicRegister, program.roughnessRegister,
                              program.emissionRegister);
@@ -1333,6 +1518,17 @@ MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
                     gpu.fieldSlots[static_cast<int>(fieldNames.size())] = g.fieldSlot;
                     fieldNames.push_back(op.field);
                 }
+            }
+            if ((op.kind == MaterialOpKind::TextureTriplanar || op.kind == MaterialOpKind::TextureTriplanarNormal) &&
+                textureOps < kMaxMaterialTextureOps) {
+                // ADR-1642: its layer and array, and the slot the pre-pass samples it into. Unloaded (layer -1), the
+                // shader answers colour 1 / a flat normal, as the CPU reference does.
+                const MaterialTexture* texture = program.textureNamed(op.texture);
+                g.fieldSlot = texture != nullptr && textureLayerOf ? textureLayerOf(*texture) : -1;
+                g.input = texture != nullptr && !texture->srgb ? 1u : 0u;
+                g.fieldOrdinal = kMaxMaterialFields + textureOps;
+                gpu.textureOps[textureOps] = count;
+                ++textureOps;
             }
             g.registers = glm::ivec4(op.dst, op.srcA, op.srcB, op.srcC);
             g.value = op.value;

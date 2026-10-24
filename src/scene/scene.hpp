@@ -96,6 +96,10 @@ struct Scene {
     AstralForge astral;                          // ADR-1221; rendering::AstralRenderer (the second Environment)
     Clouds clouds;                           // ADR-1289; rendering::CloudRenderer (the third Environment)
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
+    // ADR-1642: the images the programs' texture ops read, decoded, one entry per (resolved path, colour space). Filled
+    // by the composition from each program's `textures`; the renderer lays them into one array per colour space.
+    std::vector<ProgramTexture> programTextures;
+    std::uint64_t programTextureVersion = 0; // a digest of the table's keys: changes when an image is added or dropped
     // ADR-099: the water surfaces of this scene, one per distinct look. An entity drawn with
     // MeshStyle::Water finds its settings by the material-program name it carries, which is how a
     // water surface reaches rendering::WaterRenderer without an index on every Entity in a world.

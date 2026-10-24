@@ -1,5 +1,6 @@
 // Composition: node kinds, flattening with shared assets, parameter surface, nesting, files.
 #include "assets/asset_registry.hpp"
+#include "assets/image.hpp"
 #include "core/time.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
@@ -766,6 +767,48 @@ TEST_CASE("Composition takes material programs inline or from a file", "[scene][
     const auto wrongType = fx.json("materials_wrong", R"({"format": "avgen-scene", "version": 1,
         "materialPrograms": [42]})");
     CHECK_FALSE(scene::Composition::loadFile(wrongType, fx.registry).has_value());
+}
+
+// ADR-1642: a program's `textures` load beside the scene file into Scene::programTextures, once per image and colour
+// space; the authored relative path is what the scene saves; an image that is missing is said, not fatal.
+TEST_CASE("Composition loads a material program's textures beside its scene file", "[scene][composition][adr1642]") {
+    Fixture fx;
+    const auto png = tempDir() / "avgen_comp_moss_albedo.png";
+    std::vector<std::uint8_t> rgba(4 * 4 * 4, 200);
+    REQUIRE(assets::writePng(png, 4, 4, rgba).has_value());
+    fx.files.push_back(png);
+    const auto scene = fx.json("textured_scene", R"({"format": "avgen-scene", "version": 1, "name": "tex",
+        "materialPrograms": [{"name": "ground",
+            "textures": [{"name": "moss", "path": "avgen_comp_moss_albedo.png"},
+                         {"name": "mossData", "path": "avgen_comp_moss_albedo.png", "colorSpace": "linear"},
+                         {"name": "gone", "path": "avgen_comp_no_such_texture.png"}],
+            "ops": [{"kind": "textureTriplanar", "dst": 0, "texture": "moss", "value": 0.5},
+                    {"kind": "textureTriplanar", "dst": 1, "texture": "mossData"},
+                    {"kind": "textureTriplanar", "dst": 2, "texture": "gone"}],
+            "baseColor": 0}],
+        "nodes": [{"name": "orb", "kind": "orb", "material": {"program": "ground"}}]})");
+    auto loaded = scene::Composition::loadFile(scene, fx.registry);
+    REQUIRE(loaded.has_value());
+    auto composition = std::move(*loaded);
+    params::ParameterSet parameters;
+    params::Modulator modulator;
+    composition->attach(parameters, modulator);
+    composition->update({});
+    const scene::Scene& s = composition->scene();
+    REQUIRE(s.programTextures.size() == 2); // one image in two colour spaces; the missing one is left out
+    CHECK(s.programTextures[0].srgb);
+    CHECK_FALSE(s.programTextures[1].srgb);
+    REQUIRE(s.programTextures[0].image != nullptr);
+    CHECK(s.programTextures[0].image->width == 4);
+    CHECK(s.programTextures[0].key == scene::materialTextureKey(s.materialPrograms[0].textures[0]));
+    CHECK(s.programTextureVersion != 0);
+    // saved as authored
+    const nlohmann::json saved = composition->toJson();
+    CHECK(saved["materialPrograms"][0]["textures"][0]["path"] == "avgen_comp_moss_albedo.png");
+    // a rebuild with nothing changed keeps the version (no re-upload)
+    const std::uint64_t version = s.programTextureVersion;
+    composition->update({});
+    CHECK(composition->scene().programTextureVersion == version);
 }
 
 TEST_CASE("Composition nests scene files and flattens them with prefixed parameters",

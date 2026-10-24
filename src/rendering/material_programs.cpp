@@ -38,7 +38,8 @@ std::uint64_t MaterialPrograms::selectOffset(int slot) {
     return static_cast<std::uint64_t>(clamped + 1) * kSelectStride;
 }
 
-void MaterialPrograms::update(const std::vector<scene::MaterialProgram>& programs, const FieldUniforms* fields) {
+void MaterialPrograms::update(const std::vector<scene::MaterialProgram>& programs, const FieldUniforms* fields,
+                              const scene::MaterialTextureLayerFn& textureLayerOf) {
     block_ = MaterialProgramBlock{};
     slots_.clear();
     const std::size_t count = std::min<std::size_t>(programs.size(), kMaxGpuMaterialPrograms);
@@ -49,9 +50,9 @@ void MaterialPrograms::update(const std::vector<scene::MaterialProgram>& program
     }
     for (std::size_t i = 0; i < count; ++i) {
         const scene::MaterialProgram& program = programs[i];
-        block_.programs[i] = scene::packMaterialProgram(program, [fields](const std::string& name) {
-            return fields != nullptr ? fields->slotOf(name) : -1;
-        });
+        block_.programs[i] = scene::packMaterialProgram(
+            program, [fields](const std::string& name) { return fields != nullptr ? fields->slotOf(name) : -1; },
+            textureLayerOf);
         slots_.emplace(program.name, static_cast<int>(i));
     }
     block_.count = static_cast<std::uint32_t>(count);

@@ -77,6 +77,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace avgen::gpu {
@@ -965,8 +966,19 @@ private:
     void updateLights(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const glm::mat4& view,
                       float aspect, FrameUniforms& frame);
     // ADR-1562: with `startInto`, the compile is started into it (init waits for it) and an empty pipeline returned.
+    // ADR-1642: `programTextures` builds the variant that samples material programs' textures (MAT_PROGRAM_TEXTURES).
     Result<wgpu::RenderPipeline> createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
-                                                   wgpu::RenderPipeline* startInto = nullptr);
+                                                   wgpu::RenderPipeline* startInto = nullptr,
+                                                   bool programTextures = false);
+    // ADR-1642: the three textured lit variants, built the first time a frame draws an entity whose program has a
+    // texture op (none for a scene without one). False when they failed (those entities draw untextured).
+    bool ensureTexturedLitPipelines();
+    // ADR-1642: whether `material`'s program (as uploaded this frame) has a texture op.
+    [[nodiscard]] bool programSamplesTexture(const scene::Material& material) const;
+    // ADR-1642: says once, per surface, that a procedural or SDF surface's program samples a texture it cannot read
+    // (only the entity pass has the textured variant).
+    void warnUntexturedPaths(const scene::Scene& scene);
+    std::unordered_set<std::string> untexturedWarned_;
     Result<wgpu::RenderPipeline> createGridPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createSkyboxPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createAtmospherePipeline(const wgpu::ShaderModule& module);
@@ -975,6 +987,8 @@ private:
     Result<wgpu::RenderPipeline> finishPipeline(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     void uploadMeshes(const scene::Scene& scene);
     void uploadTextures(const scene::Scene& scene);
+    // ADR-1642: the material programs' images as one array per colour space, rebuilt when the scene's table changes.
+    void uploadProgramTextures(const scene::Scene& scene);
     // ADR-715: uploads the scene's terrain height bake when it is not the one already resident.
     void uploadTerrainHeight(const scene::Scene& scene);
     [[nodiscard]] const wgpu::TextureView& terrainHeightView() const {
@@ -1110,6 +1124,11 @@ private:
     wgpu::RenderPipeline litOpaqueCull_;
     wgpu::RenderPipeline litOpaqueNoCull_;
     wgpu::RenderPipeline litBlend_;
+    // ADR-1642: the same three with MAT_PROGRAM_TEXTURES, for entities whose program samples a texture.
+    wgpu::RenderPipeline litTexturedOpaqueCull_;
+    wgpu::RenderPipeline litTexturedOpaqueNoCull_;
+    wgpu::RenderPipeline litTexturedBlend_;
+    bool litTexturedFailed_ = false;
     wgpu::RenderPipeline gridPipeline_;
     wgpu::RenderPipeline skyboxPipeline_;
     // ADR-230: the atmospheric sky layer, drawn immediately after the sky. Its own pipeline rather
@@ -1225,6 +1244,12 @@ private:
 
     // Defaults for absent textures and IBL.
     gpu::GpuTexture whiteSrgb_;
+    // ADR-1642: material bind group bindings 9..11, and each program texture's layer by key.
+    gpu::GpuTexture programTexturesSrgb_;
+    gpu::GpuTexture programTexturesLinear_;
+    wgpu::Sampler programTextureSampler_;
+    std::unordered_map<std::string, int> programTextureLayers_;
+    std::uint64_t programTextureVersion_ = ~0ull;
     gpu::GpuTexture whiteLinear_;
     gpu::GpuTexture flatNormal_;
     gpu::GpuTexture blackCube_;

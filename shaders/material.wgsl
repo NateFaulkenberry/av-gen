@@ -1,6 +1,6 @@
 // Procedural materials on the GPU (ADR-030, layered in ADR-036): the WGSL transliteration of
 // scene::evaluateMaterialProgram (src/scene/material_program.cpp). A packed MaterialProgramGpu
-// (5728 bytes: a 96-byte header, 4 layer records of 64 bytes and 48 ops of 112 bytes,
+// (5744 bytes: a 112-byte header (ADR-1642), 4 layer records of 64 bytes and 48 ops of 112 bytes,
 // scene::packMaterialProgram) per slot in a *storage* MaterialProgramBlock;
 // evaluateMaterialProgram(slot, ctx, base) runs the base's ops over a register file of 8 vec4s
 // (all zero at entry), reads the outputs, then runs and composites each layer, with a register
@@ -46,11 +46,12 @@ struct MaterialProgramGpu {
     aux: vec4<i32>,               // normal, occlusion, height registers, total op count
     fieldSlots: vec4<i32>,        // FieldBlock slot of each distinct field named, -1 = unused
     flags: vec4<i32>,             // ADR-904: x = MAT_FLAG_WRITES_EMISSION | MAT_FLAG_EMISSION_READS_INSTANCE
+    textureOps: vec4<i32>,        // ADR-1642: op index of each texture op (-1 = none), sampled into fields slot 4 + k
     layers: array<MaterialLayerGpu, 4>,
     ops: array<MaterialOpGpu, 48>,
 };
 
-// Mirrors rendering::MaterialProgramBlock (91664 bytes since ADR-1290's 16 slots; a storage buffer since ADR-036).
+// Mirrors rendering::MaterialProgramBlock (91920 bytes since ADR-1642's header lane; a storage buffer since ADR-036).
 struct MaterialProgramBlock {
     count: u32,
     pad0: u32,
@@ -99,6 +100,14 @@ const MAT_OP_SWIZZLE: u32 = 30u;
 const MAT_OP_VORONOI_EDGE: u32 = 31u; // ADR-1069
 const MAT_OP_QUANTIZE: u32 = 32u;     // ADR-1162
 const MAT_OP_OKLAB_RAMP: u32 = 33u;   // ADR-1470
+const MAT_OP_TEXTURE_TRIPLANAR: u32 = 34u;        // ADR-1642
+const MAT_OP_TEXTURE_TRIPLANAR_NORMAL: u32 = 35u; // ADR-1642
+const MAT_MAX_TEXTURE_OPS: i32 = 4;               // scene::kMaxMaterialTextureOps
+// ADR-1642: whether this pipeline samples program textures. False (the default, and every pipeline but the entity
+// pass's textured variants): the texture pre-pass is compiled out and texture ops read colour 1 and a flat normal.
+// A pipeline-time constant rather than a branch because the pre-pass's code, present at all, cost every program,
+// textured or not: +23% in the interpreter's compute A/B, +2 ms on a frame-filling 4K ground (ADR-1642).
+override MAT_PROGRAM_TEXTURES: bool = false;
 
 fn matPick(v: vec4<f32>, index: f32) -> f32 {
     return v[clamp(i32(index), 0, 3)];
@@ -169,6 +178,10 @@ struct MaterialContext {
     // ADR-904: the material's emission as this instance shows it with no program -- emissive colour
     // x intensity x the instance's multiplier (rgb), w = 1.
     materialEmission: vec4<f32>,
+    // ADR-1642: the first two columns of the tangent frame the caller applies a program's tangent-space normal in
+    // (the third is `normal`); zero = none, and the texture-normal op answers (0, 0, 1).
+    tangent: vec3<f32>,
+    bitangent: vec3<f32>,
 };
 
 // The material values a program reads from (`base`) and writes (scene::MaterialResult without
@@ -202,32 +215,50 @@ struct MatRegs {
     r7: vec4<f32>,
 };
 
-// The program's distinct field samples, one per fieldSlots entry. Four named fields, again not an
-// array: the point of the pre-pass is to keep the field evaluator out of the interpreter's loop,
-// and putting its results in indexable memory would give back what that buys.
+// The program's distinct field samples, one per fieldSlots entry, then (ADR-1642) its texture ops' samples, one per
+// textureOps entry: f0..f3 the fields, f4..f7 the textures. Again not an array: the point of the pre-pass is to keep
+// the field evaluator and the texture reads out of the interpreter's loop, and putting their results in indexable
+// memory would give back what that buys.
 struct MatFields {
     f0: vec4<f32>,
     f1: vec4<f32>,
     f2: vec4<f32>,
     f3: vec4<f32>,
+    f4: vec4<f32>,
+    f5: vec4<f32>,
+    f6: vec4<f32>,
+    f7: vec4<f32>,
 };
+
+fn matFieldsZero() -> MatFields {
+    return MatFields(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0),
+                     vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0));
+}
 
 fn matFieldGet(f: MatFields, index: i32) -> vec4<f32> {
     if (index < 0) {
         return vec4<f32>(0.0);   // more distinct fields than kMaxMaterialFields, or none at all
     }
-    let i = index & 3;
+    let i = index & 7;
     let h0 = select(f.f0, f.f1, (i & 1) != 0);
     let h1 = select(f.f2, f.f3, (i & 1) != 0);
-    return select(h0, h1, (i & 2) != 0);
+    let h2 = select(f.f4, f.f5, (i & 1) != 0);
+    let h3 = select(f.f6, f.f7, (i & 1) != 0);
+    let q0 = select(h0, h1, (i & 2) != 0);
+    let q1 = select(h2, h3, (i & 2) != 0);
+    return select(q0, q1, (i & 4) != 0);
 }
 
 fn matFieldSet(f: ptr<function, MatFields>, index: i32, v: vec4<f32>) {
-    let i = index & 3;
+    let i = index & 7;
     (*f).f0 = select((*f).f0, v, i == 0);
     (*f).f1 = select((*f).f1, v, i == 1);
     (*f).f2 = select((*f).f2, v, i == 2);
     (*f).f3 = select((*f).f3, v, i == 3);
+    (*f).f4 = select((*f).f4, v, i == 4);
+    (*f).f5 = select((*f).f5, v, i == 5);
+    (*f).f6 = select((*f).f6, v, i == 6);
+    (*f).f7 = select((*f).f7, v, i == 7);
 }
 
 fn matRegsZero() -> MatRegs {
@@ -286,6 +317,8 @@ fn materialContextZero() -> MaterialContext {
     ctx.footprint = 0.0;
     ctx.materialId = 0.0;
     ctx.materialEmission = vec4<f32>(0.0);
+    ctx.tangent = vec3<f32>(0.0);
+    ctx.bitangent = vec3<f32>(0.0);
     return ctx;
 }
 
@@ -662,6 +695,21 @@ fn matKField(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>,
     return matFieldGet(fields, matOpFieldOrdinal(pi, oi));
 }
 
+// ADR-1642: a texture op's value was sampled by materialTexturePrepass into its slot (4 + k); the loop only reads it.
+fn matKTextureTriplanar(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    if (!MAT_PROGRAM_TEXTURES) {
+        return vec4<f32>(1.0);
+    }
+    return matFieldGet(fields, matOpFieldOrdinal(pi, oi));
+}
+
+fn matKTextureTriplanarNormal(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    if (!MAT_PROGRAM_TEXTURES) {
+        return vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    }
+    return matFieldGet(fields, matOpFieldOrdinal(pi, oi));
+}
+
 fn matKTriplanar(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
     let k = materialPrograms.programs[pi].ops[oi].constant;
     let f = materialPrograms.programs[pi].ops[oi].value;
@@ -904,6 +952,12 @@ fn materialEvalOpKind(kind: u32, pi: u32, oi: u32, ctx: MaterialContext, a: vec4
     if (kind == MAT_OP_OKLAB_RAMP) {
         return matKOklabRamp(pi, oi, ctx, a, b, c, fields);
     }
+    if (kind == MAT_OP_TEXTURE_TRIPLANAR) {
+        return matKTextureTriplanar(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_TEXTURE_TRIPLANAR_NORMAL) {
+        return matKTextureTriplanarNormal(pi, oi, ctx, a, b, c, fields);
+    }
     return vec4<f32>(0.0);
 }
 
@@ -928,12 +982,100 @@ fn materialEvalOp(pi: u32, oi: u32, ctx: MaterialContext, regs: MatRegs, fields:
 // field share an ordinal, so each field is sampled once however often it is read.
 fn materialFieldPrepass(pi: u32, p: vec3<f32>) -> MatFields {
     let slots = materialPrograms.programs[pi].fieldSlots;
-    var f = MatFields(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0));
+    var f = matFieldsZero();
     // A loop rather than four calls: one inlined copy of the evaluator is the whole point.
     for (var k = 0; k < i32(MAT_MAX_FIELDS); k = k + 1) {
         let slot = slots[k];
         if (slot >= 0) {
             matFieldSet(&f, k, materialFieldValue(slot, p));
+        }
+    }
+    return f;
+}
+
+// ADR-1642: one texture op (scene::textureOpValue is the reference). The including module declares
+//   programTexturesSrgb, programTexturesLinear: texture_2d_array<f32>, programTextureSampler: sampler (repeating)
+// -- pbr_shade.wgsl at group 2 bindings 9..11. The mip is the one the world footprint asks for: one pixel covers
+// `footprint` metres, so footprint x tiles-per-metre x texels-per-tile texels.
+fn matTextureSample(linear: bool, layer: i32, uv: vec2<f32>, lod: f32) -> vec4<f32> {
+    if (linear) {
+        return textureSampleLevel(programTexturesLinear, programTextureSampler, uv, layer, lod);
+    }
+    return textureSampleLevel(programTexturesSrgb, programTextureSampler, uv, layer, lod);
+}
+
+fn matTextureOp(pi: u32, oi: u32, ctx: MaterialContext) -> vec4<f32> {
+    let isNormal = materialPrograms.programs[pi].ops[oi].kind == MAT_OP_TEXTURE_TRIPLANAR_NORMAL;
+    let missing = select(vec4<f32>(1.0), vec4<f32>(0.0, 0.0, 1.0, 1.0), isNormal);
+    let layer = materialPrograms.programs[pi].ops[oi].fieldSlot;
+    if (layer < 0) {
+        return missing;
+    }
+    let linear = materialPrograms.programs[pi].ops[oi].input == 1u;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let k2 = materialPrograms.programs[pi].ops[oi].constant2;
+    let p = ctx.worldPosition * f + k.xyz;
+    let n = matSafeNormalize(ctx.normal, vec3<f32>(0.0, 1.0, 0.0));
+    let w = matTriplanarWeights(n, k2.x);
+    let sg = select(vec3<f32>(-1.0), vec3<f32>(1.0), n >= vec3<f32>(0.0));
+    var size = f32(textureDimensions(programTexturesSrgb).x);
+    if (linear) {
+        size = f32(textureDimensions(programTexturesLinear).x);
+    }
+    let lod = log2(max(ctx.footprint * abs(f) * size, 1e-6)) + k2.z;
+    let green = select(1.0, -1.0, k2.y < 0.0);
+    let strength = select(k2.w, 1.0, k2.w == 0.0);
+    var colour = vec4<f32>(0.0);
+    var perturb = vec3<f32>(0.0);
+    for (var i = 0; i < 3; i = i + 1) {
+        let wi = w[i];
+        if (!(wi >= 1e-3)) {
+            continue;
+        }
+        // the plane's uv, its world tangent (u) and its image-up axis, with u x up the face's outward normal
+        var uv = vec2<f32>(-p.z * sg.x, -p.y);
+        var tu = vec3<f32>(0.0, 0.0, -sg.x);
+        var up = vec3<f32>(0.0, 1.0, 0.0);
+        if (i == 1) {
+            uv = vec2<f32>(p.x * sg.y, p.z);
+            tu = vec3<f32>(sg.y, 0.0, 0.0);
+            up = vec3<f32>(0.0, 0.0, -1.0);
+        } else if (i == 2) {
+            uv = vec2<f32>(p.x * sg.z, -p.y);
+            tu = vec3<f32>(sg.z, 0.0, 0.0);
+        }
+        let s = matTextureSample(linear, layer, uv, lod);
+        if (isNormal) {
+            let t = s.xy * 2.0 - 1.0;
+            perturb = perturb + wi * strength * (t.x * tu + green * t.y * up);
+        } else {
+            colour = colour + wi * s;
+        }
+    }
+    if (!isNormal) {
+        return colour;
+    }
+    let nw = matSafeNormalize(n + perturb, n);
+    let tf = ctx.tangent;
+    let bf = ctx.bitangent;
+    let det = dot(tf, cross(bf, n));
+    if (!(abs(det) > 1e-10)) {
+        return vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    }
+    let ts = vec3<f32>(dot(cross(bf, n), nw), dot(cross(n, tf), nw), dot(cross(tf, bf), nw)) / det;
+    return vec4<f32>(matSafeNormalize(ts, vec3<f32>(0.0, 0.0, 1.0)), 1.0);
+}
+
+// ADR-1642: samples the program's texture ops once, before any op runs (materialFieldPrepass's reasoning: a texture
+// read inlined into the loop body would set every program's register allocation), into slots 4..7.
+fn materialTexturePrepass(pi: u32, ctx: MaterialContext, fieldsIn: MatFields) -> MatFields {
+    var f = fieldsIn;
+    let ops = materialPrograms.programs[pi].textureOps;
+    for (var k = 0; k < MAT_MAX_TEXTURE_OPS; k = k + 1) {
+        let oi = ops[k];
+        if (oi >= 0 && oi < i32(MAT_MAX_OPS)) {
+            matFieldSet(&f, 4 + k, matTextureOp(pi, u32(oi), ctx));
         }
     }
     return f;
@@ -998,7 +1140,10 @@ fn evaluateMaterialProgram(programIndex: i32, ctx: MaterialContext, base: Materi
     let pi = u32(programIndex);
     var regs = matRegsZero();
     var local = ctx;
-    let fields = materialFieldPrepass(pi, ctx.worldPosition);
+    var fields = materialFieldPrepass(pi, ctx.worldPosition);
+    if (MAT_PROGRAM_TEXTURES) { // ADR-1642: compiled out of every pipeline that does not ask for it
+        fields = materialTexturePrepass(pi, ctx, fields);
+    }
     let baseCount = u32(max(materialPrograms.programs[pi].opacityCountPad.y, 0));
     var result = base;
 

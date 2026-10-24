@@ -114,10 +114,11 @@ std::vector<std::uint8_t> downsampleF(const std::vector<std::uint8_t>& src, std:
 }
 
 void writeLevel(Context& context, const wgpu::Texture& texture, std::uint32_t level, std::uint32_t w, std::uint32_t h,
-                std::uint32_t bytesPerPixel, const std::vector<std::uint8_t>& pixels) {
+                std::uint32_t bytesPerPixel, const std::vector<std::uint8_t>& pixels, std::uint32_t layer = 0) {
     wgpu::TexelCopyTextureInfo dst{};
     dst.texture = texture;
     dst.mipLevel = level;
+    dst.origin = {0, 0, layer};
     wgpu::TexelCopyBufferLayout layout{};
     layout.bytesPerRow = w * bytesPerPixel;
     layout.rowsPerImage = h;
@@ -125,7 +126,105 @@ void writeLevel(Context& context, const wgpu::Texture& texture, std::uint32_t le
     context.queue().WriteTexture(&dst, pixels.data(), pixels.size(), &layout, &extent);
 }
 
+// ADR-1642: a bilinear resample of 8-bit RGBA to (dw, dh), in linear light for sRGB data (texel centres aligned).
+std::vector<std::uint8_t> resample8(const std::vector<std::uint8_t>& src, std::uint32_t w, std::uint32_t h,
+                                    std::uint32_t dw, std::uint32_t dh, bool srgb) {
+    std::vector<std::uint8_t> dst(static_cast<std::size_t>(dw) * dh * 4);
+    const auto at = [&](std::uint32_t x, std::uint32_t y, int c) {
+        const std::uint8_t v = src[(static_cast<std::size_t>(y) * w + x) * 4 + static_cast<std::size_t>(c)];
+        return srgb && c < 3 ? srgbToLinear(v) : static_cast<float>(v) / 255.0f;
+    };
+    for (std::uint32_t y = 0; y < dh; ++y) {
+        const float sy = std::clamp((static_cast<float>(y) + 0.5f) * static_cast<float>(h) / static_cast<float>(dh) - 0.5f,
+                                    0.0f, static_cast<float>(h - 1));
+        const auto y0 = static_cast<std::uint32_t>(sy);
+        const std::uint32_t y1 = std::min(y0 + 1, h - 1);
+        const float fy = sy - static_cast<float>(y0);
+        for (std::uint32_t x = 0; x < dw; ++x) {
+            const float sx = std::clamp((static_cast<float>(x) + 0.5f) * static_cast<float>(w) / static_cast<float>(dw) -
+                                            0.5f,
+                                        0.0f, static_cast<float>(w - 1));
+            const auto x0 = static_cast<std::uint32_t>(sx);
+            const std::uint32_t x1 = std::min(x0 + 1, w - 1);
+            const float fx = sx - static_cast<float>(x0);
+            std::uint8_t* q = dst.data() + (static_cast<std::size_t>(y) * dw + x) * 4;
+            for (int c = 0; c < 4; ++c) {
+                const float v = (at(x0, y0, c) * (1.0f - fx) + at(x1, y0, c) * fx) * (1.0f - fy) +
+                                (at(x0, y1, c) * (1.0f - fx) + at(x1, y1, c) * fx) * fy;
+                q[c] = srgb && c < 3 ? linearToSrgb(v)
+                                     : static_cast<std::uint8_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+            }
+        }
+    }
+    return dst;
+}
+
 } // namespace
+
+Result<GpuTexture> uploadTextureArray(Context& context, const std::vector<const scene::TextureData*>& layers, bool srgb,
+                                      const std::array<std::uint8_t, 4>& fill, const char* label) {
+    std::uint32_t width = 1;
+    std::uint32_t height = 1;
+    for (const scene::TextureData* layer : layers) {
+        if (layer == nullptr || !layer->valid() || layer->isHdr()) {
+            return fail("texture array '{}': layer '{}' is not an 8-bit image", label,
+                        layer != nullptr ? layer->name : std::string("(null)"));
+        }
+        width = std::max(width, layer->width);
+        height = std::max(height, layer->height);
+    }
+    width = std::min(width, 4096u);
+    height = std::min(height, 4096u);
+    const auto count = static_cast<std::uint32_t>(std::max<std::size_t>(layers.size(), 1));
+    GpuTexture out;
+    out.width = width;
+    out.height = height;
+    out.format = srgb ? wgpu::TextureFormat::RGBA8UnormSrgb : wgpu::TextureFormat::RGBA8Unorm;
+    out.mipLevels = mipLevelCount(width, height);
+    wgpu::TextureDescriptor desc{};
+    desc.label = label;
+    desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+    desc.dimension = wgpu::TextureDimension::e2D;
+    desc.size = {width, height, count};
+    desc.format = out.format;
+    desc.mipLevelCount = out.mipLevels;
+    out.texture = context.device().CreateTexture(&desc);
+    if (!out.texture) {
+        return fail("failed to create texture array '{}'", label);
+    }
+    for (std::uint32_t i = 0; i < count; ++i) {
+        std::vector<std::uint8_t> level;
+        if (layers.empty()) {
+            level.assign(static_cast<std::size_t>(width) * height * 4, 0);
+            for (std::size_t p = 0; p < level.size(); p += 4) {
+                std::copy(fill.begin(), fill.end(), level.begin() + static_cast<std::ptrdiff_t>(p));
+            }
+        } else {
+            const scene::TextureData& src = *layers[i];
+            level = src.width == width && src.height == height
+                        ? src.data
+                        : resample8(src.data, src.width, src.height, width, height, srgb);
+        }
+        std::uint32_t w = width;
+        std::uint32_t h = height;
+        writeLevel(context, out.texture, 0, w, h, 4, level, i);
+        for (std::uint32_t mip = 1; mip < out.mipLevels; ++mip) {
+            const std::uint32_t dw = std::max(1u, w / 2);
+            const std::uint32_t dh = std::max(1u, h / 2);
+            level = downsample8(level, w, h, dw, dh, srgb);
+            w = dw;
+            h = dh;
+            writeLevel(context, out.texture, mip, w, h, 4, level, i);
+        }
+    }
+    wgpu::TextureViewDescriptor viewDesc{};
+    viewDesc.label = label;
+    viewDesc.dimension = wgpu::TextureViewDimension::e2DArray;
+    viewDesc.mipLevelCount = out.mipLevels;
+    viewDesc.arrayLayerCount = count;
+    out.view = out.texture.CreateView(&viewDesc);
+    return out;
+}
 
 float srgbToLinear8(std::uint8_t value) { return srgbToLinear(value); }
 

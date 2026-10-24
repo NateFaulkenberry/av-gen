@@ -8,8 +8,10 @@
 
 #include <webgpu/webgpu_cpp.h>
 
+#include <array>
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 namespace avgen::gpu {
 
@@ -28,6 +30,12 @@ struct GpuTexture {
 // Uploads with a full mip chain (box filter on the CPU; sRGB data is filtered in linear space).
 // Rgba32Float textures get no mips unless `mips` is true.
 Result<GpuTexture> uploadTexture(Context& context, const scene::TextureData& data, bool mips = true);
+
+// ADR-1642: uploads 8-bit images as one 2D array with a full mip chain, RGBA8UnormSrgb when `srgb` (filtered in linear
+// light) else RGBA8Unorm, viewed as a 2D array. Every layer takes the largest width and height among them (at most
+// 4096); a smaller image is resampled up bilinearly. No images: one 1x1 layer of `fill`. A float image is refused.
+Result<GpuTexture> uploadTextureArray(Context& context, const std::vector<const scene::TextureData*>& layers, bool srgb,
+                                      const std::array<std::uint8_t, 4>& fill, const char* label);
 
 // Uploads an Rgba32Float image as RGBA16Float (filterable on every backend) with a mip chain.
 Result<GpuTexture> uploadTextureAsHalf(Context& context, const scene::TextureData& data, bool mips = true);

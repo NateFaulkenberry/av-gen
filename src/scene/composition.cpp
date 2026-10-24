@@ -3755,9 +3755,51 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     seekLandedSeconds_ = seconds;
 }
 
+// ADR-1642: Scene::programTextures from every program the scene carries (its own and its nested compositions'), each
+// image decoded once through the registry's cache. A program added without a file (the editor, the AI) resolves its
+// paths against the project here. An image that does not load is said once and its ops read colour 1 / a flat normal.
+void Composition::collectProgramTextures() {
+    std::vector<ProgramTexture> table;
+    std::uint64_t digest = 0xC0FFEE1642ull;
+    for (MaterialProgram& program : scene_.materialPrograms) {
+        for (MaterialTexture& texture : program.textures) {
+            if (texture.resolvedPath.empty()) {
+                texture.resolvedPath = registry_.resolve(texture.path).lexically_normal();
+            }
+            const std::string key = materialTextureKey(texture);
+            if (std::any_of(table.begin(), table.end(), [&key](const ProgramTexture& t) { return t.key == key; })) {
+                continue;
+            }
+            auto image = registry_.loadImage(texture.resolvedPath, texture.srgb);
+            if (!image) {
+                if (programTextureWarned_.insert(key).second) {
+                    log::warn("material program '{}': texture '{}' ({}) did not load: {} -- its texture ops read colour "
+                              "1 and a flat normal (ADR-1642)",
+                              program.name, texture.name, texture.resolvedPath.string(), image.error().message);
+                }
+                continue;
+            }
+            const std::shared_ptr<const assets::ImageAsset> asset = *image;
+            table.push_back(ProgramTexture{key, texture.srgb,
+                                           std::shared_ptr<const TextureData>(asset, &asset->image)});
+            for (const char c : key) {
+                digest = (digest ^ static_cast<std::uint8_t>(c)) * 0x100000001B3ull;
+            }
+            digest = (digest ^ asset->version) * 0x100000001B3ull;
+        }
+    }
+    scene_.programTextures = std::move(table);
+    scene_.programTextureVersion = digest;
+}
+
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
     if (auto v = program.validate(); !v) {
         return std::unexpected(v.error());
+    }
+    for (MaterialTexture& texture : program.textures) { // ADR-1642: one with no file of its own resolves in the project
+        if (texture.resolvedPath.empty()) {
+            texture.resolvedPath = registry_.resolve(texture.path).lexically_normal();
+        }
     }
     for (const auto& existing : materialPrograms_) {
         if (existing.name == program.name) {
@@ -7787,6 +7829,7 @@ void Composition::rebuild() {
     // rebuild that re-adds the same images has already moved the counter by the time we get here.
     // Putting it back is what makes "no texture changed" mean "no re-upload" rather than "one fewer
     // re-upload than before".
+    collectProgramTextures(); // ADR-1642
     const auto textureDigestStart = std::chrono::steady_clock::now();
     const std::uint64_t textureDigest = textureTableDigest(scene_.textures);
     const double textureDigestMs =
@@ -12056,6 +12099,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 mp = MaterialProgram::loadFile(file);
             } else if (pj.is_object()) {
                 mp = MaterialProgram::fromJson(pj);
+                if (mp) { // ADR-1642: an inline program's images sit beside the scene file
+                    resolveMaterialTexturePaths(mp->textures,
+                                                !scenePath.empty() ? scenePath.parent_path() : registry.resolve("."));
+                }
             }
             if (!mp) {
                 return fail("scene file '{}': material program: {}", scenePath.string(), mp.error().message);

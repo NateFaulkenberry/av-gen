@@ -50,6 +50,15 @@
 //   RoughnessFilter: Kaplanyan specular anti-aliasing from normalVariance (a.x = roughness,
 //                    f = variance scale)
 //   MicroDetail    : noise whose amplitude fades with the screen-space footprint, so it never aliases
+// ADR-1642 ops (texture inputs; the program's `textures` name the images):
+//   TextureTriplanar      : the named texture projected on the three world planes of worldPosition * f + k.xyz,
+//                           blended by triplanarWeights(normal, k2.x) -> rgba (linear; an sRGB image is decoded)
+//   TextureTriplanarNormal: the named normal map, the same projection, its tangent-space x/y laid on each plane's
+//                           world axes and added to the surface normal (UDN), returned as the tangent-space normal
+//                           the shader applies (in the fragment's own tangent frame) -> (xyz, 1)
+//   For both, k2 = (blend sharpness (0 = 4), green sign (< 0: a DirectX map), mip bias, normal strength (0 = 1)).
+//   They read no register: the shader samples them once, before the interpreter loop (as Field ops, ADR-050),
+//   at most kMaxMaterialTextureOps of them per program.
 // Outputs: baseColor (rgb), metallic (x), roughness (x), emission (rgb x emissionIntensity),
 // opacity (x), normal (xyz, tangent space), occlusion (x), height (x); -1 = keep the material's
 // value.
@@ -62,6 +71,8 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -91,6 +102,8 @@ enum class MaterialOpKind : std::uint8_t {
     // ADR-1470, appended: a four-stop gradient blended in OKLab (no grey or dark midpoints between saturated stops),
     // optionally cyclic, so a colour field can run through a palette's roles in one op.
     OklabRamp,
+    // ADR-1642, appended: an image the program names, projected triplanar in world space (colour, and a normal map).
+    TextureTriplanar, TextureTriplanarNormal,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
 [[nodiscard]] std::optional<MaterialOpKind> materialOpKindFromName(std::string_view name);
@@ -126,6 +139,7 @@ struct MaterialOp {
     std::uint32_t seed = 1;
     MaterialInput input = MaterialInput::WorldPosition;
     std::string field;            // Field op: field name
+    std::string texture;          // ADR-1642 texture ops: the name of one of the program's `textures`
 };
 constexpr int kMaxMaterialOps = 48;   // ADR-036 (was 16); shared by the base and every layer
 constexpr int kMaterialRegisters = 8;
@@ -134,6 +148,33 @@ constexpr int kMaterialRegisters = 8;
 // program 2.2x whether or not it uses one -- see docs/performance.md.
 constexpr int kMaxMaterialFields = 4;
 constexpr int kMaxMaterialLayers = 4;
+// ADR-1642: texture ops one program may hold (each is sampled once, before the interpreter loop, into its own slot),
+// and the distinct images it may name.
+constexpr int kMaxMaterialTextureOps = 4;
+constexpr int kMaxMaterialTextures = 8;
+
+// ADR-1642: an image a program samples by name. `path` is as authored: relative to the file the program came from
+// (a `.material.json`, or the scene that holds it inline). `resolvedPath` is where it was found, set when the program
+// is loaded and never written back. A colour image (albedo) is sRGB; a data image (normal, roughness, a mask) linear.
+struct MaterialTexture {
+    std::string name;
+    std::string path;
+    bool srgb = true;
+    std::filesystem::path resolvedPath; // runtime only
+    [[nodiscard]] bool operator==(const MaterialTexture& o) const {
+        return name == o.name && path == o.path && srgb == o.srgb;
+    }
+};
+// Fills each texture's `resolvedPath` from `base` (the directory its program's file is in) where it is still empty.
+void resolveMaterialTexturePaths(std::vector<MaterialTexture>& textures, const std::filesystem::path& base);
+// ADR-1642: one decoded program texture in Scene::programTextures. `key` is materialTextureKey(texture).
+struct TextureData;
+struct ProgramTexture {
+    std::string key;
+    bool srgb = true;
+    std::shared_ptr<const TextureData> image;
+};
+[[nodiscard]] std::string materialTextureKey(const MaterialTexture& texture);
 
 // One layer over the base (ADR-036). Its ops run after the base's, over the same registers, and
 // the values it names are composited with `heightBlendWeight(runningHeight, height, mask, range)`.
@@ -184,6 +225,7 @@ struct MaterialProgram {
     std::string name = "material";
     std::vector<MaterialOp> ops;
     std::vector<MaterialLayer> layers;
+    std::vector<MaterialTexture> textures; // ADR-1642: the images its texture ops name
     int baseColorRegister = -1;
     int metallicRegister = -1;
     int roughnessRegister = -1;
@@ -216,6 +258,8 @@ struct MaterialProgram {
     [[nodiscard]] bool emissionReadsMaterial() const;
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
+    // ADR-1642: the texture a texture op names, or null.
+    [[nodiscard]] const MaterialTexture* textureNamed(std::string_view textureName) const;
     [[nodiscard]] nlohmann::json toJson() const;
     static Result<MaterialProgram> fromJson(const nlohmann::json& j);
     // Loads a program from a standalone `.material.json` file (the same object `fromJson` takes),
@@ -262,10 +306,23 @@ struct MaterialContext {
     glm::vec4 materialEmission{0.0f};
     // Field samples by name are resolved through this callback (null = zeros).
     const struct MaterialFieldSampler* fields = nullptr;
+    // ADR-1642: the first two columns of the tangent frame the shader applies a program's tangent-space normal in (the
+    // third is `normal`); the texture-normal op answers in it. Zero (the default) is no frame: that op returns (0,0,1).
+    glm::vec3 tangent{0.0f};
+    glm::vec3 bitangent{0.0f};
+    // ADR-1642: the images texture ops read (null = an unresolved texture: colour 1, normal flat).
+    const struct MaterialTextureSampler* textures = nullptr;
 };
 struct MaterialFieldSampler {
     virtual ~MaterialFieldSampler() = default;
     [[nodiscard]] virtual glm::vec4 sample(std::string_view field, const glm::vec3& worldPosition) const = 0;
+};
+// ADR-1642: the CPU reference's texture lookup. `sample` is level 0, bilinear, repeating, an sRGB image decoded to
+// linear (the GPU reads mip `lod`; with a zero footprint that is level 0 too, which is what parity compares). nullopt =
+// the texture is not loaded.
+struct MaterialTextureSampler {
+    virtual ~MaterialTextureSampler() = default;
+    [[nodiscard]] virtual std::optional<glm::vec4> sample(const MaterialTexture& texture, const glm::vec2& uv) const = 0;
 };
 struct MaterialResult {
     glm::vec3 baseColor{1.0f};
@@ -297,7 +354,7 @@ struct MaterialResult {
 [[nodiscard]] MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const MaterialContext& ctx,
                                                      const MaterialResult& base);
 
-// GPU packing (see shaders/material.wgsl): a 96-byte header, kMaxMaterialLayers 64-byte layer
+// GPU packing (see shaders/material.wgsl): a 112-byte header (ADR-1642; was 96), kMaxMaterialLayers 64-byte layer
 // records and kMaxMaterialOps 112-byte ops.
 struct alignas(16) MaterialOpGpu {
     std::uint32_t kind;
@@ -331,21 +388,32 @@ struct alignas(16) MaterialProgramGpu {
     // ADR-904: x = kMaterialWritesEmission | kMaterialEmissionReadsInstance, yzw = 0. The header had
     // no lane to spare (the gate took the last ones), so the header grew by one vec4.
     glm::ivec4 flags;
+    // ADR-1642: the op index of each texture op (-1 = none), sampled before the loop into fields slot 4 + k. A texture
+    // op's MaterialOpGpu: fieldSlot = its layer in the array, input = 0 (the sRGB array) or 1 (the linear array),
+    // fieldOrdinal = 4 + k.
+    glm::ivec4 textureOps;
     std::array<MaterialLayerGpu, kMaxMaterialLayers> layers;
     std::array<MaterialOpGpu, kMaxMaterialOps> ops;
 };
-static_assert(sizeof(MaterialProgramGpu) == 96 + 64 * kMaxMaterialLayers + 112 * kMaxMaterialOps);
+static_assert(sizeof(MaterialProgramGpu) == 112 + 64 * kMaxMaterialLayers + 112 * kMaxMaterialOps);
+static_assert(kMaxMaterialTextureOps == 4); // textureOps is one ivec4
 // The bits of `MaterialProgramGpu::flags.x` (MaterialProgram::writesEmission/emissionReadsInstance).
 inline constexpr std::int32_t kMaterialWritesEmission = 1;
 inline constexpr std::int32_t kMaterialEmissionReadsInstance = 2;
 static_assert(kMaxMaterialFields == 4); // fieldSlots is one ivec4
 // `fieldSlotOf` maps a field name to a GPU slot (-1 when unknown).
+// ADR-1642: `textureLayerOf` maps a program texture to its layer in the renderer's array of its colour space (-1 = not
+// loaded; an empty function = none is).
+using MaterialTextureLayerFn = std::function<int(const MaterialTexture&)>;
 template <typename SlotFn>
-MaterialProgramGpu packMaterialProgram(const MaterialProgram& program, SlotFn&& fieldSlotOf);
-MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program, const std::vector<std::pair<std::string, int>>& slots);
+MaterialProgramGpu packMaterialProgram(const MaterialProgram& program, SlotFn&& fieldSlotOf,
+                                       const MaterialTextureLayerFn& textureLayerOf = {});
+MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program, const std::vector<std::pair<std::string, int>>& slots,
+                                                const MaterialTextureLayerFn& textureLayerOf = {});
 
 template <typename SlotFn>
-MaterialProgramGpu packMaterialProgram(const MaterialProgram& program, SlotFn&& fieldSlotOf) {
+MaterialProgramGpu packMaterialProgram(const MaterialProgram& program, SlotFn&& fieldSlotOf,
+                                       const MaterialTextureLayerFn& textureLayerOf) {
     std::vector<std::pair<std::string, int>> slots;
     const auto collect = [&slots, &fieldSlotOf](const std::vector<MaterialOp>& ops) {
         for (const MaterialOp& op : ops) {
@@ -358,7 +426,7 @@ MaterialProgramGpu packMaterialProgram(const MaterialProgram& program, SlotFn&& 
     for (const MaterialLayer& layer : program.layers) {
         collect(layer.ops);
     }
-    return packMaterialProgramWithSlots(program, slots);
+    return packMaterialProgramWithSlots(program, slots, textureLayerOf);
 }
 
 } // namespace avgen::scene

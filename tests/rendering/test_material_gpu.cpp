@@ -13,6 +13,7 @@
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
+#include "gpu/texture.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/material_programs.hpp"
 #include "rendering/scene_renderer.hpp"
@@ -22,10 +23,12 @@
 #include "spatial/field.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <memory>
@@ -71,15 +74,18 @@ scene::MaterialResult harnessBase() {
 
 // ---- the compute harness --------------------------------------------------------------------------
 
-// 14 vec4s per context (ADR-036 added the geometric inputs); results are 4 vec4s per context. The
+// 16 vec4s per context (ADR-036 added the geometric inputs, ADR-1642 the tangent frame); results are 4 vec4s per context. The
 // base values are baked in so both sides start from harnessBase().
 constexpr const char* kKernel = R"(
 @group(0) @binding(0) var<uniform> fieldBlock: FieldBlock;
 @group(0) @binding(1) var<storage, read> materialPrograms: MaterialProgramBlock;
 @group(0) @binding(2) var<storage, read> contexts: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read_write> results: array<vec4<f32>>;
+@group(0) @binding(16) var programTexturesSrgb: texture_2d_array<f32>;   // ADR-1642
+@group(0) @binding(17) var programTexturesLinear: texture_2d_array<f32>;
+@group(0) @binding(18) var programTextureSampler: sampler;
 
-const CTX_STRIDE: u32 = 14u;
+const CTX_STRIDE: u32 = 16u;
 
 @compute @workgroup_size(64)
 fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -112,6 +118,8 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     ctx.footprint = contexts[b + 12u].y;
     ctx.materialId = contexts[b + 12u].z;
     ctx.materialEmission = contexts[b + 13u]; // ADR-904
+    ctx.tangent = contexts[b + 14u].xyz;       // ADR-1642
+    ctx.bitangent = contexts[b + 15u].xyz;
 
     var base = materialResultZero();
     base.baseColor = vec3<f32>(0.8, 0.7, 0.6);
@@ -127,6 +135,13 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     results[i * 4u + 3u] = vec4<f32>(r.normal, 0.0);
 }
 )";
+
+// ADR-1642: the program texture arrays a harness run binds, and each texture's layer in them.
+struct HarnessTextures {
+    gpu::GpuTexture srgb;
+    gpu::GpuTexture linear;
+    scene::MaterialTextureLayerFn layerOf;
+};
 
 // One evaluation: a MaterialContext plus the program slot to run it against.
 struct Case {
@@ -149,7 +164,7 @@ public:
         const auto& device = ctx_.device();
         // fields.wgsl declares the shared grid table at binding 15 (ADR-032), so every layout
         // serving a consumer of it must carry that entry too.
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         for (std::uint32_t i = 0; i < 4; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
@@ -161,6 +176,15 @@ public:
         entries[4].binding = 15;
         entries[4].visibility = wgpu::ShaderStage::Compute;
         entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        for (std::uint32_t i = 5; i < 7; ++i) { // ADR-1642: the program texture arrays and their sampler
+            entries[i].binding = 11 + i;
+            entries[i].visibility = wgpu::ShaderStage::Compute;
+            entries[i].texture.sampleType = wgpu::TextureSampleType::Float;
+            entries[i].texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
+        }
+        entries[7].binding = 18;
+        entries[7].visibility = wgpu::ShaderStage::Compute;
+        entries[7].sampler.type = wgpu::SamplerBindingType::Filtering;
         wgpu::BindGroupLayoutDescriptor ldesc{};
         ldesc.entryCount = entries.size();
         ldesc.entries = entries.data();
@@ -172,23 +196,42 @@ public:
         cdesc.layout = device.CreatePipelineLayout(&pdesc);
         cdesc.compute.module = *module;
         cdesc.compute.entryPoint = "cs_material";
+        wgpu::ConstantEntry texturesOn{}; // ADR-1642: the harness reads texture ops (the entity pass's variant)
+        texturesOn.key = "MAT_PROGRAM_TEXTURES";
+        texturesOn.value = 1.0;
+        cdesc.compute.constantCount = 1;
+        cdesc.compute.constants = &texturesOn;
         pipeline_ = device.CreateComputePipeline(&cdesc);
         REQUIRE(pipeline_ != nullptr);
+        auto srgb = gpu::uploadTextureArray(ctx_, {}, true, {255, 255, 255, 255}, "harness-srgb");
+        auto linear = gpu::uploadTextureArray(ctx_, {}, false, {128, 128, 255, 255}, "harness-linear");
+        REQUIRE(srgb.has_value());
+        REQUIRE(linear.has_value());
+        defaultTextures_.srgb = std::move(*srgb);
+        defaultTextures_.linear = std::move(*linear);
+        wgpu::SamplerDescriptor sd{};
+        sd.addressModeU = wgpu::AddressMode::Repeat;
+        sd.addressModeV = wgpu::AddressMode::Repeat;
+        sd.magFilter = wgpu::FilterMode::Linear;
+        sd.minFilter = wgpu::FilterMode::Linear;
+        sd.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+        sampler_ = device.CreateSampler(&sd);
     }
 
     // Uploads `programs` (at most 8) and evaluates every case; returns one result per case.
     std::vector<scene::MaterialResult> run(const std::vector<MaterialProgram>& programs,
                                            const spatial::FieldSet& fields, double time,
-                                           const std::vector<Case>& cases) {
+                                           const std::vector<Case>& cases, const HarnessTextures* textures = nullptr) {
+        const HarnessTextures& tex = textures != nullptr ? *textures : defaultTextures_;
         rendering::FieldUniforms fieldBlock(ctx_);
         fieldBlock.update(fields, time);
         rendering::MaterialPrograms block(ctx_);
-        block.update(programs, &fieldBlock);
+        block.update(programs, &fieldBlock, tex.layerOf);
 
-        std::vector<glm::vec4> packed(cases.size() * 14, glm::vec4(0.0f));
+        std::vector<glm::vec4> packed(cases.size() * 16, glm::vec4(0.0f));
         for (std::size_t i = 0; i < cases.size(); ++i) {
             const scene::MaterialContext& c = cases[i].ctx;
-            glm::vec4* p = packed.data() + i * 14;
+            glm::vec4* p = packed.data() + i * 16;
             p[0] = glm::vec4(c.worldPosition, c.objectId);
             p[1] = glm::vec4(c.localPosition, c.instanceIndex);
             p[2] = glm::vec4(c.normal, c.instanceId);
@@ -203,6 +246,8 @@ public:
             p[11] = glm::vec4(c.curvature, c.cavity, c.occlusion, c.height);
             p[12] = glm::vec4(c.normalVariance, c.footprint, c.materialId, 0.0f);
             p[13] = c.materialEmission; // ADR-904
+            p[14] = glm::vec4(c.tangent, 0.0f);   // ADR-1642
+            p[15] = glm::vec4(c.bitangent, 0.0f);
         }
 
         const auto& device = ctx_.device();
@@ -218,7 +263,7 @@ public:
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
 
-        std::array<wgpu::BindGroupEntry, 5> entries{};
+        std::array<wgpu::BindGroupEntry, 8> entries{};
         entries[0].binding = 0;
         entries[0].buffer = fieldBlock.buffer();
         entries[0].size = rendering::FieldUniforms::kBufferSize;
@@ -234,6 +279,12 @@ public:
         entries[4].binding = 15;
         entries[4].buffer = fieldBlock.gridBuffer();
         entries[4].size = rendering::FieldUniforms::kGridBufferSize;
+        entries[5].binding = 16; // ADR-1642
+        entries[5].textureView = tex.srgb.view;
+        entries[6].binding = 17;
+        entries[6].textureView = tex.linear.view;
+        entries[7].binding = 18;
+        entries[7].sampler = sampler_;
         wgpu::BindGroupDescriptor gdesc{};
         gdesc.layout = layout_;
         gdesc.entryCount = entries.size();
@@ -271,6 +322,8 @@ private:
     gpu::ShaderLibrary shaders_;
     wgpu::BindGroupLayout layout_;
     wgpu::ComputePipeline pipeline_;
+    HarnessTextures defaultTextures_;
+    wgpu::Sampler sampler_;
 };
 
 // The CPU field sampler the Field op reads through: exactly what materialFieldValue does on the GPU.
@@ -1502,4 +1555,359 @@ TEST_CASE("the ninth to sixteenth material programs render; the seventeenth fall
     INFO("seventeenth pixel " << g[0] << "," << g[1] << "," << g[2]);
     CHECK(std::abs(g[1] - g[0]) < 12);
     CHECK(std::abs(g[1] - g[2]) < 12);
+}
+
+// ---- ADR-1642: texture inputs ------------------------------------------------------------------------------------
+
+namespace {
+
+// A smooth 32x32 image: neighbouring texels differ little, so the GPU's fixed-point bilinear weights stay within the
+// parity tolerance. `normalMap`: a tangent-space normal map whose tilt turns across the tile.
+scene::TextureData smoothImage(bool normalMap) {
+    scene::TextureData t;
+    t.name = normalMap ? "normal" : "colour";
+    t.width = 32;
+    t.height = 32;
+    t.format = normalMap ? scene::TextureFormat::Rgba8Unorm : scene::TextureFormat::Rgba8Srgb;
+    t.data.resize(32 * 32 * 4);
+    for (int y = 0; y < 32; ++y) {
+        for (int x = 0; x < 32; ++x) {
+            const float a = 6.2831853f * static_cast<float>(x) / 32.0f;
+            const float b = 6.2831853f * static_cast<float>(y) / 32.0f;
+            std::uint8_t* p = t.data.data() + (y * 32 + x) * 4;
+            if (normalMap) {
+                const glm::vec3 n = glm::normalize(glm::vec3(0.45f * std::sin(a), 0.45f * std::cos(b), 1.0f));
+                for (int c = 0; c < 3; ++c) {
+                    p[c] = static_cast<std::uint8_t>(std::lround((n[c] * 0.5f + 0.5f) * 255.0f));
+                }
+            } else {
+                p[0] = static_cast<std::uint8_t>(std::lround(127.5f + 100.0f * std::sin(a)));
+                p[1] = static_cast<std::uint8_t>(std::lround(127.5f + 100.0f * std::cos(b)));
+                p[2] = static_cast<std::uint8_t>(std::lround(127.5f + 60.0f * std::sin(a + b)));
+            }
+            p[3] = 255;
+        }
+    }
+    return t;
+}
+
+// The CPU reference's lookup: level 0, bilinear, repeating, sRGB decoded -- what the GPU reads at a zero footprint.
+class ImageSampler : public scene::MaterialTextureSampler {
+public:
+    ImageSampler(const scene::TextureData& colour, const scene::TextureData& normal) : colour_(colour), normal_(normal) {}
+    std::optional<glm::vec4> sample(const scene::MaterialTexture& t, const glm::vec2& uv) const override {
+        const scene::TextureData& img = t.srgb ? colour_ : normal_;
+        const auto texel = [&](int x, int y) {
+            const int w = static_cast<int>(img.width);
+            const int h = static_cast<int>(img.height);
+            x = ((x % w) + w) % w;
+            y = ((y % h) + h) % h;
+            const std::uint8_t* p = img.data.data() + (y * w + x) * 4;
+            glm::vec4 v;
+            for (int c = 0; c < 4; ++c) {
+                const float f = static_cast<float>(p[c]) / 255.0f;
+                v[c] = t.srgb && c < 3 ? (f <= 0.04045f ? f / 12.92f : std::pow((f + 0.055f) / 1.055f, 2.4f)) : f;
+            }
+            return v;
+        };
+        const float fx = uv.x * static_cast<float>(img.width) - 0.5f;
+        const float fy = uv.y * static_cast<float>(img.height) - 0.5f;
+        const int x0 = static_cast<int>(std::floor(fx));
+        const int y0 = static_cast<int>(std::floor(fy));
+        const float tx = fx - static_cast<float>(x0);
+        const float ty = fy - static_cast<float>(y0);
+        return glm::mix(glm::mix(texel(x0, y0), texel(x0 + 1, y0), tx), glm::mix(texel(x0, y0 + 1), texel(x0 + 1, y0 + 1), tx),
+                        ty);
+    }
+
+private:
+    const scene::TextureData& colour_;
+    const scene::TextureData& normal_;
+};
+
+} // namespace
+
+TEST_CASE("texture ops match the CPU interpreter (ADR-1642)", "[material][gpu][adr1642]") {
+    auto ctx = makeContext();
+    MaterialHarness harness(*ctx);
+    const scene::TextureData colour = smoothImage(false);
+    const scene::TextureData normal = smoothImage(true);
+    HarnessTextures textures;
+    auto srgb = gpu::uploadTextureArray(*ctx, {&colour}, true, {255, 255, 255, 255}, "parity-srgb");
+    auto linear = gpu::uploadTextureArray(*ctx, {&normal}, false, {128, 128, 255, 255}, "parity-linear");
+    REQUIRE(srgb.has_value());
+    REQUIRE(linear.has_value());
+    textures.srgb = std::move(*srgb);
+    textures.linear = std::move(*linear);
+    textures.layerOf = [](const scene::MaterialTexture& t) { return t.name == "missing" ? -1 : 0; };
+
+    MaterialProgram colourProgram;
+    colourProgram.name = "colour";
+    colourProgram.textures = {{"albedo", "albedo.png", true, {}}};
+    MaterialOp albedo = op(MaterialOpKind::TextureTriplanar, 0);
+    albedo.texture = "albedo";
+    albedo.value = 0.37f;
+    albedo.constant = {0.1f, 0.2f, 0.3f, 0.0f};
+    albedo.constant2 = {6.0f, 0.0f, 0.0f, 0.0f};
+    colourProgram.ops = {albedo};
+    colourProgram.baseColorRegister = 0;
+    colourProgram.emissionRegister = 0;
+    colourProgram.roughnessRegister = 0;
+
+    MaterialProgram normalProgram;
+    normalProgram.name = "normal";
+    normalProgram.textures = {{"bumps", "bumps.png", false, {}}};
+    MaterialOp bumps = op(MaterialOpKind::TextureTriplanarNormal, 1);
+    bumps.texture = "bumps";
+    bumps.value = 0.5f;
+    bumps.constant2 = {0.0f, -1.0f, 0.0f, 1.5f}; // default sharpness, a DirectX map, stronger
+    normalProgram.ops = {bumps};
+    normalProgram.normalRegister = 1;
+
+    MaterialProgram missingProgram = colourProgram;
+    missingProgram.name = "missing";
+    missingProgram.textures[0].name = "missing";
+    missingProgram.ops[0].texture = "missing";
+
+    const std::vector<MaterialProgram> programs = {colourProgram, normalProgram, missingProgram};
+    const ImageSampler sampler(colour, normal);
+    std::vector<Case> cases;
+    for (std::size_t p = 0; p < programs.size(); ++p) {
+        for (scene::MaterialContext c : makeContexts()) {
+            c.footprint = 0.0f; // level 0 on both sides
+            // a skewed, unnormalised frame (as the cotangent frame is), so the inverse is exercised
+            c.tangent = glm::normalize(glm::cross(c.normal, glm::vec3(0.3f, 0.1f, 1.0f))) * 1.3f;
+            c.bitangent = glm::cross(c.normal, c.tangent) * 0.8f + c.tangent * 0.2f;
+            c.textures = p == 2 ? nullptr : &sampler; // the missing texture: the CPU has no image either
+            Case k;
+            k.ctx = c;
+            k.program = static_cast<int>(p);
+            cases.push_back(k);
+        }
+    }
+    const auto gpu = harness.run(programs, spatial::FieldSet{}, 0.0, cases, &textures);
+    REQUIRE(gpu.size() == cases.size());
+    float worst = 0.0f;
+    for (std::size_t i = 0; i < cases.size(); ++i) {
+        const MaterialProgram& program = programs[static_cast<std::size_t>(cases[i].program)];
+        REQUIRE(program.validate().has_value());
+        const scene::MaterialResult cpu = scene::evaluateMaterialProgram(program, cases[i].ctx, harnessBase());
+        const scene::MaterialResult& g = gpu[i];
+        const float d = std::max({maxAbs(cpu.baseColor - g.baseColor), maxAbs(cpu.emission - g.emission),
+                                  std::abs(cpu.roughness - g.roughness), maxAbs(cpu.normal - g.normal)});
+        INFO("program '" << program.name << "' context " << (i % 10) << " differs by " << d);
+        CHECK(d <= 4e-3f);
+        worst = std::max(worst, d);
+    }
+    // the ops did something: the colour is not the missing texture's 1, and the normal leans
+    CHECK(gpu[0].baseColor.x < 0.99f);
+    CHECK(gpu[10].normal.z < 0.999f);
+    CHECK(gpu[20].baseColor == glm::vec3(1.0f));
+    WARN("texture-op parity: worst difference " << worst);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("a program's texture reaches an entity's pixels, and no texture leaves it white (ADR-1642)",
+          "[material][gpu][adr1642]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    if (auto init = renderer.init(); !init) {
+        FAIL(init.error().message);
+    }
+    // a red/blue checker, 8 texels a square, 64 texels a tile
+    auto checker = std::make_shared<scene::TextureData>();
+    checker->name = "checker";
+    checker->width = 64;
+    checker->height = 64;
+    checker->format = scene::TextureFormat::Rgba8Srgb;
+    checker->data.resize(64 * 64 * 4);
+    for (int y = 0; y < 64; ++y) {
+        for (int x = 0; x < 64; ++x) {
+            const bool red = ((x / 8) + (y / 8)) % 2 == 0;
+            std::uint8_t* p = checker->data.data() + (y * 64 + x) * 4;
+            p[0] = red ? 230 : 20;
+            p[1] = 20;
+            p[2] = red ? 20 : 230;
+            p[3] = 255;
+        }
+    }
+    MaterialProgram paint;
+    paint.name = "paint";
+    paint.textures = {{"checker", "checker.png", true, "/fixture/checker.png"}};
+    MaterialOp sample = op(MaterialOpKind::TextureTriplanar, 0);
+    sample.texture = "checker";
+    sample.value = 0.5f; // a tile every 2 m: a 3 m box face shows a dozen squares across
+    paint.ops = {sample};
+    paint.emissionRegister = 0;
+    paint.baseColorRegister = 0;
+
+    scene::Scene s = baseScene();
+    s.materialPrograms.push_back(paint);
+    const scene::MeshId id = s.addMesh(scene::makeBox(glm::vec3(3.0f), 1));
+    scene::Entity& e = s.addEntity("cube", id);
+    e.material.program = "paint";
+    e.transform.rotation = glm::angleAxis(0.5f, glm::normalize(glm::vec3(0.3f, 1.0f, 0.0f)));
+    s.programTextures.push_back(
+        scene::ProgramTexture{scene::materialTextureKey(paint.textures[0]), true, checker});
+    s.programTextureVersion = 1;
+
+    const auto count = [](const gpu::Image8& img) {
+        int red = 0, blue = 0;
+        for (std::uint32_t y = 40; y < 120; ++y) {
+            for (std::uint32_t x = 40; x < 120; ++x) {
+                const std::uint8_t* p = img.pixel(x, y);
+                red += p[0] > p[2] + 60 ? 1 : 0;
+                blue += p[2] > p[0] + 60 ? 1 : 0;
+            }
+        }
+        return std::pair{red, blue};
+    };
+    const auto textured = renderWith(renderer, s);
+    const auto [red, blue] = count(textured);
+    INFO("red " << red << ", blue " << blue);
+    CHECK(red > 400);
+    CHECK(blue > 400);
+    CHECK(ctx->errorCount() == 0);
+
+    // the same scene without the image: the op reads colour 1, no checker
+    s.programTextures.clear();
+    s.programTextureVersion = 2;
+    const auto plain = renderWith(renderer, s);
+    const auto [red2, blue2] = count(plain);
+    CHECK(red2 == 0);
+    CHECK(blue2 == 0);
+    // and back: the arrays are rebuilt when the table changes
+    s.programTextures.push_back(
+        scene::ProgramTexture{scene::materialTextureKey(paint.textures[0]), true, checker});
+    s.programTextureVersion = 3;
+    CHECK(gpu::hashImage(renderWith(renderer, s)) == gpu::hashImage(textured));
+    CHECK(ctx->errorCount() == 0);
+}
+
+// Hidden ([.]): ADR-1642's cost in the entity path terrain draws through (honest timestamps, ADR-1600). A ground-like
+// entity fills a 4K frame with a 12-op program and no texture op, drawn by a renderer whose material.wgsl is the
+// baseline (AVGEN_MATERIAL_BASELINE: a directory holding the interpreter from before ADR-1642, with only the header lane
+// added) and by the current one, interleaved; then the same program with a colour and a normal texture op. It WARNs
+// the medians and asserts only that it measured.
+TEST_CASE("texture ops: cost in the entity path (measure)", "[.][gpu][material][measure][adr1642]") {
+    const char* baselinePath = std::getenv("AVGEN_MATERIAL_BASELINE");
+    if (baselinePath == nullptr) {
+        SKIP("set AVGEN_MATERIAL_BASELINE to a directory holding a baseline material.wgsl");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary baseShaders(*ctx, {std::filesystem::path(baselinePath),
+                                          std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    gpu::ShaderLibrary nowShaders = makeShaders(*ctx);
+    rendering::SceneRenderer before(*ctx, baseShaders);
+    rendering::SceneRenderer after(*ctx, nowShaders);
+    REQUIRE(before.init().has_value());
+    REQUIRE(after.init().has_value());
+    if (!after.timeline().available()) {
+        SKIP("timestamp queries unavailable");
+    }
+
+    // a ground program shaped like the aurora valley's: noise, ramps, a slope mask from the normal, a mix
+    MaterialProgram ground;
+    ground.name = "ground";
+    ground.ops.push_back(inputOp(MaterialInput::WorldPosition, 0));
+    MaterialOp n1 = op(MaterialOpKind::Noise, 1, 0);
+    n1.value = 0.4f;
+    MaterialOp n2 = op(MaterialOpKind::Noise, 2, 0);
+    n2.value = 2.3f;
+    n2.seed = 7;
+    ground.ops.push_back(n1);
+    ground.ops.push_back(n2);
+    MaterialOp mixed = op(MaterialOpKind::Mix, 3, 1, 2);
+    mixed.value = 0.35f;
+    ground.ops.push_back(mixed);
+    MaterialOp ramp = op(MaterialOpKind::Ramp, 3, 3);
+    ramp.constant = {0.02f, 0.05f, 0.02f, 1.0f};
+    ramp.constant2 = {0.05f, 0.1f, 0.03f, 1.0f};
+    ramp.constant3 = {0.08f, 0.07f, 0.05f, 1.0f};
+    ground.ops.push_back(ramp);
+    ground.ops.push_back(inputOp(MaterialInput::Normal, 4));
+    MaterialOp slope = op(MaterialOpKind::Gradient, 4, 4);
+    slope.constant = {0.0f, 1.0f, 0.0f, 0.0f};
+    ground.ops.push_back(slope);
+    MaterialOp edge = op(MaterialOpKind::Smoothstep, 4, 4);
+    edge.constant = {0.7f, 0.9f, 0.0f, 0.0f};
+    ground.ops.push_back(edge);
+    ground.ops.push_back(constantOp(5, {0.06f, 0.05f, 0.045f, 1.0f}));
+    ground.ops.push_back(op(MaterialOpKind::MixBy, 3, 5, 3, 4));
+    MaterialOp rough = op(MaterialOpKind::Remap, 6, 2);
+    rough.constant = {0.0f, 1.0f, 0.7f, 0.95f};
+    ground.ops.push_back(rough);
+    ground.ops.push_back(op(MaterialOpKind::Multiply, 3, 3, 6));
+    ground.baseColorRegister = 3;
+    ground.roughnessRegister = 6;
+    REQUIRE(ground.totalOpCount() == 12);
+
+    MaterialProgram textured = ground;
+    textured.name = "textured";
+    textured.textures = {{"albedo", "albedo.png", true, "/fixture/albedo.png"},
+                         {"normal", "normal.png", false, "/fixture/normal.png"}};
+    MaterialOp albedo = op(MaterialOpKind::TextureTriplanar, 7);
+    albedo.texture = "albedo";
+    albedo.value = 0.5f;
+    MaterialOp bumps = op(MaterialOpKind::TextureTriplanarNormal, 1);
+    bumps.texture = "normal";
+    bumps.value = 0.5f;
+    textured.ops.push_back(albedo);
+    textured.ops.push_back(op(MaterialOpKind::Multiply, 3, 3, 7));
+    textured.ops.push_back(bumps);
+    textured.normalRegister = 1;
+
+    // 1K images, as a CC0 set ships
+    auto colour = std::make_shared<scene::TextureData>(smoothImage(false));
+    auto normal = std::make_shared<scene::TextureData>(smoothImage(true));
+    const auto sceneWith = [&](const MaterialProgram& program) {
+        scene::Scene s = baseScene();
+        s.materialPrograms.push_back(program);
+        s.camera.position = {0.0f, 6.0f, 9.0f};
+        s.camera.target = {0.0f, 0.0f, -6.0f};
+        const scene::MeshId id = s.addMesh(scene::makeBox(glm::vec3(60.0f, 1.0f, 60.0f), 64));
+        scene::Entity& e = s.addEntity("ground", id);
+        e.material.program = program.name;
+        s.programTextures.push_back(scene::ProgramTexture{scene::materialTextureKey(textured.textures[0]), true, colour});
+        s.programTextures.push_back(scene::ProgramTexture{scene::materialTextureKey(textured.textures[1]), false, normal});
+        s.programTextureVersion = 1;
+        return s;
+    };
+    const scene::Scene plain = sceneWith(ground);
+    const scene::Scene withTextures = sceneWith(textured);
+    const auto measure = [](rendering::SceneRenderer& r, const scene::Scene& s) {
+        std::vector<double> sceneMs;
+        for (int i = 0; i < 100; ++i) {
+            FrameTime t{};
+            t.renderTime = i / 30.0;
+            REQUIRE(r.renderFrame(s, t, 3840, 2160).has_value());
+            if (i >= 20) {
+                sceneMs.push_back(r.timeline().msFor("scene"));
+            }
+        }
+        std::sort(sceneMs.begin(), sceneMs.end());
+        return sceneMs[sceneMs.size() / 2];
+    };
+    static_cast<void>(measure(before, plain));
+    static_cast<void>(measure(after, plain));
+    static_cast<void>(measure(after, withTextures));
+    std::vector<double> b, a, t;
+    for (int rep = 0; rep < 6; ++rep) {
+        b.push_back(measure(before, plain));
+        a.push_back(measure(after, plain));
+        t.push_back(measure(after, withTextures));
+    }
+    const auto list = [](const std::vector<double>& v) {
+        std::string out;
+        for (const double x : v) {
+            out += fmt::format(" {:.3f}", x);
+        }
+        return out;
+    };
+    WARN("4K, a ground entity filling the frame, 12-op program, 6 interleaved reps of 80 frames, the scene label's "
+         "median (ms): baseline interpreter"
+         << list(b) << " | ADR-1642 interpreter, no texture op" << list(a) << " | + a colour and a normal texture op"
+         << list(t));
+    CHECK(a[0] > 0.0);
 }

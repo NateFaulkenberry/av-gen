@@ -332,8 +332,9 @@ Result<void> SceneRenderer::init() {
     {
         // 0 sampler, 1..5 the glTF textures, then ADR-030: 6 the material program block, 7 the
         // 16-byte select region naming this material's program, 8 the field block (only the entity
-        // pass reads it there; procedural.wgsl and sdf_raymarch.wgsl bind their own at group 1).
-        std::array<wgpu::BindGroupLayoutEntry, 9> entries{};
+        // pass reads it there; procedural.wgsl and sdf_raymarch.wgsl bind their own at group 1). ADR-1642: 9 and 10
+        // the program texture arrays (sRGB, linear), 11 their repeating sampler.
+        std::array<wgpu::BindGroupLayoutEntry, 12> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].sampler.type = wgpu::SamplerBindingType::Filtering;
@@ -357,6 +358,15 @@ Result<void> SceneRenderer::init() {
         entries[8].visibility = wgpu::ShaderStage::Fragment;
         entries[8].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[8].buffer.minBindingSize = FieldUniforms::kBufferSize;
+        for (std::uint32_t i = 9; i < 11; ++i) {
+            entries[i].binding = i;
+            entries[i].visibility = wgpu::ShaderStage::Fragment;
+            entries[i].texture.sampleType = wgpu::TextureSampleType::Float;
+            entries[i].texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
+        }
+        entries[11].binding = 11;
+        entries[11].visibility = wgpu::ShaderStage::Fragment;
+        entries[11].sampler.type = wgpu::SamplerBindingType::Filtering;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "material-layout";
         desc.entryCount = entries.size();
@@ -1285,7 +1295,7 @@ static_assert(sizeof(scene::Vertex) == 32);
 } // namespace
 
 Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
-                                                               wgpu::RenderPipeline* startInto) {
+                                                               wgpu::RenderPipeline* startInto, bool programTextures) {
     VertexLayoutStorage vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -1304,6 +1314,13 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     fragment.entryPoint = "fs_main";
     fragment.targetCount = kSceneTargetCount;
     fragment.targets = colorTargets.data();
+    wgpu::ConstantEntry texturesOn{}; // ADR-1642
+    texturesOn.key = "MAT_PROGRAM_TEXTURES";
+    texturesOn.value = 1.0;
+    if (programTextures) {
+        fragment.constantCount = 1;
+        fragment.constants = &texturesOn;
+    }
     wgpu::DepthStencilState depth{};
     depth.format = kDepthFormat;
     depth.depthWriteEnabled = variant == LitVariant::Blend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
@@ -1311,7 +1328,13 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
                                                       : wgpu::CompareFunction::LessEqual;
 
     wgpu::RenderPipelineDescriptor desc{};
-    const char* label = variant == LitVariant::OpaqueCull ? "pbr-opaque" : variant == LitVariant::OpaqueNoCull ? "pbr-opaque-twosided" : "pbr-blend";
+    const char* label = programTextures
+                            ? (variant == LitVariant::OpaqueCull     ? "pbr-opaque-textured"
+                               : variant == LitVariant::OpaqueNoCull ? "pbr-opaque-twosided-textured"
+                                                                     : "pbr-blend-textured")
+                            : (variant == LitVariant::OpaqueCull     ? "pbr-opaque"
+                               : variant == LitVariant::OpaqueNoCull ? "pbr-opaque-twosided"
+                                                                     : "pbr-blend");
     desc.label = label;
     desc.layout = scenePipelineLayout_;
     desc.vertex.module = module;
@@ -1332,6 +1355,54 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
         return wgpu::RenderPipeline{};
     }
     return finishPipeline(desc, label);
+}
+
+bool SceneRenderer::ensureTexturedLitPipelines() {
+    if (litTexturedOpaqueCull_ && litTexturedOpaqueNoCull_ && litTexturedBlend_) {
+        return true;
+    }
+    if (litTexturedFailed_ || !pbrModule_) {
+        return false;
+    }
+    auto a = createLitPipeline(pbrModule_, LitVariant::OpaqueCull, nullptr, true);
+    auto b = createLitPipeline(pbrModule_, LitVariant::OpaqueNoCull, nullptr, true);
+    auto c = createLitPipeline(pbrModule_, LitVariant::Blend, nullptr, true);
+    if (!a || !b || !c) {
+        log::warn("the textured lit pipelines failed ({}); entities whose program samples a texture draw it as colour 1 "
+                  "(ADR-1642)",
+                  (!a ? a : !b ? b : c).error().message);
+        litTexturedFailed_ = true;
+        return false;
+    }
+    litTexturedOpaqueCull_ = *a;
+    litTexturedOpaqueNoCull_ = *b;
+    litTexturedBlend_ = *c;
+    log::info("textured lit pipelines built (a material program samples a texture; ADR-1642)");
+    return true;
+}
+
+bool SceneRenderer::programSamplesTexture(const scene::Material& material) const {
+    if (qualitySettings_.materialProgramsOff || material.program.empty()) {
+        return false;
+    }
+    const int slot = materialPrograms_->slotOf(material.program);
+    return slot >= 0 && materialPrograms_->block().programs[slot].textureOps.x >= 0;
+}
+
+void SceneRenderer::warnUntexturedPaths(const scene::Scene& scene) {
+    const auto check = [&](const std::string& surface, const scene::Material& material, const char* kind) {
+        if (programSamplesTexture(material) && untexturedWarned_.insert(surface).second) {
+            log::warn("{} '{}': material program '{}' samples a texture, which only entities (terrain, meshes) draw; "
+                      "here its texture ops read colour 1 and a flat normal (ADR-1642)",
+                      kind, surface, material.program);
+        }
+    };
+    for (const scene::ProceduralGeometry& p : scene.procedurals) {
+        check(p.name, p.material, "procedural");
+    }
+    for (const scene::SdfObject& o : scene.sdfs) {
+        check(o.name, o.material, "SDF object");
+    }
 }
 
 Result<wgpu::RenderPipeline> SceneRenderer::createGridPipeline(const wgpu::ShaderModule& module) {
@@ -2173,6 +2244,11 @@ Result<void> SceneRenderer::reloadEngineShaders() {
             litOpaqueCull_ = *a;
             litOpaqueNoCull_ = *b;
             litBlend_ = *c;
+            pbrModule_ = *pbr;
+            litTexturedOpaqueCull_ = nullptr; // ADR-1642: rebuilt from the reloaded module on next need
+            litTexturedOpaqueNoCull_ = nullptr;
+            litTexturedBlend_ = nullptr;
+            litTexturedFailed_ = false;
             sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_);
         } else {
             keep("pbr.wgsl", std::unexpected((!a ? a : !b ? b : c).error()));
@@ -2534,6 +2610,46 @@ void SceneRenderer::uploadTextures(const scene::Scene& scene) {
     stats_.textures = static_cast<std::uint32_t>(textures_.size());
 }
 
+void SceneRenderer::uploadProgramTextures(const scene::Scene& scene) {
+    if (programTexturesSrgb_.valid() && scene.programTextureVersion == programTextureVersion_) {
+        return;
+    }
+    if (!programTextureSampler_) {
+        wgpu::SamplerDescriptor sd{};
+        sd.label = "program-texture-sampler";
+        sd.addressModeU = wgpu::AddressMode::Repeat;
+        sd.addressModeV = wgpu::AddressMode::Repeat;
+        sd.magFilter = wgpu::FilterMode::Linear;
+        sd.minFilter = wgpu::FilterMode::Linear;
+        sd.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+        programTextureSampler_ = context_.device().CreateSampler(&sd);
+    }
+    std::vector<const scene::TextureData*> srgb;
+    std::vector<const scene::TextureData*> linear;
+    programTextureLayers_.clear();
+    for (const scene::ProgramTexture& t : scene.programTextures) {
+        if (t.image == nullptr || !t.image->valid() || t.image->isHdr()) {
+            continue;
+        }
+        auto& list = t.srgb ? srgb : linear;
+        programTextureLayers_[t.key] = static_cast<int>(list.size());
+        list.push_back(t.image.get());
+    }
+    auto s = gpu::uploadTextureArray(context_, srgb, true, {255, 255, 255, 255}, "program-textures-srgb");
+    auto l = gpu::uploadTextureArray(context_, linear, false, {128, 128, 255, 255}, "program-textures-linear");
+    if (!s || !l) {
+        log::warn("program textures not uploaded: {} -- texture ops read colour 1 and a flat normal (ADR-1642)",
+                  !s ? s.error().message : l.error().message);
+        programTextureLayers_.clear();
+        s = gpu::uploadTextureArray(context_, {}, true, {255, 255, 255, 255}, "program-textures-srgb");
+        l = gpu::uploadTextureArray(context_, {}, false, {128, 128, 255, 255}, "program-textures-linear");
+    }
+    programTexturesSrgb_ = std::move(*s);
+    programTexturesLinear_ = std::move(*l);
+    programTextureVersion_ = scene.programTextureVersion;
+    materialBindGroups_.clear(); // every group binds the arrays
+}
+
 const gpu::GpuTexture& SceneRenderer::textureOrDefault(const scene::TextureRef& ref,
                                                         const gpu::GpuTexture& fallback) const {
     if (ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid()) {
@@ -2556,7 +2672,10 @@ const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& m
     if (auto it = materialBindGroups_.find(key); it != materialBindGroups_.end()) {
         return it->second;
     }
-    std::array<wgpu::BindGroupEntry, 9> entries{};
+    if (!programTexturesSrgb_.valid()) {
+        uploadProgramTextures(scene::Scene{}); // ADR-1642: the 1x1 defaults, before any scene names an image
+    }
+    std::array<wgpu::BindGroupEntry, 12> entries{};
     entries[0].binding = 0;
     entries[0].sampler = samplers_->get(material.baseColorTexture);
     entries[1].binding = 1;
@@ -2579,6 +2698,12 @@ const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& m
     entries[8].binding = 8;
     entries[8].buffer = fields_->buffer();
     entries[8].size = FieldUniforms::kBufferSize;
+    entries[9].binding = 9; // ADR-1642
+    entries[9].textureView = programTexturesSrgb_.view;
+    entries[10].binding = 10;
+    entries[10].textureView = programTexturesLinear_.view;
+    entries[11].binding = 11;
+    entries[11].sampler = programTextureSampler_;
     wgpu::BindGroupDescriptor desc{};
     desc.label = "material-bind-group";
     desc.layout = materialLayout_;
@@ -3985,7 +4110,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     fields_->update(scene.fields, time.renderTime);
     stats_.fieldAudio = fields_->audioStats();
     // ---- material programs (ADR-030): packed after the fields so Field ops resolve to slots ----
-    materialPrograms_->update(scene.materialPrograms, fields_.get());
+    uploadProgramTextures(scene); // ADR-1642: before the packing resolves each texture op's layer
+    materialPrograms_->update(scene.materialPrograms, fields_.get(), [this](const scene::MaterialTexture& t) {
+        const auto it = programTextureLayers_.find(scene::materialTextureKey(t));
+        return it != programTextureLayers_.end() ? it->second : -1;
+    });
+    if (!scene.programTextures.empty()) {
+        warnUntexturedPaths(scene); // ADR-1642
+    }
     // ADR-1493: the procedural lit pass's compiled-materials variant follows the programs' structure.
     procedurals_->noteMaterialPrograms(std::span<const scene::MaterialProgramGpu>(
         materialPrograms_->block().programs, materialPrograms_->count()));
@@ -4470,9 +4602,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 skinnedBound);
                     rp.SetBindGroup(2, materialBindGroup(m));
                 } else if (lit) {
-                    rp.SetPipeline(m.alphaMode == scene::AlphaMode::Blend      ? litBlend_
-                                   : (m.doubleSided || item.fxTwoSided) ? litOpaqueNoCull_
-                                                                        : litOpaqueCull_);
+                    // ADR-1642: a program that samples a texture draws through the textured variant.
+                    const bool textured = programSamplesTexture(m) && ensureTexturedLitPipelines();
+                    rp.SetPipeline(m.alphaMode == scene::AlphaMode::Blend
+                                       ? (textured ? litTexturedBlend_ : litBlend_)
+                                   : (m.doubleSided || item.fxTwoSided)
+                                       ? (textured ? litTexturedOpaqueNoCull_ : litOpaqueNoCull_)
+                                       : (textured ? litTexturedOpaqueCull_ : litOpaqueCull_));
                     rp.SetBindGroup(2, materialBindGroup(m));
                     rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
                 } else {

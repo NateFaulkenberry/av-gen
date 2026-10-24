@@ -930,8 +930,10 @@ static_assert(offsetof(spatial::FieldGpu, worldToLocal) == 16);
 static_assert(offsetof(spatial::FieldGpu, gridRes) == 352);
 // ADR-904: the header grew one vec4 (`flags`, at 80), so the layers start at 96 and the ops at 352.
 static_assert(offsetof(scene::MaterialProgramGpu, flags) == 80);
-static_assert(offsetof(scene::MaterialProgramGpu, layers) == 96);
-static_assert(offsetof(scene::MaterialProgramGpu, ops) == 352);
+// ADR-1642: and one more (`textureOps`, at 96), so the layers start at 112 and the ops at 368.
+static_assert(offsetof(scene::MaterialProgramGpu, textureOps) == 96);
+static_assert(offsetof(scene::MaterialProgramGpu, layers) == 112);
+static_assert(offsetof(scene::MaterialProgramGpu, ops) == 368);
 static_assert(offsetof(scene::MaterialOpGpu, constant) == 48);
 
 TEST_CASE("every shared uniform structure has the layout its WGSL twin declares",

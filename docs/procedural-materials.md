@@ -140,6 +140,63 @@ the fragment's normal and view direction.
 | `quantize` | a | ADR-1162: `c = floor(a.xyz * f + k.xyz)`; `vec4((c + 0.5 - k.xyz) / f, hash01(c, seed))` — the centre of a's square cell in a's own units, and a uniform random per cell. `f <= 0` passes `a` through. Squares and macroblock masks: noise at the centre is constant per cell; `step(out.w, mask)` fails cells one at a time |
 | `oklabRamp` | a | ADR-1470: four stops `constant`, `constant2`, `constant3`, `constant4` (linear RGB) blended in OKLab (`mixOklab`), w linear. `f >= 0` (the default 1): `t = clamp(a.x, 0, 1)`, stops at 0, 1/3, 2/3, 1. `f < 0`: cyclic, `t = fract(a.x)`, stops at 0, 1/4, 1/2, 3/4 and the first again at 1. A palette's roles as a gradient with no grey midpoints; the bindings still write the stops |
 
+### Texture inputs (ADR-1642)
+
+A program can sample images: rock, moss, ground. It names them in a `textures` list, and two ops read them projected
+**triplanar in world space**, so a terrain chunk, a cliff or any mesh needs no UVs and a steep wall is not stretched.
+
+```json
+{"name": "valley_ground",
+ "textures": [{"name": "rock",  "path": "textures/rock_albedo.jpg"},
+              {"name": "rockN", "path": "textures/rock_normal_gl.jpg", "colorSpace": "linear"},
+              {"name": "moss",  "path": "textures/moss_albedo.jpg"},
+              {"name": "mossN", "path": "textures/moss_normal_gl.jpg", "colorSpace": "linear"}],
+ "ops": [
+   {"kind": "textureTriplanar", "dst": 1, "texture": "moss", "value": 0.35},
+   {"kind": "textureTriplanar", "dst": 2, "texture": "rock", "value": 0.08, "constant2": [6, 0, 0, 0]},
+   {"kind": "input", "dst": 3, "input": "normal"},
+   {"kind": "gradient", "dst": 3, "srcA": 3, "constant": [0, 1, 0, 0]},
+   {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.72, 0.88, 0, 0]},
+   {"kind": "mixBy", "dst": 4, "srcA": 2, "srcB": 1, "srcC": 3},
+   {"kind": "textureTriplanarNormal", "dst": 5, "texture": "mossN", "value": 0.35},
+   {"kind": "textureTriplanarNormal", "dst": 6, "texture": "rockN", "value": 0.08, "constant2": [6, 0, 0, 1.5]},
+   {"kind": "mixBy", "dst": 7, "srcA": 6, "srcB": 5, "srcC": 3}],
+ "baseColor": 4, "normal": 7}
+```
+
+Moss on the flats (the normal's y above 0.72-0.88), rock on the walls. Masks are ordinary ops:
+- slope: `gradient` of the `normal` input on (0, 1, 0);
+- height: `gradient` of `worldPosition`;
+- a painted or noise region: `noise`, `voronoi`, `decalBox`, `field`;
+- near/far: `cameraDistance`, for a coarser "bushy" ground texture in the distance.
+
+Combine them with `mixBy`, or use layers to height-blend whole material sets.
+
+| key | meaning |
+|---|---|
+| `textures[].name` | what the ops call it (unique in the program) |
+| `textures[].path` | relative to the file the program is in (the scene, or its `.material.json`); saved as written |
+| `textures[].colorSpace` | `"srgb"` (the default: albedo, colour) or `"linear"` (normal maps, roughness, masks) |
+
+| Kind (JSON) | Reads | Writes `reg[dst]` |
+|---|---|---|
+| `textureTriplanar` | worldPosition, N | `p = worldPosition * f + k.xyz` (`f` = tiles per metre); the image read at the three planes' uv (`(-p.z·s.x, -p.y)`, `(p.x·s.y, p.z)`, `(p.x·s.z, -p.y)`, `s` = the normal's signs) and blended by `triplanarWeights(N, k2.x)` (`k2.x ≤ 0` = 4; raise it, e.g. 6-8, for a crisper seam). rgba, linear (an sRGB image is decoded). A plane weighing under 0.001 is not read |
+| `textureTriplanarNormal` | worldPosition, N | The same projection of a tangent-space normal map. Each plane's x/y lands on that plane's world tangent and image-up axes (`u × up` is the face's outward normal, so an OpenGL-convention map lights correctly on every face) and is added to the surface normal (UDN), then expressed in the frame the shader applies a program normal in. `(xyz, 1)`: route it to the `normal` output (or a layer's). `k2.y < 0`: a DirectX map (green flipped); `k2.w`: strength (0 = 1) |
+
+For both, `k2.z` is a mip bias. The mip follows the world footprint of a pixel (`footprint · f · width`), so a
+supersampled offline render reads sharper texels, and a distant slope does not shimmer.
+
+Limits:
+- At most 4 texture ops and 8 images per program. The ops are sampled once, before the interpreter loop, like
+  fields.
+- Every image in a colour space is laid into one array at the largest size among them (at most 4096; a smaller one is
+  resampled up). Ship a set at one resolution.
+- **Entities only**: terrain chunks and meshes. A procedural (instanced, or a GLB's parts), SDF or skinned surface
+  reads colour 1 and a flat normal from these ops, and the log names the surface and its program.
+- The CPU reference reads mip 0 (it is what parity compares, at a zero footprint).
+- Cost: on a 4K frame filled with ground, a colour and a normal op added about 7-8 ms to a 12-op program; about a
+  quarter of that at 1080p. Only pipelines drawing such a program carry it (see ADR-1642).
+
 Notes for the shader transliteration:
 
 - `fbm3` and `voronoiF1` are the functions in `core/noise.hpp` / `procedural.wgsl` (3-octave

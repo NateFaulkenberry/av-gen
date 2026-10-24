@@ -444,6 +444,11 @@ struct MaterialSelect {
 @group(2) @binding(5) var occlusionTex: texture_2d<f32>;
 @group(2) @binding(6) var<storage, read> materialPrograms: MaterialProgramBlock;
 @group(2) @binding(7) var<uniform> materialSelect: MaterialSelect;
+// ADR-1642: the images material programs' texture ops read (material.wgsl's matTextureOp), one scene-wide array per
+// colour space, and a repeating trilinear sampler. A 1x1 layer when the scene names none.
+@group(2) @binding(9) var programTexturesSrgb: texture_2d_array<f32>;
+@group(2) @binding(10) var programTexturesLinear: texture_2d_array<f32>;
+@group(2) @binding(11) var programTextureSampler: sampler;
 
 @group(3) @binding(0) var iblSampler: sampler;
 @group(3) @binding(1) var irradianceMap: texture_cube<f32>;
@@ -714,6 +719,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ctx.footprint = geometry.w;
         ctx.occlusion = occlusion.visibility;
         ctx.materialId = object.ids.y;
+        // ADR-1642: the frame `programNormal` is applied in below, so a texture-normal op can answer in it.
+        ctx.tangent = tangentFrame[0];
+        ctx.bitangent = tangentFrame[1];
         // ADR-904: what this instance would emit with no program, variation included.
         ctx.materialEmission = vec4<f32>(object.emissive.rgb * emissiveMul * object.emissive.w, 1.0);
         var base = materialResultZero();

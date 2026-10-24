@@ -687,9 +687,10 @@ TEST_CASE("packMaterialProgram: layout, disabled ops skipped, field slots", "[ma
     CHECK(offsetof(MaterialOpGpu, constant4) == 96);
     CHECK(offsetof(MaterialProgramGpu, fieldSlots) == 64);
     CHECK(offsetof(MaterialProgramGpu, flags) == 80); // ADR-904: the emission facts
-    CHECK(offsetof(MaterialProgramGpu, layers) == 96);
+    CHECK(offsetof(MaterialProgramGpu, textureOps) == 96); // ADR-1642: the texture ops the pre-pass samples
+    CHECK(offsetof(MaterialProgramGpu, layers) == 112);
     CHECK(sizeof(MaterialLayerGpu) == 64);
-    CHECK(offsetof(MaterialProgramGpu, ops) == 352); // 96-byte header + 4 layer records (ADR-036/050/904)
+    CHECK(offsetof(MaterialProgramGpu, ops) == 368); // 112-byte header + 4 layer records (ADR-036/050/904/1642)
 
     MaterialProgram p;
     MaterialOp in = inputOp(0, MaterialInput::Uv);
@@ -1918,4 +1919,200 @@ TEST_CASE("quantize gives the cell centre and a per-cell random", "[material][ad
     }
     CHECK_THAT(sum / 4096.0, WithinAbs(0.5, 0.03));
     CHECK_THAT(below / 4096.0, WithinAbs(0.25, 0.03));
+}
+
+// ---- ADR-1642: texture inputs ------------------------------------------------------------------------------------
+
+namespace {
+
+// A CPU texture source that answers by texture name: "colour" is a function of uv (so the plane read is visible),
+// "flat" a flat normal map, "tilt" a normal map tilted towards the image's +u.
+class NamedSampler : public MaterialTextureSampler {
+public:
+    std::optional<glm::vec4> sample(const MaterialTexture& t, const glm::vec2& uv) const override {
+        reads.push_back(uv);
+        if (t.name == "colour") {
+            return glm::vec4(glm::fract(uv.x), glm::fract(uv.y), 0.25f, 1.0f);
+        }
+        if (t.name == "flat") {
+            return glm::vec4(0.5f, 0.5f, 1.0f, 1.0f);
+        }
+        if (t.name == "tilt") {
+            return glm::vec4(1.0f, 0.5f, 0.5f, 1.0f); // tangent x = +1
+        }
+        return std::nullopt;
+    }
+    mutable std::vector<glm::vec2> reads;
+};
+
+MaterialProgram texturedProgram() {
+    MaterialProgram p;
+    p.name = "ground";
+    p.textures = {{"colour", "tex/moss_albedo.png", true, {}},
+                  {"flat", "tex/moss_normal.png", false, {}},
+                  {"tilt", "tex/rock_normal.png", false, {}}};
+    MaterialOp albedo = makeOp(MaterialOpKind::TextureTriplanar, 0);
+    albedo.texture = "colour";
+    albedo.value = 1.0f;
+    MaterialOp normal = makeOp(MaterialOpKind::TextureTriplanarNormal, 1);
+    normal.texture = "flat";
+    p.ops = {albedo, normal};
+    p.baseColorRegister = 0;
+    p.normalRegister = 1;
+    return p;
+}
+
+} // namespace
+
+TEST_CASE("material program textures read, validate and round-trip (ADR-1642)", "[material][adr1642]") {
+    const MaterialProgram p = texturedProgram();
+    REQUIRE(p.validate().has_value());
+    const nlohmann::json j = p.toJson();
+    REQUIRE(j.contains("textures"));
+    CHECK(j["textures"][1]["colorSpace"] == "linear");
+    CHECK(j["ops"][0]["texture"] == "colour");
+    auto back = MaterialProgram::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->textures == p.textures);
+    CHECK(back->toJson() == j);
+    CHECK(back->structuralHash() == p.structuralHash());
+
+    // a program without textures writes no key and keeps its hash
+    MaterialProgram plain;
+    plain.name = "plain";
+    plain.ops = {constantOp(0, glm::vec4(1.0f))};
+    plain.baseColorRegister = 0;
+    CHECK_FALSE(plain.toJson().contains("textures"));
+    CHECK_FALSE(plain.toJson()["ops"][0].contains("texture"));
+    MaterialProgram withList = plain;
+    withList.textures = p.textures;
+    CHECK(withList.structuralHash() != plain.structuralHash());
+
+    // an op naming a texture the program does not carry, a bad colour space, an unknown key, a duplicate name
+    MaterialProgram dangling = p;
+    dangling.ops[0].texture = "nope";
+    CHECK_FALSE(dangling.validate().has_value());
+    nlohmann::json badSpace = j;
+    badSpace["textures"][0]["colorSpace"] = "rec709";
+    CHECK_FALSE(MaterialProgram::fromJson(badSpace).has_value());
+    nlohmann::json badKey = j;
+    badKey["textures"][0]["wrap"] = "clamp";
+    CHECK_FALSE(MaterialProgram::fromJson(badKey).has_value());
+    MaterialProgram twice = p;
+    twice.textures.push_back(p.textures[0]);
+    CHECK_FALSE(twice.validate().has_value());
+    // at most four texture ops (each takes a pre-pass slot)
+    MaterialProgram many = p;
+    for (int i = 0; i < 3; ++i) {
+        many.ops.push_back(p.ops[0]);
+    }
+    CHECK_FALSE(many.validate().has_value());
+    many.ops.back().enabled = false; // a disabled op takes no slot
+    CHECK(many.validate().has_value());
+}
+
+TEST_CASE("material program texture paths resolve beside the file that names them (ADR-1642)", "[material][adr1642]") {
+    std::vector<MaterialTexture> list = {{"a", "tex/a.png", true, {}}, {"b", "/abs/b.png", false, {}}};
+    resolveMaterialTexturePaths(list, "/project/materials");
+    CHECK(list[0].resolvedPath == std::filesystem::path("/project/materials/tex/a.png"));
+    CHECK(list[1].resolvedPath == std::filesystem::path("/abs/b.png"));
+    CHECK(materialTextureKey(list[0]) == "/project/materials/tex/a.png|srgb");
+    CHECK(materialTextureKey(list[1]) == "/abs/b.png|linear");
+    // a .material.json resolves its own
+    const auto dir = std::filesystem::temp_directory_path() / "avgen_adr1642_paths";
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream out(dir / "ground.material.json");
+        out << texturedProgram().toJson().dump();
+    }
+    auto loaded = MaterialProgram::loadFile(dir / "ground.material.json");
+    REQUIRE(loaded.has_value());
+    CHECK(loaded->textures[0].resolvedPath == (dir / "tex/moss_albedo.png").lexically_normal());
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("texture ops sample the three world planes and answer in the shader's tangent frame (ADR-1642)",
+          "[material][adr1642]") {
+    const MaterialProgram p = texturedProgram();
+    NamedSampler sampler;
+    MaterialContext ctx;
+    ctx.worldPosition = {0.25f, 3.0f, 0.75f};
+    ctx.normal = {0.0f, 1.0f, 0.0f}; // flat ground: only the Y plane, uv = (x, z)
+    ctx.tangent = {1.0f, 0.0f, 0.0f};
+    ctx.bitangent = {0.0f, 0.0f, -1.0f};
+    ctx.textures = &sampler;
+    MaterialResult base;
+    MaterialResult r = evaluateMaterialProgram(p, ctx, base);
+    checkVec3(r.baseColor, {0.25f, 0.75f, 0.25f}, 1e-5);
+    checkVec3(r.normal, {0.0f, 0.0f, 1.0f}, 1e-5); // a flat map leaves the surface unperturbed
+    CHECK(sampler.reads.size() == 2); // one plane each
+
+    // a wall facing +x: only the X plane, uv = (-z, -y)
+    sampler.reads.clear();
+    ctx.normal = {1.0f, 0.0f, 0.0f};
+    r = evaluateMaterialProgram(p, ctx, base);
+    checkVec3(r.baseColor, {glm::fract(-0.75f), glm::fract(-3.0f), 0.25f}, 1e-5);
+
+    // a slope blends planes by weight; a heavier sharpness narrows the blend
+    ctx.normal = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
+    sampler.reads.clear();
+    r = evaluateMaterialProgram(p, ctx, base);
+    CHECK(sampler.reads.size() == 4); // X and Y planes for each op, never Z
+
+    // a tilted map on flat ground leans the normal towards the Y plane's +u (world +x)
+    MaterialProgram tilted = p;
+    tilted.ops[1].texture = "tilt";
+    ctx.normal = {0.0f, 1.0f, 0.0f};
+    r = evaluateMaterialProgram(tilted, ctx, base);
+    const glm::mat3 frame(ctx.tangent, ctx.bitangent, ctx.normal);
+    const glm::vec3 world = glm::normalize(frame * r.normal);
+    CHECK(world.x > 0.5f);
+    CHECK(std::abs(world.z) < 1e-4f);
+    // a stronger map leans further
+    MaterialProgram strong = tilted;
+    strong.ops[1].constant2.w = 3.0f;
+    const glm::vec3 worldStrong = glm::normalize(frame * evaluateMaterialProgram(strong, ctx, base).normal);
+    CHECK(worldStrong.x > world.x);
+
+    // no frame (zero tangent): a flat answer rather than a guess
+    MaterialContext noFrame = ctx;
+    noFrame.tangent = glm::vec3(0.0f);
+    checkVec3(evaluateMaterialProgram(tilted, noFrame, base).normal, {0.0f, 0.0f, 1.0f}, 1e-6);
+    // no images: colour 1 and a flat normal
+    MaterialContext none = ctx;
+    none.textures = nullptr;
+    r = evaluateMaterialProgram(tilted, none, base);
+    checkVec3(r.baseColor, glm::vec3(1.0f), 1e-6);
+    checkVec3(r.normal, {0.0f, 0.0f, 1.0f}, 1e-6);
+}
+
+TEST_CASE("texture ops pack their layer, array and pre-pass slot (ADR-1642)", "[material][adr1642]") {
+    MaterialProgram p = texturedProgram();
+    p.ops.insert(p.ops.begin(), constantOp(5, glm::vec4(0.5f)));
+    p.layers.push_back(MaterialLayer{});
+    MaterialOp layerAlbedo = makeOp(MaterialOpKind::TextureTriplanar, 2);
+    layerAlbedo.texture = "colour";
+    p.layers[0].ops = {layerAlbedo};
+    p.layers[0].baseColorRegister = 2;
+    REQUIRE(p.validate().has_value());
+    const auto gpu = packMaterialProgramWithSlots(p, {}, [](const MaterialTexture& t) {
+        return t.name == "colour" ? 3 : (t.name == "flat" ? 1 : -1);
+    });
+    CHECK(gpu.textureOps == glm::ivec4(1, 2, 3, -1)); // op indices, base then layer
+    CHECK(gpu.ops[1].fieldSlot == 3);
+    CHECK(gpu.ops[1].input == 0u); // sRGB array
+    CHECK(gpu.ops[1].fieldOrdinal == 4);
+    CHECK(gpu.ops[2].fieldSlot == 1);
+    CHECK(gpu.ops[2].input == 1u); // linear array
+    CHECK(gpu.ops[2].fieldOrdinal == 5);
+    CHECK(gpu.ops[3].fieldOrdinal == 6);
+    CHECK(gpu.ops[0].fieldOrdinal == -1);
+    // unresolved: layer -1 (the shader's colour 1 / flat normal)
+    const auto unresolved = packMaterialProgramWithSlots(p, {});
+    CHECK(unresolved.ops[1].fieldSlot == -1);
+    // a program without texture ops packs the header lane as -1 and nothing else differs
+    MaterialProgram plain;
+    plain.ops = {constantOp(0, glm::vec4(1.0f))};
+    plain.baseColorRegister = 0;
+    CHECK(packMaterialProgramWithSlots(plain, {}).textureOps == glm::ivec4(-1));
 }

@@ -10,7 +10,7 @@ namespace avgen::scene {
 namespace {
 
 // The WGSL function of each op kind, in MaterialOpKind order (the wire format, so the order is fixed).
-constexpr std::array<std::string_view, 34> kKindFunctions{
+constexpr std::array<std::string_view, 36> kKindFunctions{
     "matKInput",         "matKConstant",      "matKGradient",        "matKNoise",       "matKVoronoi",
     "matKFresnel",       "matKRamp",          "matKRemap",           "matKMultiply",    "matKAdd",
     "matKMix",           "matKMixby",         "matKPower",           "matKSmoothstep",  "matKThreshold",
@@ -18,8 +18,9 @@ constexpr std::array<std::string_view, 34> kKindFunctions{
     "matKWorldProject",  "matKObjectProject", "matKHeightBlend",     "matKDetailNormal", "matKCurvatureMask",
     "matKEdgeWear",      "matKDecalBox",      "matKAnisotropy",      "matKRoughnessFilter", "matKMicroDetail",
     "matKSwizzle",       "matKVoronoiEdge",   "matKQuantize",        "matKOklabRamp",
+    "matKTextureTriplanar", "matKTextureTriplanarNormal", // ADR-1642
 };
-static_assert(static_cast<std::size_t>(scene::MaterialOpKind::OklabRamp) + 1 == kKindFunctions.size(),
+static_assert(static_cast<std::size_t>(scene::MaterialOpKind::TextureTriplanarNormal) + 1 == kKindFunctions.size(),
               "a new op kind needs its matK function here and in shaders/material.wgsl");
 
 constexpr int kMaxOps = scene::kMaxMaterialOps;
@@ -57,6 +58,16 @@ void emitOps(std::string& out, const scene::MaterialProgramGpu& p, int first, in
     }
 }
 
+// ADR-1642: whether the program has a texture op the pre-pass samples.
+bool usesTexture(const scene::MaterialProgramGpu& p) {
+    for (int k = 0; k < scene::kMaxMaterialTextureOps; ++k) {
+        if (p.textureOps[k] >= 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool usesField(const scene::MaterialProgramGpu& p) {
     for (const scene::MaterialOpGpu& op : p.ops) {
         if (op.kind == static_cast<std::uint32_t>(scene::MaterialOpKind::Field)) {
@@ -79,6 +90,7 @@ std::uint64_t materialStructureKey(std::span<const scene::MaterialProgramGpu> pr
         for (int c = 0; c < 3; ++c) {
             mix(h, static_cast<std::uint32_t>(p.opacityCountPad[c]));
         }
+        mix(h, usesTexture(p) ? 1u : 0u); // ADR-1642: the pre-pass is emitted or not
         for (const scene::MaterialLayerGpu& layer : p.layers) {
             for (int c = 0; c < 4; ++c) {
                 mix(h, static_cast<std::uint32_t>(layer.outputs[c]));
@@ -104,10 +116,12 @@ std::string compileMaterialProgramWgsl(const scene::MaterialProgramGpu& p, int s
     out += "    var r0 = vec4<f32>(0.0); var r1 = vec4<f32>(0.0); var r2 = vec4<f32>(0.0); var r3 = vec4<f32>(0.0);\n";
     out += "    var r4 = vec4<f32>(0.0); var r5 = vec4<f32>(0.0); var r6 = vec4<f32>(0.0); var r7 = vec4<f32>(0.0);\n";
     out += "    var local = ctx;\n";
-    if (usesField(p)) {
-        out += "    let fields = materialFieldPrepass(pi, ctx.worldPosition);\n";
+    const std::string fieldsExpr = usesField(p) ? "materialFieldPrepass(pi, ctx.worldPosition)" : "matFieldsZero()";
+    if (usesTexture(p)) { // ADR-1642: only where the pipeline samples program textures (MAT_PROGRAM_TEXTURES)
+        out += fmt::format("    var fields = {};\n", fieldsExpr);
+        out += "    if (MAT_PROGRAM_TEXTURES) { fields = materialTexturePrepass(pi, ctx, fields); }\n";
     } else {
-        out += "    let fields = MatFields(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0));\n";
+        out += fmt::format("    let fields = {};\n", fieldsExpr);
     }
     emitOps(out, p, 0, std::max(p.opacityCountPad.y, 0));
     out += "    var result = base;\n";

@@ -37,8 +37,8 @@ class FieldUniforms;
 // the ninth program was dropped with one log line -- its surfaces shading as though they had none.
 constexpr int kMaxGpuMaterialPrograms = 16;
 
-// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (91,664 bytes since ADR-1290; 45,840 since ADR-904's header
-// flags; past the uniform limit since ADR-036, which is why it is a read-only storage buffer).
+// Mirrors `MaterialProgramBlock` in shaders/material.wgsl (91,920 bytes since ADR-1642's texture-op lane; 91,664 since
+// ADR-1290; 45,840 since ADR-904's header flags; past the uniform limit since ADR-036, which is why it is a read-only storage buffer).
 struct MaterialProgramBlock {
     std::uint32_t count = 0;
     std::uint32_t pad[3] = {0, 0, 0};
@@ -61,7 +61,10 @@ public:
 
     // Packs and uploads `programs`, resolving each Field op's field name through `fields` (null =
     // every field reference is unresolved). Call once per frame, after FieldUniforms::update.
-    void update(const std::vector<scene::MaterialProgram>& programs, const FieldUniforms* fields);
+    // ADR-1642: `textureLayerOf` resolves each texture op's image to its layer in the renderer's arrays (empty = none
+    // loaded: every texture op answers colour 1 / a flat normal).
+    void update(const std::vector<scene::MaterialProgram>& programs, const FieldUniforms* fields,
+                const scene::MaterialTextureLayerFn& textureLayerOf = {});
     // Slot of an uploaded program by name; -1 when unknown, empty or beyond the limit.
     [[nodiscard]] int slotOf(std::string_view name) const;
     [[nodiscard]] std::uint32_t count() const { return block_.count; }

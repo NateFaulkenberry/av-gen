@@ -20,6 +20,7 @@
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/shader_library.hpp"
+#include "gpu/texture.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/material_programs.hpp"
 #include "scene/material_program.hpp"
@@ -61,6 +62,52 @@ std::unique_ptr<gpu::Context> makeContext() {
     }
     return std::move(*ctx);
 }
+
+// ADR-1642: material.wgsl's texture ops read three bindings its includer declares; both kernels declare them at
+// 16..18 and bind 1x1 defaults (no program here samples a texture).
+constexpr const char* kTextureDecls = R"(
+@group(0) @binding(16) var programTexturesSrgb: texture_2d_array<f32>;
+@group(0) @binding(17) var programTexturesLinear: texture_2d_array<f32>;
+@group(0) @binding(18) var programTextureSampler: sampler;
+)";
+
+struct PerfTextures {
+    gpu::GpuTexture srgb;
+    gpu::GpuTexture linear;
+    wgpu::Sampler sampler;
+    explicit PerfTextures(gpu::Context& ctx) {
+        auto s = gpu::uploadTextureArray(ctx, {}, true, {255, 255, 255, 255}, "perf-srgb");
+        auto l = gpu::uploadTextureArray(ctx, {}, false, {128, 128, 255, 255}, "perf-linear");
+        REQUIRE(s.has_value());
+        REQUIRE(l.has_value());
+        srgb = std::move(*s);
+        linear = std::move(*l);
+        wgpu::SamplerDescriptor sd{};
+        sd.magFilter = wgpu::FilterMode::Linear;
+        sd.minFilter = wgpu::FilterMode::Linear;
+        sd.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+        sampler = ctx.device().CreateSampler(&sd);
+    }
+    static void layoutEntries(wgpu::BindGroupLayoutEntry* e) {
+        for (std::uint32_t i = 0; i < 2; ++i) {
+            e[i].binding = 16 + i;
+            e[i].visibility = wgpu::ShaderStage::Compute;
+            e[i].texture.sampleType = wgpu::TextureSampleType::Float;
+            e[i].texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
+        }
+        e[2].binding = 18;
+        e[2].visibility = wgpu::ShaderStage::Compute;
+        e[2].sampler.type = wgpu::SamplerBindingType::Filtering;
+    }
+    void groupEntries(wgpu::BindGroupEntry* e) const {
+        e[0].binding = 16;
+        e[0].textureView = srgb.view;
+        e[1].binding = 17;
+        e[1].textureView = linear.view;
+        e[2].binding = 18;
+        e[2].sampler = sampler;
+    }
+};
 
 // One invocation per pixel. The context varies with the invocation id so no lane sees the same
 // inputs as its neighbour -- a program of noise ops must actually evaluate 5.18 M distinct noises.
@@ -130,12 +177,12 @@ public:
         REQUIRE(fields.has_value());
         auto material = shaders_.loadSource("material.wgsl");
         REQUIRE(material.has_value());
-        auto module = shaders_.compile(*fields + "\n" + *material + kKernel, "material-perf-probe");
+        auto module = shaders_.compile(*fields + "\n" + *material + kTextureDecls + kKernel, "material-perf-probe");
         if (!module) {
             FAIL(module.error().message);
         }
         const auto& device = ctx_.device();
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         for (std::uint32_t i = 0; i < 4; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
@@ -147,6 +194,7 @@ public:
         entries[4].binding = 15; // fields.wgsl's shared grid table (ADR-032)
         entries[4].visibility = wgpu::ShaderStage::Compute;
         entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        PerfTextures::layoutEntries(&entries[5]); // ADR-1642
         wgpu::BindGroupLayoutDescriptor ldesc{};
         ldesc.entryCount = entries.size();
         ldesc.entries = entries.data();
@@ -183,7 +231,8 @@ public:
         rendering::FieldUniforms& fieldBlock = *fields_;
         rendering::MaterialPrograms& block = *programs_;
 
-        std::array<wgpu::BindGroupEntry, 5> entries{};
+        std::array<wgpu::BindGroupEntry, 8> entries{};
+        textures_.groupEntries(&entries[5]); // ADR-1642
         entries[0].binding = 0;
         entries[0].buffer = fieldBlock.buffer();
         entries[0].size = rendering::FieldUniforms::kBufferSize;
@@ -227,6 +276,7 @@ private:
     }
 
     gpu::Context& ctx_;
+    PerfTextures textures_{ctx_}; // ADR-1642
     gpu::ShaderLibrary shaders_;
     wgpu::BindGroupLayout layout_;
     wgpu::ComputePipeline pipeline_;
@@ -428,7 +478,7 @@ fn cs_body(@builtin(global_invocation_id) gid: vec3<u32>) {
         if (i >= n) { break; }
         acc = acc + materialEvalOp(pi, i, ctx,
                                    MatRegs(regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7]),
-                                   MatFields(vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0), vec4<f32>(0.0)));
+                                   matFieldsZero());
     }
     if (acc.x + acc.y + acc.z + acc.w < -1.0e30) { results[gid.y * 2880u + gid.x] = acc; }
 }
@@ -445,12 +495,12 @@ public:
         REQUIRE(fields.has_value());
         auto material = shaders_.loadSource("material.wgsl");
         REQUIRE(material.has_value());
-        auto module = shaders_.compile(*fields + "\n" + *material + kSplitKernel, "material-split-probe");
+        auto module = shaders_.compile(*fields + "\n" + *material + kTextureDecls + kSplitKernel, "material-split-probe");
         if (!module) {
             FAIL(module.error().message);
         }
         const auto& device = ctx_.device();
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
         for (std::uint32_t i = 0; i < 4; ++i) {
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Compute;
@@ -462,6 +512,7 @@ public:
         entries[4].binding = 15;
         entries[4].visibility = wgpu::ShaderStage::Compute;
         entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        PerfTextures::layoutEntries(&entries[5]); // ADR-1642
         wgpu::BindGroupLayoutDescriptor ldesc{};
         ldesc.entryCount = entries.size();
         ldesc.entries = entries.data();
@@ -493,7 +544,8 @@ public:
         programs_->update({repeated("filler", MaterialOpKind::Constant, 48)}, fields_.get());
         rendering::FieldUniforms& fieldBlock = *fields_;
         rendering::MaterialPrograms& block = *programs_;
-        std::array<wgpu::BindGroupEntry, 5> ge{};
+        std::array<wgpu::BindGroupEntry, 8> ge{};
+        textures_.groupEntries(&ge[5]); // ADR-1642
         ge[0].binding = 0;
         ge[0].buffer = fieldBlock.buffer();
         ge[0].size = rendering::FieldUniforms::kBufferSize;
@@ -554,6 +606,7 @@ private:
     }
 
     gpu::Context& ctx_;
+    PerfTextures textures_{ctx_}; // ADR-1642
     gpu::ShaderLibrary shaders_;
     wgpu::BindGroupLayout layout_;
     std::vector<wgpu::ComputePipeline> pipelines_;

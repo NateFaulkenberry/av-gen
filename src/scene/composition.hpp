@@ -1741,6 +1741,9 @@ private:
     // `Scene::textureVersion` conditional on a texture having actually changed rather than on a
     // flatten having happened (ADR-273).
     std::uint64_t textureDigest_ = 0;
+    // ADR-1642: program textures that failed to load, said once each rather than on every rebuild.
+    std::unordered_set<std::string> programTextureWarned_;
+    void collectProgramTextures();
     bool legacyProceduralGeneration_ = false;
     glm::vec3 center_{0.0f};
     float radius_ = 1.0f;
