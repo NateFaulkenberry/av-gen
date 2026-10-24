@@ -259,3 +259,55 @@ TEST_CASE("UI reach: an effect's card names the routes that move it, which its a
     // The control: an effect nothing routes to lists nothing.
     CHECK(ui::effectRoutesOn(std::span<const params::ModRoute>(routes).subspan(6, 1), e, *schema).empty());
 }
+
+// ADR-1641: the ribbons' settings pack only when ribbons are on (so every aurora authored before them packs the
+// bytes it packed), validate their ranges, and survive the file; a file without them reads the defaults.
+TEST_CASE("aurora ribbons pack only when on, validate, and round-trip (ADR-1641)",
+          "[world][atmospherics][aurora][adr1641]") {
+    const world::AuroraGpu off = packed(1.0f, {});
+    CHECK(off.ribbon0 == glm::vec4(0.0f));
+    CHECK(off.ribbon1 == glm::vec4(0.0f));
+
+    world::EffectInstance e = world::glowmereAurora("sky");
+    e.timing.fadeIn = 0.0;
+    e.aurora.shape.ribbons = true;
+    e.aurora.shape.ribbonAltitude = 1500.0f;
+    e.aurora.shape.ribbonSteps = 300.0f; // clamped on the way to the GPU
+    std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
+    std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
+    const std::array<world::EffectInstance, 1> set{e};
+    world::EffectContext ctx;
+    ctx.seconds = 4.0;
+    REQUIRE(world::resolveAtmosphericEffects(set, ctx, comets, auroras).auroras == 1);
+    const world::AuroraGpu on = world::packAurora(auroras[0], {});
+    CHECK(on.ribbon0 == glm::vec4(1.0f, 1500.0f, 128.0f, e.aurora.shape.ribbonScale));
+    CHECK(on.ribbon1.x == e.aurora.shape.ribbonWidth);
+    CHECK(on.ribbon1.w == e.aurora.shape.ribbonDistance);
+    // the curtains' lanes are the same either way
+    CHECK(on.config == off.config);
+    CHECK(on.low == off.low);
+
+    CHECK_FALSE(e.validate().has_value()); // 300 planes is out of range
+    e.aurora.shape.ribbonSteps = 64.0f;
+    REQUIRE(e.validate().has_value());
+    world::EffectInstance bad = e;
+    bad.aurora.shape.ribbonScale = 0.0f;
+    CHECK_FALSE(bad.validate().has_value());
+
+    const nlohmann::json j = e.toJson();
+    REQUIRE(j.at("parameters").at("shape").contains("ribbons"));
+    auto back = world::EffectInstance::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->aurora.shape.ribbons);
+    CHECK(back->aurora.shape.ribbonAltitude == 1500.0f);
+    CHECK(back->aurora.shape.ribbonSteps == 64.0f);
+    nlohmann::json old = j;
+    for (const char* key : {"ribbons", "ribbonAltitude", "ribbonScale", "ribbonWidth", "ribbonSwirl", "ribbonEdge",
+                            "ribbonSteps", "ribbonDistance"}) {
+        old["parameters"]["shape"].erase(key);
+    }
+    auto legacy = world::EffectInstance::fromJson(old);
+    REQUIRE(legacy.has_value());
+    CHECK_FALSE(legacy->aurora.shape.ribbons);
+    CHECK(legacy->aurora.shape.ribbonSteps == 48.0f);
+}

@@ -84,7 +84,12 @@ by N routes**, every modulation route onto the effect's controls as its source a
 (*audio.rms -> Brightness*), marked *(off)* or *[plan]* where that applies — the ones **+ Add Effect** or
 a Director plan installed included. Routes are separate from an effect's own response to the music: an
 aurora's **Audio response** at 0 stops everything the aurora does with the music by itself, and leaves
-its routes moving it. **Source** and
+its routes moving it. An aurora's **Advanced → Ribbons** turns its curtains into ribbons overhead (ADR-1641):
+broad sheets that arch and swirl across the sky, with bright curving lower edges and rays rising from them.
+**Altitude** is how high the lower edges hang, **Fold size** how broad a swirl is, **Sheet width**, **Swirl** and
+**Edge variation** shape them, **Quality** is the number of planes marched (48 offline, 16-24 live) and **Fade
+distance** how far towards the horizon they reach. The colours, height, opacity, edge brightness, filaments,
+speeds and audio all still apply. **Source** and
 **Target** pickers for the types that start from, or point at, a thing in the scene. **Advanced** holds
 the rest, including **Follows** (the spatial field the effect's motion answers to) and **Anchored
 to** for sky effects. **Timing** holds the activation and the delay, fades, lifetime and repeat.

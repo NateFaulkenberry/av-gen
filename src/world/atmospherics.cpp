@@ -216,6 +216,16 @@ Result<void> AuroraShape::validate() const {
     for (const float v : {flowSpeed, driftSpeed, verticalSpeed}) {
         if (!finite(v)) { return fail("an aurora motion speed is not finite"); }
     }
+    // ADR-1641
+    if (!finite(ribbonAltitude)) { return fail("aurora ribbon altitude is not finite"); }
+    if (!(ribbonScale > 0.0f) || !finite(ribbonScale)) { return fail("aurora ribbon scale must be positive"); }
+    if (!(ribbonWidth > 0.0f) || !finite(ribbonWidth)) { return fail("aurora ribbon width must be positive"); }
+    if (ribbonSwirl < 0.0f || !finite(ribbonSwirl)) { return fail("aurora ribbon swirl must not be negative"); }
+    if (ribbonEdge < 0.0f || !finite(ribbonEdge)) { return fail("aurora ribbon edge must not be negative"); }
+    if (ribbonSteps < 8.0f || ribbonSteps > 128.0f || !finite(ribbonSteps)) {
+        return fail("an aurora's ribbons march 8..128 planes; each one is a sample per sky pixel");
+    }
+    if (!(ribbonDistance > 0.0f) || !finite(ribbonDistance)) { return fail("aurora ribbon distance must be positive"); }
     return {};
 }
 
@@ -747,6 +757,14 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
     g.anchor = glm::vec4(r.anchor, std::clamp(au.rainbow.saturation, 0.0f, 1.0f));
     // ADR-939: the glints' high-band depth, under the same master as the five above.
     g.audio3 = glm::vec4(std::max(ad.glints, 0.0f) * sens, 0.0f, 0.0f, 0.0f);
+    // ADR-1641: the ribbons. Zero when off, which is every aurora authored before them, so the bytes the curtains
+    // read are the bytes they read before.
+    if (s.ribbons) {
+        g.ribbon0 = glm::vec4(1.0f, s.ribbonAltitude, std::clamp(s.ribbonSteps, 8.0f, 128.0f),
+                              std::max(s.ribbonScale, 1.0f));
+        g.ribbon1 = glm::vec4(std::clamp(s.ribbonWidth, 0.005f, 0.5f), std::max(s.ribbonSwirl, 0.0f),
+                              std::max(s.ribbonEdge, 0.0f), std::max(s.ribbonDistance, 1.0f));
+    }
 
     // The spectrum, or a flat 0.5 when there is no music. 0.5 is the value the shader's height
     // mapping treats as neutral, so silence gives an ordinary curtain rather than a collapsed one.

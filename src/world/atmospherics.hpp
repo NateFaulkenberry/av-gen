@@ -235,6 +235,21 @@ struct AuroraShape {
     float flowSpeed = 0.055f;    // how fast the whole curtain drifts, in turns per second
     float driftSpeed = 0.13f;    // how fast the internal folds churn
     float verticalSpeed = 0.07f; // how fast the fold pattern climbs
+
+    // ADR-1641: ribbons. Off (the default), the curtains above. On, the aurora is a layer of sheets overhead
+    // whose footprint is a folded curve on the ground plane (a domain-warped noise's mid-level line), marched as
+    // `ribbonSteps` horizontal planes between the lower edges and the tops. Seen in perspective the curves sweep
+    // and arch across the sky with bright lower rims and vertical rays rising from them. The curtain height,
+    // colours, opacity, edge brightness, filaments, speeds and audio depths above all apply; the radius, layer
+    // spacing, base height, waves and curtain count are the cylinders' and do nothing here.
+    bool ribbons = false;
+    float ribbonAltitude = 1800.0f;  // metres above the anchor the lower edges hang at
+    float ribbonScale = 9000.0f;     // metres: the size of one fold of the footprint
+    float ribbonWidth = 0.08f;       // how thin a sheet is, as a fraction of a fold
+    float ribbonSwirl = 1.2f;        // how far the footprint is folded and swirled
+    float ribbonEdge = 0.35f;        // how far the lower rim rises and falls, as a fraction of the curtain height
+    float ribbonSteps = 48.0f;       // horizontal planes marched (8..128): more is smoother, each one a sample
+    float ribbonDistance = 60000.0f; // metres: how far away a ribbon fades into the sky
     [[nodiscard]] Result<void> validate() const;
 };
 
@@ -604,8 +619,13 @@ struct AuroraGpu {
     // `sensitivity`); yzw = 0. Last, so no lane above moved. The bins above arrive sensitised too:
     // each one's distance from the neutral 0.5 is scaled by the sensitivity.
     glm::vec4 audio3{0.0f};
+    // ADR-1641: x = 1 for ribbons (0 = the curtains), y = altitude above the anchor (m), z = planes, w = fold size (m)
+    glm::vec4 ribbon0{0.0f};
+    // ADR-1641: x = sheet width (fraction of a fold), y = swirl, z = lower-rim variation (curtain heights),
+    // w = fade distance (m)
+    glm::vec4 ribbon1{0.0f};
 };
-static_assert(sizeof(AuroraGpu) == 240);
+static_assert(sizeof(AuroraGpu) == 272);
 
 // The ground illumination every live effect contributes, summed. One block rather than one per
 // effect because §6 asks for *cinematic* light rather than correct light, and a sum of coloured

@@ -95,6 +95,42 @@ constexpr EffectField kFields[] = {
                GET(e.aurora.shape.verticalSpeed), SETF(e.aurora.shape.verticalSpeed))
         .json("shape/verticalSpeed"),
 
+    // ---- ADR-1641: ribbons. Off, the curtains above; on, folded sheets overhead seen in perspective.
+    boolField("ribbons", "Ribbons", GET(e.aurora.shape.ribbons), SETB(e.aurora.shape.ribbons))
+        .json("shape/ribbons").sec("Ribbons")
+        .tooltip("Broad ribbons arching and swirling across the sky, with bright curving lower edges and\n"
+                 "rays rising from them, instead of curtains standing round the horizon. Height, colours,\n"
+                 "opacity, edge brightness, filaments, speeds and audio all still apply."),
+    floatField("ribbonAltitude", "Altitude", -2000.0f, 20000.0f, 300.0f, 6000.0f, GET(e.aurora.shape.ribbonAltitude),
+               SETF(e.aurora.shape.ribbonAltitude))
+        .json("shape/ribbonAltitude").fmt("%.0f m")
+        .tooltip("How high above the viewer (or the anchor) the ribbons' lower edges hang."),
+    floatField("ribbonScale", "Fold size", 200.0f, 100000.0f, 2000.0f, 30000.0f, GET(e.aurora.shape.ribbonScale),
+               SETF(e.aurora.shape.ribbonScale))
+        .json("shape/ribbonScale").fmt("%.0f m").log().floorAt(1.0f)
+        .tooltip("The size of one swirl of the ribbons, seen from below: larger is broader, slower arcs."),
+    floatField("ribbonWidth", "Sheet width", 0.005f, 0.5f, 0.02f, 0.25f, GET(e.aurora.shape.ribbonWidth),
+               SETF(e.aurora.shape.ribbonWidth))
+        .json("shape/ribbonWidth").clampTo(0.005f, 0.5f)
+        .tooltip("How thick a ribbon is, as a fraction of a fold. Thin is a crisp sheet; wide a glowing band."),
+    floatField("ribbonSwirl", "Swirl", 0.0f, 6.0f, 0.0f, 3.0f, GET(e.aurora.shape.ribbonSwirl),
+               SETF(e.aurora.shape.ribbonSwirl))
+        .json("shape/ribbonSwirl")
+        .tooltip("How much the ribbons fold back on themselves. Low Mid -> waves (Audio response) adds to it."),
+    floatField("ribbonEdge", "Edge variation", 0.0f, 3.0f, 0.0f, 1.0f, GET(e.aurora.shape.ribbonEdge),
+               SETF(e.aurora.shape.ribbonEdge))
+        .json("shape/ribbonEdge")
+        .tooltip("How far the bright lower edge rises and falls along a ribbon, in curtain heights."),
+    floatField("ribbonSteps", "Quality", 8.0f, 128.0f, 16.0f, 96.0f, GET(e.aurora.shape.ribbonSteps),
+               SETF(e.aurora.shape.ribbonSteps))
+        .json("shape/ribbonSteps").fmt("%.0f").clampTo(8.0f, 128.0f)
+        .tooltip("Planes marched through the ribbons per sky pixel. More is smoother and costs more:\n"
+                 "48 offline; 16-24 live."),
+    floatField("ribbonDistance", "Fade distance", 1000.0f, 400000.0f, 10000.0f, 200000.0f,
+               GET(e.aurora.shape.ribbonDistance), SETF(e.aurora.shape.ribbonDistance))
+        .json("shape/ribbonDistance").fmt("%.0f m").log().floorAt(1.0f)
+        .tooltip("How far away a ribbon fades into the sky (towards the horizon)."),
+
     floatField("emission", "Bloom weight", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.aurora.appearance.emission),
                SETF(e.aurora.appearance.emission)).json("appearance/emission").sec("Appearance"),
     floatField("opacity", "Curtain opacity", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.aurora.appearance.opacity),
