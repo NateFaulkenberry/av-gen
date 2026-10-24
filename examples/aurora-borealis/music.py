@@ -149,8 +149,17 @@ def sources():
         sig("quietFull", [inp("signal.cueQuiet", gate="signal.arrHigh")]),
         sig("cFallback", [inp("beat.phrasePulse", gate="signal.quietFull")], chain=latch(36000.0, 0.5, 0.05)),
         sig("comet", [inp("signal.cometCue"), inp("signal.cFallback")], combine="max", chain=latch(8000.0, 0.4, 0.3)),
+        sig("pulseAOn", [inp("signal.pulseA", {"threshold": "binary", "thresholdLevel": 0.75})]),
+        sig("pulseBOn", [inp("signal.pulseB", {"threshold": "binary", "thresholdLevel": 0.75})]),
+        sig("cometOn", [inp("signal.comet", {"threshold": "binary", "thresholdLevel": 0.8})]),
         sig("cometGlow", [inp("signal.comet", {"attackMs": 300.0, "envelope": "linearfall",
                                                "envelopeFallPerSecond": 0.5})]),
+        # ---- the triggers. An effect's trigger reads an EVENT signal (effect_trigger.hpp), so each latch above is
+        # turned into one: the beat pulse (an event) gated by the latch's first half-beat. The launch lands on the beat
+        # the latch rose on (the pulses rise on a kick, which is on the grid), and a latch can fire only once.
+        sig("pulseAEv", [inp("beat.pulse", gate="signal.pulseAOn")], event=True),
+        sig("pulseBEv", [inp("beat.pulse", gate="signal.pulseBOn")], event=True),
+        sig("cometEv", [inp("beat.pulse", gate="signal.cometOn")], event=True),
         # ---- the light
         sig("auroraLight", [inp("signal.arrangement", amount=0.55), inp("signal.kickWave", amount=0.28),
                             inp("signal.bassHit", amount=0.16), inp("signal.swell", amount=0.25)], combine="sum"),

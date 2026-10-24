@@ -210,10 +210,10 @@ def _timing(**kw):
     return t
 
 
-def river_pulse(slot, signal, speed=750.0, intensity=0.8, name=None):
+def river_pulse(slot, signal, speed=750.0, intensity=0.6, name=None):
     """Gate D: a front of light that leaves the camera and runs down the river (research A s5.3): a directional
     groundPulse from the camera at the water's height, a few metres tall, so it lights the water and the first metres
-    of the shore slope wherever the river goes. Triggered by its slot of the ring of two (music.py)."""
+    of the shore slope wherever the river goes. Triggered by its slot of the ring of two (music.py, signal.pulseAEv/BEv)."""
     c = look_colors(REST_LOOK)
     return {"id": name or ("riverPulse" + slot), "name": name or ("riverPulse" + slot), "type": "groundPulse",
             "owner": {"kind": "world"}, "enabled": True, "order": 0, "activation": "trigger",
@@ -238,10 +238,10 @@ CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the pu
 
 
 def comet_effect(start_az=30.0, end_az=-35.0):
-    """Gate F: one comet, triggered by signal.comet (about five a song, never two alive), crossing above the aurora's
+    """Gate F: one comet, triggered by signal.cometEv (about five a song, never two alive), crossing above the aurora's
     band in the palette's lavender, violet and magenta (research A s7.3)."""
     return {"id": "comet", "name": "comet", "type": "comet", "owner": {"kind": "world"}, "enabled": True, "order": 0,
-            "activation": "trigger", "trigger": {"source": "signal", "name": "signal.comet", "threshold": 0.5},
+            "activation": "trigger", "trigger": {"source": "signal", "name": "signal.cometEv", "threshold": 0.5},
             "style": "", "timing": _timing(fadeIn=0.4, fadeOut=1.5, lifetime=9.0),
             "ground": {"color": hexrgb("#b38cff"), "falloff": 2.0, "intensity": 0.4, "mode": "subtle",
                        "radius": 600.0},
@@ -253,7 +253,7 @@ def comet_effect(start_az=30.0, end_az=-35.0):
                                "wispScale": 0.002},
                 "path": {"acceleration": 0.0, "anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0],
                          "arcLift": 200.0, "curvature": 0.0, "distance": 5000.0, "endAzimuth": end_az,
-                         "endElevation": 13.0, "speedScale": 1.0, "startAzimuth": start_az, "startElevation": 30.0,
+                         "endElevation": 8.0, "speedScale": 1.0, "startAzimuth": start_az, "startElevation": 21.0,
                          "travelSeconds": 6.5},
                 "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
                             "speed": 0.2},
