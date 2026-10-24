@@ -36,11 +36,37 @@ R0 = 3000.0
 A3 = 0.10
 
 
-# the meanders: broad S-bends alternating left and right along the valley, about 1.1 km apart, their amplitude
-# varying slowly round the loop, so two or three bends show at once from the camera and the river snakes toward the
-# far ranges (the owner's brief s3)
-NM, PM = 17, 0.9
-AM0, AM1 = 0.050, 0.035
+# the river's course on the valley axis: straight reaches of about 1-2 km between mild bends (owner, Gate A take 3:
+# "some straight aways and mild bends"). Each bend is one broad, low-curvature swing to one side -- a smooth bump in
+# the river's offset from the axis -- with its own position, length and amplitude, alternating sides. Between them
+# the offset is ~0 and the river runs straight down the valley toward the far ranges.
+BENDS = []   # (theta centre, half-length in radians, amplitude m, side)
+
+
+def _bends(count=7):
+    out = []
+    for i in range(count):
+        c = TAU * (i + 0.5 + 0.35 * (_h(i, 1) - 0.5)) / count
+        half = 0.11 + 0.06 * _h(i, 2)              # 0.11-0.17 rad: 330-510 m either side of the apex
+        amp = (95.0 + 85.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
+        out.append((c, half, amp))
+    return out
+
+
+def _h(i, k):
+    return mx._hash(i, k, 333)
+
+
+BENDS = _bends()
+
+
+def meander(th):
+    d = 0.0
+    for c, half, amp in BENDS:
+        x = (th - c + math.pi) % TAU - math.pi
+        if abs(x) < 2.5 * half:
+            d += amp * math.exp(-(x / half) ** 2)
+    return d
 
 
 def rc_axis(th):
@@ -49,9 +75,8 @@ def rc_axis(th):
 
 
 def rc(th):
-    """The river: the valley axis with the meanders on it."""
-    am = AM0 + AM1 * periodic_noise(th, 5, 41)
-    return rc_axis(th) + R0 * am * math.sin(NM * th + PM)
+    """The river: the valley axis, with the bends on it."""
+    return rc_axis(th) + meander(th)
 
 
 def half_width(th):
@@ -60,7 +85,8 @@ def half_width(th):
     perp = 185.0 + 30.0 * math.sin(2.0 * th + 1.0)
     e = 1e-4
     slope = (rc(th + e) - rc(th - e)) / (2.0 * e) / rc(th)
-    return perp * math.sqrt(1.0 + slope * slope)
+    # only half the radial correction: a full one widened the bends into lakes (owner, Gate A take 2)
+    return perp * (1.0 + 0.5 * (math.sqrt(1.0 + slope * slope) - 1.0))
 
 
 def centre(th):
@@ -167,8 +193,8 @@ def _spurs(count=140):
 # the program's haze pales them. The outer layers stand in the ring meshes (range_tris reads peak_height too).
 LAYERS = [  # (side, set-back min, max (m from the water), height min, max, count)
     (+1, 650.0, 1100.0, 260.0, 420.0, 30),
-    (+1, 1500.0, 2600.0, 420.0, 650.0, 34),
-    (+1, 3400.0, 6000.0, 600.0, 950.0, 36),
+    (+1, 1500.0, 2600.0, 480.0, 720.0, 34),
+    (+1, 3400.0, 6000.0, 850.0, 1300.0, 36),
     (-1, 550.0, 1000.0, 220.0, 360.0, 26),
     (-1, 1250.0, 1900.0, 320.0, 480.0, 18),
 ]
@@ -224,8 +250,11 @@ def detail(x, z, th, o, side):
     ww = wall_weight(th, o, side)
     flat = 2.5 * mx.smooth(15.0, 70.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
     # rocky shoulders: large ridged facets from 30 m up the shore (the waterline itself stays a gentle slope)
-    flat += (9.0 + 0.04 * min(o, 600.0)) * mx.smooth(30.0, 140.0, o) * (
-        mx.fbm(x / 110.0, z / 110.0, 27, 3, ridged=True) - 0.3)
+    flat += (16.0 + 0.06 * min(o, 600.0)) * mx.smooth(30.0, 120.0, o) * (
+        mx.fbm(x / 110.0, z / 110.0, 27, 3, ridged=True) - 0.25)
+    # and a coarser set of rock buttresses, so every stretch of the near slopes has large readable facets
+    flat += (12.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
+        mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 2, ridged=True) - 0.3)
     spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 230.0, z / 230.0, 23, 4, ridged=True) - 0.35)
     return flat + spur
 
@@ -342,7 +371,7 @@ def _crest(t, peak, keep_outer):
 RANGES = [
     ("near", 4300.0, 7000.0, 9, 360, 120.0, 380.0, 900.0, 3, 0.45, False),
     ("far", 6500.0, 11000.0, 9, 300, 200.0, 500.0, 1300.0, 7, 0.5, False),
-    ("distant", 10500.0, 19000.0, 7, 220, 300.0, 700.0, 2100.0, 13, 0.55, True),
+    ("distant", 10500.0, 19000.0, 7, 220, 600.0, 1300.0, 2100.0, 13, 0.55, True),
 ]
 
 

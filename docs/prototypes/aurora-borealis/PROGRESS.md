@@ -194,3 +194,25 @@ Media: `~/Desktop/av-gen-review/aurora-borealis/gateA2/`:
   layout at the same times, below. The camera paths differ;
 - `clip-40-60s.mp4`, 20 s: the river stays visible in every sampled frame;
 - `topdown-map.png`: the meanders in blue, the camera's axis path in yellow, minute marks.
+
+### Gate A, third showing
+
+- **Straights and mild bends** (owner: "some straight aways and mild bends"). The sine meander is gone. The river
+  carries 7 discrete bends: each is one broad swing to one side, 370-470 m either side of its apex, 109-179 m out,
+  alternating sides, each placed, sized and spaced on its own. Between them the river runs straight down the valley
+  axis. 54% of the loop is straight (within 15 m of the axis), in runs of 0.6-2.1 km.
+- **Bends widen less:** half the radial correction, so the bends read as river, not lake. The base half-width is
+  unchanged (155-215 m).
+- **Taller far ranges:** the middle layer is 480-720 m, the far layer 850-1300 m, and the distant ring 600-1300 m relief.
+  Haze still pales them with distance.
+- **Rock throughout the near slopes:** stronger ridged facets from 30 m up, plus a coarser set of buttresses from 40 m.
+  The waterline stays gentle.
+- **Headless Ultra A/B** (take 2 against take 3), interleaved, 3 reps, AC, same build, GPU p50: take 2 14.20 (t60) /
+  13.86 (t140); **take 3 13.87 / 14.29**. CPU work p50 3.62 / 3.75 against 3.41 / 3.53.
+- Media: `~/Desktop/av-gen-review/aurora-borealis/gateA3/`:
+  - `pair-t*.png`: take 2 above, take 3 below;
+  - `sheet-after.png`;
+  - `straight-t214-and-bend-t12.png`;
+  - `several-bends-t100-t140-t200.png`;
+  - `clip-40-60s.mp4`;
+  - `topdown-map.png`: straights in green, bends in orange, the camera path in yellow.
