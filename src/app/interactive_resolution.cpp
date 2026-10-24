@@ -142,6 +142,12 @@ constexpr LiveQualityRung singleRead(LiveQualityRung r) {
     r.refractionDispersion = false;
     return r;
 }
+// ADR-1651: the aurora ribbons march fewer planes (a fraction of the authored `ribbonSteps`, at least 8). Nothing in a
+// scene without ribbons. Balanced: 3/4 at Medium, 1/2 from Low.
+constexpr LiveQualityRung auroraPlanes(LiveQualityRung r, float scale) {
+    r.auroraStepScale = scale;
+    return r;
+}
 constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, float particleMetres, float lod) {
     r.shadowCasterMinPixels = casterPixels;
     r.particleCullDistance = particleMetres;
@@ -153,28 +159,28 @@ constexpr LiveQualityLadder kResolutionFirst{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
     singleRead(astral(volumes(rung(L::Medium, 0.71f), 0.25f), 2)),
-    refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f),
-    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f),
+    auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.75f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
 };
 
 constexpr LiveQualityLadder kBalanced{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
-    singleRead(astral(noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)), 2)),
-    refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f),
-    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f),
+    auroraPlanes(singleRead(astral(noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)), 2)), 0.75f),
+    auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
 };
 
 constexpr LiveQualityLadder kEffectsFirst{
     rung(L::Ultra, 1.0f),
-    cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2),
-    singleRead(astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)), 2)),
-    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
-               80.0f, 1.5f), 4), 3), false, 0.5f),
-    refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
-               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f),
+    auroraPlanes(cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2), 0.75f),
+    auroraPlanes(singleRead(astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)), 2)), 0.5f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
+               80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+               24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
 };
 
 // ADR-1099: the profiles, rows of the same family. QUALITY is the tier. BALANCED spends nothing on what is small or far
@@ -204,6 +210,8 @@ int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
            (a.particleCullDistance != b.particleCullDistance ? 1 : 0) +
            (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0) + (a.astralTier != b.astralTier ? 1 : 0) +
            (a.refraction != b.refraction ? 1 : 0) + (a.waterSsrScale != b.waterSsrScale ? 1 : 0); // ADR-1603
+    // ADR-1651: auroraStepScale is not counted either, for the same reason: it is a gain only where a scene has
+    // ribbons, and counting it would promise every other scene's controller a step it cannot take.
     // ADR-1640: refractionDispersion is not counted. Seven reads for one on the refractive pixels only (+0.15 ms at 4K
     // over 40% of the frame, the ADR), and nothing in a scene without dispersion: counting it would promise Medium a
     // quarter more of a gain.
@@ -241,6 +249,7 @@ void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::Quali
     q.refraction = base.refraction && rung.refraction;                      // ADR-1603
     q.waterSsrScale = std::min(base.waterSsrScale, rung.waterSsrScale);
     q.refractionDispersion = base.refractionDispersion && rung.refractionDispersion; // ADR-1640
+    q.auroraStepScale = std::min(base.auroraStepScale, rung.auroraStepScale);         // ADR-1651
 }
 } // namespace
 
@@ -797,6 +806,7 @@ void giveUp(LiveQualityRung& r, std::string_view group, int depth) {
     } else if (group == "volumes") {
         r.volumeResolutionScale = 0.25f;
         r.volumeStepScale = full ? 0.5f : 1.0f;
+        r.auroraStepScale = full ? 0.5f : 0.75f; // ADR-1651: the ribbons' plane march is a sky volume
     } else if (group == "post") {
         r.postEffectQuality = 0.5f;
         r.waterSsrScale = full ? 0.0f : 0.5f; // ADR-1603: the screen-space effects go with the post group
@@ -875,6 +885,8 @@ bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
     else if (lever == "nodispersion") c.refractionDispersion = false;                         // ADR-1640
     else if (lever == "waterssrhalf") c.waterSsrScale = std::min(c.waterSsrScale, 0.5f);
     else if (lever == "nowaterssr") c.waterSsrScale = 0.0f;
+    else if (lever == "auroraplanes75") c.auroraStepScale = std::min(c.auroraStepScale, 0.75f);  // ADR-1651
+    else if (lever == "auroraplaneshalf") c.auroraStepScale = std::min(c.auroraStepScale, 0.5f); // ADR-1651
     else if (lever == "nomotionblur") c.motionBlur = false;
     else if (lever == "nodof") c.depthOfField = false;
     else if (lever == "castercull") c.shadowCasterMinPixels = std::max(c.shadowCasterMinPixels, 24.0f);
@@ -917,6 +929,7 @@ std::string ceilingJsonText(const LiveQualityRung& c) {
     if (c.refraction != n.refraction) j["refraction"] = c.refraction;   // ADR-1603
     if (c.waterSsrScale != n.waterSsrScale) j["waterSsrScale"] = c.waterSsrScale;
     if (c.refractionDispersion != n.refractionDispersion) j["refractionDispersion"] = c.refractionDispersion; // ADR-1640
+    if (c.auroraStepScale != n.auroraStepScale) j["auroraStepScale"] = c.auroraStepScale;                     // ADR-1651
     return j.dump();
 }
 
@@ -950,6 +963,7 @@ std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std:
         else if (key == "refraction" && flag) c.refraction = v.get<bool>();                             // ADR-1603
         else if (key == "waterSsrScale" && num) c.waterSsrScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
         else if (key == "refractionDispersion" && flag) c.refractionDispersion = v.get<bool>();         // ADR-1640
+        else if (key == "auroraStepScale" && num) c.auroraStepScale = std::clamp(v.get<float>(), 0.1f, 1.0f); // ADR-1651
         else {
             error = "'" + key + "' is not a quality ceiling (or has the wrong type)";
             return std::nullopt;

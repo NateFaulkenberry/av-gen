@@ -175,6 +175,10 @@ Result<void> WaterSettings::validate() const {
     if (!(streakColorScale >= 0.001f && streakColorScale <= 10.0f)) {
         return fail("water: streakColorScale must be in [0.001, 10] cycles per metre");
     }
+    // ADR-1650
+    if (!(skyMirror >= 0.0f && skyMirror <= 1.0f)) {
+        return fail("water: skyMirror must be in [0, 1]");
+    }
     if (!(glints >= 0.0f && glints <= 50.0f)) {
         return fail("water: glints must be in [0, 50]");
     }

@@ -498,6 +498,126 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
     return radiance;
 }
 
+// ---- ribbon pulse (ADR-1652) begin ----
+// ADR-1652: the ribbons with a travelling pulse -- `atmosAuroraRibbons` line for line, plus the front (two marked
+// edits: the sheet's width and the emission). A copy rather than a branch inside the march, because a gated term in
+// the shared loop changed the compiled march enough to move the ribbons' pixels at pulse 0; with the copy, pulse 0
+// runs exactly the function it ran before (the identity test holds it to that). A change to the ribbons belongs in
+// both functions.
+fn atmosAuroraRibbonsPulsed(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32, bass: f32, lowMid: f32,
+                      midBand: f32, high: f32) -> vec3<f32> {
+    var radiance = vec3<f32>(0.0);
+    let height = max(a.config.w, 1.0);
+    let baseY = a.anchor.y + a.ribbon0.y;
+    let steps = clamp(i32(a.ribbon0.z + 0.5), 8, 128);
+    let scale = max(a.ribbon0.w, 1.0);
+    let width = clamp(a.ribbon1.x, 0.005, 0.5);
+    let swirl = a.ribbon1.y * (1.0 + a.audio.y * lowMid);
+    let edgeVar = max(a.ribbon1.z, 0.0);
+    let fadeDist = max(a.ribbon1.w, 1.0);
+    let lift = 1.0 + a.audio.x * bass * 0.5;
+    // The layer the planes cross: from the lowest a rim can hang to the highest a top can reach.
+    let span = height * (edgeVar + 1.5 * lift);
+    // The ray climbs into the layer from below (the viewer under the sky), or is already in it.
+    if (rd.y < 1.0e-3 || ro.y > baseY + span) {
+        return radiance;
+    }
+    let dy = span / f32(steps);
+    // A plane's sample stands for dy of altitude, crossed over dy / rd.y of path. Where that path, laid
+    // horizontally, is wider than a sheet, the sheet is widened to it (and dimmed by the same factor below): a
+    // sheet thinner than the gap between samples would otherwise land on some pixels and miss their neighbours.
+    let pathPerPlane = dy / rd.y;
+    let advance = pathPerPlane * length(rd.xz) / scale; // the footprint distance between two planes' samples
+    // `width` is in the footprint line's own units, and the line climbs about 5 of them per unit of footprint
+    // (an fbm's gradient, stretched by 1.8), so a sheet covers about width / 5 of footprint. A factor of 8 keeps at
+    // least ~1.5 samples across it; below that each plane drew its own copy of the sheet (horizontal banding with a
+    // fixed jitter, grain with a varying one); 8 removes the grain entirely but blurs every sheet, so 3 is the
+    // compromise: crisp sheets, and a fine grain that supersampling averages away.
+    let widthEff = max(width, advance * 3.0);
+    let weight = min(pathPerPlane / (widthEff * scale), 4.0);
+    // Front to back: a sheet in front hides some of what stands behind it ("Curtain opacity"), so the many sheets
+    // a low ray crosses towards the horizon read as layers, not as one haze.
+    var transmit = 1.0;
+    let onset = max(0.015, 1.5 * dy / height);       // the rim's onset, in curtain heights
+    let off = vec2<f32>(a.flow.x, a.flow.x * 0.37); // the whole pattern drifting
+    let churn = a.flow.y;                            // its folds churning
+    let foldAmount = clamp(a.shape.z + a.audio.z * midBand, 0.0, 1.5);
+    for (var k = 0; k < steps; k = k + 1) {
+        let y = baseY + (f32(k) + jitter) * dy;
+        let t = (y - ro.y) / rd.y;
+        if (t <= 0.0) {
+            continue;
+        }
+        let fade = exp(-t / fadeDist);
+        if (fade < 0.01) {
+            break; // each plane up is further along the ray
+        }
+        let p = ro + rd * t;
+        let q = p.xz / scale + off;
+        // Gaps between the ribbons first (it reads only q): the dark sky between them is the silhouette, and most
+        // samples land there, so they skip the folding below.
+        let presence = smoothstep(0.22, 0.55, atmosFbm2(q * 0.45 + vec2<f32>(3.1, 1.7), 2));
+        if (presence <= 1.0e-3) {
+            continue;
+        }
+        // Fold the footprint, then take its mid-level line: 1 on the curve, falling off either side. Two octaves,
+        // stretched: an fbm's values crowd round the middle, so its raw mid-level "line" is a band.
+        let w1 = atmosFbm2(q * 0.8 + vec2<f32>(churn * 0.2, 1.3), 2);
+        let w2 = atmosFbm2(q * 0.8 + vec2<f32>(5.2, 7.1 - churn * 0.2), 2);
+        let qw = q + swirl * (vec2<f32>(w1, w2) - 0.5);
+        let line = abs(2.0 * (atmosFbm2(qw, 2) + 0.125 * a.audio3.y) - 1.0) * 1.8; // ADR-1660, as above
+        // The front: at `pulse` 1 it stands on the lower rims; as the routed envelope decays it climbs a curtain
+        // height and fades with it (front = 1 - pulse). The same height as the rim test below, so it follows each
+        // rim's own curve. Where it passes the sheets are wider (here) and brighter (at the emission).
+        let hp = (y - baseY) / height - edgeVar * w1;
+        let pd = (hp - (1.0 - a.ribbon2.x)) / max(a.ribbon2.w, 0.01);
+        let pulseGlow = a.ribbon2.x * exp(-pd * pd);
+        let sheet = 1.0 - smoothstep(0.0, widthEff * (1.0 + a.ribbon2.z * pulseGlow), line);
+        if (sheet <= 1.0e-3) {
+            continue;
+        }
+        // The lower rim's height along the ribbon, so it curves in elevation as well as across the sky.
+        let h = (y - baseY) / height - edgeVar * w1;
+        if (h < 0.0) {
+            continue;
+        }
+        // The spectrum at this bearing sets the top, as it sets the curtains'.
+        let rel = p - a.anchor.xyz;
+        let theta = atan2(rel.z, rel.x);
+        let m = 1.0 - abs(1.0 - 2.0 * (theta / kAtmosTau + 0.5));
+        let shaped = mix(1.0, 0.30 + 0.95 * atmosAuroraSpectrum(a, m), a.detail.z);
+        let top = clamp(shaped * lift, 0.08, 1.5);
+        let hn = h / top;
+        // The rim's onset is never sharper than the planes are apart: a 40 m edge sampled every 50 m lands on some
+        // pixels' planes and between their neighbours', which is grain along every lower rim.
+        let body = smoothstep(0.0, onset, h) * (1.0 - smoothstep(0.2, 0.95, hn)) * presence * sheet;
+        if (body <= 1.0e-3) {
+            continue;
+        }
+        // Rays: the footprint's fine structure along the curve, the same on every plane, so it reads as
+        // striations rising from the rim.
+        let rays = 0.35 + 0.65 * atmosFbm2(qw * (a.shape.w * 0.3) + vec2<f32>(churn * 0.3, 0.0), 2);
+        let folds = atmosFbm2(qw * 1.7 + vec2<f32>(0.0, h * 2.0 + a.flow.z), 2);
+        let foldGain = mix(1.0, 0.45 + 1.1 * folds, foldAmount);
+        var col = mix(a.low.rgb, a.mid.rgb, smoothstep(0.0, 0.45, hn));
+        col = mix(col, a.top.rgb, smoothstep(0.42, 1.0, hn));
+        if (a.audio2.y > 0.0) {
+            col = col * atmosRainbow(m * a.audio2.z + a.audio2.w, a.anchor.w, a.audio2.y);
+        }
+        let edge = exp(-hn * hn * 34.0) * a.top.w * 0.28;
+        let filament = pow(rays, 5.0) * a.detail.x * (0.4 + 1.6 * a.audio.w * high);
+        let emit = col * (body * rays * foldGain + (edge + filament) * body) * fade * weight *
+                   (1.0 + a.ribbon2.y * pulseGlow);
+        radiance = radiance + transmit * emit;
+        transmit = transmit * (1.0 - clamp(body * a.low.w * weight * 0.5, 0.0, 0.95));
+        if (transmit < 0.02) {
+            break;
+        }
+    }
+    return radiance;
+}
+// ---- ribbon pulse (ADR-1652) end ----
+
 fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosResult {
     var out: AtmosResult;
     out.radiance = vec3<f32>(0.0);
@@ -539,8 +659,17 @@ fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosRes
         let beatGain = 1.0 + a.audio2.x * pulse;
 
         if (a.ribbon0.x > 0.5) { // ADR-1641: ribbons overhead instead of curtains on shells
+            // ---- ribbon pulse (ADR-1652) begin ----
+            if (a.ribbon2.x > 0.0) {
+                radiance = atmosAuroraRibbonsPulsed(a, ro, rd, atmosRibbonJitter(rd, pixelAngle), bass, lowMid,
+                                                    midBand, high) * beatGain;
+            } else {
+            // ---- ribbon pulse (ADR-1652) end ----
             radiance = atmosAuroraRibbons(a, ro, rd, atmosRibbonJitter(rd, pixelAngle), bass, lowMid, midBand, high) *
                        beatGain;
+            // ---- ribbon pulse (ADR-1652) begin ----
+            }
+            // ---- ribbon pulse (ADR-1652) end ----
         }
         for (var k = 0; k < select(shells, 0, a.ribbon0.x > 0.5); k = k + 1) {
             let fk = f32(k);

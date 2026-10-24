@@ -253,6 +253,14 @@ struct AuroraShape {
     // ADR-1660: how much of the sky the ribbons fill (0..1). 0 is ADR-1641 exactly; 1 stands the sheets on the
     // footprint noise's mean level, where its level line winds through the whole sky instead of a few loops.
     float ribbonCoverage = 0.0f;
+    // ADR-1652: a travelling pulse through the ribbons, for an accent such as the kick. One front, climbing from the
+    // lower rims a curtain height up as `pulse` falls from 1 to 0 (front = 1 - pulse), brightening and widening the
+    // sheets where it passes and fading with `pulse`. Route an envelope onto `pulse` (fast attack, a few hundred ms
+    // of decay). 0 (the default) is the ribbons exactly as before; it does nothing on the curtains.
+    float pulse = 0.0f;              // the front, 0..1 (route an envelope here)
+    float pulseGain = 2.0f;          // how much brighter the sheets are at the front, at pulse 1 (0..16)
+    float pulseThicken = 1.0f;       // how much wider the sheets are at the front, at pulse 1 (0..8)
+    float pulseWidth = 0.15f;        // the front's width, in curtain heights (0.02..1)
     [[nodiscard]] Result<void> validate() const;
 };
 
@@ -627,8 +635,16 @@ struct AuroraGpu {
     // ADR-1641: x = sheet width (fraction of a fold), y = swirl, z = lower-rim variation (curtain heights),
     // w = fade distance (m)
     glm::vec4 ribbon1{0.0f};
+    // ADR-1652: x = the travelling pulse, 0..1 (0 = none, every lane 0), y = its brightness gain, z = how much it
+    // widens the sheets, w = the front's width (curtain heights)
+    glm::vec4 ribbon2{0.0f};
 };
-static_assert(sizeof(AuroraGpu) == 272);
+static_assert(sizeof(AuroraGpu) == 288);
+
+// ADR-1651: the live ladder's lever on the ribbons' plane march. `scale` < 1 takes that fraction of the packed plane
+// count (rounded, at least 8, the march's own floor); 1 (or more) leaves the slot exactly as packed, and a slot that is
+// not ribbons (`ribbon0.x` 0, the curtains) is never touched.
+void applyAuroraStepScale(AuroraGpu& g, float scale);
 
 // The ground illumination every live effect contributes, summed. One block rather than one per
 // effect because §6 asks for *cinematic* light rather than correct light, and a sum of coloured
@@ -644,7 +660,7 @@ static_assert(sizeof(SkyGroundGpu) == 48);
 // ---- the placed volumetric media (ADR-562) ------------------------------------------------------
 
 // How many placed media the march carries. Four to start, and the number is a MARCH-COST decision
-// rather than a capacity one: a slot is 272 bytes, so eight would be 2 KB against a 64 KB uniform
+// rather than a capacity one: a slot is 288 bytes, so eight would be 2 KB against a 64 KB uniform
 // limit. ADR-374 measured one medium at +5.5 ms of a 13.5 ms frame and ADR-560 measured a fog bank
 // at 7.14 ms of `volume.march`, with the cost tracking how many (pixel, step) samples have non-zero
 // density -- which is what the per-slot ray interval is for, and what has to be measured before

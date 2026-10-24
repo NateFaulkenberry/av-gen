@@ -540,6 +540,8 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterStreakColor1Param = nullptr;
     params::Parameter<glm::vec3>* waterStreakColor2Param = nullptr;
     params::Parameter<glm::vec3>* waterStreakColor3Param = nullptr;
+    // ADR-1650: the sky mirror's amount, `nodes/<terrain>/water/skyMirror`.
+    params::Parameter<float>* waterSkyMirrorParam = nullptr;
     // ADR-916: the water's tears, all under `nodes/<terrain>/water/tears/`, so both panels head them
     // "tears" and label each for what it does to the picture. The amount, shear and coverage are
     // routable. The other seven are controls a route cannot drive (`modulatable = false`); why, is in

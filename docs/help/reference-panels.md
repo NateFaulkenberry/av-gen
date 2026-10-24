@@ -89,7 +89,10 @@ broad sheets that arch and swirl across the sky, with bright curving lower edges
 **Altitude** is how high the lower edges hang, **Fold size** how broad a swirl is, **Sheet width**, **Swirl** and
 **Edge variation** shape them, **Quality** is the number of planes marched (48 offline, 16-24 live) and **Fade
 distance** how far towards the horizon they reach. The colours, height, opacity, edge brightness, filaments,
-speeds and audio all still apply. **Source** and
+speeds and audio all still apply. **Pulse** (ADR-1652) sends one front of light climbing the ribbons: at 1 it
+stands on the lower edges, and as it falls to 0 it rises a curtain height and fades. Route an envelope onto it (the
+kick); **Pulse brightness**, **Pulse widening** and **Pulse width** shape it. Live, the quality ladder marches fewer
+planes from Medium (ADR-1651). **Source** and
 **Target** pickers for the types that start from, or point at, a thing in the scene. **Advanced** holds
 the rest, including **Follows** (the spatial field the effect's motion answers to) and **Anchored
 to** for sky effects. **Timing** holds the activation and the delay, fades, lifetime and repeat.

@@ -73,7 +73,8 @@ constexpr std::string_view kProbeName = "conformance probe";
     // 2564 -> 2596 for ADR-939: `AuroraGpu` gained one vec4 (the glints' high-band depth), two
     // auroras' worth. Asked and answered yes: `auroras` is compared whole below, lane for lane.
     // 2596 -> 2660 for ADR-1641: two more vec4s per aurora (the ribbons). The same answer.
-    static_assert(sizeof(AtmosphericFrame) == 2660,
+    // 2660 -> 2692 for ADR-1652: one more vec4 per aurora (the ribbons' pulse). The same answer.
+    static_assert(sizeof(AtmosphericFrame) == 2692,
                   "AtmosphericFrame changed size: check that frameDiffers still reads all of it");
     if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount ||
         a.cometSteps != b.cometSteps || a.mediumCount != b.mediumCount ||

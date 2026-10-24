@@ -252,6 +252,44 @@ downstream at the river's speed.
 **Cost:** off, nothing. The code is compiled out, and a cinematic surface without streaks is drawn by a shader without
 it. On, about 0.1 ms on the QA river at 1080p.
 
+## Sky mirror (ADR-1650)
+
+The sky the frame drew, in the water: an aurora, a comet, the sky layer itself. The screen-space reflection cannot find
+the sky (its depth is 1e7, so no step of the march lands behind it) and the environment cube has no sky effect in it,
+so without this a river under an aurora reflects none of it. With it, where a reflected ray points up, the surface reads
+the copy of the frame at that direction's vanishing point on screen (`viewProj * (r, 0)`): the sky is at infinity, so
+that is where the frame shows what the ray sees, whatever the surface's height.
+
+```json
+"water": { "ssr": 1.0, "ssrDistance": 700, "ssrSteps": 16, "skyMirror": 1.0 }
+```
+
+| key | default | meaning |
+|---|---|---|
+| `skyMirror` | 0 (off) | how much of the reflection the drawn sky supplies where it is trusted (0..1). Above 0 the surface is drawn by the cinematic pipeline with the mirror in |
+
+**Parameter** (routable): `nodes/<terrain>/water/skyMirror`.
+
+**Where it is trusted:**
+- the vanishing point is on screen, faded out over the last 6% of the frame, so a ripple that throws it off an edge eases
+  back to the environment reflection instead of smearing the edge;
+- the reflected ray points up;
+- what the copy shows there is far: beyond half `ssrDistance` (the sky, or a distant range). A near bank at that point is
+  not what the ray sees; the march finds those.
+
+**With the SSR:** the march's hits still win over it, and its far fade hands over to the mirror. Its brightness is the
+SSR's (`ssrGain`), so the two meet without a seam. It does not need the SSR: with `ssr` 0, or the live ladder's
+Emergency rung (`waterSsrScale` 0), the sky stays in the river.
+
+**Framing:** a water pixel's mirror direction is as far above the horizon as the pixel is below it. A camera with the
+horizon near or above the frame's centre sees every water pixel's mirror on screen; pitched well down, the mirror points
+fall off the top and those pixels keep the environment reflection.
+
+**Tint patches** (`tintPatches`) recolour the reflection after the mirror, so they tint the aurora's reflection too.
+
+**Cost:** off, nothing (compiled out). On, one tap of the frame copy and one of the depth per water pixel; see ADR-1650
+for the measurement.
+
 ## Things that float
 
 A `float` block on a **procedural** node makes its instances drift on water instead of standing on

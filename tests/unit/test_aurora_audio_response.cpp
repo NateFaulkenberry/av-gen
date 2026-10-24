@@ -328,3 +328,103 @@ TEST_CASE("aurora ribbons pack only when on, validate, and round-trip (ADR-1641)
     CHECK(legacy->aurora.shape.ribbonSteps == 48.0f);
     CHECK(legacy->aurora.shape.ribbonCoverage == 0.0f);
 }
+
+// ADR-1652: the ribbons' travelling pulse packs only when the ribbons are on and the pulse is above 0 (so every aurora
+// authored before it, and every ribbon sky at pulse 0, packs the bytes it packed); its ranges validate; it survives
+// the file; and `pulse` is a registered parameter a route reaches (`fx/<id>/pulse`).
+TEST_CASE("aurora ribbon pulse packs only when on, validates, round-trips and is routable (ADR-1652)",
+          "[world][atmospherics][aurora][adr1652]") {
+    world::EffectInstance e = world::glowmereAurora("sky");
+    e.timing.fadeIn = 0.0;
+    e.aurora.shape.ribbons = true;
+    const auto packOf = [](const world::EffectInstance& inst) {
+        std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
+        std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
+        const std::array<world::EffectInstance, 1> set{inst};
+        world::EffectContext ctx;
+        ctx.seconds = 4.0;
+        REQUIRE(world::resolveAtmosphericEffects(set, ctx, comets, auroras).auroras == 1);
+        return world::packAurora(auroras[0], {});
+    };
+    // off: the default, and any shaping with the pulse at 0, packs zeros
+    const world::AuroraGpu still = packOf(e);
+    CHECK(still.ribbon2 == glm::vec4(0.0f));
+    world::EffectInstance shaped = e;
+    shaped.aurora.shape.pulseGain = 5.0f;
+    shaped.aurora.shape.pulseThicken = 3.0f;
+    shaped.aurora.shape.pulseWidth = 0.4f;
+    const world::AuroraGpu shapedOff = packOf(shaped);
+    CHECK(std::memcmp(&shapedOff, &still, sizeof(still)) == 0);
+    // on
+    shaped.aurora.shape.pulse = 0.6f;
+    const world::AuroraGpu on = packOf(shaped);
+    CHECK(on.ribbon2 == glm::vec4(0.6f, 5.0f, 3.0f, 0.4f));
+    CHECK(on.ribbon0 == still.ribbon0);
+    // the curtains never read it: a pulse on a curtain aurora packs nothing
+    world::EffectInstance curtains = shaped;
+    curtains.aurora.shape.ribbons = false;
+    CHECK(packOf(curtains).ribbon2 == glm::vec4(0.0f));
+
+    REQUIRE(shaped.validate().has_value());
+    for (const auto& bad : {std::pair{&world::AuroraShape::pulse, 1.5f}, std::pair{&world::AuroraShape::pulse, -0.1f},
+                            std::pair{&world::AuroraShape::pulseGain, 20.0f},
+                            std::pair{&world::AuroraShape::pulseThicken, -1.0f},
+                            std::pair{&world::AuroraShape::pulseWidth, 0.0f}}) {
+        world::EffectInstance b = shaped;
+        b.aurora.shape.*(bad.first) = bad.second;
+        CHECK_FALSE(b.validate().has_value());
+    }
+
+    const nlohmann::json j = shaped.toJson();
+    REQUIRE(j.at("parameters").at("shape").contains("pulse"));
+    auto back = world::EffectInstance::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->aurora.shape.pulse == 0.6f);
+    CHECK(back->aurora.shape.pulseGain == 5.0f);
+    CHECK(back->aurora.shape.pulseThicken == 3.0f);
+    CHECK(back->aurora.shape.pulseWidth == 0.4f);
+    nlohmann::json old = j;
+    for (const char* key : {"pulse", "pulseGain", "pulseThicken", "pulseWidth"}) {
+        old["parameters"]["shape"].erase(key);
+    }
+    auto legacy = world::EffectInstance::fromJson(old);
+    REQUIRE(legacy.has_value());
+    CHECK(legacy->aurora.shape.pulse == 0.0f);
+    CHECK(legacy->aurora.shape.pulseGain == 2.0f);
+
+    params::ParameterSet params;
+    const std::array<world::EffectInstance, 1> set{shaped};
+    world::EffectParameters registered = world::registerEffectParameters(params, set);
+    const std::string prefix = world::effectParameterPrefix(shaped.id);
+    for (const char* leaf : {"pulse", "pulseGain", "pulseThicken", "pulseWidth"}) {
+        INFO(leaf);
+        params::IParameter* p = params.find(prefix + leaf);
+        REQUIRE(p != nullptr);
+        CHECK(p->flags().exposed);
+    }
+    CHECK(params.find(prefix + "pulse")->flags().modulatable);
+    world::unregisterEffectParameters(params, registered);
+}
+
+// ADR-1651: the live ladder's lever on the ribbons' planes scales a ribbon slot's plane count (at least 8), and leaves a
+// curtain slot, and any slot at scale 1, exactly as packed.
+TEST_CASE("the aurora step scale thins only a ribbon slot's planes (ADR-1651)", "[world][atmospherics][aurora][adr1651]") {
+    world::AuroraGpu ribbons;
+    ribbons.ribbon0 = glm::vec4(1.0f, 1800.0f, 48.0f, 9000.0f);
+    world::AuroraGpu g = ribbons;
+    world::applyAuroraStepScale(g, 1.0f);
+    CHECK(std::memcmp(&g, &ribbons, sizeof(g)) == 0);
+    world::applyAuroraStepScale(g, 0.75f);
+    CHECK(g.ribbon0 == glm::vec4(1.0f, 1800.0f, 36.0f, 9000.0f));
+    g = ribbons;
+    world::applyAuroraStepScale(g, 0.5f);
+    CHECK(g.ribbon0.z == 24.0f);
+    g = ribbons;
+    world::applyAuroraStepScale(g, 0.05f);
+    CHECK(g.ribbon0.z == 8.0f); // the march's floor
+    world::AuroraGpu curtains;
+    curtains.config = glm::vec4(3.0f, 5200.0f, -40.0f, 2600.0f);
+    world::AuroraGpu c = curtains;
+    world::applyAuroraStepScale(c, 0.5f);
+    CHECK(std::memcmp(&c, &curtains, sizeof(c)) == 0);
+}

@@ -72,7 +72,9 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              s.tintPatches, s.tintPatchScale, s.glints,
                              // ADR-1643
                              s.flowStreaks, s.streakDensity, s.streakLength, s.streakLines, s.streakSpeed,
-                             s.streakHighlight, s.streakColorScale};
+                             s.streakHighlight, s.streakColorScale,
+                             // ADR-1650
+                             s.skyMirror};
     bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
               finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
               finite3(s.emissiveColor) && finite3(s.absorption) && finite3(s.reflectionTint2) &&
@@ -127,6 +129,8 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     u.streakColor1 = glm::vec4(s.streakColor1, 0.0f);
     u.streakColor2 = glm::vec4(s.streakColor2, 0.0f);
     u.streakColor3 = glm::vec4(s.streakColor3, 0.0f);
+    // ADR-1650. Read only by the sky-mirror pipeline, which draws a surface only when `skyMirror` > 0.
+    u.mirror = glm::vec4(std::clamp(s.skyMirror, 0.0f, 1.0f), 0.0f, 0.0f, 0.0f);
     return u;
 }
 
@@ -281,13 +285,28 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     }
     // ADR-1286: the cinematic block is compiled out of both of the older pipelines, so they are the
     // shaders they were; the full source (tears and cinematic) is the third.
-    // ADR-1643: the flow streaks are compiled out of all three of those, so each is the shader it was; the full
-    // source (tears, cinematic and streaks) is the fourth, which draws only a surface with streaks.
-    auto noStreaks = waterSourceWithout(*source, "flow streaks (ADR-1643)");
+    // ADR-1643: the flow streaks are compiled out of all three of those, so each is the shader it was; the source with
+    // tears, cinematic and streaks is the fourth, which draws only a surface with streaks.
+    // ADR-1650: the sky mirror is compiled out of all four, so each is the shader it was; the full source is the fifth,
+    // which draws only a surface with the mirror (with or without streaks: their code is gated on their amount).
+    auto mirrorModule = shaders.compile(*source, "water.wgsl (cinematic, flow streaks, sky mirror)");
+    if (!mirrorModule) {
+        return std::unexpected(mirrorModule.error());
+    }
+    auto mirror = buildPipeline(*mirrorModule, "water-cinematic-mirror", cinePipelineLayout_);
+    if (!mirror) {
+        return std::unexpected(mirror.error());
+    }
+    mirrorPipeline_ = *mirror;
+    auto noMirror = waterSourceWithout(*source, "sky mirror (ADR-1650)");
+    if (!noMirror) {
+        return std::unexpected(noMirror.error());
+    }
+    auto noStreaks = waterSourceWithout(*noMirror, "flow streaks (ADR-1643)");
     if (!noStreaks) {
         return std::unexpected(noStreaks.error());
     }
-    auto streaksModule = shaders.compile(*source, "water.wgsl (cinematic, flow streaks)");
+    auto streaksModule = shaders.compile(*noMirror, "water.wgsl (cinematic, flow streaks)");
     if (!streaksModule) {
         return std::unexpected(streaksModule.error());
     }
@@ -425,8 +444,10 @@ void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUnif
         torn_[i] = materials[i].tears.x > 0.0f; // ADR-916: which pipeline draws this slot
         // ADR-1286: the same test as WaterSettings::cinematic, on the packed record
         cine_[i] = materials[i].cineA.x > 0.0f || materials[i].cineA.z > 0.0f || materials[i].cineA.w > 0.0f ||
-                   materials[i].cineB.x > 0.0f || materials[i].cineC.z > 0.0f || materials[i].streakA.x > 0.0f;
+                   materials[i].cineB.x > 0.0f || materials[i].cineC.z > 0.0f || materials[i].streakA.x > 0.0f ||
+                   materials[i].mirror.x > 0.0f;
         streaks_[i] = materials[i].streakA.x > 0.0f; // ADR-1643
+        mirror_[i] = materials[i].mirror.x > 0.0f;   // ADR-1650
     }
     queue.WriteBuffer(uniforms_, 0, staging_.data(), static_cast<std::size_t>(uploaded_) * kStride);
 }

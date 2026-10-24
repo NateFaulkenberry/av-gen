@@ -70,6 +70,9 @@ struct WaterUniforms {
     streakColor2: vec4<f32>,
     streakColor3: vec4<f32>,
     // ---- flow streaks (ADR-1643) end ----
+    // ---- sky mirror (ADR-1650) begin ----
+    mirror: vec4<f32>,         // x = sky mirror amount (0..1), yzw = 0
+    // ---- sky mirror (ADR-1650) end ----
 };
 
 @group(2) @binding(0) var<uniform> water: WaterUniforms;
@@ -944,6 +947,39 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
                     water.reflectTint.rgb;
     }
     reflected = reflected * water.reflectTint.w;
+    // ---- cinematic (ADR-1286) begin ----
+    // (ADR-1650: inside the cinematic markers too, because it reads the cinematic frame copy and its uniforms.)
+    // ---- sky mirror (ADR-1650) begin ----
+    // The sky the frame itself drew, in the water. The screen-space march below cannot find the sky (its depth is
+    // 1e7, so no step ever lands behind it), and the environment cube has no aurora, comet or anything else the sky
+    // layer draws. But the sky is at infinity, so the reflected direction's own vanishing point on screen --
+    // `viewProj * (r, 0)` -- is where the copy of the frame shows what this reflection sees, whatever the surface's
+    // height. One tap of the copy and one of the depth there: trusted only where the point is on screen (faded over
+    // the last 6% of the frame, so a ripple that throws it off an edge eases back to the cube instead of smearing
+    // the edge texel), where the ray points up, and where what the copy shows there is far (beyond half the SSR
+    // reach: the sky or a distant range; a near bank there is not what this ray sees). The march's hits still win
+    // over it below. Independent of the SSR switch: with `ssr` 0 (the ladder's Emergency) the sky stays in the river.
+    if (water.mirror.x > 0.0 && !underwater) {
+        let rm = reflect(-v, n);
+        let cm = frame.viewProj * vec4<f32>(rm, 0.0);
+        if (cm.w > 1e-4 && rm.y > 0.0) {
+            let nm = cm.xy / cm.w;
+            let um = vec2<f32>(nm.x * 0.5 + 0.5, 0.5 - nm.y * 0.5);
+            let inside = smoothstep(0.0, 0.06, min(um.x, 1.0 - um.x)) * smoothstep(0.0, 0.06, min(um.y, 1.0 - um.y));
+            if (inside > 0.0) {
+                let uc = clamp(um, vec2<f32>(0.0), vec2<f32>(1.0));
+                var far = 1.0;
+                if (water.params.z >= 0.5) {
+                    let reach = max(water.cineA.y, 1.0);
+                    far = smoothstep(0.35 * reach, 0.5 * reach, waterLinearDepthAt(uc));
+                }
+                let trust = inside * far * smoothstep(0.0, 0.04, rm.y) * clamp(water.mirror.x, 0.0, 1.0);
+                reflected = mix(reflected, waterSceneAt(uc, 0.0) * water.cineB.w, trust);
+            }
+        }
+    }
+    // ---- sky mirror (ADR-1650) end ----
+    // ---- cinematic (ADR-1286) end ----
 
     // ---- the moon's own glint -----------------------------------------------------------------
     // Directional lights only, with the shared shadow lookup, so a reach of river under a hill goes

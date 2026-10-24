@@ -5828,6 +5828,9 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             &params_->add(vec3Desc(base + "water/streaks/color2", w.streakColor2, 0.0f, 20.0f, 0.0f, 1.0f));
         node.waterStreakColor3Param =
             &params_->add(vec3Desc(base + "water/streaks/color3", w.streakColor3, 0.0f, 20.0f, 0.0f, 1.0f));
+        // ADR-1650: the sky mirror's amount (the drawn sky -- the aurora -- in the river).
+        node.waterSkyMirrorParam =
+            &params_->add(floatDesc(base + "water/skyMirror", w.skyMirror, 0.0f, 1.0f, 0.0f, 1.0f));
         // ADR-916: the tears, every one of them a control, under their own heading -- the Parameters
         // panel shows "<terrain>/water/tears", the World panel's Inspector "tears/..." under "water" --
         // each labelled for what it does to the picture.
@@ -5899,6 +5902,7 @@ void nullWaterParameters(CompositionNode& node) {
     node.waterStreakColor1Param = nullptr;
     node.waterStreakColor2Param = nullptr;
     node.waterStreakColor3Param = nullptr;
+    node.waterSkyMirrorParam = nullptr; // ADR-1650
     node.waterTearParams = {};
 }
 
@@ -5998,7 +6002,8 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
                   "water/fresnel",
                   "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
                   "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/streaks/amount",
-                  "water/streaks/color1", "water/streaks/color2", "water/streaks/color3", "water/tears/amount",
+                  "water/streaks/color1", "water/streaks/color2", "water/streaks/color3", "water/skyMirror",
+                  "water/tears/amount",
                   "water/tears/shear", "water/tears/coverage", "water/tears/cell", "water/tears/spacing",
                   "water/tears/stretch", "water/tears/followWind", "water/tears/direction",
                   "water/tears/drift", "water/tears/wind"}) {
@@ -9804,6 +9809,7 @@ void Composition::updateWaterSurfaces() {
         if (node.waterStreakColor1Param != nullptr) w.streakColor1 = node.waterStreakColor1Param->value();
         if (node.waterStreakColor2Param != nullptr) w.streakColor2 = node.waterStreakColor2Param->value();
         if (node.waterStreakColor3Param != nullptr) w.streakColor3 = node.waterStreakColor3Param->value();
+        if (node.waterSkyMirrorParam != nullptr) w.skyMirror = node.waterSkyMirrorParam->value(); // ADR-1650
         // ADR-916: every tear control. The seven a route cannot drive are copied the same way, so an
         // edit in the panel or a project's saved value reaches the surface like any other.
         const CompositionNode::WaterTearParameters& tp = node.waterTearParams;
@@ -11107,6 +11113,10 @@ nlohmann::json Composition::toJson() const {
                     wj["streakColor1"] = vecToJson(w.streakColor1);
                     wj["streakColor2"] = vecToJson(w.streakColor2);
                     wj["streakColor3"] = vecToJson(w.streakColor3);
+                }
+                // ADR-1650: the sky mirror, written only when authored (every scene before it saves the file it had).
+                if (w.skyMirror != d.skyMirror) {
+                    n["terrain"]["water"]["skyMirror"] = w.skyMirror;
                 }
             }
             const Material& m = node.terrainMaterial;
@@ -13099,7 +13109,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"streakLines", &w.streakLines},
                               TerrainFloat{"streakSpeed", &w.streakSpeed},
                               TerrainFloat{"streakHighlight", &w.streakHighlight},
-                              TerrainFloat{"streakColorScale", &w.streakColorScale}}) {
+                              TerrainFloat{"streakColorScale", &w.streakColorScale},
+                              // ADR-1650: the sky mirror
+                              TerrainFloat{"skyMirror", &w.skyMirror}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
