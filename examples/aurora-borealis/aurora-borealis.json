@@ -303,8 +303,8 @@
     "colors": {
      "auroraLow": [
       1.0,
-      0.52712,
-      0.8388
+      0.30499,
+      0.71569
      ],
      "auroraMid": [
       1.0,
@@ -7917,7 +7917,7 @@
   {
    "source": "signal.auroraLight",
    "target": "fx/aurora/intensity",
-   "amount": 2.2,
+   "amount": 1.4,
    "op": "add",
    "polarity": "unipolar"
   },
@@ -7973,7 +7973,14 @@
   {
    "source": "signal.kickWave",
    "target": "post/bloom/intensity",
-   "amount": 0.08,
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.kickWave",
+   "target": "fx/aurora/pulse",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar"
   },

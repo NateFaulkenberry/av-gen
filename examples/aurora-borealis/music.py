@@ -139,7 +139,7 @@ def routes():
         R("signal.hatDrive", A + "filaments", 1.6),
         R("signal.hatDrive", A + "sparkle", 0.35),
         # the light: the aurora and the facets facing it (the same signal, proportional amounts), the river's glow
-        R("signal.auroraLight", A + "intensity", 2.2),
+        R("signal.auroraLight", A + "intensity", 1.4),
         R("signal.auroraLight", look.ROCK.path("auroraGlow"), 0.75),
         R("signal.auroraLight", W + "glow", 0.5),
         # bass: the lower rims' undulation, the folds, the river's reflection
@@ -147,9 +147,11 @@ def routes():
         R("signal.bassBody", A + "ribbonSwirl", 0.45),
         R("signal.bassBody", W + "reflection", 0.25),
         R("signal.bassHit", W + "reflection", 0.3),
-        # drums: the snare's bright fold; the kick's small bloom (its wave through the ribbons is E3, when merged)
+        # drums: the snare's bright fold; the kick's small bloom and its wave through the ribbons
         R("signal.snareFold", A + "edgeBrightness", 2.4),
-        R("signal.kickWave", "post/bloom/intensity", 0.08),
+        R("signal.kickWave", "post/bloom/intensity", 0.06),
+        # the kick's wave: a front climbs the ribbons from the lower rims as the envelope falls (ADR-1652, E3)
+        R("signal.kickWave", A + "pulse", 1.0),
         # swell: the ribbons spread
         R("signal.swell", A + "ribbonWidth", 0.015),
     ]

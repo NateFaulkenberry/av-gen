@@ -42,7 +42,7 @@ LOOKS = [
                      "facetLit": "#a070f0", "waterGlow": "#6a40c0"}),
     ("Electric", {"auroraLow": "#ff6ad0", "auroraMid": "#3f7cff", "auroraTop": "#5a2ad0",
                   "facetLit": "#7a8cff", "waterGlow": "#4060e0"}),
-    ("Rose Lift", {"auroraLow": "#ffc0ec", "auroraMid": "#ff58c0", "auroraTop": "#8a3ae8",
+    ("Rose Lift", {"auroraLow": "#ff96dc", "auroraMid": "#ff58c0", "auroraTop": "#8a3ae8",
                    "facetLit": "#e080d8", "waterGlow": "#d060b0"}),
 ]
 REST_LOOK = 1                # the colours authored into the effect and program (the palette replaces them)
@@ -203,13 +203,14 @@ def water():
         "shallowColor": hexrgb("#0a0a24"), "deepColor": hexrgb(WATER_DEEP), "shallow": 2.0, "clarity": 1.0,
         "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 1.15,
         "reflectionTint": [0.82, 0.84, 1.0], "specular": 0.5, "roughness": 0.06,
-        "ripple": 0.18, "rippleScale": 0.05, "rippleSpeed": 0.25, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
+        "ripple": 0.2, "rippleScale": 0.05, "rippleSpeed": 0.25, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
         "sparkle": 0.0, "glow": 0.25, "glowColor": c["waterGlow"], "glowScale": 0.012, "glowCoverage": 0.45,
         "glowDepth": 0.2,
-        # cinematic water (ADR-1286): SSR 16 steps x 1 ray for the banks and the near ranges; long reflections
-        # streaked along the view; broad tint patches
-        "ssr": 1.0, "ssrDistance": 2000.0, "ssrSteps": 16.0, "ssrGain": 1.1, "streak": 1.2, "reflectionRays": 1.0,
-        "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.5, "undulationScale": 0.012,
+        # cinematic water (ADR-1286): SSR 16 steps x 1 ray for the banks and the near ranges; beyond half its reach
+        # the sky mirror (ADR-1650, E1) reads the rendered sky and aurora at the reflection's vanishing point, so the
+        # aurora is in the river; long reflections streaked along the view
+        "ssr": 1.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.1, "streak": 1.2, "reflectionRays": 1.0,
+        "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.2, "undulationScale": 0.012,
         "roughnessVariation": 0.4, "tintPatches": 0.0, "glints": 0.0,
     }
 
