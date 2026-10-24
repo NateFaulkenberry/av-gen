@@ -348,6 +348,15 @@ def aurora(name, low, mid, top, height, base, radius, count, intensity, complexi
             "flow": {"field": "", "influence": 0.0}}
 
 
+# Phase 4b (ADR-1641, main 18cad001): both layers as ribbons overhead -- sheets standing on swirling curves, marched
+# through 48 planes (offline; the 2x supersample averages the fine grain). Altitude, fold size (ribbonScale) and swirl
+# set so broad green (main) and pink (second) arcs sweep across the sky; the cylinders' settings are unused.
+RIBBONS_MAIN = dict(ribbons=True, ribbonAltitude=800.0, ribbonScale=3400.0, ribbonWidth=0.08, ribbonSwirl=2.2,
+                    ribbonEdge=0.7, ribbonSteps=48.0, ribbonDistance=20000.0)
+RIBBONS_PINK = dict(ribbons=True, ribbonAltitude=1200.0, ribbonScale=5000.0, ribbonWidth=0.07, ribbonSwirl=2.2,
+                    ribbonEdge=0.7, ribbonSteps=48.0, ribbonDistance=20000.0)
+
+
 def aurora_fx(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves, **kw):
     """aurora() with any appearance/shape field overridden by keyword (Phase 4)."""
     e = aurora(name, low, mid, top, height, base, radius, count, intensity, complexity, flow, waves)
@@ -579,11 +588,11 @@ def scene_json(placed, scans, bushes=None):
             # the green-teal main curtain has deep folds and fine rays, the pink-violet layer stands further out with
             # its own wave scale, so pink and green regions interleave by azimuth with dark sky between.
             aurora_fx("auroraMain", R0["auroraLow"], R0["auroraMid"], R0["auroraTop"], 1300.0, 120.0, 2600.0, 2.0,
-                      2.2, 90.0, 0.02, 6.0, waveAmplitude=1.2, turbulence=0.45, filaments=3.0, edgeBrightness=3.6,
-                      opacity=0.75, layerSpacing=0.5),
+                      1.5, 90.0, 0.02, 6.0, waveAmplitude=1.2, turbulence=0.45, filaments=3.0, edgeBrightness=3.6,
+                      opacity=0.75, layerSpacing=0.5, **RIBBONS_MAIN),
             aurora_fx("auroraPink", R0["aurora2Low"], R0["aurora2Mid"], R0["aurora2Top"], 2000.0, 60.0, 3300.0, 2.0,
-                      1.6, 70.0, 0.015, 3.2, waveAmplitude=1.1, turbulence=0.4, filaments=2.5, edgeBrightness=3.0,
-                      opacity=0.6, layerSpacing=0.45)],
+                      1.3, 70.0, 0.015, 3.2, waveAmplitude=1.1, turbulence=0.4, filaments=2.5, edgeBrightness=3.0,
+                      opacity=0.6, layerSpacing=0.45, **RIBBONS_PINK)],
         "materialPrograms": [prog_ground_textured() if TERRAIN_TEX else prog_ground(),
                              XTAL_P.json(base=-1, emission=5, roughness=6)],
         "nodes": nodes,
