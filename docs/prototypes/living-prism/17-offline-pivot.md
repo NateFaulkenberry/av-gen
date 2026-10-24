@@ -418,3 +418,24 @@ The owner's notes, verbatim:
 - The "before" frames were rendered at the same settings and are labelled with their build.
 - The two looks differ only in colour: their edge maps differ on 0.64% of pixels, the aurora curtains' own hue edges.
 - Render time: 4K at 2x supersample, 15 frames in 27.2 s: **1.81 s/frame**, inside the 2 s budget.
+
+## Phase 5g gate: terrain textures (2026-10-23)
+
+ADR-1642 merged to main 2d211c8e, and the branch is rebased onto it. The textured ground (`prog_ground_textured`) is now the default; `AU_TERRAIN_TEX=0` builds the procedural one.
+
+- **Textures:** Poly Haven CC0 `rock_face` on steep ground (0.025 tiles/m, a large tile so its features survive distance, with its normal map at strength 1.6), `mossy_rock` between, and `forest_leaves_02` on the flats under the bushes.
+- **Mixing:** triplanar, mixed by slope plus a patch noise. Albedo ×1.1 into the night. The aurora rim stays on the crests and stays palette-bound (op 18).
+- **Haze:** first test, at the 5f fog density (0.0006), the distant walls hardly changed, because the haze swamped the detail. The density is now 0.00042, so the distant walls show their rock.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5g/`, one run (build feefc323, 4K at 2x, t = 10, stamped).
+
+| File | Shows |
+|---|---|
+| `phase5g-frame-green.png`, `phase5g-frame-rose.png` | the full frame in both looks |
+| `phase5g-walls-left.png` | the left wall, 5f against 5g |
+| `phase5g-walls-distant.png` | the distant walls, 5f against 5g |
+| `phase5g-floor.png` | the floor, 5f against 5g |
+
+The 5f "before" is the 5f gate run, at the same settings.
+
+**Render time:** 4K at 2x supersample, 15 frames in 27.5 s: **1.83 s/frame**. The textures cost no measurable time over 5f.
