@@ -152,9 +152,18 @@ struct WaterSettings {
     glm::vec3 streakColor2{0.25f, 0.95f, 0.85f}; // teal
     glm::vec3 streakColor3{0.7f, 0.55f, 1.0f};  // lavender
 
+    // ---- sky mirror (ADR-1650) ---------------------------------------------------------------------
+    // The sky the frame drew -- an aurora, a comet, the sky layer itself -- reflected in the water, which neither the
+    // screen-space march (the sky's depth is 1e7, so a ray never lands behind it) nor the environment cube (no sky
+    // effect in it) can show. Where a reflected ray points up, the surface reads the copy of the frame at that
+    // direction's vanishing point on screen, faded out toward the frame's edges and where the copy shows something
+    // near. One tap. Independent of `ssr`: on at `ssr` 0 (and so at the live ladder's Emergency). 0 (the default)
+    // draws none, with the code compiled out; above 0 the surface is drawn by the cinematic pipeline with it in.
+    float skyMirror = 0.0f;      // how much of the reflection the drawn sky supplies where it is trusted (0..1)
+
     [[nodiscard]] bool cinematic() const {
         return ssr > 0.0f || transmission > 0.0f || undulation > 0.0f || roughnessVariation > 0.0f ||
-               tintPatches > 0.0f || flowStreaks > 0.0f;
+               tintPatches > 0.0f || flowStreaks > 0.0f || skyMirror > 0.0f;
     }
 
     [[nodiscard]] Result<void> validate() const;

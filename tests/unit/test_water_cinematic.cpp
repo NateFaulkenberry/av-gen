@@ -179,3 +179,37 @@ TEST_CASE("water flow streaks are off by default, round-trip, and are written on
         CHECK(bad.error().message.find(key) != std::string::npos);
     }
 }
+
+// ADR-1650: the sky mirror -- off by default, a cinematic setting when on (so the frame copy it reads is taken), packed
+// into its own lane, read and written (only when authored), refused out of range.
+TEST_CASE("the water's sky mirror is off by default, round-trips, and is written only when authored",
+          "[unit][water][adr1650]") {
+    const scene::WaterSettings defaults;
+    CHECK(defaults.skyMirror == 0.0f);
+    CHECK_FALSE(defaults.cinematic());
+    scene::WaterSettings on;
+    on.skyMirror = 0.8f;
+    CHECK(on.cinematic());
+
+    assets::AssetRegistry registry;
+    auto loaded = scene::Composition::fromJson(terrainWith(json::object({{"skyMirror", 0.7}})), registry);
+    REQUIRE(loaded.has_value());
+    const scene::WaterSettings& w = waterOf(**loaded);
+    CHECK(w.skyMirror == 0.7f);
+    CHECK(w.cinematic());
+    const json written = (*loaded)->toJson();
+    REQUIRE(written["nodes"][0]["terrain"]["water"].contains("skyMirror"));
+    auto again = scene::Composition::fromJson(written, registry);
+    REQUIRE(again.has_value());
+    CHECK(waterOf(**again).skyMirror == 0.7f);
+
+    auto plain = scene::Composition::fromJson(terrainWith(json::object({{"glow", 0.5}})), registry);
+    REQUIRE(plain.has_value());
+    CHECK_FALSE((*plain)->toJson()["nodes"][0]["terrain"]["water"].contains("skyMirror"));
+
+    for (const double value : {-0.1, 1.5}) {
+        auto bad = scene::Composition::fromJson(terrainWith(json::object({{"skyMirror", value}})), registry);
+        REQUIRE_FALSE(bad.has_value());
+        CHECK(bad.error().message.find("skyMirror") != std::string::npos);
+    }
+}

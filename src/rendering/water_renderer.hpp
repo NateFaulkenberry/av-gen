@@ -75,8 +75,10 @@ struct WaterUniforms {
     glm::vec4 streakColor1{0.0f}; // rgb, 0
     glm::vec4 streakColor2{0.0f};
     glm::vec4 streakColor3{0.0f};
+    // ADR-1650, appended. Read only by the sky-mirror pipeline.
+    glm::vec4 mirror{0.0f};       // sky mirror amount (0..1), 0, 0, 0
 };
-static_assert(sizeof(WaterUniforms) == 400);
+static_assert(sizeof(WaterUniforms) == 416);
 // The part of the record a shader without the cinematic block reads (its binding's minimum size).
 inline constexpr std::uint64_t kWaterUniformsPlainSize = 240;
 
@@ -145,6 +147,10 @@ public:
     // (the compiler builds the shared ripple path differently once the tear's data flows through it).
     [[nodiscard]] const wgpu::RenderPipeline& pipeline(std::size_t slot) const {
         if (slot < cine_.size() && cine_[slot] && cineBindGroup_) {
+            // ADR-1650: the sky mirror, in a fifth pipeline (the full source) only a surface with it is drawn by.
+            if (slot < mirror_.size() && mirror_[slot]) {
+                return mirrorPipeline_;
+            }
             // ADR-1643: the flow streaks, compiled into a fourth pipeline only a surface with streaks is drawn by.
             return slot < streaks_.size() && streaks_[slot] ? streaksPipeline_ : cinePipeline_;
         }
@@ -152,13 +158,13 @@ public:
     }
     [[nodiscard]] bool ready() const {
         return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_) && static_cast<bool>(cinePipeline_) &&
-               static_cast<bool>(streaksPipeline_);
+               static_cast<bool>(streaksPipeline_) && static_cast<bool>(mirrorPipeline_);
     }
     [[nodiscard]] std::uint32_t materialCount() const { return uploaded_; }
 
 private:
     // Dynamic uniform offsets must be a multiple of the device's minimum alignment, which is 256
-    // on every backend this runs on. 400 bytes of record (ADR-1286, ADR-1643), padded.
+    // on every backend this runs on. 416 bytes of record (ADR-1286, ADR-1643, ADR-1650), padded.
     static constexpr std::uint32_t kStride = 512;
     static_assert(kStride % 256 == 0);
     static_assert(sizeof(WaterUniforms) <= kStride);
@@ -179,11 +185,13 @@ private:
     wgpu::PipelineLayout cinePipelineLayout_;
     wgpu::RenderPipeline cinePipeline_;
     wgpu::RenderPipeline streaksPipeline_; // ADR-1643: the cinematic pipeline with the flow streaks in
+    wgpu::RenderPipeline mirrorPipeline_;  // ADR-1650: the full source (cinematic, streaks and the sky mirror)
     wgpu::BindGroup cineBindGroup_;
     wgpu::Sampler cineSampler_;
     std::array<bool, kMaxWaterMaterials> cine_{};
     std::array<bool, kMaxWaterMaterials> torn_{};
     std::array<bool, kMaxWaterMaterials> streaks_{}; // ADR-1643
+    std::array<bool, kMaxWaterMaterials> mirror_{};  // ADR-1650
     wgpu::Buffer uniforms_;
     wgpu::BindGroup bindGroup_;
     std::uint32_t uploaded_ = 0;

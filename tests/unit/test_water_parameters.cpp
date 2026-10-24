@@ -188,3 +188,24 @@ TEST_CASE("the water's flow streaks are parameters that reach the surface", "[un
     CHECK(comp.scene().waters[0].settings.streakColor2 == glm::vec3(0.1f, 0.2f, 0.3f));
     CHECK(comp.scene().waters[0].settings.cinematic());
 }
+
+// ADR-1650: the sky mirror's amount is a parameter, and it reaches the surface.
+TEST_CASE("the water's sky mirror is a parameter that reaches the surface", "[unit][water][parameters][adr1650]") {
+    assets::AssetRegistry registry;
+    auto loaded = scene::Composition::fromJson(terrainScene(1.25f), registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    comp.attach(params, modulator);
+    comp.update(FrameTime{});
+    REQUIRE(comp.scene().waters.size() == 1);
+    CHECK(comp.scene().waters[0].settings.skyMirror == 0.0f);
+    auto* mirror = params.findAs<float>("nodes/sea/water/skyMirror");
+    REQUIRE(mirror != nullptr);
+    mirror->setBase(0.9f);
+    params.resetFinals();
+    comp.update(FrameTime{});
+    CHECK(comp.scene().waters[0].settings.skyMirror == 0.9f);
+    CHECK(comp.scene().waters[0].settings.cinematic());
+}
