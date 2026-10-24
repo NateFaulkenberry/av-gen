@@ -41,12 +41,11 @@ from datetime import datetime
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # The audit's reference scenes minus Digital Mosh Live (shelved by the owner; its misses are a separate ticket, 03
-# §14 #7), plus the Living Prism once it is on this branch. Each: (project, a file its generated scene needs).
+# §14 #7). Each: (project, a file its generated scene needs).
 SCENES = {
     "rainbow-world": ("examples/rainbow-world/rainbow-world.json", "examples/rainbow-world/scene"),
     "rift-live": ("examples/bioluminescent/rift-live.json", "examples/bioluminescent/rift.scene.json"),
     "event-horizon": ("examples/sonic-vfx/event-horizon.json", "examples/sonic-vfx/event-horizon.scene.json"),
-    "living-prism": ("examples/living-prism/living-prism.json", None),
 }
 AUDIO = "assets/audio/feline-footwear.wav"
 COMMON = ["--audio", AUDIO, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", "60"]
