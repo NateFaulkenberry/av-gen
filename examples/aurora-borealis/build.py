@@ -32,10 +32,10 @@ SCENE_DIR = os.path.join(HERE, "scene")
 PROJECT = os.path.join(HERE, "aurora-borealis.json")
 SCENE_FILE = "aurora-borealis.scene.json"
 
-CAM_H = 95.0              # metres above the water
+CAM_H = 65.0              # metres above the water
 CAM_SPEED = 22.0          # metres a second along the river
-AHEAD = 2000.0            # the target this far ahead on the centreline
-PITCH_DEG = 2.5           # the view pitched up so the horizon sits low and the sky takes the frame
+AHEAD = 1600.0            # the target this far ahead on the centreline
+PITCH_DEG = 1.5           # the view pitched up so the horizon sits low and the sky takes the frame
 SWAY = 0.22               # the camera drifts across the river by this fraction of its half-width
 KEYS_PER_LOOP = 500
 
@@ -51,18 +51,19 @@ def camera_tracks():
         s = L * i / KEYS_PER_LOOP
         th = world.lerp_table(arcs, ths, s % L)
         tha = world.lerp_table(arcs, ths, (s + AHEAD) % L)
-        c = world.centre(th)
+        c = world.axis_centre(th)
         # sideways drift: a slow sine across the river, two cycles a loop, so the view is not always dead centre
-        side = SWAY * world.half_width(th) * math.sin(2.0 * world.TAU * i / KEYS_PER_LOOP + 0.4)
-        r = world.rc(th) + side
+        # the camera flies the valley's axis (smoothed), not every meander; a slow sideways drift
+        side = SWAY * 180.0 * math.sin(2.0 * world.TAU * i / KEYS_PER_LOOP + 0.4)
+        r = world.rc_axis(th) + side
         pos = (r * math.sin(th), CAM_H, r * math.cos(th))
-        ca = world.centre(tha)
+        ca = world.axis_centre(tha)
         dist = math.hypot(ca[0] - pos[0], ca[2] - pos[2])
         tgt = (ca[0], CAM_H + dist * math.tan(math.radians(PITCH_DEG)), ca[2])
         # roll: the turn's signed curvature (heading change over the next stretch), a few degrees at most
         th2 = world.lerp_table(arcs, ths, (s + 160.0) % L)
         h1 = math.atan2(ca[0] - c[0], ca[2] - c[2])
-        c2 = world.centre(th2)
+        c2 = world.axis_centre(th2)
         h0 = math.atan2(c2[0] - c[0], c2[2] - c[2])
         turn = (h1 - h0 + math.pi) % world.TAU - math.pi
         roll = max(-3.5, min(3.5, -math.degrees(turn) * 0.35))

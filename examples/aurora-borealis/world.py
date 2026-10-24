@@ -34,21 +34,42 @@ R0 = 3000.0
 # a rounded triangle: with A3 = 0.10 each side's midpoint has zero curvature, so the loop has three long, nearly
 # straight reaches the camera can look down (11-research-pass2-render.md s2.3); two small harmonics add the meanders
 A3 = 0.10
-A8, P8 = 0.016, 0.7
-A13, P13 = 0.007, 2.3
+
+
+# the meanders: broad S-bends alternating left and right along the valley, about 1.1 km apart, their amplitude
+# varying slowly round the loop, so two or three bends show at once from the camera and the river snakes toward the
+# far ranges (the owner's brief s3)
+NM, PM = 17, 0.9
+AM0, AM1 = 0.050, 0.035
+
+
+def rc_axis(th):
+    """The valley's axis: the rounded triangle (A3 = 0.10 makes each side's midpoint straight). The camera follows it."""
+    return R0 * (1.0 - A3 * math.cos(3.0 * th))
 
 
 def rc(th):
-    return R0 * (1.0 - A3 * math.cos(3.0 * th) + A8 * math.sin(8.0 * th + P8) + A13 * math.sin(13.0 * th + P13))
+    """The river: the valley axis with the meanders on it."""
+    am = AM0 + AM1 * periodic_noise(th, 5, 41)
+    return rc_axis(th) + R0 * am * math.sin(NM * th + PM)
 
 
 def half_width(th):
-    """Half the river's width (m): 58-86."""
-    return 72.0 + 14.0 * math.sin(2.0 * th + 1.0)
+    """Half the river's width (m), measured radially: 155-215 m across the flow, widened where the river runs at an
+    angle to the radius so the bends do not pinch -- a substantial river whose near reach carries a broad reflection."""
+    perp = 185.0 + 30.0 * math.sin(2.0 * th + 1.0)
+    e = 1e-4
+    slope = (rc(th + e) - rc(th - e)) / (2.0 * e) / rc(th)
+    return perp * math.sqrt(1.0 + slope * slope)
 
 
 def centre(th):
     r = rc(th)
+    return (r * math.sin(th), 0.0, r * math.cos(th))
+
+
+def axis_centre(th):
+    r = rc_axis(th)
     return (r * math.sin(th), 0.0, r * math.cos(th))
 
 
@@ -69,9 +90,9 @@ def valley_height(th, o, side):
         return max(-8.0, o * s0)
     fl = floor_edge(th, side)
     if side > 0:
-        wall_h = 190.0 + 140.0 * periodic_noise(th, 5, 9 + s)
-    else:
         wall_h = 110.0 + 110.0 * periodic_noise(th, 5, 9 + s)
+    else:
+        wall_h = 80.0 + 90.0 * periodic_noise(th, 5, 9 + s)
     run = 350.0 + 250.0 * periodic_noise(th, 4, 13 + s)
     low = s0 * min(o, 60.0) + 0.14 * max(o - 60.0, 0.0)
     return low + wall_h * mx.smooth(fl, fl + run, o) ** 1.3
@@ -141,7 +162,36 @@ def _spurs(count=140):
     return out
 
 
-PEAKS = PEAKS + _spurs()
+# ---- the layered ranges: distinct peaks stepping back from the river in three layers per bank, at random bearings
+# (so left and right never repeat). Nearer layers stand taller in the frame; further ones are smaller in angle and
+# the program's haze pales them. The outer layers stand in the ring meshes (range_tris reads peak_height too).
+LAYERS = [  # (side, set-back min, max (m from the water), height min, max, count)
+    (+1, 650.0, 1100.0, 260.0, 420.0, 30),
+    (+1, 1500.0, 2600.0, 420.0, 650.0, 34),
+    (+1, 3400.0, 6000.0, 600.0, 950.0, 36),
+    (-1, 550.0, 1000.0, 220.0, 360.0, 26),
+    (-1, 1250.0, 1900.0, 320.0, 480.0, 18),
+]
+
+
+def _layer_peaks():
+    out = []
+    k = 0
+    for li, (side, o0, o1, h0, h1, n) in enumerate(LAYERS):
+        for i in range(n):
+            u = mx._hash(i, li, 211)
+            deg = (i + 0.8 * (mx._hash(i, li, 213) - 0.5)) * 360.0 / n + 37.0 * li
+            off = o0 + (o1 - o0) * u
+            h = h0 + (h1 - h0) * mx._hash(i, li, 215)
+            rad = h * (1.5 + 0.8 * mx._hash(i, li, 217))
+            elong = 1.1 + 0.9 * mx._hash(i, li, 219)
+            az = 360.0 * mx._hash(i, li, 221)
+            out.append((deg % 360.0, side, off, h, rad, elong, az, 500 + k))
+            k += 1
+    return out
+
+
+PEAKS = PEAKS + _spurs() + _layer_peaks()
 PEAK_FRAMES = _peak_frames()
 
 
@@ -173,6 +223,9 @@ def detail(x, z, th, o, side):
     so the bank meets it cleanly."""
     ww = wall_weight(th, o, side)
     flat = 2.5 * mx.smooth(15.0, 70.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
+    # rocky shoulders: large ridged facets from 30 m up the shore (the waterline itself stays a gentle slope)
+    flat += (9.0 + 0.04 * min(o, 600.0)) * mx.smooth(30.0, 140.0, o) * (
+        mx.fbm(x / 110.0, z / 110.0, 27, 3, ridged=True) - 0.3)
     spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 230.0, z / 230.0, 23, 4, ridged=True) - 0.35)
     return flat + spur
 
@@ -287,9 +340,9 @@ def _crest(t, peak, keep_outer):
 
 # (name, r0, r1, rings, columns, base height, relief, wavelength, seed, crest position, keep the outer side up)
 RANGES = [
-    ("near", 4300.0, 7000.0, 7, 300, 180.0, 420.0, 900.0, 3, 0.45, False),
-    ("far", 6500.0, 11000.0, 7, 240, 300.0, 600.0, 1300.0, 7, 0.5, False),
-    ("distant", 10500.0, 19000.0, 6, 180, 500.0, 1000.0, 2100.0, 13, 0.55, True),
+    ("near", 4300.0, 7000.0, 9, 360, 120.0, 380.0, 900.0, 3, 0.45, False),
+    ("far", 6500.0, 11000.0, 9, 300, 200.0, 500.0, 1300.0, 7, 0.5, False),
+    ("distant", 10500.0, 19000.0, 7, 220, 300.0, 700.0, 2100.0, 13, 0.55, True),
 ]
 
 
@@ -298,7 +351,7 @@ def range_tris(name, r0, r1, nr, nth, base, amp, wl, seed, peak, keep):
         t = (r - r0) / (r1 - r0)
         c = _crest(t, peak, keep)
         n = mx.fbm(x / wl, z / wl, seed, 4, ridged=True)
-        return c * (base + amp * n) - 30.0 * (1.0 - c) ** 2 - 2.0
+        return max(c * (base + amp * n) - 30.0 * (1.0 - c) ** 2 - 2.0, peak_height(x, z) * min(1.0, 4.0 * t))
     return mx.polar_range(r0, r1, nr, nth, h, seed=seed)
 
 
@@ -327,13 +380,15 @@ def river_length(n=4000):
     return total
 
 
-def theta_at_arc(n=8000):
-    """A table mapping arc length to theta, so the camera moves at a constant speed."""
+def theta_at_arc(n=8000, curve=None):
+    """A table mapping arc length along `curve` (the valley axis by default) to theta, so the camera moves at a
+    constant speed."""
+    curve = curve or axis_centre
     arcs, ths = [0.0], [0.0]
-    p = centre(0.0)
+    p = curve(0.0)
     for i in range(1, n + 1):
         th = TAU * i / n
-        q = centre(th)
+        q = curve(th)
         arcs.append(arcs[-1] + math.dist(p, q))
         ths.append(th)
         p = q

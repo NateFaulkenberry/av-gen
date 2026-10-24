@@ -166,3 +166,31 @@ Media: `~/Desktop/av-gen-review/aurora-borealis/gateA/`:
 
 **Open for the owner:** the river still turns out of view behind the bends in some views (A's risk 1). The levers are
 camera height (85-95 m), a target further ahead, and smaller meander amplitudes.
+
+### Gate A, second showing (owner sent the first back)
+
+Kept: one river definition feeding land, water and camera internally, and the no-lip shoreline. Changed:
+- **A snaking river:** 17 broad S-bends round the loop, about 1.1 km apart, alternating left and right, their amplitude
+  150-255 m varying slowly, on the rounded-triangle valley axis. Two or three bends show at once from the camera. The
+  camera flies the smoothed valley axis, not every meander.
+- **A substantial river:** half-width 155-215 m across the flow (was 72), widened radially where the river runs at an
+  angle so the bends do not pinch.
+- **Layered ranges:** 144 distinct peaks in 3 layers on the outer bank (650-1100 m, 1500-2600 m and 3400-6000 m back;
+  260-420, 420-650 and 600-950 m high) and 2 on the inner, at random bearings so left and right never repeat. The
+  outer layers stand in the ring meshes. The valley walls are lowered (outer 110-220 m, inner 80-170 m) so the peaks
+  stand out above them. Haze pales the far layers.
+- **Rocky shoulders:** large ridged facets from 30 m up the shore. The waterline stays a gentle slope.
+- **Camera:** 65 m, pitch +1.5°, target 1.6 km ahead. The near water carries the aurora again.
+- Water terrain 8.4 km; the river course is 200 m wide in the flow model; 600 streak lanes.
+
+Headless Ultra A/B (pass-1 layout before, this one after), interleaved, 3 reps, AC, same build, GPU p50:
+before 14.90 (t60) / 14.50 (t140); **after 14.81 / 13.58**. CPU work p50 3.53 / 3.35 against 3.39 / 2.72.
+
+Media: `~/Desktop/av-gen-review/aurora-borealis/gateA2/`:
+- `pair-t{20,50,100,140,160,200}.png`: pass 1 above, this layout below, same build;
+- `sheet-after.png`;
+- `several-bends-t100-t200-t230.png`;
+- `vanish-moments-prevGateA-top-new-bottom.png`: the first Gate A at the times its river vanished, above, and this
+  layout at the same times, below. The camera paths differ;
+- `clip-40-60s.mp4`, 20 s: the river stays visible in every sampled frame;
+- `topdown-map.png`: the meanders in blue, the camera's axis path in yellow, minute marks.

@@ -217,7 +217,7 @@ def water():
         "ssr": 0.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.0, "streak": 2.0,
         "reflectionRays": 1.0, "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.03,
         "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
-        "flowStreaks": 1.2, "streakLines": 260.0, "streakLength": 50.0, "streakDensity": 0.45, "streakSpeed": 1.8,
+        "flowStreaks": 1.2, "streakLines": 600.0, "streakLength": 50.0, "streakDensity": 0.45, "streakSpeed": 1.8,
         "streakHighlight": 1.0, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],
         "streakColor3": c["waterGlow"],
     }
@@ -229,7 +229,7 @@ def river_feature():
     import world
     pts = [world.centre(world.TAU * i / 255) for i in range(256)]   # 256 points at most
     return {"name": "river", "kind": "river", "path": [[round(p[0], 2), 0.0, round(p[2], 2)] for p in pts],
-            "width": 80.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
+            "width": 200.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
             "waterDepth": 0.0, "smoothing": 0}
 
 
@@ -237,7 +237,7 @@ def water_node():
     """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
     there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
     return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, 0.0],
-            "world": {"name": "aurora-river", "seed": 1, "size": [7400.0, 7400.0], "baseHeight": -6.0,
+            "world": {"name": "aurora-river", "seed": 1, "size": [8400.0, 8400.0], "baseHeight": -6.0,
                       "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
             "terrain": {"chunkSize": 400.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
                         "viewDistance": 6000.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,
