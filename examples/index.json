@@ -78,13 +78,6 @@
       "project": "sonic-abstract/bit-ocean.json"
     },
     {
-      "category": "Sonic Abstract",
-      "description": "Play live audio (a mix with a clear low end) plus a MIDI controller: CC 1 palette (violet sunset -> golden afternoon -> electric blue), CC 2 night, CC 3 waves, CC 4 wave energy, CC 5 sun rays, CC 6 clouds, CC 7 water colour, CC 8 spray, CC 9 wave speed, CC 10 wave direction, CC 11 band contrast, CC 12 highlights, CC 13 foam, CC 14 surface detail; pads 36 dolphin leap, 37 hero wave, 38 bioluminescent bloom, 39 sun flare, 40 spray, 41 daybreak. An illustrated ocean world whose colour and swell follow the music. See docs/prototypes/digital-ocean/11-report-art-direction-reset.md.",
-      "live": true,
-      "name": "Sonic Abstract - Digital Ocean",
-      "project": "sonic-abstract/digital-ocean.json"
-    },
-    {
       "category": "Sonic VFX",
       "description": "Play live audio (a mix or a synth) and MIDI notes from a keyboard. On an endless salt flat at dusk the sky is the instrument: chords paint it, melodies fall through it as meteors, the bass makes the horizon shimmer, and a black monolith answers the drums. Opening it turns live input on (View > Live); the Scene list, PageUp/PageDown and MIDI program changes step through the live scenes. See docs/prototypes/sonic-garden/SCENE-CATALOG.md.",
       "live": true,
