@@ -439,3 +439,29 @@ Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase5g/`, one run (build
 The 5f "before" is the 5f gate run, at the same settings.
 
 **Render time:** 4K at 2x supersample, 15 frames in 27.5 s: **1.83 s/frame**. The textures cost no measurable time over 5f.
+
+## Phase 4b gate: aurora ribbons (2026-10-24)
+
+ADR-1641 merged to main 18cad001, and the branch is rebased onto it. Both aurora layers are now ribbons overhead: sheets standing on swirling curves, marched through 48 planes (offline; the 2x supersample averages the grain).
+
+- **Main (green):** altitude 800 m, folds 3.4 km, swirl 2.2.
+- **Second (pink):** altitude 1.2 km, folds 5 km, width 0.07.
+- **Intensity:** eased to 1.5 and 1.3, because the larger arcs washed to near-white where they overlapped.
+
+The result: broad green and lavender-pink arcs sweep across the sky from the left and curve back toward the horizon, as in the reference.
+
+Media: `~/Desktop/av-gen-review/82-living-prism/aurora-phase4b/`, one run (build 8451d4db, 4K at 2x, t = 10, stamped).
+
+| File | Shows |
+|---|---|
+| `phase4b-frame-green.png`, `phase4b-frame-rose.png` | the full frame in both looks |
+| `phase4b-curtains-vs-ribbons.png` | the 5g curtains against the ribbons, same settings |
+| `phase4b-sky-vs-reference.png` | the sky beside the reference's sky |
+
+**Render time:** 4K at 2x, 15 frames in 29.8 s: **1.99 s/frame**, right at the 2 s budget (the ribbons cost about 0.15 s/frame).
+
+**Open:**
+- Where the two layers overlap, the arcs still read pale lavender rather than distinct green and pink.
+- The upper right of the sky is empty dark (the reference has arcs there too).
+
+Both are tunable: the second layer's altitude, scale and colours, or a third ribbon layer, which is affordable offline.
