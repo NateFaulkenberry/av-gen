@@ -201,6 +201,68 @@
     "T3": true,
     "T4": false
    }
+  },
+  "aurora-borealis": {
+   "project": "examples/aurora-borealis/aurora-borealis.json",
+   "reps": [
+    {
+     "frames": 901,
+     "deadlineMisses": 3,
+     "missesPer900": 2.9966703662597114,
+     "p50": 33.268958,
+     "p99": 40.103041,
+     "max": 45.048,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "338ca7775cb9"
+    },
+    {
+     "frames": 901,
+     "deadlineMisses": 2,
+     "missesPer900": 1.997780244173141,
+     "p50": 33.378417,
+     "p99": 39.035167,
+     "max": 59.372333,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "338ca7775cb9"
+    },
+    {
+     "frames": 900,
+     "deadlineMisses": 3,
+     "missesPer900": 3.0,
+     "p50": 33.342125,
+     "p99": 39.197666,
+     "max": 55.528958,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "338ca7775cb9"
+    }
+   ],
+   "failedRuns": [],
+   "missesMedian": 2.9966703662597114,
+   "missesWorst": 3.0,
+   "p99Median": 39.197666,
+   "p99Worst": 40.103041,
+   "mediumOrBetter": 1.0,
+   "headless": {
+    "gpuP50": 13.766623,
+    "gpuP95": 17.670688,
+    "cpuWorkP50": 2.150750000000002
+   },
+   "thresholds": {
+    "T1": true,
+    "T2": true,
+    "T3": true,
+    "T4": true
+   },
+   "note": "added 2026-10-24 from a run at 509ac00d-dirty (scene/aurora-borealis); the other scenes keep their c7a211f5-dirty rows"
   }
  }
 }

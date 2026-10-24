@@ -46,6 +46,8 @@ SCENES = {
     "rainbow-world": ("examples/rainbow-world/rainbow-world.json", "examples/rainbow-world/scene"),
     "rift-live": ("examples/bioluminescent/rift-live.json", "examples/bioluminescent/rift.scene.json"),
     "event-horizon": ("examples/sonic-vfx/event-horizon.json", "examples/sonic-vfx/event-horizon.scene.json"),
+    "aurora-borealis": ("examples/aurora-borealis/aurora-borealis.json",
+                        "examples/aurora-borealis/scene/aurora-borealis.scene.json"),
 }
 AUDIO = "assets/audio/feline-footwear.wav"
 COMMON = ["--audio", AUDIO, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", "60"]

@@ -69,6 +69,10 @@ PATHS = [
     ("RW signal.glint", "signal.glint", ["hat"]),
     ("RW clap route final", "final:material/rw_rainbow/op/9/constant/constant[0]", ["snare"]),
     ("RW signal.kick (beat grid)", "signal.kick", ["kick"]),
+    # Aurora Borealis's accents (02-research-signals.md s3.3) and the kick pulse's route final (ADR-1652)
+    ("AB signal.kickWave", "signal.kickWave", ["kick"]),
+    ("AB signal.snareFold", "signal.snareFold", ["snare"]),
+    ("AB kick pulse route final", "final:fx/aurora/pulse[0]", ["kick"]),
 ]
 
 
