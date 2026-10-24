@@ -223,3 +223,46 @@ The index entry is now category "Sonic VFX", named "Sonic VFX - Aurora Borealis"
 directly after "Sonic VFX - Event Horizon". The project files stay in examples/aurora-borealis/. The Sonic VFX menu
 test now expects seven offered scenes. Merged main 250564e9 (the Digital Ocean cut) in the same step.
 `check_project_integrity.py` reports 0 problems, and the `[examples]` and `[aurora-borealis]` tests pass.
+
+## Pass 2, Gates B-G: status at the pass-3 stop (2026-10-24)
+
+The owner's pass-3 brief (Sabertooth) supersedes the comet, river-pulse and edge-split gates, so the final stop was
+not reached. Live acceptance, sound to light and the suites were not run for pass 2.
+
+| Gate | State | Commits |
+|---|---|---|
+| A composition | done, approved (take 3) | c61111e6 |
+| B ridge edges | built: baked one-edge-per-facet mask in TEXCOORD_0 (research A probe F), a 17-op line term, palette colour, bass breadth + kick/snare/comet accents. **Simplified:** no beat-hash subset, no hat sparkle | 5049f3c3, f1dd701a |
+| C moving water | built: speedOverride 3 m/s, streaks 50 m at 1.8x, ripple 0.01; bass and synth bed → streak strength; small drum ripple | 981826d7, 5049f3c3 |
+| D river pulses | built: two directional groundPulse fronts, ring-of-two triggers (88 + 86 launches, at most 2 alive), snare flare | 5049f3c3, 850f3e40 |
+| E celestial sky | comparison of 4 variants from existing star parameters (`sky-variants-comparison.png`); none clearly wins, so the current sky stays. **Not built:** engine S1/S2 | — |
+| F comet | built: one comet on `signal.cometEv` at 48.27, 87.53, 114.6, 151.0, 185.33 s, azimuths keyed from the camera track, environment wash | 5049f3c3, 850f3e40 |
+| G integration | partial: rockier near slopes on both banks (the owner's right-side note), snare attack 0 with a 150 ms refractory, clip planes, flash budget | 5049f3c3, f1dd701a |
+| menu | done: "Sonic VFX - Aurora Borealis" after Event Horizon, merged main 250564e9 | b3437e26 |
+
+**Fixes found on the way:**
+- Effect triggers need event signals. The latches are levels, so the first build's pulses and comet never fired.
+  `pulseAEv`, `pulseBEv` and `cometEv` are the beat pulse gated by each latch's first half-beat.
+- Black frames: the automatic far plane (about 1,000 km) made the sky direction NaN on some frames, and the bloom
+  blacked the frame. Explicit near 1 m / far 45 km.
+- Flash audit (gate: relative-luminance swing ≤ 0.05 in 267 ms): it failed at lift kicks until E3's front stopped
+  widening the sheets 1x (now 0.3x at gain 1.0), the swell ramped in over 0.6 s, and the kick and bass accents were
+  reduced. Final windows: 0.024 (44-58 s), 0.029 (60-70 s), 0.046 (150-160 s), 0.006 (183-193 s).
+
+**Stage measurements** (headless Ultra 1080p, GPU p50 ms, median of 3 interleaved reps, AC). Stages 1-3 and 4-8 ran
+as two batches, so the 3→4 step is not interleaved. Stages 5-8 were measured with working triggers but before the
+f1dd701a tuning:
+
+| t | 1 pass-1 | 2 land | 3 +edges | 4 +water | 5 +pulses | 6 +sky | 8 final (+comet) |
+|---|---|---|---|---|---|---|---|
+| 60 | 14.54 | 12.91 | 13.25 | 11.72 | 11.94 | 12.00 | 12.08 (p95 13.18) |
+| 152 | 13.99 | 14.86 | 14.62 | 12.32 | 12.67 | 12.74 | 12.70 (p95 13.89) |
+| 186 | 14.34 | 14.12 | 12.90 | 11.95 | 11.98 | 11.95 | 12.03 (p95 13.76) |
+| comet window ~49-55 s | | | | | | 11.57 | 12.63 (+1.06) |
+| comet window ~186-192 s | | | | | | 12.09 | 13.31 (+1.22) |
+
+- Pulses add +0.03 to +0.35 ms, the sky +0.06, and a comet +1.1-1.2 ms while alive. Every stage-8 window is under
+  17 ms p50 with p95 ≤ 1.3 x p50.
+- Stage-8 CPU work p99 was 3.2-3.8 ms.
+- Media: `~/Desktop/av-gen-review/aurora-borealis/final2/`: clips, sheet, comet and pulse frames, the sky comparison,
+  the map.
