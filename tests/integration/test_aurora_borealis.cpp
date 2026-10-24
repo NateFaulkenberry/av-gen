@@ -279,6 +279,46 @@ TEST_CASE("Aurora Borealis: the signals on the Feline Footwear stems (S2, S4-S6)
         REQUIRE_FALSE(steps.empty());
         CHECK(steps[steps.size() * 99 / 100] < 0.02);
     }
+    // pass 2 (12 s6.2 point 7): the comet's five cues land on their frames, at most one alive
+    {
+        const std::vector<double> comets = rises(t, t.col("signal.comet"), 0.5);
+        const std::vector<double> expected{48.27, 87.53, 114.6, 151.0, 185.33};
+        std::vector<double> inSong;
+        for (double c : comets) {
+            if (c < 205.0) {
+                inSong.push_back(c);
+            }
+        }
+        REQUIRE(inSong.size() == expected.size());
+        for (std::size_t i = 0; i < expected.size(); ++i) {
+            CHECK(std::abs(inSong[i] - expected[i]) <= 1.0 / 30.0 + 1e-6);
+        }
+        for (std::size_t i = 1; i < comets.size(); ++i) {
+            CHECK(comets[i] - comets[i - 1] >= 8.0);
+        }
+    }
+    // the river pulses: a ring of two, so never more than two fronts alive, each slot latched for its life
+    {
+        const std::size_t a = t.col("signal.pulseA");
+        const std::size_t b = t.col("signal.pulseB");
+        const std::vector<double> la = rises(t, a, 0.5);
+        const std::vector<double> lb = rises(t, b, 0.5);
+        CHECK(la.size() > 60);
+        CHECK(lb.size() > 60);
+        for (std::size_t i = 1; i < la.size(); ++i) {
+            CHECK(la[i] - la[i - 1] >= 1.79);
+        }
+        for (std::size_t i = 1; i < lb.size(); ++i) {
+            CHECK(lb[i] - lb[i - 1] >= 1.79);
+        }
+    }
+    // the snare: attack 0 and a 150 ms refractory
+    {
+        const std::vector<double> sn = rises(t, t.col("signal.snareFold"), 0.3);
+        for (std::size_t i = 1; i < sn.size(); ++i) {
+            CHECK(sn[i] - sn[i - 1] >= 0.149);
+        }
+    }
     // the palette moves through its looks: low in the intro, high in the lift
     CHECK(sectionMedian(t, "signal.paletteAxis", 0.2, 8.2) < 0.3);
     CHECK(sectionMedian(t, "signal.paletteAxis", 151.0, 166.9) > 0.85);
