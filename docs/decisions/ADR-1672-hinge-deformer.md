@@ -48,6 +48,21 @@ renders, points past the corners just below the slit's plane turned while the co
 so the chin folded. The opening was also uniform out to the corners, so it read as a notch. The `lip` term replaced it
 before anything shipped.
 
+**The purse** (`tension`, added after the owner's stop-4 note: "reshape fully open mouth to more of an 'oh' sound /
+look rather than a half smile"). 0 is off and skipped, so a hinge without one is byte-identical. With purse > 0:
+- **The lens rounds toward an ellipse.** `taper` becomes `mix(1 - u^2, sqrt(1 - u^2), min(purse, 1))`, giving steep
+  sides and a round bottom.
+- **The lips move, in proportion to the angle t = amount x purse** (so shut is still sealed, and half open is half the
+  pursing). With near = 1 - smoothstep(0, r/4, |dy|):
+  - **drawn in:** along a, `-sign x min(lat, cw) x 0.5 t x near`, easing out from cw to 2 cw;
+  - **upper lip arched:** above the slit only, along u, `0.20 t r x taper x (1 - smoothstep(0, r/4, dy))`;
+  - **pushed forward:** along d, `0.10 t r x near`, easing out to 2 cw.
+- **On the GPU,** it travels as the forward vector's length past 1, because every slot of the uniform was already
+  used. The shader normalises forward anyway, and a purse of 0 packs the vector unchanged.
+- **Tests.** `test_procedural.cpp` `[adr1672]` checks drawn in, arched, forward, linear in the angle, still sealed
+  shut, nothing far away moving, and purse 0 bit-equal to none. `test_procedural_gpu.cpp` checks that a purse
+  changes the image.
+
 The GPU packing reuses the existing slots:
 
 | GPU slot | Holds |

@@ -1,5 +1,6 @@
 #include "scene/procedural.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <glm/gtc/constants.hpp>
@@ -2278,6 +2279,39 @@ TEST_CASE("Hinge deformer: turns what lies below the slit inside its mask, eases
             prev = m;
         }
         CHECK(prev > 0.01f);
+    }
+    SECTION("the purse rounds the lips into an oh: drawn in, the upper lip arched, both forward (ADR-1672)") {
+        Deformer o = h;
+        o.tension = 2.0f;
+        const glm::vec3 corner{0.019f, -0.001f, 0.06f};     // inside the corner, the lower lip
+        const glm::vec3 upper{0.0f, 0.001f, 0.06f};         // the upper lip's middle
+        const glm::vec3 lower{0.0f, -0.001f, 0.06f};
+        CHECK(applyDeformer(o, corner, 0.0).x < applyDeformer(h, corner, 0.0).x - 1e-3f);   // drawn in
+        CHECK(applyDeformer(o, upper, 0.0).y > upper.y + 1e-3f);                           // arched up
+        CHECK(applyDeformer(h, upper, 0.0) == upper);                                      // (no purse: still)
+        CHECK(applyDeformer(o, lower, 0.0).z > applyDeformer(h, lower, 0.0).z + 1e-3f);    // pushed forward
+        // in proportion to the opening: half the angle moves the upper lip half as far, and shut is still sealed
+        Deformer half = o;
+        half.amount = 0.5f * o.amount;
+        CHECK(applyDeformer(half, upper, 0.0).y - upper.y ==
+              Catch::Approx(0.5f * (applyDeformer(o, upper, 0.0).y - upper.y)).epsilon(1e-4));
+        Deformer shut = o;
+        shut.amount = 0.0f;
+        CHECK(applyDeformer(shut, upper, 0.0) == upper);
+        // nothing far from the lips moves with it (the brow, the back of the head)
+        checkVec(applyDeformer(o, {0.0f, 0.06f, 0.06f}, 0.0), {0.0f, 0.06f, 0.06f});
+        checkVec(applyDeformer(o, {0.0f, -0.03f, -0.2f}, 0.0), {0.0f, -0.03f, -0.2f});
+    }
+    SECTION("a purse of 0 is exactly the deformer without one") {
+        Deformer z = h;
+        z.tension = 0.0f;
+        for (const glm::vec3 q : {glm::vec3{0.01f, -0.002f, 0.06f}, glm::vec3{0.0f, 0.001f, 0.06f}}) {
+            const glm::vec3 x = applyDeformer(z, q, 0.0);
+            const glm::vec3 y = applyDeformer(h, q, 0.0);
+            CHECK(x.x == y.x);
+            CHECK(x.y == y.y);
+            CHECK(x.z == y.z);
+        }
     }
     SECTION("amount 0 is the identity, bit for bit") {
         h.amount = 0.0f;

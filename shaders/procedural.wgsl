@@ -210,6 +210,8 @@ fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn:
         return p;
     }
     let a = axisIn;
+    // ADR-1672: the purse travels as the forward vector's length past 1 (procedural_renderer packs it)
+    let purse = max(length(fwdIn) - 1.0, 0.0);
     var fwd = fwdIn - a * dot(fwdIn, a);
     if (dot(fwd, fwd) < 1e-12) {
         fwd = perpendicularTo(a);
@@ -225,14 +227,32 @@ fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn:
     let m = c + fwd * params.y + up * upOffset;
     let lat = abs(dot(p - m, a));
     let u = min(lat / cw, 1.0);
-    let taper = 1.0 - u * u;
+    var taper = 1.0 - u * u;
+    if (purse > 1e-4) {
+        taper = taper + min(purse, 1.0) * (sqrt(1.0 - u * u) - taper);
+    }
     let lip = taper + (1.0 - taper) * smoothstep(0.0, 0.25 * r, -dy);
     let mask = 1.0 - smoothstep(0.5, 1.0, length(p - m) / r);
     let angle = amount * slit * lip * mask;
-    if (angle == 0.0) {
-        return p;
+    var out = p;
+    if (angle != 0.0) {
+        out = rotateAbout(p, c, a, angle);
     }
-    return rotateAbout(p, c, a, angle);
+    if (purse > 1e-4) {
+        let t = amount * purse;
+        let L = 0.25 * r;
+        let sa = dot(p - m, a);
+        let near = 1.0 - smoothstep(0.0, L, abs(dy));
+        let latw = 1.0 - smoothstep(cw, 2.0 * cw, lat);
+        let inward = -sign(sa) * min(lat, cw) * 0.5 * t * near * latw;
+        var raise = 0.0;
+        if (dy > 0.0) {
+            raise = 0.20 * t * r * taper * (1.0 - smoothstep(0.0, L, dy));
+        }
+        let push = 0.10 * t * r * near * (1.0 - smoothstep(0.0, 2.0 * cw, lat));
+        out = out + a * inward + up * raise + fwd * push;
+    }
+    return out;
 }
 
 fn falloffRamp(y: f32, falloff: f32) -> f32 {

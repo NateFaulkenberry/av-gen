@@ -163,7 +163,13 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
         // ADR-1672: x = the mask's half-width along the axis (frequency), w = its radius (falloff); extra.xyz =
         // forward, extra.w = the mask centre's offset along up (scale) as a plain float, not seed bits
         u.params = glm::vec4(d.frequency, d.speed, d.phase, std::max(d.falloff, 0.0f));
-        u.extra = glm::vec4(d.displacementAxis, d.scale);
+        // ... and the purse (tension) as the forward vector's length past 1 (the shader normalises forward anyway).
+        // A purse of 0 sends the vector unchanged, so a deformer without one packs exactly as before.
+        if (d.tension > 0.0f && glm::length(d.displacementAxis) > 1e-6f) {
+            u.extra = glm::vec4(glm::normalize(d.displacementAxis) * (1.0f + d.tension), d.scale);
+        } else {
+            u.extra = glm::vec4(d.displacementAxis, d.scale);
+        }
         return u;
     }
     u.extra = glm::vec4(extra, std::bit_cast<float>(d.seed));

@@ -977,5 +977,11 @@ TEST_CASE("Hinge deformer: amount 0 is the identity, an angle moves the masked p
     const Coverage tc = coverage(turnedImg);
     CHECK(tc.pixels > 0);
     CHECK((tc.minX != baseCov.minX || tc.maxX != baseCov.maxX || tc.minY != baseCov.minY || tc.maxY != baseCov.maxY));
+    // the purse (tension, packed as the forward vector's length past 1) reaches the shader and moves the surface
+    scene::Scene pursed = plain;
+    h.tension = 1.5f;
+    pursed.procedurals[0].deformers.push_back(h);
+    const auto pursedImg = renderOnce(*ctx, pursed, 0.0);
+    CHECK(gpu::hashImage(pursedImg) != gpu::hashImage(turnedImg));
     CHECK(ctx->errorCount() == 0);
 }

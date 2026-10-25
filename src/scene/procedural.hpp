@@ -425,6 +425,13 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //                   the corners, where the surface is whole, nothing at the slit's height moves); r/4 below it
 //                   the whole width turns (the chin), so the cheeks stretch rather than tear;
 //            mask = 1 - smoothstep(0.5, 1, |p - m| / r): rigid inside half the sphere, easing out at its shell.
+//          Then the PURSE (`tension`, 0 = off and skipped). It rounds the lens toward an ellipse -- taper becomes
+//          mix(1 - u^2, sqrt(1 - u^2), min(purse, 1)), u = min(lat/cw, 1) -- and, with t = amount x purse, L = r/4, sa = dot(p - m, a),
+//          near = 1 - smoothstep(0, L, |dy|), latw = 1 - smoothstep(cw, 2cw, lat), the point moves by
+//            a x (-sign(sa) min(lat, cw) 0.5 t near latw)                            (the lips drawn in)
+//          + u x (0.20 t r taper (1 - smoothstep(0, L, dy)))   above the slit only   (the upper lip arched)
+//          + d x (0.10 t r near (1 - smoothstep(0, 2cw, lat)))                       (both pushed forward),
+//          so the opening rounds into an "oh", in proportion to the angle (shut is still sealed).
 //          amount 0 is the identity.
 //   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
 //          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of

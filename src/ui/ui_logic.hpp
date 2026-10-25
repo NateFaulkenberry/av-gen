@@ -1541,6 +1541,7 @@ struct DeformerRow {
         {"frequency", "half-width", "%.3f m", "The mask's half-width along the hinge axis."},
         {"speed", "forward", "%.3f m", "The mask centre's offset forward of the pivot."},
         {"scale", "up", "%.3f m", "The mask centre's offset up from the pivot (negative is down)."},
+        {"tension", "purse", "%.2f", "How far the lips round into an \"oh\" as it opens: drawn in, the upper lip arched, both pushed forward."},
     };
     static constexpr DeformerRow kPath[] = {
         {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},
