@@ -22,6 +22,11 @@
 // A camera INSIDE the cone's box sees the cone through the box's far faces, which the depth test can
 // hide where the ground is nearer; the pool light is a point light half-way down the beam, not a spot.
 // Stateless: a function of the transport second, the id and where the owner is drawn.
+//
+// **Follow the owner (ADR-1670).** With `local` on, an Entity-owned beam is placed and aimed in the owner
+// node's own frame: the offset is a local point, the aim a heading and pitch about the node's axes, all
+// carried by the node's drawn world matrix. A mouth's fan stays in the mouth while the head turns, bobs
+// and shakes. Off, the rows mean exactly what they always did.
 
 #include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -84,6 +89,17 @@ constexpr EffectField kFields[] = {
                  "of its bounds. On a light: an offset from the light."),
     storedFloat("offsetY", "Offset Y", 0.0f, -100000.0f, 100000.0f, -20.0f, 20.0f).fmt("%.2f m"),
     storedFloat("offsetZ", "Offset Z", 0.0f, -100000.0f, 100000.0f, -20.0f, 20.0f).fmt("%.2f m"),
+    // ADR-1670: an entity-owned beam that rides its owner's transform -- a mouth, an eye, a lamp on a
+    // turning head. Off (the default) the beam resolves exactly as before.
+    storedBool("local", "Follow the owner", false).sec("Local (Entity)")
+        .tooltip("Entity owners: place and aim the beam in the owner node's own frame, so it moves, turns\n"
+                 "and scales with the node (and with Shake, Float and every other offset on it). The\n"
+                 "offset is then a point in the node's local space (its mesh units, from the node's\n"
+                 "origin), and the beam points along Heading (about the node's +Y, 0 = its +Z) and\n"
+                 "Pitch (up from the node's horizontal plane). Length and source radius stay in metres."),
+    storedFloat("pitch", "Pitch", 0.0f, -90.0f, 90.0f, -90.0f, 90.0f).fmt("%.1f deg").clampTo(-90.0f, 90.0f)
+        .tooltip("Follow the owner only: how far the beam points up (+) or down (-) from the node's\n"
+                 "horizontal plane."),
 };
 
 constexpr kinds::StoredRows kRows{"lightBeam", kFields};
@@ -175,6 +191,24 @@ bool resolveBeam(const E& e, const EffectContext& ctx, Beam& out) {
         }
         out.tint = anchor.light.color;
         return true;
+    }
+    if (anchor.entity && kRows.f(e, "local") > 0.5f) {
+        // ADR-1670: the owner's drawn transform (XFORM offsets included) carries the offset and the aim.
+        NodeView view;
+        if (!ctx.scene->nodeView(e.owner.name, view)) {
+            return false;
+        }
+        glm::mat3 basis(view.world);
+        for (int c = 0; c < 3; ++c) {
+            const float len = glm::length(basis[c]);
+            if (!(len > 1e-8f)) {
+                return false; // a zero-scaled owner has no frame to aim in
+            }
+            basis[c] /= len;
+        }
+        out.apex = glm::vec3(view.world * glm::vec4(offset, 1.0f));
+        out.axis = glm::normalize(basis * kinds::fxHeading(kRows.f(e, "yaw"), kRows.f(e, "pitch"), false));
+        return kinds::finite3(out.apex) && kinds::finite3(out.axis);
     }
     out.apex = anchor.entity ? glm::vec3(anchor.centre.x, anchor.baseY, anchor.centre.z) : anchor.centre;
     out.axis = kinds::fxHeading(kRows.f(e, "yaw"), kRows.f(e, "tilt"), true);

@@ -628,3 +628,110 @@ TEST_CASE("the TRIGGER-driven phase-2 types on a moving owner are the same playe
                           a.distortion.count * sizeof(world::DistortionProxy)) == 0);
     }
 }
+
+// ADR-1670: an entity-owned Light Beam can follow its owner -- placed and aimed in the node's own frame.
+namespace {
+class TurnedScene final : public world::EffectSceneQuery {
+public:
+    glm::mat4 world{1.0f};
+    [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
+        if (name != "head") {
+            return false;
+        }
+        out = glm::vec3(world[3]);
+        return true;
+    }
+    [[nodiscard]] bool nodeView(std::string_view name, world::NodeView& out) const override {
+        if (name != "head") {
+            return false;
+        }
+        out = world::NodeView{};
+        out.world = world;
+        out.boundsMin = glm::vec3(world[3]) - glm::vec3(1.0f);
+        out.boundsMax = glm::vec3(world[3]) + glm::vec3(1.0f);
+        out.hasBounds = true;
+        out.entityCount = 1;
+        return true;
+    }
+    [[nodiscard]] bool lightView(std::string_view, world::LightView&) const override { return false; }
+};
+
+glm::mat4 turned(float yawDeg, float scale, glm::vec3 at) {
+    const float a = glm::radians(yawDeg);
+    glm::mat4 m(1.0f);
+    m[0] = glm::vec4(std::cos(a), 0.0f, -std::sin(a), 0.0f) * scale; // rotation about +Y, then uniform scale
+    m[1] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f) * scale;
+    m[2] = glm::vec4(std::sin(a), 0.0f, std::cos(a), 0.0f) * scale;
+    m[3] = glm::vec4(at, 1.0f);
+    return m;
+}
+} // namespace
+
+TEST_CASE("Light Beam follows its owner in local space (ADR-1670)", "[shell2][effects][beam][adr1670]") {
+    TurnedScene scene;
+    world::EffectContext ctx;
+    ctx.seconds = 1.0;
+    ctx.scene = &scene;
+    world::EffectInstance beam = always(EffectKind::LightBeam, "mouth", EffectOwner::entity("head"));
+    beam.values.setFloat("lightBeam/castLight", 0.0f);
+    beam.values.setFloat("lightBeam/length", 4.0f);
+    beam.values.setFloat("lightBeam/offsetX", 0.0f);
+    beam.values.setFloat("lightBeam/offsetY", 0.5f);
+    beam.values.setFloat("lightBeam/offsetZ", 0.25f);
+    beam.values.setFloat("lightBeam/yaw", 0.0f);
+
+    SECTION("off is byte-identical to a beam that never had the row") {
+        scene.world = turned(30.0f, 2.0f, glm::vec3(1.0f, 2.0f, 3.0f));
+        world::EffectInstance off = beam;
+        off.values.setFloat("lightBeam/local", 0.0f);
+        off.values.setFloat("lightBeam/pitch", 45.0f); // ignored while off
+        const Built a = build({beam}, ctx);
+        const Built b = build({off}, ctx);
+        REQUIRE(a.frame.instances.size() == 1);
+        CHECK(sameBytes(a.frame.instances, b.frame.instances));
+        // and it is the old entity rule: the apex sits at the bottom of the bounds, pointing down
+        CHECK(a.frame.instances[0].model[1].y == Approx(2.0f)); // col1 = -axis * L / 2, axis = -Y
+    }
+
+    beam.values.setFloat("lightBeam/local", 1.0f);
+    const auto apexAxis = [&](const Built& b) {
+        const world::ShellInstance& s = b.frame.instances.at(0);
+        const glm::vec3 axis = -glm::normalize(glm::vec3(s.model[1]));
+        const glm::vec3 apex = glm::vec3(s.model[3]) - axis * 2.0f; // centre = apex + axis * L / 2
+        return std::pair{apex, axis};
+    };
+
+    SECTION("the offset and the aim are carried by the node's rotation, scale and position") {
+        scene.world = turned(90.0f, 2.0f, glm::vec3(1.0f, 2.0f, 3.0f));
+        const Built b = build({beam}, ctx);
+        INFO(b.reasons[0]);
+        REQUIRE(b.status[0] == EffectStatus::Drawn);
+        const auto [apex, axis] = apexAxis(b);
+        // local (0, 0.5, 0.25) scaled by 2 and turned 90 degrees: +Z -> +X
+        CHECK(apex.x == Approx(1.0f + 0.5f));
+        CHECK(apex.y == Approx(2.0f + 1.0f));
+        CHECK(apex.z == Approx(3.0f).margin(1e-5));
+        CHECK(axis.x == Approx(1.0f)); // heading 0 is the node's +Z, now world +X
+        CHECK(axis.y == Approx(0.0f).margin(1e-5));
+        CHECK(glm::length(glm::vec3(b.frame.instances[0].model[1])) == Approx(2.0f)); // length stays in metres
+    }
+    SECTION("it can point up, which the world rule cannot") {
+        beam.values.setFloat("lightBeam/pitch", 90.0f);
+        const auto [apex, axis] = apexAxis(build({beam}, ctx));
+        CHECK(axis.y == Approx(1.0f));
+    }
+    SECTION("turning the node turns the beam with it") {
+        beam.values.setFloat("lightBeam/yaw", 30.0f);
+        scene.world = turned(0.0f, 1.0f, glm::vec3(0.0f));
+        const auto [a0, x0] = apexAxis(build({beam}, ctx));
+        scene.world = turned(-30.0f, 1.0f, glm::vec3(0.0f));
+        const auto [a1, x1] = apexAxis(build({beam}, ctx));
+        CHECK(x0.x == Approx(std::sin(glm::radians(30.0f))));
+        CHECK(x1.z == Approx(1.0f)); // the node's -30 undoes the beam's +30
+    }
+    SECTION("a zero-scaled owner draws nothing rather than a NaN") {
+        scene.world = turned(0.0f, 0.0f, glm::vec3(0.0f));
+        const Built b = build({beam}, ctx);
+        CHECK(b.frame.empty());
+    }
+}
