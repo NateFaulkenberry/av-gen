@@ -206,7 +206,7 @@ def ghost_program(name, colour):
 # so +X and +Z both lean toward the frame's right: the fan pours right and a little up, away from the cover's diagonal.
 MOUTH_RAYS = [
     # the hero cone: wide, soft, a pale core, always the brightest
-    {"yaw": 18.0, "pitch": 7.0, "angle": 11.0, "length": 3.2, "aperture": 0.012, "coreSharpness": 3.2,
+    {"yaw": 18.0, "pitch": 7.0, "angle": 10.0, "length": 2.4, "aperture": 0.012, "coreSharpness": 3.2,
      "edgeSoftness": 0.75, "falloff": 1.1, "dust": 0.12, "color": hexrgb(CORE)},
     # six thinner rays fanned round it, uneven (their weights live in RAY_WEIGHT)
     {"yaw": -14.0, "pitch": 20.0, "angle": 1.6, "length": 2.6, "aperture": 0.003, "color": hexrgb(MAGENTA)},
@@ -365,9 +365,9 @@ def routes(s, mouth, eye_l, eye_r):
     fx = lambda i, leaf: "fx/%s/%s" % (i, leaf)
     clamp = lambda hi: {"clampEnabled": True, "clampMin": 0.0, "clampMax": hi}
     # ---- mouth (M rows)
-    s.route(R("response.sustain", fx(hero, "intensity"), 0.9, depth=G("mouth"), attackMs=120, decayMs=900),
-            R("signal.voice", fx(hero, "intensity"), 1.3, depth=G("mouth"), attackMs=40, decayMs=400),
-            R("signal.kickEnv", fx(hero, "intensity"), 0.9, depth=G("mouth"), attackMs=0, decayMs=180),
+    s.route(R("response.sustain", fx(hero, "intensity"), 0.45, depth=G("mouth"), attackMs=120, decayMs=900),
+            R("signal.voice", fx(hero, "intensity"), 0.8, depth=G("mouth"), attackMs=40, decayMs=400),
+            R("signal.kickEnv", fx(hero, "intensity"), 0.6, depth=G("mouth"), attackMs=0, decayMs=180),
             R("signal.overload", fx(hero, "intensity"), 0.6, depth=G("mouth"), attackMs=0, decayMs=600),
             R("response.onset", fx(hero, "coreSharpness"), 1.6, depth="response.onsetLow", attackMs=0, decayMs=200),
             R("signal.kickEnv", fx(hero, "angle"), 2.0, depth=G("mouth"), attackMs=0, decayMs=220))
@@ -429,7 +429,7 @@ def routes(s, mouth, eye_l, eye_r):
     s.route(R("signal.snare", "post/glitch/tear", 0.5, depth=G("tear"), attackMs=0, decayMs=120, **clamp(0.6)),
             R("signal.snare", "post/glitch/tearShift", 90.0, depth=G("tear"), attackMs=0, decayMs=120),
             R("signal.snare", "post/split/amount", 8.0, depth=G("tear"), attackMs=0, decayMs=110),
-            R("signal.overload", "post/glitch/amount", 0.08, depth=G("tear"), attackMs=0, decayMs=800),
+            R("signal.overload", "post/glitch/amount", 0.025, depth=G("tear"), attackMs=0, decayMs=800),
             R("signal.overload", "post/glitch/tear", 0.15, depth=G("tear"), attackMs=0, decayMs=800),
             R("signal.snare", "material/th-bust/op/%d/threshold/value" % BUST.at["bands"], -0.35, depth=G("tear"),
               attackMs=0, decayMs=150),
