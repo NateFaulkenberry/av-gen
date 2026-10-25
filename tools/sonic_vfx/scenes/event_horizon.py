@@ -69,10 +69,9 @@ DESIGN = {
         ["polyphony", "notes.polyphony", "a chord tears off a cluster: the birthplace spreads"],
         ["bass", "response.bass", "the hole's mass: the lens and the shadow swell, the sky bends more, and the star "
          "flares and bleeds faster into its stream"],
-        ["kick", "signal.kick", "the photon ring flashes, the jets fire and a shock ripple races out from the hole"],
-        ["snare", "response.snare", "a flare erupts from the hot spot on the approaching side, and the star sheds a "
-         "burst of plasma"],
-        ["hat", "response.hat", "sparks glint across the disk"],
+        ["low", "response.low", "the photon ring flashes, the jets fire and a shock ripple races out from the hole"],
+        ["onset", "response.onset", "a flare erupts from the hot spot on the approaching side, and the star sheds a "
+         "burst of plasma; sparks glint across the disk"],
         ["density", "notes.density", "busy playing churns the gas (turbulence, finer streaks)"],
         ["tension", "notes.tension", "dissonance splits the lens's colours"],
         ["brightness", "sonic.brightness", "a bright timbre turns the inner edge from gold to blue-white"],
@@ -322,7 +321,7 @@ def build():
         s.track("particles/%s/position" % sid, star_pos, loop=STAR_PERIOD)
         s.track("particles/%s/direction" % sid, star_dir, loop=STAR_PERIOD)
 
-    # ---- jets: particle beams leaving the poles, a steady whisper that the kick fires
+    # ---- jets: particle beams leaving the poles, a steady whisper that the low attack fires
     for jid, sign in (("jetUp", 1.0), ("jetDown", -1.0)):
         s.particles(jid, capacity=9000, seed=61 if sign > 0 else 67, shape="sphere", position=[0, 1.2 * sign, 0],
                     extent=[0.15, 0.1, 0.15], direction=[0, sign, 0], spawnRate=1400.0, lifetimeMin=1.4,
@@ -356,14 +355,14 @@ def build():
                 sizeStart=0.12, sizeEnd=0.03, colorStart=hexrgb("#f2f6ff") + [1.0],
                 colorEnd=hexrgb(GOLD) + [0.0], emissive=9.0, blend="additive",
                 trailEnabled=True, trailLength=24, trailStride=2, trailWidth=0.35, trailTaper=0.1, trailFade=0.0)
-    # ---- the flare (snare): a burst from the hot spot on the approaching side
+    # ---- the flare (onset): a burst from the hot spot on the approaching side
     s.particles("flare", capacity=4000, seed=41, shape="sphere", position=[-4.6, 0.05, 1.2],
                 extent=[0.35, 0.05, 0.35], direction=[0, 0.3, 1], spawnRate=0.0, lifetimeMin=0.35, lifetimeMax=0.9,
                 spread=0.25, speedMin=4.0, speedMax=9.0, gravity=[0, 0, 0], drag=0.6, turbulence=0.2,
                 turbulenceScale=0.8, attractorPosition=[0, 0, 0], attractorStrength=1.2, attractorRadius=12.0,
                 orbit=ORBIT_SIGN * 6.0, sizeStart=0.06, sizeEnd=0.0, colorStart=hexrgb(WHITE_HOT) + [1.0],
                 colorEnd=hexrgb(EMBER) + [0.0], emissive=10.0, blend="additive", velocityStretch=1.2, stretchMax=0.8)
-    # ---- sparks (hat): glints scattered over the disk, a few frames each
+    # ---- sparks (onset): glints scattered over the disk, a few frames each
     s.particles("sparks", capacity=2000, seed=53, shape="disc", position=[0, 0.05, 0], extent=[11.0, 0.0, 11.0],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.08, lifetimeMax=0.22, spread=1.0,
                 speedMin=0.0, speedMax=0.2, gravity=[0, 0, 0], drag=0.0, turbulence=0.0,
@@ -432,24 +431,24 @@ def build():
             R("polyphony", "particles/fragments/extent", 1.6, comp=2, **FAST),
             R("noteOn", "particles/fragments/burst", 10.0, depth="lastVelocity", attackMs=0, decayMs=140),
             R("noteEnv", "procedural/star/material/emissive", 6.0, attackMs=0, decayMs=300))
-    # kick: the photon ring flashes, the jets fire
-    s.route(R("kick", "fx/bh/photonRing", 26.0, **HIT),
-            R("kick", "particles/jetUp/burst", 160.0, attackMs=0, decayMs=90),
-            R("kick", "particles/jetDown/burst", 160.0, attackMs=0, decayMs=90),
-            R("kick", "particles/jetUp/emissive", 2.5, attackMs=0, decayMs=500),
-            R("kick", "particles/jetDown/emissive", 2.5, attackMs=0, decayMs=500),
-            R("kick", "post/lens/chromaticAberration", 0.06, attackMs=0, decayMs=160),
+    # low attack: the photon ring flashes, the jets fire
+    s.route(R("low", "fx/bh/photonRing", 26.0, **HIT),
+            R("low", "particles/jetUp/burst", 160.0, attackMs=0, decayMs=90),
+            R("low", "particles/jetDown/burst", 160.0, attackMs=0, decayMs=90),
+            R("low", "particles/jetUp/emissive", 2.5, attackMs=0, decayMs=500),
+            R("low", "particles/jetDown/emissive", 2.5, attackMs=0, decayMs=500),
+            R("low", "post/lens/chromaticAberration", 0.06, attackMs=0, decayMs=160),
             # a gravitational ripple: a shock ring racing out from the hole (ADR-1065), centred where the arc
             # camera keeps the hole on screen
-            R("kickEnv", "post/shock/amount", 34.0, attackMs=0, decayMs=0),
-            R("kickEnv", "post/shock/radius", -1.4, op="replace", offset=-1.0, attackMs=0, decayMs=0))
-    # snare: a flare from the hot spot, and the star sheds a burst into its stream
-    s.route(R("snare", "particles/flare/burst", 260.0, attackMs=0, decayMs=40),
-            R("snare", "particles/stream/burst", 900.0, attackMs=0, decayMs=40),
-            R("snare", "particles/streamers/burst", 12.0, attackMs=0, decayMs=40),
-            R("snare", "post/bloom/intensity", 0.22, attackMs=0, decayMs=260))
-    # hat: sparks
-    s.route(R("hat", "particles/sparks/burst", 45.0, attackMs=0, decayMs=30))
+            R("lowEnv", "post/shock/amount", 34.0, attackMs=0, decayMs=0),
+            R("lowEnv", "post/shock/radius", -1.4, op="replace", offset=-1.0, attackMs=0, decayMs=0))
+    # onset: a flare from the hot spot, and the star sheds a burst into its stream
+    s.route(R("onset", "particles/flare/burst", 260.0, attackMs=0, decayMs=40),
+            R("onset", "particles/stream/burst", 900.0, attackMs=0, decayMs=40),
+            R("onset", "particles/streamers/burst", 12.0, attackMs=0, decayMs=40),
+            R("onset", "post/bloom/intensity", 0.22, attackMs=0, decayMs=260))
+    # onset: sparks
+    s.route(R("onset", "particles/sparks/burst", 45.0, attackMs=0, decayMs=30))
     # tension: dissonance splits the lens's colours
     s.route(R("tension", "fx/bh/chroma", 0.03, **MEDIUM))
 

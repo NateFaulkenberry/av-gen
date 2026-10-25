@@ -69,8 +69,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "STRUCTURE: the corridor's spacing breathes like an accordion round the viewer"],
-        ["kick", "signal.kick", "a zoom punch toward the light; the light flares"],
-        ["snare", "response.snare", "the whole colour sequence jumps a step round the wheel and stays there"],
+        ["low", "response.low", "a zoom punch toward the light; the light flares"],
+        ["onset", "response.onset", "the whole colour sequence jumps a step round the wheel and stays there"],
         ["mids", "audio.mid", "the corridor winds its twist"],
         ["highs", "audio.treble", "a fine light traces every edge"],
         ["brightness", "sonic.brightness.slow", "the colour range cools as the sound brightens"],
@@ -126,18 +126,17 @@ def instrument(s):
     s.route(R("bass", N % "accordion" + "size", 1.0, comp=1, **breath),
             R("bass", N % "travel" + "translation", 1.0, comp=1, **breath),
             R("bass", "scene/volumeDensity", 0.008, attackMs=60, decayMs=600))
-    # ---- KICK: a zoom punch toward the light; the light flares
-    s.route(R("kick", "post/radial/amount", 0.1, attackMs=0, decayMs=200),
-            R("kick", "camera/lens/focalLength", 10.0, attackMs=0, decayMs=240),
-            R("kick", "lights/end/intensity", 30000.0, attackMs=0, decayMs=260),
-            R("kick", "procedural/endLight/material/emissive", 50.0, attackMs=0, decayMs=260))
-    # ---- SNARE: the whole colour sequence jumps a step round the wheel (an integrated hit: it stays where it lands)
-    s.route(R("snare", HUE, 1.1, attackMs=0, decayMs=180, integrate=True))
+    # ---- LOW: a zoom punch toward the light; the light flares
+    s.route(R("low", "post/radial/amount", 0.1, attackMs=0, decayMs=200),
+            R("low", "camera/lens/focalLength", 10.0, attackMs=0, decayMs=240),
+            R("low", "lights/end/intensity", 30000.0, attackMs=0, decayMs=260),
+            R("low", "procedural/endLight/material/emissive", 50.0, attackMs=0, decayMs=260))
+    # ---- ONSET: the whole colour sequence jumps a step round the wheel (an integrated hit: it stays where it lands)
+    s.route(R("onset", HUE, 1.1, attackMs=0, decayMs=180, integrate=True))
     # ---- MIDS: the corridor winds and unwinds its twist
     s.route(R("audio.mid", N % "twist" + "amount", 0.03, attackMs=120, decayMs=900))
     # ---- HIGHS: a fine light traces every edge
-    s.route(R("audio.treble", "sdf/corridor/look/edge/intensity", 2.0, attackMs=20, decayMs=200),
-            R("hat", "sdf/corridor/look/edge/intensity", 1.2, attackMs=0, decayMs=90))
+    s.route(R("audio.treble", "sdf/corridor/look/edge/intensity", 2.0, attackMs=20, decayMs=200))
     # ---- CENTROID: the colour range cools as the sound brightens
     s.route(R("brightnessSlow", HUE, 0.3, **SLOW))
     # ---- FLUX: the corridor wrings tighter (more twist on change)

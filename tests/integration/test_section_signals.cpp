@@ -207,11 +207,8 @@ TEST_CASE("Each section's measured audio reaches the cue sheet, the plan and the
     for (const song::SectionCue& c : cues) {
         CHECK(c.audio.measured());
     }
-    // The kickless middle section measures no kicks -- at most the next bar's first kick, whose onset
-    // is stamped on an attack frame that can sit a few milliseconds before the boundary -- and the
-    // groove around it two a second.
-    CHECK_THAT(static_cast<double>(cues[0].audio.kickRate), WithinAbs(2.0, 0.2));
-    CHECK(cues[1].audio.kickRate <= 0.25f);
+    // The kickless middle section is sparser than the groove around it.
+    CHECK(cues[1].audio.onsetRate < cues[0].audio.onsetRate);
     CHECK(cues[1].audio.onsetRate < cues[2].audio.onsetRate);
     CHECK(cues[2].audio.brightnessHz > 0.0f);
     // The section's own (authored) energy stays what its author said.
@@ -224,7 +221,7 @@ TEST_CASE("Each section's measured audio reaches the cue sheet, the plan and the
     CHECK(plan->sections[1].audio == cues[1].audio);
     const auto back = app::SongPlan::fromJson(plan->toJson());
     REQUIRE(back.has_value());
-    CHECK(back->sections[1].audio.kickRate == cues[1].audio.kickRate);
+    CHECK(back->sections[1].audio.onsetRate == cues[1].audio.onsetRate);
     CHECK(back->sections[1].audio.bandDb == cues[1].audio.bandDb);
     // ...and the engine's own plan is built with the track.
     const auto engines = app::songPlanForEngine(engine);
@@ -238,7 +235,7 @@ TEST_CASE("Each section's measured audio reaches the cue sheet, the plan and the
     CHECK(music.phraseBars == engine.meter().phraseBars);
     CHECK(music.sections[1].energy == 0.2f);
     CHECK(music.sections[1].audio.measured());
-    CHECK(music.sections[1].audio.kickRate <= 0.25f);
+    CHECK(music.sections[1].audio.onsetRate < music.sections[0].audio.onsetRate);
 
     // director.inspect_scene says all of it.
     ai::ToolRegistry registry;
@@ -250,7 +247,8 @@ TEST_CASE("Each section's measured audio reaches the cue sheet, the plan and the
     REQUIRE(sections.size() == 3);
     CHECK(sections[1]["energy"].get<float>() == 0.2f);
     REQUIRE(sections[1].contains("audio"));
-    CHECK(sections[1]["audio"]["kickRate"].get<float>() <= 0.25f);
+    CHECK(sections[1]["audio"]["onsetRate"].get<float>() < sections[0]["audio"]["onsetRate"].get<float>());
+    CHECK_FALSE(sections[1]["audio"].contains("kickRate"));
     CHECK(sections[0]["audio"]["bandsDb"].contains("bass"));
     CHECK(sections[0]["audio"].contains("brightnessHz"));
     CHECK(r.value["meter"]["downbeatBeat"] == engine.meter().downbeat);

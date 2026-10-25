@@ -138,55 +138,7 @@
   "camera/focus/mode": 0,
   "camera/lens/focusDistance": 2.429
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.bass",
@@ -355,7 +307,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/bell/source/rotation",
    "amount": -34.0,
    "op": "add",
@@ -369,7 +321,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/bell/distribution/radius",
    "amount": 0.08,
    "op": "add",
@@ -380,7 +332,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/puff/burst",
    "amount": 160.0,
    "op": "add",
@@ -391,7 +343,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "lights/heartLight/intensity",
    "amount": 10.0,
    "op": "add",
@@ -402,7 +354,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/mushSpores/burst",
    "amount": 220.0,
    "op": "add",
@@ -413,7 +365,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/caps/material/emissive",
    "amount": 2.0,
    "op": "add",
@@ -435,17 +387,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "procedural/vineTip0/material/emissive",
-   "amount": 6.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 150
-   }
-  },
-  {
    "source": "audio.treble",
    "target": "procedural/vine1/deform/2/amount",
    "amount": 0.025,
@@ -453,17 +394,6 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 15,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/vineTip1/material/emissive",
-   "amount": 6.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
     "decayMs": 150
    }
   },
@@ -479,17 +409,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "procedural/vineTip2/material/emissive",
-   "amount": 6.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 150
-   }
-  },
-  {
    "source": "audio.treble",
    "target": "procedural/vine3/deform/2/amount",
    "amount": 0.025,
@@ -501,17 +420,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "procedural/vineTip3/material/emissive",
-   "amount": 6.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 150
-   }
-  },
-  {
    "source": "audio.treble",
    "target": "procedural/vine4/deform/2/amount",
    "amount": 0.025,
@@ -519,17 +427,6 @@
    "polarity": "unipolar",
    "chain": {
     "attackMs": 15,
-    "decayMs": 150
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/vineTip4/material/emissive",
-   "amount": 6.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
     "decayMs": 150
    }
   },
@@ -1118,17 +1015,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "procedural/radA/wire/intensity",
-   "amount": 4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 140
-   }
-  },
-  {
    "source": "audio.treble",
    "target": "procedural/radA/wire/width",
    "amount": 1.2,
@@ -1151,7 +1037,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/radACore/material/emissive",
    "amount": 10.0,
    "op": "add",
@@ -1159,17 +1045,6 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 260
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/radB/wire/intensity",
-   "amount": 4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 140
    }
   },
   {
@@ -1195,7 +1070,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/radBCore/material/emissive",
    "amount": 10.0,
    "op": "add",
@@ -1203,17 +1078,6 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 260
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/radC/wire/intensity",
-   "amount": 4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 140
    }
   },
   {
@@ -1239,7 +1103,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/radCCore/material/emissive",
    "amount": 10.0,
    "op": "add",
@@ -1589,19 +1453,14 @@
     "the garden breathes: the lantern swells, the jelly-trees' bells swim"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the lantern blooms open on a spring; a spore puff from its heart"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "the mushrooms puff spores; their dots flash"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "the vines' tips sparkle; cilia shimmer"
    ],
    [
     "mids",

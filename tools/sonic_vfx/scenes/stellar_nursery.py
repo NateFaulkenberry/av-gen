@@ -54,8 +54,7 @@ DESIGN = {
         ["note duration", "notes.held", "a held note's stars grow"],
         ["note", "response.note", "the stars flare as they ignite"],
         ["bass", "response.bass", "the cloud's density and glow"],
-        ["kick", "signal.kick", "a shock front through the gas"],
-        ["hat", "response.hat", "the starfield twinkles"],
+        ["low", "response.low", "a shock front through the gas"],
         ["sustained", "response.sustain", "ionisation: the pillars' rims brighten"],
         ["tension", "notes.tension", "the cloud churns"],
         ["silence", "(no input)", "dark pillars on the glowing gas; the stars unlit"],
@@ -208,11 +207,10 @@ def build():
             R("sustain", "lights/rim/intensity", 8.0, **SLOW),
             R("tension", "material/snNebula/op/%d/noise/constant" % OP_CHURN, 0.12, comp=0, integrate=True,
               attackMs=500, decayMs=500))
-    # kick: a shock front from the nest; hat: twinkle
+    # low attack: a shock front from the nest
     shock_uv = [round(v, 3) for v in s.project(list(HEAD))[:2]]
-    s.route(R("kickEnv", "post/shock/amount", 40.0, attackMs=0, decayMs=0),
-            R("kickEnv", "post/shock/radius", -1.6, op="replace", offset=-1.0, attackMs=0, decayMs=0),
-            R("hat", "fx/stars/twinkle", 1.5, attackMs=0, decayMs=120),
+    s.route(R("lowEnv", "post/shock/amount", 40.0, attackMs=0, decayMs=0),
+            R("lowEnv", "post/shock/radius", -1.6, op="replace", offset=-1.0, attackMs=0, decayMs=0),
             R("noteEnv", "post/bloom/intensity", 0.12, attackMs=0, decayMs=300))
 
     s.params_({

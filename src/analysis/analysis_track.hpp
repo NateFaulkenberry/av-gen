@@ -64,14 +64,14 @@ struct TrackedGrid {
     [[nodiscard]] bool empty() const { return beats.beatTimes.empty(); }
 };
 
-// ADR-896/898: live playback of a loaded file hears what a render hears.
+// ADR-896: live playback of a loaded file hears what a render hears.
 //
-// The live runner analyses the audio as the device plays it, with the causal beat tracker and no
-// band onsets -- so in the editor `music.downbeat` counted beats from wherever play was pressed and
-// `audio.onsetLow` never fired, while a render of the same second had both. This overlays a live
-// frame with the whole-track analysis at the same position: the tracked beat (flag, count, phase,
-// tempo), the three band onsets, the percussive onset rate and the energy composite that includes
-// it. Events are OR-ed over the track frames in (`previousSeconds`, `live.timeSeconds`], so none is
+// The live runner analyses the audio as the device plays it, with the causal beat tracker -- so in
+// the editor `music.downbeat` counted beats from wherever play was pressed, while a render of the
+// same second had the whole track's grid. This overlays a live frame with the whole-track analysis
+// at the same position: the tracked beat (flag, count, phase, tempo), the onset rate and the energy
+// composite (walked from the track's start, as a render reads them). The beat is OR-ed over the track
+// frames in (`previousSeconds`, `live.timeSeconds`], so none is
 // lost or repeated between two live frames; after a jump (time went back, or forward by more than
 // 0.25 s) no event is carried, only the continuous fields. Returns the time to pass next call.
 double overlayTrackFields(AnalysisFrame& live, const AnalysisTrack& track, double previousSeconds);

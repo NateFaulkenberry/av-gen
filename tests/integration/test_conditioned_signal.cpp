@@ -243,13 +243,13 @@ TEST_CASE("signal: firstActive follows the stem while it is active and falls bac
     params::ParameterSet params;
     const signals::SignalId stem = bus.declare("stem.drums.highMid");
     const signals::SignalId active = bus.declare("stem.drums.active");
-    const signals::SignalId mix = bus.declare("response.snareEnv");
+    const signals::SignalId mix = bus.declare("response.onsetEnv");
     ConditionedSignalSource sig("clap");
     ConditionedSignalSource::Input a;
     a.source = "stem.drums.highMid"; // gate: stem.drums.active, found by name
     a.amount = 2.0f;
     ConditionedSignalSource::Input b;
-    b.source = "response.snareEnv"; // no response.active: always active, the fallback
+    b.source = "response.onsetEnv"; // no response.active: always active, the fallback
     sig.inputs() = {a, b};
     sig.attach(bus, params);
     const signals::SignalId out = *bus.find("signal.clap");
@@ -271,7 +271,7 @@ TEST_CASE("signal: firstActive follows the stem while it is active and falls bac
 
     // A stem the project does not have: its input never resolves and the mix plays throughout.
     signals::SignalBus noStem;
-    const signals::SignalId mixOnly = noStem.declare("response.snareEnv");
+    const signals::SignalId mixOnly = noStem.declare("response.onsetEnv");
     ConditionedSignalSource fallback("clap");
     fallback.inputs() = {a, b};
     fallback.attach(noStem, params);

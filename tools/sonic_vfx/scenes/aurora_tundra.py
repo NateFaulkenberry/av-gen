@@ -53,9 +53,9 @@ DESIGN = {
          "(consonant), teal, violet, rose (dissonant)"],
         ["melodic", "response.note", "a ripple runs through the curtains and their edges flare"],
         ["bass", "response.bass", "the curtains reach lower and taller"],
-        ["kick", "signal.kick", "a surge of brightness through the curtains"],
-        ["snare", "response.snare", "the ice cracks with light"],
-        ["hat", "response.hat", "diamond dust glitters in the air"],
+        ["low", "response.low", "a surge of brightness through the curtains"],
+        ["onset", "response.onset", "the ice cracks with light"],
+        ["flux", "response.flux", "diamond dust glitters in the air"],
         ["velocity", "notes.lastVelocity", "how big a note's ripple is"],
         ["silence", "(no input)", "a faint green arc drifting over the trees, the stars, the still ice"],
     ],
@@ -216,7 +216,7 @@ def build():
                variation={"seed": seed, "position": [6.0, 0.0, 70.0], "rotation": [0.04, 3.1, 0.04],
                           "scale": [0.2, 0.55, 0.2], "uniformScale": 0.35})
 
-    # ---- diamond dust: tiny glints hanging in the cold air (hats)
+    # ---- diamond dust: tiny glints hanging in the cold air (their number follows the flux)
     s.particles("dust", capacity=3000, seed=41, shape="box", position=[CAM[0], 2.5, CAM[2] - 6.0],
                 extent=[7.0, 2.0, 5.0], direction=[0.1, -0.05, 0.0], spawnRate=6.0, lifetimeMin=0.3, lifetimeMax=0.9,
                 spread=1.0, speedMin=0.02, speedMax=0.1, gravity=[0, -0.02, 0], drag=0.5, turbulence=0.05,
@@ -252,23 +252,22 @@ def build():
     s.route(R("noteEnv", "fx/aurora/waveAmplitude", 0.55, depth="lastVelocity", attackMs=60, decayMs=900),
             R("noteEnv", "fx/aurora/turbulence", 0.5, attackMs=60, decayMs=700),
             R("noteEnv", "fx/aurora/edgeBrightness", 1.4, attackMs=0, decayMs=400))
-    # kick: a surge through the curtains; the ridge glints
-    s.route(R("kick", "fx/aurora/intensity", 2.4, attackMs=0, decayMs=420),
-            R("kick", "fx/aurora/edgeBrightness", 1.6, attackMs=0, decayMs=500))
-    # ...and the ice gives the curtains back: held sound brightens the reflection, a kick flashes it
+    # low attack: a surge through the curtains; the ridge glints
+    s.route(R("low", "fx/aurora/intensity", 2.4, attackMs=0, decayMs=420),
+            R("low", "fx/aurora/edgeBrightness", 1.6, attackMs=0, decayMs=500))
+    # ...and the ice gives the curtains back: held sound brightens the reflection, a low attack flashes it
     for c in range(3):
         s.route(R("sustain", "material/atIce/op/%d/constant/constant" % OP_REFL_GAIN, 0.05, comp=c, **SLOW),
-                R("kick", "material/atIce/op/%d/constant/constant" % OP_REFL_GAIN, 0.07, comp=c, attackMs=0,
+                R("low", "material/atIce/op/%d/constant/constant" % OP_REFL_GAIN, 0.07, comp=c, attackMs=0,
                   decayMs=420))
-    # snare: the ice cracks with light
+    # onset: the ice cracks with light
     for c, w in enumerate(hexrgb("#7fe8ff", 1.0)):
-        s.route(R("snare", "material/atIce/op/%d/constant/constant" % OP_CRACK, 2.5 * w, comp=c, attackMs=0,
+        s.route(R("onset", "material/atIce/op/%d/constant/constant" % OP_CRACK, 2.5 * w, comp=c, attackMs=0,
                   decayMs=320))
-    # hat: diamond dust
-    s.route(R("hat", "particles/dust/burst", 70.0, attackMs=0, decayMs=40),
-            R("hatRate", "particles/dust/spawnRate", 260.0, **MEDIUM),
+    # flux: diamond dust
+    s.route(R("flux", "particles/dust/spawnRate", 260.0, **MEDIUM),
             R("visual.mood", "post/bloom/intensity", 0.1, **SLOW),
-            R("kick", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
+            R("low", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
 
     s.params_({
         "post/bloom/intensity": 0.32, "post/bloom/threshold": 0.9, "post/output/vignette": 0.38,

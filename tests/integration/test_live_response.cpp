@@ -111,7 +111,7 @@ double meanSignal(Play p, const std::string& name) {
 
 } // namespace
 
-TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the hits", "[live][digital-mosh][adr1361][adr1620]") {
+TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the hits", "[live][digital-mosh][adr1361]") {
     Play p{.project = example("digital-mosh/digital-mosh-live.json")};
     p.response = {{"sensitivity", 0.2f}};
     const double dull = meanParam(p, "macros/energy");
@@ -141,15 +141,14 @@ TEST_CASE("Digital Mosh Live: Sensitivity drives the arc, Transients the hits", 
     CHECK(std::abs(quiet - loud) < 0.25 * loud);
     CHECK(lifted > quiet);
 
-    // The hats' glints on the ground (the Dream's rhythm gate opened): more Transients, harder hits. ADR-1620: on a mix
-    // the hats are the broadband onset, which Transients curves; the kick's fracture is the beat clock's pulse, which
-    // it does not (at Transients 0 nothing is busy, and the kick stands aside too).
+    // The rhythm (the Dream's rhythm gate opened): the infection spreads on each onset and the fracture flares on each
+    // low attack, both the response's hits, which Transients curves -- more Transients, harder hits; at 0 none fires.
     Play k{.project = example("digital-mosh/digital-mosh-live.json"), .hold = {{"macros/gRhythm", 1.0f}}};
     k.response = {{"transient", 0.2f}};
-    const double soft = meanParam(k, "material/ground/emissionIntensity");
+    const double soft = meanParam(k, "field/infect/strength");
     k.response = {{"transient", 0.8f}};
-    const double hard = meanParam(k, "material/ground/emissionIntensity");
-    INFO("hat glints: " << soft << " / " << hard);
+    const double hard = meanParam(k, "field/infect/strength");
+    INFO("infection spread: " << soft << " / " << hard);
     CHECK(soft < hard);
     k.response = {{"transient", 0.0f}};
     const double none = meanParam(k, "lights/fracture/intensity");
@@ -221,10 +220,10 @@ TEST_CASE("THE ASTRAL FORGE LIVE: the conductor's song is heard through the Resp
     const Heard neutral = run({});
     CHECK(neutral.heard == neutral.song);
 
-    // Transients down: weak kicks are not heard and the rest land softer (the collapse's 0.5, the blast).
-    const Heard soft = run({{"transient", 0.15f}});
+    // Transients down: weak low onsets are not heard and the rest land softer (the collapse's 0.5, the blast).
+    const Heard soft = run({{"transient", 0.05f}});
     REQUIRE(soft.heard != soft.song);
-    CHECK(soft.heard->song.kickT.size() < soft.song->song.kickT.size());
+    CHECK(soft.heard->song.lowT.size() < soft.song->song.lowT.size());
     // Sensitivity up: the spectrum the god's matter reads is lifted.
     const Heard keen = run({{"sensitivity", 0.85f}});
     double before = 0.0, after = 0.0;

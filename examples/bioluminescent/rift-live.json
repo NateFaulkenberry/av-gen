@@ -234,7 +234,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/swarm/spawnRate",
    "op": "add",
    "amount": 4680.0,

@@ -224,10 +224,9 @@ TEST_CASE("roles: the role saves, \"hits\" is gone with a warning, and a stem wi
     CHECK(doc["assets"]["stems"][1]["role"] == "bass");
 }
 
-TEST_CASE("roles: a feed can name a role; a class from a source that is not a drums source is refused",
-          "[feeds][stems][engine][adr1630]") {
+TEST_CASE("roles: a feed can name a role, and any role can feed the response's hits", "[feeds][stems][engine][adr1630]") {
     const auto& fx = testsupport::requireStemFixture();
-    const std::vector<std::pair<std::string, std::string>> envs{{"kick", "response.kick"}, {"low", "response.low"}};
+    const std::vector<std::pair<std::string, std::string>> envs{{"low", "response.low"}};
     app::Engine byRole(app::EngineMode::Offline);
     REQUIRE(byRole.loadProject(writeProject(fx, "feed-role", roleStems(fx, "kit"), {{"hits", "role.drums"}}, envs))
                 .has_value());
@@ -237,18 +236,14 @@ TEST_CASE("roles: a feed can name a role; a class from a source that is not a dr
     app::Engine byKey(app::EngineMode::Offline);
     REQUIRE(byKey.loadProject(writeProject(fx, "feed-key", roleStems(fx, "kit"), {{"hits", "stem.kit"}}, envs))
                 .has_value());
-    const std::size_t roleKicks = rises(byRole, "env.kick", 19.9, 60.0);
-    CHECK(roleKicks == rises(byKey, "env.kick", 19.9, 60.0));
-    CHECK(roleKicks >= fx.times("drums", "kicks").size() - 2);
-    // The bass stem asked for the kick: refused and said; the kick does not fire. Its low onsets are activity, and
-    // feed.
+    const std::size_t roleLows = rises(byRole, "env.low", 19.9, 60.0);
+    CHECK(roleLows == rises(byKey, "env.low", 19.9, 60.0));
+    CHECK(roleLows >= fx.times("drums", "kicks").size() - 2);
+    // A bass stem feeds the low attacks too: activity, not an identity.
     app::Engine bass(app::EngineMode::Offline);
-    REQUIRE(bass.loadProject(writeProject(fx, "feed-bass", roleStems(fx), {{"kick", "role.bass"}, {"low", "stem.bass"}},
-                                          envs))
-                .has_value());
-    CHECK(warned(bass, "a kick comes only from a drums source"));
+    REQUIRE(bass.loadProject(writeProject(fx, "feed-bass", roleStems(fx), {{"low", "role.bass"}}, envs)).has_value());
+    CHECK(bass.projectWarnings().empty());
     CHECK(bass.stems()[1].track->hits()); // fed: it runs the hits tier for the feed
-    CHECK(rises(bass, "env.kick", 19.9, 60.0) == 0);
     CHECK(rises(bass, "env.low", 19.9, 60.0) >= 8);
     // The block round-trips with the role reference.
     CHECK(audio::Feeds::fromJson(byRole.feeds().toJson())->hits == "role.drums");
@@ -306,13 +301,19 @@ TEST_CASE("history: from a drums source its onset rows are its kicks, snares and
     CHECK(listed(fromDrums, spatial::OnsetSource::High) == times(drums, &analysis::StemFrame::hat, 0.75));
     CHECK(listed(fromDrums, spatial::OnsetSource::Beat) == listed(mixHistory, spatial::OnsetSource::Beat));
     CHECK_FALSE(times(drums, &analysis::StemFrame::kick, 0.0).empty());
-    // A bass source: no identity, so its onsets are on all three rows.
+    // A bass source: no identity, so each onset is on the row of its register -- every onset once, and the bass's
+    // mostly low.
     const auto fromBass = analysis::buildAudioHistory(*e.track(), {}, {&bass, 0.0, false});
     const auto bassOnsets = times(bass, &analysis::StemFrame::onset, 0.0);
     CHECK_FALSE(bassOnsets.empty());
+    std::vector<double> rows;
     for (const auto s : {spatial::OnsetSource::Low, spatial::OnsetSource::Mid, spatial::OnsetSource::High}) {
-        CHECK(listed(fromBass, s) == bassOnsets);
+        const auto l = listed(fromBass, s);
+        rows.insert(rows.end(), l.begin(), l.end());
     }
+    std::sort(rows.begin(), rows.end());
+    CHECK(rows == bassOnsets);
+    CHECK(listed(fromBass, spatial::OnsetSource::Low).size() * 2 >= bassOnsets.size());
     // The spectrogram: the source's rows at its offset, 0 before it and after it, held to the mix's end.
     const double end = e.track()->frames().back().timeSeconds;
     const auto spectrum = analysis::buildAudioHistory(*e.track(), {&bass, 2.0, false}, {});
@@ -517,13 +518,12 @@ TEST_CASE("roles live: role.<role>.* follows the input source of that role; the 
     CHECK_FALSE(a.bassKickDeclared);
     CHECK_FALSE(a.clickKickDeclared); // a bass input has no class names
     REQUIRE(a.historyLive);
-    // A source with no identity: its onsets on all three rows -- one click every 0.5 s on the bass source, about 16 in
-    // 8 s (the first while the detector warms up).
-    CHECK(a.history[0] == a.history[1]);
-    CHECK(a.history[1] == a.history[2]);
-    CHECK(a.history[0] >= 11);
-    CHECK(a.history[0] <= 17);
+    // A source with no identity: each onset on the row of its register -- one click every 0.5 s on the bass source,
+    // about 16 in 8 s (the first while the detector warms up).
+    const std::size_t heard = a.history[0] + a.history[1] + a.history[2];
+    CHECK(heard >= 11);
+    CHECK(heard <= 17);
     // The beat row stays the mix's either way; the mix's own rows are not the source's.
     REQUIRE(b.historyLive);
-    CHECK(a.history[0] != b.history[0]);
+    CHECK(a.history[0] + a.history[1] + a.history[2] != b.history[0] + b.history[1] + b.history[2]);
 }

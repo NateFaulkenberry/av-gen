@@ -54,9 +54,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the garden breathes: the lantern swells, the jelly-trees' bells swim"],
-        ["kick", "signal.kick", "the lantern blooms open on a spring; a spore puff from its heart"],
-        ["snare", "response.snare", "the mushrooms puff spores; their dots flash"],
-        ["hat", "response.hat", "the vines' tips sparkle; cilia shimmer"],
+        ["low", "response.low", "the lantern blooms open on a spring; a spore puff from its heart"],
+        ["onset", "response.onset", "the mushrooms puff spores; their dots flash"],
         ["mids", "audio.mid", "the current: tentacles and tendrils sway harder"],
         ["brightness", "sonic.brightness", "the glow turns from coral to mint; the petals sharpen"],
         ["sustained", "response.sustain", "the lantern grows taller"],
@@ -170,19 +169,18 @@ def instrument(s):
         s.route(R("bass", P % ("jtBell%d" % k) + "transform/scale", -0.12, comp=0, attackMs=60, decayMs=500),
                 R("bass", P % ("jtBell%d" % k) + "transform/scale", -0.12, comp=2, attackMs=60, decayMs=500),
                 R("bass", P % ("jtBell%d" % k) + "transform/scale", 0.12, comp=1, attackMs=60, decayMs=500))
-    # ---- KICK: the lantern blooms open (its petals lift from a 52-degree droop) and closes on a spring; a spore puff
-    s.route(R("kick", P % "bell" + "source/rotation", -34.0, comp=0, attackMs=0, decayMs=300, springHz=1.8,
+    # ---- LOW: the lantern blooms open (its petals lift from a 52-degree droop) and closes on a spring; a spore puff
+    s.route(R("low", P % "bell" + "source/rotation", -34.0, comp=0, attackMs=0, decayMs=300, springHz=1.8,
               springDamping=0.4),
-            R("kick", P % "bell" + "distribution/radius", 0.08, attackMs=0, decayMs=300),
-            R("kick", "particles/puff/burst", 160.0, threshold="binary", thresholdLevel=0.05),
-            R("kick", "lights/heartLight/intensity", 10.0, attackMs=0, decayMs=300))
-    # ---- SNARE: the mushrooms puff spores and their dots flash
-    s.route(R("snare", "particles/mushSpores/burst", 220.0, threshold="binary", thresholdLevel=0.05),
-            R("snare", P % "caps" + "material/emissive", 2.0, attackMs=0, decayMs=240))
+            R("low", P % "bell" + "distribution/radius", 0.08, attackMs=0, decayMs=300),
+            R("low", "particles/puff/burst", 160.0, threshold="binary", thresholdLevel=0.05),
+            R("low", "lights/heartLight/intensity", 10.0, attackMs=0, decayMs=300))
+    # ---- ONSET: the mushrooms puff spores and their dots flash
+    s.route(R("onset", "particles/mushSpores/burst", 220.0, threshold="binary", thresholdLevel=0.05),
+            R("onset", P % "caps" + "material/emissive", 2.0, attackMs=0, decayMs=240))
     # ---- HIGHS: cilia shimmer on the vines; the spores sparkle
     for k in range(5):
-        s.route(R("audio.treble", P % ("vine%d" % k) + "deform/2/amount", 0.025, attackMs=15, decayMs=150),
-                R("hat", P % ("vineTip%d" % k) + "material/emissive", 6.0, attackMs=0, decayMs=150))
+        s.route(R("audio.treble", P % ("vine%d" % k) + "deform/2/amount", 0.025, attackMs=15, decayMs=150))
     s.route(R("audio.treble", "particles/spores/emissive", 5.0, attackMs=20, decayMs=250))
     # ---- MIDS: the current -- the tentacles and the jelly-trees' tendrils sway harder
     for k in range(5):
@@ -220,12 +218,11 @@ def instrument(s):
                 R(v + "held", P % ("budHeart%d" % k) + "material/emissive", 6.0, attackMs=60, decayMs=600))
     s.route(R("polyphony", P % "bell" + "distribution/count", 24.0, attackMs=0, decayMs=900),
             R("release", "particles/petalFall/burst", 60.0, attackMs=0, decayMs=0))
-    # ---- RADIOLARIANS: the hats flash their lattices, the bass breathes them, the kick pulses their cores
+    # ---- RADIOLARIANS: the bass breathes them, the low attack pulses their cores
     for name, *_ in RADIOLARIANS:
-        s.route(R("hat", P % name + "wire/intensity", 4.0, attackMs=0, decayMs=140),
-                R("audio.treble", P % name + "wire/width", 1.2, attackMs=20, decayMs=200),
+        s.route(R("audio.treble", P % name + "wire/width", 1.2, attackMs=20, decayMs=200),
                 R("bass", "nodes/%s/scale" % name, 0.12, attackMs=40, decayMs=420),
-                R("kick", P % (name + "Core") + "material/emissive", 10.0, attackMs=0, decayMs=260))
+                R("low", P % (name + "Core") + "material/emissive", 10.0, attackMs=0, decayMs=260))
     # ---- MOD WHEEL: the season (the whole garden's hue turns)
     s.route(R(s.modwheel(), "post/grade/hueShift", 0.5, attackMs=80, decayMs=80))
 
@@ -354,7 +351,7 @@ def build():
     for name, c, r, col in RADIOLARIANS:
         radiolarian(s, name, c, r, col)
 
-    # ---- the lantern's spore puff (the kick), the mushrooms' spores (the snare), falling petals (note releases)
+    # ---- the lantern's spore puff (the low attack), the mushrooms' spores (the onset), falling petals (note releases)
     s.particles("puff", capacity=2000, seed=31, shape="sphere", position=[BELL[0], BELL[1] - 0.1, BELL[2]],
                 extent=[0.12, 0.08, 0.12], direction=[0, -1, 0], spawnRate=0.0, lifetimeMin=1.5, lifetimeMax=3.0,
                 spread=0.8, speedMin=0.3, speedMax=0.9, gravity=[0, -0.05, 0], drag=1.2, turbulence=0.3,

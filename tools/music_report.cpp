@@ -2,24 +2,21 @@
 // one (ADR-896..899).
 //
 //   avgen_music_report AUDIO [--grid BPM FIRST_DOWNBEAT_SECONDS] [--bar-offset N]
-//                            [--kicks FILE] [--sections FILE] [--json OUT] [--no-grid-kicks]
+//                            [--sections FILE] [--json OUT]
 //
 // Prints the tempo, the meter estimate (which tracked beat is beat 1, how sure, the phrase length),
-// the band-onset counts and, per section, the level-free profile a director is handed. With
-// `--grid`, scores the bar lines the meter produces against a constant grid; with `--kicks` (one
-// time in seconds per line), scores the low-band onsets for precision and recall within 30 ms (and,
-// with `--no-grid-kicks`, the same detector given no beat grid -- the grid prior's contribution). With
-// `--sections` (lines of "name start end"), profiles those spans instead of whole-track quarters.
+// the onset count and, per section, the level-free profile a director is handed. With `--grid`,
+// scores the bar lines the meter produces against a constant grid. With `--sections` (lines of
+// "name start end"), profiles those spans instead of whole-track quarters.
 //
 // `--json OUT` writes everything for a generator to read: `tempo`, `beatTimes`, `meterEstimate`,
 // `meter` (the downbeat, phrase length and first downbeat the engine resolves with nothing pinned),
-// `barTimes` (bar 1 first), `onsetTimes.{low,mid,high}` (what `audio.onsetLow/Mid/High` fire on),
+// `barTimes` (bar 1 first), `onsetTimes` (what `audio.onset` fires on),
 // and `sections`, each in the `director.inspect_scene` shape plus its name and span.
 //
 // The audio never leaves the process: nothing here writes a sample, only numbers.
 
 #include "analysis/analysis_track.hpp"
-#include "analysis/band_onsets.hpp"
 #include "analysis/meter.hpp"
 #include "analysis/span_profile.hpp"
 #include "audio/audio_file.hpp"
@@ -43,17 +40,6 @@ struct Section {
     double start = 0.0;
     double end = 0.0;
 };
-
-std::vector<double> readTimes(const std::string& path) {
-    std::vector<double> out;
-    std::ifstream in(path);
-    double t = 0.0;
-    while (in >> t) {
-        out.push_back(t);
-    }
-    std::sort(out.begin(), out.end());
-    return out;
-}
 
 std::vector<Section> readSections(const std::string& path) {
     std::vector<Section> out;
@@ -115,18 +101,16 @@ Score match(const std::vector<double>& detected, const std::vector<double>& refe
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr,
-                     "usage: avgen_music_report AUDIO [--grid BPM FIRST] [--bar-offset N] [--kicks FILE] "
-                     "[--sections FILE] [--json OUT] [--no-grid-kicks]\n");
+                     "usage: avgen_music_report AUDIO [--grid BPM FIRST] [--bar-offset N] [--sections FILE] "
+                     "[--json OUT]\n");
         return 2;
     }
     const std::string audioPath = argv[1];
     double gridBpm = 0.0;
     double gridFirst = 0.0;
     int barOffset = -1;
-    std::string kicksPath;
     std::string sectionsPath;
     std::string jsonPath;
-    bool noGridKicks = false;
     for (int i = 2; i < argc; ++i) {
         const std::string a = argv[i];
         if (a == "--grid" && i + 2 < argc) {
@@ -134,14 +118,10 @@ int main(int argc, char** argv) {
             gridFirst = std::stod(argv[++i]);
         } else if (a == "--bar-offset" && i + 1 < argc) {
             barOffset = std::stoi(argv[++i]);
-        } else if (a == "--kicks" && i + 1 < argc) {
-            kicksPath = argv[++i];
         } else if (a == "--sections" && i + 1 < argc) {
             sectionsPath = argv[++i];
         } else if (a == "--json" && i + 1 < argc) {
             jsonPath = argv[++i];
-        } else if (a == "--no-grid-kicks") {
-            noGridKicks = true;
         } else {
             std::fprintf(stderr, "unknown argument '%s'\n", a.c_str());
             return 2;
@@ -183,25 +163,16 @@ int main(int argc, char** argv) {
                 static_cast<double>(est.downbeatScores[1]), static_cast<double>(est.downbeatScores[2]),
                 static_cast<double>(est.downbeatScores[3]), est.phraseBars, static_cast<double>(est.phraseEvidence));
 
-    std::vector<double> lows;
-    std::vector<double> mids;
-    std::vector<double> highs;
+    std::vector<double> onsets;
     for (const auto& f : track.frames()) {
-        if (f.lowOnset) {
-            lows.push_back(f.timeSeconds);
-        }
-        if (f.midOnset) {
-            mids.push_back(f.timeSeconds);
-        }
-        if (f.highOnset) {
-            highs.push_back(f.timeSeconds);
+        if (f.onset) {
+            onsets.push_back(f.timeSeconds);
         }
     }
-    std::printf("onsets   low %zu, mid %zu, high %zu\n", lows.size(), mids.size(), highs.size());
-    report["onsets"] = {{"low", lows.size()}, {"mid", mids.size()}, {"high", highs.size()}};
+    std::printf("onsets   %zu\n", onsets.size());
     // The times themselves, in seconds (each the analysis frame the attack is stamped on): what
-    // `audio.onsetLow/Mid/High` fire on, for a generator that wants to place things on them.
-    report["onsetTimes"] = {{"low", lows}, {"mid", mids}, {"high", highs}};
+    // `audio.onset` fires on, for a generator that wants to place things on them.
+    report["onsetTimes"] = onsets;
 
     analysis::Meter meter;
     meter.downbeat = barOffset >= 0 ? barOffset : est.downbeat;
@@ -251,30 +222,6 @@ int main(int argc, char** argv) {
                           {"within30ms", within},      {"meanAbsMs", 1000.0 * sumAbs / static_cast<double>(truth.size())},
                           {"worstMs", 1000.0 * worst}, {"offGrid", predicted.size() - s.hits}};
     }
-    if (!kicksPath.empty()) {
-        const std::vector<double> kicks = readTimes(kicksPath);
-        const Score s = match(lows, kicks, 0.030);
-        const double precision = s.detected > 0 ? static_cast<double>(s.hits) / static_cast<double>(s.detected) : 0.0;
-        const double recall = s.reference > 0 ? static_cast<double>(s.hits) / static_cast<double>(s.reference) : 0.0;
-        std::printf("kicks    %zu reference, %zu detected, %zu matched: precision %.3f recall %.3f (mean error %+.1f ms, "
-                    "worst %.1f ms)\n",
-                    s.reference, s.detected, s.hits, precision, recall, 1000.0 * s.meanError, 1000.0 * s.maxError);
-        report["kicks"] = {{"reference", s.reference}, {"detected", s.detected}, {"matched", s.hits},
-                           {"precision", precision},   {"recall", recall},     {"meanErrorMs", 1000.0 * s.meanError}};
-        if (noGridKicks) {
-            const float binHz = static_cast<float>(track.config().sampleRate) / static_cast<float>(track.config().windowSize);
-            const analysis::BandOnsets bare = analysis::detectBandOnsets(track.frames(), binHz, {}, 0.0);
-            std::vector<double> ungridded;
-            for (const analysis::BandOnset& o : bare.low) {
-                ungridded.push_back(track.frames()[o.frame].timeSeconds);
-            }
-            const Score u = match(ungridded, kicks, 0.030);
-            std::printf("kicks    without the beat grid: %zu detected, %zu matched: precision %.3f recall %.3f\n",
-                        u.detected, u.hits, u.detected > 0 ? static_cast<double>(u.hits) / static_cast<double>(u.detected) : 0.0,
-                        u.reference > 0 ? static_cast<double>(u.hits) / static_cast<double>(u.reference) : 0.0);
-        }
-    }
-
     std::vector<Section> sections = sectionsPath.empty() ? std::vector<Section>{} : readSections(sectionsPath);
     if (sections.empty()) {
         const double d = file->durationSeconds();
@@ -282,14 +229,14 @@ int main(int argc, char** argv) {
             sections.push_back(Section{"q" + std::to_string(q + 1), d * q / 4.0, d * (q + 1) / 4.0});
         }
     }
-    std::printf("%-18s %8s %8s %6s %6s %6s %6s %8s %6s  bands dB (bass lowMid mid highMid treble)\n", "section",
-                "start", "end", "energy", "rate/s", "kick/s", "hat/s", "brightHz", "width");
+    std::printf("%-18s %8s %8s %6s %6s %8s %6s  bands dB (bass lowMid mid highMid treble)\n", "section",
+                "start", "end", "energy", "rate/s", "brightHz", "width");
     nlohmann::json spans = nlohmann::json::array();
     for (const Section& s : sections) {
         const analysis::SpanProfile p = analysis::profileSpan(track, s.start, s.end);
-        std::printf("%-18s %8.2f %8.2f %6.3f %6.2f %6.2f %6.2f %8.0f %6.3f ", s.name.c_str(), s.start, s.end,
-                    static_cast<double>(p.energy), static_cast<double>(p.onsetRate), static_cast<double>(p.kickRate),
-                    static_cast<double>(p.hatRate), static_cast<double>(p.brightnessHz), static_cast<double>(p.width));
+        std::printf("%-18s %8.2f %8.2f %6.3f %6.2f %8.0f %6.3f ", s.name.c_str(), s.start, s.end,
+                    static_cast<double>(p.energy), static_cast<double>(p.onsetRate),
+                    static_cast<double>(p.brightnessHz), static_cast<double>(p.width));
         for (std::size_t b = 0; b < p.bandCount; ++b) {
             std::printf(" %6.1f", static_cast<double>(p.bandDb[b]));
         }

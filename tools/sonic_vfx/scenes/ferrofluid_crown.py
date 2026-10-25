@@ -50,9 +50,8 @@ DESIGN = {
         ["sustained", "notes.held", "a held note's spike stays up; released, it melts back"],
         ["chord", "notes.polyphony", "the crown forms: the spike field rises round the tower"],
         ["bass", "response.bass", "the magnetic field: the surface heaves, the small spikes lengthen together"],
-        ["kick", "signal.kick", "a ripple ring crosses the dish"],
-        ["snare", "response.snare", "spike tips throw black droplets"],
-        ["hat", "response.hat", "glints flicker on the liquid's skin"],
+        ["low", "response.low", "a ripple ring crosses the dish"],
+        ["onset", "response.onset", "spike tips throw black droplets; glints flicker on the liquid's skin"],
         ["tension", "notes.tension", "dissonance makes the surface restless (noise)"],
         ["brightness", "sonic.brightness", "the warm key cools toward white"],
     ],
@@ -95,7 +94,7 @@ def fluid():
     body = sd_smooth(0.08, pool, field, ring, tower)
     body = sd_wave(0.0, 2.2, body, axis=(1.0, 0.0, 0.3), speed=1.1, name="swell")
     # (no noise "shimmer" round the whole liquid: evaluated at every march step it cost a tenth of the frame; the
-    #  hats glint on the skin instead)
+    #  onsets glint on the skin instead)
     return body
 
 
@@ -136,12 +135,12 @@ def build():
     s.light("top", "rect", position=[0.0, 4.0, 0.0], direction=[0.0, -1.0, 0.0], up=[0, 0, 1],
             color=hexrgb("#d8d4cc"), intensity=6.0, width=2.0, height=2.0, castsShadow=False)
 
-    # ---- glints (hat): points of the softbox's light catching the skin for an instant
+    # ---- glints (onset): points of the softbox's light catching the skin for an instant
     s.particles("skinGlints", capacity=1200, seed=9, shape="disc", position=[0.0, 0.02, 0.0], extent=[1.9, 0.0, 1.9],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.08, lifetimeMax=0.2, spread=1.0, speedMin=0.0,
                 speedMax=0.01, gravity=[0, 0, 0], drag=0.0, sizeStart=0.02, sizeEnd=0.0,
                 colorStart=hexrgb("#fff2dc") + [1.0], colorEnd=hexrgb(WARM) + [0.0], emissive=18.0, blend="additive")
-    # ---- droplets (snare): beads flung from the spike tips, seen as the liquid is seen -- only by the softbox's
+    # ---- droplets (onset): beads flung from the spike tips, seen as the liquid is seen -- only by the softbox's
     #      highlight on each (black beads on black read as nothing at all), streaked by their flight
     s.particles("droplets", capacity=2000, seed=5, shape="disc", position=[0.0, 0.55, 0.0], extent=[1.25, 0.0, 1.25],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=0.9, spread=0.35, speedMin=1.2,
@@ -149,8 +148,8 @@ def build():
                 colorStart=hexrgb("#ffe2bc") + [0.85], colorEnd=hexrgb(WARM) + [0.2], emissive=1.8,
                 blend="additive", collision="kill", collisionHeight=0.0, velocityStretch=1.0, stretchMax=0.08)
 
-    # ---- the kick's ripple ring across the dish (a refracting membrane wave)
-    s.effect("ripple", "ripple", ("world",), trigger={"source": "signal", "name": signals.S("kick"), "threshold": 0.25},
+    # ---- the low attack's ripple ring across the dish (a refracting membrane wave)
+    s.effect("ripple", "ripple", ("world",), trigger={"source": "signal", "name": signals.S("low"), "threshold": 0.25},
              parameters={"amplitude": 0.22, "radius": 2.2, "wavelength": 0.32, "speed": 2.6, "plane": 1,
                          "crestColor": hexrgb("#d8e4ff"), "crestEmission": 0.4, "chroma": 0.06, "radialDecay": 1.2,
                          "ageDecay": 2.4, "duration": 1.1, "maxConcurrent": 3, "offsetX": 0.0, "offsetY": 0.05,
@@ -188,16 +187,16 @@ def build():
     for j, (r, n, cr, ch) in enumerate(FIELD_RINGS):
         s.route(R("bass", "sdf/fluid/node/ringCone%d/height" % j, ch * 0.9, attackMs=50 + 30 * j, decayMs=500))
     s.route(R("bass", "sdf/fluid/node/swell/amount", 0.05, attackMs=50, decayMs=700))
-    # hat: glints on the liquid's skin
-    s.route(R("hat", "particles/skinGlints/burst", 40.0, attackMs=0, decayMs=30))
-    # snare: droplets
-    s.route(R("snare", "particles/droplets/burst", 55.0, attackMs=0, decayMs=30))
+    # onset: glints on the liquid's skin
+    s.route(R("onset", "particles/skinGlints/burst", 40.0, attackMs=0, decayMs=30))
+    # onset: droplets
+    s.route(R("onset", "particles/droplets/burst", 55.0, attackMs=0, decayMs=30))
     # tension: a restless surface
     s.route(R("visual.unrest", "sdf/fluid/node/swell/amount", 0.012, **MEDIUM))
     # timbre: a bright sound cools the key toward white
     s.route(R("brightness", "lights/softbox/color", -0.15, comp=0, **MEDIUM),
             R("brightness", "lights/softbox/color", 0.25, comp=2, **MEDIUM))
-    s.route(R("kick", "post/lens/chromaticAberration", 0.03, attackMs=0, decayMs=120),
+    s.route(R("low", "post/lens/chromaticAberration", 0.03, attackMs=0, decayMs=120),
             R("visual.crown", "post/bloom/intensity", 0.08, **SLOW))
 
     s.params_({

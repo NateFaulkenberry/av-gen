@@ -170,10 +170,9 @@ def sheet(dst, blockouts=False, cols=3):
 DIMENSIONS = [
     ("Level (loudness)", ("response.level",)),
     ("Bass", ("response.bass",)),
-    ("Kick (drums, else the beat)", ("signal.kick", "signal.kickEnv", "response.low")),
-    ("Snare (onset, mid)", ("response.snare", "response.snareEnv")),
-    ("Hats and highs", ("response.hat", "response.hatEnv", "response.hatRate", "audio.treble")),
+    ("Low attacks", ("response.low", "response.lowEnv")),
     ("Any onset", ("response.onset", "response.onsetEnv")),
+    ("Highs", ("audio.treble",)),
     ("Mids", ("audio.mid", "response.melodic")),
     ("Spectral bands", ("audio.bass", "audio.lowMid", "audio.highMid")),
     ("Centroid (brightness)", ("sonic.brightness", "sonic.brightness.slow", "audio.spectralCentroid")),

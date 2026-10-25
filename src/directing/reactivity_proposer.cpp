@@ -32,13 +32,11 @@ struct Template {
     float attackMs = 0.0f;
     float decayMs = 0.0f;
     bool beat = true;    // answers a beat, so its depth follows the section
-    std::string what;    // "a heartbeat on each kick"
+    std::string what;    // "a heartbeat on each beat"
 };
 
-// ADR-1620: a mix has no kick (the mix's kick detector fired on bass notes and hat clicks about half the time); the kick
-// layer's heartbeat is the beat clock's pulse, which a kick lands on.
-Template kick() { return {"kick", "beat.pulse", ModOp::Add, 0.60f, 0, 1, 1, 1, 5.0f, 300.0f, true, "a heartbeat on each beat"}; }
-Template clap() { return {"clap", "audio.onsetMid", ModOp::Add, 0.50f, 0, 1, 1, 1, 5.0f, 180.0f, true, "a short flare on each clap"}; }
+// The beat layer's heartbeat: the beat clock's pulse.
+Template pulse() { return {"beat", "beat.pulse", ModOp::Add, 0.60f, 0, 1, 1, 1, 5.0f, 300.0f, true, "a heartbeat on each beat"}; }
 Template bar() { return {"bar", "music.downbeat", ModOp::Add, 0.45f, 0, 1, 1, 1, 80.0f, 1200.0f, true, "a slow swell on each bar's downbeat"}; }
 Template breath(const std::string& signal) {
     return {"breath", signal, ModOp::Multiply, 1.0f, 0.0f, 1.0f, 0.88f, 1.15f, 0.0f, 0.0f, true, "a breath across every two bars"};
@@ -58,7 +56,8 @@ Template gusts(const std::string& signal) {
 Template sectionFlare() {
     return {"section", "section.change", ModOp::Add, 0.80f, 0, 1, 1, 1, 40.0f, 1800.0f, true, "relighting at each new section"};
 }
-Template hats() { return {"hats", "audio.onsetHigh", ModOp::Add, 0.18f, 0, 1, 1, 1, 8.0f, 200.0f, true, "a flicker on the hats"}; }
+// The onset layer: any attack in the mix (audio.onset), for small, fast, local things.
+Template attacks() { return {"onset", "audio.onset", ModOp::Add, 0.18f, 0, 1, 1, 1, 8.0f, 200.0f, true, "a flicker on each attack"}; }
 
 // The same template as an echo on a Multiply target (a light, spores): the event lifts it from 1.
 Template asMultiply(Template t, float lift) {
@@ -294,19 +293,12 @@ std::vector<MusicalLayer> musicalLayers(const MusicalContext& music) {
         return l;
     };
     std::vector<MusicalLayer> out;
-    MusicalLayer k = rate(&analysis::SpanProfile::kickRate, 0.5f, "kicks");
-    k.name = "kick";
-    k.signal = "beat.pulse"; // ADR-1620
-    out.push_back(k);
-    MusicalLayer c = rate(&analysis::SpanProfile::snareRate, 0.5f, "snares/claps");
-    c.name = "clap";
-    c.signal = "audio.onsetMid";
-    out.push_back(c);
-    MusicalLayer h = rate(&analysis::SpanProfile::hatRate, 0.8f, "hats");
-    h.name = "hats";
-    h.signal = "audio.onsetHigh";
-    out.push_back(h);
     const std::string grid = beat > 0.0 ? fmt::format("a beat of {:.3f} s ({:.1f} BPM)", beat, 60.0 / beat) : "no beat grid";
+    out.push_back({"beat", "beat.pulse", beat > 0.0, grid});
+    MusicalLayer o = rate(&analysis::SpanProfile::onsetRate, 0.8f, "onsets");
+    o.name = "onset";
+    o.signal = "audio.onset";
+    out.push_back(o);
     out.push_back({"bar", "music.downbeat", beat > 0.0, grid});
     out.push_back({"breath", "", beat > 0.0, beat > 0.0 ? fmt::format("two bars = {:.2f} s", 8.0 * beat) : grid});
     out.push_back({"phrase", "music.phrase", beat > 0.0,
@@ -426,8 +418,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         return a->importance != c->importance ? a->importance > c->importance : a->name < c->name;
     });
     std::vector<Template> rotation;
-    if (layer("kick").present) rotation.push_back(kick());
-    if (layer("clap").present) rotation.push_back(clap());
+    if (layer("beat").present) rotation.push_back(pulse());
     if (layer("bar").present) rotation.push_back(bar());
     if (layer("breath").present) rotation.push_back(breath("lfo." + breathName));
     if (layer("phrase").present) rotation.push_back(phrase());
@@ -537,7 +528,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         out.notes.push_back("no hero emits light of its own (nodes/<part>/emissiveBoost), so no hero answers a layer");
     }
 
-    // ---- the glowing scatter layers: micro fast layers, and the kick's echo -----------------------------
+    // ---- the glowing scatter layers: micro fast layers, and the beat's echo -----------------------------
     // Only the layers that read as lights: a quarter of the brightest glowing layer's emission or more.
     // A faint glow in the vegetation (ferns, grass, the trees' fireflies at a few percent of the
     // mushrooms') pulsing on a beat reads as flicker, not as the valley listening.
@@ -577,7 +568,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         }
         const std::string name = shortName(*t);
         if (t->size >= 1.0f) {
-            Template tp = layer("clap").present ? clap() : (layer("bar").present ? bar() : sectionFlare());
+            Template tp = layer("bar").present ? bar() : sectionFlare();
             tp.amount = 0.30f;
             tp.attackMs = std::max(tp.attackMs, 8.0f);
             const float delay = 60.0f + 30.0f * static_cast<float>(lamps++);
@@ -587,8 +578,8 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
                                 name, t->size, tp.layer, delay, depthWords()));
             continue;
         }
-        if (small == 0 && (layer("kick").present || layer("bar").present)) {
-            Template tp = layer("kick").present ? kick() : bar();
+        if (small == 0 && (layer("beat").present || layer("bar").present)) {
+            Template tp = layer("beat").present ? pulse() : bar();
             tp.amount = 0.30f;
             tp.decayMs = 320.0f;
             b.route(*t, tp, 1.0f, 90.0f, ReactiveLevel::Meso, t->owner,
@@ -597,8 +588,8 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
                                 name, t->size, tp.layer, leadHero.empty() ? std::string("the heroes") : leadHero,
                                 depthWords()));
         } else {
-            Template tp = layer("hats").present ? hats() : (layer("clap").present ? clap() : bar());
-            tp.amount = tp.layer == "hats" ? 0.18f : 0.20f;
+            Template tp = layer("onset").present ? attacks() : bar();
+            tp.amount = tp.layer == "onset" ? 0.18f : 0.20f;
             const float delay = 30.0f + 40.0f * static_cast<float>(flickers++);
             b.route(*t, tp, 1.0f, delay, ReactiveLevel::Micro, t->owner,
                     fmt::format("The {} ({:.2f} m) flicker on the {}, {:.0f} ms behind the beat, +{:.0f}%: small, fast and "
@@ -735,7 +726,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         }
     }
 
-    // ---- micro: free particle systems glint on the hats; macro: their density follows the section ---------
+    // ---- micro: free particle systems glint on the attacks; macro: their density follows the section ------
     std::size_t glints = 0;
     for (const ReactiveTarget& t : catalog.targets) {
         if (t.group != ReactiveGroup::Particles || !t.hero.empty()) {
@@ -745,7 +736,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
             if (!b.free(t)) {
                 continue;
             }
-            Template tp = layer("hats").present ? hats() : (layer("clap").present ? clap() : bar());
+            Template tp = layer("onset").present ? attacks() : bar();
             tp = asMultiply(tp, 0.25f + 0.03f * static_cast<float>(glints % 3));
             tp.attackMs = 5.0f;
             tp.decayMs = 250.0f;
@@ -815,7 +806,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         case ReactiveGroup::Water: {
             const std::string leaf = t.path.substr(t.path.rfind('/') + 1);
             if (leaf == "sparkle" && t.op == ModOp::Multiply && b.free(t)) {
-                Template tp = asMultiply(layer("hats").present ? hats() : bar(), 0.30f);
+                Template tp = asMultiply(layer("onset").present ? attacks() : bar(), 0.30f);
                 tp.attackMs = 10.0f;
                 tp.decayMs = 300.0f;
                 b.route(t, tp, 1.0f, 150.0f, ReactiveLevel::Micro, t.owner,

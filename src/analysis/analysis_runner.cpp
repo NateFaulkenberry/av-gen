@@ -74,11 +74,15 @@ void AnalysisRunner::carryEvents(AnalysisFrame& frame) {
         }
     };
     auto& p = pending_;
+    const bool raised = frame.onset;
     carry(frame.onset, &frame.onsetStrength, frame.onsetStamp, p.onset, &p.onsetStrength, p.onsetStamp);
+    // ADR-1604: the onset's register travels with it.
+    if (raised) {
+        p.onsetRegister = frame.onsetRegister;
+    } else if (frame.onset) {
+        frame.onsetRegister = p.onsetRegister;
+    }
     carry(frame.beat, nullptr, frame.beatStamp, p.beat, nullptr, p.beatStamp);
-    carry(frame.lowOnset, &frame.lowOnsetStrength, frame.lowStamp, p.low, &p.lowStrength, p.lowStamp);
-    carry(frame.midOnset, &frame.midOnsetStrength, frame.midStamp, p.mid, &p.midStrength, p.midStamp);
-    carry(frame.highOnset, &frame.highOnsetStrength, frame.highStamp, p.high, &p.highStrength, p.highStamp);
 }
 
 std::vector<AnalysisFrame> AnalysisRunner::history(std::size_t count) const {
@@ -124,18 +128,9 @@ void AnalysisRunner::threadMain(std::stop_token token) {
             frame.beat = beat.beat;
             frame.beatPhase = beat.phase;
             frame.beatCount = beat.beatCount;
-            // ADR-1060: live kick, snare and hat (the band-onset fields a file gets from ADR-898's offline pass).
+            // ADR-1060: the causal onsets (low, onset), the same detector a file's pass runs.
             causal_.process(frame, static_cast<float>(config_.sampleRate) / static_cast<float>(config_.windowSize),
                             static_cast<double>(config_.hopSize) / static_cast<double>(config_.sampleRate));
-            {
-                const CausalOnsets& c = frame.causal;
-                frame.lowOnset = c.hit[static_cast<std::size_t>(HitClass::Kick)];
-                frame.lowOnsetStrength = c.strength[static_cast<std::size_t>(HitClass::Kick)];
-                frame.midOnset = c.hit[static_cast<std::size_t>(HitClass::Snare)];
-                frame.midOnsetStrength = c.strength[static_cast<std::size_t>(HitClass::Snare)];
-                frame.highOnset = c.hit[static_cast<std::size_t>(HitClass::Hat)];
-                frame.highOnsetStrength = c.strength[static_cast<std::size_t>(HitClass::Hat)];
-            }
             if (tap_ != nullptr) {
                 tap_->onFrame(frame);
             }

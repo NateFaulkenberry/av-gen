@@ -90,11 +90,7 @@ Result<json> proposeReactivityForProject(const std::filesystem::path& project, d
     for (const directing::SectionRun& s : music.sections) {
         json o{{"type", s.type}, {"start", s.startSeconds}, {"end", s.endSeconds}, {"energy", s.energy}};
         if (s.audio.measured()) {
-            o["audio"] = {{"energy", s.audio.energy},
-                          {"onsetRate", s.audio.onsetRate},
-                          {"kickRate", s.audio.kickRate},
-                          {"snareRate", s.audio.snareRate},
-                          {"hatRate", s.audio.hatRate}};
+            o["audio"] = {{"energy", s.audio.energy}, {"onsetRate", s.audio.onsetRate}};
         }
         sectionsJson.push_back(std::move(o));
     }

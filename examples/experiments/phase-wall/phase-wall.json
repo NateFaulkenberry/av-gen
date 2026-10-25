@@ -182,18 +182,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "grid/net/noise",
-   "amount": 0.12,
-   "op": "add",
-   "polarity": "unipolar",
-   "depthSource": "visual.influence",
-   "chain": {
-    "attackMs": 40,
-    "decayMs": 400
-   }
-  },
-  {
    "source": "response.intensity",
    "target": "grid/net/phaseLag",
    "amount": 0.5,
@@ -231,7 +219,7 @@
    }
   },
   {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "material/bladeSphere/op/30/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -245,7 +233,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "material/bladeSphere/op/40/constant/constant",
    "amount": 1.0,
    "op": "multiply",

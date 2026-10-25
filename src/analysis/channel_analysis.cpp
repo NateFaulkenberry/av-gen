@@ -233,7 +233,7 @@ bool LiveFeedMixer::feedAt(double seconds, const CausalOnsets& mix, ResponseFeed
                                    seconds);
         pending.erase(pending.begin(), end);
     }
-    out = mergeFeeds(ResponseFeed::fromMix(mix), now_, routing_); // ADR-1620: no drum class from the mix
+    out = mergeFeeds(ResponseFeed::fromCausal(mix), now_, routing_);
     return true;
 }
 

@@ -94,12 +94,11 @@ void drawFeedsRow(app::Engine& engine) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Feeds");
     if (ImGui::IsItemHovered()) {
-        tooltip("Which source drives the beat clock (beat.*, bars, music.*) and feeds response.* -- the hits (kick, "
-                "low, snare, hat, onset) and the levels (bass, level, sustain, ...). Main mix is how every project "
-                "works without this; the mix has no kick (ADR-1620: it comes only from a drum source). A role names the "
-                "first source of that role, whatever its key (ADR-1630); a kick, snare or hat comes only from a drums "
-                "source. A source here gets the hits analysis. An inactive source feeds nothing; a "
-                "missing one falls back to the mix. Saved in the project as \"feeds\".");
+        tooltip("Which source drives the beat clock (beat.*, bars, music.*) and feeds response.* -- the hits (low, "
+                "onset) and the levels (bass, level, sustain, ...). Main mix is how every project works without this. "
+                "A role names the first source of that role, whatever its key (ADR-1630). A source here gets the hits "
+                "analysis. An inactive source feeds nothing; a missing one falls back to the mix. Saved in the project "
+                "as \"feeds\".");
     }
     ImGui::SameLine();
     changed |= feedCombo("Beat", feeds.beat, keys, false, engine);
@@ -118,13 +117,12 @@ void drawFeedsRow(app::Engine& engine) {
             std::string list;
             for (std::size_t k = 0; k < feeds.hit.size(); ++k) {
                 list += std::string(audio::kFeedHitNames[k]) + ": " +
-                        (feeds.hitSource(k).empty() ? std::string(k == 0 ? "none (silent: ADR-1620)" : "main mix")
-                                                    : display(feeds.hitSource(k))) +
+                        (feeds.hitSource(k).empty() ? std::string("main mix") : display(feeds.hitSource(k))) +
                         "\n";
             }
-            tooltip("Per class (from the project file):\n%sChoosing an entry sets all five.", list.c_str());
+            tooltip("Per class (from the project file):\n%sChoosing an entry sets both.", list.c_str());
         } else {
-            tooltip("response.kick, low, snare, hat and onset (and their envelopes) from this source.");
+            tooltip("response.low and response.onset (their envelopes and the onset's register) from this source.");
         }
     }
     ImGui::SameLine();
@@ -148,8 +146,8 @@ void drawFeedsRow(app::Engine& engine) {
                     feeds.onsetsSource().empty() ? "main mix" : display(feeds.onsetsSource()).c_str());
         } else {
             tooltip("What spectrum and onset fields hear (Resonator, the generative fields): this source's spectrogram "
-                    "and onsets. A drums source's kicks, snares and hats are the low, mid and high onsets; any other "
-                    "source's onsets are on all three. The beat stays the mix's.");
+                    "and onsets. A drums source's kicks, snares and hats are the low, mid and high onsets; the mix's and "
+                    "any other source's onsets land on the row of their register. The beat stays the mix's.");
         }
     }
     if (changed) {

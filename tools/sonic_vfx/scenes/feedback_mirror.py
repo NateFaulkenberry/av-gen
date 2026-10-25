@@ -64,9 +64,8 @@ DESIGN = {
         ["interval", "notes.interval", "a rising step twists the corridor one way, a falling one the other"],
         ["sustained", "response.sustain", "the echoes last longer: the corridor reaches further"],
         ["bass", "response.bass", "the corridor deepens and twists: each screen falls further in, turned further"],
-        ["kick", "signal.kick", "a zoom punch: the corridor jumps inward; the bezel and the core flash"],
-        ["snare", "response.snare", "an RGB split across the frame"],
-        ["hat", "response.hat", "grain and a flicker in the scanlines"],
+        ["low", "response.low", "a zoom punch: the corridor jumps inward; the bezel and the core flash"],
+        ["onset", "response.onset", "an RGB split across the frame"],
         ["chord", "notes.polyphony", "the hue step: a chord colours the corridor faster round the circle, "
          "dissonance further"],
         ["brightness", "sonic.brightness", "a bright timbre also walks the corridor's colour further round"],
@@ -173,15 +172,15 @@ def build():
             loop=120.0)
     # interval: a rising step twists the corridor one way, a falling step the other
     s.route(R("interval", "temporal/feedback/rotate", 6.0, attackMs=350, decayMs=350))
-    # sustain: the echoes last; bass: the corridor deepens; kick: a zoom punch, the bezel and the core flash
+    # sustain: the echoes last; bass: the corridor deepens; low attack: a zoom punch, the bezel and the core flash
     s.route(R("sustain", "temporal/feedback/decay", 0.06, **SLOW),
             R("bass", "temporal/feedback/zoom", -0.03, attackMs=50, decayMs=700),
             R("bass", "temporal/feedback/rotate", 2.4, attackMs=120, decayMs=900),
-            R("kick", "temporal/feedback/zoom", -0.05, attackMs=0, decayMs=200),
-            R("kick", "sdf/glyph/surface/2/emission", 8.0, attackMs=0, decayMs=240),
-            R("kick", "sdf/glyph/node/core/radius", 0.05, attackMs=0, decayMs=260))
+            R("low", "temporal/feedback/zoom", -0.05, attackMs=0, decayMs=200),
+            R("low", "sdf/glyph/surface/2/emission", 8.0, attackMs=0, decayMs=240),
+            R("low", "sdf/glyph/node/core/radius", 0.05, attackMs=0, decayMs=260))
     for name in ("bezTop", "bezBottom", "bezLeft", "bezRight"):
-        s.route(R("kick", "procedural/%s/material/emissive" % name, 10.0, attackMs=0, decayMs=220))
+        s.route(R("low", "procedural/%s/material/emissive" % name, 10.0, attackMs=0, decayMs=220))
     # chord: the hue step (polyphony colours faster, tension further)
     s.map(M("hueStep", [("polyphony", 1.0), ("tension", 1.0), ("brightness", 0.6)], "max"))
     s.route(R("visual.hueStep", "temporal/feedback/hue", -0.03, **MEDIUM))
@@ -191,11 +190,9 @@ def build():
                   decayMs=300),
                 R("noteEnv", "sdf/glyph/surface/1/emission", 4.0, comp=c, depth="lastVelocity", attackMs=0,
                   decayMs=260))
-    # snare: an RGB split; hat: grain and a scanline flicker
-    s.route(R("snare", "post/split/amount", 10.0, attackMs=0, decayMs=160),
-            R("hat", "post/output/grain", 0.05, attackMs=0, decayMs=60),
-            R("hat", "post/display/scanlines", 0.2, attackMs=0, decayMs=60),
-            R("kick", "post/lens/chromaticAberration", 0.012, attackMs=0, decayMs=120),
+    # onset: an RGB split
+    s.route(R("onset", "post/split/amount", 10.0, attackMs=0, decayMs=160),
+            R("low", "post/lens/chromaticAberration", 0.012, attackMs=0, decayMs=120),
             R("noteEnv", "post/bloom/intensity", 0.15, attackMs=0, decayMs=300))
 
     # ---- the evaluator's screen regions, projected through the camera at t = 0

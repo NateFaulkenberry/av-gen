@@ -47,13 +47,11 @@ float presence(float sensitivity) {
     return clamp01(sensitivity / 0.1f);
 }
 
-constexpr std::array<analysis::HitClass, 5> kAudioHits{analysis::HitClass::Kick, analysis::HitClass::Low,
-                                                       analysis::HitClass::Snare, analysis::HitClass::Hat,
-                                                       analysis::HitClass::Onset};
-constexpr std::array<const char*, kResponseHitCount> kHitNames{"kick", "low", "snare", "hat", "onset", "note"};
+constexpr std::array<analysis::HitClass, 2> kAudioHits{analysis::HitClass::Low, analysis::HitClass::Onset};
+constexpr std::array<const char*, kResponseHitCount> kHitNames{"low", "onset", "note"};
 constexpr std::array<const char*, kResponseHitCount> kHitLabels{
-    "kick (from a drum feed only: silent on a mix)", "low attack (a kick or a bass note)", "snare / clap", "hat",
-    "onset (any attack, level-free)", "note (MIDI note-on, curved velocity)"};
+    "low attack (40-120 Hz: any low-register attack)", "onset (any attack, level-free)",
+    "note (MIDI note-on, curved velocity)"};
 
 } // namespace
 
@@ -131,8 +129,6 @@ Result<void> ResponseSettings::applyJson(const nlohmann::json& j) {
     fluxRelease = j.value("fluxRelease", fluxRelease);
     intensitySeconds = j.value("intensitySeconds", intensitySeconds);
     levelSlowSeconds = std::max(0.05f, j.value("levelSlowSeconds", levelSlowSeconds));
-    hatRateSeconds = std::max(0.1f, j.value("hatRateSeconds", hatRateSeconds));
-    hatRateFull = std::max(0.1f, j.value("hatRateFull", hatRateFull));
     melodicFull = std::max(0.1f, j.value("melodicFull", melodicFull));
     return {};
 }
@@ -181,8 +177,6 @@ void ResponseModel::declare(signals::SignalBus& bus) {
     bus.setLabel(ids_.sustain, "sustained energy (slow, not percussive)");
     ids_.flux = bus.declare("response.flux");
     bus.setLabel(ids_.flux, "spectral change");
-    ids_.hatRate = bus.declare("response.hatRate");
-    bus.setLabel(ids_.hatRate, "hat activity (hats a second)");
     ids_.melodic = bus.declare("response.melodic");
     bus.setLabel(ids_.melodic, "melodic activity (pitch moves; MIDI single notes)");
     ids_.pitch = bus.declare("response.pitch");
@@ -203,7 +197,7 @@ void ResponseModel::declare(signals::SignalBus& bus) {
 }
 
 void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseControls& c, const ResponseSettings& s) {
-    step(f, analysis::ResponseFeed::fromMix(f.causal), dt, c, s); // ADR-1620: the mix has no kick
+    step(f, analysis::ResponseFeed::fromCausal(f.causal), dt, c, s);
 }
 
 void ResponseModel::step(const TimbreFeatures& f, const analysis::ResponseFeed& o, double dt, const ResponseControls& c,
@@ -230,24 +224,15 @@ void ResponseModel::step(const TimbreFeatures& f, const analysis::ResponseFeed& 
         if (strength > 0.0f) {
             const float shaped = curve(strength, hitS) * presence(hitS);
             const std::size_t h = i; // kAudioHits are in ResponseHit order
-            if (!pending_[h]) {
-                envBefore_[h] = env_[h];
-                pendingDrumness_[h] = 1.0f;
-            }
             pending_[h] = true;
             pendingStrength_[h] = std::max(pendingStrength_[h], shaped);
-            pendingDrumness_[h] = std::min(pendingDrumness_[h], o.drumness[k]);
             if (h == static_cast<std::size_t>(ResponseHit::Onset)) {
                 onsetRegister_ = o.onsetRegister; // ADR-1604: known on the onset's own hop
             }
             env_[h] = std::max(env_[h], shaped);
             ++count_[h];
-            if (h == static_cast<std::size_t>(ResponseHit::Hat)) {
-                hatRate_ += 1.0f;
-            }
         }
     }
-    hatRate_ *= static_cast<float>(std::exp(-dt / std::max(0.1, static_cast<double>(s.hatRateSeconds))));
 
     // ---- levels (ADR-1510): followers in dB, read against the adaptive loudness reference ----
     if (!o.valid) {
@@ -360,34 +345,6 @@ void ResponseModel::publish(signals::SignalBus& bus, const NoteTrack& notes, dou
         }
         env_[kNote] = env;
     }
-    // ADR-1068: a snare or a hat that lands on a MIDI note-on (a note begun in the last 120 ms: the snare is decided
-    // 43 ms after its attack, and a frame is up to one render frame late) is that note's attack unless it is clearly
-    // noise: a pluck's or a stab's attack is broadband enough to pass the detector, and the note says what it was.
-    {
-        bool noteNear = false;
-        const auto& n = notes.notes;
-        for (auto it = std::upper_bound(n.begin(), n.end(), seconds,
-                                        [](double t, const NoteEvent& e) { return t < e.start; });
-             it != n.begin();) {
-            --it;
-            if (seconds - it->start > 0.12) {
-                break;
-            }
-            noteNear = true;
-            break;
-        }
-        if (noteNear) {
-            for (const ResponseHit h : {ResponseHit::Snare, ResponseHit::Hat}) {
-                const auto i = static_cast<std::size_t>(h);
-                if (pending_[i] && pendingDrumness_[i] < s.midiDrumness) {
-                    pending_[i] = false;
-                    pendingStrength_[i] = 0.0f;
-                    env_[i] = envBefore_[i];
-                    ++demoted_[i];
-                }
-            }
-        }
-    }
     for (std::size_t h = 0; h < kResponseHitCount; ++h) {
         bus.setEvent(ids_.hit[h], pending_[h], pendingStrength_[h]);
         bus.set(ids_.env[h], env_[h]);
@@ -399,7 +356,6 @@ void ResponseModel::publish(signals::SignalBus& bus, const NoteTrack& notes, dou
     bus.set(ids_.transient, transient_);
     bus.set(ids_.sustain, sustain_);
     bus.set(ids_.flux, flux_);
-    bus.set(ids_.hatRate, clamp01(hatRate_ / std::max(s.hatRateSeconds, 0.1f) / s.hatRateFull));
     bus.set(ids_.melodic, std::max(clamp01(melodic_ / s.melodicFull), clamp01(midiMelodic)));
     bus.set(ids_.pitch, midiPitch >= 0.0f ? midiPitch : std::max(audioPitch_, 0.0f));
     bus.set(ids_.intensity, intensity_);
@@ -417,8 +373,7 @@ void ResponseModel::publishZeros(signals::SignalBus& bus) {
         bus.setEvent(ids_.hit[h], false);
         bus.set(ids_.env[h], 0.0f);
     }
-    for (const signals::SignalId id : {ids_.bass, ids_.level, ids_.transient, ids_.sustain, ids_.flux, ids_.hatRate,
-                                       ids_.melodic, ids_.pitch, ids_.intensity, ids_.levelSlow,
+    for (const signals::SignalId id : {ids_.bass, ids_.level, ids_.transient, ids_.sustain, ids_.flux, ids_.melodic, ids_.pitch, ids_.intensity, ids_.levelSlow,
                                        ids_.onsetRegister[0], ids_.onsetRegister[1], ids_.onsetRegister[2]}) {
         bus.set(id, 0.0f);
     }

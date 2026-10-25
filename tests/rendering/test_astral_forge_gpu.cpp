@@ -96,8 +96,8 @@ std::shared_ptr<const scene::AstralSong> syntheticSong(double seconds) {
     s.centroid.assign(static_cast<std::size_t>(s.hops), 0.5f);
     for (double t = 0.0; t < seconds; t += 0.5) {
         s.beats.push_back(t);
-        s.kickT.push_back(static_cast<float>(t));
-        s.kickS.push_back(0.3f);
+        s.lowT.push_back(static_cast<float>(t));
+        s.lowS.push_back(0.3f);
     }
     s.sections.push_back(astral::Section{0.0, seconds, 0, 0.8f, 0.8f, "verse"});
     song->score = astral::buildScore(s);

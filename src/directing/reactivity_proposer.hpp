@@ -7,16 +7,16 @@
 // plan (03-revision-plan.md section 5) and its stream reports:
 //
 //   * **One owner per musical layer; nothing important shares a source.** The heroes, most important
-//     first, take the kick, the clap, the bar, a two-bar breath, the phrase turn, the lead and the bass
+//     first, take the beat, the bar, a two-bar breath, the phrase turn, the lead and the bass
 //     in turn; every further hero relights on the section change, later the farther it stands from the
 //     first (a wave outward at walking pace, not a strobe). Each hero's parts answer 35 ms apart, the
 //     practical light beside it 50 ms later and its spores 90 ms later: the hero reads as one body,
 //     and no two heroes share a source, a timing and an amplitude.
-//   * **micro** -- hats and claps on small, fast, local things: the small scatter layers (the smallest
-//     echoes the kick 90 ms after the lead hero, the fungi's +0.30), the others flicker on the hats
-//     30-110 ms apart, a layer of lamps flares on the claps; free particle systems glint on the hats,
-//     staggered 0-120 ms.
-//   * **meso** -- the kick and the bar on heroes, and waves through the mushrooms: a layer that names a
+//   * **micro** -- the mix's attacks on small, fast, local things: the small scatter layers (the
+//     smallest echoes the beat 90 ms after the lead hero, the fungi's +0.30), the others flicker on the
+//     attacks 30-110 ms apart, a layer of lamps flares on the bar; free particle systems glint on the
+//     attacks, staggered 0-120 ms.
+//   * **meso** -- the beat and the bar on heroes, and waves through the mushrooms: a layer that names a
 //     triggered wave field (ADR-906) gets its wave's depth from the section.
 //   * **macro** -- the section on the world: the ecology light, the fog, the wind's strength, the free
 //     particles' density, the water's glow, all gliding over seconds; the glowing layers' hue keyed per
@@ -57,10 +57,10 @@ struct ReactivityOptions {
 
 // One layer of the music, as the proposer found it.
 struct MusicalLayer {
-    std::string name;     // "kick", "clap", "hats", "bar", "breath", "phrase", "lead", "bass", "section"
+    std::string name;     // "beat", "onset", "bar", "breath", "phrase", "lead", "bass", "section"
     std::string signal;   // what a route reads: "beat.pulse", ...
     bool present = false;
-    std::string evidence; // "kicks 2.2/s at most", "no measured audio"
+    std::string evidence; // "onsets 4.2/s at most", "no measured audio"
 };
 
 struct ReactivityProposal {

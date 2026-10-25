@@ -178,21 +178,21 @@ struct ResonanceSpec {
     float limit = 1.0f;         // the soft limit of sqrt(sum a_i^2)
     // ADR-1403, ripples: every heard onset launches a travelling ring -- a wave packet cos(k (rho - R)) e^{-((rho - R) /
     // w)^2} / sqrt(1 + rho / lambda) whose radius R = speed x age grows from a point the onset's time hashes to within
-    // `rippleArea` metres of the field's origin (horizontal distance rho). A low onset (kick) draws a broad, slow, long
-    // ring; a mid one (snare) a sharper, faster, shorter, more local one; a high one (hat) a fine, faint one. Amplitude
+    // `rippleArea` metres of the field's origin (horizontal distance rho). A low onset draws a broad, slow, long
+    // ring; a mid one a sharper, faster, shorter, more local one; a high one a fine, faint one. Amplitude
     // `ripple` x heard strength x e^{-age / life}; the newest `rippleCount` (at most kMaxResonanceRipples) still alive.
     // Pure functions of the onset list and the clock: exact under seek. ripple 0 = none.
     float ripple = 0.0f;
-    float rippleSpeed = 9.0f;   // m/s, the kick's ring (a snare's runs 1.6x, a hat's 2.2x)
-    float rippleLife = 1.6f;    // seconds to 1/e, the kick's (a snare's 0.55x, a hat's 0.35x)
+    float rippleSpeed = 9.0f;   // m/s, the low ring (the mid runs 1.6x, the high 2.2x)
+    float rippleLife = 1.6f;    // seconds to 1/e, the low ring's (the mid's 0.55x, the high's 0.35x)
     float rippleWidth = 0.9f;   // the packet's half-width, in its wavelengths
     float rippleArea = 30.0f;   // metres: launch points lie within this of the origin
     float rippleCount = 2.0f;   // ADR-1404: the most rings each band keeps alive (0..kMaxRipplesPerBand); a ring a newer
                                 // one displaces fades out over rippleFade instead of vanishing
     float rippleFade = 0.35f;   // seconds
     // ADR-1405: where each band's ring (low, mid, high) sits on the dispersion axis -- its wavelength, and which readers
-    // hear it (a reader's listening window): a kick's ring can travel through the medium scale, leaving the large figure
-    // to answer the kick through its strikes
+    // hear it (a reader's listening window): a low ring can travel through the medium scale, leaving the large figure
+    // to answer the low onset through its strikes
     std::array<float, 3> rippleU{0.1f, 0.45f, 0.85f};
     std::vector<ResonanceSource> sources; // empty = one point source at the origin, order 4
     // ---- the reader (any resonance field) --------------------------------------------------------

@@ -2,6 +2,7 @@
 #include "scene/astral_song.hpp"
 
 #include "analysis/analysis_track.hpp"
+#include "analysis/audio_history_builder.hpp"
 #include "analysis/structure.hpp"
 #include "audio/audio_file.hpp"
 #include "spatial/audio_history.hpp"
@@ -17,7 +18,7 @@ namespace avgen::astral {
 namespace {
 
 constexpr std::uint32_t kCacheMagic = 0x41535446u; // "ASTF"
-constexpr std::uint32_t kCacheVersion = 2;
+constexpr std::uint32_t kCacheVersion = 3; // 3: the low/mid/high hits are the onsets by register
 
 template <typename T>
 void putVec(std::ofstream& f, const std::vector<T>& v) {
@@ -48,8 +49,8 @@ bool readCache(const std::string& path, SongAnalysis& s) {
     f.read(reinterpret_cast<char*>(&s.duration), 8);
     f.read(reinterpret_cast<char*>(&s.tempoBpm), 4);
     std::vector<SectionPod> secs;
-    const bool ok = getVec(f, s.spec) && getVec(f, s.env0) && getVec(f, s.env1) && getVec(f, s.centroid) && getVec(f, s.kickT) &&
-                    getVec(f, s.kickS) && getVec(f, s.snareT) && getVec(f, s.snareS) && getVec(f, s.hatT) && getVec(f, s.hatS) &&
+    const bool ok = getVec(f, s.spec) && getVec(f, s.env0) && getVec(f, s.env1) && getVec(f, s.centroid) && getVec(f, s.lowT) &&
+                    getVec(f, s.lowS) && getVec(f, s.midT) && getVec(f, s.midS) && getVec(f, s.highT) && getVec(f, s.highS) &&
                     getVec(f, s.beats) && getVec(f, s.novelty) && getVec(f, secs);
     for (const auto& p : secs) s.sections.push_back(Section{p.start, p.end, p.group, p.energy, p.density, p.label});
     return ok;
@@ -71,8 +72,8 @@ void writeCache(const std::string& path, const SongAnalysis& s) {
         std::snprintf(p.label, sizeof(p.label), "%s", x.label.c_str());
         secs.push_back(p);
     }
-    putVec(f, s.spec); putVec(f, s.env0); putVec(f, s.env1); putVec(f, s.centroid); putVec(f, s.kickT); putVec(f, s.kickS);
-    putVec(f, s.snareT); putVec(f, s.snareS); putVec(f, s.hatT); putVec(f, s.hatS); putVec(f, s.beats); putVec(f, s.novelty);
+    putVec(f, s.spec); putVec(f, s.env0); putVec(f, s.env1); putVec(f, s.centroid); putVec(f, s.lowT); putVec(f, s.lowS);
+    putVec(f, s.midT); putVec(f, s.midS); putVec(f, s.highT); putVec(f, s.highS); putVec(f, s.beats); putVec(f, s.novelty);
     putVec(f, secs);
 }
 
@@ -151,9 +152,12 @@ SongAnalysis buildSong(const avgen::analysis::AnalysisTrack& track, double durat
     for (const auto& f : frames) rmsPeak = std::max(rmsPeak, f.rms);
     for (int h = 0; h < s.hops; ++h) {
         s.env1[h] = glm::vec4(s.env1[h].x, frames[h].energy, frames[h].beatPhase, frames[h].rms / rmsPeak);
-        if (frames[h].lowOnset) { s.kickT.push_back(static_cast<float>(frames[h].timeSeconds)); s.kickS.push_back(std::max(0.25f, frames[h].lowOnsetStrength)); }
-        if (frames[h].midOnset) { s.snareT.push_back(static_cast<float>(frames[h].timeSeconds)); s.snareS.push_back(std::max(0.25f, frames[h].midOnsetStrength)); }
-        if (frames[h].highOnset) { s.hatT.push_back(static_cast<float>(frames[h].timeSeconds)); s.hatS.push_back(std::max(0.25f, frames[h].highOnsetStrength)); }
+        // The hits: each onset on the row of its register (the audio history's rows, so live and offline agree).
+        const std::array<float, 3> rows = avgen::analysis::onsetRows(frames[h]);
+        std::array<std::vector<float>*, 3> T{&s.lowT, &s.midT, &s.highT}, S{&s.lowS, &s.midS, &s.highS};
+        for (std::size_t r = 0; r < 3; ++r) {
+            if (rows[r] > 0.0f) { T[r]->push_back(static_cast<float>(frames[h].timeSeconds)); S[r]->push_back(std::max(0.25f, rows[r])); }
+        }
     }
     if (auto st = avgen::analysis::detectStructure(track)) {
         for (const auto& sec : st->sections)
@@ -204,7 +208,7 @@ SongAnalysis conditionSong(const SongAnalysis& base, const spatial::AudioRespons
     for (float& v : s.spec) v = response.level(v);
     for (std::size_t h = 0; h < s.env1.size(); ++h) s.env1[h].w = response.level(s.env1[h].w);
     foldSongEnvelopes(s, std::clamp(response.attack, 0.25f, 4.0f), s.release);
-    // The hits: as heard, the kick's 0.25 floor kept (buildSong's); one below the performer's floor is not heard.
+    // The hits: as heard, the 0.25 floor kept (buildSong's); one below the performer's floor is not heard.
     auto hits = [&](std::vector<float>& T, std::vector<float>& S) {
         std::size_t w = 0;
         for (std::size_t i = 0; i < T.size(); ++i) {
@@ -217,9 +221,9 @@ SongAnalysis conditionSong(const SongAnalysis& base, const spatial::AudioRespons
         T.resize(w);
         S.resize(w);
     };
-    hits(s.kickT, s.kickS);
-    hits(s.snareT, s.snareS);
-    hits(s.hatT, s.hatS);
+    hits(s.lowT, s.lowS);
+    hits(s.midT, s.midS);
+    hits(s.highT, s.highS);
     return s;
 }
 
@@ -264,9 +268,9 @@ AudioAtT sampleSong(const SongAnalysis& s, double t) {
         return std::min(e, 1.5f);
     };
     const float rel = std::max(s.release, 0.25f); // ADR-1361: 1 unless the performer moved Release
-    a.kickEnv = env(s.kickT, s.kickS, 7.0f / rel, a.lastKick, &a.lastKickS);
-    a.snareEnv = env(s.snareT, s.snareS, 9.0f / rel, a.lastSnare, &a.lastSnareS);
-    a.hatEnv = env(s.hatT, s.hatS, 14.0f / rel, a.lastHat, nullptr);
+    a.lowEnv = env(s.lowT, s.lowS, 7.0f / rel, a.lastLow, &a.lastLowS);
+    a.midEnv = env(s.midT, s.midS, 9.0f / rel, a.lastMid, &a.lastMidS);
+    a.highEnv = env(s.highT, s.highS, 14.0f / rel, a.lastHigh, nullptr);
     return a;
 }
 

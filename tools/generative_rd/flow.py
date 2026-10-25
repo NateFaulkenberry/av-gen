@@ -320,22 +320,17 @@ MIDI_NOTES = [(36, "eddy0"), (37, "eddy1"), (38, "eddy2")]
 def flow_music(s, prog=None):
     """Phase 5. The music shapes the current, never a bank of effect knobs:
       - bass is the river's strength (the designed current speeds and slows as one body);
-      - kicks push the water sideways in a ring that the current carries downstream (a travelling disturbance);
-      - snares strengthen the boulders' shedding (eddies spin up in the wakes);
-      - hats lift the fine chop where there is one, and brighten the light the lines carry;
+      - low attacks push the water sideways in a ring that the current carries downstream (a travelling disturbance);
+      - any attack strengthens the boulders' shedding (eddies spin up in the wakes);
       - sustained sound raises the gusts (a held passage brings weather; a sparse one lets it settle);
       - MIDI notes 36-38 spin up the eddy behind boulder 1, 2, 3 (velocity = strength, release = how long it lasts)."""
     s.route(common.audio("response.bass", "field/baseFlow/strength", 1.0, op="multiply", gain=0.9, offset=0.7,
                          attackMs=250, decayMs=1500),
-            common.audio("signal.kick", "field/kickPush/strength", 1.5, attackMs=5, decayMs=200),
-            common.audio("response.snare", "field/shedding/strength", 0.6, attackMs=30, decayMs=1500))
+            common.audio("response.low", "field/kickPush/strength", 1.5, attackMs=5, decayMs=200),
+            common.audio("response.onset", "field/shedding/strength", 0.6, attackMs=30, decayMs=1500))
     names = {f["name"] for f in s.nodes if f.get("kind") == "field"}
     if "gust" in names:
-        s.route(common.audio("response.sustain", "field/gust/strength", 1.2, attackMs=3000, decayMs=6000),
-                common.audio("response.hat", "field/chop/strength", 0.8, attackMs=40, decayMs=400))
-    if prog is not None and "pulse" in prog.at:
-        s.route(common.audio("response.hat", prog.path("pulse"), 1.0, op="multiply", gain=2.0, offset=1.0,
-                             attackMs=30, decayMs=300))
+        s.route(common.audio("response.sustain", "field/gust/strength", 1.2, attackMs=3000, decayMs=6000))
     common.instrument(s, MIDI_CC, MIDI_NOTES)
     s.route(R("control.strength", "field/baseFlow/strength", 1.0, **common.CC),
             R("control.persistence", "grid/wake/dissipation", -0.3, **common.CC))

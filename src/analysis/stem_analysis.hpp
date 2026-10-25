@@ -7,16 +7,18 @@
 // vocabulary publishes (signals/stem_signals.hpp). The same `StemAnalyzer` serves both paths, so a stem file and the
 // same audio arriving on an input channel publish the same numbers.
 //
-// Deliberately NOT here: the beat tracker, the meter, the ADR-898 band onsets, the Sonic timbre stage. Those read the
+// Deliberately NOT here: the beat tracker, the meter, the Sonic timbre stage. Those read the
 // main mix only (ADR-1520 §scope).
 //
 // Two tiers, chosen from measured cost (docs/prototypes/stems-multichannel/02-research-report.md §9.1):
 //   levels (always): the Analyzer -- rms, peak, level, onset, the five bands, centroid, width. ~16 us per hop.
-//   hits (opt-in):   + the ADR-1060 causal kick/snare/hat classifier. ~80-100 us more per hop.
+//   hits (opt-in):   + the ADR-1060 causal onsets (low, onset: what a response feed reads) and, on a drums-role source
+//                    only (ADR-1630), the kick/snare/hat `DrumClassifier`. ~80-100 us more per hop.
 // A time-domain-only tier would save ~15 us per hop per source, which is not worth a third tier.
 
 #include "analysis/analyzer.hpp"
 #include "analysis/causal_onsets.hpp"
+#include "analysis/drum_classifier.hpp"
 #include "analysis/response_feed.hpp"
 #include "audio/audio_file.hpp"
 #include "audio/stem_source.hpp"
@@ -93,8 +95,9 @@ struct StemAnalysisConfig {
     AnalyzerConfig analyzer{};
     StemOnsetConfig onset{};
     bool hits = false;
-    // ADR-1630: with `hits`, whether the classifier's kick/snare/hat reach the frame. A drums-role source only; another
-    // role that a response feed names runs the hits tier for the feed's levels and onsets, never for a class name.
+    // ADR-1630: with `hits`, whether the drum classifier runs and its kick/snare/hat reach the frame. A drums-role
+    // source only; another role that a response feed names runs the hits tier for the feed's levels and onsets, never
+    // for a class name.
     bool classes = true;
     // ADR-1582: the source's trim, dB, applied to its samples before anything is measured. 0 touches no sample.
     float gainDb = 0.0f;
@@ -127,6 +130,7 @@ private:
     std::vector<float> gainedMono_, gainedSide_;
     Analyzer analyzer_;
     CausalOnsetDetector causal_;
+    DrumClassifier drums_; // ADR-1630: a drums-role source only (`classes`)
     AnalysisFrame scratch_;
     // The level (ADR-1510's law, per source).
     float levelDb_ = -120.0f;

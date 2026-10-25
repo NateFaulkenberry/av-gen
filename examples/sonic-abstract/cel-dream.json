@@ -145,53 +145,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -425,7 +378,7 @@
  ],
  "routes": [
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "nodes/blob1/position",
    "amount": 0.75,
    "op": "add",
@@ -440,7 +393,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "nodes/blob2/position",
    "amount": 0.75,
    "op": "add",
@@ -455,7 +408,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "nodes/blob3/position",
    "amount": 0.75,
    "op": "add",
@@ -470,7 +423,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "nodes/blob4/position",
    "amount": 0.75,
    "op": "add",
@@ -485,7 +438,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "nodes/blob5/position",
    "amount": 0.75,
    "op": "add",
@@ -692,7 +645,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/petals/transform/scale",
    "amount": 0.22,
    "op": "add",
@@ -705,20 +658,9 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/confetti/burst",
    "amount": 140.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "threshold": "binary",
-    "thresholdLevel": 0.05
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "particles/sparkle/burst",
-   "amount": 18.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -1164,7 +1106,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/spout/burst",
    "amount": 160.0,
    "op": "add",
@@ -1734,8 +1676,8 @@
   },
   "vocabulary": [
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the creatures hop, a ripple left to right, landing on a spring"
    ],
    [
@@ -1744,14 +1686,9 @@
     "the creatures squash and stretch; the camera bobs"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "the giant flower's petals flick; a confetti puff"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "sparkles round the flower"
    ],
    [
     "mids",

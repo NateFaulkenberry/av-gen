@@ -1,15 +1,12 @@
-// ADR-1530: the Live panel no longer shows kick / snare / hat meters, while the detection behind them stays.
+// ADR-1530: the Live panel shows no hit meters.
 //
 // The Live panel is one immediate-mode ImGui function with no headless harness, so the first case reads its
-// source: it must not read the hit envelopes it used to show. The others pin what stays: the response hit signals
-// on the bus, the five response parameters carried across a live switch, and the detector's hits on a drum kit.
+// source: it must not read hit envelopes. The other pins what stays: the response hit signals on the bus (none
+// naming an instrument) and the five response parameters carried across a live switch.
 
-#include "analysis/analysis_track.hpp"
-#include "analysis/causal_onsets.hpp"
 #include "app/live_scenes.hpp"
 #include "signals/signal_bus.hpp"
 #include "sonic/response.hpp"
-#include "support/drum_kit.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -34,31 +31,20 @@ TEST_CASE("The Live panel shows no kick, snare or hat meters", "[ui][live][adr15
     }
 }
 
-TEST_CASE("The response hit signals are still declared for scenes", "[sonic][adr1530]") {
+TEST_CASE("The response hit signals are declared for scenes, and none names an instrument", "[sonic][adr1530]") {
     signals::SignalBus bus;
     sonic::ResponseModel model;
     model.declare(bus);
-    for (const char* name : {"response.kick", "response.kickEnv", "response.snare", "response.snareEnv", "response.hat",
-                             "response.hatEnv", "response.hatRate", "response.low", "response.onset", "response.note",
-                             "response.level", "response.bass"}) {
+    for (const char* name : {"response.low", "response.lowEnv", "response.onset", "response.onsetEnv", "response.note",
+                             "response.noteEnv", "response.level", "response.bass"}) {
         INFO(name);
         CHECK(bus.find(name).has_value());
     }
+    for (const char* name : {"response.kick", "response.kickEnv", "response.snare", "response.snareEnv",
+                             "response.hat", "response.hatEnv", "response.hatRate"}) {
+        INFO(name);
+        CHECK_FALSE(bus.find(name).has_value());
+    }
     CHECK(app::kResponseParameterPaths.size() == 5);
     CHECK(std::string_view(app::kResponseParameterPaths[1]) == "sonic/response/transient");
-}
-
-TEST_CASE("The causal detector still finds the kit's kicks, snares and hats", "[analysis][adr1530]") {
-    const testsupport::Kit kit = testsupport::makeKit(8);
-    const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
-    std::size_t kicks = 0, snares = 0, hats = 0;
-    for (const analysis::AnalysisFrame& f : track.frames()) {
-        REQUIRE(f.causal.valid);
-        kicks += f.causal.hit[static_cast<std::size_t>(analysis::HitClass::Kick)] ? 1u : 0u;
-        snares += f.causal.hit[static_cast<std::size_t>(analysis::HitClass::Snare)] ? 1u : 0u;
-        hats += f.causal.hit[static_cast<std::size_t>(analysis::HitClass::Hat)] ? 1u : 0u;
-    }
-    CHECK(kicks > 0);
-    CHECK(snares > 0);
-    CHECK(hats > 0);
 }

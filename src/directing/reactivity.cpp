@@ -443,7 +443,7 @@ void validateReactivity(Plan& plan, const SceneFacts& facts, Validation& v) {
                                            top->second.size(), live.size(), top->first));
             issue.subject = top->first;
             issue.details = {{"source", top->first}, {"routes", top->second.size()}, {"of", live.size()}, {"share", share}};
-            issue.suggestions = {"hats and claps on small things, the kick and the bar on heroes, section energy on "
+            issue.suggestions = {"attacks on small things, the beat and the bar on heroes, section energy on "
                                  "the light, the air and the colour"};
         }
     }

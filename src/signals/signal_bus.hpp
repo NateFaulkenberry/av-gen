@@ -22,7 +22,7 @@ struct SignalInfo {
     float minValue = 0.0f;
     float maxValue = 1.0f;
     bool isEvent = false; // events are pulses: value = strength for one frame, event flag set
-    // What the signal is, in words an artist would use ("kick (low-band onset)"), shown beside the
+    // What the signal is, in words an artist would use ("bass level (steady, not auto-gained)"), shown beside the
     // name wherever a route's source is picked. Empty when the name says it already.
     std::string label;
 };

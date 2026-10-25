@@ -148,60 +148,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -350,7 +296,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/amount",
    "amount": 70.0,
    "op": "add",
@@ -361,7 +307,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/radius",
    "amount": -1.2,
    "op": "replace",
@@ -373,7 +319,7 @@
    }
   },
   {
-   "source": "response.snareEnv",
+   "source": "response.onsetEnv",
    "target": "post/glitch/tear",
    "amount": 0.7,
    "op": "add",
@@ -384,7 +330,7 @@
    }
   },
   {
-   "source": "response.snareEnv",
+   "source": "response.onsetEnv",
    "target": "post/glitch/amount",
    "amount": 0.25,
    "op": "add",
@@ -392,50 +338,6 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 0
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/num0/material/emissive",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/num1/material/emissive",
-   "amount": -1.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/num2/material/emissive",
-   "amount": 2.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/num3/material/emissive",
-   "amount": -1.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
    }
   }
  ],
@@ -590,19 +492,14 @@
     "the ridges heave"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a shock ring across the frame"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "a tear through the data"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "the numerals flicker"
    ],
    [
     "sustained",

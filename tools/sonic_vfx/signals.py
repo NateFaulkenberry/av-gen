@@ -1,22 +1,17 @@
 """The signal classes every Sonic VFX scene speaks in (02-brief-vfx-expansion.md §9, §11, §12).
 
-A scene names the brief's classes -- sustained, melodic, bass, kick, snare, hat -- and the distinct MIDI facts, never
-raw bus ids. This table is the one place the classes meet the bus, so a scene written today keeps working when the
-engineer's response model (VFX-ARCHITECTURE.md §1.1: `response.*`, the per-note `notes.*`) replaces a stand-in.
+A scene names the brief's classes -- sustained, melodic, bass, low attacks, any attack -- and the distinct MIDI facts,
+never raw bus ids. This table is the one place the classes meet the bus.
 
 Two vocabularies:
 
-  ENGINE = "response"  the engineer's response model (ADR-1060..1062): live snare/hat, conditioned levels, the
-                       per-note MIDI signals, and the live Effect Library trigger source `signal`. ADR-1620: the kick
-                       is tools/drum_signals.py's `signal.kick` (a drums source's kick, else the beat clock's pulse
-                       while the drums play), which kit.Scene installs as a source.
-  ENGINE = "adr1061"   4bc1a762: live kick/snare/hat (`audio.onsetLow/Mid/High`, ADR-1061) and the Effect Library's
-                       live `signal` trigger source (ADR-1060), before the response model: levels and per-note facts
-                       still fall back to the Sonic Character and the context.
+  ENGINE = "response"  the response model (ADR-1060..1062): the low and broadband attacks, conditioned levels, the
+                       per-note MIDI signals, and the live Effect Library trigger source `signal`. No class names an
+                       instrument: a scene that has an isolated drum source reads its own `role.drums.*` signals.
   ENGINE = "legacy"    what fc99580d (the art agent's first pin) publishes: the Sonic Character, `notes.*` context,
-                       `audio.*`. Hits fall back to the broadband onset, so drums read as generic attacks.
+                       `audio.*`. Hits fall back to the broadband onset.
 
-Set SONIC_VFX_ENGINE=adr1061 or legacy in the environment to build for an older pin (look development only).
+Set SONIC_VFX_ENGINE=legacy in the environment to build for the older pin (look development only).
 """
 import os
 
@@ -26,12 +21,8 @@ ENGINE = os.environ.get("SONIC_VFX_ENGINE", "response")
 # an envelope chain, or use its `Env` twin.
 RESPONSE = {
     # ---- hits (events) and their shaped envelopes (0..1)
-    "kick": "signal.kick", "kickEnv": "signal.kickEnv",          # ADR-1620: the mix has no kick (drum_signals.py)
-    "snare": "response.snare", "snareEnv": "response.snareEnv",
-    "hat": "response.hat", "hatEnv": "response.hatEnv",
-    "low": "response.low", "lowEnv": "response.lowEnv",          # any low attack: a kick or a bass note
+    "low": "response.low", "lowEnv": "response.lowEnv",          # any low attack (40-120 Hz)
     "onset": "response.onset", "onsetEnv": "response.onsetEnv",  # any attack, level-free
-    "hatRate": "response.hatRate",                               # hats a second / 12: granular activity
     # ---- levels (0..1, read against the music's own loudness over the last minute -- ADR-1510: a track's body sits
     #      around 0.5-0.7, a breakdown low, a drop high -- and conditioned by the Live panel's sensitivity)
     "bass": "response.bass",              # 30-150 Hz, the body (held between hits): displacement, pressure
@@ -74,15 +65,11 @@ RESPONSE = {
     "time": "time.seconds",
 }
 
-# What the first pin can offer instead. A hit with no class falls back to the broadband onset (drums read as attacks
-# without telling kick from hat); a per-note fact falls back to the context's.
+# What the first pin can offer instead. A hit falls back to the broadband onset;
+# a per-note fact falls back to the context's.
 LEGACY_OVERRIDES = {
-    "kick": "audio.onset", "kickEnv": "audio.onset",
-    "snare": "audio.onset", "snareEnv": "audio.onset",
-    "hat": "audio.onset", "hatEnv": "audio.onset",
     "low": "audio.onset", "lowEnv": "audio.onset",
     "onset": "audio.onset", "onsetEnv": "audio.onset",
-    "hatRate": "audio.onsetRate",
     "bass": "audio.bass", "level": "audio.rms", "transient": "sonic.transient",
     "sustain": "sonic.energy.slow", "flux": "audio.spectralFlux", "melodic": "notes.motion",
     "pitchAny": "notes.pitch", "intensity": "sonic.energy.slow",
@@ -93,16 +80,8 @@ LEGACY_OVERRIDES = {
     "velocitySpread": "notes.velocity", "lowest": "notes.pitch", "highest": "notes.pitch",
 }
 
-# 4bc1a762 (ADR-1060/1061): the drum classes are real and live; everything else as legacy.
-ADR1061_OVERRIDES = dict(LEGACY_OVERRIDES)
-ADR1061_OVERRIDES.update({
-    "kick": "audio.onsetLow", "kickEnv": "audio.onsetLow",
-    "snare": "audio.onsetMid", "snareEnv": "audio.onsetMid",
-    "hat": "audio.onsetHigh", "hatEnv": "audio.onsetHigh",
-})
-
 # Events: route them through an envelope stage (or an attack/decay chain with attack 0).
-EVENTS = {"kick", "snare", "hat", "low", "onset", "note", "noteOn", "noteOff", "release", "noteLow", "noteHigh",
+EVENTS = {"low", "onset", "note", "noteOn", "noteOff", "release", "noteLow", "noteHigh",
           "phrase", "beat", "transientT"}
 
 
@@ -110,8 +89,6 @@ def S(name):
     """The bus id for a signal class or MIDI fact."""
     if ENGINE == "legacy" and name in LEGACY_OVERRIDES:
         return LEGACY_OVERRIDES[name]
-    if ENGINE == "adr1061" and name in ADR1061_OVERRIDES:
-        return ADR1061_OVERRIDES[name]
     if name in RESPONSE:
         return RESPONSE[name]
     if "." in name:  # already a bus id (visual.*, fx.*, macro.*)
@@ -125,4 +102,4 @@ def is_event(name):
 
 def live_triggers_available():
     """The Effect Library's `signal` trigger source (VFX-ARCHITECTURE.md §1.3) exists only in the response engine."""
-    return ENGINE in ("response", "adr1061")
+    return ENGINE == "response"

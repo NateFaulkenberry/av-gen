@@ -72,11 +72,6 @@ struct LivenessInputs {
     // above 0). Null = unknown, and those rules then say nothing rather than guess.
     const params::Modulator* modulator = nullptr;
     const params::Timeline* timeline = nullptr;
-    // ADR-1620: whether the project's feeds give the kick a source that resolves. The kick never fires from the mix,
-    // so `response.kick` and its envelope are silent without one. Judged only when `judgeKick` is set (an engine's
-    // inputs); a bare bus says nothing.
-    bool judgeKick = false;
-    bool kickFed = false;
 };
 
 class SceneLivenessFacts final : public params::liveness::Facts {

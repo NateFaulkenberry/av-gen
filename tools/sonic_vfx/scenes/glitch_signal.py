@@ -71,10 +71,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the RGB split widens; the walls push apart; the horizon flares"],
-        ["kick", "signal.kick", "a ring of distortion comes out of the horizon through the frame; the lit pixels flash"],
-        ["snare", "response.snare", "MESO: the frame tears; the rows shear sideways"],
-        ["hat", "response.hat", "MICRO: glitch blocks flicker; sparks of pixels"],
-        ["onset", "response.onset", "MESO: channels swap in the glitch blocks"],
+        ["low", "response.low", "a ring of distortion comes out of the horizon through the frame; the lit pixels flash"],
+        ["onset", "response.onset", "MESO: the frame tears; the rows shear sideways; channels swap in the glitch blocks"],
         ["mids", "audio.mid", "the data ribbons stream faster; the rows' stagger drifts"],
         ["highs", "audio.treble", "the scanlines deepen; the pixel rain thickens"],
         ["brightness", "sonic.brightness", "the lit pixels brighten"],
@@ -225,22 +223,21 @@ def instrument(s):
             R("bass", P % "horizon" + "material/emissive", 30.0, attackMs=20, decayMs=400))
     for node, sgn in (("wallL", -1.0), ("wallR", 1.0)):
         s.route(R("bass", P % node + "transform/position", 2.5 * sgn, comp=0, attackMs=30, decayMs=350))
-    # ---- KICK: a ring of displacement comes out of the horizon and through the frame (a shock from the vanishing
+    # ---- LOW: a ring of displacement comes out of the horizon and through the frame (a shock from the vanishing
     # point, its radius growing as the envelope falls); the lit pixels flash
-    s.route(R("kick", "post/shock/amount", 26.0, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
+    s.route(R("low", "post/shock/amount", 26.0, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
               envelopeHoldMs=0, envelopeFallPerSecond=2.2),
-            R("kick", "post/shock/radius", 1.3, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
+            R("low", "post/shock/radius", 1.3, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
               envelopeHoldMs=0, envelopeFallPerSecond=2.2, remapEnabled=True, remapInMin=0.0, remapInMax=1.0,
               remapOutMin=1.0, remapOutMax=0.0),
-            R("kick", "material/gsPixel/op/15/ramp/constant3", 1.4, attackMs=0, decayMs=200))
-    # ---- SNARE (MESO): the frame tears; the rows shear sideways
-    s.route(R("snare", "post/glitch/tear", 0.35, attackMs=0, decayMs=180),
-            R("snare", "post/glitch/tearShift", 90.0, attackMs=0, decayMs=180))
+            R("low", "material/gsPixel/op/15/ramp/constant3", 1.4, attackMs=0, decayMs=200))
+    # ---- ONSET (MESO): the frame tears; the rows shear sideways
+    s.route(R("onset", "post/glitch/tear", 0.35, attackMs=0, decayMs=180),
+            R("onset", "post/glitch/tearShift", 90.0, attackMs=0, decayMs=180))
     for node in WALLS:
-        s.route(R("snare", P % node + "deform/1/amount", 2.4, attackMs=0, decayMs=260))
-    # ---- HAT (MICRO): glitch blocks flicker; ONSET (MESO): their channels swap
-    s.route(R("hat", "post/glitch/amount", 0.08, attackMs=0, decayMs=90),
-            R("onset", "post/glitch/swap", 0.6, attackMs=0, decayMs=200))
+        s.route(R("onset", P % node + "deform/1/amount", 2.4, attackMs=0, decayMs=260))
+    # ---- ONSET (MESO): the glitch blocks' channels swap
+    s.route(R("onset", "post/glitch/swap", 0.6, attackMs=0, decayMs=200))
     # ---- MIDS: the data ribbons stream faster; the rows' stagger drifts (the shear's phase, integrated)
     s.route(R("audio.mid", "material/gsRibbon/op/4/constant/constant", -160.0, attackMs=60, decayMs=500))
     for node in WALLS:
@@ -369,12 +366,12 @@ def build():
         {"time": 0.0, "value": 0.0, "interp": "linear"},
         {"time": PERIOD, "value": -MODULE, "interp": "linear"}], loop=PERIOD)
 
-    # ---- the collapse's trigger: a STRONG EVENT -- a hard kick at a moment of large spectral change (the kick's envelope
+    # ---- the collapse's trigger: a STRONG EVENT -- a hard low attack at a moment of large spectral change (the low attack's envelope
     # times the flux, above 0.62: measured at 30 fps on the two review excerpts, three to five times in thirty seconds,
     # at the hits and the drops, where either signal alone passes on most beats) -- or a note at full velocity. Envelopes, not one-frame
     # events: a delayed route reads its input interpolated between frames, which can halve a one-frame pulse below its
     # threshold.
-    s.map(M("collapseAudio", [("kickEnv", 1.0), ("flux", 1.0)], "product", bias=-0.74, gain=2.0),
+    s.map(M("collapseAudio", [("lowEnv", 1.0), ("flux", 1.0)], "product", bias=-0.74, gain=2.0),
           M("collapseMidi", [("noteEnv", 1.0), ("lastVelocity", 1.0)], "product", bias=-1.4, gain=2.0))
     s.map2(M("collapse", [("visual.collapseAudio", 1.0), ("visual.collapseMidi", 1.0)], "max"))
 

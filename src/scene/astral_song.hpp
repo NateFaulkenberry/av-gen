@@ -38,7 +38,7 @@ struct SongAnalysis {
     std::vector<glm::vec4> env0;  // bass, lowMid, mid, high
     std::vector<glm::vec4> env1;  // air, energy, beatPhase, rms
     std::vector<float> centroid;  // per row, 0..1 (log-frequency spectral centroid of the normalised spectrum)
-    std::vector<float> kickT, kickS, snareT, snareS, hatT, hatS;
+    std::vector<float> lowT, lowS, midT, midS, highT, highS; // the onsets by register (analysis::onsetRows)
     std::vector<double> beats;
     std::vector<Section> sections;
     std::vector<float> novelty;   // beat-synchronous Foote novelty, one per beat
@@ -61,9 +61,9 @@ void foldSongEnvelopes(SongAnalysis& s, float attackScale, float releaseScale);
 struct AudioAtT {
     glm::vec4 env0{0.0f}, env1{0.0f};
     float hopF = 0.0f, rms = 0.0f, centroid = 0.0f;
-    float kickEnv = 0.0f, snareEnv = 0.0f, hatEnv = 0.0f;
-    float lastKick = -1e4f, lastSnare = -1e4f, lastHat = -1e4f;     // times
-    float lastKickS = 0.0f, lastSnareS = 0.0f;
+    float lowEnv = 0.0f, midEnv = 0.0f, highEnv = 0.0f;
+    float lastLow = -1e4f, lastMid = -1e4f, lastHigh = -1e4f;     // times
+    float lastLowS = 0.0f, lastMidS = 0.0f;
 };
 
 AudioAtT sampleSong(const SongAnalysis& song, double t);

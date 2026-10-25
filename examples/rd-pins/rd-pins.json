@@ -247,7 +247,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "material/rpPin/op/27/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -261,21 +261,7 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "material/rpPin/op/38/constant/constant",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "depthSource": "visual.influence",
-   "chain": {
-    "gain": 0.25,
-    "offset": 1.0,
-    "attackMs": 30,
-    "decayMs": 300
-   }
-  },
-  {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "material/rpPin/op/40/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -289,7 +275,7 @@
    }
   },
   {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "material/rpPin/op/38/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -303,7 +289,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "field/brush/strength",
    "amount": 2.0,
    "op": "add",

@@ -69,12 +69,12 @@ constexpr double kHannEnergyGain = 1.5;
 //   high band   power above 2 kHz relative to the whole spectrum, -36..-12 dB    weight 2
 //   brightness  spectral centroid, log-scaled 250 Hz..6 kHz                       weight 2
 //   flux        spectral flux relative to the frame's magnitude, 0.08..0.24      weight 1
-//   density     percussive onsets per second, 2..12                              weight 1 (when known)
+//   density     onsets per second, 2..12                                          weight 1 (when known)
 //   width       stereo side/mid RMS, 0.1..0.4                                     weight 1 (when known)
 //
 // Each term is clamped to 0..1 on its fixed range and the weighted mean is taken over the terms
-// that are known: live input has no stereo and no percussive onset rate, and a missing term is left
-// out rather than read as zero. Silence (no spectral power) is 0. Unsmoothed; callers smooth it.
+// that are known: live input has no stereo and no whole-track onset rate, and a missing term is
+// left out rather than read as zero. Silence (no spectral power) is 0. Unsmoothed; callers smooth it.
 struct EnergyTerms {
     float highRatioDb = -120.0f;
     float centroidHz = 0.0f;
@@ -100,6 +100,9 @@ struct AnalysisFrame {
     float flux = 0.0f;              // half-wave-rectified spectral flux, 0..~1
     float onsetStrength = 0.0f;     // flux relative to adaptive threshold (>=1 means over)
     bool onset = false;             // peak-picked onset event in this hop
+    // ADR-1604: the register of `onset` -- the low (30-250 Hz), mid (250 Hz-4 kHz) and high (4-16 kHz)
+    // shares of the power its hop gained (`registerShares`), summing to 1; all 0 with no onset.
+    std::array<float, 3> onsetRegister{};
     // Beat tracking (filled by AnalysisRunner live / AnalysisTrack offline, not by Analyzer).
     float tempoBpm = 0.0f;          // 0 while unknown
     float tempoConfidence = 0.0f;   // 0..1
@@ -118,37 +121,25 @@ struct AnalysisFrame {
     float relativeFlux = 0.0f;   // the unclamped flux over the frame's summed magnitude (level-free)
     float width = 0.0f;          // stereo side/mid RMS over the window; meaningful when `stereo`
     bool stereo = false;
-    // Onsets per second through a leaky window of `onsetRateSeconds`. Offline (AnalysisTrack) it
-    // counts the percussive band onsets below; live input, which has none, counts `onset`.
+    // Onsets per second through a leaky window of `onsetRateSeconds`. Live it counts `onset`; offline
+    // (AnalysisTrack) the causal detector's broadband onsets (`causal`, what `response.onset` fires on).
     float onsetRate = 0.0f;
-    bool onsetRateIsPercussive = false;
     // The energy composite (`energyComposite`), smoothed over `energySmoothingSeconds`, 0..1.
     float energy = 0.0f;
-
-    // ---- ADR-898: band-limited onsets (offline: AnalysisTrack's post-pass) ------------------------
-    // low: a kick -- a percussive attack in 100-300 Hz, told from a bass note by its percussive share;
-    // mid: a snare or clap -- 2-6 kHz; high: a hat -- 6-16 kHz. Strength is the attack against the
-    // strongest of its band in the surrounding second, 0..1.
-    bool lowOnset = false;
-    float lowOnsetStrength = 0.0f;
-    bool midOnset = false;
-    float midOnsetStrength = 0.0f;
-    bool highOnset = false;
-    float highOnsetStrength = 0.0f;
 
     // ---- ADR-1060: causal onsets (live: AnalysisRunner; file: AnalysisTrack's pass, the same detector) ---------
     CausalOnsets causal;
     // Live only: the frame index each event above was first raised on. The runner carries an event forward until
     // the render thread has acquired a frame that holds it, so one between two render frames is not lost; the
     // consumer fires an event only when its stamp is newer than the last it fired (`LiveEventLatch`). 0 = none.
-    std::uint64_t onsetStamp = 0, beatStamp = 0, lowStamp = 0, midStamp = 0, highStamp = 0;
+    std::uint64_t onsetStamp = 0, beatStamp = 0;
     std::uint64_t liveSerial = 0; // live only: this frame's position in the runner's output, from 1
 };
 
 // ADR-1060: the render thread's half of the live event carry (see `AnalysisFrame::onsetStamp`). An event whose stamp
 // is not newer than the last one fired for its kind was already seen on an earlier frame, and is cleared.
 struct LiveEventLatch {
-    std::uint64_t onset = 0, beat = 0, low = 0, mid = 0, high = 0;
+    std::uint64_t onset = 0, beat = 0;
     std::uint64_t serial = 0; // the newest frame seen: a smaller one means a new runner, and the latch restarts
     void apply(AnalysisFrame& frame);
 };

@@ -63,10 +63,9 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the near rows swell under the camera; the monoliths stretch taller"],
-        ["kick", "signal.kick", "the plain heaves and lurches forward; a zoom punch; the monoliths' lines flash"],
-        ["snare", "response.snare", "construction: three flat colour shapes snap into the sky in sequence; the lines "
+        ["low", "response.low", "the plain heaves and lurches forward; a zoom punch; the monoliths' lines flash"],
+        ["onset", "response.onset", "construction: three flat colour shapes snap into the sky in sequence; the lines "
          "flash"],
-        ["hat", "response.hat", "fine jitter on every line"],
         ["bands", "audio.lowMid", "the spectrum lies across the landscape in depth: low mids and mids swell the "
          "middle rows, high mids the far rows"],
         ["mids", "audio.mid", "the horizon circle's rings breathe and turn"],
@@ -157,33 +156,32 @@ def instrument(s):
     def both(group, rel, *a, **k):
         for kind in ("lines_", "fins_"):
             s.route(R(a[0], "procedural/%s%s/%s" % (kind, group, rel), *a[1:], **k))
-    # ---- BASS: the near rows swell under the camera; the plain heaves on the kick
+    # ---- BASS: the near rows swell under the camera; the plain heaves on the low attack
     both("near", "deform/2/amount", "bass", 1.3, attackMs=30, decayMs=380)
     for g in ("near", "mid", "far"):
-        both(g, "deform/1/amount", "kick", 1.1, attackMs=0, decayMs=420)
+        both(g, "deform/1/amount", "low", 1.1, attackMs=0, decayMs=420)
     # ---- BANDS: the middle rows answer the low mids and mids, the far rows the high mids: the spectrum lies across the
     # landscape in depth
     both("mid", "deform/2/amount", "audio.lowMid", 2.2, attackMs=40, decayMs=420)
     both("mid", "deform/3/amount", "audio.mid", 2.6, attackMs=40, decayMs=420)
     both("far", "deform/2/amount", "audio.highMid", 2.6, attackMs=40, decayMs=420)
     both("far", "deform/3/amount", "audio.highMid", 3.0, attackMs=40, decayMs=420)
-    # ---- HIGHS: fine jitter on every line; the hats flick it
+    # ---- HIGHS: fine jitter on every line
     for g in ("near", "mid", "far"):
         both(g, "deform/4/amount", "audio.treble", 0.22, attackMs=15, decayMs=160)
-        both(g, "deform/4/amount", "hat", 0.18, attackMs=0, decayMs=90)
-    # ---- KICK: a forward lurch (the plain's shapes jump toward the camera); a zoom punch
+    # ---- LOW: a forward lurch (the plain's shapes jump toward the camera); a zoom punch
     for fld in ("plainNoise", "peakNoise"):
-        s.route(R("kick", "field/%s/position" % fld, 14.0, comp=2, attackMs=0, decayMs=260, integrate=True))
-    s.route(R("kick", "camera/lens/focalLength", 2.0, attackMs=0, decayMs=220))
-    # ---- SNARE: construction -- three flat shapes snap into existence in sequence and shrink away; the lines flash
+        s.route(R("low", "field/%s/position" % fld, 14.0, comp=2, attackMs=0, decayMs=260, integrate=True))
+    s.route(R("low", "camera/lens/focalLength", 2.0, attackMs=0, decayMs=220))
+    # ---- ONSET: construction -- three flat shapes snap into existence in sequence and shrink away; the lines flash
     for k, name in enumerate(("buildBar", "buildSquare", "buildDisc")):
-        s.route(R("snare", "procedural/%s/transform/scale" % name, 1.0, attackMs=0, decayMs=650, delayMs=90 * k))
+        s.route(R("onset", "procedural/%s/transform/scale" % name, 1.0, attackMs=0, decayMs=650, delayMs=90 * k))
     for g in ("near", "mid", "far"):
-        s.route(R("snare", "procedural/lines_%s/material/emissive" % g, 2.5, attackMs=0, decayMs=160))
-    # ---- WIRE: the kick flashes the monoliths' lines, the high mids thicken them, the bass stretches them taller,
+        s.route(R("onset", "procedural/lines_%s/material/emissive" % g, 2.5, attackMs=0, decayMs=160))
+    # ---- WIRE: the low attack flashes the monoliths' lines, the high mids thicken them, the bass stretches them taller,
     # and STRUCTURE: the rows grow longer (5 to 9 monoliths) as the piece builds
     for side in ("L", "R"):
-        s.route(R("kick", "procedural/monolith%s/wire/intensity" % side, 4.0, attackMs=0, decayMs=220),
+        s.route(R("low", "procedural/monolith%s/wire/intensity" % side, 4.0, attackMs=0, decayMs=220),
                 R("audio.highMid", "procedural/monolith%s/wire/width" % side, 1.4, attackMs=30, decayMs=300),
                 R("bass", "procedural/monolith%s/source/scale" % side, 6.0, comp=1, attackMs=40, decayMs=400),
                 R("bass", "procedural/monolith%s/source/position" % side, 3.0, comp=1, attackMs=40, decayMs=400),
@@ -318,7 +316,7 @@ def build():
                transform={"position": [0.0, 0.0, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]},
                extra={"sourceTransform": {"position": [0.0, 9.0, 0.0], "scale": [1.0, 18.0, 1.0]}})
 
-    # ---- construction: three flat shapes the snare builds, PARKED at scale 0.01 at rest (not 0.001: below a uniform
+    # ---- construction: three flat shapes the onset builds, PARKED at scale 0.01 at rest (not 0.001: below a uniform
     # scale of about 0.005 the composed transform's determinant is under float epsilon, glm::decompose fails and the
     # object pops back to full size, unrotated), each a different accent shape
     for name, src, pos, rot, col in (

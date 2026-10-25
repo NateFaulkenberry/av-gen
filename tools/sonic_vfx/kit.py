@@ -23,13 +23,7 @@ import math
 import os
 import zlib
 
-from . import signals as sig
 from .signals import S
-
-try:  # tools/ on the path (the scripts' own way), else the repository root
-    import drum_signals  # noqa: E402
-except ImportError:  # pragma: no cover
-    from tools import drum_signals  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(REPO, "examples", "sonic-vfx")
@@ -768,7 +762,7 @@ class Scene:
     def effect(self, fid, ftype, owner=None, parameters=None, activation="always", timing=None, style="",
                trigger=None, order=0, name=None, extra=None):
         """An Effect Library instance (ADR-702). `owner` is ("world",) or ("entity", name) or ("camera",) or
-        ("light", name). `trigger` (a dict, e.g. {"source": "signal", "name": "signal.kick", "threshold": 0.3})
+        ("light", name). `trigger` (a dict, e.g. {"source": "signal", "name": "response.onset", "threshold": 0.3})
         makes it an EVENT activation."""
         own = {"kind": "world"}
         if owner:
@@ -1001,12 +995,8 @@ class Scene:
         sonic = {"live": True, "character": character}
         if self.response:
             sonic["response"] = self.response
-        # the scene's own sources first (lfo, envelope, timeline): an interpret mapping may read them. ADR-1620: the drum
-        # signals the scene reads (signal.kick ...) before everything, so every later source reads them on their frame.
+        # the scene's own sources first (lfo, envelope, timeline): an interpret mapping may read them.
         sources = list(self.sources)
-        if sig.ENGINE == "response":
-            sources = drum_signals.sources(drum_signals.used(
-                [self.routes, self.effects, self.mappings, self.mappings2, self.mappings3, self.sources])) + sources
         if self.mappings:
             sources.append({"kind": "interpret", "name": "scene", "settings": {"mappings": self.mappings}})
         if self.mappings2:

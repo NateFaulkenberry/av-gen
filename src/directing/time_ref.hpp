@@ -90,8 +90,8 @@ struct SectionRun {
     // them -- authored or detected -- averaged by duration over merged entries.
     float energy = 0.0f;
     float density = 0.0f;
-    // What the audio under the run measures, level-free: energy composite, onsets per second (kick /
-    // snare / hat apart), brightness in Hz, band levels, stereo width. `audio.measured()` is false
+    // What the audio under the run measures, level-free: energy composite, onsets per second,
+    // brightness in Hz, band levels, stereo width. `audio.measured()` is false
     // when the context was built without the analysed track.
     analysis::SpanProfile audio;
 };

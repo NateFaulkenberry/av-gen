@@ -180,18 +180,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "grid/net/noise",
-   "amount": 0.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "depthSource": "visual.influence",
-   "chain": {
-    "attackMs": 40,
-    "decayMs": 400
-   }
-  },
-  {
    "source": "response.intensity",
    "target": "grid/net/phaseLag",
    "amount": 0.35,

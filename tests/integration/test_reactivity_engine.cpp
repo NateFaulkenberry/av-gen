@@ -140,7 +140,7 @@ TEST_CASE("A revision replaces its routes in place, and never overwrites one a p
     CHECK(glade.engine.modulator().routes().size() == count);
 
     // A person turns the fungi's kick down in the Modulation panel...
-    const std::string fungi = planItemId("reactivity", "kick.fungi");
+    const std::string fungi = planItemId("reactivity", "beat.fungi");
     auto& routes = glade.engine.modulator().routes();
     const auto edited = std::find_if(routes.begin(), routes.end(), [&](const params::ModRoute& r) { return r.planItem == fungi; });
     REQUIRE(edited != routes.end());
@@ -150,7 +150,7 @@ TEST_CASE("A revision replaces its routes in place, and never overwrites one a p
     const auto handEdited = std::find_if(third.validation.issues.begin(), third.validation.issues.end(),
                                          [](const Issue& i) { return i.code == IssueCode::HandEdited; });
     REQUIRE(handEdited != third.validation.issues.end());
-    CHECK(handEdited->item == "kick.fungi");
+    CHECK(handEdited->item == "beat.fungi");
     REQUIRE(app::applyCompilation(glade.engine, history, third));
     const auto kept = std::find_if(glade.engine.modulator().routes().begin(), glade.engine.modulator().routes().end(),
                                    [&](const params::ModRoute& r) { return r.planItem == fungi; });
@@ -161,7 +161,7 @@ TEST_CASE("A revision replaces its routes in place, and never overwrites one a p
     // And the revision after that still leaves it: keeping a person's edit once is not adopting it.
     const Compilation fourth = glade.proposal();
     CHECK(std::any_of(fourth.validation.issues.begin(), fourth.validation.issues.end(),
-                      [](const Issue& i) { return i.code == IssueCode::HandEdited && i.item == "kick.fungi"; }));
+                      [](const Issue& i) { return i.code == IssueCode::HandEdited && i.item == "beat.fungi"; }));
     REQUIRE(app::applyCompilation(glade.engine, history, fourth));
     const auto still = std::find_if(glade.engine.modulator().routes().begin(), glade.engine.modulator().routes().end(),
                                     [&](const params::ModRoute& r) { return r.planItem == fungi; });
@@ -171,7 +171,7 @@ TEST_CASE("A revision replaces its routes in place, and never overwrites one a p
     // The Director panel's rows say which route is no longer the plan's as made.
     const Plan& stored = glade.engine.directingPlans().front();
     const auto rows = ui::reactivityRows(stored, glade.engine.modulator().routes());
-    const auto row = std::find_if(rows.begin(), rows.end(), [](const ui::ReactivityRow& r) { return r.key == "kick.fungi"; });
+    const auto row = std::find_if(rows.begin(), rows.end(), [](const ui::ReactivityRow& r) { return r.key == "beat.fungi"; });
     REQUIRE(row != rows.end());
     CHECK(row->state == "edited by hand");
     CHECK(std::count_if(rows.begin(), rows.end(), [](const ui::ReactivityRow& r) { return r.state == "as made"; }) ==
@@ -245,14 +245,14 @@ TEST_CASE("A save and a reload keep the plan, its routes and the sources they re
     // The Modulation panel's note on a reloaded route still finds its plan and its reason.
     const auto& routes = back.modulator().routes();
     const auto fungi = std::find_if(routes.begin(), routes.end(), [](const params::ModRoute& r) {
-        return r.planItem == "reactivity/kick.fungi";
+        return r.planItem == "reactivity/beat.fungi";
     });
     REQUIRE(fungi != routes.end());
     const ui::RoutePlanNote note = ui::routePlanNote(*fungi, back.directingPlans());
     CHECK(note.show);
-    CHECK(note.text == "[plan: kick.fungi]");
+    CHECK(note.text == "[plan: beat.fungi]");
     CHECK(note.tooltip.find("fungi") != std::string::npos);
-    CHECK(note.tooltip.find("kick") != std::string::npos);
+    CHECK(note.tooltip.find("beat") != std::string::npos);
     // A route a person made carries no note; a route whose plan is gone says so.
     params::ModRoute plain = *fungi;
     plain.planItem.clear();
@@ -280,8 +280,8 @@ TEST_CASE("The Director panel lists a proposal's route and source items, and the
         REQUIRE(it != rows.end());
         return *it;
     };
-    CHECK(kind("kick.fungi").kind == "route");
-    CHECK(kind("kick.fungi").mark == ui::ItemMark::Ok);
+    CHECK(kind("beat.fungi").kind == "route");
+    CHECK(kind("beat.fungi").mark == ui::ItemMark::Ok);
     CHECK(kind("source.two-bar-breath").kind == "source");
     const ui::PlanItemRow blocked = kind("dark");
     CHECK(blocked.mark == ui::ItemMark::Blocked);

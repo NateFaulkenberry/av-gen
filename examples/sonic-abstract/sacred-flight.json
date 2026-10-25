@@ -137,55 +137,7 @@
   "post/dof/maxRadius": 8.0,
   "post/tonemap/operator": 4
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.bass",
@@ -716,7 +668,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/sgfWave/op/3/constant/constant",
    "amount": -340.0,
    "op": "add",
@@ -730,7 +682,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/radial/amount",
    "amount": 0.05,
    "op": "add",
@@ -741,7 +693,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "camera/lens/focalLength",
    "amount": -1.6,
    "op": "add",
@@ -752,7 +704,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/starTriA/transform/scale",
    "amount": 0.16,
    "op": "add",
@@ -766,7 +718,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/starTriA/transform/scale",
    "amount": 0.16,
    "op": "add",
@@ -780,7 +732,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/starTriA/material/emissive",
    "amount": 5.0,
    "op": "add",
@@ -791,7 +743,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/starTriB/transform/scale",
    "amount": 0.16,
    "op": "add",
@@ -805,7 +757,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/starTriB/transform/scale",
    "amount": 0.16,
    "op": "add",
@@ -819,7 +771,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/starTriB/material/emissive",
    "amount": 5.0,
    "op": "add",
@@ -830,7 +782,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/roses/transform/scale",
    "amount": 0.16,
    "op": "add",
@@ -844,7 +796,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/roses/transform/scale",
    "amount": 0.16,
    "op": "add",
@@ -858,7 +810,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/roses/material/emissive",
    "amount": 5.0,
    "op": "add",
@@ -869,7 +821,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/sparks/burst",
    "amount": 420.0,
    "op": "add",
@@ -877,17 +829,6 @@
    "chain": {
     "threshold": "binary",
     "thresholdLevel": 0.05
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/beads/material/emissive",
-   "amount": 7.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 140
    }
   },
   {
@@ -2833,19 +2774,14 @@
     "STRUCTURE: the passage widens and narrows; the outer rings expand"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a wave of light runs down the passage from you to the sun; a surge forward"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "the gates' stars bloom open and flash vermilion; sparks stream past"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "the beads glint"
    ],
    [
     "highs",

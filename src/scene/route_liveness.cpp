@@ -360,14 +360,6 @@ params::liveness::SignalFacts SceneLivenessFacts::signal(std::string_view name) 
     } else if (in_.judgeSilence && !in_.hasAudio && !in_.hasTempo && startsWith("beat.")) {
         facts.silentBecause = fmt::format("the project has no audio and no tempo, so '{}' never moves", name);
     }
-    // ADR-1620: the kick comes only from a drum source the feeds name.
-    if (in_.judgeKick && !in_.kickFed && facts.silentBecause.empty() &&
-        (name == "response.kick" || name == "response.kickEnv")) {
-        facts.silentBecause = fmt::format(
-            "'{}' fires only from a drum source (ADR-1620) and this project's feeds name none for the kick: on a mix "
-            "use beat.pulse, or a signal choosing role.drums.kick first (tools/drum_signals.py's signal.kick)",
-            name);
-    }
     const auto median = [](std::vector<float>& v) {
         if (v.empty()) {
             return 0.0f;
@@ -868,7 +860,7 @@ std::optional<Finding> SceneLivenessFacts::effectNeverFires(const world::EffectI
             std::array<double, 1> last{};
             const double end = duration > 0.0 ? duration : 1e9;
             // A Signal trigger's events come from the host (derived or recorded), which the audit does not run --
-            // except that a signal this project cannot move never fires (ADR-1620: an unfed kick).
+            // except that a signal this project cannot move never fires.
             if (e.timing.trigger.source == world::TriggerSource::Signal) {
                 if (const auto f = signal(e.timing.trigger.name); !f.silentBecause.empty()) {
                     never(f.silentBecause);

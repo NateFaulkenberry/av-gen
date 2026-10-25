@@ -677,7 +677,6 @@ FLOW_AMP = float(os.environ.get("RS_FLOW_AMP", "0.25"))      # metres at rest; t
 FLOW_MID = float(os.environ.get("RS_FLOW_MID", "1.1"))
 CROSS_WAVE = float(os.environ.get("RS_CROSS_WAVE", "5.5"))
 CROSS_AMP = float(os.environ.get("RS_CROSS_AMP", "0.06"))
-CROSS_HAT = float(os.environ.get("RS_CROSS_HAT", "0.3"))
 SNARE_LIGHT = float(os.environ.get("RS_SNARE_LIGHT", "0"))
 GLINT_N = float(os.environ.get("RS_GLINT_N", "70"))        # glints along the cloth's 344 m (one each ~5 m)
 GLINT_GAIN = float(os.environ.get("RS_GLINT_GAIN", "0.35"))
@@ -1039,10 +1038,9 @@ def instrument(s, g):
         vp = "material/%s/op/%d/remap/constant" % (vg.name, vg["veilPhase"])
         s.route(*[R("sonic.energy", vp, SILK_RATE * 0.5, comp=c, gain=1.0, offset=0.35, integrate=True) for c in (2, 3)])
     if MUSIC2:
-        # the mids lift the flow ripples (a quick rise, a slower fall), the hats the fine crosswise waves; the slow
-        # energy tightens the folds over a phrase (the drift's breadth); the bass history lifts the veil (its deformer)
+        # the mids lift the flow ripples (a quick rise, a slower fall); the slow energy tightens the folds over a phrase
+        # (the drift's breadth); the bass history lifts the veil (its deformer)
         s.route(R("audio.mid", "field/flowWave/strength", FLOW_MID / 0.9, attackMs=150, decayMs=900),
-                *([] if RES_BAKE else [R("hatEnv", "field/crossWave/strength", CROSS_HAT / 0.9, attackMs=10, decayMs=260)]),
                 R("sonic.energy.slow", D % 1 + "amount", 1.0, op="multiply", gain=0.6, offset=0.8, attackMs=4000,
                   decayMs=8000))
     # MIDI
