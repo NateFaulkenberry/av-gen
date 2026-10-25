@@ -131,10 +131,14 @@ fn wavePathEdge(e: Wave) -> f32 {
 // The light fades in with distance from the camera (`shape.z` metres; 0 = off): the first frames of a front
 // would otherwise fill the bottom of the frame.
 fn wavePathNearFade(e: Wave, viewDistance: f32) -> f32 {
-    if (e.shape.z <= 0.0) {
+    return wavePathFadeIn(e.shape.z, viewDistance);
+}
+
+fn wavePathFadeIn(distance: f32, viewDistance: f32) -> f32 {
+    if (distance <= 0.0) {
         return 1.0;
     }
-    return smoothstep(e.shape.z * 0.3, e.shape.z, viewDistance);
+    return smoothstep(distance * 0.3, distance, viewDistance);
 }
 
 // The land beside the path, facet by facet: the core's colour (and a share of the head's) by how squarely
@@ -174,7 +178,9 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
     let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);
     let orient = select(0.05 + 0.95 * facing * facing, 2.5 * facing, underneath);
     let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
-    return light * (share * across * vband * orient * wavePathNearFade(e, viewDistance));
+    // The land and the bed fade in over 40% of the water's near fade: the bed shows through the water only near the
+    // camera (further out the reflection covers it), and a full fade would hide it.
+    return light * (share * across * vband * orient * wavePathFadeIn(e.shape.z * 0.4, viewDistance));
 }
 
 struct WavePathWater {
