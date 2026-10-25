@@ -223,7 +223,7 @@ Also in that folder:
    - the plate washed grey under the sweep in the first take; it must stay near black (metal F0 dark, roughness 0.1);
    - the skin read mid-grey; it needs a darker base with a wetter, selective specular.
 
-**Cost:** probe numbers are in 03 §5 (headless 1080p bench, P1-P3).
+**Cost:** the headless bench is still to run (it lost the GPU lock queue; 03 §5).
 
 ## 7. Limitations (honest)
 
