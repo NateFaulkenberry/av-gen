@@ -50,6 +50,9 @@ the one place the code is decoded, and the CPU and GPU change together.
   (tested). No shipped scene uses the kind.
 - **The flag renumbering changes no picture.** Every world-space deformer's code changes in the packer and the decoder
   together. The existing procedural CPU and GPU suites pass unchanged.
+- **The `scale` parameter is signed for this kind.** The other kinds' `scale` is a size with a hard minimum of 0.001,
+  which would have moved a mouth's mask from the chin to the pivot. `tests/unit/test_procedural_params.cpp` `[adr1672]`
+  holds both ranges.
 - **Normals:** the rotation is rigid where w = 1, so normals there are exact. In the ease band they follow the
   renderer's existing deformed-normal path, as for Bend and Twist.
 - **Talking Heads uses one Hinge for the lips and lower face.** Its eyelids are their own small meshes, posed by node

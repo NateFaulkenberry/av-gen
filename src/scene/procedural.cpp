@@ -4030,7 +4030,11 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         p.deformerSpeed[slot] = addF("speed", def.speed, -100.0f, 100.0f, -5.0f, 5.0f);
         addF("phase", def.phase, -1.0e6f, 1.0e6f, -kTwoPi, kTwoPi); // ADR-1372: wide, so a clock can drive it
         addF("frequency", def.frequency, 0.0f, 100.0f, 0.0f, 10.0f);
-        addF("scale", def.scale, 0.001f, 100.0f, 0.05f, 5.0f);
+        if (def.kind == DeformerKind::Hinge) { // ADR-1672: the mask's up offset, signed (below the pivot is negative)
+            addF("scale", def.scale, -1e4f, 1e4f, -0.5f, 0.5f);
+        } else {
+            addF("scale", def.scale, 0.001f, 100.0f, 0.05f, 5.0f);
+        }
         addF("falloff", def.falloff, 0.0f, 1000.0f, 0.0f, 10.0f);
         addV3("center", def.center, -1e4f, 1e4f, -10.0f, 10.0f);
         addV3("axis", def.axis, -1.0f, 1.0f, -1.0f, 1.0f);
