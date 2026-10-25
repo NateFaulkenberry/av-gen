@@ -342,7 +342,8 @@ BEAM_PAIRS = {   # (kick, snare)
 BEAM_PAIR = os.environ.get("AB_BEAM_PAIR", "magenta-lilac")
 CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the beams' source sits on the water
 START_OFFSET = 160.0   # metres in front of the camera where a pulse launches (pass 6: the river's again)
-NEAR_FADE = 500.0
+NEAR_FADE = 700.0   # pass 9 (was 500): the light under the water fades in from 280 m (0.4 x this), so the brighter
+                    # pools do not flood the bottom of the frame when three hits land together
 BED_VARIANT = os.environ.get("AB_BED", "coarse")
 
 
@@ -353,10 +354,12 @@ def _whiter(hexcol, k):
 
 def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifetime, fade_out, core, twin, halo,
                wake, wake_growth, disturb, land, bed, reach, reach_height, front_width, lane=0.0, lane_jitter=0.0,
-               splash=0.0, near_wake=0.0):
+               splash=0.0, near_wake=0.0, splash_glow=0.0):
     return {"id": name, "name": name, "type": "groundPulse", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "trigger", "trigger": {"source": "signal", "name": signal, "threshold": 0.0},
-            "style": "", "timing": _timing(fadeIn=0.0, fadeOut=fade_out, lifetime=lifetime),
+            # pass 9: a 0.15 s swell into each hit (was instant): with the brighter light under the water, an instant hit
+            # lit the near riverbed in two frames and swung the frame past the flash gate
+            "style": "", "timing": _timing(fadeIn=BEAM_FADE_IN, fadeOut=fade_out, lifetime=lifetime),
             "parameters": {
                 "appearance": {"color": hexrgb(color), "edgeColor": _whiter(color, 0.6), "edgeIntensity": edge,
                                "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
@@ -370,9 +373,9 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                 "path": {"node": WATER_NODE, "feature": "river", "ease": ease,
                                          "wakeGrowth": wake_growth, "coreWidth": core, "coreOffset": twin,
                                          "haloWidth": halo, "reach": reach, "reachHeight": reach_height,
-                                         "land": land, "bed": bed, "embed": 0.625, "disturb": disturb,
+                                         "land": land, "bed": bed, "embed": EMBED, "bedReach": BED_REACH, "disturb": disturb,
                                          "nearFade": NEAR_FADE, "lane": lane, "laneJitter": lane_jitter,
-                                         "splash": splash, "nearWake": near_wake}},
+                                         "splash": splash, "nearWake": near_wake, "splashGlow": splash_glow}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
                 "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
@@ -385,15 +388,33 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 # owner: "tone down the amount of light that gets throw onto the mountains from the underwater snare / kick / tom
 # lights"): the light on the land (`land`) is a quarter of pass 4's, a restrained accent; the light in the water and on
 # the bed is unchanged. Pass 6: back on the river, with pass 4's lanes and travel and pass 5's reduced spill.
+# Pass 9 (the owner: "we lost the big splash look ... as if someone is dropping a big ball into the water"): the splash
+# was halved in pass 4 (08c7c9ce: 0.07/0.05/0.06 -> 0.035/0.025/0.03, near wake 1.6/1.3/1.3 -> 0.8/0.6/0.6) when the near
+# water looked permanently churned, and never restored; the near fade (500 m) also keeps the beams' light dim where they
+# launch, 160 m out. Now: (splash, near wake, splash light): the rings at twice pass 4's first strength -- the kick
+# hardest -- the heavier near wake, and (ADR-1666) the splash throws light, a flash at the impact and a bright ring
+# running out with the rings, so the impact reads; all of it gone in about a second, so the river heals between hits.
+SPLASH = {"kick": (0.11, 2.0, 2.5), "snare": (0.065, 1.4, 1.8), "toms": (0.08, 1.5, 2.2)}
+# Pass 9 (the owner: "the under water balls beams of light should illuminate under water more"): each pulse's light
+# reaches 75 m down and at least 75 m across under the water (ADR-1666; it stopped at 40 m, and the bed is 75 m deep
+# mid-river since pass 8), wider halos (a third), and more of the light under the reflection (`embed`, was 0.625) so it
+# glows in the water's body. The light on the slopes (`land`) is unchanged. A first take (95 m, a fifth more bed light,
+# halos half as wide again, twice the splash light) swung the frame by 0.08-0.096 at 3.4 s (the flash gate is 0.05).
+BED_REACH = 75.0
+BEAM_FADE_IN = 0.15
+EMBED = 0.72
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
-            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=4.5, reach=700.0,
-            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.035, near_wake=0.8)
+            twin=0.0, halo=45.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=4.0, reach=700.0,
+            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=SPLASH['kick'][0], near_wake=SPLASH['kick'][1],
+            splash_glow=SPLASH['kick'][2])
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
-             twin=0.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=3.6, reach=600.0,
-             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.025, near_wake=0.6)
+             twin=0.0, halo=34.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
+             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=SPLASH['snare'][0], near_wake=SPLASH['snare'][1],
+             splash_glow=SPLASH['snare'][2])
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
-            twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.9, reach=650.0,
-            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=0.03, near_wake=0.6)
+            twin=0.0, halo=40.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.5, reach=650.0,
+            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=SPLASH['toms'][0], near_wake=SPLASH['toms'][1],
+            splash_glow=SPLASH['toms'][2])
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
 

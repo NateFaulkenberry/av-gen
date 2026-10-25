@@ -195,6 +195,19 @@ inline constexpr EffectField kFields[] = {
                AVGEN_WAVE_SETF(e.wave.propagation.path.nearWake)).json("propagation/path/nearWake").floorAt(0.0f)
         .tooltip("The ripples are this many times stronger at the camera, back to 1x by 700 m (0: 1x everywhere).")
         .writtenWhen(isPathWave),
+    // ADR-1666: the splash's light (written only when set)
+    floatField("path/splashGlow", "Splash light", 0.0f, 200.0f, 0.0f, 50.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.splashGlow), AVGEN_WAVE_SETF(e.wave.propagation.path.splashGlow))
+        .json("propagation/path/splashGlow").floorAt(0.0f)
+        .tooltip("A flash where the front launches and a bright ring running out with the splash, this many times the "
+                 "splash (0: the splash only ripples the water).")
+        .writtenWhen(+[](const E& e) { return isPathWave(e) && e.wave.propagation.path.splashGlow != 0.0f; }),
+    floatField("path/bedReach", "Light under water", 0.0f, 500.0f, 0.0f, 200.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.bedReach), AVGEN_WAVE_SETF(e.wave.propagation.path.bedReach))
+        .json("propagation/path/bedReach").fmt("%.0f m").floorAt(0.0f)
+        .tooltip("How far the light reaches under the water: down (fading from half this depth) and across (at least "
+                 "this wide). 0: 40 m.")
+        .writtenWhen(+[](const E& e) { return isPathWave(e) && e.wave.propagation.path.bedReach != 0.0f; }),
     // ADR-1663: a light ball's flight (Propagation > Ball)
     floatField("ball/launchRight", "Launch right", -2000.0f, 2000.0f, -400.0f, 400.0f,
                AVGEN_WAVE_GET(e.wave.propagation.ball.launch.x), AVGEN_WAVE_SETF(e.wave.propagation.ball.launch.x))

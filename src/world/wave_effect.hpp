@@ -160,6 +160,12 @@ struct PathShape {
     float laneJitter = 0.0f;
     float splash = 0.0f;
     float nearWake = 0.0f;
+    // ADR-1666: the splash throws light -- a flash at the launch and a bright ring running out with the splash's rings,
+    // in the wave's colour, this many times the splash (0: none; the splash only ripples the water, as in ADR-1663)
+    float splashGlow = 0.0f;
+    // ADR-1666: how far the light reaches under the water, in metres -- down (it fades from half this depth) and across
+    // (at least this wide); 0 keeps ADR-1663's 40 m
+    float bedReach = 0.0f;
 };
 
 // ADR-1663: a LightBall's flight. Launch and target are offsets in the camera's own frame (right, up, forward, in

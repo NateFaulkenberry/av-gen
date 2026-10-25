@@ -466,3 +466,39 @@ TEST_CASE("ADR-1665: a fireball's look packs its smoke, embers and seed; look 0 
     fire.wave.propagation.ball.smoke = 1.5f;
     CHECK_FALSE(fire.wave.validate().has_value());
 }
+
+TEST_CASE("ADR-1666: a splash's light and the reach of the light under the water pack in sparkle.x/w; at 0 a path "
+          "wave packs and writes exactly as before",
+          "[world][effects][waves][adr1666]") {
+    const PathScene scene;
+    world::EffectInstance beam = pathWave();
+    beam.wave.propagation.path.splash = 0.1f;
+    REQUIRE(beam.wave.validate().has_value());
+    const auto r0 = world::resolveWave(beam, at(0.5, scene));
+    REQUIRE(r0.has_value());
+    const world::WaveGpu g0 = world::packWave(*r0);
+    CHECK(g0.sparkle.x == 0.0f);
+    CHECK(g0.sparkle.w == 0.0f);
+    CHECK_FALSE(beam.toJson().at("parameters").at("propagation").at("path").contains("splashGlow"));
+    CHECK_FALSE(beam.toJson().at("parameters").at("propagation").at("path").contains("bedReach"));
+    world::EffectInstance lit = beam;
+    lit.wave.propagation.path.splashGlow = 15.0f;
+    REQUIRE(lit.wave.validate().has_value());
+    const world::WaveGpu g1 = world::packWave(*world::resolveWave(lit, at(0.5, scene)));
+    CHECK(g1.sparkle.x == 15.0f);
+    // and how far its light reaches under the water, in sparkle.w
+    lit.wave.propagation.path.bedReach = 90.0f;
+    const world::WaveGpu g2 = world::packWave(*world::resolveWave(lit, at(0.5, scene)));
+    CHECK(g2.sparkle.w == 90.0f);
+    world::WaveGpu g1z = g2;
+    g1z.sparkle.x = 0.0f;
+    g1z.sparkle.w = 0.0f;
+    CHECK(std::memcmp(&g0, &g1z, sizeof(world::WaveGpu)) == 0); // only the two lanes differ
+    const nlohmann::json j = lit.toJson();
+    CHECK(j.at("parameters").at("propagation").at("path").at("splashGlow") == 15.0);
+    const auto back = world::EffectInstance::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->wave.propagation.path.splashGlow == 15.0f);
+    lit.wave.propagation.path.splashGlow = -1.0f;
+    CHECK_FALSE(lit.wave.validate().has_value());
+}

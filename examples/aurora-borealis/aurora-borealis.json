@@ -508,7 +508,7 @@
    "style": "",
    "timing": {
     "delay": 0.0,
-    "fadeIn": 0.0,
+    "fadeIn": 0.15,
     "fadeOut": 0.7,
     "lifetime": 1.4,
     "repeatSeconds": 0.0,
@@ -564,18 +564,20 @@
       "wakeGrowth": 0.35,
       "coreWidth": 6.0,
       "coreOffset": 0.0,
-      "haloWidth": 35.0,
+      "haloWidth": 45.0,
       "reach": 700.0,
       "reachHeight": 250.0,
       "land": 0.09,
-      "bed": 4.5,
-      "embed": 0.625,
+      "bed": 4.0,
+      "embed": 0.72,
+      "bedReach": 75.0,
       "disturb": 0.045,
-      "nearFade": 500.0,
+      "nearFade": 700.0,
       "lane": -55.0,
       "laneJitter": 25.0,
-      "splash": 0.035,
-      "nearWake": 0.8
+      "splash": 0.11,
+      "nearWake": 2.0,
+      "splashGlow": 2.5
      }
     },
     "response": {
@@ -617,7 +619,7 @@
    "style": "",
    "timing": {
     "delay": 0.0,
-    "fadeIn": 0.0,
+    "fadeIn": 0.15,
     "fadeOut": 0.5,
     "lifetime": 0.9,
     "repeatSeconds": 0.0,
@@ -673,18 +675,20 @@
       "wakeGrowth": 0.22,
       "coreWidth": 4.0,
       "coreOffset": 0.0,
-      "haloWidth": 26.0,
+      "haloWidth": 34.0,
       "reach": 600.0,
       "reachHeight": 200.0,
       "land": 0.06,
-      "bed": 3.6,
-      "embed": 0.625,
+      "bed": 2.8,
+      "embed": 0.72,
+      "bedReach": 75.0,
       "disturb": 0.035,
-      "nearFade": 500.0,
+      "nearFade": 700.0,
       "lane": 55.0,
       "laneJitter": 25.0,
-      "splash": 0.025,
-      "nearWake": 0.6
+      "splash": 0.065,
+      "nearWake": 1.4,
+      "splashGlow": 1.8
      }
     },
     "response": {
@@ -726,7 +730,7 @@
    "style": "",
    "timing": {
     "delay": 0.0,
-    "fadeIn": 0.0,
+    "fadeIn": 0.15,
     "fadeOut": 0.55,
     "lifetime": 1.0,
     "repeatSeconds": 0.0,
@@ -782,18 +786,20 @@
       "wakeGrowth": 0.3,
       "coreWidth": 4.5,
       "coreOffset": 0.0,
-      "haloWidth": 30.0,
+      "haloWidth": 40.0,
       "reach": 650.0,
       "reachHeight": 220.0,
       "land": 0.075,
-      "bed": 3.9,
-      "embed": 0.625,
+      "bed": 3.5,
+      "embed": 0.72,
+      "bedReach": 75.0,
       "disturb": 0.04,
-      "nearFade": 500.0,
+      "nearFade": 700.0,
       "lane": 0.0,
       "laneJitter": 90.0,
-      "splash": 0.03,
-      "nearWake": 0.6
+      "splash": 0.08,
+      "nearWake": 1.5,
+      "splashGlow": 2.2
      }
     },
     "response": {

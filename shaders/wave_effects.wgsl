@@ -166,11 +166,13 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
     // path's nearest point, sharpened so neighbouring planes differ. Below it (a riverbed seen through the water): a
     // band about the halo's width under the light, lit from the head itself -- a low, grazing light that catches the
     // planes tilted toward it and leaves the others dark.
-    let width = select(reach * 0.5, max(e.vertical.w * 2.5, 40.0), underneath);
+    // ADR-1666: sparkle.w, how far the light reaches under the water (0: ADR-1663's 40 m)
+    let bedReach = select(40.0, e.sparkle.w, e.sparkle.w > 0.0);
+    let width = select(reach * 0.5, max(e.vertical.w * 2.5, bedReach), underneath);
     let x = h.lateral / width;
     let across = exp(-x * x);
     let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), dy);
-    let below = 1.0 - smoothstep(20.0, 40.0, -dy); // ADR-1663: 40 m below the level (vertical.x is now the age)
+    let below = 1.0 - smoothstep(bedReach * 0.5, bedReach, -dy); // ADR-1663: 40 m below the level; ADR-1666: bedReach
     let vband = select(above, below, underneath);
     // Above the level the light comes from the path's nearest point raised most of the way to the surface's own height
     // (pass 4): mostly level, so a valley wall facing the path takes it squarely; from the water's level it struck the
@@ -212,6 +214,25 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
         let e = frame.waves[i];
         if (abs(e.originKind.w - 2.0) > 0.5) { // path waves only
             continue;
+        }
+        // ADR-1666: the splash throws light -- a flash where the front launched and a bright ring running out with the
+        // splash's rings, in the wave's own colour, gone in about a second (sparkle.x, its gain over the splash: 0 none)
+        if (e.extra.z > 0.0 && e.sparkle.x > 0.0) {
+            let age = e.vertical.x;
+            let rs = distance(worldPos.xz, e.extra.xy);
+            let ringR = 25.0 + 170.0 * age;
+            if (age < 1.6 && rs < ringR + 80.0) {
+                let k = e.extra.z * e.sparkle.x;
+                let x = (rs - ringR) / (6.0 + 10.0 * age);
+                let ring = exp(-x * x) * exp(-age / 0.4);
+                let cf = rs / 24.0;
+                let flash = exp(-cf * cf) * exp(-age / 0.18);
+                // dimmed under 250 m from the camera, so the ring running toward it does not wash the bottom of the frame
+                let nearDim = 0.25 + 0.75 * smoothstep(80.0, 250.0, viewDistance);
+                let splashLight = (e.color.rgb * (0.8 * ring + 2.0 * flash) + e.edge.rgb * (0.3 * flash)) * (k * nearDim);
+                out.under = out.under + splashLight * 0.4;
+                out.surface = out.surface + splashLight * 0.6;
+            }
         }
         let halo = max(e.vertical.w, 1.0e-3);
         if (!wavePathNear(e, worldPos.xz, 3.0 * halo + e.edge.w)) {
