@@ -94,13 +94,14 @@ HEADS = [
     {"prefix": "th1", "role": "drums", "band": "bass", "mix": "response.lowEnv", "mixOpen": 0.7, "open": 0.60, "close": 0.45,
      "at": [-0.62, 0.0, -0.15], "heading": 22.0, "scan": (0.55, 0.13, 3), "palette": ICE,
      "emphasis": {"shake": 1.0, "tear": 1.0, "ghost": 0.3, "wash": 0.45}},
-    {"prefix": "th2", "role": "bass", "band": "bass", "mix": "audio.bass", "open": 0.55, "close": 0.42,
+    {"prefix": "th2", "role": "bass", "band": "bass", "mix": "audio.bass", "open": 0.55, "close": 0.42, "onsets": True,
      "at": [0.0, 0.0, 0.25], "heading": 0.0, "scan": (0.48, 0.11, 7), "palette": ORCHID,
      "emphasis": {"shake": 0.3, "tear": 0.25, "ghost": 1.0, "wash": 0.45}},
-    {"prefix": "th3", "role": "synth", "band": "mid", "mix": "audio.mid", "open": 0.80, "close": 0.65,
+    {"prefix": "th3", "role": "synth", "band": "mid", "mix": "audio.mid", "open": 0.80, "close": 0.65, "onsets": True, "onsetLevel": 0.8,
      "at": [0.62, 0.0, -0.15], "heading": -22.0, "scan": (0.52, 0.17, 11), "palette": EMBER,
      "emphasis": {"shake": 0.25, "tear": 0.25, "ghost": 0.3, "wash": 1.0}},
 ]
+ONSET_REFRACTORY_MS = 90.0   # an onset-gated head re-opens at most this often (no 16th-note chatter)
 MIX_STRICT = 0.15        # the mix path's thresholds sit this much higher than the stem path's
 MIX_PULSE_MS = 200.0     # a mix opening is a fixed pulse ...
 MIX_REFRACTORY_MS = 450.0  # ... at most once per this long (07: "on a full mix we can limit the amount of times")
@@ -667,7 +668,12 @@ def gate(s, spec):
                                               "chain": {"attackMs": 150.0, "decayMs": 150.0}}], combine="sum"),
         sig(TR, [{"source": "signal." + RS, "chain": dict(binary(0.20), envelope="peakhold", envelopeHoldMs=0.0,
                                                           envelopeFallPerSecond=30.0, envelopeRearm=0.5,
-                                                          envelopeRefractoryMs=33.0)}]),
+                                                          envelopeRefractoryMs=33.0)}]
+            + ([{"source": "role.%s.onsetStrength" % role, "chain": dict(binary(spec.get("onsetLevel", 1.0)),
+                                                                         envelope="peakhold", envelopeHoldMs=0.0,
+                                                                 envelopeFallPerSecond=30.0, envelopeRearm=0.5,
+                                                                 envelopeRefractoryMs=ONSET_REFRACTORY_MS)}]
+               if spec.get("onsets") else []), combine="max"),
         sig(PV, [{"source": "visual.%sKeep" % GT}]),                      # one-frame memory
         # the mix path: on only while the head's role has no active source
         sig(OM, [{"constant": 1.0}, {"source": "role.%s.active" % role, "amount": -1.0}], combine="sum",
@@ -678,7 +684,17 @@ def gate(s, spec):
                                 envelopeFallPerSecond=1000.0, envelopeRearm=0.5,
                                 envelopeRefractoryMs=MIX_REFRACTORY_MS)}], combine="max"),
         sig(GR, [{"source": "signal." + LS, "chain": binary(spec["open"])},
-                 {"source": "signal." + PV},
+                 {"source": "signal." + PV}]
+            # ONSETS (stop 5, the synth: "i think it needs to be more sensitive"): the stem's own note onsets open the
+            # gate for a moment, the level keeps it open while the note rings, and an onset while open is a chomp --
+            # so legato notes, which never fall below the level's threshold between them, each read as their own
+            + ([{"source": "role.%s.onsetStrength" % role, "chain": dict(binary(spec.get("onsetLevel", 1.0)),
+                                                                         envelope="peakhold",
+                                                                         envelopeHoldMs=spec.get("onsetHoldMs", 140.0),
+                                                                         envelopeFallPerSecond=1000.0,
+                                                                         envelopeRearm=0.5,
+                                                                         envelopeRefractoryMs=ONSET_REFRACTORY_MS)}]
+               if spec.get("onsets") else []) + [
                  {"source": "signal." + MG},
                  {"source": "control.padOpen", "chain": {"envelope": "peakhold", "envelopeHoldMs": 600.0,
                                                          "envelopeFallPerSecond": 1000.0}}],
