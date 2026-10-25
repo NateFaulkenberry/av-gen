@@ -192,7 +192,10 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"]):
     o.add("ivory", "constant", 3, constant=list(IVORY) + [1.0])
     o.add("socketDark", "remap", 5, srcA=2, value=1.0, constant=[0.0, 1.0, 1.0, 0.6])
     o.add("socketMul", "multiply", 3, srcA=3, srcB=5)
-    o.add("washNoise", "noise", 4, srcA=0, value=7.0, constant=[0.0, 0.0, 0.0, 0.0], seed=5)
+    # the wash's colour and the signal bands read WORLD position: every piece of a bust has its own local origin, so a
+    # pattern in local space breaks at each piece's edge (the owner, stop 4: "eliminate this seam")
+    o.add("world", "input", 4, input="worldPosition")
+    o.add("washNoise", "noise", 4, srcA=4, value=7.0, constant=[0.0, 0.0, 0.0, 0.0], seed=5)
     o.add("washSpread", "remap", 4, srcA=4, value=1.0, constant=[0.32, 0.68, 0.0, 1.0])
     o.add("washRamp", "oklabRamp", 5, srcA=4, value=1.0, constant=hexrgb(wash[0]) + [1.0],
           constant2=hexrgb(wash[1]) + [1.0], constant3=hexrgb(wash[2]) + [1.0], constant4=hexrgb(wash[3]) + [1.0])
@@ -205,8 +208,9 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"]):
     o.add("bandTime", "input", 1, input="time")
     o.add("bandRate", "constant", 2, constant=[0.0, 0.0, 14.0, 0.0])
     o.add("bandEpoch", "multiply", 1, srcA=1, srcB=2)
+    o.add("bandWorld", "input", 3, input="worldPosition")
     o.add("bandY", "constant", 2, constant=[0.0, 1.0, 0.0, 0.0])
-    o.add("bandYMul", "multiply", 2, srcA=0, srcB=2)
+    o.add("bandYMul", "multiply", 2, srcA=3, srcB=2)
     o.add("bandCoord", "add", 1, srcA=1, srcB=2)
     o.add("bandCell", "quantize", 1, srcA=1, value=70.0, constant=[0.0, 0.0, 0.0, 0.0], seed=9)
     o.add("bandHash", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
@@ -221,8 +225,13 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"]):
             "emissionIntensity": 1.0, "opacity": -1}
 
 
+GHOST_FADE = (0.0, 0.07)   # the head ghost fades in over this height (its frame, metres) above its lower edge
+
+
 def ghost_program(name, colour):
-    """A spectral copy: black, a fresnel edge in its colour, opacity (constant op 4) routed from zero."""
+    """A spectral copy: black, a fresnel edge in its colour, opacity (constant op 4) routed from zero. It is a copy of
+    the HEAD only, so it fades to nothing toward its lower edge (an object-space gradient) rather than ending in a
+    line across the neck."""
     return {"name": name, "ops": [
         {"kind": "fresnel", "dst": 0, "value": 1.6},
         {"kind": "constant", "dst": 1, "constant": hexrgb(colour, 1.6) + [1.0]},
@@ -231,6 +240,11 @@ def ghost_program(name, colour):
         {"kind": "remap", "dst": 4, "srcA": 0, "value": 1.0, "constant": [0.0, 1.0, 0.35, 1.0]},
         {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
+        {"kind": "input", "dst": 6, "input": "localPosition"},
+        {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [1.0, 1.0, 1.0, 1.0]},
+        {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [GHOST_FADE[0], GHOST_FADE[1], 0.0, 0.0]},
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 6},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 6},
         {"kind": "constant", "dst": 5, "constant": [0.0, 0.0, 0.0, 1.0]},
     ], "baseColor": 5, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": 3}
 
@@ -411,9 +425,11 @@ def head(s, spec):
     s.effect(P + "-shake", "shake", ("entity", P + "-bust"),
              parameters={"trauma": 0.0, "amplitude": 0.004, "rotation": 1.0, "frequency": 17.0, "decay": 0.0,
                          "seed": 7.0})
-    s.effect(P + "-glowH", "glow", ("entity", P + "-head"),
-             parameters={"gain": 1.0, "tint": hexrgb(pal["glow"]), "glow": 0.0, "rim": 0.05,
-                         "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
+    # the glow on EVERY piece, with identical values and routes: a glow on the head alone stopped in a line at the neck
+    for part, piece in (("H", "head"), ("N", "neck"), ("B", "bust")):
+        s.effect("%s-glow%s" % (P, part), "glow", ("entity", "%s-%s" % (P, piece)),
+                 parameters={"gain": 1.0, "tint": hexrgb(pal["glow"]), "glow": 0.0, "rim": 0.05,
+                             "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
     # the head's own light, in front of its face: dark until its gate opens, then its colour on the mist round it
     # and on its neighbours' porcelain (world space: the heads stand still, they only turn)
     at, hd = spec.get("at", [0.0, 0.0, 0.0]), math.radians(spec.get("heading", 0.0))
@@ -725,7 +741,9 @@ def routes(s, spec, rays):
                 R("control.palette", op("washSpread", "remap") + "constant", -0.6, comp=2),
                 R(OPEN, op("bands", "threshold") + "value", -0.18 * E["tear"], depth=K("tear"), attackMs=0,
                   decayMs=120))
-    s.route(R(OPEN, "fx/%s-glowH/glow" % P, 0.5 * E["wash"], depth=K("chroma"), attackMs=0, decayMs=200))
+    for part in ("H", "N", "B"):
+        s.route(R(OPEN, "fx/%s-glow%s/glow" % (P, part), 0.5 * E["wash"], depth=K("chroma"), attackMs=0,
+                  decayMs=200))
     # ---- global gain (CC 7, bipolar about its rest): once, on the first head
     if spec is HEADS[0] or P == "th1":
         s.route(R("control.gain", "camera/exposure/compensation", 1.5, polarity="bipolar"),
