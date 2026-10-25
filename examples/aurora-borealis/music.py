@@ -218,8 +218,8 @@ def routes():
     out = [
         # ---- Cloud Diving -> the aurora (B s3): intensity, height, width, fold amplitude, inner detail, airglow
         R("signal.cloudSwell", A + "intensity", 1.6),
-        R("signal.cloudSwell", A + "curtainHeight", 400.0),
-        R("signal.cloudSwell", A + "ribbonWidth", 0.02),
+        R("signal.cloudSwell", A + "curtainHeight", 250.0),
+        R("signal.cloudSwell", A + "ribbonWidth", 0.012),
         R("signal.cloudSwell", A + "ribbonSwirl", 0.6),
         R("signal.cloudSwell", A + "filaments", 1.5),
         R("signal.cloudSwell", A + "edgeBrightness", 1.5),

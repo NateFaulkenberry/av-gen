@@ -87,12 +87,12 @@ EDGE_GLOW = 0.5   # the edges' resting glow (Gate B)
 # picks a deterministic subset; its smoothstep rests above 1 (nothing lit) and an instrument's envelope, routed onto
 # its constant, lowers it by up to GATE_DROP: a hit lights a subset, a louder one more of it, more fully.
 GATE_REST = [1.05, 1.10, 0.0, 0.0]
-GATE_DROP = 0.14
+GATE_DROP = 0.16
 # (label, teeth, glint line width in px (None: a whole-facet plane flash), colour, intensity)
 GLINTS = {
     "L": [("moog", 3.0, 3.0, "#ff9fdc", 3.2)],                       # pale pink edge glints: the Moog
-    "R": [("tblock", 5.0, 2.5, "#e9dcff", 3.0),                      # small sharp lavender-white glints: the tone block
-          ("toms", 2.0, None, "#7d6cff", 0.9)],                      # blue-violet plane flashes: the toms
+    "R": [("tblock", 5.0, 3.5, "#e9dcff", 4.0),                      # small sharp lavender-white glints: the tone block
+          ("toms", 2.0, None, "#7d6cff", 1.3)],                      # blue-violet plane flashes: the toms
 }
 
 
@@ -215,7 +215,7 @@ def environment():
 
 
 # ---- the aurora ----------------------------------------------------------------------------------------------------
-RIBBONS = {"ribbons": True, "ribbonAltitude": 600.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
+RIBBONS = {"ribbons": True, "ribbonAltitude": 1000.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
            "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 0.75,
            # E3's travelling kick front, gentler than its default 2x so the kick stays under the flash budget
            "pulseGain": 1.0, "pulseThicken": 0.3}
@@ -324,7 +324,7 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
                                "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
                 "propagation": {"kind": "path", "direction": "explicit", "beamRadius": 0.0,
-                                "startOffset": 100.0, "speed": round(rng / travel, 2), "range": rng,
+                                "startOffset": 160.0, "speed": round(rng / travel, 2), "range": rng,
                                 "frontWidth": front_width, "trailLength": wake, "falloff": 1.6,
                                 "verticalExtent": 40.0, "verticalGrowth": 0.0, "ringCount": 0.0,
                                 "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
@@ -333,7 +333,7 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                          "wakeGrowth": wake_growth, "coreWidth": core, "coreOffset": twin,
                                          "haloWidth": halo, "reach": reach, "reachHeight": reach_height,
                                          "land": land, "bed": bed, "embed": 0.625, "disturb": disturb,
-                                         "nearFade": 200.0}},
+                                         "nearFade": 500.0}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
                 "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
@@ -375,7 +375,7 @@ def music_routes(R):
     for prog in ROCKS:
         out += [R("signal.auroraLight", prog.path("auroraGlow"), 0.75),
                 # a crash flares the high sky-facing facets, both banks (white-violet: the route adds to every channel)
-                R("signal.crashGlow", prog.path("crashCrest"), 0.7)]
+                R("signal.crashGlow", prog.path("crashCrest"), 0.2)]
     L, Rt = ROCK_L, ROCK_R
     out += [
         # LEFT, the Moog: its subset glides slowly (lfo.moogDrift); a note opens the gate and swells the line; the
@@ -388,7 +388,7 @@ def music_routes(R):
         # sequence of facets; the hit's size (blockSize) is already in blockTick
         R("lfo.barSaw", Rt.path("tblock", "value"), 1.0),
         R("signal.blockTick", Rt.path("tblockGate"), -GATE_DROP),
-        R("signal.blockTick", Rt.path("tblockLine"), 1.5),
+        R("signal.blockTick", Rt.path("tblockLine"), 2.5),
         # RIGHT, the toms: a new subset of planes per note (random.tomPick), sized; the fill's body a little more
         R("random.tomPick", Rt.path("toms", "value"), 1.0),
         R("signal.tomHit", Rt.path("tomsGate"), -0.11),
