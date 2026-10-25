@@ -678,6 +678,52 @@ TEST_CASE("validate: at most kMaxMaterialFields distinct fields", "[material]") 
     CHECK(bad.error().message.find("distinct fields") != std::string::npos);
 }
 
+// ADR-1661: the op ceiling rose from 48 to 64. A program packs exactly as it did: the header, the layer records and
+// its ops are the same bytes at the same offsets (the golden hash below was taken from the 48-op build on a 48-op
+// layered program), and the new slots past its last op are zero, so every program written for 48 ops renders
+// unchanged; the WGSL interpreter stops at the packed op count.
+TEST_CASE("packMaterialProgram: a 48-op program packs to the bytes it did before the 64-op ceiling", "[material][adr1661]") {
+    MaterialProgram p;
+    p.name = "golden48";
+    for (int i = 0; i < 40; ++i) {
+        MaterialOp o = makeOp(static_cast<MaterialOpKind>(1 + i % 6), i % 8, (i + 1) % 8, (i + 3) % 8, (i + 5) % 8);
+        o.value = 0.25f * static_cast<float>(i) - 3.0f;
+        o.constant = {0.1f * static_cast<float>(i), -0.5f, 2.0f, 1.0f};
+        o.seed = static_cast<std::uint32_t>(7 + i);
+        p.ops.push_back(o);
+    }
+    for (int li = 0; li < 2; ++li) {
+        MaterialLayer layer;
+        layer.name = "layer" + std::to_string(li);
+        for (int k = 0; k < 4; ++k) {
+            MaterialOp o = constantOp((k + li) % 8, glm::vec4(0.2f * static_cast<float>(k + 1), 0.3f, 0.4f, 1.0f));
+            layer.ops.push_back(o);
+        }
+        layer.maskRegister = 1 + li;
+        layer.blendRange = 0.2f;
+        layer.baseColorRegister = 3;
+        p.layers.push_back(std::move(layer));
+    }
+    p.baseColorRegister = 3;
+    p.emissionRegister = 4;
+    p.emissionIntensity = 0.75f;
+    REQUIRE(p.totalOpCount() == 48);
+    REQUIRE(p.validate().has_value());
+    const MaterialProgramGpu gpu = packMaterialProgramWithSlots(p, {});
+    const auto* bytes = reinterpret_cast<const unsigned char*>(&gpu);
+    constexpr std::size_t kOld = 112 + 64 * 4 + 112 * 48; // the 48-op MaterialProgramGpu (5744 bytes)
+    std::uint64_t h = 1469598103934665603ULL;             // FNV-1a
+    for (std::size_t i = 0; i < kOld; ++i) {
+        h = (h ^ bytes[i]) * 1099511628211ULL;
+    }
+    INFO("hash " << h);
+    CHECK(h == 11963876806781119183ULL);
+    for (std::size_t i = kOld; i < sizeof(MaterialProgramGpu); ++i) {
+        INFO("byte " << i);
+        REQUIRE(bytes[i] == 0);
+    }
+}
+
 TEST_CASE("packMaterialProgram: layout, disabled ops skipped, field slots", "[material]") {
     CHECK(sizeof(MaterialOpGpu) == 112);
     CHECK(offsetof(MaterialOpGpu, registers) == 16);
@@ -1472,14 +1518,14 @@ TEST_CASE("layers: normal and occlusion channels", "[material]") {
 TEST_CASE("validate and pack: the layer budget", "[material]") {
     MaterialProgram p;
     p.name = "m";
-    p.ops.assign(40, constantOp(0, glm::vec4(1.0f)));
+    p.ops.assign(static_cast<std::size_t>(kMaxMaterialOps) - 8, constantOp(0, glm::vec4(1.0f)));
     MaterialLayer layer;
     layer.ops.assign(8, constantOp(1, glm::vec4(1.0f)));
     p.layers.push_back(layer);
-    CHECK(p.totalOpCount() == 48);
+    CHECK(p.totalOpCount() == kMaxMaterialOps);
     CHECK(p.validate().has_value());
     p.layers[0].ops.push_back(constantOp(1, glm::vec4(1.0f)));
-    CHECK_FALSE(p.validate().has_value()); // 49 ops across the base and its layers
+    CHECK_FALSE(p.validate().has_value()); // one op over the budget across the base and its layers (64, ADR-1661)
 
     p.ops.clear();
     p.layers.clear();

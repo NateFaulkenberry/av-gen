@@ -141,7 +141,7 @@ struct MaterialOp {
     std::string field;            // Field op: field name
     std::string texture;          // ADR-1642 texture ops: the name of one of the program's `textures`
 };
-constexpr int kMaxMaterialOps = 48;   // ADR-036 (was 16); shared by the base and every layer
+constexpr int kMaxMaterialOps = 64;   // ADR-1661 (ADR-036 made it 48, from 16); shared by the base and every layer
 constexpr int kMaterialRegisters = 8;
 // Distinct fields one program may name (ADR-050). Field ops are evaluated once each, before the
 // interpreter's loop, because the field evaluator inlined into that loop costs every material
