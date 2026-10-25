@@ -277,10 +277,9 @@ def land_height(x, z, th, o, side):
 # ---- the valley band ------------------------------------------------------------------------------------------------
 # (offset from the water's edge in m, columns round the loop). Near rows are dense (about 17 m facets along the bank),
 # the far ones coarse; the last outer row sinks so the band's edge tucks under the first range.
-# pass 7: pass 3's rows, less the -30 m ones (the seam under the water; pass 4)
-OUTER_ROWS = [(-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+OUTER_ROWS = [(-30, 900), (-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
               (300, 450), (400, 450), (520, 360), (680, 300), (880, 250), (1100, 210), (1350, 180)]
-INNER_NEAR = [(-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+INNER_NEAR = [(-30, 900), (-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
               (300, 450), (400, 450), (520, 360)]
 INNER_FAR = [(0.50, 160), (0.66, 120), (0.80, 90), (0.91, 60)]   # fractions of the way to the centre
 
@@ -345,6 +344,9 @@ def valley_band():
     outer, inner = [], []
     # outer band: row k to row k+1 (outward); inner band: row k to row k+1 (inward); the two -16 m rows are the river
     # bed's edges under the water, never joined across the river
+    # pass 7: the -30 m rows are still built (so every other row keeps pass 3's seed and so its exact vertices) but not
+    # joined: they were the bank running on under the river, the seam the owner found in pass 4
+    rows_out, rows_in = rows_out[1:], rows_in[1:]
     for a, b in zip(rows_out, rows_out[1:]):
         outer += _zip(a, b, True)
     for a, b in zip(rows_in, rows_in[1:]):
