@@ -274,7 +274,7 @@ def routes():
         # the light the river takes from the aurora
         R("signal.auroraLight", W + "glow", 0.5),
         # ---- Crash: the environment's response to a shooting star (B s4)
-        R("signal.crashGlow", A + "intensity", 0.15),
+        R("signal.crashGlow", A + "intensity", 0.1),   # 0.15 with the pass-5 fireballs: 0.050 at 47.7 s
         R("signal.crashGlow", W + "glow", 0.1),   # 0.3 on a kick + bed failed the flash gate at 23-25 s
         # a phrase-start crash throws a brighter ball than a re-hit on its decay
         R("signal.crashSize", "fx/ballA/intensity", 0.6),
