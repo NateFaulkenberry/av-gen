@@ -292,7 +292,7 @@ def ball_effect(name):
                                 "path": {"ease": 0.35},
                                 "ball": {"launch": list(l0), "target": list(l1), "travel": 1.4, "arc": 120.0,
                                          "lightRadius": 150.0, "range": 1100.0, "coreSize": 9.0, "haloSize": 30.0,
-                                         "coronaColor": [1.0, 0.36, 0.06], "coronaIntensity": 2.6,
+                                         "coronaColor": [1.0, 0.36, 0.06], "coronaIntensity": 2.2,
                                          "coronaSize": 85.0, "flicker": 0.8, "trail": 220.0, "spread": 900.0,
                                          # ADR-1665 (pass 5): the flame billboard, sooty, shedding embers -- the
                                          # most convincing of the three looks compared (41-research-pass5-fireball.md)
