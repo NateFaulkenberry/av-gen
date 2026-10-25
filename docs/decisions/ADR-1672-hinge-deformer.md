@@ -4,8 +4,13 @@
 - Code: `src/scene/procedural.{hpp,cpp}` (`DeformerKind::Hinge`, `applyHinge`), `shaders/procedural.wgsl` (`hingePoint`),
   `src/rendering/procedural_renderer.{hpp,cpp}` (packing), `src/ui/ui_logic.hpp` and `src/ui/world_panel.cpp` (panel rows).
 - Tests:
-  - `tests/unit/test_procedural.cpp` `[adr1672]`: a rigid turn at the mask centre; nothing moves above the slit or
-    outside the mask; the ease-out along the hinge axis is monotone; amount 0 is bit-identical.
+  - `tests/unit/test_procedural.cpp` `[adr1672]`:
+    - a rigid turn at the mask centre;
+    - nothing moves above the slit or outside the mask;
+    - the mask's ease-out is monotone;
+    - the lips part in a lens (widest in the middle, the corners attached, nothing past them at the slit's height);
+    - past the corners the turn grows smoothly toward the chin;
+    - amount 0 is bit-identical.
   - `tests/rendering/test_procedural_gpu.cpp` `[adr1672]`: on the GPU, amount 0 is the identity and an angle moves
     the masked part.
   - `tests/unit/test_deformer_panel.cpp`: the panel lists the kind and every control moves the point.
@@ -20,18 +25,28 @@ Twist turns about the axis by height. A rigid node turn needs a separate piece, 
 ## Decision
 
 Add `DeformerKind::Hinge`, appended as kind 8. It turns a point by `amount` radians about `axis` through `center`, the
-pivot, weighted by `w = slit x mask`:
+pivot, weighted by `w = slit x lip x mask`:
 
 - **The frame.**
   - `axis` is a.
   - forward d is `displacementAxis`, made perpendicular to a.
   - up is u = cross(d, a).
-- **The slit.** `slit = 1 - smoothstep(phase - e, phase + e, dot(p - c, u))`, with e = 0.004 x `falloff`. Only points
-  below a plane at height `phase` turn. A mesh cut along that plane, which is what the lips are, opens cleanly.
-- **The mask.** It is an ellipsoid centred at m = c + d x `speed` + u x `scale`, with radii (`frequency` along a,
-  `falloff` along u and d). `mask = 1 - smoothstep(0.5, 1, |q|)`. Full turn in the inner half, easing to zero at the
-  rim, so the corners stay attached and the cheek stretches.
+  - m = c + d x `speed` + u x `scale` is the mask's centre (the chin).
+  - dy = dot(p - c, u) - `phase` is the height above the slit.
+  - lat = |dot(p - m, a)|; r = `falloff`; cw = `frequency`, the cut's half-width (the mouth's corners).
+- **The slit.** `slit = 1 - smoothstep(-e, e, dy)`, with e = 0.004 r: a step, hidden in the mesh's own cut (the lips).
+- **The lips.** `lip = taper + (1 - taper) x smoothstep(0, r/4, -dy)`, with `taper = 1 - min(lat/cw, 1)^2`.
+  - Just below the slit, the turn tapers to nothing at the corners, so the lips part in a lens.
+  - Past the corners, where the surface is not cut, nothing at the slit's height moves.
+  - A quarter radius below the slit, the whole width turns (the chin), so the cheeks stretch rather than tear.
+- **The mask.** `mask = 1 - smoothstep(0.5, 1, |p - m| / r)`: rigid inside half the sphere, easing to nothing at its
+  shell.
 - **The rotation.** Rodrigues about a through c, by `amount x w`. The CPU twin and the shader share the formula.
+
+The first version had no `lip` term, an ellipsoid mask, and `frequency` as the mask's half-width. In the first
+renders, points past the corners just below the slit's plane turned while the connected points just above it did not,
+so the chin folded. The opening was also uniform out to the corners, so it read as a notch. The `lip` term replaced it
+before anything shipped.
 
 The GPU packing reuses the existing slots:
 

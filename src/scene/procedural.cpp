@@ -2421,15 +2421,20 @@ glm::vec3 applyHinge(const Deformer& d, const glm::vec3& p) {
     fwd = glm::length(fwd) > 1e-6f ? glm::normalize(fwd) : anyPerpendicular(a);
     const glm::vec3 up = glm::normalize(glm::cross(fwd, a));
     const float r = std::max(d.falloff, 1e-6f);
-    const float rx = std::max(d.frequency, 1e-6f);
+    const float cw = std::max(d.frequency, 1e-6f);   // the cut's half-width (the mouth's corners)
+    const float dy = glm::dot(p - d.center, up) - d.phase; // height above the slit (negative below)
     const float e = 0.004f * r;
-    const float py = glm::dot(p - d.center, up);
-    const float slit = 1.0f - hingeSmoothstep(d.phase - e, d.phase + e, py);
+    const float slit = 1.0f - hingeSmoothstep(-e, e, dy);
     const glm::vec3 m = d.center + fwd * d.speed + up * d.scale;
-    const glm::vec3 rel = p - m;
-    const glm::vec3 q(glm::dot(rel, a) / rx, glm::dot(rel, up) / r, glm::dot(rel, fwd) / r);
-    const float mask = 1.0f - hingeSmoothstep(0.5f, 1.0f, glm::length(q));
-    const float angle = d.amount * slit * mask;
+    const float lat = std::abs(glm::dot(p - m, a));
+    // the lips: just below the slit the turn tapers to nothing at the corners (a lens-shaped opening; past the
+    // corners, where the surface is not cut, nothing at the slit's height moves); a lip height L below it, the
+    // whole width turns
+    const float u = std::min(lat / cw, 1.0f);
+    const float taper = 1.0f - u * u;
+    const float lip = taper + (1.0f - taper) * hingeSmoothstep(0.0f, 0.25f * r, -dy);
+    const float mask = 1.0f - hingeSmoothstep(0.5f, 1.0f, glm::length(p - m) / r);
+    const float angle = d.amount * slit * lip * mask;
     if (angle == 0.0f) {
         return p;
     }

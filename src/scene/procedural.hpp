@@ -414,15 +414,18 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          deformer space is World, else at the instance's world position + local offset):
 //          vector fields: p += v * a; scalar fields: p += n * s * a (along the normal) when
 //          `alongNormal`, else p += axis * s * a.
-//   Hinge (ADR-1672): a soft-masked rigid turn -- a jaw (a mouth that opens), a lid -- with no rig and no cut. Points
-//          turn by `amount` (radians) about `axis` through `center` (the pivot), weighted by w = slit x mask:
-//          the frame is axis a, forward d = `displacementAxis` made perpendicular to a, up u = cross(d, a);
-//          slit = 1 - smoothstep(s - e, s + e, dot(p - c, u)) with s = `phase` (the slit's height above the
-//          pivot) and e = 0.004 x `falloff` (a step, hidden in a mesh's own slit: the lips);
-//          mask = 1 - smoothstep(0.5, 1, |q|), q = (p - m) in the frame scaled by (`frequency`, `falloff`,
-//          `falloff`) for (a, u, d), m = c + d x `speed` + u x `scale` (the mask's centre). So inside half the
-//          ellipsoid everything below the slit turns rigidly, and it eases to nothing at its shell: the cheeks
-//          and the corners of the mouth stretch, and nothing is cut. amount 0 is the identity.
+//   Hinge (ADR-1672): a soft-masked rigid turn -- a mouth that opens along a cut -- with no rig. Points turn by
+//          `amount` (radians) about `axis` through `center` (the pivot), weighted by w = slit x lip x mask. The frame
+//          is axis a, forward d = `displacementAxis` made perpendicular to a, up u = cross(d, a); m = c + d x
+//          `speed` + u x `scale` is the mask's centre; dy = dot(p - c, u) - `phase` (height above the slit);
+//          lat = |dot(p - m, a)|; r = `falloff`; cw = `frequency` (the cut's half-width: the mouth's corners).
+//            slit = 1 - smoothstep(-e, e, dy), e = 0.004 r: a step, hidden in the mesh's own cut (the lips);
+//            lip  = taper + (1 - taper) x smoothstep(0, r/4, -dy), taper = 1 - min(lat/cw, 1)^2: just
+//                   below the slit the turn tapers to nothing at the corners (a lens-shaped opening, and past
+//                   the corners, where the surface is whole, nothing at the slit's height moves); r/4 below it
+//                   the whole width turns (the chin), so the cheeks stretch rather than tear;
+//            mask = 1 - smoothstep(0.5, 1, |p - m| / r): rigid inside half the sphere, easing out at its shell.
+//          amount 0 is the identity.
 //   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
 //          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of
 //          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds)

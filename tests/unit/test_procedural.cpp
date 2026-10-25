@@ -2226,8 +2226,8 @@ TEST_CASE("Hinge deformer: turns what lies below the slit inside its mask, eases
     h.displacementAxis = {0.0f, 0.0f, 1.0f}; // forward: +Z, so up is +Y
     h.center = {0.0f, 0.0f, 0.0f};           // the pivot
     h.phase = 0.0f;                          // the slit at the pivot's height
-    h.falloff = 0.10f;                       // mask radius (up, forward)
-    h.frequency = 0.05f;                     // mask half-width (along the hinge)
+    h.falloff = 0.10f;                       // mask radius
+    h.frequency = 0.02f;                     // the cut's half-width (the mouth's corners)
     h.speed = 0.06f;                         // mask centre 6 cm forward ...
     h.scale = -0.03f;                        // ... and 3 cm down
     h.amount = 0.3f;
@@ -2246,16 +2246,38 @@ TEST_CASE("Hinge deformer: turns what lies below the slit inside its mask, eases
         checkVec(applyDeformer(h, {0.0f, -0.2f, 0.06f}, 0.0), {0.0f, -0.2f, 0.06f});
         checkVec(applyDeformer(h, {0.0f, -0.03f, -0.2f}, 0.0), {0.0f, -0.03f, -0.2f});
     }
-    SECTION("it eases out across the mask's outer half: no step at the mouth's corners") {
+    SECTION("it eases out across the mask's outer half") {
         float prev = 1e9f;
         for (int i = 0; i <= 10; ++i) {
-            const float x = 0.025f + 0.025f * static_cast<float>(i) / 10.0f; // half to full half-width
+            const float x = 0.05f + 0.05f * static_cast<float>(i) / 10.0f; // half to full radius
             const glm::vec3 p{x, -0.03f, 0.06f};
             const float moved = glm::length(applyDeformer(h, p, 0.0) - p);
             CHECK(moved <= prev + 1e-6f);
             prev = moved;
         }
         CHECK(prev < 1e-5f);
+    }
+    SECTION("the lips part in a lens: widest at the middle, nothing at or past the corners") {
+        const auto drop = [&](float x, float y) {
+            const glm::vec3 p{x, y, 0.06f};
+            return glm::length(applyDeformer(h, p, 0.0) - p);
+        };
+        const float lip = -0.001f;                  // just below the slit: the lower lip
+        CHECK(drop(0.0f, lip) > 0.015f);            // the middle opens (0.3 rad at ~6 cm from the pivot)
+        CHECK(drop(0.015f, lip) < 0.5f * drop(0.0f, lip));
+        // the corner stays attached and past it, where the surface is whole, a millimetre below the slit's height
+        // moves under 0.2 mm (the start of the cheek's smooth stretch)
+        CHECK(drop(0.02f, lip) < 2e-4f);
+        CHECK(drop(0.03f, lip) < 2e-4f);
+        CHECK(drop(0.03f, 0.001f) < 1e-6f);         // ... and nothing above it, so no tear
+        // past the corners the turn grows smoothly downward: the cheek stretches to the chin
+        float prev = -1.0f;
+        for (int i = 0; i <= 10; ++i) {
+            const float m = drop(0.03f, -0.025f * static_cast<float>(i) / 10.0f);
+            CHECK(m >= prev - 1e-7f);
+            prev = m;
+        }
+        CHECK(prev > 0.01f);
     }
     SECTION("amount 0 is the identity, bit for bit") {
         h.amount = 0.0f;

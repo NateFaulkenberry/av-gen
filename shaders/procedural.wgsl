@@ -218,15 +218,17 @@ fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn:
     }
     let up = normalize(cross(fwd, a));
     let r = max(params.w, 1e-6);
-    let rx = max(params.x, 1e-6);
+    let cw = max(params.x, 1e-6);
+    let dy = dot(p - c, up) - params.z;
     let e = 0.004 * r;
-    let py = dot(p - c, up);
-    let slit = 1.0 - smoothstep(params.z - e, params.z + e, py);
+    let slit = 1.0 - smoothstep(-e, e, dy);
     let m = c + fwd * params.y + up * upOffset;
-    let rel = p - m;
-    let q = vec3<f32>(dot(rel, a) / rx, dot(rel, up) / r, dot(rel, fwd) / r);
-    let mask = 1.0 - smoothstep(0.5, 1.0, length(q));
-    let angle = amount * slit * mask;
+    let lat = abs(dot(p - m, a));
+    let u = min(lat / cw, 1.0);
+    let taper = 1.0 - u * u;
+    let lip = taper + (1.0 - taper) * smoothstep(0.0, 0.25 * r, -dy);
+    let mask = 1.0 - smoothstep(0.5, 1.0, length(p - m) / r);
+    let angle = amount * slit * lip * mask;
     if (angle == 0.0) {
         return p;
     }
