@@ -387,18 +387,39 @@ def river_effects(pair=None):
             river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)]
 
 
+BED_SHELF = "#1c1858"   # pass 5: the lakebed's own faint blue-violet where it is shallow
+BED_SHELF_DEPTH = (-38.0, -3.0)   # metres: it fades to the body's black between these depths
+
+
 def bed_program():
-    """The riverbed: nearly black at rest (the river body's colour), so only the river light reveals its planes."""
-    return {"name": "abBed", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb("#010106") + [1.0]}],
+    """The lakebed: the river body's near black, plus (pass 5, "make the pond appear deeper") a faint blue-violet that
+    fades with depth -- the shelves round the shores show through the water, the middle drops away into black, so the
+    lake reads as a volume. The light in the water (ADR-1662's land term) reveals its planes as before."""
+    c4 = lambda h: hexrgb(h) + [1.0]   # noqa: E731
+    return {"name": "abBed", "ops": [
+        {"kind": "input", "dst": 0, "input": "worldPosition"},
+        {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [1.0, 1.0, 1.0, 1.0]},
+        {"kind": "smoothstep", "dst": 0, "srcA": 0, "constant": [BED_SHELF_DEPTH[0], BED_SHELF_DEPTH[1], 0.0, 0.0]},
+        {"kind": "power", "dst": 0, "srcA": 0, "value": 1.6},
+        {"kind": "constant", "dst": 1, "constant": c4(BED_SHELF)},
+        {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
+        {"kind": "constant", "dst": 1, "constant": c4("#010106")},
+        {"kind": "add", "dst": 0, "srcA": 0, "srcB": 1}],
+            "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
+
+
+def fish_program():
+    """The fish: near black, so a fish shows only when a pulse's light in the water passes over it."""
+    return {"name": "abFish", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb("#010106") + [1.0]}],
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
 
 
 def fish_node():
-    """Pass 4: the fish, in the bed's program -- near black, lit only by the beams' under-water light."""
+    """The fish (pass 4-5), in their own near-black program: lit only by the pulses' light in the water."""
     return {"name": "fish", "kind": "procedural", "procedural": {
         "source": {"kind": "mesh", "asset": "ab-fish.glb"}, "distribution": {"kind": "single"},
         "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
-                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "abBed"},
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "abFish"},
         "castsShadow": False}}
 
 
