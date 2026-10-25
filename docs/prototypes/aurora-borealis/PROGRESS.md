@@ -718,3 +718,101 @@ All from the final build, ee7f85a6, using the same build for every comparison.
 | `20-mountain-visibility-per-note.txt` | the share of each bank lit per note |
 | `21-mountain-spill-before-after.txt` | the spill measured |
 | `22-headless-ultra-ab-pass4-vs-pass5.txt` | headless Ultra 1080p, pass 4 against pass 5, the same build |
+
+## Pass 6: back to the river (stop, 2026-10-25)
+
+The owner's notes are at the end of `40-owner-notes-pass5.md`. The lake is retired.
+
+- **Main merged** (daf93949, the mix kick/snare/hat detection retired).
+  - The only conflict, `tools/sound_to_light.py`, was resolved by keeping both: main's `signal.beatPop` path and the
+    AB paths.
+  - `aurora-tundra.json` merged cleanly and keeps `ribbonCoverage`.
+  - The Feline project reads none of the retired signals. CMake was reconfigured.
+
+### What changed
+
+- **A gently curving river.**
+  - `world.py` is pass 4's unrolled straight valley again, with 45-75 m bends over 390-600 m half-lengths. Pass 4 had
+    12-26 m.
+  - Within 2 km ahead of the camera the river turns at most 14 degrees. Pass 4 turned 5.7 and pass 3's loop 46-66.
+  - It is at most 7 degrees and 72 m off the axis, which keeps both ranges in view.
+  - The camera flies pass 4's straight 4 km run.
+- **Simpler mountains.**
+  - The bank band has about 60% of pass 4's columns and rows.
+  - Detail is two broad ridged octaves at 260-320 m with less amplitude; pass 4 had three octaves at 95-260 m.
+  - The peaks' crest noise is one octave at 320 m.
+  - There are 80 spurs (were 140), and the ranges have about 55% of the columns and three quarters of the rings.
+  - The result is larger planes and longer, cleaner ridgelines. A coarser first try, with 9 rows, flattened the peaks
+    into hills.
+- **The sides are swapped:** the left bank is the bass and the right bank is the Moog.
+- **The mountain effect** is pass 5's: strike and soft notes, a sustain that follows the level, wide lines, facet fills
+  and ridgeline glow. Its light now runs down the range.
+  - Each bank's glint term is lit only inside bands that always flow away from the camera.
+  - The bands are a comb over the lines' distance fade, three across 0.4-4.5 km and about 1.4 km apart. A saw LFO
+    (`lfo.rangeFlow`, 1 Hz) advances its phase, so a band runs 1.4 km a second.
+  - A note lights whatever bands are running, and the sustain keeps them lit as they run. Every note, including each
+    trill note, reads as light travelling down the range.
+  - The programs are 62 ops each.
+  - **Rejected, two takes:**
+    - Lighting everything nearer than a front blanked the bank and lit it again on each note: 0.052 on the flash gate.
+    - A single band restarting per note had to run its length before the next could start. Only 67 of 445 Moog notes
+      sent one, and the share of the bank that brightened per note fell from 35% to 8-10%.
+- **Carried over:**
+  - The fireball (ADR-1665), now aimed 560-600 m up (was 230-250), so it clears the ridges.
+  - The fish: 18 of four types, at least 1.5 m under, checked.
+  - The deeper water: a bed about 50 m deep mid-river, twice the absorption, and the shelf tint.
+  - Pass 4's three lanes with pass 5's quarter spill.
+
+### Measurements
+
+All from 505ce9bc, the same build for every comparison.
+
+- **Notes caught** (`15-...`): the same signals as pass 5.
+  - Moog: every note 0.94 recall at 0.75 precision; onsets 0.88 at 0.86.
+  - Bass: 0.94 at 0.94.
+- **Visibility per note** (`16-...`), using per-frame masks because the camera moves:
+  - **Lit share**, the song against the same song without the mountain instruments. The bass lights a median 37% of the
+    left bank and the Moog 39% of the right; notes lighting at least 15% of the bank: 99% and 97%.
+  - **Brightening**, pass 5's measure. The bass is 33% and the Moog 31%, against a floor of 19-21%: the bands keep
+    running between notes.
+- **Spill** (`17-...`): pass 4's spill added a mean 0.003 linear luminance over the mountains and lit 16% of their pixels
+  a little brighter. Pass 6 keeps a quarter of it.
+- **Flash gate:** worst 0.039; 0 general flashes.
+- **Headless Ultra 1080p, on AC**, pass 4 against pass 6:
+  - GPU p50: 13.85 / 13.38 ms at 12 s, 13.22 / 13.78 at 36 s, 13.14 / 13.41 at 47 s.
+  - The difference is within the run-to-run spread; CPU work is 1.8 ms.
+- **Fish:** the highest vertex is 1.50 m down.
+
+### Pass-6 stop media: `~/Desktop/av-gen-review/aurora-borealis/pass6/`
+
+| File | What it shows |
+|---|---|
+| `00a-river-curvature-measurements.txt` | the curve: heading change ahead, the share near the axis, the swing |
+| `00b-top-down-river-pass4-straight-vs-pass6-gently-curving.png` | top down, pass 4 against pass 6 |
+| `00c-river-and-simpler-mountains-6-21-36-51-66s.png` | five frames down the river: the simpler mountains, both ranges in view |
+| `01-gently-curving-river-simpler-mountains-0-12s.mp4` | the opening, with sound |
+| `02-busy-passage-bass-left-moog-right-bands-running-down-the-range-18.5-24.5s.mp4` | the densest Moog and bass, the bands running down both ranges, with sound |
+| `03-moog-right-bank-closeup-half-speed-19-22s.mp4` | the Moog's right bank close up, half speed |
+| `04-bass-left-bank-closeup-half-speed-19-22s.mp4` | the bass's left bank close up, half speed |
+| `05-moog-sustain-holding-and-decaying-54-60s.mp4` | Moog notes held and decaying, then busy bass, with sound |
+| `06-bass-heavy-passage-with-moog-35.5-42s.mp4` | a bass-heavy passage with the Moog, with sound |
+| `07-fireballs-crash-group-clearing-the-ridges-44.5-49s.mp4` | the fireballs on the 45.6/47.0/47.7 s crashes, now clearing the ridges, with sound |
+| `08-fireball-closeups-at-45.9-46.4-46.9-47.8-48.4s.png` | the fireballs close up, in the sky above the ridges |
+| `09-three-pulse-lanes-on-the-river-8-16s.mp4` | the three lanes on the river, with sound |
+| `10-mountain-spill-before-left-after-right-8-16s.mp4` | pass 4's spill (left) against pass 6's quarter (right), the same build |
+| `11-fish-and-deeper-water-closeup-quarter-speed-10-14s.mp4` | fish and the deeper water lit by the pulses, quarter speed |
+| `12-full-song-0-70s-1080p.mp4` | the whole song, with sound (117 MB) |
+| `13-full-song-0-70s-720p-small.mp4` | the same at 720p, 20 MB |
+| `14-flash-audit-full-song.txt` | the flash audit |
+| `15-moog-bass-notes-caught.txt` | notes caught |
+| `16-mountain-visibility-per-note.txt` | visibility per note, both measures |
+| `17-mountain-spill-before-after.txt` | the spill measured |
+| `18-fish-below-the-surface-check.txt` | every fish's highest vertex |
+| `19-headless-ultra-ab-pass4-vs-pass6.txt` | headless Ultra, pass 4 against pass 6 |
+
+### Open at the stop
+
+- **The light runs down the range all the time, not launched per note.** The bands always flow and each note lights
+  them. A true front per note would need several fronts per bank, more op constants than the 64-op ceiling leaves.
+- **The Moog's soft notes:** precision 0.75.
+- **Live acceptance and the suites** wait for the owner's approval: a fresh reboot, on AC, with the LG at 60 Hz.
