@@ -998,3 +998,69 @@ All from b74fa105:
 | `12-aurora-smoothness-vs-pass4.txt` | the smoothness measure against pass 4 |
 | `13-full-song-0-70s-720p-small.mp4` | the whole song, 720p, 29 MB, with sound |
 | `14-flash-audit-full-song.txt` | the flash audit |
+
+## Pass 10: close (stop, 2026-10-25)
+
+The owner's notes on pass 9 are at the end of `40-owner-notes-pass5.md`, with later notes relayed by the coordinator:
+
+- the shoreline;
+- the camera;
+- BASS.mid;
+- the toms (retracted: nothing changed).
+
+From now on the owner reviews full-video renders. Media is in `~/Desktop/av-gen-review/91-aurora-borealis/pass10/`; the
+folder was renamed by the owner.
+
+### What changed
+
+- **Fish swim** (`world.fish_list`, `build.fish_tracks`, `build.fish_wag`).
+  - There are 28 (were 18), one node per fish. Each swims a slow, looping circle and turns along it; two LFOs wag the
+    heading +-9 degrees.
+  - Depth is fixed, at least 1.5 m under, checked round each lap, and clear of the bed.
+- **Brighter underwater, and the pulses light the banks.** The base light and the fish are a touch brighter, and the
+  pulses' light on the land is half of pass 4's (was a quarter).
+- **The ripple seam** (ADR-1666 addendum): the wake's ripples feather in over 25 m and out over the last 40% of the
+  wake. They had stopped at hard lines.
+- **The splash behind the camera.**
+  - The pulses launch 40 m behind it (`startOffset` -40), so the impact and its flash are never in frame.
+  - The rings run at 300 m/s for 1.2 s, so they reach into view.
+- **The land's light stops at the waterline.**
+  - A mask in both banks' programs, 0 at the surface and 1 from 0.08 m up, multiplies the lines' fade. The crease
+    lines, ridgeline glow, glints, fills and bands stop at the water.
+  - A ramp of 1.5 m, then 0.4 m, darkened the inner bank's low flats.
+  - Pass 3's crash flash on the crests made room for the mask in the programs.
+- **The camera centred on the river** (`build.follow_r`). It follows the river's course, smoothed over +-220 m, 90%
+  of the way from the valley's axis, and looks 900 m ahead on it.
+  - River offset from frame centre, as a share of the half-frame width, 600 m ahead: median 0.28 -> 0.07, max
+    0.43 -> 0.21.
+  - Turn rate at most 1.0 deg/s.
+- **The bass from BASS.mid** (ADR-1667: `sonic.notes` re-timed and optional).
+  - **Fit** to BASS.wav's onsets: scale 0.970905 (1/1.03 to 0.003%), offset -75.7446 s, residual median 1.5 ms, no
+    drift.
+  - **All 216 notes fire.** Each note-on lights the left bank (sized by velocity), and `notes.active` holds the
+    sustain until note-off, shaped by the stem's level.
+  - **Fallback:** the audio onsets, while no MIDI note has sounded for 4 s (`notes.phrase`). A `notes.*` input is
+    otherwise gated off between notes by the bus's implied `notes.active`.
+- **Fireball clearance** re-checked on the new camera: least 82 m.
+
+### Measurements
+
+All from ad18d94e:
+
+- **Flash gate:** 0.044 at 3.5 s; 0 general flashes.
+- **Fish:** the highest vertex is 1.50 m under.
+- **Tests:** [aurora-borealis], [adr1667], [adr1666], [sonic] pass.
+
+### Pass-10 stop media: `~/Desktop/av-gen-review/91-aurora-borealis/pass10/`
+
+| File | What it shows |
+|---|---|
+| `01-full-song-0-70s-1080p.mp4` | the whole song, 1080p, with sound (117 MB) |
+| `02-full-song-0-70s-720p-small.mp4` | the same at 720p, 27 MB |
+| `03-ripple-seam-before-top-after-bottom-closeup-half-speed-8-16s.mp4` | the seam: the pass-9 shader against pass 10's, the same frames |
+| `04-shoreline-before-left-after-right-at-21-36-51s.png` | the shoreline without and with the waterline mask |
+| `05-summary-of-changes.txt` | the summary |
+| `06-bass-midi-fit.txt` | the MIDI fit and the bass measured |
+| `07-flash-audit-full-song.txt` | the flash audit |
+| `08-fish-check.txt` | the fish check |
+| `09-camera-centring.txt` | the camera centring, measured |
