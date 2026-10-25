@@ -2818,13 +2818,13 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
     if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr && !track->empty()) {
         const analysis::SpanProfile p = analysis::profileSpan(*track, section.startSeconds, section.endSeconds);
         if (p.measured()) {
-            ImGui::TextDisabled("measured: energy %.2f, %.1f hits/s (kick %.1f), brightness %.0f Hz",
+            ImGui::TextDisabled("measured: energy %.2f, %.1f onsets/s, brightness %.0f Hz",
                                 static_cast<double>(p.energy), static_cast<double>(p.onsetRate),
-                                static_cast<double>(p.kickRate), static_cast<double>(p.brightnessHz));
+                                static_cast<double>(p.brightnessHz));
             if (ImGui::IsItemHovered()) {
                 tooltip("The audio under this section, measured independently of loudness: the energy\n"
-                        "composite (audio.energy), percussive hits per second (audio.onsetRate), kicks\n"
-                        "per second (the file's low-band onsets) and the mean spectral centroid.");
+                        "composite (audio.energy), onsets per second (audio.onsetRate) and the mean\n"
+                        "spectral centroid.");
             }
         }
     }
@@ -4312,7 +4312,7 @@ void SequencePanel::drawStems(app::Engine& engine) {
     ImGui::SeparatorText("Stems (analysis only)");
     if (ImGui::IsItemHovered()) {
         tooltip("Files analysed beside the mix -- a drum stem, a bass stem -- and published as stem.<key>.* for "
-                "routes: level, rms, peak, onset, the five bands, brightness, width, and kick/snare/hat with Hits. "
+                "routes: level, rms, peak, onset, the five bands, brightness, width, and kick/snare/hat on a drums stem. "
                 "Never played and never mixed: the clips above are what you hear. Line them up with the offset; "
                 "nothing is guessed.");
     }
@@ -4416,8 +4416,7 @@ void SequencePanel::drawStems(app::Engine& engine) {
             changed |= roleCombo("role", edit.role); // ADR-1630
             if (ImGui::IsItemHovered()) {
                 tooltip("What the stem is. Drums finds kicks, snares and hats in it (stem.<key>.kick/snare/hat, and "
-                        "role.drums.*: what tools/drum_signals.py's signal.kick reads first); about six times the "
-                        "analysis cost of the rest. Every other role publishes onsets, levels and register only -- "
+                        "role.drums.kick/snare/hat); about six times the analysis cost of the rest. Every other role publishes onsets, levels and register only -- "
                         "never a kick, snare or hat. Never guessed from the key or the audio.");
             }
             ImGui::SameLine();

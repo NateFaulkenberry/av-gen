@@ -501,9 +501,9 @@ SCAN_ON_CREST = os.environ.get("CW_SCAN_CREST", "1") == "1"
 SCAN_FROM = (-95.0, 0.0, 30.0)                                  # upstream of the frame's left edge
 SCAN_AXIS = (0.96, 0.0, -0.28)                                  # across the frame, a little away from the camera
 RIPPLE_RELIEF = float(os.environ.get("CW_RIPPLE_RELIEF", "0.35"))  # metres of the onset rings in the geometry (0 = off)
-# the snare's flash on every nodal line at once (a frame-wide event, brief §4.2 "not the same full-screen flash"): the
-# snare's energy now travels (the ripples, the scan's glimmer); its flash on the lines comes down
-SNARE_LINE = float(os.environ.get("CW_SNARE_LINE", "0.3"))
+# the onset's flash on every nodal line at once (a frame-wide event, brief §4.2 "not the same full-screen flash"): the
+# onset's energy now travels (the ripples, the scan's glimmer); its flash on the lines comes down
+ONSET_LINE = float(os.environ.get("CW_ONSET_LINE", "0.3"))
 MERGE_FINE = os.environ.get("CW_MERGE_FINE", "1") == "1"
 MERGE_VIB = float(os.environ.get("CW_MERGE_VIB", "0"))   # art pass II: medium + fine in one relief reader
 BASS_FRONT = float(os.environ.get("CW_BASS_FRONT", "0.6"))        # metres of the bass wavefront (0 = off)
@@ -1357,9 +1357,7 @@ def build_world():
               decayMs=1200),
             R("sonic.roughness.slow", F + "source/3/amplitude", 0.45, attackMs=1500, decayMs=3000),
             R("response.bass", D(1), 1.0, op="multiply", gain=0.35, offset=1.0, attackMs=80, decayMs=900),
-            R("response.sustain", D(2), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000),
-            R("response.hat", ("field/%s/resonance/source/1/amplitude" % FIELD_FINE) if MERGE_FINE else D(3), 1.0,
-              op="multiply", gain=1.5, offset=1.0, attackMs=10, decayMs=220))
+            R("response.sustain", D(2), 1.0, op="multiply", gain=0.3, offset=1.0, attackMs=1200, decayMs=3000))
     s.control = control_map(cc, pads)
     s.route(R("control.relief", "procedural/ground/deform/1/amount", 3.0, **CCR))
     if PALETTE == "M" and BAKE:
@@ -1387,9 +1385,8 @@ def build_world():
     #   persistent (seconds): the song's build (intensity, a 12 s follower) turns the grit from deep teal toward a
     #     brighter cyan -- a HUE/value change of a material, no brightness pulse; held sound (sustain) builds the
     #     hollow glow's presence.
-    #   transient (a few hundred ms): kicks flare the hollow glow where the cells already ring; snares brighten the
-    #     nodal lines; hats sharpen the stone's sheen (fine highlights only); spectral change (flux) lifts the
-    #     fuchsia counter-fill on the far flanks.
+    #   transient (a few hundred ms): low attacks flare the hollow glow where the cells already ring; any attack
+    #     brightens the nodal lines; spectral change (flux) lifts the fuchsia counter-fill on the far flanks.
     tgt = hexrgb("#0f6b82")
     base = pc("grit")
     colour_routes = PALETTE != "G"
@@ -1410,18 +1407,17 @@ def build_world():
             # held sound (the low-mid body of a mix): the dominant surface shifts -- the band's phase leans over
             # seconds, so the whole field slides a step along the gradient and settles back
             R("response.sustain", band, 20.0, attackMs=2500, decayMs=5000),
-            # mids (snares, the body of the beat): the medium folds' light (with LINE2; otherwise the snare's route
-            # onto the crest lines, above, carries the mids)
-            *[R("snareEnv", p_, 1.0, op="multiply", gain=1.4, offset=1.0, attackMs=0, decayMs=420)
+            # any attack: the medium folds' light (with LINE2; otherwise the onset's route onto the crest lines, above,
+            # carries it)
+            *[R("onsetEnv", p_, 1.0, op="multiply", gain=1.4, offset=1.0, attackMs=0, decayMs=420)
               for p_ in ([RP % (g["line2"], "constant2"), RP % (g["line2"], "constant3")] if LINE2 else [])])
         # the chromatic field's band (layer B) migrates across the basin: its phase is the integral of the music's
         # energy plus a slow floor (ADR-1041), so it never resets, quickens in loud passages and still drifts in
         # silence -- about one band in 60-90 s
         s.route(R("sonic.energy", band, BAND_RATE, gain=1.0, offset=0.4, integrate=True))
         s.route(*[R("sustain", p_, 1.0, op="multiply", gain=1.2, offset=1.0, attackMs=1500, decayMs=4000) for p_ in hollow],
-                *[R("kickEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
-                R("snareEnv", line, 1.0, op="multiply", gain=SNARE_LINE, offset=1.0, attackMs=0, decayMs=260),
-                *[R("hatEnv", p_, 1.0, op="multiply", gain=0.5, offset=1.0, attackMs=0, decayMs=180) for p_ in sheen],
+                *[R("lowEnv", p_, 1.0, op="multiply", gain=1.6, offset=1.0, attackMs=0, decayMs=380) for p_ in hollow],
+                R("onsetEnv", line, 1.0, op="multiply", gain=ONSET_LINE, offset=1.0, attackMs=0, decayMs=260),
                 *[R("flux", p_, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=300, decayMs=1500) for p_ in counter])
     s.route(*[R("control.light", p_, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR) for p_ in counter],
             R("control.light", line, 1.0, op="multiply", gain=2.0, offset=1.0, **CCR))

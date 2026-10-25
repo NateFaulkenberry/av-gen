@@ -147,60 +147,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "lfo",
    "name": "famPlate",
    "settings": {
@@ -428,19 +374,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "field/cymaticFine/resonance/source/1/amplitude",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.5,
-    "offset": 1.0,
-    "attackMs": 10,
-    "decayMs": 220
-   }
-  },
-  {
    "source": "control.relief",
    "target": "procedural/ground/deform/1/amount",
    "amount": 3.0,
@@ -536,7 +469,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "material/cwGround/op/26/ramp/constant2",
    "amount": 1.0,
    "op": "multiply",
@@ -549,7 +482,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "material/cwGround/op/26/ramp/constant3",
    "amount": 1.0,
    "op": "multiply",
@@ -562,7 +495,7 @@
    }
   },
   {
-   "source": "response.snareEnv",
+   "source": "response.onsetEnv",
    "target": "material/cwGround/op/15/constant/constant",
    "amount": 1.0,
    "op": "multiply",
@@ -572,32 +505,6 @@
     "offset": 1.0,
     "attackMs": 0,
     "decayMs": 260
-   }
-  },
-  {
-   "source": "response.hatEnv",
-   "target": "material/cwGround/op/41/ramp/constant2",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 0.5,
-    "offset": 1.0,
-    "attackMs": 0,
-    "decayMs": 180
-   }
-  },
-  {
-   "source": "response.hatEnv",
-   "target": "material/cwGround/op/41/ramp/constant3",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 0.5,
-    "offset": 1.0,
-    "attackMs": 0,
-    "decayMs": 180
    }
   },
   {

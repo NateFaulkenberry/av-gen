@@ -49,9 +49,8 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "arc brightness and its light"],
         ["sustained", "notes.active", "a held note is a steady writhing arc; a staccato note one crack"],
         ["bass", "response.bass", "the core charges: its top-load glows and the hall hums brighter"],
-        ["kick", "signal.kick", "a discharge: bolts from the core to the ring, the hall flashes"],
-        ["snare", "response.snare", "crackle crawls over the core"],
-        ["hat", "response.hat", "sparks spit from the core's crown"],
+        ["low", "response.low", "a discharge: bolts from the core to the ring, the hall flashes"],
+        ["onset", "response.onset", "crackle crawls over the core; sparks spit from the core's crown"],
         ["tension", "notes.tension", "dissonant chords make the arcs jagged and flickering"],
         ["timbre", "sonic.roughness", "arc jaggedness; arc colour from violet to blue-white"],
     ],
@@ -169,8 +168,8 @@ def build():
             "glowWidth": 0.32, "flicker": 0.45, "light": 0.0, "lightRange": 20.0, "seed": 11 + 7 * i,
             "source": {"kind": "world", "position": [CORE_TOP[0], CORE_TOP[1] + 0.2, CORE_TOP[2]]},
             "target": {"kind": "world", "position": list(tower_top(i))}})
-    # ---- the kick's discharge from the core
-    s.effect("discharge", "discharge", ("world",), trigger={"source": "signal", "name": signals.S("kick"),
+    # ---- the low attack's discharge from the core
+    s.effect("discharge", "discharge", ("world",), trigger={"source": "signal", "name": signals.S("low"),
                                                              "threshold": 0.25},
              parameters={"bolts": 3, "radius": 4.2, "downward": 0.9, "boltDuration": 0.16, "jaggedness": 0.3,
                          "branchProbability": 0.3, "color": hexrgb(ARC), "intensity": 30.0,
@@ -178,14 +177,14 @@ def build():
                          "flashRange": 26.0, "sparkCount": 16, "sparkSpeed": 10.0, "sparkLife": 0.6,
                          "sparkIntensity": 12.0, "seed": 5,
                          "source": {"kind": "world", "position": list(CORE_TOP)}})
-    # ---- the snare's crackle over the core
+    # ---- the onset's crackle over the core
     s.entity("coreLoad", tags=["core"])
     s.effect("crackle", "electricField", ("entity", "coreLoad"), parameters={
         "crackle": 0.0, "crackleScale": 6.0, "crackleSpeed": 3.0, "coverage": 0.5, "arcCount": 3, "arcRate": 9.0,
         "hopDistance": 0.6, "color": hexrgb(ARC), "intensity": 0.0, "coreWidth": 0.02, "glowWidth": 0.25,
         "glowIntensity": 0.0, "seed": 3})
 
-    # ---- sparks from the core's crown (hat)
+    # ---- sparks from the core's crown (onset)
     s.particles("sparks", capacity=3000, seed=31, shape="sphere", position=list(CORE_TOP), extent=[1.4, 0.3, 1.4],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.4, lifetimeMax=1.1, spread=0.9, speedMin=2.0,
                 speedMax=5.0, gravity=[0, -9.0, 0], drag=0.4, turbulence=0.0, sizeStart=0.035, sizeEnd=0.0,
@@ -239,17 +238,17 @@ def build():
             R("bass", "lights/coreGlow/intensity", 150.0, attackMs=50, decayMs=700, offset=0.35),
             R("bass", "procedural/coreCoil/material/emissive", 1.6, attackMs=50, decayMs=700, offset=0.35),
             R("bass", "procedural/cables/material/emissive", 0.4, attackMs=50, decayMs=900, offset=0.35))
-    # snare: crackle over the core
-    s.route(R("snare", "fx/crackle/intensity", 60.0, attackMs=0, decayMs=240),
-            R("snare", "fx/crackle/crackle", 14.0, attackMs=0, decayMs=240),
-            R("snare", "fx/crackle/glowIntensity", 3.0, attackMs=0, decayMs=240),
+    # onset: crackle over the core
+    s.route(R("onset", "fx/crackle/intensity", 60.0, attackMs=0, decayMs=240),
+            R("onset", "fx/crackle/crackle", 14.0, attackMs=0, decayMs=240),
+            R("onset", "fx/crackle/glowIntensity", 3.0, attackMs=0, decayMs=240),
             # (the crackle alone was lost on the glowing top-load: the core's light snaps with it, on the floor)
-            R("snare", "lights/coreGlow/intensity", 220.0, attackMs=0, decayMs=160))
-    # hat: sparks from the crown
-    s.route(R("hat", "particles/sparks/burst", 60.0, attackMs=0, decayMs=30))
-    # kick: the discharge fires on its own trigger; the hall answers with a cold flash in the haze and a lens tick
-    s.route(R("kick", "lights/fill/intensity", 0.6, attackMs=0, decayMs=180),
-            R("kick", "post/lens/chromaticAberration", 0.1, attackMs=0, decayMs=150))
+            R("onset", "lights/coreGlow/intensity", 220.0, attackMs=0, decayMs=160))
+    # onset: sparks from the crown
+    s.route(R("onset", "particles/sparks/burst", 60.0, attackMs=0, decayMs=30))
+    # low attack: the discharge fires on its own trigger; the hall answers with a cold flash in the haze and a lens tick
+    s.route(R("low", "lights/fill/intensity", 0.6, attackMs=0, decayMs=180),
+            R("low", "post/lens/chromaticAberration", 0.1, attackMs=0, decayMs=150))
     # timbre: bright sounds whiten the arcs
     for i in range(12):
         s.route(R("brightness", "fx/arc%d/color" % i, -0.3, comp=0, **MEDIUM))

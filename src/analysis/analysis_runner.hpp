@@ -59,13 +59,14 @@ private:
     audio::AnalysisStream& stream_;
     Analyzer analyzer_;
     BeatTracker beatTracker_; // fills the beat fields of every frame
-    CausalOnsetDetector causal_; // ADR-1060: kick/snare/hat live, into the band-onset fields
+    CausalOnsetDetector causal_; // ADR-1060: the causal onsets (low, onset) live
     // ADR-1060: the event carry. `pending_` holds the newest event of each kind until a frame holding it has been
     // acquired (`consumed_`, the serial of the newest acquired frame, written by the render thread in acquire()).
     struct Pending {
-        bool onset = false, beat = false, low = false, mid = false, high = false;
-        float onsetStrength = 0.0f, lowStrength = 0.0f, midStrength = 0.0f, highStrength = 0.0f;
-        std::uint64_t onsetStamp = 0, beatStamp = 0, lowStamp = 0, midStamp = 0, highStamp = 0;
+        bool onset = false, beat = false;
+        float onsetStrength = 0.0f;
+        std::array<float, 3> onsetRegister{}; // ADR-1604: the carried onset's register
+        std::uint64_t onsetStamp = 0, beatStamp = 0;
     } pending_;
     std::uint64_t serial_ = 0;
     std::atomic<std::uint64_t> consumed_{0};

@@ -671,7 +671,7 @@ def macros():
 # ============================================================================================ the response (ADR-1361)
 # LIVE ONLY. The performer's Response controls (the Live panel: Sensitivity, Transients, Sustain, Attack, Release =
 # `sonic/response/*`, ADR-1062) reach THE RIFT LIVE twice:
-#   the routes  the snare is the response model's (Transients decides how many fire and how hard); an auto-gained
+#   the routes  the onset is the response model's (Transients decides how many fire and how hard); an auto-gained
 #               band or the analyser's energy keeps its shape (what the music is doing) and is multiplied by the
 #               response level it is heard at (against the music's own loudness, ADR-1510), so a breakdown wakes the
 #               canyon less and Sensitivity lifts it. The arc's two listeners (macro.energy, macro.bassSlow), and so the stage
@@ -686,8 +686,8 @@ def macros():
 # ones times those ratios (1.38, 1.21). The offline project keeps its audio.* routes.
 RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
 LIVE_SOURCES = {"audio.energy": "visual.hEnergy", "audio.bass": "visual.hBass", "audio.trebleLevel": "visual.hTreble",
-                "audio.mid": "visual.hMid", "audio.onsetMid": "response.snare"}
-LIVE_HIT_SCALE = {"audio.onsetMid": 0.78}   # a response snare's mean strength is 0.95 to the onset's 0.745
+                "audio.mid": "visual.hMid", "audio.onset": "response.onset"}
+LIVE_HIT_SCALE = {"audio.onset": 0.78}
 
 
 def heard(name, band, level, gain):
@@ -738,8 +738,8 @@ def routes(length, live=False):
     # highs are small life: spores rise with the treble
     r.append({"source": "audio.trebleLevel", "target": "particles/spores/spawnRate", "op": "add", "amount": 1600.0,
               "chain": {"attackMs": 80, "decayMs": 900}})
-    # the snare throws a burst of the swarm (only where the stage lets the swarm fly at all: it multiplies)
-    r.append({"source": "audio.onsetMid", "target": "particles/swarm/spawnRate", "op": "add", "amount": 6000.0,
+    # an attack throws a burst of the swarm (only where the stage lets the swarm fly at all: it multiplies)
+    r.append({"source": "audio.onset", "target": "particles/swarm/spawnRate", "op": "add", "amount": 6000.0,
               "chain": {"envelope": "peakhold", "envelopeHoldMs": 40, "envelopeFallPerSecond": 4.0},
               "depthSource": "macro.energy", "depthMin": 0.0, "depthMax": 1.0})
     # mids breathe the siphonophore chains

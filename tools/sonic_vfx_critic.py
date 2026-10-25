@@ -10,11 +10,11 @@
                motion        a speed per cell of an 8x6 grid, its tiers (p90/p10, Gini): "is everything moving alike"
                audio-visual  for every response.*/notes.*/visual.* signal: lagged correlation per cell (a synchrony
                              map), event-locked latency / gain / decay / reliability, the modulation-spectrum ratio
-                             (slow sound -> slow picture?), specificity (do kick and hat move different places?), and
+                             (slow sound -> slow picture?), and
                              every signal the scene's `sonicScene.vocabulary` names that nothing on screen answers
                defects       empty frame, blown highlights, flash risk (WCAG 2.3.1-style), flicker share
     inputs   --video clip.mp4 --trace trace.csv [--project p.json] --out inputs.json
-             a Creative Critic inputs file: the trace's response signals as the Critic's five audio features, kick
+             a Creative Critic inputs file: the trace's response signals as the Critic's five audio features, low-attack
              and note-on times as events, the scene's thesis and palette as intent, routes as a modulation LIST
     compare  a.json b.json        what moved between two measure reports, by stable key
     trace    --project p.json --out trace.csv     the engine's per-frame signals (avgen --sonic-trace, no GPU)
@@ -646,13 +646,6 @@ def measure(args):
                     fx.add("hit_moves_slow", "musical_synchronization", "low", "A hit with a slow answer",
                            "Where the picture follows %s it modulates %.1fx slower than the hits." % (name, 1 / mr),
                            r, region=name)
-        # specificity: do the kick and the hat move different places?
-        k, h = av.get("signal.kickEnv"), av.get("response.hatEnv")  # ADR-1620: the kick is drum_signals.py's
-        if k and h and k.get("map") and h.get("map") and k.get("z", 0) >= 3 and h.get("z", 0) >= 3:
-            sim = corr(np.array(k["map"]), np.array(h["map"]))
-            if sim > 0.8:
-                fx.add("kick_hat_same_place", "musical_synchronization", "medium", "Kick and hat move the same place",
-                       "Their synchrony maps correlate %.2f: drums read as one gesture." % sim, {"similarity": sim})
         # the scene's own vocabulary: every signal it says the world answers, answered?
         for row in (meta["sonicScene"].get("vocabulary") or []):
             sigs = [s for s in row if isinstance(s, str) and "." in s and s.split(".")[0] in
@@ -719,16 +712,16 @@ def inputs(args):
     feats = {"hz": hz, "t0": float(tt[0]),
              "low": [round(float(v), 4) for v in pick("response.bass", "sonic.energy")],
              "lowmid": [round(float(v), 4) for v in pick("response.sustain", "sonic.energy.slow")],
-             "mid": [round(float(v), 4) for v in pick("response.snareEnv")],
-             "high": [round(float(v), 4) for v in pick("response.hatEnv")],
+             "mid": [round(float(v), 4) for v in pick("audio.mid")],
+             "high": [round(float(v), 4) for v in pick("audio.treble")],
              "onset": [round(float(v), 4) for v in pick("response.onsetEnv", "response.transient")]}
     F = hz
-    kicks = [round(float(tt[i]), 3) for i in events_of(pick("signal.kickEnv"), F)]  # ADR-1620: no mix kick
+    lows = [round(float(tt[i]), 3) for i in events_of(pick("response.lowEnv"), F)]
     notes = [round(float(tt[i]), 3) for i in events_of(pick("response.noteEnv"), F)]
     routes = []
     for r in (doc.get("routes") or []):
         if isinstance(r, dict) and r.get("source") and r.get("target"):
-            ev = kicks if "kick" in r["source"] else notes if "note" in r["source"] else None
+            ev = lows if r["source"].startswith("response.low") else notes if "note" in r["source"] else None
             item = {"source": r["source"], "target": r["target"]}
             if ev:
                 item["events"] = ev
@@ -817,7 +810,7 @@ def selftest(_args):
     for i in range(n):
         frames[i, :, :, 2] = int(40 + 60 * pad[i])
         frames[i, 30:90, 40:120, :] = int(30 + 220 * env[i])
-    k = _measure_clip(tmp, "local", frames, {"response.kickEnv": env, "response.sustain": pad})["response.kickEnv"]
+    k = _measure_clip(tmp, "local", frames, {"response.lowEnv": env, "response.sustain": pad})["response.lowEnv"]
     cell = (k["cell"] % GW, k["cell"] // GW)
     check("local: kick z >= 3", k["z"] >= 3)
     check("local: kick lag within 70 ms", abs(k["lag_ms"]) <= 70)
@@ -830,7 +823,7 @@ def selftest(_args):
     frames = np.full((n, 216, 384, 3), 40, np.uint8)
     for i in range(n):
         frames[i, 120:200, 250:360, :] = int(30 + 220 * env[i])
-    k = _measure_clip(tmp, "periodic", frames, {"response.kickEnv": env})["response.kickEnv"]
+    k = _measure_clip(tmp, "periodic", frames, {"response.lowEnv": env})["response.lowEnv"]
     check("periodic: four-on-the-floor kick z >= 3", k["z"] >= 3)
 
     # small: a 6x6 glint
@@ -838,13 +831,13 @@ def selftest(_args):
     frames = np.full((n, 216, 384, 3), 25, np.uint8)
     for i in range(n):
         frames[i, 170:176, 330:336, :] = int(25 + 230 * env[i])
-    k = _measure_clip(tmp, "small", frames, {"response.kickEnv": env})["response.kickEnv"]
+    k = _measure_clip(tmp, "small", frames, {"response.lowEnv": env})["response.lowEnv"]
     cell = (k["cell"] % GW, k["cell"] // GW)
     check("small: glint z >= 3", k["z"] >= 3)
     check("small: glint found in its cell (x 6, y 4)", cell == (6, 4))
     # the control: an envelope of other, unrelated kicks against the same clip
     other = envelope(sorted(set(int(F * x) for x in np.cumsum(rng.uniform(0.3, 0.8, 30)) if x * F < n - 1)))
-    k = _measure_clip(tmp, "control", frames, {"response.kickEnv": other})["response.kickEnv"]
+    k = _measure_clip(tmp, "control", frames, {"response.lowEnv": other})["response.lowEnv"]
     check("control: an unrelated envelope is not significant (z %.1f)" % k.get("z", 0), k.get("z", 0) < 3)
 
     # slow: 20 s of a smoothed random sustain, the picture following 1.5 s late and smoothed over a second

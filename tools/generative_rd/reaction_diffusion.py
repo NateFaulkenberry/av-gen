@@ -178,9 +178,6 @@ def rd_music(s, grid, focal, relief=None, prog=None, kick_speed=10.0, pool="regi
     s.route(common.audio("response.sustain", "field/%s/strength" % pool, 0.5, attackMs=4000, decayMs=8000))
     if relief:
         s.route(common.audio("response.bass", relief, 0.9, attackMs=150, decayMs=800))
-    if prog is not None and "line" in prog.at:
-        s.route(common.audio("response.hat", prog.path("line"), 1.0, op="multiply", gain=3.0, offset=1.0,
-                             attackMs=30, decayMs=300))
     common.instrument(s, MIDI_CC, MIDI_NOTES)
     s.route(R("control.regime", "field/%s/strength" % pool, 1.0, **common.CC),
             R("control.growth", G + "speed", 960.0, **common.CC),

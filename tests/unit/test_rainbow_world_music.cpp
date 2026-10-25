@@ -198,12 +198,12 @@ TEST_CASE("Rainbow World: the trees' twirl and fireworks are gated by the scan, 
     }
 }
 
-TEST_CASE("Rainbow World: the grass's kick pops ride the beat clock's phase, not the drum stem's late band",
+TEST_CASE("Rainbow World: the grass's beat pops ride the beat clock's phase, not the drum stem's late band",
           "[examples][rainbow-world][adr1602]") {
     // 29 section 9 ("the ground lights look completely off time"): the drum stem's low band peaked ~140 ms after the
     // kick; the phase lands within a frame of it.
     const json live = load("rainbow-world.json");
-    const json kick = signalSettings(live, "kick");
+    const json kick = signalSettings(live, "beatPop");
     REQUIRE(kick.at("inputs").size() == 2); // with the drum stem (its level the depth) and without (the fallback)
     for (const json& in : kick.at("inputs")) {
         CHECK(in.at("source") == "beat.phase");
@@ -216,7 +216,7 @@ TEST_CASE("Rainbow World: the grass's kick pops ride the beat clock's phase, not
     CHECK(kick.at("inputs")[0].at("depthSource") == "stem.drums.level");
     int routes = 0;
     for (const json& r : live.at("routes")) {
-        if (r.at("source") == "signal.kick") {
+        if (r.at("source") == "signal.beatPop") {
             CHECK(r.at("target").get<std::string>().find("rw_grass") != std::string::npos);
             ++routes;
         }

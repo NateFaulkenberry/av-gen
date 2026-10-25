@@ -163,7 +163,7 @@ void StemSignals::publish(SignalBus& bus, const analysis::StemFrame& f, bool eve
     for (std::size_t b = 0; b < onsetRegister.size(); ++b) {
         bus.set(onsetRegister[b], f.onsetRegister[b]); // ADR-1604
     }
-    // An event fires with its strength, floored so a quiet one still moves an event route (as ADR-898's band onsets did).
+    // An event fires with its strength, floored so a quiet one still moves an event route.
     bus.setEvent(onset, events && f.onset, std::clamp(f.onsetStrength * 0.5f, 0.05f, 1.0f));
     bus.setEvent(kick, events && f.kick, std::max(0.05f, f.kickStrength));
     bus.setEvent(snare, events && f.snare, std::max(0.05f, f.snareStrength));

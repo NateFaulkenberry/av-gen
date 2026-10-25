@@ -1130,9 +1130,9 @@ void Composition::updateAstral() {
             auto song = std::make_shared<AstralSong>();
             song->song = astral::buildSong(*analysisTrack_, analysisDuration_);
             song->score = astral::buildScore(song->song);
-            log::info("astral: song {:.1f} s, {:.1f} bpm, {} sections, {} phrases, {} kicks", song->song.duration,
+            log::info("astral: song {:.1f} s, {:.1f} bpm, {} sections, {} phrases, {} low onsets", song->song.duration,
                       song->song.tempoBpm, song->song.sections.size(), song->score.phrases.size(),
-                      song->song.kickT.size());
+                      song->song.lowT.size());
             astralSong_ = std::move(song);
             astralSongTrack_ = analysisTrack_.get();
             astralHeardSong_.reset();
@@ -1147,12 +1147,12 @@ void Composition::updateAstral() {
                 song->song = astral::conditionSong(astralSong_->song, heard);
                 song->score = astral::buildScore(song->song);
                 const auto opens = [](const astral::Score& sc) {
-                    return std::count_if(sc.phrases.begin(), sc.phrases.end(), [](const astral::Phrase& p) { return p.kickOpens; });
+                    return std::count_if(sc.phrases.begin(), sc.phrases.end(), [](const astral::Phrase& p) { return p.lowOpens; });
                 };
                 log::info("astral: heard through the Response (hits {:.2f}, levels {:.2f}, attack {:.2f}x, release {:.2f}x): "
-                          "{} of {} kicks, {} of {} phrases kick-opened",
+                          "{} of {} low onsets, {} of {} phrases low-opened",
                           heard.hitSensitivity, heard.levelSensitivity, heard.attack, heard.release,
-                          song->song.kickT.size(), astralSong_->song.kickT.size(), opens(song->score),
+                          song->song.lowT.size(), astralSong_->song.lowT.size(), opens(song->score),
                           opens(astralSong_->score));
                 astralHeardSong_ = std::move(song);
             }
@@ -9697,7 +9697,7 @@ void Composition::updateEcologyLights() {
         const float boostBase = node.emissiveParam != nullptr ? node.emissiveParam->base() : node.emissiveBoost;
         // Per layer, once: whether it glows enough to cast a pool, and the gain and hue its light
         // takes. The threshold and the ranking read the gain's BASE -- what the artist set -- so a
-        // route pulsing the fungi on the kick brightens their pools without reshuffling which
+        // route pulsing the fungi on the beat brightens their pools without reshuffling which
         // patches have lights on every beat; the light's intensity reads the final (ADR-905).
         struct LayerLight {
             bool casts = false;

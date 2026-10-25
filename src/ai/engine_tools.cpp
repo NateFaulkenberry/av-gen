@@ -3025,7 +3025,7 @@ void registerAudioTools(ToolRegistry& registry) {
                                   {"beatsPerBar", meter.beatsPerBar},
                                   {"phraseBars", meter.phraseBars},
                                   {"downbeatBeat", meter.downbeat}};
-            // ADR-897 / 898: the level-free measures and the band onsets.
+            // ADR-897: the level-free measures; ADR-1604: the latest onset's register.
             json levels = json::array();
             for (std::uint32_t i = 0; i < f.bandCount && i < analysis::kMaxBands; ++i) {
                 levels.push_back(f.bandLevels[i]);
@@ -3036,7 +3036,8 @@ void registerAudioTools(ToolRegistry& registry) {
             if (f.stereo) {
                 out["width"] = f.width;
             }
-            out["onsets"] = json{{"low", f.lowOnset}, {"mid", f.midOnset}, {"high", f.highOnset}};
+            out["onsetRegister"] = json{{"low", f.onsetRegister[0]}, {"mid", f.onsetRegister[1]},
+                                        {"high", f.onsetRegister[2]}};
             json events = json::object();
             for (std::size_t i = 0; i < engine.music().eventCount(); ++i) {
                 const auto event = static_cast<signals::MusicalEvent>(i);

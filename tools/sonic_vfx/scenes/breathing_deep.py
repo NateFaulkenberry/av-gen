@@ -50,9 +50,8 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "how bright the thread's pulse is"],
         ["chord", "notes.polyphony", "a chord shimmers through the whole curtain of threads"],
         ["bass", "response.bass", "the organism breathes: the cap swells, the threads sway"],
-        ["kick", "signal.kick", "a contraction: the cap tightens and springs back; a puff of spores"],
-        ["snare", "response.snare", "the gill ring flashes and sheds a burst of spores"],
-        ["hat", "response.hat", "spore glints in the haze"],
+        ["low", "response.low", "a contraction: the cap tightens and springs back; a puff of spores"],
+        ["onset", "response.onset", "the gill ring flashes and sheds a burst of spores; spore glints in the haze"],
         ["brightness", "sonic.brightness", "the spores turn from amber to cyan"],
         ["roughness", "sonic.roughness", "the gills ripple and the threads kink"],
     ],
@@ -220,7 +219,7 @@ def build():
                          "roughness": 0.35, "metallic": 0.0},
                material_variation={"emissiveRandom": 0.6})
 
-    # ---- particles: spores falling from the gills; a burst on a snare; glints on hats
+    # ---- particles: spores falling from the gills; a burst and glints on an onset
     s.particles("spores", capacity=6000, seed=7, shape="disc", position=[ORG[0], ORG[1] - 0.7, ORG[2]],
                 extent=[4.6, 0.0, 4.6], direction=[0, -1, 0], spawnRate=55.0, lifetimeMin=6.0, lifetimeMax=11.0,
                 spread=0.35, speedMin=0.05, speedMax=0.25, gravity=[0, -0.04, 0], drag=0.6, turbulence=0.35,
@@ -283,17 +282,17 @@ def build():
             R("bass", "procedural/gills/transform/scale", 0.05, comp=1, attackMs=50, decayMs=900))
     for k in range(N_THREADS):
         s.route(R("bass", "procedural/thread%d/deform/1/amount" % k, 0.35, attackMs=50, decayMs=1200))
-    # kick: a contraction, on a spring (overshoot and settle), and a puff of spores
+    # low attack: a contraction, on a spring (overshoot and settle), and a puff of spores
     for node in ("cap", "gills", "hymenium"):
-        s.route(R("kick", "procedural/%s/transform/scale" % node, 1.0, op="multiply", gain=-0.07, offset=1.0,
+        s.route(R("low", "procedural/%s/transform/scale" % node, 1.0, op="multiply", gain=-0.07, offset=1.0,
                   attackMs=0, decayMs=90, springHz=2.6, springDamping=0.32))
-    s.route(R("kick", "particles/sporeBurst/burst", 90.0, attackMs=0, decayMs=40))
-    # snare: the gill ring flashes and sheds spores
-    s.route(R("snare", "procedural/gills/material/emissive", 9.0, attackMs=0, decayMs=220),
-            R("snare", "procedural/hymenium/material/emissive", 6.0, attackMs=0, decayMs=260),
-            R("snare", "particles/sporeBurst/burst", 420.0, attackMs=0, decayMs=40))
-    # hat: glints in the haze
-    s.route(R("hat", "particles/glints/burst", 26.0, attackMs=0, decayMs=30))
+    s.route(R("low", "particles/sporeBurst/burst", 90.0, attackMs=0, decayMs=40))
+    # onset: the gill ring flashes and sheds spores
+    s.route(R("onset", "procedural/gills/material/emissive", 9.0, attackMs=0, decayMs=220),
+            R("onset", "procedural/hymenium/material/emissive", 6.0, attackMs=0, decayMs=260),
+            R("onset", "particles/sporeBurst/burst", 420.0, attackMs=0, decayMs=40))
+    # onset: glints in the haze
+    s.route(R("onset", "particles/glints/burst", 26.0, attackMs=0, decayMs=30))
     # timbre: a bright sound turns the spores from amber toward cyan; a rough one ripples the gills
     s.route(R("brightness", "particles/spores/colorStart", -0.55, comp=0, **MEDIUM),
             R("brightness", "particles/spores/colorStart", 0.25, comp=1, **MEDIUM),
@@ -301,7 +300,7 @@ def build():
             R("visual.grit", "procedural/gills/deform/1/amount", 0.18, **FAST))
     # no generic post routes: bloom and chromatic aberration answer only to these
     s.route(R("visual.heat", "post/bloom/intensity", 0.15, **SLOW),
-            R("snare", "post/lens/chromaticAberration", 0.05, attackMs=0, decayMs=180))
+            R("onset", "post/lens/chromaticAberration", 0.05, attackMs=0, decayMs=180))
 
     s.params_({
         "post/bloom/intensity": 0.5, "post/bloom/threshold": 0.85, "post/bloom/emissionWeight": 0.8,

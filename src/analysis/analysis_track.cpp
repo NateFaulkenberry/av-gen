@@ -1,6 +1,5 @@
 #include "analysis/analysis_track.hpp"
 
-#include "analysis/band_onsets.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -8,6 +7,53 @@
 #include <utility>
 
 namespace avgen::analysis {
+
+namespace {
+
+// The onset rate (the causal detector's broadband onsets, one per 30 ms) and the energy composite that includes it,
+// walked forward exactly as the analyzer walks its own one-poles, so the offline and streaming versions differ only in
+// their inputs.
+void stampOnsetRate(std::span<AnalysisFrame> frames, const AnalyzerConfig& config) {
+    if (frames.empty() || config.sampleRate == 0) {
+        return;
+    }
+    const double hop = static_cast<double>(config.hopSize) / static_cast<double>(config.sampleRate);
+    const auto keep = [hop](float seconds) {
+        return seconds > 0.0f ? std::exp(-hop / static_cast<double>(seconds)) : 0.0;
+    };
+    const double rateKeep = keep(config.onsetRateSeconds);
+    const double rateImpulse = config.onsetRateSeconds > 0.0f ? 1.0 / static_cast<double>(config.onsetRateSeconds) : 0.0;
+    const double energyKeep = keep(config.energySmoothingSeconds);
+    constexpr double kSameHitSeconds = 0.03;
+    constexpr auto kOnset = static_cast<std::size_t>(HitClass::Onset);
+    double rate = 0.0;
+    double energy = 0.0;
+    double lastHit = -1e30;
+    for (std::size_t i = 0; i < frames.size(); ++i) {
+        AnalysisFrame& f = frames[i];
+        rate *= rateKeep;
+        if (f.causal.valid && f.causal.hit[kOnset] && f.timeSeconds - lastHit >= kSameHitSeconds) {
+            rate += rateImpulse;
+            lastHit = f.timeSeconds;
+        }
+        f.onsetRate = static_cast<float>(rate);
+        EnergyTerms terms;
+        terms.highRatioDb = f.highRatioDb;
+        terms.centroidHz = f.centroidHz;
+        terms.relativeFlux = f.relativeFlux;
+        terms.onsetRate = f.onsetRate;
+        terms.hasOnsetRate = true;
+        terms.width = f.width;
+        terms.hasWidth = f.stereo;
+        terms.silent = !(f.rms > 1e-7f);
+        const double raw = energyComposite(terms);
+        energy = i == 0 ? raw : energyKeep * energy + (1.0 - energyKeep) * raw;
+        f.energy = static_cast<float>(energy);
+    }
+}
+
+} // namespace
+
 
 namespace {
 
@@ -266,15 +312,13 @@ AnalysisTrack AnalysisTrack::analyze(const audio::AudioFile& file, AnalyzerConfi
     track.config_ = analyzer.config();
     stampBeats(track.frames_, track.beats_, track.config_, beatConfig);
 
-    // The passes that need the whole track (ADR-896/897/898).
+    // The passes that need the whole track (ADR-896/897).
     const float binHz = static_cast<float>(track.config_.sampleRate) / static_cast<float>(track.config_.windowSize);
     track.meter_ = estimateMeter(track.frames_, track.beats_.beatTimes, binHz);
-    const BandOnsets onsets =
-        detectBandOnsets(track.frames_, binHz, track.beats_.beatTimes, track.beatSeconds());
-    stampBandOnsets(track.frames_, onsets, track.config_);
     // ADR-1060: the causal detector the live runner runs, over the file in the same order (file == live).
     detectCausalOnsets(track.frames_, binHz,
                        static_cast<double>(track.config_.hopSize) / static_cast<double>(track.config_.sampleRate));
+    stampOnsetRate(track.frames_, track.config_);
     return track;
 }
 
@@ -290,11 +334,8 @@ double overlayTrackFields(AnalysisFrame& live, const AnalysisTrack& track, doubl
     live.beatCount = here.beatCount;
     live.beatPhase = here.beatPhase;
     live.onsetRate = here.onsetRate;
-    live.onsetRateIsPercussive = here.onsetRateIsPercussive;
     live.energy = here.energy;
     live.beat = false;
-    live.lowOnset = live.midOnset = live.highOnset = false;
-    live.lowOnsetStrength = live.midOnsetStrength = live.highOnsetStrength = 0.0f;
     constexpr double kMaxStepSeconds = 0.25;
     const bool continuous = now > previousSeconds && now - previousSeconds <= kMaxStepSeconds;
     if (continuous) {
@@ -302,18 +343,6 @@ double overlayTrackFields(AnalysisFrame& live, const AnalysisTrack& track, doubl
                                            [](double t, const AnalysisFrame& f) { return t < f.timeSeconds; });
         for (auto it = from; it != frames.end() && it->timeSeconds <= now; ++it) {
             live.beat = live.beat || it->beat;
-            if (it->lowOnset) {
-                live.lowOnset = true;
-                live.lowOnsetStrength = std::max(live.lowOnsetStrength, it->lowOnsetStrength);
-            }
-            if (it->midOnset) {
-                live.midOnset = true;
-                live.midOnsetStrength = std::max(live.midOnsetStrength, it->midOnsetStrength);
-            }
-            if (it->highOnset) {
-                live.highOnset = true;
-                live.highOnsetStrength = std::max(live.highOnsetStrength, it->highOnsetStrength);
-            }
         }
     }
     return now;

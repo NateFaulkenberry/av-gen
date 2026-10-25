@@ -753,7 +753,7 @@ def claps():
     beat is the valley's held breath, every cap and small mushroom dimming together, the one moment
     it answers as one (apply_motifs), and a lantern flaring through it would break it.
     Measured on the song: above 8 kHz, beats 2/4 rise 5-19 dB more than 1/3 in every groove section.
-    Scored, because the analyser's snare band (audio.onsetMid, 2-6 kHz) is the clap only where the
+    Scored, because a 2-6 kHz band onset is the clap only where the
     groove is bare: it fires 1.0-1.1 times a second in the cold open, the riff, groove 2, the lead and
     the suspension (the claps' own 1.08), but 3.4-3.8 in the lift, the arrival, the plateau and the
     drop, where the 16th shakers and the mid synth play (the planner's section profiles), and 1.9-3.0

@@ -68,9 +68,12 @@ UNIT = {"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}   # a macro knob
 
 def stem_signal(name, stem, feature, fallback, chain, fb_chain=None):
     """`stem.<stem>.<feature>` through `chain` while that stem is active (its `.active`), else `fallback` through
-    `fb_chain`: what a stem route and its main-mix twin (ADR-1570) did to their target, as one signal."""
-    return signal(name, [inp("stem.%s.%s" % (stem, feature), chain),
-                         inp(fallback, chain if fb_chain is None else fb_chain)])
+    `fb_chain`: what a stem route and its main-mix twin (ADR-1570) did to their target, as one signal. No `fallback`:
+    the stem's alone (nothing on a mix)."""
+    inputs = [inp("stem.%s.%s" % (stem, feature), chain)]
+    if fallback is not None:
+        inputs.append(inp(fallback, chain if fb_chain is None else fb_chain))
+    return signal(name, inputs)
 
 
 def op_target(program, roles, role, kind, field):
@@ -135,16 +138,16 @@ def routes(fx, swell_nodes, swell):
         # depth = -0.5 + 2.4 x the drums' level: none below 0.21 (the drums gone), 1 at 0.62, 1.4 at full drive; with
         # no drum stem the default reads depth 0 and the fallback below plays instead
         # (ADR-1602: the twin pair as one signal: the drum stem's level while it is active, else full)
-        out.append(route(signal("kick", [inp("beat.phase", pulse, depthSource="stem.drums.level", depthMin=-0.5,
+        out.append(route(signal("beatPop", [inp("beat.phase", pulse, depthSource="stem.drums.level", depthMin=-0.5,
                                              depthMax=1.9, gate="stem.drums.active"),
                                          inp("beat.phase", pulse)]), kick, 3.6))
 
-    # ---- drums: hat glints in the grass ----------------------------------------------------------------------------
+    # ---- drums: glints in the grass (the drum stem's highs; nothing on a mix) ----------------------------------------
     if "glint_gain" in fx.get("rw_grass", {}):
         roles = fx["rw_grass"]
         glint = {"offset": -0.35, "gain": 1.6, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                  "attackMs": 3.0, "decayMs": 110.0}
-        hats = stem_signal("glint", "drums", "treble", "response.hatEnv", glint, {"attackMs": 3.0, "decayMs": 90.0})
+        hats = stem_signal("glint", "drums", "treble", None, glint)
         out.append(route(hats, op_target("rw_grass", roles, "glint_gain", "constant", "constant"), 3.2))
         out.append(route(hats, op_target("rw_grass", roles, "glint_threshold", "threshold", "value"), -0.14))
 
@@ -179,23 +182,23 @@ def routes(fx, swell_nodes, swell):
     # meadow, sky, clouds, trees, stones) rises with the bass body. No shader cost: the first version did it with
     # three ops in the ground and grass programs.
     out.append(route(swell_, "palette/saturation", 0.18))
-    # shimmer across the flower fields: the synth's light, lifted on the hats
+    # shimmer across the flower fields: the synth's light, lifted by the drum stem's highs
     if "shimmer_gain" in fx.get("rw_flower", {}):
         sh = op_target("rw_flower", fx["rw_flower"], "shimmer_gain", "constant", "constant")
         out.append(route("signal.synth", sh, 1.6))
-        out.append(route(stem_signal("shimmer", "drums", "treble", "response.hatEnv",
+        out.append(route(stem_signal("shimmer", "drums", "treble", None,
                                      {"offset": -0.35, "gain": 1.6, "clampEnabled": True, "clampMin": 0.0,
-                                      "clampMax": 1.0, "attackMs": 3.0, "decayMs": 160.0},
-                                     {"attackMs": 3.0, "decayMs": 120.0}), sh, 1.2))
+                                      "clampMax": 1.0, "attackMs": 3.0, "decayMs": 160.0}), sh, 1.2))
 
     # ---- drums: the clap fronts on the arches ----------------------------------------------------------------------
-    # both feet to the crown in one beat; bright only where the drum stem's 2-6 kHz band says a clap landed
+    # both feet to the crown in one beat; bright only where the drum stem's 2-6 kHz band says a clap landed (on a mix,
+    # any attack)
     for prog in RAINBOWS:
         roles = fx.get(prog, {})
         if "flow_gain" not in roles:
             continue
         # the clap brightens the flow bands: the backbeat travels along the bow
-        out.append(route(stem_signal("clap", "drums", "highMid", "response.snareEnv",
+        out.append(route(stem_signal("clap", "drums", "highMid", "response.onsetEnv",
                                      {"offset": -1.55, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0,
                                       "clampMax": 1.0, "attackMs": 4.0, "decayMs": 280.0},
                                      {"attackMs": 4.0, "decayMs": 220.0}),
@@ -363,7 +366,7 @@ def sky_routes(fx):
     amt = op_target("rw_cloud", roles, "splash_amount", "constant", "constant")
     # (smoothed for the owner's "cloud color popping", 29 section 7: the claps' splashes bloom over 150 ms and fade
     # over a beat and a half, not 8 ms and 420 ms; the phrase's blooms over 400 ms)
-    out.append(route(stem_signal("splash", "drums", "highMid", "response.snareEnv",
+    out.append(route(stem_signal("splash", "drums", "highMid", "response.onsetEnv",
                                  {"offset": -1.3, "gain": 2.5, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
                                   "attackMs": 150.0, "decayMs": 750.0}, {"attackMs": 150.0, "decayMs": 700.0}),
                      amt, 0.6))

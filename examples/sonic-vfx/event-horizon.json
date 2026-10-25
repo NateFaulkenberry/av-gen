@@ -153,78 +153,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -832,7 +760,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "fx/bh/photonRing",
    "amount": 26.0,
    "op": "add",
@@ -843,7 +771,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/jetUp/burst",
    "amount": 160.0,
    "op": "add",
@@ -854,7 +782,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/jetDown/burst",
    "amount": 160.0,
    "op": "add",
@@ -865,7 +793,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/jetUp/emissive",
    "amount": 2.5,
    "op": "add",
@@ -876,7 +804,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/jetDown/emissive",
    "amount": 2.5,
    "op": "add",
@@ -887,7 +815,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.06,
    "op": "add",
@@ -898,7 +826,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/amount",
    "amount": 34.0,
    "op": "add",
@@ -909,7 +837,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/radius",
    "amount": -1.4,
    "op": "replace",
@@ -921,7 +849,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/flare/burst",
    "amount": 260.0,
    "op": "add",
@@ -932,7 +860,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/stream/burst",
    "amount": 900.0,
    "op": "add",
@@ -943,7 +871,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/streamers/burst",
    "amount": 12.0,
    "op": "add",
@@ -954,7 +882,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "post/bloom/intensity",
    "amount": 0.22,
    "op": "add",
@@ -965,7 +893,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/sparks/burst",
    "amount": 45.0,
    "op": "add",
@@ -5786,19 +5714,14 @@
     "the hole's mass: the lens and the shadow swell, the sky bends more, and the star flares and bleeds faster into its stream"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the photon ring flashes, the jets fire and a shock ripple races out from the hole"
    ],
    [
-    "snare",
-    "response.snare",
-    "a flare erupts from the hot spot on the approaching side, and the star sheds a burst of plasma"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "sparks glint across the disk"
+    "onset",
+    "response.onset",
+    "a flare erupts from the hot spot on the approaching side, and the star sheds a burst of plasma; sparks glint across the disk"
    ],
    [
     "density",

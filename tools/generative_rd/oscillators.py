@@ -199,7 +199,6 @@ def music(s, grid, centre, relief_target=None, kick_rate=2.5, pace=True):
             g["injectRate"] = kick_rate
     s.route(common.audio("response.sustain", G + "coupling", 6.0, attackMs=3000, decayMs=6000),
             common.audio("response.bass", G + "frequency", 0.25, attackMs=300, decayMs=1500),
-            common.audio("response.hat", G + "noise", 0.5, attackMs=40, decayMs=400),
             common.audio("response.intensity", G + "phaseLag", 0.35, attackMs=6000, decayMs=12000))
     if relief_target:
         s.route(common.audio("response.bass", relief_target, 0.6, attackMs=200, decayMs=900))

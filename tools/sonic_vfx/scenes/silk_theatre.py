@@ -51,9 +51,8 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "how wide the ribbon is"],
         ["chord", "notes.polyphony", "a sheaf of parallel gold ribbons"],
         ["bass", "response.bass", "the whole dance sways"],
-        ["kick", "signal.kick", "a whip-crack: the silk shudders and shreds fly from the hand"],
-        ["snare", "response.snare", "gold shreds fly; the rim light flashes"],
-        ["hat", "response.hat", "glitter sparks along the ribbons"],
+        ["low", "response.low", "a whip-crack: the silk shudders and shreds fly from the hand"],
+        ["onset", "response.onset", "gold shreds fly; the rim light flashes; glitter sparks along the ribbons"],
         ["sustained", "response.sustain", "the spot breathes brighter"],
         ["silence", "(no input)", "the empty stage: the cone of light, the curtain, the last ribbons falling"],
     ],
@@ -123,7 +122,7 @@ def build():
     s.particles("gold", capacity=9000, seed=13, lifetimeMin=3.5, lifetimeMax=4.5, extent=[0.04, 0.05, 0.04],
                 sizeStart=0.02, sizeEnd=0.012, colorStart=hexrgb(GOLD) + [0.5], colorEnd=hexrgb("#a86a1a") + [0.0],
                 emissive=1.8, **silk)
-    # the whip-crack: a flick of silk shreds thrown from the hand (kick red, snare gold), stopped by the air
+    # the whip-crack: a flick of silk shreds thrown from the hand (low attack red, onset gold), stopped by the air
     for name, colour, seed in (("shreds", "#ff3a3a", 19), ("goldShreds", GOLD, 23)):
         s.particles(name, capacity=1500, seed=seed, shape="sphere", position=list(LEAD), extent=[0.05, 0.05, 0.05],
                     direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.8, lifetimeMax=1.4, spread=1.0, speedMin=2.0,
@@ -176,17 +175,17 @@ def build():
     #  silk's own flare)
     # chord: a second, gold stroke beside the red
     s.route(R("polyphony", "particles/gold/spawnRate", 1900.0, attackMs=20, decayMs=80))
-    # bass: the dance sways; kick: the whip-crack -- the laid silk shudders all along its length
+    # bass: the dance sways; low attack: the whip-crack -- the laid silk shudders all along its length
     for sysname in ("silk", "gold"):
         s.route(R("bass", "particles/%s/position" % sysname, 0.5, comp=0, attackMs=50, decayMs=900),
-                R("kick", "particles/%s/turbulence" % sysname, 2.4, attackMs=0, decayMs=180))
-    s.route(R("kick", "particles/shreds/burst", 70.0, attackMs=0, decayMs=40),
-            R("snare", "particles/goldShreds/burst", 50.0, attackMs=0, decayMs=40))
-    # hat: glitter; sustain: the spot breathes
-    s.route(R("hat", "particles/glitter/burst", 60.0, attackMs=0, decayMs=40),
+                R("low", "particles/%s/turbulence" % sysname, 2.4, attackMs=0, decayMs=180))
+    s.route(R("low", "particles/shreds/burst", 70.0, attackMs=0, decayMs=40),
+            R("onset", "particles/goldShreds/burst", 50.0, attackMs=0, decayMs=40))
+    # onset: glitter; sustain: the spot breathes
+    s.route(R("onset", "particles/glitter/burst", 60.0, attackMs=0, decayMs=40),
             R("sustain", "lights/spot/intensity", 500.0, **SLOW),
-            R("snare", "lights/rim/intensity", 260.0, attackMs=0, decayMs=240),
-            R("kick", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
+            R("onset", "lights/rim/intensity", 260.0, attackMs=0, decayMs=240),
+            R("low", "post/lens/chromaticAberration", 0.008, attackMs=0, decayMs=120))
 
     s.params_({
         "scene/volumeSteps": 16, "scene/volumeJitter": 0.5,   # (32: 16 ms; 16: 8)

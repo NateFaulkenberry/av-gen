@@ -5,7 +5,7 @@
 // Two things, both a function of the history's clock and nothing else:
 //   * a log-frequency spectrogram, kAudioBins bins from kAudioMinHz to kAudioMaxHz, one row per
 //     analysis hop (93.75 rows/s at the analyzer's defaults), each bin in [0, 1];
-//   * per source (low / mid / high band onsets, beats), the onset times and strengths.
+//   * per row (low / mid / high onsets by register, beats), the onset times and strengths.
 //
 // Offline (a file with an analysed track) the history holds the WHOLE track and its clock is the
 // transport second, so every query is a pure function of t and a seek is exact by construction.

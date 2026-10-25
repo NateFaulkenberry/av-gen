@@ -1,10 +1,10 @@
 #pragma once
 
 // The event list of a bus EVENT signal as a function of the piece (ADR-1061): what a Signal trigger
-// (`{"source": "signal", "name": "response.kick"}`) fires on in a render, so a seek finds the fronts a play
+// (`{"source": "signal", "name": "response.onset"}`) fires on in a render, so a seek finds the fronts a play
 // reaches.
 //
-//   audio.onset, audio.beat, audio.onsetMid/High       the analysis track's frames, with the strengths
+//   audio.onset, audio.beat                            the analysis track's frames, with the strengths
 //                                                      `AudioSignals::publish` gives them
 //   sonic.*, response.*, notes.*, timbre.* events      a scratch `SonicRuntime` stepped over the timbre track
 //                                                      and published at every analysis frame (with no audio,

@@ -53,9 +53,8 @@ DESIGN = {
         ["note", "response.note", "a bright strip is written at the pitch's place across the plain"],
         ["velocity", "notes.lastVelocity", "the strip's brightness"],
         ["bass", "response.bass", "the ridges heave"],
-        ["kick", "signal.kick", "a shock ring across the frame"],
-        ["snare", "response.snare", "a tear through the data"],
-        ["hat", "response.hat", "the numerals flicker"],
+        ["low", "response.low", "a shock ring across the frame"],
+        ["onset", "response.onset", "a tear through the data"],
         ["sustained", "response.sustain", "the strips settle into order (the dashes lengthen)"],
         ["silence", "(no input)", "a dark plain drifting forward; the strips dim to a faint grid"],
     ],
@@ -178,14 +177,11 @@ def build():
     # sustain: order -- the dashes lengthen (the dash threshold falls)
     s.route(R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.22, comp=0, **SLOW),
             R("sustain", "material/dsData/op/%d/smoothstep/constant" % OP_DASH, -0.22, comp=1, **SLOW))
-    # kick: a shock ring; snare: a tear through the data; hat: the numerals flicker
-    s.route(R("kickEnv", "post/shock/amount", 70.0, attackMs=0, decayMs=0),
-            R("kickEnv", "post/shock/radius", -1.2, op="replace", offset=-1.0, attackMs=0, decayMs=0),
-            R("snareEnv", "post/glitch/tear", 0.7, attackMs=0, decayMs=0),
-            R("snareEnv", "post/glitch/amount", 0.25, attackMs=0, decayMs=0))
-    for k in range(4):
-        s.route(R("hat", "procedural/num%d/material/emissive" % k, -1.2 if k % 2 else 2.5, attackMs=0,
-                  decayMs=90))
+    # low attack: a shock ring; onset: a tear through the data
+    s.route(R("lowEnv", "post/shock/amount", 70.0, attackMs=0, decayMs=0),
+            R("lowEnv", "post/shock/radius", -1.2, op="replace", offset=-1.0, attackMs=0, decayMs=0),
+            R("onsetEnv", "post/glitch/tear", 0.7, attackMs=0, decayMs=0),
+            R("onsetEnv", "post/glitch/amount", 0.25, attackMs=0, decayMs=0))
 
     s.params_({
         "post/bloom/intensity": 0.25, "post/bloom/threshold": 1.0, "post/output/vignette": 0.25,

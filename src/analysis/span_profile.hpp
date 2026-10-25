@@ -23,12 +23,9 @@ class AnalysisTrack;
 struct SpanProfile {
     // The energy composite (ADR-897), mean over the span, 0..1. Not rescaled to the track.
     float energy = 0.0f;
-    // Onsets per second over the span: all percussive band onsets (one per 30 ms), and each band's.
-    // Live-only tracks (no band onsets) count the broadband picked onsets in `onsetRate`.
+    // Onsets per second over the span: the causal detector's broadband onsets (what `response.onset` fires on), whose
+    // threshold is level-free and follows the music's own flux.
     float onsetRate = 0.0f;
-    float kickRate = 0.0f;  // low band
-    float snareRate = 0.0f; // mid band
-    float hatRate = 0.0f;   // high band
     // Brightness: the mean spectral centroid over the span's non-silent frames, Hz.
     float brightnessHz = 0.0f;
     // Each analyzer band's mean power over the span, in dB, and on the long-term level scale
@@ -46,7 +43,7 @@ struct SpanProfile {
     friend bool operator==(const SpanProfile&, const SpanProfile&) = default;
 };
 
-// {"energy", "onsetRate", "kickRate", "snareRate", "hatRate", "brightnessHz", "bandsDb": {"bass": dB,
+// {"energy", "onsetRate", "brightnessHz", "bandsDb": {"bass": dB,
 // ...}, "bandLevels": {...}, "width", "frames"} -- the shape `director.inspect_scene` and a song
 // plan write. `fromJson` reads back exactly what `toJson` wrote.
 [[nodiscard]] nlohmann::json spanProfileToJson(const SpanProfile& profile);

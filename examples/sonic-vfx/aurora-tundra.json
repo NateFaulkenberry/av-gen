@@ -137,53 +137,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -297,7 +250,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "fx/aurora/intensity",
    "amount": 2.4,
    "op": "add",
@@ -308,7 +261,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "fx/aurora/edgeBrightness",
    "amount": 1.6,
    "op": "add",
@@ -331,7 +284,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/atIce/op/40/constant/constant",
    "amount": 0.07,
    "op": "add",
@@ -355,7 +308,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/atIce/op/40/constant/constant",
    "amount": 0.07,
    "op": "add",
@@ -379,7 +332,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/atIce/op/40/constant/constant",
    "amount": 0.07,
    "op": "add",
@@ -391,7 +344,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/atIce/op/25/constant/constant",
    "amount": 0.530575,
    "op": "add",
@@ -403,7 +356,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/atIce/op/25/constant/constant",
    "amount": 2.017375,
    "op": "add",
@@ -415,7 +368,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/atIce/op/25/constant/constant",
    "amount": 2.5,
    "op": "add",
@@ -427,18 +380,7 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "particles/dust/burst",
-   "amount": 70.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 40
-   }
-  },
-  {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "particles/dust/spawnRate",
    "amount": 260.0,
    "op": "add",
@@ -460,7 +402,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.006,
    "op": "add",
@@ -625,18 +567,18 @@
     "the curtains reach lower and taller"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a surge of brightness through the curtains"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "the ice cracks with light"
    ],
    [
-    "hat",
-    "response.hat",
+    "flux",
+    "response.flux",
     "diamond dust glitters in the air"
    ],
    [

@@ -105,14 +105,13 @@ log-spectral flux and `stem.<key>.level` is ADR-1510's law per source. The fixtu
 by the build into `build/<preset>/test-fixtures/stems` (or by the first test that needs it).
 
 **Roles (ADR-1630).** `role` is what the source is: `drums`, `bass`, `synth`, `vocal` or `other` (absent: `other`;
-never inferred from the key or the audio). Only `drums` runs the ADR-1060 classifier and has `stem.<key>.kick/snare/
-hat` on the bus, always (no flag: `hits` is gone and a load warning). Every other role publishes onsets, levels and
-the onset register -- activity, never an identity. A live input source has the same `role` (`live.inputSources`, the
+never inferred from the key or the audio). Only `drums` runs the drum classifier (`analysis::DrumClassifier`) and has
+`stem.<key>.kick/snare/hat` on the bus, always. Every other role publishes onsets, levels and the onset register --
+activity, never an identity. The mix never runs the classifier: it publishes where an attack is (`response.low`,
+`response.onset`, `audio.onset` and the onset register), never what made it. A live input source has the same `role` (`live.inputSources`, the
 Inputs table's Role column, `--input-sources <key>@<ch>:<role>`). `role.<role>.*` is the same vocabulary for the first
 ACTIVE source of each role (live inputs first while an input is open, then stems, each in list order), declared once a
-source has the role, the class names on `role.drums` only; seek-replayed like the stems. `tools/drum_signals.py` reads
-roles: `signal.kick` = `role.drums.kick` else the beat stand-in, `signal.bassLevel` = `role.bass.level` else
-`response.bass`, `signal.synthLevel` = `role.synth.level` else `response.sustain`.
+source has the role, the class names on `role.drums` only; seek-replayed like the stems.
 
 **The stem-set check (ADR-1632).** At load, and whenever the mix or a stem changes, `audio::checkStemSet` compares the
 stems with the mix from a 4 kHz probe of each (box-averaged mono, kept per stem: 3.4 MB for 210 s): channels (info),
@@ -159,8 +158,8 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 | Key | Routes | Default |
 |---|---|---|
 | `beat` | the beat clock: `beat.*`, the metre (bar 1, phrases), `music.*`, the timeline's beat markers and snap, the Director's and the camera director's grid, effect triggers | `"audio"` |
-| `hits` | every response hit class not named below: `response.kick`, `low`, `snare`, `hat`, `onset` and their `*Env` | `"audio"` |
-| `kick` `low` `snare` `hat` `onset` | that one class, over `hits` (`"audio"` puts one class back on the mix; for `kick` it is a load warning and feeds nothing: the mix has no kick) | `hits` |
+| `hits` | every response hit class not named below: `response.low`, `response.onset`, their `*Env` and the onset register (`response.onsetLow/Mid/High`) | `"audio"` |
+| `low` `onset` | that one class, over `hits` (`"audio"` puts one class back on the mix) | `hits` |
 | `levels` | `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient`, `flux` (one source: they share one loudness reference, ADR-1510) | `"audio"` |
 | `history` | ADR-1631: the audio history spectrum and onset fields read (Resonator, the generative fields, THE ASTRAL FORGE's conductors): its spectrogram and its low/mid/high onset rows | `"audio"` |
 | `historySpectrum` `historyOnsets` | one half of the history, over `history` | `history` |
@@ -174,23 +173,21 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 - Anything else is a load warning, and then the mix feeds everything.
 
 **Rules:**
-- **The kick needs a drum source (ADR-1620):** `response.kick` and `kickEnv` fire only from a source `hits` or `kick`
-  names; the mix has none (`audio.onsetLow` is gone too). On a mix use `beat.pulse`, or a `signal.*` source that takes
-  `role.drums.kick` first and the beat otherwise (`tools/drum_signals.py`'s `signal.kick`, gated by the mix's own hat
-  and snare). A route on an unfed kick is reported dead by `--audit-routes`. The snare and hat are the mix's as before.
-- **A class needs a drums source (ADR-1630):** a kick, snare or hat fed from a source whose role is not `drums` is a
-  project warning; the kick then fires nothing and the snare or hat reads the mix. `low`, `onset` and the levels take
-  any role.
+- **No instrument classes in the response:** the response hits are the low attack and the onset, from any role. A drum
+  source's kick, snare and hat are its own `stem.<key>.kick/snare/hat` and `role.drums.kick/snare/hat`, not part of
+  `response.*`; a key `kick`, `snare` or `hat` in `feeds` is not a feed (a load warning, and the mix feeds everything).
 - **The history (ADR-1631):** offline, the whole-file history is built from the named stem (its folded spectrum rows,
   stretched over its own percentiles, at its offset and zero outside its span; its onsets: a drums stem's kick / snare /
-  hat as the low / mid / high rows, any other stem's onsets on all three), so a seek is exact as before. The beat row
+  hat as the low / mid / high rows, any other stem's onsets on the row of their register), so a seek is exact as
+  before. The mix's onset rows are its picked onsets (`audio.onset`), each on the row of its register (low 30-250 Hz,
+  mid 250 Hz-4 kHz, high 4-16 kHz). The beat row
   stays the mix's. Live, the named input source's newest row and onsets, on the mix's clock; an inactive source gives
   silent rows. One history is uploaded either way: no GPU cost.
 - **Not fed by a source:** `response.melodic`, `pitch` and `note` stay on the mix and MIDI. `audio.*` is always the
   mix's measurement, `audio.beat` and `audio.tempo` included.
 - **Needs a `sonic` block:** `response.*` runs only with a `sonic` block (or live Sonic input). `beat` needs none.
-- **The hits tier:** a drums source always runs the kick/snare/hat analysis; a stem or input source of another role that
-  a response feed names runs it for the feed's onsets and levels, and still publishes no class name.
+- **The hits tier:** a drums source always runs it, with the drum classifier; a stem or input source of another role that
+  a response feed names runs it for the feed's onsets and levels, and publishes no class name.
 - **Inactive sources:** an inactive source feeds nothing: no hits, and its levels read 0. That covers a stem outside
   `[offset, offset + duration)`, and an absent, disconnected or stalled input channel. Offline the beat clock keeps the
   stem's grid, extrapolated at its tempo. Live it free-runs at the last tempo.

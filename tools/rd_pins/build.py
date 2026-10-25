@@ -398,9 +398,10 @@ def instrument(s, g):
       - bass level: the broad swell's height (a slow attack, a long release) and the pattern's lift
       - the bass history: a lift and a pool of light rolling out from the heart (the spectrum field, no route)
       - mids: the ripple's reach into the contours (how far they bunch and open) and its small heave
-      - kicks: the ring of impact (lift, contour swell, a band of light, the regime toward spots)
-      - snares: a quicker ring of light from off-centre, and a burst of growth at the wandering brush
-      - hats: the beads of light the ripple runs along the contours (8 ms in, 260 ms out), never the whole field
+      - low onsets: the ring of impact (lift, contour swell, a band of light, the regime toward spots)
+      - mid onsets: a quicker ring of light from off-centre; any attack: a burst of growth at the wandering brush and
+        the beads of light the ripple runs along the contours (8 ms in, 260 ms out), never the whole field
+      - spectral change: how hot the contours run
       - held sound: the spot pool widens
     Every audio route's depth is Audio Influence (CC 4, half at rest). MIDI: eight handles, the palette pair, three
     seed notes."""
@@ -423,13 +424,11 @@ def instrument(s, g):
             A("response.bass", E, 4.5, attackMs=250, decayMs=1200),
             A("response.bass", D + "1/amount", 1.05, attackMs=400, decayMs=2500),
             A("audio.mid", shift, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=120, decayMs=700),
-            A("response.hat", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
-            A("response.hat", ring, 1.0, op="multiply", gain=0.25, offset=1.0, attackMs=30, decayMs=300),
-            # density (hats a second, 0..0.65 measured on the test tracks): a busy mix lights the contours, a held
-            # note or a breakdown lets them settle
-            A("response.hatRate", hot, 1.0, op="multiply", gain=1.8, offset=0.55, attackMs=600, decayMs=2500),
-            A("response.hatRate", ring, 1.0, op="multiply", gain=1.2, offset=0.7, attackMs=600, decayMs=2500),
-            A("response.snare", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
+            A("response.onset", glint, 1.0, op="multiply", gain=3.0, offset=0.12, attackMs=8, decayMs=260),
+            # spectral change: a busy mix lights the contours, a held note or a breakdown lets them settle
+            A("response.flux", hot, 1.0, op="multiply", gain=1.8, offset=0.55, attackMs=600, decayMs=2500),
+            A("response.flux", ring, 1.0, op="multiply", gain=1.2, offset=0.7, attackMs=600, decayMs=2500),
+            A("response.onset", "field/brush/strength", 2.0, attackMs=10, decayMs=600))
     CC = common.CC
     s.route(R("control.pattern", "field/pool/strength", 1.2, **CC),
             R("control.seeding", "field/brush/strength", 3.0, **CC),

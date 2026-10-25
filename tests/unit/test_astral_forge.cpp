@@ -48,8 +48,8 @@ astral::SongAnalysis syntheticSong(double seconds) {
     s.centroid.assign(static_cast<std::size_t>(s.hops), 0.5f);
     for (double t = 0.0; t < seconds; t += 0.5) {
         s.beats.push_back(t);
-        s.kickT.push_back(static_cast<float>(t));
-        s.kickS.push_back(std::fmod(t, 8.0) < 1e-6 ? 1.0f : 0.3f);
+        s.lowT.push_back(static_cast<float>(t));
+        s.lowS.push_back(std::fmod(t, 8.0) < 1e-6 ? 1.0f : 0.3f);
     }
     s.sections.push_back(astral::Section{0.0, seconds, 0, 0.8f, 0.8f, "verse"});
     return s;
@@ -197,11 +197,11 @@ TEST_CASE("the live conductor builds phrases from the beats it hears and collaps
     // 40 beats: two closed phrases of 16 and an open third
     CHECK(live.score().phrases.size() == 3);
     CHECK(live.score().beatSeconds == Approx(0.5).margin(0.02));
-    CHECK(live.score().phrases[1].kickOpens); // its downbeat was a strong kick
+    CHECK(live.score().phrases[1].lowOpens); // its downbeat was a strong kick
     // a performer's collapse opens a phrase at once, as a kick would
     const astral::State s = live.update(audio, audio.now(t), k, true);
     CHECK(live.score().phrases.size() == 4);
-    CHECK(live.score().phrases.back().kickOpens);
+    CHECK(live.score().phrases.back().lowOpens);
     CHECK(s.strobe > 0.0f);
 }
 

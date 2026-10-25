@@ -92,7 +92,7 @@ Result<std::string> feedKey(std::string_view value) {
                 value);
 }
 
-Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>* warnings) {
+Result<Feeds> Feeds::fromJson(const nlohmann::json& j) {
     if (!j.is_object()) {
         return fail("'feeds' must be an object");
     }
@@ -121,14 +121,10 @@ Result<Feeds> Feeds::fromJson(const nlohmann::json& j, std::vector<std::string>*
                                                 [&](const char* n) { return name == n; });
                    it != kFeedHitNames.end()) {
             const auto k = static_cast<std::size_t>(it - kFeedHitNames.begin());
-            if (k == 0 && key->empty() && warnings != nullptr) {
-                warnings->push_back("feeds.kick is \"audio\", but the mix has no kick (ADR-1620: the kick comes only "
-                                    "from a drum source); it feeds nothing");
-            }
             f.hit[k] = std::move(*key);
         } else {
-            return fail("feeds.{} is not a feed (beat, hits, kick, low, snare, hat, onset, levels, history, "
-                        "historySpectrum, historyOnsets)",
+            return fail("feeds.{} is not a feed (beat, hits, low, onset, levels, history, historySpectrum, "
+                        "historyOnsets)",
                         name);
         }
     }

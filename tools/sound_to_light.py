@@ -58,9 +58,7 @@ PATHS = [
     ("env on response.onset", "env.s2lHit", None),
     ("route env (response.onset)", "final:post/grade/contrast[0]", None),
     ("route env (stem.drums.onset)", "final:post/tonemap/chroma-retention[0]", None),
-    # (ADR-1620: response.kick fires only from a drum source the feeds name; the mix has none)
-    ("response.snare", "response.snare", ["snare"]),
-    ("response.hat", "response.hat", ["hat"]),
+    ("response.low", "response.low", ["kick"]),
     ("stem.drums.kick", "stem.drums.kick", ["kick"]),
     ("stem.drums.snare", "stem.drums.snare", ["snare"]),
     ("stem.drums.hat", "stem.drums.hat", ["hat"]),
@@ -68,7 +66,7 @@ PATHS = [
     ("RW signal.clap", "signal.clap", ["snare"]),
     ("RW signal.glint", "signal.glint", ["hat"]),
     ("RW clap route final", "final:material/rw_rainbow/op/9/constant/constant[0]", ["snare"]),
-    ("RW signal.kick (beat grid)", "signal.kick", ["kick"]),
+    ("RW signal.beatPop (beat grid)", "signal.beatPop", ["kick"]),
     # Aurora Borealis pass 3's onset paths (23-plan-pass3.md): the kick and snare beams' latches on their stems' own
     # onsets (run the rig with INPUT_SOURCES="kick@2:drums,snare@2:other,crash@2:other" so stem.kick, stem.snare and
     # stem.crash exist), and the crash's star latch

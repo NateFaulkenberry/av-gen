@@ -4,7 +4,7 @@
 // The glade (tests/support/reactivity_fixture.hpp) is loaded into an offline engine with its groove
 // and its sections; the default proposal is compiled and installed exactly as the Director installs a
 // plan. For each kind of target, one proposed route is taken, a moment is found at which its source is
-// active -- a detected kick, clap or hat from the engine's own analysis, a downbeat, a moment inside
+// active -- a beat or an onset from the engine's own analysis, a downbeat, a moment inside
 // the drop -- and the frame there is drawn twice: with the route, and with only that route switched
 // off. The pixels must differ where the target is, and in the direction the route pushes. That is the
 // control arm: the same frame without the route. A kick route is also drawn in the kickless break,
@@ -154,18 +154,28 @@ struct Proof {
         engine.update(FrameTime{t, 0.0, 0});
         return t;
     }
-    // The first detected event of a band after `after` seconds (the engine's own analysis).
-    [[nodiscard]] double firstOnset(bool analysis::AnalysisFrame::*band, double after) const {
+    // The first detected onset after `after` seconds (the engine's own analysis).
+    [[nodiscard]] double firstOnset(double after) const {
         for (const analysis::AnalysisFrame& f : engine.track()->frames()) {
-            if (f.timeSeconds > after && f.*band) {
+            if (f.timeSeconds > after && f.onset) {
                 return f.timeSeconds;
             }
         }
         FAIL("no onset after " << after);
         return 0.0;
     }
-    // The first beat of the engine's grid after `after` seconds (ADR-1620: the Director's kick layer is the beat
-    // clock's pulse, `beat.pulse`, which fires on these).
+    // The first bar line of the engine's grid after `after` seconds (what `music.downbeat` fires on).
+    [[nodiscard]] double firstDownbeat(double after) const {
+        for (const double b : engine.meter().barTimes(engine.beatGrid().beats.beatTimes)) {
+            if (b > after) {
+                return b;
+            }
+        }
+        FAIL("no downbeat after " << after);
+        return 0.0;
+    }
+    // The first beat of the engine's grid after `after` seconds (the Director's beat layer is the beat clock's
+    // pulse, `beat.pulse`, which fires on these).
     [[nodiscard]] double firstBeat(double after) const {
         for (const double b : engine.beatGrid().beats.beatTimes) {
             if (b > after) {
@@ -215,10 +225,10 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
     const song::SectionTimeline sections = testsupport::gladeSections();
     const double dropStart = sections.sections[4].startSeconds;
     const double inTheDrop = dropStart + 7.0;           // past every arc's glide
-    const double kick = p.firstBeat(10.0); // ADR-1620: the kick layer is the beat clock's pulse
-    const double clap = p.firstOnset(&analysis::AnalysisFrame::midOnset, 10.0);
-    const double hat = p.firstOnset(&analysis::AnalysisFrame::highOnset, 10.0);
-    INFO("kick " << kick << " s, clap " << clap << " s, hat " << hat << " s, drop " << dropStart << " s");
+    const double kick = p.firstBeat(10.0); // the beat layer: the beat clock's pulse
+    const double bar = p.firstDownbeat(10.0);
+    const double hat = p.firstOnset(10.0);
+    INFO("beat " << kick << " s, bar " << bar << " s, onset " << hat << " s, drop " << dropStart << " s");
 
     SECTION("a hero's glow on the beat, and nothing just before the next one") {
         const params::ModRoute* r = p.route("nodes/elder-gills/emissiveBoost");
@@ -238,7 +248,7 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
                                        << lift);
         CHECK(tail * 3.0 < lift);
     }
-    SECTION("a scatter layer's glow on the kick, 90 ms after the heroes") {
+    SECTION("a scatter layer's glow on the beat, 90 ms after the heroes") {
         const params::ModRoute* r = p.route("nodes/meadow/scatter/fungi/emissionGain");
         REQUIRE(r != nullptr);
         CHECK(r->chain.delayMs == 90.0f);
@@ -283,13 +293,13 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
         CHECK(a.diff.changed > 10);
         CHECK(a.diff.lumaOn() < a.diff.lumaOff());
     }
-    SECTION("particles: the elder's spores catch its kick") {
+    SECTION("particles: the elder's spores catch its beat") {
         const Arm a = armAt(h, p, "particles/elder-spores/emissive", kick + 0.09 + 0.03, false, "spores-kick");
         INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
         CHECK(a.diff.changed > 15); // small, fast, local: a swarm of 0.3 m motes (30 pixels at 384x216)
         CHECK(a.diff.lumaOn() > a.diff.lumaOff());
     }
-    SECTION("a practical light echoes the elder's kick") {
+    SECTION("a practical light echoes the elder's beat") {
         const Arm a = armAt(h, p, "lightrig/Glade/elder-practical/intensity", kick + 0.05 + 0.02, false, "practical-kick");
         INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
         CHECK(a.diff.changed > 15); // a small point light low under the elder: the ground around its foot (30 px)
@@ -311,7 +321,7 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
         INFO("changed " << a.diff.changed);
         CHECK(a.diff.changed > 5);
     }
-    SECTION("the water catches the hats") {
+    SECTION("the water catches the onsets") {
         const params::ModRoute* r = p.route("nodes/meadow/water/sparkle");
         REQUIRE(r != nullptr);
         const Arm sparkle = armAt(h, p, "nodes/meadow/water/sparkle", hat + r->chain.delayMs / 1000.0 + 0.02, false, "water-hat");
@@ -324,11 +334,12 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
         INFO("changed " << a.diff.changed);
         CHECK(a.diff.changed > 20);
     }
-    SECTION("a lamp layer flares on the clap") {
+    SECTION("a lamp layer flares on the bar") {
         const params::ModRoute* r = p.route("nodes/meadow/scatter/lamps/emissionGain");
         REQUIRE(r != nullptr);
-        CHECK(r->source == "audio.onsetMid");
-        const Arm a = armAt(h, p, "nodes/meadow/scatter/lamps/emissionGain", clap + r->chain.delayMs / 1000.0 + 0.02, true, "lamps-clap");
+        CHECK(r->source == "music.downbeat");
+        const Arm a = armAt(h, p, "nodes/meadow/scatter/lamps/emissionGain",
+                            bar + (r->chain.delayMs + r->chain.attackMs) / 1000.0 + 0.02, true, "lamps-bar");
         INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
         CHECK(a.diff.changed > 5);
         CHECK(a.diff.lumaOn() > a.diff.lumaOff());

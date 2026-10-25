@@ -141,53 +141,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -1651,7 +1604,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/skinGlints/burst",
    "amount": 40.0,
    "op": "add",
@@ -1662,7 +1615,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/droplets/burst",
    "amount": 55.0,
    "op": "add",
@@ -1708,7 +1661,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.03,
    "op": "add",
@@ -1989,19 +1942,14 @@
     "the magnetic field: the surface heaves, the small spikes lengthen together"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a ripple ring crosses the dish"
    ],
    [
-    "snare",
-    "response.snare",
-    "spike tips throw black droplets"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "glints flicker on the liquid's skin"
+    "onset",
+    "response.onset",
+    "spike tips throw black droplets; glints flicker on the liquid's skin"
    ],
    [
     "tension",
@@ -2091,7 +2039,7 @@
    },
    "trigger": {
     "source": "signal",
-    "name": "signal.kick",
+    "name": "response.low",
     "threshold": 0.25
    }
   }

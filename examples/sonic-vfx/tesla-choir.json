@@ -140,53 +140,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -1049,7 +1002,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "fx/crackle/intensity",
    "amount": 60.0,
    "op": "add",
@@ -1060,7 +1013,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "fx/crackle/crackle",
    "amount": 14.0,
    "op": "add",
@@ -1071,7 +1024,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "fx/crackle/glowIntensity",
    "amount": 3.0,
    "op": "add",
@@ -1082,7 +1035,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "lights/coreGlow/intensity",
    "amount": 220.0,
    "op": "add",
@@ -1093,7 +1046,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/sparks/burst",
    "amount": 60.0,
    "op": "add",
@@ -1104,7 +1057,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "lights/fill/intensity",
    "amount": 0.6,
    "op": "add",
@@ -1115,7 +1068,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.1,
    "op": "add",
@@ -1686,19 +1639,14 @@
     "the core charges: its top-load glows and the hall hums brighter"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a discharge: bolts from the core to the ring, the hall flashes"
    ],
    [
-    "snare",
-    "response.snare",
-    "crackle crawls over the core"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "sparks spit from the core's crown"
+    "onset",
+    "response.onset",
+    "crackle crawls over the core; sparks spit from the core's crown"
    ],
    [
     "tension",
@@ -2507,7 +2455,7 @@
    },
    "trigger": {
     "source": "signal",
-    "name": "signal.kick",
+    "name": "response.low",
     "threshold": 0.25
    }
   },

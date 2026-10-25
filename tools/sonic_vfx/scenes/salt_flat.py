@@ -76,9 +76,9 @@ DESIGN = {
          "low and left, high notes high and right), all from one radiant"],
         ["velocity", "notes.lastVelocity", "the meteor's brightness"],
         ["bass", "response.bass", "heat shimmer along the horizon; the haze thickens"],
-        ["kick", "signal.kick", "a ring of light runs out across the salt from the monolith's base"],
-        ["snare", "response.snare", "the monolith's outline flares white"],
-        ["hat", "response.hat", "salt crystals glint across the near crust; grains blow low across the flat"],
+        ["low", "response.low", "a ring of light runs out across the salt from the monolith's base"],
+        ["onset", "response.onset", "the monolith's outline flares white; salt crystals glint across the near crust; grains blow low across the flat"],
+        ["flux", "response.flux", "salt crystals glint across the near crust; grains blow low across the flat"],
         ["silence", "(no input)", "a still rose dusk: the sky settles, nothing moves but the drift"],
     ],
     "tier": "light: one shadowed sun, a thin uniform haze (no march detail), one DF shimmer column",
@@ -132,7 +132,7 @@ def salt_program():
     }
 
 
-# 1-based index of the outline colour's constant op (routed by the snare)
+# 1-based index of the outline colour's constant op (routed by the onset)
 OP_RIM = 9
 
 
@@ -257,7 +257,7 @@ def build():
                 lifetimeMax=0.2, spread=0.0, speedMin=200.0, speedMax=200.0, gravity=[0, 0, 0], drag=0.0,
                 sizeStart=22.0, sizeEnd=5.0, colorStart=hexrgb("#f6fff8") + [1.0],
                 colorEnd=hexrgb("#ffd2a8") + [0.0], emissive=14.0, blend="additive")
-    # ---- blowing salt (hat): grains streaming low across the flat
+    # ---- blowing salt (flux): grains streaming low across the flat
     s.particles("salt", capacity=3000, seed=23, shape="box", position=[-2.0, 0.12, -10.0], extent=[16.0, 0.1, 9.0],
                 direction=[1, 0.03, 0.25], spawnRate=0.0, lifetimeMin=0.22, lifetimeMax=0.55, spread=0.1,
                 speedMin=9.0, speedMax=13.0, gravity=[0, -0.2, 0], drag=0.2, turbulence=0.3, turbulenceScale=0.6,
@@ -265,14 +265,14 @@ def build():
                 colorEnd=hexrgb("#fff8ee") + [0.0], emissive=0.7, blend="additive", velocityStretch=1.0,
                 stretchMax=0.35)
 
-    # ---- glints: salt crystals catching the low sun for an instant (hats), across the near crust
+    # ---- glints: salt crystals catching the low sun for an instant (onsets), across the near crust
     s.particles("glints", capacity=4000, seed=27, shape="box", position=[0.0, 0.04, -14.0], extent=[22.0, 0.02, 14.0],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.06, lifetimeMax=0.18, spread=1.0, speedMin=0.0,
                 speedMax=0.01, gravity=[0, 0, 0], drag=0.0, sizeStart=0.05, sizeEnd=0.0,
                 colorStart=hexrgb("#fff6e8") + [1.0], colorEnd=hexrgb("#ffd8b0") + [0.0], emissive=26.0,
                 blend="additive")
 
-    # ---- effects: the horizon's heat shimmer (bass), the ring of light (kick)
+    # ---- effects: the horizon's heat shimmer (bass), the ring of light (low attack)
     # (its strength is metres at the column, projected from the middle of the air a ray crosses: a column
     #  kilometres wide moves the horizon by a fraction of a pixel; one 400 m round the view moves it by several)
     s.effect("shimmer", "heatShimmer", ("world",), parameters={
@@ -280,7 +280,7 @@ def build():
         "churn": 0.7, "edgeSoftness": 0.5, "heightFalloff": 1.4, "thicknessRef": 300.0, "fadeDistance": 0.0,
         "offsetX": CAM[0], "offsetY": 0.0, "offsetZ": CAM[2] - 380.0})
     s.effect("ring", "groundPulse", ("world",),
-             trigger={"source": "signal", "name": signals.S("kick"), "threshold": 0.25},
+             trigger={"source": "signal", "name": signals.S("low"), "threshold": 0.25},
              parameters={"source": {"kind": "world", "position": [MONO[0], 0.0, MONO[1]]},
                          "propagation": {"kind": "radial", "speed": 60.0, "range": 220.0, "frontWidth": 3.5,
                                          "trailLength": 18.0, "falloff": 1.6, "ringCount": 1.0,
@@ -318,17 +318,16 @@ def build():
     # bass: the horizon shimmers and the haze thickens
     s.route(R("bass", "fx/shimmer/strength", 1.6, attackMs=40, decayMs=1200),
             R("bass", "scene/volumeDensity", 0.00018, attackMs=50, decayMs=1800))
-    # hat: salt grains blowing
-    s.route(R("hat", "particles/glints/burst", 160.0, attackMs=0, decayMs=30),
-            R("hat", "particles/salt/burst", 50.0, attackMs=0, decayMs=40),
-            R("hatRate", "particles/salt/spawnRate", 240.0, **MEDIUM))
-    # snare: the monolith's outline flares (the kick's ring fires on its own trigger)
+    # onset: salt glints; flux: salt grains blowing
+    s.route(R("onset", "particles/glints/burst", 160.0, attackMs=0, decayMs=30),
+            R("flux", "particles/salt/spawnRate", 240.0, **MEDIUM))
+    # onset: the monolith's outline flares (the low attack's ring fires on its own trigger)
     for c in range(3):
-        s.route(R("snare", "material/sfMonolith/op/%d/constant/constant" % OP_RIM, 9.0, comp=c, attackMs=0,
+        s.route(R("onset", "material/sfMonolith/op/%d/constant/constant" % OP_RIM, 9.0, comp=c, attackMs=0,
                   decayMs=260))
-    # kick: the impact at the monolith's foot is instant (a flash of light on the salt); the ring then runs out
-    s.route(R("kick", "lights/foot/intensity", 900.0, attackMs=0, decayMs=220),
-            R("kick", "post/lens/chromaticAberration", 0.012, attackMs=0, decayMs=120),
+    # low attack: the impact at the monolith's foot is instant (a flash of light on the salt); the ring then runs out
+    s.route(R("low", "lights/foot/intensity", 900.0, attackMs=0, decayMs=220),
+            R("low", "post/lens/chromaticAberration", 0.012, attackMs=0, decayMs=120),
             R("visual.glow", "post/bloom/intensity", 0.05, **SLOW))
 
     s.params_({

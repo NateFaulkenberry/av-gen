@@ -82,8 +82,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the river rises up its banks and brightens"],
-        ["kick", "signal.kick", "the contour lines flash white across the land; the river surges"],
-        ["snare", "response.snare", "the groves bloom (their colours flare)"],
+        ["low", "response.low", "the contour lines flash white across the land; the river surges"],
+        ["onset", "response.onset", "the groves bloom (their colours flare)"],
         ["mids", "audio.mid", "the contour lines flow up the slopes"],
         ["low mids", "audio.lowMid", "the round trees glow"],
         ["highs", "audio.treble", "pollen sparks over the river; the contour lines brighten"],
@@ -283,12 +283,12 @@ def instrument(s):
     s.route(R("bass", "material/ctLand/op/21/smoothstep/constant", 5.0, comp=0, attackMs=40, decayMs=500),
             R("bass", "material/ctLand/op/22/constant/constant", 0.35, attackMs=30, decayMs=500),
             R("bass", "material/ctRiver/op/9/constant/constant", 1.2, attackMs=30, decayMs=400))
-    # ---- KICK: the contour lines flash white across the whole land, the river surges
-    s.route(R("kick", "material/ctLand/op/18/constant/constant", 1.6, attackMs=0, decayMs=240),
-            R("kick", "material/ctRiver/op/9/constant/constant", 1.6, attackMs=0, decayMs=300))
-    # ---- SNARE: the groves bloom (their colour flares); LOW MIDS: the round trees glow
-    s.route(R("snare", P % "cones" + "material/emissive", 1.4, attackMs=0, decayMs=320),
-            R("snare", P % "balls" + "material/emissive", 1.4, attackMs=0, decayMs=320),
+    # ---- LOW: the contour lines flash white across the whole land, the river surges
+    s.route(R("low", "material/ctLand/op/18/constant/constant", 1.6, attackMs=0, decayMs=240),
+            R("low", "material/ctRiver/op/9/constant/constant", 1.6, attackMs=0, decayMs=300))
+    # ---- ONSET: the groves bloom (their colour flares); LOW MIDS: the round trees glow
+    s.route(R("onset", P % "cones" + "material/emissive", 1.4, attackMs=0, decayMs=320),
+            R("onset", P % "balls" + "material/emissive", 1.4, attackMs=0, decayMs=320),
             R("audio.lowMid", P % "balls" + "material/emissive", 0.8, attackMs=120, decayMs=700))
     # ---- MIDS: the contour lines flow up the slopes (the palette's phase, integrated)
     s.route(R("audio.mid", "material/ctLand/op/16/palette/value", 30.0, integrate=True, attackMs=80, decayMs=600))

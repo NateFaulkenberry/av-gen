@@ -141,60 +141,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -639,7 +585,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/abZooid/op/14/constant/constant",
    "amount": 2.5,
    "op": "add",
@@ -850,7 +796,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/amount",
    "amount": 26.0,
    "op": "add",
@@ -861,7 +807,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/radius",
    "amount": -1.1,
    "op": "replace",
@@ -873,7 +819,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/glints/burst",
    "amount": 30.0,
    "op": "add",
@@ -1054,19 +1000,14 @@
     "the current swells: the snow streams and the colony sways"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a pressure wave ripples the water"
    ],
    [
-    "snare",
-    "response.snare",
-    "a flare through the colony"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "marine snow glints"
+    "onset",
+    "response.onset",
+    "a flare through the colony; marine snow glints"
    ],
    [
     "silence",

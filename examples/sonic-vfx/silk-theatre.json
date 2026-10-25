@@ -135,55 +135,7 @@
   "post/lens/chromaticAberration": 0.002,
   "post/tonemap/operator": 3
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "notes.lastPitch",
@@ -318,7 +270,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/silk/turbulence",
    "amount": 2.4,
    "op": "add",
@@ -341,7 +293,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/gold/turbulence",
    "amount": 2.4,
    "op": "add",
@@ -352,7 +304,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/shreds/burst",
    "amount": 70.0,
    "op": "add",
@@ -363,7 +315,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/goldShreds/burst",
    "amount": 50.0,
    "op": "add",
@@ -374,7 +326,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/glitter/burst",
    "amount": 60.0,
    "op": "add",
@@ -396,7 +348,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "lights/rim/intensity",
    "amount": 260.0,
    "op": "add",
@@ -407,7 +359,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.008,
    "op": "add",
@@ -1757,19 +1709,14 @@
     "the whole dance sways"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a whip-crack: the silk shudders and shreds fly from the hand"
    ],
    [
-    "snare",
-    "response.snare",
-    "gold shreds fly; the rim light flashes"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "glitter sparks along the ribbons"
+    "onset",
+    "response.onset",
+    "gold shreds fly; the rim light flashes; glitter sparks along the ribbons"
    ],
    [
     "sustained",

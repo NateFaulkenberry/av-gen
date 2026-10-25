@@ -58,10 +58,9 @@ DESIGN = {
         "extremely_fast": ["the creatures' hop on the kick"],
     },
     "vocabulary": [
-        ["kick", "signal.kick", "the creatures hop, a ripple left to right, landing on a spring"],
+        ["low", "response.low", "the creatures hop, a ripple left to right, landing on a spring"],
         ["bass", "response.bass", "the creatures squash and stretch; the camera bobs"],
-        ["snare", "response.snare", "the giant flower's petals flick; a confetti puff"],
-        ["hat", "response.hat", "sparkles round the flower"],
+        ["onset", "response.onset", "the giant flower's petals flick; a confetti puff"],
         ["mids", "audio.mid", "the clouds sway; the creatures turn their heads"],
         ["brightness", "sonic.brightness.slow", "the time of day: the sky and the sun's strength"],
         ["sustained", "response.sustain", "the giant flower blooms open"],
@@ -137,9 +136,9 @@ RAINBOW = ["#ff9aa8", "#ffc38a", "#fff09a", "#a8f0b8", "#9ad4ff", "#c8a8ff"]
 def instrument(s):
     """The modulation map (ABSTRACT-PLAN.md section 3)."""
     N = "nodes/%s/"
-    # ---- KICK: the creatures hop, a ripple left to right, landing on a spring; velocity sets the height
+    # ---- LOW: the creatures hop, a ripple left to right, landing on a spring; velocity sets the height
     for k, name in enumerate(CREATURES + EXTRA):
-        s.route(R("kick", N % name + "position", 0.75, comp=1, attackMs=0, decayMs=240, delayMs=70 * k,
+        s.route(R("low", N % name + "position", 0.75, comp=1, attackMs=0, decayMs=240, delayMs=70 * k,
                   springHz=2.4, springDamping=0.45))
     # ---- BASS: squash and stretch (wider and lower on the bass); the camera bobs
     for name in CREATURES + EXTRA:
@@ -147,13 +146,12 @@ def instrument(s):
                 R("bass", N % name + "scale", 0.1, comp=0, attackMs=20, decayMs=260),
                 R("bass", N % name + "scale", 0.1, comp=2, attackMs=20, decayMs=260))
     s.route(R("bass", "camera/position", 0.35, comp=1, attackMs=60, decayMs=500))
-    # ---- SNARE: the flower's petals flick open; a confetti puff from its heart
-    s.route(R("snare", "procedural/petals/transform/scale", 0.22, attackMs=0, decayMs=260, springHz=3.0,
+    # ---- ONSET: the flower's petals flick open; a confetti puff from its heart
+    s.route(R("onset", "procedural/petals/transform/scale", 0.22, attackMs=0, decayMs=260, springHz=3.0,
               springDamping=0.4),
-            R("snare", "particles/confetti/burst", 140.0, threshold="binary", thresholdLevel=0.05))
-    # ---- HATS: sparkles round the flower
-    s.route(R("hat", "particles/sparkle/burst", 18.0, threshold="binary", thresholdLevel=0.05),
-            R("audio.treble", "particles/sparkle/spawnRate", 60.0, attackMs=30, decayMs=300))
+            R("onset", "particles/confetti/burst", 140.0, threshold="binary", thresholdLevel=0.05))
+    # ---- HIGHS: sparkles round the flower
+    s.route(R("audio.treble", "particles/sparkle/spawnRate", 60.0, attackMs=30, decayMs=300))
     # ---- MIDS: the clouds sway; the creatures turn their heads
     for k in range(4):
         s.route(R("audio.mid", "procedural/cloud%d/transform/position" % k, 2.4 * (1 if k % 2 else -1), comp=0,
@@ -185,9 +183,9 @@ def instrument(s):
         s.route(R("polyphony", "procedural/%s/distribution/count" % node, 16.0, attackMs=0, decayMs=900))
     for k in range(len(RAINBOW)):
         s.route(R("held", "procedural/rainbow%d/transform/scale" % k, 1.0, delayMs=60 * k, **MEDIUM))
-    # ---- THE SKY-WHALE: it breathes on the bass, spouts on the snare, sings while notes are held
+    # ---- THE SKY-WHALE: it breathes on the bass, spouts on the onset, sings while notes are held
     s.route(R("bass", "nodes/whale/scale", 0.5, comp=1, attackMs=60, decayMs=500),
-            R("snare", "particles/spout/burst", 160.0, threshold="binary", thresholdLevel=0.05),
+            R("onset", "particles/spout/burst", 160.0, threshold="binary", thresholdLevel=0.05),
             R("held", "nodes/whaleMouth/scale", 0.16, comp=1, **MEDIUM))
     # ---- MOD WHEEL: day to night
     wheel = s.modwheel()
@@ -233,7 +231,7 @@ def sky_whale(s):
                      "value": [round(WHALE[0] + 9.0 * math.sin(a), 3), round(WHALE[1] + 2.2 * math.sin(2.0 * a), 3),
                                round(WHALE[2] + 6.0 * (1.0 - math.cos(a)), 3)]})
     s.track("nodes/whale/position", keys, loop=90.0)
-    # the spout (the snare)
+    # the spout (the onset)
     s.particles("spout", capacity=1500, seed=33, shape="sphere", position=[WHALE[0] + 2.0, WHALE[1] + 6.8, WHALE[2]],
                 extent=[0.3, 0.3, 0.3], direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=1.0, lifetimeMax=1.6,
                 spread=0.25, speedMin=6.0, speedMax=9.0, gravity=[0, -7.0, 0], drag=0.6, sizeStart=0.35,
@@ -367,7 +365,7 @@ def build():
                material=toon(col, bands=1, ambient=0.9, emissive=0.25),
                transform={"position": [0.0, -0.4, -3.5], "rotation": [90.0, 0.0, 0.0], "scale": [0.01, 0.01, 0.01]})
 
-    # ---- confetti (the snare) and sparkles (the hats) from the flower
+    # ---- confetti (the onset) and sparkles (the highs) from the flower
     s.particles("confetti", capacity=2000, seed=19, shape="sphere", position=list(head), extent=[0.4, 0.4, 0.4],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=1.6, lifetimeMax=2.6, spread=0.9, speedMin=2.0,
                 speedMax=4.0, gravity=[0, -3.0, 0], drag=1.2, turbulence=0.6, turbulenceScale=0.8,

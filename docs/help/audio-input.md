@@ -57,7 +57,7 @@ can follow the bass alone while the picture still plays the whole song. See the 
 - **The role** says what the stem is: **drums**, **bass**, **synth**, **vocal** or **other** (the default). Only a
   drums stem looks for kicks, snares and hats, always; a bass or synth stem publishes its onsets and levels, never a
   "kick" a bass note could fake. `role.<role>.*` follows the first active source of each role, so a scene that reads
-  `role.drums.kick` -- or the live scenes' `signal.kick` -- works whatever the drum stem's key is. AV Gen never guesses
+  `role.drums.kick` works whatever the drum stem's key is. AV Gen never guesses
   the role from the key or the audio.
 
 - **The key** (`drums`, `synth_lead`) is the signal name. It is made from the label once and kept: rename the label
@@ -83,7 +83,7 @@ drums source finds kicks, snares and hats). The map is remembered for that inter
 AV Gen cannot know what is plugged in: the drum bus is only on input 1 if your mixer sends it there. Give each
 part its own physical output on the mixer (a group or aux bus, pre-fader if the main fader should not change it) and
 cable it to its own interface input. A stem key used offline (`drums`) works live when an input has the same key, and
-anything read by role (`role.drums.*`, `signal.kick`) works live when an input has that role, whatever its key.
+anything read by role (`role.drums.*`) works live when an input has that role, whatever its key.
 
 When the interface is unplugged the panel says **Disconnected**, its sources read 0, and nothing else is opened in its
 place; it is reopened when it comes back. `avgen --list-audio-devices` prints every device's channels per stream;
@@ -95,7 +95,7 @@ which channel answers.
 > ticked.
 
 **Gain** (the last column) trims one source before it is analysed, -24 to +24 dB, on top of Input gain. Use it to lift
-a quiet channel over the gate and into the kick, snare, hat and beat detectors. It does not make that source's levels
+a quiet channel over the gate and into the onset, drum and beat detectors. It does not make that source's levels
 bigger: those read against the source's own loudness. A stem has the same **gain** in the Stems section (a change
 analyses the stem again).
 
@@ -106,21 +106,19 @@ the Inputs table and under the Stems section, lets a source drive them instead:
 
 - **Beat**: the beat clock from this source. A clean kick or drum bus gives a steadier grid than a full mix. A running
   MIDI clock still wins.
-- **Hits**: `response.kick`, `low`, `snare`, `hat` and `onset` (and their envelopes) from this source. The bass line in
-  the mix no longer fires `response.low`. The kick, snare and hat come only from a **drums** source; named on another
-  role they are refused (a project warning).
+- **Hits**: `response.low` and `response.onset` (their envelopes and the onset register) from this source. From a drum
+  bus, the bass line in the mix no longer fires `response.low`.
 - **Levels**: `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient` and `flux` from this source,
   read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
-  with every hit. For one level per part, read `signal.bassLevel` or `signal.synthLevel` instead.
+  with every hit. For one level per part, read that part's own `role.<role>.level` instead.
 - **History**: what spectrum and onset fields hear (Resonator, the generative fields): this source's spectrogram and
-  onsets instead of the mix's. A drums source's kicks, snares and hats are the fields' low, mid and high onsets; any
-  other source's onsets are on all three. The beat stays the mix's.
+  onsets instead of the mix's. A drums source's kicks, snares and hats are the fields' low, mid and high onsets; the
+  mix's and any other source's onsets land on the row of their register. The beat stays the mix's.
 
 Each list offers the roles first (**role: drums**: the first source of that role, whatever its key), then every key.
 
-Every route keeps working: a route on `response.kick` now follows the drum stem's kicks. On **Main mix** the kick does
-not fire at all (ADR-1620: it comes only from a drum source); the snare and hat are the mix's. A source a feed uses gets the
-kick/snare/hat analysis automatically. A fed source that goes quiet, or a stem outside its span, feeds nothing. It is
+Every route keeps working: a route on `response.low` now follows the drum stem's low attacks. A source a feed uses
+gets the hits analysis automatically. A fed source that goes quiet, or a stem outside its span, feeds nothing. It is
 not swapped for the mix. The same key works offline (a stem) and live (an input source with that key). The choice is
 saved in the project as `"feeds"` (see `docs/audio.md`); a role is saved as `"role.drums"`.
 

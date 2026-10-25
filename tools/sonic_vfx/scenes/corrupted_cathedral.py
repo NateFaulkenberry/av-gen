@@ -49,9 +49,8 @@ DESIGN = {
         ["melodic", "response.note", "the bay at the pitch's place flares (low notes near the "
          "door, high notes near the apse)"],
         ["bass", "response.bass", "the structure sways (an SDF warp) and the lines thicken"],
-        ["kick", "signal.kick", "the image breaks for a moment: it splits along the nave, a shock runs from the rose"],
-        ["snare", "response.snare", "frame corruption: mosh blocks and a magenta channel shift"],
-        ["hat", "response.hat", "data motes flicker"],
+        ["low", "response.low", "the image breaks for a moment: it splits along the nave, a shock runs from the rose"],
+        ["onset", "response.onset", "frame corruption: mosh blocks and a magenta channel shift"],
         ["phrase", "notes.phrase", "a scan sweep crosses the frame and rebuilds it"],
         ["velocity", "notes.lastVelocity", "how hard a note flares its bay"],
         ["density", "notes.density", "fragmentation: more, smaller mosh blocks"],
@@ -112,7 +111,7 @@ def nave():
                       name="rose")
     glass = sd_move((0.0, ROSE_Y, APSE_Z - 0.3), sd_rot((90, 0, 0), sd_cyl(5.0, 0.04)), m=1)
     # (no Voronoi fracture round the whole nave: evaluated at every march step it cost most of a 92 ms SDF pass at
-    #  1080p; the kick breaks the image with post instruments instead)
+    #  1080p; the low attack breaks the image with post instruments instead)
     parts = [piers, arcades, ribs, end_wall] + ([] if FLOOR_MESH else [floor]) + ([] if ROSE_SPLIT else [tracery])
     body = sd_union(*parts) if ROSE_SPLIT else sd_union(sd_union(*parts), glass)
     return sway(body)
@@ -219,7 +218,7 @@ def build():
     s.light("fill", "directional", direction=[0.1, -1.0, -0.4], color=hexrgb("#3a4a70"), intensity=0.03,
             castsShadow=False)
 
-    # data motes: tiny square-ish points hanging in the nave, flickering on hats
+    # data motes: tiny square-ish points hanging in the nave, flickering
     s.particles("motes", capacity=4000, seed=17, shape="box", position=[0.0, 7.0, -18.0], extent=[5.5, 6.5, 20.0],
                 direction=[0, 1, 0], spawnRate=60.0, lifetimeMin=4.0, lifetimeMax=8.0, spread=1.0, speedMin=0.0,
                 speedMax=0.03, gravity=[0, 0.02, 0], drag=0.5, turbulence=0.05, sizeStart=0.03, sizeEnd=0.03,
@@ -270,22 +269,20 @@ def build():
         s.route(R("bass", "sdf/%s/node/sway/amount" % obj, 0.004 if SWAY_TWIST else 0.35, attackMs=50,
                   decayMs=900),
                 R("bass", "sdf/%s/look/edge/pixels" % obj, 1.2, attackMs=50, decayMs=600))
-    # kick: the image breaks for a moment -- it splits along the nave's axis and a shock runs out from the rose
-    s.route(R("kickEnv", "post/split/amount", 14.0, attackMs=0, decayMs=0),
-            R("kickEnv", "post/shock/amount", 40.0, attackMs=0, decayMs=0),
-            R("kickEnv", "post/shock/radius", -1.3, op="replace", offset=-1.0, attackMs=0, decayMs=0),
-            R("kick", "post/lens/chromaticAberration", 0.05, attackMs=0, decayMs=140))
-    # snare: frame corruption -- mosh blocks and a channel shift; denser playing breaks it into smaller blocks
-    s.route(R("snare", "temporal/mosh/amount", 0.42, attackMs=0, decayMs=240),
-            R("snare", "temporal/mosh/shift", 6.0, attackMs=0, decayMs=200),
-            R("snare", "particles/shards/burst", 60.0, attackMs=0, decayMs=40),
+    # low attack: the image breaks for a moment -- it splits along the nave's axis and a shock runs out from the rose
+    s.route(R("lowEnv", "post/split/amount", 14.0, attackMs=0, decayMs=0),
+            R("lowEnv", "post/shock/amount", 40.0, attackMs=0, decayMs=0),
+            R("lowEnv", "post/shock/radius", -1.3, op="replace", offset=-1.0, attackMs=0, decayMs=0),
+            R("low", "post/lens/chromaticAberration", 0.05, attackMs=0, decayMs=140))
+    # onset: frame corruption -- mosh blocks and a channel shift; denser playing breaks it into smaller blocks
+    s.route(R("onset", "temporal/mosh/amount", 0.42, attackMs=0, decayMs=240),
+            R("onset", "temporal/mosh/shift", 6.0, attackMs=0, decayMs=200),
+            R("onset", "particles/shards/burst", 60.0, attackMs=0, decayMs=40),
             R("visual.frag", "temporal/mosh/block", -18.0, **MEDIUM),
             R("visual.frag", "temporal/mosh/amount", 0.06, **MEDIUM),
             # ...and the frame tears: row bands torn sideways, a few blocks swapped (ADR-1065)
-            R("snareEnv", "post/glitch/tear", 0.5, attackMs=0, decayMs=0),
-            R("snareEnv", "post/glitch/amount", 0.14, attackMs=0, decayMs=0))
-    # hat: the motes flicker
-    s.route(R("hat", "particles/motes/emissive", 7.0, attackMs=0, decayMs=70))
+            R("onsetEnv", "post/glitch/tear", 0.5, attackMs=0, decayMs=0),
+            R("onsetEnv", "post/glitch/amount", 0.14, attackMs=0, decayMs=0))
     # phrase: a scan sweeps the frame (progress 0 -> 1 as the envelope falls), in the accent colour
     s.route(R("phrase", "post/sweep/progress", 1.0, op="replace", envelope="linearfall", envelopeFallPerSecond=0.9,
               remapEnabled=True, remapInMin=0.0, remapInMax=1.0, remapOutMin=1.0, remapOutMax=0.0),

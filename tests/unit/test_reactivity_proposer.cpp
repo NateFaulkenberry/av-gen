@@ -2,11 +2,11 @@
 //
 // A golden plan pins the whole proposal (tests/data/directing/reactivity/glade-proposal.json; set
 // AVGEN_REGEN_REACTIVITY_GOLDEN=1 to rewrite it after an intended change, and say why in the commit).
-// The music is written by hand -- 120 BPM, measured kicks, claps and hats, the glade's six sections --
+// The music is written by hand -- 120 BPM, a measured onset rate, the glade's six sections --
 // so the golden depends on the scene and the proposer and not on the analyser. Beside the golden, the
 // properties the brief asks for are checked one by one, so a regenerated golden cannot quietly drop
 // one: three levels; each hero its own source, timing and amplitude; depth that follows the section;
-// the fungi on the kick at +0.25-0.35 and the lamps on the claps; a hue keyed by section and never
+// the fungi on the beat at +0.25-0.35 and the lamps on the bar; a hue keyed by section and never
 // driven by the audio; nothing on a global light, a shared material, a character or a faint layer;
 // and the validator finds no "everything on one source" or "one phase" in it.
 
@@ -41,7 +41,7 @@ namespace fs = std::filesystem;
 namespace {
 
 // The glade's music, as a measured context would carry it.
-MusicalContext gladeMusic(bool claps = true, bool measured = true, bool sections = true) {
+MusicalContext gladeMusic(bool attacks = true, bool measured = true, bool sections = true) {
     MusicalContext m;
     m.tempoBpm = 120.0;
     m.phraseBars = 8;
@@ -68,10 +68,7 @@ MusicalContext gladeMusic(bool claps = true, bool measured = true, bool sections
         if (measured) {
             run.audio.frames = 1000;
             run.audio.energy = 0.3f + 0.3f * s.energy;
-            run.audio.kickRate = s.type == "breakdown" ? 0.0f : 2.0f;
-            run.audio.snareRate = claps ? (s.type == "breakdown" ? 0.0f : 1.0f) : 0.0f;
-            run.audio.hatRate = 2.0f;
-            run.audio.onsetRate = run.audio.kickRate + run.audio.snareRate + run.audio.hatRate;
+            run.audio.onsetRate = attacks ? (s.type == "breakdown" ? 0.5f : 5.0f) : 0.0f;
             run.audio.bandCount = 5;
             run.audio.bandLevels = {0.6f + 0.2f * s.energy, 0.55f, midLevel.at(s.type), 0.5f, 0.45f};
         }
@@ -162,11 +159,11 @@ TEST_CASE("The proposal answers the music at three levels, each hero on its own 
     CHECK(levels[ReactiveLevel::Meso] >= 6);
     CHECK(levels[ReactiveLevel::Macro] >= 5);
 
-    // ---- meso: the heroes, most important first, take the kick, the clap, the bar, the breath ----
+    // ---- meso: the heroes, most important first, take the beat, the bar, the breath, the phrase ----
     CHECK(only(plan, "nodes/elder-gills/emissiveBoost").route.source == "beat.pulse");
-    CHECK(only(plan, "nodes/lantern-gills/emissiveBoost").route.source == "audio.onsetMid");
-    CHECK(only(plan, "nodes/spire-gills/emissiveBoost").route.source == "music.downbeat");
-    CHECK(only(plan, "nodes/moss-gills/emissiveBoost").route.source == "lfo.two-bar-breath");
+    CHECK(only(plan, "nodes/lantern-gills/emissiveBoost").route.source == "music.downbeat");
+    CHECK(only(plan, "nodes/spire-gills/emissiveBoost").route.source == "lfo.two-bar-breath");
+    CHECK(only(plan, "nodes/moss-gills/emissiveBoost").route.source == "music.phrase");
     // Each hero's own triple of source, timing and amplitude: no two heroes share all three.
     std::set<std::tuple<std::string, float, float, float, float>> triples;
     for (const char* hero : {"elder", "lantern", "spire", "moss"}) {
@@ -190,7 +187,7 @@ TEST_CASE("The proposal answers the music at three levels, each hero on its own 
     // The character answers nothing: its glow is its simulation's.
     CHECK(routesTo(plan, "nodes/walker/emissiveBoost").empty());
 
-    // ---- the glowing layers: the fungi echo the kick at +0.25-0.35, the lamps flare on the claps ----
+    // ---- the glowing layers: the fungi echo the beat at +0.25-0.35, the lamps flare on the bar ----
     const PlanRoute& fungi = only(plan, "nodes/meadow/scatter/fungi/emissionGain");
     CHECK(fungi.route.source == "beat.pulse");
     CHECK(fungi.route.op == params::ModOp::Add);
@@ -201,9 +198,9 @@ TEST_CASE("The proposal answers the music at three levels, each hero on its own 
     CHECK(fungi.route.chain.decayMs >= 250.0f);
     CHECK(fungi.route.chain.decayMs <= 400.0f);
     const PlanRoute& lamps = only(plan, "nodes/meadow/scatter/lamps/emissionGain");
-    CHECK(lamps.route.source == "audio.onsetMid");
-    CHECK(lamps.route.chain.attackMs <= 10.0f);
-    CHECK(only(plan, "nodes/meadow/scatter/shelf/emissionGain").route.source == "audio.onsetHigh");
+    CHECK(lamps.route.source == "music.downbeat");
+    CHECK(lamps.route.chain.attackMs >= 8.0f);
+    CHECK(only(plan, "nodes/meadow/scatter/shelf/emissionGain").route.source == "audio.onset");
     CHECK(only(plan, "nodes/meadow/scatter/shelf/emissionGain").level == ReactiveLevel::Micro);
     // The faint layer is left alone; the dark one was never offered.
     CHECK(routesTo(plan, "nodes/meadow/scatter/grass/emissionGain").empty());
@@ -291,12 +288,12 @@ TEST_CASE("The proposal follows what the music offers: no claps, no audio, no se
     Glade glade;
     const ReactiveCatalog catalog = glade.facts().capabilities.reactive();
 
-    SECTION("no claps: nothing reads the snare band, and the lamps take the bar") {
+    SECTION("no attacks: nothing reads the onset, and the small layers take the bar") {
         const ReactivityProposal p = proposeReactivity(catalog, gladeMusic(false));
         for (const PlanRoute& r : p.plan.routes) {
-            CHECK(r.route.source != "audio.onsetMid");
+            CHECK(r.route.source != "audio.onset");
         }
-        CHECK(only(p.plan, "nodes/meadow/scatter/lamps/emissionGain").route.source == "music.downbeat");
+        CHECK(only(p.plan, "nodes/meadow/scatter/shelf/emissionGain").route.source == "music.downbeat");
         CHECK(only(p.plan, "nodes/lantern-gills/emissiveBoost").route.source == "music.downbeat");
     }
     SECTION("no measured audio: only the grid and the sections are followed") {
@@ -306,7 +303,7 @@ TEST_CASE("The proposal follows what the music offers: no claps, no audio, no se
             CHECK_FALSE(r.route.source.starts_with("audio."));
         }
         CHECK(p.depthSource == "section.energy");
-        CHECK(only(p.plan, "nodes/elder-gills/emissiveBoost").route.source == "music.downbeat");
+        CHECK(only(p.plan, "nodes/elder-gills/emissiveBoost").route.source == "beat.pulse"); // the grid's own beat
     }
     SECTION("no sections: no depth from them and no colour keyed by them") {
         const ReactivityProposal p = proposeReactivity(catalog, gladeMusic(true, true, false));

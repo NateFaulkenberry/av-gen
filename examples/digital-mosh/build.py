@@ -25,9 +25,6 @@ import forms  # noqa: E402
 import land  # noqa: E402
 from forms import add, mul, norm  # noqa: E402
 
-sys.path.insert(0, str(HERE.parent.parent / "tools"))
-import drum_signals  # noqa: E402  (ADR-1620: the kick as a signal: a drum source's, else the beat's)
-
 # ============================================================================================ palettes
 # Every colour is a cluster extracted from a reproduction of a named painting (05-palettes.md), sRGB hex -> linear.
 
@@ -871,8 +868,8 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 # ============================================================================================ the response (ADR-1361)
 # LIVE ONLY. The performer's Response controls (the Live panel: Sensitivity, Transients, Sustain, Attack, Release =
 # `sonic/response/*`, ADR-1062) reach the live scene through `response.*`:
-#   hits    the kick, snare and hat are the response model's (ADR-1067's detector, the hit sensitivity's floor and
-#           curve, so Transients decides how many fire and how hard), scaled so a hit's peak is the old onset's
+#   hits    the low attack and the onset are the response model's (the hit sensitivity's floor and curve, so
+#           Transients decides how many fire and how hard), scaled so a hit's peak is the old onset's
 #   levels  a level is the response model's level, read against the music's own loudness (ADR-1510): the bass melt
 #           reads response.bass;
 #           an auto-gained band (the treble's glints, the limbs' lift) keeps its shape (character) and is multiplied
@@ -886,11 +883,9 @@ GATES = ["gMicro", "gRhythm", "gMosh", "gGlitch", "gMelt", "gLift"]
 # level 0.60 mean on Trench, from 0.77 and 0.83 on the old -44..-2 dB window) and a breakdown near 0; the gains are
 # the old ones times those ratios (1.21 bass, 1.38 level), and a quieter take reads as the mix does.
 RESPONSE = {}  # ADR-1510: the levels read against the adaptive loudness reference (was a -44/42 dB window)
-# ADR-1620: the mix has no kick. Every project (offline and live) reads tools/drum_signals.py's `signal.kick` -- a drums
-# source's kick, else the beat clock's pulse while the drums play -- at the old live amount (the onset's x 0.77: the
-# response kick's scale, which the drum signal keeps). The snare and hat are as before.
-LIVE_HITS = {"audio.onsetMid": ("response.snare", 0.78),
-             "audio.onsetHigh": ("response.hat", 0.91)}
+# The hits: every project (offline and live) reads the low attack (response.low) for the rhythmic fracture; the
+# offline projects read the analysis track's onset (audio.onset) for the spread, the live ones the response's.
+LIVE_HITS = {"audio.onset": ("response.onset", 0.78)}
 LIVE_LEVELS = {"audio.bassLevel": ("response.bass", 1.26), "audio.treble": ("visual.hTreble", 1.0),
                "audio.trebleLevel": ("visual.hTrebleLevel", 1.0), "audio.bass": ("visual.hBass", 1.0)}
 
@@ -985,18 +980,15 @@ def routes(live=False):
                         "remapOutMax": 0.0105, "integrate": True, "integrateMin": 0.0, "integrateMax": 1.0}})
     # ---- LAYER 1, micro: high frequencies are fine detail -- dust glints, the infected cells shimmer
     r.append(gated("audio.treble", "particles/motes/spawnRate", 260.0, "gMicro", {"attackMs": 40, "decayMs": 600}))
-    r.append(gated("audio.onsetHigh", "material/ground/emissionIntensity", 3.0, "gRhythm", PEAK(20, 6.0)))
-    for blocks in ("treeBlocks", "tanguyBlocks"):
-        r.append(gated("audio.onsetHigh", f"material/{blocks}/emissionIntensity", 4.0, "gRhythm", PEAK(20, 6.0)))
     r.append(gated("audio.trebleLevel", "post/glitch/amount", 0.05, "gGlitch", {"attackMs": 30, "decayMs": 300}))
-    # ---- LAYER 2, rhythmic: the kick fractures, the snare spreads
-    r.append(gated("signal.kick", "lights/fracture/intensity", 1925.0, "gRhythm", PEAK(30, 5.0)))
+    # ---- LAYER 2, rhythmic: a low attack fractures, any attack spreads
+    r.append(gated("response.low", "lights/fracture/intensity", 1925.0, "gRhythm", PEAK(30, 5.0)))
     for blocks in ("treeBlocks", "tanguyBlocks"):
-        r.append(gated("signal.kick", f"procedural/{blocks}/effector/5/strength", 0.462, "gRhythm", PEAK(40, 4.0)))
-    r.append(gated("audio.onsetMid", "field/infect/strength", 4.0, "gRhythm", PEAK(60, 3.0)))
-    r.append(gated("audio.onsetMid", "temporal/mosh/amount", 0.10, "gMosh", PEAK(60, 6.0)))
-    r.append(gated("audio.onsetMid", "post/glitch/tear", 0.35, "gGlitch", PEAK(50, 6.0)))
-    r.append(gated("signal.kick", "post/split/amount", 4.62, "gGlitch", PEAK(15, 12.0)))
+        r.append(gated("response.low", f"procedural/{blocks}/effector/5/strength", 0.462, "gRhythm", PEAK(40, 4.0)))
+    r.append(gated("audio.onset", "field/infect/strength", 4.0, "gRhythm", PEAK(60, 3.0)))
+    r.append(gated("audio.onset", "temporal/mosh/amount", 0.10, "gMosh", PEAK(60, 6.0)))
+    r.append(gated("audio.onset", "post/glitch/tear", 0.35, "gGlitch", PEAK(50, 6.0)))
+    r.append(gated("response.low", "post/split/amount", 4.62, "gGlitch", PEAK(15, 12.0)))
     # ---- LAYER 3, musical: bass is mass and gravity -- the limbs sag and lift, the bark flows, the haze breathes
     for li in range(3):
         r.append(gated("audio.bassLevel", f"sdf/limb{li}/node/melt/amount", 0.10 if li < 2 else -0.08, "gMelt",
@@ -1072,8 +1064,6 @@ def project(name, audio, live=False, sensitivity=None):
         "states": states(),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/digital-mosh.mp4"},
     }
-    # ADR-1620: the kick's signals first (the interpret sources after them may read them too)
-    p["sources"] = drum_signals.sources(drum_signals.used(p["routes"])) + p["sources"]
     if audio:
         p["assets"]["audio"] = {"path": audio}
     if sensitivity is not None:

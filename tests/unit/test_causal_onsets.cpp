@@ -1,5 +1,5 @@
-// Causal onsets (ADR-1060): kick, snare, hat, a bass attack and a broadband onset, with no look-ahead, the same
-// from a file as live -- scored against a groove whose hits were placed, with the kick's hardest rival in it.
+// Causal onsets (ADR-1060): a low-register attack and a broadband onset, with no look-ahead, the same from a file as
+// live. The detector names no instrument; a drums-role source's kick / snare / hat are test_drum_classifier.cpp's.
 
 #include "analysis/analysis_runner.hpp"
 #include "analysis/analysis_track.hpp"
@@ -10,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -64,79 +65,37 @@ std::vector<double> hitsOf(const analysis::AnalysisTrack& track, HitClass c) {
 }
 
 struct Parts {
-    std::vector<double> claps, hats, offbeats;
+    std::vector<double> offbeats;
 };
 
 Parts partsOf(const testsupport::Groove& g) {
     Parts p;
-    for (std::size_t i = 0; i < g.truth.beats.size(); ++i) {
-        if (i % 4 == 1 || i % 4 == 3) {
-            p.claps.push_back(g.truth.beats[i]);
-        }
-        if (i + 1 < g.truth.beats.size()) {
-            p.offbeats.push_back(0.5 * (g.truth.beats[i] + g.truth.beats[i + 1]));
-        }
+    for (std::size_t i = 0; i + 1 < g.truth.beats.size(); ++i) {
+        p.offbeats.push_back(0.5 * (g.truth.beats[i] + g.truth.beats[i + 1]));
     }
-    p.hats = p.offbeats;
     return p;
 }
 
 } // namespace
 
-TEST_CASE("Causal kick, snare and hat find a drum machine's parts without look-ahead", "[analysis][adr1060]") {
-    // The drums and the pad (the bass line is the next case's: ADR-1067).
-    const testsupport::Kit kit = testsupport::makeKit(16, true, false, true);
-    const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
-
-    const Score kick = match(hitsOf(track, HitClass::Kick), kit.kicks);
-    const Score snare = match(hitsOf(track, HitClass::Snare), kit.snares);
-    const Score hat = match(hitsOf(track, HitClass::Hat), kit.hats);
-    INFO("kick " << kick.detected << " p " << kick.precision() << " r " << kick.recall() << " lat "
-                 << kick.meanLatency << "; snare " << snare.detected << " p " << snare.precision() << " r "
-                 << snare.recall() << " lat " << snare.meanLatency << "; hat " << hat.detected << " p "
-                 << hat.precision() << " r " << hat.recall() << " lat " << hat.meanLatency);
-    CHECK(kick.recall() >= 0.95);
-    CHECK(kick.precision() >= 0.95);
-    CHECK(snare.recall() >= 0.95);
-    // This kit's open hat (one per odd bar) is a second difference of white noise: lasting noise down to 1.5 kHz,
-    // which is a snare's signature. The art agent's open hats (7 kHz and up) do not fire (test_drum_recall.cpp).
-    CHECK(snare.precision() >= 0.75);
-    CHECK(hat.recall() >= 0.85);
-    CHECK(hat.precision() >= 0.85);
-    // Causal: a hit is stamped near its attack. The kick is decided one hop after the low band's rise peaks (the
-    // sweep falls into the band two or three hops after the click), the snare four hops after its attack.
-    CHECK(kick.meanLatency <= 0.05);
-    CHECK(snare.meanLatency <= 0.06);
-    CHECK(hat.meanLatency <= 0.025);
-}
-
-TEST_CASE("A bright synth bass's plucks are low attacks; they also read as kicks (a known limit)",
-          "[analysis][adr1060][adr1067]") {
-    // An alias-free saw with a filter envelope from 1.2 kHz: its attack is broadband up to 4 kHz, which is what a
-    // beater's click looks like to the percussive flux. ADR-1067 records the limit; the art agent's darker, driven
-    // bass is the regression case (test_drum_recall.cpp).
+TEST_CASE("Low attacks find a synth bass's plucks and a kick alike", "[analysis][adr1060]") {
     const testsupport::Kit kit = testsupport::makeKit(16);
     const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
-    const Score kick = match(hitsOf(track, HitClass::Kick), kit.kicks);
-    const Score lowOnBass = match(hitsOf(track, HitClass::Low), kit.bass);
-    const Score kickOnBass = match(hitsOf(track, HitClass::Kick), kit.bass);
-    INFO("kick r " << kick.recall() << "; low on bass " << lowOnBass.recall() << "; kick on bass "
-                   << kickOnBass.hits << "/" << kit.bass.size());
-    CHECK(kick.recall() >= 0.9);
-    CHECK(lowOnBass.recall() >= 0.8);
-    WARN("bright bass plucks read as kicks: " << kickOnBass.hits << " of " << kit.bass.size());
+    const std::vector<double> lows = hitsOf(track, HitClass::Low);
+    const Score onBass = match(lows, kit.bass);
+    const Score onKick = match(lows, kit.kicks);
+    INFO("low on bass " << onBass.recall() << "; low on kicks " << onKick.recall());
+    CHECK(onBass.recall() >= 0.8);
+    CHECK(onKick.recall() >= 0.8);
 }
 
-TEST_CASE("A sustained pad alone fires no drum", "[analysis][adr1060]") {
+TEST_CASE("A sustained pad alone fires almost no low attack", "[analysis][adr1060]") {
     const testsupport::Kit kit = testsupport::makeKit(8, false, false, true);
     const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
-    CHECK(hitsOf(track, HitClass::Kick).empty());
-    CHECK(hitsOf(track, HitClass::Snare).empty());
-    CHECK(hitsOf(track, HitClass::Hat).empty());
     CHECK(hitsOf(track, HitClass::Low).size() <= 1);
 }
 
-TEST_CASE("A bass note is a low attack but not a kick", "[analysis][adr1060]") {
+TEST_CASE("A bass note is a low attack", "[analysis][adr1060]") {
     testsupport::GrooveSpec spec;
     spec.bars = 16;
     spec.offbeatBass = true;    // a percussive bass note on every off-beat
@@ -146,19 +105,23 @@ TEST_CASE("A bass note is a low attack but not a kick", "[analysis][adr1060]") {
     const testsupport::Groove g = testsupport::makeGroove(spec);
     const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(g.file, analysis::AnalyzerConfig{});
     const Parts p = partsOf(g);
-
-    const std::vector<double> kicks = hitsOf(track, HitClass::Kick);
-    const std::vector<double> lows = hitsOf(track, HitClass::Low);
-    const Score kick = match(kicks, g.truth.kicks);
-    const Score kickOnBass = match(kicks, p.offbeats);
-    const Score lowOnBass = match(lows, p.offbeats);
-    INFO("kick " << kick.detected << " p " << kick.precision() << " r " << kick.recall() << "; kicks on bass notes "
-                 << kickOnBass.hits << " of " << p.offbeats.size() << "; low on bass notes " << lowOnBass.recall());
-    CHECK(kick.recall() >= 0.9);
-    // This groove's bass is a sine with a 4 ms attack and nothing else in the frame: its onset is a click to the
-    // percussive flux, and it reads as a kick (ADR-1067's limit; the art agent's bass is the regression case).
-    WARN("clicky sine-bass notes read as kicks: " << kickOnBass.hits << " of " << p.offbeats.size());
+    const Score lowOnBass = match(hitsOf(track, HitClass::Low), p.offbeats);
+    INFO("low on bass notes " << lowOnBass.recall());
     CHECK(lowOnBass.recall() >= 0.8);
+}
+
+TEST_CASE("The onset fires on every part of a drum machine and names none", "[analysis][adr1060]") {
+    const testsupport::Kit kit = testsupport::makeKit(16, true, false, true);
+    const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
+    const std::vector<double> onsets = hitsOf(track, HitClass::Onset);
+    std::vector<double> all = kit.kicks;
+    all.insert(all.end(), kit.snares.begin(), kit.snares.end());
+    std::sort(all.begin(), all.end());
+    const Score s = match(onsets, all);
+    INFO("onset on kicks and snares: r " << s.recall() << " (" << onsets.size() << " onsets)");
+    CHECK(s.recall() >= 0.8);
+    // Two classes, neither an instrument.
+    STATIC_REQUIRE(analysis::kHitClassCount == 2);
 }
 
 TEST_CASE("Causal onsets are a function of the frame sequence", "[analysis][adr1060]") {
@@ -200,29 +163,29 @@ TEST_CASE("The live latch fires a carried event once", "[analysis][adr1060]") {
     analysis::LiveEventLatch latch;
     analysis::AnalysisFrame f;
     f.liveSerial = 10;
-    f.lowOnset = true;
-    f.lowStamp = 9; // raised on frame 9, carried onto 10
+    f.onset = true;
+    f.onsetStamp = 9; // raised on frame 9, carried onto 10
     latch.apply(f);
-    CHECK(f.lowOnset);
+    CHECK(f.onset);
     analysis::AnalysisFrame g2;
     g2.liveSerial = 11;
-    g2.lowOnset = true;
-    g2.lowStamp = 9; // the same event, carried again before the runner saw it consumed
+    g2.onset = true;
+    g2.onsetStamp = 9; // the same event, carried again before the runner saw it consumed
     latch.apply(g2);
-    CHECK_FALSE(g2.lowOnset);
+    CHECK_FALSE(g2.onset);
     analysis::AnalysisFrame h;
     h.liveSerial = 12;
-    h.lowOnset = true;
-    h.lowStamp = 12;
+    h.onset = true;
+    h.onsetStamp = 12;
     latch.apply(h);
-    CHECK(h.lowOnset);
+    CHECK(h.onset);
     // A new runner starts its serials again: the latch restarts with it.
     analysis::AnalysisFrame r;
     r.liveSerial = 1;
-    r.lowOnset = true;
-    r.lowStamp = 1;
+    r.onset = true;
+    r.onsetStamp = 1;
     latch.apply(r);
-    CHECK(r.lowOnset);
+    CHECK(r.onset);
 }
 
 

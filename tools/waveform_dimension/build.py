@@ -720,8 +720,7 @@ def instrument(s, g):
     glow, edge = CP % g["glowGain"], CP % g["edgeLevel"]
     s.route(R("response.level", glow, 1.0, op="multiply", gain=1.6, offset=0.4, attackMs=150, decayMs=900),
             R("control.spectral", glow, 1.0, op="multiply", gain=2.0, offset=1.0, **CCR),
-            R("response.hatEnv", edge, 1.0, op="multiply", gain=1.0, offset=1.0, attackMs=0, decayMs=200),
-            R("response.snareEnv", edge, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=0, decayMs=260),
+            R("response.onsetEnv", edge, 1.0, op="multiply", gain=0.8, offset=1.0, attackMs=0, decayMs=260),
             R("control.light", edge, 1.0, op="multiply", gain=1.5, offset=1.0, **CCR))
     # the chromatic waves travel: their phase integrates the music's energy over a floor (ADR-1041) -- never reset,
     # quicker in loud passages, still moving in silence (k.z and k.w of the phase remap move together)
