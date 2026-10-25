@@ -262,6 +262,40 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     CHECK(fr == std::set<std::string>{"drums", "bass", "synth"});
     CHECK(f.at("feeds").at("beat") == "role.drums");
     CHECK(f.at("effects") == p.at("effects")); // one scene, two songs
+
+    // pass 3's effects: the river beams are ADR-1662 path waves on the water's own course, each on its own refractory
+    // event and fading on its own envelope; the stars are two fast comets (a pool of two); the pass-2 perpendicular
+    // pulses and slow comet are gone
+    std::map<std::string, json> fx;
+    for (const json& e : p.at("effects")) {
+        fx[e.at("id")] = e;
+    }
+    CHECK_FALSE(fx.contains("riverPulseA"));
+    CHECK_FALSE(fx.contains("comet"));
+    for (const auto& [id, event] : std::map<std::string, std::string>{{"riverKick", "signal.kickBeamEv"},
+                                                                      {"riverSnare", "signal.snareBeamEv"}}) {
+        INFO(id);
+        REQUIRE(fx.contains(id));
+        const json& e = fx.at(id);
+        CHECK(e.at("trigger").at("name") == event);
+        CHECK(e.at("trigger").at("threshold").get<double>() == 0.0); // an onset's strength is 0.05-1: take every one
+        CHECK(e.at("timing").at("lifetime").get<double>() > 0.0);    // ADR-981: each hit its own fading front
+        const json& prop = e.at("parameters").at("propagation");
+        CHECK(prop.at("kind") == "path");
+        CHECK(prop.at("path").at("node") == "river");
+        CHECK(prop.at("path").at("feature") == "river");
+        CHECK(prop.at("path").at("disturb").get<double>() > 0.0);    // the owner: the ripples are required
+    }
+    CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("coreOffset").get<double>() > 0.0);
+    CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("coreOffset").get<double>() == 0.0);
+    for (const char* id : {"starA", "starB"}) {
+        INFO(id);
+        REQUIRE(fx.contains(id));
+        CHECK(fx.at(id).at("type") == "comet");
+        CHECK(fx.at(id).at("trigger").at("name") == std::string("signal.") + id + "Ev");
+        CHECK(fx.at(id).at("parameters").at("path").at("travelSeconds").get<double>() <= 0.6);
+        CHECK(fx.at(id).at("parameters").at("appearance").at("wispAmount").get<double>() == 0.0);
+    }
 }
 
 TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce research A's event lists",
