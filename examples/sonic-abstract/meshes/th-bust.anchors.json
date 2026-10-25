@@ -1,0 +1,81 @@
+{
+ "note": "Emitter anchors for the node's LOCAL space (tools/talking_heads/make_bust.py). 'gltf' is the exported GLB's frame (+Y up, face +Z, metres, origin at the base's bottom centre). eyeLeft is the bust's own left (+X). mouthBack is the back of the mouth cavity (the hero beam's apex).",
+ "blender": {
+  "mouth": [
+   0.0,
+   -0.0685,
+   0.383
+  ],
+  "eyeLeft": [
+   0.0295,
+   -0.0611,
+   0.463
+  ],
+  "eyeRight": [
+   -0.0295,
+   -0.0611,
+   0.463
+  ],
+  "headCentre": [
+   0.0,
+   0.0052,
+   0.465
+  ]
+ },
+ "gltf": {
+  "mouth": [
+   0.0,
+   0.383,
+   0.0977
+  ],
+  "mouthBack": [
+   0.0,
+   0.383,
+   0.0685
+  ],
+  "eyeLeft": [
+   0.0295,
+   0.463,
+   0.0611
+  ],
+  "eyeRight": [
+   -0.0295,
+   0.463,
+   0.0611
+  ],
+  "headCentre": [
+   0.0,
+   0.465,
+   -0.0052
+  ],
+  "forward": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "up": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ "mesh": {
+  "triangles": 38894,
+  "vertices": 19449,
+  "nonManifoldEdges": 0,
+  "trianglesPerMaterial": {
+   "porcelain": 38742,
+   "mouth_interior": 152
+  },
+  "boundsMinBlender": [
+   -0.184,
+   -0.1096,
+   0.0
+  ],
+  "boundsMaxBlender": [
+   0.184,
+   0.1141,
+   0.592
+  ]
+ }
+}
