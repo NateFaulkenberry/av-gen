@@ -16,6 +16,12 @@
 //   DirectionalWave  d = dot(p - origin, axis)      a front sweeping along an axis
 //   RadialWave       d = length((p - origin).xz)    a ripple in the ground plane
 //
+// ADR-1662 adds a third, PathWave: the arc along an eight-point chain of a river's own polyline round the
+// front (`wavePathHit`). It is drawn three ways, each in its own function: on land (`wavesAtSurface`, the
+// facets beside the path lit by their orientation to it), on water (`wavePathWater`: a core, a halo and a
+// head, which the water draws under its reflection), and as the wake's ripples in the water's normal
+// (`wavePathDisturb`). The water skips the land term (`wavesAtSurface(..., true)`).
+//
 // The radial metric is horizontal on purpose. Measuring in the ground plane and masking by height
 // is what makes a ripple *follow the terrain* -- every fragment is evaluated where its own surface
 // is, so the ring climbs a bank because the bank is there, with no terrain query, no projection and
@@ -70,7 +76,185 @@ fn waveGain(response: vec4<f32>, normal: vec3<f32>) -> f32 {
     return select(authored, response.y, kProceduralDraw);
 }
 
+
+// ---- ADR-1662: path waves ----------------------------------------------------------------------
+
+fn wavePathPoint(e: Wave, i: u32) -> vec2<f32> {
+    let v = e.path[i / 2u];
+    return select(v.zw, v.xy, (i & 1u) == 0u);
+}
+
+struct WavePathHit {
+    u: f32,             // metres behind the front along the path (negative: ahead of it)
+    lateral: f32,       // metres from the path, in the ground plane
+    nearest: vec2<f32>, // the nearest point of the path (xz)
+};
+
+// The projection of q onto the chain: point 0 is ahead of the front, point 1 is the front, 2-7 the wake.
+fn wavePathHit(e: Wave, q: vec2<f32>) -> WavePathHit {
+    var h: WavePathHit;
+    h.lateral = 1.0e9;
+    h.u = 0.0;
+    h.nearest = q;
+    var a = wavePathPoint(e, 0u);
+    var arc = -distance(a, wavePathPoint(e, 1u));
+    for (var i: u32 = 1u; i < 8u; i = i + 1u) {
+        let b = wavePathPoint(e, i);
+        let ab = b - a;
+        let len = length(ab);
+        if (len > 1.0e-3) {
+            let t = clamp(dot(q - a, ab) / (len * len), 0.0, 1.0);
+            let c = a + ab * t;
+            let d = distance(q, c);
+            if (d < h.lateral) {
+                h.lateral = d;
+                h.u = arc + t * len;
+                h.nearest = c;
+            }
+            arc = arc + len;
+        }
+        a = b;
+    }
+    return h;
+}
+
+// Whether q can be touched by path wave e at all: within the wake plus the widest reach of the front.
+fn wavePathNear(e: Wave, q: vec2<f32>, reach: f32) -> bool {
+    return distance(q, e.originKind.xz) < e.shape.y + reach + 4.0 * e.shape.x + 60.0;
+}
+
+// The leading edge widens to the distance the front moves in about a frame, so a fast front does not strobe.
+fn wavePathEdge(e: Wave) -> f32 {
+    return max(e.shape.x, e.sparkle.y * 0.02);
+}
+
+// The light fades in with distance from the camera (`shape.z` metres; 0 = off): the first frames of a front
+// would otherwise fill the bottom of the frame.
+fn wavePathNearFade(e: Wave, viewDistance: f32) -> f32 {
+    if (e.shape.z <= 0.0) {
+        return 1.0;
+    }
+    return smoothstep(e.shape.z * 0.3, e.shape.z, viewDistance);
+}
+
+// The land beside the path, facet by facet: the core's colour (and a share of the head's) by how squarely
+// the surface faces the path's nearest point, across `vertical.z` metres and up `vertical.y` (down
+// `vertical.x`: a riverbed under the water takes it too).
+fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f32) -> vec3<f32> {
+    let reach = e.vertical.z;
+    if (reach <= 0.0 || e.rainbow.z <= 0.0 || !wavePathNear(e, worldPos.xz, reach)) {
+        return vec3<f32>(0.0);
+    }
+    let h = wavePathHit(e, worldPos.xz);
+    let edgeW = wavePathEdge(e);
+    let wake = max(e.shape.y, 1.0e-3);
+    if (h.u < -2.0 * edgeW || h.u > wake || h.lateral > reach) {
+        return vec3<f32>(0.0);
+    }
+    let lead = smoothstep(-edgeW, 0.0, h.u);
+    let tail = pow(clamp(1.0 - h.u / wake, 0.0, 1.0), e.shape.w);
+    let t = h.u / edgeW;
+    let edge = exp(-t * t);
+    let x = h.lateral / (reach * 0.5);
+    let across = exp(-x * x);
+    let dy = worldPos.y - e.originKind.y;
+    let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), dy);
+    let below = 1.0 - smoothstep(e.vertical.x * 0.5, max(e.vertical.x, 1.0e-3), -dy);
+    let vband = select(below, above, dy >= 0.0);
+    let toPath = vec3<f32>(h.nearest.x, e.originKind.y + 2.0, h.nearest.y) - worldPos;
+    let orient = 0.2 + 0.8 * max(dot(normal, toPath / max(length(toPath), 1.0e-3)), 0.0);
+    let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
+    return light * (e.rainbow.z * across * vband * orient * wavePathNearFade(e, viewDistance));
+}
+
+struct WavePathWater {
+    under: vec3<f32>,   // drawn under the reflection (the water mixes it into its body)
+    surface: vec3<f32>, // drawn on top of it
+};
+
+// The light in the water: a narrow core (or twin filaments), a soft halo, a white-hot head at the leading
+// edge; `rainbow.x` of it under the reflection and the rest on top, so it reads at grazing distance too.
+fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
+    var out: WavePathWater;
+    out.under = vec3<f32>(0.0);
+    out.surface = vec3<f32>(0.0);
+    let count = u32(frame.waveCount.x + 0.5);
+    if (count == 0u) {
+        return out;
+    }
+    let viewDistance = distance(frame.cameraPos.xyz, worldPos);
+    for (var i: u32 = 0u; i < count; i = i + 1u) {
+        let e = frame.waves[i];
+        if (e.originKind.w < 1.5) {
+            continue;
+        }
+        let halo = max(e.vertical.w, 1.0e-3);
+        if (!wavePathNear(e, worldPos.xz, 3.0 * halo + e.edge.w)) {
+            continue;
+        }
+        let h = wavePathHit(e, worldPos.xz);
+        let edgeW = wavePathEdge(e);
+        let wake = max(e.shape.y, 1.0e-3);
+        if (h.u < -2.0 * edgeW || h.u > wake || h.lateral > 3.0 * halo + e.edge.w) {
+            continue;
+        }
+        let lead = smoothstep(-edgeW, 0.0, h.u);
+        let tail = pow(clamp(1.0 - h.u / wake, 0.0, 1.0), e.shape.w);
+        let t = h.u / edgeW;
+        let edge = exp(-t * t);
+        // the core never narrower than about a pixel and a half, so a far beam does not break up
+        let coreW = max(e.color.w, footprint * 1.5);
+        let lat = select(h.lateral, abs(h.lateral - e.edge.w), e.edge.w > 0.0);
+        let c = lat / coreW;
+        let core = exp(-c * c);
+        let g = h.lateral / halo;
+        let haloAmt = exp(-g * g);
+        let light = (e.color.rgb * (core + 0.15 * haloAmt) * (lead * tail) + e.edge.rgb * (core * edge))
+                    * wavePathNearFade(e, viewDistance);
+        out.under = out.under + light;
+        out.surface = out.surface + light * (1.0 - e.rainbow.x);
+    }
+    return out;
+}
+
+// The wake's disturbance as a slope in the water plane (stage 3 of the owner's river brief): behind each
+// front, crests spread out across the river from the path at 260 m/s and die in about half a second; they
+// wander and break with position, so they never read as ruled rings, and the mirror heals behind them.
+fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
+    var g = vec2<f32>(0.0);
+    let count = u32(frame.waveCount.x + 0.5);
+    for (var i: u32 = 0u; i < count; i = i + 1u) {
+        let e = frame.waves[i];
+        if (e.originKind.w < 1.5 || e.rainbow.y <= 0.0 || !wavePathNear(e, worldPos.xz, 300.0)) {
+            continue;
+        }
+        let h = wavePathHit(e, worldPos.xz);
+        if (h.u <= 0.0 || h.u > e.shape.y) {
+            continue;
+        }
+        let tau = h.u / max(e.sparkle.z, 100.0);     // seconds since the front passed this point
+        let reach = 30.0 + 260.0 * tau;
+        let d = h.lateral;
+        if (d > reach) {
+            continue;
+        }
+        let p = worldPos.xz;
+        let decay = exp(-tau / 0.45) * smoothstep(reach, reach * 0.7, d);
+        let broken = smoothstep(0.15, 0.85, 0.5 + 0.5 * sin(p.x * 0.047 + sin(p.y * 0.021) * 2.6) *
+                                                       sin(p.y * 0.039 + sin(p.x * 0.017) * 2.2));
+        let phase = kWaveTau / 14.0 * (d - 260.0 * tau) + 2.4 * sin(p.x * 0.019 + p.y * 0.023);
+        let radial = (p - h.nearest) / max(d, 1.0e-3);
+        g = g + radial * (e.rainbow.y * decay * broken * cos(phase));
+    }
+    return g;
+}
+
 fn wavesAt(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>) -> WaveResult {
+    return wavesAtSurface(worldPos, normal, emission, false);
+}
+
+// `onWater`: the caller is the water, which draws a path wave itself (`wavePathWater`, `wavePathDisturb`).
+fn wavesAtSurface(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>, onWater: bool) -> WaveResult {
     var out: WaveResult;
     out.radiance = vec3<f32>(0.0);
     out.bloom = 0.0;
@@ -82,6 +266,12 @@ fn wavesAt(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>) -> WaveR
     let viewDistance = distance(frame.cameraPos.xyz, worldPos);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let e = frame.waves[i];
+        if (e.originKind.w > 1.5) { // ADR-1662: a path wave
+            if (!onWater) {
+                out.radiance = out.radiance + wavePathLand(e, worldPos, normal, viewDistance) * waveGain(e.response, normal);
+            }
+            continue;
+        }
         let toP = worldPos - e.originKind.xyz;
 
         // ---- the distance metric ----

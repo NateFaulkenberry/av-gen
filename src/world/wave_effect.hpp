@@ -35,6 +35,12 @@
 // along an axis; `RadialWave` measures a radius in the ground plane. A ring, a shockwave, a cone and
 // a beam are each one of those two with a different mask, which is why the extension point is the
 // mask and why this enum is short.
+//
+// ADR-1662 adds a third metric, `PathWave`: distance measured ALONG a terrain feature's polyline (a
+// river's own course), so a front follows the bends the water follows. The CPU walks the polyline once
+// per front per frame and hands the GPU an eight-point chain round the front; the shader projects onto
+// that chain. It also lights the water from under its reflection, disturbs the water's normal behind the
+// front, and lights the land beside the path by facet orientation (see `PathShape`).
 
 #include "core/error.hpp"
 #include "world/effects/effect_timing.hpp"
@@ -43,6 +49,7 @@
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -72,6 +79,7 @@ inline constexpr std::size_t kMaxWaveFronts = 4;
 enum class PropagationKind : std::uint8_t {
     DirectionalWave, // distance measured along an axis from the origin: a front sweeping the world
     RadialWave,      // distance measured as a radius in the ground plane: a ripple
+    PathWave,        // ADR-1662: distance measured along a terrain feature's polyline: light down a river
 };
 [[nodiscard]] const char* propagationKindName(PropagationKind k);
 [[nodiscard]] std::optional<PropagationKind> propagationKindFromName(std::string_view name);
@@ -121,6 +129,29 @@ struct EffectEndpoint {
     [[nodiscard]] Result<void> validate() const;
 };
 
+// ADR-1662: the path a `PathWave` travels and how its light is shaped. The path is a terrain node's
+// feature by name -- the very polyline the water's flow and streaks are built from, so the light cannot
+// drift from the water -- and the front travels along it AWAY from the camera, starting where the
+// source (normally the camera) projects onto it.
+struct PathShape {
+    std::string node;          // the terrain node
+    std::string feature;       // its feature (a river)
+    // How the front moves: it covers `range` metres in range / speed seconds, eased out by `ease`
+    // (0 = constant speed, 1 = starts at twice the mean speed and stops), then holds there while the
+    // instance's own fade-out takes it away.
+    float ease = 0.5f;
+    float wakeGrowth = 0.25f;  // the wake is trailLength + wakeGrowth x metres travelled (perspective)
+    float coreWidth = 6.0f;    // metres: the core's 1/e half-width across the path
+    float coreOffset = 0.0f;   // 0 = one core on the centreline; > 0 = twin filaments this far either side
+    float haloWidth = 35.0f;   // metres: the soft halo round the core
+    float reach = 0.0f;        // metres across the path the land is lit to (0 = the land is not lit)
+    float reachHeight = 90.0f; // metres above the path's level the land light reaches
+    float land = 0.0f;         // the land light's share of the core radiance (facets lit by orientation)
+    float embed = 0.625f;      // on water: the share of the light drawn under the reflection (the rest on top)
+    float disturb = 0.0f;      // on water: the wake's ripple slope behind the front (0 = the mirror untouched)
+    float nearFade = 0.0f;     // metres from the camera inside which the light fades in (0 = off)
+};
+
 struct Propagation {
     PropagationKind kind = PropagationKind::RadialWave;
     // Explicit, because the default must not require anything else to exist: a `SourceToTarget`
@@ -151,6 +182,8 @@ struct Propagation {
     // Lateral falloff for a DirectionalWave, in metres from the axis. 0 means the front is a plane
     // rather than a beam, which is the right default for "the world lights up ahead of the camera".
     float beamRadius = 0.0f;
+
+    PathShape path; // ADR-1662: PathWave only
 
     [[nodiscard]] Result<void> validate() const;
 };
@@ -225,8 +258,21 @@ bool applyPulseStyle(WaveEffect& wave, std::string_view style);
 struct EffectInstance;
 enum class EffectStatus : std::uint8_t;
 
-// Mirrors `Wave` in shaders/wave_effects.wgsl. 144 bytes; see ADR-207 for why it lives in
-// FrameUniforms rather than in a buffer of its own.
+// Mirrors `Wave` in shaders/common.wgsl. 208 bytes (ADR-1662: 144 + the path chain); see ADR-207 for
+// why it lives in FrameUniforms rather than in a buffer of its own.
+//
+// A PathWave (kind 2) re-reads the lanes it has no use for (ADR-1662):
+//   originKind  xyz = the front's point on the path (at the source's height), w = 2
+//   axisFront   xyz = the path's unit tangent at the front (downstream), w = metres travelled
+//   shape       x = leading-edge width, y = wake length, z = near fade (m), w = wake falloff exponent
+//   vertical    x = metres below the path's level the light reaches (a riverbed), y = metres above it the
+//               land light reaches, z = land reach across the path (m), w = halo width (m)
+//   color       rgb = core radiance (envelope folded in), w = core half-width (m)
+//   edge        rgb = leading-edge radiance (envelope folded in), w = twin offset (m; 0 = one core)
+//   rainbow     x = embed share, y = disturbance slope (envelope folded in), z = land share, w = transport s
+//   sparkle     x = 0, y = the front's speed now (m/s), z = its mean speed (m/s), w = 0
+//   path        eight xz points round the front, the first `lead` ahead of it, the second AT it, the rest
+//               back along the wake; every other kind leaves them zero.
 struct WaveGpu {
     glm::vec4 originKind{0.0f};   // xyz = origin (world), w = PropagationKind
     glm::vec4 axisFront{0.0f};    // xyz = unit axis (directional), w = how far the front has travelled
@@ -240,8 +286,10 @@ struct WaveGpu {
     glm::vec4 sparkle{0.0f};      // x = cells per metre (0 = off), y = size, z = intensity,
                                   // w = twinkle phase
     glm::vec4 response{0.0f};     // x = ground, y = foliage, z = surface, w = emissive amplification
+    glm::vec4 path[4]{};          // ADR-1662: PathWave's chain, two xz points per vec4; zero otherwise
 };
-static_assert(sizeof(WaveGpu) == 144);
+static_assert(sizeof(WaveGpu) == 208);
+inline constexpr std::size_t kPathChainPoints = 8;
 
 // What one frame hands the renderer. A plain array so nothing allocates and so `scene::Scene` can
 // hold it by value the way it holds `post`.
@@ -261,6 +309,26 @@ struct ResolvedWave {
     float envelope = 0.0f;      // 0..1: delay, fade in, lifetime and fade out, multiplied together
     double elapsed = 0.0;       // seconds since this pass started, for the phase lanes
     glm::vec3 color{0.0f};      // the colour actually used: the hero's accent when it had one
+    // ADR-1662, PathWave only: the chain round the front (`kPathChainPoints` xz points, see WaveGpu), the
+    // wake's length, the front's speed now and its mean, and the transport second (the ripples' crests).
+    std::array<glm::vec2, kPathChainPoints> path{};
+    float wake = 0.0f;
+    float frontSpeed = 0.0f;
+    float meanSpeed = 0.0f;
+    double seconds = 0.0;
+};
+
+// ADR-1662: a polyline's geometry for a PathWave, exposed for the tests. `arcOf` projects a point onto
+// the polyline (in xz) and returns its arc length and the unit tangent there; `pointAt` walks to an arc
+// length (wrapping on a closed polyline, clamping on an open one). A polyline whose last point is within
+// a metre of its first is closed.
+struct PathGeometry {
+    std::span<const glm::vec3> points;
+    glm::mat4 transform{1.0f};
+    [[nodiscard]] bool closed() const;
+    [[nodiscard]] float length() const;
+    [[nodiscard]] float arcOf(const glm::vec3& p, glm::vec2* tangent = nullptr) const;
+    [[nodiscard]] glm::vec2 pointAt(float arc, glm::vec2* tangent = nullptr) const;
 };
 
 // Resolves ONE wave-type instance's NEWEST front. Nothing when it is not alive this frame: disabled,

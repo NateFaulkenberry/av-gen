@@ -383,10 +383,20 @@ Report checkAtmospheric(EffectKind kind) {
             EffectParameters registeredAfter = registerEffectParameters(after, std::span(&loaded, 1));
             std::string lost;
             std::size_t lostCount = 0;
+            // ADR-1662: a row the effect's mode does not write (a wave's path shape on a non-path wave) is not
+            // expected back; every row it does write still is.
+            std::unordered_set<std::string> unwritten;
+            if (const EffectSchema* schema = effectSchema(kind)) {
+                for (const EffectField& f : schema->fields) {
+                    if (f.written != nullptr && !f.written(effects.front())) {
+                        unwritten.insert(prefix + f.leaf);
+                    }
+                }
+            }
             for (const std::string& path : registered.registered) {
                 const params::IParameter* before = params.find(path);
                 const params::IParameter* now = after.find(path);
-                if (before == nullptr) {
+                if (before == nullptr || unwritten.contains(path)) {
                     continue;
                 }
                 if (now == nullptr) {

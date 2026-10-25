@@ -31,10 +31,13 @@ using E = EffectInstance;
 #define AVGEN_WAVE_SETC(lhs) +[](E& e, glm::vec3 v) { (lhs) = v; }
 #define AVGEN_WAVE_SETB(lhs) +[](E& e, bool v) { (lhs) = v; }
 
-inline constexpr const char* kPropagationNames[] = {"directional", "radial"};
+inline constexpr const char* kPropagationNames[] = {"directional", "radial", "path"};
 inline constexpr const char* kDirectionNames[] = {"explicit",       "sourceForward",  "cameraForward",
                                                   "cameraVelocity", "sourceToTarget", "cameraToTarget",
                                                   "blended"};
+
+// ADR-1662: the path rows are written only by a path wave, so no other wave's file changes.
+inline bool isPathWave(const E& e) { return e.wave.propagation.kind == PropagationKind::PathWave; }
 
 inline constexpr EffectField kFields[] = {
     colorField("color", "Colour", AVGEN_WAVE_GET(e.wave.appearance.color),
@@ -80,10 +83,11 @@ inline constexpr EffectField kFields[] = {
                 AVGEN_WAVE_GET(static_cast<float>(e.wave.propagation.kind)),
                 +[](E& e, float v) {
                     e.wave.propagation.kind = static_cast<PropagationKind>(
-                        std::clamp(static_cast<int>(v + 0.5f), 0, 1));
+                        std::clamp(static_cast<int>(v + 0.5f), 0, 2));
                 })
         .json("propagation/kind").sec("Propagation")
-        .tooltip("Directional: a front sweeping along an axis. Radial: a ring spreading from the source."),
+        .tooltip("Directional: a front sweeping along an axis. Radial: a ring spreading from the source.\n"
+                 "Path: a front travelling along a terrain feature (a river), away from the camera (ADR-1662)."),
     choiceField("direction", "Direction", kDirectionNames,
                 AVGEN_WAVE_GET(static_cast<float>(e.wave.propagation.direction)),
                 +[](E& e, float v) {
@@ -117,6 +121,55 @@ inline constexpr EffectField kFields[] = {
     floatField("beamRadius", "Beam radius", 0.0f, 1000.0f, 0.0f, 200.0f,
                AVGEN_WAVE_GET(e.wave.propagation.beamRadius), AVGEN_WAVE_SETF(e.wave.propagation.beamRadius))
         .json("propagation/beamRadius").fmt("%.0f m").floorAt(0.0f),
+    // ADR-1662: a path wave's shape (Propagation > Path). Ignored by the other kinds.
+    floatField("path/ease", "Path ease", 0.0f, 1.0f, 0.0f, 1.0f, AVGEN_WAVE_GET(e.wave.propagation.path.ease),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.ease)).json("propagation/path/ease").sec("Path")
+        .tooltip("0: the front keeps its speed. 1: it starts at twice the mean speed and slows to a stop.")
+        .writtenWhen(isPathWave),
+    floatField("path/wakeGrowth", "Wake growth", 0.0f, 2.0f, 0.0f, 1.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.wakeGrowth),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.wakeGrowth)).json("propagation/path/wakeGrowth")
+        .tooltip("The wake lengthens by this many metres per metre travelled, so it keeps a length on screen.")
+        .floorAt(0.0f).writtenWhen(isPathWave),
+    floatField("path/coreWidth", "Core width", 0.1f, 100.0f, 0.5f, 30.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.coreWidth),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.coreWidth)).json("propagation/path/coreWidth")
+        .fmt("%.1f m").floorAt(0.1f).writtenWhen(isPathWave),
+    floatField("path/coreOffset", "Twin offset", 0.0f, 100.0f, 0.0f, 40.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.coreOffset),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.coreOffset)).json("propagation/path/coreOffset")
+        .fmt("%.1f m").floorAt(0.0f).tooltip("0: one core on the path. Above 0: two filaments this far either side.")
+        .writtenWhen(isPathWave),
+    floatField("path/haloWidth", "Halo width", 0.0f, 400.0f, 0.0f, 120.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.haloWidth),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.haloWidth)).json("propagation/path/haloWidth")
+        .fmt("%.0f m").floorAt(0.0f).writtenWhen(isPathWave),
+    floatField("path/reach", "Land reach", 0.0f, 2000.0f, 0.0f, 600.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.reach),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.reach)).json("propagation/path/reach").fmt("%.0f m")
+        .floorAt(0.0f).tooltip("How far across the path the land is lit, facet by facet. 0: the land is not lit.")
+        .writtenWhen(isPathWave),
+    floatField("path/reachHeight", "Land height", 0.0f, 1000.0f, 0.0f, 300.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.reachHeight),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.reachHeight)).json("propagation/path/reachHeight")
+        .fmt("%.0f m").floorAt(0.0f).writtenWhen(isPathWave),
+    floatField("path/land", "Land light", 0.0f, 4.0f, 0.0f, 1.0f, AVGEN_WAVE_GET(e.wave.propagation.path.land),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.land)).json("propagation/path/land").floorAt(0.0f)
+        .writtenWhen(isPathWave),
+    floatField("path/embed", "Under the surface", 0.0f, 1.0f, 0.0f, 1.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.embed),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.embed)).json("propagation/path/embed")
+        .tooltip("On water: the share of the light drawn under the reflection; the rest lies on top.")
+        .writtenWhen(isPathWave),
+    floatField("path/disturb", "Ripples", 0.0f, 1.0f, 0.0f, 0.3f, AVGEN_WAVE_GET(e.wave.propagation.path.disturb),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.disturb)).json("propagation/path/disturb").floorAt(0.0f)
+        .tooltip("On water: the wake's ripples behind the front, which break the reflection and heal.")
+        .writtenWhen(isPathWave),
+    floatField("path/nearFade", "Near fade", 0.0f, 2000.0f, 0.0f, 800.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.nearFade),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.nearFade)).json("propagation/path/nearFade")
+        .fmt("%.0f m").floorAt(0.0f).tooltip("The light fades in over this distance from the camera (0: off).")
+        .writtenWhen(isPathWave),
     floatField("response/ground", "Ground", 0.0f, 6.0f, 0.0f, 2.0f, AVGEN_WAVE_GET(e.wave.response.ground),
                AVGEN_WAVE_SETF(e.wave.response.ground)).json("response/ground").sec("Surface response")
         .floorAt(0.0f),
@@ -153,6 +206,10 @@ inline void writeExtra(const E& e, nlohmann::json& block) {
     p["velocityWeight"] = w.propagation.velocityWeight;
     p["targetWeight"] = w.propagation.targetWeight;
     p["verticalGrowth"] = w.propagation.verticalGrowth;
+    if (!w.propagation.path.node.empty() || !w.propagation.path.feature.empty()) { // ADR-1662
+        p["path"]["node"] = w.propagation.path.node;
+        p["path"]["feature"] = w.propagation.path.feature;
+    }
     nlohmann::json& s = block["sparkle"];
     s["fadeDistance"] = w.sparkle.fadeDistance;
     s["seed"] = w.sparkle.seed;
@@ -190,6 +247,15 @@ inline Result<void> readExtra(E& e, const nlohmann::json& block) {
         w.propagation.velocityWeight = num(p, "velocityWeight", w.propagation.velocityWeight);
         w.propagation.targetWeight = num(p, "targetWeight", w.propagation.targetWeight);
         w.propagation.verticalGrowth = num(p, "verticalGrowth", w.propagation.verticalGrowth);
+        if (p.contains("path") && p.at("path").is_object()) { // ADR-1662
+            const nlohmann::json& q = p.at("path");
+            if (q.contains("node") && q.at("node").is_string()) {
+                w.propagation.path.node = q.at("node").get<std::string>();
+            }
+            if (q.contains("feature") && q.at("feature").is_string()) {
+                w.propagation.path.feature = q.at("feature").get<std::string>();
+            }
+        }
     }
     if (block.contains("sparkle") && block.at("sparkle").is_object()) {
         const nlohmann::json& s = block.at("sparkle");

@@ -194,6 +194,11 @@ struct EffectField {
     const char* const* choices = nullptr;
     int choiceCount = 0;
 
+    // ADR-1662: when non-null, the row is written to the effect's JSON only while this says so (a row that
+    // means something only in one mode of its kind -- a wave's path shape -- leaves every other file as it
+    // was). It is read whenever present, and it is a parameter and routable either way.
+    bool (*written)(const EffectInstance&) = nullptr;
+
     [[nodiscard]] constexpr const char* choiceName(float v) const {
         if (choices == nullptr || choiceCount <= 0) {
             return "";
@@ -234,6 +239,11 @@ struct EffectField {
     // Chainable, so a row reads as one expression and the optional parts are named where they are
     // set rather than counted along a positional list.
     [[nodiscard]] consteval EffectField json(const char* p) const { EffectField f = *this; f.jsonPath = p; return f; }
+    [[nodiscard]] consteval EffectField writtenWhen(bool (*when)(const EffectInstance&)) const {
+        EffectField f = *this;
+        f.written = when;
+        return f;
+    }
     [[nodiscard]] consteval EffectField fmt(const char* p) const { EffectField f = *this; f.format = p; return f; }
     [[nodiscard]] consteval EffectField tooltip(const char* p) const { EffectField f = *this; f.tip = p; return f; }
     [[nodiscard]] consteval EffectField sec(const char* p) const { EffectField f = *this; f.section = p; return f; }

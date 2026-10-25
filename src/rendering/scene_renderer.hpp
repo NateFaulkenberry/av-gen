@@ -380,7 +380,7 @@ struct FrameUniforms {
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
 // the same field in the same place, which is the whole reason it is written as a sum rather than a
 // number.
-static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWaves +
+static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 208 * world::kMaxGpuWaves + // ADR-1662: 144 -> 208
                                        16 + 160 * world::kMaxGpuComets + 288 * world::kMaxGpuAuroras + 48 + // ADR-1641: 240 -> 272; ADR-1652: -> 288
                                        64 + // ADR-345: four vec4s of analytic sky
                                        32 + // ADR-379: two vec4s of vortex glow
@@ -407,13 +407,14 @@ static_assert(offsetof(FrameUniforms, wind) == 576);
 static_assert(offsetof(FrameUniforms, lights) == 640);
 static_assert(offsetof(FrameUniforms, waveCount) == 1152);
 static_assert(offsetof(FrameUniforms, waves) == 1168);
-static_assert(offsetof(FrameUniforms, atmosCount) == 3472); // ADR-981: 16 waves, +1152
-static_assert(offsetof(FrameUniforms, comets) == 3488);
-static_assert(offsetof(FrameUniforms, auroras) == 4448);
+static_assert(offsetof(FrameUniforms, atmosCount) == 4496); // ADR-981: 16 waves, +1152; ADR-1662: 208-byte waves, +1024
+static_assert(offsetof(FrameUniforms, comets) == 4512);
+static_assert(offsetof(FrameUniforms, auroras) == 5472);
 // ADR-939: 3744 + 2 x 16 (ADR-981: +1152 for the eight more wave slots). The aurora block grew one vec4 (its glints' depth), so everything after
 // `auroras` moved by one vec4 per aurora; the WGSL mirror moved with it (test_renderer_layout_guards).
-// ADR-1641: + 2 x 32 (two vec4s of ribbons per aurora). ADR-1652: + 2 x 16 (the ribbons' pulse).
-static_assert(offsetof(FrameUniforms, skyGround) == 5024);
+// ADR-1641: + 2 x 32 (two vec4s of ribbons per aurora). ADR-1652: + 2 x 16 (the ribbons' pulse). ADR-1662: + 1024
+// (each of the 16 wave records carries a path chain of four vec4s).
+static_assert(offsetof(FrameUniforms, skyGround) == 6048);
 
 struct ObjectUniforms {
     glm::mat4 model;

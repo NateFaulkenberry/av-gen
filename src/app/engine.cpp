@@ -6629,6 +6629,27 @@ public:
         return true;
     }
 
+    // ADR-1662. A terrain node's feature polyline, for a PathWave: the points its terrain samples (the
+    // water's flow follows the same ones) and where the node stands.
+    [[nodiscard]] bool featurePath(std::string_view name, std::string_view feature, std::span<const glm::vec3>& points,
+                                   glm::mat4& transform) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        const scene::CompositionNode* node = comp_->findNode(std::string(name));
+        if (node == nullptr || node->kind != scene::NodeKind::Terrain) {
+            return false;
+        }
+        for (const world::Feature& f : node->worldMap.features) {
+            if (f.name == feature && f.samplePath().size() >= 2) {
+                points = f.samplePath();
+                transform = comp_->nodeWorldTransform(*node).matrix();
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ADR-983. Where the node's current placement begins in HIST: a wake reads its path no further back.
     [[nodiscard]] bool nodePlacedSince(std::string_view name, double& out) const override {
         return history_ != nullptr && history_->placementStart(name, out);

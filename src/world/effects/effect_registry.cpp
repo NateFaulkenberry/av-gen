@@ -601,6 +601,9 @@ void effectPayloadToJson(const EffectSchema& schema, const EffectInstance& effec
         }
     }
     for (const EffectField& field : schema.fields) {
+        if (field.written != nullptr && !field.written(effect)) {
+            continue; // ADR-1662: a row this effect's mode does not use
+        }
         const std::string path = jsonPathOf(schema, field);
         switch (field.type) {
         case FieldType::Float: writeAt(out, path, json(fieldFloat(field, schema, effect))); break;

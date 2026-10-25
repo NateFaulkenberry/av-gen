@@ -242,6 +242,13 @@ public:
     [[nodiscard]] virtual bool nodeDrawnPosition(std::string_view name, double t, glm::vec3& out) const {
         (void)name; (void)t; (void)out; return false;
     }
+    // ADR-1662. A terrain node's feature polyline by name (the points the terrain samples, in the node's
+    // space) and the node's world transform, for a PathWave. The span stays valid for the frame. Optional:
+    // false when there is no such node or feature.
+    [[nodiscard]] virtual bool featurePath(std::string_view node, std::string_view feature,
+                                           std::span<const glm::vec3>& points, glm::mat4& transform) const {
+        (void)node; (void)feature; (void)points; (void)transform; return false;
+    }
 };
 
 // Everything an effect may read on a frame, for every type (ADR-702 merged ADR-207's and ADR-230's

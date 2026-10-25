@@ -13,9 +13,10 @@ struct Light {
 };
 
 // One surface wave (a Ground Pulse or Travel Beam instance), as world::packWave writes it (ADR-207). The evaluation lives in
-// wave_effects.wgsl; the layout lives here because it is part of the frame block.
+// wave_effects.wgsl; the layout lives here because it is part of the frame block. A path wave (kind 2, ADR-1662)
+// re-reads most lanes: see world::WaveGpu's table.
 struct Wave {
-    originKind: vec4<f32>, // xyz = origin (world), w = kind (0 directional, 1 radial)
+    originKind: vec4<f32>, // xyz = origin (world), w = kind (0 directional, 1 radial, 2 path)
     axisFront: vec4<f32>,  // xyz = unit axis (directional only), w = metres the front has travelled
     shape: vec4<f32>,      // x = front width, y = trail length, z = range, w = trail falloff exponent
     vertical: vec4<f32>,   // x = vertical half-extent, y = growth per metre travelled,
@@ -26,6 +27,7 @@ struct Wave {
     rainbow: vec4<f32>,    // x = cycles per metre, y = phase, z = saturation, w = brightness
     sparkle: vec4<f32>,    // x = cells per metre (0 = off), y = size, z = intensity, w = twinkle phase
     response: vec4<f32>,   // x = ground, y = foliage (the scatter), z = surface, w = emissive gain
+    path: array<vec4<f32>, 4>, // ADR-1662: a path wave's chain, two xz points per vec4 (ahead, at the front, the wake)
 };
 
 // ADR-230 atmospheric effects. Mirrors world::CometGpu / world::AuroraGpu; the C++ side asserts
