@@ -479,4 +479,6 @@ Cut from one full-song render (01) by the final build, except the stop-1 referen
 | `15-headless-ultra-ab-final.txt` | every headless A/B run |
 | `16-sound-to-light.txt` | the sound-to-light table |
 | `17-live-acceptance.txt` | the live runs and the control |
-| `REPORT.md` | the final report (brief §16) |
+
+### Pass 3 suites on bd0a44ca (recorded by the coordinator)
+`run-suite.sh gpu` (bare): PASS, exit 0, 704 passed / 0 failed / 1 skipped, 47 min 41 s. `gpu-lock.sh run-suite.sh cpu-assets`: PASS, exit 0, 4,470 passed / 0 failed / 29 skipped / 1 expected failure, 18 min 19 s. The first cpu-assets run failed one case (the registry round-trip test expected path rows back from a non-path wave, which `EffectField::written` leaves out by design); fixed in bd0a44ca. Logs: `~/Desktop/av-gen-review/aurora-borealis/pass3-impl/suite-gpu/` and `suite-cpu-assets2/`.
