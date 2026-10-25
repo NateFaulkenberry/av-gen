@@ -746,3 +746,37 @@ TEST_CASE("Light Beam follows its owner in local space (ADR-1670)", "[shell2][ef
         CHECK(b.frame.empty());
     }
 }
+
+// ADR-1671: `castLight` is a Bool row. Read through the float reader it always answered its default (true), so a
+// project's `"castLight": false` never turned an entity or world beam's pool light off.
+TEST_CASE("Light Beam: castLight false, as a project sets it, asks the pool for no light (ADR-1671)",
+          "[shell2][effects][beam][adr1671]") {
+    FakeScene scene;
+    world::EffectContext ctx;
+    ctx.seconds = 2.0;
+    ctx.scene = &scene;
+    const world::EffectSchema& schema = *world::effectSchema(EffectKind::LightBeam);
+    const auto withCastLight = [&](bool on) {
+        world::EffectInstance b = always(EffectKind::LightBeam, "tractor", EffectOwner::entity("craft"));
+        b.values.setFloat("lightBeam/light", 300.0f);
+        for (const world::EffectField& f : schema.fields) {
+            if (std::string_view(f.leaf) == "castLight") {
+                REQUIRE(f.type == world::FieldType::Bool);
+                world::setFieldBool(f, schema, b, on); // what loading `"castLight": <on>` does
+            }
+        }
+        return b;
+    };
+    const Built on = build({withCastLight(true)}, ctx);
+    const Built off = build({withCastLight(false)}, ctx);
+    CHECK(on.lights.count == 1);
+    CHECK(off.lights.count == 0);
+    // the beam itself draws the same either way: the row decides the light, not the cone
+    REQUIRE(on.frame.instances.size() == 1);
+    REQUIRE(off.frame.instances.size() == 1);
+    CHECK(std::memcmp(&on.frame.instances[0], &off.frame.instances[0], sizeof(world::ShellInstance)) == 0);
+    // and a beam that never names the row keeps its default: it lights
+    world::EffectInstance unset = always(EffectKind::LightBeam, "tractor", EffectOwner::entity("craft"));
+    unset.values.setFloat("lightBeam/light", 300.0f);
+    CHECK(build({unset}, ctx).lights.count == 1);
+}

@@ -173,9 +173,10 @@ in `--bench-json` `gpuPassMedianMs`. It will be the hero cone's screen coverage:
 | ADR | Change | When |
 |---|---|---|
 | 1670 | G1: `lightBeam` `space: local` for entity owners (local offset and full-sphere local aim) | **Decided (D3): the first engine task, before task 3.** Test `test_light_beam_local` plus off = byte-identical |
-| 1671 | G2: an ellipse mask on `post/glitch` and `post/split` | If the T1 tear visibly catches haze, motes or beams the owner wants clean. GPU pixel-diff test |
-| 1672 | G3: Sine deformer `bands` (rigid per-band offsets) | If the owner wants geometric tearing of the object itself. CPU/GPU parity test |
-| 1673-1689 | Reserved for what the art pass finds | |
+| 1672 | G2: an ellipse mask on `post/glitch` and `post/split` | If the T1 tear visibly catches haze, motes or beams the owner wants clean. GPU pixel-diff test |
+| 1673 | G3: Sine deformer `bands` (rigid per-band offsets) | If the owner wants geometric tearing of the object itself. CPU/GPU parity test |
+| 1671 | `castLight` read as a Bool (found by ADR-1670; fixed with the owner's approval) | Done |
+| 1674-1689 | Reserved for what the art pass finds | |
 
 ## 7. Risks
 

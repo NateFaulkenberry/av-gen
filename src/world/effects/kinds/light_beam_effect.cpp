@@ -262,7 +262,7 @@ EffectStatus emit(const E& e, const EffectContext& ctx, ShellSink& sink, std::st
         sink.usesDepth();
     }
     const float light = std::max(kRows.f(e, "light"), 0.0f) * live.envelope;
-    if (!beam.lightOwner && kRows.f(e, "castLight") > 0.5f && light > 0.0f) {
+    if (!beam.lightOwner && kRows.b(e, "castLight") && light > 0.0f) { // ADR-1671: a Bool row, read as one
         glm::vec3 hue = color;
         hue /= std::max({hue.r, hue.g, hue.b, 1e-4f});
         EffectLight l;
