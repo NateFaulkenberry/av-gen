@@ -427,8 +427,8 @@ def bed_program():
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
 
 
-UNDERWATER_AMBIENT = "#0b0928"   # pass 8: the base light on the bed and the fish (was #010106)
-FISH_AMBIENT = "#100d36"         # the fish a little brighter than the bed round them, so they stand off it
+UNDERWATER_AMBIENT = "#3428a0"   # pass 8: the base light on the bed and the fish (was #010106)
+FISH_AMBIENT = "#5a48e0"         # the fish a little brighter than the bed round them, so they stand off it
 
 
 def fish_program():
@@ -511,7 +511,8 @@ def water():
     return {
         "enabled": True,
         "shallowColor": hexrgb("#0a0a24"), "deepColor": hexrgb(WATER_DEEP), "shallow": 2.0, "clarity": 1.0,
-        "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 1.1,
+        # pass 8: the mirror a touch lower (was 1.1), so the lit water body under it shows; the reflections stay
+        "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 0.9,
         "reflectionTint": [0.85, 0.86, 1.0], "specular": 0.3, "roughness": 0.03,
         "ripple": 0.01, "rippleScale": 0.03, "rippleSpeed": 1.0, "chop": 0.0, "foam": 0.0, "refraction": 1.5,
         "sparkle": 0.0, "glow": 0.15, "glowColor": c["waterGlow"], "glowScale": 0.012, "glowCoverage": 0.45,
@@ -520,9 +521,10 @@ def water():
         # pass 3: the bed is seen through the water (dimmed with depth, wobbled by the beam's ripples via the refraction)
         # pass 5 ("make the pond appear deeper"; kept in pass 6): twice pass 4's absorption, so the bed darkens with depth -- the shelf
         # shows near the shores and fades into a dark middle -- and the water reads as a volume
-        # pass 8 (the owner: "make the underwater slightly more illuminated its hard to see the geometry / fish"): two
-        # thirds of pass 5-7's absorption, so the light carries deeper
-        "reflectionRays": 1.0, "transmission": 0.7, "absorption": [0.05, 0.04, 0.028], "undulation": 0.03,
+        # pass 8 (the owner: "make the underwater slightly more illuminated its hard to see the geometry / fish"): 27% of
+        # pass 5-7's absorption, so the light carries deeper (at two thirds the bed still vanished: a view 20 m down at
+        # 20 degrees runs 60 m through the water)
+        "reflectionRays": 1.0, "transmission": 0.7, "absorption": [0.02, 0.016, 0.011], "undulation": 0.03,
         "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
         "flowStreaks": 1.2, "streakLines": 600.0, "streakLength": 50.0, "streakDensity": 0.45, "streakSpeed": 1.8,
         "streakHighlight": 1.0, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],
