@@ -266,3 +266,120 @@ f1dd701a tuning:
 - Stage-8 CPU work p99 was 3.2-3.8 ms.
 - Media: `~/Desktop/av-gen-review/aurora-borealis/final2/`: clips, sheet, comet and pulse frames, the sky comparison,
   the map.
+
+## Pass 3: Sabertooth (stop 1, 2026-10-24)
+
+Brief: `20-brief-sabertooth.md`, `20b-brief-river-light.md`; plan `23-plan-pass3.md`; research `21-` (audio), `22-`
+(scene). Owner notes relayed during the pass, applied: slower beams that fade out, more light on the mountains, the
+ripples are required; no Worley caustic, a faceted underwater bed instead; beam colours from the scene's own family.
+
+### Audio (step 1)
+
+- **Projects.** `aurora-borealis.json` is Sabertooth, the default: nine stems by key (`stem.<key>.*`), roles Kick
+  `drums`, Cloud Diving `synth`, BASS `bass`, the rest `other`, `feeds.beat = stem.kick`. Feline Footwear stays as
+  `aurora-borealis-feline.json`: the same scene and signals, driven from its role stems (synth → aurora, drum
+  classes → beams, bass notes → left glints). It is the hidden index entry "Sonic VFX - Aurora Borealis (Feline
+  Footwear)", the Digital Mosh pattern. The owner's Sonic VFX menu is unchanged; the menu test counts 11 hidden.
+- **Signals.** Every transient is the stem's onset into an attack-0 latch with its own refractory. An effect
+  trigger reads the raw event, so each `<name>Ev` is the onset gated by its latch's first frames, and respects the
+  refractory. A binary threshold before each latch lifts every onset to 1; an onset's value is its strength, and the
+  first build's 0.9 gate dropped weak hits. No classifier, no `macro.*`. Transients are stem-only; the aurora keeps
+  a mix fallback.
+- **Verified against A's lists** (`--sonic-trace` at 240 fps with one-frame probe latches on each event; the trace
+  row is written after the bus clears its events). Exact, no extras: **12 crashes** (+0.1 ms), **121 kicks**,
+  **48 snares**, **28 tom notes**, **176 tone-block accents**. A's list has 121 kicks, the downbeat at t = 0
+  included. The crashes go 8 to star A and 4 to star B. The integration test holds all of this.
+- **The re-bounced Moog (19:42):** at lag 0 in all ten 7 s windows against the mix (correlation 0.14-0.34;
+  `pass3-impl/moog/winlag-out.txt`); different from BASS.wav, at half its RMS. It is 23 long notes, each a hard
+  attack and a slow decay, at least 1.04 s apart: not v1's plucks. A's catch-all (rms trend 0.25 s/15 ms, ×1.6)
+  catches all 23 at -3.3 ms. With A's 150 ms latch it adds 3 re-steps 0.18-0.24 s after a note; a **300 ms
+  refractory** removes them with no loss. Plot: `pass3-impl/moog/moog-notes.png`. The audio "note starts" my
+  script lists beyond the 23 are noise blips in the decays (checked on the plot).
+- **Moog subset.** An rms rise is a level, not an event, so no per-note random pick exists (onset-gated picks scored
+  recall 0.32 in v1). The left comb's offset glides on a slow saw (`lfo.moogDrift`, 0.137 Hz), so notes 1.4 s
+  apart light different scatterings. The toms pick a new subset per note (`random.tomPick`); the tone block steps
+  through a one-bar saw.
+
+### Engine (step 2)
+
+- **ADR-1661: 64 material ops (was 48).** Golden pack hash of a 48-op program unchanged from the 48-op build; new
+  slots zero.
+- **ADR-1662: a wave can travel along a river** (`propagation.kind: "path"`). The arc along the water's own `river`
+  feature, away from the camera, eased; an eight-point chain round the front. Drawn as a core or twin + halo + head
+  under the reflection, ripples in the water's normal behind the front, land lit facet by facet by orientation, and
+  a riverbed below the water lit from the head. `EffectField::written` keeps the Path rows out of every other
+  wave's file. Off = byte-identical: the water hashes as a shader with the path blocks removed (plain and
+  cinematic); ground pulses and the QA water scene render byte-identical PNGs to the build before (acf387ae).
+  Tests: `test_wave_path.cpp`, `test_wave_path_gpu.cpp` (the bend is lit, the straight continuation is not).
+
+### Scene (steps 3-5)
+
+- **River beam.** `riverKick`: magenta-pink core (#ff2f92), 1.6 s over 1.6 km, eased, life 1.4 s with a 0.7 s
+  fade. `riverSnare`: pale lilac twin filaments 10 m either side (#e2d2ff), 1.0 s over 1.3 km, life 0.9 s with a
+  0.5 s fade. Both:
+  - start 160 m out, fade in over 500 m;
+  - ripples (`disturb` 0.045 / 0.035);
+  - land light across 700 / 600 m and up 250 / 200 m;
+  - a bed share 2.0 / 1.6.
+
+  The pass-2 perpendicular pulses are gone.
+- **The faceted riverbed.** `ab-bed-coarse.glb` (about 50 m facets, 3,040 triangles, chosen) or `ab-bed-fine.glb`
+  (about 30 m, 7,680). Rows across the river, jittered in plan and ±7 m in depth, -9 to -21 m. A near-black program
+  (`abBed`), so it shows only when the beam lights it, through the water: transmission 0.7, absorption
+  0.035/0.03/0.022 per metre, refraction 1.5 m, so the ripples wobble it. The terrain bed moved to -40 m. A plain
+  overhead light read as a glow; lit from the beam's head, a grazing light, the planes separate.
+- **Sky.** Cloud Diving: intensity +1.6, height +250, width +0.012, swirl +0.6, filaments, edge, airglow (fast,
+  300/1200); coverage +0.25 on a 0.75 base and the palette (slow, 1500/4000). The drum and bass routes into the
+  aurora are cut. Crash: two fast comets (0.45 s, 900 m tail, no wisps), environment response 0.4 s (aurora +0.3,
+  river glow +0.3, crest flare 0.2: at 0.7 it whitened the ranges). **Ribbons raised 600 → 1000 m:** a near sheet
+  hung over the camera as a large pink wedge at the top right during swells. It was there in pass 2, smaller; the
+  swell enlarged it. Owner to confirm the look.
+- **Glints.** The valley is split by bank: `ab-valleyL.glb` (inner, always left) with `abRockL` (57 ops), and
+  `ab-valleyR.glb` plus the three ranges with `abRockR` (64 ops). The bake now carries v = the crease's own hash;
+  importance went into the line width. Moog: pale pink edge glints, 3 teeth. Tone block: lavender-white edge
+  glints, 5 teeth, stepping through the bar. Toms: blue-violet plane flashes, 2 teeth, sized. A crash flares both
+  banks' crests. The haze and line fade are now linear ramps on metres (one op each, not a decametre smoothstep).
+- **Routes:** 29 live, 0 dead (`--audit-routes`).
+
+### Stop 1 media: `~/Desktop/av-gen-review/aurora-borealis/pass3-stop1/`
+
+All rendered by one build (the commit before this entry).
+
+| File | What it shows |
+|---|---|
+| `01-beam-compare-2x2-test-events-10-16s.mp4` | Deterministic events, kick and snare together every 1.4 s. Panels: (1) the path beam alone (stage 1); (2) chosen: ripples + mountain light + coarse bed; (3) the same with the fine bed; (4) as 2 with more mountain light. The beam follows the left bend |
+| `02-beam-underwater-bed-closeup-coarse-vs-fine-quarter-speed.mp4` | A close-up of the near water, like the owner's crop, at quarter speed: the faceted bed revealed under the beam, coarse against fine |
+| `03-beam-colour-pairs-kick-snare-together-10-16s.mp4` | Three pairs side by side, kick and snare firing together: A magenta-pink + pale lilac (recommended), B deep rose + bright orchid, C fuchsia + lavender |
+| `04-beam-on-sabertooth-10-16s.mp4` | The chosen beam on the real stems, with sound |
+| `05-beam-on-sabertooth-busy-35-41s.mp4` | A busy section (crashes, a tom fill, kick pickups), with sound; the beam follows the right-hand curve |
+| `06-sky-swells-crashes-22-27s.mp4` | A Cloud Diving swell and three crashes (23.16, 24.57, 25.26 s): fast stars, reflected in the river, with the crest flare; with sound |
+| `07-sky-swells-crashes-45-49s.mp4` | The 45.6 / 47.0 / 47.7 s crash group across a swell's start; with sound |
+| `08-glints-moog-left-toms-toneblock-right-40-48s.mp4` | Moog notes at 41.4, 42.8, 47.7 s on the left; the tone block and the 41.8 and 46-47.5 s tom fills on the right; with sound |
+| `09-glints-test-events-moog-1.4Hz-toms-0.7Hz-block-2.8Hz-30-36s.mp4` | The glints on deterministic test events: left pink, right lavender-white lines and blue-violet planes |
+| `10-full-scene-23-49s.mp4` | 26 s of the whole scene with sound |
+| `11-headless-ultra-ab.txt` | The headless Ultra A/B below, every run |
+
+### Headless Ultra A/B (stop 1)
+
+Conditions: 1920x1080, target 30, 90 warm-up frames, 4 s measured, AC power, one build (0bb1aff0), 3 interleaved
+reps. Before = pass 2's scene (b6e572c2, regenerated in an untracked folder) on Feline Footwear; after = pass 3 on
+Sabertooth, each at the same song second. GPU p50, ms; median of 3:
+
+| t | pass 2 | pass 3 | Δ | pass 3 GPU p95 range | CPU work p50 (2 → 3) |
+|---|---|---|---|---|---|
+| 12 s (beams, a swell) | 12.27 | 12.01 | −0.26 | 15.6-16.9 | 1.84 → 2.18 |
+| 36 s (crashes, tom fill, beams) | 11.73 | 11.87 | +0.14 | 15.0-16.7 | 1.81 → 2.11 |
+| 47 s (crash group, tom fill, Moog) | 12.94 | 12.00 | −0.94 | 14.4-16.4 | 1.86 → 2.16 |
+
+The pass-2 comet (+1.1-1.2 ms while alive) is gone, and the beams, bed, stars and glints together cost about what
+it did. CPU work is +0.3 ms p50: nine stems' signal chains and the path resolution. Everything sits well inside
+33.3 ms. Live acceptance on the 60 Hz LG is owed after the owner's review, as planned.
+
+### Open for the owner at stop 1
+
+1. **The beam** (01-05): the chosen v4-style beam with the faceted bed, coarse or fine, and the colour pair (A
+   recommended). Speed and fades are tuned to Sabertooth: the kick takes 1.6 s, fading from 0.7 s; the snare 1.0 s,
+   fading from 0.4 s. Stage 3's sparse upward rays (E3) are not built; the ripples (stage 3's other half) are in.
+2. **The ribbons at 1000 m** (was 600) to remove the near pink wedge: does the aurora still read as before?
+3. **The bed is subtle**: it shows only in the near water (further out the reflection covers it, by design). It
+   could be stronger at the cost of more launch flash.
