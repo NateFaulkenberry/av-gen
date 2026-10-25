@@ -816,3 +816,67 @@ All from 505ce9bc, the same build for every comparison.
   them. A true front per note would need several fronts per bank, more op constants than the 64-op ceiling leaves.
 - **The Moog's soft notes:** precision 0.75.
 - **Live acceptance and the suites** wait for the owner's approval: a fresh reboot, on AC, with the LG at 60 Hz.
+
+## Pass 7: pass 3's landscape with pass 6's effects (stop, 2026-10-25)
+
+The owner, on pass 6: "just tell it to go back to the pass 3 geometry". Then: "but keep the pass 6 effects".
+
+### What changed
+
+- **The landscape is pass 3's, restored from bd0a44ca rather than approximated.**
+  - `world.py` is pass 3's generator verbatim: the closed-loop river with its seven mild bends and straight reaches, the
+    valley walls, hero peaks, spurs, layered ranges and rock shoulders.
+  - The camera (`build.camera_tracks`) is pass 3's path, height, pitch, sway and roll, less the shooting stars' azimuth
+    tracks. Pass 3's water node and river feature are back too.
+  - **Checked against the generator at bd0a44ca:**
+    - The near, far and distant range GLBs are byte-identical.
+    - Every one of the bank's 26,600 triangles is one of pass 3's.
+    - The river course is identical.
+  - **The only things missing are 3,600 triangles of pass 3's -30 m rows**, all under the water (their highest vertex is
+    at -1.1 m). That is the bank running on under the river: the shoreline seam the owner found in pass 4. The rows are
+    still generated, so every other row keeps its seed, but they are not joined.
+- **Added on top:** the deeper bed (its edges on the banks' waterline rows) and the 18 fish.
+- **Every pass-6 effect and setting is unchanged:**
+  - bass on the left bank, Moog on the right;
+  - the bands running down the range, with wide lines, facet fills, ridgeline glow, sustain and soft notes;
+  - the three lanes, splashes and wake, at a quarter of the spill;
+  - the fireball (ADR-1665), aimed 560-600 m up;
+  - the deeper water;
+  - the smoothed aurora.
+- **What follows the bends:**
+  - The lanes, splashes and wake follow the river feature's centreline, which is pass 3's bending course.
+  - The fish sit on the lanes round the river's own centre line.
+  - The mountain bands are keyed to distance from the camera, not to any axis, so they run down whichever way the valley
+    turns.
+- **The fireballs:** all twelve crashes were checked in the render, and every ball flies in the sky above pass 3's ridges.
+
+### Measurements
+
+All from 514b40a3, the same build.
+
+- **Flash gate:** worst 0.037; 0 general flashes.
+- **Fish:** the highest vertex is 1.50 m down.
+- **Notes caught:** unchanged from pass 6. Moog every note 0.94 recall at 0.75 precision; bass 0.94 at 0.94.
+- **Lit share per note:** bass median 38.5% of the left bank, Moog 41.4% of the right.
+- **Brightening:** bass 36.5%, Moog 31.1%, against a floor of 16-22%.
+- **Headless Ultra 1080p, on AC**, pass 6 (regenerated from 505ce9bc) against pass 7, the same build:
+  - GPU p50 is about equal: 13.7 / 13.9 ms, 14.1 / 14.0, 13.6 / 14.1.
+  - p95 is 1-2 ms higher and CPU work about 0.5 ms higher (2.3-2.9 ms): pass 3's denser land is 52k triangles against 34k.
+
+### Pass-7 stop media: `~/Desktop/av-gen-review/aurora-borealis/pass7/`
+
+| File | What it shows |
+|---|---|
+| `01-five-frames-down-the-river-6-21-36-51-66s.png` | five frames down pass 3's river |
+| `02-frame-at-{6,21,36,51,66}s-1080p.png` | the same five at full size |
+| `03-busy-passage-bass-left-moog-right-18.5-24.5s.mp4` | the busy bass and Moog passage, with sound |
+| `04-fireballs-crash-group-22-27s.mp4` | the 23.2/24.6/25.3 s crashes, with sound |
+| `05-fireballs-crash-group-44.5-49s.mp4` | the 45.6/47.0/47.7 s crashes, with sound |
+| `06-twelve-crashes-closeups-left-col-2.8-36.5s-right-col-45.6-59.0s.png` | a crop round each crash's fireball (two crops caught a lit mountain instead; 06b/06c show those two whole) |
+| `06b-crash-35.8s-full-frames-36.1-37.3s.png`, `06c-crash-56.8s-full-frames-57.1-58.3s.png` | those two crashes, whole frames |
+| `07-full-song-0-70s-720p-small.mp4` | the whole song, 720p, 24 MB, with sound |
+| `08-flash-audit-full-song.txt` | the flash audit |
+| `09-notes-caught.txt` | notes caught |
+| `10-visibility-per-note.txt` | visibility per note |
+| `11-fish-below-the-surface-check.txt` | the fish check |
+| `12-headless-ultra-ab-pass6-vs-pass7.txt` | headless, pass 6 against pass 7 |
