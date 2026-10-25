@@ -225,6 +225,7 @@ TEST_CASE("ADR-1662: a path wave packs its chain and shape; every other wave pac
     q.reach = 260.0f;
     q.reachHeight = 90.0f;
     q.land = 0.5f;
+    q.bed = 1.25f;
     q.embed = 0.625f;
     q.disturb = 0.04f;
     q.nearFade = 300.0f;
@@ -243,7 +244,7 @@ TEST_CASE("ADR-1662: a path wave packs its chain and shape; every other wave pac
     CHECK(g.rainbow.x == 0.625f);
     CHECK_THAT(g.rainbow.y, WithinAbs(0.04, 1e-6));
     CHECK(g.rainbow.z == 0.5f);
-    CHECK_THAT(g.rainbow.w, WithinAbs(1.2, 1e-6));
+    CHECK(g.rainbow.w == 1.25f);
     CHECK(g.sparkle == glm::vec4(0.0f, 1000.0f, 1000.0f, 0.0f));
     for (std::size_t i = 0; i < 4; ++i) {
         CHECK(g.path[i] == glm::vec4(r->path[2 * i], r->path[2 * i + 1]));

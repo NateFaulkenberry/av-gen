@@ -147,6 +147,7 @@ struct PathShape {
     float reach = 0.0f;        // metres across the path the land is lit to (0 = the land is not lit)
     float reachHeight = 90.0f; // metres above the path's level the land light reaches
     float land = 0.0f;         // the land light's share of the core radiance (facets lit by orientation)
+    float bed = 0.0f;          // the same below the path's level (a riverbed seen through the water), lit from the head
     float embed = 0.625f;      // on water: the share of the light drawn under the reflection (the rest on top)
     float disturb = 0.0f;      // on water: the wake's ripple slope behind the front (0 = the mirror untouched)
     float nearFade = 0.0f;     // metres from the camera inside which the light fades in (0 = off)
@@ -269,7 +270,7 @@ enum class EffectStatus : std::uint8_t;
 //               land light reaches, z = land reach across the path (m), w = halo width (m)
 //   color       rgb = core radiance (envelope folded in), w = core half-width (m)
 //   edge        rgb = leading-edge radiance (envelope folded in), w = twin offset (m; 0 = one core)
-//   rainbow     x = embed share, y = disturbance slope (envelope folded in), z = land share, w = transport s
+//   rainbow     x = embed share, y = disturbance slope (envelope folded in), z = land share, w = bed share
 //   sparkle     x = 0, y = the front's speed now (m/s), z = its mean speed (m/s), w = 0
 //   path        eight xz points round the front, the first `lead` ahead of it, the second AT it, the rest
 //               back along the wake; every other kind leaves them zero.
@@ -310,7 +311,7 @@ struct ResolvedWave {
     double elapsed = 0.0;       // seconds since this pass started, for the phase lanes
     glm::vec3 color{0.0f};      // the colour actually used: the hero's accent when it had one
     // ADR-1662, PathWave only: the chain round the front (`kPathChainPoints` xz points, see WaveGpu), the
-    // wake's length, the front's speed now and its mean, and the transport second (the ripples' crests).
+    // wake's length, the front's speed now and its mean, and the transport second.
     std::array<glm::vec2, kPathChainPoints> path{};
     float wake = 0.0f;
     float frontSpeed = 0.0f;

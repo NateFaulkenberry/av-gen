@@ -142,7 +142,10 @@ fn wavePathNearFade(e: Wave, viewDistance: f32) -> f32 {
 // `vertical.x`: a riverbed under the water takes it too).
 fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f32) -> vec3<f32> {
     let reach = e.vertical.z;
-    if (reach <= 0.0 || e.rainbow.z <= 0.0 || !wavePathNear(e, worldPos.xz, reach)) {
+    let dy = worldPos.y - e.originKind.y;
+    let underneath = dy < 0.0;
+    let share = select(e.rainbow.z, e.rainbow.w, underneath); // the land's share above the level, the bed's below
+    if (reach <= 0.0 || share <= 0.0 || !wavePathNear(e, worldPos.xz, reach)) {
         return vec3<f32>(0.0);
     }
     let h = wavePathHit(e, worldPos.xz);
@@ -155,16 +158,23 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
     let tail = pow(clamp(1.0 - h.u / wake, 0.0, 1.0), e.shape.w);
     let t = h.u / edgeW;
     let edge = exp(-t * t);
-    let x = h.lateral / (reach * 0.5);
+    // Above the path's level (banks, slopes, mountains): across `reach`, lit by how squarely each facet faces the
+    // path's nearest point, sharpened so neighbouring planes differ. Below it (a riverbed seen through the water): a
+    // band about the halo's width under the light, lit from the head itself -- a low, grazing light that catches the
+    // planes tilted toward it and leaves the others dark.
+    let width = select(reach * 0.5, max(e.vertical.w * 2.5, 40.0), underneath);
+    let x = h.lateral / width;
     let across = exp(-x * x);
-    let dy = worldPos.y - e.originKind.y;
     let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), dy);
     let below = 1.0 - smoothstep(e.vertical.x * 0.5, max(e.vertical.x, 1.0e-3), -dy);
-    let vband = select(below, above, dy >= 0.0);
-    let toPath = vec3<f32>(h.nearest.x, e.originKind.y + 2.0, h.nearest.y) - worldPos;
-    let orient = 0.2 + 0.8 * max(dot(normal, toPath / max(length(toPath), 1.0e-3)), 0.0);
+    let vband = select(above, below, underneath);
+    let source = select(vec3<f32>(h.nearest.x, e.originKind.y + 2.0, h.nearest.y),
+                        e.originKind.xyz + vec3<f32>(0.0, 2.0, 0.0), underneath);
+    let toLight = source - worldPos;
+    let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);
+    let orient = select(0.05 + 0.95 * facing * facing, 2.5 * facing, underneath);
     let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
-    return light * (e.rainbow.z * across * vband * orient * wavePathNearFade(e, viewDistance));
+    return light * (share * across * vband * orient * wavePathNearFade(e, viewDistance));
 }
 
 struct WavePathWater {
@@ -268,7 +278,8 @@ fn wavesAtSurface(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>, o
         let e = frame.waves[i];
         if (e.originKind.w > 1.5) { // ADR-1662: a path wave
             if (!onWater) {
-                out.radiance = out.radiance + wavePathLand(e, worldPos, normal, viewDistance) * waveGain(e.response, normal);
+                let land = wavePathLand(e, worldPos, normal, viewDistance);
+                out.radiance = out.radiance + land * waveGain(e.response, normal);
             }
             continue;
         }

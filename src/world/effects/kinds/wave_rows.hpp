@@ -156,6 +156,10 @@ inline constexpr EffectField kFields[] = {
     floatField("path/land", "Land light", 0.0f, 4.0f, 0.0f, 1.0f, AVGEN_WAVE_GET(e.wave.propagation.path.land),
                AVGEN_WAVE_SETF(e.wave.propagation.path.land)).json("propagation/path/land").floorAt(0.0f)
         .writtenWhen(isPathWave),
+    floatField("path/bed", "Bed light", 0.0f, 8.0f, 0.0f, 3.0f, AVGEN_WAVE_GET(e.wave.propagation.path.bed),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.bed)).json("propagation/path/bed").floorAt(0.0f)
+        .tooltip("Below the path's level (a riverbed seen through the water): the light, cast from the head.")
+        .writtenWhen(isPathWave),
     floatField("path/embed", "Under the surface", 0.0f, 1.0f, 0.0f, 1.0f,
                AVGEN_WAVE_GET(e.wave.propagation.path.embed),
                AVGEN_WAVE_SETF(e.wave.propagation.path.embed)).json("propagation/path/embed")

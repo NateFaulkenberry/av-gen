@@ -156,7 +156,7 @@
      "ribbonEdge": 0.3,
      "ribbonSteps": 48.0,
      "ribbonDistance": 24000.0,
-     "ribbonCoverage": 1.0,
+     "ribbonCoverage": 0.75,
      "pulseGain": 1.0,
      "pulseThicken": 0.3
     }
@@ -413,6 +413,216 @@
      "speed": 1.3
     }
    }
+  },
+  {
+   "id": "riverKick",
+   "name": "riverKick",
+   "type": "groundPulse",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "trigger",
+   "trigger": {
+    "source": "signal",
+    "name": "signal.kickBeamEv",
+    "threshold": 0.0
+   },
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.7,
+    "lifetime": 1.4,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      1.0,
+      0.02843,
+      0.28744
+     ],
+     "edgeColor": [
+      1.0,
+      0.6114,
+      0.715
+     ],
+     "edgeIntensity": 7.0,
+     "intensity": 4.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.85,
+     "rainbowScale": 0.025,
+     "rainbowSpeed": 0.35,
+     "width": 1.0
+    },
+    "propagation": {
+     "kind": "path",
+     "direction": "explicit",
+     "beamRadius": 0.0,
+     "startOffset": 100.0,
+     "speed": 1000.0,
+     "range": 1600.0,
+     "frontWidth": 14.0,
+     "trailLength": 220.0,
+     "falloff": 1.6,
+     "verticalExtent": 40.0,
+     "verticalGrowth": 0.0,
+     "ringCount": 0.0,
+     "forwardWeight": 1.0,
+     "targetWeight": 0.0,
+     "velocityWeight": 0.0,
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "path": {
+      "node": "river",
+      "feature": "river",
+      "ease": 0.6,
+      "wakeGrowth": 0.35,
+      "coreWidth": 6.0,
+      "coreOffset": 0.0,
+      "haloWidth": 35.0,
+      "reach": 700.0,
+      "reachHeight": 250.0,
+      "land": 0.35,
+      "bed": 2.0,
+      "embed": 0.625,
+      "disturb": 0.045,
+      "nearFade": 200.0
+     }
+    },
+    "response": {
+     "emissive": 0.0,
+     "foliage": 1.0,
+     "ground": 1.0,
+     "surface": 1.0
+    },
+    "source": {
+     "kind": "camera",
+     "groundOffset": 65.0
+    },
+    "sparkle": {
+     "density": 0.9,
+     "enabled": false,
+     "fadeDistance": 85.0,
+     "intensity": 1.8,
+     "seed": 1,
+     "size": 0.3,
+     "speed": 0.6
+    }
+   }
+  },
+  {
+   "id": "riverSnare",
+   "name": "riverSnare",
+   "type": "groundPulse",
+   "owner": {
+    "kind": "world"
+   },
+   "enabled": true,
+   "order": 0,
+   "activation": "trigger",
+   "trigger": {
+    "source": "signal",
+    "name": "signal.snareBeamEv",
+    "threshold": 0.0
+   },
+   "style": "",
+   "timing": {
+    "delay": 0.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.5,
+    "lifetime": 0.9,
+    "repeatSeconds": 0.0,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.76052,
+      0.64448,
+      1.0
+     ],
+     "edgeColor": [
+      0.9042,
+      0.8578,
+      1.0
+     ],
+     "edgeIntensity": 7.0,
+     "intensity": 3.6,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.85,
+     "rainbowScale": 0.025,
+     "rainbowSpeed": 0.35,
+     "width": 1.0
+    },
+    "propagation": {
+     "kind": "path",
+     "direction": "explicit",
+     "beamRadius": 0.0,
+     "startOffset": 100.0,
+     "speed": 1300.0,
+     "range": 1300.0,
+     "frontWidth": 9.0,
+     "trailLength": 130.0,
+     "falloff": 1.6,
+     "verticalExtent": 40.0,
+     "verticalGrowth": 0.0,
+     "ringCount": 0.0,
+     "forwardWeight": 1.0,
+     "targetWeight": 0.0,
+     "velocityWeight": 0.0,
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "path": {
+      "node": "river",
+      "feature": "river",
+      "ease": 0.6,
+      "wakeGrowth": 0.22,
+      "coreWidth": 2.5,
+      "coreOffset": 10.0,
+      "haloWidth": 26.0,
+      "reach": 600.0,
+      "reachHeight": 200.0,
+      "land": 0.25,
+      "bed": 1.6,
+      "embed": 0.625,
+      "disturb": 0.035,
+      "nearFade": 200.0
+     }
+    },
+    "response": {
+     "emissive": 0.0,
+     "foliage": 1.0,
+     "ground": 1.0,
+     "surface": 1.0
+    },
+    "source": {
+     "kind": "camera",
+     "groundOffset": 65.0
+    },
+    "sparkle": {
+     "density": 0.9,
+     "enabled": false,
+     "fadeDistance": 85.0,
+     "intensity": 1.8,
+     "seed": 1,
+     "size": 0.3,
+     "speed": 0.6
+    }
+   }
   }
  ],
  "palette": {
@@ -553,7 +763,11 @@
    },
    {
     "role": "facetLit",
-    "target": "material/abRock/op/8/constant/constant"
+    "target": "material/abRockL/op/6/constant/constant"
+   },
+   {
+    "role": "facetLit",
+    "target": "material/abRockR/op/6/constant/constant"
    },
    {
     "role": "waterGlow",
@@ -573,12 +787,22 @@
    },
    {
     "role": "auroraLow",
-    "target": "material/abRock/op/24/constant/constant",
+    "target": "material/abRockL/op/25/constant/constant",
     "gain": 0.1
    },
    {
     "role": "auroraLow",
-    "target": "material/abRock/op/39/constant/constant",
+    "target": "material/abRockR/op/25/constant/constant",
+    "gain": 0.1
+   },
+   {
+    "role": "auroraLow",
+    "target": "material/abRockL/op/38/constant/constant",
+    "gain": 0.8
+   },
+   {
+    "role": "auroraLow",
+    "target": "material/abRockR/op/38/constant/constant",
     "gain": 0.8
    }
   ],
@@ -17919,8 +18143,99 @@
   },
   {
    "source": "signal.auroraLight",
-   "target": "material/abRock/op/10/constant/constant",
+   "target": "material/abRockL/op/8/constant/constant",
    "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.crashGlow",
+   "target": "material/abRockL/op/21/constant/constant",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.auroraLight",
+   "target": "material/abRockR/op/8/constant/constant",
+   "amount": 0.75,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.crashGlow",
+   "target": "material/abRockR/op/21/constant/constant",
+   "amount": 0.7,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.moogDrift",
+   "target": "material/abRockL/op/47/palette/value",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.moogNote",
+   "target": "material/abRockL/op/48/smoothstep/constant",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.moogGlow",
+   "target": "material/abRockL/op/48/smoothstep/constant",
+   "amount": -0.05,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.moogNote",
+   "target": "material/abRockL/op/44/smoothstep/constant",
+   "amount": 2.0,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "lfo.barSaw",
+   "target": "material/abRockR/op/47/palette/value",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.blockTick",
+   "target": "material/abRockR/op/48/smoothstep/constant",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.blockTick",
+   "target": "material/abRockR/op/44/smoothstep/constant",
+   "amount": 1.5,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "random.tomPick",
+   "target": "material/abRockR/op/55/palette/value",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.tomHit",
+   "target": "material/abRockR/op/56/smoothstep/constant",
+   "amount": -0.11,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.tomBody",
+   "target": "material/abRockR/op/56/smoothstep/constant",
+   "amount": -0.03,
    "op": "add",
    "polarity": "unipolar"
   }

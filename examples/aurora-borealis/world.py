@@ -335,13 +335,13 @@ def valley_band():
             edge = rc(th) - half_width(th)
             return (edge * (1.0 - fr), edge * fr, -1)
         rows_in.append(_row(f, n, 300 + idx))
-    tris = []
+    outer, inner = [], []
     # outer band: row k to row k+1 (outward); inner band: row k to row k+1 (inward); the two -16 m rows are the river
     # bed's edges under the water, never joined across the river
     for a, b in zip(rows_out, rows_out[1:]):
-        tris += _zip(a, b, True)
+        outer += _zip(a, b, True)
     for a, b in zip(rows_in, rows_in[1:]):
-        tris += _zip(a, b, False)
+        inner += _zip(a, b, False)
     # the centre: a fan from the innermost row to the middle of the loop
     last = rows_in[-1]
     mid = (0.0, land_height(0.0, 0.0, 0.0, rc(0.0), -1), 0.0)
@@ -350,7 +350,48 @@ def valley_band():
         tri = (a, b, mid)
         if mx.cross(mx.sub(tri[1], tri[0]), mx.sub(tri[2], tri[0]))[1] < 0.0:
             tri = (a, mid, b)
-        tris.append(tri)
+        inner.append(tri)
+    # pass 3 (22-research-pass3-scene.md s5.1): the camera flies the loop in +theta with its right vector pointing out
+    # of the loop, so the inner bank is always on the LEFT (the Moog's) and the outer bank on the RIGHT (the toms' and
+    # the tone block's), with the three outer ranges
+    return outer, inner
+
+
+# ---- the riverbed (pass 3): faceted planes under the water for the river light to reveal ------------------------
+# The owner (2026-10-24): the beam should reveal "an underwater faceted riverbed: the same low-poly, flat-shaded
+# triangle planes as the mountains, seen through the water". Rows across the river, each vertex jittered along and
+# across the flow and in depth, zipped into large irregular facets; deepest mid-river. The bed's program is nearly
+# black (look.bed_program), so it is invisible until the light (ADR-1662's land term) catches its planes.
+# (columns round the loop, interior rows across the river): BED["coarse"] about 50 m facets, BED["fine"] about 30 m.
+BED = {"coarse": (380, 3), "fine": (640, 5)}
+
+
+def bed_rows(variant="coarse"):
+    cols, inner = BED[variant]
+    fracs = [-1.0] + [-1.0 + 2.0 * (k + 1) / (inner + 1) for k in range(inner)] + [1.0]
+    rows = []
+    for idx, f in enumerate(fracs):
+        edge = abs(f) > 0.999
+        pts = []
+        for j in range(cols):
+            jt = 0.0 if edge else (mx._hash(j, 500 + idx, 77) - 0.5) * 0.7
+            th = TAU * (j + jt) / cols
+            fj = f if edge else f + (mx._hash(j, 500 + idx, 78) - 0.5) * 1.2 / (inner + 1)
+            reach = half_width(th) - 30.0        # out to the banks' last under-water row (30 m inside the edge)
+            r = rc(th) + fj * reach
+            depth = -9.0 - 12.0 * (1.0 - min(1.0, fj * fj))
+            if not edge:
+                depth += (mx._hash(j, 500 + idx, 79) - 0.5) * 14.0   # tilted planes, so a grazing light picks some out
+            pts.append((r * math.sin(th), depth, r * math.cos(th)))
+        rows.append(pts)
+    return rows
+
+
+def bed_tris(variant="coarse"):
+    rows = bed_rows(variant)
+    tris = []
+    for a, b in zip(rows, rows[1:]):
+        tris += _zip(a, b, True)
     return tris
 
 
@@ -425,18 +466,36 @@ def edge_uvs(tris):
         e = max(range(3), key=lambda i: imp[t][i])
         w = imp[t][e]
         if w < 0.08:
-            uvs += [(1.0e4, 0.0)] * 3
+            # no crease: no line, and the facet's own random value (a facet left at 0 lit with every other one)
+            cx = sum(v[0] for v in tri) / 3.0
+            cz = sum(v[2] for v in tri) / 3.0
+            uvs += [(1.0e4, _crease_hash((cx, 0.0, cz), (cz, 0.0, cx)))] * 3
             continue
         p, q = tri[e], tri[(e + 1) % 3]
         d = mx.sub(q, p)
         L = math.sqrt(d[0] ** 2 + d[1] ** 2 + d[2] ** 2) or 1.0
+        h = _crease_hash(p, q)   # the crease's own value: the two facets sharing it agree, so a picked ridge lights whole
         out = []
         for v in tri:
             r = mx.sub(v, p)
             c = mx.cross(r, d)
-            out.append((math.sqrt(c[0] ** 2 + c[1] ** 2 + c[2] ** 2) / L, w))
+            # pass 3: u = metres to the crease over its importance (a weak crease draws thinner, under a pixel), v = the
+            # crease's random value, which the glints' combs pick subsets by (22 s5.1)
+            out.append((math.sqrt(c[0] ** 2 + c[1] ** 2 + c[2] ** 2) / L / w, h))
         uvs += out
     return uvs
+
+
+def _crease_hash(p, q):
+    """A deterministic value in [0, 1) for an edge, the same whichever way round its endpoints come."""
+    a, b = sorted((_key(p), _key(q)))
+    x = int(round((a[0] + b[0]) * 2.0)) * 73856093 ^ int(round((a[2] + b[2]) * 2.0)) * 19349663 ^ \
+        int(round((a[1] + b[1]) * 2.0)) * 83492791
+    x &= 0xFFFFFFFF
+    x ^= x >> 16
+    x = (x * 0x45D9F3B) & 0xFFFFFFFF
+    x ^= x >> 16
+    return (x & 0xFFFFFF) / float(1 << 24)
 
 
 def write_faceted_uv(path, tris, name):
@@ -476,13 +535,19 @@ def generate(mesh_dir):
     """Write every GLB, each with its edge mask in TEXCOORD_0; return {name: triangle count}."""
     os.makedirs(mesh_dir, exist_ok=True)
     out = {}
-    tris = valley_band()
-    write_faceted_uv(os.path.join(mesh_dir, "ab-valley.glb"), tris, "valley")
-    out["valley"] = len(tris)
+    outer, inner = valley_band()
+    write_faceted_uv(os.path.join(mesh_dir, "ab-valleyL.glb"), inner, "valleyL")
+    write_faceted_uv(os.path.join(mesh_dir, "ab-valleyR.glb"), outer, "valleyR")
+    out["valleyL"] = len(inner)
+    out["valleyR"] = len(outer)
     for spec in RANGES:
         t = range_tris(*spec)
         write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
         out[spec[0]] = len(t)
+    for variant in BED:
+        t = bed_tris(variant)
+        write_faceted_uv(os.path.join(mesh_dir, "ab-bed-%s.glb" % variant), t, "bed")
+        out["bed-" + variant] = len(t)
     return out
 
 

@@ -153,7 +153,7 @@ Result<void> Propagation::validate() const {
         // finds nothing to travel along, as a FocusHero source with nothing spotlit.
         const PathShape& q = path;
         for (const float v : {q.ease, q.wakeGrowth, q.coreWidth, q.coreOffset, q.haloWidth, q.reach, q.reachHeight,
-                              q.land, q.embed, q.disturb, q.nearFade}) {
+                              q.land, q.bed, q.embed, q.disturb, q.nearFade}) {
             if (!(v >= 0.0f) || !finite(v)) {
                 return fail("a path wave's shape values must be finite and not negative");
             }
@@ -913,8 +913,7 @@ WaveGpu packWave(const ResolvedWave& r) {
         g.vertical = glm::vec4(e.propagation.verticalExtent, q.reachHeight, q.reach * w, q.haloWidth * w);
         g.color.w = q.coreWidth * w;
         g.edge.w = q.coreOffset * w;
-        g.rainbow = glm::vec4(std::clamp(q.embed, 0.0f, 1.0f), q.disturb * r.envelope, q.land,
-                              static_cast<float>(std::fmod(r.seconds, 4096.0)));
+        g.rainbow = glm::vec4(std::clamp(q.embed, 0.0f, 1.0f), q.disturb * r.envelope, q.land, q.bed);
         g.sparkle = glm::vec4(0.0f, r.frontSpeed, r.meanSpeed, 0.0f);
         for (std::size_t i = 0; i < 4; ++i) {
             g.path[i] = glm::vec4(r.path[2 * i], r.path[2 * i + 1]);

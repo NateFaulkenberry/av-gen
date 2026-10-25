@@ -99,13 +99,17 @@ def camera_tracks():
 
 def scene_doc(camera):
     nodes = [look.water_node()]
-    for name in ["valley"] + [r[0] for r in world.RANGES]:
+    # pass 3: the inner bank (always on the camera's left) takes the left program, the outer bank and the ranges the
+    # right one (22-research-pass3-scene.md s5.1)
+    for name in ["valleyL", "valleyR"] + [r[0] for r in world.RANGES]:
+        prog = look.ROCK_L if name == "valleyL" else look.ROCK_R
         nodes.append({"name": name, "kind": "procedural", "procedural": {
             "source": {"kind": "mesh", "asset": "ab-%s.glb" % name}, "distribution": {"kind": "single"},
-            "material": look.rock_material(), "castsShadow": False}})
+            "material": look.rock_material(prog), "castsShadow": False}})
+    nodes.append(look.bed_node())
     return {"format": "avgen-scene", "version": 1, "name": "aurora-borealis", "camera": camera,
             "environment": look.environment(), "nodes": nodes, "lights": [look.unshadowed_key()],
-            "materialPrograms": [look.rock_program()]}
+            "materialPrograms": [look.rock_program(look.ROCK_L), look.rock_program(look.ROCK_R), look.bed_program()]}
 
 
 def project_doc(tracks, period, song):

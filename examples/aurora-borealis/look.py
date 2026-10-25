@@ -77,23 +77,36 @@ class Prog:
                                             field)
 
 
-HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 30.0, 950.0, 0.55    # decametres (op constants clamp to +-1000): 400 m to 9 km
+HAZE_NEAR, HAZE_FAR, HAZE_CURVE = 300.0, 9500.0, 0.55   # metres: the haze comes in from 300 m to 9.5 km
+LINE_FADE_NEAR, LINE_FADE_FAR = 400.0, 4500.0          # metres: the crease lines (and their glints) fade out by 4.5 km
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
 AURORA_WRAP_POWER = 4.0
-EDGE_GLOW = 0.5   # the edges' resting glow (Gate B); the music adds to it (music.py)
+EDGE_GLOW = 0.5   # the edges' resting glow (Gate B)
+
+# pass 3: the glints (22-research-pass3-scene.md s5). A comb over each crease's random value v (baked in TEXCOORD_0.y)
+# picks a deterministic subset; its smoothstep rests above 1 (nothing lit) and an instrument's envelope, routed onto
+# its constant, lowers it by up to GATE_DROP: a hit lights a subset, a louder one more of it, more fully.
+GATE_REST = [1.05, 1.10, 0.0, 0.0]
+GATE_DROP = 0.14
+# (label, teeth, glint line width in px (None: a whole-facet plane flash), colour, intensity)
+GLINTS = {
+    "L": [("moog", 3.0, 3.0, "#ff9fdc", 3.2)],                       # pale pink edge glints: the Moog
+    "R": [("tblock", 5.0, 2.5, "#e9dcff", 3.0),                      # small sharp lavender-white glints: the tone block
+          ("toms", 2.0, None, "#7d6cff", 0.9)],                      # blue-violet plane flashes: the toms
+}
 
 
-def rock() -> Prog:
-    """Every landform, unlit (47 ops; the material-op ceiling is 48). Facet colour = shadow + sky-facing blue-violet + aurora-facing aurora light x
-    glow; high sky-facing facets pale to lavender; then the distance haze."""
-    p = Prog("abRock")
+def rock(side) -> Prog:
+    """Every landform, unlit; one program per bank (`side` "L" or "R", pass 3). Facet colour = shadow + sky-facing
+    blue-violet + aurora-facing aurora light x glow; high sky-facing facets pale to lavender (and flare with a crash);
+    the glass rim; the crease lines; this bank's instrument glints; then the distance haze. 57 ops left, 64 right (the
+    ceiling, ADR-1661)."""
+    p = Prog("abRock" + side)
     c4 = lambda h: hexrgb(h) + [1.0]   # noqa: E731
     lit = look_colors(REST_LOOK)["facetLit"] + [1.0]
     (p.op("input", 0, input="worldPosition")
       .op("input", 1, input="normal")
-      .op("input", 2, input="cameraDistance")
-      .op("constant", 3, constant=[0.1, 0.1, 0.1, 0.1])
-      .op("multiply", 2, srcA=2, srcB=3)                                                        # decametres
+      .op("input", 2, input="cameraDistance")                                                   # metres
       .op("gradient", 3, srcA=1, constant=list(AURORA_DIR) + [0.0], value=1.0, label="auroraDir")
       .op("power", 3, srcA=3, value=AURORA_WRAP_POWER)
       .op("constant", 4, constant=lit, label="facetLit")                                        # palette
@@ -108,15 +121,19 @@ def rock() -> Prog:
       .op("add", 3, srcA=3, srcB=5)                                                             # the facet
       .op("swizzle", 5, srcA=0, constant=[1.0, 1.0, 1.0, 1.0])                                  # y
       .op("smoothstep", 5, srcA=5, constant=[CREST_LO, CREST_HI, 0.0, 0.0])
-      .op("multiply", 5, srcA=5, srcB=4)
+      .op("multiply", 5, srcA=5, srcB=4)                                                        # the crest mask
       .op("constant", 6, constant=c4(CREST), label="crest")
       .op("mixBy", 3, srcA=3, srcB=6, srcC=5)
+      # pass 3: a crash's flash on the high sky-facing facets (crashGlow routes this up from 0; white-violet)
+      .op("constant", 6, constant=[0.0, 0.0, 0.0, 0.0], label="crashCrest")
+      .op("multiply", 6, srcA=6, srcB=5)
+      .op("add", 3, srcA=3, srcB=6)
       .op("fresnel", 6, value=6.0)                                                              # glassy rim
-      .op("constant", 7, constant=c4(RIM) , label="rim")                                        # palette
+      .op("constant", 7, constant=c4(RIM), label="rim")                                         # palette
       .op("multiply", 6, srcA=6, srcB=7)
       .op("add", 3, srcA=3, srcB=6)
-      # Gate B, the ridge edges: TEXCOORD_0 = (metres to this facet's chosen crease, that crease's importance), baked by
-      # world.edge_uvs; a ~2 px anti-aliased line (metres over the pixel footprint), faded out by 4.5 km
+      # the ridge edges: TEXCOORD_0 = (metres to this facet's chosen crease over its importance, the crease's random
+      # value), baked by world.edge_uvs; a ~2 px anti-aliased line (metres over the pixel footprint)
       .op("input", 0, input="uv")
       .op("input", 1, input="footprint")
       # floored before the reciprocal: a zero footprint made inf, u = 0 times inf made NaN, and the bloom spread one
@@ -127,33 +144,54 @@ def rock() -> Prog:
       .op("multiply", 5, srcA=0, srcB=1)
       .op("smoothstep", 5, srcA=5, constant=[1.6, 0.0, 0.0, 0.0])
       .op("swizzle", 5, srcA=5, constant=[0.0, 0.0, 0.0, 0.0])
-      .op("swizzle", 6, srcA=0, constant=[1.0, 1.0, 1.0, 1.0])
-      .op("multiply", 5, srcA=5, srcB=6)
-      .op("smoothstep", 6, srcA=2, constant=[450.0, 40.0, 0.0, 0.0])
-      .op("multiply", 5, srcA=5, srcB=6)
+      # the lines' distance fade, linear in metres, kept in r4 for the glints too
+      .op("gradient", 4, srcA=2, constant=[1.0, 0.0, 0.0, LINE_FADE_FAR / (LINE_FADE_FAR - LINE_FADE_NEAR)],
+          value=-1.0 / (LINE_FADE_FAR - LINE_FADE_NEAR))
+      .op("multiply", 5, srcA=5, srcB=4)
       .op("constant", 6, constant=lit, label="edgeColor")                                       # palette
       .op("multiply", 5, srcA=5, srcB=6)
       .op("constant", 6, constant=[EDGE_GLOW, EDGE_GLOW, EDGE_GLOW, 1.0], label="edgeGlow")   # routes; 0 = off
       .op("multiply", 5, srcA=5, srcB=6)
-      .op("add", 3, srcA=3, srcB=5)
-      .op("constant", 6, constant=c4(HAZE), label="haze")
-      .op("smoothstep", 7, srcA=2, constant=[HAZE_NEAR, HAZE_FAR, 0.0, 0.0])
+      .op("add", 3, srcA=3, srcB=5))
+    for label, teeth, width, color, gain in GLINTS[side]:
+        if width is not None:   # an edge glint: a wider line on the picked creases (routing `<label>Line` swells it)
+            (p.op("multiply", 6, srcA=0, srcB=1)
+              .op("smoothstep", 6, srcA=6, constant=[width, 0.0, 0.0, 0.0], label=label + "Line")
+              .op("swizzle", 6, srcA=6, constant=[0.0, 0.0, 0.0, 0.0]))
+        (p.op("swizzle", 7, srcA=0, constant=[1.0, 1.0, 1.0, 1.0])                               # v
+          .op("palette", 7, srcA=7, value=0.0, label=label, constant=[0.5, 0.5, 0.5, 0.0],
+              constant2=[0.5, 0.5, 0.5, 0.0], constant3=[teeth, teeth, teeth, 0.0], constant4=[0.0, 0.0, 0.0, 0.0])
+          .op("smoothstep", 7, srcA=7, constant=list(GATE_REST), label=label + "Gate"))
+        if width is not None:
+            p.op("multiply", 6, srcA=6, srcB=7).op("multiply", 6, srcA=6, srcB=4)
+            p.op("constant", 7, constant=[round(v * gain, 4) for v in hexrgb(color)] + [1.0], label=label + "Color")
+            p.op("multiply", 6, srcA=6, srcB=7).op("add", 3, srcA=3, srcB=6)
+        else:
+            p.op("multiply", 7, srcA=7, srcB=4)
+            p.op("constant", 6, constant=[round(v * gain, 4) for v in hexrgb(color)] + [1.0], label=label + "Color")
+            p.op("multiply", 7, srcA=7, srcB=6).op("add", 3, srcA=3, srcB=7)
+    (p.op("constant", 6, constant=c4(HAZE), label="haze")
+      .op("gradient", 7, srcA=2, constant=[1.0, 0.0, 0.0, -HAZE_NEAR / (HAZE_FAR - HAZE_NEAR)],
+          value=1.0 / (HAZE_FAR - HAZE_NEAR))
       .op("power", 7, srcA=7, value=HAZE_CURVE)
       .op("mixBy", 3, srcA=3, srcB=6, srcC=7))
+    assert len(p.ops) <= 64, (side, len(p.ops))
     return p
 
 
-ROCK = rock()
+ROCK_L = rock("L")
+ROCK_R = rock("R")
+ROCKS = [ROCK_L, ROCK_R]
 
 
-def rock_program():
-    return {"name": ROCK.name, "ops": ROCK.ops, "baseColor": -1, "metallic": -1, "roughness": -1,
+def rock_program(prog):
+    return {"name": prog.name, "ops": prog.ops, "baseColor": -1, "metallic": -1, "roughness": -1,
             "emission": 3, "emissionIntensity": 1.0, "opacity": -1}
 
 
-def rock_material():
+def rock_material(prog):
     return {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
-            "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": ROCK.name}
+            "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": prog.name}
 
 
 def unshadowed_key():
@@ -178,7 +216,7 @@ def environment():
 
 # ---- the aurora ----------------------------------------------------------------------------------------------------
 RIBBONS = {"ribbons": True, "ribbonAltitude": 600.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
-           "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 1.0,
+           "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 0.75,
            # E3's travelling kick front, gentler than its default 2x so the kick stays under the flash budget
            "pulseGain": 1.0, "pulseThicken": 0.3}
 
@@ -256,14 +294,107 @@ def star_effects():
     return [star_effect(n) for n in STARS]
 
 
-def river_effects():
-    """The Kick and Snare river light (E2 path waves on the water's river course); added in pass 3's beam stage."""
-    return []
+# ---- the river light (pass 3, 20b-brief-river-light.md; ADR-1662's path wave on the water's own `river` feature) --
+# Kick: one hot core; snare: a twin filament, faster and shorter. Each hit is its own front fading on its own envelope
+# (an ADR-981 trigger with a lifetime), so a beam finishes before the next hit and overlap is a fading one. The light
+# sits under the reflection, ripples the mirror behind it, and lights the facets of the banks, the slopes and the
+# riverbed (BED) by their orientation. Colours from the scene's own family (owner, 2026-10-24: no amber or cyan).
+BEAM_PAIRS = {   # (kick, snare)
+    "magenta-lilac": ("#ff2f92", "#e2d2ff"),
+    "rose-orchid": ("#e8346c", "#cf7cff"),
+    "fuchsia-lavender": ("#ff3cd0", "#ab9bff"),
+}
+BEAM_PAIR = os.environ.get("AB_BEAM_PAIR", "magenta-lilac")
+CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the beams' source sits on the water
+BED_VARIANT = os.environ.get("AB_BED", "coarse")
+
+
+def _whiter(hexcol, k):
+    c = hexrgb(hexcol)
+    return [round(v + (1.0 - v) * k, 4) for v in c]
+
+
+def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifetime, fade_out, core, twin, halo,
+               wake, wake_growth, disturb, land, bed, reach, reach_height, front_width):
+    return {"id": name, "name": name, "type": "groundPulse", "owner": {"kind": "world"}, "enabled": True, "order": 0,
+            "activation": "trigger", "trigger": {"source": "signal", "name": signal, "threshold": 0.0},
+            "style": "", "timing": _timing(fadeIn=0.0, fadeOut=fade_out, lifetime=lifetime),
+            "parameters": {
+                "appearance": {"color": hexrgb(color), "edgeColor": _whiter(color, 0.6), "edgeIntensity": edge,
+                               "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
+                               "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
+                "propagation": {"kind": "path", "direction": "explicit", "beamRadius": 0.0,
+                                "startOffset": 100.0, "speed": round(rng / travel, 2), "range": rng,
+                                "frontWidth": front_width, "trailLength": wake, "falloff": 1.6,
+                                "verticalExtent": 40.0, "verticalGrowth": 0.0, "ringCount": 0.0,
+                                "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
+                                "explicitDirection": [0.0, 0.0, -1.0],
+                                "path": {"node": WATER_NODE, "feature": "river", "ease": ease,
+                                         "wakeGrowth": wake_growth, "coreWidth": core, "coreOffset": twin,
+                                         "haloWidth": halo, "reach": reach, "reachHeight": reach_height,
+                                         "land": land, "bed": bed, "embed": 0.625, "disturb": disturb,
+                                         "nearFade": 200.0}},
+                "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
+                "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
+                "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
+                            "size": 0.3, "speed": 0.6}}}
+
+
+# brief s12: kick and snare colour and travel; ripple strength (`disturb`)
+KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
+            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.35, bed=2.0, reach=700.0,
+            reach_height=250.0, front_width=14.0)
+SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=2.5,
+             twin=10.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=1.6, reach=600.0,
+             reach_height=200.0, front_width=9.0)
+
+
+def river_effects(pair=None):
+    k, sn = BEAM_PAIRS[pair or BEAM_PAIR]
+    return [river_beam("riverKick", "signal.kickBeamEv", k, **KICK),
+            river_beam("riverSnare", "signal.snareBeamEv", sn, **SNARE)]
+
+
+def bed_program():
+    """The riverbed: nearly black at rest (the river body's colour), so only the river light reveals its planes."""
+    return {"name": "abBed", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb("#010106") + [1.0]}],
+            "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
+
+
+def bed_node():
+    return {"name": "riverbed", "kind": "procedural", "procedural": {
+        "source": {"kind": "mesh", "asset": "ab-bed-%s.glb" % BED_VARIANT}, "distribution": {"kind": "single"},
+        "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "abBed"},
+        "castsShadow": False}}
 
 
 def music_routes(R):
     """The routes that name this module's program ops (music.py adds them to its own)."""
-    return [R("signal.auroraLight", ROCK.path("auroraGlow"), 0.75)]
+    out = []
+    for prog in ROCKS:
+        out += [R("signal.auroraLight", prog.path("auroraGlow"), 0.75),
+                # a crash flares the high sky-facing facets, both banks (white-violet: the route adds to every channel)
+                R("signal.crashGlow", prog.path("crashCrest"), 0.7)]
+    L, Rt = ROCK_L, ROCK_R
+    out += [
+        # LEFT, the Moog: its subset glides slowly (lfo.moogDrift); a note opens the gate and swells the line; the
+        # ring keeps the same subset gently lit
+        R("lfo.moogDrift", L.path("moog", "value"), 1.0),
+        R("signal.moogNote", L.path("moogGate"), -GATE_DROP),
+        R("signal.moogGlow", L.path("moogGate"), -0.05),
+        R("signal.moogNote", L.path("moogLine"), 2.0),
+        # RIGHT, the tone block: the subset steps through the bar (lfo.barSaw), so a repeated pattern repeats its
+        # sequence of facets; the hit's size (blockSize) is already in blockTick
+        R("lfo.barSaw", Rt.path("tblock", "value"), 1.0),
+        R("signal.blockTick", Rt.path("tblockGate"), -GATE_DROP),
+        R("signal.blockTick", Rt.path("tblockLine"), 1.5),
+        # RIGHT, the toms: a new subset of planes per note (random.tomPick), sized; the fill's body a little more
+        R("random.tomPick", Rt.path("toms", "value"), 1.0),
+        R("signal.tomHit", Rt.path("tomsGate"), -0.11),
+        R("signal.tomBody", Rt.path("tomsGate"), -0.03),
+    ]
+    return out
 
 
 def stars_effect():
@@ -292,11 +423,12 @@ def water():
         "shallowColor": hexrgb("#0a0a24"), "deepColor": hexrgb(WATER_DEEP), "shallow": 2.0, "clarity": 1.0,
         "edgeFade": 0.4, "maxOpacity": 0.98, "fresnel": 0.35, "reflection": 1.1,
         "reflectionTint": [0.85, 0.86, 1.0], "specular": 0.3, "roughness": 0.03,
-        "ripple": 0.01, "rippleScale": 0.03, "rippleSpeed": 1.0, "chop": 0.0, "foam": 0.0, "refraction": 0.0,
+        "ripple": 0.01, "rippleScale": 0.03, "rippleSpeed": 1.0, "chop": 0.0, "foam": 0.0, "refraction": 1.5,
         "sparkle": 0.0, "glow": 0.15, "glowColor": c["waterGlow"], "glowScale": 0.012, "glowCoverage": 0.45,
         "glowDepth": 0.2,
         "ssr": 0.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.0, "streak": 2.0,
-        "reflectionRays": 1.0, "transmission": 0.3, "absorption": [2.0, 1.6, 1.0], "undulation": 0.03,
+        # pass 3: the bed is seen through the water (dimmed with depth, wobbled by the beam's ripples via the refraction)
+        "reflectionRays": 1.0, "transmission": 0.7, "absorption": [0.035, 0.03, 0.022], "undulation": 0.03,
         "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
         "flowStreaks": 1.2, "streakLines": 600.0, "streakLength": 50.0, "streakDensity": 0.45, "streakSpeed": 1.8,
         "streakHighlight": 1.0, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],
@@ -318,7 +450,7 @@ def water_node():
     """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
     there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
     return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, 0.0],
-            "world": {"name": "aurora-river", "seed": 1, "size": [8400.0, 8400.0], "baseHeight": -6.0,
+            "world": {"name": "aurora-river", "seed": 1, "size": [8400.0, 8400.0], "baseHeight": -40.0,
                       "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
             "terrain": {"chunkSize": 400.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
                         "viewDistance": 6000.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,
@@ -349,12 +481,12 @@ def palette():
         {"role": "auroraLow", "target": "fx/aurora/lowColor"},
         {"role": "auroraMid", "target": "fx/aurora/midColor"},
         {"role": "auroraTop", "target": "fx/aurora/topColor"},
-        {"role": "facetLit", "target": ROCK.path("facetLit")},
+        *[{"role": "facetLit", "target": prog.path("facetLit")} for prog in ROCKS],
         {"role": "waterGlow", "target": w + "glowColor"},
         {"role": "auroraLow", "target": w + "streaks/color1"},
         {"role": "auroraMid", "target": w + "streaks/color2"},
         {"role": "waterGlow", "target": w + "streaks/color3"},
-        {"role": "auroraLow", "target": ROCK.path("rim"), "gain": 0.1},
-        {"role": "auroraLow", "target": ROCK.path("edgeColor"), "gain": 0.8},
+        *[{"role": "auroraLow", "target": prog.path("rim"), "gain": 0.1} for prog in ROCKS],
+        *[{"role": "auroraLow", "target": prog.path("edgeColor"), "gain": 0.8} for prog in ROCKS],
     ]
     return {"states": states, "bindings": bindings, "position": float(REST_LOOK), "saturation": 1.0, "value": 1.0}
