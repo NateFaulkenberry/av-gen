@@ -85,7 +85,7 @@ ORCHID = {"rays": (MAGENTA, PINK, VIOLET), "wash": (VIOLET, MAGENTA, PINK, "#ffb
 EMBER = {"rays": ("#ffb347", "#ff7a3d", "#ffe08a"), "wash": ("#ff4a2b", "#ff9a3d", "#ffd36b", "#fff1cf"),
          "glow": "#ffb347", "ghosts": ("#ffb347", "#ff5a2b"), "spill": "#ff9a40"}
 HEADS = [
-    {"prefix": "th1", "role": "drums", "band": "bass", "mix": "signal.kickEnv", "mixOpen": 0.45, "open": 0.60, "close": 0.45,
+    {"prefix": "th1", "role": "drums", "band": "bass", "mix": "response.lowEnv", "mixOpen": 0.7, "open": 0.60, "close": 0.45,
      "at": [-0.92, 0.0, -0.25], "heading": 28.0, "scan": (0.55, 0.13, 3), "palette": ICE,
      "emphasis": {"shake": 1.0, "tear": 1.0, "ghost": 0.3, "wash": 0.45}},
     {"prefix": "th2", "role": "bass", "band": "bass", "mix": "audio.bass", "open": 0.55, "close": 0.42,
@@ -127,7 +127,7 @@ DESIGN = {
         ["drums", "role.drums.bass", "head 1 speaks the kick"],
         ["bass", "role.bass.bass", "head 2 speaks the bass line"],
         ["synth", "role.synth.mid", "head 3 speaks the synth"],
-        ["a mix", "signal.kickEnv / audio.bass / audio.mid", "with no stems: each head on the mix's band, rate-limited"],
+        ["a mix", "response.lowEnv / audio.bass / audio.mid", "with no stems: each head on the mix's band, rate-limited"],
         ["silence", "(no input)", "the heads are shut and scan the room"],
     ],
     "tier": "light: three articulated busts (about 45k triangles each), rays and copies only on a speaking head",
