@@ -302,9 +302,12 @@ def land_height(x, z, th, o, side):
 # ---- the valley band ------------------------------------------------------------------------------------------------
 # (offset from the water's edge in m, columns round the loop). Near rows are dense (about 17 m facets along the bank),
 # the far ones coarse; the last outer row sinks so the band's edge tucks under the first range.
-OUTER_ROWS = [(-30, 900), (-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+# pass 4: the rows at -30 m are gone (both banks). They were the bank running on under the river from the layout where
+# the mountains went straight into the water; their edge stood as a step above the riverbed and showed through the
+# water as a line along the shore (the owner's screenshot). The riverbed now runs under the bank's first row instead.
+OUTER_ROWS = [(-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
               (300, 450), (400, 450), (520, 360), (680, 300), (880, 250), (1100, 210), (1350, 180)]
-INNER_NEAR = [(-30, 900), (-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+INNER_NEAR = [(-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
               (300, 450), (400, 450), (520, 360)]
 INNER_FAR = [(0.50, 160), (0.66, 120), (0.80, 90), (0.91, 60)]   # fractions of the way to the centre
 
@@ -401,9 +404,14 @@ def bed_rows(variant="coarse"):
             jt = 0.0 if edge else (mx._hash(j, 500 + idx, 77) - 0.5) * 0.7
             th = TAU * (j + jt) / cols
             fj = f if edge else f + (mx._hash(j, 500 + idx, 78) - 0.5) * 1.2 / (inner + 1)
-            reach = half_width(th) - 30.0        # out to the banks' last under-water row (30 m inside the edge)
+            # pass 4: the bed's edges ARE the banks' waterline rows (8 m inside the water's edge, at their height), so
+            # bed and bank share an edge and nothing steps between them; it falls from there to about 20 m mid-river
+            reach = half_width(th) - 8.0
             r = rc(th) + fj * reach
-            depth = -9.0 - 12.0 * (1.0 - min(1.0, fj * fj))
+            side = 1 if fj > 0.0 else -1
+            rim = land_height(r * math.sin(th), r * math.cos(th), th, -8.0, side) if edge else \
+                valley_height(th, -8.0, side)
+            depth = rim - 18.0 * (1.0 - min(1.0, fj * fj))
             if not edge:
                 depth += (mx._hash(j, 500 + idx, 79) - 0.5) * 14.0   # tilted planes, so a grazing light picks some out
             pts.append((r * math.sin(th), depth, r * math.cos(th)))
