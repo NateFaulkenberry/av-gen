@@ -254,6 +254,7 @@ TEST_CASE("A Hinge deformer's signed mask offset survives its parameter (ADR-167
     ProceduralGeometry rest = makeRest();
     rest.deformers[0].kind = DeformerKind::Hinge;
     rest.deformers[0].scale = -0.04f;
+    CHECK(rest.validate().has_value());   // a scene file holding it loads
     const ProceduralParameters p = registerProceduralParameters(params, rest, "procedural/columns/");
     ProceduralGeometry live = rest;
     params.resetFinals();

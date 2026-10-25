@@ -2676,7 +2676,11 @@ Result<void> ProceduralGeometry::validate() const {
         if (d.falloff < 0.0f) {
             return fail("procedural '{}': deformer {} falloff must be >= 0", name, i + 1);
         }
-        if (!(d.scale > 0.0f)) {
+        if (d.kind == DeformerKind::Hinge) { // ADR-1672: scale is the mask's signed up offset
+            if (!std::isfinite(d.scale)) {
+                return fail("procedural '{}': deformer {} (hinge) scale must be finite", name, i + 1);
+            }
+        } else if (!(d.scale > 0.0f)) {
             return fail("procedural '{}': deformer {} scale must be > 0", name, i + 1);
         }
         if (d.kind == DeformerKind::Field && d.field.empty()) {
