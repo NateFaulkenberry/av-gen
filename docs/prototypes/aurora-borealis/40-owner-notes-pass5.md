@@ -22,3 +22,7 @@ Coordinator reading: pass 6 returns to a river (slightly curved, between pass 3'
 "just tell it to go bakc to the pass 3 geometry"
 
 Coordinator reading: restore the pass-3 landscape (Gate A take 3, c61111e6 lineage: the river with straight reaches and mild bends, the pass-3 mountains, peaks and camera path) and keep everything pass 4-6 added on top.
+
+## The owner on pass 7 (verbatim, 2026-10-25)
+
+"aurora if we could just make the underwater slightly more illuminated its hard to see the geometry / fish also make the river bed deeper so theres more room for fish etc"
