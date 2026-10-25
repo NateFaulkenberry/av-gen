@@ -179,8 +179,11 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
     let orient = select(0.05 + 0.95 * facing * facing, 2.5 * facing, underneath);
     let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
     // The land and the bed fade in over 40% of the water's near fade: the bed shows through the water only near the
-    // camera (further out the reflection covers it), and a full fade would hide it.
-    return light * (share * across * vband * orient * wavePathFadeIn(e.shape.z * 0.4, viewDistance));
+    // camera (further out the reflection covers it), and a full fade would hide it. They also wait for the front to
+    // travel out past the near fade (axisFront.w, metres travelled): lit from a head just launched, the near bed and
+    // banks washed the bottom of the frame; lit once the head has moved on, the bed behind it reads as planes.
+    let launched = wavePathFadeIn(e.shape.z, e.axisFront.w);
+    return light * (share * across * vband * orient * launched * wavePathFadeIn(e.shape.z * 0.4, viewDistance));
 }
 
 struct WavePathWater {

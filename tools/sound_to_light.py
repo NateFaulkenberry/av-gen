@@ -69,10 +69,12 @@ PATHS = [
     ("RW signal.glint", "signal.glint", ["hat"]),
     ("RW clap route final", "final:material/rw_rainbow/op/9/constant/constant[0]", ["snare"]),
     ("RW signal.kick (beat grid)", "signal.kick", ["kick"]),
-    # Aurora Borealis's accents (02-research-signals.md s3.3) and the kick pulse's route final (ADR-1652)
-    ("AB signal.kickWave", "signal.kickWave", ["kick"]),
-    ("AB signal.snareFold", "signal.snareFold", ["snare"]),
-    ("AB kick pulse route final", "final:fx/aurora/pulse[0]", ["kick"]),
+    # Aurora Borealis pass 3's onset paths (23-plan-pass3.md): the kick and snare beams' latches on their stems' own
+    # onsets (run the rig with INPUT_SOURCES="kick@2:drums,snare@2:other,crash@2:other" so stem.kick, stem.snare and
+    # stem.crash exist), and the crash's star latch
+    ("AB signal.kickBeam", "signal.kickBeam", ["kick"]),
+    ("AB signal.snareBeam", "signal.snareBeam", ["snare"]),
+    ("AB signal.crashStar", "signal.crashStar", None),
 ]
 
 

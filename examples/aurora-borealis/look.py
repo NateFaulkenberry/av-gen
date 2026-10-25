@@ -272,7 +272,7 @@ def star_effect(name):
             "activation": "trigger", "trigger": {"source": "signal", "name": "signal.%sEv" % name, "threshold": 0.0},
             "style": "", "timing": _timing(fadeIn=0.03, fadeOut=0.55, lifetime=1.0),
             # the comet's ground term reaches lit PBR and water only: the river's flash
-            "ground": {"color": hexrgb("#d8c8ff"), "falloff": 2.0, "intensity": 0.4, "mode": "subtle",
+            "ground": {"color": hexrgb("#d8c8ff"), "falloff": 2.0, "intensity": 0.15, "mode": "subtle",
                        "radius": 600.0},
             "parameters": {
                 "appearance": {"coreColor": hexrgb("#f6f0ff"), "coreIntensity": STAR_CORE, "flowSpeed": 0.35,
@@ -342,10 +342,10 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 
 # brief s12: kick and snare colour and travel; ripple strength (`disturb`)
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
-            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.35, bed=2.0, reach=700.0,
+            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.35, bed=3.5, reach=700.0,
             reach_height=250.0, front_width=14.0)
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=2.5,
-             twin=10.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=1.6, reach=600.0,
+             twin=10.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=2.8, reach=600.0,
              reach_height=200.0, front_width=9.0)
 
 

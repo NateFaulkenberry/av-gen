@@ -232,7 +232,7 @@ def routes():
         R("signal.auroraLight", W + "glow", 0.5),
         # ---- Crash: the environment's response to a shooting star (B s4)
         R("signal.crashGlow", A + "intensity", 0.3),
-        R("signal.crashGlow", W + "glow", 0.3),
+        R("signal.crashGlow", W + "glow", 0.1),   # 0.3 on a kick + bed failed the flash gate at 23-25 s
         # a phrase-start crash is a brighter star than a re-hit on its decay
         R("signal.crashSize", "fx/starA/coreIntensity", 40.0),
         R("signal.crashSize", "fx/starB/coreIntensity", 40.0),

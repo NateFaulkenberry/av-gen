@@ -49,8 +49,22 @@ SCENES = {
     "aurora-borealis": ("examples/aurora-borealis/aurora-borealis.json",
                         "examples/aurora-borealis/scene/aurora-borealis.scene.json"),
 }
+# Scenes that play their own song (Aurora Borealis pass 3: Sabertooth, 70 s, with its stems) instead of Feline from
+# 60 s: their analysis track and start. Sabertooth from 12 s puts the 5 s warm-up and the 30 s measured window inside
+# the song, over its swells, crashes, tom fills and the busiest beam passages.
+SCENE_AUDIO = {
+    "aurora-borealis": ("assets/audio/stems/sabertooth/Sabertooth.wav", "12"),
+}
 AUDIO = "assets/audio/feline-footwear.wav"
 COMMON = ["--audio", AUDIO, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", "60"]
+
+
+def common(scene):
+    """COMMON, with the scene's own song and start where it has one (SCENE_AUDIO)."""
+    if scene not in SCENE_AUDIO:
+        return list(COMMON)
+    audio, start = SCENE_AUDIO[scene]
+    return ["--audio", audio, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", start]
 LEVELS = ["Ultra", "High", "Medium", "Low", "Emergency"]
 DEFAULT_BASELINE = os.path.join(ROOT, "docs", "perf", "live-baseline.json")
 MISS_MARGIN = 2.0
@@ -70,6 +84,8 @@ def available(scene):
         return "its project is not in this tree"
     if needs and not os.path.exists(os.path.join(ROOT, needs)):
         return "its generated scene is missing (%s)" % needs
+    if scene in SCENE_AUDIO and not os.path.exists(os.path.join(ROOT, SCENE_AUDIO[scene][0])):
+        return "its song is missing (%s; never committed)" % SCENE_AUDIO[scene][0]
     return None
 
 
@@ -112,7 +128,7 @@ def run(a):
             time.sleep(a.gap)  # leave the GPU lock to the other agents between runs
         rep += a.rep_offset
         name = "%s-%s-r%d" % (scene, mode, rep)
-        args = ["--live-profile", "--mode", mode, "--project", SCENES[scene][0]] + COMMON
+        args = ["--live-profile", "--mode", mode, "--project", SCENES[scene][0]] + common(scene)
         args += ["--quality", "auto", "--warmup", "5", "--measure", "30"] if mode == "live" else \
                 ["--quality", "ultra", "--warmup-frames", "150", "--measure", "15"]
         args += ["--json", os.path.join(a.out, name + ".json"), "--trace", os.path.join(a.out, name + ".csv")]

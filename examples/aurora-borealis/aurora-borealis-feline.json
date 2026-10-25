@@ -242,7 +242,7 @@
      1.0
     ],
     "falloff": 2.0,
-    "intensity": 0.4,
+    "intensity": 0.15,
     "mode": "subtle",
     "radius": 600.0
    },
@@ -344,7 +344,7 @@
      1.0
     ],
     "falloff": 2.0,
-    "intensity": 0.4,
+    "intensity": 0.15,
     "mode": "subtle",
     "radius": 600.0
    },
@@ -492,7 +492,7 @@
       "reach": 700.0,
       "reachHeight": 250.0,
       "land": 0.35,
-      "bed": 2.0,
+      "bed": 3.5,
       "embed": 0.625,
       "disturb": 0.045,
       "nearFade": 500.0
@@ -597,7 +597,7 @@
       "reach": 600.0,
       "reachHeight": 200.0,
       "land": 0.25,
-      "bed": 1.6,
+      "bed": 2.8,
       "embed": 0.625,
       "disturb": 0.035,
       "nearFade": 500.0
@@ -18123,7 +18123,7 @@
   {
    "source": "signal.crashGlow",
    "target": "nodes/river/water/glow",
-   "amount": 0.3,
+   "amount": 0.1,
    "op": "add",
    "polarity": "unipolar"
   },
