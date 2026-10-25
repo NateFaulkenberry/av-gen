@@ -61,7 +61,7 @@ def apply_effect(p, s, P, effect):
         if effect == "ghosts" and n["name"] in (P + "-ghostAh", P + "-ghostBh"):
             sg = 1.0 if "ghostA" in n["name"] else -1.0
             n["scale"] = [1.0, 1.0, 1.0]
-            n["position"] = [0.028 * sg, 0.011 * sg, 0.0]
+            n["position"] = [0.028 * sg, 0.011 * sg, -th.GHOST_BACK]
     if effect == "spill":
         for l in s.get("lights", []):
             if l.get("name") == P + "-spill" or l.get("id") == P + "-spill":

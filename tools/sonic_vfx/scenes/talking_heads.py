@@ -44,7 +44,10 @@ EYE_L = _A["head"]["eyeLeft"]
 EYE_R = _A["head"]["eyeRight"]
 EYEBALL_L = _A["eyes"]["left"]
 EYEBALL_R = _A["eyes"]["right"]
-MOUTH = _A["head"]["mouth"]                      # the rays' origin, head frame: behind the lips
+# the rays' origin, head frame: behind the lips, at the middle of the open "oh" (it opens downward from the slit, so
+# an origin at the slit's height read as rays leaving the upper lip -- the owner's stop-5 screenshot)
+MOUTH = [_A["head"]["mouth"][0], _A["head"]["mouth"][1] - 0.010, _A["head"]["mouth"][2] - 0.004]
+GHOST_BACK = 0.03   # the ghosts sit this far behind the head, so they echo round its silhouette and never on its face
 LID_UPPER_CLOSED = _A["eyes"]["lidCloseUpperDeg"]  # the upper lid's turn about X to meet the lower (positive)
 LID_LOWER_CLOSED = _A["eyes"]["lidCloseLowerDeg"]  # the lower lid's (applied negative)
 
@@ -415,8 +418,8 @@ def head(s, spec):
             (P + "-lidLL", "th-lid-lower", P + "-head", EYEBALL_L, None, 1.0),
             (P + "-lidUR", "th-lid-upper", P + "-head", EYEBALL_R, None, 1.0),
             (P + "-lidLR", "th-lid-lower", P + "-head", EYEBALL_R, None, 1.0),
-            (P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostA", 0.001),
-            (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostB", 0.001)):
+            (P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, -GHOST_BACK], P + "-ghostA", 0.001),
+            (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, -GHOST_BACK], P + "-ghostB", 0.001)):
         n = {"name": name, "kind": "gltf", "asset": "meshes/%s.glb" % mesh, "position": [float(v) for v in pos],
              "rotation": [0.0, 0.0, 0.0], "scale": [scale] * 3, "parent": parent, "castsShadow": False}
         if prog:
@@ -842,7 +845,9 @@ def routes(s, spec, rays):
                   decayMs=160 + 300 * E["ghost"]),
                 R(OPEN, "nodes/%s/position" % node, 0.4 * part * sgn, comp=1, depth=K("copies"), attackMs=0,
                   decayMs=160 + 300 * E["ghost"]),
-                R("signal.%sLevelS" % P, "nodes/%s/position" % node, 0.012 * E["ghost"] * sgn, comp=2,
+                # ... and back, never forward: a copy in front of the face lies across it in patches (the
+                # owner's "cut out look"); behind it, depth-tested against the head, only its rim shows
+                R("signal.%sLevelS" % P, "nodes/%s/position" % node, -0.02 * E["ghost"], comp=2,
                   depth=K("copies"), attackMs=40, decayMs=400))
     # wash (the synth): the possession colour over the porcelain, its spread on this head's own level
     for part in ("body", "head"):
