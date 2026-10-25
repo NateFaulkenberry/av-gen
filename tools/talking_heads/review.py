@@ -4,6 +4,7 @@ ADR-1025), with or without the Feline stems, every render through tools/gpu-lock
 
     python3 tools/talking_heads/review.py still  --at 62 [--wav feline] [--stems] [--size 1920x1080] --out F.png
     python3 tools/talking_heads/review.py clip   --range 60:75 [--wav feline|trench|<path>] [--stems] --out F.mp4
+    python3 tools/talking_heads/review.py clip   --wav none --range 0:12 --out F.mp4   # the silent world, moving
     python3 tools/talking_heads/review.py silent --at 4 --out F.png          # no audio, no routes: the dormant world
     python3 tools/talking_heads/review.py clip   --range 68:80 --only mouth --out F.mp4   # one feature isolated
     python3 tools/talking_heads/review.py bench  --range 60: --frames 360 --out F.json [--wav ...] [--stems]
@@ -101,7 +102,8 @@ def main():
             got = sorted(glob.glob(os.path.join(d, "*.png")))
             shutil.copy(got[-1], a.out)
         elif a.mode == "clip":
-            proj = variant(a.project, a.wav, a.stems, work, a.only)
+            proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
+                    else variant(a.project, a.wav, a.stems, work, a.only))
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
