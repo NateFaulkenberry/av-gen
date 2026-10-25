@@ -918,3 +918,83 @@ the defaults: the seam fix stays (the under-water strip stays out), and the Moog
 | `06-flash-audit-full-song.txt` | the flash audit |
 | `07-fish-below-the-surface-check.txt` | every fish's depth and highest vertex |
 | `08-headless-ultra-ab-pass7-vs-pass8.txt` | headless, pass 7 against pass 8 |
+
+## Pass 9: the big splash, light under the water, crossing fireballs, the aurora checked (stop, 2026-10-25)
+
+The owner's notes:
+
+- "we lost the big splash look ... as if someone is dropping a big ball into the water"
+- "the under water balls beams of light should illuminate under water more"
+- "sky fireballs go across the valley from left to right and right to left"
+- confirm that the pass-4 aurora work (twist and curl, smoothing) survived
+
+### What changed
+
+- **Where the splash went** (`01-...`).
+  - **The cause:** commit 08c7c9ce, pass 4, halved it after the owner's later notes, when the near water looked
+    permanently churned. Splash went from 0.07/0.05/0.06 to 0.035/0.025/0.03, and near wake from 1.6/1.3/1.3 to
+    0.8/0.6/0.6. Passes 5-8 changed no splash setting.
+  - **Why the impact never had light:** the water's light fades in over 150-500 m, and the pulses launch 160 m out.
+  - **Measured on one build and one clip**, against the splash off. The near water's mean change is:
+
+    | Setting | Mean change |
+    |---|---|
+    | Pass 4's first take | 0.017 |
+    | Pass 4 halved, through pass 8 | 0.009 |
+    | Pass 9 | 0.032 |
+
+- **The big splash back** (ADR-1666 `path.splashGlow`).
+  - The rings are 0.11/0.065/0.08 and the near wake 2.0/1.4/1.5: the kick is hardest, and both are stronger than
+    pass 4's first take.
+  - The splash now throws light: a flash at the impact and a bright ring running out with the rings, gone in about a
+    second, dimmed under 250 m from the camera.
+  - The rings break the reflections.
+  - **Not built:** a crown of geometry or particles. The engine draws path waves on the water and the land only.
+- **More light under the water** (ADR-1666 `path.bedReach`).
+  - Each pulse's light reaches 75 m down and at least 75 m across. It stopped at 40 m, and the bed has been 75 m deep
+    since pass 8.
+  - Halos are about a third wider, and more of the light sits under the reflection (`embed` 0.72, was 0.625).
+  - The light on the slopes is unchanged.
+  - To keep the flash gate, each hit swells in over 0.15 s (it was instant), and the light under the water fades in from
+    280 m (`nearFade` 700).
+  - **First take:** 95 m reach and stronger light. It flooded the near riverbed when the kick, the snare and the Moog's
+    entrance land together at 3.4 s: 0.08-0.096 on the flash gate.
+- **The fireballs cross the valley** (`look.BALLS`).
+  - Slot A flies left to right, 1.7 km out; slot B right to left, 2.1 km out. Each starts and ends just outside the
+    frame's edges, 540-700 m up.
+  - The pool gives every crash group both directions.
+  - **Clearance:** recomputed for all 12 crashes, both slots, at both extremes of the spread. The least height above the
+    land under the ball is 126 m (`08-...`).
+- **The aurora** (`11-...`, `12-...`).
+  - Against pass 4 and pass 6, every fx/aurora parameter, cloud signal and chain, and route is identical, except the
+    crash's flare on the aurora (0.15 -> 0.1, pass 5, for the flash gate). Nothing was lost.
+  - The smoothness figures are the same as pass 4's to the digit, except intensity's jerk share: 0.305% against the
+    0.3% line. Its absolute jerk is lower than pass 4's; its range over the song is smaller because of that flare.
+  - **Pushed this pass:** churn 14 -> 18 and swirl 3.2 -> 4.0. On pass 3's curving river the curling read a little
+    weaker. They keep 1.38% and 0.091%.
+
+### Measurements
+
+All from b74fa105:
+
+- **Flash gate:** worst 0.0485 at 4.9 s; 0 general flashes.
+- **Tests:** `[adr1666]` and `[adr1662]` (no wave: byte-identical) pass, as does the scene test.
+
+### Pass-9 stop media: `~/Desktop/av-gen-review/aurora-borealis/pass9/`
+
+| File | What it shows |
+|---|---|
+| `01-splash-bisect-passes-4-to-9.txt` | where the splash went, measured |
+| `02-splash-near-camera-closeup-normal-speed-8-16s.mp4` | the splashes near the camera, normal speed, with sound |
+| `03-splash-near-camera-closeup-quarter-speed-10.8-12.8s.mp4` | the same, quarter speed |
+| `04-splash-and-underwater-light-before-pass8-left-after-right-8-16s.mp4` | pass 8 (left) against pass 9, the same build, with sound |
+| `05-pulse-over-bed-and-fish-before-top-after-bottom-closeup-half-speed.mp4` | a pulse over the bed and fish, before and after, half speed |
+| `06-fireballs-crossing-the-valley-crash-group-22-27s.mp4` | the fireballs crossing, the 23-25 s crashes, with sound |
+| `07-fireballs-crossing-the-valley-crash-group-44.5-49s.mp4` | the 45.6/47.0/47.7 s crashes, with sound |
+| `08-fireball-ridge-clearance-all-12-crashes.txt` | the clearance over the ridges |
+| `09-aurora-swell-pass4-left-pass9-right-25-31s.mp4` | a swell, pass 4 against pass 9, the same build |
+| `10-aurora-swell-pass4-left-pass9-right-36-42s.mp4` | another |
+| `11-aurora-settings-diff-vs-pass4-and-pass6.txt` | the aurora settings compared |
+| `12-aurora-smoothness-vs-pass4.txt` | the smoothness measure against pass 4 |
+| `13-full-song-0-70s-720p-small.mp4` | the whole song, 720p, 29 MB, with sound |
+| `14-flash-audit-full-song.txt` | the flash audit |
