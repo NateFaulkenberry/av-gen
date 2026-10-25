@@ -578,7 +578,8 @@ def main():
     print("BUST_STATS", json.dumps(anchors["mesh"]))
     if not PREV:
         return
-    bpy.data.objects.remove(ob)
+    for o in (ob, head_g, jaw_g):   # previews show the real pieces only
+        bpy.data.objects.remove(o)
     neck_rest = neck.data.copy()
     cam = setup_render()
 
