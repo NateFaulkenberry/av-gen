@@ -322,11 +322,13 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
                 if (source == "signal." + part + "Hold" && lowers) {
                     wired.insert(part + " hold");
                 }
-                if (source == "signal." + part + "Sweep" && lowers) {
+                // the band's centre (a constant subtracted from the distance) is routed up by the ramp
+                if (source == "signal." + part + "Sweep" && target.find("/constant/") != std::string::npos &&
+                    amount > 0.0) {
                     wired.insert(part + " front");
                 }
                 if (source == "signal." + part + "Hold" && target.find("/constant/") != std::string::npos &&
-                    amount > 0.0) {
+                    amount > 0.0 && source.find("Sweep") == std::string::npos) {
                     wired.insert(part + " ridges");
                 }
             }

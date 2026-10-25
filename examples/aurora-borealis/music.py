@@ -161,10 +161,10 @@ def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay
 
 
 def sweep_signals(name, onset, run_s):
-    """Pass 6, the front down the range: `<name>Trail`, a latch on the note onsets falling over `run_s` and deaf for
-    as long (so a trill sends front after front, each running its whole length), and `<name>Sweep` = 1 - trail: 0 at
-    the camera on a note, 1 when the front has run out to where the lines fade -- where it rests between notes, the
-    whole bank in its lit stretch, lit at the sustain's level (look.py routes it onto `<label>Sweep`)."""
+    """Pass 6, the band down the range: `<name>Trail`, a latch on the note onsets falling over `run_s` and deaf for
+    as long (so a trill sends band after band, each running its whole length), and `<name>Sweep` = 1 - trail: 0 just
+    past the near slopes on a note, 1 when the band has run out to where the lines fade, where it rests between notes
+    (look.py routes it onto `<label>Sweep`)."""
     if not onset:
         return [sig(name + "Trail", []), sig(name + "Sweep", [{"constant": 1.0}])]
     restart = {"threshold": "binary", "thresholdLevel": 0.01, "attackMs": 0.0, "envelope": "linearfall",

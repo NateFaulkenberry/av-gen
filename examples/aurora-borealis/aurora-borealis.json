@@ -13926,7 +13926,7 @@
   },
   {
    "source": "signal.bassStrike",
-   "target": "material/abRockL/op/50/smoothstep/constant",
+   "target": "material/abRockL/op/53/smoothstep/constant",
    "amount": 2.0,
    "op": "add",
    "polarity": "unipolar"
@@ -13940,8 +13940,8 @@
   },
   {
    "source": "signal.bassSweep",
-   "target": "material/abRockL/op/47/smoothstep/constant",
-   "amount": -1.35,
+   "target": "material/abRockL/op/47/constant/constant",
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar"
   },
@@ -13968,7 +13968,7 @@
   },
   {
    "source": "signal.moogStrike",
-   "target": "material/abRockR/op/50/smoothstep/constant",
+   "target": "material/abRockR/op/53/smoothstep/constant",
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
@@ -13982,8 +13982,8 @@
   },
   {
    "source": "signal.moogSweep",
-   "target": "material/abRockR/op/47/smoothstep/constant",
-   "amount": -1.35,
+   "target": "material/abRockR/op/47/constant/constant",
+   "amount": 1.2,
    "op": "add",
    "polarity": "unipolar"
   }
