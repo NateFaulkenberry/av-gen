@@ -1,0 +1,34 @@
+{
+ "scene": "Talking Heads (Sonic Abstract)",
+ "policy": "Reference downloads only, for comparison with the custom bust (tools/talking_heads/make_bust.py, our own work, committed). Third-party binaries stay gitignored under assets/talking-heads/reference/ (main checkout; worktrees symlink it). Approved by the owner 2026-10-24 (decision D2).",
+ "assets": [
+  {
+   "id": "innerscene-modern-abstract-bust",
+   "source": "https://www.innerscene.com/tools/library/3d-parts/modern-abstract-bust-91e3ae04",
+   "download": "https://www.innerscene.com/api/library/modern-abstract-bust-91e3ae04/download",
+   "creators": ["Innerscene (adapted from MakeHuman / MPFB CC0 assets)"],
+   "license": "CC0 1.0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "terms": "https://www.innerscene.com/tools/library/terms",
+   "attribution": "not required",
+   "localPath": "assets/talking-heads/reference/innerscene-modern-abstract-bust.glb",
+   "fetched": "2026-10-25",
+   "bytes": 755020,
+   "sha256": "4c9faa8f298b5d8958bd052bbfa277566c645a5cc1f7f02c5e6f5a850976745a",
+   "inspection": {"meshes": "'Abstract visage and shoulders' 11,200 tris (material 'Original dark cast bronze'); 'Turned marble bust socle' 1,920 tris (material 'Original honed ivory marble')", "size_m": [0.39, 0.237, 0.633]},
+   "compare": "~/Desktop/av-gen-review/talking-heads/prep/compare-candidates.png",
+   "verdict": "reference only: borrow the T-shaped brow-and-nose plane and the crisp almond eye recesses"
+  },
+  {
+   "id": "dessen-male-head",
+   "source": "https://sketchfab.com/3d-models/male-head-0247a25a04ba46b99629130277fe39b7",
+   "creators": ["Dessen (Sketchfab)"],
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "attribution": "\"Male Head\" by Dessen (https://sketchfab.com/3d-models/male-head-0247a25a04ba46b99629130277fe39b7), licensed under CC BY 4.0. Required in CREDITS.md only if anything derived from it ships; nothing does.",
+   "localPath": null,
+   "fetched": null,
+   "status": "NOT DOWNLOADED: Sketchfab's download API (GET /v3/models/<uid>/download) answers 401 without a signed-in account's API token. Needs the owner to download it in a browser while signed in (or to provide a Sketchfab API token), then place the glTF at assets/talking-heads/reference/dessen-male-head/."
+  }
+ ]
+}

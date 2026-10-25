@@ -4,8 +4,14 @@
 dark indigo ether. Coloured beams pour from its mouth and eyes, and it vibrates, takes on colour and tears like a video
 signal with the music. One head only.
 
-**State on 2026-10-24.** Research and prep only, on branch `prep/talking-heads` in `../av-gen-talkingheads`. No scene
-code, no engine code and no index entry exist yet. **The slice needs no engine change.**
+**State on 2026-10-25.** Research and prep are done. The owner has decided D1-D4 (03 §8):
+- custom bust;
+- reference downloads approved;
+- **ADR-1670 (the Light Beam follows its owner in local space) is the first engine task**, replacing the riding spot
+  lights;
+- tearing as full-screen bursts plus the local layers first.
+
+D5-D9 are decided at the first review. Branch: `scene/talking-heads` in `../av-gen-talkingheads`.
 
 ## Read, in order (about 30 minutes)
 
@@ -17,7 +23,7 @@ code, no engine code and no index entry exist yet. **The slice needs no engine c
    - §3 the binding table;
    - §4 the MIDI map;
    - §5 the budget;
-   - §8 **the owner's decisions** (get D1-D4 answered before task 1).
+   - §8 the decisions (D1-D4 decided; D5-D9 at stop 1).
 3. `02-research-engine.md`:
    - §2 which engine system serves each feature, with file pointers;
    - §3 audio and latency;
@@ -35,6 +41,7 @@ code, no engine code and no index entry exist yet. **The slice needs no engine c
 | Probe previews | `probe/bust-contact-sheet.jpg`; full size in `~/Desktop/av-gen-review/talking-heads/prep/` |
 | Proof that the beams ride the head | `probe/engine-beams-follow-bust.jpg` |
 | Cost probe (eight arms; how to bench) | `probe/cost_arms.py`. Results in 02 §4: 4.0-4.7 ms GPU p50 for the full stack against 29.3 ms |
+| Reference downloads (gitignored; manifest `assets/talking-heads.manifest.json`) | `assets/talking-heads/reference/innerscene-modern-abstract-bust.glb` (CC0). Comparison: `~/Desktop/av-gen-review/talking-heads/prep/compare-candidates.png` |
 | Mood reference (copyrighted: **never** copy it into the repo) | `~/Desktop/av-gen-review/talking-heads/reference/de-loused-in-the-comatorium.jpeg`. Take one dominant soft mouth cone with a bright core; do not reproduce the cover |
 
 ## Code you will touch or copy
