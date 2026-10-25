@@ -1,11 +1,11 @@
 #!/bin/bash
 # Talking Heads stop 2 (the gated head, 05-owner-notes-stop1.md): clips, checks and the headless 1080p numbers, into
-# ~/Desktop/av-gen-review/talking-heads/stop2/. Every render goes through tools/gpu-lock.sh, one job per hold.
+# ~/Desktop/av-gen-review/92-talking-heads/stop2/. Every render goes through tools/gpu-lock.sh, one job per hold.
 #   tools/talking_heads/stop2.sh [project.json]
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 P="${1:-$REPO/examples/sonic-abstract/talking-heads.json}"
-OUT="$HOME/Desktop/av-gen-review/talking-heads/stop2"
+OUT="$HOME/Desktop/av-gen-review/92-talking-heads/stop2"
 mkdir -p "$OUT"
 R() { python3 "$REPO/tools/talking_heads/review.py" "$@" --project "$P"; }
 R clip --range 56:72 --stems --out "$OUT/01-gate-on-the-bass-stem-feline.mp4"

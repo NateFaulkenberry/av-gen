@@ -1,12 +1,12 @@
 #!/bin/bash
 # Talking Heads stop 4 (the hinged mouth, lids, palettes, per-source effects, neck swivel, atmosphere): stills, clips,
-# checks and the headless 1080p numbers, into ~/Desktop/av-gen-review/talking-heads/stop4/. Every render goes through
+# checks and the headless 1080p numbers, into ~/Desktop/av-gen-review/92-talking-heads/stop4/. Every render goes through
 # tools/gpu-lock.sh, one job per hold.
 #   tools/talking_heads/stop4.sh [project.json]
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 P="${1:-$REPO/examples/sonic-abstract/talking-heads.json}"
-OUT="$HOME/Desktop/av-gen-review/talking-heads/stop4"
+OUT="$HOME/Desktop/av-gen-review/92-talking-heads/stop4"
 mkdir -p "$OUT/mouth" "$OUT/checks"
 R() { python3 "$REPO/tools/talking_heads/review.py" "$@" --project "$P"; }
 PS() { python3 "$REPO/tools/talking_heads/pose_stills.py" --project "$P" "$@"; }

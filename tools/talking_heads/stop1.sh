@@ -1,11 +1,11 @@
 #!/bin/bash
 # Talking Heads stop 1: the spec's section-10 clips and the headless 1080p numbers, into
-# ~/Desktop/av-gen-review/talking-heads/stop1/. Every render goes through tools/gpu-lock.sh (review.py), one job per hold.
+# ~/Desktop/av-gen-review/92-talking-heads/stop1/. Every render goes through tools/gpu-lock.sh (review.py), one job per hold.
 #   tools/talking_heads/stop1.sh [project.json]
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 P="${1:-$REPO/examples/sonic-abstract/talking-heads.json}"
-OUT="$HOME/Desktop/av-gen-review/talking-heads/stop1"
+OUT="$HOME/Desktop/av-gen-review/92-talking-heads/stop1"
 mkdir -p "$OUT"
 R() { python3 "$REPO/tools/talking_heads/review.py" "$@" --project "$P"; }
 R clip --wav none --range 0:12 --out "$OUT/01-dormant.mp4"

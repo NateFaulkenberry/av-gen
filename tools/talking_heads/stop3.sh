@@ -1,11 +1,11 @@
 #!/bin/bash
 # Talking Heads stop 3 (the multi-head scene, 07-owner-notes-stop2.md): clips, checks and the headless 1080p numbers,
-# into ~/Desktop/av-gen-review/talking-heads/stop3/. Every render goes through tools/gpu-lock.sh, one job per hold.
+# into ~/Desktop/av-gen-review/92-talking-heads/stop3/. Every render goes through tools/gpu-lock.sh, one job per hold.
 #   tools/talking_heads/stop3.sh [project.json]
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 P="${1:-$REPO/examples/sonic-abstract/talking-heads.json}"
-OUT="$HOME/Desktop/av-gen-review/talking-heads/stop3"
+OUT="$HOME/Desktop/av-gen-review/92-talking-heads/stop3"
 mkdir -p "$OUT"
 R() { python3 "$REPO/tools/talking_heads/review.py" "$@" --project "$P"; }
 EYES="-0.10,0.44,0.62,0.0,0.43,0.18"     # close on the middle head's face

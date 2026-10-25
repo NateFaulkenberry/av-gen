@@ -14,7 +14,7 @@ merge of `scene/talking-heads`.
   head, they show only as an echo round its silhouette.
 - **The rays.** They met at the upper lip, because their origin was at the slit's height while the "oh" opens
   downward. They now leave the middle of the opening; the anchor check passes at full opening, tilt 0 and 32.
-- **Media:** `~/Desktop/av-gen-review/talking-heads/stop6/cutout/`.
+- **Media:** `~/Desktop/av-gen-review/92-talking-heads/stop6/cutout/`.
 
 **"it looks like its the synth stem - i think it needs to be more sensitive".**
 `tools/talking_heads/gate_recall.py` scores a head's openings against an independent spectral-flux onset reference

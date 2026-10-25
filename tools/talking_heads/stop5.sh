@@ -1,12 +1,12 @@
 #!/bin/bash
 # Talking Heads stop 5: the "oh" mouth, the seam, the larger staggered busts and the background (10-brief-background.md):
 # stills, clips, the heads-hidden background, the seam close-ups, the checks and the 1080p numbers, into
-# ~/Desktop/av-gen-review/talking-heads/stop5/. Every render goes through tools/gpu-lock.sh.
+# ~/Desktop/av-gen-review/92-talking-heads/stop5/. Every render goes through tools/gpu-lock.sh.
 #   tools/talking_heads/stop5.sh [project.json]
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 P="${1:-$REPO/examples/sonic-abstract/talking-heads.json}"
-OUT="$HOME/Desktop/av-gen-review/talking-heads/stop5"
+OUT="$HOME/Desktop/av-gen-review/92-talking-heads/stop5"
 mkdir -p "$OUT/mouth" "$OUT/checks"
 R() { python3 "$REPO/tools/talking_heads/review.py" "$@" --project "$P"; }
 PS() { python3 "$REPO/tools/talking_heads/pose_stills.py" --project "$P" "$@"; }
