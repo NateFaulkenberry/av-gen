@@ -75,3 +75,17 @@ Aurora Borealis sets its values in `look.py` (`SPLASH`, `BED_REACH`).
 - **The wake's ripples are feathered** in over their first 25 m and out over the last 40% of the wake. They stopped
   at hard lines at the front and at the wake's end, straight edges across the ripple field trailing each pulse: the
   owner's "ripple seam".
+
+## Addendum (pass 11)
+
+- **`path.splashBack`** (metres, written only when set): the splash's centre sits this far back along the path from
+  where the front starts.
+  - So a front can start in view, and show on its onset's frame, while its splash lands behind the camera in its own
+    lane. At 0 it lands where the front starts, byte for byte.
+  - Test: `[adr1666]`.
+- **The wake seam.**
+  - `wavePathHit` now blends the chain's segments by a soft minimum of their distances. Its nearest segment had jumped
+    on the line bisecting each bend, and every value keyed to the arc length stepped along that line.
+  - `wavePathLand` cross-fades the land's and the bed's light over the 1.5 m under the level, instead of switching at
+    it.
+  - The light's cut-offs moved to 4 halos and 4 edge widths, where it is nil.

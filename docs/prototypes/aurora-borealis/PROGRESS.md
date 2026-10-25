@@ -1064,3 +1064,30 @@ All from ad18d94e:
 | `07-flash-audit-full-song.txt` | the flash audit |
 | `08-fish-check.txt` | the fish check |
 | `09-camera-centring.txt` | the camera centring, measured |
+
+## Pass 11 (stop, 2026-10-25)
+
+The owner's notes on pass 10 are at the end of `40-owner-notes-pass5.md`, with later ones relayed by the coordinator:
+more fish and more variety, and one review video per pass from now on.
+
+- **The wake seam:** see `seam-isolation.txt`. The chain's nearest point is now blended across segments, the
+  land/bed light cross-fades at the waterline, and the cut-offs sit where the light is nil.
+- **A splash per pulse:**
+  - Each pulse's splash lands 40 m behind the camera in its own lane (ADR-1666 `splashBack`).
+  - The lanes are wider apart, so the coloured rings come from three places: kick 85 m left, snare 85 m right, toms
+    in the middle within +-45 m.
+- **Timing:**
+  - Each pulse starts 330 m out (the snare 400 m), where its light shows, with no swell. It shows on its onset's own
+    frame: kick 31/32, snare 14/14, toms 4/4 (`timing-table.txt`).
+  - Pass 10's pulses never showed a clear arrival within 7 frames: they launched behind the camera and swelled in.
+- **Fish:** 56, of nine species.
+  - The four before, plus eel, catfish (with barbels), baitfish (four shoals of four), carp and sturgeon.
+  - Each species has its own size, lap, circle and tint.
+  - The highest vertex of any is 1.50 m under.
+- **Flash gate:** 0.043 at 3.4 s. Media from b76a1570.
+- **Media** (one video, the owner's rule): `~/Desktop/av-gen-review/91-aurora-borealis/pass11/`
+  - `aurora-borealis-pass11-full-song-1080p.mp4`
+  - `timing-table.txt`
+  - `seam-isolation.txt`
+  - `fish-check.txt`
+  - `flash-audit.txt`
