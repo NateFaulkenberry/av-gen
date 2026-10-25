@@ -107,7 +107,8 @@ def main():
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
-            proj = variant(a.project, a.wav, a.stems, work, a.only)
+            proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
+                    else variant(a.project, a.wav, a.stems, work, a.only))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
                  "--size", a.size])
         print(a.out)
