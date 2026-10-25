@@ -60,9 +60,13 @@ those it draws three things:
   with a share on top so it reads at grazing distance.
 - **On the water's normal**, the wake's ripples. Crests spread from the path behind the front, wander and break
   with position, and die in about half a second.
-- **On land** (any surface but the water: banks, mountains, a riverbed), the beam's colour across `reach` and up
+- **On land** (any surface but the water: banks, mountains), the beam's colour across `reach` and up
   `reachHeight`, weighted by how squarely each surface faces the path. On faceted land that lights the facets
   themselves, plane by plane, instead of laying a pattern over them.
+- **Below the path's level** (a riverbed seen through the water), its own share (`bed`), in a band about the
+  halo's width, lit from the head itself. That low, grazing light catches the planes tilted toward it and leaves
+  the rest dark, so a faceted bed reads as facets through the water. A plain light from overhead lit every
+  near-horizontal plane alike, and the bed read as a glow.
 
 A near fade by distance from the camera keeps the first frames of a front out of the bottom of the frame without
 delaying its onset.
