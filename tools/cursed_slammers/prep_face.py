@@ -11,12 +11,14 @@ The recipe (03-plan.md, 04-study.md):
 2. Orient: the area-weighted mean normal of a front mask points at the viewer; rotate it onto Blender -Y (glTF +Z),
    keeping the scan's own up as close to +Z as possible. `--rot x,y,z` (degrees, applied after) corrects a scan whose
    up is wrong; check the preview.
-3. Normalise: centre the bounding box on the origin, scale so the width (x) is 1.0.
+3. Normalise: centre the bounding box on the origin, scale so the width (x) is 1.0. Weld coincident vertices (the
+   scan arrives as six objects; unwelded borders crack when decimated).
 4. LOW = HIGH duplicated and decimated (collapse, seams and UVs kept) to --tris. Photogrammetry atlases do not overlap,
    so LOW keeps HIGH's UV layout and reuses its texture.
 5. Bake HIGH's detail into LOW's UVs as a tangent-space normal map (Cycles, selected-to-active, a small cage
    extrusion, 16 px margin), --bake square.
-6. The colour: HIGH's base-colour image scaled to --tex (8192 -> 4096 by default) and saved as PNG.
+6. The colour: HIGH's base-colour image scaled to --tex (8192 -> 4096 by default), its black atlas gutter filled
+   outward from the islands (--dilate px, so mips and edge taps read skin), saved as PNG.
 7. LOW gets one Principled material (colour + normal map), exported as GLB with the images embedded.
 
 Writes --out, and <out>.json beside it (statistics, the orientation applied, the bounding box).
@@ -38,7 +40,9 @@ ap.add_argument("--tris", type=int, default=80000)
 ap.add_argument("--tex", type=int, default=4096)
 ap.add_argument("--bake", type=int, default=4096)
 ap.add_argument("--rot", default="0,0,0")
-ap.add_argument("--extrusion", type=float, default=0.006, help="bake cage extrusion, in face widths")
+ap.add_argument("--extrusion", type=float, default=0.01, help="bake cage extrusion, in face widths")
+ap.add_argument("--weld", type=float, default=2e-5, help="merge distance, in face widths")
+ap.add_argument("--dilate", type=int, default=24, help="colour gutter fill, in pixels")
 ap.add_argument("--previews", default="")
 args = ap.parse_args(argv)
 SRC = os.path.abspath(os.path.expanduser(args.src))
@@ -138,6 +142,16 @@ me.update()
 bb = [[(min(xs) - c.x) * s, (min(ys) - c.y) * s, (min(zs) - c.z) * s],
       [(max(xs) - c.x) * s, (max(ys) - c.y) * s, (max(zs) - c.z) * s]]
 log("normalised to width 1.0; bbox", bb)
+# the scan arrives as several objects whose borders coincide but are not joined; left open, each border decimates on
+# its own and the low mesh cracks along them (hair-line black gaps). Weld coincident vertices first.
+bpy.ops.object.select_all(action="DESELECT")
+high.select_set(True)
+bpy.context.view_layer.objects.active = high
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.mesh.remove_doubles(threshold=args.weld)
+bpy.ops.object.mode_set(mode="OBJECT")
+log("welded: HIGH now", len(high.data.vertices), "verts")
 
 # ---------------------------------------------------------------- 4. decimate
 bpy.ops.object.select_all(action="DESELECT")
@@ -189,7 +203,7 @@ bpy.context.view_layer.objects.active = low
 bake = scene.render.bake
 bake.use_selected_to_active = True
 bake.cage_extrusion = args.extrusion
-bake.max_ray_distance = args.extrusion * 4.0
+bake.max_ray_distance = args.extrusion * 6.0
 bake.margin = 16
 bake.normal_space = "TANGENT"
 bpy.ops.object.bake(type="NORMAL")
@@ -206,6 +220,27 @@ if src_img is not None and low.data.uv_layers:
     col.name = "cs_face_color"
     if max(col.size) > args.tex:
         col.scale(args.tex, args.tex)
+    # fill the atlas gutter (black between the photogrammetry islands) outward from the islands, so mip levels and
+    # bilinear taps at an island's edge read skin, not black
+    import numpy as np
+    w, h = col.size
+    px = np.empty(w * h * 4, dtype=np.float32)
+    col.pixels.foreach_get(px)
+    px = px.reshape(h, w, 4)
+    rgb = px[..., :3].copy()
+    known = rgb.max(axis=2) > 0.012
+    for _ in range(args.dilate):
+        acc = np.zeros_like(rgb)
+        cnt = np.zeros(known.shape, dtype=np.float32)
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            k = np.roll(known, (dy, dx), axis=(0, 1))
+            acc += np.roll(rgb, (dy, dx), axis=(0, 1)) * k[..., None]
+            cnt += k
+        grow = (~known) & (cnt > 0)
+        rgb[grow] = acc[grow] / cnt[grow][:, None]
+        known = known | grow
+    px[..., :3] = rgb
+    col.pixels.foreach_set(px.ravel())
     col_path = os.path.join(WORK, "cs_face_color.png")
     col.filepath_raw = col_path
     col.file_format = "PNG"

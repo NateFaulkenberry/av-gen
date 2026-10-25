@@ -17,7 +17,7 @@ Variants (each a project + scene in --out):
               view angle) and a foil substrate
 
 Layout (world units, +Y up, camera at +Z): the face at the origin, its relief exaggerated in depth (scale z 1.5),
-the ridged substrate at z = -1.4. The camera sweeps x +-0.45 at z = 2.45, always aimed at the face.
+the ridged substrate at z = -1.4. The camera sweeps x +-0.40 at z = 2.0, always aimed at the face.
 """
 import argparse
 import math
@@ -38,12 +38,12 @@ FACE = os.path.abspath(args.face)
 OUT = os.path.abspath(args.out)
 PERIOD = args.period
 TARGET = [0.0, 0.02, 0.0]
-CAM_Z = 2.45
-SWEEP = 0.45
+CAM_Z = 2.0
+SWEEP = 0.40
 PLATE_Z = -1.4
 
 RIDGE_FREQ = 70.0          # lenticules per world unit (about 120 across the frame at the face)
-RIDGE_FREQ_PLATE = 48.0
+RIDGE_FREQ_PLATE = 32.0
 
 
 def ridge(dst, freq):
@@ -71,21 +71,37 @@ def foil_f0(dst, tmp):
     ]
 
 
+def edge_fade(dst, colour):
+    """Darken the scan's cut edges (grazing to the camera: high Fresnel) so the mask sinks into the dark instead of
+    showing a rim: colour *= 1 - smoothstep(0.45, 0.9, fresnel^1)."""
+    return [
+        {"kind": "fresnel", "dst": dst, "value": 1.0},
+        {"kind": "smoothstep", "dst": dst, "srcA": dst, "constant": [0.45, 0.9, 0.0, 0.0]},
+        {"kind": "constant", "dst": dst + 1, "constant": [1.0, 1.0, 1.0, 1.0]},
+        {"kind": "mixBy", "dst": dst, "srcA": dst + 1, "srcB": dst + 2, "srcC": dst},
+        {"kind": "multiply", "dst": colour, "srcA": colour, "srcB": dst},
+    ]
+
+
 def skin_program(variant):
-    """The head. Registers: r0 ridge normal, r1 t (0 = embossed look, 1 = lit look), r2..r7 scratch / outputs."""
+    """The head. Registers: r0 ridge normal, r1 t (0 = embossed look, 1 = lit look), r2..r7 scratch / outputs.
+    (edge_fade uses r5..r7; r7 is never written, so it reads zero.)"""
     if variant == "V0":
-        return None
+        ops = [{"kind": "constant", "dst": 4, "constant": [0.75, 0.72, 0.70, 1.0]}] + edge_fade(5, 4)
+        return {"name": "cs_face", "ops": ops, "normal": -1, "roughness": -1, "baseColor": 4, "metallic": -1,
+                "emission": -1, "emissionIntensity": 1.0, "opacity": -1}
     ops = ridge(0, RIDGE_FREQ)
     if variant == "V1":
         # ridges in the highlights only: a small tilt, anisotropic roughness along the lenticules
         ops += [
-            {"kind": "constant", "dst": 2, "constant": [0.16, 1.0, 1.0, 0.0]},
+            {"kind": "constant", "dst": 2, "constant": [0.12, 1.0, 1.0, 0.0]},
             {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
             {"kind": "constant", "dst": 3, "constant": [0.38, 0.38, 0.38, 0.38]},
             {"kind": "anisotropy", "dst": 3, "srcA": 3, "value": 0.8, "constant": [0.0, 1.0, 0.0, 0.0]},
             {"kind": "roughnessFilter", "dst": 3, "srcA": 3, "value": 1.0},
-        ]
-        return {"name": "cs_face", "ops": ops, "normal": 0, "roughness": 3, "baseColor": -1, "metallic": -1,
+            {"kind": "constant", "dst": 4, "constant": [0.75, 0.72, 0.70, 1.0]},
+        ] + edge_fade(5, 4)
+        return {"name": "cs_face", "ops": ops, "normal": 0, "roughness": 3, "baseColor": 4, "metallic": -1,
                 "emission": -1, "emissionIntensity": 1.0, "opacity": -1}
     # V2 / V3: the interlaced flip. t = smoothstep(0.4, 0.6, saturate(2.6 viewDir.x + 0.5 + 0.2 cos(2 pi x f)))
     ops += [
@@ -99,11 +115,11 @@ def skin_program(variant):
         {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.40, 0.60, 0.0, 0.0]},
         # ridge tilt: 0.65 embossed, 0.16 lit
         {"kind": "constant", "dst": 2, "constant": [0.65, 1.0, 1.0, 0.0]},
-        {"kind": "constant", "dst": 3, "constant": [0.16, 1.0, 1.0, 0.0]},
+        {"kind": "constant", "dst": 3, "constant": [0.12, 1.0, 1.0, 0.0]},
         {"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 3, "srcC": 1},
         {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
-        # roughness: 0.10 embossed (glossy lens sheet), 0.40 lit skin; anisotropic along the lenticules
-        {"kind": "constant", "dst": 3, "constant": [0.10, 0.10, 0.10, 0.10]},
+        # roughness: 0.16 embossed (glossy lens sheet), 0.40 lit skin; anisotropic along the lenticules
+        {"kind": "constant", "dst": 3, "constant": [0.16, 0.16, 0.16, 0.16]},
         {"kind": "constant", "dst": 4, "constant": [0.40, 0.40, 0.40, 0.40]},
         {"kind": "mixBy", "dst": 3, "srcA": 3, "srcB": 4, "srcC": 1},
         {"kind": "anisotropy", "dst": 3, "srcA": 3, "value": 0.8, "constant": [0.0, 1.0, 0.0, 0.0]},
@@ -124,7 +140,7 @@ def skin_program(variant):
         # V3: embossed = foil metal (F0 from the muted rainbow, darkened); lit = the scan
         ops += foil_f0(4, 5)
         ops += [
-            {"kind": "constant", "dst": 5, "constant": [0.35, 0.35, 0.35, 1.0]},
+            {"kind": "constant", "dst": 5, "constant": [0.6, 0.6, 0.6, 1.0]},
             {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
             {"kind": "constant", "dst": 5, "constant": [0.75, 0.72, 0.70, 1.0]},
             {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 1},
@@ -132,6 +148,15 @@ def skin_program(variant):
             {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 0.0]},
             {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 6, "srcC": 1},
         ]
+    # edge fade on the colour with r6 (fade) and r7 (ones); r2 is free again and zero-filled first
+    ops += [
+        {"kind": "fresnel", "dst": 6, "value": 1.0},
+        {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.45, 0.9, 0.0, 0.0]},
+        {"kind": "constant", "dst": 7, "constant": [1.0, 1.0, 1.0, 1.0]},
+        {"kind": "constant", "dst": 2, "constant": [0.0, 0.0, 0.0, 0.0]},
+        {"kind": "mixBy", "dst": 6, "srcA": 7, "srcB": 2, "srcC": 6},
+        {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 6},
+    ]
     return {"name": "cs_face", "ops": ops, "normal": 0, "roughness": 3, "baseColor": 4, "metallic": 5,
             "emission": -1, "emissionIntensity": 1.0, "opacity": -1}
 
@@ -170,21 +195,20 @@ def build(variant):
     # catch: a small light just above the lens so the eyes keep a catchlight as the camera moves
     s.light("key", "spot", position=[-1.5, 1.5, 1.5], direction=[0.55, -0.5, -0.65], color=[1.0, 0.93, 0.86],
             intensity=10.0, range=8.0, innerCone=16.0, outerCone=30.0, castsShadow=False, contactShadow=False)
-    s.light("rim", "directional", direction=[-0.65, -0.2, 0.72], color=[0.55, 0.45, 1.0], intensity=1.4,
+    s.light("rim", "directional", direction=[-0.4, -0.75, 0.5], color=[0.55, 0.45, 1.0], intensity=0.7,
             castsShadow=False, contactShadow=False)
     s.light("catch", "point", position=[0.0, 0.35, CAM_Z - 0.4], color=[0.9, 0.92, 1.0], intensity=0.6, range=4.0,
             castsShadow=False, contactShadow=False)
     if variant != "V0":
         # the sweep: a narrow spot travelling across in front: the ridge combs slide over the face and the substrate
         s.light("sweep", "spot", position=[-2.0, 0.4, 1.2], direction=[0.0, -0.1, -1.0], color=[0.85, 0.86, 1.0],
-                intensity=9.0, range=8.0, innerCone=20.0, outerCone=45.0, castsShadow=False, contactShadow=False)
+                intensity=14.0, range=8.0, innerCone=20.0, outerCone=45.0, castsShadow=False, contactShadow=False)
         s.track("lights/sweep/position", [
             {"time": 0.0, "value": [-2.0, 0.4, 1.2], "interp": "smooth"},
             {"time": PERIOD * 0.5, "value": [2.0, 0.4, 1.2], "interp": "smooth"},
             {"time": PERIOD, "value": [-2.0, 0.4, 1.2], "interp": "smooth"}], loop=PERIOD)
     prog = skin_program(variant)
-    if prog:
-        s.program(prog)
+    s.program(prog)
     s.program(plate_program(variant))
     face = {"name": "face", "kind": "gltf", "asset": FACE, "position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0],
             "scale": [1.0, 1.0, float(args.depth)], "castsShadow": False}
