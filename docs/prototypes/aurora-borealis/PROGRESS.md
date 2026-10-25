@@ -383,3 +383,100 @@ it did. CPU work is +0.3 ms p50: nine stems' signal chains and the path resoluti
 2. **The ribbons at 1000 m** (was 600) to remove the near pink wedge: does the aurora still read as before?
 3. **The bed is subtle**: it shows only in the near water (further out the reflection covers it, by design). It
    could be stronger at the cost of more launch flash.
+
+## Pass 3: final (2026-10-25)
+
+The owner's stop-1 decisions: colour pair A (magenta-pink kick #ff2f92, pale lilac snare #e2d2ff) and the coarse
+bed; the aurora as it is (ribbons at 1000 m); the bed stronger, with the launch inside the flash gate.
+
+### After stop 1
+
+- **The bed, stronger:** bed share 3.5 (kick) / 2.8 (snare); 2.0 / 1.6 at stop 1. The land and bed light now also wait
+  until the front has travelled past the near fade. Lit from a head just launched, the near bed washed the bottom of
+  the frame pale lilac (the 2.8 s crash with a kick and snare). Lit after the head has moved on, the bed behind it
+  reads as magenta planes.
+- **Flash gate:** at the first full-song audit it failed, 0.054 in 267 ms at 24.4 s: a crash on a kick, the crash's
+  river glow (0.3) on top of the beam and bed. Cuts:
+  - the crash's river glow 0.3 → 0.1;
+  - the stars' ground term 0.4 → 0.15;
+  - the launch fade above.
+
+  **Final, the whole song (0-70.18 s): worst 267 ms swing 0.025 at 24.37 s** (gate 0.05); frame-to-frame max 0.009;
+  0 WCAG-style general flashes. Tool: `pass3-impl/scripts/flash.py` (4x4 tiles, ≥ 0.10 over ≥ 25% of the frame).
+- **E3 (sparse upward rays): not built.** The beam already reads as light moving through the water: a core under the
+  reflection, the ripples breaking the mirror behind it, the lit riverbed planes, and the banks' facets taking its
+  colour. Rays would add vertical spikes along the river on every kick, 1.7 a second, which is the field of spikes
+  the brief rules out. They would cost an M-sized engine change (Beam shells spawned per front). They do not earn
+  their place.
+- **Bass: tried, not assigned.** I tried `stem.bass.rms` (150/800 ms, gain 3) onto the water's flow streaks (+0.7 over
+  a 0.8 base; B §8's zero-op candidate), on against off at 2-8 s. The difference was not legible at the performance
+  camera (the streaks are sub-pixel lanes at that distance), so by the brief's rule 3 it stays off. The aurora's
+  colour stays Cloud Diving's.
+- **HH: not assigned.** 374 closed hats at 5.3 a second are the "continuous stream of flashes" the brief forbids.
+  The 29 once-a-bar open hats are legible, but a detector would need to know the hat's rms 100 ms after its onset:
+  that is a 100 ms-late accent, or look-ahead the live path does not have. A water micro-sparkle adds nothing the
+  ripples and glints do not already say.
+- **Tools:**
+  - `tools/live_perf_baseline.py` runs Aurora on its own song: Sabertooth from 12 s, so the 5 s warm-up and 30 s
+    measure fall inside the 70 s song (`SCENE_AUDIO`).
+  - `tools/sound_to_light.py` reports the pass-3 onset paths (`signal.kickBeam`, `snareBeam`, `crashStar`).
+  - `tools/sound_to_light.sh` takes `INPUT_SOURCES`, so a keyed scene gets its stems.
+  - `docs/perf/live-baseline.json`: the aurora entry is replaced with this run, with a note (below).
+
+### Final measurements
+
+- **Headless Ultra A/B** (same build, 3 interleaved reps, AC, GPU p50 median, ms):
+
+  | t | pass 2 | pass 3 |
+  |---|---|---|
+  | 12 s | 14.32 | 11.89 |
+  | 36 s | 13.43 | 11.95 |
+  | 47 s | 12.87 | 11.84 |
+
+  Pass 3's GPU p95 is 14.1-17.6 ms and its max 27.8 (one frame). CPU work p50 is 2.1-2.4 ms, against 1.8-2.7 for
+  pass 2. The pass-2 folder is removed.
+- **Live acceptance: T1/T2 not met.** On the LG UltraFine at 60.00 Hz (verified: the only and main display; every
+  run's `refreshMs` 16.667), AC power, live Auto:
+  - misses per 900: 12 / 9 / 5, median 9 (T1 ≤ 5);
+  - frame p99: 41.8 / 41.7 / 40.8 ms (T2 ≤ 40);
+  - Ultra throughout (T3 ok);
+  - headless GPU p50 15.3 ms (T4 ok).
+
+  **A same-day control** ran the pass-2 scene (b6e572c2) interleaved, with its own pass-2 arguments: 9 and 6 misses,
+  p99 41.6 and 41.4 ms, live GPU p50 19.5-19.8 ms. Its committed baseline is 3 misses at p99 39.2. Pass 3 in the same
+  session: 11 and 17 misses, p99 41.8.
+
+  The whole machine runs about 7 ms slower live today than when the baseline was taken (live GPU p50 18-20 ms against
+  headless 12-15). The scene is at parity with pass 2 here, within the run-to-run spread. No thermal or power warning,
+  no competing process. A re-run on a fresh boot is the open item.
+- **Sound to light** (BlackHole loopback, 80 probe transients, `INPUT_SOURCES=kick@2:drums,snare@2:other,crash@2:other`):
+  - `signal.snareBeam`: 20/20, light p50 67 ms, p95 79 ms.
+  - `signal.crashStar`: 61/80 across families, light p50 70 ms, p95 84 ms.
+  - `signal.kickBeam`: 3/20. The live stem-onset detector barely sees the probe's synthetic kick, though the real Kick
+    stem is caught 121/121 offline. `response.onset` caught all 80 at 70 / 85 ms.
+  - The run's live GPU p50 was 27.9 ms, the same slow machine state as above.
+
+### Final media: `~/Desktop/av-gen-review/aurora-borealis/pass3-final/`
+
+Cut from one full-song render (01) by the final build, except the stop-1 references.
+
+| File | What it shows |
+|---|---|
+| `01-full-song-sabertooth-0-70s.mp4` | the whole song, with sound |
+| `02-river-beams-10-16s.mp4` | the kick and snare beams down the river on Sabertooth, with sound |
+| `03-river-beams-busy-35-41s.mp4` | a busy section: crashes, a tom fill, kick pickups; the beam follows the right-hand curve |
+| `04-sky-swell-crashes-22-27s.mp4` | a Cloud Diving swell and the 23.2 / 24.6 / 25.3 s crashes: fast stars, reflected, the crest flare |
+| `05-sky-crash-group-45-49s.mp4` | the 45.6 / 47.0 / 47.7 s crash group |
+| `06-glints-moog-left-toms-toneblock-right-40-48s.mp4` | Moog notes (41.4, 42.8, 47.7 s) on the left; tone block and tom fills on the right |
+| `07-crash-group-and-swell-56-61s.mp4` | the 56.8 / 58.3 / 59.0 s crashes across a swell's end |
+| `08-ref-stop1-beam-compare-2x2-test-events.mp4` | stop-1 reference: the beam's stages and variants on deterministic events |
+| `09-ref-stop1-beam-colour-pairs.mp4` | stop-1 reference: the three colour pairs (A chosen) |
+| `10-ref-stop1-glints-test-events.mp4` | stop-1 reference: the glints on deterministic test events |
+| `11-contact-sheet-every-5s.png` | a frame every 5 s of 01 |
+| `12-moog-notes-detector.png` | the re-bounced Moog's level, its note starts and the detector's 23 fires |
+| `13-riverbed-closeup-quarter-speed-2.6-5s.mp4` | the near water at quarter speed: the bed's planes revealed behind the head |
+| `14-flash-audit-full-song.txt` | the flash audit of 01 |
+| `15-headless-ultra-ab-final.txt` | every headless A/B run |
+| `16-sound-to-light.txt` | the sound-to-light table |
+| `17-live-acceptance.txt` | the live runs and the control |
+| `REPORT.md` | the final report (brief §16) |

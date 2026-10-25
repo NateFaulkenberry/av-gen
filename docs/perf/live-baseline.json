@@ -207,62 +207,63 @@
    "reps": [
     {
      "frames": 901,
-     "deadlineMisses": 3,
-     "missesPer900": 2.9966703662597114,
-     "p50": 33.268958,
-     "p99": 40.103041,
-     "max": 45.048,
+     "deadlineMisses": 12,
+     "missesPer900": 11.986681465038846,
+     "p50": 33.314875,
+     "p99": 41.80125,
+     "max": 44.279084,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "338ca7775cb9"
+     "revision": "62573ac3a6eb"
     },
     {
      "frames": 901,
-     "deadlineMisses": 2,
-     "missesPer900": 1.997780244173141,
-     "p50": 33.378417,
-     "p99": 39.035167,
-     "max": 59.372333,
+     "deadlineMisses": 9,
+     "missesPer900": 8.990011098779135,
+     "p50": 33.274875,
+     "p99": 41.666041,
+     "max": 54.855834,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "338ca7775cb9"
+     "revision": "62573ac3a6eb"
     },
     {
-     "frames": 900,
-     "deadlineMisses": 3,
-     "missesPer900": 3.0,
-     "p50": 33.342125,
-     "p99": 39.197666,
-     "max": 55.528958,
+     "frames": 901,
+     "deadlineMisses": 5,
+     "missesPer900": 4.994450610432852,
+     "p50": 33.305667,
+     "p99": 40.83525,
+     "max": 50.900458,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "338ca7775cb9"
+     "revision": "62573ac3a6eb"
     }
    ],
    "failedRuns": [],
-   "missesMedian": 2.9966703662597114,
-   "missesWorst": 3.0,
-   "p99Median": 39.197666,
-   "p99Worst": 40.103041,
+   "missesMedian": 8.990011098779135,
+   "missesWorst": 11.986681465038846,
+   "p99Median": 41.666041,
+   "p99Worst": 41.80125,
    "mediumOrBetter": 1.0,
    "headless": {
-    "gpuP50": 13.766623,
-    "gpuP95": 17.670688,
-    "cpuWorkP50": 2.150750000000002
+    "gpuP50": 15.311224999999999,
+    "gpuP95": 18.734047999999998,
+    "cpuWorkP50": 2.572666999999999
    },
    "thresholds": {
-    "T1": true,
-    "T2": true,
+    "T1": false,
+    "T2": false,
     "T3": true,
     "T4": true
    },
-   "note": "added 2026-10-24 from a run at 509ac00d-dirty (scene/aurora-borealis); the other scenes keep their c7a211f5-dirty rows"
+   "conditions": "pass 3: Sabertooth (its own song and nine stems) muted from 12 s, not Feline from 60 s (SCENE_AUDIO)",
+   "note": "replaced 2026-10-25 for Aurora Borealis pass 3 (scene/aurora-borealis 046d04fc), on the LG at 60 Hz. T1/T2 not met: misses 5-12 (median 9), p99 40.8-41.8. Same-day control: the pass-2 scene (b6e572c2) with its pass-2 arguments missed 6-9 with p99 41.4-41.6 and live GPU p50 19.5-19.8, against its committed 3 and 39.2: the machine has drifted, the scene has not (docs/prototypes/aurora-borealis/PROGRESS.md, pass 3 final)"
   }
  }
 }
