@@ -279,12 +279,12 @@ def peak_height(x, z, side=0):
 
 def detail(x, z, th, o, side):
     """Relief, so the facets are large, planar and irregular. Pass 6 (the owner: "simplify the mountain geometry"): the
-    river's three layers of ridged noise at 95-260 m become two broad ones at 260-420 m with half the amplitude, so the
+    river's three layers of ridged noise at 95-260 m become two broad ones (260 m, 320 m) with less amplitude, so the
     slopes are a few large planes and the ridgelines between them are long and clean -- a clean stage for the light."""
     ww = wall_weight(th, o, side)
     flat = (10.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
         mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 1, ridged=True) - 0.3)
-    spur = (24.0 + 0.09 * min(o, 900.0)) * ww * (mx.fbm(x / 420.0, z / 420.0, 23, 2, ridged=True) - 0.35)
+    spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 320.0, z / 320.0, 23, 2, ridged=True) - 0.35)
     return flat + spur
 
 
@@ -303,10 +303,11 @@ def land_height(x, z, th, o, side):
 # pass 4: the rows at -30 m are gone (both banks). They were the bank running on under the river from the layout where
 # the mountains went straight into the water; their edge stood as a step above the riverbed and showed through the
 # water as a line along the shore (the owner's screenshot). The riverbed now runs under the bank's first row instead.
-# pass 6: about half the columns and fewer rows (the facets twice as long along the bank, the bands between rows wider)
-OUTER_ROWS = [(-8, 480), (20, 480), (70, 400), (150, 320), (260, 260), (400, 220), (600, 180), (880, 150),
-              (1350, 120)]
-INNER_NEAR = [(-8, 480), (20, 480), (70, 400), (150, 320), (260, 260), (400, 220), (520, 200)]
+# pass 6: about 60% of pass 4's density each way -- facets about twice the area, still fine enough up the walls (where
+# the peaks rise, 200-900 m out) that every peak keeps its shape; a coarser first try (9 rows) flattened them into hills
+OUTER_ROWS = [(-8, 520), (20, 520), (70, 440), (130, 400), (200, 360), (280, 330), (370, 300), (470, 280), (580, 250),
+              (720, 220), (900, 190), (1100, 170), (1350, 150)]
+INNER_NEAR = [(-8, 520), (20, 520), (70, 440), (130, 400), (200, 360), (280, 330), (370, 300), (470, 280), (580, 250)]
 INNER_FAR = [(0.50, 120), (0.66, 90), (0.80, 70), (0.91, 50)]   # fractions of the way to the centre
 
 
