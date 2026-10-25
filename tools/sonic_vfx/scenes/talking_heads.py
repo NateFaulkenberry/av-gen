@@ -64,7 +64,10 @@ IVORY = (0.86, 0.82, 0.74)
 # lower lip and chin turn down about a pivot behind the mouth, the corners stay attached, the cheeks stretch). The head
 # is placed on the bent neck's top exactly at this angle (neck_offset), and within a millimetre on the way there.
 TILT_OPEN = 24.0
-MOUTH_OPEN = 0.20
+MOUTH_OPEN = 0.28
+# The owner, stop 4: "reshape fully open mouth to more of an 'oh' sound / look rather than a half smile". The Hinge's
+# purse (ADR-1672) draws the lips in, arches the upper lip and pushes both forward, in proportion to the opening.
+MOUTH_PURSE = 2.0
 # A step, then a short mechanical settle (the owner approved the snap at stop 2). The rays use the SAME chain.
 SNAP = {"attackMs": 0.0, "decayMs": 0.0, "springHz": 11.0, "springDamping": 0.62}
 
@@ -357,7 +360,8 @@ def head(s, spec):
     bend_fwd = dict(bend_back, displacementAxis=[0.0, 0.0, 1.0])
     hinge = {"kind": "hinge", "amount": 0.0, "space": "local", "axis": HINGE["axis"], "center": HINGE["center"],
              "displacementAxis": HINGE["displacementAxis"], "phase": HINGE["phase"], "falloff": HINGE["falloff"],
-             "frequency": HINGE["frequency"], "speed": HINGE["speed"], "scale": HINGE["scale"]}
+             "frequency": HINGE["frequency"], "speed": HINGE["speed"], "scale": HINGE["scale"],
+             "tension": MOUTH_PURSE}
     # The head hangs from a PIVOT at the neck's top: the pivot takes the pitch (and its place on the bent neck), the
     # head the yaw, so the head turns Rx(pitch) Ry(yaw) -- the order the neck's twist-then-bend turns its top ring.
     s.nodes.append({"name": P + "-pivot", "kind": "group", "position": [float(v) for v in HEAD_REST],
