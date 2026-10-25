@@ -971,6 +971,86 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     return procShade(in, frontFacing);
 }
 
+// ADR-1673: the unlit fast path. A draw the renderer has proved needs none of the lit shading -- an unlit, opaque,
+// untextured material with no effect lanes, no refraction, and a program (if any) that reads no screen-space input
+// and writes no normal, occlusion or height (scene::unlitFastEligible) -- is drawn by this entry instead of fs_proc.
+// It is `shadeSurface`'s unlit branch with nothing else compiled in: the program, the emission lane, the waves, the
+// fog. Every value it produces is the one fs_proc produces for such a draw; what it does not do is set up the tangent
+// frame, the screen-space geometry, the ambient-occlusion read and the lit paths' registers, which the big entry
+// pays for whether or not a draw uses them (about 4.5 ms over a frame-filling sheet at 1080p, Talking Heads stop 5).
+@fragment
+fn fs_proc_unlit(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    var emissionField = 1.0;
+    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
+    if (emissiveSlot >= 0) {
+        fieldElement = in.instRandom.w; // ADR-1116
+        emissionField = 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos);
+    }
+    let worldPos = in.worldPos;
+    var n = normalize(in.normal);
+    if (!frontFacing) {
+        n = -n;
+    }
+    var matColor = object.baseColor;
+    var matEmissive = object.emissive;
+    var ownEmissiveMul = in.instEmissive.rgb;
+    var ownHue = 0.0;
+    var ownGain = 1.0;
+    let programIndex = materialSelect.program;
+    let programRuns = programIndex >= 0 &&
+                      materialProgramAdmits(programIndex, in.instRandom, distance(frame.cameraPos.xyz, worldPos));
+    if (programRuns) {
+        var ctx = materialContextZero();
+        ctx.worldPosition = worldPos;
+        ctx.localPosition = in.localPos;
+        ctx.normal = n;
+        ctx.uv = in.uv;
+        ctx.objectId = pickIndex(object.ids.x);
+        ctx.instanceIndex = in.instIndex;
+        ctx.instanceId = in.instColor.a;
+        ctx.instanceRandom = in.instRandom;
+        ctx.instanceColor = in.instColor;
+        ctx.instanceEmissive = in.instEmissive;
+        ctx.time = frame.params.x;
+        ctx.audio = frame.audio;
+        ctx.audioBands = frame.audioBands;
+        ctx.beat = frame.beat;
+        ctx.viewDirection = normalize(frame.cameraPos.xyz - worldPos);
+        ctx.depth = distance(frame.cameraPos.xyz, worldPos);
+        ctx.occlusion = 1.0;
+        ctx.materialId = object.ids.y;
+        ctx.materialEmission = vec4<f32>(object.emissive.rgb * in.instEmissive.rgb * object.emissive.w, 1.0);
+        var base = materialResultZero();
+        base.baseColor = object.baseColor.rgb;
+        base.metallic = object.material.y;
+        base.roughness = object.material.x;
+        base.emission = object.emissive.rgb * object.emissive.w;
+        base.opacity = object.baseColor.a;
+        let program = evaluateMaterialProgramFast(programIndex, ctx, base);
+        matColor = vec4<f32>(program.baseColor, program.opacity);
+        matEmissive = vec4<f32>(program.emission, 1.0);
+        let programFlags = materialProgramFlags(programIndex);
+        if ((programFlags & MAT_FLAG_WRITES_EMISSION) != 0) {
+            ownEmissiveMul = vec3<f32>(1.0);
+            if ((programFlags & MAT_FLAG_EMISSION_READS_INSTANCE) == 0) {
+                ownHue = in.variation.x;
+                ownGain = in.variation.y;
+            }
+        }
+    }
+    let baseColor = matColor * vec4<f32>(in.instColor.rgb, 1.0);
+    var emissive = matEmissive.rgb * ownEmissiveMul * matEmissive.w;
+    emissive = emissionLane(emissive, ownHue + object.emission.y, ownGain * object.emission.x * emissionField);
+    let fx = wavesAt(worldPos, n, emissive);
+    var out: SceneOut;
+    out.color = vec4<f32>(applyFog(baseColor.rgb + emissive + fx.radiance, worldPos), 1.0);
+    out.normalRoughness = packNormalRoughness(n, 1.0, 2.0);
+    out.velocity = screenVelocityAt(in.clip, in.prevClip);
+    out.emission = vec4<f32>(baseColor.rgb + emissive + fx.radiance, max(max(object.ids.z, 0.0), fx.bloom));
+    out.ids = packIds(object.ids.x, object.ids.y);
+    return out;
+}
+
 // ADR-1603: the refraction phase. A refractive surface (object.refraction0.x > 0) drawn after the refraction copy
 // shows what is behind it: the copy read at the pixel offset along the surface's view-space normal, absorbed per
 // channel over the path to what is behind (the linear depth there minus the surface's own, at most refraction0.z

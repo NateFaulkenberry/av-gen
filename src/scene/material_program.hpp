@@ -246,6 +246,11 @@ struct MaterialProgram {
     // emission without reading either has the variation applied for it, after it, as a rotation of
     // the displayed hue and a gain.
     [[nodiscard]] bool writesEmission() const;
+    // ADR-1673: the program can be drawn by the unlit fast path -- it reads none of the screen-space inputs
+    // (curvature, cavity, occlusion, footprint and the rest, which need derivatives or the AO buffer), uses only
+    // plain arithmetic, noise and ramp ops (no textures, fields or tangent-frame ops), has no layers, and writes no
+    // normal, occlusion or height. Conservative: anything not on the list is not eligible.
+    [[nodiscard]] bool unlitFastEligible() const;
     // ADR-1590: the base names an opacity register (layers have none), so the program can cut a masked surface. A
     // program that does not leaves the material's own opacity, and a depth-only draw need not run it.
     [[nodiscard]] bool writesOpacity() const;

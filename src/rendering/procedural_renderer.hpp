@@ -101,6 +101,7 @@ struct ProceduralStats {
     // ADR-1603: visible objects whose material refracts (drawn in the refraction phase when it runs).
     std::uint32_t refractiveObjects = 0;
     std::uint32_t refractiveDraws = 0;
+    std::uint32_t unlitFastDraws = 0;   // ADR-1673: lit-pass draws taken by the unlit fast path (fs_proc_unlit)
     // Pipeline, bind-group and buffer binds this renderer recorded, over every pass. It tracks what
     // it has bound and skips the rest, so `redundantBindsAvoided` is what that tracking saved.
     StateChangeCounters state;
@@ -369,6 +370,8 @@ public:
     // Emergency), a refractive object draws in the lit pass as its opaque material. `hasRefractive()`: whether any
     // object updated this frame refracts and is visible.
     void setRefractionPhase(bool on) { refractionPhase_ = on; }
+    // ADR-1673: the unlit fast path (on by default). Off draws every unlit surface through the full fs_proc, as before.
+    void setUnlitFastPath(bool on);
     [[nodiscard]] bool refractionPhase() const { return refractionPhase_; }
     // ADR-1640: whether a material's dispersion reaches the shader (QualitySettings::refractionDispersion). Read by
     // `update` when it packs the object slots, so set it before. Off, a dispersive material packs dispersion 0 and

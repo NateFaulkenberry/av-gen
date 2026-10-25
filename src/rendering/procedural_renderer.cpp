@@ -330,6 +330,9 @@ struct ProceduralRenderer::Impl {
         // would otherwise be left unshaded (the clear colour: solid black through a dissolving
         // saucer's holes). The mesh entities' `fxTwoSided`, for procedural nodes.
         bool fxTwoSided = false;
+        // ADR-1673: the lit pass may draw this object with fs_proc_unlit (scene::MaterialProgram::unlitFastEligible
+        // and the material's own conditions; see update()).
+        bool unlitFast = false;
         // ADR-1073: the edge list this object's wire lines draw (null: no lines this frame).
         const WireMesh* wire = nullptr;
     };
@@ -392,6 +395,11 @@ struct ProceduralRenderer::Impl {
     wgpu::ShaderModule litModule;
     wgpu::RenderPipeline pipelineRefractCull;
     wgpu::RenderPipeline pipelineRefractNoCull;
+    // ADR-1673: the unlit fast path's pipelines, built the first time a frame has a draw that can take it.
+    wgpu::RenderPipeline pipelineUnlitCull;
+    wgpu::RenderPipeline pipelineUnlitNoCull;
+    bool unlitFastEnabled = true; // tests turn it off to compare
+    bool ensureUnlitPipelines();
     // ADR-1603: the refractive surfaces' own depth, laid inside the scene pass before they shade (their colour targets
     // write-masked off), so each refracting pixel is shaded once however many crystals overlap it.
     wgpu::RenderPipeline pipelineRefractDepth;
@@ -444,6 +452,8 @@ struct ProceduralRenderer::Impl {
         std::uint64_t key = 0;
         wgpu::RenderPipeline cull;
         wgpu::RenderPipeline noCull;
+        wgpu::RenderPipeline unlitCull;   // ADR-1673
+        wgpu::RenderPipeline unlitNoCull; // ADR-1673
         int pending = 0;
         bool failed = false;
         std::chrono::steady_clock::time_point started{};
@@ -959,9 +969,12 @@ void ProceduralRenderer::Impl::buildMaterialVariant(std::span<const scene::Mater
     desc.multisample.count = sampleCount;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
-    slot->pending = 2;
+    slot->pending = 4;
     const auto make = [&](wgpu::CullMode cull, const char* label, wgpu::RenderPipeline MaterialVariant::* member) {
         desc.label = label;
+        // ADR-1673: the unlit fast path's pair is the same descriptor with the slim fragment entry
+        fragment.entryPoint = (member == &MaterialVariant::unlitCull || member == &MaterialVariant::unlitNoCull)
+                                  ? "fs_proc_unlit" : "fs_proc";
         desc.primitive.cullMode = cull;
         static_cast<void>(gpu::pipelineCountersNoteAsync());
         context.device().CreateRenderPipelineAsync(
@@ -983,6 +996,8 @@ void ProceduralRenderer::Impl::buildMaterialVariant(std::span<const scene::Mater
     };
     make(wgpu::CullMode::Back, "procedural-opaque-compiled", &MaterialVariant::cull);
     make(wgpu::CullMode::None, "procedural-opaque-twosided-compiled", &MaterialVariant::noCull);
+    make(wgpu::CullMode::Back, "procedural-unlit-compiled", &MaterialVariant::unlitCull);
+    make(wgpu::CullMode::None, "procedural-unlit-twosided-compiled", &MaterialVariant::unlitNoCull);
 }
 
 Result<void> ProceduralRenderer::reload() {
@@ -1168,6 +1183,26 @@ void ProceduralRenderer::setShadowViews(std::span<const FrustumPlanes> views) {
                                                        std::min<std::size_t>(views.size(), kMaxShadowCullViews)));
 }
 
+bool ProceduralRenderer::Impl::ensureUnlitPipelines() {
+    if (pipelineUnlitCull && pipelineUnlitNoCull) {
+        return true;
+    }
+    if (!litModule) {
+        return false;
+    }
+    auto cull = createPipeline(litModule, true, false, nullptr, "fs_proc_unlit");
+    auto noCull = createPipeline(litModule, false, false, nullptr, "fs_proc_unlit");
+    if (!cull || !noCull) {
+        log::warn("procedural: the unlit fast-path pipelines failed ({}); unlit surfaces take the full path",
+                  !cull ? cull.error().message : noCull.error().message);
+        unlitFastEnabled = false;
+        return false;
+    }
+    pipelineUnlitCull = *cull;
+    pipelineUnlitNoCull = *noCull;
+    return true;
+}
+
 bool ProceduralRenderer::Impl::ensureRefractPipelines() {
     if (pipelineRefractCull && pipelineRefractNoCull && pipelineRefractDepth) {
         return true;
@@ -1231,6 +1266,8 @@ bool ProceduralRenderer::Impl::ensureRefractPipelines() {
 
 Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule& module, bool start) {
     litModule = module; // ADR-1603: the refraction pipelines are built from it on demand
+    pipelineUnlitCull = nullptr; // ADR-1673: likewise
+    pipelineUnlitNoCull = nullptr;
     pipelineRefractCull = nullptr;
     pipelineRefractNoCull = nullptr;
     pipelineRefractDepth = nullptr;
@@ -2815,11 +2852,27 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             obj.fxB = scene.entityFx.records[record].lanes[world::kFxLaneB];
         }
         const bool fxTwoSided = (static_cast<std::uint32_t>(obj.fxA.z + 0.5f) & world::kFxClip) != 0;
+        // ADR-1673: the unlit fast path draws only what it provably shades the same: unlit, not masked (the full path
+        // discards there), no textures, no effect lanes, no refraction, and a program (if any) of the eligible kind.
+        bool unlitFast = false;
+        if (im.unlitFastEnabled && m.unlit && m.alphaMode != scene::AlphaMode::Mask && mask == 0 && obj.fxA.z == 0.0f &&
+            !m.refraction.enabled()) {
+            if (m.program.empty()) {
+                unlitFast = true;
+            } else {
+                for (const scene::MaterialProgram& prog : scene.materialPrograms) {
+                    if (prog.name == m.program) {
+                        unlitFast = prog.unlitFastEligible();
+                        break;
+                    }
+                }
+            }
+        }
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 
         im.items.push_back(Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive,
-                                          fullyCulled, shadowFullyCulled, levels, fxTwoSided});
+                                          fullyCulled, shadowFullyCulled, levels, fxTwoSided, unlitFast});
         if (object.material.wire.enabled() && !isPoint) {
             im.items.back().wire = im.ensureWireMesh(object); // ADR-1073
         }
@@ -3023,6 +3076,10 @@ void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene&
     drawImpl(pass, scene, materialBindGroup, false, false);
 }
 
+void ProceduralRenderer::setUnlitFastPath(bool on) {
+    impl_->unlitFastEnabled = on;
+}
+
 bool ProceduralRenderer::hasRefractive() const {
     return stats_.refractiveObjects > 0;
 }
@@ -3068,6 +3125,21 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
     const wgpu::RenderPipeline& litNoCull =
         layDown ? im.pipelineRefractDepth
                 : (refractPass ? im.pipelineRefractNoCull : (variant != nullptr ? variant->noCull : im.pipelineNoCull));
+    // ADR-1673: the unlit fast path's pair (the variant's when it is ready, else the base module's), lit pass only
+    const bool unlitPass = !depthOnly && !shadowPass && !refractPass;
+    const bool unlitVariant = variant != nullptr && variant->unlitCull && variant->unlitNoCull;
+    bool unlitReady = false;
+    if (unlitPass && !unlitVariant) {
+        for (const auto& it : im.items) {
+            if (it.unlitFast) {
+                unlitReady = im.ensureUnlitPipelines();
+                break;
+            }
+        }
+    }
+    unlitReady = unlitReady || (unlitPass && unlitVariant);
+    const wgpu::RenderPipeline& unlitCull = unlitVariant ? variant->unlitCull : im.pipelineUnlitCull;
+    const wgpu::RenderPipeline& unlitNoCull = unlitVariant ? variant->unlitNoCull : im.pipelineUnlitNoCull;
     const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
         if (p.Get() != boundPipeline.Get()) {
             pass.SetPipeline(p);
@@ -3147,7 +3219,9 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             // An object with no cull pass has one list and one group: the visible-list binding is
             // the inert placeholder the vertex stage never reads, so the shadow pass draws the same
             // group the camera does. There is no second list here because there is no first one.
-            setPipeline(depthOnly ? im.pipelineDepth : (twoSided ? litNoCull : litCull));
+            const bool fast = unlitReady && item.unlitFast && im.unlitFastEnabled;
+            setPipeline(depthOnly ? im.pipelineDepth
+                                  : (fast ? (twoSided ? unlitNoCull : unlitCull) : (twoSided ? litNoCull : litCull)));
             const auto& direct = item.state->usesLive ? item.state->groupsLive : item.state->groups;
             pass.SetBindGroup(1, direct[0], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
@@ -3158,6 +3232,7 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             submitted.record(item.meshes[0]->indexCount, item.instanceCount, false);
             if (!depthOnly) {
                 ++stats_.drawCalls;
+                stats_.unlitFastDraws += fast ? 1u : 0u;
             }
             continue;
         }
@@ -3184,7 +3259,10 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
                 ++stats_.skippedIndirectDraws;
                 continue;
             }
-            setPipeline(depthOnly ? im.pipelineDepth : (twoSided || mesh->impostor ? litNoCull : litCull));
+            const bool fast = unlitReady && item.unlitFast && im.unlitFastEnabled;
+            const bool noCullLevel = twoSided || mesh->impostor;
+            setPipeline(depthOnly ? im.pipelineDepth
+                                  : (fast ? (noCullLevel ? unlitNoCull : unlitCull) : (noCullLevel ? litNoCull : litCull)));
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);
@@ -3211,6 +3289,7 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             }
             if (!depthOnly) {
                 ++stats_.drawCalls;
+                stats_.unlitFastDraws += fast ? 1u : 0u;
             }
         }
     }

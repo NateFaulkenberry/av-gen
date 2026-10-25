@@ -1,3 +1,4 @@
+#include "scene/material_program.hpp"
 #include "scene/procedural.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -2320,5 +2321,60 @@ TEST_CASE("Hinge deformer: turns what lies below the slit inside its mask, eases
         CHECK(q.x == p.x);
         CHECK(q.y == p.y);
         CHECK(q.z == p.z);
+    }
+}
+
+TEST_CASE("The unlit fast path takes only programs that need no lit-path inputs (ADR-1673)", "[scene][material][adr1673]") {
+    const auto op = [](MaterialOpKind kind, int dst, int a = 0) {
+        MaterialOp o;
+        o.kind = kind;
+        o.dst = dst;
+        o.srcA = a;
+        return o;
+    };
+    MaterialProgram p;
+    MaterialOp world = op(MaterialOpKind::Input, 0);
+    world.input = MaterialInput::WorldPosition;
+    p.ops = {world, op(MaterialOpKind::Gradient, 1, 0), op(MaterialOpKind::OklabRamp, 2, 1),
+             op(MaterialOpKind::Quantize, 3, 0), op(MaterialOpKind::Noise, 4, 0)};
+    p.emissionRegister = 2;
+    CHECK(p.unlitFastEligible());
+    SECTION("a screen-space input (here ambient occlusion) needs the full path") {
+        MaterialOp ao = op(MaterialOpKind::Input, 5);
+        ao.input = MaterialInput::Occlusion;
+        p.ops.push_back(ao);
+        CHECK_FALSE(p.unlitFastEligible());
+        p.ops.back().enabled = false;   // a disabled op asks for nothing
+        CHECK(p.unlitFastEligible());
+    }
+    SECTION("so do curvature, cavity and footprint") {
+        for (const MaterialInput in : {MaterialInput::Curvature, MaterialInput::Cavity, MaterialInput::Footprint}) {
+            MaterialProgram q = p;
+            MaterialOp o = op(MaterialOpKind::Input, 5);
+            o.input = in;
+            q.ops.push_back(o);
+            CHECK_FALSE(q.unlitFastEligible());
+        }
+    }
+    SECTION("ops that need the tangent frame, textures or fields are not on the list") {
+        for (const MaterialOpKind k : {MaterialOpKind::Triplanar, MaterialOpKind::DetailNormal,
+                                       MaterialOpKind::CurvatureMask, MaterialOpKind::Field}) {
+            MaterialProgram q = p;
+            q.ops.push_back(op(k, 5));
+            CHECK_FALSE(q.unlitFastEligible());
+        }
+    }
+    SECTION("a normal, occlusion or height output, or an enabled layer, needs the full path") {
+        MaterialProgram q = p;
+        q.normalRegister = 3;
+        CHECK_FALSE(q.unlitFastEligible());
+        q = p;
+        q.occlusionRegister = 3;
+        CHECK_FALSE(q.unlitFastEligible());
+        q = p;
+        q.layers.emplace_back();
+        CHECK_FALSE(q.unlitFastEligible());
+        q.layers.back().enabled = false;
+        CHECK(q.unlitFastEligible());
     }
 }
