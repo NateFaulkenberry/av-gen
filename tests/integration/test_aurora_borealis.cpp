@@ -296,27 +296,34 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
     CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
     CHECK(fx.at("riverToms").at("parameters").at("propagation").at("path").at("laneJitter").get<double>() > 0.0);
-    // the mountains (pass 5): the Moog on the left bank and the bass on the right -- every note opens its subset's gate
-    // (`<part>Strike`), the sustain holds it and lights the bank's ridgelines (`<part>Hold` onto edgeGlow), and a
-    // fresh subset per note (random.<part>Pick); no travelling band any more
+    // the mountains (pass 6): the bass on the LEFT bank and the Moog on the RIGHT (swapped from pass 4-5) -- every note
+    // opens its subset's gate (`<part>Strike`), the sustain holds it and lights the bank's ridgelines (`<part>Hold`
+    // onto edgeGlow), a fresh subset per note (random.<part>Pick), and each note sends the lit stretch down the range
+    // (`<part>Sweep`, the front)
     {
         std::set<std::string> wired;
         for (const json& r : p.at("routes")) {
             const std::string target = r.at("target");
             const std::string source = r.at("source");
-            CHECK(source.find("Sweep") == std::string::npos);
-            for (const auto& [part, prog] : std::map<std::string, std::string>{{"moog", "abRockL"}, {"bass", "abRockR"}}) {
+            for (const auto& [part, prog] : std::map<std::string, std::string>{{"bass", "abRockL"}, {"moog", "abRockR"}}) {
+                const std::string other = prog == "abRockL" ? "abRockR" : "abRockL";
+                if (source.find(part) != std::string::npos) {
+                    CHECK(target.find(other) == std::string::npos); // never on the other bank
+                }
                 if (target.find(prog) == std::string::npos) {
                     continue;
                 }
-                // the gate opens downward (its smoothstep's edges lowered), the ridgelines' glow rises
+                // the gate and the front open downward (their smoothsteps' edges lowered), the ridgelines' glow rises
                 const double amount = r.at("amount").get<double>();
-                const bool gate = target.find("/smoothstep/") != std::string::npos && amount < 0.0;
-                if (source == "signal." + part + "Strike" && gate) {
+                const bool lowers = target.find("/smoothstep/") != std::string::npos && amount < 0.0;
+                if (source == "signal." + part + "Strike" && lowers) {
                     wired.insert(part + " strike");
                 }
-                if (source == "signal." + part + "Hold" && gate) {
+                if (source == "signal." + part + "Hold" && lowers) {
                     wired.insert(part + " hold");
+                }
+                if (source == "signal." + part + "Sweep" && lowers) {
+                    wired.insert(part + " front");
                 }
                 if (source == "signal." + part + "Hold" && target.find("/constant/") != std::string::npos &&
                     amount > 0.0) {
@@ -324,12 +331,8 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
                 }
             }
         }
-        CHECK(wired == std::set<std::string>{"moog strike", "moog hold", "moog ridges", "bass strike", "bass hold",
-                                             "bass ridges"});
-    }
-    // the static camera (pass 5, the owner: "static camera"): no timeline track moves it
-    for (const json& tr : p.at("timeline").at("tracks")) {
-        CHECK(tr.at("target").get<std::string>().rfind("camera/", 0) != 0);
+        CHECK(wired == std::set<std::string>{"moog strike", "moog hold", "moog ridges", "moog front", "bass strike",
+                                             "bass hold", "bass ridges", "bass front"});
     }
     // the fireballs replace the stars (pass 4, ADR-1663)
     CHECK_FALSE(fx.contains("starA"));

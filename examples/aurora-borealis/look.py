@@ -94,10 +94,19 @@ GATE_DROP = 0.16
 # either side of them (`fill`, a share of the line's brightness), so a note lights planes, not hairlines; the whole
 # bank's ridgelines (the resting edge lines) glow with the instrument's sustained level (music.py routes it onto
 # `edgeGlow`); and the travelling band of pass 4 is gone -- every note lights its subset at once, everywhere on its bank.
+# Pass 6 (the owner: "swap left and right mountain sides so left is BASS right is MOOG, and have it use the same effect it
+# did for the lake but have it revert to sending the light down the mountain range"): the sides swapped, pass 5's look
+# kept, and each glint term now lights only the part of its bank nearer than a front (`<label>Sweep`, an op constant
+# routed by a ramp that restarts on a note): each note sends the front out from the camera down the range, everything it
+# has passed lit at the strike's and the sustain's level, and while the note rings that lit stretch holds.
 GLINTS = {
-    "L": [("moog", 3.0, 7.0, "#ff9fdc", 6.0, 0.24)],     # pale pink: the Moog
-    "R": [("bass", 2.0, 5.0, "#6a52ff", 2.2, 0.9)],     # deep blue-violet: the bass (planes first, lines on them)
+    "L": [("bass", 2.0, 5.0, "#6a52ff", 2.2, 0.9)],     # deep blue-violet: the bass (planes first, lines on them)
+    "R": [("moog", 3.0, 7.0, "#ff9fdc", 6.0, 0.24)],     # pale pink: the Moog
 }
+# The front, in the units of the lines' distance fade r4 (1 at LINE_FADE_NEAR, 0 at LINE_FADE_FAR, linear in metres):
+# a smoothstep of r4 whose edges rest above r4's largest value (nothing lit) and fall with the routed ramp to below 0
+# (the whole bank, out to where the lines fade). SWEEP_SOFT is the front's soft edge (about 330 m).
+SWEEP_REST, SWEEP_SOFT, SWEEP_RUN = 1.15, 0.08, 1.35
 
 
 def rock(side) -> Prog:
@@ -164,7 +173,10 @@ def rock(side) -> Prog:
           .op("palette", 7, srcA=7, value=0.0, label=label, constant=[0.5, 0.5, 0.5, 0.0],
               constant2=[0.5, 0.5, 0.5, 0.0], constant3=[teeth, teeth, teeth, 0.0], constant4=[0.0, 0.0, 0.0, 0.0])
           .op("smoothstep", 7, srcA=7, constant=list(GATE_REST), label=label + "Gate")
-          .op("multiply", 7, srcA=7, srcB=4))                                                     # the distance fade
+          .op("multiply", 7, srcA=7, srcB=4)                                                      # the distance fade
+          # pass 6: the front -- lit only nearer than it (r4 above its edge)
+          .op("smoothstep", 6, srcA=4, constant=[SWEEP_REST, SWEEP_REST + SWEEP_SOFT, 0.0, 0.0], label=label + "Sweep")
+          .op("multiply", 7, srcA=7, srcB=6))
         # a wide line on the picked creases (routing `<label>Line` swells it) plus the fill on their facets, r6
         (p.op("multiply", 6, srcA=0, srcB=1)
           .op("smoothstep", 6, srcA=6, constant=[width, 0.0, 0.0, 0.0], label=label + "Line")
@@ -267,8 +279,9 @@ def _timing(**kw):
 # far mountains, shrinking; each crash its own heading (`spread`), lighting land, water and riverbed as it flies. Fire
 # orange: the aurora's complement, so it reads as the most vibrant thing in the frame. One instance per slot of the
 # pool of two (music.py). (launch, target) in the camera's frame: right, up, forward (m)
-BALLS = {"ballA": ((18.0, 22.0, -35.0), (-150.0, 230.0, 2600.0)),
-         "ballB": ((-18.0, 26.0, -30.0), (150.0, 250.0, 2500.0))}
+# pass 6: aimed higher (was 230-250 m up at 2.5 km): in pass 5 each one flew into a ridge near the end of its flight
+BALLS = {"ballA": ((18.0, 22.0, -35.0), (-150.0, 560.0, 2500.0)),
+         "ballB": ((-18.0, 26.0, -30.0), (150.0, 600.0, 2400.0))}
 BALL_COLOR = "#ffa060"       # the light it casts: warm fire
 BALL_INTENSITY = 0.6         # crashSize adds up to 0.6 (a phrase-start crash throws a brighter fireball)
 
@@ -319,11 +332,9 @@ BEAM_PAIRS = {   # (kick, snare)
     "fuchsia-lavender": ("#ff3cd0", "#ab9bff"),
 }
 BEAM_PAIR = os.environ.get("AB_BEAM_PAIR", "magenta-lilac")
-CAM_H_WATER = float(os.environ.get("AB_CAM_H", "110"))   # the camera's height above the water (build.CAM_POS)
-# pass 5: the lake is 2 km deep, so the light must show from close in -- it launches 70 m out and fades in over 150 m
-# (the river's 160 m and 500 m left only the last strip by the far shore lit)
-START_OFFSET = float(os.environ.get("AB_START", "70"))
-NEAR_FADE = float(os.environ.get("AB_NEARFADE", "150"))
+CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the beams' source sits on the water
+START_OFFSET = 160.0   # metres in front of the camera where a pulse launches (pass 6: the river's again)
+NEAR_FADE = 500.0
 BED_VARIANT = os.environ.get("AB_BED", "coarse")
 
 
@@ -361,22 +372,20 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 
 
 # brief s12: kick and snare colour and travel; ripple strength (`disturb`)
-# Pass 4 (owner): three lanes -- kick left of the centre, snare right, toms anywhere, each hit jittered -- a splash
-# where each launches and a heavier wake near the camera; the toms a third colour. Pass 5, the lake: the lanes run from
-# just in front of the camera straight out across the lake to the far shore (about 2 km), 150 m either side of its axis
-# for the kick and snare, the toms anywhere across it; and (the owner: "tone down the amount of light that gets throw
-# onto the mountains from the underwater snare / kick / tom lights") the light on the land (`land`) is a quarter of
-# pass 4's, a restrained accent, while the light in the water and on the bed is unchanged. The cores and halos are half
-# as wide again as the river's: the camera stands 110 m up and sees them across the lake at 0.3-2 km.
-KICK = dict(intensity=4.0, edge=7.0, travel=2.0, rng=1950.0, ease=0.6, lifetime=2.0, fade_out=0.8, core=9.0,
-            twin=0.0, halo=52.0, wake=260.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=3.5, reach=700.0,
-            reach_height=250.0, front_width=14.0, lane=-150.0, lane_jitter=50.0, splash=0.035, near_wake=0.8)
-SNARE = dict(intensity=3.6, edge=7.0, travel=1.4, rng=1900.0, ease=0.6, lifetime=1.3, fade_out=0.6, core=6.0,
-             twin=0.0, halo=40.0, wake=160.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
-             reach_height=200.0, front_width=9.0, lane=150.0, lane_jitter=50.0, splash=0.025, near_wake=0.6)
-TOMS = dict(intensity=3.8, edge=6.0, travel=1.7, rng=1920.0, ease=0.6, lifetime=1.6, fade_out=0.7, core=7.0,
-            twin=0.0, halo=45.0, wake=200.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.0, reach=650.0,
-            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=220.0, splash=0.03, near_wake=0.6)
+# Pass 4 (owner): three lanes across the river's width -- kick left of the centre, snare right, toms anywhere, each hit
+# jittered -- a splash where each launches and a heavier wake near the camera; the toms a third colour. Pass 5 (the
+# owner: "tone down the amount of light that gets throw onto the mountains from the underwater snare / kick / tom
+# lights"): the light on the land (`land`) is a quarter of pass 4's, a restrained accent; the light in the water and on
+# the bed is unchanged. Pass 6: back on the river, with pass 4's lanes and travel and pass 5's reduced spill.
+KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
+            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=3.5, reach=700.0,
+            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.035, near_wake=0.8)
+SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
+             twin=0.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
+             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.025, near_wake=0.6)
+TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
+            twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.0, reach=650.0,
+            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=0.03, near_wake=0.6)
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
 
@@ -440,22 +449,25 @@ def music_routes(R):
                 R("signal.crashGlow", prog.path("crashCrest"), 0.2)]
     L, Rt = ROCK_L, ROCK_R
     out += [
-        # LEFT, the Moog (pass 5): a fresh subset on every note (random.moogPick, the stem's onsets); every note the
-        # stem plays -- its onsets and the softer ones its onset strength shows (music.py moogStrike) -- opens the
-        # gate, sized by the stem's level, and swells the lines; the sustained level holds it open as long as a note
-        # rings and lets it close as the note decays (moogHold), and lights every ridgeline on the bank with it
-        R("random.moogPick", L.path("moog", "value"), 1.0),
-        R("signal.moogStrike", L.path("moogGate"), -0.26),
-        R("signal.moogHold", L.path("moogGate"), -0.24),
-        R("signal.moogStrike", L.path("moogLine"), 3.0),
-        R("signal.moogHold", L.path("edgeGlow"), 1.6),
-        # RIGHT, the bass (pass 4-5; the toms and tone block before): the same on the right bank, its planes first.
-        # The tone block is unassigned; the toms keep their lake lane
-        R("random.bassPick", Rt.path("bass", "value"), 1.0),
-        R("signal.bassStrike", Rt.path("bassGate"), -0.2),
-        R("signal.bassHold", Rt.path("bassGate"), -0.2),
-        R("signal.bassStrike", Rt.path("bassLine"), 2.0),
-        R("signal.bassHold", Rt.path("edgeGlow"), 1.3),
+        # LEFT, the bass (pass 6; the Moog's bank before): a fresh set of planes per note (random.bassPick, the stem's
+        # onsets); every note it plays -- its onsets and the softer ones its onset strength shows (music.py bassStrike) --
+        # opens the gate, sized by the stem's level, and swells the lines; the sustained level holds it open while a
+        # note rings and lets it close as the note decays (bassHold), and lights every ridgeline on the bank; each note
+        # sends the lit stretch out down the range (bassSweep, the front)
+        R("random.bassPick", L.path("bass", "value"), 1.0),
+        R("signal.bassStrike", L.path("bassGate"), -0.2),
+        R("signal.bassHold", L.path("bassGate"), -0.2),
+        R("signal.bassStrike", L.path("bassLine"), 2.0),
+        R("signal.bassHold", L.path("edgeGlow"), 1.3),
+        R("signal.bassSweep", L.path("bassSweep"), -SWEEP_RUN),
+        # RIGHT, the Moog (pass 6; the bass's bank before): the same, its creases first. The tone block is unassigned;
+        # the toms keep their river lane
+        R("random.moogPick", Rt.path("moog", "value"), 1.0),
+        R("signal.moogStrike", Rt.path("moogGate"), -0.26),
+        R("signal.moogHold", Rt.path("moogGate"), -0.24),
+        R("signal.moogStrike", Rt.path("moogLine"), 3.0),
+        R("signal.moogHold", Rt.path("edgeGlow"), 1.6),
+        R("signal.moogSweep", Rt.path("moogSweep"), -SWEEP_RUN),
     ]
     return out
 
@@ -491,7 +503,7 @@ def water():
         "glowDepth": 0.2,
         "ssr": 0.0, "ssrDistance": 700.0, "skyMirror": 1.0, "ssrSteps": 16.0, "ssrGain": 1.0, "streak": 2.0,
         # pass 3: the bed is seen through the water (dimmed with depth, wobbled by the beam's ripples via the refraction)
-        # pass 5 ("make the pond appear deeper"): twice pass 4's absorption, so the bed darkens with depth -- the shelf
+        # pass 5 ("make the pond appear deeper"; kept in pass 6): twice pass 4's absorption, so the bed darkens with depth -- the shelf
         # shows near the shores and fades into a dark middle -- and the water reads as a volume
         "reflectionRays": 1.0, "transmission": 0.7, "absorption": [0.075, 0.06, 0.042], "undulation": 0.03,
         "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
@@ -502,28 +514,28 @@ def water():
 
 
 def river_feature():
-    """Pass 5: the lake's axis, the line the light in the water runs along (each beam on its lane beside it) and the
-    flow the streaks follow -- from behind the camera straight out to the far shore. Wide enough to cover the lake, so
-    the streaks lie across all of it, drifting slowly away from the camera."""
+    """The river's course for the water's flow (the streaks run along it): the centreline, with no cut (the land is
+    the GLB banks) and its surface at the sea's level."""
     import world
-    z0, z1 = 400.0, world.LAKE_Z - world.LAKE_B - 200.0
-    pts = [[0.0, 0.0, round(z0 + (z1 - z0) * i / 32, 2)] for i in range(33)]
-    return {"name": "river", "kind": "river", "path": pts, "width": 1200.0, "amplitude": 0.0, "falloff": 1.0,
-            "flatten": 0.0, "roughness": 0.0, "water": True, "waterDepth": 0.0, "smoothing": 0}
+    pts = world.river_points(256)   # 256 points at most; pass 4: the straight valley's (world.unroll)
+    return {"name": "river", "kind": "river", "path": [[round(p[0], 2), 0.0, round(p[2], 2)] for p in pts],
+            "width": 200.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
+            "waterDepth": 0.0, "smoothing": 0}
 
 
 def water_node():
-    """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the shores, so there is
-    nothing to fit). Pass 5: a rectangle over the lake whose edges lie under the shore band. Coarse chunks; the bed is
-    unlit and nearly black."""
-    return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, -1000.0],
-            "world": {"name": "aurora-lake", "seed": 1, "size": [2000.0, 3200.0], "baseHeight": -70.0,
+    """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
+    there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
+    # pass 4: a long strip down the straight valley's channel (the land's GLBs make the banks), from 3 km behind the
+    # camera's start to the far end of the unrolled world
+    return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, -3200.0],
+            "world": {"name": "aurora-river", "seed": 1, "size": [1600.0, 12600.0], "baseHeight": -40.0,
                       "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
             "terrain": {"chunkSize": 400.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
                         "viewDistance": 6000.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,
                         "groundGlow": 0.0, "water": water(),
-                        # a lake: a slow drift away from the camera, so the streaks barely move
-                        "flow": {"speedOverride": 0.8, "bankShear": 0.5, "meander": 0.12, "turbulence": 0.3}},
+                        # the river's real speed (it was about 0.02 m/s, so nothing in the water moved: 11 s4)
+                        "flow": {"speedOverride": 3.0, "bankShear": 0.5, "meander": 0.12, "turbulence": 0.3}},
             "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": hexrgb("#020208"), "emissiveIntensity": 1.0,
                          "roughness": 1.0, "metallic": 0.0, "unlit": True}}
 

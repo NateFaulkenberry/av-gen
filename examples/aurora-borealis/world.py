@@ -1,12 +1,20 @@
-"""Aurora Borealis: the land. Pass 5: a lake in front of a static camera with faceted mountains all round it -- a
-horseshoe open toward the camera -- the river valley's own shore profile, hero peaks, spurs and three receding layers,
-written as flat-faceted GLBs (tools/sonic_vfx/meshes.py), plus the lakebed and the fish.
+"""Aurora Borealis: the land. A closed-loop river with S-bends, faceted valley walls, a handful of art-directed hero
+peaks on alternate banks, and three receding outer ranges, written as flat-faceted GLBs (tools/sonic_vfx/meshes.py).
 
 Everything is a pure function of the constants below, so a rebuild writes the same bytes.
 
-Coordinates: metres, +Y up; the camera at the origin, looking down -z. The water is not in these meshes: the
-engine's water surface lies at y = 0 (a terrain node with its sea at 0, see look.water_node), and the land starts
-below it at the shore, so the lake's outline is simply where the land is not.
+Coordinates: metres, +Y up. The river's centreline is the closed curve
+
+    rc(theta) = R0 * (1 + A3 sin(3 theta + P3) + A5 sin(5 theta + P5)),   (x, z) = rc * (sin theta, cos theta)
+
+which swings through alternating S-bends. The valley band is a grid whose rows follow the river (each row a fixed
+distance from the water's edge, measured radially), so its facets are small at the water and grow with distance from
+it -- the camera is always on the river, so that is the same as growing with distance from the camera. Rows of
+different column counts are zipped together, so the band is watertight. The outer ranges are rings round the origin
+whose inner edges tuck under the band.
+
+The water is not in these meshes: the engine's water surface lies at y = 0 everywhere (a terrain node with its sea at
+0, see build.py), and every mesh here starts below it, so the river's shape is simply where the land is not.
 """
 from __future__ import annotations
 
@@ -21,54 +29,112 @@ from sonic_vfx import meshes as mx  # noqa: E402
 
 TAU = 2.0 * math.pi
 
-# ---- the lake (pass 5) ------------------------------------------------------------------------------------------
-# The owner (pass 5): "turn the river into a lake and make the mountains horse shoe around the lake - pretty much close
-# to what we have now. static camera". The camera stands still at the origin, looking down -z; the lake is an ellipse
-# in front of it whose near end passes just behind the camera, and the land -- the same profile, peaks, spurs and
-# layered ranges as the river's valley -- rises all round it. Seen from the camera that is a horseshoe open toward it:
-# the arms come forward on the left and the right, the back closes the view.
-#
-# Polar coordinates about the lake's centre C: phi = 0 straight away from the camera (-z), +pi/2 to the right (+x),
-# -pi/2 to the left; `o` metres outward from the shore. Every recipe below that took (theta, offset, side) round the
-# river's loop takes (phi, o, side) here, periodic the same way.
-LAKE_Z = -950.0                  # the lake's centre, metres in front of the camera
-LAKE_A, LAKE_B = 520.0, 1150.0   # its semi-axes across and along the view: 290 m either side of the camera, 2.1 km deep
-C = (0.0, LAKE_Z)
+# ---- the river --------------------------------------------------------------------------------------------------
+R0 = 3000.0
+# a rounded triangle: with A3 = 0.10 each side's midpoint has zero curvature, so the loop has three long, nearly
+# straight reaches the camera can look down (11-research-pass2-render.md s2.3); two small harmonics add the meanders
+A3 = 0.0   # pass 4: the loop's rounded triangle (was 0.10) is gone; with the world unrolled the axis is straight
 
 
-def lake_dir(ph):
-    return (math.sin(ph), -math.cos(ph))
+# the river's course on the valley axis: straight reaches of about 1-2 km between mild bends (owner, Gate A take 3:
+# "some straight aways and mild bends"). Each bend is one broad, low-curvature swing to one side -- a smooth bump in
+# the river's offset from the axis -- with its own position, length and amplitude, alternating sides. Between them
+# the offset is ~0 and the river runs straight down the valley toward the far ranges.
+BENDS = []   # (theta centre, half-length in radians, amplitude m, side)
+
+
+def _bends(count=7):
+    out = []
+    for i in range(count):
+        c = TAU * (i + 0.5 + 0.35 * (_h(i, 1) - 0.5)) / count
+        half = 0.13 + 0.07 * _h(i, 2)              # 0.13-0.20 rad: 390-600 m either side of the apex
+        # pass 4 (owner): "a mostly straight river with some very slight bends" -- the hard bends hid the left
+        # mountains, the Moog's stage. 12-26 m swings (were 95-180 m) over the same 330-510 m half-lengths: at most
+        # a few degrees off the axis
+        # pass 6 (the owner: "go back to a slightly curved river design"): 45-75 m swings, between pass 4's 12-26 m (a
+        # straight valley) and pass 3's 95-180 m round a winding loop -- gentle bends that keep both ranges in view
+        amp = (45.0 + 30.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
+        out.append((c, half, amp))
+    return out
+
+
+def _h(i, k):
+    return mx._hash(i, k, 333)
+
+
+BENDS = _bends()
+
+
+def meander(th):
+    d = 0.0
+    for c, half, amp in BENDS:
+        x = (th - c + math.pi) % TAU - math.pi
+        if abs(x) < 2.5 * half:
+            d += amp * math.exp(-(x / half) ** 2)
+    return d
+
+
+def rc_axis(th):
+    """The valley's axis: the rounded triangle (A3 = 0.10 makes each side's midpoint straight). The camera follows it."""
+    return R0 * (1.0 - A3 * math.cos(3.0 * th))
+
+
+def rc(th):
+    """The river: the valley axis, with the bends on it."""
+    return rc_axis(th) + meander(th)
+
+
+def half_width(th):
+    """Half the river's width (m), measured radially: 155-215 m across the flow, widened where the river runs at an
+    angle to the radius so the bends do not pinch -- a substantial river whose near reach carries a broad reflection."""
+    perp = 185.0 + 30.0 * math.sin(2.0 * th + 1.0)
+    e = 1e-4
+    slope = (rc(th + e) - rc(th - e)) / (2.0 * e) / rc(th)
+    # only half the radial correction: a full one widened the bends into lakes (owner, Gate A take 2)
+    return perp * (1.0 + 0.5 * (math.sqrt(1.0 + slope * slope) - 1.0))
+
+
+def centre(th):
+    r = rc(th)
+    return (r * math.sin(th), 0.0, r * math.cos(th))
+
+
+def axis_centre(th):
+    r = rc_axis(th)
+    return (r * math.sin(th), 0.0, r * math.cos(th))
 
 
 def periodic_noise(th, cycles, seed, octaves=3):
-    """0..1 smooth noise round the lake, periodic in phi (`cycles` lattice cells round it)."""
+    """0..1 smooth noise along the loop, periodic in theta (`cycles` lattice cells round the loop)."""
     return mx.fbm_p(0.37 * seed, (th % TAU) / TAU * cycles, seed, octaves, py=cycles)
 
 
-def shore_r(ph):
-    """The shore's distance from C: the ellipse, its outline broken by a gentle wobble (bays and points)."""
-    e = 1.0 / math.sqrt((math.sin(ph) / LAKE_A) ** 2 + (math.cos(ph) / LAKE_B) ** 2)
-    return e * (1.0 + 0.14 * (periodic_noise(ph, 9, 41) - 0.5))
+# ---- pass 4: the world unrolled into a straight valley -------------------------------------------------------------
+# The owner: "terrain is still too curved, i asked for a mostly straight river + valley". Everything here is still
+# generated round the loop (theta, r), which keeps every recipe above and below unchanged; then every point written --
+# each mesh vertex, the river's course, the camera -- passes through `unroll`: distance round the loop becomes
+# distance along a straight axis (z = -R0 theta, so the camera, flying +theta, looks down -z) and radius becomes the
+# lateral offset (x = r - R0: the inner bank, on the camera's left, at -x). The seam is the far side of the loop
+# (theta = +-pi, z = -+9.4 km): triangles across it are dropped, and the camera crosses it only after about 7 minutes.
+def unroll(p):
+    th = math.atan2(p[0], p[2])
+    r = math.hypot(p[0], p[2])
+    return (r - R0, p[1], -R0 * th)
 
 
-def lake_at(ph, r):
-    d = lake_dir(ph)
-    return (C[0] + r * d[0], C[1] + r * d[1])
+def unroll_tris(tris):
+    out = []
+    for tri in tris:
+        ths = [math.atan2(v[0], v[2]) for v in tri]
+        if max(ths) - min(ths) > math.pi or min(math.hypot(v[0], v[2]) for v in tri) < 1.0:
+            continue   # across the seam, or touching the loop's centre (no place on a straight valley)
+        out.append(tuple(unroll(v) for v in tri))
+    return out
 
 
-def lake_polar(x, z):
-    return math.atan2(x - C[0], -(z - C[1])), math.hypot(x - C[0], z - C[1])
-
-
-def side_of(ph):
-    """+1 right (x > 0, the bass's mountains), -1 left (the Moog's)."""
-    return 1 if math.sin(ph) >= 0.0 else -1
-
-
-def right_weight(ph):
-    """The blend between the left and right banks' recipes: 0 left, 1 right, eased across the back and behind the camera
-    so the land is continuous where the two meshes meet."""
-    return mx.smooth(-0.22, 0.22, math.sin(ph))
+def river_points(n=256):
+    """The river's centreline, unrolled: n points along the straight valley, inside the seam."""
+    return [unroll(centre(-math.pi + 1e-3 + (2.0 * math.pi - 2e-3) * i / (n - 1))) for i in range(n)]
 
 
 # ---- the valley's profile across its band -------------------------------------------------------------------------
@@ -86,16 +152,15 @@ def valley_height(th, o, side):
         wall_h = 110.0 + 110.0 * periodic_noise(th, 5, 9 + s)
     else:
         wall_h = 80.0 + 90.0 * periodic_noise(th, 5, 9 + s)
-    run = 260.0 + 200.0 * periodic_noise(th, 4, 13 + s)
+    run = 350.0 + 250.0 * periodic_noise(th, 4, 13 + s)
     low = s0 * min(o, 60.0) + 0.14 * max(o - 60.0, 0.0)
     return low + wall_h * mx.smooth(fl, fl + run, o) ** 1.3
 
 
 def floor_edge(th, side):
-    """Where the shore's lower slopes end and the wall begins (m from the water): 90-210 round the lake (the river's
-    valley floor was 200-420: a mountain lake's walls come down closer to the water)."""
+    """Where the valley floor's lower slopes end and the wall begins (m from the water): 200-420."""
     s = 0 if side > 0 else 1
-    return 90.0 + 120.0 * periodic_noise(th, 6, 31 + s)
+    return 200.0 + 220.0 * periodic_noise(th, 6, 31 + s)
 
 
 def wall_weight(th, o, side):
@@ -103,110 +168,89 @@ def wall_weight(th, o, side):
     return 0.15 * mx.smooth(40.0, 200.0, o) + 0.85 * mx.smooth(fl - 80.0, fl + 200.0, o)
 
 
-# ---- the hero peaks round the lake: (bearing from the camera deg, metres back from the shore along that bearing,
-# elevation from the camera deg, radius over height, elongation, ridge azimuth deg relative to the shore's tangent,
-# seed). Each a deliberate silhouette -- a long ridge with its summit off-centre, a steep pyramid, a twin summit --
-# placed by where it stands in the frame (bearing 0 dead ahead, +-41 the frame's edges) and its height set so it rises
-# the stated angle above the water: the arms tall at the frame's edges, the back lower, so the horseshoe reads.
-HEROES = [
-    (-50.0, 260.0, 17.0, 1.2, 1.5, 30.0, 1), (-37.0, 300.0, 15.0, 1.25, 1.9, -40.0, 2),
-    (-26.0, 380.0, 12.0, 1.3, 1.4, 60.0, 3), (-15.0, 420.0, 9.5, 1.2, 2.1, 15.0, 4),
-    (-5.0, 520.0, 8.0, 1.35, 1.7, -20.0, 5), (6.0, 460.0, 9.0, 1.3, 2.3, 10.0, 6),
-    (16.0, 420.0, 10.5, 1.25, 1.8, 35.0, 7), (27.0, 340.0, 13.0, 1.3, 1.5, -55.0, 8),
-    (38.0, 300.0, 15.5, 1.2, 2.2, -10.0, 9), (51.0, 260.0, 17.5, 1.35, 1.6, 25.0, 10),
+# ---- the hero peaks: (theta deg, side, metres from the water's edge, height, radius, elongation, ridge azimuth deg
+# relative to the river's tangent, seed). Alternating banks, each a deliberate silhouette: a long ridge with a summit
+# off-centre, a steep pyramid, a twin summit. Heights are held so that from the river they rise 9-14 degrees.
+PEAKS = [
+    (8.0, +1, 560.0, 247.5, 330.0, 1.9, 25.0, 1),
+    (38.0, -1, 470.0, 210.0, 280.0, 1.5, -40.0, 2),
+    (71.0, +1, 760.0, 307.5, 420.0, 2.4, 10.0, 3),
+    (104.0, -1, 560.0, 225.0, 300.0, 1.3, 60.0, 4),
+    (139.0, +1, 640.0, 270.0, 380.0, 1.7, -20.0, 5),
+    (176.0, -1, 430.0, 187.5, 260.0, 2.1, 15.0, 6),
+    (205.0, +1, 880.0, 345.0, 470.0, 2.2, 35.0, 7),
+    (238.0, -1, 600.0, 240.0, 320.0, 1.6, -55.0, 8),
+    (272.0, +1, 520.0, 225.0, 300.0, 1.4, -10.0, 9),
+    (306.0, -1, 500.0, 217.5, 290.0, 1.8, 30.0, 10),
+    (334.0, +1, 700.0, 292.5, 400.0, 2.0, -35.0, 11),
 ]
-
-
-def _place(ph, off):
-    return lake_at(ph, shore_r(ph) + off)
-
-
-def _shore_on_bearing(bearing):
-    """The point where the ray from the camera on `bearing` (deg, + right) leaves the lake."""
-    b = math.radians(bearing)
-    d = (math.sin(b), -math.cos(b))
-    s = 0.0
-    while True:
-        x, z = d[0] * s, d[1] * s
-        ph, r = lake_polar(x, z)
-        if s > 50.0 and r > shore_r(ph):
-            return x, z, d
-        s += 2.0
-
-
-def _heroes():
-    out = []
-    for bearing, back, elev, rr, elong, az, seed in HEROES:
-        x, z, d = _shore_on_bearing(bearing)
-        x, z = x + d[0] * back, z + d[1] * back
-        ph, r = lake_polar(x, z)
-        h = math.hypot(x, z) * math.tan(math.radians(elev))
-        out.append((math.degrees(ph), side_of(ph), r - shore_r(ph), h, h * rr, elong, az, seed))
-    return out
-
-
-# ---- the spurs: ridges running down from the slopes toward the water every few degrees round the lake, with
-# jittered size and set-back, overlapping as they recede: near, middle and far ridges stacked in depth (the river
-# valley's layered read, kept). Each is a long low pyramid whose ridge points at the water.
-def _spurs(count=56):
-    out = []
-    for i in range(count):
-        jit = mx._hash(i, 3, 91)
-        deg = ((i + 0.35 * (jit - 0.5)) * 360.0 / count + 180.0) % 360.0 - 180.0
-        side = side_of(math.radians(deg))
-        off = 420.0 + 600.0 * mx._hash(i, 5, 93)            # set back from the shore (m): near to far
-        h = (30.0 + off * (0.13 + 0.07 * mx._hash(i, 7, 95))) * (1.15 if side > 0 else 0.85)
-        rad = 120.0 + 0.25 * off
-        elong = 1.8 + 1.0 * mx._hash(i, 11, 99)
-        az = 90.0 + 30.0 * (mx._hash(i, 13, 101) - 0.5)     # across the shore: the ridge points at the water
-        out.append((deg, side, off, h, rad, elong, az, 100 + i))
-    return out
-
-
-# ---- the layered ranges: distinct peaks stepping back from the shore in three layers, at random bearings round the
-# lake; nearer layers stand taller in the frame, further ones smaller in angle, paled by the program's haze. The right
-# bank stands a little higher than the left, as the river's outer bank did. The outer two layers stand in the ring meshes.
-LAYERS = [  # (set-back min, max (m from the shore), height min, max, count)
-    (600.0, 1100.0, 260.0, 420.0, 24),
-    (1400.0, 2400.0, 480.0, 720.0, 28),
-    (3000.0, 5200.0, 850.0, 1300.0, 32),
-]
-
-
-def _layer_peaks():
-    out = []
-    k = 0
-    for li, (o0, o1, h0, h1, n) in enumerate(LAYERS):
-        for i in range(n):
-            u = mx._hash(i, li, 211)
-            deg = ((i + 0.8 * (mx._hash(i, li, 213) - 0.5)) * 360.0 / n + 37.0 * li + 180.0) % 360.0 - 180.0
-            side = side_of(math.radians(deg))
-            off = o0 + (o1 - o0) * u
-            h = (h0 + (h1 - h0) * mx._hash(i, li, 215)) * (1.08 if side > 0 else 0.92)
-            rad = h * (1.5 + 0.8 * mx._hash(i, li, 217))
-            elong = 1.1 + 0.9 * mx._hash(i, li, 219)
-            az = 360.0 * mx._hash(i, li, 221)
-            out.append((deg, side, off, h, rad, elong, az, 500 + k))
-            k += 1
-    return out
-
-
-PEAKS = _heroes() + _spurs() + _layer_peaks()
 
 
 def _peak_frames():
     out = []
     for deg, side, off, h, rad, elong, az, seed in PEAKS:
-        ph = math.radians(deg)
-        cx, cz = _place(ph, off)
-        d = lake_dir(ph)
-        t = (-d[1], d[0])                          # the shore's tangent (increasing phi), turned by the ridge azimuth
+        th = math.radians(deg)
+        r = rc(th) + side * (half_width(th) + off)
+        cx, cz = r * math.sin(th), r * math.cos(th)
+        # the river's tangent at theta (direction of increasing theta), turned by the ridge azimuth
+        t = (math.cos(th), -math.sin(th))
         a = math.radians(az)
         u = (t[0] * math.cos(a) - t[1] * math.sin(a), t[0] * math.sin(a) + t[1] * math.cos(a))
         out.append((cx, cz, u, h, rad, elong, seed, side))
     return out
 
 
+# ---- the spurs: ridges running down from the valley walls toward the river, every few degrees round the loop,
+# alternating banks with jittered size and set-back. Looking down the river they overlap as they recede -- near, middle
+# and far ridges stacked in depth -- which is the layered "river in a valley" read (the Living Prism aurora valley's
+# composition, in this scene's faceted language). Each is a long low pyramid whose ridge points at the water.
+def _spurs(count=80):   # pass 6: 80 (was 140), so the ridges stand apart
+    out = []
+    for i in range(count):
+        side = 1 if i % 2 == 0 else -1
+        jit = mx._hash(i, 3, 91)
+        deg = (i + 0.35 * (jit - 0.5)) * 360.0 / count
+        off = 450.0 + 650.0 * mx._hash(i, 5, 93)            # set back from the water's edge (m): near to far
+        # summit height grows with the set-back, so from the river each rises about 8-12 degrees and the farther
+        # ones show over the nearer: layers in depth, never a wall over the camera
+        h = (30.0 + off * (0.13 + 0.07 * mx._hash(i, 7, 95))) * (1.15 if side > 0 else 0.85)
+        rad = 120.0 + 0.25 * off
+        elong = 1.8 + 1.0 * mx._hash(i, 11, 99)
+        az = 90.0 + 30.0 * (mx._hash(i, 13, 101) - 0.5)     # across the river: the ridge points at the water
+        out.append((deg, side, off, h, rad, elong, az, 100 + i))
+    return out
+
+
+# ---- the layered ranges: distinct peaks stepping back from the river in three layers per bank, at random bearings
+# (so left and right never repeat). Nearer layers stand taller in the frame; further ones are smaller in angle and
+# the program's haze pales them. The outer layers stand in the ring meshes (range_tris reads peak_height too).
+LAYERS = [  # (side, set-back min, max (m from the water), height min, max, count)
+    (+1, 650.0, 1100.0, 260.0, 420.0, 30),
+    (+1, 1500.0, 2600.0, 480.0, 720.0, 34),
+    (+1, 3400.0, 6000.0, 850.0, 1300.0, 36),
+    (-1, 550.0, 1000.0, 220.0, 360.0, 26),
+    (-1, 1250.0, 1900.0, 320.0, 480.0, 18),
+]
+
+
+def _layer_peaks():
+    out = []
+    k = 0
+    for li, (side, o0, o1, h0, h1, n) in enumerate(LAYERS):
+        for i in range(n):
+            u = mx._hash(i, li, 211)
+            deg = (i + 0.8 * (mx._hash(i, li, 213) - 0.5)) * 360.0 / n + 37.0 * li
+            off = o0 + (o1 - o0) * u
+            h = h0 + (h1 - h0) * mx._hash(i, li, 215)
+            rad = h * (1.5 + 0.8 * mx._hash(i, li, 217))
+            elong = 1.1 + 0.9 * mx._hash(i, li, 219)
+            az = 360.0 * mx._hash(i, li, 221)
+            out.append((deg % 360.0, side, off, h, rad, elong, az, 500 + k))
+            k += 1
+    return out
+
+
+PEAKS = PEAKS + _spurs() + _layer_peaks()
 PEAK_FRAMES = _peak_frames()
 
 
@@ -227,24 +271,20 @@ def peak_height(x, z, side=0):
         d = 0.55 * math.sqrt(ua * ua + vb * vb) + 0.45 * max(abs(ua), abs(vb))
         if d >= 1.0:
             continue
-        n = mx.fbm(x / 140.0, z / 140.0, 40 + seed, 3, ridged=True)
-        best = max(best, h * (1.0 - d) ** 1.35 * (0.86 + 0.28 * n))
+        # pass 6: one broad ridged octave (was three at 140 m), so a peak's faces are few and its crest clean
+        n = mx.fbm(x / 320.0, z / 320.0, 40 + seed, 1, ridged=True)
+        best = max(best, h * (1.0 - d) ** 1.35 * (0.93 + 0.14 * n))
     return best
 
 
 def detail(x, z, th, o, side):
-    """Relief, so the facets are large, planar and irregular: a little on the flats, strong ridged spurs on the walls
-    (their crests and gullies are what give the facets their different orientations). Nothing at the water's edge,
-    so the bank meets it cleanly."""
+    """Relief, so the facets are large, planar and irregular. Pass 6 (the owner: "simplify the mountain geometry"): the
+    river's three layers of ridged noise at 95-260 m become two broad ones at 260-420 m with half the amplitude, so the
+    slopes are a few large planes and the ridgelines between them are long and clean -- a clean stage for the light."""
     ww = wall_weight(th, o, side)
-    flat = 2.5 * mx.smooth(15.0, 70.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
-    # rocky shoulders: large ridged facets from 30 m up the shore (the waterline itself stays a gentle slope)
-    flat += (22.0 + 0.07 * min(o, 600.0)) * mx.smooth(30.0, 110.0, o) * (
-        mx.fbm(x / 95.0, z / 95.0, 27 + (0 if side > 0 else 4), 3, ridged=True) - 0.25)
-    # and a coarser set of rock buttresses, so every stretch of the near slopes has large readable facets
-    flat += (12.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
-        mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 2, ridged=True) - 0.3)
-    spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 230.0, z / 230.0, 23, 4, ridged=True) - 0.35)
+    flat = (10.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
+        mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 1, ridged=True) - 0.3)
+    spur = (24.0 + 0.09 * min(o, 900.0)) * ww * (mx.fbm(x / 420.0, z / 420.0, 23, 2, ridged=True) - 0.35)
     return flat + spur
 
 
@@ -252,44 +292,41 @@ def land_height(x, z, th, o, side):
     h = valley_height(th, o, side) + detail(x, z, th, o, side)
     if o > 4.0:
         # a peak or spur rises only on its own bank, and its foot meets the water as the wall does
-        fl = floor_edge(th, side)   # spurs and peaks stand behind the lower slopes, never in the water
+        fl = floor_edge(th, side)   # spurs and peaks stand behind the valley floor, never in the water
         h = max(h, peak_height(x, z, side) * mx.smooth(fl - 150.0, fl + 120.0, o) ** 0.7)
     return h
 
 
-def lake_land(x, z, ph, o):
-    """The land round the lake: the left bank's recipe and the right's, blended across the back and behind the camera
-    (right_weight), so the two halves meet without a step."""
-    w = right_weight(ph)
-    if w <= 0.0:
-        return land_height(x, z, ph, o, -1)
-    if w >= 1.0:
-        return land_height(x, z, ph, o, +1)
-    return (1.0 - w) * land_height(x, z, ph, o, -1) + w * land_height(x, z, ph, o, +1)
+# ---- the valley band ------------------------------------------------------------------------------------------------
+# (offset from the water's edge in m, columns round the loop). Near rows are dense (about 17 m facets along the bank),
+# the far ones coarse; the last outer row sinks so the band's edge tucks under the first range.
+# pass 4: the rows at -30 m are gone (both banks). They were the bank running on under the river from the layout where
+# the mountains went straight into the water; their edge stood as a step above the riverbed and showed through the
+# water as a line along the shore (the owner's screenshot). The riverbed now runs under the bank's first row instead.
+# pass 6: about half the columns and fewer rows (the facets twice as long along the bank, the bands between rows wider)
+OUTER_ROWS = [(-8, 480), (20, 480), (70, 400), (150, 320), (260, 260), (400, 220), (600, 180), (880, 150),
+              (1350, 120)]
+INNER_NEAR = [(-8, 480), (20, 480), (70, 400), (150, 320), (260, 260), (400, 220), (520, 200)]
+INNER_FAR = [(0.50, 120), (0.66, 90), (0.80, 70), (0.91, 50)]   # fractions of the way to the centre
 
 
-# ---- the shore band ---------------------------------------------------------------------------------------------
-# (offset from the shore in m, columns round the lake). Near rows are dense (about 17 m facets along the shore), the
-# far ones coarse; the last row sinks so the band's edge tucks under the first range. The first row is 8 m inside the
-# water's edge: the lakebed's rim is the same row (bed_rows), so bed and bank share an edge.
-BAND_ROWS = [(-8, 440), (14, 440), (40, 400), (72, 400), (110, 360), (160, 320), (220, 320), (300, 280), (400, 280),
-             (520, 240), (680, 220), (880, 200), (1100, 190), (1350, 180)]
-
-
-def _row(o, n, seed, jitter=0.3, sink=0.0, ojit=0.0):
+def _row(offset_fn, n, seed, jitter=0.3, sink=0.0, ojit=0.0):
     pts = []
     for j in range(n):
         jt = (mx._hash(j, seed, 77) - 0.5) * 2.0 * jitter
         th = TAU * (j + jt) / n
-        oo = o
+        r, o, side = offset_fn(th, j)
         if ojit:   # break the rows' parallel strips: each vertex moves along its row's normal
-            oo += (mx._hash(j, seed, 79) - 0.5) * 2.0 * ojit
-        x, z = lake_at(th, shore_r(th) + oo)
-        pts.append((x, lake_land(x, z, th, oo) - sink, z))
+            d = (mx._hash(j, seed, 79) - 0.5) * 2.0 * ojit
+            r += d * side
+            o += d
+        x, z = r * math.sin(th), r * math.cos(th)
+        y = land_height(x, z, th, o, side) - sink
+        pts.append((x, y, z))
     return pts
 
 
-def _zip(inner, outer, up_is_outward=True):
+def _zip(inner, outer, up_is_outward):
     """Triangles between two closed rows (counts may differ), walking both by their angular parameter."""
     n, m = len(inner), len(outer)
     tris = []
@@ -300,78 +337,83 @@ def _zip(inner, outer, up_is_outward=True):
         a, b = inner[i % n], outer[k % m]
         if k >= m or (i < n and ti <= tk):
             c = inner[(i + 1) % n]
+            tri = (a, b, c)
             i += 1
         else:
             c = outer[(k + 1) % m]
+            tri = (a, b, c)
             k += 1
-        tri = (a, b, c)
+        # orient each triangle to face up
         nrm = mx.cross(mx.sub(tri[1], tri[0]), mx.sub(tri[2], tri[0]))
-        if nrm[1] < 0.0:   # orient each triangle to face up
+        if nrm[1] < 0.0:
             tri = (tri[0], tri[2], tri[1])
         tris.append(tri)
     return tris
 
 
-def shore_band():
-    rows = []
-    for idx, (o, n) in enumerate(BAND_ROWS):
-        last = idx == len(BAND_ROWS) - 1
-        nxt = BAND_ROWS[idx + 1][0] if not last else o
-        rows.append(_row(o, n, 100 + idx, jitter=0.0 if o < 0 else 0.35, sink=40.0 if last else 0.0,
-                         ojit=0.0 if (o < 0 or last) else 0.4 * (nxt - o)))
-    tris = []
-    for a, b in zip(rows, rows[1:]):
-        tris += _zip(a, b)
-    return tris
+def valley_band():
+    rows_out, rows_in = [], []
+    for idx, (o, n) in enumerate(OUTER_ROWS):
+        last = idx == len(OUTER_ROWS) - 1
+        f = (lambda o_: (lambda th, j: (rc(th) + half_width(th) + o_, o_, +1)))(o)
+        rows_out.append(_row(f, n, 100 + idx, jitter=0.0 if o < 0 else 0.35, sink=40.0 if last else 0.0,
+                             ojit=0.0 if (o < 0 or last) else 0.4 * (OUTER_ROWS[idx + 1][0] - o)))
+    for idx, (o, n) in enumerate(INNER_NEAR):
+        f = (lambda o_: (lambda th, j: (rc(th) - half_width(th) - o_, o_, -1)))(o)
+        nxt = INNER_NEAR[idx + 1][0] if idx + 1 < len(INNER_NEAR) else o + 150
+        rows_in.append(_row(f, n, 200 + idx, jitter=0.0 if o < 0 else 0.35, ojit=0.0 if o < 0 else 0.4 * (nxt - o)))
+    for idx, (fr, n) in enumerate(INNER_FAR):
+        def f(th, j, fr=fr):
+            edge = rc(th) - half_width(th)
+            return (edge * (1.0 - fr), edge * fr, -1)
+        rows_in.append(_row(f, n, 300 + idx))
+    outer, inner = [], []
+    # outer band: row k to row k+1 (outward); inner band: row k to row k+1 (inward); the two -16 m rows are the river
+    # bed's edges under the water, never joined across the river
+    for a, b in zip(rows_out, rows_out[1:]):
+        outer += _zip(a, b, True)
+    for a, b in zip(rows_in, rows_in[1:]):
+        inner += _zip(a, b, False)
+    # (pass 4: no fan to the loop's centre -- unrolled, the inner band ends in a long edge, and the left ranges stand
+    # beyond it)
+    # pass 3 (22-research-pass3-scene.md s5.1): the camera flies the loop in +theta with its right vector pointing out
+    # of the loop, so the inner bank is always on the LEFT (the Moog's) and the outer bank on the RIGHT (the toms' and
+    # the tone block's), with the three outer ranges
+    return outer, inner
 
 
-def split_lr(tris):
-    """The left (x < 0: the Moog's) and right (the bass's) halves, by each triangle's centre."""
-    left, right = [], []
-    for t in tris:
-        (left if t[0][0] + t[1][0] + t[2][0] < 0.0 else right).append(t)
-    return left, right
-
-
-# ---- the lakebed (pass 5; the riverbed of pass 3): faceted planes under the water for the light to reveal. The owner:
-# "make the pond appear deeper". Rings inward from the shore, each vertex jittered round, inward and in depth, zipped
-# into large irregular facets; a shelf falling from the shore to about 45 m 500 m out, then a floor at 55-65 m, so a
-# beam crossing the lake lights the slopes near the shores and loses the bed as it goes deeper (the land term's light
-# reaches 40 m down, and the water's absorption darkens what it shows), and the middle is a dark volume. The program
-# is nearly black (look.bed_program): only the light shows it. Rings: (fraction of the way to the centre, columns).
-BED = {"coarse": [(0.0, 440), (0.035, 300), (0.09, 240), (0.16, 200), (0.26, 160), (0.38, 130), (0.52, 100),
-                  (0.68, 70), (0.84, 40)],
-       "fine": [(0.0, 440), (0.02, 400), (0.05, 340), (0.09, 300), (0.14, 260), (0.2, 220), (0.27, 190), (0.35, 160),
-                (0.45, 130), (0.56, 100), (0.68, 80), (0.82, 50)]}
-BED_FLOOR = -62.0
-
-
-def bed_depth(rim, d):
-    """The bed's depth `d` metres in from the shore, below the rim row's height `rim`."""
-    return rim - 44.0 * mx.smooth(0.0, 520.0, d) ** 0.8 - 14.0 * mx.smooth(350.0, 900.0, d)
+# ---- the riverbed (pass 3): faceted planes under the water for the river light to reveal ------------------------
+# The owner (2026-10-24): the beam should reveal "an underwater faceted riverbed: the same low-poly, flat-shaded
+# triangle planes as the mountains, seen through the water". Rows across the river, each vertex jittered along and
+# across the flow and in depth, zipped into large irregular facets; deepest mid-river. The bed's program is nearly
+# black (look.bed_program), so it is invisible until the light (ADR-1662's land term) catches its planes.
+# (columns round the loop, interior rows across the river): BED["coarse"] about 50 m facets, BED["fine"] about 30 m.
+BED = {"coarse": (380, 3), "fine": (640, 5)}
 
 
 def bed_rows(variant="coarse"):
+    cols, inner = BED[variant]
+    fracs = [-1.0] + [-1.0 + 2.0 * (k + 1) / (inner + 1) for k in range(inner)] + [1.0]
     rows = []
-    for idx, (f, cols) in enumerate(BED[variant]):
-        edge = idx == 0
+    for idx, f in enumerate(fracs):
+        edge = abs(f) > 0.999
         pts = []
         for j in range(cols):
             jt = 0.0 if edge else (mx._hash(j, 500 + idx, 77) - 0.5) * 0.7
             th = TAU * (j + jt) / cols
-            sr = shore_r(th)
-            if edge:   # the band's first row, vertex for vertex
-                x, z = lake_at(th, sr - 8.0)
-                pts.append((x, lake_land(x, z, th, -8.0), z))
-                continue
-            rings = BED[variant]
-            gap = (rings[idx + 1][0] if idx + 1 < len(rings) else 1.0) - f
-            fj = f + (mx._hash(j, 500 + idx, 78) - 0.5) * 0.5 * min(gap, f - rings[idx - 1][0])
-            r = (sr - 8.0) * (1.0 - fj)
-            x, z = lake_at(th, r)
-            rim = valley_height(th, -8.0, side_of(th))
-            y = bed_depth(rim, sr - r) + (mx._hash(j, 500 + idx, 79) - 0.5) * 12.0 * min(1.0, (sr - r) / 60.0)
-            pts.append((x, y, z))
+            fj = f if edge else f + (mx._hash(j, 500 + idx, 78) - 0.5) * 1.2 / (inner + 1)
+            # pass 4: the bed's edges ARE the banks' waterline rows (8 m inside the water's edge, at their height), so
+            # bed and bank share an edge and nothing steps between them; it falls from there to about 20 m mid-river
+            reach = half_width(th) - 8.0
+            r = rc(th) + fj * reach
+            side = 1 if fj > 0.0 else -1
+            rim = land_height(r * math.sin(th), r * math.cos(th), th, -8.0, side) if edge else \
+                valley_height(th, -8.0, side)
+            # pass 5-6: deeper -- about 50 m mid-river (was 20), falling steeply off the banks
+            depth = rim - 52.0 * (1.0 - min(1.0, fj * fj)) ** 0.7
+            if not edge:
+                depth += (mx._hash(j, 500 + idx, 79) - 0.5) * 14.0   # tilted planes, so a grazing light picks some out
+            pts.append((r * math.sin(th), depth, r * math.cos(th)))
         rows.append(pts)
     return rows
 
@@ -380,22 +422,15 @@ def bed_tris(variant="coarse"):
     rows = bed_rows(variant)
     tris = []
     for a, b in zip(rows, rows[1:]):
-        tris += _zip(b, a)
-    centre = (C[0], BED_FLOOR - 2.0, C[1])
-    last = rows[-1]
-    for i in range(len(last)):
-        tri = (last[i], last[(i + 1) % len(last)], centre)
-        nrm = mx.cross(mx.sub(tri[1], tri[0]), mx.sub(tri[2], tri[0]))
-        tris.append(tri if nrm[1] >= 0.0 else (tri[0], tri[2], tri[1]))
+        tris += _zip(a, b, True)
     return tris
 
 
-# ---- the fish (pass 4; pass 5: "less fish, add some variety to their shapes and sizes - some of them stick out of the
-# water make sure that doesnt happen"). Eighteen single faceted fish of four body types, each its own size and
-# heading, spread over the lake where the beams run (the kick's, snare's and toms' lanes) so the light finds them.
-# Their program is the bed's (near black): a fish shows only when a beam's under-water light passes over it. Static
-# (no swim motion), so a fish's highest point is fixed: every one is clamped so its whole body -- back, fins, tail --
-# stays FISH_CLEARANCE below the surface, and check_fish() (run by build.py and by the integration test) proves it.
+# ---- the fish (pass 4; pass 5: fewer, four body types and sizes, never breaking the surface; pass 6 back in the river).
+# Single faceted fish over the river's width along the stretch the camera flies, near the three lanes so the light finds
+# them, each its own type, size and heading. Their program is near black (look.fish_program): a fish shows only when a
+# pulse's light in the water passes over it. Static (no swim motion), so a fish's highest point is fixed: each is
+# clamped so its whole body stays FISH_CLEARANCE below the surface; check_fish() (build.py, the integration test) proves it.
 FISH_COUNT = 18
 FISH_CLEARANCE = 1.5   # metres between the surface and a fish's highest vertex, at least
 # body types, in the fish's frame (forward f, up u, right r; times its size): nose, tail root, back, belly, the flanks'
@@ -411,7 +446,7 @@ FISH_TYPES = {
                 tail_bot=-0.02, dorsal=0.0, size=(10.0, 16.0)),
 }
 FISH_ORDER = ["trout", "bream", "pike", "ray", "trout", "bream"]
-FISH_LANES = [-150.0, 0.0, 150.0]   # look.py's kick, toms and snare lanes (m right of the lake's axis)
+FISH_LANES = [-55.0, 0.0, 55.0]   # look.py's kick, toms and snare lanes (m right of the river's centreline)
 
 
 def _fish(kind, cx, cy, cz, heading, size):
@@ -436,15 +471,18 @@ def _fish(kind, cx, cy, cz, heading, size):
 
 
 def fish_list():
-    """(kind, x, y, z, heading, size) per fish; y is the body's centre line, already clamped below the surface."""
+    """(kind, x, y, z, heading, size) per fish in the loop's frame (write_faceted_uv unrolls them); y is the body's centre
+    line, already clamped below the surface."""
     out = []
     for k in range(FISH_COUNT):
         kind = FISH_ORDER[k % len(FISH_ORDER)]
         b = FISH_TYPES[kind]
         lo, hi = b["size"]
         size = lo + (hi - lo) * mx._hash(k, 700, 7)
-        x = FISH_LANES[k % 3] + (mx._hash(k, 700, 2) - 0.5) * 140.0
-        z = -380.0 - 1100.0 * (k + mx._hash(k, 700, 1)) / FISH_COUNT
+        th = 0.03 + 1.25 * (k + mx._hash(k, 700, 1)) / FISH_COUNT
+        lat = FISH_LANES[k % 3] + (mx._hash(k, 700, 2) - 0.5) * 80.0
+        r = rc(th) + lat
+        x, z = r * math.sin(th), r * math.cos(th)
         heading = TAU * mx._hash(k, 700, 6)          # every way round: along, across, toward, away
         y = -3.0 - 6.0 * mx._hash(k, 700, 5)
         top = max(b["back"], b["tail_top"], b["dorsal"], 0.02)
@@ -480,24 +518,21 @@ def _crest(t, peak, keep_outer):
     return mx.smooth(1.0, peak, t) ** 0.7
 
 
-# (name, r0, r1, rings, columns, base height, relief, wavelength, seed, crest position, keep the outer side up): rings
-# round the lake's centre, their inner edges under the shore band's last row
+# (name, r0, r1, rings, columns, base height, relief, wavelength, seed, crest position, keep the outer side up)
 RANGES = [
-    ("near", 1650.0, 4800.0, 10, 260, 120.0, 380.0, 900.0, 3, 0.45, False),
-    ("far", 4300.0, 8500.0, 9, 240, 200.0, 500.0, 1300.0, 7, 0.5, False),
-    ("distant", 8000.0, 16000.0, 7, 200, 600.0, 1300.0, 2100.0, 13, 0.55, True),
+    ("near", 4300.0, 7000.0, 6, 200, 120.0, 380.0, 1300.0, 3, 0.45, False),   # pass 6: fewer, larger facets
+    ("far", 6500.0, 11000.0, 6, 170, 200.0, 500.0, 1800.0, 7, 0.5, False),
+    ("distant", 10500.0, 19000.0, 5, 130, 600.0, 1300.0, 2600.0, 13, 0.55, True),
 ]
 
 
 def range_tris(name, r0, r1, nr, nth, base, amp, wl, seed, peak, keep):
     def h(x, z, r, th):
-        x, z = x + C[0], z + C[1]
         t = (r - r0) / (r1 - r0)
         c = _crest(t, peak, keep)
-        n = mx.fbm(x / wl, z / wl, seed, 4, ridged=True)
+        n = mx.fbm(x / wl, z / wl, seed, 2, ridged=True)
         return max(c * (base + amp * n) - 30.0 * (1.0 - c) ** 2 - 2.0, peak_height(x, z) * min(1.0, 4.0 * t))
-    return [tuple((v[0] + C[0], v[1], v[2] + C[1]) for v in tri)
-            for tri in mx.polar_range(r0, r1, nr, nth, h, seed=seed)]
+    return mx.polar_range(r0, r1, nr, nth, h, seed=seed)
 
 
 # ---- Gate B: baked edge masks (research A probe F) (TEXCOORD_0 = (metres to this facet's chosen edge, that edge's importance)) ----------
@@ -573,8 +608,13 @@ def _crease_hash(p, q):
     return (x & 0xFFFFFF) / float(1 << 24)
 
 
-def write_faceted_uv(path, tris, name):
+def write_faceted_uv_unrolled(path, tris, name):
+    """write_faceted_uv for triangles already in the straight valley's frame."""
     _write_faceted_uv(path, tris, name)
+
+
+def write_faceted_uv(path, tris, name):
+    _write_faceted_uv(path, unroll_tris(tris), name)   # pass 4: the straight valley
 
 
 def _write_faceted_uv(path, tris, name):
@@ -611,15 +651,27 @@ def _write_faceted_uv(path, tris, name):
 
 
 def generate(mesh_dir):
-    """Write every GLB, each with its edge mask in TEXCOORD_0; return {name: triangle count}. Each land mesh comes in a
-    left and a right half (the Moog's and the bass's programs)."""
+    """Write every GLB, each with its edge mask in TEXCOORD_0; return {name: triangle count}."""
     os.makedirs(mesh_dir, exist_ok=True)
     out = {}
-    parts = [("shore", shore_band())] + [(spec[0], range_tris(*spec)) for spec in RANGES]
-    for name, tris in parts:
-        for side, half in zip("LR", split_lr(tris)):
-            write_faceted_uv(os.path.join(mesh_dir, "ab-%s%s.glb" % (name, side)), half, name + side)
-            out[name + side] = len(half)
+    outer, inner = valley_band()
+    write_faceted_uv(os.path.join(mesh_dir, "ab-valleyL.glb"), inner, "valleyL")
+    write_faceted_uv(os.path.join(mesh_dir, "ab-valleyR.glb"), outer, "valleyR")
+    out["valleyL"] = len(inner)
+    out["valleyR"] = len(outer)
+    for spec in RANGES:
+        t = range_tris(*spec)
+        write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
+        out[spec[0]] = len(t)
+    # pass 4: the left (inner) side had no outer ranges -- the loop's centre was there. Unrolled, it gets the far and
+    # distant ranges too, with their own seeds, mirrored across the river (and turned to face up), so left and right
+    # never repeat
+    for spec in RANGES[1:]:
+        name = "left" + spec[0]
+        t = range_tris(name, *spec[1:8], spec[8] + 50, *spec[9:])
+        t = [tuple((-v[0], v[1], v[2]) for v in (tri[0], tri[2], tri[1])) for tri in unroll_tris(t)]
+        write_faceted_uv_unrolled(os.path.join(mesh_dir, "ab-%s.glb" % name), t, name)
+        out[name] = len(t)
     check_fish()
     t = fish_tris()
     write_faceted_uv(os.path.join(mesh_dir, "ab-fish.glb"), t, "fish")
@@ -631,7 +683,42 @@ def generate(mesh_dir):
     return out
 
 
-LAND = ["shore", "near", "far", "distant"]   # the land meshes, each as <name>L and <name>R
+# ---- the camera's path -------------------------------------------------------------------------------------------
+def river_length(n=4000):
+    total = 0.0
+    p = centre(0.0)
+    for i in range(1, n + 1):
+        q = centre(TAU * i / n)
+        total += math.dist(p, q)
+        p = q
+    return total
+
+
+def theta_at_arc(n=8000, curve=None):
+    """A table mapping arc length along `curve` (the valley axis by default) to theta, so the camera moves at a
+    constant speed."""
+    curve = curve or axis_centre
+    arcs, ths = [0.0], [0.0]
+    p = curve(0.0)
+    for i in range(1, n + 1):
+        th = TAU * i / n
+        q = curve(th)
+        arcs.append(arcs[-1] + math.dist(p, q))
+        ths.append(th)
+        p = q
+    return arcs, ths
+
+
+def lerp_table(arcs, ths, s):
+    lo, hi = 0, len(arcs) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if arcs[mid] <= s:
+            lo = mid
+        else:
+            hi = mid
+    t = (s - arcs[lo]) / max(arcs[hi] - arcs[lo], 1e-9)
+    return ths[lo] + (ths[hi] - ths[lo]) * t
 
 
 if __name__ == "__main__":
