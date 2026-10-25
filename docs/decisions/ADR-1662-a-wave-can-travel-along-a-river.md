@@ -32,6 +32,8 @@
   path past the corner is lit and the first leg's straight continuation is not; a dark or distant path wave
   beside a ring leaves the ground's hash; the water with no path wave lit, or a dark one, hashes the same as a
   shader with the three blocks removed, plain and cinematic, and its light and its ripples each change it).
+  Across builds (once, at the commit): `examples/effects/ufo-stack.json` (ground pulses) and the QA water scene
+  rendered to PNG at 3.0-3.2 s by this build and by the build before it (acf387ae) are byte-identical, frame for frame.
 
 ## Context
 
