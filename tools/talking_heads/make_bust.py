@@ -17,9 +17,12 @@ contour. Quad topology, no decimation: the ring and segment counts set the trian
         --out examples/sonic-abstract/meshes [--previews ~/Desktop/av-gen-review/talking-heads/bust] [--samples 48]
 
 Writes to --out:
-- th-bust.glb: shell + mouth, two materials;
-- th-bust-ghost.glb: the same geometry, one alpha-BLEND material, for the spectral copies;
-- th-bust.anchors.json: emitter anchors (mouth, eyes, head centre) in the GLB frame, and the mesh statistics.
+- th-head.glb: the head and upper neck (porcelain + mouth_interior), its origin AT THE NECK JOINT, closed by a dome;
+- th-body.glb: the lower neck and bust, closed by a dome rising into the head, with a collar ring over the seam;
+- th-head-ghost.glb, th-body-ghost.glb: the same pieces, one alpha-BLEND material, for the spectral copies;
+- th-bust.anchors.json: the joint, the emitter anchors in the head's frame, and the mesh statistics.
+The head tilts back about the joint (the owner, 2026-10-25: "when the head talks its head can tilt back") with no gap
+up to 32 degrees: the body's dome fills the throat as it opens.
 
 Units: metres. Blender Z-up, the face looks down -Y. The glTF exporter's +Y-up conversion gives +Y up and the face
 toward **+Z** in the GLB (Blender (x, y, z) -> glTF (x, z, -y)). Origin: the centre of the base's bottom face. Height
@@ -315,51 +318,150 @@ def silhouette(cam, ob, name):
         s.material = m
 
 
+NECK_PIVOT_Z = 0.300   # the neck joint: the upper neck just below the jaw (the owner's circled point)
+TILT_TEST_DEG = 32.0   # the tilt the seam is checked at
+
+
+def split_piece(src, name, keep_above):
+    """A copy of the bust cut at the neck joint's plane: the head (above) or the body (below)."""
+    me = src.data.copy()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(0, 0, NECK_PIVOT_Z), plane_no=(0, 0, 1),
+                           clear_inner=keep_above, clear_outer=not keep_above)
+    bm.to_mesh(me)
+    bm.free()
+    return ob
+
+
+def add_joint_shapes(ob, up, collar):
+    """Close a piece at the joint with a dome of the neck's own cross-section, pushed 0.6 mm inside it: the body's dome
+    rises into the head (it fills the gap that opens at the front of the throat when the head tilts back), the head's
+    dome hangs into the body. The body also gets a thin collar ring over the seam: a mannequin's neck joint."""
+    W, DF, DB, CY, _N = interp(NECK_PIVOT_Z)
+    ry = 0.5 * (DF + DB)
+    cy = CY + 0.5 * (DB - DF)
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    rings, seg = 10, 48
+    verts = []
+    for i in range(rings + 1):
+        t = (math.pi / 2) * i / rings
+        r, h = math.cos(t), math.sin(t) * (1.0 if up else -1.0)
+        row = []
+        for k in range(seg if i < rings else 1):
+            a = 2.0 * math.pi * k / seg
+            row.append(bm.verts.new(((W - 0.0006) * r * math.cos(a), cy + (ry - 0.0006) * r * math.sin(a),
+                                     NECK_PIVOT_Z + 0.85 * ry * h)))
+        verts.append(row)
+    faces = []
+    for i in range(rings - 1):
+        for k in range(seg):
+            q = (verts[i][k], verts[i][(k + 1) % seg], verts[i + 1][(k + 1) % seg], verts[i + 1][k])
+            faces.append(bm.faces.new(q if up else q[::-1]))
+    for k in range(seg):
+        q = (verts[rings - 1][k], verts[rings - 1][(k + 1) % seg], verts[rings][0])
+        faces.append(bm.faces.new(q if up else q[::-1]))
+    if collar:
+        # an elliptical tube round the seam: major radii 4% over the neck, minor radius 3.5 mm
+        segs, sides, mr = 64, 10, 0.0035
+        ring = []
+        for k in range(segs):
+            a = 2.0 * math.pi * k / segs
+            cx, cyy = (W * 1.04) * math.cos(a), cy + (ry * 1.04) * math.sin(a)
+            nx, ny = math.cos(a) / (W * 1.04), math.sin(a) / (ry * 1.04)
+            nl = math.hypot(nx, ny)
+            nx, ny = nx / nl, ny / nl
+            ring.append([bm.verts.new((cx + mr * math.cos(b) * nx, cyy + mr * math.cos(b) * ny,
+                                       NECK_PIVOT_Z + mr * math.sin(b)))
+                         for b in (2.0 * math.pi * j / sides for j in range(sides))])
+        for k in range(segs):
+            for j in range(sides):
+                faces.append(bm.faces.new((ring[k][j], ring[(k + 1) % segs][j], ring[(k + 1) % segs][(j + 1) % sides],
+                                           ring[k][(j + 1) % sides])))
+    for f in faces:
+        f.material_index = 0
+        f.smooth = True
+    bm.to_mesh(ob.data)
+    bm.free()
+
+
+def shift(ob, by):
+    for v in ob.data.vertices:
+        v.co -= by
+    ob.data.update()
+
+
+def ghost_material():
+    """The ghost: the same surface, one blended material (its program writes its colour and opacity at runtime)."""
+    ghost = make_mat("ghost", (0.0, 0.0, 0.0), 0.5, 0.0)
+    ghost.node_tree.nodes["Principled BSDF"].inputs["Alpha"].default_value = 0.4
+    ghost.surface_render_method = "BLENDED"
+    return ghost
+
+
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     ob = build_mesh()
     assign_regions(ob)
-    st = stats(ob)
     mouth = surface_point(ob, 0.0, MOUTH_Z)
     lip = surface_point(ob, 0.0, MOUTH_Z + 0.012)
     eyes = [surface_point(ob, s * EYE_DEG, EYE_Z) for s in (1, -1)]   # +X first = the bust's LEFT eye
-    head = Vector((0.0, interp(0.465)[3], 0.465))
+    centre = Vector((0.0, interp(0.465)[3], 0.465))
+    pivot = Vector((0.0, interp(NECK_PIVOT_Z)[3], NECK_PIVOT_Z))
+    # the two pieces: the head (with the upper neck) and the body (lower neck and bust), each closed at the joint
+    head = split_piece(ob, "th-head", True)
+    body = split_piece(ob, "th-body", False)
+    add_joint_shapes(head, up=False, collar=False)
+    add_joint_shapes(body, up=True, collar=True)
+    shift(head, pivot)  # the head's origin IS the joint, so turning its node turns it about the neck
+    H = lambda v: to_gltf(v - pivot)
     anchors = {
-        "note": "Emitter anchors for the node's LOCAL space (tools/talking_heads/make_bust.py). 'gltf' is the exported "
-                "GLB's frame (+Y up, face +Z, metres, origin at the base's bottom centre). eyeLeft is the bust's own left "
-                "(+X). mouthBack is the back of the mouth cavity (the hero beam's apex).",
-        "blender": {"mouth": [round(c, 4) for c in mouth], "eyeLeft": [round(c, 4) for c in eyes[0]],
-                    "eyeRight": [round(c, 4) for c in eyes[1]], "headCentre": [round(c, 4) for c in head]},
-        "gltf": {"mouth": to_gltf(Vector((0.0, lip.y, MOUTH_Z))), "mouthBack": to_gltf(mouth), "eyeLeft": to_gltf(eyes[0]), "eyeRight": to_gltf(eyes[1]),
-                 "headCentre": to_gltf(head), "forward": [0.0, 0.0, 1.0], "up": [0.0, 1.0, 0.0]},
-        "mesh": st,
+        "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). 'head' points "
+                "are in th-head.glb's own frame, whose origin is the neck joint; 'body' points in th-body.glb's frame "
+                "(origin at the base's bottom centre). Place the head node at body.neckPivot as a child of the body; "
+                "turning it about its X axis tilts the head (negative = chin up, back). eyeLeft is the bust's own "
+                "left (+X). mouthBack is the back of the mouth cavity (the hero beam's apex).",
+        "head": {"mouth": H(Vector((0.0, lip.y, MOUTH_Z))), "mouthBack": H(mouth), "eyeLeft": H(eyes[0]),
+                 "eyeRight": H(eyes[1]), "headCentre": H(centre), "forward": [0.0, 0.0, 1.0], "up": [0.0, 1.0, 0.0]},
+        "body": {"neckPivot": to_gltf(pivot), "tiltSeamTestedDeg": TILT_TEST_DEG},
+        "mesh": {"head": stats(head), "body": stats(body), "whole": stats(ob)},
     }
     with open(os.path.join(OUT, "th-bust.anchors.json"), "w") as f:
         json.dump(anchors, f, indent=1)
         f.write("\n")
-    export(ob, os.path.join(OUT, "th-bust.glb"))
-    # the ghost: the same surface, one blended material (its program writes its colour and opacity at runtime)
-    ghost = make_mat("ghost", (0.0, 0.0, 0.0), 0.5, 0.0)
-    ghost.node_tree.nodes["Principled BSDF"].inputs["Alpha"].default_value = 0.4
-    ghost.surface_render_method = "BLENDED"
-    ob.data.materials.clear()
-    ob.data.materials.append(ghost)
-    export(ob, os.path.join(OUT, "th-bust-ghost.glb"))
-    print("BUST_STATS", json.dumps(st))
+    export(head, os.path.join(OUT, "th-head.glb"))
+    export(body, os.path.join(OUT, "th-body.glb"))
+    gm = ghost_material()
+    for piece, name in ((head, "th-head-ghost.glb"), (body, "th-body-ghost.glb")):
+        keep = [m for m in piece.data.materials]
+        piece.data.materials.clear()
+        piece.data.materials.append(gm)
+        export(piece, os.path.join(OUT, name))
+        piece.data.materials.clear()
+        for m in keep:
+            piece.data.materials.append(m)
+    print("BUST_STATS", json.dumps(anchors["mesh"]))
     if not PREV:
         return
-    ob.data.materials.clear()
-    assign_regions(ob)
+    bpy.data.objects.remove(ob)
+    head.location = pivot  # reassemble for the previews
     cam = setup_render()
     shoot(cam, 0, "bust-front.png")
     shoot(cam, 35, "bust-three-quarter.png")
     shoot(cam, -90, "bust-profile.png")
     shoot(cam, 20, "bust-face-close.png", dist=0.75, height=0.47, aim_z=0.43)
-    # the engine's framing: 50 mm, three-quarter, a little above (the camera that made the probe read as a pawn)
     bpy.context.scene.camera.data.lens = 50
     shoot(cam, 28, "bust-engine-framing.png", dist=1.9, height=0.55, aim_z=0.36)
+    # the seam at full tilt, chin up: a NEGATIVE turn about X (+X tips the face, which looks down -Y, downward)
+    head.rotation_euler = (-math.radians(TILT_TEST_DEG), 0.0, 0.0)
+    shoot(cam, -90, "bust-tilt-profile.png", dist=2.0)
+    shoot(cam, -35, "bust-tilt-three-quarter.png")
+    shoot(cam, -20, "bust-tilt-throat-close.png", dist=0.7, height=0.30, aim_z=0.31)
     bpy.context.scene.camera.data.lens = 85
-    silhouette(cam, ob, "bust-silhouette")
 
 
 def export(ob, path):

@@ -17,6 +17,7 @@ R clip --range 128:140 --only tear --stems --out "$OUT/06-signal-tearing.mp4"
 R clip --range 60:80 --stems --out "$OUT/07-combined-feline-stems.mp4"
 R clip --range 48:63 --wav trench --out "$OUT/07b-combined-trench-mix.mp4"
 R clip --range 190:210 --out "$OUT/08-quiet-recovery.mp4"
+R clip --range 40:64 --only mouth,eyes --out "$OUT/09-head-tilts-back-while-talking.mp4"
 for rep in 1 2 3; do
   R bench --range 60: --frames 360 --stems --out "$OUT/bench-feline-stems.$rep.json"
   R bench --range 48: --frames 360 --wav trench --out "$OUT/bench-trench.$rep.json"

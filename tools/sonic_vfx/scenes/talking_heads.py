@@ -6,7 +6,9 @@ shivers into coloured spectral copies, is possessed by washes of colour around i
 bad video signal. It falls silent when the music does. One head; no set, no floor, no horizon.
 
 Systems (02-research-engine.md):
-- the bust: a procedural mesh node (tools/talking_heads/make_bust.py -> meshes/th-bust.glb), one material program;
+- the bust: two procedural mesh nodes from tools/talking_heads/make_bust.py -- the body (th-body.glb, node `th-bust`)
+  and the head (th-head.glb, node `th-head`, its child, with its origin at the neck joint) -- so the head can tilt back
+  as it talks (the owner, 2026-10-25), each with the same material program (the body's masks are moved out of reach);
 - emitters: Light Beams owned by the bust that ride it (ADR-1670, `kit.Scene.emitter_fan`);
 - vibration: a Shake on the bust, and two blended ghost copies (gltf children through their own programs);
 - chromatic possession: the program's wash (an OKLab ramp over object-space noise, concentrated by mouth and eye masks)
@@ -28,9 +30,14 @@ ID = "talking-heads"
 TITLE = "Talking Heads"
 HERO_AT = 20.0
 
-MESH = "meshes/th-bust.glb"
-GHOST = "meshes/th-bust-ghost.glb"
-ANCHORS = json.load(open(os.path.join(kit.ABSTRACT_DIR, "meshes", "th-bust.anchors.json")))["gltf"]
+BODY_MESH = "meshes/th-body.glb"
+HEAD_MESH = "meshes/th-head.glb"
+BODY_GHOST = "meshes/th-body-ghost.glb"
+HEAD_GHOST = "meshes/th-head-ghost.glb"
+_A = json.load(open(os.path.join(kit.ABSTRACT_DIR, "meshes", "th-bust.anchors.json")))
+ANCHORS = _A["head"]               # every emitter and mask point is in the HEAD's frame (origin at the neck joint)
+NECK_PIVOT = _A["body"]["neckPivot"]
+PROGS = ("th-head", "th-body")
 MOUTH = ANCHORS["mouthBack"]
 MOUTH_LIP = ANCHORS["mouth"]
 EYE_L = ANCHORS["eyeLeft"]
@@ -96,7 +103,7 @@ INDEX_ENTRY = {
                    "drums source the hits). A porcelain mannequin bust speaks through the music: a cone of light and "
                    "rays from its mouth, narrow rays from its eyes, spectral copies on the bass, colour washes on the "
                    "voice, signal tears on the snare; it falls silent when the music does. MIDI: CC 1 master, CC 2 "
-                   "mouth, CC 3 eyes, CC 4 vibration, CC 5 tearing, CC 6 colour, CC 7 gain, CC 8 palette (each rests "
+                   "mouth, CC 3 eyes, CC 4 vibration, CC 5 tearing, CC 6 colour, CC 7 gain, CC 8 palette, CC 9 head tilt (each rests "
                    "at its middle and picks up); pads 36 hush, 37 speak, 38 overload, 39 burst. "
                    "docs/prototypes/talking-heads/.",
     "live": True,
@@ -132,19 +139,21 @@ def ellipsoid(o, label, dst, centre, radii, src=0):
           constant=[1.0 / radii[0] ** 2, 1.0 / radii[1] ** 2, 1.0 / radii[2] ** 2, 1.0])
 
 
-BUST = Ops()
+BUST = Ops()   # the head's op list; the body's is identical op for op, so one index names an op in both
 
 
-def bust_program():
-    """th-bust: porcelain, darkened sockets and mouth, the possession wash, the mouth glow and the signal bands.
-    Registers: r0 local position, r1 mouth mask, r2 eye mask, r3 porcelain, r5 wash colour, r6 wash amount,
-    r7 base colour out, r4 emission out."""
-    o = BUST
+def bust_program(name, masks=True):
+    """Porcelain, darkened sockets and mouth, the possession wash, the mouth glow and the signal bands. Registers: r0
+    local position, r1 mouth mask, r2 eye mask, r3 porcelain, r5 wash colour, r6 wash amount, r7 base colour out, r4
+    emission out. The body has no face: its masks sit far outside it (`masks=False`) and read 0 everywhere."""
+    o = BUST if masks else Ops()
+    far = [0.0, 0.0, 0.0] if masks else [9.0, 9.0, 9.0]
+    MOUTH_, EYE_L_, EYE_R_ = ([[a + f for a, f in zip(p, far)] for p in (MOUTH, EYE_L, EYE_R)])
     o.add("local", "input", 0, input="localPosition")
     # the masks (object space, so they ride every motion; before the deformers, so a tear does not move them)
-    ellipsoid(o, "mouth", 1, [0.0, MOUTH[1], MOUTH[2]], [0.021, 0.0068, 0.024])
-    ellipsoid(o, "eyeL", 2, [EYE_L[0], EYE_L[1], EYE_L[2] - 0.004], [0.021, 0.012, 0.030])
-    ellipsoid(o, "eyeR", 3, [EYE_R[0], EYE_R[1], EYE_R[2] - 0.004], [0.021, 0.012, 0.030])
+    ellipsoid(o, "mouth", 1, [MOUTH_[0], MOUTH_[1], MOUTH_[2]], [0.021, 0.0068, 0.024])
+    ellipsoid(o, "eyeL", 2, [EYE_L_[0], EYE_L_[1], EYE_L_[2] - 0.004], [0.021, 0.012, 0.030])
+    ellipsoid(o, "eyeR", 3, [EYE_R_[0], EYE_R_[1], EYE_R_[2] - 0.004], [0.021, 0.012, 0.030])
     o.add("eyes", "add", 2, srcA=2, srcB=3)
     # porcelain: warm ivory (routable), sockets to 60%, the mouth's cavity to near black
     o.add("ivory", "constant", 3, constant=list(IVORY) + [1.0])
@@ -183,7 +192,7 @@ def bust_program():
     o.add("bandColour", "multiply", 1, srcA=1, srcB=5)
     o.add("bandAdd", "add", 4, srcA=4, srcB=1)
     assert len(o.ops) <= 48, len(o.ops)
-    return {"name": "th-bust", "ops": o.ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
+    return {"name": name, "ops": o.ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
             "emissionIntensity": 1.0, "opacity": -1}
 
 
@@ -246,16 +255,22 @@ def build():
     # ---- the bust (a procedural mesh node, for the shear deformer) and its spectral copies
     shear = [{"kind": "sine", "amount": 0.0, "frequency": 240.0, "speed": 0.0, "phase": 0.0,
               "axis": [0.0, 1.0, 0.0], "displacementAxis": [1.0, 0.0, 0.0], "space": "local"}]
-    s.proc("th-bust", {"kind": "mesh", "asset": MESH},
-           material={"baseColor": list(IVORY), "roughness": 0.36, "metallic": 0.0, "program": "th-bust"},
-           deformers=shear, position=[0.0, 0.0, 0.0], rotation=[0.0, 0.0, 0.0], scale=[1.0, 1.0, 1.0],
-           extra={"castsShadow": False})
-    s.entity("th-bust")
-    for name, prog in (("th-ghostA", "th-ghostA"), ("th-ghostB", "th-ghostB")):
-        s.nodes.append({"name": name, "kind": "gltf", "asset": GHOST, "position": [0.0, 0.0, 0.0],
-                        "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": "th-bust",
-                        "castsShadow": False, "program": prog})
-    s.program(bust_program())
+    for node, mesh, prog, parent, at in (("th-bust", BODY_MESH, "th-body", None, [0.0, 0.0, 0.0]),
+                                         ("th-head", HEAD_MESH, "th-head", "th-bust", NECK_PIVOT)):
+        s.proc(node, {"kind": "mesh", "asset": mesh},
+               material={"baseColor": list(IVORY), "roughness": 0.36, "metallic": 0.0, "program": prog},
+               deformers=[dict(d) for d in shear], position=at, rotation=[0.0, 0.0, 0.0], scale=[1.0, 1.0, 1.0],
+               parent=parent, extra={"castsShadow": False})
+        s.entity(node)
+    # the spectral copies: one per piece and colour, each riding its piece (the head's copies tilt with the head)
+    for colour in ("A", "B"):
+        for name, mesh, parent in (("th-ghost%s" % colour, BODY_GHOST, "th-bust"),
+                                   ("th-ghost%sh" % colour, HEAD_GHOST, "th-head")):
+            s.nodes.append({"name": name, "kind": "gltf", "asset": mesh, "position": [0.0, 0.0, 0.0],
+                            "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": parent,
+                            "castsShadow": False, "program": "th-ghost" + colour})
+    s.program(bust_program("th-head", masks=True))
+    s.program(bust_program("th-body", masks=False))
     s.program(ghost_program("th-ghostA", MAGENTA))
     s.program(ghost_program("th-ghostB", BLUE))
 
@@ -267,19 +282,20 @@ def build():
                 colorEnd=hexrgb(VIOLET) + [0.0], emissive=1.4, blend="additive")
 
     # ---- the effects on the bust
-    mouth = s.emitter_fan("th-mouth", "th-bust", MOUTH, MOUTH_RAYS)
-    eye_l = s.emitter_fan("th-eyeL", "th-bust", EYE_L,
+    mouth = s.emitter_fan("th-mouth", "th-head", MOUTH, MOUTH_RAYS)
+    eye_l = s.emitter_fan("th-eyeL", "th-head", EYE_L,
                           [dict(r, yaw=r["yaw"] + 3.0) for r in EYE_RAYS], look=EYE_LOOK)
-    eye_r = s.emitter_fan("th-eyeR", "th-bust", EYE_R,
+    eye_r = s.emitter_fan("th-eyeR", "th-head", EYE_R,
                           [dict(r, yaw=r["yaw"] - 3.0) for r in EYE_RAYS], look=EYE_LOOK)
     s.effect("th-shake", "shake", ("entity", "th-bust"),
              parameters={"trauma": 0.0, "amplitude": 0.004, "rotation": 1.0, "frequency": 17.0, "decay": 0.0,
                          "seed": 7.0})
     s.effect("th-float", "float", ("entity", "th-bust"),
              parameters={"height": 0.007, "period": 9.0, "tilt": 1.2, "yaw": 2.5, "sway": 0.004, "seed": 3.0})
-    s.effect("th-glow", "glow", ("entity", "th-bust"),
-             parameters={"gain": 1.0, "tint": hexrgb(MAGENTA), "glow": 0.0, "rim": 0.05,
-                         "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
+    for gid, ent in (("th-glow", "th-bust"), ("th-glowH", "th-head")):
+        s.effect(gid, "glow", ("entity", ent),
+                 parameters={"gain": 1.0, "tint": hexrgb(MAGENTA), "glow": 0.0, "rim": 0.05,
+                             "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
 
     # ---- post: a restrained bloom; the glitch passes rest at 0 and only routes open them
     s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.42, "post/bloom/threshold": 0.9,
@@ -311,7 +327,9 @@ def sig(name, inputs, combine="firstActive", chain=None, event=False):
 
 
 CHANNELS = [("master", 1), ("mouth", 2), ("eyes", 3), ("vibration", 4), ("tear", 5), ("chroma", 6), ("gain", 7),
-            ("palette", 8)]
+            ("palette", 8), ("tilt", 9)]
+HEAD_TILT_DEG = 20.0   # degrees back at signal.tilt 1, knob at rest; overload lifts it to 1.6 (32, the seam's tested
+                       # angle); the knob turned fully up doubles it
 PADS = [("padHush", 36), ("padSpeak", 37), ("padOverload", 38), ("padBurst", 39)]
 
 
@@ -338,6 +356,14 @@ def signals_and_control(s):
                                                                       "clampMin": 0.0, "clampMax": 1.0,
                                                                       "attackMs": 300.0, "decayMs": 2500.0}},
                           {"source": "control.padOverload", "chain": hold(6000.0, 0.35)}], combine="max"),
+        # the head's tilt back: the voice above its middle, slowly, plus a bigger lift on overload (summed after
+        # each input's own slow chain), so it lifts as it speaks and settles as it falls silent -- never a nod
+        sig("tilt", [{"source": "signal.voice", "chain": {"remapEnabled": True, "remapInMin": 0.3, "remapInMax": 0.85,
+                                                           "remapOutMin": 0.0, "remapOutMax": 1.0, "clampEnabled": True,
+                                                           "clampMin": 0.0, "clampMax": 1.0, "attackMs": 1400.0,
+                                                           "decayMs": 2600.0}},
+                     {"source": "signal.overload", "amount": 0.55, "chain": {"attackMs": 900.0, "decayMs": 3000.0}}],
+            combine="sum", chain={"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.6}),
     ]
     s.sources += [{"kind": "noise", "name": n, "settings": {}} for n in
                   ("waverA", "waverB", "eyeL", "eyeR", "yaw", "pitch", "diverge")]
@@ -347,6 +373,8 @@ def signals_and_control(s):
     s.map(M("present", [("signal.awake", 1.0), ("signal.hush", 1.0, True)], "product"))
     s.map2(*[M(name + "Gate", [("visual.present", 1.0), ("control.master", 1.0), ("control." + name, 1.0)],
                "product", gain=2.0) for name in ("mouth", "eyes", "vibration", "tear", "chroma")])
+    # the head's tilt: presence x its own knob (rest 0.5 -> depth 1; not the master, which scales the effects, not the pose)
+    s.map2(M("tiltGate", [("visual.present", 1.0), ("control.tilt", 1.0)], "product"))
     # which eye a hat fires: two slow noises through the eyes' gate
     s.map3(M("eyeLPick", [("noise.eyeL", 1.0), ("visual.eyesGate", 1.0)], "product", gain=1.6),
            M("eyeRPick", [("noise.eyeR", 1.0), ("visual.eyesGate", 1.0)], "product", gain=1.6))
@@ -381,11 +409,11 @@ def routes(s, mouth, eye_l, eye_r):
                   depth="signal.voice"),
                 R("noise.waverB" if i % 2 else "noise.waverA", fx(r, "pitch"), 4.0, polarity="bipolar",
                   depth="signal.voice"))
-    s.route(R("signal.voice", "material/th-bust/op/%d/constant/constant" % BUST.at["mouthGlow"], 3.0, comp=0,
+    s.route(R("signal.voice", "material/th-head/op/%d/constant/constant" % BUST.at["mouthGlow"], 3.0, comp=0,
               depth=G("mouth"), attackMs=30, decayMs=300),
-            R("signal.voice", "material/th-bust/op/%d/constant/constant" % BUST.at["mouthGlow"], 1.6, comp=1,
+            R("signal.voice", "material/th-head/op/%d/constant/constant" % BUST.at["mouthGlow"], 1.6, comp=1,
               depth=G("mouth"), attackMs=30, decayMs=300),
-            R("signal.voice", "material/th-bust/op/%d/constant/constant" % BUST.at["mouthGlow"], 2.6, comp=2,
+            R("signal.voice", "material/th-head/op/%d/constant/constant" % BUST.at["mouthGlow"], 2.6, comp=2,
               depth=G("mouth"), attackMs=30, decayMs=300))
     # ---- eyes (E rows): bursts on the hats, one eye or the other; a quiet shimmer floor on the highs
     for ids, pick in ((eye_l, "visual.eyeLPick"), (eye_r, "visual.eyeRPick")):
@@ -402,46 +430,57 @@ def routes(s, mouth, eye_l, eye_r):
             R("signal.kickEnv", "fx/th-shake/trauma", 1.2, depth=G("vibration"), attackMs=0, decayMs=160,
               **clamp(1.0)))
     for ghost, sgn in (("th-ghostA", 1.0), ("th-ghostB", -1.0)):
-        s.route(R("signal.bassLevel", "nodes/%s/position" % ghost, 0.012 * sgn, comp=0, depth=G("vibration"),
-                  attackMs=20, decayMs=300),
-                R("signal.bassLevel", "nodes/%s/position" % ghost, 0.008 * sgn, comp=1, depth=G("vibration"),
-                  attackMs=20, decayMs=300),
-                R("signal.kickEnv", "nodes/%s/position" % ghost, 0.03 * sgn, comp=0, depth=G("vibration"),
-                  attackMs=0, decayMs=180),
-                R("signal.overload", "nodes/%s/position" % ghost, 0.02 * sgn, comp=0, attackMs=0, decayMs=800),
-                R("signal.bassLevel", "material/%s/op/4/constant/constant" % ghost, 0.5, comp=0, depth=G("vibration"),
+        for node in (ghost, ghost + "h"):   # the body's copy and the head's (which tilts with the head)
+            s.route(R("signal.bassLevel", "nodes/%s/position" % node, 0.012 * sgn, comp=0, depth=G("vibration"),
+                      attackMs=20, decayMs=300),
+                    R("signal.bassLevel", "nodes/%s/position" % node, 0.008 * sgn, comp=1, depth=G("vibration"),
+                      attackMs=20, decayMs=300),
+                    R("signal.kickEnv", "nodes/%s/position" % node, 0.03 * sgn, comp=0, depth=G("vibration"),
+                      attackMs=0, decayMs=180),
+                    R("signal.overload", "nodes/%s/position" % node, 0.02 * sgn, comp=0, attackMs=0, decayMs=800))
+        s.route(R("signal.bassLevel", "material/%s/op/4/constant/constant" % ghost, 0.5, comp=0, depth=G("vibration"),
                   attackMs=20, decayMs=300, **clamp(0.6)),
                 R("signal.kickEnv", "material/%s/op/4/constant/constant" % ghost, 0.5, comp=0, depth=G("vibration"),
                   attackMs=0, decayMs=180, **clamp(0.6)))
-    # ---- chromatic possession (C rows)
-    wash = "material/th-bust/op/%d/remap/constant" % BUST.at["washAmount"]
-    s.route(R("signal.voice", wash, 0.10, comp=2, depth=G("chroma"), attackMs=250, decayMs=2400),
-            R("signal.voice", wash, 0.8, comp=3, depth=G("chroma"), attackMs=250, decayMs=2400),
-            R("signal.overload", wash, 0.5, comp=3, attackMs=0, decayMs=1500),
-            R("response.onset", "fx/th-glow/glow", 0.5, depth=G("chroma"), attackMs=0, decayMs=250),
-            R("response.intensity", "material/th-bust/op/%d/remap/constant" % BUST.at["washSpread"], -0.25,
-              comp=2, attackMs=2500, decayMs=5000),
-            R("control.palette", "material/th-bust/op/%d/remap/constant" % BUST.at["washSpread"], -0.6, comp=2),
-            # the wash crawls: an integrating route scrolls the noise's offset while the voice speaks
-            R("signal.voice", "material/th-bust/op/%d/noise/constant" % BUST.at["washNoise"], 0.25, comp=1,
-              integrate=True, attackMs=100, decayMs=600))
-    # ---- tearing (T rows, D4): full-screen bursts, local bands, the shear
+    # ---- chromatic possession (C rows): both pieces' programs (same op indices)
+    for prog in PROGS:
+        op = lambda label, kind: "material/%s/op/%d/%s/" % (prog, BUST.at[label], kind)
+        s.route(R("signal.voice", op("washAmount", "remap") + "constant", 0.04, comp=2, depth=G("chroma"),
+                  attackMs=250, decayMs=2400),
+                R("signal.voice", op("washAmount", "remap") + "constant", 1.0, comp=3, depth=G("chroma"),
+                  attackMs=250, decayMs=2400),
+                R("signal.overload", op("washAmount", "remap") + "constant", 0.12, comp=2, attackMs=0, decayMs=1500),
+                R("signal.overload", op("washAmount", "remap") + "constant", 0.5, comp=3, attackMs=0, decayMs=1500),
+                R("response.intensity", op("washSpread", "remap") + "constant", -0.25, comp=2, attackMs=2500,
+                  decayMs=5000),
+                R("control.palette", op("washSpread", "remap") + "constant", -0.6, comp=2),
+                # the wash crawls: an integrating route scrolls the noise's offset while the voice speaks
+                R("signal.voice", op("washNoise", "noise") + "constant", 0.25, comp=1, integrate=True, attackMs=100,
+                  decayMs=600),
+                R("signal.snare", op("bands", "threshold") + "value", -0.35, depth=G("tear"), attackMs=0,
+                  decayMs=150))
+    for gid in ("th-glow", "th-glowH"):
+        s.route(R("response.onset", "fx/%s/glow" % gid, 0.5, depth=G("chroma"), attackMs=0, decayMs=250))
+    # ---- tearing (T rows, D4): full-screen bursts, local bands (above), the shear on both pieces
     s.route(R("signal.snare", "post/glitch/tear", 0.5, depth=G("tear"), attackMs=0, decayMs=120, **clamp(0.6)),
             R("signal.snare", "post/glitch/tearShift", 90.0, depth=G("tear"), attackMs=0, decayMs=120),
             R("signal.snare", "post/split/amount", 8.0, depth=G("tear"), attackMs=0, decayMs=110),
             R("signal.overload", "post/glitch/amount", 0.025, depth=G("tear"), attackMs=0, decayMs=800),
-            R("signal.overload", "post/glitch/tear", 0.15, depth=G("tear"), attackMs=0, decayMs=800),
-            R("signal.snare", "material/th-bust/op/%d/threshold/value" % BUST.at["bands"], -0.35, depth=G("tear"),
-              attackMs=0, decayMs=150),
-            R("audio.treble", "procedural/th-bust/deform/1/amount", 0.0016, depth=G("tear"), attackMs=10,
-              decayMs=120),
-            R("signal.snare", "procedural/th-bust/deform/1/amount", 0.006, depth=G("tear"), attackMs=0,
-              decayMs=140),
-            R("signal.snare", "procedural/th-bust/deform/1/phase", 20.0, integrate=True, attackMs=0, decayMs=140))
-    # ---- life (L rows; not gated: the head is faintly alive in silence)
+            R("signal.overload", "post/glitch/tear", 0.15, depth=G("tear"), attackMs=0, decayMs=800))
+    for node in ("th-bust", "th-head"):
+        s.route(R("audio.treble", "procedural/%s/deform/1/amount" % node, 0.0016, depth=G("tear"), attackMs=10,
+                  decayMs=120),
+                R("signal.snare", "procedural/%s/deform/1/amount" % node, 0.006, depth=G("tear"), attackMs=0,
+                  decayMs=140),
+                R("signal.snare", "procedural/%s/deform/1/phase" % node, 20.0, integrate=True, attackMs=0,
+                  decayMs=140))
+    # ---- life (L rows; not gated: the head is faintly alive in silence). The whole bust turns slowly; the head
+    # tilts back about the neck joint as it talks (signal.tilt: slow attack and release, a bigger lift on overload)
+    # with the small sprung nod on top.
     s.route(R("noise.yaw", "procedural/th-bust/transform/rotation", 6.0, comp=1, polarity="bipolar"),
-            R("noise.pitch", "procedural/th-bust/transform/rotation", 3.0, comp=0, polarity="bipolar"),
-            R("response.onset", "procedural/th-bust/transform/rotation", 1.5, comp=0, depth="response.onsetLow",
+            R("noise.pitch", "procedural/th-bust/transform/rotation", 2.0, comp=0, polarity="bipolar"),
+            R("signal.tilt", "procedural/th-head/transform/rotation", -HEAD_TILT_DEG, comp=0, depth="visual.tiltGate"),
+            R("response.onset", "procedural/th-head/transform/rotation", 1.2, comp=0, depth="response.onsetLow",
               attackMs=0, decayMs=80, springHz=3.5, springDamping=0.5))
     # ---- residual trails in overload
     s.route(R("signal.overload", "temporal/echo/strength", 0.3, attackMs=250, decayMs=900))
@@ -455,3 +494,5 @@ def routes(s, mouth, eye_l, eye_r):
     for r in s.routes:
         if r.get("depthSource", "").endswith("Gate") or r.get("depthSource", "").endswith("Pick"):
             r["depthMax"] = 2.0
+        if r.get("depthSource") == "visual.tiltGate":
+            r["depthMax"] = 2.0   # at rest (gate 0.5) the depth is 1: up to 20 degrees speaking, 32 in overload
