@@ -148,9 +148,10 @@ INDEX_ENTRY = {
                    "mouth; between notes they look round the room, eyes darting. MIDI: CC 1 master, CC 2 rays, CC 3 gate "
                    "sensitivity, CC 4 copies, CC 5 tearing, CC 6 colour, CC 7 gain, CC 8 palette, CC 9 head tilt (each "
                    "rests at its middle and picks up); pad 36 holds every gate shut, 37 holds them open, 39 bursts. "
+                   "Opening it turns live input on (View > Live); PageUp/PageDown step through the Sonic Abstract set. "
                    "docs/prototypes/talking-heads/.",
     "live": True,
-    "name": TITLE,
+    "name": kit.ABSTRACT_CATEGORY + " - " + TITLE,
     "project": "sonic-abstract/" + ID + ".json",
 }
 
