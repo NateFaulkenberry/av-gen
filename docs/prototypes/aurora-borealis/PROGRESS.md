@@ -880,3 +880,41 @@ All from 514b40a3, the same build.
 | `10-visibility-per-note.txt` | visibility per note |
 | `11-fish-below-the-surface-check.txt` | the fish check |
 | `12-headless-ultra-ab-pass6-vs-pass7.txt` | headless, pass 6 against pass 7 |
+
+## Pass 8: a lit, deeper underwater (stop, 2026-10-25)
+
+The owner: "if we could just make the underwater slightly more illuminated its hard to see the geometry / fish also make
+the river bed deeper so theres more room for fish etc". Everything else is pass 7's. On the open pass-7 questions I took
+the defaults: the seam fix stays (the under-water strip stays out), and the Moog's soft-note sensitivity stays.
+
+- **Underwater light:**
+  - **A base light:** the bed's program adds blue-violet #3428a0 at every depth (was the near-black #010106), and the
+    shelf tint is a little brighter (#241e70).
+  - **The fish** are #5a48e0, a touch brighter than the bed, so they stand off it between pulses.
+  - **The pulses** put about a third more light on the bed: `bed` 4.5/3.6/3.9, was 3.5/2.8/3.0.
+  - **Absorption** is 27% of pass 7's, [0.02, 0.016, 0.011].
+  - **The mirror** is at 0.9 (was 1.1), so the lit water under it shows. The reflections stay.
+  - **First take:** two thirds of the absorption and a dimmer base light did not show through the reflection. A view 20 m
+    down at 20 degrees runs about 60 m through the water.
+- **A deeper bed and the fish spread through it:**
+  - The bed is about 75 m deep mid-river (was 52), on the same profile up to the banks' waterline rows, with no seam or
+    shelf.
+  - The 18 fish now sit 2.5-30 m down (was 3-9). I kept 18: the extra depth spreads them rather than calling for more.
+- **Checks**, all from afa64fd6, the same build:
+  - **Flash gate:** worst 0.039; 0 general flashes.
+  - **Fish:** the highest vertex of any is 1.50 m down.
+  - **Headless Ultra 1080p, on AC**, pass 7 against pass 8, GPU p50: 13.48 / 13.66 ms at 12 s, 13.22 / 13.57 at 36 s,
+    13.15 / 13.32 at 47 s. That is about 0.2-0.35 ms more, at the edge of the spread.
+
+### Pass-8 stop media: `~/Desktop/av-gen-review/aurora-borealis/pass8/`
+
+| File | What it shows |
+|---|---|
+| `01-underwater-before-left-after-right-wide-8-16s.mp4` | pass 7 (left) against pass 8 (right), the same build, wide, with sound |
+| `02-underwater-before-top-after-bottom-closeup-half-speed-8-16s.mp4` | the same, the water cropped, half speed |
+| `03-underwater-still-before-left-after-right-at-11.2s.png`, `...-13.5s.png` | stills, before and after |
+| `04-five-frames-down-the-river-6-21-36-51-66s.png` | five frames down the river |
+| `05-full-song-0-70s-720p-small.mp4` | the whole song, 720p, 24 MB, with sound |
+| `06-flash-audit-full-song.txt` | the flash audit |
+| `07-fish-below-the-surface-check.txt` | every fish's depth and highest vertex |
+| `08-headless-ultra-ab-pass7-vs-pass8.txt` | headless, pass 7 against pass 8 |
