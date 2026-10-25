@@ -54,14 +54,17 @@ SpanProfile profileSpan(const AnalysisTrack& track, double startSeconds, double 
     const double n = static_cast<double>(out.frames);
     const double seconds = endSeconds - startSeconds;
     out.onsetRate = static_cast<float>(static_cast<double>(onsets) / seconds);
-    // The span's energy is the mean composite of its frames' level-free terms -- not the mean of the
-    // frames' smoothed `energy`, whose one-pole lags a short section (a 7 s riser climbs for most of
-    // its length).
+    // The span's energy is the composite of its frames' level-free terms with the span's OWN onset
+    // rate as the density term -- not the mean of the frames' smoothed `energy`, whose one-pole lags a
+    // short section (a 7 s riser climbs for most of its length) and whose leaky rate carries the
+    // previous section's density into this one.
     for (auto it = first; it != last; ++it) {
         EnergyTerms terms;
         terms.highRatioDb = it->highRatioDb;
         terms.centroidHz = it->centroidHz;
         terms.relativeFlux = it->relativeFlux;
+        terms.onsetRate = out.onsetRate;
+        terms.hasOnsetRate = true;
         terms.width = it->width;
         terms.hasWidth = it->stereo;
         terms.silent = !(it->rms > 1e-7f);

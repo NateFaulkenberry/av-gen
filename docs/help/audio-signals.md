@@ -52,8 +52,8 @@ reads full scale again within seconds. For levels that stay where the music puts
 | `audio.midLevel` | 0 – 1 | | 400 – 2000 Hz, likewise |
 | `audio.highMidLevel` | 0 – 1 | | 2000 – 6000 Hz, likewise |
 | `audio.trebleLevel` | 0 – 1 | | 6000 – 16000 Hz, likewise |
-| `audio.energy` | 0 – 1 | | how much is happening, independent of loudness: high-band share, brightness, flux and stereo width, smoothed over 1 s |
-| `audio.onsetRate` | 0 – 20 | | density: onsets (`audio.onset`) per second over a 2 s window |
+| `audio.energy` | 0 – 1 | | how much is happening, independent of loudness: high-band share, brightness, flux, onset density (a loaded file) and stereo width, smoothed over 1 s |
+| `audio.onsetRate` | 0 – 20 | | density: onsets per second over a 2 s window (live `audio.onset`; a loaded file the whole-track onsets `response.onset` fires on) |
 | `audio.width` | 0 – 2 | | stereo width, side over mid; 0 for mono |
 
 On these scales 6 dB is 0.1. A heavily limited master barely moves `audio.rms`, but its arrangement

@@ -69,16 +69,19 @@ constexpr double kHannEnergyGain = 1.5;
 //   high band   power above 2 kHz relative to the whole spectrum, -36..-12 dB    weight 2
 //   brightness  spectral centroid, log-scaled 250 Hz..6 kHz                       weight 2
 //   flux        spectral flux relative to the frame's magnitude, 0.08..0.24      weight 1
+//   density     onsets per second, 2..12                                          weight 1 (when known)
 //   width       stereo side/mid RMS, 0.1..0.4                                     weight 1 (when known)
 //
 // Each term is clamped to 0..1 on its fixed range and the weighted mean is taken over the terms
-// that are known: live input has no stereo, and a missing term is left out rather than read as
-// zero. Silence (no spectral power) is 0. Unsmoothed; callers smooth it.
+// that are known: live input has no stereo and no whole-track onset rate, and a missing term is
+// left out rather than read as zero. Silence (no spectral power) is 0. Unsmoothed; callers smooth it.
 struct EnergyTerms {
     float highRatioDb = -120.0f;
     float centroidHz = 0.0f;
     float relativeFlux = 0.0f;
+    float onsetRate = 0.0f;
     float width = 0.0f;
+    bool hasOnsetRate = false;
     bool hasWidth = false;
     bool silent = true;
 };
@@ -118,7 +121,8 @@ struct AnalysisFrame {
     float relativeFlux = 0.0f;   // the unclamped flux over the frame's summed magnitude (level-free)
     float width = 0.0f;          // stereo side/mid RMS over the window; meaningful when `stereo`
     bool stereo = false;
-    // Onsets per second (`onset`) through a leaky window of `onsetRateSeconds`.
+    // Onsets per second through a leaky window of `onsetRateSeconds`. Live it counts `onset`; offline
+    // (AnalysisTrack) the causal detector's broadband onsets (`causal`, what `response.onset` fires on).
     float onsetRate = 0.0f;
     // The energy composite (`energyComposite`), smoothed over `energySmoothingSeconds`, 0..1.
     float energy = 0.0f;

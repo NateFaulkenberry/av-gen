@@ -7,7 +7,7 @@
 // vocabulary publishes (signals/stem_signals.hpp). The same `StemAnalyzer` serves both paths, so a stem file and the
 // same audio arriving on an input channel publish the same numbers.
 //
-// Deliberately NOT here: the beat tracker, the meter, the ADR-898 band onsets, the Sonic timbre stage. Those read the
+// Deliberately NOT here: the beat tracker, the meter, the Sonic timbre stage. Those read the
 // main mix only (ADR-1520 §scope).
 //
 // Two tiers, chosen from measured cost (docs/prototypes/stems-multichannel/02-research-report.md §9.1):

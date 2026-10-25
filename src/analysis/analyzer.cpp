@@ -55,6 +55,9 @@ float energyComposite(const EnergyTerms& terms) {
     const float octaves = terms.centroidHz > 0.0f ? std::log2(terms.centroidHz / 250.0f) / std::log2(24.0f) : 0.0f;
     add(clamp01(octaves), 2.0);
     add(on(terms.relativeFlux, 0.08f, 0.24f), 1.0);
+    if (terms.hasOnsetRate) {
+        add(on(terms.onsetRate, 2.0f, 12.0f), 1.0);
+    }
     if (terms.hasWidth) {
         add(on(terms.width, 0.1f, 0.4f), 1.0);
     }
@@ -383,7 +386,8 @@ void Analyzer::computeFrame() {
     onsetRate_ = static_cast<float>(impl.rateKeep * static_cast<double>(onsetRate_) +
                                     (frame.onset ? impl.rateImpulse : 0.0));
     frame.onsetRate = onsetRate_;
-    // The composite of the level-free spectral terms (and the width, when stereo).
+    // The streaming composite: the level-free spectral terms (and the width, when stereo). AnalysisTrack
+    // recomputes it with the density term once the whole track's causal onsets exist.
     EnergyTerms terms;
     terms.highRatioDb = frame.highRatioDb;
     terms.centroidHz = frame.centroidHz;
