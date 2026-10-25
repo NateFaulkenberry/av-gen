@@ -357,9 +357,10 @@ CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the be
 # forward but not the source spot") launched each pulse 40 m behind the camera. Pass 11 (the owner: "they feel late"):
 # the front now starts in view, START_OFFSET in front of the camera, where its light shows on the onset's frame, while its
 # splash still lands SPLASH_BACK behind that -- 40 m behind the camera, in the pulse's own lane (ADR-1666 splashBack)
-START_OFFSET = 200.0
-SPLASH_BACK = 240.0
-NEAR_FADE = 450.0   # the light in the water fades in from 135 m, under the water from 180 m (pass 9-10: 700)
+START_OFFSET = 330.0
+SPLASH_BACK = 370.0
+NEAR_FADE = 700.0   # the light in the water fades in from 210 m (a near fade of 450 m swung the frame by 0.075 at 3.3 s)
+# (the snare starts at 400 m: its narrower, paler core first showed a frame after the onset at 330 m)
 BED_VARIANT = os.environ.get("AB_BED", "coarse")
 
 
@@ -370,7 +371,7 @@ def _whiter(hexcol, k):
 
 def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifetime, fade_out, core, twin, halo,
                wake, wake_growth, disturb, land, bed, reach, reach_height, front_width, lane=0.0, lane_jitter=0.0,
-               splash=0.0, near_wake=0.0, splash_glow=0.0):
+               splash=0.0, near_wake=0.0, splash_glow=0.0, start=None):
     return {"id": name, "name": name, "type": "groundPulse", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "trigger", "trigger": {"source": "signal", "name": signal, "threshold": 0.0},
             # pass 9: a 0.15 s swell into each hit (was instant): with the brighter light under the water, an instant hit
@@ -381,7 +382,7 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
                                "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
                 "propagation": {"kind": "path", "direction": "explicit", "beamRadius": 0.0,
-                                "startOffset": START_OFFSET, "speed": round(rng / travel, 2), "range": rng,
+                                "startOffset": start or START_OFFSET, "speed": round(rng / travel, 2), "range": rng,
                                 "frontWidth": front_width, "trailLength": wake, "falloff": 1.6,
                                 "verticalExtent": 40.0, "verticalGrowth": 0.0, "ringCount": 0.0,
                                 "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
@@ -392,7 +393,7 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                          "land": land, "bed": bed, "embed": EMBED, "bedReach": BED_REACH, "disturb": disturb,
                                          "nearFade": NEAR_FADE, "lane": lane, "laneJitter": lane_jitter,
                                          "splash": splash, "nearWake": near_wake, "splashGlow": splash_glow,
-                                         "splashBack": SPLASH_BACK}},
+                                         "splashBack": SPLASH_BACK + ((start or START_OFFSET) - START_OFFSET)}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
                 "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
@@ -428,7 +429,7 @@ KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=
             splash_glow=SPLASH['kick'][2])
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
              twin=0.0, halo=34.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.12, bed=2.8, reach=600.0,
-             reach_height=200.0, front_width=9.0, lane=85.0, lane_jitter=20.0, splash=SPLASH['snare'][0], near_wake=SPLASH['snare'][1],
+             reach_height=200.0, front_width=9.0, start=400.0, lane=85.0, lane_jitter=20.0, splash=SPLASH['snare'][0], near_wake=SPLASH['snare'][1],
              splash_glow=SPLASH['snare'][2])
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
             twin=0.0, halo=40.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.15, bed=3.5, reach=650.0,

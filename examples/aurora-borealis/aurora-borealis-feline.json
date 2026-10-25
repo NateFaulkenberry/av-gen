@@ -506,7 +506,7 @@
      "kind": "path",
      "direction": "explicit",
      "beamRadius": 0.0,
-     "startOffset": 200.0,
+     "startOffset": 330.0,
      "speed": 1000.0,
      "range": 1600.0,
      "frontWidth": 14.0,
@@ -538,13 +538,13 @@
       "embed": 0.72,
       "bedReach": 75.0,
       "disturb": 0.045,
-      "nearFade": 450.0,
+      "nearFade": 700.0,
       "lane": -85.0,
       "laneJitter": 20.0,
       "splash": 0.11,
       "nearWake": 2.0,
       "splashGlow": 2.5,
-      "splashBack": 240.0
+      "splashBack": 370.0
      }
     },
     "response": {
@@ -618,7 +618,7 @@
      "kind": "path",
      "direction": "explicit",
      "beamRadius": 0.0,
-     "startOffset": 200.0,
+     "startOffset": 400.0,
      "speed": 1300.0,
      "range": 1300.0,
      "frontWidth": 9.0,
@@ -650,13 +650,13 @@
       "embed": 0.72,
       "bedReach": 75.0,
       "disturb": 0.035,
-      "nearFade": 450.0,
+      "nearFade": 700.0,
       "lane": 85.0,
       "laneJitter": 20.0,
       "splash": 0.065,
       "nearWake": 1.4,
       "splashGlow": 1.8,
-      "splashBack": 240.0
+      "splashBack": 440.0
      }
     },
     "response": {
@@ -730,7 +730,7 @@
      "kind": "path",
      "direction": "explicit",
      "beamRadius": 0.0,
-     "startOffset": 200.0,
+     "startOffset": 330.0,
      "speed": 1076.92,
      "range": 1400.0,
      "frontWidth": 12.0,
@@ -762,13 +762,13 @@
       "embed": 0.72,
       "bedReach": 75.0,
       "disturb": 0.04,
-      "nearFade": 450.0,
+      "nearFade": 700.0,
       "lane": 0.0,
       "laneJitter": 45.0,
       "splash": 0.08,
       "nearWake": 1.5,
       "splashGlow": 2.2,
-      "splashBack": 240.0
+      "splashBack": 370.0
      }
     },
     "response": {
