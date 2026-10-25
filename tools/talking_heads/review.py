@@ -49,13 +49,13 @@ def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_m
         doc = json.load(f)
     if no_atmos:
         # the stop-3 room, for the atmosphere's cost: no mist, only the middle motes, no sky tones
-        doc["routes"] = [r for r in doc["routes"] if not r["target"].startswith(("scene/volume", "env/sky/"))]
+        mist = lambda name: name == "mist" or name.endswith("-mist")
+        doc["routes"] = [r for r in doc["routes"] if not r["target"].startswith("env/sky/")
+                         and not (r["target"].startswith("particles/") and mist(r["target"].split("/")[1]))]
         sp = doc["assets"]["scene"]["path"]
         with open(sp) as f:
             sc = json.load(f)
-        sc["nodes"] = [n for n in sc["nodes"] if n["name"] not in ("motesFar", "motesNear")]
-        sc["environment"]["volumeDensity"] = 0.0
-        sc["environment"]["volumeMaxDistance"] = 0.0
+        sc["nodes"] = [n for n in sc["nodes"] if n["name"] not in ("motesFar", "motesNear") and not mist(n["name"])]
         base = os.path.dirname(sp)
         for n in sc["nodes"]:
             src = n.get("procedural", {}).get("source", {})
@@ -180,7 +180,7 @@ def main():
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
                     else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
-                 "--size", a.size])
+                 "--size", a.size, "--tier", a.tier])
         print(a.out)
     finally:
         shutil.rmtree(work, ignore_errors=True)

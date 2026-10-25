@@ -4,7 +4,7 @@ entities should all be unique to the sound source").
 
 Runs the engine's sonic trace (no GPU) on Feline Footwear's stems, then again with ONE stem replaced by silence of the
 same length, and compares every column a head owns: its signals (`signal.<p>...`, `visual.<p>...`) and every route
-target's final value under its prefix (`nodes/<p>-`, `fx/<p>-`, `material/<p>-`, `lights/<p>-`, `procedural/<p>-`).
+target's final value under its prefix (`nodes/<p>-`, `fx/<p>-`, `material/<p>-`, `lights/<p>-`, `procedural/<p>-`, `particles/<p>-`).
 The muted stem's head must change, and every other head must be bit-identical on every frame. Exits non-zero
 otherwise.
 
@@ -52,7 +52,8 @@ def trace(project, work, tag, mute=None):
 
 def owned(col, P):
     return (col.startswith(("signal." + P, "visual." + P)) or
-            any(col.startswith("final:%s/%s-" % (k, P)) for k in ("nodes", "fx", "material", "lights", "procedural")))
+            any(col.startswith("final:%s/%s-" % (k, P)) for k in ("nodes", "fx", "material", "lights", "procedural",
+                                                                    "particles")))
 
 
 def main():

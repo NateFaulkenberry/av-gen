@@ -13,7 +13,7 @@ The eyes look ahead and the lids are open unless --lids is given. Every render g
         [--poses 0:0,0:0.5,0:1,32:0,32:0.5,32:1] [--views front,three-quarter] [--prefix th2] [--size 1920x1080] \
         [--no-rays] [--lids 0..1] [--tag mouth]
 
-A pose is tilt (degrees):opening (0 = shut, 1 = MOUTH_OPEN).
+A pose is tilt (degrees, back +, forward -):opening (0 = shut, 1 = MOUTH_OPEN)[:yaw (degrees at the neck)].
 """
 import argparse
 import copy
@@ -32,7 +32,7 @@ import anchor_check as ac  # noqa: E402
 from tools.sonic_vfx.scenes import talking_heads as th  # noqa: E402
 
 
-def posed(project, scene, P, tilt, opening, lids, rays_on=True):
+def posed(project, scene, P, tilt, opening, lids, rays_on=True, yaw=0.0):
     p, s = copy.deepcopy(project), copy.deepcopy(scene)
     mine = ("procedural/%s-" % P, "nodes/%s-" % P, "fx/%s-mouth" % P)
     p["routes"] = [r for r in p.get("routes", []) if not r["target"].startswith(mine)]
@@ -48,18 +48,23 @@ def posed(project, scene, P, tilt, opening, lids, rays_on=True):
             n["rotation"] = [-tilt, 0.0, 0.0]
             if tilt:
                 F = th.BEND_LEN
-                t = math.radians(tilt)
+                t = math.radians(abs(tilt))
                 R_ = F / t
+                sg = 1.0 if tilt > 0 else -1.0   # forward: the head's top moves toward the face
                 n["position"] = [n["position"][0], n["position"][1] + R_ * math.sin(t) - F,
-                                 n["position"][2] - R_ * (1.0 - math.cos(t))]
+                                 n["position"][2] - sg * R_ * (1.0 - math.cos(t))]
         if n["name"] == P + "-head":
+            n["rotation"] = [0.0, yaw, 0.0]
             for d in n["procedural"]["deformers"]:
                 if d["kind"] == "hinge":
                     d["amount"] = th.MOUTH_OPEN * opening
-        if n["name"] == P + "-neck" and tilt:
+        if n["name"] == P + "-neck":
             for d in n["procedural"]["deformers"]:
-                if d["kind"] == "bend" and d["displacementAxis"][2] < 0:   # the back bend
-                    d["amount"] = math.radians(tilt) / d["falloff"]
+                if d["kind"] == "twist":   # the swivel's yaw, as the scene's routes drive it
+                    d["amount"] = math.radians(yaw) / th.BEND_LEN
+                # tilt > 0 bends back (the back bend), < 0 forward (the forward bend)
+                if d["kind"] == "bend" and tilt and (d["displacementAxis"][2] < 0) == (tilt > 0):
+                    d["amount"] = math.radians(abs(tilt)) / d["falloff"]
         if lids and n["name"] in (P + "-lidUL", P + "-lidUR"):
             n["rotation"] = [th.LID_UPPER_CLOSED * lids, 0.0, 0.0]
         if lids and n["name"] in (P + "-lidLL", P + "-lidLR"):
@@ -98,10 +103,11 @@ def main():
     work = tempfile.mkdtemp(prefix="th-pose-")
     try:
         for pose in a.poses.split(","):
-            tilt, opening = (float(v) for v in pose.split(":"))
+            vals = [float(v) for v in pose.split(":")]
+            tilt, opening, nyaw = (vals + [0.0])[:3]
             for view in a.views.split(","):
                 # aim at the mouth of the posed head, in world space; look from the head's front (+ its heading)
-                pp, ss = posed(project, scene, P, tilt, opening, a.lids, not a.no_rays)
+                pp, ss = posed(project, scene, P, tilt, opening, a.lids, not a.no_rays, nyaw)
                 nodes = {n["name"]: n for n in ss["nodes"]}
                 mouth = ac.apply(ac.node_world(nodes, P + "-head"), th.MOUTH)
                 aim = [mouth[0], mouth[1] + 0.03, mouth[2]]
@@ -110,7 +116,8 @@ def main():
                        aim[2] + a.dist * math.cos(math.radians(yaw))]
                 ss["camera"] = {"mode": 1, "position": cam, "target": aim, "fov": 40.0, "orbitSpeed": 0.0}
                 png = ac.render(pp, ss, work, "pose")
-                name = "%s-%s-tilt%02d-open%03d.png" % (a.tag, view, int(tilt), int(round(opening * 100)))
+                name = "%s-%s-tilt%02d-open%03d%s.png" % (a.tag, view, int(tilt), int(round(opening * 100)),
+                                                         "-yaw%d" % int(nyaw) if nyaw else "")
                 shutil.copy(png, os.path.join(a.out, name))
                 print(os.path.join(a.out, name))
     finally:

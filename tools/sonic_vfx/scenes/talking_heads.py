@@ -297,17 +297,18 @@ def build(heads=None):
 # should be dynamic too". All of it is the room's, not a head's: it drifts on its own clocks, swells a little with the
 # whole mix's energy, and takes each head's colour only through that head's own light (`<p>-spill`, in head()).
 MIST = "#3a2f7a"
-MIST_DENSITY = 0.03     # per metre: a haze that the heads stand in, not a wall
+MIST_DEEP = "#1a1240"
 
 
 def atmosphere(s):
-    # the mist: the environment's own air, marched (16 steps, 7 m: the heads and the air round them), its density
-    # broken into drifting patches by its noise, and lit by the scene's local lights -- so a head's spill light
-    # colours the mist round it when its gate opens. (A placed fog bank drew nothing at this scale; see 09-stop4.md.)
-    s.environment.update({"volumeDensity": MIST_DENSITY, "volumeMaxDistance": 7.0, "volumeSteps": 16,
-                          "volumeNoise": 1.0, "volumeNoiseScale": 2.5, "volumeNoiseSpeed": 0.12,
-                          "volumeLocalLights": 1.0, "volumeScattering": 0.35, "volumeAnisotropy": 0.3,
-                          "fogColor": hexrgb(MIST, 0.3)})
+    # the mist: large, soft, slow sprites (depth-faded where they cross a bust), a few dozen of them drifting through
+    # and behind the heads -- banks of haze at the cost of a particle draw. (The environment's marched air looked
+    # right and cost 13-16 ms a frame at 1080p; a placed fog bank drew nothing at this scale. See 09-stop4.md.)
+    s.particles("mist", capacity=70, seed=53, shape="box", position=[0.0, 0.45, -0.7], extent=[3.4, 0.9, 1.6],
+                direction=[1.0, 0.1, 0.0], spawnRate=3.0, lifetimeMin=18.0, lifetimeMax=30.0, spread=0.6,
+                speedMin=0.01, speedMax=0.035, gravity=[0, 0.0, 0], drag=0.05, turbulence=0.01,
+                turbulenceScale=0.3, sizeStart=0.55, sizeEnd=0.95, colorStart=hexrgb(MIST) + [0.16],
+                colorEnd=hexrgb(MIST_DEEP) + [0.0], emissive=1.3, blend="additive", softness=0.25)
     # the motes, at three depths: far (fine and many, behind the heads), mid (among them), near (few, larger, slow,
     # between the camera and the heads); each its own clock
     for name, cap, seed, pos, ext, rate, size, alpha, emis in (
@@ -324,7 +325,8 @@ def atmosphere(s):
     for name, rate, seed in (("toneA", 0.021, 71), ("toneB", 0.033, 73), ("toneC", 0.027, 79)):
         s.sources.append({"kind": "noise", "name": name, "settings": {"seed": seed}})
         s.params_({"sources/%s/rate" % name: rate, "sources/%s/smoothness" % name: 1.0})
-    s.route(R("noise.toneA", "env/sky/zenithColor", 0.035, comp=2, polarity="bipolar"),
+    s.route(R("noise.toneC", "particles/mist/emissive", 0.35, polarity="bipolar"),
+            R("noise.toneA", "env/sky/zenithColor", 0.035, comp=2, polarity="bipolar"),
             R("noise.toneA", "env/sky/zenithColor", -0.015, comp=0, polarity="bipolar"),
             R("noise.toneB", "env/sky/horizonColor", 0.03, comp=0, polarity="bipolar"),
             R("noise.toneB", "env/sky/horizonColor", 0.012, comp=1, polarity="bipolar"),
@@ -333,9 +335,9 @@ def atmosphere(s):
             R("noise.toneB", "env/sky/groundColor", 0.03, comp=0, polarity="bipolar"),
             R("noise.toneB", "env/sky/groundColor", 0.012, comp=1, polarity="bipolar"),
             R("noise.toneC", "env/sky/groundColor", 0.03, comp=2, polarity="bipolar"),
-            R("noise.toneC", "scene/volumeDensity", 0.3 * MIST_DENSITY, polarity="bipolar"))
+            )
     # ... and the whole mix's energy swells the mist and the bloom a little (seconds, not beats)
-    s.route(R("response.intensity", "scene/volumeDensity", 0.6 * MIST_DENSITY, attackMs=1500.0, decayMs=4000.0),
+    s.route(R("response.intensity", "particles/mist/emissive", 0.8, attackMs=1500.0, decayMs=4000.0),
             R("response.intensity", "post/bloom/intensity", 0.08, attackMs=1500.0, decayMs=4000.0))
 
 
@@ -415,6 +417,13 @@ def head(s, spec):
     s.light(P + "-spill", "point", position=[at[0] + fwd * math.sin(hd), at[1] + HEAD_REST[1] + 0.12,
                                               at[2] + fwd * math.cos(hd)],
             color=hexrgb(pal["spill"]), intensity=0.0, range=2.0, castsShadow=False, contactShadow=False)
+    # the mist round this head, in its own colour: dark until its gate opens, then lit (its light on the mist)
+    s.particles(P + "-mist", capacity=36, seed=61 + int(P[2:]), shape="box",
+                position=[at[0] + 0.1 * math.sin(hd), 0.42, at[2] - 0.05], extent=[0.55, 0.4, 0.45],
+                direction=[0.0, 1.0, 0.0], spawnRate=1.8, lifetimeMin=14.0, lifetimeMax=22.0, spread=1.0,
+                speedMin=0.005, speedMax=0.02, gravity=[0, 0.0, 0], drag=0.1, turbulence=0.01,
+                turbulenceScale=0.3, sizeStart=0.3, sizeEnd=0.5, colorStart=hexrgb(pal["spill"]) + [0.06],
+                colorEnd=hexrgb(pal["spill"]) + [0.0], emissive=0.0, blend="additive", softness=0.25)
     gate(s, spec)
     scan_and_eyes(s, spec)
     blinks(s, spec)
@@ -430,20 +439,20 @@ LID_FOLLOW = 0.32        # the upper lid follows a downward glance by this share
 
 def blinks(s, spec):
     """The lids (the owner: "add eyelids to busts too"): porcelain shells round each eye, turned about the eye's centre,
-    so they can never cut into the eyeball. Both eyes blink together, irregularly: two slow smooth noises at
-    incommensurate rates, each blink on a noise's upward crossing, at least BLINK_MIN_MS apart -- intervals of about
-    2-6 s, each head its own. The upper lid also follows the eyes' downward glances (the same saccade noise, the same
+    so they can never cut into the eyeball. Both eyes blink together, irregularly: two smooth noises at
+    incommensurate rates, each blink on a noise's upward crossing, at least BLINK_MIN_MS apart -- measured on Feline
+    Footwear, intervals of 2.0-8.8 s (median 3.4), each blink 133 ms, each head its own. The upper lid also follows the eyes' downward glances (the same saccade noise, the same
     spring), so a look down half-lowers it. The upper lid's turn is clamped at closed, so a blink during a downward
     glance seals and never overshoots."""
     P = spec["prefix"]
     seed = spec.get("scan", (0.4, 0.13, 1))[2]
-    for name, r, sd in (("%sBlinkA" % P, 0.31, seed + 601), ("%sBlinkB" % P, 0.47, seed + 709)):
+    for name, r, sd in (("%sBlinkA" % P, 1.1, seed + 601), ("%sBlinkB" % P, 1.7, seed + 709)):
         s.sources.append({"kind": "noise", "name": name, "settings": {"seed": sd}})
         s.params_({"sources/%s/rate" % name: r, "sources/%s/smoothness" % name: 1.0})
     sac = {"springHz": 14.0, "springDamping": 0.78}
     s.sources += [
         sig("%sBlink" % P, [{"source": "noise.%sBlinkA" % P}, {"source": "noise.%sBlinkB" % P}], combine="max",
-            chain={"threshold": "binary", "thresholdLevel": 0.72, "envelope": "peakhold",
+            chain={"threshold": "binary", "thresholdLevel": 0.7, "envelope": "peakhold",
                    "envelopeHoldMs": BLINK_HOLD_MS, "envelopeFallPerSecond": BLINK_OPEN_PER_S, "envelopeRearm": 0.5,
                    "envelopeRefractoryMs": BLINK_MIN_MS}),
         sig("%sLidU" % P, [{"source": "signal.%sBlink" % P, "chain": {"attackMs": BLINK_CLOSE_MS, "decayMs": 0.0}},
@@ -667,7 +676,8 @@ def routes(s, spec, rays):
     for i, r in enumerate(rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
     # ---- its light on the mist: the same pose, in its own colour
-    s.route(R(G, "lights/%s-spill/intensity" % P, 1.6, depth=K("chroma"), **SNAP_CUT))
+    s.route(R(G, "lights/%s-spill/intensity" % P, 1.0, depth=K("chroma"), **SNAP_CUT),
+            R(G, "particles/%s-mist/emissive" % P, 1.4, depth=K("chroma"), attackMs=0, decayMs=350))
     # ---- the secondary effects, every one on THIS head's gate, weighted by its instrument's emphasis
     # shake (the drums)
     s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75 * E["shake"], depth=K("copies"), attackMs=0, decayMs=140,
