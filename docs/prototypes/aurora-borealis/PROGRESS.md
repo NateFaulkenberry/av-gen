@@ -576,3 +576,145 @@ running down the mountains; the right range on BASS.
 | `17-aurora-smoothness-before-after.txt` | step and jerk p99 of every routed aurora final, before and after |
 | `18-bass-detector.txt` | the bass detector candidates' recall and precision |
 | `19-headless-ultra-ab-pass3-vs-pass4-and-fireball-cost-ON-BATTERY.txt` | every headless run (battery: indicative only) |
+
+## Pass 5: the lake (stop, 2026-10-25)
+
+Notes: `40-owner-notes-pass5.md` (verbatim). The coordinator broke them into six items.
+
+### What changed
+
+- **The river is now a lake in a horseshoe of mountains, seen from a static camera** (`world.py`, `build.py`).
+  - **The lake:** an ellipse 1.04 km across and 2.3 km deep. Its near end passes just behind the camera, at the origin
+    and 110 m up, looking down -z, pitched down 1 degree. There are no timeline tracks.
+  - **The land:** the river valley's own recipe, now wrapped round the lake's centre in polar coordinates. It keeps the
+    shore profile, ridged detail, spurs, three layers of peaks and the near, far and distant rings.
+  - **The walls** come down closer to the water than the river's valley floor did: 90-210 m, not 200-420 m.
+  - **The hero peaks** are placed by where they stand in the frame, by bearing from the camera. They are tallest at
+    the frame's edges (15-17.5 degrees above the water) and lower at the back (8-9.5 degrees), so the horseshoe reads
+    with its open side toward the camera.
+  - **The banks:** every land mesh is split in halves. x < 0 is the Moog's left bank and x > 0 is the bass's right
+    bank. The two banks' recipes blend across the back, so they meet without a step.
+  - **Composition:** the lake sits in the lower middle, the arms fill the frame's sides, the back closes the view, and
+    the aurora takes the top.
+  - **First take:** the camera stood 48 m up and pitched up 7 degrees. The sky mirror ran off the top of the frame and
+    left a black band at its bottom. From that height the 2 km lake was also a thin strip, so the pulses showed only by
+    the far shore.
+- **The pulses on the lake** (`look.py`):
+  - **Lanes:** kick 150 m left of the lake's axis and snare 150 m right, each jittered +-50 m; toms anywhere within
+    +-220 m.
+  - **Travel:** each runs from 70 m in front of the camera out to the far shore (1.9-1.95 km) and fades in over 150 m.
+    The river's 160 m and 500 m left only the strip by the far shore lit.
+  - **Size:** cores and halos are half as wide again as the river's. Splashes and the near wake are kept.
+  - **Spill onto the mountains:** cut to a quarter (`land` 0.09/0.06/0.075, was 0.35/0.25/0.30). The light in the
+    water and on the bed is unchanged.
+- **A deeper lake:**
+  - **The bed:** a shelf falls from the shore to about 45 m at 500 m out, then a floor at 55-65 m. Pass 4's bed was
+    about 20 m.
+  - **Absorption** is twice pass 4's.
+  - **The bed's program** (`abBed`) adds a faint blue-violet that fades to black between 3 and 38 m down: the shelves
+    show and the middle drops away.
+  - **The land term** only lights the bed down to 40 m, so a pulse loses the bed as it crosses into deep water.
+  - The surface keeps pass 4's mirror.
+  - **Honest note:** the difference reads only where the surface is not reflecting the bright aurora (clips 04/05). Most
+    of the near lake is mirror.
+- **The fish** (`world.py`):
+  - **Fewer and varied:** 18 (were 64), of four body types: trout, deep-bodied bream with a dorsal fin, long pike, and a
+    flat ray. Each is 7-18 m by type, on its own heading in any direction, and placed near the three lanes so the light
+    finds them.
+  - **None breaks the surface:** the fish are static (no swim motion), and each is clamped so its highest vertex (back,
+    fin or tail tip) is at least 1.5 m down.
+  - **Checks:** `world.check_fish()` runs in `generate()`, and the integration test runs `world.py --check-fish`.
+  - **The cause:** in pass 4 the bodies' centres sat 2-4 m down but their backs reached 3.7 m above their centres.
+  - **Lighting:** the fish now have their own near-black program (`abFish`), so the bed's shelf tint does not light
+    them.
+- **The fireball** (ADR-1665; research in `41-research-pass5-fireball.md`, with sources):
+  - **Look 1, the flame billboard**, was chosen from three looks compared on the same build.
+  - **What it is:** domain-warped fbm tongues, keyed in the ball's own 3D frame, boiling and swept back along the
+    flight. A blackbody ramp runs white-yellow, orange, deep red, then soot. A sooty fringe dims the aurora behind it,
+    and a string of puffs makes a trail cooling to smoke, with embers.
+  - **Light below:** it still lights the land and water below.
+  - **Look 0** is byte-identical (unit test).
+  - **Flash gate:** corona 2.0 and the crash's aurora flare at 0.1 (was 0.15) keep the 47 s crash group inside it.
+- **The Moog (left) and bass (right) on the mountains** (`look.py`, `music.py`):
+  - **More sensitive:** the onsets' refractories are shorter (35 ms and 60 ms; the detector's own 60 ms floor binds for
+    the Moog). Softer notes are now caught too: the stem's onset strength, gated at 0.9 of the detector's line, latched
+    on each rise. `<part>Strike` is the larger of the two signals.
+  - **Sustain:** `<part>Hold` is the stem's rms, up in 5 ms and down in 150 ms (Moog) or 220 ms (bass). It holds the
+    picked subset's gate open while a note rings and closes it as the note decays.
+  - **More visible:**
+    - Each note lights its picked creases as wide lines (7 px Moog, 5 px bass), widened further by the strike.
+    - It fills the facets beside them as planes: a 0.24 share for the Moog, 0.9 for the bass.
+    - The sustained level lights every ridgeline on the bank (`edgeGlow`).
+    - A fresh subset is picked per note, as before.
+  - **The travelling band of pass 4 is gone,** as the owner allowed.
+  - **Programs:** 59 ops each.
+- **Tone block:** still unassigned. Toms keep their lane.
+
+### Measurements
+
+All from the final build, ee7f85a6, using the same build for every comparison.
+
+- **Notes caught** (`19-...`): reference note starts come from each stem's own audio (spectral-flux peaks, independent
+  of the engine's detector).
+
+  | Stem | Note starts | Version | Fires | Recall | Precision |
+  |---|---|---|---|---|---|
+  | Moog | 339 | pass 4 | 346 | 0.88 | 0.86 |
+  | Moog | 339 | pass 5 | 445 | 0.94 | 0.75 |
+  | Bass | 224 | pass 4 | 215 | 0.92 | 0.95 |
+  | Bass | 224 | pass 5 | 225 | 0.94 | 0.94 |
+
+  The reference is itself a heuristic: some of the extra Moog fires are real soft notes it does not call.
+- **Visibility per note** (`20-...`): the share of the note's own bank's mountain pixels that brighten.
+
+  | Part | Median | p90 | Notes lighting at least 5% | Other bank (median) |
+  |---|---|---|---|---|
+  | Moog | 35% | 54% | 98% | 5% |
+  | Bass | 41% | 50% | 98% | 11% |
+
+  There is no pass-4 figure: its program does not fit the lake's camera.
+- **Mountain spill** (`21-...`): pass 4's land shares against pass 5's on the slopes over the water. The frame-by-frame
+  difference is mean 0.005 and p95 0.016 linear luminance, which is the three quarters removed.
+- **Flash gate**, whole song: worst swing 0.042 at 47.6 s; 0 general flashes.
+- **Fish:** the highest vertex of any fish is 1.50 m below the surface (`17-...`).
+- **Headless Ultra 1080p, on AC**, pass 4 (f0fb48dd, regenerated) against pass 5, the same build, 2 interleaved reps.
+  - GPU p50: 13.8 -> 12.5 ms at 12 s, 13.6 -> 12.8 ms at 36 s, 13.7 -> 12.9 ms at 47 s (two fireballs alive).
+  - The fireball look's own cost is within the noise. CPU work p50 is 1.5-1.9 ms.
+
+### Open at the stop
+
+- **The fireballs fly into the back mountains:** they are aimed 2.5 km out at 230-250 m, and the lake's back ridges
+  stand 300-500 m at 2.5-3.5 km, so each disappears behind a ridge near the end of its flight. Raising the targets is a
+  one-line change if the owner wants them to clear the ridges.
+- **Depth is subtle:** the deeper lake reads mostly as darker water where the mirror is dark; the mirror is unchanged.
+- **The Moog's extra soft notes** carry some false fires (precision 0.75), and the flash gate has 0.008 of headroom.
+- **Live acceptance and the suites** wait for the owner's approval.
+
+### Pass-5 stop media: `~/Desktop/av-gen-review/aurora-borealis/pass5/`
+
+| File | What it shows |
+|---|---|
+| `00a-lake-composition-still-30s.png` | the composition: lake lower middle, horseshoe left, back and right, aurora above |
+| `00b-top-down-map-lake-horseshoe-lanes-fish.png` | top down: the lake, its bed depth, the shore band and near range, the view, the three lanes, the fish |
+| `01-lake-composition-static-camera-26-34s.mp4` | the static composition, with sound |
+| `02-pulses-on-the-lake-kick-snare-toms-8-16s.mp4` | kick, snare and toms crossing the lake in their lanes, with sound |
+| `03-pulses-on-the-lake-closeup-quarter-speed-10-13s.mp4` | the lake's middle at quarter speed: cores, splashes, wakes |
+| `04-deeper-lake-before-left-after-right-8-16s.mp4` | pass 4's depth and absorption (left) against the deeper lake (right), same build |
+| `05-deeper-lake-closeup-before-top-after-bottom-half-speed.mp4` | the same, the lake cropped, half speed |
+| `06-fish-lit-by-the-pulses-closeup-quarter-speed-10-14s.mp4` | fish of different shapes lit as the pulses pass |
+| `07-fireball-variants-2x2-same-build-crash-group-44.5-49s.mp4` | A pass 4's glow, B the chosen flame billboard, C volumetric-lite, D volumetric-lite with embers and a smoke trail, with sound |
+| `08-fireball-variants-closeups-A-B-C-D-left-to-right-at-46.0-46.4-46.9-47.7s.png` | the four close up, four moments |
+| `09-mountain-spill-from-the-pulses-before-left-after-right-8-16s.mp4` | pass 4's spill on the mountains (left) against a quarter of it (right) |
+| `10-moog-busy-trills-left-bass-right-18.5-24.5s.mp4` | the densest Moog trills on the left bank, the bass on the right, with sound |
+| `11-moog-sustain-holding-and-decaying-54-60s.mp4` | Moog notes held and decaying (56.7-58.5 s), then busy bass, with sound |
+| `12-bass-heavy-passage-with-moog-35.5-42s.mp4` | a bass-heavy passage with the Moog, with sound |
+| `13-chosen-fireball-in-the-song-crash-group-44.5-49s.mp4` | the chosen fireballs on the 45.6/47.0/47.7 s crashes, with sound |
+| `14-chosen-fireball-closeups-at-46.0-46.4-46.9-47.8s.png` | the chosen fireball close up |
+| `15-full-song-0-70s-1080p.mp4` | the whole song, with sound (117 MB) |
+| `16-full-song-0-70s-720p-small.mp4` | the same at 720p, 20 MB |
+| `17-fish-below-the-surface-check.txt` | every fish and its highest vertex |
+| `18-flash-audit-full-song.txt` | the flash audit |
+| `19-moog-bass-notes-caught-before-after.txt` | notes caught, pass 4 against pass 5 |
+| `20-mountain-visibility-per-note.txt` | the share of each bank lit per note |
+| `21-mountain-spill-before-after.txt` | the spill measured |
+| `22-headless-ultra-ab-pass4-vs-pass5.txt` | headless Ultra 1080p, pass 4 against pass 5, the same build |
