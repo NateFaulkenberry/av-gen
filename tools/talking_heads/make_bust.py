@@ -728,6 +728,12 @@ def main():
     gm = ghost_material()
     head_g.data.materials.clear()
     head_g.data.materials.append(gm)
+    # the ghost is only a fresnel edge: a fifth of the head's triangles draws it the same, and six of them at full
+    # resolution cost 2.2 ms a frame at 1080p (stop-4 profile)
+    dec = head_g.modifiers.new("decimate", "DECIMATE")
+    dec.ratio = 0.2
+    bpy.context.view_layer.objects.active = head_g
+    bpy.ops.object.modifier_apply(modifier=dec.name)
     export(head_g, os.path.join(OUT, "th-head-ghost.glb"))
     print("BUST_STATS", json.dumps(anchors["mesh"]))
     if not PREV:

@@ -42,11 +42,37 @@ FEATURES = ("beams", "copies", "tear", "chroma")
 CLOSE = ([-0.34, 0.37, 0.80], [0.0, 0.30, 0.22])   # three-quarter from the right, on the middle head's mouth and jaw
 
 
-def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_mouth="", no_atmos=False):
+def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_mouth="", no_atmos=False,
+            no_heads=False, no_bg=False):
     out = os.path.join(work, "variant.json")
     make_variant(project, wav_path(wav), None, out)
     with open(out) as f:
         doc = json.load(f)
+    if no_heads or no_bg:
+        # the brief's test: the background alone (no busts, rays, ghosts or their mists); or the heads without it
+        sp = doc["assets"]["scene"]["path"]
+        with open(sp) as f:
+            sc = json.load(f)
+        base = os.path.dirname(sp)
+        if no_heads:
+            sc["nodes"] = [n for n in sc["nodes"] if not n["name"].startswith("th")
+                           or n["name"].startswith("thbg-")]
+            doc["effects"] = [e for e in doc["effects"] if not e["id"].startswith("th")]
+        if no_bg:
+            sc["nodes"] = [n for n in sc["nodes"] if not n["name"].startswith("thbg-")]
+        names = {n["name"] for n in sc["nodes"]}
+        doc["routes"] = [r for r in doc["routes"] if not (r["target"].startswith(("nodes/", "procedural/"))
+                                                          and r["target"].split("/")[1] not in names)]
+        for n in sc["nodes"]:
+            src = n.get("procedural", {}).get("source", {})
+            if "asset" in src and not os.path.isabs(src["asset"]):
+                src["asset"] = os.path.join(base, src["asset"])
+            if "asset" in n and not os.path.isabs(n["asset"]):
+                n["asset"] = os.path.join(base, n["asset"])
+        nsp = os.path.join(work, "subset.scene.json")
+        with open(nsp, "w") as f:
+            json.dump(sc, f)
+        doc["assets"]["scene"] = {"kind": "composition", "path": nsp}
     if no_atmos:
         # the stop-3 room, for the atmosphere's cost: no mist, only the middle motes, no sky tones
         mist = lambda name: name == "mist" or name.endswith("-mist")
@@ -148,6 +174,8 @@ def main():
     ap.add_argument("--cam", default="", help="a static camera: px,py,pz,tx,ty,tz (implies --close)")
     ap.add_argument("--only", default="", help="comma-separated features to keep (mouth, eyes, vibration, tear, "
                                                 "chroma); the others' knobs rest at 0")
+    ap.add_argument("--no-heads", action="store_true", help="the background alone (the brief's test)")
+    ap.add_argument("--no-bg", action="store_true", help="without the stop-5 background (for its cost)")
     ap.add_argument("--no-atmos", action="store_true", help="without stop 4's mist, extra motes and sky tones")
     ap.add_argument("--slow-mouth", default="", help="a head's prefix: its mouth on a slow sine, its look held")
     ap.add_argument("--at", type=float, default=60.0)
@@ -163,7 +191,8 @@ def main():
     try:
         if a.mode in ("still", "silent"):
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.mode == "silent"
-                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos,
+                            a.no_heads, a.no_bg))
             d = os.path.join(work, "frames")
             # a still lands on the instant after 2 s of the music before it, so the envelopes are warm
             run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
@@ -173,12 +202,14 @@ def main():
             shutil.copy(got[-1], a.out)
         elif a.mode == "clip":
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos,
+                            a.no_heads, a.no_bg))
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos,
+                            a.no_heads, a.no_bg))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
                  "--size", a.size, "--tier", a.tier])
         print(a.out)

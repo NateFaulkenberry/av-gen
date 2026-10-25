@@ -813,10 +813,10 @@ class Scene:
 
     def route(self, *routes):
         for r in routes:
-            if isinstance(r, list):
-                self.routes.extend(r)
-            else:
+            if isinstance(r, dict):
                 self.routes.append(r)
+            else:   # a list, or any iterable of routes (a generator expression)
+                self.routes.extend(r)
 
     def param(self, path, value):
         self.params[path] = value

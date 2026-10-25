@@ -89,13 +89,13 @@ EMBER = {"rays": ("#ffb347", "#ff7a3d", "#ffe08a"), "wash": ("#ff4a2b", "#ff9a3d
          "glow": "#ffb347", "ghosts": ("#ffb347", "#ff5a2b"), "spill": "#ff9a40"}
 HEADS = [
     {"prefix": "th1", "role": "drums", "band": "bass", "mix": "response.lowEnv", "mixOpen": 0.7, "open": 0.60, "close": 0.45,
-     "at": [-0.92, 0.0, -0.25], "heading": 28.0, "scan": (0.55, 0.13, 3), "palette": ICE,
+     "at": [-0.62, 0.0, -0.15], "heading": 22.0, "scan": (0.55, 0.13, 3), "palette": ICE,
      "emphasis": {"shake": 1.0, "tear": 1.0, "ghost": 0.3, "wash": 0.45}},
     {"prefix": "th2", "role": "bass", "band": "bass", "mix": "audio.bass", "open": 0.55, "close": 0.42,
-     "at": [0.0, 0.0, 0.18], "heading": 0.0, "scan": (0.48, 0.11, 7), "palette": ORCHID,
+     "at": [0.0, 0.0, 0.25], "heading": 0.0, "scan": (0.48, 0.11, 7), "palette": ORCHID,
      "emphasis": {"shake": 0.3, "tear": 0.25, "ghost": 1.0, "wash": 0.45}},
     {"prefix": "th3", "role": "synth", "band": "mid", "mix": "audio.mid", "open": 0.80, "close": 0.65,
-     "at": [0.92, 0.0, -0.25], "heading": -28.0, "scan": (0.52, 0.17, 11), "palette": EMBER,
+     "at": [0.62, 0.0, -0.15], "heading": -22.0, "scan": (0.52, 0.17, 11), "palette": EMBER,
      "emphasis": {"shake": 0.25, "tear": 0.25, "ghost": 0.3, "wash": 1.0}},
 ]
 MIX_STRICT = 0.15        # the mix path's thresholds sit this much higher than the stem path's
@@ -299,11 +299,15 @@ def build(heads=None):
     if len(heads) == 1:   # one head: the stop-2 framing, three-quarter from its right
         s.drift_camera(centre=[-0.98, 0.50, 2.05], target=[0.0, 0.36, 0.0], period=78.0, amp=(0.06, 0.02, 0.04),
                        tamp=(0.01, 0.006, 0.0), steps=8)
-    else:                 # the row of heads, a little from the right, all in frame at 1080p
-        s.drift_camera(centre=[-0.55, 0.62, 3.25], target=[0.0, 0.34, 0.0], period=90.0, amp=(0.08, 0.02, 0.05),
-                       tamp=(0.01, 0.006, 0.0), steps=8)
+    else:
+        # stop 5 (the owner: "make the busts take up more space in the composition"): the middle head forward, the two
+        # others back and to the sides; the middle bust about 55% of the frame's height, the others about 45%, with
+        # the background showing between and round them
+        s.drift_camera(centre=[-0.28, 0.46, 2.2], target=[0.0, 0.33, -0.05], period=90.0, amp=(0.05, 0.015, 0.03),
+                       tamp=(0.008, 0.005, 0.0), steps=8)
     control(s)
     atmosphere(s)
+    background(s)
     for spec in heads:
         head(s, spec)
     return s
@@ -329,7 +333,6 @@ def atmosphere(s):
     # the motes, at three depths: far (fine and many, behind the heads), mid (among them), near (few, larger, slow,
     # between the camera and the heads); each its own clock
     for name, cap, seed, pos, ext, rate, size, alpha, emis in (
-            ("motesFar", 700, 31, [0.0, 0.6, -2.2], [6.0, 2.4, 1.6], 14.0, 0.0022, 0.45, 1.1),
             ("motes", 500, 17, [0.0, 0.45, 0.0], [3.6, 1.6, 2.4], 8.0, 0.0035, 0.6, 1.4),
             ("motesNear", 90, 43, [0.0, 0.5, 1.7], [2.6, 1.4, 1.0], 1.6, 0.0065, 0.35, 1.2)):
         s.particles(name, capacity=cap, seed=seed, shape="box", position=pos, extent=ext,
@@ -430,19 +433,15 @@ def head(s, spec):
         s.effect("%s-glow%s" % (P, part), "glow", ("entity", "%s-%s" % (P, piece)),
                  parameters={"gain": 1.0, "tint": hexrgb(pal["glow"]), "glow": 0.0, "rim": 0.05,
                              "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
-    # the head's own light, in front of its face: dark until its gate opens, then its colour on the mist round it
-    # and on its neighbours' porcelain (world space: the heads stand still, they only turn)
     at, hd = spec.get("at", [0.0, 0.0, 0.0]), math.radians(spec.get("heading", 0.0))
-    fwd = 0.45
-    s.light(P + "-spill", "point", position=[at[0] + fwd * math.sin(hd), at[1] + HEAD_REST[1] + 0.12,
-                                              at[2] + fwd * math.cos(hd)],
-            color=hexrgb(pal["spill"]), intensity=0.0, range=2.0, castsShadow=False, contactShadow=False)
+    # (stop 4 also had a point light per head; three clustered lights cost 1 ms a frame, and the head's own mist and
+    # glow carry its colour into the room, so it is gone)
     # the mist round this head, in its own colour: dark until its gate opens, then lit (its light on the mist)
     s.particles(P + "-mist", capacity=36, seed=61 + int(P[2:]), shape="box",
-                position=[at[0] + 0.1 * math.sin(hd), 0.42, at[2] - 0.05], extent=[0.55, 0.4, 0.45],
+                position=[at[0] - 0.3 * math.sin(hd), 0.45, at[2] - 0.35], extent=[0.5, 0.35, 0.2],
                 direction=[0.0, 1.0, 0.0], spawnRate=1.8, lifetimeMin=14.0, lifetimeMax=22.0, spread=1.0,
                 speedMin=0.005, speedMax=0.02, gravity=[0, 0.0, 0], drag=0.1, turbulence=0.01,
-                turbulenceScale=0.3, sizeStart=0.3, sizeEnd=0.5, colorStart=hexrgb(pal["spill"]) + [0.06],
+                turbulenceScale=0.3, sizeStart=0.45, sizeEnd=0.8, colorStart=hexrgb(pal["spill"]) + [0.07],
                 colorEnd=hexrgb(pal["spill"]) + [0.0], emissive=0.0, blend="additive", softness=0.25)
     gate(s, spec)
     scan_and_eyes(s, spec)
@@ -484,6 +483,127 @@ def blinks(s, spec):
     for side in ("L", "R"):
         s.route(R("signal.%sLidU" % P, "nodes/%s-lidU%s/rotation" % (P, side), LID_UPPER_CLOSED, comp=0),
                 R("signal.%sLidL" % P, "nodes/%s-lidL%s/rotation" % (P, side), -LID_LOWER_CLOSED, comp=0))
+
+
+# ================================================================================================ the background
+# The owner's background brief (10-brief-background.md; the plan is 11-background-plan.md): a surreal signal dimension
+# behind the heads. Two warped membranes carry the colour fields and topographic contour lines; a few partial rings,
+# a bent frame and two far bands give depth; sparse filaments hang behind the busts. All of it answers the WHOLE mix
+# (the heads answer their own sources): low energy waves the membranes, a bass hit ripples them and lights their
+# contours, the mids move the colour, the highs light the filaments, a strong transient tears the membranes for an
+# instant, sustained energy brightens the fields -- and the waves, the drift and the colour travel on their own clocks
+# when the music is quiet.
+FIELD = ("#1a1050", "#5a1fb0", "#e0249a", "#2b6bff")     # indigo, violet, magenta, electric blue
+FIELD_B = ("#22104a", "#8a2be2", "#ff4f8b", "#5a3cff")   # the near membrane: violet, pink, blue
+BG_PROGRAM_OPS = {}
+# The membranes' size: what a sheet costs is the share of the frame it covers (about 4 ms for a frame-filling sheet
+# at 1080p before its program), so they leave dark sky round them -- which also shows their shape.
+BG_SCALE = {"thbg-memA": 0.72, "thbg-memB": 0.6}
+
+
+def membrane_program(name, ramp, field_scale=0.16):
+    """A membrane's light: a dark surface whose colour field -- an OKLab ramp over a slow diagonal gradient through
+    world space, shifted by routes -- glows only in its bright bands. Eight ops: every op of a program costs about
+    0.2 ms a frame over a frame-filling sheet at 1080p, so the contour lines are geometry (`-lines` nodes, lit by
+    glow_program), not per-pixel arithmetic. Registers: r0 world/base, r5 field, r6 colour, r7 emission."""
+    o = Ops()
+    o.add("world", "input", 0, input="worldPosition")
+    o.add("field", "gradient", 5, srcA=0, value=field_scale, constant=[0.8, 0.45, 0.3, 0.5])
+    o.add("fieldShift", "constant", 6, constant=[0.0, 0.0, 0.0, 0.0])
+    o.add("fieldShifted", "add", 5, srcA=5, srcB=6)
+    o.add("fieldColour", "oklabRamp", 6, srcA=5, value=1.0, constant=hexrgb(ramp[0]) + [1.0],
+          constant2=hexrgb(ramp[1]) + [1.0], constant3=hexrgb(ramp[2]) + [1.0], constant4=hexrgb(ramp[3]) + [1.0])
+    o.add("fieldGlow", "constant", 7, constant=[0.05, 0.05, 0.05, 0.0])
+    o.add("fieldLit", "multiply", 7, srcA=6, srcB=7)
+    o.add("base", "constant", 0, constant=[0.012, 0.009, 0.022, 1.0])
+    BG_PROGRAM_OPS[name] = o
+    return {"name": name, "ops": o.ops, "baseColor": 0, "metallic": -1, "roughness": -1, "emission": 7,
+            "emissionIntensity": 1.0, "opacity": -1}
+
+
+def glow_program(name, colour, gain):
+    """A structure's or a filament's light: one colour at a routed gain, on a dark body."""
+    o = Ops()
+    o.add("colour", "constant", 0, constant=hexrgb(colour) + [1.0])
+    o.add("gain", "constant", 1, constant=[gain, gain, gain, 0.0])
+    o.add("lit", "multiply", 2, srcA=0, srcB=1)
+    o.add("base", "constant", 3, constant=[0.01, 0.008, 0.02, 1.0])
+    BG_PROGRAM_OPS[name] = o
+    return {"name": name, "ops": o.ops, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 2,
+            "emissionIntensity": 1.0, "opacity": -1}
+
+
+def background(s):
+    sheet = lambda freq, axis, speed, amp: {"kind": "sine", "amount": amp, "frequency": freq, "speed": speed,
+                                            "phase": 0.0, "axis": axis, "displacementAxis": [0.0, 0.0, 1.0],
+                                            "space": "local"}
+    tear = {"kind": "sine", "amount": 0.0, "frequency": 90.0, "speed": 0.0, "phase": 0.0, "axis": [0.0, 1.0, 0.0],
+            "displacementAxis": [1.0, 0.0, 0.0], "space": "world"}
+    drift = {"kind": "noise", "amount": 0.12, "scale": 0.35, "speed": 0.04, "space": "local"}
+    s.program(membrane_program("thbg-memA", FIELD))
+    s.program(membrane_program("thbg-memB", FIELD_B, field_scale=0.22))
+    s.program(glow_program("thbg-memA-lines", "#7a5cff", 0.10))
+    s.program(glow_program("thbg-memB-lines", "#ff5fb0", 0.10))
+    s.program(glow_program("thbg-arcs", "#8f7dff", 0.22))
+    s.program(glow_program("thbg-bands", "#d0309a", 0.22))
+    s.program(glow_program("thbg-fil", "#5f8cff", 0.10))
+    # deformers: [slow waves (independent), bass waves (low energy), ripple (bass hits), the tear, the slow drift];
+    # a sheet's lines carry the same stack and the same routes, so they ride its waves
+    MEM_A = [sheet(0.9, [1.0, 0.35, 0.0], 0.35, 0.10), sheet(1.6, [0.6, 1.0, 0.0], 0.0, 0.0),
+             sheet(3.2, [1.0, -0.2, 0.0], 0.0, 0.0), tear, drift]
+    MEM_B = [sheet(1.3, [1.0, -0.4, 0.0], -0.5, 0.06), sheet(2.2, [0.4, 1.0, 0.0], 0.0, 0.0),
+             sheet(4.0, [1.0, 0.3, 0.0], 0.0, 0.0), tear, drift]
+    pieces = [
+        ("thbg-memA", "th-bg-membrane-a", [0.5, 0.2, -4.6], [-28.0, 18.0, 6.0], MEM_A),
+        ("thbg-memA-lines", "th-bg-membrane-a-lines", [0.5, 0.2, -4.6], [-28.0, 18.0, 6.0], MEM_A),
+        ("thbg-memB", "th-bg-membrane-b", [-1.7, 0.75, -2.3], [12.0, 40.0, -14.0], MEM_B),
+        ("thbg-memB-lines", "th-bg-membrane-b-lines", [-1.7, 0.75, -2.3], [12.0, 40.0, -14.0], MEM_B),
+        ("thbg-arcs", "th-bg-arcs", [0.4, 0.9, -3.4], [0.0, -6.0, 0.0], [sheet(1.1, [1.0, 0.0, 0.0], 0.25, 0.03)]),
+        ("thbg-bands", "th-bg-bands", [0.0, 0.5, -5.2], [0.0, 0.0, -4.0], [sheet(0.7, [1.0, 0.2, 0.0], 0.15, 0.10)]),
+        ("thbg-fil", "th-bg-filaments", [0.0, 0.25, -1.3], [0.0, 0.0, 0.0],
+         [sheet(2.5, [1.0, 0.0, 0.0], 0.6, 0.015), sheet(6.0, [1.0, 0.0, 0.0], 2.0, 0.0)]),
+    ]
+    for node, mesh, pos, rot, deformers in pieces:
+        s.proc(node, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh},
+               # unlit: the background is all emission, and the shared PBR shading cost ~5 ms over a frame-filling sheet
+               material={"baseColor": [0.012, 0.009, 0.022], "roughness": 0.9, "metallic": 0.0, "program": node,
+                         "unlit": True},
+               deformers=[dict(d) for d in deformers], position=pos, rotation=rot,
+               scale=[BG_SCALE.get(node.replace("-lines", ""), 1.0)] * 3, extra={"castsShadow": False})
+    # a constant op's value: material/<program>/op/<n>/constant/constant
+    op = lambda prog, label, kind: "material/%s/op/%d/%s/constant" % (prog, BG_PROGRAM_OPS[prog].at[label], kind)
+    LOW = {"attackMs": 400.0, "decayMs": 1400.0}      # low energy, sustained
+    HIT = {"attackMs": 0.0, "decayMs": 700.0}         # a bass hit
+    STRONG = {"threshold": "gate", "thresholdLevel": 0.7, "attackMs": 0.0, "decayMs": 140.0}
+    for base, wave, ripple, rip_phase in (("thbg-memA", 0.16, 0.06, 9.0), ("thbg-memB", 0.10, 0.045, 12.0)):
+        for node in (base, base + "-lines"):
+            d = lambda n, leaf: "procedural/%s/deform/%d/%s" % (node, n, leaf)
+            s.route(R("audio.bass", d(2, "amount"), wave, **LOW),                  # low energy: big waves
+                    R("audio.bass", d(2, "phase"), 2.5, integrate=True, **LOW),    # ... that travel while it lasts
+                    R("response.lowEnv", d(3, "amount"), ripple, **HIT),           # a bass hit: a ripple ...
+                    R("response.lowEnv", d(3, "phase"), rip_phase, integrate=True, **HIT),   # ... running across it
+                    R("response.onsetEnv", d(4, "amount"), 0.035, **STRONG),       # a strong transient: it tears
+                    R("response.onsetEnv", d(4, "phase"), 30.0, integrate=True, attackMs=0.0, decayMs=140.0))
+        node = base
+        # a bass hit lights the contour lines
+        s.route(R("response.lowEnv", op(base + "-lines", "gain", "constant"), 1.4, comp=c, **HIT) for c in range(3))
+        s.route(R("audio.mid", op(node, "fieldShift", "constant"), 0.45, comp=c, attackMs=900.0, decayMs=2600.0)
+                for c in range(3))
+        s.route(R("response.intensity", op(node, "fieldGlow", "constant"), 0.14, comp=c, attackMs=3000.0,
+                  decayMs=6000.0) for c in range(3))
+    # the slow, independent colour: the field's shift also wanders on its own minute-long noise
+    s.sources.append({"kind": "noise", "name": "bgTone", "settings": {"seed": 83}})
+    s.params_({"sources/bgTone/rate": 0.017, "sources/bgTone/smoothness": 1.0})
+    for node in ("thbg-memA", "thbg-memB"):
+        s.route(R("noise.bgTone", op(node, "fieldShift", "constant"), 0.3, comp=c, polarity="bipolar")
+                for c in range(3))
+    # the structures flare on strong transients; the filaments on the highs (and quiver)
+    s.route(R("response.onsetEnv", op("thbg-arcs", "gain", "constant"), 1.2, comp=c, **STRONG) for c in range(3))
+    s.route(R("audio.mid", op("thbg-bands", "gain", "constant"), 0.25, comp=c, attackMs=900.0, decayMs=2600.0)
+            for c in range(3))
+    s.route(R("audio.treble", op("thbg-fil", "gain", "constant"), 1.4, comp=c, attackMs=20.0, decayMs=260.0)
+            for c in range(3))
+    s.route(R("audio.treble", "procedural/thbg-fil/deform/2/amount", 0.012, attackMs=20.0, decayMs=260.0))
 
 
 # ================================================================================================ the instrument
@@ -696,8 +816,7 @@ def routes(s, spec, rays):
     for i, r in enumerate(rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
     # ---- its light on the mist: the same pose, in its own colour
-    s.route(R(G, "lights/%s-spill/intensity" % P, 1.0, depth=K("chroma"), **SNAP_CUT),
-            R(G, "particles/%s-mist/emissive" % P, 1.4, depth=K("chroma"), attackMs=0, decayMs=350))
+    s.route(R(G, "particles/%s-mist/emissive" % P, 1.4, depth=K("chroma"), attackMs=0, decayMs=350))
     # ---- the secondary effects, every one on THIS head's gate, weighted by its instrument's emphasis
     # shake (the drums)
     s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75 * E["shake"], depth=K("copies"), attackMs=0, decayMs=140,
