@@ -331,6 +331,10 @@ def atmosphere(s):
             R("noise.toneB", "env/sky/horizonColor", 0.03, comp=0, polarity="bipolar"),
             R("noise.toneB", "env/sky/horizonColor", 0.012, comp=1, polarity="bipolar"),
             R("noise.toneC", "env/sky/horizonColor", 0.03, comp=2, polarity="bipolar"),
+            # the ground moves with the horizon, so no horizon line ever shows (the room has none)
+            R("noise.toneB", "env/sky/groundColor", 0.03, comp=0, polarity="bipolar"),
+            R("noise.toneB", "env/sky/groundColor", 0.012, comp=1, polarity="bipolar"),
+            R("noise.toneC", "env/sky/groundColor", 0.03, comp=2, polarity="bipolar"),
             R("noise.toneC", "fx/mist/fogDensity", 0.12, polarity="bipolar"))
     # ... and the whole mix's energy swells the mist and the bloom a little (seconds, not beats)
     s.route(R("response.intensity", "fx/mist/fogDensity", 0.25, attackMs=1500.0, decayMs=4000.0),
@@ -500,7 +504,7 @@ def gate(s, spec):
       once per MIX_REFRACTORY_MS (07: "limit the amount of times it happens").
 
       <p>Gate      the max of the two; visual.<p>GateLive = Gate x (1 - Chomp) x (1 - the shut pad): what the head does
-      <p>Open      a one-shot on each opening and each chomp (the flashes)
+      <p>Open      a one-shot on each rise of Live: each opening and each re-opening after a chomp (the flashes)
     Pad 37 forces every gate open, pad 36 shut."""
     P, role, band = spec["prefix"], spec["role"], spec["band"]
     L, LS, RS, TR, GR, GT, PV, CH, OP, OM, ML, MG = ("%s%s" % (P, n) for n in (
@@ -533,11 +537,6 @@ def gate(s, spec):
         sig(GT, [{"source": "signal." + GR, "chain": binary(0.4)}]),
         sig(GT + "Keep", [{"source": "signal." + LS, "chain": binary(spec["close"])}]),
         sig(CH, [{"source": "signal." + TR, "gate": "signal." + PV}]),
-        sig(OP, [{"source": "signal." + GT, "chain": {"envelope": "peakhold", "envelopeHoldMs": 0.0,
-                                                       "envelopeFallPerSecond": 3.0, "envelopeRearm": 0.5,
-                                                       "envelopeRefractoryMs": 60.0}},
-                 {"source": "signal." + CH, "chain": {"envelope": "peakhold", "envelopeHoldMs": 0.0,
-                                                       "envelopeFallPerSecond": 3.0}}], combine="max"),
     ]
     # what the head does: Gate AND NOT Chomp AND NOT the shut pad (all 0 or 1: Gate - Chomp - Shut, clamped), then the POSE --
     # that through the snap's spring, in a signal, so every pose route and the rays read one value. Values under 0.002
@@ -548,6 +547,11 @@ def gate(s, spec):
                          {"source": "signal.padShutHold", "amount": -1.0}],
             combine="sum", chain={"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}),
         sig(P + "Pose", [{"source": "signal.%sLive" % P, "chain": dict(SNAP)}]),
+        # the flash: a one-shot on each rise of what the head DOES (an opening, and the re-opening after each chomp),
+        # so a head held shut (pad 36) or silent flashes nothing
+        sig(OP, [{"source": "signal.%sLive" % P, "chain": {"envelope": "peakhold", "envelopeHoldMs": 0.0,
+                                                            "envelopeFallPerSecond": 3.0, "envelopeRearm": 0.5,
+                                                            "envelopeRefractoryMs": 30.0}}]),
     ]
     s.map(M(GT + "Keep", [("signal.%sKeep" % GT, 1.0), ("signal." + GT, 1.0)], "min"))
 
