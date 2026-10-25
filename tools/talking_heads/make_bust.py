@@ -17,12 +17,12 @@ contour. Quad topology, no decimation: the ring and segment counts set the trian
         --out examples/sonic-abstract/meshes [--previews ~/Desktop/av-gen-review/talking-heads/bust] [--samples 48]
 
 Writes to --out:
-- th-head.glb: the head and upper neck (porcelain + mouth_interior), its origin AT THE NECK JOINT, closed by a dome;
-- th-body.glb: the lower neck and bust, closed by a dome rising into the head, with a collar ring over the seam;
-- th-head-ghost.glb, th-body-ghost.glb: the same pieces, one alpha-BLEND material, for the spectral copies;
-- th-bust.anchors.json: the joint, the emitter anchors in the head's frame, and the mesh statistics.
-The head tilts back about the joint (the owner, 2026-10-25: "when the head talks its head can tilt back") with no gap
-up to 32 degrees: the body's dome fills the throat as it opens.
+- th-body.glb, th-neck.glb, th-head.glb, th-jaw.glb: the four articulated pieces (see "the articulation" below);
+- th-mouth-cavity.glb (head frame), th-jaw-floor.glb (jaw frame): the mouth's near-black interior;
+- th-head-ghost.glb, th-jaw-ghost.glb: the head and jaw, one alpha-BLEND material, for the spectral copies;
+- th-bust.anchors.json: the hierarchy, the joints, the emitter anchors in each piece's frame, mesh statistics.
+The head tilts back on a neck that BENDS (the owner, stop 1: "the neck to snap back"; no ridge at the joint) and the jaw
+hinges open; the mouth's dark interior shows when it does.
 
 Units: metres. Blender Z-up, the face looks down -Y. The glTF exporter's +Y-up conversion gives +Y up and the face
 toward **+Z** in the GLB (Blender (x, y, z) -> glTF (x, z, -y)). Origin: the centre of the base's bottom face. Height
@@ -99,6 +99,20 @@ EYE_DEG = 24.0
 MOUTH_Z = 0.383
 
 
+# The owner (stop 1, 2026-10-25): "shorten the neck some". Everything from the jaw up is authored above at its old
+# height and dropped by NECK_DROP here; the long-neck control point between them goes. The neck (shoulders to jaw)
+# is 30% shorter.
+NECK_DROP = 0.050
+PROFILE = [(z - NECK_DROP if z >= 0.29 else z,) + tuple(rest) for (z, *rest) in PROFILE if not 0.2 < z < 0.29]
+FEATURES = [(n, a, z - NECK_DROP, sa, sz, amp, m) for (n, a, z, sa, sz, amp, m) in FEATURES]
+EYE_Z -= NECK_DROP
+MOUTH_Z -= NECK_DROP
+# The owner (stop 1): "give the bust an adam's apple too". A soft, restrained bump on the front of the shortened neck,
+# on the body piece just below the bend's foot (it does not move when the head snaps back, and the chin swings away
+# from it). Authored at its final height.
+FEATURES.append(("adamsApple", 0.0, 0.188, 11.0, 0.0085, +0.0065, False))
+
+
 def mouth_shape(da, z):
     """0..1: the mouth opening's profile (a rounded rectangle, superelliptic in both directions)."""
     return math.exp(-abs(da / MOUTH_HALF_DEG) ** 4) * math.exp(-abs((z - MOUTH_Z) / 0.0058) ** 4)
@@ -107,11 +121,12 @@ def mouth_shape(da, z):
 def rings_z():
     """Ring heights: coarse on the base and neck, fine through the face, finest across the mouth."""
     zs, z = [], 0.0
-    while z < 0.300:
+    d = NECK_DROP
+    while z < 0.300 - d:
         zs.append(z); z += 0.008
-    while z < 0.520:
-        zs.append(z); z += (0.0010 if 0.370 < z < 0.396 else 0.0018)
-    while z < 0.588:
+    while z < 0.520 - d:
+        zs.append(z); z += (0.0010 if 0.370 - d < z < 0.396 - d else 0.0018)
+    while z < 0.588 - d:
         zs.append(z); z += 0.0040
     return zs  # the pole is added separately
 
@@ -318,73 +333,122 @@ def silhouette(cam, ob, name):
         s.material = m
 
 
-NECK_PIVOT_Z = 0.300   # the neck joint: the upper neck just below the jaw (the owner's circled point)
-TILT_TEST_DEG = 32.0   # the tilt the seam is checked at
+# ------------------------------------------------------------------------------------------- the articulation
+# Four pieces (the owner, 2026-10-25: the neck snaps back and the mouth opens on a gate; no ridge at the neck):
+#   body  -- shoulders and lower neck, up to NECK_LOW;            rigid
+#   neck  -- the neck between NECK_LOW and NECK_TOP;                BENT by the engine's Bend deformer (local, about +Y,
+#            curving toward -Z = the back), so it stays joined to the body at its foot and carries the head at its
+#            top: one continuous porcelain neck, no seam that opens, no ring
+#   head  -- everything above NECK_TOP except the jaw;             rigid, turned and moved to the bent neck's top
+#   jaw   -- the chin block below the mouth line, hinged at JAW_HINGE; rigid, a child of the head
+# Every cut runs along an existing ring of the mesh, and every piece takes the WHOLE mesh's smooth normals, so the
+# pieces meet flush and shade as one surface.
+def _ring_near(target):
+    return min(rings_z(), key=lambda z: abs(z - target))
 
 
-def split_piece(src, name, keep_above):
-    """A copy of the bust cut at the neck joint's plane: the head (above) or the body (below)."""
+NECK_TOP = _ring_near(0.316 - NECK_DROP - 0.016)   # just below the jaw (the owner's circled point)
+NECK_LOW = _ring_near(NECK_TOP - 0.048)            # the bend's foot, mid-neck
+JAW_HALF_DEG = 62.0                                # the jaw block's half width round the face
+JAW_BOTTOM_Z = 0.312 - NECK_DROP                   # under the chin: the block's underside (above NECK_TOP)
+JAW_HINGE = (0.0, None, MOUTH_Z + 0.010)           # y filled in from the profile (the head's centre line)
+TILT_TEST_DEG = 32.0
+JAW_TEST_DEG = 14.0
+JOINT_INSET = 0.004            # the junction domes sit 4 mm inside the walls: hidden, and never coincident
+
+
+def in_jaw(c, f=None):
+    """The chin block: below the mouth line, above the chin's underside, inside the front sector. The sector is read
+    from the faces' SEGMENT indices (build_mesh makes the ring vertices in order), so its side cuts run straight down
+    a segment line instead of stepping where the superellipse's angle and the ring's own angle disagree."""
+    if not max(JAW_BOTTOM_Z, NECK_TOP) < c.z < MOUTH_Z:
+        return False
+    if f is None:
+        cy = interp(min(max(c.z, 0.0), 0.6))[3]
+        a = angle_of(c, cy)
+        return abs((a + 180.0) % 360.0 - 180.0) < JAW_HALF_DEG
+    S = args.segments
+    for v in f.verts:
+        k = v.index % S
+        a = (360.0 * k / S + 180.0) % 360.0 - 180.0
+        if abs(a) > JAW_HALF_DEG + 1e-6:
+            return False
+    return True
+
+
+def piece(src, name, keep):
+    """A copy of the whole mesh keeping the faces `keep(centre, face)` accepts (vertex indices are the original
+    mesh's, ring by ring)."""
     me = src.data.copy()
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
     bm = bmesh.new()
     bm.from_mesh(me)
-    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
-    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(0, 0, NECK_PIVOT_Z), plane_no=(0, 0, 1),
-                           clear_inner=keep_above, clear_outer=not keep_above)
+    bm.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if not keep(f.calc_center_median(), f)], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     bm.to_mesh(me)
     bm.free()
     return ob
 
 
-def add_joint_shapes(ob, up, collar):
-    """Close a piece at the joint with a dome of the neck's own cross-section, pushed 0.6 mm inside it: the body's dome
-    rises into the head (it fills the gap that opens at the front of the throat when the head tilts back), the head's
-    dome hangs into the body. The body also gets a thin collar ring over the seam: a mannequin's neck joint."""
-    W, DF, DB, CY, _N = interp(NECK_PIVOT_Z)
-    ry = 0.5 * (DF + DB)
-    cy = CY + 0.5 * (DB - DF)
+def copy_smooth_normals(whole, ob):
+    """Give a piece the WHOLE mesh's smooth vertex normals, so the cuts shade as one surface."""
+    key = lambda co: (round(co.x, 6), round(co.y, 6), round(co.z, 6))
+    normals = {key(v.co): v.normal.copy() for v in whole.data.vertices}
+    ob.data.normals_split_custom_set_from_vertices([normals.get(key(v.co), v.normal) for v in ob.data.vertices])
+
+
+def add_cap_dome(ob, z, up, depth_scale=0.6):
+    """A dome on the ring's own cross-section at height z, JOINT_INSET inside the wall, closing a piece: hidden at
+    rest, it fills any sliver the neck-head junction opens (the head is placed on the bent neck to a millimetre)."""
+    W, DF, DB, CY, N = interp(z)
+    depth = 0.5 * (DF + DB)
     bm = bmesh.new()
     bm.from_mesh(ob.data)
-    rings, seg = 10, 48
+    rings, seg = 8, 104
     verts = []
     for i in range(rings + 1):
         t = (math.pi / 2) * i / rings
         r, h = math.cos(t), math.sin(t) * (1.0 if up else -1.0)
         row = []
         for k in range(seg if i < rings else 1):
-            a = 2.0 * math.pi * k / seg
-            row.append(bm.verts.new(((W - 0.0006) * r * math.cos(a), cy + (ry - 0.0006) * r * math.sin(a),
-                                     NECK_PIVOT_Z + 0.85 * ry * h)))
+            p = ring_point(360.0 * k / seg, z, W, DF, DB, CY, N)
+            dx, dy = p.x, p.y - CY
+            L = math.hypot(dx, dy) or 1.0
+            sc = r * (1.0 - JOINT_INSET / L)
+            row.append(bm.verts.new((dx * sc, CY + dy * sc, z + depth_scale * depth * h)))
         verts.append(row)
     faces = []
     for i in range(rings - 1):
         for k in range(seg):
             q = (verts[i][k], verts[i][(k + 1) % seg], verts[i + 1][(k + 1) % seg], verts[i + 1][k])
-            faces.append(bm.faces.new(q if up else q[::-1]))
+            faces.append(bm.faces.new(q[::-1] if up else q))
     for k in range(seg):
         q = (verts[rings - 1][k], verts[rings - 1][(k + 1) % seg], verts[rings][0])
-        faces.append(bm.faces.new(q if up else q[::-1]))
-    if collar:
-        # an elliptical tube round the seam: major radii 4% over the neck, minor radius 3.5 mm
-        segs, sides, mr = 64, 10, 0.0035
-        ring = []
-        for k in range(segs):
-            a = 2.0 * math.pi * k / segs
-            cx, cyy = (W * 1.04) * math.cos(a), cy + (ry * 1.04) * math.sin(a)
-            nx, ny = math.cos(a) / (W * 1.04), math.sin(a) / (ry * 1.04)
-            nl = math.hypot(nx, ny)
-            nx, ny = nx / nl, ny / nl
-            ring.append([bm.verts.new((cx + mr * math.cos(b) * nx, cyy + mr * math.cos(b) * ny,
-                                       NECK_PIVOT_Z + mr * math.sin(b)))
-                         for b in (2.0 * math.pi * j / sides for j in range(sides))])
-        for k in range(segs):
-            for j in range(sides):
-                faces.append(bm.faces.new((ring[k][j], ring[(k + 1) % segs][j], ring[(k + 1) % segs][(j + 1) % sides],
-                                           ring[k][(j + 1) % sides])))
+        faces.append(bm.faces.new(q[::-1] if up else q))
     for f in faces:
         f.material_index = 0
         f.smooth = True
+    bm.normal_update()
+    bm.to_mesh(ob.data)
+    bm.free()
+
+
+def add_dark_ellipsoid(ob, centre, radii, mat_index, inward=False):
+    """A dark ellipsoid (the mouth's interior): what the opening jaw shows."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    res = bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=1.0)
+    for v in res["verts"]:
+        v.co = Vector((centre[0] + v.co.x * radii[0], centre[1] + v.co.y * radii[1], centre[2] + v.co.z * radii[2]))
+    faces = list({f for v in res["verts"] for f in v.link_faces})
+    for f in faces:
+        f.material_index = mat_index
+        f.smooth = True
+    if inward:
+        bmesh.ops.reverse_faces(bm, faces=faces)
+    bm.normal_update()
     bm.to_mesh(ob.data)
     bm.free()
 
@@ -403,6 +467,35 @@ def ghost_material():
     return ghost
 
 
+def neck_bend(theta, F):
+    """The engine's Bend (procedural.cpp applyBend, falloff F, centre at the neck's foot, axis +Z, bending toward +Y in
+    Blender = the back): where the top of the bend region goes. Returns (dy, dz) of the axis point at height F and
+    the angle the region above it turns by. For the scene's head placement and the previews."""
+    if abs(theta) < 1e-9:
+        return 0.0, 0.0
+    R = F / theta
+    return R * (1.0 - math.cos(theta)), R * math.sin(theta) - F
+
+
+def bend_mesh(ob, theta, z0, F):
+    """Apply the same Bend to a Blender mesh (previews only): Barr bend about the X axis, toward +Y."""
+    if abs(theta) < 1e-9:
+        return
+    k = theta / F
+    R = 1.0 / k
+    cy = interp(z0)[3]
+    for v in ob.data.vertices:
+        y = v.co.z - z0
+        x = v.co.y - cy
+        yb_ = max(-F, min(F, y))
+        rest = y - yb_
+        th = k * yb_
+        xb = R - (R - x) * math.cos(th) + rest * math.sin(th)
+        ybb = (R - x) * math.sin(th) + rest * math.cos(th)
+        v.co.y, v.co.z = cy + xb, z0 + ybb
+    ob.data.update()
+
+
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     ob = build_mesh()
@@ -410,58 +503,115 @@ def main():
     mouth = surface_point(ob, 0.0, MOUTH_Z)
     lip = surface_point(ob, 0.0, MOUTH_Z + 0.012)
     eyes = [surface_point(ob, s * EYE_DEG, EYE_Z) for s in (1, -1)]   # +X first = the bust's LEFT eye
-    centre = Vector((0.0, interp(0.465)[3], 0.465))
-    pivot = Vector((0.0, interp(NECK_PIVOT_Z)[3], NECK_PIVOT_Z))
-    # the two pieces: the head (with the upper neck) and the body (lower neck and bust), each closed at the joint
-    head = split_piece(ob, "th-head", True)
-    body = split_piece(ob, "th-body", False)
-    add_joint_shapes(head, up=False, collar=False)
-    add_joint_shapes(body, up=True, collar=True)
-    shift(head, pivot)  # the head's origin IS the joint, so turning its node turns it about the neck
-    H = lambda v: to_gltf(v - pivot)
+    centre = Vector((0.0, interp(0.465 - NECK_DROP)[3], 0.465 - NECK_DROP))
+    neck_foot = Vector((0.0, interp(NECK_LOW)[3], NECK_LOW))
+    head_origin = Vector((0.0, interp(NECK_LOW)[3], NECK_TOP))      # straight above the neck's foot: the bend's axis
+    hinge = Vector((0.0, interp(MOUTH_Z)[3] - 0.010, JAW_HINGE[2]))
+    body = piece(ob, "th-body", lambda c, f: c.z < NECK_LOW)
+    neck = piece(ob, "th-neck", lambda c, f: NECK_LOW < c.z < NECK_TOP)
+    head = piece(ob, "th-head", lambda c, f: c.z > NECK_TOP and not in_jaw(c, f))
+    jaw = piece(ob, "th-jaw", lambda c, f: in_jaw(c, f))
+    for p_ in (body, neck, head, jaw):
+        copy_smooth_normals(ob, p_)
+    # the ghosts' copies are taken BEFORE the junction domes: a spectral copy is offset sideways, and the head's dome
+    # (hidden inside the neck on the real head) would stick out of the neck as a dark band on the copy
+    head_g = piece(head, "th-head-g", lambda c, f: True)
+    jaw_g = piece(jaw, "th-jaw-g", lambda c, f: True)
+    copy_smooth_normals(ob, head_g)
+    copy_smooth_normals(ob, jaw_g)
+    add_cap_dome(neck, NECK_TOP, up=True, depth_scale=0.3)
+    add_cap_dome(head, NECK_TOP, up=False, depth_scale=0.22)
+    # the mouth's dark interior, as SEPARATE meshes (the scene draws them as plain gltf children with their own near-black
+    # material: a procedural node's one program would paint them porcelain): a cavity in the head behind the jaw block,
+    # and a dark floor riding the jaw
+    def dark_piece(name, centre, radii):
+        o = bpy.data.objects.new(name, bpy.data.meshes.new(name))
+        bpy.context.scene.collection.objects.link(o)
+        o.data.materials.append(make_mat("mouth_interior", (0.012, 0.010, 0.012), 0.85, 0.1))
+        add_dark_ellipsoid(o, centre, radii, 0)
+        return o
+    cavity = dark_piece("th-mouth-cavity", (0.0, interp(MOUTH_Z)[3] - 0.040, MOUTH_Z - 0.006), (0.042, 0.046, 0.026))
+    floor = dark_piece("th-jaw-floor", (0.0, interp(MOUTH_Z)[3] - 0.046, MOUTH_Z - 0.014), (0.040, 0.040, 0.016))
+    shift(neck, neck_foot)
+    shift(head, head_origin)
+    shift(cavity, head_origin)
+    shift(jaw, hinge)
+    shift(floor, hinge)
+    shift(head_g, head_origin)
+    shift(jaw_g, hinge)
+    # frames (glTF): neck at its foot, head at the bend axis above it, jaw at its hinge in the head's frame
+    G = lambda v: to_gltf(v)
+    F = NECK_TOP - NECK_LOW
     anchors = {
-        "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). 'head' points "
-                "are in th-head.glb's own frame, whose origin is the neck joint; 'body' points in th-body.glb's frame "
-                "(origin at the base's bottom centre). Place the head node at body.neckPivot as a child of the body; "
-                "turning it about its X axis tilts the head (negative = chin up, back). eyeLeft is the bust's own "
-                "left (+X). mouthBack is the back of the mouth cavity (the hero beam's apex).",
-        "head": {"mouth": H(Vector((0.0, lip.y, MOUTH_Z))), "mouthBack": H(mouth), "eyeLeft": H(eyes[0]),
-                 "eyeRight": H(eyes[1]), "headCentre": H(centre), "forward": [0.0, 0.0, 1.0], "up": [0.0, 1.0, 0.0]},
-        "body": {"neckPivot": to_gltf(pivot), "tiltSeamTestedDeg": TILT_TEST_DEG},
-        "mesh": {"head": stats(head), "body": stats(body), "whole": stats(ob)},
+        "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). Hierarchy: "
+                "body (origin at the base's bottom centre) > neck at body.neckFoot (bent by a Bend deformer: local, "
+                "axis +Y, displacementAxis -Z, falloff neck.bendLength, centre 0) ; head (a child of the BODY, at "
+                "body.headRest, turned by the bend's angle and moved by neck.headOffset to the bent neck's top) > jaw "
+                "at head.jawHinge (a positive turn about X opens it). jaw.mouth is the mouth beams' origin, inside the "
+                "opening, in the jaw's frame. head.eyeLeft/eyeRight are the eye recesses (for the darting-eyes pass).",
+        "body": {"neckFoot": G(neck_foot), "headRest": G(head_origin)},
+        "neck": {"bendLength": round(F, 4), "headOffsetNote": "for a tilt back of theta (rad): the head turns by "
+                 "-theta about X and moves by (0, (R sin(theta) - F), -R (1 - cos(theta))) with R = F / theta"},
+        "head": {"jawHinge": G(hinge - head_origin), "eyeLeft": G(eyes[0] - head_origin),
+                 "eyeRight": G(eyes[1] - head_origin), "headCentre": G(centre - head_origin),
+                 "mouthLip": G(Vector((0.0, lip.y, MOUTH_Z)) - head_origin), "forward": [0.0, 0.0, 1.0],
+                 "up": [0.0, 1.0, 0.0]},
+        "jaw": {"mouth": G(Vector((0.0, mouth.y - 0.004, MOUTH_Z + 0.001)) - hinge)},
+        "test": {"tiltDeg": TILT_TEST_DEG, "jawDeg": JAW_TEST_DEG},
+        "mesh": {n.name: stats(n) for n in (body, neck, head, jaw)} | {"whole": stats(ob)},
     }
     with open(os.path.join(OUT, "th-bust.anchors.json"), "w") as f:
         json.dump(anchors, f, indent=1)
         f.write("\n")
-    export(head, os.path.join(OUT, "th-head.glb"))
-    export(body, os.path.join(OUT, "th-body.glb"))
+    for p_, name in ((body, "th-body"), (neck, "th-neck"), (head, "th-head"), (jaw, "th-jaw"),
+                     (cavity, "th-mouth-cavity"), (floor, "th-jaw-floor")):
+        export(p_, os.path.join(OUT, name + ".glb"))
     gm = ghost_material()
-    for piece, name in ((head, "th-head-ghost.glb"), (body, "th-body-ghost.glb")):
-        keep = [m for m in piece.data.materials]
-        piece.data.materials.clear()
-        piece.data.materials.append(gm)
-        export(piece, os.path.join(OUT, name))
-        piece.data.materials.clear()
+    for p_, name in ((head_g, "th-head-ghost.glb"), (jaw_g, "th-jaw-ghost.glb")):
+        keep = list(p_.data.materials)
+        p_.data.materials.clear()
+        p_.data.materials.append(gm)
+        export(p_, os.path.join(OUT, name))
+        p_.data.materials.clear()
         for m in keep:
-            piece.data.materials.append(m)
+            p_.data.materials.append(m)
     print("BUST_STATS", json.dumps(anchors["mesh"]))
     if not PREV:
         return
     bpy.data.objects.remove(ob)
-    head.location = pivot  # reassemble for the previews
+    neck_rest = neck.data.copy()
     cam = setup_render()
+
+    def pose(tilt_deg, jaw_deg):
+        th = math.radians(tilt_deg)
+        neck.data = neck_rest.copy()
+        shift(neck, -neck_foot)
+        bend_mesh(neck, th, NECK_LOW, F)
+        dy, dz = neck_bend(th, F)
+        head.location = head_origin + Vector((0.0, dy, dz))
+        head.rotation_euler = (-th, 0.0, 0.0)
+        jaw.parent = head
+        jaw.location = hinge - head_origin
+        jaw.rotation_euler = (math.radians(jaw_deg), 0.0, 0.0)
+        cavity.parent = head
+        floor.parent = jaw
+
+    pose(0.0, 0.0)
     shoot(cam, 0, "bust-front.png")
     shoot(cam, 35, "bust-three-quarter.png")
     shoot(cam, -90, "bust-profile.png")
-    shoot(cam, 20, "bust-face-close.png", dist=0.75, height=0.47, aim_z=0.43)
-    bpy.context.scene.camera.data.lens = 50
-    shoot(cam, 28, "bust-engine-framing.png", dist=1.9, height=0.55, aim_z=0.36)
-    # the seam at full tilt, chin up: a NEGATIVE turn about X (+X tips the face, which looks down -Y, downward)
-    head.rotation_euler = (-math.radians(TILT_TEST_DEG), 0.0, 0.0)
-    shoot(cam, -90, "bust-tilt-profile.png", dist=2.0)
-    shoot(cam, -35, "bust-tilt-three-quarter.png")
-    shoot(cam, -20, "bust-tilt-throat-close.png", dist=0.7, height=0.30, aim_z=0.31)
-    bpy.context.scene.camera.data.lens = 85
+    shoot(cam, 20, "bust-face-close.png", dist=0.75, height=0.42, aim_z=0.38)
+    pz = NECK_TOP
+    for deg, jd in ((0, 0), (20, JAW_TEST_DEG), (int(TILT_TEST_DEG), JAW_TEST_DEG)):
+        pose(deg, jd)
+        shoot(cam, -90, "neck-%02ddeg-profile-close.png" % deg, dist=0.55, height=pz + 0.03, aim_z=pz)
+        shoot(cam, -8, "neck-%02ddeg-front-close.png" % deg, dist=0.55, height=pz + 0.03, aim_z=pz)
+        shoot(cam, -35, "bust-%02ddeg-three-quarter.png" % deg, dist=1.65, height=0.40, aim_z=0.29)
+        shoot(cam, -90, "bust-%02ddeg-profile.png" % deg, dist=1.65, height=0.40, aim_z=0.29)
+    pose(0.0, JAW_TEST_DEG)
+    shoot(cam, -25, "jaw-open-close.png", dist=0.6, height=MOUTH_Z + 0.03, aim_z=MOUTH_Z)
+    pose(0.0, 0.0)
+    shoot(cam, -25, "jaw-shut-close.png", dist=0.6, height=MOUTH_Z + 0.03, aim_z=MOUTH_Z)
 
 
 def export(ob, path):

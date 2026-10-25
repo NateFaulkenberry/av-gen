@@ -38,10 +38,11 @@ def wav_path(name):
     return os.path.join(AUDIO, WAVS[name]) if name in WAVS else os.path.abspath(name)
 
 
-FEATURES = ("mouth", "eyes", "vibration", "tear", "chroma")
+FEATURES = ("beams", "copies", "tear", "chroma")
+CLOSE = ([-0.34, 0.40, 0.62], [0.0, 0.33, 0.04])   # three-quarter from the bust's right, on the mouth and jaw
 
 
-def variant(project, wav, stems, work, only=None):
+def variant(project, wav, stems, work, only=None, close=None):
     out = os.path.join(work, "variant.json")
     make_variant(project, wav_path(wav), None, out)
     with open(out) as f:
@@ -52,6 +53,24 @@ def variant(project, wav, stems, work, only=None):
         for ch in doc.get("control", {}).get("channels", []):
             if ch["name"] in FEATURES and ch["name"] not in keep:
                 ch["rest"] = 0.0
+    if close:
+        # a static close camera on the face (the jaw close-up): a copy of the scene, the camera tracks removed
+        sp = doc["assets"]["scene"]["path"]
+        with open(sp) as f:
+            sc = json.load(f)
+        sc["camera"] = {"mode": 1, "position": close[0], "target": close[1], "fov": 40.0, "orbitSpeed": 0.0}
+        base = os.path.dirname(sp)
+        for n in sc["nodes"]:
+            src = n.get("procedural", {}).get("source", {})
+            if "asset" in src and not os.path.isabs(src["asset"]):
+                src["asset"] = os.path.join(base, src["asset"])
+            if "asset" in n and not os.path.isabs(n["asset"]):
+                n["asset"] = os.path.join(base, n["asset"])
+        csp = os.path.join(work, "close.scene.json")
+        with open(csp, "w") as f:
+            json.dump(sc, f)
+        doc["assets"]["scene"] = {"kind": "composition", "path": csp}
+        doc["timeline"]["tracks"] = [t for t in doc["timeline"]["tracks"] if not t["target"].startswith("camera/")]
     if stems:
         doc["assets"]["stems"] = [{"key": k, "label": lbl, "role": role,
                                    "file": os.path.join(AUDIO, "stems", "feline-footwear (%s).wav" % lbl)}
@@ -78,6 +97,7 @@ def main():
     ap.add_argument("--project", default=os.path.join(REPO, "examples", "sonic-abstract", "talking-heads.json"))
     ap.add_argument("--wav", default="feline")
     ap.add_argument("--stems", action="store_true")
+    ap.add_argument("--close", action="store_true", help="a static close camera on the face")
     ap.add_argument("--only", default="", help="comma-separated features to keep (mouth, eyes, vibration, tear, "
                                                 "chroma); the others' knobs rest at 0")
     ap.add_argument("--at", type=float, default=60.0)
@@ -93,7 +113,7 @@ def main():
     try:
         if a.mode in ("still", "silent"):
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.mode == "silent"
-                    else variant(a.project, a.wav, a.stems, work, a.only))
+                    else variant(a.project, a.wav, a.stems, work, a.only, CLOSE if a.close else None))
             d = os.path.join(work, "frames")
             # a still lands on the instant after 2 s of the music before it, so the envelopes are warm
             run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
@@ -103,12 +123,12 @@ def main():
             shutil.copy(got[-1], a.out)
         elif a.mode == "clip":
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only))
+                    else variant(a.project, a.wav, a.stems, work, a.only, CLOSE if a.close else None))
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only))
+                    else variant(a.project, a.wav, a.stems, work, a.only, CLOSE if a.close else None))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
                  "--size", a.size])
         print(a.out)

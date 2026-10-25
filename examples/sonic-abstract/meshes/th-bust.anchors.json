@@ -1,30 +1,46 @@
 {
- "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). 'head' points are in th-head.glb's own frame, whose origin is the neck joint; 'body' points in th-body.glb's frame (origin at the base's bottom centre). Place the head node at body.neckPivot as a child of the body; turning it about its X axis tilts the head (negative = chin up, back). eyeLeft is the bust's own left (+X). mouthBack is the back of the mouth cavity (the hero beam's apex).",
- "head": {
-  "mouth": [
+ "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). Hierarchy: body (origin at the base's bottom centre) > neck at body.neckFoot (bent by a Bend deformer: local, axis +Y, displacementAxis -Z, falloff neck.bendLength, centre 0) ; head (a child of the BODY, at body.headRest, turned by the bend's angle and moved by neck.headOffset to the bent neck's top) > jaw at head.jawHinge (a positive turn about X opens it). jaw.mouth is the mouth beams' origin, inside the opening, in the jaw's frame. head.eyeLeft/eyeRight are the eye recesses (for the darting-eyes pass).",
+ "body": {
+  "neckFoot": [
    0.0,
-   0.083,
-   0.1083
+   0.2,
+   -0.0237
   ],
-  "mouthBack": [
+  "headRest": [
    0.0,
-   0.083,
-   0.0791
+   0.248,
+   -0.0237
+  ]
+ },
+ "neck": {
+  "bendLength": 0.048,
+  "headOffsetNote": "for a tilt back of theta (rad): the head turns by -theta about X and moves by (0, (R sin(theta) - F), -R (1 - cos(theta))) with R = F / theta"
+ },
+ "head": {
+  "jawHinge": [
+   0.0,
+   0.095,
+   0.0337
   ],
   "eyeLeft": [
    0.0295,
-   0.163,
-   0.0717
+   0.165,
+   0.0848
   ],
   "eyeRight": [
    -0.0295,
-   0.163,
-   0.0717
+   0.165,
+   0.0848
   ],
   "headCentre": [
    0.0,
-   0.165,
-   0.0054
+   0.167,
+   0.0184
+  ],
+  "mouthLip": [
+   0.0,
+   0.085,
+   0.1214
   ],
   "forward": [
    0.0,
@@ -37,40 +53,24 @@
    0.0
   ]
  },
- "body": {
-  "neckPivot": [
+ "jaw": {
+  "mouth": [
    0.0,
-   0.3,
-   -0.0106
-  ],
-  "tiltSeamTestedDeg": 32.0
+   -0.009,
+   0.0625
+  ]
+ },
+ "test": {
+  "tiltDeg": 32.0,
+  "jawDeg": 14.0
  },
  "mesh": {
-  "head": {
-   "triangles": 32008,
-   "vertices": 16082,
-   "nonManifoldEdges": 152,
+  "th-body": {
+   "triangles": 5302,
+   "vertices": 2704,
+   "nonManifoldEdges": 104,
    "trianglesPerMaterial": {
-    "porcelain": 31856,
-    "mouth_interior": 152
-   },
-   "boundsMinBlender": [
-    -0.0765,
-    -0.1202,
-    -0.0389
-   ],
-   "boundsMaxBlender": [
-    0.0765,
-    0.1034,
-    0.292
-   ]
-  },
-  "body": {
-   "triangles": 10198,
-   "vertices": 5177,
-   "nonManifoldEdges": 152,
-   "trianglesPerMaterial": {
-    "porcelain": 10198,
+    "porcelain": 5302,
     "mouth_interior": 0
    },
    "boundsMinBlender": [
@@ -81,16 +81,73 @@
    "boundsMaxBlender": [
     0.184,
     0.084,
-    0.3389
+    0.2
+   ]
+  },
+  "th-neck": {
+   "triangles": 2808,
+   "vertices": 1561,
+   "nonManifoldEdges": 312,
+   "trianglesPerMaterial": {
+    "porcelain": 2808,
+    "mouth_interior": 0
+   },
+   "boundsMinBlender": [
+    -0.0458,
+    -0.056,
+    0.0
+   ],
+   "boundsMaxBlender": [
+    0.0458,
+    0.046,
+    0.0616
+   ]
+  },
+  "th-head": {
+   "triangles": 29388,
+   "vertices": 14878,
+   "nonManifoldEdges": 366,
+   "trianglesPerMaterial": {
+    "porcelain": 29312,
+    "mouth_interior": 76
+   },
+   "boundsMinBlender": [
+    -0.0765,
+    -0.1333,
+    -0.01
+   ],
+   "boundsMaxBlender": [
+    0.0765,
+    0.0904,
+    0.294
+   ]
+  },
+  "th-jaw": {
+   "triangles": 3060,
+   "vertices": 1610,
+   "nonManifoldEdges": 158,
+   "trianglesPerMaterial": {
+    "porcelain": 2988,
+    "mouth_interior": 72
+   },
+   "boundsMinBlender": [
+    -0.0606,
+    -0.0812,
+    -0.0816
+   ],
+   "boundsMaxBlender": [
+    0.0606,
+    -0.0051,
+    -0.0102
    ]
   },
   "whole": {
-   "triangles": 38894,
-   "vertices": 19449,
+   "triangles": 37438,
+   "vertices": 18721,
    "nonManifoldEdges": 0,
    "trianglesPerMaterial": {
-    "porcelain": 38742,
-    "mouth_interior": 152
+    "porcelain": 37290,
+    "mouth_interior": 148
    },
    "boundsMinBlender": [
     -0.184,
@@ -100,7 +157,7 @@
    "boundsMaxBlender": [
     0.184,
     0.1141,
-    0.592
+    0.542
    ]
   }
  }
