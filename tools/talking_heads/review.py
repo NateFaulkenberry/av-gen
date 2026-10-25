@@ -42,11 +42,45 @@ FEATURES = ("beams", "copies", "tear", "chroma")
 CLOSE = ([-0.34, 0.37, 0.80], [0.0, 0.30, 0.22])   # three-quarter from the right, on the middle head's mouth and jaw
 
 
-def variant(project, wav, stems, work, only=None, close=None, shut=False):
+def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_mouth="", no_atmos=False):
     out = os.path.join(work, "variant.json")
     make_variant(project, wav_path(wav), None, out)
     with open(out) as f:
         doc = json.load(f)
+    if no_atmos:
+        # the stop-3 room, for the atmosphere's cost: no mist, only the middle motes, no sky tones
+        doc["effects"] = [e for e in doc["effects"] if e["id"] != "mist"]
+        doc["routes"] = [r for r in doc["routes"] if not r["target"].startswith(("fx/mist/", "env/sky/"))]
+        sp = doc["assets"]["scene"]["path"]
+        with open(sp) as f:
+            sc = json.load(f)
+        sc["nodes"] = [n for n in sc["nodes"] if n["name"] not in ("motesFar", "motesNear")]
+        base = os.path.dirname(sp)
+        for n in sc["nodes"]:
+            src = n.get("procedural", {}).get("source", {})
+            if "asset" in src and not os.path.isabs(src["asset"]):
+                src["asset"] = os.path.join(base, src["asset"])
+            if "asset" in n and not os.path.isabs(n["asset"]):
+                n["asset"] = os.path.join(base, n["asset"])
+        nsp = os.path.join(work, "noatmos.scene.json")
+        with open(nsp, "w") as f:
+            json.dump(sc, f)
+        doc["assets"]["scene"] = {"kind": "composition", "path": nsp}
+    if slow_mouth:
+        # one head's mouth on a slow sine (0.2 Hz: 2.5 s open, 2.5 s shut) instead of its gate; its neck and look
+        # held still and its flashes, copies and wash off, so the clip shows the lips and the rays alone
+        P = slow_mouth
+        doc["sources"].append({"kind": "lfo", "name": "slowMouth", "settings": {"shape": "sine"}})
+        doc["parameters"]["sources/slowMouth/rate"] = 0.2
+        hold = {P + "Pose": [{"source": "lfo.slowMouth"}], P + "Live": [{"constant": 0.0}],
+                P + "Open": [{"constant": 0.0}], P + "NeckY": [{"constant": 0.0}], P + "NeckP": [{"constant": 0.0}],
+                P + "NeckLeadY": [{"constant": 0.0}], P + "NeckLeadP": [{"constant": 0.0}],
+                P + "Theta": [{"constant": 0.0}]}
+        for src in doc.get("sources", []):
+            if src.get("kind") == "signal" and src["name"] in hold:
+                src["settings"]["inputs"] = hold[src["name"]]
+                src["settings"].pop("chain", None)
+        doc["routes"] = [r for r in doc["routes"] if not r["target"].startswith("nodes/%s-bust/rotation" % P)]
     if shut:
         for src in doc.get("sources", []):
             if src.get("name") == "padShutHold":
@@ -113,6 +147,8 @@ def main():
     ap.add_argument("--cam", default="", help="a static camera: px,py,pz,tx,ty,tz (implies --close)")
     ap.add_argument("--only", default="", help="comma-separated features to keep (mouth, eyes, vibration, tear, "
                                                 "chroma); the others' knobs rest at 0")
+    ap.add_argument("--no-atmos", action="store_true", help="without stop 4's mist, extra motes and sky tones")
+    ap.add_argument("--slow-mouth", default="", help="a head's prefix: its mouth on a slow sine, its look held")
     ap.add_argument("--at", type=float, default=60.0)
     ap.add_argument("--range", default="60:75")
     ap.add_argument("--size", default="1920x1080")
@@ -126,7 +162,7 @@ def main():
     try:
         if a.mode in ("still", "silent"):
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.mode == "silent"
-                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
             d = os.path.join(work, "frames")
             # a still lands on the instant after 2 s of the music before it, so the envelopes are warm
             run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
@@ -136,12 +172,12 @@ def main():
             shutil.copy(got[-1], a.out)
         elif a.mode == "clip":
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
                  "--size", a.size])
         print(a.out)

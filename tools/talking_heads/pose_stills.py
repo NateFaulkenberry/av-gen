@@ -44,7 +44,7 @@ def posed(project, scene, P, tilt, opening, lids, rays_on=True):
     for i, e in enumerate(rays):
         e["parameters"]["intensity"] = th.RAY_BRIGHTNESS * th.RAY_WEIGHT[i] * opening * (1.0 if rays_on else 0.0)
     for n in s["nodes"]:
-        if n["name"] == P + "-head":
+        if n["name"] == P + "-pivot":
             n["rotation"] = [-tilt, 0.0, 0.0]
             if tilt:
                 F = th.BEND_LEN
@@ -52,12 +52,13 @@ def posed(project, scene, P, tilt, opening, lids, rays_on=True):
                 R_ = F / t
                 n["position"] = [n["position"][0], n["position"][1] + R_ * math.sin(t) - F,
                                  n["position"][2] - R_ * (1.0 - math.cos(t))]
+        if n["name"] == P + "-head":
             for d in n["procedural"]["deformers"]:
                 if d["kind"] == "hinge":
                     d["amount"] = th.MOUTH_OPEN * opening
         if n["name"] == P + "-neck" and tilt:
             for d in n["procedural"]["deformers"]:
-                if d["kind"] == "bend":
+                if d["kind"] == "bend" and d["displacementAxis"][2] < 0:   # the back bend
                     d["amount"] = math.radians(tilt) / d["falloff"]
         if lids and n["name"] in (P + "-lidUL", P + "-lidUR"):
             n["rotation"] = [th.LID_UPPER_CLOSED * lids, 0.0, 0.0]
@@ -92,7 +93,6 @@ def main():
             n["asset"] = os.path.join(base, n["asset"])
     P = a.prefix
     bust = next(n for n in scene["nodes"] if n["name"] == P + "-bust")
-    head = next(n for n in scene["nodes"] if n["name"] == P + "-head")
     bp, hd = bust.get("position", [0.0, 0.0, 0.0]), bust.get("rotation", [0.0, 0.0, 0.0])[1]
     os.makedirs(a.out, exist_ok=True)
     work = tempfile.mkdtemp(prefix="th-pose-")

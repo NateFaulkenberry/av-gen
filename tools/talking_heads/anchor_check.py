@@ -95,7 +95,7 @@ def pose_docs(project, scene, tilt, jaw, cam_pos, cam_tgt, beams_on):
     s["camera"] = {"mode": 1, "position": cam_pos, "target": cam_tgt, "fov": 40.0, "orbitSpeed": 0.0}
     s["nodes"] = [n for n in s["nodes"] if n["kind"] != "particles" and not n["name"].startswith("th-ghost")]
     for n in s["nodes"]:
-        if n["name"] == PFX + "-head":
+        if n["name"] == PFX + "-pivot":   # the head hangs from the pivot at the neck's top (stop 4)
             n["rotation"] = [-tilt, 0.0, 0.0]
             if tilt:   # onto the bent neck's top, as the scene's routes place it (applyBend: R = F / theta)
                 F = next(d["falloff"] for m in s["nodes"] if m["name"] == PFX + "-neck"
@@ -110,7 +110,7 @@ def pose_docs(project, scene, tilt, jaw, cam_pos, cam_tgt, beams_on):
                     d["amount"] = math.radians(jaw)
         if n["name"] == PFX + "-neck" and tilt:
             for d in n["procedural"].get("deformers", []):
-                if d["kind"] == "bend":
+                if d["kind"] == "bend" and d.get("displacementAxis", [0, 0, -1])[2] < 0:   # the back bend
                     d["amount"] = math.radians(tilt) / d["falloff"]
     return p, s
 
@@ -170,7 +170,7 @@ def main():
         sys.exit(1)
     global PFX
     PFX = a.prefix
-    head = next(n for n in scene["nodes"] if n["name"] == PFX + "-head")
+    head = next(n for n in scene["nodes"] if n["name"] == PFX + "-pivot")
     bust = next(n for n in scene["nodes"] if n["name"] == PFX + "-bust")
     bp = bust.get("position", [0.0, 0.0, 0.0])
     aim = [bp[0] + head["position"][0], bp[1] + head["position"][1] + 0.12, bp[2] + head["position"][2] + 0.06]
