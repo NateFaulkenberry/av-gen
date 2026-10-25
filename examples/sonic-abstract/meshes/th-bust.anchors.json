@@ -3,44 +3,58 @@
  "body": {
   "neckFoot": [
    0.0,
-   0.2,
-   -0.0237
+   0.162,
+   -0.0214
   ],
   "headRest": [
    0.0,
-   0.248,
-   -0.0237
+   0.237,
+   -0.0214
   ]
  },
  "neck": {
-  "bendLength": 0.048,
+  "bendLength": 0.075,
   "headOffsetNote": "for a tilt back of theta (rad): the head turns by -theta about X and moves by (0, (R sin(theta) - F), -R (1 - cos(theta))) with R = F / theta"
+ },
+ "eyes": {
+  "radius": 0.0125,
+  "left": [
+   0.0281,
+   0.161,
+   0.073
+  ],
+  "right": [
+   -0.0281,
+   0.161,
+   0.073
+  ],
+  "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and pitch within -18..+6 degrees so the iris never sinks into the socket."
  },
  "head": {
   "jawHinge": [
    0.0,
-   0.095,
-   0.0337
+   0.091,
+   0.0314
   ],
   "eyeLeft": [
-   0.0295,
-   0.165,
-   0.0848
+   0.0294,
+   0.161,
+   0.0824
   ],
   "eyeRight": [
-   -0.0295,
-   0.165,
-   0.0848
+   -0.0294,
+   0.161,
+   0.0824
   ],
   "headCentre": [
    0.0,
-   0.167,
-   0.0184
+   0.163,
+   0.0162
   ],
   "mouthLip": [
    0.0,
-   0.085,
-   0.1214
+   0.081,
+   0.1191
   ],
   "forward": [
    0.0,
@@ -62,15 +76,15 @@
  },
  "test": {
   "tiltDeg": 32.0,
-  "jawDeg": 14.0
+  "jawDeg": 10.0
  },
  "mesh": {
   "th-body": {
-   "triangles": 5302,
-   "vertices": 2704,
+   "triangles": 5094,
+   "vertices": 2600,
    "nonManifoldEdges": 104,
    "trianglesPerMaterial": {
-    "porcelain": 5302,
+    "porcelain": 5094,
     "mouth_interior": 0
    },
    "boundsMinBlender": [
@@ -81,73 +95,73 @@
    "boundsMaxBlender": [
     0.184,
     0.084,
-    0.2
+    0.162
    ]
   },
   "th-neck": {
-   "triangles": 2808,
-   "vertices": 1561,
+   "triangles": 6760,
+   "vertices": 3537,
    "nonManifoldEdges": 312,
    "trianglesPerMaterial": {
-    "porcelain": 2808,
+    "porcelain": 6760,
     "mouth_interior": 0
    },
    "boundsMinBlender": [
-    -0.0458,
-    -0.056,
+    -0.0596,
+    -0.0576,
     0.0
    ],
    "boundsMaxBlender": [
-    0.0458,
-    0.046,
-    0.0616
+    0.0596,
+    0.0498,
+    0.0889
    ]
   },
   "th-head": {
-   "triangles": 29388,
-   "vertices": 14878,
-   "nonManifoldEdges": 366,
+   "triangles": 30640,
+   "vertices": 15491,
+   "nonManifoldEdges": 340,
    "trianglesPerMaterial": {
-    "porcelain": 29312,
-    "mouth_interior": 76
-   },
-   "boundsMinBlender": [
-    -0.0765,
-    -0.1333,
-    -0.01
-   ],
-   "boundsMaxBlender": [
-    0.0765,
-    0.0904,
-    0.294
-   ]
-  },
-  "th-jaw": {
-   "triangles": 3060,
-   "vertices": 1610,
-   "nonManifoldEdges": 158,
-   "trianglesPerMaterial": {
-    "porcelain": 2988,
+    "porcelain": 30568,
     "mouth_interior": 72
    },
    "boundsMinBlender": [
-    -0.0606,
-    -0.0812,
-    -0.0816
+    -0.0765,
+    -0.131,
+    -0.0102
    ],
    "boundsMaxBlender": [
-    0.0606,
-    -0.0051,
-    -0.0102
+    0.0765,
+    0.0926,
+    0.29
+   ]
+  },
+  "th-jaw": {
+   "triangles": 2520,
+   "vertices": 1334,
+   "nonManifoldEdges": 146,
+   "trianglesPerMaterial": {
+    "porcelain": 2436,
+    "mouth_interior": 84
+   },
+   "boundsMinBlender": [
+    -0.0533,
+    -0.0812,
+    -0.08
+   ],
+   "boundsMaxBlender": [
+    0.0533,
+    -0.0121,
+    -0.0096
    ]
   },
   "whole": {
-   "triangles": 37438,
-   "vertices": 18721,
+   "triangles": 41390,
+   "vertices": 20697,
    "nonManifoldEdges": 0,
    "trianglesPerMaterial": {
-    "porcelain": 37290,
-    "mouth_interior": 148
+    "porcelain": 41234,
+    "mouth_interior": 156
    },
    "boundsMinBlender": [
     -0.184,
@@ -156,8 +170,8 @@
    ],
    "boundsMaxBlender": [
     0.184,
-    0.1141,
-    0.542
+    0.114,
+    0.527
    ]
   }
  }

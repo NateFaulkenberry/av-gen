@@ -19,6 +19,7 @@ contour. Quad topology, no decimation: the ring and segment counts set the trian
 Writes to --out:
 - th-body.glb, th-neck.glb, th-head.glb, th-jaw.glb: the four articulated pieces (see "the articulation" below);
 - th-mouth-cavity.glb (head frame), th-jaw-floor.glb (jaw frame): the mouth's near-black interior;
+- th-eye.glb: an eyeball (porcelain with a dark iris disc facing +Z), placed in both recesses by the scene;
 - th-head-ghost.glb, th-jaw-ghost.glb: the head and jaw, one alpha-BLEND material, for the spectral copies;
 - th-bust.anchors.json: the hierarchy, the joints, the emitter anchors in each piece's frame, mesh statistics.
 The head tilts back on a neck that BENDS (the owner, stop 1: "the neck to snap back"; no ridge at the joint) and the jaw
@@ -99,18 +100,18 @@ EYE_DEG = 24.0
 MOUTH_Z = 0.383
 
 
-# The owner (stop 1, 2026-10-25): "shorten the neck some". Everything from the jaw up is authored above at its old
-# height and dropped by NECK_DROP here; the long-neck control point between them goes. The neck (shoulders to jaw)
-# is 30% shorter.
-NECK_DROP = 0.050
+# The owner (stops 1 and 2): "shorten the neck some" ... "the neck still reads long". Everything from the jaw up is
+# authored above at its old height and dropped by NECK_DROP here; the long-neck control point between them goes. The
+# neck (shoulders to jaw) is 39% shorter than the probe's.
+NECK_DROP = 0.065
 PROFILE = [(z - NECK_DROP if z >= 0.29 else z,) + tuple(rest) for (z, *rest) in PROFILE if not 0.2 < z < 0.29]
 FEATURES = [(n, a, z - NECK_DROP, sa, sz, amp, m) for (n, a, z, sa, sz, amp, m) in FEATURES]
 EYE_Z -= NECK_DROP
 MOUTH_Z -= NECK_DROP
-# The owner (stop 1): "give the bust an adam's apple too". A soft, restrained bump on the front of the shortened neck,
-# on the body piece just below the bend's foot (it does not move when the head snaps back, and the chin swings away
-# from it). Authored at its final height.
-FEATURES.append(("adamsApple", 0.0, 0.188, 11.0, 0.0085, +0.0065, False))
+# The owner (stops 1 and 2): "give the bust an adam's apple too" ... "adams apple needs to be moved up a bit". One soft,
+# clean bump high on the throat, about 3 cm under the jaw's underside, in the bending part of the neck (it bends with
+# the neck, and the chin swings up and away from it as the head snaps back). Authored at its final height.
+FEATURES.append(("adamsApple", 0.0, 0.316 - NECK_DROP - 0.030, 13.0, 0.0095, +0.0068, False))
 
 
 def mouth_shape(da, z):
@@ -122,8 +123,10 @@ def rings_z():
     """Ring heights: coarse on the base and neck, fine through the face, finest across the mouth."""
     zs, z = [], 0.0
     d = NECK_DROP
-    while z < 0.300 - d:
+    while z < 0.140:
         zs.append(z); z += 0.008
+    while z < 0.300 - d:   # the neck bends: fine rings, so the bent surface stays smooth (no facets, no wobble)
+        zs.append(z); z += 0.003
     while z < 0.520 - d:
         zs.append(z); z += (0.0010 if 0.370 - d < z < 0.396 - d else 0.0018)
     while z < 0.588 - d:
@@ -347,33 +350,58 @@ def _ring_near(target):
     return min(rings_z(), key=lambda z: abs(z - target))
 
 
-NECK_TOP = _ring_near(0.316 - NECK_DROP - 0.016)   # just below the jaw (the owner's circled point)
-NECK_LOW = _ring_near(NECK_TOP - 0.048)            # the bend's foot, mid-neck
-JAW_HALF_DEG = 62.0                                # the jaw block's half width round the face
+NECK_TOP = _ring_near(0.316 - NECK_DROP - 0.014)   # just below the jaw (the owner's circled point)
+NECK_LOW = _ring_near(NECK_TOP - 0.075)            # the bend's foot, where the neck meets the shoulders: the whole
+                                                   # neck bends, with a gentle curvature (no notch at the nape)
+JAW_HALF_DEG = 50.0                                # the jaw's half width round the face
+JAW_CORE_DEG = 42.0                                # the head keeps its skin over the jaw's sides beyond this, and
+JAW_SKIRT = 0.006                                  # over its lower edge by this much: the jaw slides under the head
+JAW_INSET = 0.0006                                 # how far the jaw's hidden edges sit under the head's skin
 JAW_BOTTOM_Z = 0.312 - NECK_DROP                   # under the chin: the block's underside (above NECK_TOP)
 JAW_HINGE = (0.0, None, MOUTH_Z + 0.010)           # y filled in from the profile (the head's centre line)
 TILT_TEST_DEG = 32.0
-JAW_TEST_DEG = 14.0
+JAW_TEST_DEG = 10.0
+EYE_RADIUS = 0.0125            # the eyeballs: 25 mm across, seated in the 17 mm recesses
+EYE_SEAT = 0.0095              # how far behind the recess surface the eyeball's centre sits
 JOINT_INSET = 0.004            # the junction domes sit 4 mm inside the walls: hidden, and never coincident
 
 
-def in_jaw(c, f=None):
+def in_jaw(c, f=None, half=None, skirt=0.0):
     """The chin block: below the mouth line, above the chin's underside, inside the front sector. The sector is read
     from the faces' SEGMENT indices (build_mesh makes the ring vertices in order), so its side cuts run straight down
     a segment line instead of stepping where the superellipse's angle and the ring's own angle disagree."""
-    if not max(JAW_BOTTOM_Z, NECK_TOP) < c.z < MOUTH_Z:
+    half = JAW_HALF_DEG if half is None else half
+    if not max(JAW_BOTTOM_Z, NECK_TOP) + skirt < c.z < MOUTH_Z:
         return False
     if f is None:
         cy = interp(min(max(c.z, 0.0), 0.6))[3]
         a = angle_of(c, cy)
-        return abs((a + 180.0) % 360.0 - 180.0) < JAW_HALF_DEG
+        return abs((a + 180.0) % 360.0 - 180.0) < half
     S = args.segments
     for v in f.verts:
         k = v.index % S
         a = (360.0 * k / S + 180.0) % 360.0 - 180.0
-        if abs(a) > JAW_HALF_DEG + 1e-6:
+        if abs(a) > half + 1e-6:
             return False
     return True
+
+
+def sink_jaw_edges(jaw):
+    """The softened jaw (the owner, stop 2): the head keeps its skin over the jaw's sides (beyond JAW_CORE_DEG) and its
+    lower edge (JAW_SKIRT), and the jaw's own surface there sinks JAW_INSET under it, easing in over 4 degrees / 4 mm. So
+    at rest the face reads as one surface with a fine seam, and as the jaw drops its sides slide under the cheeks: no
+    dark wedges at the sides of the chin."""
+    def sm(a, b, x):
+        u = max(0.0, min(1.0, (x - a) / (b - a)))
+        return u * u * (3.0 - 2.0 * u)
+    for v in jaw.data.vertices:
+        cy = interp(min(max(v.co.z, 0.0), 0.6))[3]
+        a = abs((angle_of(v.co, cy) + 180.0) % 360.0 - 180.0)
+        w = max(sm(JAW_CORE_DEG - 4.0, JAW_CORE_DEG, a),
+                sm(JAW_BOTTOM_Z + JAW_SKIRT + 0.004, JAW_BOTTOM_Z + JAW_SKIRT, v.co.z))
+        if w > 0.0:
+            v.co -= v.normal * (JAW_INSET * w)
+    jaw.data.update()
 
 
 def piece(src, name, keep):
@@ -496,6 +524,14 @@ def bend_mesh(ob, theta, z0, F):
     ob.data.update()
 
 
+def eye_centre(surface, side):
+    """The eyeball's centre: EYE_SEAT behind the recess surface point, along the recess's axis (the face's forward,
+    turned a little outward like a real gaze at rest)."""
+    a = math.radians(side * 8.0)
+    d = Vector((math.sin(a), -math.cos(a), 0.0))   # Blender: forward is -Y
+    return surface - d * EYE_SEAT
+
+
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     ob = build_mesh()
@@ -509,10 +545,11 @@ def main():
     hinge = Vector((0.0, interp(MOUTH_Z)[3] - 0.010, JAW_HINGE[2]))
     body = piece(ob, "th-body", lambda c, f: c.z < NECK_LOW)
     neck = piece(ob, "th-neck", lambda c, f: NECK_LOW < c.z < NECK_TOP)
-    head = piece(ob, "th-head", lambda c, f: c.z > NECK_TOP and not in_jaw(c, f))
+    head = piece(ob, "th-head", lambda c, f: c.z > NECK_TOP and not in_jaw(c, f, JAW_CORE_DEG, JAW_SKIRT))
     jaw = piece(ob, "th-jaw", lambda c, f: in_jaw(c, f))
     for p_ in (body, neck, head, jaw):
         copy_smooth_normals(ob, p_)
+    sink_jaw_edges(jaw)
     # the ghosts' copies are taken BEFORE the junction domes: a spectral copy is offset sideways, and the head's dome
     # (hidden inside the neck on the real head) would stick out of the neck as a dark band on the copy
     head_g = piece(head, "th-head-g", lambda c, f: True)
@@ -530,6 +567,20 @@ def main():
         o.data.materials.append(make_mat("mouth_interior", (0.012, 0.010, 0.012), 0.85, 0.1))
         add_dark_ellipsoid(o, centre, radii, 0)
         return o
+    # the eyeballs (the darting-eyes pass): one porcelain ball with a dark iris disc on its +Y (Blender's forward is -Y,
+    # so the disc faces -Y), exported once and placed in both sockets by the scene. Its origin is its centre.
+    eyeball = bpy.data.objects.new("th-eye", bpy.data.meshes.new("th-eye"))
+    bpy.context.scene.collection.objects.link(eyeball)
+    eyeball.data.materials.append(make_mat("eye_white", (0.86, 0.84, 0.80), 0.25, 0.6, 0.3))
+    eyeball.data.materials.append(make_mat("iris", (0.03, 0.025, 0.04), 0.3, 0.5, 0.3))
+    ebm = bmesh.new()
+    res = bmesh.ops.create_uvsphere(ebm, u_segments=32, v_segments=20, radius=EYE_RADIUS)
+    for fce in {f for v in res["verts"] for f in v.link_faces}:
+        fce.smooth = True
+        c = fce.calc_center_median()
+        fce.material_index = 1 if c.y < -EYE_RADIUS * 0.62 else 0
+    ebm.to_mesh(eyeball.data)
+    ebm.free()
     cavity = dark_piece("th-mouth-cavity", (0.0, interp(MOUTH_Z)[3] - 0.040, MOUTH_Z - 0.006), (0.042, 0.046, 0.026))
     floor = dark_piece("th-jaw-floor", (0.0, interp(MOUTH_Z)[3] - 0.046, MOUTH_Z - 0.014), (0.040, 0.040, 0.016))
     shift(neck, neck_foot)
@@ -552,6 +603,10 @@ def main():
         "body": {"neckFoot": G(neck_foot), "headRest": G(head_origin)},
         "neck": {"bendLength": round(F, 4), "headOffsetNote": "for a tilt back of theta (rad): the head turns by "
                  "-theta about X and moves by (0, (R sin(theta) - F), -R (1 - cos(theta))) with R = F / theta"},
+        "eyes": {"radius": EYE_RADIUS, "left": G(eye_centre(eyes[0], 1) - head_origin),
+                 "right": G(eye_centre(eyes[1], -1) - head_origin),
+                 "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and "
+                         "pitch within -18..+6 degrees so the iris never sinks into the socket."},
         "head": {"jawHinge": G(hinge - head_origin), "eyeLeft": G(eyes[0] - head_origin),
                  "eyeRight": G(eyes[1] - head_origin), "headCentre": G(centre - head_origin),
                  "mouthLip": G(Vector((0.0, lip.y, MOUTH_Z)) - head_origin), "forward": [0.0, 0.0, 1.0],
@@ -564,7 +619,7 @@ def main():
         json.dump(anchors, f, indent=1)
         f.write("\n")
     for p_, name in ((body, "th-body"), (neck, "th-neck"), (head, "th-head"), (jaw, "th-jaw"),
-                     (cavity, "th-mouth-cavity"), (floor, "th-jaw-floor")):
+                     (cavity, "th-mouth-cavity"), (floor, "th-jaw-floor"), (eyeball, "th-eye")):
         export(p_, os.path.join(OUT, name + ".glb"))
     gm = ghost_material()
     for p_, name in ((head_g, "th-head-ghost.glb"), (jaw_g, "th-jaw-ghost.glb")):
@@ -580,6 +635,12 @@ def main():
         return
     for o in (ob, head_g, jaw_g):   # previews show the real pieces only
         bpy.data.objects.remove(o)
+    for i, side in enumerate((1, -1)):   # the two eyes in the previews (the scene places them the same way)
+        e = eyeball if i == 0 else bpy.data.objects.new("th-eye-R", eyeball.data)
+        if i:
+            bpy.context.scene.collection.objects.link(e)
+        e.parent = head
+        e.location = eye_centre(eyes[i], side) - head_origin
     neck_rest = neck.data.copy()
     cam = setup_render()
 

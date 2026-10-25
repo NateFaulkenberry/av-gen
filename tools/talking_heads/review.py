@@ -39,14 +39,18 @@ def wav_path(name):
 
 
 FEATURES = ("beams", "copies", "tear", "chroma")
-CLOSE = ([-0.34, 0.40, 0.62], [0.0, 0.33, 0.04])   # three-quarter from the bust's right, on the mouth and jaw
+CLOSE = ([-0.34, 0.37, 0.80], [0.0, 0.30, 0.22])   # three-quarter from the right, on the middle head's mouth and jaw
 
 
-def variant(project, wav, stems, work, only=None, close=None):
+def variant(project, wav, stems, work, only=None, close=None, shut=False):
     out = os.path.join(work, "variant.json")
     make_variant(project, wav_path(wav), None, out)
     with open(out) as f:
         doc = json.load(f)
+    if shut:
+        for src in doc.get("sources", []):
+            if src.get("name") == "padShutHold":
+                src["settings"]["inputs"] = [{"constant": 1.0}]
     if only:
         # isolate features: every other feature's control channel rests at 0 (its knob turned down)
         keep = set(only.split(","))
@@ -80,6 +84,13 @@ def variant(project, wav, stems, work, only=None, close=None):
     return out
 
 
+def cam(a):
+    if a.cam:
+        v = [float(x) for x in a.cam.split(",")]
+        return (v[:3], v[3:])
+    return CLOSE if a.close else None
+
+
 def run(args):
     r = subprocess.run([LOCK, AVGEN] + args, capture_output=True, text=True)
     lines = (r.stdout + r.stderr).splitlines()
@@ -98,6 +109,8 @@ def main():
     ap.add_argument("--wav", default="feline")
     ap.add_argument("--stems", action="store_true")
     ap.add_argument("--close", action="store_true", help="a static close camera on the face")
+    ap.add_argument("--shut", action="store_true", help="every gate held shut (pad 36 held): only the scans and eyes move")
+    ap.add_argument("--cam", default="", help="a static camera: px,py,pz,tx,ty,tz (implies --close)")
     ap.add_argument("--only", default="", help="comma-separated features to keep (mouth, eyes, vibration, tear, "
                                                 "chroma); the others' knobs rest at 0")
     ap.add_argument("--at", type=float, default=60.0)
@@ -113,7 +126,7 @@ def main():
     try:
         if a.mode in ("still", "silent"):
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.mode == "silent"
-                    else variant(a.project, a.wav, a.stems, work, a.only, CLOSE if a.close else None))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut))
             d = os.path.join(work, "frames")
             # a still lands on the instant after 2 s of the music before it, so the envelopes are warm
             run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
@@ -123,12 +136,12 @@ def main():
             shutil.copy(got[-1], a.out)
         elif a.mode == "clip":
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only, CLOSE if a.close else None))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut))
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
-                    else variant(a.project, a.wav, a.stems, work, a.only, CLOSE if a.close else None))
+                    else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
                  "--size", a.size])
         print(a.out)

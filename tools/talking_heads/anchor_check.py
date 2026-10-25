@@ -27,6 +27,7 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 AVGEN = os.environ.get("AVGEN") or os.path.join(REPO, "build", "release", "src", "avgen")
 LOCK = os.path.join(REPO, "tools", "gpu-lock.sh")
 W, H = 1280, 720
+PFX = "th"
 
 
 # ------------------------------------------------------------------------------------------- tiny linear algebra
@@ -94,18 +95,18 @@ def pose_docs(project, scene, tilt, jaw, cam_pos, cam_tgt, beams_on):
     s["camera"] = {"mode": 1, "position": cam_pos, "target": cam_tgt, "fov": 40.0, "orbitSpeed": 0.0}
     s["nodes"] = [n for n in s["nodes"] if n["kind"] != "particles" and not n["name"].startswith("th-ghost")]
     for n in s["nodes"]:
-        if n["name"] == "th-head":
+        if n["name"] == PFX + "-head":
             n["rotation"] = [-tilt, 0.0, 0.0]
             if tilt:   # onto the bent neck's top, as the scene's routes place it (applyBend: R = F / theta)
-                F = next(d["falloff"] for m in s["nodes"] if m["name"] == "th-neck"
+                F = next(d["falloff"] for m in s["nodes"] if m["name"] == PFX + "-neck"
                          for d in m["procedural"]["deformers"] if d["kind"] == "bend")
                 th = math.radians(tilt)
                 R_ = F / th
                 n["position"] = [n["position"][0], n["position"][1] + R_ * math.sin(th) - F,
                                  n["position"][2] - R_ * (1.0 - math.cos(th))]
-        if n["name"] == "th-jaw":
+        if n["name"] == PFX + "-jaw":
             n["rotation"] = [jaw, 0.0, 0.0]
-        if n["name"] == "th-neck" and tilt:
+        if n["name"] == PFX + "-neck" and tilt:
             for d in n["procedural"].get("deformers", []):
                 if d["kind"] == "bend":
                     d["amount"] = math.radians(tilt) / d["falloff"]
@@ -134,6 +135,7 @@ def main():
     ap.add_argument("--poses", default="0:0,20:0,32:18", help="tilt:jaw degrees, comma-separated")
     ap.add_argument("--tol", type=float, default=12.0, help="pixels (the origin sits inside the mouth, so the lip can hide its first few)")
     ap.add_argument("--view", default="three-quarter", choices=["front", "three-quarter"])
+    ap.add_argument("--prefix", default="th", help="the head to pose and look at (th, th1, th2...)")
     a = ap.parse_args()
     from PIL import Image, ImageChops, ImageDraw
     base = os.path.dirname(os.path.abspath(a.project))
@@ -164,8 +166,12 @@ def main():
     if bad:
         print("routes move a beam owner's drawn mesh without its node (use nodes/<name>/...):", sorted(set(bad)))
         sys.exit(1)
-    head = next(n for n in scene["nodes"] if n["name"] == "th-head")
-    aim = [head["position"][0], head["position"][1] + 0.12, head["position"][2] + 0.06]
+    global PFX
+    PFX = a.prefix
+    head = next(n for n in scene["nodes"] if n["name"] == PFX + "-head")
+    bust = next(n for n in scene["nodes"] if n["name"] == PFX + "-bust")
+    bp = bust.get("position", [0.0, 0.0, 0.0])
+    aim = [bp[0] + head["position"][0], bp[1] + head["position"][1] + 0.12, bp[2] + head["position"][2] + 0.06]
     yaw = 0.0 if a.view == "front" else -32.0
     dist = 0.75
     cam = [aim[0] + dist * math.sin(math.radians(yaw)), aim[1] + 0.02, aim[2] + dist * math.cos(math.radians(yaw))]
@@ -186,7 +192,7 @@ def main():
             img = on.copy()
             dr = ImageDraw.Draw(img)
             for e in on_p["effects"]:
-                if e["type"] != "lightBeam":
+                if e["type"] != "lightBeam" or not e["owner"].get("name", "").startswith(PFX + "-"):
                     continue
                 q = e["parameters"]
                 owner = e["owner"]["name"]
