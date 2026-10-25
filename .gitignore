@@ -183,3 +183,6 @@ __pycache__/
 # Rainbow World (docs/prototypes/rainbow-world/04-production-plan.md section 3): downloads, milestone .blend files and
 # large generated meshes. assets/rainbow-world.manifest.json is the part the repository keeps.
 /assets/rainbow-world/
+# Cursed Slammers (look-development study): the downloaded CC-BY face scan and everything derived from it stay out of
+# git (assets/cursed-slammers.manifest.json records the source and the attribution).
+/assets/cursed-slammers

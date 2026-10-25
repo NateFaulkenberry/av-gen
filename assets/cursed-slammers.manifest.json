@@ -1,0 +1,44 @@
+{
+ "scene": "Cursed Slammers (look-development study, docs/prototypes/cursed-slammers/)",
+ "policy": "Third-party downloads and everything derived from them stay gitignored under assets/cursed-slammers/ (main checkout; worktrees symlink it). The repo is public: never commit them. The owner chose H1 on 2026-10-25 ('just try rendering this head') and downloaded it himself (Sketchfab needs a signed-in account).",
+ "assets": [
+  {
+   "id": "gorilla-face-jtuhtan",
+   "source": "https://sketchfab.com/3d-models/gorilla-face-808b2c0c11bf44c983e8b8c787ada844",
+   "uid": "808b2c0c11bf44c983e8b8c787ada844",
+   "title": "Gorilla Face",
+   "creators": [
+    "Jeffrey Tuhtan (https://sketchfab.com/jtuhtan)"
+   ],
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "attribution": "This work is based on \"Gorilla Face\" (https://sketchfab.com/3d-models/gorilla-face-808b2c0c11bf44c983e8b8c787ada844) by Jeffrey Tuhtan (https://sketchfab.com/jtuhtan) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+   "notes": "Photogrammetry (114 photos, PhotoScan) of a gorilla-face sculpture at Wilhelma Zoo, Stuttgart; the sculptor is not named. 559,884 tri / 281,109 verts, one 8192x8192 texture, a front mask (no back, no jaw). The scan is the uploader's CC-BY work; the sculpture's own copyright is the owner's call (02-research-asset.md 1.1). Add the attribution line to CREDITS.md if anything derived from it is ever shipped.",
+   "localPath": "assets/cursed-slammers/reference/gorilla-face/",
+   "derived": [
+    "assets/cursed-slammers/cs-face.glb (tools/cursed_slammers/prep_face.py)"
+   ],
+   "fetched": "2026-10-25 (downloaded by the owner, signed in)",
+   "status": "downloaded; gitignored",
+   "attributionSource": "license.txt in the download, verbatim",
+   "files": {
+    "scene.gltf": {
+     "bytes": 11093,
+     "sha256": "0ec2ced99d34dd8ac8e19907a67fb8aaa02b03f3d64c077e0c78f6682172b6b7"
+    },
+    "scene.bin": {
+     "bytes": 18272112,
+     "sha256": "670c34288a59c2aa9ce07060ac27ab5c2b317873c8e094ee9420556e2a50b431"
+    },
+    "textures/material_0_baseColor.jpeg": {
+     "bytes": 12404317,
+     "sha256": "d6c536f3049d81a8f5e40969a01558353517d9dbee572792eb2e18e24bc93ab5"
+    },
+    "license.txt": {
+     "bytes": 678,
+     "sha256": "97458adadae4fddf243c930966daa4f4e3853bf78989878f23bfa2d844a3f276"
+    }
+   }
+  }
+ ]
+}
