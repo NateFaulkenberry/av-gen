@@ -83,9 +83,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "every kelp plant bends at once; the brain coral pulses; the sunlight swells"],
-        ["kick", "signal.kick", "the coins and gems flash; a ring ripples out through the water"],
-        ["snare", "response.snare", "a swarm of bubbles bursts round you; the fish schools turn and dart"],
-        ["hat", "response.hat", "sparkles glint in the water"],
+        ["low", "response.low", "the coins and gems flash; a ring ripples out through the water"],
+        ["onset", "response.onset", "a swarm of bubbles bursts round you; the fish schools turn and dart"],
         ["mids", "audio.mid", "the fish swim faster; the bubble streams thicken"],
         ["highs", "audio.treble", "tiny sparkling creatures (sparks) swarm"],
         ["beat", "beat.pulse", "the jellies pump"],
@@ -349,22 +348,21 @@ def instrument(s):
     for node in BRAIN:
         s.route(R("bass", P % node + "transform/scale", 0.12, attackMs=30, decayMs=300))
     s.route(R("bass", "lights/sun/intensity", 1.2, attackMs=40, decayMs=500))
-    # ---- KICK: the coins and gems flash (treasure); a ring ripples out through the water (a shock in the frame)
+    # ---- LOW: the coins and gems flash (treasure); a ring ripples out through the water (a shock in the frame)
     for node in ("coins", "gemsruins", "gemsdeep"):
-        s.route(R("kick", P % node + "material/emissive", 2.4, attackMs=0, decayMs=260))
-    s.route(R("kick", "post/shock/amount", 18.0, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
+        s.route(R("low", P % node + "material/emissive", 2.4, attackMs=0, decayMs=260))
+    s.route(R("low", "post/shock/amount", 18.0, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
               envelopeHoldMs=0, envelopeFallPerSecond=1.8),
-            R("kick", "post/shock/radius", 1.3, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
+            R("low", "post/shock/radius", 1.3, threshold="binary", thresholdLevel=0.3, envelope="linearfall",
               envelopeHoldMs=0, envelopeFallPerSecond=1.8, remapEnabled=True, remapInMin=0.0, remapInMax=1.0,
               remapOutMin=1.0, remapOutMax=0.0))
-    # ---- SNARE: a swarm of bubbles bursts round the swimmer; the schools turn and dart (a burst of extra turn)
-    s.route(R("snare", "particles/burst/burst", 160.0, threshold="binary", thresholdLevel=0.1))
+    # ---- ONSET: a swarm of bubbles bursts round the swimmer; the schools turn and dart (a burst of extra turn)
+    s.route(R("onset", "particles/burst/burst", 160.0, threshold="binary", thresholdLevel=0.1))
     for node, sgn in (("schoolA", 1.0), ("schoolB", -1.0), ("schoolC", 1.0)):
-        s.route(R("snare", P % node + "transform/rotation", 18.0 * sgn, comp=1, attackMs=0, decayMs=600,
+        s.route(R("onset", P % node + "transform/rotation", 18.0 * sgn, comp=1, attackMs=0, decayMs=600,
                   springHz=1.6, springDamping=0.45))
-    # ---- HAT: sparkles glint; HIGHS: tiny sparkling creatures swarm
-    s.route(R("hat", "particles/sparkle/burst", 40.0, threshold="binary", thresholdLevel=0.1),
-            R("audio.treble", "particles/sparkle/spawnRate", 600.0, attackMs=20, decayMs=250))
+    # ---- HIGHS: tiny sparkling creatures swarm
+    s.route(R("audio.treble", "particles/sparkle/spawnRate", 600.0, attackMs=20, decayMs=250))
     # ---- MIDS: the fish swim faster (their circling, integrated); the bubble streams thicken
     for node, rate in (("schoolA", 9.0), ("schoolB", -12.0), ("schoolC", 7.0)):
         s.route(R("audio.mid", P % node + "transform/rotation", rate, comp=1, integrate=True, attackMs=80,
@@ -390,12 +388,12 @@ def instrument(s):
     s.route(R("noteOn", "particles/burst/burst", 120.0, depth="lastVelocity", threshold="binary", thresholdLevel=0.05))
     for node in KELP:
         s.route(R("held", P % node + "material/emissive", 0.9, **MEDIUM))
-    # ---- THE GUIDE sings along: the pitch lifts it (it swims the melody's contour), a kick bobs it, the bass beats its
+    # ---- THE GUIDE sings along: the pitch lifts it (it swims the melody's contour), a low attack bobs it, the bass beats its
     # tail (the body's bend), held notes light its eyes
     for part in GUIDE_PARTS:
         node = "guide" + part.capitalize()
         s.route(R("lastPitch", P % node + "transform/position", 9.0, comp=1, **MEDIUM),
-                R("kick", P % node + "transform/position", 1.4, comp=1, attackMs=0, decayMs=350, springHz=2.2,
+                R("low", P % node + "transform/position", 1.4, comp=1, attackMs=0, decayMs=350, springHz=2.2,
                   springDamping=0.45),
                 R("bass", P % node + "deform/1/amount", 0.022, attackMs=40, decayMs=500, springHz=1.4,
                   springDamping=0.5))

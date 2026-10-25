@@ -169,78 +169,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -987,7 +915,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/split/amount",
    "amount": 14.0,
    "op": "add",
@@ -998,7 +926,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/amount",
    "amount": 40.0,
    "op": "add",
@@ -1009,7 +937,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/radius",
    "amount": -1.3,
    "op": "replace",
@@ -1021,7 +949,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.05,
    "op": "add",
@@ -1032,7 +960,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "temporal/mosh/amount",
    "amount": 0.42,
    "op": "add",
@@ -1043,7 +971,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "temporal/mosh/shift",
    "amount": 6.0,
    "op": "add",
@@ -1054,7 +982,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/shards/burst",
    "amount": 60.0,
    "op": "add",
@@ -1087,7 +1015,7 @@
    }
   },
   {
-   "source": "response.snareEnv",
+   "source": "response.onsetEnv",
    "target": "post/glitch/tear",
    "amount": 0.5,
    "op": "add",
@@ -1098,7 +1026,7 @@
    }
   },
   {
-   "source": "response.snareEnv",
+   "source": "response.onsetEnv",
    "target": "post/glitch/amount",
    "amount": 0.14,
    "op": "add",
@@ -1106,17 +1034,6 @@
    "chain": {
     "attackMs": 0,
     "decayMs": 0
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "particles/motes/emissive",
-   "amount": 7.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 70
    }
   },
   {
@@ -1447,19 +1364,14 @@
     "the structure sways (an SDF warp) and the lines thicken"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the image breaks for a moment: it splits along the nave, a shock runs from the rose"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "frame corruption: mosh blocks and a magenta channel shift"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "data motes flicker"
    ],
    [
     "phrase",

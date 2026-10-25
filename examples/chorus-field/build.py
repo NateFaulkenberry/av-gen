@@ -13,9 +13,6 @@ import math
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tools"))
-import drum_signals  # noqa: E402
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUDIO = "../../assets/audio/trench.wav"
 
@@ -609,11 +606,11 @@ def p5_chorus():
               clampEnabled=True, clampMin=0.0, clampMax=1.3),
         route("audio.bass", d + "2/amount", 1.0, op="multiply", attackMs=200, decayMs=1500, gain=2.0,
               clampEnabled=True, clampMin=0.2, clampMax=1.4),
-        # kick -> a travelling shockwave through the field.
-        route("signal.kick", d + "6/amount", 14.0, op="add", envelope="peakhold", envelopeHoldMs=60,
+        # a low attack -> a travelling shockwave through the field.
+        route("response.low", d + "6/amount", 14.0, op="add", envelope="peakhold", envelopeHoldMs=60,
               envelopeFallPerSecond=3.0),
-        # snare -> tearing: a short burst of curl.
-        route("audio.onsetMid", d + "3/amount", 1.4, op="add", envelope="peakhold", envelopeHoldMs=40,
+        # any attack -> tearing: a short burst of curl.
+        route("audio.onset", d + "3/amount", 1.4, op="add", envelope="peakhold", envelopeHoldMs=40,
               envelopeFallPerSecond=6.0),
         # mid -> coherence (calms the curl).
         route("audio.mid", d + "3/amount", -0.12, op="add", attackMs=100, decayMs=600),
@@ -791,9 +788,9 @@ def p8_god_trench():
               curve="power", curveAmount=4.0, clampEnabled=True, clampMin=0.0, clampMax=1.0),
         route("audio.mid", "field/eyeL/position", -3.0, op="add", component=0, attackMs=1500, decayMs=3000),
         route("audio.mid", "field/eyeR/position", 3.0, op="add", component=0, attackMs=1500, decayMs=3000),
-        route("signal.kick", d + "5/amount", 10.0, op="add", envelope="peakhold", envelopeHoldMs=60,
+        route("response.low", d + "5/amount", 10.0, op="add", envelope="peakhold", envelopeHoldMs=60,
               envelopeFallPerSecond=3.0),
-        route("audio.onsetMid", d + "2/amount", 1.2, op="add", envelope="peakhold", envelopeHoldMs=40,
+        route("audio.onset", d + "2/amount", 1.2, op="add", envelope="peakhold", envelopeHoldMs=40,
               envelopeFallPerSecond=6.0),
         # ---- the camera: phrase-scale, sprung, no shake, driven by the same normalised bass ----
         # G = the normalised bass mapped so it is 0 below 60% of its running peak and 1 at it. A fast copy of G
@@ -869,11 +866,8 @@ def main(argv):
         with open(os.path.join(HERE, base + ".json"), "w") as f:
             pr = project("Chorus Field " + base, base + ".scene.json")
             pr["routes"] += routes
-            # ADR-1620: the kick is tools/drum_signals.py's signal (a drums source's kick, else the beat clock's pulse
-            # while the drums play); its stand-in reads response.hat/snare, so the project needs a sonic block
-            drums = drum_signals.sources(drum_signals.used(routes))
-            if drums:
-                pr["sources"] = drums + pr.get("sources", [])
+            # a route on response.* (the low attack) needs the response model: a sonic block
+            if any(r.get("source", "").startswith("response.") for r in routes):
                 pr.setdefault("sonic", {})
             json.dump(pr, f, indent=1)
         print("wrote", base)

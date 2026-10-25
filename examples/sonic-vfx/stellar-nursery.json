@@ -184,60 +184,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -880,7 +826,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/amount",
    "amount": 40.0,
    "op": "add",
@@ -891,7 +837,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "post/shock/radius",
    "amount": -1.6,
    "op": "replace",
@@ -900,17 +846,6 @@
     "offset": -1.0,
     "attackMs": 0,
     "decayMs": 0
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "fx/stars/twinkle",
-   "amount": 1.5,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 120
    }
   },
   {
@@ -1082,14 +1017,9 @@
     "the cloud's density and glow"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a shock front through the gas"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "the starfield twinkles"
    ],
    [
     "sustained",

@@ -134,53 +134,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -217,7 +170,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "field/kickPush/strength",
    "amount": 1.5,
    "op": "add",
@@ -229,7 +182,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "field/shedding/strength",
    "amount": 0.6,
    "op": "add",
@@ -238,20 +191,6 @@
    "chain": {
     "attackMs": 30,
     "decayMs": 1500
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "material/flowStreams/op/18/constant/constant",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "depthSource": "visual.influence",
-   "chain": {
-    "gain": 2.0,
-    "offset": 1.0,
-    "attackMs": 30,
-    "decayMs": 300
    }
   },
   {

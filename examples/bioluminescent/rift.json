@@ -158,7 +158,7 @@
    }
   },
   {
-   "source": "audio.onsetMid",
+   "source": "audio.onset",
    "target": "particles/swarm/spawnRate",
    "op": "add",
    "amount": 6000.0,

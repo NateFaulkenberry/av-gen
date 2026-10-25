@@ -139,53 +139,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -783,7 +736,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "lights/thunder/intensity",
    "amount": 3000000.0,
    "op": "add",
@@ -794,7 +747,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/wheat/deform/1/amount",
    "amount": 0.35,
    "op": "add",
@@ -805,7 +758,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/wheat/deform/2/amount",
    "amount": 0.12,
    "op": "add",
@@ -816,7 +769,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.01,
    "op": "add",
@@ -827,7 +780,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "lights/slot/intensity",
    "amount": 6.0,
    "op": "add",
@@ -838,7 +791,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/rain/emissive",
    "amount": 4.0,
    "op": "add",
@@ -849,7 +802,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "camera/exposure/compensation",
    "amount": 0.6,
    "op": "add",
@@ -860,7 +813,7 @@
    }
   },
   {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "particles/rain/spawnRate",
    "amount": 5000.0,
    "op": "add",
@@ -871,18 +824,7 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "particles/rain/burst",
-   "amount": 900.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 40
-   }
-  },
-  {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "particles/rain/stretch",
    "amount": 0.8,
    "op": "add",
@@ -1235,18 +1177,18 @@
     "the funnel winds: rotation, width and the debris skirt; the wind in the wheat"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "thunder: the cloud flashes from within, a gust bends the field, the camera nudges"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "a lightning strike under the cloud that lights the whole prairie and the rain"
    ],
    [
-    "hat",
-    "response.hat",
+    "flux",
+    "response.flux",
     "rain: its density and streak length"
    ],
    [
@@ -1471,7 +1413,7 @@
    },
    "trigger": {
     "source": "signal",
-    "name": "response.snare",
+    "name": "response.onset",
     "threshold": 0.25
    }
   }

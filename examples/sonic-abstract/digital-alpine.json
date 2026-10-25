@@ -132,55 +132,7 @@
   "temporal/mosh/enabled": false,
   "post/tonemap/operator": 4
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.level",
@@ -414,7 +366,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/daRock/op/15/constant/constant",
    "amount": 0.5,
    "op": "add",
@@ -425,7 +377,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/drops/burst",
    "amount": 14.0,
    "op": "add",
@@ -436,7 +388,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/daSky/op/7/constant/constant",
    "amount": 0.25,
    "op": "add",
@@ -447,7 +399,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/daSky/op/8/constant/constant",
    "amount": 0.35,
    "op": "add",
@@ -458,7 +410,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/daWater/op/5/constant/constant",
    "amount": 0.25,
    "op": "add",
@@ -2596,13 +2548,13 @@
     "AUDIO TOPOGRAPHY: the waves rolling out through the mountains grow taller"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the low sun flares across every facet that faces it; rings of light land on the water"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "a flash along the horizon"
    ],
    [

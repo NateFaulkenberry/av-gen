@@ -91,9 +91,9 @@ DESIGN = {
         ["high mids", "audio.highMid", "the distant range lights"],
         ["highs", "audio.treble", "glints scatter on the water; the sun's glow brightens"],
         ["level", "response.level", "AUDIO TOPOGRAPHY: the waves rolling out through the mountains grow taller"],
-        ["kick", "signal.kick", "the low sun flares across every facet that faces it; rings of light land on the "
+        ["low", "response.low", "the low sun flares across every facet that faces it; rings of light land on the "
          "water"],
-        ["snare", "response.snare", "a flash along the horizon"],
+        ["onset", "response.onset", "a flash along the horizon"],
         ["brightness", "sonic.brightness.slow", "the whole palette drifts warmer or cooler"],
         ["intensity", "response.intensity", "STRUCTURE: the ranges rise as the piece builds"],
         ["pitch class", "notes.class.0", "twelve lanterns round the shore, one per pitch class, with their reflections"],
@@ -355,13 +355,13 @@ def instrument(s):
             s.route(R(BANDS[name], P % (name + suffix) + "material/emissive", 0.16, attackMs=60, decayMs=700))
     # ---- BASS: the sun's path on the water brightens
     s.route(R("bass", "material/daWater/op/29/constant/constant", 1.2, attackMs=30, decayMs=500))
-    # ---- KICK: the low sun flares across every facet that faces it; rings of light land on the water
-    s.route(R("kick", "material/daRock/op/15/constant/constant", 0.5, attackMs=0, decayMs=380),
-            R("kick", "particles/drops/burst", 14.0, threshold="binary", thresholdLevel=0.3))
-    # ---- SNARE: a flash along the horizon (the sky's horizon and its image in the water)
-    s.route(R("snare", "material/daSky/op/7/constant/constant", 0.25, attackMs=0, decayMs=260),
-            R("snare", "material/daSky/op/8/constant/constant", 0.35, attackMs=0, decayMs=260),
-            R("snare", "material/daWater/op/5/constant/constant", 0.25, attackMs=0, decayMs=260))
+    # ---- LOW: the low sun flares across every facet that faces it; rings of light land on the water
+    s.route(R("low", "material/daRock/op/15/constant/constant", 0.5, attackMs=0, decayMs=380),
+            R("low", "particles/drops/burst", 14.0, threshold="binary", thresholdLevel=0.3))
+    # ---- ONSET: a flash along the horizon (the sky's horizon and its image in the water)
+    s.route(R("onset", "material/daSky/op/7/constant/constant", 0.25, attackMs=0, decayMs=260),
+            R("onset", "material/daSky/op/8/constant/constant", 0.35, attackMs=0, decayMs=260),
+            R("onset", "material/daWater/op/5/constant/constant", 0.25, attackMs=0, decayMs=260))
     # ---- MIDS: the water's ripples deepen; HIGHS: glints on the water, the sun's glow brightens
     s.route(R("audio.mid", "material/daWater/op/20/remap/constant", -0.25, comp=2, attackMs=80, decayMs=700),
             R("audio.mid", "material/daWater/op/20/remap/constant", 0.3, comp=3, attackMs=80, decayMs=700),

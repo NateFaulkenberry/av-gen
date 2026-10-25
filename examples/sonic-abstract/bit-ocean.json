@@ -144,55 +144,7 @@
   "post/outline/normalThreshold": 0.5,
   "post/outline/objectEdges": 1.0
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.bass",
@@ -350,7 +302,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/coins/material/emissive",
    "amount": 2.4,
    "op": "add",
@@ -361,7 +313,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/gemsruins/material/emissive",
    "amount": 2.4,
    "op": "add",
@@ -372,7 +324,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/gemsdeep/material/emissive",
    "amount": 2.4,
    "op": "add",
@@ -383,7 +335,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/shock/amount",
    "amount": 18.0,
    "op": "add",
@@ -397,7 +349,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/shock/radius",
    "amount": 1.3,
    "op": "add",
@@ -416,7 +368,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/burst/burst",
    "amount": 160.0,
    "op": "add",
@@ -427,7 +379,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/schoolA/transform/rotation",
    "amount": 18.0,
    "op": "add",
@@ -441,7 +393,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/schoolB/transform/rotation",
    "amount": -18.0,
    "op": "add",
@@ -455,7 +407,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/schoolC/transform/rotation",
    "amount": 18.0,
    "op": "add",
@@ -466,17 +418,6 @@
     "decayMs": 600,
     "springHz": 1.6,
     "springDamping": 0.45
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "particles/sparkle/burst",
-   "amount": 40.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "threshold": "binary",
-    "thresholdLevel": 0.1
    }
   },
   {
@@ -1174,7 +1115,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/guideBody/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1213,7 +1154,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/guideBelly/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1252,7 +1193,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/guideFins/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1291,7 +1232,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/guideEyes/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -1330,7 +1271,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/guidePupils/transform/position",
    "amount": 1.4,
    "op": "add",
@@ -4285,19 +4226,14 @@
     "every kelp plant bends at once; the brain coral pulses; the sunlight swells"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the coins and gems flash; a ring ripples out through the water"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "a swarm of bubbles bursts round you; the fish schools turn and dart"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "sparkles glint in the water"
    ],
    [
     "mids",

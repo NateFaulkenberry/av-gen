@@ -168,20 +168,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "material/rdPins/op/10/constant/constant",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "depthSource": "visual.influence",
-   "chain": {
-    "gain": 3.0,
-    "offset": 1.0,
-    "attackMs": 30,
-    "decayMs": 300
-   }
-  },
-  {
    "source": "control.regime",
    "target": "field/regimeDrift/strength",
    "amount": 1.0,

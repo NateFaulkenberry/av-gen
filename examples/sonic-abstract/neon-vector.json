@@ -132,55 +132,7 @@
   "temporal/mosh/enabled": false,
   "post/tonemap/operator": 4
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.bass",
@@ -205,7 +157,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/lines_near/deform/1/amount",
    "amount": 1.1,
    "op": "add",
@@ -216,7 +168,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/fins_near/deform/1/amount",
    "amount": 1.1,
    "op": "add",
@@ -227,7 +179,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/lines_mid/deform/1/amount",
    "amount": 1.1,
    "op": "add",
@@ -238,7 +190,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/fins_mid/deform/1/amount",
    "amount": 1.1,
    "op": "add",
@@ -249,7 +201,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/lines_far/deform/1/amount",
    "amount": 1.1,
    "op": "add",
@@ -260,7 +212,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/fins_far/deform/1/amount",
    "amount": 1.1,
    "op": "add",
@@ -381,28 +333,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "procedural/lines_near/deform/4/amount",
-   "amount": 0.18,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/fins_near/deform/4/amount",
-   "amount": 0.18,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
    "source": "audio.treble",
    "target": "procedural/lines_mid/deform/4/amount",
    "amount": 0.22,
@@ -422,28 +352,6 @@
    "chain": {
     "attackMs": 15,
     "decayMs": 160
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/lines_mid/deform/4/amount",
-   "amount": 0.18,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/fins_mid/deform/4/amount",
-   "amount": 0.18,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
    }
   },
   {
@@ -469,29 +377,7 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "procedural/lines_far/deform/4/amount",
-   "amount": 0.18,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "procedural/fins_far/deform/4/amount",
-   "amount": 0.18,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
-   }
-  },
-  {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "field/plainNoise/position",
    "amount": 14.0,
    "op": "add",
@@ -504,7 +390,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "field/peakNoise/position",
    "amount": 14.0,
    "op": "add",
@@ -517,7 +403,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "camera/lens/focalLength",
    "amount": 2.0,
    "op": "add",
@@ -528,7 +414,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/buildBar/transform/scale",
    "amount": 1.0,
    "op": "add",
@@ -540,7 +426,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/buildSquare/transform/scale",
    "amount": 1.0,
    "op": "add",
@@ -552,7 +438,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/buildDisc/transform/scale",
    "amount": 1.0,
    "op": "add",
@@ -564,7 +450,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/lines_near/material/emissive",
    "amount": 2.5,
    "op": "add",
@@ -575,7 +461,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/lines_mid/material/emissive",
    "amount": 2.5,
    "op": "add",
@@ -586,7 +472,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "procedural/lines_far/material/emissive",
    "amount": 2.5,
    "op": "add",
@@ -597,7 +483,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/monolithL/wire/intensity",
    "amount": 4.0,
    "op": "add",
@@ -654,7 +540,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/monolithR/wire/intensity",
    "amount": 4.0,
    "op": "add",
@@ -1638,19 +1524,14 @@
     "the near rows swell under the camera; the monoliths stretch taller"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the plain heaves and lurches forward; a zoom punch; the monoliths' lines flash"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "construction: three flat colour shapes snap into the sky in sequence; the lines flash"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "fine jitter on every line"
    ],
    [
     "bands",

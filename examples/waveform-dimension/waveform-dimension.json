@@ -463,20 +463,7 @@
    }
   },
   {
-   "source": "response.hatEnv",
-   "target": "material/wdSurface/op/28/constant/constant",
-   "amount": 1.0,
-   "op": "multiply",
-   "polarity": "unipolar",
-   "chain": {
-    "gain": 1.0,
-    "offset": 1.0,
-    "attackMs": 0,
-    "decayMs": 200
-   }
-  },
-  {
-   "source": "response.snareEnv",
+   "source": "response.onsetEnv",
    "target": "material/wdSurface/op/28/constant/constant",
    "amount": 1.0,
    "op": "multiply",

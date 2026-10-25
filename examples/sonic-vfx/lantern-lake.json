@@ -139,53 +139,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -393,7 +346,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/llMirror/op/25/remap/constant",
    "amount": -0.77,
    "op": "add",
@@ -405,7 +358,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/llMirror/op/25/remap/constant",
    "amount": -0.77,
    "op": "add",
@@ -417,7 +370,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/llMirror/op/27/constant/constant",
    "amount": 1.5,
    "op": "add",
@@ -429,7 +382,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/llMirror/op/27/constant/constant",
    "amount": 1.5,
    "op": "add",
@@ -441,7 +394,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/llMirror/op/27/constant/constant",
    "amount": 1.5,
    "op": "add",
@@ -453,7 +406,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "fx/swell/strength",
    "amount": 0.5,
    "op": "add",
@@ -464,7 +417,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "fx/swell/scale",
    "amount": 0.6,
    "op": "add",
@@ -475,18 +428,7 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "particles/fireflies/burst",
-   "amount": 16.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 40
-   }
-  },
-  {
-   "source": "response.hatRate",
+   "source": "response.flux",
    "target": "particles/fireflies/spawnRate",
    "amount": 30.0,
    "op": "add",
@@ -508,7 +450,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.006,
    "op": "add",
@@ -677,13 +619,13 @@
     "a slow swell beneath: the reflection heaves"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a ripple runs through the reflection"
    ],
    [
-    "hat",
-    "response.hat",
+    "flux",
+    "response.flux",
     "fireflies blink at the jetty"
    ],
    [

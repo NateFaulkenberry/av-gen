@@ -138,53 +138,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -337,7 +290,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/crack/burst",
    "amount": 30.0,
    "op": "add",
@@ -348,7 +301,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/efBark/op/12/constant/constant",
    "amount": 3.0,
    "op": "add",
@@ -360,7 +313,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/efBark/op/12/constant/constant",
    "amount": 1.0546,
    "op": "add",
@@ -372,7 +325,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "material/efBark/op/12/constant/constant",
    "amount": 0.1538,
    "op": "add",
@@ -384,7 +337,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/torch/burst",
    "amount": 90.0,
    "op": "add",
@@ -395,7 +348,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "lights/torchLight/intensity",
    "amount": 900.0,
    "op": "add",
@@ -406,7 +359,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/glints/burst",
    "amount": 30.0,
    "op": "add",
@@ -450,7 +403,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.006,
    "op": "add",
@@ -611,19 +564,14 @@
     "the wind breathes on the coals: the beds and the log glow up, embers stream off downwind, the smoke stirs"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a snag cracks: a throw of sparks from the base of the near snag and its cracks flash"
    ],
    [
-    "snare",
-    "response.snare",
-    "a tree torches: flame bursts up a midground trunk and lights the smoke"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "glints off the coal"
+    "onset",
+    "response.onset",
+    "a tree torches: flame bursts up a midground trunk and lights the smoke; glints off the coal"
    ],
    [
     "sustained",

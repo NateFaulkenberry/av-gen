@@ -53,9 +53,8 @@ DESIGN = {
         ["sustained", "notes.held", "a held note sharpens the figure (the nodal lines narrow); silence scatters the "
          "sand"],
         ["velocity", "response.noteEnv", "the sand flashes and leaps with the note's strength"],
-        ["kick", "signal.kick", "the whole bed leaps, scatters and settles back onto its lines"],
-        ["snare", "response.snare", "a burst of sand from the nodes"],
-        ["hat", "response.hat", "granular glitter"],
+        ["low", "response.low", "the whole bed leaps, scatters and settles back onto its lines"],
+        ["onset", "response.onset", "a burst of sand from the nodes; granular glitter"],
         ["bass", "response.bass", "the plate flexes and the sand swells on its lines"],
         ["tension", "notes.tension", "the figure jitters"],
     ],
@@ -168,7 +167,7 @@ def build():
                      "roughness": 0.25, "metallic": 1.0},
            transform={"position": [0.0, 0.04, 0.0], "rotation": [0, 0, 0], "scale": [1, 1, 1]})
 
-    # sand leaping off the plate (kick, note) and a burst from the nodes (snare), falling back onto it
+    # sand leaping off the plate (low attack, note) and a burst from the nodes (onset), falling back onto it
     s.particles("leap", capacity=8000, seed=3, shape="box", position=[0.0, 0.03, 0.0],
                 extent=[W * 0.5 - 0.1, 0.0, L * 0.5 - 0.1],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.5, lifetimeMax=1.1, spread=0.7, speedMin=0.4,
@@ -224,14 +223,14 @@ def build():
     # velocity: the sand flashes and leaps with the note
     s.route(R("noteEnv", "procedural/plate/material/emissive", 1.6, attackMs=0, decayMs=220),
             R("note", "particles/leap/burst", 220.0, attackMs=0, decayMs=40))
-    # kick: the whole bed leaps and blurs for a moment
-    s.route(R("kick", "particles/leap/burst", 900.0, attackMs=0, decayMs=40))
+    # low attack: the whole bed leaps and blurs for a moment
+    s.route(R("low", "particles/leap/burst", 900.0, attackMs=0, decayMs=40))
     for op in (OP_WIDTH, OP_WIDTH2):
-        s.route(R("kickEnv", (pre % op) + "smoothstep/constant", 0.12, comp=0, attackMs=0, decayMs=250))
-    # snare: a burst from the nodes; hat: glitter
-    s.route(R("snare", "particles/leap/burst", 500.0, attackMs=0, decayMs=40),
-            R("snare", "post/bloom/intensity", 0.18, attackMs=0, decayMs=200),
-            R("hat", "particles/glitter/burst", 40.0, attackMs=0, decayMs=30))
+        s.route(R("lowEnv", (pre % op) + "smoothstep/constant", 0.12, comp=0, attackMs=0, decayMs=250))
+    # onset: a burst from the nodes; and glitter
+    s.route(R("onset", "particles/leap/burst", 500.0, attackMs=0, decayMs=40),
+            R("onset", "post/bloom/intensity", 0.18, attackMs=0, decayMs=200),
+            R("onset", "particles/glitter/burst", 40.0, attackMs=0, decayMs=30))
     # bass: the plate flexes, and the flex gathers the sand: the lines swell (from straight above a flex alone is
     # invisible, so the sand carries it)
     s.route(R("bass", "procedural/plate/deform/1/amount", 0.012, attackMs=40, decayMs=300))
@@ -240,7 +239,7 @@ def build():
     # tension: the figure jitters
     s.map(M("jitter", [("tension", 1.0)], "mean"))
     s.route(R("visual.jitter", (pre % OP_X) + "palette/constant3", 0.35, comp=0, attackMs=30, decayMs=60))
-    s.route(R("kick", "post/lens/chromaticAberration", 0.02, attackMs=0, decayMs=120))
+    s.route(R("low", "post/lens/chromaticAberration", 0.02, attackMs=0, decayMs=120))
 
     s.params_({
         "post/bloom/intensity": 0.22, "post/bloom/threshold": 1.0, "post/output/vignette": 0.6,

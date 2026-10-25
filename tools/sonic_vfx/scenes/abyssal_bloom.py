@@ -62,9 +62,8 @@ DESIGN = {
         ["polyphony", "notes.polyphony", "more of the colony lights at once"],
         ["sustained", "response.sustain", "the whole colony glows"],
         ["bass", "response.bass", "the current swells: the snow streams and the colony sways"],
-        ["kick", "signal.kick", "a pressure wave ripples the water"],
-        ["snare", "response.snare", "a flare through the colony"],
-        ["hat", "response.hat", "marine snow glints"],
+        ["low", "response.low", "a pressure wave ripples the water"],
+        ["onset", "response.onset", "a flare through the colony; marine snow glints"],
         ["silence", "(no input)", "the dark water, the colony's faint stem, the snow falling"],
     ],
     "tier": "medium: an absorbing water march (24 steps), one instanced colony, five bells",
@@ -201,7 +200,7 @@ def build():
     s.light("colonyLight", "point", position=list(CHAIN[4]), color=hexrgb(CYAN), intensity=0.0, range=7.0,
             radius=1.0, castsShadow=False, volumetric=1.0)
 
-    # ---- marine snow (always), and its glints (hats)
+    # ---- marine snow (always), and its glints (onsets)
     s.particles("snow", capacity=9000, seed=29, shape="box", position=[0.0, 7.0, -9.0], extent=[14.0, 1.0, 9.0],
                 direction=[0.05, -1.0, 0.0], spawnRate=220.0, lifetimeMin=14.0, lifetimeMax=22.0, spread=0.3,
                 speedMin=0.25, speedMax=0.5, gravity=[0, -0.02, 0], drag=0.2, turbulence=0.12, turbulenceScale=0.4,
@@ -228,12 +227,12 @@ def build():
     # melody: the light runs along the stem to the pitch's place (a spring, so it travels)
     s.map(M("place", [("lastPitch", 1.0)], "mean", -0.28 / 0.44, 1.0 / 0.44))
     s.route(R("visual.place", prog % OP_PLACE, -1.0, comp=0, springHz=1.4, springDamping=0.8))
-    # notes flare it; polyphony widens it; sustain is the colony's base glow; the snare flares it all
+    # notes flare it; polyphony widens it; sustain is the colony's base glow; the onset flares it all
     s.route(R("noteEnv", prog % OP_GAIN, 4.0, comp=0, depth="lastVelocity", attackMs=0, decayMs=600),
             R("polyphony", prog % OP_WIDTH, 0.03, comp=0, **MEDIUM),
             R("polyphony", "material/abZooid/op/10/constant/constant", 0.03, comp=0, **MEDIUM),
             R("sustain", prog % OP_BASE, 0.25, comp=0, **SLOW),
-            R("snare", prog % OP_BASE, 2.5, comp=0, attackMs=0, decayMs=300),
+            R("onset", prog % OP_BASE, 2.5, comp=0, attackMs=0, decayMs=300),
             R("noteEnv", "lights/colonyLight/intensity", 6.0, attackMs=0, decayMs=600))
     # the jellyfish at the pitch's depth answers
     s.places("jl", "lastPitch", [c for _, c, _ in JELLIES], 0.05, event="noteOn")
@@ -245,10 +244,10 @@ def build():
     # bass: the current -- the snow streams sideways and the colony light swells
     s.route(R("bass", "particles/snow/gravity", 0.25, comp=0, attackMs=50, decayMs=1600),
             R("bass", "particles/snow/turbulence", 0.3, attackMs=50, decayMs=1200))
-    # kick: a pressure wave; hat: snow glints
-    s.route(R("kickEnv", "post/shock/amount", 26.0, attackMs=0, decayMs=0),
-            R("kickEnv", "post/shock/radius", -1.1, op="replace", offset=-1.0, attackMs=0, decayMs=0),
-            R("hat", "particles/glints/burst", 30.0, attackMs=0, decayMs=40),
+    # low attack: a pressure wave; onset: snow glints
+    s.route(R("lowEnv", "post/shock/amount", 26.0, attackMs=0, decayMs=0),
+            R("lowEnv", "post/shock/radius", -1.1, op="replace", offset=-1.0, attackMs=0, decayMs=0),
+            R("onset", "particles/glints/burst", 30.0, attackMs=0, decayMs=40),
             R("sustain", "post/bloom/intensity", 0.1, **SLOW))
 
     s.params_({

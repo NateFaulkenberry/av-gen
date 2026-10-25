@@ -206,7 +206,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/fibers/deform/5/amount",
    "op": "add",
    "amount": 10.0,
@@ -217,7 +217,7 @@
    }
   },
   {
-   "source": "audio.onsetMid",
+   "source": "audio.onset",
    "target": "procedural/fibers/deform/2/amount",
    "op": "add",
    "amount": 1.2,
@@ -323,55 +323,6 @@
     "integrateMin": 0.0,
     "integrateMax": 1.0,
     "springHz": 0.15
-   }
-  }
- ],
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
    }
   }
  ],

@@ -1737,8 +1737,7 @@ palette = {"states": [{"name": n, "colors": c, "scalars": SCALARS[n]} for n, c i
 #                     (palette/select 0-7)
 #   CC 10 look lock   hold the current look (palette/lock); unlocked, the look advances on phrase boundaries
 #                     (beat.phrasePulse) or a big change in the music, holding each at least 60 s
-# Audio (live input, no file): response.sustain and response.kick light the rainbows, response.level blooms the air,
-# response.hat lifts saturation, response.bass lifts the warm bounce light from the cloud sea.
+# Audio (live input, no file): music.py's routes (the stems where they exist, the mix's response.* otherwise).
 CC = [(1, "glow"), (2, "lens"), (5, "haze"), (6, "light"), (7, "colour"), (9, "palette"), (10, "paletteLock")]
 control = {"midi": {"enabled": True, "filter": "*", "bindings": [
     {"source": "*", "channel": -1, "kind": "cc", "number": n, "signal": sig} for n, sig in CC]}}
@@ -1751,9 +1750,7 @@ routes = [{"source": "timeline.ride", "target": "camera/splineT", "amount": 1.0,
           # every control rests at 0 = the world as built (no MIDI is the default state), and turns one way
           {"source": "control.light", "target": "camera/exposure/compensation", "amount": 1.2, "op": "add", "polarity": "unipolar", "chain": ctl},
           {"source": "control.colour", "target": "post/grade/saturation", "amount": 0.5, "op": "add", "polarity": "unipolar", "chain": ctl}]
-# Rainbow World 2: the music (music.py, 16-effect-mapping.md). The Stage 7 routes on response.* (the arches' breath,
-# the kick's bloom flash, the hats' saturation, the bass's bounce light) are replaced by the stem-driven set; the
-# rainbows keep CC 1's glow.
+# Rainbow World 2: the music (music.py, 16-effect-mapping.md): the stem-driven set; the rainbows keep CC 1's glow.
 for rn in rainbow_nodes:
     routes.append({"source": "control.glow", "target": "nodes/%s/emissiveBoost" % rn["name"], "amount": 2.0,
                    "op": "add", "polarity": "unipolar", "chain": ctl})

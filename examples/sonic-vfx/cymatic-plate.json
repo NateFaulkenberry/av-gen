@@ -137,78 +137,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kickEnv",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      }
-     },
-     {
-      "source": "beat.pulse",
-      "chain": {
-       "attackMs": 0.0,
-       "decayMs": 160.0
-      },
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ]
-   }
-  },
-  {
    "kind": "interpret",
    "name": "scene",
    "settings": {
@@ -512,7 +440,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "particles/leap/burst",
    "amount": 900.0,
    "op": "add",
@@ -523,7 +451,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "material/cymatic/op/15/smoothstep/constant",
    "amount": 0.12,
    "op": "add",
@@ -535,7 +463,7 @@
    }
   },
   {
-   "source": "signal.kickEnv",
+   "source": "response.lowEnv",
    "target": "material/cymatic/op/27/smoothstep/constant",
    "amount": 0.12,
    "op": "add",
@@ -547,7 +475,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "particles/leap/burst",
    "amount": 500.0,
    "op": "add",
@@ -558,7 +486,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "post/bloom/intensity",
    "amount": 0.18,
    "op": "add",
@@ -569,7 +497,7 @@
    }
   },
   {
-   "source": "response.hat",
+   "source": "response.onset",
    "target": "particles/glitter/burst",
    "amount": 40.0,
    "op": "add",
@@ -627,7 +555,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/lens/chromaticAberration",
    "amount": 0.02,
    "op": "add",
@@ -782,19 +710,14 @@
     "the sand flashes and leaps with the note's strength"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "the whole bed leaps, scatters and settles back onto its lines"
    ],
    [
-    "snare",
-    "response.snare",
-    "a burst of sand from the nodes"
-   ],
-   [
-    "hat",
-    "response.hat",
-    "granular glitter"
+    "onset",
+    "response.onset",
+    "a burst of sand from the nodes; granular glitter"
    ],
    [
     "bass",

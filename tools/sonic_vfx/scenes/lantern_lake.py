@@ -56,8 +56,8 @@ DESIGN = {
         ["chord", "notes.polyphony", "a cluster of lanterns at once"],
         ["sustained", "response.sustain", "the lanterns glow brighter and the dusk lingers"],
         ["bass", "response.bass", "a slow swell beneath: the reflection heaves"],
-        ["kick", "signal.kick", "a ripple runs through the reflection"],
-        ["hat", "response.hat", "fireflies blink at the jetty"],
+        ["low", "response.low", "a ripple runs through the reflection"],
+        ["flux", "response.flux", "fireflies blink at the jetty"],
         ["silence", "(no input)", "a still lake: the old lanterns drift up into the dark, doubled below"],
     ],
     "tier": "light: two particle twins, a few procedural copies, one DF shimmer column; no march",
@@ -107,7 +107,7 @@ def jetty(mirror):
     return parts
 
 
-# The kick's ripple: a ring on the water centred on the jetty's end, its radius and brightness routed into the mirror
+# The low attack's ripple: a ring on the water centred on the jetty's end, its radius and brightness routed into the mirror
 # program. RING_R is the radius the ring's parameter is normalised to; the ring starts at RING_START and runs out to
 # RING_END (fractions of RING_R) as its route's envelope falls.
 RING_CENTRE = (-2.4, -16.0)
@@ -215,15 +215,15 @@ def build():
                 colorStart=hexrgb("#ffb050") + [1.0], colorEnd=hexrgb("#ff7a2a") + [0.0], emissive=2.6, **common)
     s.particles("twins", position=[0.0, -0.3, RELEASE_Z], direction=[0.12, -1.0, 0.0], gravity=[0.06, -0.02, 0.0],
                 colorStart=hexrgb("#ff9a50") + [0.7], colorEnd=hexrgb("#c86a2a") + [0.0], emissive=1.8, **common)
-    # fireflies at the jetty (hats)
-    # (along the jetty's length, low over the deck, where they read against the dark water: a short blink per hat)
+    # fireflies at the jetty (their number follows the flux)
+    # (along the jetty's length, low over the deck, where they read against the dark water)
     s.particles("fireflies", capacity=900, seed=23, shape="box", position=[-2.4, 1.0, -4.0], extent=[1.6, 0.5, 11.0],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.16, lifetimeMax=0.38, spread=1.0, speedMin=0.05,
                 speedMax=0.2, gravity=[0, 0, 0], drag=0.8, turbulence=0.3, turbulenceScale=0.8, sizeStart=0.05,
                 sizeEnd=0.01, colorStart=hexrgb("#d8ff7a") + [1.0], colorEnd=hexrgb("#ffd25a") + [0.0], emissive=16.0,
                 blend="additive")
 
-    # ---- the water: a shimmer column under the waterline wobbles the mirror world (bass swells, kick ripples)
+    # ---- the water: a shimmer column under the waterline wobbles the mirror world (bass swells, low attack ripples)
     s.effect("swell", "heatShimmer", ("world",), parameters={
         "strength": 0.08, "radius": 900.0, "height": 60.0, "scale": 0.9, "riseSpeed": 0.4, "chroma": 0.0,
         "churn": 0.4, "edgeSoftness": 0.2, "heightFalloff": 0.2, "thicknessRef": 60.0, "fadeDistance": 0.0,
@@ -263,22 +263,21 @@ def build():
     s.route(R("bass", "fx/swell/strength", 0.35, attackMs=50, decayMs=1800),
             R("bass", "material/llMirror/op/%d/remap/constant" % OP_BANDS, -0.3, comp=2, attackMs=50, decayMs=1800),
             R("bass", "material/llMirror/op/%d/remap/constant" % OP_BANDS, 0.35, comp=3, attackMs=50, decayMs=1800))
-    # kick: a ripple ring runs out across the water from the jetty's end (its radius rides the route's envelope down,
+    # low attack: a ripple ring runs out across the water from the jetty's end (its radius rides the route's envelope down,
     # linearly, from RING_START to RING_END in half a second; its light fades as it goes) and the mirror wobbles
     for c in (0, 1):
-        s.route(R("kick", "material/llMirror/op/%d/remap/constant" % OP_RING, -(RING_END - RING_START), comp=c,
+        s.route(R("low", "material/llMirror/op/%d/remap/constant" % OP_RING, -(RING_END - RING_START), comp=c,
                   envelope="linearfall", envelopeFallPerSecond=2.0))
     for c in (0, 1, 2):
         # (brightest at the jetty, dimming as it spreads: near the camera, perspective makes the ring a wide band)
-        s.route(R("kick", "material/llMirror/op/%d/constant/constant" % OP_RING_GAIN, 1.5, comp=c, attackMs=0,
+        s.route(R("low", "material/llMirror/op/%d/constant/constant" % OP_RING_GAIN, 1.5, comp=c, attackMs=0,
                   decayMs=320))
-    s.route(R("kick", "fx/swell/strength", 0.5, attackMs=0, decayMs=500),
-            R("kick", "fx/swell/scale", 0.6, attackMs=0, decayMs=500))
-    # hat: fireflies
-    s.route(R("hat", "particles/fireflies/burst", 16.0, attackMs=0, decayMs=40),
-            R("hatRate", "particles/fireflies/spawnRate", 30.0, **MEDIUM),
+    s.route(R("low", "fx/swell/strength", 0.5, attackMs=0, decayMs=500),
+            R("low", "fx/swell/scale", 0.6, attackMs=0, decayMs=500))
+    # flux: fireflies
+    s.route(R("flux", "particles/fireflies/spawnRate", 30.0, **MEDIUM),
             R("sustain", "post/bloom/intensity", 0.1, **SLOW),
-            R("kick", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
+            R("low", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
 
     s.params_({
         "post/bloom/intensity": 0.35, "post/bloom/threshold": 0.9, "post/halation/enabled": True,

@@ -78,9 +78,8 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "STRUCTURE: the passage widens and narrows; the outer rings expand"],
-        ["kick", "signal.kick", "a wave of light runs down the passage from you to the sun; a surge forward"],
-        ["snare", "response.snare", "the gates' stars bloom open and flash vermilion; sparks stream past"],
-        ["hat", "response.hat", "the beads glint"],
+        ["low", "response.low", "a wave of light runs down the passage from you to the sun; a surge forward"],
+        ["onset", "response.onset", "the gates' stars bloom open and flash vermilion; sparks stream past"],
         ["highs", "audio.treble", "sparks stream past along the walls"],
         ["mids", "audio.mid", "the whole lattice turns (the twist's phase)"],
         ["brightness", "sonic.brightness", "gold turns toward ivory and white"],
@@ -224,23 +223,22 @@ def instrument(s):
             s.route(R("bass", P % node + "transform/scale", 0.14, comp=comp, attackMs=40, decayMs=420))
     for comp in (0, 1):
         s.route(R("bass", P % "outerRings" + "transform/scale", 0.3, comp=comp, attackMs=60, decayMs=700))
-    # ---- KICK: a wave of light runs from the camera to the far end at a constant speed (a binary trigger, then a
+    # ---- LOW: a wave of light runs from the camera to the far end at a constant speed (a binary trigger, then a
     # linear fall: op 3's constant goes from 0, the camera, back to WAVE_REST); a surge forward and a radial burst
-    s.route(R("kick", "material/sgfWave/op/3/constant/constant", -WAVE_REST, threshold="binary", thresholdLevel=0.12,
+    s.route(R("low", "material/sgfWave/op/3/constant/constant", -WAVE_REST, threshold="binary", thresholdLevel=0.12,
               envelope="linearfall", envelopeHoldMs=0, envelopeFallPerSecond=1.15),
-            R("kick", "post/radial/amount", 0.05, attackMs=0, decayMs=220),
-            R("kick", "camera/lens/focalLength", -1.6, attackMs=0, decayMs=260))
-    # ---- SNARE: the gates bloom (the stars' triangles and the roses' circles swell past the rim and ring back) and
+            R("low", "post/radial/amount", 0.05, attackMs=0, decayMs=220),
+            R("low", "camera/lens/focalLength", -1.6, attackMs=0, decayMs=260))
+    # ---- ONSET: the gates bloom (the stars' triangles and the roses' circles swell past the rim and ring back) and
     # flash; a burst of sparks
     for node in ("starTriA", "starTriB", "roses"):
         for comp in (0, 1):
-            s.route(R("snare", P % node + "transform/scale", 0.16, comp=comp, attackMs=0, decayMs=300,
+            s.route(R("onset", P % node + "transform/scale", 0.16, comp=comp, attackMs=0, decayMs=300,
                       springHz=2.2, springDamping=0.35))
-        s.route(R("snare", P % node + "material/emissive", 5.0, attackMs=0, decayMs=240))
-    s.route(R("snare", "particles/sparks/burst", 420.0, threshold="binary", thresholdLevel=0.05))
+        s.route(R("onset", P % node + "material/emissive", 5.0, attackMs=0, decayMs=240))
+    s.route(R("onset", "particles/sparks/burst", 420.0, threshold="binary", thresholdLevel=0.05))
     # ---- HIGHS: the beads glint; sparks stream past along the walls
-    s.route(R("hat", P % "beads" + "material/emissive", 7.0, attackMs=0, decayMs=140),
-            R("audio.treble", "particles/sparks/spawnRate", 320.0, attackMs=30, decayMs=300),
+    s.route(R("audio.treble", "particles/sparks/spawnRate", 320.0, attackMs=30, decayMs=300),
             R("audio.highMid", P % "starInner" + "material/emissive", 2.0, attackMs=30, decayMs=300),
             R("audio.highMid", P % "roseInner" + "material/emissive", 2.0, attackMs=30, decayMs=300))
     # ---- MIDS: the whole lattice turns (the twist's phase, integrated so it never jumps); the inner tunnel the other way
@@ -350,7 +348,7 @@ def build():
            material=glow(INK, 1.0, program="sgfEnd"),
            transform={"position": [0.0, 0.0, Z_FAR - 30.0], "rotation": [90.0, 0.0, 0.0], "scale": [1, 1, 1]})
 
-    # ---- sparks streaming past along the walls (the highs, the snare)
+    # ---- sparks streaming past along the walls (the highs, the onset)
     s.particles("sparks", capacity=6000, seed=19, shape="disc", position=[0.0, 0.0, -170.0],
                 extent=[8.0, 0.2, 8.0], direction=[0.0, 0.0, 1.0], spawnRate=150.0, lifetimeMin=4.5,
                 lifetimeMax=6.0, spread=0.02, speedMin=34.0, speedMax=46.0, gravity=[0, 0, 0], drag=0.0,

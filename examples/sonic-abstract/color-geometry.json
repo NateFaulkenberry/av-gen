@@ -132,55 +132,7 @@
   "temporal/mosh/enabled": false,
   "post/tonemap/operator": 4
  },
- "sources": [
-  {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  }
- ],
+ "sources": [],
  "routes": [
   {
    "source": "response.bass",
@@ -222,7 +174,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/radial/amount",
    "amount": 0.1,
    "op": "add",
@@ -233,7 +185,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "camera/lens/focalLength",
    "amount": 10.0,
    "op": "add",
@@ -244,7 +196,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "lights/end/intensity",
    "amount": 30000.0,
    "op": "add",
@@ -255,7 +207,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/endLight/material/emissive",
    "amount": 50.0,
    "op": "add",
@@ -266,7 +218,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "material/cgSpace/op/6/hueShift/value",
    "amount": 1.1,
    "op": "add",
@@ -297,17 +249,6 @@
    "chain": {
     "attackMs": 20,
     "decayMs": 200
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "sdf/corridor/look/edge/intensity",
-   "amount": 1.2,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 90
    }
   },
   {
@@ -732,13 +673,13 @@
     "STRUCTURE: the corridor's spacing breathes like an accordion round the viewer"
    ],
    [
-    "kick",
-    "signal.kick",
+    "low",
+    "response.low",
     "a zoom punch toward the light; the light flares"
    ],
    [
-    "snare",
-    "response.snare",
+    "onset",
+    "response.onset",
     "the whole colour sequence jumps a step round the wheel and stays there"
    ],
    [

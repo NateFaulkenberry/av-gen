@@ -41,53 +41,6 @@
  },
  "sources": [
   {
-   "kind": "signal",
-   "name": "drumming",
-   "settings": {
-    "combine": "max",
-    "inputs": [
-     {
-      "source": "response.hat",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     },
-     {
-      "source": "response.snare",
-      "chain": {
-       "envelope": "peakhold",
-       "envelopeHoldMs": 750.0,
-       "envelopeFallPerSecond": 1000.0
-      }
-     }
-    ],
-    "chain": {
-     "threshold": "binary",
-     "thresholdLevel": 0.01
-    }
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "kick",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "role.drums.kick"
-     },
-     {
-      "source": "beat.pulse",
-      "amount": 0.7,
-      "gate": "signal.drumming"
-     }
-    ],
-    "event": true
-   }
-  },
-  {
    "kind": "interpret",
    "name": "heard",
    "settings": {
@@ -396,48 +349,6 @@
    }
   },
   {
-   "source": "response.hat",
-   "target": "material/ground/emissionIntensity",
-   "op": "add",
-   "amount": 2.73,
-   "depthSource": "macro.gRhythm",
-   "depthMin": 0.0,
-   "depthMax": 1.0,
-   "chain": {
-    "envelope": "peakhold",
-    "envelopeHoldMs": 20,
-    "envelopeFallPerSecond": 6.0
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "material/treeBlocks/emissionIntensity",
-   "op": "add",
-   "amount": 3.64,
-   "depthSource": "macro.gRhythm",
-   "depthMin": 0.0,
-   "depthMax": 1.0,
-   "chain": {
-    "envelope": "peakhold",
-    "envelopeHoldMs": 20,
-    "envelopeFallPerSecond": 6.0
-   }
-  },
-  {
-   "source": "response.hat",
-   "target": "material/tanguyBlocks/emissionIntensity",
-   "op": "add",
-   "amount": 3.64,
-   "depthSource": "macro.gRhythm",
-   "depthMin": 0.0,
-   "depthMax": 1.0,
-   "chain": {
-    "envelope": "peakhold",
-    "envelopeHoldMs": 20,
-    "envelopeFallPerSecond": 6.0
-   }
-  },
-  {
    "source": "visual.hTrebleLevel",
    "target": "post/glitch/amount",
    "op": "add",
@@ -451,7 +362,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "lights/fracture/intensity",
    "op": "add",
    "amount": 1925.0,
@@ -465,7 +376,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/treeBlocks/effector/5/strength",
    "op": "add",
    "amount": 0.462,
@@ -479,7 +390,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "procedural/tanguyBlocks/effector/5/strength",
    "op": "add",
    "amount": 0.462,
@@ -493,7 +404,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "field/infect/strength",
    "op": "add",
    "amount": 3.12,
@@ -507,7 +418,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "temporal/mosh/amount",
    "op": "add",
    "amount": 0.078,
@@ -521,7 +432,7 @@
    }
   },
   {
-   "source": "response.snare",
+   "source": "response.onset",
    "target": "post/glitch/tear",
    "op": "add",
    "amount": 0.273,
@@ -535,7 +446,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "response.low",
    "target": "post/split/amount",
    "op": "add",
    "amount": 4.62,

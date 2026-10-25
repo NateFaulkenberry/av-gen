@@ -1990,7 +1990,7 @@
   },
   {
    "kind": "signal",
-   "name": "kick",
+   "name": "beatPop",
    "settings": {
     "combine": "firstActive",
     "inputs": [
@@ -2039,13 +2039,6 @@
        "clampMax": 1.0,
        "attackMs": 3.0,
        "decayMs": 110.0
-      }
-     },
-     {
-      "source": "response.hatEnv",
-      "chain": {
-       "attackMs": 3.0,
-       "decayMs": 90.0
       }
      }
     ]
@@ -2121,13 +2114,6 @@
        "attackMs": 3.0,
        "decayMs": 160.0
       }
-     },
-     {
-      "source": "response.hatEnv",
-      "chain": {
-       "attackMs": 3.0,
-       "decayMs": 120.0
-      }
      }
     ]
    }
@@ -2151,7 +2137,7 @@
       }
      },
      {
-      "source": "response.snareEnv",
+      "source": "response.onsetEnv",
       "chain": {
        "attackMs": 4.0,
        "decayMs": 220.0
@@ -2416,7 +2402,7 @@
       }
      },
      {
-      "source": "response.snareEnv",
+      "source": "response.onsetEnv",
       "chain": {
        "attackMs": 150.0,
        "decayMs": 700.0
@@ -8464,7 +8450,7 @@
    }
   },
   {
-   "source": "signal.kick",
+   "source": "signal.beatPop",
    "target": "material/rw_grass/op/41/constant/constant",
    "amount": 3.6,
    "op": "add",

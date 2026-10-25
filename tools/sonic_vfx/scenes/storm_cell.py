@@ -65,9 +65,9 @@ DESIGN = {
     },
     "vocabulary": [
         ["bass", "response.bass", "the funnel winds: rotation, width and the debris skirt; the wind in the wheat"],
-        ["kick", "signal.kick", "thunder: the cloud flashes from within, a gust bends the field, the camera nudges"],
-        ["snare", "response.snare", "a lightning strike under the cloud that lights the whole prairie and the rain"],
-        ["hat", "response.hat", "rain: its density and streak length"],
+        ["low", "response.low", "thunder: the cloud flashes from within, a gust bends the field, the camera nudges"],
+        ["onset", "response.onset", "a lightning strike under the cloud that lights the whole prairie and the rain"],
+        ["flux", "response.flux", "rain: its density and streak length"],
         ["melodic", "response.note", "light crawls inside the cloud base at the pitch's place, low "
          "notes left, high notes right"],
         ["velocity", "notes.lastVelocity", "how bright a note's light and a strike are"],
@@ -233,7 +233,7 @@ def build():
     # ---- light: a cold back light from the clear slot (it rims the funnel and the cloud's underside)
     s.light("slot", "directional", direction=_toward(16.0, 4.0), color=hexrgb("#b8c8a0"), intensity=1.1,
             castsShadow=False)
-    # the cloud's inner lights, one per place (notes), plus the kick's thunder glow
+    # the cloud's inner lights, one per place (notes), plus the low attack's thunder glow
     for k, (yaw_deg, _) in enumerate(CLOUD_LIGHTS):
         p = bearing(yaw_deg, 1250.0, CLOUD_Y - 40.0)
         s.light("cloud%d" % k, "point", position=p, color=hexrgb("#cfd8ff"), intensity=0.0, range=520.0,
@@ -241,11 +241,11 @@ def build():
     s.light("thunder", "point", position=bearing(6.0, 1400.0, CLOUD_Y + 60.0), color=hexrgb("#c8d0ff"),
             intensity=0.0, range=900.0, radius=80.0, castsShadow=False, volumetric=1.0)
 
-    # ---- lightning: the snare strikes under the cloud, scattered round the funnel
+    # ---- lightning: the onset strikes under the cloud, scattered round the funnel
     #      (flashRange under the strike's distance from the camera: a flash whose range held the camera lit the
     #       funnel's medium in hard screen-tile rectangles)
     s.effect("strike", "lightning", ("world",),
-             trigger={"source": "signal", "name": signals.S("snare"), "threshold": 0.25},
+             trigger={"source": "signal", "name": signals.S("onset"), "threshold": 0.25},
              parameters={"jaggedness": 0.3, "branchProbability": 0.55, "branchDecay": 0.5, "depth": 7,
                          "height": CLOUD_Y - 30.0, "lean": 120.0, "scatter": 650.0,
                          "coreColor": hexrgb(BOLT), "coreIntensity": 90.0, "coreWidth": 1.6,
@@ -271,20 +271,19 @@ def build():
     # sustain: the cloud glows from within; the storm feeds
     s.route(R("sustain", "fx/storm/emission", 0.03, **SLOW),
             R("sustain", "lights/thunder/intensity", 4.0e5, **SLOW))
-    # kick: thunder -- the cloud flashes from inside, a gust bends the field, the camera nudges
-    s.route(R("kick", "lights/thunder/intensity", 3.0e6, attackMs=0, decayMs=380),
-            R("kick", "procedural/wheat/deform/1/amount", 0.35, attackMs=40, decayMs=700),
-            R("kick", "procedural/wheat/deform/2/amount", 0.12, attackMs=40, decayMs=900),
-            R("kick", "post/lens/chromaticAberration", 0.01, attackMs=0, decayMs=150))
-    # snare: the strike (its own trigger) lights the sky, the rain and the exposure for a flicker
+    # low attack: thunder -- the cloud flashes from inside, a gust bends the field, the camera nudges
+    s.route(R("low", "lights/thunder/intensity", 3.0e6, attackMs=0, decayMs=380),
+            R("low", "procedural/wheat/deform/1/amount", 0.35, attackMs=40, decayMs=700),
+            R("low", "procedural/wheat/deform/2/amount", 0.12, attackMs=40, decayMs=900),
+            R("low", "post/lens/chromaticAberration", 0.01, attackMs=0, decayMs=150))
+    # onset: the strike (its own trigger) lights the sky, the rain and the exposure for a flicker
     # (not the sky's intensity: every change of the procedural sky rebuilds its lighting cube, 7-8 ms a time)
-    s.route(R("snare", "lights/slot/intensity", 6.0, attackMs=0, decayMs=220),
-            R("snare", "particles/rain/emissive", 4.0, attackMs=0, decayMs=200),
-            R("snare", "camera/exposure/compensation", 0.6, attackMs=0, decayMs=260))
-    # hat: rain -- density and streak length
-    s.route(R("hatRate", "particles/rain/spawnRate", 5000.0, **MEDIUM),
-            R("hat", "particles/rain/burst", 900.0, attackMs=0, decayMs=40),
-            R("hatRate", "particles/rain/stretch", 0.8, **MEDIUM))
+    s.route(R("onset", "lights/slot/intensity", 6.0, attackMs=0, decayMs=220),
+            R("onset", "particles/rain/emissive", 4.0, attackMs=0, decayMs=200),
+            R("onset", "camera/exposure/compensation", 0.6, attackMs=0, decayMs=260))
+    # flux: rain -- density and streak length
+    s.route(R("flux", "particles/rain/spawnRate", 5000.0, **MEDIUM),
+            R("flux", "particles/rain/stretch", 0.8, **MEDIUM))
     # melodic: each note lights the cloud base at its place (low notes left), its brightness the velocity
     s.places("cl", "lastPitch", [c for _, c in CLOUD_LIGHTS], 0.045, event="noteOn")
     for k in range(len(CLOUD_LIGHTS)):

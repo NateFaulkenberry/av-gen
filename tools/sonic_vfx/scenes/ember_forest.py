@@ -64,10 +64,9 @@ DESIGN = {
         ["velocity", "notes.lastVelocity", "how many embers and how bright"],
         ["bass", "response.bass", "the wind breathes on the coals: the beds and the log glow up, embers stream "
          "off downwind, the smoke stirs"],
-        ["kick", "signal.kick", "a snag cracks: a throw of sparks from the base of the near snag and its cracks "
+        ["low", "response.low", "a snag cracks: a throw of sparks from the base of the near snag and its cracks "
          "flash"],
-        ["snare", "response.snare", "a tree torches: flame bursts up a midground trunk and lights the smoke"],
-        ["hat", "response.hat", "glints off the coal"],
+        ["onset", "response.onset", "a tree torches: flame bursts up a midground trunk and lights the smoke; glints off the coal"],
         ["sustained", "response.sustain", "the fire front on the ridge grows and its glow climbs the sky"],
         ["silence", "(no input)", "a still, smoking forest under a cold sky; the coals breathe faintly; ash falls"],
     ],
@@ -315,21 +314,21 @@ def build():
                 speedMax=0.3, gravity=[0.08, -0.12, 0], drag=0.8, turbulence=0.35, turbulenceScale=0.4,
                 sizeStart=0.02, sizeEnd=0.016, sizeVariance=0.5, colorStart=hexrgb("#9aa0aa") + [0.7],
                 colorEnd=hexrgb("#6a6e78") + [0.0], emissive=0.0, blend="alpha")
-    # sparks thrown when the near snag cracks (kick)
+    # sparks thrown when the near snag cracks (low attack)
     s.particles("crack", capacity=3000, seed=11, shape="sphere", position=[SNAG[0], 0.8, SNAG[2]],
                 extent=[0.4, 0.5, 0.4], direction=[0.3, 1, 0.3], spawnRate=0.0, lifetimeMin=0.6, lifetimeMax=1.6,
                 spread=0.6, speedMin=1.2, speedMax=3.5, gravity=[0.2, -2.0, 0], drag=0.35, turbulence=0.4,
                 sizeStart=0.016, sizeEnd=0.003, colorStart=hexrgb("#ffc070") + [1.0], colorEnd=hexrgb(EMBER) + [0.0],
                 emissive=14.0, blend="additive", trailEnabled=True, trailLength=6, trailStride=1, trailWidth=0.4,
                 trailTaper=0.0, trailFade=0.0)
-    # the torching tree (snare): flame climbing the trunk, then a column of sparks
+    # the torching tree (onset): flame climbing the trunk, then a column of sparks
     s.particles("torch", capacity=4000, seed=15, shape="box", position=[TORCH[0], 3.0, TORCH[2]],
                 extent=[0.6, 3.0, 0.6], direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.35, lifetimeMax=0.8,
                 spread=0.15, speedMin=3.0, speedMax=7.0, gravity=[0.3, 3.0, 0], drag=0.4, turbulence=0.6,
                 turbulenceScale=0.4, sizeStart=1.1, sizeEnd=0.2, sizeVariance=0.4,
                 colorStart=hexrgb("#ffc870") + [0.35], colorEnd=hexrgb("#ff4a00") + [0.0], emissive=5.0,
                 blend="additive", velocityStretch=0.25, stretchMax=0.8)
-    # glints off the coal (hat)
+    # glints off the coal (onset)
     s.particles("glints", capacity=1500, seed=19, shape="box", position=[0.5, 0.05, -9.0], extent=[12.0, 0.0, 6.0],
                 direction=[0, 1, 0], spawnRate=0.0, lifetimeMin=0.06, lifetimeMax=0.2, spread=1.0, speedMin=0.0,
                 speedMax=0.3, gravity=[0, 0, 0], drag=0.0, sizeStart=0.03, sizeEnd=0.0,
@@ -370,23 +369,23 @@ def build():
     s.route(R("bass", "particles/embers/spawnRate", 260.0, attackMs=60, decayMs=1200),
             R("bass", "particles/embers/gravity", 2.2, comp=0, attackMs=60, decayMs=1400),
             R("bass", "scene/volumeNoise", 0.3, attackMs=60, decayMs=1500))
-    # kick: the near snag cracks -- sparks thrown, its cracks (and every glowing crack) flash
-    s.route(R("kick", "particles/crack/burst", 30.0, attackMs=0, decayMs=40))
+    # low attack: the near snag cracks -- sparks thrown, its cracks (and every glowing crack) flash
+    s.route(R("low", "particles/crack/burst", 30.0, attackMs=0, decayMs=40))
     for c, w in enumerate(hexrgb(COAL, 0.6)):
         if w > 1e-4:
-            s.route(R("kick", "material/efBark/op/%d/constant/constant" % OP_FLARE, 5.0 * w, comp=c, attackMs=0,
+            s.route(R("low", "material/efBark/op/%d/constant/constant" % OP_FLARE, 5.0 * w, comp=c, attackMs=0,
                       decayMs=350))
-    # snare: a tree torches -- flame up the midground trunk and its light in the smoke
-    s.route(R("snare", "particles/torch/burst", 90.0, attackMs=0, decayMs=40),
-            R("snare", "lights/torchLight/intensity", 900.0, attackMs=0, decayMs=600))
-    # hat: glints off the coal
-    s.route(R("hat", "particles/glints/burst", 30.0, attackMs=0, decayMs=30))
+    # onset: a tree torches -- flame up the midground trunk and its light in the smoke
+    s.route(R("onset", "particles/torch/burst", 90.0, attackMs=0, decayMs=40),
+            R("onset", "lights/torchLight/intensity", 900.0, attackMs=0, decayMs=600))
+    # onset: glints off the coal
+    s.route(R("onset", "particles/glints/burst", 30.0, attackMs=0, decayMs=30))
     # sustained: the fire front grows and its glow climbs the sky and the smoke
     s.route(R("sustain", "procedural/front/material/emissive", 9.0, **SLOW),
             R("sustain", "lights/fire/intensity", 0.9, **SLOW),
             # (live, a routed sky relights at most twice a second, ADR-1070: a slow route suits that schedule)
             R("sustain", "env/sky/intensity", 0.8, **SLOW),
-            R("kick", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
+            R("low", "post/lens/chromaticAberration", 0.006, attackMs=0, decayMs=120))
 
     s.params_({
         "scene/volumeSteps": 10, "scene/volumeJitter": 0.6,

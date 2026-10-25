@@ -30,15 +30,14 @@ CLASS_EXPECTS = {
     "bass": ["response.bass", "response.note", "notes.lastPitch"],
     "lead": ["response.note", "notes.lastPitch", "notes.lastVelocity"],
     "arp": ["response.note", "notes.lastPitch"],
-    "edrums": ["signal.kick", "response.snare", "response.hat"],     # ADR-1620: the kick is drum_signals.py's
-    "drumloop": ["signal.kick", "response.snare", "response.hat"],
+    "edrums": ["response.low", "response.onset"],
+    "drumloop": ["response.low", "response.onset"],
     "dense": ["response.note", "notes.polyphony", "notes.density"],          # (no drums in this class)
     "sparse": ["response.note", "notes.lastPitch"],
     "velocity": ["notes.lastVelocity", "response.note"],
     "rapid": ["response.note", "notes.lastPitch"],
     "sustained": ["response.sustain", "notes.held"],
-    "full": ["response.note", "response.bass", "signal.kick", "response.snare", "response.hat",
-             "response.sustain"],
+    "full": ["response.note", "response.bass", "response.low", "response.onset", "response.sustain"],
 }
 
 
@@ -66,8 +65,7 @@ def vocab_for(doc):
     return {r[1]: r for r in rows if len(r) > 2 and isinstance(r[1], str) and "." in r[1]}
 
 
-HITS = {"signal.kick": "signal.kickEnv", "response.snare": "response.snareEnv", "response.hat": "response.hatEnv",
-        "response.note": "response.noteEnv", "response.low": "response.lowEnv", "response.onset": "response.onsetEnv"}
+HITS = {"response.note": "response.noteEnv", "response.low": "response.lowEnv", "response.onset": "response.onsetEnv"}
 
 
 def played(trace_csv, signal):
