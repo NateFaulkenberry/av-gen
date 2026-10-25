@@ -2509,7 +2509,12 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     if (sonic_) {
         nlohmann::json block = sonic_->document;
         if (!sonic_->notesPath.empty()) {
-            block["notes"] = relativeTo(sonic_->notesPath, dir);
+            const std::string rel = relativeTo(sonic_->notesPath, dir);
+            if (block.contains("notes") && block["notes"].is_object()) { // ADR-1667: the object form, kept
+                block["notes"]["path"] = rel;
+            } else {
+                block["notes"] = rel;
+            }
         }
         doc["sonic"] = std::move(block);
     }
@@ -7784,6 +7789,9 @@ Result<void> Engine::setSonic(const nlohmann::json& block, const std::filesystem
     sonicRevision_ = 0;
     log::info("sonic: {} notes{}", sonic_->notes.notes.size(),
               sonic_->notesPath.empty() ? std::string(" (no notes file)") : " from " + sonic_->notesPath.filename().string());
+    if (sonic_->notesMissing) { // ADR-1667: an optional notes file that is not here
+        log::warn("sonic: the optional notes file '{}' is not here: no notes", sonic_->notesPath.string());
+    }
     refreshSonicTimbre();
     rebuildFeeds(); // ADR-1580
     syncResponseControls(); // ADR-1062: the response parameters exist before the project's parameters are applied

@@ -54,6 +54,13 @@ SONGS = {
         "onset": {},
         "cloudGain": 4.0,      # A s3.6: rms p95 0.19, max 0.24
         "moogRise": True,
+        # pass 10 (the owner: "I've bounced a BASS.mid ... use that to perfectly line up the visuals with the bass notes ...
+        # the track itself is varispeed 3%"): the bass's notes from the session's MIDI, re-timed onto the audio
+        # (ADR-1667). The file's times (its header: 120 BPM until its one tempo event at tick 74880, 83 BPM after; every
+        # note comes after it) x scale + offset, fitted to BASS.wav's onsets by least squares over 207 of its 216 notes:
+        # scale 0.970905 (1/1.03 to 0.003%: the varispeed), offset -75.7446 s, residual median 1.5 ms, no drift
+        # (docs/prototypes/aurora-borealis/PROGRESS.md, pass 10). Optional: without the file the onsets drive the bass.
+        "bassMidi": {"path": STEMS + "sabertooth/BASS.mid", "scale": 0.970905, "offset": -75.7446, "optional": True},
     },
     "feline": {
         "mix": "../../assets/audio/feline-footwear.wav",
@@ -65,6 +72,7 @@ SONGS = {
         # one drum stem: its classes stand in for the separate kick and snare stems
         "onset": {"kick": "role.drums.kick", "snare": "role.drums.snare"},
         "cloudGain": 8.0,      # pass 1's synth gain (the Feline synth is quieter)
+        "bassMidi": None,
         "moogRise": False,     # a bass line: its onsets are its notes
     },
 }
@@ -138,7 +146,7 @@ import os as _os
 SOFT = {"moog": float(_os.environ.get("AB_SOFT_MOOG", "0.9")), "bass": float(_os.environ.get("AB_SOFT_BASS", "0.9"))}
 
 
-def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay_ms, soft):
+def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay_ms, soft, part=None, note=None):
     """Pass 5 (the owner: the Moog and bass "need to be more sensitive hit more notes and sustain if the moog sustains").
     Three signals per instrument, besides its `<name>Note` (the stem's onsets, picking the subset):
       `<name>Soft`    the softer notes the onset detector does not call: the stem's onset strength (its spectral flux
@@ -155,8 +163,8 @@ def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay
     lo, hi = hold_range
     return [
         sig(name + "Soft", [inp(src + ".onsetStrength", strike_latch, depthSource=size, depthMin=0.0, depthMax=1.0)]),
-        sig(name + "Strike", [inp("signal.%sNote" % name), inp("signal.%sSoft" % name)], combine="max"),
-        sig(name + "Hold", [inp(src + ".rms", dict(remap(lo, hi), attackMs=5.0, decayMs=hold_decay_ms), part=name)]),
+        sig(name + "Strike", [inp("signal." + (note or name + "Note")), inp("signal.%sSoft" % name)], combine="max"),
+        sig(name + "Hold", [inp(src + ".rms", dict(remap(lo, hi), attackMs=5.0, decayMs=hold_decay_ms), part=part or name)]),
     ]
 
 
@@ -235,8 +243,38 @@ def sources(song):
     out += [sig("bassSize", [inp(s("bass", "rms"), dict(**remap(0.06, 0.3, 0.35, 1.0), **size_hold()), part="bass")]
                 if src["bass"] else [])]
     out += onset_event("bassNote", onset("bass"), 60.0, 0.3, "bass", size="signal.bassSize")
-    out += note_signals("bass", src["bass"], onset("bass"), 60.0, 0.3, "signal.bassSize", (0.04, 0.3), 220.0,
-                        SOFT["bass"])
+    if S.get("bassMidi"):
+        # pass 10: the MIDI notes drive the bass (each note-on lights the bank, sized by its velocity; the note's length
+        # holds the sustain, shaped by the stem's level); the audio path (its onsets, softer notes and level) is the
+        # fallback, live only while no MIDI note has sounded for 4 s -- so it stands in when the file is absent
+        out += note_signals("bassAudio", src["bass"], onset("bass"), 60.0, 0.3, "signal.bassSize", (0.04, 0.3), 220.0,
+                            SOFT["bass"], part="bass", note="bassNote")
+        midi_latch = {"threshold": "binary", "thresholdLevel": 0.001, "attackMs": 0.0, "envelope": "linearfall",
+                      "envelopeFallPerSecond": 1.0 / 0.3, "envelopeRefractoryMs": 30.0}
+        out += [
+            # the MIDI's presence: notes.phrase, the share of the last 4 s in which a note sounded (0 only after 4 s
+            # with none); the audio path opens only then
+            # (gated by a constant 1: a notes.* input is otherwise active only while a note sounds -- the bus's implied
+            # `notes.active` gate)
+            sig("always", [{"constant": 1.0}]),
+            sig("bassAudioOk", [{"constant": 1.0}, inp("notes.phrase", binary(0.001), amount=-1.0, gate="signal.always")],
+                combine="sum", chain=UNIT),
+            sig("bassLevel", [inp(s("bass", "rms"), dict(remap(0.04, 0.3), attackMs=20.0, decayMs=200.0))]),
+            sig("bassMidi", [inp("notes.noteOn", midi_latch, depthSource="notes.lastVelocity", depthMin=0.35,
+                                 depthMax=1.0)]),
+            sig("bassMidiHeld", [inp("notes.active", dict(binary(0.5), attackMs=5.0, decayMs=220.0),
+                                     depthSource="signal.bassLevel", depthMin=0.45, depthMax=1.0)]),
+            sig("bassStrike", [inp("signal.bassMidi", part="bass"),
+                               inp("signal.bassAudioStrike", gate="signal.bassAudioOk")], combine="max"),
+            sig("bassHold", [inp("signal.bassMidiHeld", part="bass"),
+                             inp("signal.bassAudioHold", gate="signal.bassAudioOk")], combine="max"),
+            sig("bassPickEv", [inp("notes.noteOn"), inp("signal.bassNoteEv", gate="signal.bassAudioOk")],
+                combine="max", event=True),
+        ]
+    else:
+        out += note_signals("bass", src["bass"], onset("bass"), 60.0, 0.3, "signal.bassSize", (0.04, 0.3), 220.0,
+                            SOFT["bass"])
+        out += [sig("bassPickEv", [inp("signal.bassNoteEv")], event=True)]
     # ---- the light the land and river take from the aurora: the swell alone (B s3), no drum or bass share
     out += [sig("auroraLight", [inp("signal.cloudSwell", amount=0.75)], chain=UNIT)]
     # ---- subsets
@@ -244,7 +282,7 @@ def sources(song):
         # a new Moog subset on every trill note (the k-th onset's value is fixed by the seed: seek equals play)
         {"kind": "random", "name": "moogPick", "settings": {"trigger": "signal.moogNoteEv", "seed": 23}},
         # a new set of right-bank planes per bass note (the k-th note's value is fixed by the seed: seek equals play)
-        {"kind": "random", "name": "bassPick", "settings": {"trigger": "signal.bassNoteEv", "seed": 17}},
+        {"kind": "random", "name": "bassPick", "settings": {"trigger": "signal.bassPickEv", "seed": 17}},
         # pass 6: the saw that runs the mountains' bands down the range (look.py FLOW_*), a function of time: seek
         # equals play
         {"kind": "lfo", "name": "rangeFlow", "settings": {"shape": "saw"}},
@@ -308,5 +346,7 @@ def apply(doc, song="sabertooth"):
     doc["sources"] = sources(song)
     doc["routes"] = routes()
     doc["control"] = control()
+    if S.get("bassMidi"):   # ADR-1667: the bass's MIDI notes, re-timed onto the audio; optional
+        doc["sonic"]["notes"] = dict(S["bassMidi"])
     doc["parameters"]["sources/rangeFlow/rate"] = look.FLOW_HZ
     doc["palette"]["position"] = look.REST_POSITION   # silence: between dusk indigo and the violet veil

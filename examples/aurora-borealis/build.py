@@ -35,10 +35,30 @@ SCENE_FILE = "aurora-borealis.scene.json"
 
 CAM_H = 65.0              # metres above the water
 CAM_SPEED = 22.0          # metres a second along the river
-AHEAD = 1600.0            # the target this far ahead on the centreline
+AHEAD = 900.0             # the target this far ahead on the course (pass 10: was 1600, nearer so the river below stays centred)
 PITCH_DEG = 1.5           # the view pitched up so the horizon sits low and the sky takes the frame
 SWAY = 0.22               # the camera drifts across the river by this fraction of its half-width
 KEYS_PER_LOOP = 500
+
+
+# Pass 10 (the owner: "try to have the camera stay a bit more centered to the river"): pass 3's camera flew the valley's
+# smoothed axis, so through the bends the river drifted to one side of the frame. It now follows the river's course
+# blended in -- the course smoothed over +-SMOOTH_M metres, so no meander swings it -- POS_FOLLOW of the way for its
+# position and TARGET_FOLLOW for where it looks, with the sideways drift cut to SWAY_KEEP. Same height, speed and pitch.
+POS_FOLLOW, TARGET_FOLLOW, SWAY_KEEP, SMOOTH_M = 0.9, 0.95, 0.25, 220.0
+
+
+def follow_r(th, k=None):
+    """The radius the camera keeps: the valley's axis, blended `k` of the way to the river's smoothed course."""
+    k = POS_FOLLOW if k is None else k
+    w = SMOOTH_M / world.R0
+    smooth = sum(world.rc(th + w * (j / 4.0 - 1.0)) for j in range(9)) / 9.0
+    return world.rc_axis(th) + k * (smooth - world.rc_axis(th))
+
+
+def follow_centre(th, k=None):
+    r = follow_r(th, k)
+    return (r * math.sin(th), 0.0, r * math.cos(th))
 
 
 def camera_tracks():
@@ -53,13 +73,13 @@ def camera_tracks():
         s = L * i / KEYS_PER_LOOP
         th = world.lerp_table(arcs, ths, s % L)
         tha = world.lerp_table(arcs, ths, (s + AHEAD) % L)
-        c = world.axis_centre(th)
+        c = follow_centre(th)
         # sideways drift: a slow sine across the river, two cycles a loop, so the view is not always dead centre
         # the camera flies the valley's axis (smoothed), not every meander; a slow sideways drift
-        side = SWAY * 180.0 * math.sin(2.0 * world.TAU * i / KEYS_PER_LOOP + 0.4)
-        r = world.rc_axis(th) + side
+        side = SWAY * SWAY_KEEP * 180.0 * math.sin(2.0 * world.TAU * i / KEYS_PER_LOOP + 0.4)
+        r = follow_r(th) + side
         pos = (r * math.sin(th), CAM_H, r * math.cos(th))
-        ca = world.axis_centre(tha)
+        ca = follow_centre(tha, TARGET_FOLLOW)
         dist = math.hypot(ca[0] - pos[0], ca[2] - pos[2])
         tgt = (ca[0], CAM_H + dist * math.tan(math.radians(PITCH_DEG)), ca[2])
         # roll: the turn's signed curvature (heading change over the next stretch), a few degrees at most
@@ -96,11 +116,57 @@ def scene_doc(camera):
             "source": {"kind": "mesh", "asset": "ab-%s.glb" % name}, "distribution": {"kind": "single"},
             "material": look.rock_material(prog), "castsShadow": False}})
     nodes.append(look.bed_node())
-    nodes.append(look.fish_node())
+    nodes += look.fish_nodes()
     return {"format": "avgen-scene", "version": 1, "name": "aurora-borealis", "camera": camera,
             "environment": look.environment(), "nodes": nodes, "lights": [look.unshadowed_key()],
             "materialPrograms": [look.rock_program(look.ROCK_L), look.rock_program(look.ROCK_R), look.bed_program(),
                                  look.fish_program()]}
+
+
+FISH_KEYS = 40           # keys per lap
+FISH_WAG_DEG = 9.0       # the wag: the body's heading swings this many degrees either way (music.py's two LFOs)
+
+
+def fish_tracks():
+    """Pass 10 (the owner: "animate fish if possible"): each fish swims its circle (world.fish_list), its position and
+    heading keyed round one lap and looping, so the swim is seamless and a function of time (seek equals play). The
+    heading turns once a lap, kept continuous across the keys. Its height never changes, so no fish nears the surface."""
+    tracks = []
+    for k, f in enumerate(world.fish_list()):
+        period = round(f[5], 3)
+        kp, kr = [], []
+        prev = None
+        for i in range(FISH_KEYS + 1):
+            t = period * i / FISH_KEYS
+            (px, py, pz), h = world.fish_at(f, t)
+            deg = math.degrees(h)
+            if prev is not None:      # unwrapped, so the interpolation turns the short way
+                while deg - prev > 180.0:
+                    deg -= 360.0
+                while deg - prev < -180.0:
+                    deg += 360.0
+            prev = deg
+            kp.append({"time": round(t, 4), "value": [round(px, 3), round(py, 3), round(pz, 3)], "interp": "smooth"})
+            kr.append({"time": round(t, 4), "value": [0.0, round(deg, 2), 0.0], "interp": "smooth"})
+        # the lap's heading spans 360 degrees; kept inside the rotation's +-360 range
+        lo, hi = min(key["value"][1] for key in kr), max(key["value"][1] for key in kr)
+        shift = -360.0 if hi > 360.0 else (360.0 if lo < -360.0 else 0.0)
+        for key in kr:
+            key["value"][1] = round(key["value"][1] + shift, 2)
+        for target, keys in (("nodes/fish%02d/position" % k, kp), ("nodes/fish%02d/rotation" % k, kr)):
+            tracks.append({"target": target, "component": -1, "enabled": True, "timeBase": "seconds",
+                           "mode": "replace", "loopLength": period, "keys": keys})
+    return tracks
+
+
+def fish_wag(doc):
+    """The fish's wag: two sine LFOs (1.4 and 1.1 Hz), each fish on one, swinging its heading +-FISH_WAG_DEG."""
+    doc["sources"] += [{"kind": "lfo", "name": "fishWagA", "settings": {"shape": "sine"}},
+                       {"kind": "lfo", "name": "fishWagB", "settings": {"shape": "sine"}}]
+    doc["parameters"].update({"sources/fishWagA/rate": 1.4, "sources/fishWagB/rate": 1.1})
+    for k in range(world.FISH_COUNT):
+        doc["routes"].append({"source": "lfo.fishWag%s" % "AB"[k % 2], "target": "nodes/fish%02d/rotation" % k,
+                              "component": 1, "amount": FISH_WAG_DEG, "op": "add", "polarity": "bipolar"})
 
 
 def project_doc(tracks, period, song):
@@ -113,10 +179,11 @@ def project_doc(tracks, period, song):
         "live": {"overrides": {"lodBias": 1.0}},
         "effects": [look.aurora_effect(), look.stars_effect()] + look.ball_effects() + look.river_effects(),
         "palette": look.palette(),
-        "timeline": {"enabled": True, "cues": [], "tracks": tracks},
+        "timeline": {"enabled": True, "cues": [], "tracks": tracks + fish_tracks()},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/aurora-borealis.mp4"},
     }
     music.apply(doc, song)
+    fish_wag(doc)
     return doc
 
 

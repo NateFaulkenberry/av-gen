@@ -341,6 +341,23 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
         CHECK(wired == std::set<std::string>{"moog strike", "moog hold", "moog ridges", "moog front", "bass strike",
                                              "bass hold", "bass ridges", "bass front"});
     }
+    // pass 10 (ADR-1667): the bass's MIDI notes, re-timed onto the 3% varispeed audio, and optional, so a checkout
+    // without the stems still opens; the left bank's strike and hold read them, the onsets standing in without
+    {
+        const json& n = p.at("sonic").at("notes");
+        CHECK(n.at("path").get<std::string>().find("stems/sabertooth/BASS.mid") != std::string::npos);
+        CHECK(n.at("optional").get<bool>());
+        CHECK(std::abs(n.at("scale").get<double>() * 1.03 - 1.0) < 1e-3);
+        std::set<std::string> strike;
+        for (const json& src : p.at("sources")) {
+            if (src.at("name") == "bassStrike") {
+                for (const json& in : src.at("settings").at("inputs")) {
+                    strike.insert(in.at("source").get<std::string>());
+                }
+            }
+        }
+        CHECK(strike == std::set<std::string>{"signal.bassMidi", "signal.bassAudioStrike"});
+    }
     // the fireballs replace the stars (pass 4, ADR-1663)
     CHECK_FALSE(fx.contains("starA"));
     for (const char* id : {"ballA", "ballB"}) {

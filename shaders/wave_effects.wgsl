@@ -220,11 +220,11 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
         if (e.extra.z > 0.0 && e.sparkle.x > 0.0) {
             let age = e.vertical.x;
             let rs = distance(worldPos.xz, e.extra.xy);
-            let ringR = 25.0 + 170.0 * age;
-            if (age < 1.6 && rs < ringR + 80.0) {
+            let ringR = 25.0 + kSplashSpeed * age;
+            if (age < 2.4 && rs < ringR + 80.0) {
                 let k = e.extra.z * e.sparkle.x;
                 let x = (rs - ringR) / (6.0 + 10.0 * age);
-                let ring = exp(-x * x) * exp(-age / 0.4);
+                let ring = exp(-x * x) * exp(-age / (0.65 * kSplashLife));
                 let cf = rs / 24.0;
                 let flash = exp(-cf * cf) * exp(-age / 0.18);
                 // dimmed under 250 m from the camera, so the ring running toward it does not wash the bottom of the frame
@@ -266,6 +266,11 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
 // The wake's disturbance as a slope in the water plane (stage 3 of the owner's river brief): behind each
 // front, crests spread out across the river from the path at 260 m/s and die in about half a second; they
 // wander and break with position, so they never read as ruled rings, and the mirror heals behind them.
+// ADR-1663 / ADR-1666: the splash's rings run out at kSplashSpeed m/s and fade over about kSplashLife seconds (pass 10: 300 and
+// 1.2, were 170 and 0.8 -- the splash now lands behind the camera and its rings must reach well into view)
+const kSplashSpeed: f32 = 300.0;
+const kSplashLife: f32 = 1.2;
+
 fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
     var g = vec2<f32>(0.0);
     let count = u32(frame.waveCount.x + 0.5);
@@ -280,15 +285,15 @@ fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
         if (e.extra.z > 0.0) {
             let age = e.vertical.x;
             let r = distance(worldPos.xz, e.extra.xy);
-            let front = 25.0 + 170.0 * age;
+            let front = 25.0 + kSplashSpeed * age;
             if (r < front + 40.0) {
                 let pp = worldPos.xz;
                 // broken and wandering, as the wake's crests are: never a ruled set of rings (brief s8)
                 let wobble = 2.6 * sin(pp.x * 0.019 + pp.y * 0.023) + 1.4 * sin(pp.y * 0.041 - pp.x * 0.013);
-                let rings = cos(kWaveTau / 22.0 * (r - 170.0 * age) + wobble);
+                let rings = cos(kWaveTau / 22.0 * (r - kSplashSpeed * age) + wobble);
                 let broken = smoothstep(0.15, 0.85, 0.5 + 0.5 * sin(pp.x * 0.047 + sin(pp.y * 0.021) * 2.6) *
                                                              sin(pp.y * 0.039 + sin(pp.x * 0.017) * 2.2));
-                let shape = smoothstep(front + 40.0, front, r) * exp(-age / 0.8) * (0.35 + 0.65 * broken);
+                let shape = smoothstep(front + 40.0, front, r) * exp(-age / kSplashLife) * (0.35 + 0.65 * broken);
                 let away = (pp - e.extra.xy) / max(r, 1.0e-3);
                 g = g + away * (e.extra.z * shape * rings);
             }
@@ -301,6 +306,10 @@ fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
             continue;
         }
         let tau = h.u / max(e.sparkle.z, 100.0);     // seconds since the front passed this point
+        // pass 10 (the owner's "ripple seam"): the wake's ripples ended at a hard line where the wake does (u = its
+        // length) and began at one at the front (u = 0): straight edges across the ripple field trailing each pulse.
+        // Feathered in over the first 25 m and out over the last 40% of the wake, so no line shows.
+        let feather = smoothstep(0.0, 25.0, h.u) * smoothstep(e.shape.y, e.shape.y * 0.6, h.u);
         let reach = 30.0 + 260.0 * tau;
         let d = h.lateral;
         if (d > reach) {
@@ -314,7 +323,7 @@ fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
         let radial = (p - h.nearest) / max(d, 1.0e-3);
         // ADR-1663: the wake heavier near the camera (extra.w times at the camera, 1x by 700 m)
         let gain = 1.0 + e.extra.w * near;
-        g = g + radial * (e.rainbow.y * gain * decay * broken * cos(phase));
+        g = g + radial * (e.rainbow.y * gain * decay * broken * feather * cos(phase));
     }
     return g;
 }

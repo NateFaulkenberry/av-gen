@@ -417,7 +417,7 @@ def bed_tris(variant="coarse"):
 # them, each its own type, size and heading. Their program is near black (look.fish_program): a fish shows only when a
 # pulse's light in the water passes over it. Static (no swim motion), so a fish's highest point is fixed: each is
 # clamped so its whole body stays FISH_CLEARANCE below the surface; check_fish() (build.py, the integration test) proves it.
-FISH_COUNT = 18
+FISH_COUNT = 28   # pass 10 (the owner: "increase their density a bit"; was 18)
 FISH_CLEARANCE = 1.5   # metres between the surface and a fish's highest vertex, at least
 # body types, in the fish's frame (forward f, up u, right r; times its size): nose, tail root, back, belly, the flanks'
 # half-width, the tail fin's reach, top and bottom, a dorsal fin's height (0: none), and the size range (m)
@@ -457,37 +457,69 @@ def _fish(kind, cx, cy, cz, heading, size):
 
 
 def fish_list():
-    """(kind, x, y, z, heading, size) per fish in the loop's frame; y is the body's centre
-    line, already clamped below the surface."""
+    """Pass 10 (the owner: "animate fish if possible"): each fish swims a slow circle -- (kind, centre x, y, centre z,
+    radius, period s, direction +-1, phase, size) in the loop's frame -- its body turned along the circle and wagged by
+    the music's LFOs (build.py: one node per fish, its position and heading keyed round the circle, looping). y is the
+    body's centre line, fixed (the swim is level), already clamped below the surface and above the bed."""
     out = []
     for k in range(FISH_COUNT):
         kind = FISH_ORDER[k % len(FISH_ORDER)]
         b = FISH_TYPES[kind]
         lo, hi = b["size"]
         size = lo + (hi - lo) * mx._hash(k, 700, 7)
-        th = 0.03 + 1.25 * (k + mx._hash(k, 700, 1)) / FISH_COUNT
-        lat = FISH_LANES[k % 3] + (mx._hash(k, 700, 2) - 0.5) * 80.0
+        th = 0.02 + 0.6 * (k + mx._hash(k, 700, 1)) / FISH_COUNT      # along the stretch the song's camera flies
+        hw = half_width(th)
+        radius = 14.0 + 22.0 * mx._hash(k, 700, 3)
+        lat = FISH_LANES[k % 3] + (mx._hash(k, 700, 2) - 0.5) * 60.0
+        lat = max(-(hw - 40.0 - radius), min(hw - 40.0 - radius, lat))   # the whole circle well inside the banks
         r = rc(th) + lat
         x, z = r * math.sin(th), r * math.cos(th)
-        heading = TAU * mx._hash(k, 700, 6)          # every way round: along, across, toward, away
-        # pass 8: spread through the deeper water, 2.5-30 m down (pass 5-7: 3-9 m); some deep, some near the surface
         y = -2.5 - 27.5 * mx._hash(k, 700, 5) ** 1.3
         top = max(b["back"], b["tail_top"], b["dorsal"], 0.02)
+        # above the bed under the circle's widest point (its depth, pass 8: about 75 m mid-river, rising to the banks)
+        fj = min(1.0, (abs(lat) + radius) / (hw - 8.0))
+        bed = valley_height(th, -8.0, 1 if lat > 0 else -1) - 75.0 * (1.0 - fj * fj) ** 0.7
+        y = max(y, bed + 4.0 + 0.4 * size)
         y = min(y, -FISH_CLEARANCE - top * size)     # the whole body below the surface
-        out.append((kind, x, y, z, heading, size))
+        period = 40.0 + 50.0 * mx._hash(k, 700, 8)   # a slow lap: 1.5-5 m/s
+        direction = 1.0 if mx._hash(k, 700, 9) < 0.5 else -1.0
+        phase = TAU * mx._hash(k, 700, 6)
+        out.append((kind, x, y, z, radius, period, direction, phase, size))
     return out
 
 
+def fish_at(f, t):
+    """A fish's position and heading (radians, the engine's yaw: +z at 0, +x at pi/2) at time t, on its circle."""
+    kind, x, y, z, radius, period, direction, phase, size = f
+    a = phase + direction * TAU * t / period
+    px, pz = x + radius * math.cos(a), z + radius * math.sin(a)
+    vx, vz = -direction * math.sin(a), direction * math.cos(a)
+    return (px, y, pz), math.atan2(vx, vz)
+
+
 def fish_tris():
+    """Every fish at time 0, in one mesh (for the check and the top-down map; the scene draws one node per fish)."""
     tris = []
-    for kind, x, y, z, heading, size in fish_list():
-        tris += _fish(kind, x, y, z, heading, size)
+    for f in fish_list():
+        (px, py, pz), h = fish_at(f, 0.0)
+        tris += _fish(f[0], px, py, pz, h, f[8])
     return tris
 
 
+def fish_type_tris(kind):
+    """One body type at unit size, centred on the origin and heading +z: a fish node's mesh, scaled by its size."""
+    return _fish(kind, 0.0, 0.0, 0.0, 0.0, 1.0)
+
+
 def check_fish():
-    """Every fish vertex at least FISH_CLEARANCE below the water (y = 0); returns the highest vertex's y."""
-    top = max(v[1] for t in fish_tris() for v in t)
+    """Every fish vertex at least FISH_CLEARANCE below the water (y = 0), at every point of its swim (its height is
+    fixed and its turns are about the vertical, so its highest vertex is the same all round its circle -- checked at
+    eight points of each lap anyway); returns the highest vertex's y."""
+    top = -1e9
+    for f in fish_list():
+        for j in range(8):
+            (px, py, pz), h = fish_at(f, f[5] * j / 8.0)
+            top = max(top, max(v[1] for t in _fish(f[0], px, py, pz, h, f[8]) for v in t))
     assert top <= -FISH_CLEARANCE + 1e-6, "a fish breaks the surface: its highest vertex is at y = %.2f m" % top
     return top
 
@@ -642,9 +674,10 @@ def generate(mesh_dir):
         write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
         out[spec[0]] = len(t)
     check_fish()
-    t = fish_tris()
-    write_faceted_uv(os.path.join(mesh_dir, "ab-fish.glb"), t, "fish")
-    out["fish"] = len(t)
+    for kind in FISH_TYPES:   # pass 10: one mesh per body type; build.py places one node per fish
+        t = fish_type_tris(kind)
+        write_faceted_uv(os.path.join(mesh_dir, "ab-fish-%s.glb" % kind), t, "fish-" + kind)
+        out["fish-" + kind] = len(t)
     for variant in BED:
         t = bed_tris(variant)
         write_faceted_uv(os.path.join(mesh_dir, "ab-bed-%s.glb" % variant), t, "bed")

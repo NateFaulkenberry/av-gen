@@ -82,6 +82,7 @@ LINE_FADE_NEAR, LINE_FADE_FAR = 400.0, 4500.0          # metres: the crease line
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
 AURORA_WRAP_POWER = 4.0
 EDGE_GLOW = 0.5   # the edges' resting glow (Gate B)
+WATERLINE_RAMP = 1.5   # pass 10: metres above the water over which the land's lines and glints come in
 
 # pass 3: the glints (22-research-pass3-scene.md s5). A comb over each crease's random value v (baked in TEXCOORD_0.y)
 # picks a deterministic subset; its smoothstep rests above 1 (nothing lit) and an instrument's envelope, routed onto
@@ -141,10 +142,13 @@ def rock(side) -> Prog:
       .op("multiply", 5, srcA=5, srcB=4)                                                        # the crest mask
       .op("constant", 6, constant=c4(CREST), label="crest")
       .op("mixBy", 3, srcA=3, srcB=6, srcC=5)
-      # pass 3: a crash's flash on the high sky-facing facets (crashGlow routes this up from 0; white-violet)
-      .op("constant", 6, constant=[0.0, 0.0, 0.0, 0.0], label="crashCrest")
-      .op("multiply", 6, srcA=6, srcB=5)
-      .op("add", 3, srcA=3, srcB=6)
+      # pass 10 (the owner: "have illuminated mountain geometry end cleanly at the waters edge, right now it goes slightly
+      # below the surface"): a waterline mask, 0 at the surface and below, 1 from WATERLINE_RAMP m up, in r4 until the
+      # lines' distance fade multiplies it in -- so the crease lines, the ridgelines' glow and the instruments' glints,
+      # fills and bands all stop at the water. (Pass 3's crash flash on the crests made room for it: the fireballs now
+      # light the land themselves.)
+      .op("swizzle", 4, srcA=0, constant=[1.0, 1.0, 1.0, 1.0])                                  # y
+      .op("smoothstep", 4, srcA=4, constant=[0.0, WATERLINE_RAMP, 0.0, 0.0])
       .op("fresnel", 6, value=6.0)                                                              # glassy rim
       .op("constant", 7, constant=c4(RIM), label="rim")                                         # palette
       .op("multiply", 6, srcA=6, srcB=7)
@@ -162,8 +166,9 @@ def rock(side) -> Prog:
       .op("smoothstep", 5, srcA=5, constant=[1.6, 0.0, 0.0, 0.0])
       .op("swizzle", 5, srcA=5, constant=[0.0, 0.0, 0.0, 0.0])
       # the lines' distance fade, linear in metres, kept in r4 for the glints too
-      .op("gradient", 4, srcA=2, constant=[1.0, 0.0, 0.0, LINE_FADE_FAR / (LINE_FADE_FAR - LINE_FADE_NEAR)],
+      .op("gradient", 6, srcA=2, constant=[1.0, 0.0, 0.0, LINE_FADE_FAR / (LINE_FADE_FAR - LINE_FADE_NEAR)],
           value=-1.0 / (LINE_FADE_FAR - LINE_FADE_NEAR))
+      .op("multiply", 4, srcA=4, srcB=6)                                                        # x the waterline mask
       .op("multiply", 5, srcA=5, srcB=4)
       .op("constant", 6, constant=lit, label="edgeColor")                                       # palette
       .op("multiply", 5, srcA=5, srcB=6)
@@ -347,7 +352,10 @@ BEAM_PAIRS = {   # (kick, snare)
 }
 BEAM_PAIR = os.environ.get("AB_BEAM_PAIR", "magenta-lilac")
 CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the beams' source sits on the water
-START_OFFSET = 160.0   # metres in front of the camera where a pulse launches (pass 6: the river's again)
+# pass 10 (the owner: "make it appear as though its always dropped behind the camera so we see the ripples propagate
+# forward but not the source spot"): each pulse launches 40 m behind the camera (was 160 m in front), so its splash -- the
+# impact, its flash -- is always out of frame and only the rings and the light run forward into view
+START_OFFSET = -40.0
 NEAR_FADE = 700.0   # pass 9 (was 500): the light under the water fades in from 280 m (0.4 x this), so the brighter
                     # pools do not flood the bottom of the frame when three hits land together
 BED_VARIANT = os.environ.get("AB_BED", "coarse")
@@ -393,7 +401,9 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 # jittered -- a splash where each launches and a heavier wake near the camera; the toms a third colour. Pass 5 (the
 # owner: "tone down the amount of light that gets throw onto the mountains from the underwater snare / kick / tom
 # lights"): the light on the land (`land`) is a quarter of pass 4's, a restrained accent; the light in the water and on
-# the bed is unchanged. Pass 6: back on the river, with pass 4's lanes and travel and pass 5's reduced spill.
+# the bed is unchanged. Pass 6: back on the river, with pass 4's lanes and travel and pass 5's reduced spill. Pass 10
+# (the owner: "have the underwater light balls/streaks throw some more light onto the mountain ranges"): half of pass
+# 4's (0.18/0.12/0.15), so the banks catch each pulse's colour.
 # Pass 9 (the owner: "we lost the big splash look ... as if someone is dropping a big ball into the water"): the splash
 # was halved in pass 4 (08c7c9ce: 0.07/0.05/0.06 -> 0.035/0.025/0.03, near wake 1.6/1.3/1.3 -> 0.8/0.6/0.6) when the near
 # water looked permanently churned, and never restored; the near fade (500 m) also keeps the beams' light dim where they
@@ -410,15 +420,15 @@ BED_REACH = 75.0
 BEAM_FADE_IN = 0.15
 EMBED = 0.72
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
-            twin=0.0, halo=45.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=4.0, reach=700.0,
+            twin=0.0, halo=45.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.18, bed=4.0, reach=700.0,
             reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=SPLASH['kick'][0], near_wake=SPLASH['kick'][1],
             splash_glow=SPLASH['kick'][2])
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
-             twin=0.0, halo=34.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
+             twin=0.0, halo=34.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.12, bed=2.8, reach=600.0,
              reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=SPLASH['snare'][0], near_wake=SPLASH['snare'][1],
              splash_glow=SPLASH['snare'][2])
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
-            twin=0.0, halo=40.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.5, reach=650.0,
+            twin=0.0, halo=40.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.15, bed=3.5, reach=650.0,
             reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=SPLASH['toms'][0], near_wake=SPLASH['toms'][1],
             splash_glow=SPLASH['toms'][2])
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
@@ -454,8 +464,8 @@ def bed_program():
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
 
 
-UNDERWATER_AMBIENT = "#3428a0"   # pass 8: the base light on the bed and the fish (was #010106)
-FISH_AMBIENT = "#5a48e0"         # the fish a little brighter than the bed round them, so they stand off it
+UNDERWATER_AMBIENT = "#3c2eb6"   # pass 8: the base light on the bed and the fish (was #010106)
+FISH_AMBIENT = "#6652f0"         # the fish a little brighter than the bed round them, so they stand off it
 
 
 def fish_program():
@@ -465,13 +475,24 @@ def fish_program():
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
 
 
-def fish_node():
-    """The fish (pass 4-5), in their own near-black program: lit only by the pulses' light in the water."""
-    return {"name": "fish", "kind": "procedural", "procedural": {
-        "source": {"kind": "mesh", "asset": "ab-fish.glb"}, "distribution": {"kind": "single"},
-        "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
-                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "abFish"},
-        "castsShadow": False}}
+def fish_nodes():
+    """The fish (pass 4-10), one node per fish (pass 10, so each can swim): its body type's mesh at unit size, scaled to
+    the fish, in the fish program; where it starts on its circle (build.fish_tracks moves it round)."""
+    import math
+    import world
+    out = []
+    for k, f in enumerate(world.fish_list()):
+        (px, py, pz), h = world.fish_at(f, 0.0)
+        out.append({"name": "fish%02d" % k, "kind": "procedural",
+                    "position": [round(px, 3), round(py, 3), round(pz, 3)],
+                    "rotation": [0.0, round(math.degrees(h), 3), 0.0], "scale": [round(f[8], 3)] * 3,
+                    "procedural": {
+                        "source": {"kind": "mesh", "asset": "ab-fish-%s.glb" % f[0]}, "distribution": {"kind": "single"},
+                        "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0],
+                                     "emissiveIntensity": 0.0, "roughness": 1.0, "metallic": 0.0, "unlit": True,
+                                     "program": "abFish"},
+                        "castsShadow": False}})
+    return out
 
 
 def bed_node():
@@ -486,9 +507,7 @@ def music_routes(R):
     """The routes that name this module's program ops (music.py adds them to its own)."""
     out = []
     for prog in ROCKS:
-        out += [R("signal.auroraLight", prog.path("auroraGlow"), 0.75),
-                # a crash flares the high sky-facing facets, both banks (white-violet: the route adds to every channel)
-                R("signal.crashGlow", prog.path("crashCrest"), 0.2)]
+        out += [R("signal.auroraLight", prog.path("auroraGlow"), 0.75)]
     L, Rt = ROCK_L, ROCK_R
     out += [
         # LEFT, the bass (pass 6; the Moog's bank before): a fresh set of planes per note (random.bassPick, the stem's
