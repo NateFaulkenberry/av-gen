@@ -31,13 +31,14 @@ using E = EffectInstance;
 #define AVGEN_WAVE_SETC(lhs) +[](E& e, glm::vec3 v) { (lhs) = v; }
 #define AVGEN_WAVE_SETB(lhs) +[](E& e, bool v) { (lhs) = v; }
 
-inline constexpr const char* kPropagationNames[] = {"directional", "radial", "path"};
+inline constexpr const char* kPropagationNames[] = {"directional", "radial", "path", "ball"};
 inline constexpr const char* kDirectionNames[] = {"explicit",       "sourceForward",  "cameraForward",
                                                   "cameraVelocity", "sourceToTarget", "cameraToTarget",
                                                   "blended"};
 
 // ADR-1662: the path rows are written only by a path wave, so no other wave's file changes.
 inline bool isPathWave(const E& e) { return e.wave.propagation.kind == PropagationKind::PathWave; }
+inline bool isLightBall(const E& e) { return e.wave.propagation.kind == PropagationKind::LightBall; }
 
 inline constexpr EffectField kFields[] = {
     colorField("color", "Colour", AVGEN_WAVE_GET(e.wave.appearance.color),
@@ -83,11 +84,13 @@ inline constexpr EffectField kFields[] = {
                 AVGEN_WAVE_GET(static_cast<float>(e.wave.propagation.kind)),
                 +[](E& e, float v) {
                     e.wave.propagation.kind = static_cast<PropagationKind>(
-                        std::clamp(static_cast<int>(v + 0.5f), 0, 2));
+                        std::clamp(static_cast<int>(v + 0.5f), 0, 3));
                 })
         .json("propagation/kind").sec("Propagation")
         .tooltip("Directional: a front sweeping along an axis. Radial: a ring spreading from the source.\n"
-                 "Path: a front travelling along a terrain feature (a river), away from the camera (ADR-1662)."),
+                 "Path: a front travelling along a terrain feature (a river), away from the camera (ADR-1662).\n"
+                 "Ball: a ball of light thrown along an arc from the camera's view, lighting what it passes "
+                 "(ADR-1663)."),
     choiceField("direction", "Direction", kDirectionNames,
                 AVGEN_WAVE_GET(static_cast<float>(e.wave.propagation.direction)),
                 +[](E& e, float v) {
@@ -174,6 +177,62 @@ inline constexpr EffectField kFields[] = {
                AVGEN_WAVE_SETF(e.wave.propagation.path.nearFade)).json("propagation/path/nearFade")
         .fmt("%.0f m").floorAt(0.0f).tooltip("The light fades in over this distance from the camera (0: off).")
         .writtenWhen(isPathWave),
+    // ADR-1663: a path wave's lane and splash
+    floatField("path/lane", "Lane", -500.0f, 500.0f, -150.0f, 150.0f, AVGEN_WAVE_GET(e.wave.propagation.path.lane),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.lane)).json("propagation/path/lane").fmt("%.0f m")
+        .tooltip("Metres across the path from its centreline (+ = right, looking downstream).")
+        .writtenWhen(isPathWave),
+    floatField("path/laneJitter", "Lane jitter", 0.0f, 500.0f, 0.0f, 150.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.laneJitter),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.laneJitter)).json("propagation/path/laneJitter")
+        .fmt("%.0f m").floorAt(0.0f).tooltip("Each hit takes its own lane within +- this, chosen by its launch time.")
+        .writtenWhen(isPathWave),
+    floatField("path/splash", "Splash", 0.0f, 1.0f, 0.0f, 0.4f, AVGEN_WAVE_GET(e.wave.propagation.path.splash),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.splash)).json("propagation/path/splash").floorAt(0.0f)
+        .tooltip("Rings spreading from where the front launched, like something heavy dropped in the water.")
+        .writtenWhen(isPathWave),
+    floatField("path/nearWake", "Near wake", 0.0f, 10.0f, 0.0f, 6.0f, AVGEN_WAVE_GET(e.wave.propagation.path.nearWake),
+               AVGEN_WAVE_SETF(e.wave.propagation.path.nearWake)).json("propagation/path/nearWake").floorAt(0.0f)
+        .tooltip("The ripples are this many times stronger at the camera, back to 1x by 700 m (0: 1x everywhere).")
+        .writtenWhen(isPathWave),
+    // ADR-1663: a light ball's flight (Propagation > Ball)
+    floatField("ball/launchRight", "Launch right", -2000.0f, 2000.0f, -400.0f, 400.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.launch.x), AVGEN_WAVE_SETF(e.wave.propagation.ball.launch.x))
+        .json("propagation/ball/launch/0").sec("Ball").fmt("%.0f m").writtenWhen(isLightBall),
+    floatField("ball/launchUp", "Launch up", -2000.0f, 2000.0f, -200.0f, 400.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.launch.y), AVGEN_WAVE_SETF(e.wave.propagation.ball.launch.y))
+        .json("propagation/ball/launch/1").fmt("%.0f m").writtenWhen(isLightBall),
+    floatField("ball/launchForward", "Launch forward", -2000.0f, 5000.0f, 0.0f, 1000.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.launch.z), AVGEN_WAVE_SETF(e.wave.propagation.ball.launch.z))
+        .json("propagation/ball/launch/2").fmt("%.0f m").writtenWhen(isLightBall),
+    floatField("ball/targetRight", "Target right", -5000.0f, 5000.0f, -1000.0f, 1000.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.target.x), AVGEN_WAVE_SETF(e.wave.propagation.ball.target.x))
+        .json("propagation/ball/target/0").fmt("%.0f m").writtenWhen(isLightBall),
+    floatField("ball/targetUp", "Target up", -2000.0f, 5000.0f, -200.0f, 1000.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.target.y), AVGEN_WAVE_SETF(e.wave.propagation.ball.target.y))
+        .json("propagation/ball/target/1").fmt("%.0f m").writtenWhen(isLightBall),
+    floatField("ball/targetForward", "Target forward", -2000.0f, 20000.0f, 0.0f, 6000.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.target.z), AVGEN_WAVE_SETF(e.wave.propagation.ball.target.z))
+        .json("propagation/ball/target/2").fmt("%.0f m").writtenWhen(isLightBall),
+    floatField("ball/travel", "Flight", 0.05f, 30.0f, 0.2f, 5.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.travel),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.travel)).json("propagation/ball/travel").fmt("%.2f s")
+        .floorAt(0.05f).writtenWhen(isLightBall),
+    floatField("ball/arc", "Arc", 0.0f, 2000.0f, 0.0f, 500.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.arc),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.arc)).json("propagation/ball/arc").fmt("%.0f m").floorAt(0.0f)
+        .writtenWhen(isLightBall),
+    floatField("ball/lightRadius", "Light radius", 1.0f, 5000.0f, 20.0f, 800.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.lightRadius),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.lightRadius))
+        .json("propagation/ball/lightRadius").fmt("%.0f m").floorAt(1.0f).writtenWhen(isLightBall),
+    floatField("ball/range", "Light range", 1.0f, 10000.0f, 50.0f, 3000.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.range), AVGEN_WAVE_SETF(e.wave.propagation.ball.range))
+        .json("propagation/ball/range").fmt("%.0f m").floorAt(1.0f).writtenWhen(isLightBall),
+    floatField("ball/coreSize", "Ball size", 0.0f, 200.0f, 0.5f, 40.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.coreSize), AVGEN_WAVE_SETF(e.wave.propagation.ball.coreSize))
+        .json("propagation/ball/coreSize").fmt("%.1f m").floorAt(0.0f).writtenWhen(isLightBall),
+    floatField("ball/haloSize", "Ball glow", 0.0f, 1000.0f, 0.0f, 200.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.haloSize), AVGEN_WAVE_SETF(e.wave.propagation.ball.haloSize))
+        .json("propagation/ball/haloSize").fmt("%.0f m").floorAt(0.0f).writtenWhen(isLightBall),
     floatField("response/ground", "Ground", 0.0f, 6.0f, 0.0f, 2.0f, AVGEN_WAVE_GET(e.wave.response.ground),
                AVGEN_WAVE_SETF(e.wave.response.ground)).json("response/ground").sec("Surface response")
         .floorAt(0.0f),

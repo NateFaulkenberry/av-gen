@@ -137,6 +137,14 @@ constexpr EffectField kFields[] = {
         .json("shape/ribbonCoverage").clampTo(0.0f, 1.0f)
         .tooltip("How much of the sky the ribbons fill: 0 leaves wide dark gaps between them, 1 lets\n"
                  "them reach across nearly all of it."),
+    // ADR-1664: a phase offset on the folds' churn -- route a swell here for chaos with no jump. Written only when set,
+    // so no file without it changes.
+    floatField("ribbonChurn", "Churn", -1000.0f, 1000.0f, -20.0f, 20.0f, GET(e.aurora.shape.ribbonChurn),
+               SETF(e.aurora.shape.ribbonChurn))
+        .json("shape/ribbonChurn")
+        .tooltip("Turns the ribbons' folds as if time had moved on by this much of their churn; routable\n"
+                 "(a phase, not a speed), so a swell routed here twists the sheets and they unwind as it ends.")
+        .writtenWhen(+[](const E& e) { return e.aurora.shape.ribbonChurn != 0.0f; }),
     // ---- ADR-1652: a travelling pulse through the ribbons (route an envelope onto "pulse").
     floatField("pulse", "Pulse", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.aurora.shape.pulse), SETF(e.aurora.shape.pulse))
         .json("shape/pulse").clampTo(0.0f, 1.0f)

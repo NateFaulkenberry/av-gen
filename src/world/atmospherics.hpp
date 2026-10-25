@@ -253,6 +253,11 @@ struct AuroraShape {
     // ADR-1660: how much of the sky the ribbons fill (0..1). 0 is ADR-1641 exactly; 1 stands the sheets on the
     // footprint noise's mean level, where its level line winds through the whole sky instead of a few loops.
     float ribbonCoverage = 0.0f;
+    // ADR-1664: an offset added to the folds' churn phase (`driftSpeed` x elapsed), in the same units: routable,
+    // because it is a phase and not a speed -- a swell routed here churns the folds as it rises and back as it relaxes,
+    // with no jump (a routed speed multiplies the whole elapsed time, so it jumps the pattern: E4). 0 is the ribbons
+    // exactly.
+    float ribbonChurn = 0.0f;
     // ADR-1652: a travelling pulse through the ribbons, for an accent such as the kick. One front, climbing from the
     // lower rims a curtain height up as `pulse` falls from 1 to 0 (front = 1 - pulse), brightening and widening the
     // sheets where it passes and fading with `pulse`. Route an envelope onto `pulse` (fast attack, a few hundred ms

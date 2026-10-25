@@ -170,7 +170,7 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
     let x = h.lateral / width;
     let across = exp(-x * x);
     let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), dy);
-    let below = 1.0 - smoothstep(e.vertical.x * 0.5, max(e.vertical.x, 1.0e-3), -dy);
+    let below = 1.0 - smoothstep(20.0, 40.0, -dy); // ADR-1663: 40 m below the level (vertical.x is now the age)
     let vband = select(above, below, underneath);
     let source = select(vec3<f32>(h.nearest.x, e.originKind.y + 2.0, h.nearest.y),
                         e.originKind.xyz + vec3<f32>(0.0, 2.0, 0.0), underneath);
@@ -204,7 +204,7 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
     let viewDistance = distance(frame.cameraPos.xyz, worldPos);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let e = frame.waves[i];
-        if (e.originKind.w < 1.5) {
+        if (abs(e.originKind.w - 2.0) > 0.5) { // path waves only
             continue;
         }
         let halo = max(e.vertical.w, 1.0e-3);
@@ -242,9 +242,28 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
 fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
     var g = vec2<f32>(0.0);
     let count = u32(frame.waveCount.x + 0.5);
+    let near = 1.0 - smoothstep(150.0, 700.0, distance(frame.cameraPos.xyz, worldPos));
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let e = frame.waves[i];
-        if (e.originKind.w < 1.5 || e.rainbow.y <= 0.0 || !wavePathNear(e, worldPos.xz, 300.0)) {
+        if (abs(e.originKind.w - 2.0) > 0.5) { // path waves only
+            continue;
+        }
+        // ADR-1663: the splash, rings spreading from where the front launched, as if something heavy had been dropped
+        // in the water there; strongest at once, gone in about two seconds
+        if (e.extra.z > 0.0) {
+            let age = e.vertical.x;
+            let r = distance(worldPos.xz, e.extra.xy);
+            let front = 25.0 + 170.0 * age;
+            if (r < front + 40.0) {
+                let pp = worldPos.xz;
+                let wobble = 1.6 * sin(pp.x * 0.031 + pp.y * 0.027);
+                let rings = cos(kWaveTau / 22.0 * (r - 170.0 * age) + wobble);
+                let shape = smoothstep(front + 40.0, front, r) * exp(-age / 0.8);
+                let away = (pp - e.extra.xy) / max(r, 1.0e-3);
+                g = g + away * (e.extra.z * shape * rings);
+            }
+        }
+        if (e.rainbow.y <= 0.0 || !wavePathNear(e, worldPos.xz, 300.0)) {
             continue;
         }
         let h = wavePathHit(e, worldPos.xz);
@@ -263,9 +282,29 @@ fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
                                                        sin(p.y * 0.039 + sin(p.x * 0.017) * 2.2));
         let phase = kWaveTau / 14.0 * (d - 260.0 * tau) + 2.4 * sin(p.x * 0.019 + p.y * 0.023);
         let radial = (p - h.nearest) / max(d, 1.0e-3);
-        g = g + radial * (e.rainbow.y * decay * broken * cos(phase));
+        // ADR-1663: the wake heavier near the camera (extra.w times at the camera, 1x by 700 m)
+        let gain = 1.0 + e.extra.w * near;
+        g = g + radial * (e.rainbow.y * gain * decay * broken * cos(phase));
     }
     return g;
+}
+
+
+// ---- ADR-1663: light balls -------------------------------------------------------------------------
+
+// The light a ball casts on a surface: falling to half at `color.w` metres, cut from 70% to 100% of its range, and
+// weighted by how squarely the surface faces it (a little reaches every surface, so a facet turned away still
+// shows the ball has passed). Facets, the riverbed through the water, and the water itself all take it.
+fn waveBallLight(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
+    let toBall = e.originKind.xyz - worldPos;
+    let d = length(toBall);
+    if (d > e.shape.y) {
+        return vec3<f32>(0.0);
+    }
+    let r = d / max(e.color.w, 1.0e-3);
+    let fall = (1.0 / (1.0 + r * r)) * (1.0 - smoothstep(e.shape.y * 0.7, e.shape.y, d));
+    let facing = max(dot(normal, toBall / max(d, 1.0e-3)), 0.0);
+    return e.color.rgb * (fall * (0.12 + 0.88 * facing));
 }
 
 fn wavesAt(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>) -> WaveResult {
@@ -285,6 +324,13 @@ fn wavesAtSurface(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>, o
     let viewDistance = distance(frame.cameraPos.xyz, worldPos);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let e = frame.waves[i];
+        if (e.originKind.w > 2.5) { // ADR-1663: a light ball
+            out.radiance = out.radiance + waveBallLight(e, worldPos, normal) * waveGain(e.response, normal);
+            let toP = worldPos - frame.cameraPos.xyz;
+            let dist = length(toP);
+            out.radiance = out.radiance + waveBallGlow(e, frame.cameraPos.xyz, toP / max(dist, 1.0e-3), dist);
+            continue;
+        }
         if (e.originKind.w > 1.5) { // ADR-1662: a path wave
             if (!onWater) {
                 let land = wavePathLand(e, worldPos, normal, viewDistance);

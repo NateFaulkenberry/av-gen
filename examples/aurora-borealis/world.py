@@ -48,7 +48,9 @@ def _bends(count=7):
     for i in range(count):
         c = TAU * (i + 0.5 + 0.35 * (_h(i, 1) - 0.5)) / count
         half = 0.11 + 0.06 * _h(i, 2)              # 0.11-0.17 rad: 330-510 m either side of the apex
-        amp = (95.0 + 85.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
+        # pass 4 (owner): "a mostly straight river with some very slight bends" -- the hard bends hid the left
+        # mountains, the Moog's stage. 18-38 m swings (were 95-180 m) over the same 330-510 m half-lengths
+        amp = (18.0 + 20.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
         out.append((c, half, amp))
     return out
 

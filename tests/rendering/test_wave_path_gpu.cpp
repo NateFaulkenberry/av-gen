@@ -276,3 +276,41 @@ TEST_CASE("ADR-1662: with no path wave lit the water is byte-identical to the sh
     }
     CHECK(bench.ctx->errorCount() == 0);
 }
+
+// ADR-1663: a light ball lights the ground under it (a point light on every surface, by facing) and draws its core
+// where it stands in front of the ground; with no ball the frame is the ground's.
+TEST_CASE("ADR-1663: a light ball lights the ground below it and shows its core in front of it",
+          "[gpu][waves][adr1663]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    scene::Scene scene = groundScene();
+    const FrameTime time{.renderTime = 1.0, .deltaTime = 1.0 / 60.0, .frameIndex = 1};
+    const auto render = [&](const scene::Scene& s) {
+        auto image = renderer.renderToImage(s, time, kW, kH);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+    const gpu::Image8 dark = render(scene);
+    world::WaveGpu ball{};
+    ball.originKind = {-30.0f, 12.0f, 20.0f, 3.0f};
+    ball.axisFront = {0.0f, 0.0f, -1.0f, 0.0f};
+    ball.color = {3.0f, 2.0f, 3.0f, 30.0f};    // the light, half radius 30 m
+    ball.edge = {20.0f, 20.0f, 20.0f, 3.0f};   // the core, radius 3 m
+    ball.shape = {12.0f, 400.0f, 0.0f, 0.0f};  // halo 12 m, range 400 m
+    ball.response = {1.0f, 1.0f, 1.0f, 0.0f};
+    scene.waves.count = 1;
+    scene.waves.effects[0] = ball;
+    const gpu::Image8 lit = render(scene);
+    const double under = lumaAt(lit, scene, {-30.0f, 0.0f, 20.0f}) - lumaAt(dark, scene, {-30.0f, 0.0f, 20.0f});
+    const double far = lumaAt(lit, scene, {45.0f, 0.0f, -45.0f}) - lumaAt(dark, scene, {45.0f, 0.0f, -45.0f});
+    INFO("luma gained under the ball " << under << ", far from it " << far);
+    CHECK(under > 30.0);
+    CHECK(under > 4.0 * std::max(far, 1.0));
+    // the core: the pixel the ball itself projects to is near white
+    CHECK(lumaAt(lit, scene, glm::vec3(ball.originKind)) > 200.0);
+    scene.waves = world::WaveFrame{};
+    CHECK(gpu::hashImage(render(scene)) == gpu::hashImage(dark));
+    CHECK(ctx->errorCount() == 0);
+}

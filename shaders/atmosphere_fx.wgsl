@@ -425,7 +425,7 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
     var transmit = 1.0;
     let onset = max(0.015, 1.5 * dy / height);       // the rim's onset, in curtain heights
     let off = vec2<f32>(a.flow.x, a.flow.x * 0.37); // the whole pattern drifting
-    let churn = a.flow.y;                            // its folds churning
+    let churn = a.flow.y + a.audio3.z;               // its folds churning (ADR-1664: + a routable phase offset)
     let foldAmount = clamp(a.shape.z + a.audio.z * midBand, 0.0, 1.5);
     for (var k = 0; k < steps; k = k + 1) {
         let y = baseY + (f32(k) + jitter) * dy;
@@ -540,7 +540,7 @@ fn atmosAuroraRibbonsPulsed(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter
     var transmit = 1.0;
     let onset = max(0.015, 1.5 * dy / height);       // the rim's onset, in curtain heights
     let off = vec2<f32>(a.flow.x, a.flow.x * 0.37); // the whole pattern drifting
-    let churn = a.flow.y;                            // its folds churning
+    let churn = a.flow.y + a.audio3.z;               // its folds churning (ADR-1664: + a routable phase offset)
     let foldAmount = clamp(a.shape.z + a.audio.z * midBand, 0.0, 1.5);
     for (var k = 0; k < steps; k = k + 1) {
         let y = baseY + (f32(k) + jitter) * dy;
@@ -811,5 +811,11 @@ fn atmosphereSkyAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosResult
     var out: AtmosResult;
     out.radiance = comets.radiance + aurora.radiance;
     out.bloom = max(comets.bloom, aurora.bloom);
+    // ADR-1663: a light ball against the sky (its glow on surfaces is wave_effects.wgsl's)
+    if (frame.waveCount.x > 0.5) {
+        let ball = wavesBallSky(ro, rd);
+        out.radiance = out.radiance + ball;
+        out.bloom = max(out.bloom, clamp(dot(ball, vec3<f32>(0.2126, 0.7152, 0.0722)) * 0.6, 0.0, 1.0));
+    }
     return out;
 }

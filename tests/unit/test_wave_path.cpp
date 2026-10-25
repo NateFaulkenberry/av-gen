@@ -238,7 +238,8 @@ TEST_CASE("ADR-1662: a path wave packs its chain and shape; every other wave pac
     CHECK(g.originKind == glm::vec4(1000.0f, 0.0f, 300.0f, 2.0f));
     CHECK(g.axisFront == glm::vec4(0.0f, 0.0f, 1.0f, 1300.0f));
     CHECK(g.shape == glm::vec4(10.0f, 500.0f, 300.0f, beam.wave.propagation.falloff));
-    CHECK(g.vertical == glm::vec4(25.0f, 90.0f, 260.0f, 35.0f));
+    CHECK_THAT(g.vertical.x, WithinAbs(1.2, 1e-6)); // ADR-1663: seconds since launch
+    CHECK(glm::vec3(g.vertical.y, g.vertical.z, g.vertical.w) == glm::vec3(90.0f, 260.0f, 35.0f));
     CHECK(g.color == glm::vec4(2.0f, 0.4f, 1.2f, 6.0f));
     CHECK(g.edge.w == 10.0f);
     CHECK(g.rainbow.x == 0.625f);
@@ -299,4 +300,101 @@ TEST_CASE("ADR-1662: a path wave's JSON carries its path; no other wave's file c
     CHECK(back->wave.propagation.path.coreOffset == 10.0f);
     CHECK(back->wave.propagation.path.disturb == 0.04f);
     CHECK(back->toJson() == bj);
+}
+
+TEST_CASE("ADR-1663: a path wave runs on its lane, each hit keeps its jittered lane, and packs its splash",
+          "[world][effects][waves][adr1663]") {
+    const PathScene scene;
+    world::EffectInstance beam = pathWave();
+    beam.wave.propagation.path.lane = 40.0f;
+    beam.wave.propagation.path.splash = 0.3f;
+    beam.wave.propagation.path.nearWake = 3.0f;
+    // on the first leg, downstream is +x: its right (forward x up, the engine's convention) is +z
+    const auto r = world::resolveWave(beam, at(0.5, scene));
+    REQUIRE(r.has_value());
+    CHECK_THAT(r->origin.x, WithinAbs(600.0, 1e-2));
+    CHECK_THAT(r->origin.z, WithinAbs(40.0, 1e-2));
+    for (const glm::vec2& p : r->path) {
+        CHECK_THAT(offPolyline(kL, p), WithinAbs(40.0, 0.5)); // every chain point 40 m off the centreline
+    }
+    CHECK(r->launch == glm::vec2(100.0f, 40.0f));       // the start offset, on the lane
+    const world::WaveGpu g = world::packWave(*r);
+    CHECK(g.extra == glm::vec4(100.0f, 40.0f, 0.3f, 3.0f));
+    // past the bend (downstream +z), right is -x
+    const auto r2 = world::resolveWave(beam, at(1.2, scene));
+    REQUIRE(r2.has_value());
+    CHECK_THAT(r2->origin.x, WithinAbs(960.0, 1e-2));
+    // a jittered lane: fixed per hit (the launch second), within the jitter, and seek equals play
+    world::EffectInstance jit = pathWave();
+    jit.wave.propagation.path.laneJitter = 60.0f;
+    const auto j1 = world::resolveWave(jit, at(0.5, scene));
+    const auto j2 = world::resolveWave(jit, at(0.9, scene));
+    REQUIRE(j1.has_value());
+    REQUIRE(j2.has_value());
+    CHECK(std::abs(j1->origin.z) <= 60.0f);
+    CHECK_THAT(j1->origin.z, WithinAbs(j2->origin.z, 1e-3)); // the same hit stays on its lane
+    // other kinds leave `extra` zero
+    world::EffectInstance ring = world::makeEffect(world::EffectKind::GroundPulse, "ring");
+    world::ResolvedWave rw;
+    rw.effect = &ring;
+    CHECK(world::packWave(rw).extra == glm::vec4(0.0f));
+}
+
+TEST_CASE("ADR-1663: a light ball flies its camera-relative arc and packs its light and core",
+          "[world][effects][waves][adr1663]") {
+    const PathScene scene;
+    world::EffectInstance ball = world::makeEffect(world::EffectKind::GroundPulse, "ball");
+    ball.activation = world::Activation::Always;
+    ball.timing = world::Timing{};
+    ball.timing.fadeIn = 0.0;
+    ball.timing.fadeOut = 0.0;
+    ball.wave.source.kind = world::SourceKind::Camera;
+    ball.wave.propagation.kind = world::PropagationKind::LightBall;
+    ball.wave.propagation.path.ease = 0.0f;
+    world::BallShape& b = ball.wave.propagation.ball;
+    b.launch = {-70.0f, -60.0f, 200.0f};
+    b.target = {50.0f, 140.0f, 2200.0f};
+    b.travel = 1.0f;
+    b.arc = 100.0f;
+    b.lightRadius = 250.0f;
+    b.range = 1200.0f;
+    b.coreSize = 8.0f;
+    b.haloSize = 50.0f;
+    ball.wave.appearance.color = {1.0f, 0.5f, 0.8f};
+    ball.wave.appearance.intensity = 6.0f;
+    ball.wave.appearance.edgeColor = {1.0f, 1.0f, 1.0f};
+    ball.wave.appearance.edgeIntensity = 30.0f;
+    REQUIRE(ball.wave.validate().has_value());
+    // the camera at the origin looking down -z: right is +x
+    const glm::vec3 cam{0.0f, 65.0f, 0.0f};
+    const glm::vec3 fwd{0.0f, 0.0f, -1.0f};
+    const auto start = world::resolveWave(ball, at(1.0e-4, scene, cam, fwd));
+    REQUIRE(start.has_value());
+    CHECK_THAT(start->origin.x, WithinAbs(-70.0, 0.05));
+    CHECK_THAT(start->origin.y, WithinAbs(5.0, 0.1));
+    CHECK_THAT(start->origin.z, WithinAbs(-200.0, 0.3));
+    const auto mid = world::resolveWave(ball, at(0.5, scene, cam, fwd));
+    REQUIRE(mid.has_value());
+    CHECK_THAT(mid->origin.y, WithinAbs(65.0 + 40.0 + 100.0, 1e-2)); // the chord's midpoint, bowed up 100 m
+    CHECK_THAT(mid->origin.z, WithinAbs(-1200.0, 1e-2));
+    const auto end = world::resolveWave(ball, at(3.0, scene, cam, fwd));
+    REQUIRE(end.has_value());
+    CHECK_THAT(end->origin.x, WithinAbs(50.0, 1e-3)); // holds at the target
+    const world::WaveGpu g = world::packWave(*mid);
+    CHECK(g.originKind.w == 3.0f);
+    CHECK(g.color == glm::vec4(6.0f, 3.0f, 4.8f, 250.0f));
+    CHECK(g.edge == glm::vec4(30.0f, 30.0f, 30.0f, 8.0f));
+    CHECK(g.shape == glm::vec4(50.0f, 1200.0f, 0.0f, 0.0f));
+    for (const glm::vec4& v : g.path) {
+        CHECK(v == glm::vec4(0.0f));
+    }
+    // JSON: the flight round-trips; a ball writes no path rows and a path wave no ball rows
+    const nlohmann::json j = ball.toJson();
+    CHECK(j.at("parameters").at("propagation").at("kind") == "ball");
+    CHECK_FALSE(j.at("parameters").at("propagation").contains("path"));
+    const auto back = world::EffectInstance::fromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->wave.propagation.ball.target == b.target);
+    CHECK(back->wave.propagation.ball.arc == 100.0f);
+    CHECK_FALSE(pathWave().toJson().at("parameters").at("propagation").contains("ball"));
 }

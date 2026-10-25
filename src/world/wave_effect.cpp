@@ -63,6 +63,7 @@ const char* propagationKindName(PropagationKind k) {
     case PropagationKind::DirectionalWave: return "directional";
     case PropagationKind::RadialWave: return "radial";
     case PropagationKind::PathWave: return "path";
+    case PropagationKind::LightBall: return "ball";
     }
     return "radial";
 }
@@ -75,6 +76,9 @@ std::optional<PropagationKind> propagationKindFromName(std::string_view name) {
     }
     if (name == "path" || name == "pathWave") {
         return PropagationKind::PathWave;
+    }
+    if (name == "ball" || name == "lightBall") {
+        return PropagationKind::LightBall;
     }
     return std::nullopt;
 }
@@ -153,7 +157,7 @@ Result<void> Propagation::validate() const {
         // finds nothing to travel along, as a FocusHero source with nothing spotlit.
         const PathShape& q = path;
         for (const float v : {q.ease, q.wakeGrowth, q.coreWidth, q.coreOffset, q.haloWidth, q.reach, q.reachHeight,
-                              q.land, q.bed, q.embed, q.disturb, q.nearFade}) {
+                              q.land, q.bed, q.embed, q.disturb, q.nearFade, q.laneJitter, q.splash, q.nearWake}) {
             if (!(v >= 0.0f) || !finite(v)) {
                 return fail("a path wave's shape values must be finite and not negative");
             }
@@ -163,6 +167,25 @@ Result<void> Propagation::validate() const {
         }
         if (!(q.coreWidth > 0.0f)) {
             return fail("a path wave's core width must be positive");
+        }
+        if (!finite(q.lane)) {
+            return fail("a path wave's lane must be finite");
+        }
+    }
+    if (kind == PropagationKind::LightBall) {
+        const BallShape& b = ball;
+        for (const float v : {b.travel, b.arc, b.lightRadius, b.range, b.coreSize, b.haloSize}) {
+            if (!(v >= 0.0f) || !finite(v)) {
+                return fail("a light ball's flight and sizes must be finite and not negative");
+            }
+        }
+        if (!(b.travel > 0.0f) || !(b.lightRadius > 0.0f) || !(b.range > 0.0f)) {
+            return fail("a light ball's travel, light radius and range must be positive");
+        }
+        for (const glm::vec3& v : {b.launch, b.target}) {
+            if (!finite(v.x) || !finite(v.y) || !finite(v.z)) {
+                return fail("a light ball's launch and target must be finite");
+            }
         }
     }
     return {};
@@ -708,16 +731,70 @@ std::optional<ResolvedWave> resolvePathFront(const EffectInstance& instance, con
     const glm::vec2 frontXZ = geom.pointAt(sFront, &tanF);
     r.axis = glm::vec3(tanF.x * dir, 0.0f, tanF.y * dir);
     r.origin = glm::vec3(frontXZ.x, r.origin.y, frontXZ.y);
+    // ADR-1663: the hit's lane, metres across the path (+ = right looking downstream), with a per-hit jitter from a
+    // hash of its launch second, so each hit keeps its lane for its whole life and a seek finds the same one
+    float lane = q.lane;
+    if (q.laneJitter > 0.0f) {
+        std::uint32_t h = static_cast<std::uint32_t>(static_cast<std::int64_t>(std::llround(window.start * 1000.0)));
+        h = (h ^ 61u) ^ (h >> 16);
+        h *= 9u;
+        h ^= h >> 4;
+        h *= 0x27d4eb2du;
+        h ^= h >> 15;
+        lane += (static_cast<float>(h & 0xFFFFu) / 65535.0f * 2.0f - 1.0f) * q.laneJitter;
+    }
+    const auto onLane = [&](float arc) {
+        glm::vec2 t{0.0f, 1.0f};
+        const glm::vec2 p = geom.pointAt(arc, &t);
+        return p + glm::vec2(-t.y, t.x) * (lane * dir); // the right-hand normal of the downstream direction
+    };
     // ahead of the front by the leading edge, at it, then back along the wake (fractions of it)
     const float lead = 2.0f * e.propagation.frontWidth * w + 4.0f;
     constexpr std::array<float, kPathChainPoints> kBack{0.0f, 0.0f, 0.05f, 0.13f, 0.26f, 0.45f, 0.7f, 1.0f};
     for (std::size_t i = 0; i < kPathChainPoints; ++i) {
         const float offset = i == 0 ? lead : -kBack[i] * r.wake;
-        r.path[i] = geom.pointAt(sFront + dir * offset);
+        r.path[i] = lane == 0.0f ? geom.pointAt(sFront + dir * offset) : onLane(sFront + dir * offset);
     }
+    if (lane != 0.0f) {
+        const glm::vec2 f = onLane(sFront);
+        r.origin = glm::vec3(f.x, r.origin.y, f.y);
+    }
+    r.launch = lane == 0.0f ? geom.pointAt(s0 + dir * e.propagation.startOffset)
+                            : onLane(s0 + dir * e.propagation.startOffset);
     if (accent != nullptr && !e.appearance.rainbow && e.appearance.color == glm::vec3(1.0f)) {
         r.color = *accent;
     }
+    return r;
+}
+
+// ADR-1663. A LightBall: `pass` seconds after its launch. The launch and target are offsets in the current camera's
+// frame (right, up, forward); the ball flies the chord between them, eased, bowed up by `arc`, then holds while
+// the instance's fade takes it.
+std::optional<ResolvedWave> resolveBallFront(const EffectInstance& instance, const EffectContext& ctx, double pass,
+                                             float envelope) {
+    const WaveEffect& e = instance.wave;
+    const BallShape& b = e.propagation.ball;
+    const glm::vec3 fwd = safeNormalize(ctx.cameraForward, glm::vec3(0.0f, 0.0f, -1.0f));
+    const glm::vec3 right = safeNormalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(1.0f, 0.0f, 0.0f));
+    const glm::vec3 up = glm::cross(right, fwd);
+    const auto place = [&](const glm::vec3& o) { return ctx.cameraPosition + right * o.x + up * o.y + fwd * o.z; };
+    const glm::vec3 p0 = place(b.launch);
+    const glm::vec3 p1 = place(b.target);
+    const float a = std::clamp(static_cast<float>(pass) / std::max(b.travel, kEps), 0.0f, 1.0f);
+    const float ease = std::clamp(e.propagation.path.ease, 0.0f, 1.0f);
+    const float u = (1.0f - ease) * a + ease * (1.0f - (1.0f - a) * (1.0f - a));
+    ResolvedWave r;
+    r.effect = &instance;
+    r.envelope = envelope;
+    r.elapsed = pass;
+    r.seconds = ctx.seconds;
+    r.origin = glm::mix(p0, p1, u) + glm::vec3(0.0f, 4.0f * b.arc * u * (1.0f - u), 0.0f);
+    const float du = 1.0e-3f;
+    const float u2 = std::min(u + du, 1.0f);
+    const glm::vec3 ahead = glm::mix(p0, p1, u2) + glm::vec3(0.0f, 4.0f * b.arc * u2 * (1.0f - u2), 0.0f);
+    r.axis = safeNormalize(ahead - r.origin, safeNormalize(p1 - p0, fwd));
+    r.frontDistance = glm::distance(p0, r.origin);
+    r.color = e.appearance.color;
     return r;
 }
 
@@ -756,6 +833,9 @@ std::optional<ResolvedWave> resolveFront(const EffectInstance& instance, const E
     const double pass = timing.repeatSeconds > 0.0 ? std::fmod(local, timing.repeatSeconds) : local;
     if (e.propagation.kind == PropagationKind::PathWave) {
         return resolvePathFront(instance, ctx, window, pass, envelope);
+    }
+    if (e.propagation.kind == PropagationKind::LightBall) {
+        return resolveBallFront(instance, ctx, pass, envelope);
     }
     const float front = e.propagation.startOffset + e.propagation.speed * static_cast<float>(pass);
     if (front > e.propagation.range + e.propagation.trailLength * e.appearance.width) {
@@ -918,6 +998,20 @@ WaveGpu packWave(const ResolvedWave& r) {
         for (std::size_t i = 0; i < 4; ++i) {
             g.path[i] = glm::vec4(r.path[2 * i], r.path[2 * i + 1]);
         }
+        // ADR-1663: seconds since launch (the light's depth below the level is fixed at 40 m), the splash and the
+        // near-wake gain
+        g.vertical.x = static_cast<float>(r.elapsed);
+        g.extra = glm::vec4(r.launch, q.splash * r.envelope, q.nearWake);
+    }
+    if (e.propagation.kind == PropagationKind::LightBall) {
+        const BallShape& b = e.propagation.ball;
+        g.axisFront = glm::vec4(r.axis, 0.0f);
+        g.shape = glm::vec4(b.haloSize * w, b.range, 0.0f, 0.0f);
+        g.vertical = glm::vec4(0.0f);
+        g.color.w = b.lightRadius;
+        g.edge = glm::vec4(e.appearance.edgeColor * e.appearance.edgeIntensity * r.envelope, b.coreSize * w);
+        g.rainbow = glm::vec4(0.0f);
+        g.sparkle = glm::vec4(0.0f);
     }
     return g;
 }

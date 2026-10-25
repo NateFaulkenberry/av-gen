@@ -16,7 +16,7 @@ struct Light {
 // wave_effects.wgsl; the layout lives here because it is part of the frame block. A path wave (kind 2, ADR-1662)
 // re-reads most lanes: see world::WaveGpu's table.
 struct Wave {
-    originKind: vec4<f32>, // xyz = origin (world), w = kind (0 directional, 1 radial, 2 path)
+    originKind: vec4<f32>, // xyz = origin (world), w = kind (0 directional, 1 radial, 2 path, 3 light ball)
     axisFront: vec4<f32>,  // xyz = unit axis (directional only), w = metres the front has travelled
     shape: vec4<f32>,      // x = front width, y = trail length, z = range, w = trail falloff exponent
     vertical: vec4<f32>,   // x = vertical half-extent, y = growth per metre travelled,
@@ -28,6 +28,7 @@ struct Wave {
     sparkle: vec4<f32>,    // x = cells per metre (0 = off), y = size, z = intensity, w = twinkle phase
     response: vec4<f32>,   // x = ground, y = foliage (the scatter), z = surface, w = emissive gain
     path: array<vec4<f32>, 4>, // ADR-1662: a path wave's chain, two xz points per vec4 (ahead, at the front, the wake)
+    extra: vec4<f32>,          // ADR-1663: a path wave's launch point (xz), splash slope, near-wake gain
 };
 
 // ADR-230 atmospheric effects. Mirrors world::CometGpu / world::AuroraGpu; the C++ side asserts
@@ -63,7 +64,7 @@ struct AtmosAurora {
     band1: vec4<f32>,   // bins 4..7
     band2: vec4<f32>,   // bins 8..11
     band3: vec4<f32>,   // bins 12..15
-    audio3: vec4<f32>,  // ADR-939: x = the glints' high-band depth, already sensitised; ADR-1660: y = ribbon coverage; zw = 0
+    audio3: vec4<f32>,  // ADR-939: x = glints' high-band depth; ADR-1660: y = ribbon coverage; ADR-1664: z = churn; w = 0
     ribbon0: vec4<f32>, // ADR-1641: x = 1 ribbons / 0 curtains, y = altitude above the anchor (m), z = planes, w = fold (m)
     ribbon1: vec4<f32>, // ADR-1641: x = sheet width, y = swirl, z = lower-rim variation, w = fade distance (m)
     ribbon2: vec4<f32>, // ADR-1652: x = pulse (0 = none), y = its brightness gain, z = its widening, w = front width
@@ -261,6 +262,38 @@ struct EntityFx {
 // FXL's `fxA`/`fxB` (the struct is 448 of its 512-byte slot). Four remain, so ADR-135's `tiering`
 // lane still fits without growing the stride. (ADR-1071 then took the last three; ADR-1143 grew the
 // stride to 768 bytes, so a per-draw tier lane now fits again.)
+// ADR-1663: the visible ball of a light-ball wave, seen along the ray `ro + rd t` for t in (0, maxT): a tight core and a
+// soft glow by how close the ray passes the ball. Shared by the surfaces (wave_effects.wgsl, maxT = the surface's
+// distance, so the ball is hidden behind what it flies behind) and the sky (atmosphere_fx.wgsl, unbounded). The core
+// never shrinks under about a pixel and a half at 1080p, so a far ball does not vanish.
+fn waveBallGlow(e: Wave, ro: vec3<f32>, rd: vec3<f32>, maxT: f32) -> vec3<f32> {
+    let t = dot(e.originKind.xyz - ro, rd);
+    if (t <= 0.0 || t > maxT) {
+        return vec3<f32>(0.0);
+    }
+    let d = distance(e.originKind.xyz, ro + rd * t);
+    let core = max(e.edge.w, t * 0.0012);
+    let halo = max(e.shape.x, core * 3.0);
+    if (d > halo * 3.0) {
+        return vec3<f32>(0.0);
+    }
+    let c = d / core;
+    let h = d / halo;
+    return e.edge.rgb * (exp(-c * c) + 0.12 * exp(-h * h));
+}
+
+fn wavesBallSky(ro: vec3<f32>, rd: vec3<f32>) -> vec3<f32> {
+    var out = vec3<f32>(0.0);
+    let count = u32(frame.waveCount.x + 0.5);
+    for (var i: u32 = 0u; i < count; i = i + 1u) {
+        let e = frame.waves[i];
+        if (e.originKind.w > 2.5) {
+            out = out + waveBallGlow(e, ro, rd, 1.0e9);
+        }
+    }
+    return out;
+}
+
 fn materialTierOf() -> u32 {
     return u32(frame.materialTier.x + 0.5);
 }

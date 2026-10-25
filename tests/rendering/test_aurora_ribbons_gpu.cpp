@@ -214,6 +214,21 @@ TEST_CASE("the aurora's ribbon coverage fills the gaps between the sheets (ADR-1
     CHECK(h.ctx->errorCount() == 0);
 }
 
+// ADR-1664: churn 0 is the ribbons hash for hash; a churn offset turns the folds (the sky changes) without changing how
+// much of it is lit by more than a fraction.
+TEST_CASE("aurora ribbons: the churn offset at 0 is the ribbons exactly, and turns the folds when set",
+          "[gpu][atmospherics][aurora][adr1664]") {
+    Harness h;
+    const gpu::Image8 base = h.render(aurora(true));
+    world::EffectInstance zero = aurora(true);
+    zero.aurora.shape.ribbonChurn = 0.0f;
+    CHECK(gpu::hashImage(h.render(zero)) == gpu::hashImage(base));
+    world::EffectInstance turned = aurora(true);
+    turned.aurora.shape.ribbonChurn = 12.0f;
+    CHECK(gpu::hashImage(h.render(turned)) != gpu::hashImage(base));
+    CHECK(h.ctx->errorCount() == 0);
+}
+
 // Hidden ([.]): the ribbons' cost at 1080p (honest timestamps, ADR-1600): no aurora, the curtains (three shells),
 // ribbons at 24 and at 48 planes, interleaved over 4 reps of 100 frames; the GPU frame's median.
 TEST_CASE("aurora ribbons: cost (measure)", "[.][gpu][atmospherics][aurora][measure][adr1641]") {

@@ -80,6 +80,7 @@ enum class PropagationKind : std::uint8_t {
     DirectionalWave, // distance measured along an axis from the origin: a front sweeping the world
     RadialWave,      // distance measured as a radius in the ground plane: a ripple
     PathWave,        // ADR-1662: distance measured along a terrain feature's polyline: light down a river
+    LightBall,       // ADR-1663: a ball of light thrown along a camera-relative arc, lighting what it passes
 };
 [[nodiscard]] const char* propagationKindName(PropagationKind k);
 [[nodiscard]] std::optional<PropagationKind> propagationKindFromName(std::string_view name);
@@ -151,6 +152,29 @@ struct PathShape {
     float embed = 0.625f;      // on water: the share of the light drawn under the reflection (the rest on top)
     float disturb = 0.0f;      // on water: the wake's ripple slope behind the front (0 = the mirror untouched)
     float nearFade = 0.0f;     // metres from the camera inside which the light fades in (0 = off)
+    // ADR-1663 (pass 4): the lane -- metres across the path from its centreline (+ = right, looking downstream),
+    // plus up to +-laneJitter metres chosen per hit (a hash of the hit's launch time: seek equals play) -- and the
+    // splash: rings spreading from where the front launched (`splash` is their slope; 0 = none), and the wake's
+    // ripples scaled up near the camera (`nearWake` times at the camera, fading to 1x by 700 m; 0 = 1x everywhere).
+    float lane = 0.0f;
+    float laneJitter = 0.0f;
+    float splash = 0.0f;
+    float nearWake = 0.0f;
+};
+
+// ADR-1663: a LightBall's flight. Launch and target are offsets in the camera's own frame (right, up, forward, in
+// metres), taken from the camera of the current frame, so a ball thrown "from the near left bank into the canyon"
+// is that wherever the camera is. The ball flies between them in `travel` seconds, eased by the propagation's
+// `path.ease`, bowed up by `arc` metres at mid-flight; then holds while the instance fades it.
+struct BallShape {
+    glm::vec3 launch{-70.0f, -60.0f, 220.0f};
+    glm::vec3 target{60.0f, 140.0f, 2400.0f};
+    float travel = 1.2f;       // seconds
+    float arc = 120.0f;        // metres of upward bow at mid-flight
+    float lightRadius = 260.0f;// metres: where the light on surfaces has fallen to half
+    float range = 1200.0f;     // metres: past this the light is cut (faded from 70%)
+    float coreSize = 7.0f;     // metres: the visible ball's radius
+    float haloSize = 60.0f;    // metres: its glow
 };
 
 struct Propagation {
@@ -185,6 +209,7 @@ struct Propagation {
     float beamRadius = 0.0f;
 
     PathShape path; // ADR-1662: PathWave only
+    BallShape ball; // ADR-1663: LightBall only
 
     [[nodiscard]] Result<void> validate() const;
 };
@@ -262,18 +287,25 @@ enum class EffectStatus : std::uint8_t;
 // Mirrors `Wave` in shaders/common.wgsl. 208 bytes (ADR-1662: 144 + the path chain); see ADR-207 for
 // why it lives in FrameUniforms rather than in a buffer of its own.
 //
-// A PathWave (kind 2) re-reads the lanes it has no use for (ADR-1662):
+// A PathWave (kind 2) re-reads the lanes it has no use for (ADR-1662; ADR-1663 added the lane, the splash and `extra`):
 //   originKind  xyz = the front's point on the path (at the source's height), w = 2
 //   axisFront   xyz = the path's unit tangent at the front (downstream), w = metres travelled
 //   shape       x = leading-edge width, y = wake length, z = near fade (m), w = wake falloff exponent
-//   vertical    x = metres below the path's level the light reaches (a riverbed), y = metres above it the
+//   vertical    x = seconds since launch (ADR-1663; the light reaches 40 m below the level), y = metres above it the
 //               land light reaches, z = land reach across the path (m), w = halo width (m)
 //   color       rgb = core radiance (envelope folded in), w = core half-width (m)
 //   edge        rgb = leading-edge radiance (envelope folded in), w = twin offset (m; 0 = one core)
 //   rainbow     x = embed share, y = disturbance slope (envelope folded in), z = land share, w = bed share
 //   sparkle     x = 0, y = the front's speed now (m/s), z = its mean speed (m/s), w = 0
 //   path        eight xz points round the front, the first `lead` ahead of it, the second AT it, the rest
-//               back along the wake; every other kind leaves them zero.
+//               back along the wake (on the hit's lane); every other kind leaves them zero.
+//   extra       xy = the launch point (xz, on the lane), z = the splash's slope (envelope folded in),
+//               w = near-wake gain
+// A LightBall (kind 3, ADR-1663):
+//   originKind  xyz = the ball, w = 3;   axisFront xyz = its direction of flight
+//   color       rgb = the light it casts (intensity and envelope folded in), w = the light's half radius (m)
+//   edge        rgb = the visible core's radiance (edge colour x edge intensity x envelope), w = core radius (m)
+//   shape       x = halo radius (m), y = range (m);   response as every kind
 struct WaveGpu {
     glm::vec4 originKind{0.0f};   // xyz = origin (world), w = PropagationKind
     glm::vec4 axisFront{0.0f};    // xyz = unit axis (directional), w = how far the front has travelled
@@ -288,8 +320,9 @@ struct WaveGpu {
                                   // w = twinkle phase
     glm::vec4 response{0.0f};     // x = ground, y = foliage, z = surface, w = emissive amplification
     glm::vec4 path[4]{};          // ADR-1662: PathWave's chain, two xz points per vec4; zero otherwise
+    glm::vec4 extra{0.0f};        // ADR-1663: PathWave's launch point, splash and near-wake gain; zero otherwise
 };
-static_assert(sizeof(WaveGpu) == 208);
+static_assert(sizeof(WaveGpu) == 224);
 inline constexpr std::size_t kPathChainPoints = 8;
 
 // What one frame hands the renderer. A plain array so nothing allocates and so `scene::Scene` can
@@ -313,6 +346,7 @@ struct ResolvedWave {
     // ADR-1662, PathWave only: the chain round the front (`kPathChainPoints` xz points, see WaveGpu), the
     // wake's length, the front's speed now and its mean, and the transport second.
     std::array<glm::vec2, kPathChainPoints> path{};
+    glm::vec2 launch{0.0f};     // ADR-1663: where the front launched (xz, on its lane), for the splash
     float wake = 0.0f;
     float frontSpeed = 0.0f;
     float meanSpeed = 0.0f;
