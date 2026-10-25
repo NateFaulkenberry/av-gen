@@ -536,7 +536,7 @@ def eye_centre(surface, side):
 MOUTH_SLIT_DEG = 16.0      # the slit (the lips' parting) runs this far either side of the front
 LIP_GAP = 0.0006           # the closed lips sit this far apart: a fine dark line
 LIP_ROLL = 0.012           # how deep the lips' inner walls roll into the mouth
-IRIS_DEG = 36.9            # the iris's angular radius from the gaze (its edge lands on the sphere's 8th ring, 36 deg)
+IRIS_DEG = 29.0            # the iris's angular radius from the gaze (its edge lands on the sphere's 6th ring, 27 deg)
 LID_GAP = 0.0012           # the lids' shells sit this far outside the eyeball
 LID_UPPER = (24.0, 82.0)   # elevation range of the upper lid at rest (degrees above the eye's horizontal)
 LID_LOWER = (-82.0, -30.0)
@@ -593,22 +593,22 @@ def cut_mouth(ob):
     return zm, corner
 
 
-def lid_mesh(name, elev):
+def lid_mesh(name, elev, gap=None):
     """An eyelid: a thin spherical shell round the eyeball's centre (LID_GAP outside it), between two elevations and
-    within +-75 degrees of the gaze. Turned about the eye's horizontal axis it closes over the eyeball -- the upper lid
+    within +-90 degrees of the gaze (its ends on the hinge axis, so shut lids meet at the corners). Turned about the eye's horizontal axis it closes over the eyeball -- the upper lid
     down, the lower up -- and it can never touch the ball, however the eye turns."""
     o = bpy.data.objects.new(name, bpy.data.meshes.new(name))
     bpy.context.scene.collection.objects.link(o)
     o.data.materials.append(make_mat("porcelain", (0.86, 0.82, 0.74), 0.36, 0.5, 0.12))
     bm = bmesh.new()
-    R_ = EYE_RADIUS + LID_GAP
+    R_ = EYE_RADIUS + (LID_GAP if gap is None else gap)
     rows, cols = 14, 28
     grid = []
     for i in range(rows + 1):
         e = math.radians(elev[0] + (elev[1] - elev[0]) * i / rows)
         row = []
         for j in range(cols + 1):
-            az = math.radians(-75.0 + 150.0 * j / cols)
+            az = math.radians(-90.0 + 180.0 * j / cols)   # to the hinge axis itself: the corners meet
             # forward is -Y in Blender
             row.append(bm.verts.new((R_ * math.cos(e) * math.sin(az), -R_ * math.cos(e) * math.cos(az),
                                      R_ * math.sin(e))))
@@ -679,7 +679,8 @@ def main():
         fce.material_index = 1 if polar < IRIS_DEG else 0
     ebm.to_mesh(eyeball.data)
     ebm.free()
-    lid_up = lid_mesh("th-lid-upper", LID_UPPER)
+    # the upper lid rides 0.7 mm outside the lower, so where they overlap when shut it lies in front (no z-fight seam)
+    lid_up = lid_mesh("th-lid-upper", LID_UPPER, LID_GAP + 0.0007)
     lid_lo = lid_mesh("th-lid-lower", LID_LOWER)
     cy_m = interp(MOUTH_Z)[3]
     # the cavity: the dark behind the lips, its front just inside their walls
@@ -703,7 +704,7 @@ def main():
         "neck": {"bendLength": round(F, 4)},
         "eyes": {"radius": EYE_RADIUS, "left": G(eye_centre(eyes[0], 1) - head_origin),
                  "right": G(eye_centre(eyes[1], -1) - head_origin),
-                 "lidCloseUpperDeg": LID_UPPER[0] + 1.0, "lidCloseLowerDeg": -LID_LOWER[1] + 1.0,
+                 "lidCloseUpperDeg": LID_UPPER[0] + 3.0, "lidCloseLowerDeg": -LID_LOWER[1] + 1.0,
                  "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and "
                          "pitch within -4..+16 degrees (down positive) so the iris never sinks into the socket."},
         "head": {"eyeLeft": G(eyes[0] - head_origin), "eyeRight": G(eyes[1] - head_origin),

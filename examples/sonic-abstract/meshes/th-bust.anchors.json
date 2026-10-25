@@ -27,7 +27,7 @@
    0.161,
    0.0775
   ],
-  "lidCloseUpperDeg": 25.0,
+  "lidCloseUpperDeg": 27.0,
   "lidCloseLowerDeg": 31.0,
   "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and pitch within -4..+16 degrees (down positive) so the iris never sinks into the socket."
  },

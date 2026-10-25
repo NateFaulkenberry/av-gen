@@ -297,19 +297,17 @@ def build(heads=None):
 # should be dynamic too". All of it is the room's, not a head's: it drifts on its own clocks, swells a little with the
 # whole mix's energy, and takes each head's colour only through that head's own light (`<p>-spill`, in head()).
 MIST = "#3a2f7a"
-MIST_DEEP = "#1a1240"
+MIST_DENSITY = 0.03     # per metre: a haze that the heads stand in, not a wall
 
 
 def atmosphere(s):
-    # the mist: ONE placed medium (the scene's one fog slot), a deep slab behind and among the heads, its density
-    # thresholded into drifting banks and threads (detail + turbulence on their own slow clocks); lit by the scene's
-    # lights, so a head's spill light colours the mist round it when its gate opens
-    s.fogbank("mist", (0.0, 0.25, -1.1), shape="Box", density=0.55, radius=3.6, height=1.3,
-              color=hexrgb(MIST), deepColor=hexrgb(MIST_DEEP), bankLength=2.2, edgeSoftness=0.6,
-              densityThreshold=0.32, densitySoftness=0.35, contrast=1.3, detailAmount=0.55, detailScale=1.8,
-              detailDrift=0.05, driftSpeed=0.08, driftVertical=0.012, turbulence=0.35,
-              turbulenceScale=0.9, turbulenceSpeed=0.05, swirl=0.15, scattering=0.75, selfGlow=0.04,
-              glowColor=hexrgb(VIOLET), swell=0.12, swellSpeed=0.07)
+    # the mist: the environment's own air, marched (16 steps, 7 m: the heads and the air round them), its density
+    # broken into drifting patches by its noise, and lit by the scene's local lights -- so a head's spill light
+    # colours the mist round it when its gate opens. (A placed fog bank drew nothing at this scale; see 09-stop4.md.)
+    s.environment.update({"volumeDensity": MIST_DENSITY, "volumeMaxDistance": 7.0, "volumeSteps": 16,
+                          "volumeNoise": 1.0, "volumeNoiseScale": 2.5, "volumeNoiseSpeed": 0.12,
+                          "volumeLocalLights": 1.0, "volumeScattering": 0.35, "volumeAnisotropy": 0.3,
+                          "fogColor": hexrgb(MIST, 0.3)})
     # the motes, at three depths: far (fine and many, behind the heads), mid (among them), near (few, larger, slow,
     # between the camera and the heads); each its own clock
     for name, cap, seed, pos, ext, rate, size, alpha, emis in (
@@ -335,10 +333,9 @@ def atmosphere(s):
             R("noise.toneB", "env/sky/groundColor", 0.03, comp=0, polarity="bipolar"),
             R("noise.toneB", "env/sky/groundColor", 0.012, comp=1, polarity="bipolar"),
             R("noise.toneC", "env/sky/groundColor", 0.03, comp=2, polarity="bipolar"),
-            R("noise.toneC", "fx/mist/fogDensity", 0.12, polarity="bipolar"))
+            R("noise.toneC", "scene/volumeDensity", 0.3 * MIST_DENSITY, polarity="bipolar"))
     # ... and the whole mix's energy swells the mist and the bloom a little (seconds, not beats)
-    s.route(R("response.intensity", "fx/mist/fogDensity", 0.25, attackMs=1500.0, decayMs=4000.0),
-            R("response.intensity", "fx/mist/selfGlow", 0.06, attackMs=1500.0, decayMs=4000.0),
+    s.route(R("response.intensity", "scene/volumeDensity", 0.6 * MIST_DENSITY, attackMs=1500.0, decayMs=4000.0),
             R("response.intensity", "post/bloom/intensity", 0.08, attackMs=1500.0, decayMs=4000.0))
 
 
@@ -414,10 +411,10 @@ def head(s, spec):
     # the head's own light, in front of its face: dark until its gate opens, then its colour on the mist round it
     # and on its neighbours' porcelain (world space: the heads stand still, they only turn)
     at, hd = spec.get("at", [0.0, 0.0, 0.0]), math.radians(spec.get("heading", 0.0))
-    fwd = 0.22
+    fwd = 0.45
     s.light(P + "-spill", "point", position=[at[0] + fwd * math.sin(hd), at[1] + HEAD_REST[1] + 0.12,
                                               at[2] + fwd * math.cos(hd)],
-            color=hexrgb(pal["spill"]), intensity=0.0, range=1.6, castsShadow=False, contactShadow=False)
+            color=hexrgb(pal["spill"]), intensity=0.0, range=2.0, castsShadow=False, contactShadow=False)
     gate(s, spec)
     scan_and_eyes(s, spec)
     blinks(s, spec)
@@ -670,7 +667,7 @@ def routes(s, spec, rays):
     for i, r in enumerate(rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
     # ---- its light on the mist: the same pose, in its own colour
-    s.route(R(G, "lights/%s-spill/intensity" % P, 2.4, depth=K("chroma"), **SNAP_CUT))
+    s.route(R(G, "lights/%s-spill/intensity" % P, 1.6, depth=K("chroma"), **SNAP_CUT))
     # ---- the secondary effects, every one on THIS head's gate, weighted by its instrument's emphasis
     # shake (the drums)
     s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75 * E["shake"], depth=K("copies"), attackMs=0, decayMs=140,

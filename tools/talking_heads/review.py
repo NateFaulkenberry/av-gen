@@ -49,12 +49,13 @@ def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_m
         doc = json.load(f)
     if no_atmos:
         # the stop-3 room, for the atmosphere's cost: no mist, only the middle motes, no sky tones
-        doc["effects"] = [e for e in doc["effects"] if e["id"] != "mist"]
-        doc["routes"] = [r for r in doc["routes"] if not r["target"].startswith(("fx/mist/", "env/sky/"))]
+        doc["routes"] = [r for r in doc["routes"] if not r["target"].startswith(("scene/volume", "env/sky/"))]
         sp = doc["assets"]["scene"]["path"]
         with open(sp) as f:
             sc = json.load(f)
         sc["nodes"] = [n for n in sc["nodes"] if n["name"] not in ("motesFar", "motesNear")]
+        sc["environment"]["volumeDensity"] = 0.0
+        sc["environment"]["volumeMaxDistance"] = 0.0
         base = os.path.dirname(sp)
         for n in sc["nodes"]:
             src = n.get("procedural", {}).get("source", {})
