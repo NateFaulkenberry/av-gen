@@ -26,3 +26,15 @@ Coordinator reading: restore the pass-3 landscape (Gate A take 3, c61111e6 linea
 ## The owner on pass 7 (verbatim, 2026-10-25)
 
 "aurora if we could just make the underwater slightly more illuminated its hard to see the geometry / fish also make the river bed deeper so theres more room for fish etc"
+
+## The owner on pass 9 (verbatim, 2026-10-25)
+
+aurora is close, a few nit picky things:
+animate fish if possible, increase their density a bit - still bright underwater some if possible
+screen shot is from a prior version but this issue is still noticable in the latest pass - light balls under the water create a ripple seam behind them, I've highlited an example here (from prior version cause it was easier to show and placed a red line to the right of it, but again it still exists)
+have the underwater light balls/streaks throw some more light onto the mountain ranges - maybe this increased brightness will do for perceived underwater brightness 
+second screenshot shows exampel of the restored "ball dropping in water" effect I asekd to be returned - this looks good but make it apepar as thought its always dropped behind the camera so we see the ripples propage forward but not the source spot
+
+since we're close just render full video clips for my review from here on out, may only need one or two more passes then we're ready to merge
+
+Screenshots: (1) from an earlier pass, a red box over the near water behind a passing pulse: a hard straight seam/edge across the ripple field trailing the light, red line beside it; the owner says it is still visible in pass 9. (2) the restored splash: concentric rings around a bright impact spot in the near water.
