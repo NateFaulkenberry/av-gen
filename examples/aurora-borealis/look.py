@@ -82,7 +82,7 @@ LINE_FADE_NEAR, LINE_FADE_FAR = 400.0, 4500.0          # metres: the crease line
 CREST_LO, CREST_HI = 110.0, 320.0                       # metres: where the pale crest light comes in
 AURORA_WRAP_POWER = 4.0
 EDGE_GLOW = 0.5   # the edges' resting glow (Gate B)
-WATERLINE_RAMP = 1.5   # pass 10: metres above the water over which the land's lines and glints come in
+WATERLINE_RAMP = 0.4   # pass 10: metres above the water over which the land's lines and glints come in (1.5 darkened the low flats)
 
 # pass 3: the glints (22-research-pass3-scene.md s5). A comb over each crease's random value v (baked in TEXCOORD_0.y)
 # picks a deterministic subset; its smoothstep rests above 1 (nothing lit) and an instrument's envelope, routed onto

@@ -66,3 +66,12 @@ Aurora Borealis sets its values in `look.py` (`SPLASH`, `BED_REACH`).
   carry the impact.
 - **The splash light at full strength near the camera.** A first take swung the frame by 0.08-0.096 in 267 ms at 3.4 s,
   where a kick, a snare and the Moog's entrance coincide. The flash gate is 0.05.
+
+## Addendum (pass 10)
+
+- **The splash lands behind the camera.** Aurora Borealis launches the pulses 40 m behind it (`startOffset` -40), so
+  the impact and its flash are never seen. To carry the rings well into view, they now run at 300 m/s, were 170, and
+  fade over 1.2 s, were 0.8 (`kSplashSpeed`, `kSplashLife`).
+- **The wake's ripples are feathered** in over their first 25 m and out over the last 40% of the wake. They stopped
+  at hard lines at the front and at the wake's end, straight edges across the ripple field trailing each pulse: the
+  owner's "ripple seam".
