@@ -176,7 +176,10 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
                         e.originKind.xyz + vec3<f32>(0.0, 2.0, 0.0), underneath);
     let toLight = source - worldPos;
     let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);
-    let orient = select(0.05 + 0.95 * facing * facing, 2.5 * facing, underneath);
+    // Shallow under the water (the top 6 m: fish, the banks' first metres), the light is taken whatever the facing, so a
+    // small body under a passing beam lights as a whole instead of showing as a silhouette against the lit bed
+    let shallow = smoothstep(-8.0, -4.0, dy);
+    let orient = select(0.05 + 0.95 * facing * facing, mix(2.5 * facing, 1.6, shallow), underneath);
     let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
     // The land and the bed fade in over 40% of the water's near fade: the bed shows through the water only near the
     // camera (further out the reflection covers it), and a full fade would hide it. They also wait for the front to

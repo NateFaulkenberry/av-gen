@@ -294,7 +294,8 @@ def ball_effects():
 
 
 # ---- the river light (pass 3, 20b-brief-river-light.md; ADR-1662's path wave on the water's own `river` feature) --
-# Kick: one hot core; snare: a twin filament, faster and shorter. Each hit is its own front fading on its own envelope
+# Kick: one hot core; snare: one core too (owner, pass 4: the twin "looks like two beams"), told apart by its colour,
+# its lane and its faster, shorter timing. Each hit is its own front fading on its own envelope
 # (an ADR-981 trigger with a lifetime), so a beam finishes before the next hit and overlap is a fading one. The light
 # sits under the reflection, ripples the mirror behind it, and lights the facets of the banks, the slopes and the
 # riverbed (BED) by their orientation. Colours from the scene's own family (owner, 2026-10-24: no amber or cyan).
@@ -348,8 +349,8 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
             twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.35, bed=3.5, reach=700.0,
             reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.07, near_wake=1.6)
-SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=2.5,
-             twin=10.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=2.8, reach=600.0,
+SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
+             twin=0.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=2.8, reach=600.0,
              reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.05, near_wake=1.3)
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
             twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.3, bed=3.0, reach=650.0,
@@ -458,7 +459,7 @@ def river_feature():
     """The river's course for the water's flow (the streaks run along it): the centreline, with no cut (the land is
     the GLB banks) and its surface at the sea's level."""
     import world
-    pts = [world.centre(world.TAU * i / 255) for i in range(256)]   # 256 points at most
+    pts = world.river_points(256)   # 256 points at most; pass 4: the straight valley's (world.unroll)
     return {"name": "river", "kind": "river", "path": [[round(p[0], 2), 0.0, round(p[2], 2)] for p in pts],
             "width": 200.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
             "waterDepth": 0.0, "smoothing": 0}
@@ -467,8 +468,10 @@ def river_feature():
 def water_node():
     """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
     there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
-    return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, 0.0],
-            "world": {"name": "aurora-river", "seed": 1, "size": [8400.0, 8400.0], "baseHeight": -40.0,
+    # pass 4: a long strip down the straight valley's channel (the land's GLBs make the banks), from 3 km behind the
+    # camera's start to the far end of the unrolled world
+    return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, -3200.0],
+            "world": {"name": "aurora-river", "seed": 1, "size": [1600.0, 12600.0], "baseHeight": -40.0,
                       "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
             "terrain": {"chunkSize": 400.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
                         "viewDistance": 6000.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,

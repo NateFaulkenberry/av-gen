@@ -33,7 +33,7 @@ TAU = 2.0 * math.pi
 R0 = 3000.0
 # a rounded triangle: with A3 = 0.10 each side's midpoint has zero curvature, so the loop has three long, nearly
 # straight reaches the camera can look down (11-research-pass2-render.md s2.3); two small harmonics add the meanders
-A3 = 0.10
+A3 = 0.0   # pass 4: the loop's rounded triangle (was 0.10) is gone; with the world unrolled the axis is straight
 
 
 # the river's course on the valley axis: straight reaches of about 1-2 km between mild bends (owner, Gate A take 3:
@@ -49,8 +49,9 @@ def _bends(count=7):
         c = TAU * (i + 0.5 + 0.35 * (_h(i, 1) - 0.5)) / count
         half = 0.11 + 0.06 * _h(i, 2)              # 0.11-0.17 rad: 330-510 m either side of the apex
         # pass 4 (owner): "a mostly straight river with some very slight bends" -- the hard bends hid the left
-        # mountains, the Moog's stage. 18-38 m swings (were 95-180 m) over the same 330-510 m half-lengths
-        amp = (18.0 + 20.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
+        # mountains, the Moog's stage. 12-26 m swings (were 95-180 m) over the same 330-510 m half-lengths: at most
+        # a few degrees off the axis
+        amp = (12.0 + 14.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
         out.append((c, half, amp))
     return out
 
@@ -104,6 +105,34 @@ def axis_centre(th):
 def periodic_noise(th, cycles, seed, octaves=3):
     """0..1 smooth noise along the loop, periodic in theta (`cycles` lattice cells round the loop)."""
     return mx.fbm_p(0.37 * seed, (th % TAU) / TAU * cycles, seed, octaves, py=cycles)
+
+
+# ---- pass 4: the world unrolled into a straight valley -------------------------------------------------------------
+# The owner: "terrain is still too curved, i asked for a mostly straight river + valley". Everything here is still
+# generated round the loop (theta, r), which keeps every recipe above and below unchanged; then every point written --
+# each mesh vertex, the river's course, the camera -- passes through `unroll`: distance round the loop becomes
+# distance along a straight axis (z = -R0 theta, so the camera, flying +theta, looks down -z) and radius becomes the
+# lateral offset (x = r - R0: the inner bank, on the camera's left, at -x). The seam is the far side of the loop
+# (theta = +-pi, z = -+9.4 km): triangles across it are dropped, and the camera crosses it only after about 7 minutes.
+def unroll(p):
+    th = math.atan2(p[0], p[2])
+    r = math.hypot(p[0], p[2])
+    return (r - R0, p[1], -R0 * th)
+
+
+def unroll_tris(tris):
+    out = []
+    for tri in tris:
+        ths = [math.atan2(v[0], v[2]) for v in tri]
+        if max(ths) - min(ths) > math.pi or min(math.hypot(v[0], v[2]) for v in tri) < 1.0:
+            continue   # across the seam, or touching the loop's centre (no place on a straight valley)
+        out.append(tuple(unroll(v) for v in tri))
+    return out
+
+
+def river_points(n=256):
+    """The river's centreline, unrolled: n points along the straight valley, inside the seam."""
+    return [unroll(centre(-math.pi + 1e-3 + (2.0 * math.pi - 2e-3) * i / (n - 1))) for i in range(n)]
 
 
 # ---- the valley's profile across its band -------------------------------------------------------------------------
@@ -344,15 +373,8 @@ def valley_band():
         outer += _zip(a, b, True)
     for a, b in zip(rows_in, rows_in[1:]):
         inner += _zip(a, b, False)
-    # the centre: a fan from the innermost row to the middle of the loop
-    last = rows_in[-1]
-    mid = (0.0, land_height(0.0, 0.0, 0.0, rc(0.0), -1), 0.0)
-    for i in range(len(last)):
-        a, b = last[i], last[(i + 1) % len(last)]
-        tri = (a, b, mid)
-        if mx.cross(mx.sub(tri[1], tri[0]), mx.sub(tri[2], tri[0]))[1] < 0.0:
-            tri = (a, mid, b)
-        inner.append(tri)
+    # (pass 4: no fan to the loop's centre -- unrolled, the inner band ends in a long edge, and the left ranges stand
+    # beyond it)
     # pass 3 (22-research-pass3-scene.md s5.1): the camera flies the loop in +theta with its right vector pointing out
     # of the loop, so the inner bank is always on the LEFT (the Moog's) and the outer bank on the RIGHT (the toms' and
     # the tone block's), with the three outer ranges
@@ -398,12 +420,12 @@ def bed_tris(variant="coarse"):
 
 
 # ---- the fish (pass 4, "if possible add some low poly fish in the river which are illuminated by the beams of light
-# under water"): small schools of faceted fish a few metres under the surface, along the stretch the song's camera
-# flies (and the beams reach ahead of it). Static, heading upstream; their program is the bed's (near black), so a
-# fish shows only when a beam's under-water light passes over it. About 8 m long (stylised) and 2-4 m down, so it reads through
-# the water from 65 m up (3 m long and 3-6 m down did not).
-FISH_SCHOOLS = 24
-FISH_PER_SCHOOL = 9
+# under water"; then "make them bigger more individual rather than smaller schools ... dont make them all appear head
+# on"): single faceted fish spread over the river's width along the stretch the song's camera flies (and the beams
+# reach ahead of it), each on its own heading -- along the river either way, across it, angled. Static; their program
+# is the bed's (near black), so a fish shows only when a beam's under-water light passes over it. About 14 m long
+# (stylised, so each reads as a fish from 65 m up) and 2-4 m down.
+FISH_COUNT = 64
 
 
 def _fish(cx, cy, cz, heading, size, seed):
@@ -424,24 +446,19 @@ def _fish(cx, cy, cz, heading, size, seed):
 
 def fish_tris():
     tris = []
-    for k in range(FISH_SCHOOLS):
-        th = 0.03 + 1.35 * (k + 0.5 * mx._hash(k, 700, 1)) / FISH_SCHOOLS
+    for k in range(FISH_COUNT):
+        th = 0.02 + 1.4 * (k + mx._hash(k, 700, 1)) / FISH_COUNT
+        lat = (mx._hash(k, 700, 2) - 0.5) * 2.0 * (half_width(th) - 40.0)
+        r = rc(th) + lat
+        x, z = r * math.sin(th), r * math.cos(th)
+        y = -2.0 - 2.0 * mx._hash(k, 700, 5)
         e = 1e-4
         d0, d1 = centre(th), centre(th + e)
-        flow = math.atan2(d1[0] - d0[0], d1[2] - d0[2])        # downstream, as a heading from +z
-        lat0 = (mx._hash(k, 700, 2) - 0.5) * 160.0                  # within the beams' lanes (+-80 m)
-        for j in range(FISH_PER_SCHOOL):
-            a = mx._hash(k * 31 + j, 701, 3) * TAU
-            rr = 10.0 + 22.0 * mx._hash(k * 31 + j, 701, 4)
-            lat = lat0 + rr * math.cos(a)
-            along = rr * math.sin(a)
-            r = rc(th) + lat
-            th2 = th + along / max(r, 1.0)
-            x, z = r * math.sin(th2), r * math.cos(th2)
-            y = -1.8 - 2.2 * mx._hash(k * 31 + j, 701, 5)
-            heading = flow + math.pi + (mx._hash(k * 31 + j, 701, 6) - 0.5) * 0.5   # heading upstream, roughly
-            size = 7.0 + 2.0 * mx._hash(k * 31 + j, 701, 7)    # stylised: large enough to read from the camera
-            tris += _fish(x, y, z, heading, size, k * 31 + j)
+        flow = math.atan2(d1[0] - d0[0], d1[2] - d0[2])
+        # a quarter swim with the current, a quarter against it, the rest across or angled: never all head-on
+        heading = flow + [0.0, math.pi, 0.5 * math.pi, -0.5 * math.pi][k % 4] + (mx._hash(k, 700, 6) - 0.5) * 1.2
+        size = 12.0 + 5.0 * mx._hash(k, 700, 7)
+        tris += _fish(x, y, z, heading, size, k)
     return tris
 
 
@@ -548,7 +565,16 @@ def _crease_hash(p, q):
     return (x & 0xFFFFFF) / float(1 << 24)
 
 
+def write_faceted_uv_unrolled(path, tris, name):
+    """write_faceted_uv for triangles already in the straight valley's frame."""
+    _write_faceted_uv(path, tris, name)
+
+
 def write_faceted_uv(path, tris, name):
+    _write_faceted_uv(path, unroll_tris(tris), name)   # pass 4: the straight valley
+
+
+def _write_faceted_uv(path, tris, name):
     pos, nrm = mx.faceted(tris)
     uvs = edge_uvs(tris)
     n = len(pos)
@@ -594,6 +620,15 @@ def generate(mesh_dir):
         t = range_tris(*spec)
         write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
         out[spec[0]] = len(t)
+    # pass 4: the left (inner) side had no outer ranges -- the loop's centre was there. Unrolled, it gets the far and
+    # distant ranges too, with their own seeds, mirrored across the river (and turned to face up), so left and right
+    # never repeat
+    for spec in RANGES[1:]:
+        name = "left" + spec[0]
+        t = range_tris(name, *spec[1:8], spec[8] + 50, *spec[9:])
+        t = [tuple((-v[0], v[1], v[2]) for v in (tri[0], tri[2], tri[1])) for tri in unroll_tris(t)]
+        write_faceted_uv_unrolled(os.path.join(mesh_dir, "ab-%s.glb" % name), t, name)
+        out[name] = len(t)
     t = fish_tris()
     write_faceted_uv(os.path.join(mesh_dir, "ab-fish.glb"), t, "fish")
     out["fish"] = len(t)
