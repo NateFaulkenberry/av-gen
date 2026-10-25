@@ -157,7 +157,7 @@ Result<void> Propagation::validate() const {
         // finds nothing to travel along, as a FocusHero source with nothing spotlit.
         const PathShape& q = path;
         for (const float v : {q.ease, q.wakeGrowth, q.coreWidth, q.coreOffset, q.haloWidth, q.reach, q.reachHeight,
-                              q.land, q.bed, q.embed, q.disturb, q.nearFade, q.laneJitter, q.splash, q.nearWake, q.splashGlow, q.bedReach}) {
+                              q.land, q.bed, q.embed, q.disturb, q.nearFade, q.laneJitter, q.splash, q.nearWake, q.splashGlow, q.bedReach, q.splashBack}) {
             if (!(v >= 0.0f) || !finite(v)) {
                 return fail("a path wave's shape values must be finite and not negative");
             }
@@ -763,8 +763,9 @@ std::optional<ResolvedWave> resolvePathFront(const EffectInstance& instance, con
         const glm::vec2 f = onLane(sFront);
         r.origin = glm::vec3(f.x, r.origin.y, f.y);
     }
-    r.launch = lane == 0.0f ? geom.pointAt(s0 + dir * e.propagation.startOffset)
-                            : onLane(s0 + dir * e.propagation.startOffset);
+    // the splash's centre: where the front launched, less `splashBack` metres back along the path (ADR-1666)
+    const float sLaunch = s0 + dir * (e.propagation.startOffset - q.splashBack);
+    r.launch = lane == 0.0f ? geom.pointAt(sLaunch) : onLane(sLaunch);
     if (accent != nullptr && !e.appearance.rainbow && e.appearance.color == glm::vec3(1.0f)) {
         r.color = *accent;
     }

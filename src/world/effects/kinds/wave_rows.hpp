@@ -208,6 +208,11 @@ inline constexpr EffectField kFields[] = {
         .tooltip("How far the light reaches under the water: down (fading from half this depth) and across (at least "
                  "this wide). 0: 40 m.")
         .writtenWhen(+[](const E& e) { return isPathWave(e) && e.wave.propagation.path.bedReach != 0.0f; }),
+    floatField("path/splashBack", "Splash behind", 0.0f, 2000.0f, 0.0f, 400.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.path.splashBack), AVGEN_WAVE_SETF(e.wave.propagation.path.splashBack))
+        .json("propagation/path/splashBack").fmt("%.0f m").floorAt(0.0f)
+        .tooltip("The splash lands this many metres back along the path from where the front starts (0: where it starts).")
+        .writtenWhen(+[](const E& e) { return isPathWave(e) && e.wave.propagation.path.splashBack != 0.0f; }),
     // ADR-1663: a light ball's flight (Propagation > Ball)
     floatField("ball/launchRight", "Launch right", -2000.0f, 2000.0f, -400.0f, 400.0f,
                AVGEN_WAVE_GET(e.wave.propagation.ball.launch.x), AVGEN_WAVE_SETF(e.wave.propagation.ball.launch.x))

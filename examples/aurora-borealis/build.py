@@ -119,8 +119,8 @@ def scene_doc(camera):
     nodes += look.fish_nodes()
     return {"format": "avgen-scene", "version": 1, "name": "aurora-borealis", "camera": camera,
             "environment": look.environment(), "nodes": nodes, "lights": [look.unshadowed_key()],
-            "materialPrograms": [look.rock_program(look.ROCK_L), look.rock_program(look.ROCK_R), look.bed_program(),
-                                 look.fish_program()]}
+            "materialPrograms": [look.rock_program(look.ROCK_L), look.rock_program(look.ROCK_R), look.bed_program()]
+                                + look.fish_programs()}
 
 
 FISH_KEYS = 40           # keys per lap

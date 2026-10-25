@@ -353,12 +353,13 @@ BEAM_PAIRS = {   # (kick, snare)
 }
 BEAM_PAIR = os.environ.get("AB_BEAM_PAIR", "magenta-lilac")
 CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the beams' source sits on the water
-# pass 10 (the owner: "make it appear as though its always dropped behind the camera so we see the ripples propagate
-# forward but not the source spot"): each pulse launches 40 m behind the camera (was 160 m in front), so its splash -- the
-# impact, its flash -- is always out of frame and only the rings and the light run forward into view
-START_OFFSET = -40.0
-NEAR_FADE = 700.0   # pass 9 (was 500): the light under the water fades in from 280 m (0.4 x this), so the brighter
-                    # pools do not flood the bottom of the frame when three hits land together
+# Pass 10 (the owner: "make it appear as though its always dropped behind the camera so we see the ripples propagate
+# forward but not the source spot") launched each pulse 40 m behind the camera. Pass 11 (the owner: "they feel late"):
+# the front now starts in view, START_OFFSET in front of the camera, where its light shows on the onset's frame, while its
+# splash still lands SPLASH_BACK behind that -- 40 m behind the camera, in the pulse's own lane (ADR-1666 splashBack)
+START_OFFSET = 200.0
+SPLASH_BACK = 240.0
+NEAR_FADE = 450.0   # the light in the water fades in from 135 m, under the water from 180 m (pass 9-10: 700)
 BED_VARIANT = os.environ.get("AB_BED", "coarse")
 
 
@@ -390,7 +391,8 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                          "haloWidth": halo, "reach": reach, "reachHeight": reach_height,
                                          "land": land, "bed": bed, "embed": EMBED, "bedReach": BED_REACH, "disturb": disturb,
                                          "nearFade": NEAR_FADE, "lane": lane, "laneJitter": lane_jitter,
-                                         "splash": splash, "nearWake": near_wake, "splashGlow": splash_glow}},
+                                         "splash": splash, "nearWake": near_wake, "splashGlow": splash_glow,
+                                         "splashBack": SPLASH_BACK}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
                 "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
@@ -418,19 +420,19 @@ SPLASH = {"kick": (0.11, 2.0, 2.5), "snare": (0.065, 1.4, 1.8), "toms": (0.08, 1
 # glows in the water's body. The light on the slopes (`land`) is unchanged. A first take (95 m, a fifth more bed light,
 # halos half as wide again, twice the splash light) swung the frame by 0.08-0.096 at 3.4 s (the flash gate is 0.05).
 BED_REACH = 75.0
-BEAM_FADE_IN = 0.15
+BEAM_FADE_IN = 0.0   # pass 11: no swell (pass 9-10's 0.15 s put the first visible frame after the onset)
 EMBED = 0.72
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
             twin=0.0, halo=45.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.18, bed=4.0, reach=700.0,
-            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=SPLASH['kick'][0], near_wake=SPLASH['kick'][1],
+            reach_height=250.0, front_width=14.0, lane=-85.0, lane_jitter=20.0, splash=SPLASH['kick'][0], near_wake=SPLASH['kick'][1],
             splash_glow=SPLASH['kick'][2])
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
              twin=0.0, halo=34.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.12, bed=2.8, reach=600.0,
-             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=SPLASH['snare'][0], near_wake=SPLASH['snare'][1],
+             reach_height=200.0, front_width=9.0, lane=85.0, lane_jitter=20.0, splash=SPLASH['snare'][0], near_wake=SPLASH['snare'][1],
              splash_glow=SPLASH['snare'][2])
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
             twin=0.0, halo=40.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.15, bed=3.5, reach=650.0,
-            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=SPLASH['toms'][0], near_wake=SPLASH['toms'][1],
+            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=45.0, splash=SPLASH['toms'][0], near_wake=SPLASH['toms'][1],
             splash_glow=SPLASH['toms'][2])
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
@@ -467,13 +469,17 @@ def bed_program():
 
 UNDERWATER_AMBIENT = "#3c2eb6"   # pass 8: the base light on the bed and the fish (was #010106)
 FISH_AMBIENT = "#6652f0"         # the fish a little brighter than the bed round them, so they stand off it
+# pass 11: each species a little different within the palette
+FISH_TINTS = {"trout": "#6652f0", "bream": "#7a5ae8", "pike": "#5a62ea", "ray": "#8a52f0", "eel": "#5248d8",
+              "catfish": "#6c48c8", "baitfish": "#8c7cff", "carp": "#7e50e0", "sturgeon": "#5c5ad0"}
 
 
-def fish_program():
-    """The fish: the underwater base light (pass 8; near black before), so a fish reads faintly between pulses and
-    brightly when a pulse's light in the water passes over it."""
-    return {"name": "abFish", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb(FISH_AMBIENT) + [1.0]}],
-            "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
+def fish_programs():
+    """The fish (pass 8-11): one program per species, its tint the underwater base light's range, so a fish reads faintly
+    between pulses and brightly when a pulse's light in the water passes over it."""
+    return [{"name": "abFish_" + kind, "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb(c) + [1.0]}],
+             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
+            for kind, c in FISH_TINTS.items()]
 
 
 def fish_nodes():
@@ -491,7 +497,7 @@ def fish_nodes():
                         "source": {"kind": "mesh", "asset": "ab-fish-%s.glb" % f[0]}, "distribution": {"kind": "single"},
                         "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0],
                                      "emissiveIntensity": 0.0, "roughness": 1.0, "metallic": 0.0, "unlit": True,
-                                     "program": "abFish"},
+                                     "program": "abFish_" + f[0]},
                         "castsShadow": False}})
     return out
 

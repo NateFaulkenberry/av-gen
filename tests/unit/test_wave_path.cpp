@@ -502,3 +502,24 @@ TEST_CASE("ADR-1666: a splash's light and the reach of the light under the water
     lit.wave.propagation.path.splashGlow = -1.0f;
     CHECK_FALSE(lit.wave.validate().has_value());
 }
+
+TEST_CASE("ADR-1666: the splash can land behind where the front starts; at 0 it lands where it starts",
+          "[world][effects][waves][adr1666]") {
+    const PathScene scene;
+    world::EffectInstance beam = pathWave();
+    beam.wave.propagation.path.splash = 0.1f;
+    beam.wave.propagation.startOffset = 150.0f;
+    const world::WaveGpu g0 = world::packWave(*world::resolveWave(beam, at(0.5, scene)));
+    CHECK_FALSE(beam.toJson().at("parameters").at("propagation").at("path").contains("splashBack"));
+    world::EffectInstance back = beam;
+    back.wave.propagation.path.splashBack = 100.0f;
+    REQUIRE(back.wave.validate().has_value());
+    const world::WaveGpu g1 = world::packWave(*world::resolveWave(back, at(0.5, scene)));
+    // on the first leg downstream is +x: the splash 100 m further back
+    CHECK_THAT(g0.extra.x - g1.extra.x, WithinAbs(100.0, 1e-2));
+    CHECK(g0.extra.y == g1.extra.y);
+    world::WaveGpu g1z = g1;
+    g1z.extra.x = g0.extra.x;
+    CHECK(std::memcmp(&g0, &g1z, sizeof(world::WaveGpu)) == 0); // only the splash's centre moves
+    CHECK(back.toJson().at("parameters").at("propagation").at("path").at("splashBack") == 100.0);
+}

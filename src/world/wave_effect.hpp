@@ -166,6 +166,9 @@ struct PathShape {
     // ADR-1666: how far the light reaches under the water, in metres -- down (it fades from half this depth) and across
     // (at least this wide); 0 keeps ADR-1663's 40 m
     float bedReach = 0.0f;
+    // ADR-1666 (pass 11): the splash's centre sits this many metres back along the path from where the front launches
+    // (0: at the launch, as before) -- so a front can start in view while its splash lands behind the camera
+    float splashBack = 0.0f;
 };
 
 // ADR-1663: a LightBall's flight. Launch and target are offsets in the camera's own frame (right, up, forward, in

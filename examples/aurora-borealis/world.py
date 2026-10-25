@@ -417,27 +417,41 @@ def bed_tris(variant="coarse"):
 # them, each its own type, size and heading. Their program is near black (look.fish_program): a fish shows only when a
 # pulse's light in the water passes over it. Static (no swim motion), so a fish's highest point is fixed: each is
 # clamped so its whole body stays FISH_CLEARANCE below the surface; check_fish() (build.py, the integration test) proves it.
-FISH_COUNT = 28   # pass 10 (the owner: "increase their density a bit"; was 18)
 FISH_CLEARANCE = 1.5   # metres between the surface and a fish's highest vertex, at least
 # body types, in the fish's frame (forward f, up u, right r; times its size): nose, tail root, back, belly, the flanks'
 # half-width, the tail fin's reach, top and bottom, a dorsal fin's height (0: none), and the size range (m)
 FISH_TYPES = {
     "trout": dict(nose=0.55, root=-0.35, back=0.22, belly=-0.16, flank=0.14, tail=-0.62, tail_top=0.2,
-                  tail_bot=-0.16, dorsal=0.0, size=(8.0, 13.0)),
+                  tail_bot=-0.16, dorsal=0.0, size=(8.0, 13.0), lap=(40.0, 80.0), circle=(14.0, 34.0)),
     "bream": dict(nose=0.42, root=-0.28, back=0.36, belly=-0.30, flank=0.11, tail=-0.52, tail_top=0.26,
-                  tail_bot=-0.24, dorsal=0.46, size=(7.0, 11.0)),
+                  tail_bot=-0.24, dorsal=0.46, size=(7.0, 11.0), lap=(40.0, 80.0), circle=(12.0, 28.0)),
     "pike": dict(nose=0.78, root=-0.5, back=0.12, belly=-0.1, flank=0.09, tail=-0.8, tail_top=0.15,
-                 tail_bot=-0.13, dorsal=0.2, size=(12.0, 18.0)),
+                 tail_bot=-0.13, dorsal=0.2, size=(12.0, 18.0), lap=(35.0, 70.0), circle=(18.0, 36.0)),
     "ray": dict(nose=0.42, root=-0.3, back=0.07, belly=-0.05, flank=0.55, tail=-1.0, tail_top=0.02,
-                tail_bot=-0.02, dorsal=0.0, size=(10.0, 16.0)),
+                tail_bot=-0.02, dorsal=0.0, size=(10.0, 16.0), lap=(60.0, 100.0), circle=(16.0, 32.0)),
+    # pass 11 (the owner: "add more fish variety and more in the river")
+    "eel": dict(nose=0.9, root=-0.7, back=0.06, belly=-0.05, flank=0.05, tail=-1.05, tail_top=0.06,
+                tail_bot=-0.06, dorsal=0.0, size=(10.0, 17.0), lap=(30.0, 55.0), circle=(10.0, 24.0)),
+    "catfish": dict(nose=0.5, root=-0.36, back=0.16, belly=-0.14, flank=0.2, tail=-0.62, tail_top=0.14,
+                    tail_bot=-0.12, dorsal=0.22, barbels=True, size=(9.0, 15.0), lap=(70.0, 110.0), circle=(10.0, 22.0)),
+    "baitfish": dict(nose=0.5, root=-0.32, back=0.18, belly=-0.14, flank=0.1, tail=-0.58, tail_top=0.18,
+                     tail_bot=-0.14, dorsal=0.0, size=(2.5, 4.0), lap=(10.0, 18.0), circle=(5.0, 11.0)),
+    "carp": dict(nose=0.45, root=-0.3, back=0.32, belly=-0.26, flank=0.16, tail=-0.56, tail_top=0.24,
+                 tail_bot=-0.22, dorsal=0.38, size=(9.0, 14.0), lap=(50.0, 90.0), circle=(12.0, 26.0)),
+    "sturgeon": dict(nose=0.88, root=-0.6, back=0.12, belly=-0.1, flank=0.13, tail=-0.92, tail_top=0.24,
+                     tail_bot=-0.08, dorsal=0.18, size=(18.0, 26.0), lap=(100.0, 150.0), circle=(28.0, 44.0)),
 }
-FISH_ORDER = ["trout", "bream", "pike", "ray", "trout", "bream"]
-FISH_LANES = [-55.0, 0.0, 55.0]   # look.py's kick, toms and snare lanes (m right of the river's centreline)
+# pass 11: 40 single fish of eight species, and four loose shoals of four baitfish
+FISH_ORDER = ["trout", "carp", "pike", "ray", "eel", "catfish", "bream", "sturgeon", "trout", "eel"]
+FISH_SINGLES = 40
+FISH_SHOALS, FISH_SHOAL_SIZE = 4, 4
+FISH_COUNT = FISH_SINGLES + FISH_SHOALS * FISH_SHOAL_SIZE
+FISH_LANES = [-85.0, 0.0, 85.0]   # look.py's kick, toms and snare lanes (m right of the river's centreline)
 
 
 def _fish(kind, cx, cy, cz, heading, size):
     """One low-poly fish of `kind`: a six-point body (nose, tail root, back, belly, two flanks), a two-sided tail fin,
-    and for some a dorsal fin."""
+    for some a dorsal fin, and for the catfish two barbels sweeping back from its mouth."""
     b = FISH_TYPES[kind]
     c, s_ = math.cos(heading), math.sin(heading)
 
@@ -453,38 +467,69 @@ def _fish(kind, cx, cy, cz, heading, size):
     if b["dorsal"] > 0.0:
         d0, d1, top = P(0.12, b["back"] * 0.8, 0.0), P(-0.2, b["back"] * 0.5, 0.0), P(-0.12, b["dorsal"], 0.0)
         tail += [(d0, top, d1), (d0, d1, top)]
+    if b.get("barbels"):
+        for side in (-1.0, 1.0):
+            m0, m1 = P(b["nose"] - 0.04, -0.03, side * 0.03), P(b["nose"] - 0.02, -0.05, side * 0.02)
+            tip = P(b["nose"] - 0.3, -0.08, side * 0.32)
+            tail += [(m0, tip, m1), (m0, m1, tip)]
     return body + tail
 
 
+def _depth_for(th, lat, radius, size, b, h):
+    """A fish's centre-line depth: spread 2.5-30 m down (h in 0..1), above the bed under its circle's widest point
+    (pass 8: about 75 m mid-river, rising to the banks), its whole body at least FISH_CLEARANCE under the surface."""
+    hw = half_width(th)
+    y = -2.5 - 27.5 * h ** 1.3
+    top = max(b["back"], b["tail_top"], b["dorsal"], 0.02)
+    fj = min(1.0, (abs(lat) + radius) / (hw - 8.0))
+    bed = valley_height(th, -8.0, 1 if lat > 0 else -1) - 75.0 * (1.0 - fj * fj) ** 0.7
+    y = max(y, bed + 4.0 + 0.4 * size)
+    return min(y, -FISH_CLEARANCE - top * size)
+
+
 def fish_list():
-    """Pass 10 (the owner: "animate fish if possible"): each fish swims a slow circle -- (kind, centre x, y, centre z,
-    radius, period s, direction +-1, phase, size) in the loop's frame -- its body turned along the circle and wagged by
-    the music's LFOs (build.py: one node per fish, its position and heading keyed round the circle, looping). y is the
-    body's centre line, fixed (the swim is level), already clamped below the surface and above the bed."""
+    """Pass 10-11 (the owner: "animate fish if possible"; "add more fish variety and more in the river"): each fish
+    swims a slow circle -- (kind, centre x, y, centre z, radius, period s, direction +-1, phase, size) in the loop's
+    frame -- its body turned along the circle and wagged by the music's LFOs (build.py: one node per fish, its position
+    and heading keyed round the circle, looping). Each species has its own range of size, lap and circle (the sturgeon
+    big and slow, the baitfish small and quick, in shoals of four sharing one circle). y is the body's centre line,
+    fixed (the swim is level), already clamped below the surface and above the bed."""
     out = []
-    for k in range(FISH_COUNT):
+    for k in range(FISH_SINGLES):
         kind = FISH_ORDER[k % len(FISH_ORDER)]
         b = FISH_TYPES[kind]
         lo, hi = b["size"]
         size = lo + (hi - lo) * mx._hash(k, 700, 7)
-        th = 0.02 + 0.6 * (k + mx._hash(k, 700, 1)) / FISH_COUNT      # along the stretch the song's camera flies
+        th = 0.02 + 0.62 * (k + mx._hash(k, 700, 1)) / FISH_SINGLES   # along the stretch the song's camera flies
         hw = half_width(th)
-        radius = 14.0 + 22.0 * mx._hash(k, 700, 3)
-        lat = FISH_LANES[k % 3] + (mx._hash(k, 700, 2) - 0.5) * 60.0
+        radius = b["circle"][0] + (b["circle"][1] - b["circle"][0]) * mx._hash(k, 700, 3)
+        lat = FISH_LANES[k % 3] + (mx._hash(k, 700, 2) - 0.5) * 70.0
         lat = max(-(hw - 40.0 - radius), min(hw - 40.0 - radius, lat))   # the whole circle well inside the banks
         r = rc(th) + lat
         x, z = r * math.sin(th), r * math.cos(th)
-        y = -2.5 - 27.5 * mx._hash(k, 700, 5) ** 1.3
-        top = max(b["back"], b["tail_top"], b["dorsal"], 0.02)
-        # above the bed under the circle's widest point (its depth, pass 8: about 75 m mid-river, rising to the banks)
-        fj = min(1.0, (abs(lat) + radius) / (hw - 8.0))
-        bed = valley_height(th, -8.0, 1 if lat > 0 else -1) - 75.0 * (1.0 - fj * fj) ** 0.7
-        y = max(y, bed + 4.0 + 0.4 * size)
-        y = min(y, -FISH_CLEARANCE - top * size)     # the whole body below the surface
-        period = 40.0 + 50.0 * mx._hash(k, 700, 8)   # a slow lap: 1.5-5 m/s
+        y = _depth_for(th, lat, radius, size, b, mx._hash(k, 700, 5))
+        period = b["lap"][0] + (b["lap"][1] - b["lap"][0]) * mx._hash(k, 700, 8)
         direction = 1.0 if mx._hash(k, 700, 9) < 0.5 else -1.0
-        phase = TAU * mx._hash(k, 700, 6)
-        out.append((kind, x, y, z, radius, period, direction, phase, size))
+        out.append((kind, x, y, z, radius, period, direction, TAU * mx._hash(k, 700, 6), size))
+    b = FISH_TYPES["baitfish"]
+    for g in range(FISH_SHOALS):
+        th = 0.06 + 0.55 * (g + mx._hash(g, 710, 1)) / FISH_SHOALS
+        hw = half_width(th)
+        radius = b["circle"][0] + (b["circle"][1] - b["circle"][0]) * mx._hash(g, 710, 3)
+        lat = FISH_LANES[g % 3] + (mx._hash(g, 710, 2) - 0.5) * 50.0
+        lat = max(-(hw - 40.0 - radius), min(hw - 40.0 - radius, lat))
+        period = b["lap"][0] + (b["lap"][1] - b["lap"][0]) * mx._hash(g, 710, 8)
+        direction = 1.0 if mx._hash(g, 710, 9) < 0.5 else -1.0
+        phase0 = TAU * mx._hash(g, 710, 6)
+        for i in range(FISH_SHOAL_SIZE):
+            size = b["size"][0] + (b["size"][1] - b["size"][0]) * mx._hash(g * 10 + i, 711, 7)
+            # loosely together: each a little off the circle, a few metres apart along it, at its own depth
+            rr = radius + (mx._hash(g * 10 + i, 711, 3) - 0.5) * 4.0
+            r = rc(th) + lat + (mx._hash(g * 10 + i, 711, 2) - 0.5) * 3.0
+            x, z = r * math.sin(th), r * math.cos(th)
+            y = _depth_for(th, lat, rr, size, b, 0.15 + 0.2 * mx._hash(g, 710, 5)) - 1.5 * mx._hash(g * 10 + i, 711, 5)
+            y = min(y, -FISH_CLEARANCE - max(b["back"], b["tail_top"]) * size)
+            out.append(("baitfish", x, y, z, rr, period, direction, phase0 + 0.35 * i, size))
     return out
 
 

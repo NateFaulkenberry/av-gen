@@ -92,29 +92,60 @@ struct WavePathHit {
 
 // The projection of q onto the chain: point 0 is ahead of the front, point 1 is the front, 2-7 the wake.
 fn wavePathHit(e: Wave, q: vec2<f32>) -> WavePathHit {
+    // Pass 11 (the owner's "seam in the wake"): the nearest point on the chain was taken from whichever segment was
+    // nearest, so where two segments are equally near -- the line bisecting a bend in the chain, straight in the water
+    // -- the arc length jumped from one segment's value to the other's, and everything keyed to it (the wake's decay,
+    // its ripples' phase, the light's tail) stepped along that line. Now the segments are blended by a soft minimum of
+    // their distances (a few metres wide), so the arc length, the lateral distance and the nearest point all vary
+    // smoothly across the bisector.
     var h: WavePathHit;
-    h.lateral = 1.0e9;
-    h.u = 0.0;
-    h.nearest = q;
     var a = wavePathPoint(e, 0u);
     var arc = -distance(a, wavePathPoint(e, 1u));
+    var dMin = 1.0e9;
+    var ds: array<f32, 7>;
+    var us: array<f32, 7>;
+    var cs: array<vec2<f32>, 7>;
+    var valid: array<bool, 7>;
     for (var i: u32 = 1u; i < 8u; i = i + 1u) {
         let b = wavePathPoint(e, i);
         let ab = b - a;
         let len = length(ab);
-        if (len > 1.0e-3) {
+        let k = i - 1u;
+        valid[k] = len > 1.0e-3;
+        if (valid[k]) {
             let t = clamp(dot(q - a, ab) / (len * len), 0.0, 1.0);
             let c = a + ab * t;
-            let d = distance(q, c);
-            if (d < h.lateral) {
-                h.lateral = d;
-                h.u = arc + t * len;
-                h.nearest = c;
-            }
+            ds[k] = distance(q, c);
+            us[k] = arc + t * len;
+            cs[k] = c;
+            dMin = min(dMin, ds[k]);
             arc = arc + len;
         }
         a = b;
     }
+    let soft = 6.0;
+    var wSum = 0.0;
+    var u = 0.0;
+    var lat = 0.0;
+    var nearest = vec2<f32>(0.0);
+    for (var k: u32 = 0u; k < 7u; k = k + 1u) {
+        if (valid[k]) {
+            let w = exp(-(ds[k] - dMin) / soft);
+            wSum = wSum + w;
+            u = u + w * us[k];
+            lat = lat + w * ds[k];
+            nearest = nearest + w * cs[k];
+        }
+    }
+    if (wSum <= 0.0) {
+        h.lateral = 1.0e9;
+        h.u = 0.0;
+        h.nearest = q;
+        return h;
+    }
+    h.u = u / wSum;
+    h.lateral = lat / wSum;
+    h.nearest = nearest / wSum;
     return h;
 }
 
@@ -147,51 +178,58 @@ fn wavePathFadeIn(distance: f32, viewDistance: f32) -> f32 {
 fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f32) -> vec3<f32> {
     let reach = e.vertical.z;
     let dy = worldPos.y - e.originKind.y;
-    let underneath = dy < 0.0;
-    let share = select(e.rainbow.z, e.rainbow.w, underneath); // the land's share above the level, the bed's below
-    if (reach <= 0.0 || share <= 0.0 || !wavePathNear(e, worldPos.xz, reach)) {
+    // Pass 11: the land's light (above the path's level) and the bed's (below it) cross-fade over the metre and a half
+    // under the level instead of switching at it -- on a bank facet that runs into the water the switch was a straight
+    // line along the waterline, seen through the ripples
+    let aboveW = smoothstep(-1.5, 0.0, dy);
+    if (reach <= 0.0 || (e.rainbow.z <= 0.0 && e.rainbow.w <= 0.0) || !wavePathNear(e, worldPos.xz, reach)) {
         return vec3<f32>(0.0);
     }
     let h = wavePathHit(e, worldPos.xz);
     let edgeW = wavePathEdge(e);
     let wake = max(e.shape.y, 1.0e-3);
-    if (h.u < -2.0 * edgeW || h.u > wake || h.lateral > reach) {
+    // (cut where every term below is already ~0: the head's edge term is exp(-16) at four edge widths ahead)
+    if (h.u < -4.0 * edgeW || h.u > wake || h.lateral > reach) {
         return vec3<f32>(0.0);
     }
     let lead = smoothstep(-edgeW, 0.0, h.u);
     let tail = pow(clamp(1.0 - h.u / wake, 0.0, 1.0), e.shape.w);
     let t = h.u / edgeW;
     let edge = exp(-t * t);
+    let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
     // Above the path's level (banks, slopes, mountains): across `reach`, lit by how squarely each facet faces the
     // path's nearest point, sharpened so neighbouring planes differ. Below it (a riverbed seen through the water): a
     // band about the halo's width under the light, lit from the head itself -- a low, grazing light that catches the
     // planes tilted toward it and leaves the others dark.
     // ADR-1666: sparkle.w, how far the light reaches under the water (0: ADR-1663's 40 m)
     let bedReach = select(40.0, e.sparkle.w, e.sparkle.w > 0.0);
-    let width = select(reach * 0.5, max(e.vertical.w * 2.5, bedReach), underneath);
-    let x = h.lateral / width;
-    let across = exp(-x * x);
-    let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), dy);
-    let below = 1.0 - smoothstep(bedReach * 0.5, bedReach, -dy); // ADR-1663: 40 m below the level; ADR-1666: bedReach
-    let vband = select(above, below, underneath);
-    // Above the level the light comes from the path's nearest point raised most of the way to the surface's own height
-    // (pass 4): mostly level, so a valley wall facing the path takes it squarely; from the water's level it struck the
-    // high facets from steeply below and they caught almost none.
-    let source = select(vec3<f32>(h.nearest.x, mix(e.originKind.y + 2.0, worldPos.y, 0.75), h.nearest.y),
-                        e.originKind.xyz + vec3<f32>(0.0, 2.0, 0.0), underneath);
-    let toLight = source - worldPos;
-    let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);
-    // Shallow under the water (the top 6 m: fish, the banks' first metres), the light is taken whatever the facing, so a
-    // small body under a passing beam lights as a whole instead of showing as a silhouette against the lit bed
-    let shallow = smoothstep(-8.0, -4.0, dy);
-    let orient = select(0.05 + 0.95 * facing * facing, mix(2.5 * facing, 1.6, shallow), underneath);
-    let light = e.color.rgb * (lead * tail) + e.edge.rgb * (edge * 0.35);
-    // The land and the bed fade in over 40% of the water's near fade: the bed shows through the water only near the
-    // camera (further out the reflection covers it), and a full fade would hide it. They also wait for the front to
-    // travel out past the near fade (axisFront.w, metres travelled): lit from a head just launched, the near bed and
-    // banks washed the bottom of the frame; lit once the head has moved on, the bed behind it reads as planes.
+    var land = 0.0;
+    if (aboveW > 0.0 && e.rainbow.z > 0.0) {
+        let x = h.lateral / (reach * 0.5);
+        let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), max(dy, 0.0));
+        // the light from the path's nearest point raised most of the way to the surface's own height (pass 4): mostly
+        // level, so a valley wall facing the path takes it squarely
+        let source = vec3<f32>(h.nearest.x, mix(e.originKind.y + 2.0, worldPos.y, 0.75), h.nearest.y);
+        let toLight = source - worldPos;
+        let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);
+        land = e.rainbow.z * exp(-x * x) * above * (0.05 + 0.95 * facing * facing);
+    }
+    var bed = 0.0;
+    if (aboveW < 1.0 && e.rainbow.w > 0.0) {
+        let x = h.lateral / max(e.vertical.w * 2.5, bedReach);
+        let below = 1.0 - smoothstep(bedReach * 0.5, bedReach, -dy); // ADR-1663: 40 m below the level; ADR-1666
+        let source = e.originKind.xyz + vec3<f32>(0.0, 2.0, 0.0);
+        let toLight = source - worldPos;
+        let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);
+        // Shallow under the water (the top 6 m: fish, the banks' first metres), the light is taken whatever the facing,
+        // so a small body under a passing beam lights as a whole instead of showing as a silhouette against the lit bed
+        let shallow = smoothstep(-8.0, -4.0, dy);
+        bed = e.rainbow.w * exp(-x * x) * below * mix(2.5 * facing, 1.6, shallow);
+    }
+    // The land and the bed fade in over 40% of the water's near fade, and wait for the front to travel out past it
+    // (axisFront.w, metres travelled): lit from a head just launched, the near bed and banks washed the bottom of the frame
     let launched = wavePathFadeIn(e.shape.z, e.axisFront.w);
-    return light * (share * across * vband * orient * launched * wavePathFadeIn(e.shape.z * 0.4, viewDistance));
+    return light * (mix(bed, land, aboveW) * launched * wavePathFadeIn(e.shape.z * 0.4, viewDistance));
 }
 
 struct WavePathWater {
@@ -221,7 +259,7 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
             let age = e.vertical.x;
             let rs = distance(worldPos.xz, e.extra.xy);
             let ringR = 25.0 + kSplashSpeed * age;
-            if (age < 2.4 && rs < ringR + 80.0) {
+            if (age < 4.0 && rs < ringR + 80.0) {
                 let k = e.extra.z * e.sparkle.x;
                 let x = (rs - ringR) / (6.0 + 10.0 * age);
                 let ring = exp(-x * x) * exp(-age / (0.65 * kSplashLife));
@@ -235,13 +273,15 @@ fn wavePathWater(worldPos: vec3<f32>, footprint: f32) -> WavePathWater {
             }
         }
         let halo = max(e.vertical.w, 1.0e-3);
-        if (!wavePathNear(e, worldPos.xz, 3.0 * halo + e.edge.w)) {
+        if (!wavePathNear(e, worldPos.xz, 4.0 * halo + e.edge.w)) {
             continue;
         }
         let h = wavePathHit(e, worldPos.xz);
         let edgeW = wavePathEdge(e);
         let wake = max(e.shape.y, 1.0e-3);
-        if (h.u < -2.0 * edgeW || h.u > wake || h.lateral > 3.0 * halo + e.edge.w) {
+        // (cut where the light is already ~0: exp(-16) at four halos across and four edge widths ahead; pass 11, were
+        // three and two, where the head's edge term still showed a faint straight line)
+        if (h.u < -4.0 * edgeW || h.u > wake || h.lateral > 4.0 * halo + e.edge.w) {
             continue;
         }
         let lead = smoothstep(-edgeW, 0.0, h.u);
